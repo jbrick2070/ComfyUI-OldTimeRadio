@@ -553,75 +553,6 @@ def test_apply_engine_override_bad_spec_failsafe(monkeypatch):
     assert out["video"]["shots"][0]["engine_id"] == "stub_ok"
 
 
-class _StubLipsync(_StubBase):
-    name = "stub_lipsync"
-    family = "lipsync_overlay"
-
-    def render_clip(self, request, prepared):
-        assert request.get("base_clip_ref"), "base must be provided first"
-        return {"raw": True, "base": request["base_clip_ref"]["path"]}
-
-
-class _StubBaseProvider(_StubBase):
-    name = "stub_baseprov"
-    family = "text_to_video"
-
-    def render_clip(self, request, prepared):
-        assert request.get("audio_ref") is None     # the base is SILENT (V-1)
-        return {"raw": True}
-
-    def canonicalize(self, raw, request, profile=None):
-        return {"clip_id": request["shot_id"], "engine_id": self.name,
-                "family": self.family, "frame_count": 25,
-                "path": "X:/fake/base_clip.mp4"}
-
-
-@pytest.fixture
-def lipsync_registry():
-    saved = dict(vreg._VIDEO_REGISTRY._registry)
-    vreg.register(_StubLipsync())
-    vreg.register(_StubBaseProvider())
-    try:
-        yield vreg._VIDEO_REGISTRY
-    finally:
-        vreg._VIDEO_REGISTRY._registry.clear()
-        vreg._VIDEO_REGISTRY._registry.update(saved)
-
-
-def test_provide_lipsync_base_renders_and_stamps(monkeypatch, lipsync_registry):
-    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "stub_baseprov")
-    monkeypatch.setattr(rd, "ENGINE_FAMILY",
-                        dict(rd.ENGINE_FAMILY, stub_lipsync="lipsync_overlay"))
-    req = {"shot_id": "shot_x", "base_clip_ref": None,
-           "audio_ref": {"path": "a.wav"}, "text_prompt": "scene",
-           "timing": {"target_frame_count": 25},
-           "canvas": {"w": 64, "h": 64, "fps": 25, "aspect_policy": "pad"},
-           "seed_bundle": {"request_seed": 1}}
-    rd._provide_lipsync_base("stub_lipsync", req)
-    assert req["base_clip_ref"] == {"path": "X:/fake/base_clip.mp4"}
-    # the ORIGINAL request's audio_ref is untouched (only the base is silent)
-    assert req["audio_ref"] == {"path": "a.wav"}
-
-
-def test_provide_lipsync_base_noenv_noop(monkeypatch, lipsync_registry):
-    monkeypatch.delenv("OTR_LSYNC_BASE_ENGINE", raising=False)
-    monkeypatch.setattr(rd, "ENGINE_FAMILY",
-                        dict(rd.ENGINE_FAMILY, stub_lipsync="lipsync_overlay"))
-    req = {"shot_id": "shot_x", "base_clip_ref": None}
-    rd._provide_lipsync_base("stub_lipsync", req)
-    assert req["base_clip_ref"] is None
-
-
-def test_provide_lipsync_base_failure_is_loud_not_fatal(monkeypatch,
-                                                        lipsync_registry):
-    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "stub_fail_base_xyz")
-    monkeypatch.setattr(rd, "ENGINE_FAMILY",
-                        dict(rd.ENGINE_FAMILY, stub_lipsync="lipsync_overlay"))
-    req = {"shot_id": "shot_x", "base_clip_ref": None}
-    rd._provide_lipsync_base("stub_lipsync", req)   # unknown engine -> LOUD
-    assert req["base_clip_ref"] is None
-
-
 # --------------------------------------------------------------------------- #
 # W7-pre builder migration (3D plan 7.0): the builders emit SCHEMA-VALID
 # VideoRequest dicts; the chain re-validates family inputs per candidate; the
@@ -686,32 +617,6 @@ def test_character_3d_request_missing_inputs_fails_closed():
         VideoRequest.model_validate(req)
 
 
-def test_family_input_gap_fails_loud(monkeypatch, stub_registry):
-    """p3 down-chain shape: a lipsync_overlay engine whose base_clip_ref the
-    request cannot supply now FAILS LOUD (no fallbacks, operator 2026-06-16) --
-    the wrong-shaped request raises RenderError instead of degrading. Uses a
-    stub lipsync_overlay engine (latentsync removed 2026-06-17); the family-input
-    gap is the same regardless of which engine carries the family."""
-    class _StubLipsync(_StubBase):
-        name = "stub_lipsync"
-        family = "lipsync_overlay"
-        roles = ("announcer_visual", "character_video")
-
-        def render_clip(self, request, prepared):
-            return {"raw": True}
-
-    vreg.register(_StubLipsync())
-    monkeypatch.delenv("OTR_LSYNC_BASE_ENGINE", raising=False)
-    shot = {"shot_id": "shot_gap", "beat_id": "bg", "role": "character_video",
-            "engine_id": "stub_lipsync", "family": "lipsync_overlay",
-            "group_id": "g", "target_frame_count": 25,
-            "degradation_trail": []}
-    req = rd.build_request(shot, {"init_image": "p.png", "audio_ref": "a.wav"},
-                           25)
-    with pytest.raises(rd.RenderError):
-        rd.render_shot(shot, req)
-
-
 def test_family_changing_failure_is_loud_no_prune(stub_registry):
     """No fallbacks (operator 2026-06-16): a character_3d engine that fails RAISES
     loud -- there is no family-changing degrade, so no execution-group prune. The
@@ -768,10 +673,3 @@ def test_engine_failure_raises_loud(stub_registry):
         ]})
     with pytest.raises(rd.RenderError):
         rd.run_episode(led)
-
-
-def test_provide_lipsync_base_non_overlay_noop(monkeypatch):
-    monkeypatch.setenv("OTR_LSYNC_BASE_ENGINE", "stub_baseprov")
-    req = {"shot_id": "shot_x", "base_clip_ref": None}
-    rd._provide_lipsync_base("stub_ok", req)        # abstract family -> no-op
-    assert req["base_clip_ref"] is None

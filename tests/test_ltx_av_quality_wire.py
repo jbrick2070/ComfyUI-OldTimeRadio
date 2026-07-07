@@ -276,7 +276,6 @@ def test_clip_from_raw_vram_peak_none_off_box():
 
 def test_render_shot_prefers_clip_peak(monkeypatch):
     import nodes._otr_video_engines.render_driver as rd
-    monkeypatch.setattr(rd, "_provide_lipsync_base", lambda *a, **k: None)
     monkeypatch.setattr(
         rd, "_render_one",
         lambda eng, req, force_oom=False: {"vram_peak_mb": 9999})
@@ -287,7 +286,6 @@ def test_render_shot_prefers_clip_peak(monkeypatch):
 
 def test_render_shot_falls_back_when_no_clip_peak(monkeypatch):
     import nodes._otr_video_engines.render_driver as rd
-    monkeypatch.setattr(rd, "_provide_lipsync_base", lambda *a, **k: None)
     monkeypatch.setattr(
         rd, "_render_one", lambda eng, req, force_oom=False: {"path": "x"})
     monkeypatch.setattr(rd._mc, "vram_used_mb", lambda: 777)

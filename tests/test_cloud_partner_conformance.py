@@ -39,9 +39,7 @@ KNOWN_UNADAPTERED = {
 # Adapters whose _partner_inputs cannot build OFFLINE (honest dark row, or needs
 # a live comfy_api input type). Conformance for these is pinned in the
 # per-lane suites (test_cloud_video_adapters.py).
-KNOWN_NONBUILDABLE = {
-    "cloud_kling_lipsync": "needs comfy_api VideoFromFile (offline-unavailable)",
-}
+KNOWN_NONBUILDABLE = {}
 
 
 def _billed_rows():

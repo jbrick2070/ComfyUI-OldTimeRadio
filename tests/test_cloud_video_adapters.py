@@ -26,8 +26,7 @@ from nodes._otr_video_engines import registry as vreg
 
 _FFMPEG = shutil.which("ffmpeg")
 
-_CLOUD_ROWS = ("cloud_kling_avatar", "cloud_kling_lipsync",
-               "cloud_seedance_2", "cloud_wan_i2v")
+_CLOUD_ROWS = ("cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v")
 
 
 # --------------------------------------------------------------------------- #
@@ -46,7 +45,7 @@ def test_cloud_rows_never_default():
     # S3-core: selectable picks ONLY -- no cloud row declares default_roles,
     # so automatic selection can never land on one (menu ORDER is cosmetic;
     # default_engine_for_role is the automatic-selection surface).
-    for eng in (ecv.KlingAvatar, ecv.KlingLipsync, ecv.Seedance2, ecv.WanI2V):
+    for eng in (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V):
         assert tuple(eng.default_roles) == ()
     for role in ("announcer_visual", "music_visual", "character_video"):
         default = vreg.default_engine_for_role(role)
@@ -55,11 +54,10 @@ def test_cloud_rows_never_default():
 
 def test_reactivity_descriptors_match_pass04():
     assert ecv.KlingAvatar.reactivity == "required_audio_ref"
-    assert ecv.KlingLipsync.reactivity == "lipsync_overlay"
     assert ecv.Seedance2.reactivity == "required_audio_ref"
     assert ecv.WanI2V.reactivity == "mute_only"
     assert all(e.must_strip_audio for e in
-               (ecv.KlingAvatar, ecv.KlingLipsync, ecv.Seedance2, ecv.WanI2V))
+               (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V))
 
 
 def test_schema_grounded_v3_video_rows_are_partner_invocable():
@@ -190,11 +188,6 @@ def test_seedance_reference_row_sends_v3_model_dict(tmp_path, monkeypatch):
     assert hasattr(model["reference_images"]["image_1"], "ndim")
     assert set(model["reference_audios"]["audio_1"]) == {
         "waveform", "sample_rate"}
-
-
-def test_lipsync_requires_base_clip(tmp_path):
-    with pytest.raises(RuntimeError, match="base_clip_ref"):
-        ecv.KlingLipsync._partner_inputs(_request(tmp_path))
 
 
 # --------------------------------------------------------------------------- #

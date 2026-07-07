@@ -161,8 +161,8 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# CLOUD partner video rows (S3 core, 2026-07-02): kling_avatar / kling_lipsync
-# / seedance_2 / wan_i2v via the S0 invoke_partner_node bridge, conformed by
+# CLOUD partner video rows (S3 core, 2026-07-02): kling_avatar / seedance_2 /
+# wan_i2v via the S0 invoke_partner_node bridge, conformed by
 # canonicalize_video (provider audio ALWAYS stripped, strip-proven). Register
 # unconditionally (registry IS the menu) with EMPTY default_roles -- selectable
 # picks only; NO enable flag (operator directive 2026-07-02: the dropdown pick

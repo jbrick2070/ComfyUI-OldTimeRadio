@@ -80,8 +80,6 @@ CURATED_ROWS = {
                                "BEST stills; reference-image consistency"),
     "cloud_kling_avatar":     ("KlingAvatarNode", "KLING", 0,
                                "talking default; reactivity=required_audio_ref"),
-    "cloud_kling_lipsync":    ("KlingLipSyncAudioToVideoNode", "KLING", 0,
-                               "reactivity=lipsync_overlay"),
     "cloud_seedance_2":       ("ByteDance2ReferenceNode", "BYTEDANCE", 0,
                                "music/b-roll reactive default; audio-ref + identity"),
     "cloud_wan_i2v":          ("Wan2ImageToVideoApi", "WAN", 0,

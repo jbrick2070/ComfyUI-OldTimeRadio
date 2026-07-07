@@ -1,11 +1,10 @@
 """Cloud partner VIDEO adapters -- S3 core (pass04 secs 5+7, operator GO
 2026-07-02 evening: "code the cloud video plan").
 
-Four rows from the S0 pin table, invoked through the S0 bridge
+Three rows from the S0 pin table, invoked through the S0 bridge
 (``invoke_partner_node``) and conformed by ``canonicalize_video``:
 
     cloud_kling_avatar   required_audio_ref   (init_image, audio_ref)
-    cloud_kling_lipsync  lipsync_overlay      (base_clip_ref, audio_ref)
     cloud_seedance_2     required_audio_ref   (init_image, audio_ref)
     cloud_wan_i2v        mute_only            (init_image, text_prompt)
 
@@ -327,35 +326,6 @@ class CloudKlingAvatarEngine(_CloudVideoBase):
         }
 
 
-class CloudKlingLipsyncEngine(_CloudVideoBase):
-    """Kling lip-sync overlay: drives a BASE clip's mouth from audio."""
-
-    name = "cloud_kling_lipsync"
-    node_key = "cloud_kling_lipsync"
-    family = "lipsync_overlay"
-    required_inputs = ("base_clip_ref", "audio_ref")
-    reactivity = "lipsync_overlay"
-
-    def _partner_inputs(self, request):
-        base = _ref_path(_req_get(request, "base_clip_ref"))
-        if not base or not os.path.isfile(base):
-            raise RuntimeError(
-                f"{self.name}: base_clip_ref missing/absent ({base!r}) -- "
-                f"NO FALLBACK (provide a base clip or OTR_LSYNC_BASE_ENGINE)")
-        try:
-            from comfy_api.input_impl import VideoFromFile  # type: ignore
-        except Exception as exc:  # pragma: no cover -- core drift
-            raise RuntimeError(
-                f"{self.name}: comfy_api VideoFromFile unavailable ({exc}) "
-                f"-- the pinned KlingLipSync row needs a VIDEO input")
-        return {
-            "video": VideoFromFile(base),
-            "audio": self._audio_input(request),
-            "voice_language": os.environ.get(
-                "OTR_CLOUD_KLING_LIPSYNC_LANG", "en"),
-        }
-
-
 class CloudSeedance2Engine(_CloudVideoBase):
     """ByteDance Seedance 2 reference row: music/b-roll reactive default."""
 
@@ -513,15 +483,14 @@ class CloudWordRazzleEngine(_CloudVideoBase):
 
 
 KlingAvatar = CloudKlingAvatarEngine()
-KlingLipsync = CloudKlingLipsyncEngine()
 Seedance2 = CloudSeedance2Engine()
 WanI2V = CloudWanI2VEngine()
 WordRazzle = CloudWordRazzleEngine()
 
-for _eng in (KlingAvatar, KlingLipsync, Seedance2, WanI2V, WordRazzle):
+for _eng in (KlingAvatar, Seedance2, WanI2V, WordRazzle):
     register(_eng)
 
 __all__ = [
-    "CloudKlingAvatarEngine", "CloudKlingLipsyncEngine",
-    "CloudSeedance2Engine", "CloudWanI2VEngine", "CloudWordRazzleEngine",
+    "CloudKlingAvatarEngine", "CloudSeedance2Engine",
+    "CloudWanI2VEngine", "CloudWordRazzleEngine",
 ]

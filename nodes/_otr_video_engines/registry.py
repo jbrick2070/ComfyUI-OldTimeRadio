@@ -360,8 +360,6 @@ CAPABILITIES = {
     # missing credentials fail LOUD at invoke-time auth resolution.
     "cloud_kling_avatar": {"required_toolchain": None, "requires_sidecar": False,
                            "cpu_ok": True, "model_requirements": []},
-    "cloud_kling_lipsync": {"required_toolchain": None, "requires_sidecar": False,
-                            "cpu_ok": True, "model_requirements": []},
     "cloud_seedance_2": {"required_toolchain": None, "requires_sidecar": False,
                          "cpu_ok": True, "model_requirements": []},
     "cloud_wan_i2v": {"required_toolchain": None, "requires_sidecar": False,

@@ -833,29 +833,6 @@ def test_engine_non_invocable_preflight_check(monkeypatch):
     assert res["engine_id"] == "still_pan"
 
 
-def test_preflight_family_compatibility_gate():
-    """Verify that build_execution_plan raises FamilyInputGap at cast time if required inputs are missing."""
-    from nodes._otr_video_engines.render_driver import FamilyInputGap
-
-    beats = [{"beat_id": "b1", "role": "music_visual", "char_id": ""}]
-    budget = {"total_frames": 25, "per_beat": {"b1": 25}}
-    creative = {}
-    # Select cloud_kling_lipsync (lipsync_overlay family) which requires base_clip_ref
-    policy = {"video_models": {"music_video_model": "cloud_kling_lipsync"}}
-    
-    # Ledger with no base clip and OTR_LSYNC_BASE_ENGINE not set:
-    import os
-    if "OTR_LSYNC_BASE_ENGINE" in os.environ:
-        del os.environ["OTR_LSYNC_BASE_ENGINE"]
-        
-    ledger = {"images": {"images": []}}
-
-    with pytest.raises(FamilyInputGap) as excinfo:
-        sl.build_execution_plan(beats, budget, creative, policy, ledger=ledger)
-    assert "requires input(s)" in str(excinfo.value)
-    assert "base_clip_ref" in str(excinfo.value)
-
-
 def test_preflight_uses_effective_redirected_engine_for_humo_bookend(monkeypatch):
     """A HuMo policy pick for music/announcer bookends is structurally routed
     by build_request_from_shot before render. Cast-time preflight must validate

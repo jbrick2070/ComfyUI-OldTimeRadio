@@ -324,8 +324,7 @@ fallback loop (`render_driver.py:1106-1133`), which restamps LOUD and walks
 **The finding splits into EXPECTED behavior and a REAL must-root-cause item:**
 
 - **latentsync 0/6 -- EXPECTED.** `lipsync_overlay` family requires a
-  `base_clip_ref`; the 70w soak provides none and the `_provide_lipsync_base`
-  seam does not synthesize one here, so `_assert_family_inputs_satisfiable`
+  `base_clip_ref`; the 70w soak provides none, so `_assert_family_inputs_satisfiable`
   raises `FamilyInputGap` and the chain LOUD-skips to the floor. Input gate, not
   a defect.
 - **triposg_talk 0/6, mesh_stage -> parallax -- EXPECTED at 70w on this box.**

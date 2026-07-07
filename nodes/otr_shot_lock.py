@@ -828,9 +828,6 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
                     "%s is deferred to VideoRenderBatch master-audio slicing",
                     effective_engine, beat.get("beat_id", ""))
 
-    if os.environ.get("OTR_LSYNC_BASE_ENGINE", "").strip():
-        req["base_clip_ref"] = {"path": "__cast_time_base_clip__"}
-
     present = _present_request_tokens(req)
 
     if fam == "static_image_gen":

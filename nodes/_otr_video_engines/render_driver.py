@@ -1833,9 +1833,8 @@ def _assert_family_inputs_satisfiable(engine_name, request):
     (e.g. ``lipsync_overlay`` needs ``base_clip_ref`` a ``character_3d``
     request lacks) raises :class:`FamilyInputGap` -- the chain SKIPS it LOUDLY
     (decision + restamp) instead of feeding the wrong-shaped request to the
-    engine. Runs AFTER ``_provide_lipsync_base`` so the sanctioned base
-    provider seam can legitimately satisfy ``lipsync_overlay`` first. The
-    no-input floor families are always satisfiable, so termination holds."""
+    engine. The no-input floor families are always satisfiable, so termination
+    holds."""
     from .schemas import FAMILY_REQUIRED_INPUTS
     fam = engine_family(engine_name, "")
     required = FAMILY_REQUIRED_INPUTS.get(fam, ())
@@ -1890,56 +1889,6 @@ def _render_one(engine_name, request, *, force_oom):
                 pass
 
 
-#: Default text prompt for an on-the-fly lipsync BASE clip -- face-forward so
-#: the overlay's landmarker has a mouth to drive (env-overridable).
-_LSYNC_BASE_PROMPT = (
-    "close-up portrait of a 1940s radio actor speaking into a studio "
-    "microphone, face centered, warm tungsten light, period drama")
-
-
-def _provide_lipsync_base(engine_name, request):
-    """Provider seam (operator ask 2026-06-09, the lipsync combo experiment): a
-    ``lipsync_overlay`` engine needs a BASE clip; when the request has none and
-    ``OTR_LSYNC_BASE_ENGINE`` names a provider (e.g. ``ltx_video``), render the
-    base IN-LINE first and feed its path as ``base_clip_ref``. LOUD; additive;
-    no env -> no behavior change. A base-render failure leaves base_clip_ref
-    unset so the overlay fails its own usability check LOUD (NO FALLBACKS)."""
-    if engine_family(engine_name, "") != "lipsync_overlay":
-        return
-    get = request.get if isinstance(request, dict) else (
-        lambda k, d=None: getattr(request, k, d))
-    if get("base_clip_ref"):
-        return
-    base_engine = os.environ.get("OTR_LSYNC_BASE_ENGINE", "").strip()
-    if not base_engine:
-        return
-    base_req = copy.deepcopy(request) if isinstance(request, dict) else dict(request)
-    base_req["base_clip_ref"] = None
-    base_req["audio_ref"] = None          # the base is SILENT b-roll (V-1)
-    # Gap-audit F2 decision (2026-06-10): the panel suggested preferring the
-    # request's brief-grounded prompt here, but the FACE-FORWARD default is
-    # functional, not aesthetic -- the overlay's landmarker needs a mouth,
-    # and a scene-y prompt re-breaks the combo lane's face-detect lottery.
-    # Env override verbatim; otherwise the face-forward default stands.
-    # Revisit only if the lipsync combo lane is promoted past experiment.
-    base_req["text_prompt"] = os.environ.get(
-        "OTR_LSYNC_BASE_PROMPT", _LSYNC_BASE_PROMPT)
-    _LOG.warning("[OTR video] LOUD lipsync base: rendering %s base for shot %s "
-                 "via %s (OTR_LSYNC_BASE_ENGINE)", engine_name,
-                 base_req.get("shot_id"), base_engine)
-    try:
-        base_clip = _render_one(base_engine, base_req, force_oom=False)
-    except Exception as exc:              # noqa: BLE001 -- LOUD; the shot fails
-        _LOG.warning("[OTR video] lipsync base render FAILED (%s: %s) -- the "
-                     "overlay will fail closed LOUD (NO FALLBACKS)",
-                     type(exc).__name__, str(exc).splitlines()[0][:160])
-        return
-    path = (base_clip or {}).get("path") or ""
-    if path:
-        request["base_clip_ref"] = {"path": path}
-        _LOG.warning("[OTR video] lipsync base ready: %s", path)
-
-
 def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
     2026-06-16 'this is art, not a space shuttle'; hardened 2026-07-02 NO
@@ -1954,7 +1903,6 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None):
     out_shot = dict(shot)
     force = (sid == oom_shot_id and eng in (oom_engines or frozenset()))
     try:
-        _provide_lipsync_base(eng, request)
         clip = _render_one(eng, request, force_oom=force)
     except Exception as exc:              # noqa: BLE001 - no fallback: fail LOUD
         kind = _rt.FailureKind.OOM if force else classify_failure(exc)
@@ -2725,7 +2673,6 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
     request = build_request(shot, assets, frame_count, canvas)
     t0 = time.time()
     try:
-        _provide_lipsync_base(engine_name, request)   # combo seam (env-gated)
         clip = _render_one(engine_name, request, force_oom=False)
         return {"ok": True, "engine": engine_name,
                 "elapsed_s": round(time.time() - t0, 1),
