@@ -1,44 +1,51 @@
-"""Dead-simple Gemma-4 tester (local Ollama OR llama-server). Stdlib only.
+"""Smoke-test the native OTR Gemma 4 12B GGUF writer lane.
 
 Usage:
-    python gemma4_test.py                 -> asks the baked-in woodchuck question
-    python gemma4_test.py "your prompt"   -> one-shot with your own prompt
+    python docs/gemma4/gemma4_test.py
+    python docs/gemma4/gemma4_test.py "your prompt"
 
-Env overrides (so the same script tests a no-Ollama llama-server):
-    OLLAMA_BASE_URL    e.g. http://localhost:8080/v1   (default: Ollama's 11434)
-    GEMMA4_TEST_MODEL  e.g. gemma4:12b                 (default: unsloth Q4_K_M tag)
-
-The ONE line that makes Gemma-4 work is reasoning_effort="none" below -- without
-it Gemma-4 (a thinking model) burns its whole budget on <think> and returns blank.
-(llama-server ignores the body field harmlessly; pass --reasoning off there.)
+This loads the same in-process backend used by the writer dropdown row
+`unsloth/gemma-4-12b-it-GGUF`. It does not use Ollama, llama-server, or
+localhost HTTP.
 """
-import os
+from __future__ import annotations
+
 import sys
-import json
-import urllib.request
+import types
+from pathlib import Path
 
-BASE_URL = (os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434/v1").rstrip("/")
-URL = BASE_URL + "/chat/completions"
-MODEL = os.environ.get("GEMMA4_TEST_MODEL") or "hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from nodes import _otr_gguf_backend as gguf
 
-# Baked-in test prompt (override by passing your own on the command line).
-PROMPT = "How much wood could a woodchuck chuck if a woodchuck could chuck wood?"
 
-prompt = " ".join(sys.argv[1:]).strip() or PROMPT
-print("Prompt: " + prompt)
+PROMPT = "Write one vivid sentence about an old radio crackling to life."
 
-body = {
-    "model": MODEL,
-    "messages": [{"role": "user", "content": prompt}],
-    "temperature": 0.6,
-    "max_tokens": 256,
-    "reasoning_effort": "none",   # <-- the magic line (disables Gemma-4's <think>)
-}
 
-req = urllib.request.Request(
-    URL,
-    data=json.dumps(body).encode("utf-8"),
-    headers={"Content-Type": "application/json", "Authorization": "Bearer ollama"},
-)
-resp = json.load(urllib.request.urlopen(req, timeout=180))
-print("\nGemma-4: " + resp["choices"][0]["message"]["content"].strip())
+def main() -> int:
+    prompt = " ".join(sys.argv[1:]).strip() or PROMPT
+    print("Prompt: " + prompt)
+    status = gguf.validate_gemma_gguf_ready()
+    print("Readiness: " + repr(status))
+    if not status["ok"]:
+        return 2
+
+    backend = gguf.GGUFNativeBackend()
+    row = types.SimpleNamespace(context_window=gguf.DEFAULT_CONTEXT_WINDOW)
+    cache_entry = backend.load(gguf.ROW_ID, row)
+    try:
+        out = backend.generate(
+            cache_entry,
+            [{"role": "user", "content": prompt}],
+            temperature=0.6,
+            max_new_tokens=96,
+        )
+        print("\nGemma 4 12B: " + out.strip())
+        return 0
+    finally:
+        backend.unload(cache_entry)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

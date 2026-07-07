@@ -76,7 +76,7 @@ class CuratedModel:
         "transformers_gptq_int4",
         "openrouter_http",
         "comfy_credits_http",
-        "local_openai_http",
+        "gguf_native",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
     approx_safetensors_gb: float  # download size on disk, not VRAM resident
@@ -100,12 +100,12 @@ class CuratedModel:
     # every existing row uses; "openrouter" = a virtual row behind the
     # own-key OpenRouter API (S2); "comfy_credits" = a virtual row behind
     # ComfyUI's credit-billed partner-node proxy (2026-06-01);
-    # "local_openai" = a virtual row behind an external local
-    # OpenAI-compatible server. HTTP-dispatched rows carry zero local VRAM.
+    # "gguf_native" = a virtual row backed by an in-process llama-cpp-python
+    # GGUF loader. It is local VRAM, not a remote/HTTP zero-VRAM row.
     # Default "local" so every pre-existing row and any older fixture that
     # omits the field still constructs unchanged.
     provider: Literal[
-        "local", "openrouter", "comfy_credits", "local_openai",
+        "local", "openrouter", "comfy_credits", "gguf_native",
     ] = "local"
 
 
@@ -304,58 +304,57 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
     )
 
 
-def _local_openai_virtual_rows() -> tuple[CuratedModel, ...]:
-    """The external local Gemma 4 12B row.
+def _gguf_native_virtual_rows() -> tuple[CuratedModel, ...]:
+    """The native GGUF Gemma 4 12B row.
 
-    The handle is deliberately virtual (``local_gemma4_12b``) so the UI never
-    implies a Comfy-native 12B safetensor exists. The real server model id
-    lives in GEMMA4_12B_MODEL_ID and is stamped by the backend at load time.
+    The visible handle is the actual GGUF repository id so the dropdown reads
+    like a peer to the other Gemma rows. The loader resolves the local Q8_0
+    file from C:\\ComfyUI-Models by default.
     """
     try:
-        from . import _otr_local_openai_backend as _lob
+        from . import _otr_gguf_backend as _gguf
     except Exception:  # noqa: BLE001 -- catalog import must stay robust
         return ()
     return (
         CuratedModel(
-            repo_id=_lob.ROW_ID,
+            repo_id=_gguf.ROW_ID,
             requires_auth=False,
-            loader_backend=_lob.LOCAL_OPENAI_BACKEND_KEY,
+            loader_backend=_gguf.GGUF_BACKEND_KEY,
             vram_fit_tier="PASS",
-            approx_safetensors_gb=0.0,
-            notes="Gemma 4 12B via an external local OpenAI-compatible "
-            "server (llama.cpp llama-server, LiteRT-LM serve, or equivalent). "
-            "Configure GEMMA4_12B_BASE_URL and GEMMA4_12B_MODEL_ID when the "
-            "defaults do not match the server. Zero ComfyUI-process VRAM, no "
-            "HF download, no sidecar dependency, no daemon management.",
+            approx_safetensors_gb=13.4,
+            notes="Gemma 4 12B Q8_0 GGUF via in-process llama-cpp-python. "
+            "Default file: C:\\ComfyUI-Models\\LLM\\converted\\"
+            "gemma-4-12b-it\\gemma-4-12b-it-Q8_0.gguf. No Ollama, no "
+            "sidecar, no port.",
             prompt_profile="modern",
             chat_template_kind="transformers_default",
             stop_tokens=(),
-            context_window=_lob.DEFAULT_CONTEXT_WINDOW,
+            context_window=_gguf.DEFAULT_CONTEXT_WINDOW,
             license="apache_2_0",
             license_audit_status="mit_equivalent",
-            provider="local_openai",
+            provider="gguf_native",
         ),
     )
 
 
-def _curated_with_local_openai_peer() -> tuple[CuratedModel, ...]:
-    """Static curated rows plus the always-visible Gemma 4 12B HTTP peer.
+def _curated_with_gguf_native_peer() -> tuple[CuratedModel, ...]:
+    """Static curated rows plus the always-visible Gemma 4 12B GGUF peer.
 
-    Keep ``local_gemma4_12b`` beside the native Gemma 4 rows in dropdown order
+    Keep the 12B GGUF row beside the native Gemma 4 rows in dropdown order
     instead of appending it after unrelated remote slots.
     """
-    local_rows = _local_openai_virtual_rows()
-    if not local_rows:
+    gguf_rows = _gguf_native_virtual_rows()
+    if not gguf_rows:
         return CURATED_LLM_MODELS
     out: list[CuratedModel] = []
     inserted = False
     for row in CURATED_LLM_MODELS:
         out.append(row)
         if row.repo_id == "google/gemma-4-E4B-it":
-            out.extend(local_rows)
+            out.extend(gguf_rows)
             inserted = True
     if not inserted:
-        out.extend(local_rows)
+        out.extend(gguf_rows)
     return tuple(out)
 
 
@@ -368,7 +367,7 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
     the virtual rows never reach them, and GATED_CURATED_MODELS stays
     keyed off the real gated set."""
     return (
-        _curated_with_local_openai_peer()
+        _curated_with_gguf_native_peer()
         + _openrouter_virtual_rows()
         + _comfy_virtual_rows()
     )
@@ -1009,8 +1008,9 @@ def validate_model_id(
             f"{normalized!r} was removed from OTR's writer catalog because "
             "the old 11434 sidecar transport was removed and the installed "
             "transformers stack cannot load its gemma4_unified architecture. "
-            "Use the explicit external local OpenAI-compatible handle "
-            "'local_gemma4_12b', or choose Mistral-Nemo / Gemma 4 E2B / "
+            "Use the GGUF row 'unsloth/gemma-4-12b-it-GGUF' with "
+            "gemma-4-12b-it-Q8_0.gguf under C:\\ComfyUI-Models, or choose "
+            "Mistral-Nemo / Gemma 4 E2B / "
             "Gemma 4 E4B."
         )
 

@@ -648,8 +648,18 @@ def unload_llm() -> None:
 
     entry = LLM_CACHE.get("cache_entry")
     if entry is not None:
+        if entry.get("provider") == "gguf_native":
+            try:
+                from ._otr_gguf_backend import GGUFNativeBackend
+                GGUFNativeBackend().unload(entry)
+            except Exception as exc:  # noqa: BLE001
+                log.debug("[OTR_ModelLoader] GGUF unload failed: %s", exc)
         model = entry.get("model")
-        if model is not None and hasattr(model, "to"):
+        if (
+            entry.get("provider") != "gguf_native"
+            and model is not None
+            and hasattr(model, "to")
+        ):
             try:
                 model.to("cpu")
             except Exception as exc:  # noqa: BLE001
@@ -770,26 +780,51 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     # before the lane was ever exercised. Route BOTH remote loader_backends; the
     # _otr_model_runtime dispatch table already maps each key to its backend, so
     # a future remote lane only adds its key to this tuple.
-    # Backends reached over an HTTP /v1 call (dispatched via _otr_model_runtime),
-    # NOT the in-process transformers loader: OpenRouter, Comfy Credits, and the
-    # external local OpenAI-compatible Gemma 4 12B lane. A new HTTP lane only adds
-    # its key here. (BUG-LOCAL-299: routing ALL of them here keeps a virtual/HTTP
-    # handle from falling through to the local HF-download path.)
-    _HTTP_DISPATCH_BACKENDS = (
-        "openrouter_http", "comfy_credits_http", "local_openai_http",
-    )
-    _http_row = _otr_catalog._by_repo_id().get(normalized)
+    # Virtual catalog rows must be intercepted before the HF cache/download
+    # path below. Remote rows are zero-VRAM and do not disturb a resident
+    # local model. The GGUF row is different: it is in-process VRAM and must
+    # participate in the singleton cache/teardown discipline.
+    _REMOTE_DISPATCH_BACKENDS = ("openrouter_http", "comfy_credits_http")
+    _GGUF_DISPATCH_BACKENDS = ("gguf_native",)
+    _virtual_row = _otr_catalog._by_repo_id().get(normalized)
     if (
-        _http_row is not None
-        and getattr(_http_row, "loader_backend", None) in _HTTP_DISPATCH_BACKENDS
+        _virtual_row is not None
+        and getattr(_virtual_row, "loader_backend", None) in _REMOTE_DISPATCH_BACKENDS
     ):
         from ._otr_model_runtime import get_backend_for_row
         log.info(
-            "[Selector] slot=%s HTTP-dispatched backend for %s (no local VRAM; "
+            "[Selector] slot=%s remote-dispatched backend for %s (no local VRAM; "
             "resident local model left in place, no-evict)",
             slot, normalized,
         )
-        return get_backend_for_row(_http_row).load(normalized, _http_row)
+        return get_backend_for_row(_virtual_row).load(normalized, _virtual_row)
+
+    if (
+        _virtual_row is not None
+        and getattr(_virtual_row, "loader_backend", None) in _GGUF_DISPATCH_BACKENDS
+    ):
+        from ._otr_model_runtime import get_backend_for_row
+        if (
+            LLM_CACHE.get("model_id") == normalized
+            and LLM_CACHE.get("cache_entry") is not None
+        ):
+            log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
+            LLM_CACHE["slot"] = slot
+            return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
+        if LLM_CACHE.get("model_id") not in (None, normalized):
+            log.info(
+                "[Selector] slot transition: %s -> %s (full teardown)",
+                LLM_CACHE.get("model_id"),
+                normalized,
+            )
+            unload_llm()
+        cache_entry = get_backend_for_row(_virtual_row).load(
+            normalized, _virtual_row,
+        )
+        LLM_CACHE["model_id"] = normalized
+        LLM_CACHE["slot"] = slot
+        LLM_CACHE["cache_entry"] = cache_entry
+        return cache_entry
 
     # Step 2: cache hit on the same model id (regardless of slot).
     if LLM_CACHE.get("model_id") == normalized and LLM_CACHE.get("cache_entry") is not None:
@@ -935,11 +970,10 @@ def make_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "comfy_credits":
         from ._otr_comfy_backend import make_comfy_credits_generate_fn
         return make_comfy_credits_generate_fn(cache_entry)
-    # Generic external local OpenAI-compatible lane: zero process VRAM, no
-    # daemon management, no cloud.
-    if cache_entry.get("provider") == "local_openai":
-        from ._otr_local_openai_backend import make_local_openai_generate_fn
-        return make_local_openai_generate_fn(cache_entry)
+    # Native GGUF lane: in-process llama-cpp-python, no daemon or port.
+    if cache_entry.get("provider") == "gguf_native":
+        from ._otr_gguf_backend import make_gguf_generate_fn
+        return make_gguf_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:
@@ -1031,10 +1065,10 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "comfy_credits":
         from ._otr_comfy_backend import make_comfy_credits_generate_fn
         return make_comfy_credits_generate_fn(cache_entry)
-    # Generic external local OpenAI-compatible lane.
-    if cache_entry.get("provider") == "local_openai":
-        from ._otr_local_openai_backend import make_local_openai_generate_fn
-        return make_local_openai_generate_fn(cache_entry)
+    # Native GGUF lane: in-process llama-cpp-python, no daemon or port.
+    if cache_entry.get("provider") == "gguf_native":
+        from ._otr_gguf_backend import make_gguf_generate_fn
+        return make_gguf_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

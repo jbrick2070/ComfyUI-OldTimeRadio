@@ -225,15 +225,15 @@ def make_constrained_generate_fn(
         return _occ.make_comfy_credits_generate_fn(
             cache_entry, response_format=response_format,
         )
-    # Generic external local OpenAI-compatible lane. It speaks the same
-    # JSON-schema response_format shape but does not start or manage a daemon.
-    if cache_entry.get("provider") == "local_openai":
+    # Native GGUF lane. It accepts llama-cpp-python response_format, so map the
+    # existing OpenRouter-style json_schema wrapper at the backend boundary.
+    if cache_entry.get("provider") == "gguf_native":
         from . import _otr_openrouter_backend as _orb
-        from . import _otr_local_openai_backend as _lob
+        from . import _otr_gguf_backend as _gguf
         response_format = _orb.schema_to_response_format(
             schema_model, name=getattr(schema_model, "__name__", "otr_schema"),
         )
-        return _lob.make_local_openai_generate_fn(
+        return _gguf.make_gguf_generate_fn(
             cache_entry, response_format=response_format,
         )
     required = {"model", "tokenizer"}

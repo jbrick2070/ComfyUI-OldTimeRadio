@@ -607,9 +607,9 @@ def _build_truncating_generate_fn(
         return _occ.make_comfy_credits_generate_fn(cache_entry)
     # [Local OpenAI] External local server lane for Gemma 4 12B. Same
     # provider-tag dispatch; zero ComfyUI-process VRAM.
-    if cache_entry.get("provider") == "local_openai":
-        from . import _otr_local_openai_backend as _lob
-        return _lob.make_local_openai_generate_fn(cache_entry)
+    if cache_entry.get("provider") == "gguf_native":
+        from . import _otr_gguf_backend as _gguf
+        return _gguf.make_gguf_generate_fn(cache_entry)
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
     context_cap = int(cache_entry.get("context_cap") or 8192)

@@ -46,7 +46,7 @@ def test_stale_gemma_12b_pin_is_blocked_even_if_hf_shape_is_valid(tmp_path):
         encoding="utf-8",
     )
 
-    with pytest.raises(UnknownModelError, match="local_gemma4_12b"):
+    with pytest.raises(UnknownModelError, match="unsloth/gemma-4-12b-it-GGUF"):
         catalog.validate_model_id(
             "google/gemma-4-12b-it",
             auto_download_enabled=True,
@@ -55,10 +55,10 @@ def test_stale_gemma_12b_pin_is_blocked_even_if_hf_shape_is_valid(tmp_path):
         )
 
 
-def test_local_openai_handle_is_the_only_gemma_12b_catalog_route():
+def test_gguf_handle_is_the_only_gemma_12b_catalog_route():
     ids = catalog._by_repo_id()
-    assert "local_gemma4_12b" in ids
+    assert "unsloth/gemma-4-12b-it-GGUF" in ids
     assert "google/gemma-4-12b-it" not in ids
-    row = ids["local_gemma4_12b"]
-    assert row.loader_backend == "local_openai_http"
-    assert row.provider == "local_openai"
+    row = ids["unsloth/gemma-4-12b-it-GGUF"]
+    assert row.loader_backend == "gguf_native"
+    assert row.provider == "gguf_native"
