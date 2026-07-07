@@ -32,7 +32,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
+import socket
+import subprocess
 import time
+from urllib.parse import urlparse
 from typing import Any
 
 log = logging.getLogger("OTR")
@@ -51,6 +55,7 @@ DEFAULT_OUTPUT_TOKENS_CAP = 6144
 DEFAULT_MIN_OUTPUT_TOKENS = 512
 DEFAULT_TIMEOUT_S = 600
 DEFAULT_MAX_RETRIES = 2
+DEFAULT_START_TIMEOUT_S = 30
 
 _RETRYABLE_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504})
 _VALID_REASONING_EFFORT = frozenset({"high", "medium", "low", "none"})
@@ -83,6 +88,115 @@ def _int_env(name: str, default: int) -> int:
         return int(os.environ.get(name, "") or default)
     except (TypeError, ValueError):
         return default
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _ollama_autostart_enabled() -> bool:
+    """True when the backend may start the local Ollama daemon.
+
+    Manual ComfyUI runs need this because no soak harness is available to
+    preflight :11434. Test mode stays side-effect-free unless a test explicitly
+    opts in and patches the process/socket helpers.
+    """
+    if os.environ.get("OTR_TEST_MODE") == "1" and "OTR_OLLAMA_AUTOSTART" not in os.environ:
+        return False
+    return _env_flag("OTR_OLLAMA_AUTOSTART", True)
+
+
+def _is_default_local_ollama_url(base_url: str) -> bool:
+    """Only the ordinary local Ollama endpoint is safe to autostart."""
+    try:
+        parsed = urlparse(base_url)
+    except Exception:  # noqa: BLE001 -- malformed URL will fail at POST
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    host = (parsed.hostname or "").lower()
+    if host not in {"localhost", "127.0.0.1", "::1"}:
+        return False
+    port = parsed.port
+    if port is None:
+        port = 443 if parsed.scheme == "https" else 80
+    return parsed.scheme == "http" and port == 11434
+
+
+def _ollama_tcp_up(base_url: str, timeout_s: float = 2.0) -> bool:
+    parsed = urlparse(base_url)
+    host = parsed.hostname or "localhost"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    hosts = ["127.0.0.1", "localhost"] if host.lower() == "localhost" else [host]
+    for candidate in hosts:
+        try:
+            with socket.create_connection((candidate, port), timeout=timeout_s):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _find_ollama_exe() -> str:
+    path_hit = shutil.which("ollama")
+    if path_hit:
+        return path_hit
+    local = os.environ.get("LOCALAPPDATA", "")
+    if local:
+        candidate = os.path.join(local, "Programs", "Ollama", "ollama.exe")
+        if os.path.isfile(candidate):
+            return candidate
+    return ""
+
+
+def _ensure_ollama_daemon(base_url: str) -> bool:
+    """Start the local Ollama daemon for manual runs when :11434 is closed.
+
+    This is deliberately narrow: it only touches the default local Ollama
+    endpoint. A custom OLLAMA_BASE_URL may be another llama.cpp server or a LAN
+    host, so that remains the operator's infrastructure and fails closed.
+    """
+    if not _ollama_autostart_enabled():
+        return False
+    if not _is_default_local_ollama_url(base_url):
+        return False
+    if _ollama_tcp_up(base_url):
+        return True
+
+    exe = _find_ollama_exe()
+    if not exe:
+        log.warning(
+            "[Ollama] :11434 down and ollama.exe not found; local lane will fail loud"
+        )
+        return False
+
+    log.warning("[Ollama] :11434 down; starting '%s serve'", exe)
+    try:
+        popen_kwargs = {
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = getattr(
+                subprocess, "CREATE_NO_WINDOW", 0x08000000
+            )
+        subprocess.Popen([exe, "serve"], **popen_kwargs)
+    except Exception as exc:  # noqa: BLE001 -- named failure follows at POST
+        log.warning("[Ollama] failed to start ollama serve: %s: %s", type(exc).__name__, exc)
+        return False
+
+    deadline = time.time() + _int_env("OTR_OLLAMA_START_TIMEOUT_S", DEFAULT_START_TIMEOUT_S)
+    while time.time() < deadline:
+        time.sleep(1)
+        if _ollama_tcp_up(base_url, timeout_s=1.0):
+            log.info("[Ollama] :11434 up after autostart")
+            return True
+    log.warning("[Ollama] :11434 still down after autostart wait")
+    return False
 
 
 def _reasoning_effort_from_env() -> str:
@@ -239,6 +353,7 @@ class OllamaBackend:
     def _post_with_retries(self, *, base_url: str, payload: dict, slug: str) -> str:
         timeout_s = _int_env("OLLAMA_TIMEOUT_S", DEFAULT_TIMEOUT_S)
         max_retries = _int_env("OLLAMA_MAX_RETRIES", DEFAULT_MAX_RETRIES)
+        _ensure_ollama_daemon(base_url)
         last_err = ""
         for attempt in range(max_retries + 1):
             try:

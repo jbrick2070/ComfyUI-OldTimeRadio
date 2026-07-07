@@ -50,6 +50,61 @@ def test_base_url_default_is_local_and_env_overridable(monkeypatch):
     assert OLL._base_url() == "http://localhost:8080/v1"
 
 
+def test_autostart_target_is_only_default_local_ollama():
+    assert OLL._is_default_local_ollama_url("http://localhost:11434/v1")
+    assert OLL._is_default_local_ollama_url("http://127.0.0.1:11434/v1")
+    assert not OLL._is_default_local_ollama_url("http://localhost:8080/v1")
+    assert not OLL._is_default_local_ollama_url("https://localhost:11434/v1")
+    assert not OLL._is_default_local_ollama_url("http://192.168.1.10:11434/v1")
+
+
+def test_ensure_ollama_daemon_autostarts_when_default_local_port_down(monkeypatch):
+    calls = {"tcp": 0, "sleep": 0}
+    launches = []
+
+    def fake_tcp_up(base_url, timeout_s=2.0):
+        assert base_url == OLL.DEFAULT_OLLAMA_BASE_URL
+        calls["tcp"] += 1
+        return calls["tcp"] >= 2
+
+    class FakePopen:
+        def __init__(self, argv, **kwargs):
+            launches.append((argv, kwargs))
+
+    monkeypatch.setenv("OTR_OLLAMA_AUTOSTART", "1")
+    monkeypatch.setattr(OLL, "_ollama_tcp_up", fake_tcp_up)
+    monkeypatch.setattr(OLL, "_find_ollama_exe", lambda: r"C:\Ollama\ollama.exe")
+    monkeypatch.setattr(OLL.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(OLL.time, "sleep", lambda _s: calls.__setitem__("sleep", calls["sleep"] + 1))
+
+    assert OLL._ensure_ollama_daemon(OLL.DEFAULT_OLLAMA_BASE_URL) is True
+    assert launches and launches[0][0] == [r"C:\Ollama\ollama.exe", "serve"]
+    assert calls["sleep"] == 1
+
+
+def test_ensure_ollama_daemon_skips_custom_base_url(monkeypatch):
+    monkeypatch.setenv("OTR_OLLAMA_AUTOSTART", "1")
+    monkeypatch.setattr(OLL, "_ollama_tcp_up", lambda *_a, **_k: False)
+    monkeypatch.setattr(OLL, "_find_ollama_exe", lambda: r"C:\Ollama\ollama.exe")
+
+    def unexpected_popen(*_a, **_k):
+        raise AssertionError("custom OLLAMA_BASE_URL must not autostart Ollama")
+
+    monkeypatch.setattr(OLL.subprocess, "Popen", unexpected_popen)
+    assert OLL._ensure_ollama_daemon("http://localhost:8080/v1") is False
+
+
+def test_ensure_ollama_daemon_disabled_in_test_mode_by_default(monkeypatch):
+    monkeypatch.setenv("OTR_TEST_MODE", "1")
+    monkeypatch.delenv("OTR_OLLAMA_AUTOSTART", raising=False)
+
+    def unexpected_tcp(*_a, **_k):
+        raise AssertionError("test mode should avoid process/socket side effects")
+
+    monkeypatch.setattr(OLL, "_ollama_tcp_up", unexpected_tcp)
+    assert OLL._ensure_ollama_daemon(OLL.DEFAULT_OLLAMA_BASE_URL) is False
+
+
 def test_enabled_always_true_no_flag_no_key():
     # Local infrastructure: no opt-in flag, no API key required.
     assert OLL.ollama_enabled() is True
@@ -86,6 +141,7 @@ def test_load_without_tag_fails_closed():
 # --------------------------------------------------------------------------- #
 def test_generate_posts_local_and_returns_content(monkeypatch):
     captured = {}
+    preflighted = {}
 
     def fake_post(*, base_url, payload, timeout_s):
         captured["base_url"] = base_url
@@ -93,6 +149,10 @@ def test_generate_posts_local_and_returns_content(monkeypatch):
         return _ok("the answer")
 
     monkeypatch.setattr(OLL, "_post_chat_completion", fake_post)
+    monkeypatch.setattr(
+        OLL, "_ensure_ollama_daemon",
+        lambda base_url: preflighted.setdefault("base_url", base_url) or True,
+    )
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
     monkeypatch.delenv("OLLAMA_REASONING_EFFORT", raising=False)
     ce = OLL.OllamaBackend().load("google/gemma-4-12b-it", _row())
@@ -101,6 +161,7 @@ def test_generate_posts_local_and_returns_content(monkeypatch):
         temperature=0.6, max_new_tokens=128,
     )
     assert out == "the answer"
+    assert preflighted["base_url"] == OLL.DEFAULT_OLLAMA_BASE_URL
     # LOCAL endpoint, never cloud.
     assert "localhost" in captured["base_url"] or "127.0.0.1" in captured["base_url"]
     assert captured["payload"]["model"] == "hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M"
