@@ -23,6 +23,7 @@ from nodes._otr_shared.cloud_media_canonical import (
 )
 from nodes._otr_video_engines import eng_cloud_video as ecv
 from nodes._otr_video_engines import registry as vreg
+from nodes._otr_video_engines import render_driver as rd
 
 _FFMPEG = shutil.which("ffmpeg")
 
@@ -247,6 +248,75 @@ def test_seedance_short_beat_requests_provider_minimum(tmp_path, monkeypatch):
     req = _request(tmp_path, timing={"target_frame_count": 50})
     ins = ecv.Seedance2._partner_inputs(req)
     assert ins["model"]["duration"] == 4
+
+
+def test_seedance_two_second_ledger_beat_requests_minimum_and_16x9(
+        tmp_path, monkeypatch):
+    """2s ledger beat -> request builder -> real Seedance partner payload.
+
+    This proves the under-minimum cloud-duration policy on a ledger-shaped
+    request, not only a hand-built adapter dict.
+    """
+    monkeypatch.setenv("OTR_CLOUD_SEEDANCE_MODEL", "Seedance 2.0 Fast")
+    monkeypatch.setenv("OTR_CLOUD_SEEDANCE_RATIO", "16:9")
+    monkeypatch.delenv("OTR_CLOUD_SEEDANCE_DURATION", raising=False)
+    init_png = _fixture_png(tmp_path)
+    audio_wav = _fixture_wav(tmp_path)
+    shot = {
+        "shot_id": "shot_b020",
+        "source_line_ids": ["b020"],
+        "role": "music_visual",
+        "group_id": "grp_music",
+        "engine_id": "cloud_seedance_2",
+        "family": "audio_conditioned_video",
+        "target_frame_count": 50,
+        "render_request_hash": "hash_b020",
+        "cache_keys": {"request_hash": "hash_b020"},
+        "creative": {"text_prompt": _MUSIC_OPEN_RISKY_PROMPT},
+    }
+    ledger = {
+        "audio": {
+            "master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+            "ledger_frozen": True,
+        },
+        "meta": {"visual_style": "sci_fi_radio"},
+        "lines": [{
+            "line_id": "b020",
+            "speaker_role": "music_inter",
+            "char_id": "",
+            "start_s": 0.0,
+            "dur_s": 2.0,
+            "audio_wav_path": audio_wav,
+        }],
+        "images": {"images": [{
+            "object_id": "still_b020_music",
+            "kind": "scene_open",
+            "beat_id": "b020",
+            "path": init_png,
+        }]},
+        "video": {"fps": 25, "shots": [shot]},
+    }
+
+    req = rd.build_request_from_shot(shot, ledger)
+    assert req["timing"]["target_frame_count"] == 50
+    assert req["timing"]["target_duration_s"] == 2.0
+    assert req["asset_refs"]["init_image"] == init_png
+    assert req["audio_ref"]["path"] == audio_wav
+    assert req["canvas"]["w"] > req["canvas"]["h"]
+
+    ins = ecv.Seedance2._partner_inputs(req)
+    assert set(ins) == {"model", "seed", "watermark"}
+    model = ins["model"]
+    assert set(model) == {
+        "model", "prompt", "resolution", "ratio", "duration",
+        "generate_audio", "reference_images", "reference_audios"}
+    assert model["ratio"] == "16:9"
+    assert model["duration"] == 4
+    assert ecv._SEEDANCE_SMOOTH_MARKER in model["prompt"]
+    assert "whip-pans" not in model["prompt"].lower()
+    assert hasattr(model["reference_images"]["image_1"], "ndim")
+    assert set(model["reference_audios"]["audio_1"]) == {
+        "waveform", "sample_rate"}
 
 
 def test_seedance_conditioner_does_not_leak_to_other_engines(

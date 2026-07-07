@@ -25,6 +25,8 @@ JSON change and not a global style-pack edit.
   - Added empty-prompt helper guard coverage.
   - Strengthened Seedance request-shape assertions.
   - Added under-minimum duration coverage.
+  - Added ledger-shaped 2-second Seedance beat coverage with explicit `16:9`
+    ratio and real temp still/audio fixture loading.
   - Added coverage proving Wan/Kling/Pixverse prompts are unchanged.
 
 ## JSON Decision
@@ -52,8 +54,8 @@ begin immediately.
 
 ## Verification
 
-- `tests/test_cloud_video_adapters.py`: `19 passed`
-- Full repo suite: `6643 passed, 34 skipped, 2 xfailed`
+- `tests/test_cloud_video_adapters.py`: `20 passed`
+- Full repo suite: `6644 passed, 34 skipped, 2 xfailed`
 - Bug Bible: `16 passed, 7 skipped, 3 xfailed`
 - `py_compile` on touched Python files: passed
 - `git diff --check` on touched Python files: passed
