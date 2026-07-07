@@ -35,11 +35,11 @@ V3_MODEL_IDS = {
     # image rows (S1 stills lane -- invocable with a best-effort default):
     "cloud_nano_banana_2": {
         "env": "OTR_CLOUD_NANO_BANANA_MODEL",
-        "default": "gemini-2.5-flash-image-preview",  # VERIFY vs Gemini menu
+        "default": "Nano Banana 2 (Gemini 3.1 Flash Image)",
     },
     "cloud_seedream_2": {
         "env": "OTR_CLOUD_SEEDREAM_MODEL",
-        "default": "seedream-4-0-250828",             # VERIFY vs ByteDance menu
+        "default": "seedream-4-0-250828",
     },
     # video rows (grounded from installed comfy_api_nodes, 2026-07-06):
     "cloud_seedance_2": {

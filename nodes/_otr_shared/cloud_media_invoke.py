@@ -179,6 +179,48 @@ def _row_for(node_key: str) -> dict:
     return row
 
 
+def _declared_input_names(row: dict) -> tuple[set, set, set]:
+    inputs = row.get("inputs") or {}
+    required = set((inputs.get("required") or {}).keys())
+    optional = set((inputs.get("optional") or {}).keys())
+    hidden = set((inputs.get("hidden") or {}).keys())
+    return required, optional, hidden
+
+
+def _validate_declared_inputs(row: dict, node_key: str, inputs: dict) -> dict:
+    """Fail before provider/session work when adapter kwargs drift from the
+    pinned Partner schema.
+
+    The adapter owns required/optional real inputs. Hidden auth/usage inputs are
+    allowed only when declared because the bridge may add or preserve them, but
+    hidden inputs do not satisfy the adapter's required real-input contract.
+    """
+    if not isinstance(inputs, dict):
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            f"{node_key}: partner inputs must be a dict, got "
+            f"{type(inputs).__name__}",
+        )
+    required, optional, hidden = _declared_input_names(row)
+    declared = required | optional | hidden
+    supplied = set(inputs)
+    missing = sorted(required - supplied)
+    if missing:
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            f"{node_key}: adapter omitted required Partner input(s) "
+            f"{missing}; declared required inputs are {sorted(required)}",
+        )
+    extra = sorted(supplied - declared)
+    if extra:
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            f"{node_key}: adapter emitted undeclared Partner input(s) "
+            f"{extra}; declared inputs are {sorted(declared)}",
+        )
+    return dict(inputs)
+
+
 def _resolve_node_class(row: dict):
     """Import the pinned partner class directly via its import_path --
     no dependency on the full NODE_CLASS_MAPPINGS registry, so headless
@@ -716,8 +758,10 @@ def invoke_partner_node(node_key: str, inputs: dict, *,
         raise CloudMediaError(CloudErrorCode.MALFORMED_CONFIG,
                               f"timeout_s must be > 0, got {timeout_s!r}")
     row = _row_for(node_key)
+    inputs = _validate_declared_inputs(
+        row, node_key, {} if inputs is None else inputs)
     session = get_or_create_session(current_prompt_id())
-    kwargs = _inject_hidden_inputs(row, inputs or {}, session)
+    kwargs = _inject_hidden_inputs(row, inputs, session)
     sem = session.provider_semaphore(str(row.get("provider_id", "")))
     rid = session.reserve(float(estimated_usd))
     try:

@@ -115,5 +115,34 @@ def test_bad_duration_raises_no_fallback(monkeypatch, tmp_path):
         eng.generate_clip("a real cue", "not-a-number", seed=0)
 
 
+def test_prompt_longer_than_partner_max_raises(monkeypatch, tmp_path):
+    cap = {}
+    _install_seams(monkeypatch, tmp_path, cap)
+    eng = areg.get_engine("sonilo")
+    with pytest.raises(ValueError, match="TextToMusic max is 1000"):
+        eng.generate_clip("x" * 1001, 10, seed=0)
+    assert cap == {}
+
+
+def test_duration_and_seed_clamped_to_partner_range(monkeypatch, tmp_path):
+    cap = {}
+    monkeypatch.setenv("OTR_SONILO_MIN_DURATION_S", "0")
+    _install_seams(monkeypatch, tmp_path, cap)
+    eng = areg.get_engine("sonilo")
+    eng.generate_clip("a cue", 999, seed=SON._U64_MAX + 123)
+    assert cap["inputs"]["duration"] == 360
+    assert cap["inputs"]["seed"] == SON._U64_MAX
+
+
+def test_negative_duration_and_seed_clamped_to_partner_min(monkeypatch, tmp_path):
+    cap = {}
+    monkeypatch.setenv("OTR_SONILO_MIN_DURATION_S", "0")
+    _install_seams(monkeypatch, tmp_path, cap)
+    eng = areg.get_engine("sonilo")
+    eng.generate_clip("a cue", -5, seed=-99)
+    assert cap["inputs"]["duration"] == 1
+    assert cap["inputs"]["seed"] == 0
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

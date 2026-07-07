@@ -82,31 +82,78 @@ def test_flux_pro_inputs(monkeypatch):
     assert ins["prompt_upsampling"] is False
 
 
+def test_flux_pro_clamps_to_live_partner_range(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_STILL_CANVAS", "4096x4096")
+    ins = eci.FluxPro._partner_inputs(_req(width=4096, height=4096))
+    assert ins["width"] == 2048
+    assert ins["height"] == 2048
+
+
 def test_nano_banana_inputs_resolve_model(monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_NANO_BANANA_MODEL", "nb-test-model")
+    monkeypatch.setenv("OTR_CLOUD_NANO_BANANA_MODEL",
+                       "Nano Banana 2 (Gemini 3.1 Flash Image)")
     ins = eci.NanoBanana2._partner_inputs(_req())
     assert set(ins) == {"model", "prompt", "response_modalities", "seed"}
     # DYNAMICCOMBO_V3 value is a DICT. model/resolution/aspect_ratio are required
-    # by the live row; thinking_level is deliberately omitted because Vertex
-    # rejects thinkingConfig for this image model, and OTR's bridge has a scoped
-    # GeminiNanoBanana2V2 override that omits it from the provider request.
-    assert ins["model"] == {"model": "nb-test-model", "resolution": "1K",
-                            "aspect_ratio": "auto"}
+    # by the live row; thinking_level is present to match the installed
+    # DynamicCombo schema. OTR's bridge has a scoped GeminiNanoBanana2V2 override
+    # that omits thinkingConfig from the provider request.
+    assert ins["model"] == {
+        "model": "Nano Banana 2 (Gemini 3.1 Flash Image)",
+        "resolution": "1K",
+        "aspect_ratio": "auto",
+        "thinking_level": "MINIMAL",
+    }
     assert ins["response_modalities"] == "IMAGE"
 
 
+def test_nano_banana_default_selector_matches_installed_menu(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_NANO_BANANA_MODEL", raising=False)
+    ins = eci.NanoBanana2._partner_inputs(_req())
+    assert ins["model"]["model"] == "Nano Banana 2 (Gemini 3.1 Flash Image)"
+
+
+def test_nano_banana_rejects_stale_selector(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_NANO_BANANA_MODEL",
+                       "gemini-2.5-flash-image-preview")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.NanoBanana2._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_NANO_BANANA_MODEL" in str(ei.value)
+
+
+def test_nano_banana_lite_rejects_unsupported_resolution(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_NANO_BANANA_MODEL", "Nano Banana 2 Lite")
+    monkeypatch.setenv("OTR_CLOUD_NANO_RESOLUTION", "4K")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.NanoBanana2._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_NANO_RESOLUTION" in str(ei.value)
+
+
 def test_seedream_inputs_resolve_model(monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_SEEDREAM_MODEL", "sd-test-model")
+    monkeypatch.setenv("OTR_CLOUD_SEEDREAM_MODEL", "seedream-4-0-250828")
     ins = eci.Seedream2._partner_inputs(_req())
     assert set(ins) == {"model", "prompt", "seed", "watermark"}
     # ByteDanceSeedreamNodeV2.execute bracket-reads model["model"] (a bare string
-    # raises "string indices must be integers"); size_preset/width/height use
-    # model.get(default) so only "model" is required (2026-07-05 fix). Its
-    # Pydantic request model also caps seed at signed int32; OTR's 64-bit render
-    # seeds are folded deterministically into that range.
-    assert ins["model"] == {"model": "sd-test-model"} and ins["watermark"] is False
+    # raises "string indices must be integers"); OTR also supplies an installed
+    # size_preset by delivery orientation so it never depends on custom dims.
+    assert ins["model"] == {
+        "model": "seedream-4-0-250828",
+        "size_preset": "(2K) 2848x1600 (16:9)",
+        "max_images": 1,
+    }
+    assert ins["watermark"] is False
     high = eci.Seedream2._partner_inputs(_req(seed=3736360535))
-    assert high["seed"] == 1588876887
+    assert high["seed"] == 2147483647
+
+
+def test_seedream_rejects_unknown_model(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_SEEDREAM_MODEL", "sd-test-model")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.Seedream2._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_SEEDREAM_MODEL" in str(ei.value)
 
 
 def test_ideo_registered_and_inputs(monkeypatch):
@@ -118,16 +165,51 @@ def test_ideo_registered_and_inputs(monkeypatch):
     ins = eci.Ideo._partner_inputs(_req())
     assert set(ins) == {"prompt", "rendering_speed", "resolution", "seed"}
     assert ins["rendering_speed"] == "TURBO"          # v1 default = cheapest
-    assert eci.Ideo._est_usd() == 0.043               # TURBO price
+    assert ins["resolution"] == "2560x1440 (16:9)"
+    assert eci.Ideo._est_usd() == 0.0429              # TURBO price
 
 
 def test_ideogram_speed_price_map(monkeypatch):
     monkeypatch.delenv("OTR_CLOUD_IDEOGRAM_EST_USD", raising=False)
     monkeypatch.setenv("OTR_CLOUD_IDEOGRAM_SPEED", "QUALITY")
-    assert eci.Ideo._est_usd() == 0.13
+    assert eci.Ideo._est_usd() == 0.143
     assert eci.Ideo._partner_inputs(_req())["rendering_speed"] == "QUALITY"
     monkeypatch.setenv("OTR_CLOUD_IDEOGRAM_EST_USD", "0.20")   # explicit override
     assert eci.Ideo._est_usd() == 0.20
+
+
+def test_ideogram_rejects_unknown_speed(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_IDEOGRAM_SPEED", "SNAIL")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.Ideo._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_IDEOGRAM_SPEED" in str(ei.value)
+
+
+def test_ideogram_rejects_stale_resolution(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_IDEOGRAM_RESOLUTION", "1024x1024")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.Ideo._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_IDEOGRAM_RESOLUTION" in str(ei.value)
+
+
+def test_ideogram_accepts_live_pixel_alias(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_IDEOGRAM_RESOLUTION", "2048x2048")
+    assert eci.Ideo._partner_inputs(_req())["resolution"] == "2048x2048 (1:1)"
+
+
+def test_cloud_image_adapters_fail_loud_on_blank_prompt():
+    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2, eci.Ideo):
+        with pytest.raises(CloudMediaError) as ei:
+            eng._partner_inputs(_req(prompt="   "))
+        assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+
+
+def test_cloud_image_adapters_preserve_explicit_zero_seed():
+    req = _req(seed=0, request_seed=12345)
+    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2, eci.Ideo):
+        assert eng._partner_inputs(req)["seed"] == 0
 
 
 # --------------------------------------------------------------------------- #

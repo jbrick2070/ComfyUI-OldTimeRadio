@@ -8,9 +8,8 @@ Four rows from the S0 pin table, invoked through the S0 bridge
     cloud_nano_banana_2  text2img   BEST (V3 model row; reference consistency)
     cloud_seedream_2     text2img   cheapest stylization tier (V3 model row)
 
-(``cloud_ideogram_v4`` -- the text-render row -- ships as ``ideo`` / ``ideo_word``
-with its own dedicated doc, docs/GO_FORWARD_NEXT/2026-07-02-ideogram-lyric-stills.md
-= S1+1; until then it carries an explicit xfail in the conformance test.)
+(``cloud_ideogram_v4`` ships as ``ideo`` for ordinary scene stills; a future
+``ideo_word`` specialist can share the same Partner row.)
 
 Each adapter implements the REDUCED ImageEngine protocol (assert_usable /
 prepare / render_image / teardown -- registry.py): ``render_image`` builds the
@@ -42,6 +41,71 @@ _LOG = logging.getLogger("OTR.image.eng_cloud_image")
 #: default still canvas when the request carries no dims (env-overridable).
 _DEF_W_ENV, _DEF_H_ENV = "OTR_CLOUD_IMAGE_WIDTH", "OTR_CLOUD_IMAGE_HEIGHT"
 _DEF_W, _DEF_H = 832, 1216
+_U64_MAX = 0xFFFFFFFFFFFFFFFF
+_I32_MAX = 2147483647
+
+_NANO_MODELS = ("Nano Banana 2 (Gemini 3.1 Flash Image)", "Nano Banana 2 Lite")
+_NANO_ASPECTS = (
+    "auto", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4",
+    "9:16", "16:9", "21:9", "1:4", "4:1", "8:1", "1:8",
+)
+_NANO_MODALITIES = ("IMAGE", "IMAGE+TEXT")
+_NANO_THINKING_LEVELS = ("MINIMAL", "HIGH")
+_NANO_RESOLUTIONS = {
+    "Nano Banana 2 (Gemini 3.1 Flash Image)": ("1K", "2K", "4K"),
+    "Nano Banana 2 Lite": ("1K",),
+}
+
+_SEEDREAM_MODELS = (
+    "seedream 5.0 lite",
+    "seedream-4-5-251128",
+    "seedream-4-0-250828",
+)
+_SEEDREAM_PRESETS = {
+    "seedream 5.0 lite": {
+        "1:1": "(2K) 2048x2048 (1:1)",
+        "16:9": "(2K) 2848x1600 (16:9)",
+        "9:16": "(2K) 1600x2848 (9:16)",
+    },
+    "seedream-4-5-251128": {
+        "1:1": "(2K) 2048x2048 (1:1)",
+        "16:9": "(2K) 2848x1600 (16:9)",
+        "9:16": "(2K) 1600x2848 (9:16)",
+    },
+    "seedream-4-0-250828": {
+        "1:1": "(2K) 2048x2048 (1:1)",
+        "16:9": "(2K) 2848x1600 (16:9)",
+        "9:16": "(2K) 1600x2848 (9:16)",
+    },
+}
+
+_IDEOGRAM_RESOLUTIONS = (
+    "Auto",
+    "2048x2048 (1:1)",
+    "1440x2880 (1:2)",
+    "2880x1440 (2:1)",
+    "1664x2496 (2:3)",
+    "2496x1664 (3:2)",
+    "1792x2240 (4:5)",
+    "2240x1792 (5:4)",
+    "1440x2560 (9:16)",
+    "2560x1440 (16:9)",
+    "1600x2560 (5:8)",
+    "2560x1600 (8:5)",
+    "1728x2304 (3:4)",
+    "2304x1728 (4:3)",
+    "1296x3168 (9:22)",
+    "3168x1296 (22:9)",
+    "1152x2944 (9:23)",
+    "2944x1152 (23:9)",
+    "1248x3328 (3:8)",
+    "3328x1248 (8:3)",
+    "1280x3072 (5:12)",
+    "3072x1280 (12:5)",
+)
+_IDEOGRAM_RESOLUTION_BY_PIXELS = {
+    r.split(" ")[0]: r for r in _IDEOGRAM_RESOLUTIONS if r != "Auto"
+}
 
 
 def _efloat(name: str, default: float) -> float:
@@ -64,16 +128,16 @@ def _timeout_s() -> float:
 
 #: Ideogram rendering_speed -> per-image USD estimate (the pin carries no
 #: structured pricing; adapters must pass a numeric estimate). Values from
-#: PRICING.md / partner_nodes.yaml notes (TURBO 9.05cr -> QUALITY 27.16cr,
-#: 211cr = $1). v1 default speed = TURBO (cheapest). Env-overridable via
-#: OTR_CLOUD_IDEOGRAM_SPEED; unknown speeds fall back to the DEFAULT price.
-_IDEOGRAM_SPEED_PRICE = {"TURBO": 0.043, "DEFAULT": 0.086, "QUALITY": 0.13}
+#: installed Partner-node pricing constants; v1 default speed = TURBO
+#: (cheapest). Env-overridable via OTR_CLOUD_IDEOGRAM_SPEED.
+_IDEOGRAM_SPEED_PRICE = {"TURBO": 0.0429, "DEFAULT": 0.0858, "QUALITY": 0.143}
 _IDEOGRAM_DEFAULT_SPEED = "TURBO"
 
 
 def _ideogram_speed() -> str:
-    return (os.environ.get("OTR_CLOUD_IDEOGRAM_SPEED", "")
-            or _IDEOGRAM_DEFAULT_SPEED).upper()
+    return _choice_env(
+        "OTR_CLOUD_IDEOGRAM_SPEED", _IDEOGRAM_DEFAULT_SPEED,
+        tuple(_IDEOGRAM_SPEED_PRICE), normalize=str.upper)
 
 
 def _ideogram_est_usd() -> float:
@@ -91,6 +155,55 @@ def _req_get(request, key, default=None):
     if isinstance(request, dict):
         return request.get(key, default)
     return getattr(request, key, default)
+
+
+def _first_present(request, *keys, default=None):
+    for key in keys:
+        value = _req_get(request, key, None)
+        if value is not None:
+            return value
+    return default
+
+
+def _shape_error(detail: str):
+    from .._otr_shared.cloud_media_backend import CloudErrorCode, CloudMediaError
+    raise CloudMediaError(CloudErrorCode.MALFORMED_CONFIG, detail)
+
+
+def _choice(value: str, allowed: tuple, *, name: str, normalize=None,
+            aliases: dict | None = None) -> str:
+    raw = "" if value is None else str(value).strip()
+    if normalize is not None:
+        raw = normalize(raw)
+    if aliases and raw in aliases:
+        raw = aliases[raw]
+    if raw not in allowed:
+        _shape_error(
+            f"{name}={value!r} is not supported by the installed Partner "
+            f"node; allowed: {list(allowed)}")
+    return raw
+
+
+def _choice_env(env_name: str, default: str, allowed: tuple, *,
+                normalize=None, aliases: dict | None = None) -> str:
+    return _choice(os.environ.get(env_name, "") or default, allowed,
+                   name=env_name, normalize=normalize, aliases=aliases)
+
+
+def _clamp_int(value, *, name: str, lo: int, hi: int) -> int:
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError) as exc:
+        from .._otr_shared.cloud_media_backend import CloudErrorCode, CloudMediaError
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            f"{name}={value!r} is not an integer") from exc
+    return max(int(lo), min(int(hi), ivalue))
+
+
+def _ceil_step_clamped(value: int, *, lo: int, hi: int, step: int) -> int:
+    value = max(int(lo), min(int(hi), int(value)))
+    return max(int(lo), min(int(hi), ((value + step - 1) // step) * step))
 
 
 class _CloudImageBase:
@@ -148,16 +261,27 @@ class _CloudImageBase:
 
     # ---- request helpers --------------------------------------------------
     def _prompt(self, request) -> str:
-        return str(_req_get(request, "prompt")
-                   or _req_get(request, "text_prompt") or "")
+        prompt = str(_req_get(request, "prompt")
+                     or _req_get(request, "text_prompt") or "").strip()
+        if not prompt:
+            _shape_error(
+                f"{self.name}: blank prompt; installed Partner image nodes "
+                "require a non-empty prompt")
+        return prompt
 
     def _seed(self, request) -> int:
-        return int(_req_get(request, "seed")
-                   or _req_get(request, "request_seed") or 0)
+        return int(_first_present(request, "seed", "request_seed", default=0))
+
+    def _seed_u64(self, request) -> int:
+        return _clamp_int(
+            _first_present(request, "seed", "request_seed", default=0),
+            name=f"{self.name}.seed", lo=0, hi=_U64_MAX)
 
     def _seed_i32(self, request) -> int:
-        """Provider-safe deterministic seed for APIs capped at signed int32."""
-        return self._seed(request) & 0x7fffffff
+        """Provider-safe seed for APIs capped at signed int32."""
+        return _clamp_int(
+            _first_present(request, "seed", "request_seed", default=0),
+            name=f"{self.name}.seed", lo=0, hi=_I32_MAX)
 
     def _canvas_wh(self, request):
         w = int(_req_get(request, "width") or _req_get(request, "w")
@@ -211,18 +335,17 @@ class CloudFluxProImageEngine(_CloudImageBase):
         # pinned required: height INT, prompt STRING, prompt_upsampling BOOL,
         # seed INT, width INT.
         w, h = self._canvas_wh(request)
-        # BFL requires /32-aligned request dims; the 1080p cloud canvas (1920x1080)
-        # has 1080 % 32 = 24, so snap the REQUEST up to /32 (1920x1088). The
-        # canonical PNG still cover-crops to the true 1920x1080 in render_image, so
-        # the delivered still is exactly 1080p. Width 1920 is already /32.
-        w32 = max(32, (int(w) // 32) * 32)
-        h32 = max(32, ((int(h) + 31) // 32) * 32)
+        # BFL requires /32-aligned request dims in the live schema's 256..2048
+        # range. Snap upward when possible (1920x1080 -> 1920x1088), then the
+        # canonical PNG cover-crops back to the exact delivery canvas.
+        w32 = _ceil_step_clamped(int(w), lo=256, hi=2048, step=32)
+        h32 = _ceil_step_clamped(int(h), lo=256, hi=2048, step=32)
         return {
             "prompt": self._prompt(request),
             "width": w32,
             "height": h32,
             "prompt_upsampling": False,
-            "seed": self._seed(request),
+            "seed": self._seed_u64(request),
         }
 
 
@@ -248,16 +371,27 @@ class CloudNanoBanana2ImageEngine(_CloudImageBase):
         # uppercase "IMAGE" for image-only; anything else silently requests
         # IMAGE+TEXT. All env-overridable.
         from .._otr_shared.cloud_model_ids import resolve_model_id
+        model_name = _choice(
+            resolve_model_id(self.node_key), _NANO_MODELS,
+            name="OTR_CLOUD_NANO_BANANA_MODEL")
+        resolution = _choice_env(
+            "OTR_CLOUD_NANO_RESOLUTION", "1K",
+            _NANO_RESOLUTIONS[model_name])
         return {
             "model": {
-                "model": resolve_model_id(self.node_key),
-                "resolution": os.environ.get("OTR_CLOUD_NANO_RESOLUTION", "1K"),
-                "aspect_ratio": os.environ.get("OTR_CLOUD_NANO_ASPECT", "auto"),
+                "model": model_name,
+                "resolution": resolution,
+                "aspect_ratio": _choice_env(
+                    "OTR_CLOUD_NANO_ASPECT", "auto", _NANO_ASPECTS),
+                "thinking_level": _choice_env(
+                    "OTR_CLOUD_NANO_THINKING_LEVEL", "MINIMAL",
+                    _NANO_THINKING_LEVELS, normalize=str.upper),
             },
             "prompt": self._prompt(request),
-            "response_modalities": os.environ.get(
-                "OTR_CLOUD_NANO_MODALITIES", "IMAGE"),
-            "seed": self._seed(request),
+            "response_modalities": _choice_env(
+                "OTR_CLOUD_NANO_MODALITIES", "IMAGE", _NANO_MODALITIES,
+                normalize=str.upper),
+            "seed": self._seed_u64(request),
         }
 
 
@@ -275,16 +409,39 @@ class CloudSeedream2ImageEngine(_CloudImageBase):
         # slug: ByteDanceSeedreamNodeV2.execute (nodes_bytedance.py:790+) reads
         # model["model"] (KeyError/"string indices must be integers" on a bare
         # string), while size_preset/width/height use model.get(...) with safe
-        # defaults (2048/2048), so only the "model" key is required. The
-        # ByteDance schema caps seed at signed int32; OTR request seeds are
-        # 64-bit, so fold deterministically into provider range.
+        # defaults (2048/2048). OTR includes an installed size preset so the
+        # provider request matches the delivery orientation without custom dims.
+        # The ByteDance schema caps seed at signed int32; OTR clamps before
+        # invoke so the partner node never sees an out-of-range value.
         from .._otr_shared.cloud_model_ids import resolve_model_id
+        model_name = _choice(
+            resolve_model_id(self.node_key), _SEEDREAM_MODELS,
+            name="OTR_CLOUD_SEEDREAM_MODEL")
         return {
-            "model": {"model": resolve_model_id(self.node_key)},
+            "model": {
+                "model": model_name,
+                "size_preset": self._size_preset(model_name, request),
+                "max_images": 1,
+            },
             "prompt": self._prompt(request),
             "seed": self._seed_i32(request),
             "watermark": False,
         }
+
+    def _size_preset(self, model_name: str, request) -> str:
+        presets = _SEEDREAM_PRESETS[model_name]
+        allowed = tuple(presets.values())
+        env = os.environ.get("OTR_CLOUD_SEEDREAM_SIZE_PRESET", "").strip()
+        if env:
+            return _choice(env, allowed, name="OTR_CLOUD_SEEDREAM_SIZE_PRESET")
+        w, h = self._canvas_wh(request)
+        if h > w:
+            ratio = "9:16"
+        elif w > h:
+            ratio = "16:9"
+        else:
+            ratio = "1:1"
+        return presets[ratio]
 
 
 class CloudIdeoImageEngine(_CloudImageBase):
@@ -309,10 +466,23 @@ class CloudIdeoImageEngine(_CloudImageBase):
         return {
             "prompt": self._prompt(request),
             "rendering_speed": _ideogram_speed(),
-            "resolution": os.environ.get(
-                "OTR_CLOUD_IDEOGRAM_RESOLUTION", "1024x1024"),
-            "seed": self._seed(request),
+            "resolution": self._resolution(request),
+            "seed": self._seed_i32(request),
         }
+
+    def _resolution(self, request) -> str:
+        env = os.environ.get("OTR_CLOUD_IDEOGRAM_RESOLUTION", "").strip()
+        aliases = dict(_IDEOGRAM_RESOLUTION_BY_PIXELS)
+        if env:
+            return _choice(env, _IDEOGRAM_RESOLUTIONS,
+                           name="OTR_CLOUD_IDEOGRAM_RESOLUTION",
+                           aliases=aliases)
+        w, h = self._canvas_wh(request)
+        if h > w:
+            return "1440x2560 (9:16)"
+        if w > h:
+            return "2560x1440 (16:9)"
+        return "2048x2048 (1:1)"
 
 
 FluxPro = CloudFluxProImageEngine()

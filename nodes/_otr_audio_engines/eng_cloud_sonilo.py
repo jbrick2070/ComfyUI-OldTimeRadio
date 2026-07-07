@@ -36,6 +36,10 @@ _USD_PER_60S = 0.15
 _MUSIC_TIMEOUT_S = 240.0
 #: the pinned partner row (partner_nodes.yaml) this adapter drives.
 _PARTNER_ROW = "cloud_sonilo_music"
+_SONILO_PROMPT_MAX_CHARS = 1000
+_SONILO_DURATION_MIN_S = 1
+_SONILO_DURATION_MAX_S = 360
+_U64_MAX = 0xFFFFFFFFFFFFFFFF
 
 
 def _sonilo_min_duration_s() -> int:
@@ -60,6 +64,17 @@ def estimate_music_usd(duration_s) -> float:
     except (TypeError, ValueError):
         dur = 1.0
     return dur * _USD_PER_60S / 60.0
+
+
+def _clamp_int(value, *, name: str, lo: int, hi: int) -> int:
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "sonilo.generate_clip: non-numeric %s %r (no-fallback)"
+            % (name, value)
+        ) from exc
+    return max(int(lo), min(int(hi), ivalue))
 
 
 @register
@@ -96,14 +111,24 @@ class SoniloCloudMusic:
 
         FAIL-LOUD, NO FALLBACK: a blank prompt or any provider/auth/budget failure
         RAISES (never a silent local swap to musicgen / stable_audio)."""
-        if not prompt or not str(prompt).strip():
+        prompt_text = str(prompt or "").strip()
+        if not prompt_text:
             raise ValueError("sonilo.generate_clip: blank music prompt (no-fallback)")
+        if len(prompt_text) > _SONILO_PROMPT_MAX_CHARS:
+            raise ValueError(
+                "sonilo.generate_clip: music prompt is %d chars; Sonilo "
+                "TextToMusic max is %d (no-fallback)"
+                % (len(prompt_text), _SONILO_PROMPT_MAX_CHARS)
+            )
         try:
-            dur = max(1, int(round(float(duration_s))))
+            dur_raw = int(round(float(duration_s)))
         except (TypeError, ValueError) as exc:
             raise ValueError(
                 "sonilo.generate_clip: non-numeric duration_s %r (no-fallback)"
                 % (duration_s,)) from exc
+        dur = _clamp_int(
+            dur_raw, name="duration_s",
+            lo=_SONILO_DURATION_MIN_S, hi=_SONILO_DURATION_MAX_S)
 
         from .._otr_shared.cloud_media_invoke import invoke_partner_node
         from .._otr_shared.cloud_media_canonical import canonicalize_audio
@@ -113,14 +138,17 @@ class SoniloCloudMusic:
         # cue's canonical length so cue identity + the mix are unchanged.
         floor = _sonilo_min_duration_s()
         req_dur = max(dur, floor) if floor else dur
+        req_dur = _clamp_int(
+            req_dur, name="duration_s",
+            lo=_SONILO_DURATION_MIN_S, hi=_SONILO_DURATION_MAX_S)
         if req_dur != dur:
             log.info("[sonilo] cue %ss below service floor %ss -> requesting %ss, "
                      "trimming back to %ss", dur, floor, req_dur, dur)
 
         inputs = {
-            "prompt": str(prompt),
+            "prompt": prompt_text,
             "duration": req_dur,                    # provider-native seconds (INT)
-            "seed": int(seed or 0),
+            "seed": _clamp_int(seed or 0, name="seed", lo=0, hi=_U64_MAX),
         }
         result = invoke_partner_node(
             _PARTNER_ROW, inputs,

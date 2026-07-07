@@ -37,8 +37,8 @@ def _fake_row(**over):
                 "comfy_usage_source": "COMFY_USAGE_SOURCE",
                 "unique_id": "UNIQUE_ID",
             },
-            "optional": {},
-            "required": {"prompt": "STRING"},
+            "optional": {"prompt": "STRING"},
+            "required": {},
         },
         "is_async": True,
         "provider_id": "TESTPROV",
@@ -140,6 +140,38 @@ def test_bad_timeout_rejected(rig):
     with pytest.raises(CloudMediaError) as ei:
         invoke.invoke_partner_node(rig["node_key"], {}, timeout_s=0)
     assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+
+
+def test_missing_required_input_fails_before_partner(rig):
+    row = _fake_row(inputs={
+        "hidden": _fake_row()["inputs"]["hidden"],
+        "optional": {},
+        "required": {"prompt": "STRING"},
+    })
+    invoke._set_rows_for_tests({rig["node_key"]: row})
+    with pytest.raises(CloudMediaError) as ei:
+        invoke.invoke_partner_node(rig["node_key"], {}, timeout_s=5)
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "omitted required Partner input" in str(ei.value)
+    assert _RecordingNode.last_kwargs is None
+
+
+def test_undeclared_input_fails_before_partner(rig):
+    with pytest.raises(CloudMediaError) as ei:
+        invoke.invoke_partner_node(
+            rig["node_key"], {"prompt": "radio", "unsupported": 1},
+            timeout_s=5)
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "undeclared Partner input" in str(ei.value)
+    assert _RecordingNode.last_kwargs is None
+
+
+def test_non_dict_inputs_fail_before_partner(rig):
+    with pytest.raises(CloudMediaError) as ei:
+        invoke.invoke_partner_node(rig["node_key"], [], timeout_s=5)
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "partner inputs must be a dict" in str(ei.value)
+    assert _RecordingNode.last_kwargs is None
 
 
 def test_no_prompt_context_fails_closed(monkeypatch, rig):
