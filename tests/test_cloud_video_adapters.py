@@ -166,6 +166,24 @@ def test_wan_i2v_sends_v3_model_dict_without_audio(tmp_path, monkeypatch):
     assert ins["seed"] == 7
 
 
+@pytest.mark.parametrize(
+    "legacy_selector",
+    ("wan-2.2-i2v", "wan2.2-i2v", "wan2.2_i2v", "Wan 2.2 I2V",
+     "wan-2.7-i2v"),
+)
+def test_wan_i2v_normalizes_legacy_cloud_model_aliases(
+        tmp_path, monkeypatch, legacy_selector):
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", legacy_selector)
+    ins = ecv.WanI2V._partner_inputs(_request(tmp_path))
+    assert ins["model"]["model"] == "wan2.7-i2v"
+
+
+def test_wan_i2v_rejects_unknown_model_selector(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan3.0-i2v")
+    with pytest.raises(RuntimeError, match="unsupported Wan model selector"):
+        ecv.WanI2V._partner_inputs(_request(tmp_path))
+
+
 def test_wan_i2v_rejects_v3_placeholder_model(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "COMFY_DYNAMICCOMBO_V3")
     with pytest.raises(CloudMediaError, match="placeholder"):

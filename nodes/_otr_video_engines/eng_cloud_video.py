@@ -93,6 +93,14 @@ _SEEDANCE_PROMPT_SOFTENERS = (
 )
 
 _WAN_MODELS = ("wan2.7-i2v",)
+_WAN_MODEL_ALIASES = {
+    # The cloud Partner node now exposes the Wan 2.7 selector. Older saved env
+    # overrides and local-Wan docs used 2.2-style ids; normalize those at the
+    # adapter boundary so the live request still carries a schema-valid model.
+    "wan-2.2-i2v": "wan2.7-i2v",
+    "wan2.2-i2v": "wan2.7-i2v",
+    "wan-2.7-i2v": "wan2.7-i2v",
+}
 _WAN_RESOLUTIONS = ("720P", "1080P")
 
 
@@ -472,13 +480,22 @@ class CloudWanI2VEngine(_CloudVideoBase):
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
 
-    def _partner_inputs(self, request):
+    def _model_selector(self) -> str:
         from .._otr_shared.cloud_model_ids import resolve_model_id
-        model = resolve_model_id(self.node_key)
+        value = resolve_model_id(self.node_key)
+        folded = re.sub(r"[\s_]+", "-", value).lower()
+        model = _WAN_MODEL_ALIASES.get(value, _WAN_MODEL_ALIASES.get(folded, value))
+        if model != value:
+            _LOG.warning("[OTR.cloud.wan] normalized model selector %r -> %r",
+                         value, model)
         if model not in _WAN_MODELS:
             raise RuntimeError(
-                f"{self.name}: unsupported Wan model selector {model!r}; "
-                f"expected one of {_WAN_MODELS}")
+                f"{self.name}: unsupported Wan model selector {value!r}; "
+                f"expected one of {_WAN_MODELS} or known legacy aliases")
+        return model
+
+    def _partner_inputs(self, request):
+        model = self._model_selector()
         return {
             "first_frame": self._init_image_input(request),
             "model": {
