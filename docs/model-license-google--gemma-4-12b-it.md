@@ -31,16 +31,20 @@ Gemma 4 12B announcement (2026-06-03):
 
 - Added 2026-06-03 as a CANDIDATE writer model (12B class, same tier as
   the Mistral-Nemo default) for soak evaluation -- the E2B / E4B picks are
-  too small for the strict structured passes. Not bound as the default
-  workflow writer until a soak proves it.
+  too small for the strict structured passes. Mistral-Nemo remains the
+  default workflow writer.
 - `prompt_profile = modern`. Eligible for the creative slot AND the
-  technical slot. Apache 2.0 satisfies the Sprint D / D3 creative-binding
-  gate, so default-binding is allowed if a soak promotes it.
+  technical slot when explicitly selected. Apache 2.0 satisfies the Sprint D
+  / D3 creative-binding gate, but promotion to default still requires a soak.
 
 ## Notes
 
-Ungated download on HuggingFace (the model_info gated flag reads False;
-`requires_auth: true` in the catalog row passes the token harmlessly).
-Encoder-free multimodal, used text-only by the OTR writer (same
-`transformers_multimodal_text_only` backend as gemma-4-E4B). ~23.9 GB
-safetensors; NF4-quantized at load to ~8 GB on the RTX 5080.
+Ungated download on HuggingFace (the model_info gated flag reads False).
+OTR does not assume an official Comfy-native 12B safetensor exists.
+`google/gemma-4-12b-it` is no longer a selectable catalog row; stale saved pins
+are rejected because the installed transformers stack cannot load its
+`gemma4_unified` architecture. Use `local_gemma4_12b` for an external local
+OpenAI-compatible server lane, or choose the native E2B/E4B rows. Native Comfy
+Gemma 4 work should be detect-and-test only and separated from the 12B writer
+lane; known Comfy-packaged native targets are E2B/E4B, not a guaranteed 12B
+text-encoder file.

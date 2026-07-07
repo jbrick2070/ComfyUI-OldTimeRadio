@@ -272,7 +272,7 @@ def make_writer_generate_fn(model_id: Optional[str] = None):
 
     Returns ``None`` on ANY failure so the caller falls back to static (never breaks the
     render). Reuses the proven script-writer primitives -- request_slot +
-    _build_truncating_generate_fn -- which handle the HF / Ollama / OpenRouter lanes."""
+    _build_truncating_generate_fn -- which handle the HF / HTTP-backed lanes."""
     try:
         try:
             from . import _otr_model_loader as _ml  # type: ignore

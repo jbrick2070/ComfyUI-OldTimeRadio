@@ -33,10 +33,10 @@ from __future__ import annotations
 from typing import Any
 
 from . import _otr_comfy_backend
+from . import _otr_local_openai_backend
 from . import _otr_loader_backends
 from . import _otr_model_catalog
 from . import _otr_model_loader
-from . import _otr_ollama_backend
 from . import _otr_openrouter_backend
 
 
@@ -168,13 +168,10 @@ BACKENDS_BY_KEY: dict[str, Any] = {
     # resident local model (C2).
     _otr_comfy_backend.COMFY_BACKEND_KEY:
         _otr_comfy_backend.ComfyCreditsBackend(),
-    # LOCAL llama.cpp/Ollama lane (2026-06-04). Reached over HTTP at
-    # 127.0.0.1:11434/v1 -- a LOCAL daemon, NOT a cloud service. Shares this
-    # zero-process-VRAM, no-HF-download, no-evict seam because it is HTTP-
-    # dispatched, not because it is remote. Distinct from openrouter/comfy:
-    # no API key, no credit cost, fail-closed local-only.
-    _otr_ollama_backend.OLLAMA_BACKEND_KEY:
-        _otr_ollama_backend.OllamaBackend(),
+    # Generic external local OpenAI-compatible Gemma 4 12B path: zero process
+    # VRAM, no HF download, no daemon management.
+    _otr_local_openai_backend.LOCAL_OPENAI_BACKEND_KEY:
+        _otr_local_openai_backend.LocalOpenAIBackend(),
 }
 
 

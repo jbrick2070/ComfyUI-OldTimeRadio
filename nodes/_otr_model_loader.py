@@ -771,14 +771,12 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     # _otr_model_runtime dispatch table already maps each key to its backend, so
     # a future remote lane only adds its key to this tuple.
     # Backends reached over an HTTP /v1 call (dispatched via _otr_model_runtime),
-    # NOT the in-process transformers loader: the cloud lanes (openrouter_http,
-    # comfy_credits_http) AND the LOCAL llama.cpp/Ollama lane (ollama_local_http,
-    # a local daemon on 127.0.0.1 -- local, but HTTP-dispatched, so it shares
-    # this zero-process-VRAM, no-HF-download, no-evict seam). A new HTTP lane
-    # only adds its key here. (BUG-LOCAL-299: routing ALL of them here keeps a
-    # virtual/HTTP handle from falling through to the local HF-download path.)
+    # NOT the in-process transformers loader: OpenRouter, Comfy Credits, and the
+    # external local OpenAI-compatible Gemma 4 12B lane. A new HTTP lane only adds
+    # its key here. (BUG-LOCAL-299: routing ALL of them here keeps a virtual/HTTP
+    # handle from falling through to the local HF-download path.)
     _HTTP_DISPATCH_BACKENDS = (
-        "openrouter_http", "comfy_credits_http", "ollama_local_http",
+        "openrouter_http", "comfy_credits_http", "local_openai_http",
     )
     _http_row = _otr_catalog._by_repo_id().get(normalized)
     if (
@@ -937,11 +935,11 @@ def make_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "comfy_credits":
         from ._otr_comfy_backend import make_comfy_credits_generate_fn
         return make_comfy_credits_generate_fn(cache_entry)
-    # LOCAL llama.cpp/Ollama lane (2026-06-04) -- same zero-process-VRAM seam,
-    # but the endpoint is a local daemon on 127.0.0.1, not a cloud service.
-    if cache_entry.get("provider") == "ollama":
-        from ._otr_ollama_backend import make_ollama_generate_fn
-        return make_ollama_generate_fn(cache_entry)
+    # Generic external local OpenAI-compatible lane: zero process VRAM, no
+    # daemon management, no cloud.
+    if cache_entry.get("provider") == "local_openai":
+        from ._otr_local_openai_backend import make_local_openai_generate_fn
+        return make_local_openai_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:
@@ -1033,11 +1031,10 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "comfy_credits":
         from ._otr_comfy_backend import make_comfy_credits_generate_fn
         return make_comfy_credits_generate_fn(cache_entry)
-    # LOCAL llama.cpp/Ollama lane (2026-06-04) -- same zero-process-VRAM seam,
-    # but the endpoint is a local daemon on 127.0.0.1, not a cloud service.
-    if cache_entry.get("provider") == "ollama":
-        from ._otr_ollama_backend import make_ollama_generate_fn
-        return make_ollama_generate_fn(cache_entry)
+    # Generic external local OpenAI-compatible lane.
+    if cache_entry.get("provider") == "local_openai":
+        from ._otr_local_openai_backend import make_local_openai_generate_fn
+        return make_local_openai_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

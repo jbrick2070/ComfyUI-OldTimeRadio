@@ -6,8 +6,8 @@ multi-audio").
 A PLAYLIST of episodes rotates the real dropdown surface -- video engine
 (humo production / forced all-LTX / procgen floor), char-voice engine
 (indextts2 / bark / dia), music engine
-(stable_audio_3 / musicgen), writer LLM (mistral-nemo / gemma-4-12b local
-Ollama) and word count -- one FRESH headless server per episode (per-leg env
+(stable_audio_3 / musicgen), writer LLM (mistral-nemo / local_gemma4_12b
+external OpenAI-compatible server) and word count -- one FRESH headless server per episode (per-leg env
 via the launcher's _marathon_extra_env.cmd hook), every episode through the
 scripts/_otr_soak_capstone hard gates:
 
@@ -49,7 +49,7 @@ COMFY = "http://127.0.0.1:8000"
 
 # Node ids in the canonical workflow (run_combo_matrix.py probe 2026-06-05).
 N_WRITER, N_CASTLOCK, N_CHARVOICE, N_MUSIC = 1, 80, 81, 83
-GEMMA = "google/gemma-4-12b-it"
+GEMMA = "local_gemma4_12b"
 MISTRAL = "mistralai/Mistral-Nemo-Instruct-2407"
 
 #: The dropdown-rotation playlist. lane: launcher arg2 ('' = humo production,

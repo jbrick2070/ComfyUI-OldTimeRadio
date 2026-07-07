@@ -47,9 +47,9 @@ _REASONING_EFFORT_LOGGED = False
 # Thinking-mode models (gemma-4, DeepSeek-R1, QwQ, ...) prepend their
 # chain-of-thought to the reply, wrapped in <think>...</think> -- and some
 # emit OpenAI-"harmony" <|channel|>analysis<|message|>...<|channel|>final
-# <|message|> markers. Through Ollama's OpenAI-compatible endpoint that
-# scaffolding lands inline in message.content, so the writer's structured
-# (JSON / GBNF) passes parse the reasoning preamble and abort the episode.
+# <|message|> markers. Some OpenAI-compatible endpoints put that scaffolding
+# inline in message.content, so the writer's structured (JSON / GBNF) passes
+# parse the reasoning preamble and abort the episode.
 # We strip it at the single response chokepoint (_extract_text) so every
 # downstream parser sees the clean answer. The strip is a strict no-op when
 # none of the markers are present, so non-thinking models (mistral-nemo,
@@ -72,7 +72,7 @@ def _strip_reasoning_tags(text: str) -> str:
       1. OpenAI-"harmony" channels -- keep only the *final* channel's
          message when present; otherwise drop analysis headers + sentinels.
       2. Well-formed ``<think>...</think>`` blocks (removed entirely).
-      3. A dangling ``</think>`` with no open -- Ollama pre-fills the
+      3. A dangling ``</think>`` with no open -- some servers prefill the
          opening ``<think>`` in the chat template, so the completion carries
          only the close; keep everything after the LAST ``</think>``.
       4. A leading dangling ``<think>`` with no close.
@@ -253,11 +253,10 @@ def _reasoning_effort_from_env() -> str | None:
 
     Reads OPENROUTER_REASONING_EFFORT; UNSET/empty -> ``DEFAULT_REASONING_EFFORT``
     ("low", the R3 frontier-writer default). An explicit value always wins --
-    set "none" to suppress reasoning (the gemma-4 /v1 lane: emit the structured
+    set "none" to suppress reasoning (thinking /v1 lanes: emit the structured
     answer directly instead of spending the output budget on a <think> preamble
     -> finish_reason=length -> unparseable JSON). reasoning_effort is the
-    portable lever (native `think:false` / `chat_template_kwargs` are NOT
-    honoured on Ollama /v1, ollama#14820 / #16240)."""
+    portable lever across OpenAI-compatible transports."""
     raw = _env("OPENROUTER_REASONING_EFFORT")
     if raw is None or not raw.strip():
         return DEFAULT_REASONING_EFFORT
@@ -977,8 +976,8 @@ class OpenRouterBackend:
         if stop:
             payload["stop"] = [s for s in stop if s]
         # Reasoning control (gemma-4 / thinking-model lane). The OpenAI-standard
-        # `reasoning_effort` (high|medium|low|none) is the portable lever Ollama's
-        # /v1 honours to bound or disable the <think> preamble; set
+        # `reasoning_effort` (high|medium|low|none) is the portable lever used
+        # to bound or disable the <think> preamble; set
         # OPENROUTER_REASONING_EFFORT=none so a reasoning model emits the
         # structured answer directly instead of burning the output budget on
         # reasoning (-> finish_reason=length -> unparseable JSON). Unset -> the

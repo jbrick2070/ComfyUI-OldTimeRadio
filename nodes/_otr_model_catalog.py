@@ -40,6 +40,8 @@ TEST_OVERSIZED_LLM = "meta-llama/Llama-3.1-70B-Instruct"
 """Used by B1c VRAM-fit tests as a known-fails-on-16GB target. Not
 added to the dropdown."""
 
+_REMOVED_GEMMA4_12B_MODEL_IDS: frozenset[str] = frozenset({"google/gemma-4-12b-it"})
+
 # Suffix appended to a curated dropdown entry whose weights are NOT
 # present in the local HF cache. Validator strips this before any
 # allow-list check; outputs / meta keys MUST broadcast the stripped id.
@@ -74,7 +76,7 @@ class CuratedModel:
         "transformers_gptq_int4",
         "openrouter_http",
         "comfy_credits_http",
-        "ollama_local_http",
+        "local_openai_http",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
     approx_safetensors_gb: float  # download size on disk, not VRAM resident
@@ -97,16 +99,14 @@ class CuratedModel:
     # Remote-LLM provider tag. "local" = the transformers/HF weight path
     # every existing row uses; "openrouter" = a virtual row behind the
     # own-key OpenRouter API (S2); "comfy_credits" = a virtual row behind
-    # ComfyUI's credit-billed partner-node proxy (2026-06-01). Remote rows
-    # carry zero local VRAM. Default "local" so every pre-existing row and
-    # any older fixture that omits the field still constructs unchanged.
-    provider: Literal["local", "openrouter", "comfy_credits", "ollama"] = "local"
-    # The Ollama model tag for a provider="ollama" row (loader_backend=
-    # "ollama_local_http"): the LOCAL llama.cpp/Ollama model name the lane sends
-    # to 127.0.0.1:11434/v1 (e.g. "hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M").
-    # Empty for every other row. The curated repo_id stays the dropdown label;
-    # this is the on-the-wire tag, resolved by nodes/_otr_ollama_backend.py.
-    ollama_model_tag: str = ""
+    # ComfyUI's credit-billed partner-node proxy (2026-06-01);
+    # "local_openai" = a virtual row behind an external local
+    # OpenAI-compatible server. HTTP-dispatched rows carry zero local VRAM.
+    # Default "local" so every pre-existing row and any older fixture that
+    # omits the field still constructs unchanged.
+    provider: Literal[
+        "local", "openrouter", "comfy_credits", "local_openai",
+    ] = "local"
 
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
@@ -152,29 +152,6 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         context_window=8192,
         license="apache_2_0",
         license_audit_status="mit_equivalent",
-    ),
-    CuratedModel(
-        repo_id="google/gemma-4-12b-it",
-        requires_auth=False,  # served by the LOCAL Ollama daemon (GGUF), not an HF download
-        loader_backend="ollama_local_http",
-        vram_fit_tier="PASS",
-        approx_safetensors_gb=0.0,  # no HF safetensors: the GGUF lives in Ollama's store
-        notes="Gemma 4 12B via the LOCAL llama.cpp/Ollama lane (2026-06-04). "
-        "transformers cannot load the gemma4_unified architecture (it needs "
-        "transformers-from-source, which would destabilize the Blackwell "
-        "torch-2.10/cu130 venv), so this row runs through Ollama's LOCAL "
-        "OpenAI-/v1 endpoint (127.0.0.1:11434) against the GGUF -- NOT "
-        "OpenRouter, NOT Comfy Credits, fail-closed local-only. Pull it once "
-        "with: ollama pull hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M. "
-        "Apache-2.0 (Gemma 4).",
-        prompt_profile="modern",
-        chat_template_kind="transformers_default",
-        stop_tokens=(),
-        context_window=8192,
-        license="apache_2_0",
-        license_audit_status="mit_equivalent",
-        provider="ollama",
-        ollama_model_tag="hf.co/unsloth/gemma-4-12b-it-GGUF:Q4_K_M",
     ),
     CuratedModel(
         repo_id="google/gemma-2-2b-it",
@@ -327,11 +304,46 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
     )
 
 
-def _active_curated_models() -> tuple[CuratedModel, ...]:
-    """CURATED_LLM_MODELS plus the enabled-only remote virtual rows
-    (OpenRouter + Comfy Credits).
+def _local_openai_virtual_rows() -> tuple[CuratedModel, ...]:
+    """The external local Gemma 4 12B row, enabled only by env.
 
-    Consumers that should surface remote when enabled (the dropdown
+    The handle is deliberately virtual (``local_gemma4_12b``) so the UI never
+    implies a Comfy-native 12B safetensor exists. The real server model id
+    lives in GEMMA4_12B_MODEL_ID and is stamped by the backend at load time.
+    """
+    try:
+        from . import _otr_local_openai_backend as _lob
+    except Exception:  # noqa: BLE001 -- catalog import must stay robust
+        return ()
+    if not _lob.local_gemma4_enabled():
+        return ()
+    return (
+        CuratedModel(
+            repo_id=_lob.ROW_ID,
+            requires_auth=False,
+            loader_backend=_lob.LOCAL_OPENAI_BACKEND_KEY,
+            vram_fit_tier="PASS",
+            approx_safetensors_gb=0.0,
+            notes="Gemma 4 12B via an external local OpenAI-compatible "
+            "server (llama.cpp llama-server, LiteRT-LM serve, or equivalent). "
+            "Opt-in with GEMMA4_12B_ENABLED=1; configure "
+            "GEMMA4_12B_BASE_URL and GEMMA4_12B_MODEL_ID. Zero ComfyUI-process "
+            "VRAM, no HF download, no sidecar dependency, no daemon management.",
+            prompt_profile="modern",
+            chat_template_kind="transformers_default",
+            stop_tokens=(),
+            context_window=_lob.DEFAULT_CONTEXT_WINDOW,
+            license="apache_2_0",
+            license_audit_status="mit_equivalent",
+            provider="local_openai",
+        ),
+    )
+
+
+def _active_curated_models() -> tuple[CuratedModel, ...]:
+    """CURATED_LLM_MODELS plus enabled-only HTTP virtual rows.
+
+    Consumers that should surface HTTP lanes when enabled (the dropdown
     builder + validate_model_id Path 1 via _by_repo_id) read THIS.
     Static license/audit tests iterate CURATED_LLM_MODELS directly, so
     the virtual rows never reach them, and GATED_CURATED_MODELS stays
@@ -340,6 +352,7 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
         CURATED_LLM_MODELS
         + _openrouter_virtual_rows()
         + _comfy_virtual_rows()
+        + _local_openai_virtual_rows()
     )
 
 
@@ -973,6 +986,16 @@ def validate_model_id(
     if reason is not None:
         raise UnknownModelError(_unknown_recovery_hint(normalized, reason, hub_root=hub_root))
 
+    if normalized in _REMOVED_GEMMA4_12B_MODEL_IDS:
+        raise UnknownModelError(
+            f"{normalized!r} was removed from OTR's writer catalog because "
+            "the old 11434 sidecar transport was removed and the installed "
+            "transformers stack cannot load its gemma4_unified architecture. "
+            "Use the explicit external local OpenAI-compatible handle "
+            "'local_gemma4_12b' with GEMMA4_12B_ENABLED=1, or choose "
+            "Mistral-Nemo / Gemma 4 E2B / Gemma 4 E4B."
+        )
+
     # Path 1: curated
     if normalized in _by_repo_id():
         return normalized
@@ -1007,6 +1030,15 @@ def validate_model_id(
             f"is not enabled. Set OTR_ENABLE_COMFY_CREDITS=1 and log in to a "
             f"Comfy account with credits, then restart ComfyUI in a fresh "
             f"terminal. See docs/comfy-credits-setup.md."
+        )
+
+    if normalized == "local_gemma4_12b":
+        raise UnknownModelError(
+            "'local_gemma4_12b' is the external local OpenAI-compatible "
+            "Gemma 4 12B lane, but it is not enabled. Set "
+            "GEMMA4_12B_ENABLED=1, GEMMA4_12B_BASE_URL, and "
+            "GEMMA4_12B_MODEL_ID, then restart ComfyUI. This lane does not "
+            "start or manage any server."
         )
 
     raise UnknownModelError(
