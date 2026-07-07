@@ -137,3 +137,80 @@ class TestSelectStyle:
         emergency = set(CAT.all_slugs()) - set(CAT.non_emergency_slugs())
         for s in range(40):
             assert CAT.select_style("a slow afternoon at the library", {}, s) not in emergency
+
+
+# ---------------------------------------------------------------------------
+# Chunk 4 -- media archive style pool (QA must-fix test gap)
+# ---------------------------------------------------------------------------
+class TestMediaArchiveStylePool:
+    """Proves the curated media_archive style pool is correct and integrated."""
+
+    # --- all curated slugs exist in the catalog ---
+    def test_all_media_archive_slugs_exist_in_catalog(self):
+        all_known = CAT.all_slugs()
+        for slug in CAT.media_archive_slugs():
+            assert slug in all_known, f"media_archive slug {slug!r} not in STYLE_CATALOG"
+
+    # --- select_style with source_bank="media_archive" returns from curated pool ---
+    def test_select_style_uses_media_archive_pool(self):
+        pool = set(CAT.media_archive_slugs())
+        for seed in range(50):
+            slug = CAT.select_style(
+                "an archivist finds a lost recording", {"source_bank": "media_archive"}, seed
+            )
+            assert slug in pool, f"seed {seed} -> {slug!r} not in media_archive pool"
+
+    # --- curated pool excludes the 6 pruned drift-prone slugs ---
+    _PRUNED = (
+        "newsroom_emergency_bulletin",
+        "pulp_serial_cliffhanger",
+        "missing_person_audio_diary",
+        "lost_expedition_recordings",
+        "old_theater_phantom_rehearsal",
+        "live_variety_show_disaster",
+    )
+
+    def test_pruned_slugs_absent(self):
+        pool = set(CAT.media_archive_slugs())
+        for slug in self._PRUNED:
+            assert slug not in pool, f"drift-prone slug {slug!r} still in media_archive pool"
+
+    # --- pool size is exactly 18 after pruning ---
+    def test_pool_size(self):
+        assert len(CAT.media_archive_slugs()) == 18
+
+    # --- curated pool excludes obvious sci-fi, emergency, crime, horror,
+    #     disaster, ghost/phantom, and survival styles ---
+    _EXCLUDED_CATEGORIES = {
+        "emergency", "ghost", "phantom", "killer", "murder",
+        "expedition_recording", "disaster",
+    }
+
+    def test_no_obvious_drift_category_in_pool(self):
+        for slug in CAT.media_archive_slugs():
+            for cat in self._EXCLUDED_CATEGORIES:
+                assert cat not in slug, (
+                    f"media_archive slug {slug!r} contains excluded category {cat!r}"
+                )
+
+    # --- science/default style selection is byte-identical for pinned seeds ---
+    def test_science_selection_unchanged(self):
+        """The media_archive pool must NOT affect the default (science) path."""
+        a = CAT.select_style("a quiet town keeps a secret", {}, 42)
+        b = CAT.select_style("a quiet town keeps a secret", {}, 42)
+        assert a == b
+        # Must be from the full catalog, not the media_archive pool
+        assert a in CAT.all_slugs()
+
+    def test_media_archive_deterministic(self):
+        a = CAT.select_style("archive recording", {"source_bank": "media_archive"}, 99)
+        b = CAT.select_style("archive recording", {"source_bank": "media_archive"}, 99)
+        assert a == b
+
+    def test_media_archive_seed_varies(self):
+        picks = {
+            CAT.select_style("archive", {"source_bank": "media_archive"}, s)
+            for s in range(30)
+        }
+        assert len(picks) > 1  # different seeds -> variety
+

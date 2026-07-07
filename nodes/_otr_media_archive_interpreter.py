@@ -170,6 +170,9 @@ def build_media_archive_briefs(
         for term in (
             "spaceship", "mission control", "laboratory containment",
             "alien invasion", "murder victim", "body count",
+            "haunting", "cursed object", "ransom", "corpse",
+            "ghost", "phantom", "emergency broadcast",
+            "serial killer", "murder weapon",
         ):
             if term in hay:
                 return f"media archive brief drifted into forbidden term {term!r}"
@@ -198,11 +201,9 @@ def build_media_archive_briefs(
                 else "no error captured"
             ),
         ) from exc
-    except Exception as exc:  # noqa: BLE001 -- slot fn / backend failures vary
-        raise MediaArchiveInterpreterError(
-            attempts=max(1, slot_calls),
-            reason=f"{type(exc).__name__}: {exc}",
-        ) from exc
+    # Any other exception (coding bugs, contract violations, unexpected
+    # backend errors) propagates HARD -- matching the science wrapper's
+    # non-NewsInterpreterError path in _otr_source_payload.py.
 
     brief.source_hash = _source_hash(payload)
     brief.model_id = model_id
