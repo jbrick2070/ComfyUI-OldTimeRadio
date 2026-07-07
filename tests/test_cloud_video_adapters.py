@@ -27,6 +27,10 @@ from nodes._otr_video_engines import registry as vreg
 _FFMPEG = shutil.which("ffmpeg")
 
 _CLOUD_ROWS = ("cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v")
+_MUSIC_OPEN_RISKY_PROMPT = (
+    "Continuous shot, same console throughout. Dial whip-pans across "
+    "frequencies. Tube filaments ignite from cold to white-hot. Speaker "
+    "grille vibrates aggressively. Dynamic dolly push forward.")
 
 
 # --------------------------------------------------------------------------- #
@@ -167,6 +171,50 @@ def test_wan_i2v_rejects_v3_placeholder_model(tmp_path, monkeypatch):
         ecv.WanI2V._partner_inputs(_request(tmp_path))
 
 
+def test_seedance_prompt_conditioner_softens_risky_music_open():
+    conditioned, meta = ecv._condition_seedance_prompt(
+        _MUSIC_OPEN_RISKY_PROMPT)
+    lower = conditioned.lower()
+
+    assert meta["changed"] is True
+    assert meta["softeners_applied"] == [
+        "dynamic_dolly_push",
+        "whip_pans",
+        "white_hot",
+        "aggressively",
+    ]
+    assert "whip-pans" not in lower
+    assert "white-hot" not in lower
+    assert "vibrates aggressively" not in lower
+    assert "dynamic dolly push" not in lower
+    assert "slowly sweeps across frequencies" in lower
+    assert "bright warm glow" in lower
+    assert "vibrates subtly" in lower
+    assert "slow controlled dolly push forward" in lower
+    assert "\n\n" in conditioned
+    assert ecv._SEEDANCE_SMOOTH_MARKER in conditioned
+
+
+def test_seedance_prompt_conditioner_is_idempotent():
+    first, first_meta = ecv._condition_seedance_prompt(
+        _MUSIC_OPEN_RISKY_PROMPT)
+    second, second_meta = ecv._condition_seedance_prompt(first)
+    third, third_meta = ecv._condition_seedance_prompt(second)
+
+    assert first_meta["changed"] is True
+    assert second == first
+    assert third == first
+    assert second_meta["changed"] is False
+    assert third_meta["changed"] is False
+    assert second_meta["original_sha8"] == second_meta["conditioned_sha8"]
+    assert third_meta["softeners_applied"] == []
+
+
+def test_seedance_prompt_conditioner_rejects_empty_prompt():
+    with pytest.raises(ValueError, match="non-empty prompt"):
+        ecv._condition_seedance_prompt("   ")
+
+
 def test_seedance_reference_row_sends_v3_model_dict(tmp_path, monkeypatch):
     monkeypatch.setenv(
         "OTR_CLOUD_SEEDANCE_MODEL", "dreamina-seedance-2-0-fast-260128")
@@ -177,8 +225,12 @@ def test_seedance_reference_row_sends_v3_model_dict(tmp_path, monkeypatch):
     assert ins["seed"] == 8
     assert ins["watermark"] is False
     model = ins["model"]
+    assert set(model) == {
+        "model", "prompt", "resolution", "ratio", "duration",
+        "generate_audio", "reference_images", "reference_audios"}
     assert model["model"] == "Seedance 2.0 Fast"
     assert model["prompt"].startswith("a person")
+    assert ecv._SEEDANCE_SMOOTH_MARKER in model["prompt"]
     assert model["resolution"] == "720p"
     assert model["ratio"] == "adaptive"
     assert model["duration"] == 5
@@ -188,6 +240,29 @@ def test_seedance_reference_row_sends_v3_model_dict(tmp_path, monkeypatch):
     assert hasattr(model["reference_images"]["image_1"], "ndim")
     assert set(model["reference_audios"]["audio_1"]) == {
         "waveform", "sample_rate"}
+
+
+def test_seedance_short_beat_requests_provider_minimum(tmp_path, monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_SEEDANCE_DURATION", raising=False)
+    req = _request(tmp_path, timing={"target_frame_count": 50})
+    ins = ecv.Seedance2._partner_inputs(req)
+    assert ins["model"]["duration"] == 4
+
+
+def test_seedance_conditioner_does_not_leak_to_other_engines(
+        tmp_path, monkeypatch):
+    prompt = "handheld dolly with a rapid zoom"
+    req = _request(tmp_path, text_prompt=prompt)
+
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
+    wan = ecv.WanI2V._partner_inputs(req)
+    assert wan["model"]["prompt"] == prompt
+
+    kling = ecv.KlingAvatar._partner_inputs(req)
+    assert kling["prompt"] == prompt
+
+    razzle = ecv.WordRazzle._partner_inputs(req)
+    assert razzle["prompt"].endswith(prompt)
 
 
 # --------------------------------------------------------------------------- #

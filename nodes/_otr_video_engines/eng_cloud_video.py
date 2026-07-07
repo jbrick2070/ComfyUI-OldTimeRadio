@@ -29,8 +29,11 @@ soundfile / the bridge import lazily inside the render lifecycle.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
+import re
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
@@ -55,6 +58,39 @@ _SEEDANCE_RESOLUTIONS = {
     "Seedance 2.0 Mini": ("480p", "720p"),
 }
 _SEEDANCE_RATIOS = ("16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive")
+_SEEDANCE_SMOOTH_MARKER = (
+    "Gentle parallax only; all motion gradual and physically continuous.")
+_SEEDANCE_SMOOTH_MOTION_CLAUSE = (
+    "One continuous uncut shot. Smooth stabilized camera on a slow dolly "
+    "with gentle ease-in and ease-out. Motion begins immediately in the first "
+    "frame and remains gentle and continuous throughout. Preserve the "
+    "reference-image composition and framing. No whip pans, handheld shake, "
+    "sudden reframing, jump cuts, or rapid zooms. "
+    f"{_SEEDANCE_SMOOTH_MARKER}")
+_SEEDANCE_PROMPT_VARIANT = "seedance_smooth_v1"
+_SEEDANCE_PROMPT_SOFTENERS = (
+    ("dynamic_dolly_push",
+     re.compile(r"\bdynamic\s+dolly\s+push\b", re.IGNORECASE),
+     "slow controlled dolly push"),
+    ("handheld_dolly",
+     re.compile(r"\bhandheld\s+dolly\b", re.IGNORECASE),
+     "stabilized dolly"),
+    ("whip_pans",
+     re.compile(r"\bwhip[- ]pans?\b", re.IGNORECASE),
+     "slowly sweeps"),
+    ("white_hot",
+     re.compile(r"\bwhite[- ]hot\b", re.IGNORECASE),
+     "bright warm glow"),
+    ("rapid_zooms",
+     re.compile(r"\brapid\s+zooms?\b", re.IGNORECASE),
+     "slow controlled push"),
+    ("aggressively",
+     re.compile(r"\baggressively\b", re.IGNORECASE),
+     "subtly"),
+    ("standalone_handheld",
+     re.compile(r"\bhandheld\b", re.IGNORECASE),
+     "stabilized"),
+)
 
 _WAN_MODELS = ("wan2.7-i2v",)
 _WAN_RESOLUTIONS = ("720P", "1080P")
@@ -83,6 +119,50 @@ def _bool_env(name: str, default: bool) -> bool:
     if raw in {"0", "false", "no", "off"}:
         return False
     raise RuntimeError(f"{name} must be boolean-like (true/false, 1/0)")
+
+
+def _sha8(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+
+
+def _log_excerpt(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()[:160]
+
+
+def _condition_seedance_prompt(prompt: str) -> "tuple[str, dict]":
+    """Seedance 2 stabilizer: keep source style dynamic, provider prompt smooth.
+
+    The marker check runs before softening so repeated calls do not rewrite the
+    appended negative-motion clause ("No whip pans..." etc.).
+    """
+    original = str(prompt)
+    if not original.strip():
+        raise ValueError("Seedance prompt conditioner requires non-empty prompt")
+
+    def _meta(conditioned: str, changed: bool,
+              softeners_applied: "list[str]") -> dict:
+        return {
+            "changed": bool(changed),
+            "original_sha8": _sha8(original),
+            "conditioned_sha8": _sha8(conditioned),
+            "original_excerpt": _log_excerpt(original),
+            "conditioned_excerpt": _log_excerpt(conditioned),
+            "softeners_applied": list(softeners_applied),
+        }
+
+    if _SEEDANCE_SMOOTH_MARKER in original:
+        return original, _meta(original, False, [])
+
+    softened = original
+    applied: "list[str]" = []
+    for softener_id, pattern, replacement in _SEEDANCE_PROMPT_SOFTENERS:
+        softened_next, count = pattern.subn(replacement, softened)
+        if count:
+            applied.append(softener_id)
+            softened = softened_next
+
+    conditioned = softened.rstrip() + "\n\n" + _SEEDANCE_SMOOTH_MOTION_CLAUSE
+    return conditioned, _meta(conditioned, conditioned != original, applied)
 
 
 def _req_get(request, key, default=None):
@@ -348,19 +428,30 @@ class CloudSeedance2Engine(_CloudVideoBase):
 
     def _partner_inputs(self, request):
         model_label = self._model_label()
+        prompt, prompt_meta = _condition_seedance_prompt(
+            self._text_prompt_input(request))
+        duration = self._duration_seconds(
+            request, env="OTR_CLOUD_SEEDANCE_DURATION",
+            default=7, min_s=4, max_s=15)
+        log_fields = dict(prompt_meta)
+        log_fields.update({
+            "engine": self.name,
+            "prompt_variant": _SEEDANCE_PROMPT_VARIANT,
+            "seedance_requested_duration_s": duration,
+        })
+        _LOG.info("[OTR.cloud.seedance] prompt_conditioner %s",
+                  json.dumps(log_fields, sort_keys=True))
         return {
             "model": {
                 "model": model_label,
-                "prompt": self._text_prompt_input(request),
+                "prompt": prompt,
                 "resolution": self._choice(
                     "OTR_CLOUD_SEEDANCE_RESOLUTION", "720p",
                     _SEEDANCE_RESOLUTIONS[model_label], transform=str.lower),
                 "ratio": self._choice(
                     "OTR_CLOUD_SEEDANCE_RATIO", "adaptive",
                     _SEEDANCE_RATIOS),
-                "duration": self._duration_seconds(
-                    request, env="OTR_CLOUD_SEEDANCE_DURATION",
-                    default=7, min_s=4, max_s=15),
+                "duration": duration,
                 # OTR always strips provider audio at canonicalize; do not ask
                 # Seedance to synthesize a second mix just to discard it.
                 "generate_audio": False,
