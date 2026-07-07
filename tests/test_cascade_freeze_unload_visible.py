@@ -67,6 +67,11 @@ class _LoaderStubContext:
         from nodes import _otr_model_loader as _real_loader
         from nodes import production_ledger as _real_pl
 
+        _real_loader.LLM_CACHE.clear()
+        _real_loader.LLM_CACHE.update({
+            "model_id": None, "slot": None, "cache_entry": None,
+        })
+
         gen_fn = lambda *a, **k: ""  # noqa: E731
         polish_fn = lambda *a, **k: ""  # noqa: E731
 
@@ -228,3 +233,37 @@ class TestFreezeUnloadStampVisible:
             f"({led_stamp!r}). The reserialization must be a faithful "
             f"snapshot of led.data after the finally block."
         )
+
+    def test_remote_technical_model_skips_local_unload(self):
+        """Cloud technical cascade uses a provider-tagged remote entry. The
+        finally block must not call local unload_llm, because a remote request
+        never populates the local singleton cache."""
+        from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
+        from nodes import _otr_freeze_cascade as _LFC_ORCH
+        from nodes import _otr_model_inputs as _OTRMI
+        from nodes import _otr_model_loader as _OTRML
+
+        remote_entry = {
+            "provider": "openrouter",
+            "model_id": "openrouter:slot-b",
+            "slot_letter": "B",
+            "slug": "openai/gpt-5.5",
+        }
+
+        with _LoaderStubContext() as ctx:
+            with patch.object(_OTRMI, "require_model",
+                              return_value="openrouter:slot-b"):
+                with patch.object(_OTRML, "request_slot",
+                                  return_value=remote_entry):
+                    with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
+                                      side_effect=_stub_reviewer()):
+                        inst = OTR_LedgerFreezeCascade()
+                        result = inst.run(
+                            script_text="x", script_json="{}",
+                            news_used="", estimated_minutes=15,
+                            technical_model="openrouter:slot-b",
+                        )
+
+        ctx.unload_mock.assert_not_called()
+        meta = json.loads(result[1]).get("meta", {})
+        assert meta.get("freeze_unload_ok") is True

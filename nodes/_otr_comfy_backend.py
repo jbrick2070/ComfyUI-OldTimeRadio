@@ -217,20 +217,40 @@ def recommended_slug_for_slot(letter: str) -> str:
 # Slot bindings (module-global, fed from the writer's widget values)
 # ---------------------------------------------------------------------------
 
-_slot_bindings: dict[str, str] = {}
+_slot_bindings: dict[str, str | None] = {"A": None, "B": None}
+
+
+def _clean_slot_value(v: Any) -> str | None:
+    """Normalize a slot-picker widget value to a real slug or None.
+
+    Empty, whitespace, or a parenthesized UI sentinel such as
+    ``(enable Comfy Credits)`` means "unset" for this run. This mirrors the
+    OpenRouter lane and prevents a long-lived ComfyUI process from reusing a
+    previous run's bound slug after the operator turns a slot back to the
+    sentinel.
+    """
+    if not isinstance(v, str):
+        return None
+    s = v.strip()
+    if not s or (s.startswith("(") and s.endswith(")")):
+        return None
+    return s
 
 
 def set_slot_bindings(*, slot_a: Any = None, slot_b: Any = None) -> None:
-    """Record the operator's slot-picker slug for each slot so resolve_slug
-    prefers it over the env / recommended fallback. Best-effort: a non-string
-    or a sentinel value is ignored (resolution falls through to the chain)."""
-    for letter, val in (("A", slot_a), ("B", slot_b)):
-        if isinstance(val, str) and val and not val.startswith("("):
-            _slot_bindings[letter] = val
+    """Record this run's slot-picker slug bindings.
+
+    The writer calls this once at the start of every run. Sentinel / empty
+    values explicitly clear the per-run binding so resolution falls through to
+    the env / recommended chain instead of leaking a previous run's slug.
+    """
+    _slot_bindings["A"] = _clean_slot_value(slot_a)
+    _slot_bindings["B"] = _clean_slot_value(slot_b)
 
 
 def clear_slot_bindings() -> None:
-    _slot_bindings.clear()
+    _slot_bindings["A"] = None
+    _slot_bindings["B"] = None
 
 
 def resolve_slug(repo_id: str) -> str:

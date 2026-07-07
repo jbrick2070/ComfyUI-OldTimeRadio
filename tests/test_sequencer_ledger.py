@@ -14,6 +14,7 @@ Covers four canonical Pattern 7 cases adapted for Sequencer:
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -21,6 +22,8 @@ import pytest
 import torch
 
 from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # ---------------------------------------------------------------------------
 # Mocks
@@ -98,6 +101,14 @@ def patched_sequencer_env(tmp_path):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
+def test_sequencer_uses_guarded_llm_unload_handoff():
+    """All-cloud LLM runs reach Sequencer with no local LLM cache; the pre-TTS
+    handoff must use the guarded helper, not raw unload_llm()."""
+    src = (REPO_ROOT / "nodes" / "scene_sequencer.py").read_text(encoding="utf-8")
+    assert "unload_llm_if_local_resident" in src
+    assert "from ._otr_model_loader import unload_llm\n" not in src
+
 
 def test_sequencer_processes_dialogue_skips_music(patched_sequencer_env):
     """character / announcer lines stamped with start_s + dur_s +

@@ -1,9 +1,10 @@
 """tests/test_lfc_b14_unload_on_exit.py
 
 LFC sprint commit 12.5 -- B14 fix + C7 acceptance. Verify that
-OTR_LedgerFreezeCascade.run() calls _otr_model_loader.unload_llm()
-at cascade exit so VRAM is released before HuMo / SignalLostVideo
-downstream loads.
+OTR_LedgerFreezeCascade.run() calls the guarded _otr_model_loader
+LLM-unload handoff at cascade exit so local LLM VRAM is released before
+HuMo / SignalLostVideo downstream loads, while all-cloud LLM runs skip
+an unnecessary torch/CUDA teardown.
 
 These tests inspect the source file (the runtime path needs a real
 LLM + GPU which we can't fake at test time). The runtime assertion
@@ -37,11 +38,11 @@ _FLAT = _flat(NODE_SRC)
 
 class TestB14UnloadOnExit:
     def test_unload_llm_called_in_run(self):
-        # The runtime path must invoke _OTRML.unload_llm() somewhere
+        # The runtime path must invoke the guarded unload handoff somewhere
         # in the run() method body.
-        assert "_OTRML.unload_llm(" in _FLAT, (
+        assert "_OTRML.unload_llm_if_local_resident(" in _FLAT, (
             "B14 fix: OTR_LedgerFreezeCascade.run() must call "
-            "_otr_model_loader.unload_llm() at cascade exit"
+            "_otr_model_loader.unload_llm_if_local_resident() at cascade exit"
         )
 
     def test_unload_after_disp_computed(self):
@@ -49,14 +50,14 @@ class TestB14UnloadOnExit:
         # the FreezeDisposition (we need the verdict before we let
         # go of the model). Verify ordering by source position --
         # disp = _LFC_ORCH.run_freeze_cascade(...) precedes
-        # _OTRML.unload_llm().
+        # _OTRML.unload_llm_if_local_resident().
         run_idx = _FLAT.find("_LFC_ORCH.run_freeze_cascade(")
-        unload_idx = _FLAT.find("_OTRML.unload_llm(")
+        unload_idx = _FLAT.find("_OTRML.unload_llm_if_local_resident(")
         assert run_idx != -1
         assert unload_idx != -1
         assert unload_idx > run_idx, (
-            "B14 fix: unload_llm must come AFTER run_freeze_cascade "
-            "so the FreezeDisposition is computed first"
+            "B14 fix: unload_llm_if_local_resident must come AFTER "
+            "run_freeze_cascade so the FreezeDisposition is computed first"
         )
 
     def test_unload_wrapped_in_best_effort_try(self):
@@ -77,11 +78,13 @@ class TestB14UnloadOnExit:
         )
 
     def test_unload_imported(self):
-        # _otr_model_loader.unload_llm must be reachable via the
+        # _otr_model_loader unload helpers must be reachable via the
         # _OTRML module alias the cascade node lazy-imports.
         from nodes import _otr_model_loader as _OTRML
         assert hasattr(_OTRML, "unload_llm")
         assert callable(_OTRML.unload_llm)
+        assert hasattr(_OTRML, "unload_llm_if_local_resident")
+        assert callable(_OTRML.unload_llm_if_local_resident)
 
 
 class TestB14UnloadIsCallable:

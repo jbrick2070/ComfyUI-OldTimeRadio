@@ -244,6 +244,36 @@ def test_unload_llm_moves_model_to_cpu():
     assert fake_model._cpu_moves == 1
 
 
+def test_unload_if_local_resident_skips_empty_and_remote(monkeypatch):
+    calls = []
+    monkeypatch.setattr(loader, "unload_llm", lambda: calls.append(1))
+
+    loader.LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
+    assert loader.unload_llm_if_local_resident() is False
+    assert calls == []
+
+    for provider in ("openrouter", "comfy_credits"):
+        loader.LLM_CACHE.update({
+            "model_id": f"{provider}:slot-a",
+            "slot": "creative",
+            "cache_entry": {"provider": provider},
+        })
+        assert loader.unload_llm_if_local_resident() is False
+    assert calls == []
+
+
+def test_unload_if_local_resident_calls_canonical_unload(monkeypatch):
+    calls = []
+    monkeypatch.setattr(loader, "unload_llm", lambda: calls.append(1))
+    loader.LLM_CACHE.update({
+        "model_id": catalog.DEFAULT_LLM,
+        "slot": "creative",
+        "cache_entry": {"model": _FakeModel(), "tokenizer": _FakeTokenizer()},
+    })
+    assert loader.unload_llm_if_local_resident() is True
+    assert calls == [1]
+
+
 # ---------------------------------------------------------------------------
 # request_slot -- 8-step sequence
 # ---------------------------------------------------------------------------

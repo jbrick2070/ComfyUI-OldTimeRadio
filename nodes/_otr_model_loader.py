@@ -18,6 +18,10 @@ Public surface:
     unload_llm() -> None
         Re-export of _unload_llm. Frees VRAM globally.
 
+    unload_llm_if_local_resident() -> bool
+        Handoff helper: skips the full torch/CUDA teardown when the writer
+        used only remote LLM providers and no local cache entry exists.
+
     MODEL_CONTEXT_CAPS: dict[str, int]
         Local copy of the per-model context-window caps. Drift-checked at
         first use against the function-local dict in _load_llm.
@@ -44,6 +48,8 @@ log = logging.getLogger("OTR")
 __all__ = [
     "load_llm",
     "unload_llm",
+    "has_local_resident_llm",
+    "unload_llm_if_local_resident",
     "invalidate_cache_no_gpu_teardown",
     "request_slot",
     "make_generate_fn",
@@ -69,6 +75,8 @@ LLM_CACHE: dict[str, Any] = {
     "slot": None,
     "cache_entry": None,
 }
+
+_REMOTE_CACHE_PROVIDERS = frozenset({"openrouter", "comfy_credits"})
 
 
 # ---------------------------------------------------------------------------
@@ -688,6 +696,35 @@ def unload_llm() -> None:
                 log.debug("[OTR_ModelLoader] synchronize skipped: %s", exc)
     except ImportError:
         pass
+
+
+def has_local_resident_llm() -> bool:
+    """True when the singleton cache currently owns a local LLM resource.
+
+    Remote OpenRouter / Comfy Credits requests deliberately do not populate
+    ``LLM_CACHE``. If a provider-tagged remote entry is ever present, it still
+    carries no weights and must not trigger the local torch/CUDA teardown path.
+    """
+    entry = LLM_CACHE.get("cache_entry")
+    if entry is None:
+        return False
+    if isinstance(entry, dict) and entry.get("provider") in _REMOTE_CACHE_PROVIDERS:
+        return False
+    return True
+
+
+def unload_llm_if_local_resident() -> bool:
+    """Unload only when a local LLM is actually resident.
+
+    Returns True when ``unload_llm()`` was called. Handoff callers use this to
+    keep all-cloud LLM runs from importing torch just to clear an empty local
+    allocator, while preserving ``unload_llm()`` for real local teardown and
+    load-failure orphan cleanup.
+    """
+    if not has_local_resident_llm():
+        return False
+    unload_llm()
+    return True
 
 
 

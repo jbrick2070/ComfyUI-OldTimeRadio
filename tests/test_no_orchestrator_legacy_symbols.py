@@ -233,9 +233,10 @@ _IMPORTER_PATHS = (
 
 @pytest.mark.parametrize("rel_path", _IMPORTER_PATHS)
 def test_importers_use_new_unload_path(rel_path):
-    """Each of the three production importers must import `unload_llm`
-    from `_otr_model_loader`, NOT `_unload_llm` from `story_orchestrator`.
-    Folded from `test_b4b_rss_rewire.py` at S31.5 B2.
+    """Production importers must use a modern `_otr_model_loader` unload
+    handoff, NOT `_unload_llm` from `story_orchestrator`. Cloud-safe handoff
+    sites may import `unload_llm_if_local_resident`; local-only handoff sites
+    may import `unload_llm`.
     """
     path = PACK_ROOT / rel_path
     tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -253,7 +254,7 @@ def test_importers_use_new_unload_path(rel_path):
                 legacy_imports.append(f"line {node.lineno}")
             if (
                 module.endswith("_otr_model_loader")
-                and imp.name == "unload_llm"
+                and imp.name in ("unload_llm", "unload_llm_if_local_resident")
             ):
                 new_imports.append(f"line {node.lineno}")
     assert not legacy_imports, (
@@ -262,8 +263,8 @@ def test_importers_use_new_unload_path(rel_path):
         + "\n  ".join(legacy_imports)
     )
     assert new_imports, (
-        f"{rel_path} must import `unload_llm` from "
-        f"`_otr_model_loader` to free LLM VRAM; no such import found"
+        f"{rel_path} must import a modern unload helper from "
+        f"`_otr_model_loader` to free local LLM VRAM; no such import found"
     )
 
 

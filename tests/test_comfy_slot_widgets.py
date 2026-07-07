@@ -136,6 +136,15 @@ def test_set_slot_bindings_ignores_sentinel():
     assert occ.resolve_slug(occ.SLOT_A_ID) == occ.COMFY_RECOMMENDED_CREATIVE_DEFAULT
 
 
+def test_set_slot_bindings_sentinel_clears_prior_binding():
+    """A persistent ComfyUI server must not leak a prior run's cloud slug into
+    a later run whose slot picker is back on the sentinel."""
+    occ.set_slot_bindings(slot_a="openai/gpt-5.5")
+    assert occ.resolve_slug(occ.SLOT_A_ID) == "openai/gpt-5.5"
+    occ.set_slot_bindings(slot_a=cat.COMFY_ENABLE_SENTINEL)
+    assert occ.resolve_slug(occ.SLOT_A_ID) == occ.COMFY_RECOMMENDED_CREATIVE_DEFAULT
+
+
 # --- backend load + generate ------------------------------------------------
 
 

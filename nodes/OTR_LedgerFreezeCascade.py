@@ -451,7 +451,7 @@ class OTR_LedgerFreezeCascade:
             # still returns its verdict; the downstream visual
             # nodes decide what to do about a failed unload.
             try:
-                _OTRML.unload_llm()
+                _OTRML.unload_llm_if_local_resident()
             except Exception as exc:  # noqa: BLE001
                 log.warning(
                     "[OTR_LedgerFreezeCascade] unload_llm at cascade "

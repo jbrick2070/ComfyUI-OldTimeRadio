@@ -714,11 +714,14 @@ class SceneSequencer:
 
         # Free LLM VRAM before TTS generation - Bark needs GPU headroom.
         # LLM is done by this point (script + plan already generated).
-        # S30 B4b: route through the modern loader's unload_llm.
+        # S30 B4b: route through the modern loader. Cloud-only LLM runs leave
+        # no local cache entry, so skip the full torch/CUDA teardown there.
         try:
-            from ._otr_model_loader import unload_llm
-            unload_llm()
-            log.info("[SceneSequencer] Freed LLM VRAM for inline TTS")
+            from ._otr_model_loader import unload_llm_if_local_resident
+            if unload_llm_if_local_resident():
+                log.info("[SceneSequencer] Freed LLM VRAM for inline TTS")
+            else:
+                log.info("[SceneSequencer] No local LLM VRAM to free")
         except Exception:
             pass  # LLM may already be unloaded or not imported
 

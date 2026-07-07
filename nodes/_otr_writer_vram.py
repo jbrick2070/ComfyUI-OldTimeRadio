@@ -28,12 +28,16 @@ log = logging.getLogger(__name__)
 
 def unload_writer_llm_after_script(unload_fn=None) -> str:
     """Evict the writer LLM after the last LLM phase. Returns a status string
-    for testability: "unloaded" | "skipped_env" | "skipped_error".
+    for testability: "unloaded" | "skipped_env" | "skipped_no_local" |
+    "skipped_error".
 
     Gated by OTR_WRITER_UNLOAD_AFTER_SCRIPT (default "1" = on). Set it to "0"
     to disable without a code change (operator escape hatch for the unvalidated
     path). `unload_fn` is injectable for tests; production uses
-    _otr_model_loader.unload_llm (the canonical full teardown).
+    _otr_model_loader.unload_llm (the canonical full teardown) only when a
+    local writer LLM is actually resident. A fully cloud LLM run never stores
+    OpenRouter / Comfy Credits entries in the local singleton cache, so it must
+    not import torch just to empty an already-empty CUDA allocator.
     """
     if os.environ.get("OTR_WRITER_UNLOAD_AFTER_SCRIPT", "1").strip() == "0":
         return "skipped_env"
@@ -43,7 +47,9 @@ def unload_writer_llm_after_script(unload_fn=None) -> str:
                 from . import _otr_model_loader as _OTRML
             except ImportError:  # pragma: no cover - standalone / test load
                 import _otr_model_loader as _OTRML  # type: ignore
-            unload_fn = _OTRML.unload_llm
+            if not _OTRML.unload_llm_if_local_resident():
+                return "skipped_no_local"
+            return "unloaded"
         unload_fn()
         return "unloaded"
     except Exception as exc:  # noqa: BLE001 -- never break the writer (PD1)
