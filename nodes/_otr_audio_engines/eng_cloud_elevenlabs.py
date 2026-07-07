@@ -38,15 +38,15 @@ _USD_PER_1K_CHARS = 0.24
 _TTS_TIMEOUT_S = 180.0
 #: the pinned partner row (partner_nodes.yaml) this adapter drives.
 _PARTNER_ROW = "cloud_elevenlabs_tts"
-#: default V3 model dict (ElevenLabsTextToSpeech.execute reads model["model"] /
-#: ["similarity_boost"] / ["speed"]). Multilingual v2 = the BEST general voice.
-_DEFAULT_MODEL = {
-    "model": os.environ.get("OTR_ELEVENLABS_MODEL_ID", "eleven_multilingual_v2"),
-    "similarity_boost": 0.75,
-    "speed": 1.0,
-}
-_DEFAULT_OUTPUT_FORMAT = "mp3_44100_128"
+#: Grounded against the installed Comfy Partner node:
+#: ElevenLabsTextToSpeech exposes exactly these TTS models/formats today.
+_SUPPORTED_MODELS = ("eleven_multilingual_v2", "eleven_v3")
+_DEFAULT_MODEL_ID = "eleven_multilingual_v2"
+_SUPPORTED_OUTPUT_FORMATS = ("mp3_44100_192", "opus_48000_192")
+_DEFAULT_OUTPUT_FORMAT = "mp3_44100_192"
+_SUPPORTED_TEXT_NORM = ("auto", "on", "off")
 _DEFAULT_APPLY_TEXT_NORM = "auto"
+_SEED_MAX = 2147483647
 
 
 def estimate_tts_usd(text: str) -> float:
@@ -73,6 +73,55 @@ def _stability_from_delivery(delivery_vector) -> float:
     except (TypeError, ValueError):
         s = 0.5
     return max(0.0, min(1.0, s))
+
+
+def _partner_model_payload() -> dict:
+    model_id = str(os.environ.get("OTR_ELEVENLABS_MODEL_ID") or _DEFAULT_MODEL_ID).strip()
+    if model_id not in _SUPPORTED_MODELS:
+        raise ValueError(
+            "elevenlabs.generate_voice: unsupported model %r; expected one of %r"
+            % (model_id, _SUPPORTED_MODELS)
+        )
+    payload = {
+        "model": model_id,
+        "similarity_boost": 0.75,
+        "speed": 1.0,
+    }
+    if model_id == "eleven_multilingual_v2":
+        payload.update({
+            "use_speaker_boost": False,
+            "style": 0.0,
+        })
+    return payload
+
+
+def _partner_output_format() -> str:
+    fmt = str(os.environ.get("OTR_ELEVENLABS_OUTPUT_FORMAT") or _DEFAULT_OUTPUT_FORMAT).strip()
+    if fmt not in _SUPPORTED_OUTPUT_FORMATS:
+        raise ValueError(
+            "elevenlabs.generate_voice: unsupported output_format %r; expected one of %r"
+            % (fmt, _SUPPORTED_OUTPUT_FORMATS)
+        )
+    return fmt
+
+
+def _apply_text_normalization() -> str:
+    mode = str(os.environ.get("OTR_ELEVENLABS_TEXT_NORMALIZATION")
+               or _DEFAULT_APPLY_TEXT_NORM).strip()
+    if mode not in _SUPPORTED_TEXT_NORM:
+        raise ValueError(
+            "elevenlabs.generate_voice: unsupported apply_text_normalization %r; "
+            "expected one of %r" % (mode, _SUPPORTED_TEXT_NORM)
+        )
+    return mode
+
+
+def _partner_seed(seed) -> int:
+    try:
+        val = int(seed or 0)
+    except (TypeError, ValueError):
+        val = 0
+    return val & _SEED_MAX
 
 
 @register
@@ -121,11 +170,11 @@ class ElevenLabsCloudVoice(AudioEngineAdapter):
             "voice": vid,                                   # ELEVENLABS_VOICE = the id
             "text": str(text),
             "stability": _stability_from_delivery(delivery_vector),
-            "apply_text_normalization": _DEFAULT_APPLY_TEXT_NORM,
-            "model": dict(_DEFAULT_MODEL),
+            "apply_text_normalization": _apply_text_normalization(),
+            "model": _partner_model_payload(),
             "language_code": "",
-            "seed": int(seed or 0),
-            "output_format": _DEFAULT_OUTPUT_FORMAT,
+            "seed": _partner_seed(seed),
+            "output_format": _partner_output_format(),
         }
         result = invoke_partner_node(
             _PARTNER_ROW, inputs,

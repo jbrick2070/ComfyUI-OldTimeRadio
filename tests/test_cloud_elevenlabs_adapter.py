@@ -22,6 +22,13 @@ from nodes._otr_audio_engines import registry as areg
 from nodes._otr_audio_engines import eng_cloud_elevenlabs as EL
 
 
+@pytest.fixture(autouse=True)
+def _stable_elevenlabs_env(monkeypatch):
+    monkeypatch.delenv("OTR_ELEVENLABS_MODEL_ID", raising=False)
+    monkeypatch.delenv("OTR_ELEVENLABS_OUTPUT_FORMAT", raising=False)
+    monkeypatch.delenv("OTR_ELEVENLABS_TEXT_NORMALIZATION", raising=False)
+
+
 def _install_seams(monkeypatch, tmp_path, capture):
     """Patch the cloud invoke + canonicalize seams; capture the emitted kwargs."""
     import nodes._otr_shared.cloud_media_invoke as inv
@@ -65,12 +72,21 @@ def test_voice_id_passed_straight_through_as_voice(monkeypatch, tmp_path):
     cap = {}
     _install_seams(monkeypatch, tmp_path, cap)
     eng = areg.get_engine("elevenlabs")
-    out = eng.generate_voice("Signal lost. Stand by.", "21m00Tcm4TlvDq8ikWAM",
+    out = eng.generate_voice("Signal lost. Stand by.", "EXAVITQu4vr4xnSDxMaL",
                              {"expressiveness": 0.8}, seed=7)
     assert cap["node_key"] == "cloud_elevenlabs_tts"
-    assert cap["inputs"]["voice"] == "21m00Tcm4TlvDq8ikWAM"
+    assert cap["inputs"]["voice"] == "EXAVITQu4vr4xnSDxMaL"
     assert cap["inputs"]["text"] == "Signal lost. Stand by."
     assert cap["inputs"]["seed"] == 7
+    assert cap["inputs"]["apply_text_normalization"] == "auto"
+    assert cap["inputs"]["output_format"] == "mp3_44100_192"
+    assert cap["inputs"]["model"] == {
+        "model": "eleven_multilingual_v2",
+        "similarity_boost": 0.75,
+        "speed": 1.0,
+        "use_speaker_boost": False,
+        "style": 0.0,
+    }
     # expressive delivery => LOW stability (1 - 0.8 = 0.2), clamped to [0,1].
     assert cap["inputs"]["stability"] == pytest.approx(0.2)
     # returns the Bark AUDIO contract from the canonical WAV.
@@ -85,6 +101,47 @@ def test_emitted_kwargs_match_partner_inputs(monkeypatch, tmp_path):
     eng = areg.get_engine("elevenlabs")
     eng.generate_voice("x", "vid123", None, seed=0)
     assert set(cap["inputs"]) == set(eng._partner_inputs(None))
+
+
+def test_seed_is_reduced_to_partner_int_range(monkeypatch, tmp_path):
+    cap = {}
+    _install_seams(monkeypatch, tmp_path, cap)
+    eng = areg.get_engine("elevenlabs")
+    eng.generate_voice("x", "vid123", None, seed=2**31 + 13)
+    assert cap["inputs"]["seed"] == 13
+
+
+def test_eleven_v3_env_uses_partner_tts_shape(monkeypatch, tmp_path):
+    cap = {}
+    _install_seams(monkeypatch, tmp_path, cap)
+    monkeypatch.setenv("OTR_ELEVENLABS_MODEL_ID", "eleven_v3")
+    eng = areg.get_engine("elevenlabs")
+    eng.generate_voice("x", "vid123", None, seed=0)
+    assert cap["inputs"]["model"] == {
+        "model": "eleven_v3",
+        "similarity_boost": 0.75,
+        "speed": 1.0,
+    }
+
+
+def test_invalid_partner_model_env_fails_before_invoke(monkeypatch, tmp_path):
+    cap = {}
+    _install_seams(monkeypatch, tmp_path, cap)
+    monkeypatch.setenv("OTR_ELEVENLABS_MODEL_ID", "scribe_v2")
+    eng = areg.get_engine("elevenlabs")
+    with pytest.raises(ValueError, match="unsupported model"):
+        eng.generate_voice("x", "vid123", None, seed=0)
+    assert "node_key" not in cap
+
+
+def test_invalid_partner_output_format_env_fails_before_invoke(monkeypatch, tmp_path):
+    cap = {}
+    _install_seams(monkeypatch, tmp_path, cap)
+    monkeypatch.setenv("OTR_ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")
+    eng = areg.get_engine("elevenlabs")
+    with pytest.raises(ValueError, match="unsupported output_format"):
+        eng.generate_voice("x", "vid123", None, seed=0)
+    assert "node_key" not in cap
 
 
 def test_cost_estimate_is_per_line_scale():
