@@ -152,6 +152,25 @@ def engine_family(name, default=None):
     return default or "abstract"
 
 
+def _required_inputs_for_engine(engine_name, fam=None):
+    """Family requirements plus a registered engine's stricter contract.
+
+    ``FAMILY_REQUIRED_INPUTS`` is the broad request shape. Some engines inside a
+    family are stricter (Seedance needs an init still in addition to the
+    audio-conditioned-video text/audio minimum), so preflight must validate the
+    concrete engine contract before the adapter receives the request.
+    """
+    from .schemas import FAMILY_REQUIRED_INPUTS, REQUIRED_INPUT_TOKENS
+
+    name = str(engine_name or "")
+    family = fam if fam is not None else engine_family(name, "")
+    required = set(FAMILY_REQUIRED_INPUTS.get(family, ()))
+    if name and _vreg.is_registered(name):
+        required.update(str(t) for t in (
+            getattr(_vreg.get_engine(name), "required_inputs", ()) or ()))
+    return tuple(t for t in REQUIRED_INPUT_TOKENS if t in required)
+
+
 def build_soak_fixture(n_beats=40, oom_index=None):
     """Build a synthetic ``ledger['video']`` section + meta (pure; identical
     shape to scripts/otr_video_soak.build_soak_fixture).
@@ -466,8 +485,10 @@ def _mesh_fodder_index(ledger):
 
 #: Engine FAMILIES whose render is conditioned on a SCENE still (still-spine
 #: ST-4 / W6): image_to_video (wan_i2v) + static_motion (still_motion) take
-#: asset_refs.init_image from the beat's scene still; audio_driven_face keeps
-#: the character portrait; text engines (ltx_video) stay text-only by design.
+#: asset_refs.init_image from the beat's scene still. Engines in other families
+#: that explicitly declare ``init_image`` can opt into the same scene-still join
+#: in ``build_request_from_shot``; face/talking lanes keep their own portrait or
+#: radio-face branches.
 _SCENE_INIT_FAMILIES = frozenset({"image_to_video", "static_motion"})
 
 
@@ -1073,14 +1094,23 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "scene still (would mesh the environment); init stays %r. "
                 "Investigate the image phase fork for this beat.",
                 _eng_id, _bid, _subj or char_id, init_image and "portrait" or "none")
-    # Family-based init selection (still-spine ST-4 / W6): static_motion +
-    # image_to_video shots drift/animate the beat's SCENE STILL (the 6/5 look).
+    # Family/contract-based init selection (still-spine ST-4 / W6):
+    # static_motion + image_to_video shots drift/animate the beat's SCENE STILL
+    # (the 6/5 look).  Cloud Seedance lives in audio_conditioned_video but its
+    # adapter also hard-requires init_image, so any non-face/non-3D engine that
+    # explicitly declares init_image joins this path too.
     # NO-FALLBACK (operator 2026-07-03): a missing scene still for these families
     # FAILS LOUD -- it never silently degrades to the pre-spine portrait init (a
     # scene beat would then show the wrong image). audio_driven_face keeps the
     # portrait by design (not in _SCENE_INIT_FAMILIES); fodder engines are excluded
     # by the guard; text engines are unchanged (LTX text-only by design).
-    if _family in _SCENE_INIT_FAMILIES and not _requires_fodder:
+    _engine_scene_init_required = (
+        "init_image" in _required_inputs_for_engine(_eng_id, _family)
+        and _family not in ("audio_driven_face", "character_3d")
+        and _eng_id != "ltx_audio_in"
+    )
+    if ((_family in _SCENE_INIT_FAMILIES or _engine_scene_init_required)
+            and not _requires_fodder):
         # NB: mesh_stage is family=image_to_video (IN _SCENE_INIT_FAMILIES), so
         # without the not-_requires_fodder guard this override would clobber the
         # clean fodder with the scene still and re-introduce the clay blob.
@@ -1093,11 +1123,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             init_source = "scene_still"
         else:
             raise ValueError(
-                "[OTR.render_driver] %s-family shot %s beat %s has NO scene still "
+                "[OTR.render_driver] %s-family engine %r shot %s beat %s has NO scene still "
                 "in the ledger. NO portrait-init fallback (no-fallback rip) -- a "
-                "scene-init family MUST have its per-beat scene still minted "
+                "scene-init engine MUST have its per-beat scene still minted "
                 "upstream; fix the image dispatcher / ledger." % (
-                    _family, shot.get("shot_id"), _bid)
+                    _family, _eng_id, shot.get("shot_id"), _bid)
             )
     # FIX1 / BUG-LOCAL-403 (opener centre BLACK): still_pan is family
     # "static_image_gen" -- in NEITHER _SCENE_INIT_FAMILIES nor the ltx_video
@@ -1835,9 +1865,8 @@ def _assert_family_inputs_satisfiable(engine_name, request):
     (decision + restamp) instead of feeding the wrong-shaped request to the
     engine. The no-input floor families are always satisfiable, so termination
     holds."""
-    from .schemas import FAMILY_REQUIRED_INPUTS
     fam = engine_family(engine_name, "")
-    required = FAMILY_REQUIRED_INPUTS.get(fam, ())
+    required = _required_inputs_for_engine(engine_name, fam)
     present = _present_request_tokens(request)
     if fam == "static_image_gen":
         if not ({"text_prompt", "init_image"} & present):

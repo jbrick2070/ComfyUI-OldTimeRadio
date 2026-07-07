@@ -708,16 +708,16 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
         from ._otr_video_engines.render_driver import (
             FamilyInputGap, RenderError, _is_character_face_beat,
             _is_never_humo_video_role, _line_index, _present_request_tokens,
+            _required_inputs_for_engine,
             _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
-        from ._otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
     except ImportError:
         from _otr_video_engines.render_driver import (
             FamilyInputGap, RenderError, _is_character_face_beat,
             _is_never_humo_video_role, _line_index, _present_request_tokens,
+            _required_inputs_for_engine,
             _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
-        from _otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
 
     def _effective_cast_time_engine(role: str, eng_id: str) -> str:
         eff = str(eng_id or "")
@@ -807,7 +807,7 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
     # validate the engine that would actually receive this request.
     effective_engine = str(shot.get("engine_id") or effective_engine or "")
     fam = engine_family(effective_engine, "")
-    required = FAMILY_REQUIRED_INPUTS.get(fam, ())
+    required = _required_inputs_for_engine(effective_engine, fam)
     if not required and fam != "static_image_gen":
         return
 

@@ -300,6 +300,34 @@ def test_build_request_from_shot_still_pan_opener_conditions_on_scene_still():
     assert req["observability"]["init_source"] == "scene_still"
 
 
+def test_build_request_from_shot_seedance_opener_conditions_on_scene_still():
+    # Seedance is audio_conditioned_video, but its concrete adapter requires an
+    # init_image. The opener must therefore join the same minted wide scene
+    # still as the i2v/still lanes, never reach the cloud adapter empty-handed.
+    led = _still_pan_opener_ledger()
+    shot = dict(led["video"]["shots"][0])
+    shot["engine_id"] = "cloud_seedance_2"
+    shot["family"] = "audio_conditioned_video"
+    req = rd.build_request_from_shot(shot, led)
+    assert req["asset_refs"]["init_image"] == "X:/img/still_b000_music_open.png"
+    assert req["observability"]["init_source"] == "scene_still"
+
+
+def test_seedance_preflight_requires_engine_init_image():
+    # The family minimum for audio_conditioned_video is text+audio so LTX can
+    # stay flexible, but Seedance's concrete engine contract is stricter.
+    req = rd.build_request(
+        {"shot_id": "shot_b000_music_open", "role": "music_visual",
+         "engine_id": "cloud_seedance_2"},
+        {"audio_ref": "X:/audio/music.wav"},
+        25,
+        canvas=(832, 480),
+    )
+    with pytest.raises(rd.FamilyInputGap) as excinfo:
+        rd._assert_family_inputs_satisfiable("cloud_seedance_2", req)
+    assert "init_image" in str(excinfo.value)
+
+
 def test_build_request_from_shot_still_pan_missing_still_is_loud_not_black():
     # No scene still for the opener -> init stays empty (the cheap family will
     # draw its floor) but the degrade is LOUD (the branch warns), never a silent

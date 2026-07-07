@@ -917,6 +917,29 @@ def test_preflight_defers_ltx_ambient_audio_to_render_batch(monkeypatch):
     assert shots[0]["engine_id"] == "ltx_audio_in"
 
 
+def test_preflight_defers_seedance_scene_still_to_image_phase(monkeypatch):
+    """Seedance's engine contract requires init_image even though its family
+    minimum is text+audio. ShotLock runs before the image dispatcher writes the
+    scene still, so this specific image gap defers instead of freeze-halting."""
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    beats = [{"beat_id": "b000_music_open", "role": "music_visual",
+              "char_id": "", "dur_s": 2.0}]
+    budget = {"total_frames": 50, "per_beat": {"b000_music_open": 50}}
+    policy = {"video_models": {"music_video_model": "cloud_seedance_2"}}
+    ledger = {
+        "lines": [{"line_id": "b000_music_open", "char_id": "",
+                   "start_s": 0.0, "dur_s": 2.0}],
+        "images": {"images": []},
+        "meta": {"story_brief_terms": {"setting": ["a signal room"]}},
+        "video": {"fps": 25, "shots": []},
+    }
+
+    _groups, shots = sl.build_execution_plan(beats, budget, {}, policy,
+                                             ledger=ledger)
+
+    assert shots[0]["engine_id"] == "cloud_seedance_2"
+
+
 def test_preflight_defers_humo_init_image_to_image_phase(monkeypatch):
     """ShotLock runs before OTR_ImageGenDispatcher, so a character HuMo pick
     must not freeze-halt just because the portrait row has not been written
