@@ -580,8 +580,13 @@ class OTRVoiceNodeBase:
     # ------------------------------------------------------------------ #
     @staticmethod
     def _teardown(adapter):
-        """I-7 teardown: unload the engine + free VRAM. Best-effort, never
-        raises (a teardown failure must not mask the render result)."""
+        """I-7 teardown: unload local engines + free VRAM. Best-effort, never
+        raises (a teardown failure must not mask the render result).
+
+        Cloud adapters declare ``native=False``: they have no local residency,
+        so teardown must not import torch or poke CUDA just because they emitted
+        a Comfy AUDIO tensor.
+        """
         try:
             if adapter is not None and hasattr(adapter, "unload"):
                 adapter.unload()
@@ -589,6 +594,8 @@ class OTRVoiceNodeBase:
             pass
         try:
             gc.collect()
+            if adapter is not None and getattr(adapter, "native", True) is False:
+                return
             import torch
 
             if torch.cuda.is_available():

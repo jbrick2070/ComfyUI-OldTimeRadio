@@ -30,6 +30,7 @@ if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
 from nodes._otr_video_engines import cheap_families  # noqa: F401 (register floor)
+from nodes._otr_video_engines import eng_cloud_video  # noqa: F401 (register cloud video)
 from nodes._otr_video_engines import render_driver as rd
 
 
@@ -152,13 +153,22 @@ class TestSliceMasterAudio:
 # 2026-06-22: ambient-audio (ltx_audio_in / viz_green) no-timing music-beat gap
 # --------------------------------------------------------------------------- #
 class TestAmbientAudioMusicBeatGap:
-    def test_uses_ambient_master_audio_scope(self):
+    def test_uses_ambient_master_audio_scope(self, monkeypatch):
+        monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
         # ltx_audio_in's family + the viz_green engine = ambient master lanes.
         assert rd._uses_ambient_master_audio("ltx_audio_in", "audio_conditioned_video") is True
         assert rd._uses_ambient_master_audio("viz_green", "abstract") is True
         # HuMo / talk (audio_driven_face) is EXCLUDED -- it needs the OWN voice,
         # never a master-mix slice (would lip-sync to the wrong audio).
         assert rd._uses_ambient_master_audio("humo", "audio_driven_face") is False
+        # Cloud avatar bookends are selected cloud audio-reactive lanes, not
+        # local HuMo defaults; they may use the bounded bookend master slice.
+        assert rd._uses_ambient_master_audio(
+            "cloud_kling_avatar", "audio_driven_face",
+            role="announcer_visual") is True
+        assert rd._uses_ambient_master_audio(
+            "cloud_kling_avatar", "audio_driven_face",
+            role="character_video") is False
         assert rd._uses_ambient_master_audio("ltx_video", "text_to_video") is False
 
     def test_cumulative_beat_start_sums_preceding(self):
@@ -231,6 +241,40 @@ class TestAmbientAudioMusicBeatGap:
         # start == cumulative position of preceding beats (1.0s)
         assert captured["start"] == pytest.approx(1.0)
 
+    def test_cloud_avatar_bookend_no_timing_gets_bounded_slice(self, tmp_path):
+        """A cloud avatar announcer bookend stays cloud and still receives the
+        bounded master slice it needs for audio_ref when no per-line WAV exists."""
+        master = tmp_path / "master.mp4"
+        master.write_bytes(b"fake-master")
+        ledger = {
+            "audio": {"master_audio_sha256": "deadbeef"},
+            "video": {"fps": 25, "shots": [
+                {"shot_id": "shot_pre", "target_frame_count": 25},
+                {"shot_id": "shot_b009", "target_frame_count": 50},
+            ]},
+            "lines": [{"line_id": "b009"}],
+            "images": {"images": []},
+        }
+        shot = _shot("b009", engine="cloud_kling_avatar")
+        shot["role"] = "announcer_visual"
+        shot["target_frame_count"] = 50
+        sliced = str(tmp_path / "cloud_avatar_slice.wav")
+        captured = {}
+
+        def _fake_slice(path, start, dur, master_hash=""):
+            captured["start"] = start
+            captured["dur"] = dur
+            return sliced
+
+        with mock.patch.object(rd, "_slice_master_audio", side_effect=_fake_slice):
+            req = rd.build_request_from_shot(shot, ledger, master_audio_path=str(master))
+
+        assert shot["engine_id"] == "cloud_kling_avatar"
+        assert req["family_hint"] == "audio_driven_face"
+        assert req["audio_ref"] == {"path": sliced}
+        assert captured["start"] == pytest.approx(1.0)
+        assert captured["dur"] == pytest.approx(2.0)
+
 
 # --------------------------------------------------------------------------- #
 # 2026-06-30 HuMo-improve plan -- "radio is the host" (reversing Route-A
@@ -247,6 +291,35 @@ class TestRadioIsHostGuard:
             rd._enforce_radio_is_host(shot)
             assert shot["engine_id"] == "ltx_audio_in", (role, engine_id)
             assert shot["family"] == "audio_conditioned_video", (role, engine_id)
+
+    def test_cloud_audio_driven_face_bookend_is_untouched(self):
+        # Kling Avatar is a Partner/cloud audio_driven_face engine. The old HuMo
+        # default guard must not silently rewrite it to local ltx_audio_in.
+        shot = {"shot_id": "s", "beat_id": "b", "role": "announcer_visual",
+                "engine_id": "cloud_kling_avatar", "family": "audio_driven_face"}
+        rd._enforce_radio_is_host(shot)
+        assert shot["engine_id"] == "cloud_kling_avatar"
+        assert shot["family"] == "audio_driven_face"
+
+    def test_all_cloud_video_section_skips_local_reclaim(self):
+        section = {"shots": [
+            {"engine_id": "cloud_seedance_2"},
+            {"engine_id": "cloud_kling_avatar"},
+        ]}
+        assert rd._section_has_local_video_engine(section) is False
+        assert rd._should_reclaim_between_engines(
+            "cloud_seedance_2", "cloud_kling_avatar") is False
+
+    def test_mixed_video_section_reclaims_before_local_engine(self):
+        section = {"shots": [
+            {"engine_id": "cloud_seedance_2"},
+            {"engine_id": "ltx_audio_in"},
+        ]}
+        assert rd._section_has_local_video_engine(section) is True
+        assert rd._should_reclaim_between_engines(
+            "cloud_seedance_2", "ltx_audio_in") is True
+        assert rd._should_reclaim_between_engines(
+            "ltx_audio_in", "cloud_seedance_2") is False
 
     def test_character_video_humo_is_untouched(self):
         # character_video is the ONLY role HuMo may still serve (real dialogue

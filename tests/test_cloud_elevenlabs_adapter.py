@@ -61,10 +61,27 @@ def test_registered_as_elevenlabs():
     assert set(eng.roles) == {"char_voice", "announcer_voice"}
     # C1/C2: cloud voice is opt-in ONLY -- never a byte-identical default.
     assert eng.default_roles == ()
+    assert eng.native is False
     # C3: identity is adapter metadata -- no local ref clip, no local fallback.
     assert eng.requires_voice_ref is False
     assert eng.voice_ref_field == "provider_voice_id"
     assert eng.missing_ref_fallback is None
+
+
+def test_cloud_voice_teardown_skips_local_cuda_cleanup(monkeypatch):
+    import torch
+    from nodes._otr_voice_node_common import OTRVoiceNodeBase
+
+    eng = areg.get_engine("elevenlabs")
+    called = {"empty_cache": False}
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        torch.cuda, "empty_cache",
+        lambda: called.__setitem__("empty_cache", True))
+
+    OTRVoiceNodeBase._teardown(eng)
+
+    assert called["empty_cache"] is False
 
 
 def test_voice_id_passed_straight_through_as_voice(monkeypatch, tmp_path):

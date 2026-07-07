@@ -54,7 +54,24 @@ def test_registered_as_sonilo():
     assert eng.interface == "clip"
     # C1/C2: cloud music is opt-in ONLY -- never a byte-identical default.
     assert eng.default_roles == ()
+    assert eng.native is False
     assert eng.node_key == "cloud_sonilo_music"
+
+
+def test_cloud_music_teardown_skips_local_cuda_cleanup(monkeypatch):
+    import torch
+    from nodes.stable_audio_theme import StableAudioTheme
+
+    eng = areg.get_engine("sonilo")
+    called = {"empty_cache": False}
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        torch.cuda, "empty_cache",
+        lambda: called.__setitem__("empty_cache", True))
+
+    StableAudioTheme._teardown(eng)
+
+    assert called["empty_cache"] is False
 
 
 def test_prompt_duration_seed_forwarded(monkeypatch, tmp_path):

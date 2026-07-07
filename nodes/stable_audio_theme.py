@@ -221,7 +221,11 @@ class StableAudioTheme:
     # ------------------------------------------------------------------ #
     @staticmethod
     def _teardown(adapter):
-        """I-7 teardown: unload the engine + free VRAM. Best-effort."""
+        """I-7 teardown: unload local engines + free VRAM. Best-effort.
+
+        Cloud music adapters declare ``native=False`` and have no local model
+        residency, so do not import torch / touch CUDA for those routes.
+        """
         try:
             if adapter is not None and hasattr(adapter, "unload"):
                 adapter.unload()
@@ -229,6 +233,8 @@ class StableAudioTheme:
             pass
         try:
             gc.collect()
+            if adapter is not None and getattr(adapter, "native", True) is False:
+                return
             import torch
 
             if torch.cuda.is_available():

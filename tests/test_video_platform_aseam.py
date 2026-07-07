@@ -860,6 +860,41 @@ def test_preflight_uses_effective_redirected_engine_for_humo_bookend(monkeypatch
     assert shots[0]["engine_id"] == "humo_1.7B_169"
 
 
+def test_preflight_keeps_cloud_avatar_bookend_cloud(monkeypatch):
+    """Cloud avatar selections must not be validated as redirected local LTX.
+    The selected Partner engine owns the request shape."""
+    import nodes._otr_video_engines  # noqa: F401  self-register cloud engines
+    from nodes._otr_video_engines import render_driver as rd
+
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    orig_required = rd._required_inputs_for_engine
+    seen = []
+
+    def spy_required(engine_name, fam=None):
+        seen.append(str(engine_name))
+        return orig_required(engine_name, fam)
+
+    monkeypatch.setattr(rd, "_required_inputs_for_engine", spy_required)
+    beats = [{"beat_id": "bcloud", "role": "announcer_visual", "char_id": "",
+              "dur_s": 2.0}]
+    budget = {"total_frames": 50, "per_beat": {"bcloud": 50}}
+    policy = {"video_models": {"announcer_video_model": "cloud_kling_avatar"}}
+    ledger = {
+        "lines": [{"line_id": "bcloud", "char_id": "",
+                   "start_s": 0.0, "dur_s": 2.0}],
+        "images": {"images": []},
+        "meta": {"story_brief_terms": {"setting": ["a cloud broadcast room"]}},
+        "video": {"fps": 25, "shots": []},
+    }
+
+    groups, shots = sl.build_execution_plan(beats, budget, {}, policy, ledger=ledger)
+
+    assert groups[0]["engine_id"] == "cloud_kling_avatar"
+    assert shots[0]["engine_id"] == "cloud_kling_avatar"
+    assert "cloud_kling_avatar" in seen
+    assert "ltx_audio_in" not in seen
+
+
 def test_preflight_defers_redirected_announcer_radio_face(monkeypatch):
     """The redirected ltx_audio_in announcer may require the wide radio-face
     still, but ShotLock runs before MetaBrief/dispatcher materialize it."""

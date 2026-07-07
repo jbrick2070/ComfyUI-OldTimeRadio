@@ -814,25 +814,30 @@ def _uses_ambient_master_audio(engine_id, family, is_char_face=False, role=""):
     """Lanes that CONDITION on the ambient master MIX (not a specific voice): the
     ``audio_conditioned_video`` family (ltx_av_music / ltx_audio_in BOOKEND beats --
     which HARD-require audio_ref) + the viz_green scopes. These get a bounded master
-    slice when a beat lacks per-line timing. ``audio_driven_face`` (HuMo / ltx_av_talk)
-    is normally EXCLUDED: it needs the character's OWN voice, so a master-mix slice
-    would make it lip-sync to the wrong audio. A CHARACTER-FACE beat is excluded for
-    the SAME reason regardless of family -- ``ltx_audio_in`` on a character beat must
-    use the character's clean own voice, never the ambient mix (2026-06-26 role-driven).
+    slice when a beat lacks per-line timing. Local ``audio_driven_face`` engines
+    (HuMo / ltx_av_talk) are normally EXCLUDED: they need the character's OWN voice,
+    so a master-mix slice would make them lip-sync to the wrong audio. A
+    CHARACTER-FACE beat is excluded for the SAME reason regardless of family --
+    ``ltx_audio_in`` on a character beat must use the character's clean own voice,
+    never the ambient mix (2026-06-26 role-driven).
 
     OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host): when the toggle is ON,
     a LINELESS announcer/music BOOKEND routes to HuMo (audio_driven_face) as the
     radio-HOST face. That beat has NO per-line voice (it is the music/announcer bed),
     yet HuMo HARD-requires ``audio_ref`` -- so the host is driven by the ambient MASTER
     slice (it "hosts / sings" to the bed; deliberately not real lip-sync). This is the
-    ONE case an audio_driven_face beat uses the master mix, and only for the never-humo
-    bookend roles (a real CHARACTER face beat is still excluded above)."""
+    ONE local case an audio_driven_face beat uses the master mix, and only for the
+    never-humo bookend roles (a real CHARACTER face beat is still excluded above).
+    Partner/cloud avatar engines are also allowed to use the bounded bookend slice:
+    they are the selected cloud audio-reactive lane, not the historical local HuMo
+    default, and must not fall back to a local LTX rewrite just to satisfy
+    ``audio_ref``."""
     if is_char_face:
         return False
     if (str(family) == "audio_driven_face"
-            and os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
             and _is_never_humo_video_role(str(role or ""))):
-        return True
+        return (os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
+                or _is_cloud_video_engine(engine_id))
     return (str(family) == "audio_conditioned_video"
             or str(engine_id) in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
                                   "viz_camera"))
@@ -904,10 +909,63 @@ def _is_never_humo_video_role(role: str) -> bool:
     return bool(proxy) and _is_never_humo_role(proxy)
 
 
+def _is_cloud_video_engine(engine_id: str) -> bool:
+    """True for Partner/cloud video engines, including aliases whose engine id
+    does not itself start with ``cloud_`` but whose adapter declares a cloud
+    ``node_key``. Pure registry read; unknown engine -> False."""
+    eid = str(engine_id or "")
+    if eid.startswith("cloud_"):
+        return True
+    try:
+        if _vreg.is_registered(eid):
+            node_key = str(getattr(_vreg.get_engine(eid), "node_key", "") or "")
+            return node_key.startswith("cloud_")
+    except Exception:  # noqa: BLE001 -- unknown/unbuilt engines are not cloud
+        return False
+    return False
+
+
+def _radio_is_host_redirect_applies(engine_id: str) -> bool:
+    """True iff the radio-host guard should rewrite this selected engine.
+
+    The guard is a LOCAL HuMo-family policy escape hatch. Partner cloud engines
+    can also be audio-driven-face engines (for example Kling Avatar), but those
+    must remain cloud requests; rewriting them to local LTX creates the hybrid
+    cloud/local behavior the cloud profiles exist to avoid.
+    """
+    eid = str(engine_id or "")
+    return (
+        bool(eid)
+        and not _is_cloud_video_engine(eid)
+        and engine_family(eid, "") == "audio_driven_face"
+    )
+
+
+def _section_has_local_video_engine(section: dict) -> bool:
+    """True when a rendered section includes at least one non-cloud video engine.
+
+    Pure-cloud sections should not run the local VRAM residue freer: Partner
+    adapters do not load local video models, and importing cleanup machinery in
+    an all-cloud route violates the cloud-only contract even when best-effort.
+    """
+    for shot in (section or {}).get("shots") or ():
+        eid = str((shot or {}).get("engine_id") or "")
+        if eid and not _is_cloud_video_engine(eid):
+            return True
+    return False
+
+
+def _should_reclaim_between_engines(last_engine: str, this_engine: str) -> bool:
+    """Inter-beat local residue reclaim only matters before a local engine load."""
+    last = str(last_engine or "")
+    this = str(this_engine or "")
+    return bool(last and this and this != last and not _is_cloud_video_engine(this))
+
+
 def _enforce_radio_is_host(shot):
     """Mutate ``shot`` IN PLACE (the ledger's own dict, by reference -- same
     pattern as the OTR_FORCE_ENGINE_MAP override below) so an announcer_visual /
-    music_visual beat can NEVER dispatch a HuMo-family (audio_driven_face)
+    music_visual beat can NEVER dispatch a local HuMo-family (audio_driven_face)
     engine: "the radio is the host", never a talking human face for the
     bookends (operator 2026-05-01, re-affirmed 2026-06-30 after Route-A's HuMo
     bookend workaround produced a generic face on eyeball -- see the
@@ -936,15 +994,15 @@ def _enforce_radio_is_host(shot):
     if not _is_never_humo_video_role(role):
         return
     eng_id = str(shot.get("engine_id") or "")
-    if engine_family(eng_id, "") != "audio_driven_face":
+    if not _radio_is_host_redirect_applies(eng_id):
         return
     _LOG.warning(
-        "[OTR.render_driver] RADIO-IS-HOST (LOUD): role=%s picked HuMo-family "
+        "[OTR.render_driver] RADIO-IS-HOST (LOUD): role=%s picked local HuMo-family "
         "engine %r for shot %s -- HuMo's finetuned weights only animate a "
         "FACE (2026-05-01 BUG-LOCAL-129, re-confirmed 2026-06-30: an all-HuMo "
         "bookend eyeballed as a generic human host, not a radio); redirecting "
-        "to %r. Pick a non-audio_driven_face engine for this role to silence "
-        "this override.", role, eng_id, shot.get("shot_id"),
+        "to %r. Pick a non-local-audio_driven_face engine for this role to "
+        "silence this override.", role, eng_id, shot.get("shot_id"),
         _NEVER_HUMO_REDIRECT_ENGINE)
     shot["engine_id"] = _NEVER_HUMO_REDIRECT_ENGINE
     shot["family"] = engine_family(_NEVER_HUMO_REDIRECT_ENGINE,
@@ -1312,12 +1370,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "(init_source=missing_scene_still). This should not happen "
                 "after the still-spine coverage fix; investigate the image "
                 "phase for beat %s.", _bid, _bid)
-    # Route-A's HuMo-radio-face music-bookend workaround (2026-06-28) is RETIRED
-    # 2026-06-30 (see _enforce_radio_is_host above): a music_visual beat can no
-    # longer reach this point with _family == "audio_driven_face" -- the guard
-    # already redirected it to ltx_audio_in before _family was computed. The
-    # ltx_audio_in / still_pan / still_flat scene-still branch above supplies
-    # its init_image instead.
+    # Route-A's local HuMo-radio-face music-bookend workaround (2026-06-28) is
+    # RETIRED 2026-06-30 (see _enforce_radio_is_host above): a local HuMo
+    # music_visual beat redirects to ltx_audio_in before _family is computed.
+    # Partner/cloud avatar engines may still legitimately reach this point as
+    # audio_driven_face; their own declared init_image requirement is honored by
+    # the scene-still branch above.
     # OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host, chunk 4): a
     # LINELESS announcer/music bookend on a HuMo (audio_driven_face) engine has
     # char_id="" -> no cast portrait -> empty init_image. Under the toggle, feed
@@ -1383,12 +1441,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # from the beat's target_frame_count (its audio-derived length) at its
         # cumulative timeline position -- NEVER the whole master (an episode-length
         # WAV would blow up the audio encoder).
-        # Route-A's dedicated HuMo-music-bookend theme-slice carve-out
-        # (2026-06-28) is RETIRED 2026-06-30: a music_visual beat can no longer
-        # reach this point on an audio_driven_face engine (_enforce_radio_is_host
-        # redirects it to ltx_audio_in upstream), and _uses_ambient_master_audio
-        # already covers ltx_audio_in's audio_conditioned_video family directly
-        # -- no separate carve-out needed.
+        # Route-A's dedicated local HuMo-music-bookend theme-slice carve-out
+        # (2026-06-28) is RETIRED 2026-06-30: local HuMo bookends redirect to
+        # ltx_audio_in upstream. _uses_ambient_master_audio now owns the valid
+        # bookend audio lanes directly: ltx_audio_in/audio_conditioned_video,
+        # visualizers, and Partner/cloud avatar engines.
         if ((start_s is None or dur_s is None)
                 and _uses_ambient_master_audio(
                     shot.get("engine_id"), _family,
@@ -1979,26 +2036,31 @@ def run_episode(ledger, *, oom_shot_id=None,
     # render-phase ceiling (the 15-16GB pin; CS-2). Evict them 100% BEFORE the
     # first video beat so HuMo/LTX load into a clean GPU and the render-phase peak
     # reflects ONE resident heavy engine. LOUD by contract; a no-op off the box.
-    try:
-        # PHASE-BOUNDARY residue free (stills -> video). A ComfyUI-only reclaim is
-        # NOT enough: the detach loop detached 0 AND free_memory freed 0MB live
-        # (measured 2026-06-15, torch-free 6939MB -> 6939MB), because the ~7GB
-        # resident residue is the OUT-OF-BAND transformers caches (the writer LLM,
-        # Bark, ...) loaded through OTR's OWN loaders -- ComfyUI's model_management
-        # cannot see them, so free_memory/empty_cache cannot touch them. The
-        # canonical Lever-1 freer releases the writer LLM + Bark FIRST, THEN
-        # DETACHES any ComfyUI FLUX patcher (surgical; NO unload_all_models per
-        # V-4/V-5), then flushes the allocator, so the first video beat (14B
-        # wan_i2v) loads into a clean GPU instead of OOMing at the ksampler.
-        # Best-effort (never raises); MEASURED telemetry.
-        from .._otr_vram_levers import free_otr_pipeline_residue as _free_residue
-        _rep = _free_residue(reason="pre-render: all stills minted")
-        _LOG.warning(
-            "[OTR video] pre-render residue free: ran=%s failed=%s free_gb_after=%s",
-            _rep.get("steps_run"), _rep.get("steps_failed"),
-            _rep.get("free_gb_after"))
-    except Exception as _exc:  # noqa: BLE001 -- reclaim is best-effort, never fatal
-        _LOG.warning("[OTR video] pre-render VRAM reclaim skipped: %s", _exc)
+    if _section_has_local_video_engine(section):
+        try:
+            # PHASE-BOUNDARY residue free (stills -> video). A ComfyUI-only
+            # reclaim is NOT enough: the detach loop detached 0 AND free_memory
+            # freed 0MB live (measured 2026-06-15, torch-free 6939MB -> 6939MB),
+            # because the ~7GB resident residue is the OUT-OF-BAND transformers
+            # caches (the writer LLM, Bark, ...) loaded through OTR's OWN
+            # loaders -- ComfyUI's model_management cannot see them, so
+            # free_memory/empty_cache cannot touch them. The canonical Lever-1
+            # freer releases the writer LLM + Bark FIRST, THEN DETACHES any
+            # ComfyUI FLUX patcher (surgical; NO unload_all_models per V-4/V-5),
+            # then flushes the allocator, so the first local video engine loads
+            # into a clean GPU instead of OOMing at the ksampler. Best-effort
+            # (never raises); MEASURED telemetry.
+            from .._otr_vram_levers import free_otr_pipeline_residue as _free_residue
+            _rep = _free_residue(reason="pre-render: all stills minted")
+            _LOG.warning(
+                "[OTR video] pre-render residue free: ran=%s failed=%s free_gb_after=%s",
+                _rep.get("steps_run"), _rep.get("steps_failed"),
+                _rep.get("free_gb_after"))
+        except Exception as _exc:  # noqa: BLE001 -- reclaim is best-effort, never fatal
+            _LOG.warning("[OTR video] pre-render VRAM reclaim skipped: %s", _exc)
+    else:
+        _LOG.info("[OTR video] pre-render VRAM reclaim skipped: all selected "
+                  "video engines are Partner/cloud")
     _last_engine = None
     for shot in section["shots"]:
         # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
@@ -2012,7 +2074,7 @@ def run_episode(ledger, *, oom_shot_id=None,
         # the resident-stack reuse, e.g. humo x3, is preserved). Best-effort,
         # never fatal; no unload_all_models (V-4/V-5); MEASURED telemetry.
         _this_engine = str(shot.get("engine_id") or "")
-        if _last_engine and _this_engine and _this_engine != _last_engine:
+        if _should_reclaim_between_engines(_last_engine, _this_engine):
             try:
                 from .._otr_vram_levers import (
                     free_otr_pipeline_residue as _free_residue)

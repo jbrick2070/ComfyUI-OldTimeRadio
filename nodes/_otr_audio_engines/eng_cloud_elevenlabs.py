@@ -134,6 +134,7 @@ class ElevenLabsCloudVoice(AudioEngineAdapter):
     commercial_clean = True               # library voices, ToS-clean (S2 pool)
     interface = "per_line"
     sample_rate = 44100                   # matches the pinned yaml + canonicalize
+    native = False                        # runs on Comfy Cloud, not local residency
     # C3: adapter-metadata voice identity -- no local ref clip, no local fallback.
     requires_voice_ref = False
     voice_ref_field = "provider_voice_id"

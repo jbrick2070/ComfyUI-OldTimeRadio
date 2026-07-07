@@ -708,14 +708,14 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
         from ._otr_video_engines.render_driver import (
             FamilyInputGap, RenderError, _is_character_face_beat,
             _is_never_humo_video_role, _line_index, _present_request_tokens,
-            _required_inputs_for_engine,
+            _radio_is_host_redirect_applies, _required_inputs_for_engine,
             _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
     except ImportError:
         from _otr_video_engines.render_driver import (
             FamilyInputGap, RenderError, _is_character_face_beat,
             _is_never_humo_video_role, _line_index, _present_request_tokens,
-            _required_inputs_for_engine,
+            _radio_is_host_redirect_applies, _required_inputs_for_engine,
             _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
 
@@ -731,7 +731,7 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
                             "cast-time preflight: %s", exc)
         if (os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") != "1"
                 and _is_never_humo_video_role(str(role or ""))
-                and engine_family(eff, "") == "audio_driven_face"):
+                and _radio_is_host_redirect_applies(eff)):
             return "ltx_audio_in"
         return eff
 

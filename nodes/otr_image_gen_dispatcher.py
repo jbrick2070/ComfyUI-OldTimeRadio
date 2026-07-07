@@ -3,11 +3,13 @@
 The terminal C node: for each image object it (1) composes the request cache key
 ``(role, object_id, prompt_hash, seed, engine_id, engine_version)``, (2) reuses
 the existing image on a cache hit, (3) otherwise ``assert_usable`` (fail-closed,
-NO silent Flux swap) -> takes the SHARED AS-3 GPU-residency lease -> generates
-(in-process Flux gen-1 OR a cu128 sidecar; injected ``gen_fn`` in tests) -> writes
+NO silent Flux swap) -> takes the SHARED AS-3 GPU-residency lease for local
+engines only -> generates (in-process Flux gen-1, Partner/cloud adapter, or a
+cu128 sidecar; injected ``gen_fn`` in tests) -> writes
 the still CONTENT-ADDRESSED at ``output/otr/stills/{portrait_content_hash}.png``
 (AS-5, never-overwrite) -> stamps the ledger -> releases the lease + re-probes
-NVML -> emits the ``image_done`` STRING token (mirrors ``audio_done``).
+NVML for local engines -> emits the ``image_done`` STRING token (mirrors
+``audio_done``).
 
 Seam guards folded in (PASS-IMG MUST/SHOULD-FIX):
 * DISK-PATH handoff -- a sidecar returns a ``.png`` PATH, never an IMAGE tensor;
@@ -357,9 +359,9 @@ def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
     render will require. Mirror the render order:
 
     1. ``OTR_FORCE_ENGINE_MAP`` rewrites planned shot engines.
-    2. ``render_driver._enforce_radio_is_host`` redirects announcer/music
+    2. ``render_driver._enforce_radio_is_host`` redirects announcer/music local
        HuMo-family bookends to ``ltx_audio_in`` when ``OTR_ENABLE_HUMO_HOSTS`` is
-       off.
+       off. Partner/cloud engines stay cloud.
 
     Unknown engines or import failures keep the input id (fail-safe: mint the
     still rather than quietly skipping an asset that render might need)."""
@@ -370,8 +372,8 @@ def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
     if role_s not in ("announcer_visual", "music_visual"):
         return eff
     try:
-        from ._otr_video_engines.render_driver import engine_family
-        if engine_family(eff, "") == "audio_driven_face":
+        from ._otr_video_engines.render_driver import _radio_is_host_redirect_applies
+        if _radio_is_host_redirect_applies(eff):
             return "ltx_audio_in"
     except Exception:  # noqa: BLE001 -- fail-safe: keep the selected id
         return eff
@@ -611,7 +613,9 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             warnings.append(
                 f"{oid}: cache index entry {hit_id[:12]} has no on-disk file; "
                 "regenerating (LOUD)")
-        # cache miss -> assert usable (fail-closed) -> lease -> generate -> stamp
+        # cache miss -> assert usable (fail-closed) -> generate -> stamp. Local
+        # image engines take the GPU residency lease; Partner/cloud adapters do
+        # not touch the local GPU gate.
         try:
             _ireg.assert_usable(engine_id, role)
         except Exception as exc:  # noqa: BLE001  (EngineUnusable et al.)
@@ -640,8 +644,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "width": obj_w or None, "height": obj_h or None,
         }
         lease = None
+        cloud_image_engine = _is_cloud_image_engine(engine_id)
         try:
-            lease = _lease.acquire(timeout_s=lease_timeout_s, lockdir=lockdir)
+            if not cloud_image_engine:
+                lease = _lease.acquire(timeout_s=lease_timeout_s, lockdir=lockdir)
             pixels = _coerce_pixels(
                 gen_fn(request), min_bytes=handoff_min_bytes,
                 wait_attempts=handoff_wait_attempts, wait_sleep_s=handoff_wait_sleep_s,
@@ -676,7 +682,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             if lease is not None:
                 _lease.release(lease)
         # post-generation residency confirm (best-effort; gates the C->A handoff).
-        if not _lease.wait_until_below_mb(15000, attempts=3, sleep_s=0.0):
+        if (not cloud_image_engine
+                and not _lease.wait_until_below_mb(15000, attempts=3, sleep_s=0.0)):
             log.info("[OTR_ImageGenDispatcher] NVML re-probe inconclusive (CPU/no-NVML or busy)")
         image_id = f"img_{oid}_{content_hash[:12]}"
         # Materialize the fresh render into the EPISODE stills dir (ST-3/W3);
@@ -788,6 +795,19 @@ def _safe_engine(engine_id):
         return _ireg.get_engine(engine_id)
     except Exception:  # noqa: BLE001
         return None
+
+
+def _is_cloud_image_engine(engine_id):
+    """True for Partner/cloud image engines, including friendly aliases whose
+    registry id is not ``cloud_*`` but whose adapter declares a cloud node_key."""
+    eid = str(engine_id or "")
+    if eid.startswith("cloud_"):
+        return True
+    eng = _safe_engine(eid)
+    if eng is None:
+        return False
+    node_key = str(getattr(eng, "node_key", "") or "")
+    return node_key.startswith("cloud_")
 
 
 def _inprocess_gen_fn(request):

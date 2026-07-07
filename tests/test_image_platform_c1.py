@@ -583,6 +583,57 @@ def test_still_needed_honors_radio_is_host_redirect(monkeypatch):
     assert disp._still_needed_for_role(policy, "announcer_visual") is True
 
 
+def test_still_needed_keeps_cloud_audio_driven_face_bookend_cloud(monkeypatch):
+    """Cloud avatar engines can be audio_driven_face, but they must not inherit
+    the historical local HuMo bookend redirect to ltx_audio_in."""
+    import nodes._otr_video_engines  # noqa: F401  self-register the engines
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    policy = {"video_models": {
+        "announcer_video_model": {"engine_id": "cloud_kling_avatar", "custom": False}}}
+    assert disp._effective_video_engine_for_role(
+        "announcer_visual", "cloud_kling_avatar") == "cloud_kling_avatar"
+    assert disp._still_needed_for_role(policy, "announcer_visual") is True
+
+
+def test_cloud_image_adapter_bypasses_local_gpu_residency(
+        clean_image_registry, tmp_path, monkeypatch):
+    """A Partner/cloud image adapter is not a local model load path. Even when
+    exposed through a friendly alias, dispatch must not acquire the local GPU
+    residency lease or run the post-local-model NVML gate."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="ideo_alias", node_key="cloud_ideogram_v4"))
+    monkeypatch.setattr(
+        disp._lease, "acquire",
+        lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("cloud image adapter must not acquire GPU lease")))
+    monkeypatch.setattr(
+        disp._lease, "wait_until_below_mb",
+        lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("cloud image adapter must not probe local GPU")))
+    ledger = {"episode_id": "ep_cloud_image", "cast": [{"char_id": "c1"}]}
+    policy = {
+        "image_models": {"character_image_model": {"engine_id": "ideo_alias"}},
+        "seed": {"request_seed": 0},
+        "granularity": {},
+    }
+
+    calls = {"n": 0, "last": None}
+
+    def gen_fn(req):
+        calls["n"] += 1
+        calls["last"] = req
+        return _np_pixels(23)
+
+    led, done, _report, _warnings = disp.dispatch_images(
+        ledger, policy, _payload(_pobj("c1", "a spacer, station", "ph1")),
+        gen_fn=gen_fn, output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
+
+    assert calls["n"] == 1 and done.startswith("image:done:")
+    assert calls["last"]["engine_id"] == "ideo_alias"
+    assert led["images"]["images"][0]["engine_id"] == "ideo_alias"
+
+
 def test_dispatch_renders_forced_ltx_announcer_radio_face(
         clean_image_registry, tmp_path, monkeypatch):
     """Regression for the missing ledger row:
