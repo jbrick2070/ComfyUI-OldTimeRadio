@@ -55,8 +55,7 @@ def test_stale_gemma_12b_pin_is_blocked_even_if_hf_shape_is_valid(tmp_path):
         )
 
 
-def test_local_openai_handle_is_the_only_gemma_12b_catalog_route(monkeypatch):
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
+def test_local_openai_handle_is_the_only_gemma_12b_catalog_route():
     ids = catalog._by_repo_id()
     assert "local_gemma4_12b" in ids
     assert "google/gemma-4-12b-it" not in ids

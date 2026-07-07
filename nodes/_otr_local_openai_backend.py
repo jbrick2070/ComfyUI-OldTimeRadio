@@ -1,13 +1,14 @@
 """Generic local OpenAI-compatible LLM backend.
 
-This is the opt-in Gemma 4 12B lane. It speaks the same
+This is the Gemma 4 12B external local lane. It speaks the same
 ``/v1/chat/completions`` wire protocol as llama.cpp ``llama-server``,
 Google LiteRT-LM serve, and other local OpenAI-compatible servers, but it
 does not start or manage any daemon. If the endpoint is unavailable the
 selected lane fails closed with a named error.
 
-Enable it with ``GEMMA4_12B_ENABLED=1`` and select the virtual catalog handle
-``local_gemma4_12b``.
+Select the catalog handle ``local_gemma4_12b``. Configure the endpoint with
+``GEMMA4_12B_BASE_URL`` / ``GEMMA4_12B_MODEL_ID`` when the defaults do not
+match your server.
 """
 from __future__ import annotations
 
@@ -44,18 +45,6 @@ class LocalOpenAIConfigError(LocalOpenAIError):
 
 class LocalOpenAICallFailedError(LocalOpenAIError):
     """The local OpenAI-compatible call failed after bounded retries."""
-
-
-def _env_flag(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() not in {"", "0", "false", "no", "off"}
-
-
-def local_gemma4_enabled() -> bool:
-    """Whether the virtual ``local_gemma4_12b`` catalog row is visible."""
-    return _env_flag("GEMMA4_12B_ENABLED", False)
 
 
 def _base_url() -> str:
@@ -176,10 +165,6 @@ class LocalOpenAIBackend:
     """LoaderBackend adapter for an external local OpenAI-compatible server."""
 
     def load(self, repo_id: str, row: Any) -> dict[str, Any]:
-        if not local_gemma4_enabled():
-            raise LocalOpenAIConfigError(
-                f"{repo_id!r} selected but GEMMA4_12B_ENABLED is not true."
-            )
         slug = _model_id()
         if not slug:
             raise LocalOpenAIConfigError("GEMMA4_12B_MODEL_ID is empty.")
@@ -335,7 +320,6 @@ __all__ = [
     "LocalOpenAIConfigError",
     "LocalOpenAICallFailedError",
     "LocalOpenAIBackend",
-    "local_gemma4_enabled",
     "validate_local_openai_server",
     "make_local_openai_generate_fn",
 ]

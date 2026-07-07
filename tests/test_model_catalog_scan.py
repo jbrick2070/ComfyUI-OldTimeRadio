@@ -188,9 +188,9 @@ def test_scan_skips_non_models_dirs(tmp_path):
 
 def test_dropdown_empty_cache_marks_all_curated_not_downloaded(empty_hub_root):
     entries = catalog.build_dropdown_choices(hub_root=empty_hub_root)
-    curated_ids = {m.repo_id for m in catalog.CURATED_LLM_MODELS}
-    assert {e.repo_id for e in entries} == curated_ids
-    by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
+    active_ids = set(catalog._by_repo_id())
+    assert {e.repo_id for e in entries} == active_ids
+    by_id = catalog._by_repo_id()
     for e in entries:
         if by_id[e.repo_id].provider != "local":
             assert e.on_disk is True
@@ -202,7 +202,7 @@ def test_dropdown_empty_cache_marks_all_curated_not_downloaded(empty_hub_root):
 
 def test_dropdown_with_mistral_nemo_marks_only_that_on_disk(hub_root_with_mistral_nemo):
     entries = catalog.build_dropdown_choices(hub_root=hub_root_with_mistral_nemo)
-    by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
+    by_id = catalog._by_repo_id()
     for e in entries:
         if e.repo_id == catalog.DEFAULT_LLM:
             assert e.on_disk is True

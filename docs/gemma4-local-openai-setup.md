@@ -8,19 +8,20 @@ The old `google/gemma-4-12b-it` sidecar route is removed. Stale saved pins are
 rejected before the generic HuggingFace admit path so OTR does not attempt a
 bad in-process transformers load.
 
-Mistral-Nemo remains the default writer. Gemma 4 12B is opt-in.
+Mistral-Nemo remains the default writer. `local_gemma4_12b` is visible in the
+writer dropdown next to the other Gemma rows.
 
 ## External 12B Server
 
 Start your local server outside ComfyUI, then launch ComfyUI with:
 
 ```powershell
-$env:GEMMA4_12B_ENABLED = '1'
 $env:GEMMA4_12B_BASE_URL = 'http://127.0.0.1:8080/v1'
 $env:GEMMA4_12B_MODEL_ID = 'ggml-org/gemma-4-12B-it-GGUF:Q4_K_M'
 ```
 
-Then choose `local_gemma4_12b` in the writer model dropdown.
+Then choose `local_gemma4_12b` in the writer model dropdown. If those defaults
+already match your server, no environment variables are required.
 
 The backend does not start llama-server, LiteRT-LM, or any other daemon. If the
 endpoint is down, it fails closed with a named local OpenAI error.

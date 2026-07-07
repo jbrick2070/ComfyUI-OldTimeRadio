@@ -30,23 +30,17 @@ def test_constants_are_ollama_free():
     src = pathlib.Path(LOB.__file__).read_text(encoding="utf-8")
     assert "subprocess" not in src
     assert "ollama serve" not in src
+    assert "GEMMA4_12B_ENABLED" not in src
 
 
-def test_enabled_default_false(monkeypatch):
+def test_load_does_not_require_enable_flag(monkeypatch):
     monkeypatch.delenv("GEMMA4_12B_ENABLED", raising=False)
-    assert LOB.local_gemma4_enabled() is False
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
-    assert LOB.local_gemma4_enabled() is True
-
-
-def test_load_requires_enabled(monkeypatch):
-    monkeypatch.delenv("GEMMA4_12B_ENABLED", raising=False)
-    with pytest.raises(LOB.LocalOpenAIConfigError):
-        LOB.LocalOpenAIBackend().load(LOB.ROW_ID, _row())
+    ce = LOB.LocalOpenAIBackend().load(LOB.ROW_ID, _row())
+    assert ce["provider"] == "local_openai"
+    assert ce["model_id"] == LOB.ROW_ID
 
 
 def test_load_builds_zero_vram_cache_entry(monkeypatch):
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
     monkeypatch.setenv("GEMMA4_12B_BASE_URL", "http://127.0.0.1:8080/v1")
     monkeypatch.setenv("GEMMA4_12B_MODEL_ID", "gemma-4-12B-it-GGUF:Q4_K_M")
     ce = LOB.LocalOpenAIBackend().load(LOB.ROW_ID, _row())
@@ -66,7 +60,6 @@ def test_generate_posts_to_configured_local_endpoint(monkeypatch):
         captured["timeout_s"] = timeout_s
         return _ok("the answer")
 
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
     monkeypatch.setenv("GEMMA4_12B_MAX_RETRIES", "0")
     monkeypatch.setenv("GEMMA4_12B_MAX_NEW_TOKENS", "512")
     monkeypatch.setattr(LOB, "_post_chat_completion", fake_post)
@@ -89,7 +82,6 @@ def test_generate_carries_response_format(monkeypatch):
         captured["payload"] = payload
         return _ok("{}")
 
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
     monkeypatch.setattr(LOB, "_post_chat_completion", fake_post)
     ce = LOB.LocalOpenAIBackend().load(LOB.ROW_ID, _row())
     fn = LOB.make_local_openai_generate_fn(
@@ -103,7 +95,6 @@ def test_generate_carries_response_format(monkeypatch):
 def test_model_loader_generate_factory_routes_local_openai(monkeypatch):
     from nodes import _otr_model_loader as loader
 
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
     monkeypatch.setattr(LOB, "_post_chat_completion", lambda **_kwargs: _ok("ok"))
     ce = LOB.LocalOpenAIBackend().load(LOB.ROW_ID, _row())
     fn = loader.make_generate_fn(ce)
@@ -128,7 +119,6 @@ def test_constrained_generate_routes_response_format(monkeypatch):
         captured["payload"] = payload
         return _ok('{"value":"ok"}')
 
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
     monkeypatch.setattr(LOB, "_post_chat_completion", fake_post)
     ce = LOB.LocalOpenAIBackend().load(LOB.ROW_ID, _row())
     fn = cg.make_constrained_generate_fn(ce, ProbeSchema)
@@ -146,7 +136,6 @@ def test_generate_rejects_raw_grammar(monkeypatch):
         posted["called"] = True
         return _ok()
 
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
     monkeypatch.setattr(LOB, "_post_chat_completion", fake_post)
     ce = LOB.LocalOpenAIBackend().load(LOB.ROW_ID, _row())
     with pytest.raises(LOB.LocalOpenAIConfigError):
@@ -160,7 +149,6 @@ def test_generate_fail_closed_on_transport_error(monkeypatch):
     def boom(**_kwargs):
         raise ConnectionError("connection refused")
 
-    monkeypatch.setenv("GEMMA4_12B_ENABLED", "1")
     monkeypatch.setenv("GEMMA4_12B_MAX_RETRIES", "0")
     monkeypatch.setattr(LOB, "_post_chat_completion", boom)
     ce = LOB.LocalOpenAIBackend().load(LOB.ROW_ID, _row())

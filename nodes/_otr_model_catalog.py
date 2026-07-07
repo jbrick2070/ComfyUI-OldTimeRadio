@@ -305,7 +305,7 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
 
 
 def _local_openai_virtual_rows() -> tuple[CuratedModel, ...]:
-    """The external local Gemma 4 12B row, enabled only by env.
+    """The external local Gemma 4 12B row.
 
     The handle is deliberately virtual (``local_gemma4_12b``) so the UI never
     implies a Comfy-native 12B safetensor exists. The real server model id
@@ -314,8 +314,6 @@ def _local_openai_virtual_rows() -> tuple[CuratedModel, ...]:
     try:
         from . import _otr_local_openai_backend as _lob
     except Exception:  # noqa: BLE001 -- catalog import must stay robust
-        return ()
-    if not _lob.local_gemma4_enabled():
         return ()
     return (
         CuratedModel(
@@ -326,9 +324,9 @@ def _local_openai_virtual_rows() -> tuple[CuratedModel, ...]:
             approx_safetensors_gb=0.0,
             notes="Gemma 4 12B via an external local OpenAI-compatible "
             "server (llama.cpp llama-server, LiteRT-LM serve, or equivalent). "
-            "Opt-in with GEMMA4_12B_ENABLED=1; configure "
-            "GEMMA4_12B_BASE_URL and GEMMA4_12B_MODEL_ID. Zero ComfyUI-process "
-            "VRAM, no HF download, no sidecar dependency, no daemon management.",
+            "Configure GEMMA4_12B_BASE_URL and GEMMA4_12B_MODEL_ID when the "
+            "defaults do not match the server. Zero ComfyUI-process VRAM, no "
+            "HF download, no sidecar dependency, no daemon management.",
             prompt_profile="modern",
             chat_template_kind="transformers_default",
             stop_tokens=(),
@@ -340,6 +338,27 @@ def _local_openai_virtual_rows() -> tuple[CuratedModel, ...]:
     )
 
 
+def _curated_with_local_openai_peer() -> tuple[CuratedModel, ...]:
+    """Static curated rows plus the always-visible Gemma 4 12B HTTP peer.
+
+    Keep ``local_gemma4_12b`` beside the native Gemma 4 rows in dropdown order
+    instead of appending it after unrelated remote slots.
+    """
+    local_rows = _local_openai_virtual_rows()
+    if not local_rows:
+        return CURATED_LLM_MODELS
+    out: list[CuratedModel] = []
+    inserted = False
+    for row in CURATED_LLM_MODELS:
+        out.append(row)
+        if row.repo_id == "google/gemma-4-E4B-it":
+            out.extend(local_rows)
+            inserted = True
+    if not inserted:
+        out.extend(local_rows)
+    return tuple(out)
+
+
 def _active_curated_models() -> tuple[CuratedModel, ...]:
     """CURATED_LLM_MODELS plus enabled-only HTTP virtual rows.
 
@@ -349,10 +368,9 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
     the virtual rows never reach them, and GATED_CURATED_MODELS stays
     keyed off the real gated set."""
     return (
-        CURATED_LLM_MODELS
+        _curated_with_local_openai_peer()
         + _openrouter_virtual_rows()
         + _comfy_virtual_rows()
-        + _local_openai_virtual_rows()
     )
 
 
@@ -992,8 +1010,8 @@ def validate_model_id(
             "the old 11434 sidecar transport was removed and the installed "
             "transformers stack cannot load its gemma4_unified architecture. "
             "Use the explicit external local OpenAI-compatible handle "
-            "'local_gemma4_12b' with GEMMA4_12B_ENABLED=1, or choose "
-            "Mistral-Nemo / Gemma 4 E2B / Gemma 4 E4B."
+            "'local_gemma4_12b', or choose Mistral-Nemo / Gemma 4 E2B / "
+            "Gemma 4 E4B."
         )
 
     # Path 1: curated
@@ -1030,15 +1048,6 @@ def validate_model_id(
             f"is not enabled. Set OTR_ENABLE_COMFY_CREDITS=1 and log in to a "
             f"Comfy account with credits, then restart ComfyUI in a fresh "
             f"terminal. See docs/comfy-credits-setup.md."
-        )
-
-    if normalized == "local_gemma4_12b":
-        raise UnknownModelError(
-            "'local_gemma4_12b' is the external local OpenAI-compatible "
-            "Gemma 4 12B lane, but it is not enabled. Set "
-            "GEMMA4_12B_ENABLED=1, GEMMA4_12B_BASE_URL, and "
-            "GEMMA4_12B_MODEL_ID, then restart ComfyUI. This lane does not "
-            "start or manage any server."
         )
 
     raise UnknownModelError(
