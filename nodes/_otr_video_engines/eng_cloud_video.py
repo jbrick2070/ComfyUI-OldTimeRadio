@@ -364,10 +364,6 @@ class CloudSeedance2Engine(_CloudVideoBase):
     family = "audio_conditioned_video"
     required_inputs = ("init_image", "audio_ref", "text_prompt")
     reactivity = "required_audio_ref"
-    invocable = False
-    invocability_reason = (
-        "schema-grounded V3 payload builds offline; awaiting one paid live "
-        "Seedance render smoke before enabling")
 
     def _model_label(self) -> str:
         from .._otr_shared.cloud_model_ids import resolve_model_id
@@ -414,10 +410,6 @@ class CloudWanI2VEngine(_CloudVideoBase):
     family = "image_to_video"
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
-    invocable = False
-    invocability_reason = (
-        "schema-grounded V3 payload builds offline; awaiting one paid live Wan "
-        "render smoke before enabling")
 
     def _partner_inputs(self, request):
         from .._otr_shared.cloud_model_ids import resolve_model_id

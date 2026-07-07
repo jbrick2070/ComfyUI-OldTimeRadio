@@ -6,6 +6,39 @@ in the per-sprint docs + git; this is a breadcrumb trail, not a dashboard.
 
 ---
 
+## 2026-07-06 -- ShotLock ambient-audio preflight + cloud Partner Node gate -- v2.0-alpha
+Did:
+- Fixed ShotLock's cast-time family-input gate for ambient-audio lanes:
+  `ltx_audio_in` bookend/music beats can now defer `audio_ref` to
+  VideoRenderBatch's bounded master-audio slicing instead of freeze-halting
+  before `master_audio_path` exists. Character-face audio remains strict.
+- Kept the prior image-phase fix intact: portraits, scene stills, radio-face
+  stills, and mesh fodder still defer only at ShotLock time; render-time
+  validation remains fail-loud/no-fallback.
+- Removed the stale `invocable=False` gate from `cloud_seedance_2` and
+  `cloud_wan_i2v`. These are Comfy Partner Node rows with pinned OK schemas and
+  hidden Comfy auth; a dropdown pick is the enable, and missing login/credits
+  now fail at partner invocation instead of being blocked by the director.
+- Folded in the local media-archive lane promotion already present in the
+  worktree: added the missing `# LLM slot: technical` marker on the new
+  media-archive interpreter call site and retargeted the old non-runnable
+  tests to `public_domain_story`, because `media_archive` now has fetcher,
+  interpreter, prompt seams, and story-rules contracts.
+- Checked the latest `output\otr\episodes` screenshot folders. Post-19:00
+  `signal_lost_*` folders have local MP4s but no matching `output\otr\obs`
+  publish and their ledgers show `shots=0` / `images=0`; visible `pending_*`
+  folders are partial/empty/audio-only residues, not successful radio-face
+  still renders.
+Verification:
+- Focused ShotLock/cloud tests: 7 passed.
+- Nearby video/cloud suites: 115 passed, 2 skipped, 2 xfailed.
+- Source-bank/media-archive/video/cloud bundle: 263 passed, 2 skipped, 2 xfailed.
+Next: run a live Partner Node smoke from a logged-in Comfy session with credits
+to validate provider/account state, not code-side invocability.
+Commits: this commit.
+
+---
+
 ## 2026-07-06 -- Cloud Wan/Seedance V3 payload builders grounded -- v2.0-alpha
 Did:
 - Read the installed partner node source for `Wan2ImageToVideoApi` and

@@ -676,6 +676,39 @@ def non_emergency_slugs() -> List[str]:
     return [s["slug"] for s in STYLE_CATALOG if s.get("tags") != EMERGENCY_TAG]
 
 
+MEDIA_ARCHIVE_STYLE_SLUGS: tuple[str, ...] = (
+    "radio_play_within_a_radio_play",
+    "overnight_jazz_host_mystery",
+    "call_in_show_confession_spiral",
+    "live_variety_show_disaster",
+    "pirate_radio_resistance_drama",
+    "newsroom_emergency_bulletin",
+    "inheritance_tape_revelation",
+    "family_attic_revelation",
+    "final_message_before_silence",
+    "lost_expedition_recordings",
+    "desert_station_signal_hunt",
+    "roadside_diner_mystery",
+    "isolated_lighthouse_confession",
+    "family_dinner_secret_eruption",
+    "sibling_rivalry_confession_room",
+    "old_friendship_betrayal_call",
+    "school_reunion_accusation",
+    "hospital_waiting_room_vigil",
+    "landlord_tenant_hidden_room_mystery",
+    "pulp_serial_cliffhanger",
+    "expedition_camp_radio_log",
+    "old_theater_phantom_rehearsal",
+    "missing_person_audio_diary",
+    "small_town_uncanny_mystery",
+)
+
+
+def media_archive_slugs() -> List[str]:
+    """Curated existing style pool for archive mystery/adventure runs."""
+    return list(MEDIA_ARCHIVE_STYLE_SLUGS)
+
+
 def render_style_grammar(slug: str) -> str:
     """Render a style's grammar as a compact prompt block. Empty string for an
     unknown slug (caller falls back to the bare label => byte-identical)."""
@@ -724,6 +757,17 @@ def select_style(premise: Any, meta: Any, cast_seed: Any) -> str:
     sha256(cast_seed)-keyed index into the sorted pool, so the same episode seed
     always yields the same style (C7-safe) while different episodes vary."""
     import hashlib
+    source_bank = ""
+    if isinstance(meta, dict):
+        source_bank = str(meta.get("source_bank", "") or "")
+    if source_bank == "media_archive":
+        pool = sorted(media_archive_slugs())
+        if not pool:  # pragma: no cover -- defensive
+            pool = sorted(non_emergency_slugs())
+        h = int(hashlib.sha256(
+            f"{cast_seed}:style:media_archive".encode("utf-8")
+        ).hexdigest(), 16)
+        return pool[h % len(pool)]
     emergency = premise_wants_emergency(premise, meta)
     pool = sorted(all_slugs() if emergency else non_emergency_slugs())
     if not pool:  # pragma: no cover -- defensive

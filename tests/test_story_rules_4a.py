@@ -124,13 +124,14 @@ class TestLoader:
                 sys.modules["nodes._otr_story_rules"] = original
 
     def test_missing_pack_semantics(self):
-        # media_archive is registered + runnable:false + has NO rules pack:
-        # legal at sweep time, hard error on explicit resolve.
+        # public_domain_story is registered + runnable:false + has NO rules
+        # pack: legal at sweep time, hard error on explicit resolve.
         ids = sr.list_rules_ids()
         assert "science_news" in ids
-        assert "media_archive" not in ids
+        assert "media_archive" in ids
+        assert "public_domain_story" not in ids
         with pytest.raises(sr.UnknownStoryRulesError):
-            sr.resolve_story_rules("media_archive")
+            sr.resolve_story_rules("public_domain_story")
 
     def test_get_story_rules_meta_paths(self):
         assert sr.get_story_rules({}).rules_id == "science_news"
@@ -255,14 +256,14 @@ class TestFailLoudThreading:
         with pytest.raises(sr.UnknownStoryRulesError):
             lc.compose_line(
                 creative_fn=lambda *a, **k: "A quiet line.",
-                req=req, source_bank_id="media_archive")
+                req=req, source_bank_id="public_domain_story")
 
     def test_outro_raises_on_missing_rules_pack(self):
         with pytest.raises(sr.UnknownStoryRulesError):
             lc.compose_announcer_outro(
                 creative_fn=lambda *a, **k: "Good night.",
                 script_brief="brief", news_close_brief="close",
-                intro_text="intro", source_bank_id="media_archive")
+                intro_text="intro", source_bank_id="public_domain_story")
 
 
 # ---------------------------------------------------------------------------

@@ -62,14 +62,14 @@ def test_reactivity_descriptors_match_pass04():
                (ecv.KlingAvatar, ecv.KlingLipsync, ecv.Seedance2, ecv.WanI2V))
 
 
-def test_schema_grounded_v3_video_rows_wait_for_paid_smoke():
-    # Request-shape construction is fixed and tested below; selectable render
-    # enablement still follows verify-before-flip, so a paid live smoke owns the
-    # final invocable=True change.
-    assert ecv.Seedance2.invocable is False
-    assert ecv.WanI2V.invocable is False
-    assert "paid live Seedance render smoke" in ecv.Seedance2.invocability_reason
-    assert "paid live Wan render smoke" in ecv.WanI2V.invocability_reason
+def test_schema_grounded_v3_video_rows_are_partner_invocable():
+    # Partner Node video rows are credit-billed through Comfy's hidden auth
+    # context. A dropdown pick is the enable; missing login/credits fail at
+    # invoke time, not as a stale director-side "awaiting paid smoke" block.
+    assert ecv.Seedance2.invocable is True
+    assert ecv.WanI2V.invocable is True
+    assert ecv.Seedance2.invocability_reason == ""
+    assert ecv.WanI2V.invocability_reason == ""
 
 
 def test_assert_usable_no_enable_flag(monkeypatch):

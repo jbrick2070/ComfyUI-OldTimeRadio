@@ -268,6 +268,38 @@ def _interpret_news(*, bank, payload: dict, technical_fn,
         raise SourceInterpretError(str(exc)) from exc
 
 
+def _fetch_media_archive_rss(*, bank, technical_model: str) -> dict:
+    """media_archive_rss: RSS/Atom media-history feed normalizer."""
+    try:
+        from . import _otr_media_archive_sources as _mas
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        import _otr_media_archive_sources as _mas  # type: ignore
+    return _mas.fetch_media_archive_rss(
+        bank=bank, technical_model=technical_model)
+
+
+def _interpret_media_archive(*, bank, payload: dict, technical_fn,
+                             model_id: str):
+    """media_archive_interpreter: archive source brain.
+
+    Translates ONLY MediaArchiveInterpreterError -> SourceInterpretError.
+    Contract/shape bugs and unexpected exceptions propagate just like the
+    science wrapper's non-NewsInterpreterError path.
+    """
+    try:
+        from . import _otr_media_archive_interpreter as _mai
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        import _otr_media_archive_interpreter as _mai  # type: ignore
+    try:
+        return _mai.build_media_archive_briefs(
+            technical_fn=technical_fn,
+            payload=payload,
+            model_id=model_id,
+        )
+    except _mai.MediaArchiveInterpreterError as exc:
+        raise SourceInterpretError(str(exc)) from exc
+
+
 # ---------------------------------------------------------------------------
 # registries + resolution
 # ---------------------------------------------------------------------------
@@ -286,10 +318,13 @@ class FetcherEntry:
 _FETCHERS: "dict[str, FetcherEntry]" = {
     "science_rss": FetcherEntry(fetch=_fetch_science_rss,
                                 seed_source="rss_fetch"),
+    "media_archive_rss": FetcherEntry(fetch=_fetch_media_archive_rss,
+                                      seed_source="media_archive_rss"),
 }
 
 _INTERPRETERS: "dict[str, object]" = {
     "news_interpreter": _interpret_news,
+    "media_archive_interpreter": _interpret_media_archive,
 }
 
 

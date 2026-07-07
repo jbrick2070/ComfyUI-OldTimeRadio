@@ -10,7 +10,7 @@ Pins:
      science lane returns those exact bytes; the plain "outline" phase is
      UNTOUCHED (object identity preserved for the period-overlay sentinel).
   3. FAIL-LOUD: a bank whose pack lacks the outline seams raises through
-     the router (media_archive -- its lane-enablement item).
+     the router (public_domain_story -- still not outline-enabled).
   4. generate_outline threads source_bank_id (signature + AST pin on the
      writer's two call sites).
 """
@@ -55,12 +55,12 @@ class TestByteIdentity:
 class TestFailLoud:
     @pytest.mark.parametrize("phase", sorted(_SEAM_TO_CONST))
     def test_bank_without_outline_seams_raises(self, phase):
-        # media_archive's pack ships only {line_composer_system, coda_system}
-        # (2B exact-key contract) -- outline seams are its lane-enablement
-        # item; resolution must fail LOUD, never fall to science.
+        # public_domain_story's pack ships only
+        # {line_composer_system, coda_system}; resolution must fail LOUD,
+        # never fall to science.
         with pytest.raises(Exception) as ei:
             resolve_creative_system_prompt(
-                None, phase=phase, source_bank_id="media_archive")
+                None, phase=phase, source_bank_id="public_domain_story")
         assert "outline" in str(ei.value) or "seam" in str(ei.value).lower()
 
 

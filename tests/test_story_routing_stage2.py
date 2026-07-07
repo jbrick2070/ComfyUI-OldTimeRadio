@@ -131,7 +131,12 @@ def test_unknown_ids_raise():
 
 LANE_PACK_KEYS = {
     ("media_archive", "media_restoration_adventure"):
-        frozenset({"line_composer_system", "coda_system"}),
+        frozenset({
+            "outline_macro_system", "outline_phase_system",
+            "outline_beat_system", "line_composer_system",
+            "exchange_system", "coda_system", "announcer_intro_system",
+            "announcer_intro_safe_system", "announcer_outro_system",
+        }),
     ("public_domain_story", "faithful_radio_adaptation"):
         frozenset({"line_composer_system", "coda_system"}),
     ("custom_source_bank", "simple_4_prompt_experimental"):
@@ -151,12 +156,19 @@ def test_lane_pack_resolves_with_exact_keys(bank_id, model_id):
     assert routing.get_bank(bank_id).default_story_model == model_id
 
 
-@pytest.mark.parametrize("bank_id", sorted(b for b, _ in LANE_PACK_KEYS))
+@pytest.mark.parametrize("bank_id", sorted(
+    b for b, _ in LANE_PACK_KEYS if b != "media_archive"))
 def test_lane_bank_not_runnable(bank_id):
     """The lane execution paths do not exist yet: run-intent must raise LOUD
     (never a silent fall-through to the science path)."""
     with pytest.raises(routing.StoryBankNotRunnableError):
         routing.require_runnable_bank(bank_id)
+
+
+def test_media_archive_lane_is_runnable():
+    """The media_archive RSS lane now has fetcher/interpreter/story-rules
+    contracts and can pass the run-intent gate."""
+    assert routing.require_runnable_bank("media_archive").runnable is True
 
 
 def test_simple4_pack_strict_load_raises():

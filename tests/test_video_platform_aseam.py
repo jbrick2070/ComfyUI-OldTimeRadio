@@ -908,6 +908,38 @@ def test_preflight_defers_redirected_announcer_radio_face(monkeypatch):
     assert shots[0]["engine_id"] == "humo_1.7B_169"
 
 
+def test_preflight_defers_ltx_ambient_audio_to_render_batch(monkeypatch):
+    """ShotLock cannot slice the frozen master mix because RenderBatch owns
+    master_audio_path. Ambient-audio lanes must not freeze-halt at cast time
+    when line timing is absent; render-time still supplies the bounded slice."""
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    beats = [{"beat_id": "b6", "role": "music_visual", "char_id": ""}]
+    budget = {"total_frames": 50, "per_beat": {"b6": 50}}
+    policy = {"video_models": {"music_video_model": "ltx_audio_in"}}
+    ledger = {
+        "lines": [{"line_id": "b6", "char_id": ""}],
+        "images": {"images": [
+            {"object_id": "still_b6", "kind": "scene_open", "beat_id": "b6",
+             "path": "X:/episode/stills/b6.png"},
+        ]},
+        "meta": {"story_brief_terms": {"setting": ["a signal room"]}},
+        "video": {
+            "fps": 25,
+            "shots": [
+                {"shot_id": "shot_b1", "beat_id": "b1",
+                 "target_frame_count": 100},
+                {"shot_id": "shot_b6", "beat_id": "b6",
+                 "target_frame_count": 50},
+            ],
+        },
+    }
+
+    _groups, shots = sl.build_execution_plan(beats, budget, {}, policy,
+                                             ledger=ledger)
+
+    assert shots[0]["engine_id"] == "ltx_audio_in"
+
+
 def test_preflight_defers_humo_init_image_to_image_phase(monkeypatch):
     """ShotLock runs before OTR_ImageGenDispatcher, so a character HuMo pick
     must not freeze-halt just because the portrait row has not been written

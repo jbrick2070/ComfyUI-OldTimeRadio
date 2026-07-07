@@ -1,0 +1,91 @@
+{
+  "rules_id": "media_archive",
+  "label": "Media Archive (optimistic archive mystery lane)",
+  "schema_version": "v1",
+  "cliche_patterns": [
+    "\\bthis belongs in a museum\\b",
+    "\\bthe past is never truly gone\\b",
+    "\\bwe['\\u2019]?re running out of time\\b",
+    "\\bthe clock is ticking\\b",
+    "\\bthis changes everything\\b",
+    "\\bhidden in plain sight\\b",
+    "\\bbest left buried\\b"
+  ],
+  "stage_business_patterns": [
+    "\\bI['\\u2019]?ll check the catalog\\b",
+    "\\bI['\\u2019]?ll look in the files\\b",
+    "\\bI['\\u2019]?ll call the archive\\b",
+    "\\blet me handle the reel\\b"
+  ],
+  "on_the_nose_patterns": [
+    "\\bI['\\u2019]?m (?:so |really |very )?(?:scared|afraid|terrified|worried|nervous)\\b",
+    "\\bI am (?:so |really |very )?(?:scared|afraid|terrified|worried|nervous)\\b",
+    "\\bthis is (?:so |really |very )?(?:important|historic|meaningful)\\b",
+    "\\bwe must preserve (?:history|the past)\\b"
+  ],
+  "banned_thesis_patterns": [
+    "\\bthe lesson is\\b",
+    "\\breminding us\\b",
+    "\\bthis shows\\b",
+    "\\bhistory teaches us\\b",
+    "\\bwhat matters is\\b"
+  ],
+  "personal_cost_patterns": [
+    "what it costs (?:them|us|me|him|her|you)\\b.{0,16}to be the one who",
+    "the trust .{0,20}\\blose\\b.{0,8}either way",
+    "the part of (?:themselves|ourselves|myself|himself|herself)\\b.{0,20}to set down"
+  ],
+  "cliche_replacements": [
+    [
+      "\\bthis belongs in a museum\\b",
+      "people should be able to hear this"
+    ],
+    [
+      "\\bthe past is never truly gone\\b",
+      "the record still has work to do"
+    ],
+    [
+      "\\bwe['\\u2019]?re running out of time\\b",
+      "the screening starts soon"
+    ],
+    [
+      "\\bthe clock is ticking\\b",
+      "the room is waiting"
+    ],
+    [
+      "\\bthis changes everything\\b",
+      "this changes the catalog card"
+    ],
+    [
+      "\\bhidden in plain sight\\b",
+      "misfiled under the wrong name"
+    ],
+    [
+      "\\bbest left buried\\b",
+      "better handled carefully"
+    ]
+  ],
+  "banned_phrases": [
+    "spaceship",
+    "mission control",
+    "laboratory containment",
+    "alien signal",
+    "alien invasion",
+    "generic experiment emergency",
+    "space fleet",
+    "interdimensional portal",
+    "futuristic console",
+    "body count",
+    "murder victim",
+    "armed chase",
+    "ransom",
+    "corpse",
+    "monster reveal",
+    "haunting",
+    "cursed object",
+    "ancient secrets",
+    "darkness incarnate",
+    "the abyss",
+    "destiny calls"
+  ]
+}

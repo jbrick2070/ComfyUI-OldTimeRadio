@@ -105,7 +105,7 @@ def test_science_bank_resolves_both_contracts():
     assert callable(osp.resolve_interpreter(bank))
 
 
-@pytest.mark.parametrize("bank_id", ["media_archive", "public_domain_story",
+@pytest.mark.parametrize("bank_id", ["public_domain_story",
                                      "custom_source_bank"])
 def test_empty_id_bank_raises_missing_contract(bank_id):
     bank = routing.get_bank(bank_id)
@@ -113,6 +113,14 @@ def test_empty_id_bank_raises_missing_contract(bank_id):
         osp.resolve_fetcher(bank)
     with pytest.raises(osp.SourceContractMissingError, match=bank_id):
         osp.resolve_interpreter(bank)
+
+
+def test_media_archive_bank_resolves_both_contracts():
+    bank = routing.get_bank("media_archive")
+    entry = osp.resolve_fetcher(bank)
+    assert entry.seed_source == "media_archive_rss"
+    assert callable(entry.fetch)
+    assert callable(osp.resolve_interpreter(bank))
 
 
 def test_unknown_ids_raise_unknown_errors():
@@ -343,8 +351,10 @@ def test_resolve_inputs_missing_contract_propagates():
     """A bank without a fetcher contract fails _resolve_inputs LOUD --
     never a silent slide into the science path."""
     import nodes.OTR_LedgerScriptWriter as writer
-    with pytest.raises(osp.SourceContractMissingError, match="media_archive"):
-        writer._resolve_inputs(custom_premise="", source_bank="media_archive")
+    with pytest.raises(osp.SourceContractMissingError,
+                       match="public_domain_story"):
+        writer._resolve_inputs(custom_premise="",
+                               source_bank="public_domain_story")
 
 
 def test_writer_resolves_outside_try_and_catches_only_interpret_error():

@@ -706,14 +706,16 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
 
     try:
         from ._otr_video_engines.render_driver import (
-            FamilyInputGap, RenderError, _is_never_humo_video_role, _line_index,
-            _present_request_tokens, build_request, build_request_from_shot,
+            FamilyInputGap, RenderError, _is_character_face_beat,
+            _is_never_humo_video_role, _line_index, _present_request_tokens,
+            _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
         from ._otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
     except ImportError:
         from _otr_video_engines.render_driver import (
-            FamilyInputGap, RenderError, _is_never_humo_video_role, _line_index,
-            _present_request_tokens, build_request, build_request_from_shot,
+            FamilyInputGap, RenderError, _is_character_face_beat,
+            _is_never_humo_video_role, _line_index, _present_request_tokens,
+            _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
         from _otr_video_engines.schemas import FAMILY_REQUIRED_INPUTS
 
@@ -744,14 +746,16 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
         return any(n in msg for n in image_gap_needles)
 
     def _cast_time_image_gap_request(shot):
-        frame_count = int(beat.get("target_frame_count") or 1)
         return build_request(
             shot,
             {"init_image": "__cast_time_image__"},
-            frame_count if frame_count > 0 else 1,
+            cast_frame_count,
         )
 
     role = str(beat.get("role") or "")
+    cast_frame_count = int(beat.get("target_frame_count") or 1)
+    if cast_frame_count <= 0:
+        cast_frame_count = 1
     effective_engine = _effective_cast_time_engine(role, engine_name)
     if is_registered(effective_engine):
         eng = get_engine(effective_engine)
@@ -768,7 +772,11 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
         "engine_id": effective_engine,
         "char_id": beat.get("char_id", ""),
         "source_line_ids": [beat.get("beat_id", "")],
+        "target_frame_count": cast_frame_count,
     }
+    if beat.get("_synthetic_open"):
+        shot["start_s"] = beat.get("_start_s", 0.0)
+        shot["dur_s"] = beat.get("dur_s")
 
     try:
         req = build_request_from_shot(shot, ledger, master_audio_path="")
@@ -809,9 +817,16 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
         or (shot.get("start_s") is not None and shot.get("dur_s") is not None)
         or beat.get("dur_s") is not None
     )
-    if is_timed:
+    ambient_audio_deferred = _uses_ambient_master_audio(
+        effective_engine, fam, _is_character_face_beat(shot), role=role)
+    if "audio_ref" in required and (is_timed or ambient_audio_deferred):
         if req.get("audio_ref") is None:
             req["audio_ref"] = {"path": "__cast_time_master_slice__"}
+            if ambient_audio_deferred and not is_timed:
+                log.warning(
+                    "[OTR_ShotLock] cast-time audio_ref for candidate %r beat "
+                    "%s is deferred to VideoRenderBatch master-audio slicing",
+                    effective_engine, beat.get("beat_id", ""))
 
     if os.environ.get("OTR_LSYNC_BASE_ENGINE", "").strip():
         req["base_clip_ref"] = {"path": "__cast_time_base_clip__"}

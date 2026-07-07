@@ -53,7 +53,7 @@ from nodes._otr_creative_prompt_router import (  # noqa: E402
 )
 
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_scifi_16gb_full.json"
-_NON_RUNNABLE_BANK = "media_archive"  # runnable:false lane pack (2B)
+_NON_RUNNABLE_BANK = "public_domain_story"  # runnable:false lane pack (2B)
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ class TestThreading:
         )
         # Cross-check against the lane pack on disk.
         pack_path = (_REPO / "nodes" / "story_packs" / _NON_RUNNABLE_BANK /
-                     "media_restoration_adventure.json")
+                     "faithful_radio_adaptation.json")
         pack = json.loads(pack_path.read_text(encoding="utf-8"))
         assert other == pack["prompt_stages"]["line_composer_system"]
 
@@ -217,10 +217,10 @@ class TestThreading:
             canon_header="",
             last_lines=[],
         )
-        # Stage 4: media_archive has no story_rules pack yet (lane-enablement
-        # item) -- pass the science rules explicitly so this test keeps
-        # targeting PROMPT threading, not the rules gate (which has its own
-        # fail-loud test in test_story_rules_4a.py).
+        # Stage 4: public_domain_story has no story_rules pack yet
+        # (lane-enablement item) -- pass the science rules explicitly so this
+        # test keeps targeting PROMPT threading, not the rules gate (which has
+        # its own fail-loud test in test_story_rules_4a.py).
         from nodes._otr_story_rules import resolve_story_rules
         out = lc.compose_line(
             creative_fn=lambda *a, **k: "A quiet line about the machine.",

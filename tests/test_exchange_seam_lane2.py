@@ -11,8 +11,8 @@ Pins:
      build_exchange_prompt(system_prompt=<routed science value>) -- the
      science lane is byte-identical end to end.
   3. FAIL-LOUD: a bank whose pack lacks the exchange seam raises through
-     the router (media_archive -- its lane-enablement item); never falls
-     through to the science prompt.
+     the router (public_domain_story -- still not exchange-enabled); never
+     falls through to the science prompt.
   4. THREADING: system_prompt is threaded run_exchange_prepass ->
      compose_exchange -> build_exchange_prompt (signature pins), the writer
      call site passes it, and the writer's resolve call sits OUTSIDE any
@@ -102,12 +102,13 @@ class TestAssemblyIdentity:
 
 class TestFailLoud:
     def test_bank_without_exchange_seam_raises(self):
-        # media_archive's pack ships only {line_composer_system, coda_system}
-        # (2B exact-key contract) -- the exchange seam is its lane-enablement
-        # item; resolution must fail LOUD, never fall to science.
+        # public_domain_story's pack ships only
+        # {line_composer_system, coda_system}; it must fail LOUD here, never
+        # fall through to science.
         with pytest.raises(Exception) as ei:
             resolve_creative_system_prompt(
-                None, phase="exchange_system", source_bank_id="media_archive")
+                None, phase="exchange_system",
+                source_bank_id="public_domain_story")
         msg = str(ei.value).lower()
         assert "exchange" in msg or "seam" in msg
 

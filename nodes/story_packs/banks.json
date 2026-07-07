@@ -36,8 +36,8 @@
       "source_bank_id": "media_archive",
       "label": "Media RSS / Archive",
       "source_kind": "archive_item",
-      "interpreter": "",
-      "fetcher": "",
+      "interpreter": "media_archive_interpreter",
+      "fetcher": "media_archive_rss",
       "default_story_model": "media_restoration_adventure",
       "default_story_pipeline": "legacy_many_pass",
       "defaults": {
@@ -51,10 +51,16 @@
         "coda_mode": "archive_source_note"
       },
       "required_seams": [
+        "outline_macro_system",
+        "outline_phase_system",
+        "outline_beat_system",
         "line_composer_system",
-        "coda_system"
+        "coda_system",
+        "announcer_intro_system",
+        "announcer_intro_safe_system",
+        "announcer_outro_system"
       ],
-      "runnable": false,
+      "runnable": true,
       "guide_ref": ""
     },
     {
