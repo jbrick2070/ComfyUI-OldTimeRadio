@@ -43,6 +43,21 @@ _LOG = logging.getLogger("OTR.video.eng_cloud_video")
 #: adapter ships the provider's documented std tier; env-overridable.
 _KLING_MODE_ENV = "OTR_CLOUD_KLING_MODE"
 _KLING_MODE_DEFAULT = "std"
+_KLING_MODES = ("std", "pro")
+_KLING_MODE_ALIASES = {
+    "standard": "std",
+    "standard mode": "std",
+    "professional": "pro",
+    "professional mode": "pro",
+}
+_KLING_AVATAR_MARKER = (
+    "Natural broadcast avatar delivery; lip sync leads all motion.")
+_KLING_AVATAR_BASE_CLAUSE = (
+    "Broadcast-style digital human delivery. Natural lip sync follows the "
+    "audio exactly. Keep the head and shoulders stable in frame with subtle "
+    "facial expression, gentle eye contact, and small natural head movement. "
+    "No exaggerated gestures, no camera shake, no sudden reframing. "
+    f"{_KLING_AVATAR_MARKER}")
 
 _SEEDANCE_MODEL_ALIASES = {
     # The installed ByteDance2ReferenceNode indexes SEEDANCE_MODELS by UI label.
@@ -102,6 +117,55 @@ _WAN_MODEL_ALIASES = {
     "wan-2.7-i2v": "wan2.7-i2v",
 }
 _WAN_RESOLUTIONS = ("720P", "1080P")
+_WAN_SMOOTH_MARKER = (
+    "Stable first-frame motion; preserve composition and move continuously.")
+_WAN_SMOOTH_MOTION_CLAUSE = (
+    "Generate one continuous shot from the first frame. Preserve the "
+    "first-frame subject, composition, aspect ratio, lighting, and visual "
+    "style. Use slow, physically continuous motion with gentle parallax and "
+    "no cuts. No whip pans, handheld shake, sudden reframing, jump cuts, "
+    "rapid zooms, melting geometry, warped faces, drifting text, black frames, "
+    "or pillarbox bars. "
+    f"{_WAN_SMOOTH_MARKER}")
+_WAN_PROMPT_VARIANT = "wan_i2v_smooth_v1"
+_WAN_NEGATIVE_DEFAULT = (
+    "jump cuts, whip pans, rapid zooms, handheld shake, jitter, flicker, "
+    "melting geometry, warped face, distorted hands, drifting text, unreadable "
+    "text, black frame, pillarbox bars")
+
+
+def _condition_kling_avatar_prompt(prompt: str) -> "tuple[str, dict]":
+    original = str(prompt or "")
+    if _KLING_AVATAR_MARKER in original:
+        conditioned = original
+    elif original.strip():
+        conditioned = original.rstrip() + "\n\n" + _KLING_AVATAR_BASE_CLAUSE
+    else:
+        conditioned = _KLING_AVATAR_BASE_CLAUSE
+    return conditioned, {
+        "changed": conditioned != original,
+        "original_sha8": _sha8(original),
+        "conditioned_sha8": _sha8(conditioned),
+        "original_excerpt": _log_excerpt(original),
+        "conditioned_excerpt": _log_excerpt(conditioned),
+    }
+
+
+def _condition_wan_prompt(prompt: str) -> "tuple[str, dict]":
+    original = str(prompt)
+    if not original.strip():
+        raise ValueError("Wan prompt conditioner requires non-empty prompt")
+    if _WAN_SMOOTH_MARKER in original:
+        conditioned = original
+    else:
+        conditioned = original.rstrip() + "\n\n" + _WAN_SMOOTH_MOTION_CLAUSE
+    return conditioned, {
+        "changed": conditioned != original,
+        "original_sha8": _sha8(original),
+        "conditioned_sha8": _sha8(conditioned),
+        "original_excerpt": _log_excerpt(original),
+        "conditioned_excerpt": _log_excerpt(conditioned),
+    }
 
 
 def _est_usd() -> float:
@@ -353,7 +417,10 @@ class _CloudVideoBase:
             t_get = timing.get if isinstance(timing, dict) else (
                 lambda k, d=None: getattr(timing, k, d))
             n = int(t_get("target_frame_count", 0) or 0)
-            secs = int(round(n / fps)) if n else default
+            # Provider clips can always be trimmed downstream, but a too-short
+            # provider clip becomes a freeze-hold. Ceil the audio-derived frame
+            # target so cloud engines render enough motion for fractional beats.
+            secs = int((n + fps - 1) // fps) if n else default
         return max(min_s, min(max_s, secs))
 
     def _choice(self, env: str, default: str, allowed: tuple[str, ...],
@@ -386,13 +453,44 @@ class _CloudVideoBase:
                 f"checked asset_refs['init_image'] + top-level init_image)")
         return _load_image_tensor(path)
 
-    def _audio_input(self, request):
+    def _audio_input(self, request, *, min_duration_s: float | None = None,
+                     max_duration_s: float | None = None,
+                     pad_to_min: bool = False):
         path = _ref_path(_req_get(request, "audio_ref"))
         if not path or not os.path.isfile(path):
             raise RuntimeError(
                 f"{self.name}: audio_ref missing/absent on disk ({path!r}) "
                 f"-- reactivity={self.reactivity}, NO FALLBACK")
-        return _load_audio_dict(path)
+        audio = _load_audio_dict(path)
+        waveform = audio["waveform"]
+        sr = int(audio["sample_rate"])
+        samples = int(waveform.shape[-1])
+        duration = samples / float(sr) if sr > 0 else 0.0
+        if min_duration_s is not None and duration < float(min_duration_s):
+            if not pad_to_min:
+                raise RuntimeError(
+                    f"{self.name}: audio_ref duration {duration:.3f}s is below "
+                    f"provider minimum {float(min_duration_s):.3f}s -- "
+                    f"NO FALLBACK")
+            import torch
+            target_samples = int(round(float(min_duration_s) * sr))
+            pad_n = max(0, target_samples - samples)
+            if pad_n:
+                pad = torch.zeros(
+                    *waveform.shape[:-1], pad_n,
+                    dtype=waveform.dtype, device=waveform.device)
+                audio = dict(audio)
+                audio["waveform"] = torch.cat([waveform, pad], dim=-1)
+                _LOG.warning(
+                    "[OTR.cloud.%s] padded request audio %.3fs -> %.3fs "
+                    "for provider minimum; episode timeline still trims to "
+                    "target frames", self.name, duration, float(min_duration_s))
+        if max_duration_s is not None and duration > float(max_duration_s):
+            raise RuntimeError(
+                f"{self.name}: audio_ref duration {duration:.3f}s exceeds "
+                f"provider maximum {float(max_duration_s):.3f}s -- "
+                f"split the shot before selecting this engine")
+        return audio
 
 
 class CloudKlingAvatarEngine(_CloudVideoBase):
@@ -404,13 +502,34 @@ class CloudKlingAvatarEngine(_CloudVideoBase):
     required_inputs = ("init_image", "audio_ref")
     reactivity = "required_audio_ref"
 
+    def _mode(self) -> str:
+        raw = os.environ.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT).strip()
+        folded = raw.lower()
+        mode = _KLING_MODE_ALIASES.get(folded, folded)
+        if mode not in _KLING_MODES:
+            raise RuntimeError(
+                f"{self.name}: {_KLING_MODE_ENV}={raw!r} is unsupported; "
+                f"expected one of {_KLING_MODES} or known aliases")
+        return mode
+
     def _partner_inputs(self, request):
+        prompt, prompt_meta = _condition_kling_avatar_prompt(
+            str(_req_get(request, "text_prompt") or ""))
+        log_fields = dict(prompt_meta)
+        log_fields.update({
+            "engine": self.name,
+            "prompt_variant": "kling_avatar_broadcast_v1",
+        })
+        _LOG.info("[OTR.cloud.kling_avatar] prompt_conditioner %s",
+                  json.dumps(log_fields, sort_keys=True))
         return {
             "image": self._init_image_input(request),
-            "sound_file": self._audio_input(request),
-            "mode": os.environ.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT),
-            "seed": self._seed(request),
-            "prompt": str(_req_get(request, "text_prompt") or ""),
+            "sound_file": self._audio_input(
+                request, min_duration_s=2.0, max_duration_s=300.0,
+                pad_to_min=True),
+            "mode": self._mode(),
+            "seed": self._seed_i32(request),
+            "prompt": prompt,
         }
 
 
@@ -496,13 +615,23 @@ class CloudWanI2VEngine(_CloudVideoBase):
 
     def _partner_inputs(self, request):
         model = self._model_selector()
+        prompt, prompt_meta = _condition_wan_prompt(
+            self._text_prompt_input(request))
+        log_fields = dict(prompt_meta)
+        log_fields.update({
+            "engine": self.name,
+            "prompt_variant": _WAN_PROMPT_VARIANT,
+        })
+        _LOG.info("[OTR.cloud.wan] prompt_conditioner %s",
+                  json.dumps(log_fields, sort_keys=True))
         return {
             "first_frame": self._init_image_input(request),
             "model": {
                 "model": model,
-                "prompt": self._text_prompt_input(request),
+                "prompt": prompt,
                 "negative_prompt": os.environ.get(
-                    "OTR_CLOUD_WAN_NEGATIVE_PROMPT", "").strip(),
+                    "OTR_CLOUD_WAN_NEGATIVE_PROMPT", "").strip()
+                or _WAN_NEGATIVE_DEFAULT,
                 "resolution": self._choice(
                     "OTR_CLOUD_WAN_RESOLUTION", "720P",
                     _WAN_RESOLUTIONS, transform=str.upper),

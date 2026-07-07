@@ -95,11 +95,12 @@ def _fixture_png(tmp_path):
     return str(p)
 
 
-def _fixture_wav(tmp_path):
+def _fixture_wav(tmp_path, dur_s=1.0):
     import numpy as np
     import soundfile as sf
-    p = tmp_path / "voice.wav"
-    t = np.linspace(0, 1.0, 16000, dtype="float32")
+    p = tmp_path / f"voice_{int(float(dur_s) * 1000)}ms.wav"
+    t = np.linspace(0, float(dur_s), int(16000 * float(dur_s)),
+                    endpoint=False, dtype="float32")
     sf.write(str(p), (0.2 * np.sin(2 * 3.14159 * 220 * t)), 16000)
     return str(p)
 
@@ -133,8 +134,10 @@ def test_kling_avatar_partner_inputs(tmp_path, monkeypatch):
     ins = captured["inputs"]
     assert ins["mode"] and ins["seed"] == 7
     assert ins["prompt"].startswith("a person")
+    assert ecv._KLING_AVATAR_MARKER in ins["prompt"]
     assert hasattr(ins["image"], "ndim") and ins["image"].ndim == 4
     assert set(ins["sound_file"]) == {"waveform", "sample_rate"}
+    assert ins["sound_file"]["waveform"].shape[-1] == 32000
     assert raw["provider_job_id"] == "j1"
 
 
@@ -142,6 +145,27 @@ def test_kling_avatar_missing_audio_fails_loud(tmp_path):
     req = _request(tmp_path, audio_ref="")
     with pytest.raises(RuntimeError, match="audio_ref"):
         ecv.KlingAvatar._partner_inputs(req)
+
+
+def test_kling_avatar_mode_alias_and_seed_clamp(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_KLING_MODE", "Professional Mode")
+    req = _request(tmp_path, seed_bundle={"request_seed": 2147483656})
+    ins = ecv.KlingAvatar._partner_inputs(req)
+    assert ins["mode"] == "pro"
+    assert ins["seed"] == 8
+
+
+def test_kling_avatar_rejects_unknown_mode(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_KLING_MODE", "turbo")
+    with pytest.raises(RuntimeError, match="OTR_CLOUD_KLING_MODE"):
+        ecv.KlingAvatar._partner_inputs(_request(tmp_path))
+
+
+def test_kling_avatar_pads_request_audio_to_provider_floor(tmp_path):
+    req = _request(tmp_path, audio_ref=_fixture_wav(tmp_path, dur_s=0.5))
+    ins = ecv.KlingAvatar._partner_inputs(req)
+    assert ins["sound_file"]["sample_rate"] == 16000
+    assert ins["sound_file"]["waveform"].shape[-1] == 32000
 
 
 def test_wan_i2v_sends_v3_model_dict_without_audio(tmp_path, monkeypatch):
@@ -159,7 +183,8 @@ def test_wan_i2v_sends_v3_model_dict_without_audio(tmp_path, monkeypatch):
         "model", "prompt", "negative_prompt", "resolution", "duration"}
     assert ins["model"]["model"] == "wan2.7-i2v"
     assert ins["model"]["prompt"].startswith("a person")
-    assert ins["model"]["negative_prompt"] == ""
+    assert ecv._WAN_SMOOTH_MARKER in ins["model"]["prompt"]
+    assert "jump cuts" in ins["model"]["negative_prompt"]
     assert ins["model"]["resolution"] == "1080P"
     assert ins["model"]["duration"] == 6
     assert ins["prompt_extend"] is False
@@ -182,6 +207,22 @@ def test_wan_i2v_rejects_unknown_model_selector(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan3.0-i2v")
     with pytest.raises(RuntimeError, match="unsupported Wan model selector"):
         ecv.WanI2V._partner_inputs(_request(tmp_path))
+
+
+def test_wan_i2v_duration_ceil_avoids_fractional_beat_underrun(
+        tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
+    monkeypatch.delenv("OTR_CLOUD_WAN_DURATION", raising=False)
+    req = _request(tmp_path, timing={"target_frame_count": 51})
+    ins = ecv.WanI2V._partner_inputs(req)
+    assert ins["model"]["duration"] == 3
+
+
+def test_wan_i2v_negative_prompt_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
+    monkeypatch.setenv("OTR_CLOUD_WAN_NEGATIVE_PROMPT", "no smoke")
+    ins = ecv.WanI2V._partner_inputs(_request(tmp_path))
+    assert ins["model"]["negative_prompt"] == "no smoke"
 
 
 def test_wan_i2v_rejects_v3_placeholder_model(tmp_path, monkeypatch):
@@ -337,20 +378,26 @@ def test_seedance_two_second_ledger_beat_requests_minimum_and_16x9(
         "waveform", "sample_rate"}
 
 
-def test_seedance_conditioner_does_not_leak_to_other_engines(
+def test_prompt_conditioners_use_engine_specific_markers(
         tmp_path, monkeypatch):
     prompt = "handheld dolly with a rapid zoom"
     req = _request(tmp_path, text_prompt=prompt)
 
     monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
     wan = ecv.WanI2V._partner_inputs(req)
-    assert wan["model"]["prompt"] == prompt
+    assert wan["model"]["prompt"].startswith(prompt)
+    assert ecv._WAN_SMOOTH_MARKER in wan["model"]["prompt"]
+    assert ecv._SEEDANCE_SMOOTH_MARKER not in wan["model"]["prompt"]
 
     kling = ecv.KlingAvatar._partner_inputs(req)
-    assert kling["prompt"] == prompt
+    assert kling["prompt"].startswith(prompt)
+    assert ecv._KLING_AVATAR_MARKER in kling["prompt"]
+    assert ecv._SEEDANCE_SMOOTH_MARKER not in kling["prompt"]
 
     razzle = ecv.WordRazzle._partner_inputs(req)
     assert razzle["prompt"].endswith(prompt)
+    assert ecv._WAN_SMOOTH_MARKER not in razzle["prompt"]
+    assert ecv._KLING_AVATAR_MARKER not in razzle["prompt"]
 
 
 # --------------------------------------------------------------------------- #
