@@ -531,6 +531,19 @@ class TestSceneStillObjects:
         # idempotent: the grade tail appears exactly once
         assert port["prompt"].count(helpers.IMAGE_GRADE_TAIL) == 1
 
+    def test_portrait_adds_missing_cast_gender_anchor(self):
+        from nodes import otr_meta_brief_image_prompt as mbp
+        cast = [{
+            "char_id": "c01",
+            "gender": "female",
+            "portrait_prompt": (
+                "40s, weary neuroscientist landlord, receding hairline with "
+                "salt-and-pepper hair pulled into a tight knot"),
+        }]
+        payload, _w = mbp.derive_image_prompts(cast, _meta_ok(), llm_fn=None)
+        port = mbp.objects_by_id(payload)["c01"]
+        assert "adult woman" in port["prompt"].lower()
+
     def test_payload_versioned_and_portraits_migrated(self):
         from nodes import otr_meta_brief_image_prompt as mbp
         cast = [{"char_id": "c01", "portrait_prompt": "a stocky engineer"}]

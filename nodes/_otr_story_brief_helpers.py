@@ -41,6 +41,47 @@ _MUSIC_MOOD_VOCAB: frozenset[str] = frozenset({
     "reverent", "uneasy", "stoic", "yearning",
 })
 
+VISUAL_SAFETY_POSITIVE_CLAUSE = (
+    "family-safe, nonviolent, no blood, no guns, no knives, no smoking"
+)
+VISUAL_SAFETY_NEGATIVE_PROMPT = (
+    "blood, gore, violence, guns, firearms, weapons, knives, blades, "
+    "smoking, cigarettes, cigars, tobacco"
+)
+
+
+def append_visual_safety_clause(prompt: str) -> str:
+    """Append the operator's image/video safety ask to a provider prompt.
+
+    Kept as a late handoff helper so existing prompt composers remain stable,
+    while actual render requests still carry the clause.
+    """
+    text = str(prompt or "").strip()
+    if not text:
+        return ""
+    folded = text.lower()
+    if ("no blood" in folded and "no guns" in folded
+            and "no knives" in folded and "no smoking" in folded):
+        return text
+    return f"{text}, {VISUAL_SAFETY_POSITIVE_CLAUSE}"
+
+
+def visual_safety_negative(extra: str = "") -> str:
+    """Merge an engine-specific negative prompt with the visual safety block."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for src in (extra, VISUAL_SAFETY_NEGATIVE_PROMPT):
+        for raw in str(src or "").split(","):
+            term = raw.strip()
+            if not term:
+                continue
+            key = term.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(term)
+    return ", ".join(out)
+
 
 def _meta(obj: Any) -> dict:
     """Accept either a meta dict OR a parent dict carrying a meta key."""

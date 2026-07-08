@@ -63,6 +63,7 @@ def test_input_types_widget_surface():
     # option "neutral" -- the lock() kwarg still defaults + is validated/stamped.
     assert _serialized_slots(it) == [
         "voice_bank", "cast_voice_policy", "allow_voice_reuse",
+        "char_voice_engine", "announcer_voice_engine",
     ]
     for name in ("ledger_json", "cast_lock_revision", "cast_report", "done"):
         assert name in CastLock.RETURN_NAMES

@@ -20,7 +20,6 @@ from otr_api import (  # noqa: E402
     fetch_schemas,
     load_workflow,
     patch_creative,
-    patch_widget_by_name,
     submit_prompt,
     workflow_to_api_prompt,
 )
@@ -39,6 +38,7 @@ def _profile_with_char_engine(engine: str) -> dict:
         sys.path.insert(0, repo_root)
     from nodes._otr_shared.capability_profiles import load_profile
     profile = copy.deepcopy(load_profile("16gb_full"))
+    profile["slot_overrides"]["voice_bank"] = "default"
     profile["slot_overrides"]["char_voice_engine"] = engine
     return profile
 
@@ -50,11 +50,9 @@ def main() -> int:
     patch_creative(wf, 1, "target_words", 30, schemas)
     patch_creative(wf, 1, "num_characters", 2, schemas)
     patch_creative(wf, 1, "act_count", "1", schemas)
-    # the change under test: character voices on chatterbox via the applier;
-    # the cast-lock bank knob is unmanaged policy (node 80) and stays direct.
+    # the change under test: character voices on chatterbox via the applier.
     wf = apply_profile_to_workflow(wf, _profile_with_char_engine("chatterbox"),
                                    schemas)
-    patch_widget_by_name(wf, 80, "voice_bank", "default", schemas)
     api = workflow_to_api_prompt(wf, schemas)
     pid = submit_prompt(api)
     print(f"QUEUED prompt_id={pid}", flush=True)

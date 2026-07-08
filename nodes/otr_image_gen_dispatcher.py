@@ -37,12 +37,27 @@ log = logging.getLogger("OTR")
 from ._otr_shared import gpu_residency as _lease
 from ._otr_shared import portrait_ledger as _pl
 from ._otr_shared import role_slots as _role_slots
+from ._otr_story_brief_helpers import (
+    append_visual_safety_clause,
+    visual_safety_negative,
+)
 from ._otr_image_engines import registry as _ireg
 
 #: Smallest plausible real PNG (8-byte signature + IHDR + IDAT + IEND). Anything
 #: smaller off the cross-process disk handoff is a 0-byte / truncated write,
 #: never a finished render.
 _MIN_PNG_BYTES = 67
+
+
+def _prompt_content_hash(prompt: str) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            str(prompt or ""),
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
 
 
 class ImageHandoffTimeout(RuntimeError):
@@ -511,8 +526,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # family propagate onto the row for operator QA.
         lettering_style = str(obj.get("lettering_style") or "")
         backdrop_family = str(obj.get("backdrop_family") or "")
-        prompt = str(obj.get("prompt") or "")
-        prompt_hash = str(obj.get("prompt_hash") or "")
+        prompt = append_visual_safety_clause(str(obj.get("prompt") or ""))
+        prompt_hash = _prompt_content_hash(prompt)
         obj_w = int(obj.get("w") or 0)
         obj_h = int(obj.get("h") or 0)
         if not oid:
@@ -637,6 +652,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "kind": kind, "char_id": char_id, "beat_id": beat_id,
             "engine_id": engine_id, "engine_version": eng_version,
             "prompt": prompt, "prompt_hash": prompt_hash, "seed": seed,
+            "negative_prompt": visual_safety_negative(
+                str(obj.get("negative_prompt") or "")),
             # w/h end-to-end (pass-02 Gem-1): the engine call reads
             # width/height (flux_gen1._flux_params request precedence), so
             # landscape scene stills are REAL, not env defaults.

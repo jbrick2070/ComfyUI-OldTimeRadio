@@ -67,17 +67,18 @@ def mapping():
 def _registry_engine_ids():
     from nodes._otr_video_engines import registry as vreg
     from nodes._otr_video_engines import (  # noqa: F401
-        cheap_families, eng_character_3d, eng_humo,
+        cheap_families, eng_character_3d, eng_cloud_video, eng_humo,
         eng_ltx_video, eng_wan_i2v,
     )
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_audio_engines import (  # noqa: F401
         eng_bark, eng_chatterbox, eng_dia, eng_indextts2, eng_kokoro,
-        eng_musicgen, eng_stable_audio, eng_stable_audio_3,
+        eng_cloud_elevenlabs, eng_cloud_sonilo, eng_musicgen,
+        eng_stable_audio, eng_stable_audio_3,
     )
     from nodes._otr_image_engines import registry as ireg
     from nodes._otr_image_engines import (  # noqa: F401
-        flux2_klein, flux_gen1, hidream_i1, lumina_image,
+        eng_cloud_image, flux2_klein, flux_gen1, hidream_i1, lumina_image,
         qwen_image, sd35_large, z_image_turbo,
     )
     return (set(vreg.all_engine_names()) | set(areg._REGISTRY)
@@ -145,6 +146,54 @@ def test_apply_8gb_lite_lands_its_overrides(schemas, master_copy, mapping):
             slots = wa.serialized_slot_names(node_type, schemas)
             node = nodes_by_type[node_type]
             assert node["widgets_values"][slots.index(widget)] == value, (dotted, node_type)
+
+
+def _widget_value(nodes_by_type, schemas, node_type, widget):
+    slots = wa.serialized_slot_names(node_type, schemas)
+    return nodes_by_type[node_type]["widgets_values"][slots.index(widget)]
+
+
+def test_apply_cloud_all_lands_cloud_only_routes(schemas, master_copy):
+    applied = wa.apply_profile(master_copy, "cloud_all", schemas=schemas)
+    nodes_by_type = {n["type"]: n for n in applied["nodes"]}
+
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_CastLock", "voice_bank"
+    ) == "elevenlabs_cloud"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_CastLock", "cast_voice_policy"
+    ) == "auto_registry"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_CastLock", "char_voice_engine"
+    ) == "elevenlabs"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_CastLock", "announcer_voice_engine"
+    ) == "elevenlabs"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_BatchCharacterVoices", "engine"
+    ) == "elevenlabs"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_AnnouncerVoice", "engine"
+    ) == "elevenlabs"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_StableAudioTheme", "engine"
+    ) == "sonilo"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
+    ) == "cloud_wan_i2v_audio"
+
+    for widget in (
+        "announcer_video_model", "music_video_model", "character_video_model",
+    ):
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_VideoDirector", widget
+        ) == "cloud_wan_i2v_audio"
+    for widget in (
+        "announcer_image_model", "music_image_model", "character_image_model",
+    ):
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_VideoDirector", widget
+        ) == "cloud_nano_banana_2"
 
 
 def test_apply_profile_rejects_typoed_key(schemas, master_copy):

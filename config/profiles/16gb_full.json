@@ -15,6 +15,8 @@
     "character_image": "flux_gen1"
   },
   "slot_overrides": {
+    "voice_bank": "default",
+    "cast_voice_policy": "auto_registry",
     "char_voice_engine": "indextts2",
     "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",

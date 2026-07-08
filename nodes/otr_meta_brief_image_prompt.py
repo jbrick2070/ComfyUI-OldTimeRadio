@@ -79,6 +79,30 @@ def _appearance_for_char(cast: list, char_id: str) -> str:
     return ""
 
 
+_FEMALE_PROMPT_TERMS = frozenset({
+    "female", "woman", "women", "lady", "girl", "matriarch", "mother",
+})
+_MALE_PROMPT_TERMS = frozenset({
+    "male", "man", "men", "gentleman", "boy", "patriarch", "father",
+})
+
+
+def _ensure_gender_anchor(prompt: str, char: dict) -> str:
+    """Add a known cast-gender anchor when the prompt forgot one."""
+    text = str(prompt or "").strip()
+    gender = str((char or {}).get("gender") or "").strip().lower()
+    if gender not in ("female", "male") or not text:
+        return text
+    words = set(re.findall(r"[a-z]+", text.lower()))
+    if gender == "female":
+        if words & _FEMALE_PROMPT_TERMS:
+            return text
+        return f"adult woman, {text}"
+    if words & _MALE_PROMPT_TERMS:
+        return text
+    return f"adult man, {text}"
+
+
 #: Shared portrait style anchor. Reworded 2026-06-10 (operator look-QA): the
 #: old "studio portrait, neutral lighting" framing read as an ACTOR in a
 #: recording booth; portraits must show the CHARACTER in character, in the
@@ -1152,7 +1176,7 @@ def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrai
         parts.append(f"{setting} setting")
     parts.append(_style_anchor_for_aspect(aspect, talking=talking,
                                           style=_vstyle))
-    return ", ".join(parts)
+    return _ensure_gender_anchor(", ".join(parts), char)
 
 
 def _build_char_prompt_request(char: dict, meta: dict, setting: str,
@@ -1175,7 +1199,9 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_story_brief_helpers import _resolve_style  # type: ignore
     _vstyle = _resolve_style(meta, style)
-    appearance = _appearance_for_char([char], str(char.get("char_id") or ""))
+    appearance = _ensure_gender_anchor(
+        _appearance_for_char([char], str(char.get("char_id") or "")),
+        char)
     if talking:
         framing = (
             "face-forward frontal close-up bust looking DIRECTLY at the camera, "
@@ -1665,6 +1691,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                                                    talking=_talking,
                                                    style=_vstyle)
             source = "template"
+        prompt = _ensure_gender_anchor(prompt, char)
         # Story-consistency gate (schema assertion, v1). The synthetic
         # ANNOUNCER grounds on APPEARANCE ONLY (the radio anchor): an LLM
         # line that drops the radio styling for pure story-setting flavor

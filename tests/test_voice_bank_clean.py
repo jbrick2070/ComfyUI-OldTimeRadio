@@ -42,3 +42,10 @@ def test_default_clean_excludes_non_commercial_indextts2():
     # NEVER be the commercial-clean cast pick).
     eng = CastLock._resolve_char_engine("default_clean", _entries("indextts2"))
     assert eng is None
+
+
+def test_explicit_elevenlabs_routes_with_cloud_bank():
+    eng = CastLock._resolve_char_engine(
+        "elevenlabs_cloud", _entries("indextts2", "elevenlabs"),
+        requested_engine="elevenlabs")
+    assert eng == "elevenlabs"

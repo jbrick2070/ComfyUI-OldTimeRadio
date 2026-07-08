@@ -12,6 +12,8 @@
     "character_visual": "still_motion"
   },
   "slot_overrides": {
+    "voice_bank": "bark_legacy",
+    "cast_voice_policy": "auto_registry",
     "char_voice_engine": "bark",
     "announcer_voice_engine": "kokoro",
     "music_engine": "musicgen",

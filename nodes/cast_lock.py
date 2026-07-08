@@ -16,11 +16,11 @@ legacy cast RNG. ``preserve_ledger`` (default) re-casts nothing; ``auto_registry
 assigns references from the selected voice bank.
 
 E.4: the surfaced widgets are exactly ``voice_bank`` / ``cast_voice_policy`` /
-``allow_voice_reuse`` -- ``delivery_profile`` is no longer surfaced (single
-option "neutral" in v2; the ``lock()`` kwarg still defaults to "neutral" and is
-validated + stamped) -- no ``voice_engine_mode``, ``deterministic_inference`` or
-``model_id`` widget. Import-time is side-effect-free (C-5). UTF-8, no BOM,
-ASCII-only source.
+``allow_voice_reuse`` / ``char_voice_engine`` / ``announcer_voice_engine`` --
+``delivery_profile`` is no longer surfaced (single option "neutral" in v2; the
+``lock()`` kwarg still defaults to "neutral" and is validated + stamped) -- no
+``voice_engine_mode``, ``deterministic_inference`` or ``model_id`` widget.
+Import-time is side-effect-free (C-5). UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
@@ -41,6 +41,9 @@ log = logging.getLogger("OTR")
 _VOICE_BANKS = ("default", "default_clean", "bark_legacy", "kokoro_builtin",
                 "elevenlabs_cloud")  # cloud ElevenLabs voice pool (S2), 2026-07-03
 _CAST_POLICIES = ("preserve_ledger", "auto_registry")
+_CHAR_VOICE_ENGINES = (
+    "auto", "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs")
+_ANNOUNCER_VOICE_ENGINES = ("auto", "kokoro", "chatterbox", "elevenlabs")
 _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 
 
@@ -104,6 +107,21 @@ class CastLock:
                         "holds). Off -> casting fails closed instead."
                     ),
                 }),
+                "char_voice_engine": (list(_CHAR_VOICE_ENGINES), {
+                    "default": "auto",
+                    "tooltip": (
+                        "Character TTS engine CastLock stamps into the durable "
+                        "cast. auto resolves from voice_bank; explicit cloud "
+                        "picks fail loud if the bank is incompatible."
+                    ),
+                }),
+                "announcer_voice_engine": (list(_ANNOUNCER_VOICE_ENGINES), {
+                    "default": "auto",
+                    "tooltip": (
+                        "Announcer TTS engine CastLock stamps into the durable "
+                        "cast. auto keeps the shipped Kokoro announcer."
+                    ),
+                }),
                 "gate_in": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -122,7 +140,8 @@ class CastLock:
     # ------------------------------------------------------------------ #
     def lock(self, script_json, voice_bank="default",
              cast_voice_policy="preserve_ledger", delivery_profile="neutral",
-             allow_voice_reuse=False, gate_in=""):
+             allow_voice_reuse=False, char_voice_engine="auto",
+             announcer_voice_engine="auto", gate_in=""):
         from . import _otr_ledger_consumers as _OTRLC
         from ._otr_delivery_profiles import (
             DELIVERY_PROFILE_VERSION, get_delivery_profile,
@@ -157,8 +176,13 @@ class CastLock:
         self._assign_bark_voices(cast, meta, report)
 
         if cast_voice_policy == "auto_registry":
-            self._auto_registry(led, cast, voice_bank, allow_voice_reuse, report)
+            self._auto_registry(
+                led, cast, voice_bank, allow_voice_reuse, report,
+                char_voice_engine=char_voice_engine,
+                announcer_voice_engine=announcer_voice_engine)
         else:
+            self._stamp_voice_engine_selection(
+                led, voice_bank, char_voice_engine, announcer_voice_engine)
             report.append(
                 f"preserve_ledger: {len(cast)} cast entries preserved "
                 f"(no re-cast)"
@@ -204,6 +228,7 @@ class CastLock:
                     "cast_lock_revision", "cast_voice_policy",
                     "delivery_profile_id", "delivery_profile_version",
                     "voice_bank_id",
+                    "char_voice_engine", "announcer_voice_engine",
                 ) if k in meta
             },
             source="cast_lock",
@@ -449,7 +474,9 @@ class CastLock:
             seen.add(cid)
 
     # ------------------------------------------------------------------ #
-    def _auto_registry(self, led, cast, voice_bank, allow_voice_reuse, report):
+    def _auto_registry(self, led, cast, voice_bank, allow_voice_reuse, report,
+                       char_voice_engine="auto",
+                       announcer_voice_engine="auto"):
         from ._otr_voice_bank import (
             CASTING_POLICY_VERSION, VoiceCastingError, announcer_voice_ref,
             assign_voice_for_slot, load_voice_bank,
@@ -469,8 +496,9 @@ class CastLock:
         # when this CastLock resolved the SAME engine and it still validates +
         # does not collide; otherwise fall closed to the deterministic scorer.
         voice_decisions = meta.get("voice_cast_decision") or {}
-        target_engine = self._resolve_char_engine(voice_bank, bank_entries)
-        announcer_engine = _DEFAULT_ANNOUNCER_ENGINE
+        target_engine, announcer_engine = self._stamp_voice_engine_selection(
+            led, voice_bank, char_voice_engine, announcer_voice_engine,
+            bank_entries=bank_entries)
 
         if target_engine is None:
             report.append(
@@ -566,6 +594,41 @@ class CastLock:
             )
 
     # ------------------------------------------------------------------ #
+    def _stamp_voice_engine_selection(self, led, voice_bank,
+                                      char_voice_engine="auto",
+                                      announcer_voice_engine="auto",
+                                      bank_entries=None):
+        """Stamp requested voice-engine routing even when cast rows are preserved.
+
+        ``auto_registry`` uses the resolved target engine for casting; preserved
+        ledgers still need the explicit engine choice recorded so profiles like
+        cloud_all cannot silently drift back to a local voice route.
+        """
+        meta = led.get("meta")
+        if not isinstance(meta, dict):
+            meta = {}
+            led["meta"] = meta
+
+        requested = str(char_voice_engine or "auto").strip() or "auto"
+        target_engine = None
+        if requested == "auto" and bank_entries is None:
+            meta["char_voice_engine"] = "auto"
+        else:
+            if bank_entries is None:
+                from ._otr_voice_bank import load_voice_bank
+                bank_entries, _bank_sha = load_voice_bank()
+            target_engine = self._resolve_char_engine(
+                voice_bank, bank_entries, requested)
+            meta["char_voice_engine"] = (
+                target_engine or ("auto" if requested == "auto" else requested)
+            )
+
+        announcer_engine = self._resolve_announcer_engine(
+            announcer_voice_engine)
+        meta["announcer_voice_engine"] = announcer_engine
+        return target_engine, announcer_engine
+
+    # ------------------------------------------------------------------ #
     @staticmethod
     def _stamp(entry, ref) -> None:
         """Stamp the chosen reference onto a cast entry (I-4 / I-9)."""
@@ -582,15 +645,52 @@ class CastLock:
             entry["provider_voice_id"] = pvid
 
     @staticmethod
-    def _resolve_char_engine(voice_bank, bank_entries):
+    def _resolve_announcer_engine(requested_engine="auto") -> str:
+        requested = str(requested_engine or "auto").strip()
+        if requested == "auto":
+            return _DEFAULT_ANNOUNCER_ENGINE
+        if requested not in _ANNOUNCER_VOICE_ENGINES:
+            from ._otr_voice_bank import VoiceCastingError
+            raise VoiceCastingError(
+                f"unsupported announcer_voice_engine {requested!r}; expected "
+                f"one of {_ANNOUNCER_VOICE_ENGINES}")
+        return requested
+
+    @staticmethod
+    def _resolve_char_engine(voice_bank, bank_entries, requested_engine="auto"):
         """First legacy-first char_voice engine whose profile allows ``voice_bank``
         AND that has reference entries in the bank. ``None`` if there is none
         (e.g. bark_legacy / kokoro_builtin -> preset engines, no refs)."""
+        from ._otr_voice_bank import VoiceCastingError
+
         try:
             from ._otr_engine_profiles import legacy_first_engines, load_resolver
 
             resolver = load_resolver()
             engines_with_refs = {e.engine for e in bank_entries}
+            requested = str(requested_engine or "auto").strip()
+            if requested != "auto":
+                if requested not in _CHAR_VOICE_ENGINES:
+                    raise VoiceCastingError(
+                        f"unsupported char_voice_engine {requested!r}; expected "
+                        f"one of {_CHAR_VOICE_ENGINES}")
+                if resolver is not None:
+                    prof = resolver.profile_for("char_voice", requested)
+                    if prof is None:
+                        raise VoiceCastingError(
+                            f"no char_voice profile for engine {requested!r}")
+                    if voice_bank not in prof.allowed_voice_banks:
+                        raise VoiceCastingError(
+                            f"voice_bank {voice_bank!r} is not allowed for "
+                            f"char_voice_engine {requested!r}; allowed "
+                            f"{prof.allowed_voice_banks}")
+                if requested in engines_with_refs:
+                    return requested
+                if requested == "bark":
+                    return None
+                raise VoiceCastingError(
+                    f"char_voice_engine {requested!r} has no reference entries "
+                    f"in the active voice bank")
             for eng in legacy_first_engines("char_voice"):
                 if eng not in engines_with_refs:
                     continue
@@ -599,6 +699,8 @@ class CastLock:
                 prof = resolver.profile_for("char_voice", eng)
                 if prof and voice_bank in prof.allowed_voice_banks:
                     return eng
+        except VoiceCastingError:
+            raise
         except Exception:  # noqa: BLE001
             return None
         return None

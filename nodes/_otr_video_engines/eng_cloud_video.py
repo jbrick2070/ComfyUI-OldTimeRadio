@@ -1,12 +1,13 @@
 """Cloud partner VIDEO adapters -- S3 core (pass04 secs 5+7, operator GO
 2026-07-02 evening: "code the cloud video plan").
 
-Three rows from the S0 pin table, invoked through the S0 bridge
+Four rows from the S0 pin table, invoked through the S0 bridge
 (``invoke_partner_node``) and conformed by ``canonicalize_video``:
 
     cloud_kling_avatar   required_audio_ref   (init_image, audio_ref)
     cloud_seedance_2     required_audio_ref   (init_image, audio_ref)
     cloud_wan_i2v        mute_only            (init_image, text_prompt)
+    cloud_wan_i2v_audio  required_audio_ref   (init_image, audio_ref)
 
 S3-CORE SCOPE: rows REGISTER unconditionally (registry-IS-the-menu C6) with
 empty ``default_roles`` -- selectable, NEVER automatic. Operator directive
@@ -36,6 +37,10 @@ import os
 import re
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .._otr_story_brief_helpers import (
+    append_visual_safety_clause,
+    visual_safety_negative,
+)
 
 _LOG = logging.getLogger("OTR.video.eng_cloud_video")
 
@@ -128,7 +133,7 @@ _WAN_SMOOTH_MOTION_CLAUSE = (
     "or pillarbox bars. "
     f"{_WAN_SMOOTH_MARKER}")
 _WAN_PROMPT_VARIANT = "wan_i2v_smooth_v1"
-_WAN_NEGATIVE_DEFAULT = (
+_WAN_NEGATIVE_DEFAULT = visual_safety_negative(
     "jump cuts, whip pans, rapid zooms, handheld shake, jitter, flicker, "
     "melting geometry, warped face, distorted hands, drifting text, unreadable "
     "text, black frame, pillarbox bars")
@@ -142,6 +147,7 @@ def _condition_kling_avatar_prompt(prompt: str) -> "tuple[str, dict]":
         conditioned = original.rstrip() + "\n\n" + _KLING_AVATAR_BASE_CLAUSE
     else:
         conditioned = _KLING_AVATAR_BASE_CLAUSE
+    conditioned = append_visual_safety_clause(conditioned)
     return conditioned, {
         "changed": conditioned != original,
         "original_sha8": _sha8(original),
@@ -396,7 +402,7 @@ class _CloudVideoBase:
             raise RuntimeError(
                 f"{self.name}: text_prompt missing/blank -- the partner V3 "
                 f"model schema requires model['prompt']; NO FALLBACK")
-        return prompt
+        return append_visual_safety_clause(prompt)
 
     def _duration_seconds(self, request, *, env: str, default: int,
                           min_s: int, max_s: int) -> int:
@@ -629,9 +635,9 @@ class CloudWanI2VEngine(_CloudVideoBase):
             "model": {
                 "model": model,
                 "prompt": prompt,
-                "negative_prompt": os.environ.get(
+                "negative_prompt": visual_safety_negative(os.environ.get(
                     "OTR_CLOUD_WAN_NEGATIVE_PROMPT", "").strip()
-                or _WAN_NEGATIVE_DEFAULT,
+                    or _WAN_NEGATIVE_DEFAULT),
                 "resolution": self._choice(
                     "OTR_CLOUD_WAN_RESOLUTION", "720P",
                     _WAN_RESOLUTIONS, transform=str.upper),
@@ -643,6 +649,23 @@ class CloudWanI2VEngine(_CloudVideoBase):
             "seed": self._seed_i32(request),
             "watermark": False,
         }
+
+
+class CloudWanI2VAudioEngine(CloudWanI2VEngine):
+    """Wan image-to-video with its installed optional driving-audio input."""
+
+    name = "cloud_wan_i2v_audio"
+    node_key = "cloud_wan_i2v"
+    family = "audio_conditioned_video"
+    required_inputs = ("init_image", "audio_ref", "text_prompt")
+    reactivity = "required_audio_ref"
+
+    def _partner_inputs(self, request):
+        inputs = super()._partner_inputs(request)
+        inputs["audio"] = self._audio_input(
+            request, min_duration_s=2.0, max_duration_s=30.0,
+            pad_to_min=True)
+        return inputs
 
 
 # word_razzle Phase 1 (2026-07-03): the ANIMATED word-card cloud i2v engine.
@@ -659,12 +682,13 @@ class CloudWanI2VEngine(_CloudVideoBase):
 _RAZZLE_MOTION_ENV = "OTR_CLOUD_RAZZLE_MOTION_PROMPT"
 _RAZZLE_MOTION_DEFAULT = (
     "living period poster, gentle atmospheric motion around the lettering -- "
-    "drifting smoke, soft neon flicker, subtle parallax depth -- the words stay "
+    "drifting mist, soft neon flicker, subtle parallax depth -- the words stay "
     "crisp, sharp and fully legible in every frame, letterforms never warp, "
     "melt or distort")
 _RAZZLE_NEG_ENV = "OTR_CLOUD_RAZZLE_NEG"
-_RAZZLE_NEG_DEFAULT = ("warped text, melting letters, distorted typography, "
-                       "illegible words, garbled text, flickering letters")
+_RAZZLE_NEG_DEFAULT = visual_safety_negative(
+    "warped text, melting letters, distorted typography, "
+    "illegible words, garbled text, flickering letters")
 
 
 class CloudWordRazzleEngine(_CloudVideoBase):
@@ -683,7 +707,8 @@ class CloudWordRazzleEngine(_CloudVideoBase):
         readability directive."""
         motion = os.environ.get(_RAZZLE_MOTION_ENV, "").strip() or _RAZZLE_MOTION_DEFAULT
         beat = str(_req_get(request, "text_prompt") or "").strip()
-        return f"{motion}. {beat}".strip().rstrip(".") if beat else motion
+        prompt = f"{motion}. {beat}".strip().rstrip(".") if beat else motion
+        return append_visual_safety_clause(prompt)
 
     def _duration_seconds(self, request) -> int:
         """The provider duration (seconds). Derived from the beat's frame
@@ -710,8 +735,9 @@ class CloudWordRazzleEngine(_CloudVideoBase):
         return {
             "image": self._init_image_input(request),
             "prompt": self._razzle_prompt(request),
-            "negative_prompt": os.environ.get(_RAZZLE_NEG_ENV, "").strip()
-            or _RAZZLE_NEG_DEFAULT,
+            "negative_prompt": visual_safety_negative(
+                os.environ.get(_RAZZLE_NEG_ENV, "").strip()
+                or _RAZZLE_NEG_DEFAULT),
             "motion_mode": os.environ.get("OTR_CLOUD_PIXVERSE_MOTION", "normal"),
             "quality": os.environ.get("OTR_CLOUD_PIXVERSE_QUALITY", "1080p"),
             "duration_seconds": self._duration_seconds(request),
@@ -722,12 +748,13 @@ class CloudWordRazzleEngine(_CloudVideoBase):
 KlingAvatar = CloudKlingAvatarEngine()
 Seedance2 = CloudSeedance2Engine()
 WanI2V = CloudWanI2VEngine()
+WanI2VAudio = CloudWanI2VAudioEngine()
 WordRazzle = CloudWordRazzleEngine()
 
-for _eng in (KlingAvatar, Seedance2, WanI2V, WordRazzle):
+for _eng in (KlingAvatar, Seedance2, WanI2V, WanI2VAudio, WordRazzle):
     register(_eng)
 
 __all__ = [
     "CloudKlingAvatarEngine", "CloudSeedance2Engine",
-    "CloudWanI2VEngine", "CloudWordRazzleEngine",
+    "CloudWanI2VEngine", "CloudWanI2VAudioEngine", "CloudWordRazzleEngine",
 ]

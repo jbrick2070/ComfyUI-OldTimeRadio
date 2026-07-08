@@ -1,0 +1,39 @@
+{
+  "id": "cloud_all",
+  "display_name": "All cloud (Partner API)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cpu",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "cloud_wan_i2v_audio",
+    "music_visual": "cloud_wan_i2v_audio",
+    "character_visual": "cloud_wan_i2v_audio",
+    "announcer_image": "cloud_nano_banana_2",
+    "music_image": "cloud_nano_banana_2",
+    "character_image": "cloud_nano_banana_2"
+  },
+  "slot_overrides": {
+    "voice_bank": "elevenlabs_cloud",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "elevenlabs",
+    "announcer_voice_engine": "elevenlabs",
+    "music_engine": "sonilo",
+    "video_render_engine": "cloud_wan_i2v_audio"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": []
+  }
+}

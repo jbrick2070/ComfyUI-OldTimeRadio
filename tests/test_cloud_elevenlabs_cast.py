@@ -7,12 +7,15 @@ POOL in the bank (rows with engine=='elevenlabs' + a real provider_voice_id) and
 bank. These tests guard both, plus the invariant that LOCAL banks never gain a
 provider_voice_id (byte-identical local cast).
 """
+import json
 import os
+
+import pytest
 
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 os.environ.setdefault("OTR_TEST_MODE", "1")
 
-from nodes._otr_voice_bank import load_voice_bank
+from nodes._otr_voice_bank import VoiceCastingError, load_voice_bank
 from nodes.cast_lock import CastLock
 
 
@@ -100,6 +103,65 @@ def test_elevenlabs_cloud_bank_stamps_provider_voice_id():
     assert chars[0]["provider_voice_id"] != chars[1]["provider_voice_id"]
 
 
+def test_explicit_elevenlabs_voice_engines_stamp_characters_and_announcer():
+    cast = [
+        {"char_id": "c02", "name": "MARGOT", "gender": "female",
+         "voice_preset": "v2/en_speaker_2"},
+        {"name": "ANNOUNCER", "speaker_role": "announcer",
+         "char_id": "announcer", "voice_preset": "v2/en_speaker_6"},
+    ]
+    led = _led()
+    report = []
+    CastLock()._auto_registry(
+        led, cast, "elevenlabs_cloud", False, report,
+        char_voice_engine="elevenlabs",
+        announcer_voice_engine="elevenlabs")
+    by_id = {e["char_id"]: e for e in cast}
+    assert by_id["c02"]["voice_engine"] == "elevenlabs"
+    assert by_id["c02"]["provider_voice_id"]
+    assert by_id["announcer"]["voice_engine"] == "elevenlabs"
+    assert by_id["announcer"]["provider_voice_id"]
+    assert led["meta"]["char_voice_engine"] == "elevenlabs"
+    assert led["meta"]["announcer_voice_engine"] == "elevenlabs"
+
+
+def test_preserve_ledger_stamps_explicit_elevenlabs_voice_engines():
+    led = {
+        "meta": {"episode_seed": 12345},
+        "cast": [
+            {"char_id": "c02", "name": "MARGOT", "gender": "female",
+             "voice_preset": "v2/en_speaker_2"},
+            {"name": "ANNOUNCER", "speaker_role": "announcer",
+             "char_id": "announcer", "voice_preset": "v2/en_speaker_6"},
+        ],
+        "lines": [
+            {"line_id": "b002", "char_id": "c02",
+             "speaker_role": "character", "text": "hi"},
+            {"line_id": "b001", "char_id": "announcer",
+             "speaker_role": "announcer", "text": "Tonight."},
+        ],
+    }
+    ledger_json, _rev, report, _done = CastLock().lock(
+        json.dumps(led),
+        voice_bank="elevenlabs_cloud",
+        cast_voice_policy="preserve_ledger",
+        allow_voice_reuse=False,
+        char_voice_engine="elevenlabs",
+        announcer_voice_engine="elevenlabs",
+    )
+    out = json.loads(ledger_json)
+    assert "preserve_ledger" in report
+    assert out["meta"]["voice_bank_id"] == "elevenlabs_cloud"
+    assert out["meta"]["char_voice_engine"] == "elevenlabs"
+    assert out["meta"]["announcer_voice_engine"] == "elevenlabs"
+
+
+def test_explicit_elevenlabs_rejects_incompatible_voice_bank():
+    entries, _sha = load_voice_bank()
+    with pytest.raises(VoiceCastingError, match="voice_bank .* not allowed"):
+        CastLock._resolve_char_engine("default", entries, "elevenlabs")
+
+
 def test_default_bank_leaves_provider_voice_id_unset():
     cast = [{"char_id": "c02", "name": "MARGOT", "gender": "female"}]
     CastLock()._auto_registry({"meta": {"episode_seed": 1}, "lines": []},
@@ -109,11 +171,9 @@ def test_default_bank_leaves_provider_voice_id_unset():
 
 
 # --------------------------------------------------------------------------- #
-# ONE-KNOB (2026-07-04): only the VOICE ENGINE is a knob; CastLock's voice_bank
-# never has to be touched. A cast row stamped with a LOCAL voice_ref_id (bank left
-# on default) but rendered on elevenlabs must auto-resolve a gender-matched
-# provider voice_id in the dispatch -- parity with how every local engine already
-# shares the default bank (bark never needed CastLock changed).
+# Dispatch compatibility: even if an older workflow stamped a LOCAL voice_ref_id
+# but the render node is set to ElevenLabs, the TTS adapter still resolves a
+# deterministic provider voice_id instead of falling back to a local engine.
 # --------------------------------------------------------------------------- #
 def test_provider_voice_id_auto_resolves_when_bank_left_local():
     from nodes._otr_voice_node_common import _resolve_provider_voice_id

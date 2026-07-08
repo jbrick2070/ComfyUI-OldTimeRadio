@@ -771,6 +771,29 @@ def _stamp_prompt_meta(req, source, prompt, *, subsource="", beat=""):
               "| %.100s", source, sha8, len(str(prompt)), beat, prompt)
 
 
+def _apply_visual_safety_prompt(req, shot) -> None:
+    engine_id = str((shot or {}).get("engine_id") or "").strip()
+    if not _is_cloud_video_engine(engine_id):
+        return
+    prompt = str(req.get("text_prompt") or "").strip()
+    if not prompt:
+        return
+    try:
+        from .._otr_story_brief_helpers import append_visual_safety_clause
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_story_brief_helpers import append_visual_safety_clause  # type: ignore
+    safe = append_visual_safety_clause(prompt)
+    if safe == prompt:
+        return
+    req["text_prompt"] = safe
+    obs = req.setdefault("observability", {})
+    source = str(obs.get("prompt_source") or "safety")
+    subsource = str(obs.get("prompt_subsource") or "")
+    _stamp_prompt_meta(
+        req, source, safe, subsource=subsource, beat=_beat_id_for_shot(shot))
+    obs["visual_safety_prompt"] = "applied"
+
+
 def ltx_prompt_diversity_status(trace):
     """Diversity status over the BRIEF-COMPOSED text-engine prompts in a
     :func:`run_episode` trace (round 5 acceptance: the per-beat composition
@@ -1856,6 +1879,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             req["text_prompt"] = scene_prompt
             _stamp_prompt_meta(req, "brief+beat", scene_prompt,
                                beat=_beat_id_for_shot(shot))
+    _apply_visual_safety_prompt(req, shot)
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
     _video_seed = _seed_from_hash(req_hash, shot.get("shot_id"))

@@ -70,6 +70,14 @@ def _req(**over):
     return r
 
 
+def _assert_visual_safety(prompt: str):
+    lower = prompt.lower()
+    assert "no blood" in lower
+    assert "no guns" in lower
+    assert "no knives" in lower
+    assert "no smoking" in lower
+
+
 def test_flux_pro_inputs(monkeypatch):
     # TRUE 1080p cloud stills (2026-07-03): _canvas_wh now conforms to the cloud
     # delivery canvas (orientation-preserving), so a landscape role request mints
@@ -80,6 +88,7 @@ def test_flux_pro_inputs(monkeypatch):
     # BFL /32 snap: request 1920x1088 (1080 -> 1088); canonical crops to 1080.
     assert ins["width"] == 1920 and ins["height"] == 1088
     assert ins["prompt_upsampling"] is False
+    _assert_visual_safety(ins["prompt"])
 
 
 def test_flux_pro_clamps_to_live_partner_range(monkeypatch):
@@ -105,6 +114,7 @@ def test_nano_banana_inputs_resolve_model(monkeypatch):
         "thinking_level": "MINIMAL",
     }
     assert ins["response_modalities"] == "IMAGE"
+    _assert_visual_safety(ins["prompt"])
 
 
 def test_nano_banana_default_selector_matches_installed_menu(monkeypatch):
@@ -144,6 +154,7 @@ def test_seedream_inputs_resolve_model(monkeypatch):
         "max_images": 1,
     }
     assert ins["watermark"] is False
+    _assert_visual_safety(ins["prompt"])
     high = eci.Seedream2._partner_inputs(_req(seed=3736360535))
     assert high["seed"] == 2147483647
 
@@ -167,6 +178,7 @@ def test_ideo_registered_and_inputs(monkeypatch):
     assert ins["rendering_speed"] == "TURBO"          # v1 default = cheapest
     assert ins["resolution"] == "2560x1440 (16:9)"
     assert eci.Ideo._est_usd() == 0.0429              # TURBO price
+    _assert_visual_safety(ins["prompt"])
 
 
 def test_ideogram_speed_price_map(monkeypatch):

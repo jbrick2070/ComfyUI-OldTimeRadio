@@ -56,9 +56,31 @@
         ]
       ]
     },
+    "slot_overrides.voice_bank": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_CastLock",
+          "voice_bank"
+        ]
+      ]
+    },
+    "slot_overrides.cast_voice_policy": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_CastLock",
+          "cast_voice_policy"
+        ]
+      ]
+    },
     "slot_overrides.char_voice_engine": {
       "registry": "audio",
       "targets": [
+        [
+          "OTR_CastLock",
+          "char_voice_engine"
+        ],
         [
           "OTR_BatchCharacterVoices",
           "engine"
@@ -68,6 +90,10 @@
     "slot_overrides.announcer_voice_engine": {
       "registry": "audio",
       "targets": [
+        [
+          "OTR_CastLock",
+          "announcer_voice_engine"
+        ],
         [
           "OTR_AnnouncerVoice",
           "engine"

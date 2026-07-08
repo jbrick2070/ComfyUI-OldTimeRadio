@@ -634,6 +634,36 @@ def test_cloud_image_adapter_bypasses_local_gpu_residency(
     assert led["images"]["images"][0]["engine_id"] == "ideo_alias"
 
 
+def test_dispatch_appends_visual_safety_to_image_requests(
+        clean_image_registry, tmp_path):
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"episode_id": "ep_safety", "cast": [{"char_id": "c1"}]}
+    policy = {
+        "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+        "video_models": {"character_video_model": {"engine_id": "still_motion"}},
+        "seed": {"request_seed": 0},
+        "granularity": {},
+    }
+    calls = {"last": None}
+
+    def gen_fn(req):
+        calls["last"] = req
+        return _np_pixels(31)
+
+    led, done, _report, _warnings = disp.dispatch_images(
+        ledger, policy, _payload(_pobj("c1", "a lab portrait", "oldhash")),
+        gen_fn=gen_fn, output_dir=str(tmp_path),
+        lockdir=tmp_path / "lease.lockdir")
+
+    assert done.startswith("image:done:")
+    prompt = calls["last"]["prompt"].lower()
+    for term in ("no blood", "no guns", "no knives", "no smoking"):
+        assert term in prompt
+    assert calls["last"]["prompt_hash"] != "oldhash"
+    assert led["images"]["images"][0]["prompt_hash"] == calls["last"]["prompt_hash"]
+
+
 def test_dispatch_renders_forced_ltx_announcer_radio_face(
         clean_image_registry, tmp_path, monkeypatch):
     """Regression for the missing ledger row:

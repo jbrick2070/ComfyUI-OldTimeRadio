@@ -186,7 +186,8 @@ def test_widget_vectors_exact(by_id):
     # CastLock (80): intentional index-workflow override (see docstring).
     # delivery_profile surface removed 2026-07-04 (widget-audit Batch 1); the
     # "neutral" kwarg default still applies + is validated/stamped by lock().
-    assert by_id[80]["widgets_values"] == ["default", "auto_registry", True]
+    assert by_id[80]["widgets_values"] == [
+        "default", "auto_registry", True, "indextts2", "kokoro"]
     for key, nid in NEW_NODE_IDS.items():
         if nid == 80:
             continue
@@ -264,4 +265,3 @@ def test_done_gate_chain_orders_the_engines(by_id, links_by_id):
     assert char_done == [(82, "gate_in")]
     ann_done = [_dst(links_by_id, by_id, i) for i in _out_links(by_id[82], "done")]
     assert ann_done == [(83, "gate_in")]
-

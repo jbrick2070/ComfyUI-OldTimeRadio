@@ -34,6 +34,7 @@ import logging
 import os
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .._otr_story_brief_helpers import append_visual_safety_clause
 from .._otr_shared.role_compat import ROLES
 
 _LOG = logging.getLogger("OTR.image.eng_cloud_image")
@@ -267,7 +268,7 @@ class _CloudImageBase:
             _shape_error(
                 f"{self.name}: blank prompt; installed Partner image nodes "
                 "require a non-empty prompt")
-        return prompt
+        return append_visual_safety_clause(prompt)
 
     def _seed(self, request) -> int:
         return int(_first_present(request, "seed", "request_seed", default=0))

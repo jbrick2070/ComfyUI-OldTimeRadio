@@ -27,7 +27,10 @@ from nodes._otr_video_engines import render_driver as rd
 
 _FFMPEG = shutil.which("ffmpeg")
 
-_CLOUD_ROWS = ("cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v")
+_CLOUD_ROWS = (
+    "cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v",
+    "cloud_wan_i2v_audio",
+)
 _MUSIC_OPEN_RISKY_PROMPT = (
     "Continuous shot, same console throughout. Dial whip-pans across "
     "frequencies. Tube filaments ignite from cold to white-hot. Speaker "
@@ -50,7 +53,7 @@ def test_cloud_rows_never_default():
     # S3-core: selectable picks ONLY -- no cloud row declares default_roles,
     # so automatic selection can never land on one (menu ORDER is cosmetic;
     # default_engine_for_role is the automatic-selection surface).
-    for eng in (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V):
+    for eng in (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio):
         assert tuple(eng.default_roles) == ()
     for role in ("announcer_visual", "music_visual", "character_video"):
         default = vreg.default_engine_for_role(role)
@@ -61,8 +64,9 @@ def test_reactivity_descriptors_match_pass04():
     assert ecv.KlingAvatar.reactivity == "required_audio_ref"
     assert ecv.Seedance2.reactivity == "required_audio_ref"
     assert ecv.WanI2V.reactivity == "mute_only"
+    assert ecv.WanI2VAudio.reactivity == "required_audio_ref"
     assert all(e.must_strip_audio for e in
-               (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V))
+               (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio))
 
 
 def test_schema_grounded_v3_video_rows_are_partner_invocable():
@@ -71,8 +75,10 @@ def test_schema_grounded_v3_video_rows_are_partner_invocable():
     # invoke time, not as a stale director-side "awaiting paid smoke" block.
     assert ecv.Seedance2.invocable is True
     assert ecv.WanI2V.invocable is True
+    assert ecv.WanI2VAudio.invocable is True
     assert ecv.Seedance2.invocability_reason == ""
     assert ecv.WanI2V.invocability_reason == ""
+    assert ecv.WanI2VAudio.invocability_reason == ""
 
 
 def test_assert_usable_no_enable_flag(monkeypatch):
@@ -118,6 +124,20 @@ def _request(tmp_path, **over):
     return req
 
 
+def _assert_visual_safety(prompt: str):
+    lower = prompt.lower()
+    assert "no blood" in lower
+    assert "no guns" in lower
+    assert "no knives" in lower
+    assert "no smoking" in lower
+
+
+def _assert_negative_safety(prompt: str):
+    lower = prompt.lower()
+    for term in ("blood", "guns", "knives", "smoking"):
+        assert term in lower
+
+
 def test_kling_avatar_partner_inputs(tmp_path, monkeypatch):
     captured = {}
 
@@ -135,6 +155,7 @@ def test_kling_avatar_partner_inputs(tmp_path, monkeypatch):
     assert ins["mode"] and ins["seed"] == 7
     assert ins["prompt"].startswith("a person")
     assert ecv._KLING_AVATAR_MARKER in ins["prompt"]
+    _assert_visual_safety(ins["prompt"])
     assert hasattr(ins["image"], "ndim") and ins["image"].ndim == 4
     assert set(ins["sound_file"]) == {"waveform", "sample_rate"}
     assert ins["sound_file"]["waveform"].shape[-1] == 32000
@@ -184,7 +205,9 @@ def test_wan_i2v_sends_v3_model_dict_without_audio(tmp_path, monkeypatch):
     assert ins["model"]["model"] == "wan2.7-i2v"
     assert ins["model"]["prompt"].startswith("a person")
     assert ecv._WAN_SMOOTH_MARKER in ins["model"]["prompt"]
+    _assert_visual_safety(ins["model"]["prompt"])
     assert "jump cuts" in ins["model"]["negative_prompt"]
+    _assert_negative_safety(ins["model"]["negative_prompt"])
     assert ins["model"]["resolution"] == "1080P"
     assert ins["model"]["duration"] == 6
     assert ins["prompt_extend"] is False
@@ -220,9 +243,29 @@ def test_wan_i2v_duration_ceil_avoids_fractional_beat_underrun(
 
 def test_wan_i2v_negative_prompt_override(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
-    monkeypatch.setenv("OTR_CLOUD_WAN_NEGATIVE_PROMPT", "no smoke")
+    monkeypatch.setenv("OTR_CLOUD_WAN_NEGATIVE_PROMPT", "motion artifacts")
     ins = ecv.WanI2V._partner_inputs(_request(tmp_path))
-    assert ins["model"]["negative_prompt"] == "no smoke"
+    assert ins["model"]["negative_prompt"].startswith("motion artifacts")
+    _assert_negative_safety(ins["model"]["negative_prompt"])
+
+
+def test_wan_i2v_audio_sends_declared_optional_audio(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
+    req = _request(tmp_path, audio_ref=_fixture_wav(tmp_path, dur_s=0.5))
+    ins = ecv.WanI2VAudio._partner_inputs(req)
+    assert ecv.WanI2VAudio.node_key == "cloud_wan_i2v"
+    assert set(ins) == {"first_frame", "model", "prompt_extend",
+                        "seed", "watermark", "audio"}
+    assert set(ins["audio"]) == {"waveform", "sample_rate"}
+    assert ins["audio"]["sample_rate"] == 16000
+    assert ins["audio"]["waveform"].shape[-1] == 32000
+    _assert_visual_safety(ins["model"]["prompt"])
+
+
+def test_wan_i2v_audio_missing_audio_fails_loud(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_WAN_MODEL", "wan2.7-i2v")
+    with pytest.raises(RuntimeError, match="audio_ref"):
+        ecv.WanI2VAudio._partner_inputs(_request(tmp_path, audio_ref=""))
 
 
 def test_wan_i2v_rejects_v3_placeholder_model(tmp_path, monkeypatch):
@@ -291,6 +334,7 @@ def test_seedance_reference_row_sends_v3_model_dict(tmp_path, monkeypatch):
     assert model["model"] == "Seedance 2.0 Fast"
     assert model["prompt"].startswith("a person")
     assert ecv._SEEDANCE_SMOOTH_MARKER in model["prompt"]
+    _assert_visual_safety(model["prompt"])
     assert model["resolution"] == "720p"
     assert model["ratio"] == "adaptive"
     assert model["duration"] == 5
@@ -362,6 +406,7 @@ def test_seedance_two_second_ledger_beat_requests_minimum_and_16x9(
     assert req["asset_refs"]["init_image"] == init_png
     assert req["audio_ref"]["path"] == audio_wav
     assert req["canvas"]["w"] > req["canvas"]["h"]
+    _assert_visual_safety(req["text_prompt"])
 
     ins = ecv.Seedance2._partner_inputs(req)
     assert set(ins) == {"model", "seed", "watermark"}
@@ -372,6 +417,7 @@ def test_seedance_two_second_ledger_beat_requests_minimum_and_16x9(
     assert model["ratio"] == "16:9"
     assert model["duration"] == 4
     assert ecv._SEEDANCE_SMOOTH_MARKER in model["prompt"]
+    _assert_visual_safety(model["prompt"])
     assert "whip-pans" not in model["prompt"].lower()
     assert hasattr(model["reference_images"]["image_1"], "ndim")
     assert set(model["reference_audios"]["audio_1"]) == {
@@ -388,16 +434,20 @@ def test_prompt_conditioners_use_engine_specific_markers(
     assert wan["model"]["prompt"].startswith(prompt)
     assert ecv._WAN_SMOOTH_MARKER in wan["model"]["prompt"]
     assert ecv._SEEDANCE_SMOOTH_MARKER not in wan["model"]["prompt"]
+    _assert_visual_safety(wan["model"]["prompt"])
 
     kling = ecv.KlingAvatar._partner_inputs(req)
     assert kling["prompt"].startswith(prompt)
     assert ecv._KLING_AVATAR_MARKER in kling["prompt"]
     assert ecv._SEEDANCE_SMOOTH_MARKER not in kling["prompt"]
+    _assert_visual_safety(kling["prompt"])
 
     razzle = ecv.WordRazzle._partner_inputs(req)
-    assert razzle["prompt"].endswith(prompt)
+    assert prompt in razzle["prompt"]
     assert ecv._WAN_SMOOTH_MARKER not in razzle["prompt"]
     assert ecv._KLING_AVATAR_MARKER not in razzle["prompt"]
+    _assert_visual_safety(razzle["prompt"])
+    _assert_negative_safety(razzle["negative_prompt"])
 
 
 # --------------------------------------------------------------------------- #
