@@ -9,8 +9,8 @@ Pins:
   2. Router: the three new phases resolve the pack seam; repo=None on the
      science lane returns those exact bytes; the plain "outline" phase is
      UNTOUCHED (object identity preserved for the period-overlay sentinel).
-  3. FAIL-LOUD: a bank whose pack lacks the outline seams raises through
-     the router (public_domain_story -- still not outline-enabled).
+     3. NON-SCIENCE ROUTING: public_domain_story has its own outline seams;
+     routing must use them, not the science fixtures.
   4. generate_outline threads source_bank_id (signature + AST pin on the
      writer's two call sites).
 """
@@ -52,16 +52,13 @@ class TestByteIdentity:
         assert resolved is outline_mod._SYSTEM_PROMPT
 
 
-class TestFailLoud:
+class TestPublicDomainRouting:
     @pytest.mark.parametrize("phase", sorted(_SEAM_TO_CONST))
-    def test_bank_without_outline_seams_raises(self, phase):
-        # public_domain_story's pack ships only
-        # {line_composer_system, coda_system}; resolution must fail LOUD,
-        # never fall to science.
-        with pytest.raises(Exception) as ei:
-            resolve_creative_system_prompt(
-                None, phase=phase, source_bank_id="public_domain_story")
-        assert "outline" in str(ei.value) or "seam" in str(ei.value).lower()
+    def test_public_domain_outline_seams_route(self, phase):
+        resolved = resolve_creative_system_prompt(
+            None, phase=phase, source_bank_id="public_domain_story")
+        assert "public-domain" in resolved or "adaptation" in resolved
+        assert resolved != _SEAM_TO_CONST[phase]
 
 
 class TestThreading:

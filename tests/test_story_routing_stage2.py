@@ -138,7 +138,12 @@ LANE_PACK_KEYS = {
             "announcer_intro_safe_system", "announcer_outro_system",
         }),
     ("public_domain_story", "faithful_radio_adaptation"):
-        frozenset({"line_composer_system", "coda_system"}),
+        frozenset({
+            "outline_macro_system", "outline_phase_system",
+            "outline_beat_system", "line_composer_system",
+            "exchange_system", "coda_system", "announcer_intro_system",
+            "announcer_intro_safe_system", "announcer_outro_system",
+        }),
     ("custom_source_bank", "simple_4_prompt_experimental"):
         frozenset({"pass_1_creative_story", "pass_2_creative_ledger_fill",
                    "pass_3_technical_schema_cleanup",

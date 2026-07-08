@@ -84,8 +84,15 @@
         "source_ref": "gutenberg-time-machine-sample:arrival"
       },
       "required_seams": [
+        "outline_macro_system",
+        "outline_phase_system",
+        "outline_beat_system",
         "line_composer_system",
-        "coda_system"
+        "exchange_system",
+        "coda_system",
+        "announcer_intro_system",
+        "announcer_intro_safe_system",
+        "announcer_outro_system"
       ],
       "runnable": false,
       "guide_ref": ""

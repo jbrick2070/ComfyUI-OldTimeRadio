@@ -72,9 +72,10 @@ def test_briefs_pass_validate_interpreter_result():
 
 def test_wrapper_translates_only_public_domain_interpreter_error():
     from nodes import _otr_source_payload as osp
+    from nodes import _otr_public_domain_sources as pds
 
     def _raise_pd_error(*, technical_fn, payload, model_id):
-        raise PublicDomainInterpreterError(attempts=2, reason="test-boom")
+        raise pds.PublicDomainInterpreterError(attempts=2, reason="test-boom")
 
     with patch(
         "nodes._otr_public_domain_sources.build_public_domain_briefs",
@@ -93,7 +94,7 @@ def test_wrapper_translates_only_public_domain_interpreter_error():
                 technical_fn=lambda *a, **kw: "{}",
                 model_id="test",
             )
-        assert isinstance(ei.value.__cause__, PublicDomainInterpreterError)
+        assert isinstance(ei.value.__cause__, pds.PublicDomainInterpreterError)
 
 
 def test_unexpected_public_domain_interpreter_errors_propagate_hard():

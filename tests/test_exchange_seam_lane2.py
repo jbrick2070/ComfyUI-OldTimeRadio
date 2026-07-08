@@ -10,9 +10,8 @@ Pins:
   2. ASSEMBLY IDENTITY: build_exchange_prompt(system_prompt=None) ==
      build_exchange_prompt(system_prompt=<routed science value>) -- the
      science lane is byte-identical end to end.
-  3. FAIL-LOUD: a bank whose pack lacks the exchange seam raises through
-     the router (public_domain_story -- still not exchange-enabled); never
-     falls through to the science prompt.
+  3. NON-SCIENCE ROUTING: public_domain_story has its own exchange seam;
+     routing must use it, not the science fixture.
   4. THREADING: system_prompt is threaded run_exchange_prepass ->
      compose_exchange -> build_exchange_prompt (signature pins), the writer
      call site passes it, and the writer's resolve call sits OUTSIDE any
@@ -100,17 +99,13 @@ class TestAssemblyIdentity:
         assert "Ground the exchange in ONE concrete detail" in system
 
 
-class TestFailLoud:
-    def test_bank_without_exchange_seam_raises(self):
-        # public_domain_story's pack ships only
-        # {line_composer_system, coda_system}; it must fail LOUD here, never
-        # fall through to science.
-        with pytest.raises(Exception) as ei:
-            resolve_creative_system_prompt(
-                None, phase="exchange_system",
-                source_bank_id="public_domain_story")
-        msg = str(ei.value).lower()
-        assert "exchange" in msg or "seam" in msg
+class TestPublicDomainRouting:
+    def test_public_domain_exchange_seam_routes(self):
+        resolved = resolve_creative_system_prompt(
+            None, phase="exchange_system",
+            source_bank_id="public_domain_story")
+        assert "public-domain" in resolved
+        assert resolved != EXCHANGE_SYSTEM_PROMPT
 
 
 class TestThreading:
