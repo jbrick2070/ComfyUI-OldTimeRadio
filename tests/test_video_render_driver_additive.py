@@ -432,7 +432,7 @@ def test_run_episode_request_builder_overrides_default(record_registry):
     assert calls == ["shot_b001", "shot_b002"]   # the builder drove every shot
 
 
-def test_run_episode_honors_render_plan_for_character_shots(record_registry):
+def test_run_episode_ignores_render_plan_for_visible_shots(record_registry):
     led = _real_ledger()
     led["lines"].append(
         {"line_id": "b003", "char_id": "c03", "speaker_role": "character",
@@ -451,6 +451,7 @@ def test_run_episode_honors_render_plan_for_character_shots(record_registry):
         "selection_mode": "all",
         "blocked": False,
         "applied_max_n": 1,
+        "excluded_flat_lines": ["b003"],
     }}
     calls = []
 
@@ -459,9 +460,9 @@ def test_run_episode_honors_render_plan_for_character_shots(record_registry):
         return rd.build_request_from_shot(shot, ledger, canvas=canvas)
 
     out = rd.run_episode(led, request_builder=rb)
-    assert calls == ["shot_b001", "shot_b002"]
+    assert calls == ["shot_b001", "shot_b002", "shot_b003"]
     assert [s["shot_id"] for s in out["ledger"]["video"]["shots"]] == [
-        "shot_b001", "shot_b002"]
+        "shot_b001", "shot_b002", "shot_b003"]
 
 
 # --------------------------------------------------------------------------- #
