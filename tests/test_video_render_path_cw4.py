@@ -389,3 +389,28 @@ def test_title_reveal_resolves_early_and_holds_bug409():
     # the OLD full-window stretch would still read p==0.4 at frame 40; the new
     # pacing resolves strictly earlier than the linear whole-window progress
     assert _title_reveal_progress(40, w0, me, False, frac) > (40 - w0) / (me - w0)
+
+
+def test_hero_title_text_draws_black_outline_for_readability():
+    """The title-card hero text needs a real dark edge over moving CRT art."""
+    from PIL import Image, ImageDraw
+    from nodes.video_engine import (
+        _draw_crt_overstrike_text, _load_font, CRT_GREEN,
+    )
+
+    bg = (80, 0, 80)
+    im = Image.new("RGB", (360, 120), bg)
+    draw = ImageDraw.Draw(im)
+    _draw_crt_overstrike_text(
+        draw, (18, 22), "SLANTED INK", fill=CRT_GREEN,
+        font=_load_font(42), stroke_width=4, stroke_fill=(0, 0, 0),
+    )
+    px = im.load()
+    black = green = 0
+    for yy in range(im.height):
+        for xx in range(im.width):
+            val = px[xx, yy]
+            black += int(val == (0, 0, 0))
+            green += int(val == CRT_GREEN)
+    assert black > 0, "hero title stroke must add black pixels"
+    assert green > 0, "hero title fill must stay phosphor green"

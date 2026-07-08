@@ -99,6 +99,32 @@ def _load_font(size):
     return font
 
 
+def _draw_crt_overstrike_text(
+    draw,
+    xy,
+    text,
+    *,
+    fill,
+    font,
+    stroke_width=0,
+    stroke_fill=(0, 0, 0),
+):
+    """Draw CRT fake-bold text with an optional outline.
+
+    Pillow's stroke support gives the hero title a real dark edge while the
+    overstrike keeps the existing phosphor-bold look.
+    """
+    x, y = xy
+    kwargs = {"fill": fill, "font": font}
+    if int(stroke_width) > 0:
+        kwargs.update({
+            "stroke_width": int(stroke_width),
+            "stroke_fill": stroke_fill,
+        })
+    for ox, oy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        draw.text((x + ox, y + oy), text, **kwargs)
+
+
 # -----------------------------------------------------------------------------
 # AUDIO ANALYSIS - per-frame RMS + FFT
 # -----------------------------------------------------------------------------
@@ -785,9 +811,13 @@ class _CRTRenderer:
             # clamp inside the frame (no black edge from any drift/dock)
             x = max(0, min(x, self.w - tw))
             y = max(0, min(y, self.h - line_h))
-            # fake-bold by OVERSTRIKE (no real bold font is loaded)
-            for ox, oy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-                draw.text((x + ox, y + oy), s, fill=hero_col, font=font)
+            # Fake-bold by overstrike, plus a real black edge so the large
+            # episode title reads over the animated CRT field.
+            _draw_crt_overstrike_text(
+                draw, (x, y), s, fill=hero_col, font=font,
+                stroke_width=max(1, min(6, line_h // 18)),
+                stroke_fill=(0, 0, 0),
+            )
             # block cursor after the last revealed char (during reveal only)
             if not in_dock and li == len(shown) - 1 and p < 1.0:
                 cur_w = max(4, line_h // 2)
