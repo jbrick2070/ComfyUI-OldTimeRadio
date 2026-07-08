@@ -1156,6 +1156,8 @@ def _build_macro_user_prompt(req: OutlineRequest) -> str:
         "",
         source_line,
         f"Style: {req.style}",
+        "",
+        _format_cast_block(req),
     ]
     # KILL 2 (2026-06-24): inject the selected StoryContract's full grammar block
     # (label / sound_world / story_engine / ending_mode) so the body is composed in
