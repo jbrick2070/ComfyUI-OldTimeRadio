@@ -1,0 +1,32 @@
+{
+  "id": "google_omni_media",
+  "display_name": "Google BYO media (image + Omni video)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cpu",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "google_omni_video",
+    "music_visual": "google_omni_video",
+    "character_visual": "google_omni_video",
+    "announcer_image": "google_image",
+    "music_image": "google_image",
+    "character_image": "google_image"
+  },
+  "slot_overrides": {},
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": []
+  }
+}

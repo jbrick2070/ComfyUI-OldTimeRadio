@@ -35,6 +35,7 @@ from nodes._otr_shared import capability_profiles as cp
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 MASTER = REPO_ROOT / "workflows" / "otr_canonical.json"
 TIERS = ("16gb_full", "8gb_lite", "cpu_floor")
+GOOGLE_MEDIA_PROFILES = ("google_veo_media", "google_omni_media")
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +83,12 @@ def _declarations_by_registry():
 def test_committed_tier_loads_and_validates(tier):
     profile = cp.load_profile(tier)
     assert profile["id"] == tier
+
+
+@pytest.mark.parametrize("profile_id", GOOGLE_MEDIA_PROFILES)
+def test_google_media_profile_loads_and_validates(profile_id):
+    profile = cp.load_profile(profile_id)
+    assert profile["id"] == profile_id
 
 
 def test_unknown_top_level_key_rejected():
@@ -258,6 +265,13 @@ def test_availability_reason_codes():
 @pytest.mark.parametrize("tier", TIERS)
 def test_cross_validation_green_for_committed_tiers(tier):
     profile = cp.load_profile(tier)
+    mapping = cp.load_widget_mapping()
+    cp.cross_validate_profile(profile, mapping, _declarations_by_registry())
+
+
+@pytest.mark.parametrize("profile_id", GOOGLE_MEDIA_PROFILES)
+def test_cross_validation_green_for_google_media_profiles(profile_id):
+    profile = cp.load_profile(profile_id)
     mapping = cp.load_widget_mapping()
     cp.cross_validate_profile(profile, mapping, _declarations_by_registry())
 

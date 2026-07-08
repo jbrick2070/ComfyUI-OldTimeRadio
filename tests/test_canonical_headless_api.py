@@ -106,6 +106,50 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     assert str(director["inputs"]["announcer_image_model"]).startswith("cloud_")
 
 
+def test_google_veo_media_profile_dry_run_builds_prompt(tmp_path):
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas",
+        "--dry-run",
+        "--profile", "google_veo_media",
+        "--words", "30",
+        "--source-bank", "media_archive",
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    assert "profile=google_veo_media" in out
+    prompt = json.loads(dump.read_text(encoding="utf-8"))
+    director = _node(prompt, "OTR_VideoDirector")
+    assert director["inputs"]["announcer_video_model"] == "google_veo_video"
+    assert director["inputs"]["music_video_model"] == "google_veo_video"
+    assert director["inputs"]["character_video_model"] == "google_veo_video"
+    assert director["inputs"]["announcer_image_model"] == "google_image"
+    assert director["inputs"]["music_image_model"] == "google_image"
+    assert director["inputs"]["character_image_model"] == "google_image"
+
+
+def test_google_omni_media_profile_dry_run_builds_prompt(tmp_path):
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas",
+        "--dry-run",
+        "--profile", "google_omni_media",
+        "--words", "30",
+        "--source-bank", "media_archive",
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    assert "profile=google_omni_media" in out
+    prompt = json.loads(dump.read_text(encoding="utf-8"))
+    director = _node(prompt, "OTR_VideoDirector")
+    assert director["inputs"]["announcer_video_model"] == "google_omni_video"
+    assert director["inputs"]["music_video_model"] == "google_omni_video"
+    assert director["inputs"]["character_video_model"] == "google_omni_video"
+    assert director["inputs"]["announcer_image_model"] == "google_image"
+    assert director["inputs"]["music_image_model"] == "google_image"
+    assert director["inputs"]["character_image_model"] == "google_image"
+
+
 def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([
