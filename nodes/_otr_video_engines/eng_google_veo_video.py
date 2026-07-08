@@ -325,6 +325,8 @@ class GoogleVeoVideoEngine:
     invocable = True
     invocability_reason = ""
     native = False
+    provider_side = True
+    strict_text_only = True
     render_aspect = "wide"
 
     def load(self) -> None:

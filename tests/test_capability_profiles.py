@@ -35,7 +35,12 @@ from nodes._otr_shared import capability_profiles as cp
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 MASTER = REPO_ROOT / "workflows" / "otr_canonical.json"
 TIERS = ("16gb_full", "8gb_lite", "cpu_floor")
-GOOGLE_MEDIA_PROFILES = ("google_veo_media", "google_omni_media")
+GOOGLE_MEDIA_PROFILES = (
+    "google_veo_media",
+    "google_omni_media",
+    "google_veo_all",
+    "google_omni_all",
+)
 
 
 # ---------------------------------------------------------------------------

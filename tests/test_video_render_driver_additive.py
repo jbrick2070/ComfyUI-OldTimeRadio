@@ -660,6 +660,47 @@ def test_character_3d_request_missing_inputs_fails_closed():
         VideoRequest.model_validate(req)
 
 
+def test_google_text_only_request_prunes_audio_and_init_refs():
+    """Direct Google video is strict text-to-video today: the shared builder
+    must not hand it per-beat audio or still refs just because those are
+    available elsewhere in the episode."""
+    from nodes._otr_video_engines.schemas import VideoRequest
+
+    led = {
+        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+                  "ledger_frozen": True},
+        "lines": [
+            {"line_id": "b010", "char_id": "c07", "speaker_role": "character",
+             "start_s": 4.0, "dur_s": 2.4, "audio_wav_path": "X:/a/b010.wav"},
+        ],
+        "images": {"images": [
+            {"object_id": "c07", "kind": "portrait", "path": "X:/img/c07.png"},
+            {"object_id": "still_b010", "kind": "scene_character",
+             "path": "X:/img/still_b010.png"},
+        ]},
+        "video": {"video_revision": 1, "fps": 25, "shots": [
+            {"shot_id": "shot_b010", "source_line_ids": ["b010"],
+             "role": "character_video", "engine_id": "google_veo_video",
+             "family": "text_to_video", "group_id": "grp_char",
+             "target_frame_count": 60, "degradation_trail": [],
+             "creative": {"text_prompt": "archival reading room, slow pan"}},
+        ]},
+    }
+    req = rd.build_request_from_shot(led["video"]["shots"][0], led)
+    VideoRequest.model_validate(req)
+    assert req["family_hint"] == "text_to_video"
+    assert req["text_prompt"]
+    assert req["audio_ref"] is None
+    assert "init_image" not in req["asset_refs"]
+
+
+def test_google_video_is_provider_side_not_local_for_reclaim():
+    section = {"shots": [
+        {"shot_id": "shot_google", "engine_id": "google_veo_video"},
+    ]}
+    assert rd._section_has_local_video_engine(section) is False
+
+
 def test_family_changing_failure_is_loud_no_prune(stub_registry):
     """No fallbacks (operator 2026-06-16): a character_3d engine that fails RAISES
     loud -- there is no family-changing degrade, so no execution-group prune. The

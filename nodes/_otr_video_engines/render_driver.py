@@ -933,19 +933,68 @@ def _is_never_humo_video_role(role: str) -> bool:
 
 
 def _is_cloud_video_engine(engine_id: str) -> bool:
-    """True for Partner/cloud video engines, including aliases whose engine id
-    does not itself start with ``cloud_`` but whose adapter declares a cloud
-    ``node_key``. Pure registry read; unknown engine -> False."""
+    """True for provider-side video engines.
+
+    Includes Partner/cloud engines plus direct BYO API engines such as Google
+    Veo/Omni. These engines do not load local video weights, so local VRAM
+    residue cleanup and local HuMo policy redirects must not treat them as
+    in-process model routes.
+    """
     eid = str(engine_id or "")
     if eid.startswith("cloud_"):
         return True
     try:
         if _vreg.is_registered(eid):
-            node_key = str(getattr(_vreg.get_engine(eid), "node_key", "") or "")
+            eng = _vreg.get_engine(eid)
+            if bool(getattr(eng, "provider_side", False)):
+                return True
+            node_key = str(getattr(eng, "node_key", "") or "")
             return node_key.startswith("cloud_")
     except Exception:  # noqa: BLE001 -- unknown/unbuilt engines are not cloud
         return False
     return False
+
+
+def _prune_strict_text_only_request(req: dict, engine_id: str) -> dict:
+    """Remove optional refs a strict text-only provider adapter cannot accept.
+
+    The full episode builder often has per-beat audio and stills available even
+    when the selected video engine is text-to-video. Local engines may use some
+    of those optional refs, so this is opt-in per adapter; strict text-only
+    Google providers should receive exactly text/canvas/timing/seeds.
+    """
+    eid = str(engine_id or "")
+    try:
+        strict = bool(
+            eid and _vreg.is_registered(eid)
+            and getattr(_vreg.get_engine(eid), "strict_text_only", False)
+        )
+    except Exception:  # noqa: BLE001 -- unknown engine validates later
+        strict = False
+    if not strict:
+        return req
+
+    removed = []
+    if req.get("audio_ref") is not None:
+        req["audio_ref"] = None
+        removed.append("audio_ref")
+    if req.get("base_clip_ref"):
+        req["base_clip_ref"] = None
+        removed.append("base_clip_ref")
+
+    assets = dict(req.get("asset_refs") or {})
+    for key in ("init_image", "image", "still", "reference_images", "last_frame"):
+        if key in assets:
+            assets.pop(key, None)
+            removed.append("asset_refs.%s" % key)
+    req["asset_refs"] = assets
+
+    if removed:
+        _LOG.info(
+            "[OTR.render_driver] strict text-only engine %s: pruned unsupported "
+            "request ref(s) %s before invoke",
+            eid, ", ".join(removed))
+    return req
 
 
 def _radio_is_host_redirect_applies(engine_id: str) -> bool:
@@ -1914,6 +1963,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # char_id is a schema extra; VideoRequest is extra="forbid").
     if char_id:
         req["conditioning_refs"]["char_id"] = char_id
+    _prune_strict_text_only_request(req, shot.get("engine_id"))
     return req
 
 

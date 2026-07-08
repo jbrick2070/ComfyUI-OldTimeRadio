@@ -112,10 +112,10 @@ def test_request_shape_sends_only_model_and_input(monkeypatch):
         "melancholy analog synth, no vocals", 8, seed=999
     )
 
-    assert seen["payload"] == {
-        "model": "lyria-3-clip-preview",
-        "input": "melancholy analog synth, no vocals",
-    }
+    assert set(seen["payload"]) == {"model", "input"}
+    assert seen["payload"]["model"] == "lyria-3-clip-preview"
+    assert "instrumental cinematic radio drama cue" in seen["payload"]["input"]
+    assert "reflective minor-key warmth" in seen["payload"]["input"]
     assert "duration" not in seen["payload"]
     assert "seed" not in seen["payload"]
     assert seen["kwargs"]["timeout_s"] == 300
@@ -123,6 +123,40 @@ def test_request_shape_sends_only_model_and_input(monkeypatch):
     assert seen["kwargs"]["_api_key"] == "KEY"
     assert seen["mp3"] == b"mp3"
     assert tuple(audio["waveform"].shape) == (1, 2, 8 * L.SAMPLE_RATE)
+
+
+def test_provider_safe_prompt_removes_story_policy_terms(monkeypatch):
+    _clear_keys(monkeypatch)
+    monkeypatch.setenv("GEMINI_API_KEY", "KEY")
+    seen = {}
+
+    def _create(payload, **kwargs):
+        seen["payload"] = dict(payload)
+        return {"output_audio": {"data": base64.b64encode(b"mp3").decode()}}
+
+    monkeypatch.setattr(L, "create_interaction", _create)
+    monkeypatch.setattr(L, "_mp3_to_audio", lambda data, **kw: _audio(seconds=30))
+
+    AE.get_engine("google_lyria").generate_clip(
+        "dissonant, unsettling, danger, smoking, blood, guns, knives, "
+        "slow atmospheric build, instrumental intro",
+        8,
+        seed=999,
+    )
+
+    sent = seen["payload"]["input"].lower()
+    for term in (
+        "dissonant",
+        "unsettling",
+        "danger",
+        "smoking",
+        "blood",
+        "guns",
+        "knives",
+    ):
+        assert term not in sent
+    assert "slow atmospheric build" in sent
+    assert "family friendly" in sent
 
 
 def test_response_parser_accepts_camel_case_and_steps(monkeypatch):

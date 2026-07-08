@@ -1,0 +1,39 @@
+{
+  "id": "google_veo_all",
+  "display_name": "Google BYO all media (TTS + Lyria + image + Veo)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cpu",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "google_veo_video",
+    "music_visual": "google_veo_video",
+    "character_visual": "google_veo_video",
+    "announcer_image": "google_image",
+    "music_image": "google_image",
+    "character_image": "google_image"
+  },
+  "slot_overrides": {
+    "voice_bank": "google_tts",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "google_tts",
+    "announcer_voice_engine": "google_tts",
+    "music_engine": "google_lyria",
+    "video_render_engine": "google_veo_video"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": []
+  }
+}

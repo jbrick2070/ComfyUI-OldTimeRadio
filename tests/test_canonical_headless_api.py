@@ -150,6 +150,59 @@ def test_google_omni_media_profile_dry_run_builds_prompt(tmp_path):
     assert director["inputs"]["character_image_model"] == "google_image"
 
 
+@pytest.mark.parametrize(
+    "profile_id,video_engine",
+    [
+        ("google_veo_all", "google_veo_video"),
+        ("google_omni_all", "google_omni_video"),
+    ],
+)
+def test_google_all_profile_dry_run_builds_prompt(
+        tmp_path, monkeypatch, profile_id, video_engine):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-google-api-key")
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas",
+        "--dry-run",
+        "--profile", profile_id,
+        "--words", "120",
+        "--source-bank", "media_archive",
+        "--creative-model", "google_api:slot-a",
+        "--technical-model", "google_api:slot-b",
+        "--google-slot-a-model", "gemini-flash-latest",
+        "--google-slot-b-model", "gemini-flash-lite-latest",
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    assert f"profile={profile_id}" in out
+    prompt = json.loads(dump.read_text(encoding="utf-8"))
+    writer = _node(prompt, "OTR_LedgerScriptWriter")
+    cast = _node(prompt, "OTR_CastLock")
+    char_voice = _node(prompt, "OTR_BatchCharacterVoices")
+    announcer_voice = _node(prompt, "OTR_AnnouncerVoice")
+    music = _node(prompt, "OTR_StableAudioTheme")
+    director = _node(prompt, "OTR_VideoDirector")
+    render = _node(prompt, "OTR_VideoRenderBatch")
+    assert writer["inputs"]["target_words"] == 120
+    assert writer["inputs"]["creative_writing_model"] == "google_api:slot-a"
+    assert writer["inputs"]["technical_model"] == "google_api:slot-b"
+    assert writer["inputs"]["google_api_slot_a_model"] == "gemini-flash-latest"
+    assert writer["inputs"]["google_api_slot_b_model"] == "gemini-flash-lite-latest"
+    assert cast["inputs"]["voice_bank"] == "google_tts"
+    assert cast["inputs"]["char_voice_engine"] == "google_tts"
+    assert cast["inputs"]["announcer_voice_engine"] == "google_tts"
+    assert char_voice["inputs"]["engine"] == "google_tts"
+    assert announcer_voice["inputs"]["engine"] == "google_tts"
+    assert music["inputs"]["engine"] == "google_lyria"
+    assert director["inputs"]["announcer_video_model"] == video_engine
+    assert director["inputs"]["music_video_model"] == video_engine
+    assert director["inputs"]["character_video_model"] == video_engine
+    assert director["inputs"]["announcer_image_model"] == "google_image"
+    assert director["inputs"]["music_image_model"] == "google_image"
+    assert director["inputs"]["character_image_model"] == "google_image"
+    assert render["inputs"]["engine"] == video_engine
+
+
 def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([

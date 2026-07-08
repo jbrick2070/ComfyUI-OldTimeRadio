@@ -43,6 +43,9 @@ def test_key_slot_choices_include_static_text_models(monkeypatch):
     assert choices[0] == gmodels.GOOGLE_API_MODEL_UNSELECTED
     assert gmodels.GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT in choices
     assert gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT in choices
+    assert "gemini-2.5-flash" in choices
+    assert "gemini-3.5-flash" in choices
+    assert "gemini-3.1-flash-lite" in choices
 
 
 def test_virtual_rows_present_only_with_key(monkeypatch):
