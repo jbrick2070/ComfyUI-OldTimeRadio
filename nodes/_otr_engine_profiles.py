@@ -58,9 +58,13 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     "announcer_voice": ("kokoro", "chatterbox", "elevenlabs", "google_tts"),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.
-    # sonilo (cloud, dropdown-opt-in) APPENDED 2026-07-03 -- index 0 stays the
-    # byte-identical default; a cloud pick is never automatic (C2).
-    "music": ("stable_audio_3", "musicgen", "stable_audio_music", "sonilo"),
+    # sonilo (cloud, dropdown-opt-in) APPENDED 2026-07-03; google_lyria
+    # (direct-api, BYO key) APPENDED 2026-07-08 -- index 0 stays the
+    # byte-identical default; external paid picks are never automatic (C2).
+    "music": (
+        "stable_audio_3", "musicgen", "stable_audio_music", "sonilo",
+        "google_lyria",
+    ),
 }
 
 

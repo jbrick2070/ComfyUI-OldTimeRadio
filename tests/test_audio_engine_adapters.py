@@ -29,6 +29,7 @@ def test_char_voice_pool_has_optins():
 
 def test_music_role_has_stable_audio():
     assert "stable_audio_music" in AE.engines_for_role("music")
+    assert "google_lyria" in AE.engines_for_role("music")
 
 
 def test_unknown_role_has_no_engines():
@@ -45,6 +46,11 @@ def test_google_tts_serves_both_voice_roles_as_opt_in():
     assert "google_tts" in AE.engines_for_role("char_voice")
     assert "google_tts" in AE.engines_for_role("announcer_voice")
     assert AE.get_engine("google_tts").default_roles == ()
+
+
+def test_google_lyria_serves_music_as_opt_in():
+    assert "google_lyria" in AE.engines_for_role("music")
+    assert AE.get_engine("google_lyria").default_roles == ()
 
 
 def test_optin_flags_and_licensing():
@@ -124,7 +130,7 @@ def test_no_batch_interface_engines_remain():
     # Clean-break complete (1a/1b/1c): every registered audio engine is
     # self-contained per_line / clip; the batch-delegation layer is retired.
     for n in ("bark", "chatterbox", "indextts2", "kokoro", "musicgen",
-              "stable_audio_music", "google_tts"):
+              "stable_audio_music", "google_tts", "google_lyria"):
         assert AE.get_engine(n).interface in ("per_line", "clip"), n
 
 

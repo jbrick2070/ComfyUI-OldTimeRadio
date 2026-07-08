@@ -216,4 +216,6 @@ CAPABILITIES = {
     # direct_api profile metadata.
     "google_tts": {"required_toolchain": None, "requires_sidecar": False,
                    "cpu_ok": True, "model_requirements": []},
+    "google_lyria": {"required_toolchain": None, "requires_sidecar": False,
+                     "cpu_ok": True, "model_requirements": []},
 }

@@ -91,9 +91,15 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
     it = T.INPUT_TYPES()
     engines = list(it["required"]["engine"][0])
     # PROMOTED 2026-06-03: SA3 is index 0 = the shipped music default.
-    # sonilo (cloud, dropdown-opt-in) APPENDED 2026-07-03 -- selectable but never
-    # the default; index 0 stays the byte-identical stable_audio_3.
-    assert engines == ["stable_audio_3", "musicgen", "stable_audio_music", "sonilo"]
+    # sonilo (cloud, dropdown-opt-in) and google_lyria (direct-api, BYO key) are
+    # selectable but never defaults; index 0 stays byte-identical stable_audio_3.
+    assert engines == [
+        "stable_audio_3",
+        "musicgen",
+        "stable_audio_music",
+        "sonilo",
+        "google_lyria",
+    ]
     assert it["required"]["engine"][1]["default"] == "stable_audio_3"
     monkeypatch.setenv("OTR_ENABLE_STABLE_AUDIO", "1")
     assert list(T.INPUT_TYPES()["required"]["engine"][0]) == engines

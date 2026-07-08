@@ -36,8 +36,13 @@ from . import (  # noqa: E402,F401
 )
 
 # Cloud/direct-API engines (dropdown-opt-in; never a default). ElevenLabs/Sonilo
-# route through Comfy Partner nodes; Google TTS is direct Gemini BYO API.
-from . import eng_cloud_elevenlabs, eng_cloud_sonilo, eng_google_tts  # noqa: E402,F401
+# route through Comfy Partner nodes; Google TTS/Lyria are direct Gemini BYO API.
+from . import (  # noqa: E402,F401
+    eng_cloud_elevenlabs,
+    eng_cloud_sonilo,
+    eng_google_lyria,
+    eng_google_tts,
+)
 
 __all__ = [
     "AudioEngine",

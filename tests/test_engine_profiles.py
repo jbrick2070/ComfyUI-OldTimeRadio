@@ -28,6 +28,8 @@ def test_load_resolver_and_source_hash():
         "char_google_tts_v1", "announcer_google_tts_v1",
         # cloud Sonilo music (cloud-audio S5, 2026-07-03)
         "music_sonilo_cloud_v1",
+        # direct Google Lyria music (BYO API key, explicit-selection-only)
+        "music_google_lyria_v1",
     }
 
 
@@ -114,8 +116,10 @@ def test_direct_api_profiles_are_explicit_selection_only():
     r = EP.load_resolver()
     assert r.get("char_google_tts_v1").runtime == "direct_api"
     assert r.get("announcer_google_tts_v1").runtime == "direct_api"
+    assert r.get("music_google_lyria_v1").runtime == "direct_api"
     assert "google_tts" not in [p.engine for p in r.rank_chain("char_voice")]
     assert "google_tts" not in [p.engine for p in r.rank_chain("announcer_voice")]
+    assert "google_lyria" not in [p.engine for p in r.rank_chain("music")]
     assert "elevenlabs" not in [p.engine for p in r.rank_chain("char_voice")]
 
 
