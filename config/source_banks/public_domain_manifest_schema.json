@@ -1,0 +1,40 @@
+{
+  "schema_version": "v1",
+  "description": "OTR public-domain source manifest schema. Large source texts stay outside git; manifests carry rights metadata, search hints, and small curated units.",
+  "required_top_level_keys": [
+    "schema_version",
+    "sources"
+  ],
+  "source_required_keys": [
+    "source_id",
+    "title",
+    "author",
+    "year",
+    "license_status",
+    "license_url",
+    "source_url",
+    "source_label",
+    "adapter_type",
+    "search_tags",
+    "recommended_word_budget",
+    "cast_hints",
+    "visual_style_policy",
+    "units"
+  ],
+  "unit_required_keys": [
+    "unit_id",
+    "label",
+    "synopsis",
+    "text_path"
+  ],
+  "license_status_values": [
+    "public_domain_us",
+    "cc0",
+    "research_only"
+  ],
+  "adapter_type_values": [
+    "project_gutenberg_text",
+    "standard_ebooks_epub",
+    "local_text_fixture"
+  ]
+}

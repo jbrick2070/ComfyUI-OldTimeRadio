@@ -1,0 +1,35 @@
+{
+  "schema_version": "v1",
+  "sources": [
+    {
+      "source_id": "gutenberg-time-machine-sample",
+      "title": "The Time Machine",
+      "author": "H. G. Wells",
+      "year": "1895",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/ebooks/35",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "science fiction",
+        "time travel",
+        "machine"
+      ],
+      "recommended_word_budget": 300,
+      "cast_hints": [
+        "traveler",
+        "skeptical witness"
+      ],
+      "visual_style_policy": "derive_from_source",
+      "units": [
+        {
+          "unit_id": "arrival",
+          "label": "The impossible arrival",
+          "synopsis": "A shaken traveler returns with a strange machine and forces skeptical witnesses to confront an impossible journey.",
+          "text_path": "fixtures/time_machine_arrival.txt"
+        }
+      ]
+    }
+  ]
+}
