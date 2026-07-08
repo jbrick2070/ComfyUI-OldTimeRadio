@@ -3,9 +3,9 @@
 Direct Google Gemini API lane for short video clips using Veo's
 ``predictLongRunning`` REST endpoint. This adapter is not a Comfy Cloud Partner
 node and it never invokes a local video model. It supports text-to-video plus
-Veo's documented start-image/reference-image request shapes. Audio and video
-extension inputs still fail loud before network until those shapes are wired
-and tested.
+Veo's raw REST start-image/reference-image request shapes. The image payload
+uses the Veo/Vertex-style ``bytesBase64Encoded`` field, not Gemini
+``inlineData`` or SDK-internal ``imageBytes``.
 
 Import-time stays light: no Google SDK, PIL, NumPy, Torch, network, or Comfy
 runtime imports happen at module scope.
@@ -157,7 +157,22 @@ def _mime_for_image(path: str) -> str:
     return mime
 
 
-def _inline_image(ref, *, field: str) -> dict:
+def _reject_unsupported_inputs(request) -> None:
+    audio_ref = _req_get(request, "audio_ref")
+    base_clip_ref = _req_get(request, "base_clip_ref")
+    reference_videos = _req_get(request, "reference_videos")
+    assets = _assets(request)
+    if assets.get("reference_videos"):
+        reference_videos = assets.get("reference_videos")
+    if audio_ref or base_clip_ref or reference_videos:
+        raise GoogleAPIRequestShapeError(
+            "google_veo_video.render_clip: audio/base_clip/reference video "
+            "inputs are not supported by this adapter yet "
+            "(no request sent)"
+        )
+
+
+def _video_image(ref, *, field: str) -> dict:
     path = _ref_path(ref)
     if not path:
         raise GoogleAPIRequestShapeError(
@@ -177,26 +192,9 @@ def _inline_image(ref, *, field: str) -> dict:
             "(no request sent)" % (field, path)
         )
     return {
-        "inlineData": {
-            "mimeType": _mime_for_image(path),
-            "data": base64.b64encode(data).decode("ascii"),
-        }
+        "mimeType": _mime_for_image(path),
+        "bytesBase64Encoded": base64.b64encode(data).decode("ascii"),
     }
-
-
-def _reject_unsupported_inputs(request) -> None:
-    audio_ref = _req_get(request, "audio_ref")
-    base_clip_ref = _req_get(request, "base_clip_ref")
-    reference_videos = _req_get(request, "reference_videos")
-    assets = _assets(request)
-    if assets.get("reference_videos"):
-        reference_videos = assets.get("reference_videos")
-    if audio_ref or base_clip_ref or reference_videos:
-        raise GoogleAPIRequestShapeError(
-            "google_veo_video.render_clip: audio/base_clip/reference video "
-            "inputs are not supported by this adapter yet "
-            "(no request sent)"
-        )
 
 
 def _canvas_get(request, key: str, default):
@@ -289,13 +287,13 @@ def _request_payload(model: str, request) -> dict:
                            has_reference_images=bool(refs))
     instance = {"prompt": _prompt(request)}
     if init_image:
-        instance["image"] = _inline_image(init_image, field="init_image")
+        instance["image"] = _video_image(init_image, field="init_image")
     if last_frame:
-        instance["lastFrame"] = _inline_image(last_frame, field="last_frame")
+        instance["lastFrame"] = _video_image(last_frame, field="last_frame")
     if refs:
         instance["referenceImages"] = [
             {
-                "image": _inline_image(ref, field="reference_images"),
+                "image": _video_image(ref, field="reference_images"),
                 "referenceType": "asset",
             }
             for ref in refs

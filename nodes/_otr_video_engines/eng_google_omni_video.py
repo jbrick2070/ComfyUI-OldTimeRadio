@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import mimetypes
 import os
 import time
 from pathlib import Path
@@ -71,28 +72,118 @@ def _prompt(request) -> str:
     return append_visual_safety_clause(text)
 
 
-def _reject_unsupported_inputs(request) -> None:
+def _assets(request) -> dict:
     assets = _req_get(request, "asset_refs") or {}
-    a_get = assets.get if isinstance(assets, dict) else (
-        lambda k, d=None: getattr(assets, k, d)
-    )
-    init_image = a_get("init_image") or _req_get(request, "init_image")
+    return assets if isinstance(assets, dict) else {}
+
+
+def _asset_ref(request, *keys: str):
+    assets = _assets(request)
+    for key in keys:
+        value = assets.get(key)
+        if value:
+            return value
+    for key in keys:
+        value = _req_get(request, key)
+        if value:
+            return value
+    return None
+
+
+def _ref_path(ref) -> str:
+    if isinstance(ref, dict):
+        for key in ("path", "file", "filename", "uri"):
+            value = ref.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    if isinstance(ref, str):
+        return ref.strip()
+    return ""
+
+
+def _image_refs(request) -> list:
+    refs = []
+    init_image = _asset_ref(request, "init_image", "image", "still")
+    if init_image:
+        refs.append(init_image)
+    raw_refs = _asset_ref(request, "reference_images")
+    if raw_refs:
+        if isinstance(raw_refs, (list, tuple)):
+            refs.extend(raw_refs)
+        else:
+            refs.append(raw_refs)
+    refs = [ref for ref in refs if _ref_path(ref)]
+    if len(refs) > 3:
+        raise GoogleAPIRequestShapeError(
+            "google_omni_video.render_clip: image/reference inputs support at "
+            "most 3 images (no request sent)"
+        )
+    return refs
+
+
+def _mime_for_image(path: str) -> str:
+    mime = mimetypes.guess_type(path)[0] or ""
+    if mime not in ("image/png", "image/jpeg", "image/webp"):
+        raise GoogleAPIRequestShapeError(
+            "google_omni_video.render_clip: unsupported image MIME for %r; "
+            "expected png, jpeg, or webp (no request sent)" % path
+        )
+    return mime
+
+
+def _image_part(ref, *, field: str) -> dict:
+    path = _ref_path(ref)
+    if not path:
+        raise GoogleAPIRequestShapeError(
+            "google_omni_video.render_clip: %s image ref was blank "
+            "(no request sent)" % field
+        )
+    p = Path(path)
+    if not p.is_file():
+        raise GoogleAPIRequestShapeError(
+            "google_omni_video.render_clip: %s image missing/absent on disk "
+            "%r (no request sent)" % (field, path)
+        )
+    data = p.read_bytes()
+    if not data:
+        raise GoogleAPIRequestShapeError(
+            "google_omni_video.render_clip: %s image %r was empty "
+            "(no request sent)" % (field, path)
+        )
+    return {
+        "type": "image",
+        "data": base64.b64encode(data).decode("ascii"),
+        "mime_type": _mime_for_image(path),
+    }
+
+
+def _reject_unsupported_inputs(request) -> None:
     audio_ref = _req_get(request, "audio_ref")
     base_clip_ref = _req_get(request, "base_clip_ref")
     reference_videos = _req_get(request, "reference_videos")
-    if init_image or audio_ref or base_clip_ref or reference_videos:
+    assets = _assets(request)
+    if assets.get("reference_videos"):
+        reference_videos = assets.get("reference_videos")
+    if audio_ref or base_clip_ref or reference_videos:
         raise GoogleAPIRequestShapeError(
-            "google_omni_video.render_clip: this adapter is text-to-video only; "
-            "init_image/audio/base_clip/reference video inputs are not supported "
-            "yet (no request sent)"
+            "google_omni_video.render_clip: audio/base_clip/reference video "
+            "inputs are not supported by this adapter yet (no request sent)"
         )
 
 
 def _interaction_payload(model: str, request) -> dict:
     _reject_unsupported_inputs(request)
+    refs = _image_refs(request)
+    text = _prompt(request)
+    input_value = (
+        [*[_image_part(ref, field="image") for ref in refs],
+         {"type": "text", "text": text}]
+        if refs
+        else text
+    )
     return {
         "model": model,
-        "input": _prompt(request),
+        "input": input_value,
         "response_format": {"type": "video", "delivery": "uri"},
     }
 
@@ -233,7 +324,9 @@ class GoogleOmniVideoEngine:
     invocability_reason = ""
     native = False
     provider_side = True
-    strict_text_only = True
+    strict_text_only = False
+    accepts_still = True
+    accepts_init_image = True
     render_aspect = "wide"
 
     def load(self) -> None:

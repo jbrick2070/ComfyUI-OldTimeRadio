@@ -76,6 +76,9 @@ def test_google_omni_video_registers_and_capabilities():
     assert eng.default_roles == ()
     assert eng.required_inputs == ("text_prompt",)
     assert eng.native is False
+    assert eng.strict_text_only is False
+    assert eng.accepts_still is True
+    assert eng.accepts_init_image is True
     row = vreg.CAPABILITIES["google_omni_video"]
     assert row["cpu_ok"] is True
     assert row["requires_sidecar"] is False
@@ -123,9 +126,7 @@ def test_bad_shape_fails_before_request(monkeypatch):
     eng = vreg.get_engine("google_omni_video")
     with pytest.raises(GoogleAPIRequestShapeError, match="blank text_prompt"):
         eng.render_clip(_req(text_prompt="  "), {})
-    with pytest.raises(GoogleAPIRequestShapeError, match="text-to-video only"):
-        eng.render_clip(_req(init_image="portrait.png"), {})
-    with pytest.raises(GoogleAPIRequestShapeError, match="text-to-video only"):
+    with pytest.raises(GoogleAPIRequestShapeError, match="audio/base_clip"):
         eng.render_clip(_req(audio_ref={"path": "voice.wav"}), {})
     monkeypatch.setenv("OTR_GOOGLE_VIDEO_MODEL_ID", "veo-3.1-generate-preview")
     with pytest.raises(GoogleAPIRequestShapeError, match="unsupported model"):
@@ -173,6 +174,36 @@ def test_request_shape_sends_interactions_video_uri_format(monkeypatch, tmp_path
         "api_key": "KEY",
         "timeout_s": 900,
     }
+
+
+def test_request_shape_accepts_init_image_interactions_parts(monkeypatch, tmp_path):
+    _clear_keys(monkeypatch)
+    monkeypatch.setenv("GEMINI_API_KEY", "KEY")
+    first = tmp_path / "first.png"
+    first.write_bytes(b"\x89PNG\r\n\x1a\npng-bytes")
+    seen = {}
+
+    def _create(payload, **kwargs):
+        seen["payload"] = dict(payload)
+        return {"output_video": {"data": base64.b64encode(b"mp4").decode("ascii")}}
+
+    monkeypatch.setattr(G, "create_interaction", _create)
+    raw = vreg.get_engine("google_omni_video").render_clip(
+        _req(asset_refs={"init_image": str(first)}), {}
+    )
+
+    assert pathlib.Path(raw["path"]).read_bytes() == b"mp4"
+    parts = seen["payload"]["input"]
+    assert [part["type"] for part in parts] == ["image", "text"]
+    assert parts[0]["mime_type"] == "image/png"
+    assert base64.b64decode(parts[0]["data"]) == first.read_bytes()
+    assert "no smoking" in parts[1]["text"].lower()
+
+    with pytest.raises(GoogleAPIRequestShapeError, match="missing/absent"):
+        G._interaction_payload(
+            "gemini-omni-flash-preview",
+            _req(asset_refs={"init_image": str(tmp_path / "missing.png")}),
+        )
 
 
 def test_response_parser_accepts_camel_case_base64_and_steps():

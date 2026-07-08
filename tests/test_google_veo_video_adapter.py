@@ -242,8 +242,10 @@ def test_request_payload_accepts_init_image_and_reference_images(monkeypatch, tm
     )
     instance = payload["instances"][0]
     assert set(instance) == {"prompt", "image", "referenceImages"}
-    assert instance["image"]["inlineData"]["mimeType"] == "image/png"
-    assert base64.b64decode(instance["image"]["inlineData"]["data"]) == first.read_bytes()
+    assert instance["image"]["mimeType"] == "image/png"
+    assert "inlineData" not in instance["image"]
+    assert "imageBytes" not in instance["image"]
+    assert base64.b64decode(instance["image"]["bytesBase64Encoded"]) == first.read_bytes()
     assert len(instance["referenceImages"]) == 2
     assert instance["referenceImages"][0]["referenceType"] == "asset"
     assert payload["parameters"]["durationSeconds"] == 8
