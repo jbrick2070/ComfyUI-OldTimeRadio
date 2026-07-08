@@ -770,6 +770,9 @@ CREATIVE_WHITELIST = frozenset({
     # source_ref (Source Banks v2) -- optional source reference string for
     # bank fetchers; mirror of the package whitelist.
     "source_ref",
+    # Google BYO API concrete model pickers are pure headless bindings for
+    # the virtual google_api:slot-a/b LLM rows, not managed media engines.
+    "google_api_slot_a_model", "google_api_slot_b_model",
 })
 
 

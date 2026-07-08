@@ -514,6 +514,10 @@ CREATIVE_WHITELIST = frozenset({
     # bank fetchers. Blank is inert; nonblank semantics belong to the selected
     # bank and must fail loud there.
     "source_ref",
+    # Google BYO API concrete model pickers bind the virtual google_api:slot-a/b
+    # LLM rows. They are content/model-selection widgets on the writer, not
+    # managed audio/image/video engine widgets.
+    "google_api_slot_a_model", "google_api_slot_b_model",
 })
 
 

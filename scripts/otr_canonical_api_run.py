@@ -105,6 +105,10 @@ def _apply_writer_shortcuts(workflow: dict, schemas: dict, args) -> list[str]:
         shortcuts.append(("creative_writing_model", args.creative_model))
     if args.technical_model is not None:
         shortcuts.append(("technical_model", args.technical_model))
+    if args.google_slot_a_model is not None:
+        shortcuts.append(("google_api_slot_a_model", args.google_slot_a_model))
+    if args.google_slot_b_model is not None:
+        shortcuts.append(("google_api_slot_b_model", args.google_slot_b_model))
     if args.num_characters is not None:
         shortcuts.append(("num_characters", int(args.num_characters)))
     if args.act_count is not None:
@@ -165,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--visual-style", default=None)
     parser.add_argument("--creative-model", default=None)
     parser.add_argument("--technical-model", default=None)
+    parser.add_argument("--google-slot-a-model", default=None)
+    parser.add_argument("--google-slot-b-model", default=None)
     parser.add_argument("--num-characters", type=int, default=None)
     parser.add_argument("--act-count", default=None)
     parser.add_argument(

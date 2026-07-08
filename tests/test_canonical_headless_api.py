@@ -139,6 +139,28 @@ def test_set_allows_only_creative_widgets(tmp_path):
     assert _node(prompt, "OTR_LedgerScriptWriter")["inputs"]["target_words"] == 31
 
 
+def test_google_api_llm_slots_are_headless_bindable(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas",
+        "--dry-run",
+        "--creative-model", "google_api:slot-a",
+        "--technical-model", "google_api:slot-b",
+        "--google-slot-a-model", "gemini-3.5-flash",
+        "--google-slot-b-model", "gemini-3.1-flash-lite",
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    assert "google_api_slot_a_model='gemini-3.5-flash'" in out
+    prompt = json.loads(dump.read_text(encoding="utf-8"))
+    writer = _node(prompt, "OTR_LedgerScriptWriter")
+    assert writer["inputs"]["creative_writing_model"] == "google_api:slot-a"
+    assert writer["inputs"]["technical_model"] == "google_api:slot-b"
+    assert writer["inputs"]["google_api_slot_a_model"] == "gemini-3.5-flash"
+    assert writer["inputs"]["google_api_slot_b_model"] == "gemini-3.1-flash-lite"
+
+
 def test_set_refuses_direct_engine_widget_patch(tmp_path):
     with pytest.raises(ValueError, match="creative whitelist"):
         _run_main([
