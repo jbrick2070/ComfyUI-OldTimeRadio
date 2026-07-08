@@ -510,6 +510,10 @@ CREATIVE_WHITELIST = frozenset({
     # pure creative dial (prompt-tail deltas only); apply_profile never
     # manages it. Unknown id fails LOUD at run() (resolve_visual_style).
     "visual_style",
+    # source_ref (Source Banks v2) is an optional source reference string for
+    # bank fetchers. Blank is inert; nonblank semantics belong to the selected
+    # bank and must fail loud there.
+    "source_ref",
 })
 
 

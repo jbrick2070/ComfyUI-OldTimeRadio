@@ -606,6 +606,7 @@ class TestWriterB2aSurface:
         #  24  visual_style
         #  25  google_api_slot_a_model
         #  26  google_api_slot_b_model
+        #  27  source_ref
         # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270);
         # the 2026-05-29 lean-down brought the vector to 19; S2 (2026-06-01)
         # appended the OpenRouter pair; Comfy Credits appended its sibling
@@ -617,10 +618,11 @@ class TestWriterB2aSurface:
         # (slots 8/9), dropping the vector to 25 and shifting every
         # subsequent slot down by 2. The Google BYO API direct LLM lane
         # appended two passive model pickers on 2026-07-08, bringing the
-        # vector back to 27 without moving any prior slot.
-        assert len(wv) == 27, (
-            f"writer widgets_values length drift: {len(wv)} (expected 27 "
-            f"after appending the Google API slot picker pair)"
+        # vector back to 27; Source Banks v2 then appended source_ref as
+        # slot 27 without moving any prior slot.
+        assert len(wv) == 28, (
+            f"writer widgets_values length drift: {len(wv)} (expected 28 "
+            f"after appending the Google API slot picker pair + source_ref)"
         )
         # Slot 14: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
@@ -707,6 +709,9 @@ class TestWriterB2aSurface:
         assert wv[26] == "(select Google API model)", (
             f"google_api_slot_b_model (slot 26) must ship the unselected "
             f"sentinel; got {wv[26]!r}"
+        )
+        assert wv[27] == "", (
+            f"source_ref (slot 27) must ship blank/inert; got {wv[27]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

@@ -1174,6 +1174,9 @@ def _resolve_inputs(
     # creative/technical_model; concrete Gemini model ids live here.
     google_api_slot_a_model: str = "",
     google_api_slot_b_model: str = "",
+    # Source Banks v2 (2026-07-08): optional external source reference for
+    # source-bank lanes. Blank is intentionally inert until a bank consumes it.
+    source_ref: str = "",
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1339,6 +1342,7 @@ def _resolve_inputs(
         "visual_style": str(visual_style or "sci_fi_radio"),
         "google_api_slot_a_model": str(google_api_slot_a_model or ""),
         "google_api_slot_b_model": str(google_api_slot_b_model or ""),
+        "source_ref": str(source_ref or ""),
     }
 
 
@@ -2186,6 +2190,24 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
+                # Source Banks v2 source reference (2026-07-08), APPENDED
+                # after the Google API pickers as combined widget slot 27.
+                # Blank is inert; future bank-specific fetchers may consume a
+                # URL/id/title here and must add their own fail-loud validators.
+                "source_ref": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": False,
+                        "tooltip": (
+                            "Optional source reference for source-bank lanes "
+                            "(for example a public-domain URL/id/title). Blank "
+                            "uses the bank's default source selection. This is "
+                            "not a fallback; unsupported nonblank references "
+                            "must fail loud in the consuming bank."
+                        ),
+                    },
+                ),
             },
             # ComfyUI injects the logged-in account's credentials into these
             # hidden inputs at execution time (the API-nodes auth convention).
@@ -2471,12 +2493,12 @@ class OTR_LedgerScriptWriter:
         # top of the body). Default "auto" => env/default => byte-identical.
         story_scaffold="auto",
         # Stage 2C (2026-07-05): the story-path source_bank selector,
-        # appended at the END of the widget surface (slot 25). Default
+        # appended at the END of the widget surface (slot 23). Default
         # science_news = the production lane, byte-identical. Gated FIRST
         # in the body via require_runnable_bank (no fallback).
         source_bank="science_news",
         # Stage 3C (2026-07-06): the visual-style selector, appended at the
-        # END of the widget surface (slot 26). Default sci_fi_radio = the
+        # END of the widget surface (slot 24). Default sci_fi_radio = the
         # production look, byte-identical. Validated fail-loud beside the
         # bank gate; stamped at meta["visual_style"] (the threading channel).
         visual_style="sci_fi_radio",
@@ -2485,6 +2507,9 @@ class OTR_LedgerScriptWriter:
         # fails loud before the HTTP request.
         google_api_slot_a_model="",
         google_api_slot_b_model="",
+        # Source Banks v2 reference widget (2026-07-08), appended after the
+        # Google API pickers. Blank is inert for current science/media paths.
+        source_ref="",
         # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
         # _refine_loop when a refine pass re-enters this body. All default to the
         # no-op so a normal (non-refine) call is byte-identical.
@@ -2648,6 +2673,7 @@ class OTR_LedgerScriptWriter:
             visual_style=visual_style,
             google_api_slot_a_model=google_api_slot_a_model,
             google_api_slot_b_model=google_api_slot_b_model,
+            source_ref=source_ref,
         )
 
         # Stage 4 (2026-07-06): resolve the bank's story-content RULES once

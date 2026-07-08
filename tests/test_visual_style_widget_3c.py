@@ -17,7 +17,8 @@ Pins:
   5. _resolve_inputs carries visual_style as the authoritative value.
   6. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name lands
      slot 24 (shifted -2 by the 2026-07-05 style-engine consolidation,
-     which deleted the style / style_custom widgets).
+     which deleted the style / style_custom widgets). Later widgets append
+     after it.
 """
 from __future__ import annotations
 
@@ -56,6 +57,7 @@ class TestWidgetSurface:
         assert order[24] == "visual_style"
         assert order[25] == "google_api_slot_a_model"
         assert order[26] == "google_api_slot_b_model"
+        assert order[27] == "source_ref"
 
     def test_choices_are_exactly_the_registry(self):
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
@@ -172,8 +174,9 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "visual_style", "anime", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 27
+        assert len(node1["widgets_values"]) == 28
         assert node1["widgets_values"][24] == "anime"
         assert node1["widgets_values"][23] == "science_news"
         assert node1["widgets_values"][25] == "(select Google API model)"
         assert node1["widgets_values"][26] == "(select Google API model)"
+        assert node1["widgets_values"][27] == ""

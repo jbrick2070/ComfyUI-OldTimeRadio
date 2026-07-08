@@ -54,9 +54,9 @@ def remote_on(monkeypatch):
 def test_widget_order_appends_slots_at_end():
     """The widget KEYS are env-independent: [0..16] frozen, OpenRouter slots
     at 17/18, Comfy Credits slots at 19/20 (2026-06-01), and the Google
-    API slots appended at 25/26 (2026-07-08). Indices shifted -2 by the
-    2026-07-05 style-engine consolidation (style / style_custom widgets
-    deleted)."""
+    API slots appended at 25/26 (2026-07-08), then source_ref at 27
+    (Source Banks v2, 2026-07-08). Indices shifted -2 by the 2026-07-05
+    style-engine consolidation (style / style_custom widgets deleted)."""
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
     assert order[:17] == _EXPECTED_0_18, f"index drift in [0..16]: {order[:17]}"
@@ -70,7 +70,8 @@ def test_widget_order_appends_slots_at_end():
     assert order[24] == "visual_style"            # Stage 3C (2026-07-06)
     assert order[25] == "google_api_slot_a_model" # Google API (2026-07-08)
     assert order[26] == "google_api_slot_b_model" # Google API (2026-07-08)
-    assert len(order) == 27
+    assert order[27] == "source_ref"              # Source Banks v2 (2026-07-08)
+    assert len(order) == 28
 
 
 # --- conditional creative default; technical never flips --------------------

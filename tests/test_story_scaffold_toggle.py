@@ -48,8 +48,8 @@ class TestWidgetSurface:
         assert meta["default"] == "auto"
 
     def test_story_scaffold_positional_pin(self):
-        # Later source_bank, visual_style, and Google API widgets append after
-        # this toggle; the scaffold slot itself stays fixed at 22.
+        # Later source_bank, visual_style, Google API, and source_ref widgets
+        # append after this toggle; the scaffold slot itself stays fixed at 22.
         spec = W.OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
         assert order[22] == "story_scaffold"
@@ -57,6 +57,7 @@ class TestWidgetSurface:
         assert order[24] == "visual_style"
         assert order[25] == "google_api_slot_a_model"
         assert order[26] == "google_api_slot_b_model"
+        assert order[27] == "source_ref"
 
 
 class TestApplyScaffoldEnv:

@@ -767,6 +767,9 @@ CREATIVE_WHITELIST = frozenset({
     # visual_style (Stage 3C) -- the visual-style selector; mirror of the
     # package whitelist. Unknown ids fail LOUD at run().
     "visual_style",
+    # source_ref (Source Banks v2) -- optional source reference string for
+    # bank fetchers; mirror of the package whitelist.
+    "source_ref",
 })
 
 

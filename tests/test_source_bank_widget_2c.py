@@ -62,13 +62,15 @@ _NON_RUNNABLE_BANK = "public_domain_story"  # runnable:false lane pack (2B)
 class TestWidgetSurface:
     def test_source_bank_positional_pin(self):
         # Stage 3C (2026-07-06) appended visual_style after source_bank;
-        # Google API (2026-07-08) appended its slot pair after visual_style.
+        # Google API (2026-07-08) appended its slot pair after visual_style;
+        # Source Banks v2 appended source_ref after those.
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
         assert order[23] == "source_bank"
         assert order[24] == "visual_style"
         assert order[25] == "google_api_slot_a_model"
         assert order[26] == "google_api_slot_b_model"
+        assert order[27] == "source_ref"
 
     def test_choices_are_exactly_the_registry_in_order(self):
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
@@ -322,9 +324,11 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "source_bank", "science_news", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        # The Google API selectors were appended after visual_style; source_bank
-        # stays at slot 23 (was 25 before the style-engine consolidation).
-        assert len(node1["widgets_values"]) == 27
+        # The Google API selectors and source_ref were appended after
+        # visual_style; source_bank stays at slot 23 (was 25 before the
+        # style-engine consolidation).
+        assert len(node1["widgets_values"]) == 28
         assert node1["widgets_values"][23] == "science_news"
         assert node1["widgets_values"][25] == "(select Google API model)"
         assert node1["widgets_values"][26] == "(select Google API model)"
+        assert node1["widgets_values"][27] == ""

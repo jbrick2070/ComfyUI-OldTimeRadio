@@ -163,6 +163,9 @@ def _writer_schemas() -> dict:
                     # positional widgets stable.
                     "google_api_slot_a_model": ("STRING", {"default": ""}),
                     "google_api_slot_b_model": ("STRING", {"default": ""}),
+                    # Source Banks v2 source reference (2026-07-08): appended
+                    # at index 27 after Google.
+                    "source_ref": ("STRING", {"default": ""}),
                 },
                 "optional": {},
             }
@@ -214,6 +217,7 @@ def _writer_node_fixture() -> dict:
                     "sci_fi_radio",                           # 24 visual_style (3C)
                     "(select Google API model)",                # 25 google_api_slot_a_model
                     "(select Google API model)",                # 26 google_api_slot_b_model
+                    "",                                        # 27 source_ref
                 ],
             }
         ],
@@ -459,16 +463,17 @@ def test_round_trip_canonical_node1_inputs_correct():
     openrouter_slot_b_model, Comfy Credits (2026-06-01) appended
     comfy_slot_a_model + comfy_slot_b_model, the refine loop, the
     story-scaffold toggle, Stage 2C (source_bank), Stage 3C
-    (visual_style), and Google API slot pickers all appended at the END
-    so creative/technical stay at wv[3]/wv[4]. The 2026-07-05
+    (visual_style), Google API slot pickers, and source_ref all appended
+    at the END so creative/technical stay at wv[3]/wv[4]. The 2026-07-05
     style-engine consolidation then deleted the `style` / `style_custom`
     widgets outright (they used to sit at slots 8/9), dropping the vector
-    from 27 to 25 before the 2026-07-08 Google pair brought it to 27.
+    from 27 to 25 before the 2026-07-08 Google pair and source_ref brought
+    it to 28.
     """
     dump = _dump_canonical_node1()
-    # 27: 25 post style-engine consolidation plus the appended Google API
-    # slot pair.
-    assert len(dump) == 27, f"node 1 widgets_values length drift: {len(dump)}"
+    # 28: 25 post style-engine consolidation plus the appended Google API
+    # slot pair and source_ref.
+    assert len(dump) == 28, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

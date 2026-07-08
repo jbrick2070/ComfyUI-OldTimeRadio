@@ -133,6 +133,7 @@ def test_writer_appends_google_slots_after_visual_style():
     assert order[24] == "visual_style"
     assert order[25] == "google_api_slot_a_model"
     assert order[26] == "google_api_slot_b_model"
+    assert order[27] == "source_ref"
 
 
 def test_resolve_inputs_threads_google_slots():
@@ -143,6 +144,7 @@ def test_resolve_inputs_threads_google_slots():
     )
     assert out["google_api_slot_a_model"] == "gemini-3.5-flash"
     assert out["google_api_slot_b_model"] == "gemini-3.1-flash-lite"
+    assert out["source_ref"] == ""
 
 
 def test_writer_truncating_wrapper_routes_google(monkeypatch):
