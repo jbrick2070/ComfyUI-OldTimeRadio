@@ -49,3 +49,10 @@ def test_explicit_elevenlabs_routes_with_cloud_bank():
         "elevenlabs_cloud", _entries("indextts2", "elevenlabs"),
         requested_engine="elevenlabs")
     assert eng == "elevenlabs"
+
+
+def test_explicit_google_tts_routes_with_google_bank():
+    eng = CastLock._resolve_char_engine(
+        "google_tts", _entries("indextts2", "google_tts"),
+        requested_engine="google_tts")
+    assert eng == "google_tts"

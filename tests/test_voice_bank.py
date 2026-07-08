@@ -212,6 +212,61 @@ def test_announcer_voice_ref_resolves_for_active_engine():
     assert announcer_voice_ref("chatterbox").voice_ref_id == "cb_announcer_male"
 
 
+def test_google_voice_bank_has_gendered_chars_and_announcers():
+    entries, _ = load_voice_bank()
+    google = [e for e in entries if e.engine == "google_tts"]
+    chars = [e for e in google if "char_voice" in e.roles]
+    announcers = [e for e in google if "announcer_voice" in e.roles]
+    char_genders = {g: sum(1 for e in chars if e.gender == g) for g in ("male", "female")}
+    ann_genders = {e.gender for e in announcers if "preferred_announcer" in e.style_tags}
+    assert char_genders["male"] >= 2
+    assert char_genders["female"] >= 2
+    assert {"male", "female"} <= ann_genders
+    assert all("british_leaning" in e.style_tags for e in announcers)
+
+
+def test_google_announcer_selection_mixes_gender_by_episode_seed():
+    picks = [
+        announcer_voice_ref("google_tts", episode_seed=i)
+        for i in range(80)
+    ]
+    genders = [p.gender for p in picks]
+    assert set(genders) == {"male", "female"}
+    delta = abs(genders.count("male") - genders.count("female"))
+    assert delta <= 24
+    assert announcer_voice_ref("google_tts", episode_seed=17) == announcer_voice_ref(
+        "google_tts", episode_seed=17)
+
+
+def test_google_castlock_assigns_gendered_chars_and_separate_announcer():
+    from nodes.cast_lock import CastLock
+
+    led = {"meta": {"episode_seed": "google-seed"}}
+    cast = [
+        {"char_id": "ann", "name": "ANNOUNCER", "speaker_role": "announcer"},
+        {"char_id": "m1", "name": "CAPTAIN", "gender": "male"},
+        {"char_id": "f1", "name": "DOCTOR", "gender": "female"},
+    ]
+    report = []
+    CastLock()._auto_registry(
+        led, cast, "google_tts", False, report,
+        char_voice_engine="google_tts",
+        announcer_voice_engine="google_tts",
+    )
+    entries, _ = load_voice_bank()
+    by_id = {e.voice_ref_id: e for e in entries}
+    ann, male, female = cast
+    assert ann["voice_engine"] == "google_tts"
+    assert male["voice_engine"] == "google_tts"
+    assert female["voice_engine"] == "google_tts"
+    assert ann["voice_ref_id"] not in {male["voice_ref_id"], female["voice_ref_id"]}
+    assert by_id[male["voice_ref_id"]].gender == "male"
+    assert by_id[female["voice_ref_id"]].gender == "female"
+    assert ann["provider_voice_id"] not in {
+        male["provider_voice_id"], female["provider_voice_id"],
+    }
+
+
 def test_announcer_voice_ref_raises_for_engine_without_ref():
     with pytest.raises(VoiceCastingError):
         announcer_voice_ref("musicgen")  # music engine, no announcer ref

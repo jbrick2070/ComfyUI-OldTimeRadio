@@ -139,6 +139,11 @@ def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
     per-character voice, NOT a fallback: no voice is inherited from another
     character/engine, and an engine with NO pool still yields None -> the adapter
     fails loud. Never raises."""
+    # Google TTS has a stricter voice-quality/no-fallback contract: CastLock must
+    # stamp the exact provider_voice_id so announcer separation and gender-aware
+    # assignment have already been enforced. Do not invent one at render time.
+    if engine == "google_tts":
+        return None
     try:
         from ._otr_voice_bank import (
             assign_voice_for_slot, filter_by_quality_tier, load_voice_bank,

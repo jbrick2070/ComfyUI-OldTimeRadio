@@ -41,6 +41,12 @@ def test_chatterbox_serves_both_voice_roles():
     assert "chatterbox" in AE.engines_for_role("announcer_voice")
 
 
+def test_google_tts_serves_both_voice_roles_as_opt_in():
+    assert "google_tts" in AE.engines_for_role("char_voice")
+    assert "google_tts" in AE.engines_for_role("announcer_voice")
+    assert AE.get_engine("google_tts").default_roles == ()
+
+
 def test_optin_flags_and_licensing():
     cb = AE.get_engine("chatterbox")
     assert cb.requires_flag is None  # C6: registry IS the menu (no flag gate)
@@ -118,7 +124,7 @@ def test_no_batch_interface_engines_remain():
     # Clean-break complete (1a/1b/1c): every registered audio engine is
     # self-contained per_line / clip; the batch-delegation layer is retired.
     for n in ("bark", "chatterbox", "indextts2", "kokoro", "musicgen",
-              "stable_audio_music"):
+              "stable_audio_music", "google_tts"):
         assert AE.get_engine(n).interface in ("per_line", "clip"), n
 
 

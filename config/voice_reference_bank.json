@@ -2721,6 +2721,134 @@
       "ref_sha256": "cloud",
       "commercial_clean": true,
       "provider_voice_id": "pqHfZKP75CvOlQylNhV4"
+    },
+    {
+      "voice_ref_id": "gt_algenib",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "gravelly",
+        "authority"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Algenib",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Algenib"
+    },
+    {
+      "voice_ref_id": "gt_puck",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "upbeat",
+        "young"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Puck",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Puck"
+    },
+    {
+      "voice_ref_id": "gt_kore",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "firm",
+        "clear"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Kore",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Kore"
+    },
+    {
+      "voice_ref_id": "gt_aoede",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "breezy",
+        "narration"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Aoede",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Aoede"
+    },
+    {
+      "voice_ref_id": "gt_charon_announcer",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "informative",
+        "british"
+      ],
+      "roles": [
+        "announcer_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Charon",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "preferred_announcer",
+        "british_leaning"
+      ],
+      "provider_voice_id": "Charon"
+    },
+    {
+      "voice_ref_id": "gt_sulafat_announcer",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "warm",
+        "british"
+      ],
+      "roles": [
+        "announcer_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Sulafat",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "preferred_announcer",
+        "british_leaning"
+      ],
+      "provider_voice_id": "Sulafat"
     }
   ]
 }

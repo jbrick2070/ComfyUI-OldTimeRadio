@@ -103,9 +103,12 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
 
     it = B.INPUT_TYPES()
     engines = list(it["required"]["engine"][0])
-    # elevenlabs (cloud, dropdown-opt-in) APPENDED 2026-07-03 -- selectable but
-    # never the default; index 0 stays the byte-identical indextts2.
-    assert engines == ["indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs"]
+    # google_tts (direct BYO API, dropdown-opt-in) APPENDED after elevenlabs;
+    # index 0 stays the byte-identical indextts2.
+    assert engines == [
+        "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
+        "google_tts",
+    ]
     assert it["required"]["engine"][1]["default"] == "indextts2"
     # Order is stable across opt-in flags.
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")

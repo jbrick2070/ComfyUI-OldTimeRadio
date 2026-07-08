@@ -73,7 +73,7 @@
     },
     "provider_voice_id": {
       "type": "string",
-      "description": "Cloud-audio campaign 2026-07-03 (C3) ADDITIVE: the provider's own voice identifier (e.g. ElevenLabs voice_id) for cloud (partner-node) engines. Threaded end-to-end so cloud casting resolves from adapter metadata, not a disk sentinel. Empty/absent for every local (ref-clip/preset) engine."
+      "description": "Cloud/direct-provider ADDITIVE: the provider's own voice identifier (e.g. ElevenLabs voice_id or Google prebuilt voice name) for non-local provider engines. Threaded end-to-end so provider casting resolves from adapter metadata, not a disk sentinel. Empty/absent for every local (ref-clip/preset) engine."
     }
   }
 }

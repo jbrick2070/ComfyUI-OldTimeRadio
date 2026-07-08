@@ -35,9 +35,9 @@ from . import (  # noqa: E402,F401
     eng_stable_audio_3,
 )
 
-# Cloud engines (dropdown-opt-in; Comfy Cloud via invoke_partner_node; never a
-# default). Cloud-audio campaign 2026-07-03.
-from . import eng_cloud_elevenlabs, eng_cloud_sonilo  # noqa: E402,F401
+# Cloud/direct-API engines (dropdown-opt-in; never a default). ElevenLabs/Sonilo
+# route through Comfy Partner nodes; Google TTS is direct Gemini BYO API.
+from . import eng_cloud_elevenlabs, eng_cloud_sonilo, eng_google_tts  # noqa: E402,F401
 
 __all__ = [
     "AudioEngine",

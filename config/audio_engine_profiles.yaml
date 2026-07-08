@@ -14,7 +14,7 @@
 # dispatch): rank (fallback priority, lower = tried first), is_default (the
 # scope/logical default for the role -- distinct from the engine-level live
 # default, which stays on the legacy engine until promotion S6), runtime
-# (in_graph | oop_venv), needs_ref_clip, caps, license_state
+# (in_graph | oop_venv | cloud | direct_api), needs_ref_clip, caps, license_state
 # (clean|gated|unknown; blank = derive from commercial_clean), warn_text
 # (non-blocking notice emitted when gated). license_state MIRRORS
 # commercial_clean here -- final license sign-off is Sprint 6, not an
@@ -289,6 +289,61 @@ profiles:
     warn_text: ""
     partner_row: cloud_elevenlabs_tts
     provider_id: elevenlabs
+    auth_required: true
+    billing_category: tts
+    canonicalizer: audio
+    error_policy: fail_loud
+
+  # --- direct Google Gemini TTS voice (BYO API key, not Comfy Partner cloud).
+  # Explicit-selection-only: runtime=direct_api is excluded from automatic rank
+  # chains. Fail-loud, no local/cross-provider fallback. Voice identity is the
+  # Google prebuilt voice name in provider_voice_id, resolved from google_tts
+  # bank entries by CastLock auto_registry.
+  - profile_id: char_google_tts_v1
+    role: char_voice
+    engine: google_tts
+    commercial_clean: true
+    model_path: ""
+    model_sha256: ""
+    default_params: {model: gemini-2.5-flash-preview-tts}
+    allowed_voice_banks: [google_tts]
+    engine_impl_version: "1"
+    sample_rate: 24000
+    requires_hf_token: false
+    rank: 50
+    is_default: false
+    runtime: direct_api
+    needs_ref_clip: false
+    caps: {emotion_vector: true, duration_control: false}
+    license_state: clean
+    warn_text: "Google Gemini TTS is preview; voice stability may vary."
+    partner_row: ""
+    provider_id: google
+    auth_required: true
+    billing_category: tts
+    canonicalizer: audio
+    error_policy: fail_loud
+
+  - profile_id: announcer_google_tts_v1
+    role: announcer_voice
+    engine: google_tts
+    commercial_clean: true
+    model_path: ""
+    model_sha256: ""
+    default_params: {model: gemini-2.5-flash-preview-tts}
+    allowed_voice_banks: [google_tts]
+    engine_impl_version: "1"
+    sample_rate: 24000
+    requires_hf_token: false
+    rank: 50
+    is_default: false
+    runtime: direct_api
+    needs_ref_clip: false
+    caps: {emotion_vector: true, duration_control: false}
+    license_state: clean
+    warn_text: "Google Gemini TTS is preview; voice stability may vary."
+    partner_row: ""
+    provider_id: google
     auth_required: true
     billing_category: tts
     canonicalizer: audio

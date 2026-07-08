@@ -34,8 +34,9 @@ _PROFILES_FILENAME = "audio_engine_profiles.yaml"
 # Sprint 1: validated value sets for the new declarative profile metadata.
 # "cloud" (cloud-audio campaign 2026-07-03, C1): a partner-node engine invoked via
 # invoke_partner_node (ElevenLabs TTS / Sonilo music) -- dispatch runs through the
-# adapter, not profile.runtime, but the runtime tag must validate.
-_VALID_RUNTIMES = {"in_graph", "oop_venv", "cloud"}
+# adapter, not profile.runtime, but the runtime tag must validate. "direct_api"
+# is a BYO-key provider call made directly by an adapter (not a Partner node).
+_VALID_RUNTIMES = {"in_graph", "oop_venv", "cloud", "direct_api"}
 _VALID_LICENSE_STATES = {"", "clean", "gated", "unknown"}
 # error_policy for cloud engines -- fail-loud, never a silent local fallback.
 _VALID_ERROR_POLICIES = {"", "fail_loud"}
@@ -50,8 +51,11 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     # selectable. Index 0 stays indextts2 -> byte-identical default combo.
     # elevenlabs (cloud, dropdown-opt-in) APPENDED 2026-07-03 -- index 0 stays the
     # byte-identical default; a cloud pick is never automatic (C2).
-    "char_voice": ("indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs"),
-    "announcer_voice": ("kokoro", "chatterbox", "elevenlabs"),
+    "char_voice": (
+        "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
+        "google_tts",
+    ),
+    "announcer_voice": ("kokoro", "chatterbox", "elevenlabs", "google_tts"),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.
     # sonilo (cloud, dropdown-opt-in) APPENDED 2026-07-03 -- index 0 stays the
@@ -93,7 +97,7 @@ class EngineProfile(BaseModel):
     # dispatch (which stays on the engine-level default until promotion S6). ---
     rank: int = 100                  # fallback priority; lower = tried first
     is_default: bool = False         # scope/logical default for the role
-    runtime: str = "in_graph"        # in_graph | oop_venv (Path B worker) | cloud
+    runtime: str = "in_graph"        # in_graph | oop_venv | cloud | direct_api
     needs_ref_clip: bool = False     # reference-clip identity engines
     caps: dict = Field(default_factory=dict)
     license_state: str = ""          # blank -> derive from commercial_clean
@@ -139,6 +143,21 @@ class EngineProfile(BaseModel):
                 raise ValueError(
                     f"profile '{self.profile_id}': runtime=cloud requires a "
                     f"partner_row (the pinned partner_nodes.yaml key)")
+        # direct_api runtime is explicit-selection-only BYO-provider access. It
+        # must be fail-loud, authenticated, and must not claim a Partner row.
+        if self.runtime == "direct_api":
+            if self.error_policy != "fail_loud":
+                raise ValueError(
+                    f"profile '{self.profile_id}': runtime=direct_api requires "
+                    f"error_policy=fail_loud (no silent local fallback)")
+            if not self.auth_required:
+                raise ValueError(
+                    f"profile '{self.profile_id}': runtime=direct_api requires "
+                    f"auth_required=true")
+            if self.partner_row:
+                raise ValueError(
+                    f"profile '{self.profile_id}': runtime=direct_api requires "
+                    f"partner_row='' (direct APIs are not Partner nodes)")
         return self
 
 
@@ -253,14 +272,16 @@ class EngineProfileResolver:
         """LOCAL profiles serving ``role`` sorted by ``rank`` ascending (lowest
         rank = highest priority), ``profile_id`` breaking ties for stability.
 
-        CLOUD profiles (``runtime == "cloud"``) are EXCLUDED: this chain is the
-        AUTOMATIC auto-selection / fallback ladder, and a cloud engine must never
-        be picked automatically -- it costs credits + requires auth, so a silent
-        fallback to it would violate the no-silent-spend / fail-loud contract. A
-        cloud engine is reachable ONLY by an explicit dropdown selection, which
-        routes through ``resolve_casting_plan`` (``profile_for``), not this chain.
+        CLOUD and DIRECT-API profiles are EXCLUDED: this chain is the AUTOMATIC
+        auto-selection / fallback ladder, and paid/authenticated external
+        engines must never be picked automatically. They are reachable ONLY by
+        explicit dropdown/profile selection, which routes through
+        ``resolve_casting_plan`` (``profile_for``), not this chain.
         """
-        local = [p for p in self.for_role(role) if p.runtime != "cloud"]
+        local = [
+            p for p in self.for_role(role)
+            if p.runtime not in ("cloud", "direct_api")
+        ]
         return sorted(local, key=lambda p: (p.rank, p.profile_id))
 
     def role_default(self, role: str) -> Optional["EngineProfile"]:

@@ -39,11 +39,13 @@ log = logging.getLogger("OTR")
 # EXCLUDES the non-commercial indextts2 -- the release-safe cast (2026-06-18
 # voice-engine roundtable). "default" is unchanged (indextts2 first = quality).
 _VOICE_BANKS = ("default", "default_clean", "bark_legacy", "kokoro_builtin",
-                "elevenlabs_cloud")  # cloud ElevenLabs voice pool (S2), 2026-07-03
+                "elevenlabs_cloud", "google_tts")
 _CAST_POLICIES = ("preserve_ledger", "auto_registry")
 _CHAR_VOICE_ENGINES = (
-    "auto", "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs")
-_ANNOUNCER_VOICE_ENGINES = ("auto", "kokoro", "chatterbox", "elevenlabs")
+    "auto", "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
+    "google_tts")
+_ANNOUNCER_VOICE_ENGINES = (
+    "auto", "kokoro", "chatterbox", "elevenlabs", "google_tts")
 _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 
 
@@ -506,7 +508,19 @@ class CastLock:
                 f"reference engine; character voices preserved"
             )
 
+        announcer_ref = None
+        has_announcer = any(
+            isinstance(entry, dict) and _is_announcer_entry(entry)
+            for entry in cast
+        )
+        if has_announcer and announcer_engine == "google_tts":
+            announcer_ref = announcer_voice_ref(
+                announcer_engine, bank=bank_entries, episode_seed=episode_seed)
+
         used: set = set()
+        if (announcer_ref is not None and target_engine == announcer_engine
+                and not allow_voice_reuse):
+            used.add(announcer_ref.voice_ref_id)
         gated = 0
         for entry in cast:
             if not isinstance(entry, dict):
@@ -515,7 +529,9 @@ class CastLock:
 
             if _is_announcer_entry(entry):
                 try:
-                    ref = announcer_voice_ref(announcer_engine, bank=bank_entries)
+                    ref = announcer_ref or announcer_voice_ref(
+                        announcer_engine, bank=bank_entries,
+                        episode_seed=episode_seed)
                     self._stamp(entry, ref)
                     gated += 0 if ref.commercial_clean else 1
                     report.append(
@@ -523,6 +539,8 @@ class CastLock:
                         f"({ref.engine}, clean={ref.commercial_clean})"
                     )
                 except VoiceCastingError as exc:
+                    if announcer_engine == "google_tts":
+                        raise
                     report.append(f"  {char_id or 'ANNOUNCER'}: announcer NOT cast -- {exc}")
                 continue
 
@@ -530,6 +548,11 @@ class CastLock:
                 continue
             gender = str(entry.get("gender") or "").strip().lower()
             if not gender:
+                if target_engine == "google_tts":
+                    raise VoiceCastingError(
+                        f"{char_id}: google_tts character casting needs a cast "
+                        f"gender to choose a gender-plausible provider voice. "
+                        f"NO FALLBACK.")
                 report.append(f"  {char_id}: no gender -- preserved (not re-cast)")
                 continue
             # VC chunk 4: honour the HYBRID LLM voice-fit when this engine matches
@@ -577,6 +600,8 @@ class CastLock:
                     bank=bank_entries,
                 )
             except VoiceCastingError as exc:
+                if target_engine == "google_tts":
+                    raise
                 report.append(f"  {char_id}: NOT cast -- {exc}")
                 continue
             self._stamp(entry, ref)

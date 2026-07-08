@@ -24,6 +24,8 @@ def test_load_resolver_and_source_hash():
         "music_musicgen_v1", "music_stable_audio_v1", "music_stable_audio_3_v1",
         # cloud ElevenLabs voice (cloud-audio S1, 2026-07-03)
         "char_elevenlabs_cloud_v1", "announcer_elevenlabs_cloud_v1",
+        # direct Google Gemini TTS (BYO API key, explicit-selection-only)
+        "char_google_tts_v1", "announcer_google_tts_v1",
         # cloud Sonilo music (cloud-audio S5, 2026-07-03)
         "music_sonilo_cloud_v1",
     }
@@ -103,7 +105,66 @@ def test_legacy_first_engines_pure_and_legacy_first():
     assert EP.legacy_first_engines("char_voice")[0] == "indextts2"  # PROMOTED 2026-06-04
     assert EP.legacy_first_engines("announcer_voice")[0] == "kokoro"
     assert EP.legacy_first_engines("music")[0] == "stable_audio_3"  # PROMOTED 2026-06-03
+    assert EP.legacy_first_engines("char_voice")[-1] == "google_tts"
+    assert EP.legacy_first_engines("announcer_voice")[-1] == "google_tts"
     assert EP.legacy_first_engines("nonexistent_role") == []
+
+
+def test_direct_api_profiles_are_explicit_selection_only():
+    r = EP.load_resolver()
+    assert r.get("char_google_tts_v1").runtime == "direct_api"
+    assert r.get("announcer_google_tts_v1").runtime == "direct_api"
+    assert "google_tts" not in [p.engine for p in r.rank_chain("char_voice")]
+    assert "google_tts" not in [p.engine for p in r.rank_chain("announcer_voice")]
+    assert "elevenlabs" not in [p.engine for p in r.rank_chain("char_voice")]
+
+
+def _minimal_profile_row(**updates):
+    row = {
+        "profile_id": "x",
+        "role": "char_voice",
+        "engine": "google_tts",
+        "commercial_clean": True,
+        "model_path": "",
+        "model_sha256": "",
+        "default_params": {},
+        "allowed_voice_banks": ["google_tts"],
+        "engine_impl_version": "1",
+        "sample_rate": 24000,
+        "requires_hf_token": False,
+        "rank": 50,
+        "is_default": False,
+        "runtime": "direct_api",
+        "needs_ref_clip": False,
+        "caps": {},
+        "license_state": "clean",
+        "warn_text": "",
+        "partner_row": "",
+        "provider_id": "google",
+        "auth_required": True,
+        "billing_category": "tts",
+        "canonicalizer": "audio",
+        "error_policy": "fail_loud",
+    }
+    row.update(updates)
+    return row
+
+
+def test_direct_api_validation_contract():
+    assert EP.EngineProfile.model_validate(_minimal_profile_row()).runtime == "direct_api"
+    with pytest.raises(ValueError, match="auth_required"):
+        EP.EngineProfile.model_validate(_minimal_profile_row(auth_required=False))
+    with pytest.raises(ValueError, match="partner_row"):
+        EP.EngineProfile.model_validate(_minimal_profile_row(partner_row="cloud_row"))
+    with pytest.raises(ValueError, match="error_policy"):
+        EP.EngineProfile.model_validate(_minimal_profile_row(error_policy=""))
+
+
+def test_cloud_validation_still_requires_partner_row():
+    with pytest.raises(ValueError, match="runtime=cloud requires a partner_row"):
+        EP.EngineProfile.model_validate(
+            _minimal_profile_row(runtime="cloud", provider_id="elevenlabs")
+        )
 
 
 def test_bad_config_is_exception_wrapped(monkeypatch, tmp_path):
