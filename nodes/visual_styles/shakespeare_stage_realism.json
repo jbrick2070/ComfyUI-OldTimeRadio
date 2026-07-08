@@ -1,0 +1,63 @@
+{
+  "style_id": "shakespeare_stage_realism",
+  "label": "Shakespeare Stage Realism",
+  "positive_tail": "photorealistic Shakespearean stage still, candlelit theater realism, period costume detail, practical set texture",
+  "image_grade_tail": "natural lensing, rich stage contrast, warm candlelit color, crisp costume detail",
+  "broadcast_tail": "theatrical radio-play atmosphere, composed like a live stage production",
+  "allow_radio_tails": false,
+  "forbidden_terms": [
+    "anime",
+    "cartoon",
+    "origami",
+    "engraving",
+    "neon",
+    "futuristic",
+    "spaceship",
+    "film grain",
+    "blood",
+    "gun",
+    "guns",
+    "knife",
+    "knives",
+    "smoking",
+    "cigarette"
+  ],
+  "era_tail": "photorealistic Elizabethan and Jacobean stage realism",
+  "schema_version": "v2",
+  "portrait_look": "photoreal Shakespearean actor portrait, period costume, candlelit stage light, natural skin detail",
+  "portrait_look_talking": "photoreal Shakespearean talking portrait, period costume, soft stage key light, readable lips",
+  "portrait_instruction_look": "photorealistic and theater-real, like a period stage actor photographed during rehearsal",
+  "scene_instruction_look": "photoreal Shakespearean stage scene, candlelit practical set, period costume, theatrical blocking",
+  "announcer_subject_face": "its tuning dial arranged as a subtle expressive stage-prop face -- two glass dial-eyes and a shaped speaker-grille mouth, an anthropomorphic theater radio hosting the broadcast",
+  "announcer_subject_ltx_mouth": "{form} as a living theatrical radio prop: its wide speaker grille shapes into a large expressive mouth, clear lips open mid-speech, and its two glass tuning dials are attentive eyes -- a face-forward anthropomorphic period radio in candlelit stage realism, the cabinet filling the frame",
+  "announcer_subject_object": "presented as a period tabletop radio used as a stage prop, polished wood cabinet, woven grille and glowing dial in candlelit theater light",
+  "radio_object_look": "candlelit theater light, natural wood and cloth texture",
+  "plate_look": "photoreal practical stage set, candlelit period interior",
+  "non_character_emblem_fallback": "a single stage-prop object representing {base}",
+  "still_word_title_mood_style": "abstract photoreal stage mood image, candlelit fabric and set textures in a symbolic non-literal composition, no lettering",
+  "open_subjects": {
+    "synthetic": "{form} warming up on a theater prop table, glowing dials and tubes, candlelit wood and cloth textures",
+    "announcer": "{form} in a candlelit stage broadcast booth, glowing warmly, period dials and tubes",
+    "default": "{form} glowing warmly as a period stage radio, polished cabinet, dials and tubes"
+  },
+  "motion_registers": {
+    "announcer": "Continuous shot, same console throughout. Dial needle glides. Candlelight flickers across polished wood. Curtain shadows move softly. Slow theatrical dolly forward.",
+    "music_open": "Continuous shot, same console throughout. Dial sweeps across frequencies. Stage lamps rise from dim to warm. Cabinet highlights bloom. Measured dolly push forward.",
+    "music_close": "Continuous shot, same console throughout. Dial settles. Stage lamps fade to amber. Curtain shadows lengthen. Slow dolly pull back.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. VU meters pulse gently. Candlelight ripples on wood. Slow orbit around the speaker."
+  },
+  "still_word_typography": {
+    "noir": "elegant stage-poster capitals, narrow serif strokes",
+    "sci-fi": "clean theatrical capitals, precise carved edges",
+    "western": "weathered stagebill slab capitals, sturdy serif weight",
+    "pulp": "bold playbill capitals, deep cast shadow",
+    "default": "classic theater-poster capitals, balanced serif weight"
+  },
+  "still_word_backdrop": {
+    "noir": "deep charcoal velvet gradient, low candlelit side light",
+    "sci-fi": "cool slate stage gradient, crisp practical rim light",
+    "western": "warm ochre canvas gradient, low golden stage light",
+    "pulp": "rich crimson curtain gradient, dramatic side light",
+    "default": "warm umber stage gradient, gentle candlelit center light"
+  }
+}

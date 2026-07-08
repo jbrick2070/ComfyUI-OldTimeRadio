@@ -66,7 +66,8 @@ class TestWidgetSurface:
         assert meta["default"] == "sci_fi_radio"
         # ALL styles are live (no execution lane); known non-defaults listed.
         for sid in ("anime", "cartoon", "paper_origami",
-                    "archival_documentary", "storybook_engraving"):
+                    "archival_documentary", "shakespeare_stage_realism",
+                    "storybook_engraving"):
             assert sid in choices
 
 

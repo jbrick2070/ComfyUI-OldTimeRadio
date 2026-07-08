@@ -2163,6 +2163,7 @@ class OTR_LedgerScriptWriter:
                             "untouched. sci_fi_radio = the production look "
                             "(default, byte-identical). anime / cartoon / "
                             "paper_origami / archival_documentary / "
+                            "shakespeare_stage_realism / "
                             "storybook_engraving are live immediately. "
                             "Unknown id fails LOUD before any "
                             "story work."
