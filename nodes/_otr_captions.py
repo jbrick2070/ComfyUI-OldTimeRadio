@@ -5,13 +5,13 @@ Generates an ASS (libass) subtitle file from the per-episode ``*_ledger.json``
 ``char_id``), cross-referencing ``cast[]`` for speaker display names.
 
 Design (per Jeffrey's go-forward feedback 2026-05-30):
-  * Default style ``sdh_standard``: Arial 52 px, WHITE dialogue, ~65%-opaque
+  * Default style ``sdh_standard``: Arial 36 ASS units, WHITE dialogue, ~65%-opaque
     black box, bottom-center, max 2 lines. Accessibility master.
   * Optional style ``otr_crt``: green-CRT themed, for A/B QA only -- NOT default.
   * Speaker label coloring ONLY: the ``NAME:`` prefix is colored per speaker;
     the dialogue text stays white. No rainbow captions.
   * Sound/music cues are sparse and bracketed (``[STATIC HISS]`` / music note).
-  * SDH line rules: <=2 lines, <=37 chars/line, target <=17 CPS (hard cap 20),
+  * SDH line rules: <=2 lines, <=44 chars/line, target <=17 CPS (hard cap 20),
     min 1.0 s on screen, no overlap (later cue start clamps earlier cue end).
 
 This module is pure stdlib and import-safe (no side effects at import). The
@@ -29,11 +29,12 @@ from pathlib import Path
 from typing import Optional
 
 # -- SDH line rules ---------------------------------------------------------
-MAX_CHARS_PER_LINE = 37
+MAX_CHARS_PER_LINE = 44
 MAX_LINES_PER_CUE = 2
 TARGET_CPS = 17.0
 HARD_CPS_CAP = 20.0
 MIN_CUE_DUR_S = 1.0
+CAPTION_MARGIN_X = 40
 
 # -- Speaker label color (ASS \3c outline-override format: &Hbbggrr&) -------
 # ACCESSIBILITY (Jeffrey 2026-05-30): color is NEVER the speaker cue --
@@ -63,7 +64,7 @@ STYLES = {
     # Accessibility master. White text, ~55%-opaque black box (BorderStyle=3).
     "sdh_standard": {
         "font": "Arial",
-        "size": 26,
+        "size": 36,
         "primary": "&H00FFFFFF",   # opaque white
         "outline_col": "&H00000000",
         "back": "&H70000000",      # alpha 0x70 -> ~56% opaque black box (lighter)
@@ -190,12 +191,12 @@ def _ass_header(style: dict, margin_v: int) -> str:
     s = style
     style_line = (
         "Style: SDH,{font},{size},{primary},&H000000FF,{outline_col},{back},"
-        "{bold},0,0,0,100,100,0,0,{bs},{outline},{shadow},2,60,60,{mv},1"
+        "{bold},0,0,0,100,100,0,0,{bs},{outline},{shadow},2,{mx},{mx},{mv},1"
     ).format(
         font=s["font"], size=s["size"], primary=s["primary"],
         outline_col=s["outline_col"], back=s["back"], bold=s["bold"],
         bs=s["border_style"], outline=s["outline"], shadow=s["shadow"],
-        mv=margin_v,
+        mx=CAPTION_MARGIN_X, mv=margin_v,
     )
     return (
         "[Script Info]\n"

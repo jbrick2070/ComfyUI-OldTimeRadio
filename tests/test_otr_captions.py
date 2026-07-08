@@ -37,7 +37,7 @@ def test_wrap_respects_max_chars():
 
 def test_chunk_into_two_line_cues():
     text = " ".join(["word"] * 40)  # forces several cues
-    cues = cap.chunk_into_cues(text, max_chars=37, max_lines=2)
+    cues = cap.chunk_into_cues(text, max_chars=cap.MAX_CHARS_PER_LINE, max_lines=2)
     for c in cues:
         assert c.count("\\N") <= 1  # at most 2 physical lines per cue
 
@@ -83,8 +83,11 @@ def test_build_ass_structure_and_accessibility(tmp_path):
     style_line = next(l for l in text.splitlines() if l.startswith("Style: SDH,"))
     fields = style_line.split(",")
     # fields[0]="Style: SDH"; BorderStyle=15, Outline=16, Shadow=17, Align=18.
+    assert fields[2].strip() == "36", "standard captions must stay ~40% larger than the old 26"
     assert fields[15].strip() == "3", "BorderStyle must be 3 (opaque box)"
     assert int(fields[16]) > 0, "Outline must be >0 or libass draws no box"
+    assert fields[19].strip() == "40"
+    assert fields[20].strip() == "40"
     # PrimaryColour (fill) is opaque white.
     assert fields[3].strip().upper() == "&H00FFFFFF"
 
@@ -113,6 +116,12 @@ def test_unknown_style_returns_error(tmp_path):
     out, report = cap.build_ass_from_ledger(led, style="does_not_exist")
     assert out is None
     assert "unknown style" in report
+
+
+def test_caption_wrap_is_wider_for_large_sdh_style():
+    assert cap.MAX_CHARS_PER_LINE == 44
+    cues = cap.chunk_into_cues(" ".join(["archive"] * 12))
+    assert all(len(physical) <= 44 for cue in cues for physical in cue.split("\\N"))
 
 
 if __name__ == "__main__":
