@@ -149,14 +149,36 @@ def test_science_bank_resolves_both_contracts():
     assert callable(osp.resolve_interpreter(bank))
 
 
-@pytest.mark.parametrize("bank_id", ["public_domain_story",
-                                     "custom_source_bank"])
+@pytest.mark.parametrize("bank_id", ["custom_source_bank"])
 def test_empty_id_bank_raises_missing_contract(bank_id):
     bank = routing.get_bank(bank_id)
     with pytest.raises(osp.SourceContractMissingError, match=bank_id):
         osp.resolve_fetcher(bank)
     with pytest.raises(osp.SourceContractMissingError, match=bank_id):
         osp.resolve_interpreter(bank)
+
+
+def test_public_domain_bank_resolves_fetcher_but_not_interpreter():
+    bank = routing.get_bank("public_domain_story")
+    entry = osp.resolve_fetcher(bank)
+    assert entry.seed_source == "public_domain_source"
+    assert callable(entry.fetch)
+    with pytest.raises(osp.SourceContractMissingError, match="public_domain_story"):
+        osp.resolve_interpreter(bank)
+    assert bank.runnable is False
+    assert bank.defaults["source_ref"] == "gutenberg-time-machine-sample:arrival"
+    assert bank.defaults["manifest_path"].endswith("manifest.sample.json")
+
+
+def test_public_domain_fetcher_wrapper_returns_source_fetch_result():
+    bank = routing.get_bank("public_domain_story")
+    entry = osp.resolve_fetcher(bank)
+    result = entry.fetch(bank=bank, technical_model="ignored-technical")
+    payload, meta, rights = osp.normalize_fetch_result(
+        result, origin="public_domain_source")
+    assert payload["headline"] == "The Time Machine - The impossible arrival"
+    assert meta["source_ref"] == "gutenberg-time-machine-sample:arrival"
+    assert rights["license_status"] == "public_domain_us"
 
 
 def test_media_archive_bank_resolves_both_contracts():
@@ -419,9 +441,9 @@ def test_resolve_inputs_missing_contract_propagates():
     never a silent slide into the science path."""
     import nodes.OTR_LedgerScriptWriter as writer
     with pytest.raises(osp.SourceContractMissingError,
-                       match="public_domain_story"):
+                       match="custom_source_bank"):
         writer._resolve_inputs(custom_premise="",
-                               source_bank="public_domain_story")
+                               source_bank="custom_source_bank")
 
 
 def test_resolve_inputs_passes_source_ref_and_returns_sidecars(monkeypatch):

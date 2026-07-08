@@ -68,7 +68,7 @@
       "label": "Public Domain",
       "source_kind": "public_domain_source",
       "interpreter": "",
-      "fetcher": "",
+      "fetcher": "public_domain_source",
       "default_story_model": "faithful_radio_adaptation",
       "default_story_pipeline": "legacy_many_pass",
       "defaults": {
@@ -79,7 +79,9 @@
         "key_terms_label": "SOURCE KEY TERMS",
         "close_brief_label": "source attribution note",
         "title_form_label": "public-domain radio adaptation",
-        "coda_mode": "source_attribution"
+        "coda_mode": "source_attribution",
+        "manifest_path": "config/source_banks/public_domain_story/manifest.sample.json",
+        "source_ref": "gutenberg-time-machine-sample:arrival"
       },
       "required_seams": [
         "line_composer_system",

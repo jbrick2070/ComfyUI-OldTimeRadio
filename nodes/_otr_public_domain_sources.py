@@ -1,9 +1,8 @@
 """Public-domain source-bank helpers.
 
-This module is deliberately NOT registered as a live fetcher yet. It is the
-first safe source-banks-v2 slice: manifest validation, local fixture parsing,
-cache paths, atomic writes, and text cleanup. No network calls, no heavy imports,
-no workflow changes.
+This module owns the public-domain source-bank helpers and the registered
+fetcher. It is still fixture/local-file only: no network calls, no heavy
+imports, no workflow changes.
 """
 from __future__ import annotations
 
@@ -16,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ._otr_source_payload import validate_source_payload
+from ._otr_source_payload import SourceFetchResult, validate_source_payload
 
 MANIFEST_SCHEMA_VERSION = "v1"
 
@@ -219,6 +218,26 @@ def load_public_domain_manifest(path: str | os.PathLike[str]) -> dict[str, Any]:
     return validate_public_domain_manifest(data, origin=str(p))
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _resolve_repo_relative_path(raw: str, *, key: str) -> Path:
+    val = str(raw or "").strip()
+    if not val:
+        raise PublicDomainManifestError(
+            f"public-domain bank defaults must declare {key}"
+        )
+    path = Path(val)
+    if path.is_absolute():
+        return path
+    if ".." in path.parts:
+        raise PublicDomainManifestError(
+            f"public-domain bank default {key} must not contain '..': {val!r}"
+        )
+    return _repo_root() / path
+
+
 def resolve_manifest_unit(manifest: dict[str, Any], source_ref: str) -> PublicDomainUnit:
     """Resolve ``source_id:unit_id`` into a manifest source/unit pair."""
     ref = str(source_ref or "").strip()
@@ -280,6 +299,51 @@ def payload_from_manifest_unit(
         ),
     }
     return validate_source_payload(payload, origin=f"public_domain {resolved.source_ref}")
+
+
+def fetch_public_domain_source(
+    *,
+    bank: Any,
+    source_ref: str = "",
+) -> SourceFetchResult:
+    """Load a manifest-local public-domain unit and return payload + sidecars.
+
+    The bank is intentionally allowed to stay non-runnable while this fetcher
+    exists; the interpreter/runnable flip is a later chunk. Blank source_ref
+    uses the explicit bank default, otherwise it fails loud.
+    """
+    defaults = getattr(bank, "defaults", {}) or {}
+    if not isinstance(defaults, dict):
+        raise PublicDomainManifestError("public-domain bank defaults must be a dict")
+
+    manifest_path = _resolve_repo_relative_path(
+        str(defaults.get("manifest_path", "")),
+        key="manifest_path",
+    )
+    effective_ref = str(source_ref or defaults.get("source_ref", "") or "").strip()
+    if not effective_ref:
+        bank_id = getattr(bank, "source_bank_id", "public_domain_story")
+        raise PublicDomainSourceRefError(
+            f"source_bank {bank_id!r} requires source_ref or "
+            "defaults.source_ref; there is no fallback"
+        )
+
+    manifest = load_public_domain_manifest(manifest_path)
+    resolved = resolve_manifest_unit(manifest, effective_ref)
+    text_path = manifest_path.parent / resolved.unit["text_path"]
+    try:
+        text = text_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise PublicDomainSourceRefError(
+            f"public-domain source text not found for {resolved.source_ref}: "
+            f"{text_path}"
+        ) from exc
+
+    return SourceFetchResult(
+        payload=payload_from_manifest_unit(resolved, text=text),
+        source_meta=source_meta_from_unit(resolved),
+        source_rights=source_rights_from_unit(resolved),
+    )
 
 
 def source_rights_from_unit(resolved: PublicDomainUnit) -> dict[str, str]:
@@ -351,6 +415,7 @@ __all__ = [
     "PublicDomainUnit",
     "atomic_write_json",
     "canonicalize_public_domain_text",
+    "fetch_public_domain_source",
     "load_public_domain_manifest",
     "payload_from_manifest_unit",
     "resolve_manifest_unit",

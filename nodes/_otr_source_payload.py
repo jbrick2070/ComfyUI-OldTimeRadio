@@ -326,6 +326,17 @@ def _fetch_media_archive_rss(*, bank, technical_model: str,
         bank=bank, technical_model=technical_model, source_ref=source_ref)
 
 
+def _fetch_public_domain_source(*, bank, technical_model: str,
+                                source_ref: str = "") -> SourceFetchResult:
+    """public_domain_source: manifest-local public-domain source fetcher."""
+    del technical_model  # source text selection is source_ref/default driven
+    try:
+        from . import _otr_public_domain_sources as _pds
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        import _otr_public_domain_sources as _pds  # type: ignore
+    return _pds.fetch_public_domain_source(bank=bank, source_ref=source_ref)
+
+
 def _interpret_media_archive(*, bank, payload: dict, technical_fn,
                              model_id: str):
     """media_archive_interpreter: archive source brain.
@@ -368,6 +379,8 @@ _FETCHERS: "dict[str, FetcherEntry]" = {
                                 seed_source="rss_fetch"),
     "media_archive_rss": FetcherEntry(fetch=_fetch_media_archive_rss,
                                       seed_source="media_archive_rss"),
+    "public_domain_source": FetcherEntry(fetch=_fetch_public_domain_source,
+                                         seed_source="public_domain_source"),
 }
 
 _INTERPRETERS: "dict[str, object]" = {

@@ -112,6 +112,54 @@ def test_sidecars_are_separate_from_payload():
     assert "source_meta" not in payload
 
 
+def test_fetch_public_domain_source_uses_default_ref_and_sidecars():
+    from nodes import _otr_story_routing as routing
+
+    bank = routing.get_bank("public_domain_story")
+    result = pd.fetch_public_domain_source(bank=bank)
+
+    payload, meta, rights = osp.normalize_fetch_result(
+        result, origin="public_domain_source")
+    assert set(payload) == osp.SOURCE_PAYLOAD_KEYS
+    assert payload["headline"] == "The Time Machine - The impossible arrival"
+    assert payload["summary"].startswith("A shaken traveler")
+    assert "START OF THE PROJECT GUTENBERG" not in payload["full_text"]
+    assert payload["source"] == "Project Gutenberg"
+    assert payload["date"] == "1895"
+    assert payload["link"] == "https://www.gutenberg.org/ebooks/35"
+    assert "The Time Machine by H. G. Wells" in payload["seed_text"]
+    assert "Unit: The impossible arrival" in payload["seed_text"]
+    assert meta["source_ref"] == "gutenberg-time-machine-sample:arrival"
+    assert meta["recommended_word_budget"] == 300
+    assert rights["license_status"] == "public_domain_us"
+
+
+def test_fetch_public_domain_source_honors_explicit_ref():
+    from nodes import _otr_story_routing as routing
+
+    bank = routing.get_bank("public_domain_story")
+    result = pd.fetch_public_domain_source(
+        bank=bank,
+        source_ref="gutenberg-time-machine-sample:arrival",
+    )
+    assert result.source_meta["source_ref"] == "gutenberg-time-machine-sample:arrival"
+
+
+def test_fetch_public_domain_source_missing_defaults_fail_loud():
+    from types import SimpleNamespace
+
+    bank = SimpleNamespace(source_bank_id="public_domain_story", defaults={})
+    with pytest.raises(pd.PublicDomainManifestError, match="manifest_path"):
+        pd.fetch_public_domain_source(bank=bank)
+
+    bank = SimpleNamespace(
+        source_bank_id="public_domain_story",
+        defaults={"manifest_path": str(SAMPLE_MANIFEST)},
+    )
+    with pytest.raises(pd.PublicDomainSourceRefError, match="source_ref"):
+        pd.fetch_public_domain_source(bank=bank)
+
+
 def test_cache_root_env_override(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_SOURCE_BANK_CACHE_DIR", str(tmp_path / "cache"))
     assert pd.source_bank_cache_root() == tmp_path / "cache"
