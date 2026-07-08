@@ -125,6 +125,96 @@ def _post_json(
         ) from exc
 
 
+def _absolute_url(path_or_url: str) -> str:
+    value = str(path_or_url or "").strip()
+    if not value:
+        raise GoogleAPIRequestShapeError("Google API URL/path was blank.")
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+    if not value.startswith("/"):
+        value = "/" + value
+    base_url = (_env("OTR_GOOGLE_API_BASE") or DEFAULT_BASE_URL).rstrip("/")
+    return f"{base_url}{value}"
+
+
+def _get_bytes(
+    path_or_url: str,
+    *,
+    api_key: str,
+    timeout_s: int,
+    accept: str | None = None,
+) -> bytes:
+    headers = {"x-goog-api-key": api_key}
+    if accept:
+        headers["Accept"] = accept
+    req = urllib.request.Request(
+        _absolute_url(path_or_url),
+        headers=headers,
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
+            return resp.read()
+    except urllib.error.HTTPError as exc:
+        body_bytes = exc.read()
+        try:
+            body = _safe_json(body_bytes)
+        except GoogleAPIRequestShapeError:
+            body = body_bytes.decode("utf-8", errors="replace")[:500]
+        raise _classify_http_error(int(exc.code), body) from exc
+    except urllib.error.URLError as exc:
+        raise GoogleAPIError(
+            f"Google API transport failure: {exc}. No fallback was attempted."
+        ) from exc
+
+
+def get_json(
+    path_or_url: str,
+    *,
+    timeout_s: int | None = None,
+    _api_key: str | None = None,
+    _get: Any | None = None,
+) -> dict[str, Any]:
+    """GET a Google API JSON resource using the shared BYO-key auth."""
+    key = _api_key or resolve_api_key()
+    timeout = int(timeout_s or os.environ.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
+    getter = _get or _get_bytes
+    body = getter(
+        path_or_url,
+        api_key=key,
+        timeout_s=timeout,
+        accept="application/json",
+    )
+    parsed = _safe_json(body)
+    if not isinstance(parsed, dict):
+        raise GoogleAPIRequestShapeError(
+            "Google API JSON GET did not return a JSON object."
+        )
+    return parsed
+
+
+def download_media(
+    path_or_url: str,
+    *,
+    timeout_s: int | None = None,
+    _api_key: str | None = None,
+    _get: Any | None = None,
+) -> bytes:
+    """Download a Google API media resource using the shared BYO-key auth."""
+    key = _api_key or resolve_api_key()
+    timeout = int(timeout_s or os.environ.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
+    getter = _get or _get_bytes
+    data = getter(
+        path_or_url,
+        api_key=key,
+        timeout_s=timeout,
+        accept="video/mp4,application/octet-stream",
+    )
+    if not data:
+        raise GoogleAPIRequestShapeError("Google API media download was empty.")
+    return data
+
+
 def create_interaction(
     payload: dict[str, Any],
     *,
@@ -179,5 +269,7 @@ __all__ = [
     "GoogleAPIModelUnavailableError",
     "GoogleAPIRequestShapeError",
     "create_interaction",
+    "download_media",
+    "get_json",
     "resolve_api_key",
 ]

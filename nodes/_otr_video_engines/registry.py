@@ -372,6 +372,11 @@ CAPABILITIES = {
     # fails LOUD at invoke).
     "word_razzle": {"required_toolchain": None, "requires_sidecar": False,
                     "cpu_ok": True, "model_requirements": []},
+    # google_omni_video (2026-07-08): direct Google Gemini Omni Flash BYO API
+    # text-to-video lane. Provider-side render, no local weights/VRAM. Selectable
+    # only; missing Google key fails loud at invoke.
+    "google_omni_video": {"required_toolchain": None, "requires_sidecar": False,
+                          "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 
