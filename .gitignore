@@ -233,3 +233,40 @@ scripts/_otr_ref_audit_report.json
 docs/ltx_motion_clips/
 docs/*/wan_clips/
 *.webm
+
+# --- 2026-07-08 stale docs cleanup ---
+# Dated planning/run folders and model-review fanout output are local scratch by
+# default. Force-add a final artifact only when it is intentionally release
+# relevant; keep canonical handoff/roadmap docs at stable top-level paths.
+docs/2026-*/
+docs/GO_FORWARD_NEXT/
+docs/story_passes/
+docs/multimodal-story-schema/_sibling-archive/
+docs/*.html
+kibitz-runs/
+roundtables/
+.memory/
+/AGENTS.md
+/otr/cache/
+/255
+/agy_*.txt
+/agy_*.log
+/_kibitz_*.ps1
+/_kibitz_*.out
+/_poll.ps1
+/_otr_*_worker.err
+/_s*.out
+/_t*.txt
+/_ta_suite.*.log
+/full_out.txt
+/qa_script.py
+/test_ci.out
+/test_output.txt
+scripts/_*.json
+scripts/_*.jsonl
+scripts/_*.err
+scripts/_*.out
+scripts/*.prefix_bak
+scripts/otr_qa_page.py
+tests/fixtures/*.bak.*
+workflows/*__ORIGINAL_*.json

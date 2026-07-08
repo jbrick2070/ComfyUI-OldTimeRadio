@@ -1,2 +1,0 @@
-Placeholder public-domain chapter text for loader tests. Replace with verified
-public-domain source text before any real adaptation run.

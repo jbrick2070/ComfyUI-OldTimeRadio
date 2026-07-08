@@ -1,2 +1,0 @@
-comfyui: C:\Users\jeffr\.codex\skills\kibitz\references\profiles\comfyui.md
-.kibitz\comfyui.local.md: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\.kibitz\comfyui.local.md
