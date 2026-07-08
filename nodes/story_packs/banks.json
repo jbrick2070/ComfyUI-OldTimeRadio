@@ -98,6 +98,40 @@
       "guide_ref": ""
     },
     {
+      "source_bank_id": "shakespeare",
+      "label": "Shakespeare / Folger",
+      "source_kind": "shakespeare_scene",
+      "interpreter": "shakespeare_interpreter",
+      "fetcher": "shakespeare_folger",
+      "default_story_model": "folger_scene_adaptation",
+      "default_story_pipeline": "legacy_many_pass",
+      "defaults": {
+        "story_form_label": "Shakespeare radio adaptation",
+        "source_material_label": "Shakespeare scene",
+        "source_develop_verb": "adapt this Shakespeare scene while preserving its characters, dramatic turn, and play-world stakes",
+        "source_grounding_label": "source scene",
+        "key_terms_label": "SCENE KEY TERMS",
+        "close_brief_label": "Folger source note",
+        "title_form_label": "Shakespeare radio adaptation",
+        "coda_mode": "source_attribution",
+        "manifest_path": "config/source_banks/shakespeare/curated_scenes.sample.json",
+        "source_ref": "folger-macbeth:act1-scene3-witches"
+      },
+      "required_seams": [
+        "outline_macro_system",
+        "outline_phase_system",
+        "outline_beat_system",
+        "line_composer_system",
+        "exchange_system",
+        "coda_system",
+        "announcer_intro_system",
+        "announcer_intro_safe_system",
+        "announcer_outro_system"
+      ],
+      "runnable": true,
+      "guide_ref": "Folger Digital Texts are CC BY-NC 3.0; stamp noncommercial rights and do not present this bank as commercially cleared."
+    },
+    {
       "source_bank_id": "custom_source_bank",
       "label": "+ Add Your Own",
       "source_kind": "custom",

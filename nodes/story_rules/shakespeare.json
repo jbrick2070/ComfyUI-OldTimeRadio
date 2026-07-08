@@ -1,0 +1,78 @@
+{
+  "rules_id": "shakespeare",
+  "label": "Shakespeare / Folger (scene adaptation lane)",
+  "schema_version": "v1",
+  "cliche_patterns": [
+    "\\bthe bard speaks\\b",
+    "\\bto be or not to be\\b",
+    "\\bwhat light through yonder\\b",
+    "\\bthe stage is set\\b",
+    "\\ball the world['\\u2019]?s a stage\\b",
+    "\\bfair is foul\\b"
+  ],
+  "stage_business_patterns": [
+    "\\bI['\\u2019]?ll read the play\\b",
+    "\\bI['\\u2019]?ll check the script\\b",
+    "\\bthe audience can see\\b",
+    "\\bon stage\\b"
+  ],
+  "on_the_nose_patterns": [
+    "\\bI['\\u2019]?m (?:so |really |very )?(?:ambitious|afraid|terrified|worried|nervous)\\b",
+    "\\bthe prophecy means\\b",
+    "\\bthe theme is\\b",
+    "\\bthis is Shakespearean\\b"
+  ],
+  "banned_thesis_patterns": [
+    "\\bthe lesson is\\b",
+    "\\breminding us\\b",
+    "\\bthis shows\\b",
+    "\\bShakespeare teaches us\\b",
+    "\\bwhat matters is\\b"
+  ],
+  "personal_cost_patterns": [
+    "what it costs (?:them|us|me|him|her|you)\\b.{0,16}to be the one who",
+    "the trust .{0,20}\\blose\\b.{0,8}either way",
+    "the title .{0,20}\\bcost\\b"
+  ],
+  "cliche_replacements": [
+    [
+      "\\bthe bard speaks\\b",
+      "the scene holds"
+    ],
+    [
+      "\\bthe stage is set\\b",
+      "the room waits"
+    ],
+    [
+      "\\bfair is foul\\b",
+      "the promise turns"
+    ]
+  ],
+  "banned_phrases": [
+    "science-fiction audio drama",
+    "sci-fi radio drama",
+    "real science",
+    "news facts",
+    "RSS",
+    "breaking news",
+    "spaceship",
+    "mission control",
+    "laboratory containment",
+    "alien signal",
+    "alien invasion",
+    "generic experiment emergency",
+    "blood",
+    "bloody",
+    "gun",
+    "guns",
+    "knife",
+    "knives",
+    "smoking",
+    "cigarette",
+    "graphic violence",
+    "modern detective",
+    "new protagonist",
+    "unrelated framing story",
+    "commercially cleared"
+  ]
+}

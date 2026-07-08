@@ -1,0 +1,600 @@
+"""Shakespeare/Folger source-bank helpers.
+
+V1 is local-manifest only: no network calls, no import-time I/O, and no bundled
+large Folger corpus. The sample scene is deliberately small and stamped with
+Folger's noncommercial terms so downstream ledgers can distinguish it from
+public-domain-safe source banks.
+"""
+from __future__ import annotations
+
+import html
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+from xml.etree import ElementTree
+
+from pydantic import BaseModel, Field, field_validator
+
+try:
+    from . import _otr_source_payload as _osp
+except ImportError:  # pragma: no cover -- flat import harnesses
+    import _otr_source_payload as _osp  # type: ignore
+
+try:
+    from ._otr_structured_call import StructuredCallFailedError, structured_call
+except ImportError:  # pragma: no cover -- flat import harnesses
+    from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
+
+MANIFEST_SCHEMA_VERSION = "v1"
+PROMPT_VERSION = "shakespeare_interpreter_v1"
+SCHEMA_VERSION = "shakespeare_briefs_v1"
+
+_MAX_CASTING_BRIEF_CHARS = 900
+_MAX_SCRIPT_BRIEF_CHARS = 1200
+_MAX_CLOSE_BRIEF_CHARS = 520
+_MAX_KEY_TERMS = 7
+_MAX_KEY_TERM_CHARS = 80
+
+_TOP_KEYS = frozenset({"schema_version", "scenes"})
+_SCENE_KEYS = frozenset({
+    "source_ref",
+    "play_code",
+    "play_title",
+    "act",
+    "scene",
+    "scene_label",
+    "synopsis",
+    "year",
+    "source_label",
+    "source_url",
+    "license_label",
+    "license_url",
+    "commercial_use_allowed",
+    "adapter_type",
+    "recommended_word_budget",
+    "cast_hints",
+    "visual_style_policy",
+    "text_path",
+})
+_ADAPTER_TYPES = frozenset({"curated_scene_text", "folger_txt", "folger_xml"})
+_WS_RE = re.compile(r"\s+")
+
+
+class ShakespeareSourceError(RuntimeError):
+    """Base class for Shakespeare source-bank failures."""
+
+
+class ShakespeareManifestError(ShakespeareSourceError):
+    """A curated-scenes manifest violates the source-bank contract."""
+
+
+class ShakespeareSourceRefError(ShakespeareSourceError):
+    """A Shakespeare source_ref did not resolve to a manifest scene."""
+
+
+class ShakespeareInterpreterError(ShakespeareSourceError):
+    """Raised when the Shakespeare source brain cannot produce briefs."""
+
+    def __init__(self, *, attempts: int, reason: str) -> None:
+        self.attempts = attempts
+        self.reason = reason
+        super().__init__(
+            f"shakespeare interpreter failed after {attempts} attempt(s): {reason}"
+        )
+
+
+@dataclass(frozen=True)
+class ShakespeareScene:
+    """Resolved curated Shakespeare scene."""
+
+    scene: dict[str, Any]
+
+    @property
+    def source_ref(self) -> str:
+        return self.scene["source_ref"]
+
+
+@dataclass(frozen=True)
+class FolgerScene:
+    """Small parsed-scene surface for Folger XML/TEI snippets."""
+
+    play_code: str
+    act: int
+    scene: int
+    speakers: tuple[str, ...]
+    stage_directions: tuple[str, ...]
+    text: str
+
+
+def _check_unknown_keys(obj: dict[str, Any], allowed: frozenset[str], origin: str) -> None:
+    unknown = sorted(set(obj) - allowed)
+    if unknown:
+        raise ShakespeareManifestError(
+            f"{origin}: unknown key(s) {unknown}; known: {sorted(allowed)}"
+        )
+
+
+def _require_str(obj: dict[str, Any], key: str, origin: str, *, allow_empty: bool = False) -> str:
+    val = obj.get(key)
+    if not isinstance(val, str) or (not allow_empty and not val.strip()):
+        tail = "a string" if allow_empty else "a non-empty string"
+        raise ShakespeareManifestError(f"{origin}: {key} must be {tail}")
+    return val
+
+
+def _require_bool(obj: dict[str, Any], key: str, origin: str) -> bool:
+    val = obj.get(key)
+    if not isinstance(val, bool):
+        raise ShakespeareManifestError(f"{origin}: {key} must be boolean")
+    return bool(val)
+
+
+def _require_int(obj: dict[str, Any], key: str, origin: str, *, min_value: int, max_value: int) -> int:
+    val = obj.get(key)
+    if not isinstance(val, int) or isinstance(val, bool):
+        raise ShakespeareManifestError(f"{origin}: {key} must be an integer")
+    if val < min_value or val > max_value:
+        raise ShakespeareManifestError(
+            f"{origin}: {key} must be between {min_value} and {max_value}"
+        )
+    return val
+
+
+def _require_str_list(obj: dict[str, Any], key: str, origin: str) -> list[str]:
+    val = obj.get(key)
+    if not isinstance(val, list) or any(not isinstance(v, str) or not v.strip() for v in val):
+        raise ShakespeareManifestError(
+            f"{origin}: {key} must be a list of non-empty strings"
+        )
+    return list(val)
+
+
+def _validate_scene(raw: Any, origin: str) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ShakespeareManifestError(f"{origin}: scene must be an object")
+    _check_unknown_keys(raw, _SCENE_KEYS, origin)
+    scene = {
+        "source_ref": _require_str(raw, "source_ref", origin),
+        "play_code": _require_str(raw, "play_code", origin),
+        "play_title": _require_str(raw, "play_title", origin),
+        "act": _require_int(raw, "act", origin, min_value=1, max_value=5),
+        "scene": _require_int(raw, "scene", origin, min_value=1, max_value=20),
+        "scene_label": _require_str(raw, "scene_label", origin),
+        "synopsis": _require_str(raw, "synopsis", origin),
+        "year": _require_str(raw, "year", origin, allow_empty=True),
+        "source_label": _require_str(raw, "source_label", origin),
+        "source_url": _require_str(raw, "source_url", origin),
+        "license_label": _require_str(raw, "license_label", origin),
+        "license_url": _require_str(raw, "license_url", origin),
+        "commercial_use_allowed": _require_bool(raw, "commercial_use_allowed", origin),
+        "adapter_type": _require_str(raw, "adapter_type", origin),
+        "recommended_word_budget": _require_int(
+            raw, "recommended_word_budget", origin, min_value=30, max_value=320
+        ),
+        "cast_hints": _require_str_list(raw, "cast_hints", origin),
+        "visual_style_policy": _require_str(raw, "visual_style_policy", origin),
+        "text_path": _require_str(raw, "text_path", origin),
+    }
+    if scene["adapter_type"] not in _ADAPTER_TYPES:
+        raise ShakespeareManifestError(
+            f"{origin}: adapter_type {scene['adapter_type']!r} is not in "
+            f"{sorted(_ADAPTER_TYPES)}"
+        )
+    if Path(scene["text_path"]).is_absolute() or ".." in Path(scene["text_path"]).parts:
+        raise ShakespeareManifestError(
+            f"{origin}: text_path must be a relative manifest-local path"
+        )
+    return scene
+
+
+def validate_shakespeare_manifest(data: Any, *, origin: str = "manifest") -> dict[str, Any]:
+    """Validate and normalize a curated Shakespeare scene manifest."""
+    if not isinstance(data, dict):
+        raise ShakespeareManifestError(f"{origin}: top level must be an object")
+    _check_unknown_keys(data, _TOP_KEYS, origin)
+    if data.get("schema_version") != MANIFEST_SCHEMA_VERSION:
+        raise ShakespeareManifestError(
+            f"{origin}: schema_version must be {MANIFEST_SCHEMA_VERSION!r}"
+        )
+    raw_scenes = data.get("scenes")
+    if not isinstance(raw_scenes, list) or not raw_scenes:
+        raise ShakespeareManifestError(f"{origin}: scenes must be a non-empty list")
+    scenes: list[dict[str, Any]] = []
+    seen_refs: set[str] = set()
+    for idx, raw_scene in enumerate(raw_scenes):
+        scene = _validate_scene(raw_scene, f"{origin}.scenes[{idx}]")
+        if scene["source_ref"] in seen_refs:
+            raise ShakespeareManifestError(
+                f"{origin}: duplicate source_ref {scene['source_ref']!r}"
+            )
+        seen_refs.add(scene["source_ref"])
+        scenes.append(scene)
+    return {"schema_version": MANIFEST_SCHEMA_VERSION, "scenes": scenes}
+
+
+def load_shakespeare_manifest(path: str | Path) -> dict[str, Any]:
+    """Read and validate a curated-scenes manifest from disk."""
+    p = Path(path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ShakespeareManifestError(f"manifest not found: {p}") from exc
+    except json.JSONDecodeError as exc:
+        raise ShakespeareManifestError(f"manifest {p}: invalid JSON: {exc}") from exc
+    return validate_shakespeare_manifest(data, origin=str(p))
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _resolve_repo_relative_path(raw: str, *, key: str) -> Path:
+    val = str(raw or "").strip()
+    if not val:
+        raise ShakespeareManifestError(
+            f"shakespeare bank defaults must declare {key}"
+        )
+    path = Path(val)
+    if path.is_absolute():
+        return path
+    if ".." in path.parts:
+        raise ShakespeareManifestError(
+            f"shakespeare bank default {key} must not contain '..': {val!r}"
+        )
+    return _repo_root() / path
+
+
+def resolve_shakespeare_scene(manifest: dict[str, Any], source_ref: str) -> ShakespeareScene:
+    """Resolve a curated scene source_ref into a manifest scene."""
+    ref = str(source_ref or "").strip()
+    if not ref:
+        raise ShakespeareSourceRefError("source_ref is required for shakespeare")
+    checked = validate_shakespeare_manifest(manifest)
+    for scene in checked["scenes"]:
+        if scene["source_ref"] == ref:
+            return ShakespeareScene(scene=scene)
+    raise ShakespeareSourceRefError(f"unknown shakespeare source_ref {ref!r}")
+
+
+def canonicalize_shakespeare_text(text: Any, *, max_chars: int = 12000) -> str:
+    """Normalize a curated Shakespeare scene excerpt."""
+    raw = html.unescape(str(text or "")).replace("\ufeff", "")
+    cleaned = _WS_RE.sub(" ", raw).strip()
+    if len(cleaned) > max_chars:
+        cleaned = cleaned[:max_chars].rsplit(" ", 1)[0].rstrip() or cleaned[:max_chars]
+    if not cleaned:
+        raise ShakespeareSourceRefError("shakespeare source text is empty")
+    return cleaned
+
+
+def _speaker_from_line(line: str) -> str | None:
+    if ":" not in line:
+        return None
+    candidate = line.split(":", 1)[0].strip()
+    if not candidate or len(candidate) > 40:
+        return None
+    if candidate.upper() != candidate:
+        return None
+    return candidate
+
+
+def _speakers_from_text(text: str) -> list[str]:
+    seen: list[str] = []
+    for line in str(text or "").splitlines():
+        speaker = _speaker_from_line(line)
+        if speaker and speaker not in seen:
+            seen.append(speaker)
+    return seen
+
+
+def payload_from_scene(
+    resolved: ShakespeareScene,
+    *,
+    text: str,
+    excerpt_chars: int = 1200,
+) -> dict[str, str]:
+    """Build the legacy source payload for a curated Shakespeare scene."""
+    scene = resolved.scene
+    full_text = canonicalize_shakespeare_text(text)
+    excerpt = full_text[:excerpt_chars].rsplit(" ", 1)[0].rstrip() or full_text[:excerpt_chars]
+    speakers = ", ".join(_speakers_from_text(text)[:6])
+    payload = {
+        "headline": f"{scene['play_title']}, Act {scene['act']}, Scene {scene['scene']}",
+        "summary": scene["synopsis"],
+        "full_text": full_text,
+        "source": scene["source_label"],
+        "date": f"{scene['year']} | {scene['license_label']}".strip(" |"),
+        "link": scene["source_url"],
+        "seed_text": (
+            f"{scene['play_title']}, Act {scene['act']}, Scene {scene['scene']}\n"
+            f"Scene: {scene['scene_label']}\n"
+            f"Synopsis: {scene['synopsis']}\n"
+            f"Speakers: {speakers or ', '.join(scene['cast_hints'])}\n"
+            f"Excerpt: {excerpt}"
+        ),
+    }
+    return _osp.validate_source_payload(payload, origin=f"shakespeare {resolved.source_ref}")
+
+
+def source_rights_from_scene(resolved: ShakespeareScene) -> dict[str, Any]:
+    """Rights sidecar for the selected scene."""
+    scene = resolved.scene
+    return {
+        "license_label": scene["license_label"],
+        "license_url": scene["license_url"],
+        "source_url": scene["source_url"],
+        "source_label": scene["source_label"],
+        "commercial_use_allowed": scene["commercial_use_allowed"],
+    }
+
+
+def source_meta_from_scene(resolved: ShakespeareScene) -> dict[str, Any]:
+    """Metadata sidecar for the selected scene."""
+    scene = resolved.scene
+    return {
+        "source_ref": resolved.source_ref,
+        "play_code": scene["play_code"],
+        "play_title": scene["play_title"],
+        "act": scene["act"],
+        "scene": scene["scene"],
+        "scene_label": scene["scene_label"],
+        "year": scene["year"],
+        "recommended_word_budget": scene["recommended_word_budget"],
+        "cast_hints": list(scene["cast_hints"]),
+        "visual_style_policy": scene["visual_style_policy"],
+    }
+
+
+def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceFetchResult":
+    """Load a manifest-local curated Shakespeare scene."""
+    defaults = getattr(bank, "defaults", {}) or {}
+    if not isinstance(defaults, dict):
+        raise ShakespeareManifestError("shakespeare bank defaults must be a dict")
+    manifest_path = _resolve_repo_relative_path(
+        str(defaults.get("manifest_path", "")),
+        key="manifest_path",
+    )
+    effective_ref = str(source_ref or defaults.get("source_ref", "") or "").strip()
+    if not effective_ref:
+        bank_id = getattr(bank, "source_bank_id", "shakespeare")
+        raise ShakespeareSourceRefError(
+            f"source_bank {bank_id!r} requires source_ref or defaults.source_ref; "
+            "there is no fallback"
+        )
+
+    manifest = load_shakespeare_manifest(manifest_path)
+    resolved = resolve_shakespeare_scene(manifest, effective_ref)
+    text_path = manifest_path.parent / resolved.scene["text_path"]
+    try:
+        text = text_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise ShakespeareSourceRefError(
+            f"shakespeare source text not found for {resolved.source_ref}: {text_path}"
+        ) from exc
+    return _osp.SourceFetchResult(
+        payload=payload_from_scene(resolved, text=text),
+        source_meta=source_meta_from_scene(resolved),
+        source_rights=source_rights_from_scene(resolved),
+    )
+
+
+def parse_folger_scene(xml_text: str, play_code: str, act: int, scene: int) -> FolgerScene:
+    """Parse a small Folger XML/TEI scene snippet into speaker/stage text.
+
+    This helper is intentionally namespace-tolerant and conservative. V1 does
+    not fetch Folger XML; tests use snippets so later import code has a rooted
+    parser instead of ad hoc string splitting.
+    """
+    try:
+        root = ElementTree.fromstring(xml_text)
+    except ElementTree.ParseError as exc:
+        raise ShakespeareManifestError(f"invalid Folger XML: {exc}") from exc
+
+    def _tag(el) -> str:
+        return str(el.tag).rsplit("}", 1)[-1].lower()
+
+    speakers: list[str] = []
+    stage: list[str] = []
+    parts: list[str] = []
+    for el in root.iter():
+        tag = _tag(el)
+        text = _WS_RE.sub(" ", "".join(el.itertext())).strip()
+        if not text:
+            continue
+        if tag in {"speaker", "spkr"}:
+            speaker = text.upper()
+            if speaker not in speakers:
+                speakers.append(speaker)
+            parts.append(f"{speaker}:")
+        elif tag in {"stage", "stagedir"}:
+            stage.append(text)
+            parts.append(f"[{text}]")
+        elif tag in {"l", "p", "ab"}:
+            parts.append(text)
+    return FolgerScene(
+        play_code=str(play_code),
+        act=int(act),
+        scene=int(scene),
+        speakers=tuple(speakers),
+        stage_directions=tuple(stage),
+        text=canonicalize_shakespeare_text(" ".join(parts)),
+    )
+
+
+class ShakespeareBriefs(BaseModel):
+    """Briefs contract consumed by the writer's source interpreter path."""
+
+    casting_brief: str = Field(..., max_length=_MAX_CASTING_BRIEF_CHARS)
+    script_brief: str = Field(..., max_length=_MAX_SCRIPT_BRIEF_CHARS)
+    news_close_brief: str = Field(..., max_length=_MAX_CLOSE_BRIEF_CHARS)
+    key_terms: list[str] = Field(..., min_length=1, max_length=_MAX_KEY_TERMS)
+
+    source_hash: str = ""
+    prompt_version: str = PROMPT_VERSION
+    schema_version: str = SCHEMA_VERSION
+    model_id: str = ""
+    attempts: int = 0
+
+    @field_validator("key_terms", mode="before")
+    @classmethod
+    def _trim_term_count(cls, value):
+        if isinstance(value, list) and len(value) > _MAX_KEY_TERMS:
+            return value[:_MAX_KEY_TERMS]
+        return value
+
+    @field_validator("key_terms")
+    @classmethod
+    def _coerce_term_lengths(cls, value: list[str]) -> list[str]:
+        out: list[str] = []
+        for term in value:
+            if not isinstance(term, str):
+                raise ValueError(
+                    f"key_term must be str, got {type(term).__name__}: {term!r}"
+                )
+            clean = " ".join(term.split()).strip()
+            if len(clean) > _MAX_KEY_TERM_CHARS:
+                clean = clean[:_MAX_KEY_TERM_CHARS].rsplit(" ", 1)[0].rstrip()
+            if clean:
+                out.append(clean)
+        if not out:
+            raise ValueError("key_terms must contain at least one non-empty term")
+        return out
+
+
+def _source_hash(payload: dict[str, str]) -> str:
+    import hashlib
+
+    h = hashlib.sha256()
+    for key in ("headline", "summary", "full_text", "source", "date", "link"):
+        h.update(str(payload.get(key, "")).encode("utf-8", "replace"))
+        h.update(b"\0")
+    return h.hexdigest()[:16]
+
+
+def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
+    source_block = "\n".join(
+        part for part in (
+            f"Scene: {payload.get('headline', '').strip()}",
+            f"Source: {payload.get('source', '').strip()}",
+            f"Date/Rights: {payload.get('date', '').strip()}",
+            f"URL: {payload.get('link', '').strip()}",
+            f"Synopsis: {payload.get('summary', '').strip()}",
+            "Scene text:",
+            str(payload.get("full_text", ""))[:5000],
+        )
+        if part
+    )
+    instruction = (
+        "You are the source brain for a compact old-time-radio adaptation of "
+        "a Shakespeare scene.\n\n"
+        "Turn the scene below into JSON briefs for a short radio drama. "
+        "Preserve the named characters, the scene's dramatic pressure, its "
+        "major turn, and the play-world stakes. Compression is allowed; do "
+        "not replace the scene with a modern mystery or unrelated framing "
+        "story.\n\n"
+        "Make stage directions audible through spoken implication or concrete "
+        "radio business. Keep it safe for a general audience: no blood, guns, "
+        "knives, smoking, or graphic violence in the adapted premise.\n\n"
+        "Return ONE JSON object only with exactly these keys:\n"
+        "{\n"
+        "  \"casting_brief\": \"80-700 chars; source-grounded roles and voices\",\n"
+        "  \"script_brief\": \"120-1000 chars; compact scene adaptation brief\",\n"
+        "  \"news_close_brief\": \"80-440 chars; Folger/noncommercial source note\",\n"
+        "  \"key_terms\": [\"2-7 concise scene/adaptation terms\"]\n"
+        "}\n\n"
+        f"{source_block}"
+    )
+    return [{"role": "user", "content": instruction}]
+
+
+def build_shakespeare_briefs(
+    *,
+    technical_fn: Callable[..., str],
+    payload: dict[str, str],
+    model_id: str = "",
+    max_attempts: int = 3,
+    base_temperature: float = 0.35,
+    max_new_tokens: int = 520,
+) -> ShakespeareBriefs:
+    """Run the Shakespeare source brain through the structured JSON ladder."""
+    if max_attempts < 1:
+        raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
+
+    slot_calls = 0
+
+    def _counting_slot_fn(msgs, *, temperature, max_new_tokens):
+        nonlocal slot_calls
+        slot_calls += 1
+        # LLM slot: technical -- structured source-brief extraction for the
+        # Shakespeare lane, routed through the writer's technical slot.
+        return technical_fn(msgs, temperature=temperature, max_new_tokens=max_new_tokens)
+
+    def _content_validator(brief: ShakespeareBriefs) -> str | None:
+        if len(brief.key_terms) < 2:
+            return "shakespeare briefs require at least two key_terms"
+        hay = " ".join(
+            [brief.casting_brief, brief.script_brief, brief.news_close_brief]
+            + list(brief.key_terms)
+        ).casefold()
+        for term in (
+            "unrelated framing story", "modern detective", "changed ending",
+            "blood", "gun", "guns", "knife", "knives", "smoking",
+            "cigarette", "graphic violence", "commercially cleared",
+        ):
+            if term in hay:
+                return f"shakespeare brief drifted into forbidden term {term!r}"
+        return None
+
+    try:
+        # LLM slot: technical -- Shakespeare source-brief structured pass.
+        brief = structured_call(
+            prompt=_build_interpreter_prompt(payload),
+            schema=ShakespeareBriefs,
+            slot_fn=_counting_slot_fn,
+            base_temperature=float(base_temperature),
+            structural_retry_temperature=float(base_temperature) / 2.0,
+            post_validator=_content_validator,
+            max_new_tokens=int(max_new_tokens),
+            max_attempts=int(max_attempts),
+            helper_name="build_shakespeare_briefs",
+        )
+    except StructuredCallFailedError as exc:
+        raise ShakespeareInterpreterError(
+            attempts=exc.attempts,
+            reason=(
+                f"{type(exc.last_error).__name__}: {exc.last_error}"
+                if exc.last_error is not None
+                else "no error captured"
+            ),
+        ) from exc
+
+    brief.source_hash = _source_hash(payload)
+    brief.model_id = model_id
+    brief.attempts = slot_calls
+    return brief
+
+
+__all__ = [
+    "FolgerScene",
+    "MANIFEST_SCHEMA_VERSION",
+    "PROMPT_VERSION",
+    "SCHEMA_VERSION",
+    "ShakespeareBriefs",
+    "ShakespeareInterpreterError",
+    "ShakespeareManifestError",
+    "ShakespeareScene",
+    "ShakespeareSourceError",
+    "ShakespeareSourceRefError",
+    "build_shakespeare_briefs",
+    "canonicalize_shakespeare_text",
+    "fetch_shakespeare_scene",
+    "load_shakespeare_manifest",
+    "parse_folger_scene",
+    "payload_from_scene",
+    "resolve_shakespeare_scene",
+    "source_meta_from_scene",
+    "source_rights_from_scene",
+    "validate_shakespeare_manifest",
+]

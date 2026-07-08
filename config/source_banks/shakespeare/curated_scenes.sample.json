@@ -1,0 +1,29 @@
+{
+  "schema_version": "v1",
+  "scenes": [
+    {
+      "source_ref": "folger-macbeth:act1-scene3-witches",
+      "play_code": "Mac",
+      "play_title": "Macbeth",
+      "act": 1,
+      "scene": 3,
+      "scene_label": "Act 1, Scene 3 - the prophecy on the heath",
+      "synopsis": "Three witches greet Macbeth with titles he has not yet received, and the promise unsettles both his ambition and Banquo's caution.",
+      "year": "c. 1606",
+      "source_label": "Folger Shakespeare",
+      "source_url": "https://www.folger.edu/explore/shakespeares-works/macbeth/read/",
+      "license_label": "CC BY-NC 3.0",
+      "license_url": "https://www.folger.edu/copyright-policy/",
+      "commercial_use_allowed": false,
+      "adapter_type": "curated_scene_text",
+      "recommended_word_budget": 300,
+      "cast_hints": [
+        "Macbeth",
+        "Banquo",
+        "First Witch"
+      ],
+      "visual_style_policy": "derive_from_source",
+      "text_path": "fixtures/macbeth_act1_scene3_excerpt.txt"
+    }
+  ]
+}

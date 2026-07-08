@@ -337,6 +337,17 @@ def _fetch_public_domain_source(*, bank, technical_model: str,
     return _pds.fetch_public_domain_source(bank=bank, source_ref=source_ref)
 
 
+def _fetch_shakespeare_folger(*, bank, technical_model: str,
+                              source_ref: str = "") -> SourceFetchResult:
+    """shakespeare_folger: manifest-local curated Shakespeare scene fetcher."""
+    del technical_model  # scene selection is source_ref/default driven
+    try:
+        from . import _otr_shakespeare_sources as _shx
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        import _otr_shakespeare_sources as _shx  # type: ignore
+    return _shx.fetch_shakespeare_scene(bank=bank, source_ref=source_ref)
+
+
 def _interpret_media_archive(*, bank, payload: dict, technical_fn,
                              model_id: str):
     """media_archive_interpreter: archive source brain.
@@ -381,6 +392,28 @@ def _interpret_public_domain(*, bank, payload: dict, technical_fn,
         raise SourceInterpretError(str(exc)) from exc
 
 
+def _interpret_shakespeare(*, bank, payload: dict, technical_fn,
+                           model_id: str):
+    """shakespeare_interpreter: compact Shakespeare scene adaptation brain.
+
+    Translates ONLY ShakespeareInterpreterError -> SourceInterpretError.
+    Contract/shape bugs and unexpected exceptions propagate hard.
+    """
+    del bank
+    try:
+        from . import _otr_shakespeare_sources as _shx
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        import _otr_shakespeare_sources as _shx  # type: ignore
+    try:
+        return _shx.build_shakespeare_briefs(
+            technical_fn=technical_fn,
+            payload=payload,
+            model_id=model_id,
+        )
+    except _shx.ShakespeareInterpreterError as exc:
+        raise SourceInterpretError(str(exc)) from exc
+
+
 # ---------------------------------------------------------------------------
 # registries + resolution
 # ---------------------------------------------------------------------------
@@ -403,12 +436,15 @@ _FETCHERS: "dict[str, FetcherEntry]" = {
                                       seed_source="media_archive_rss"),
     "public_domain_source": FetcherEntry(fetch=_fetch_public_domain_source,
                                          seed_source="public_domain_source"),
+    "shakespeare_folger": FetcherEntry(fetch=_fetch_shakespeare_folger,
+                                       seed_source="shakespeare_folger"),
 }
 
 _INTERPRETERS: "dict[str, object]" = {
     "news_interpreter": _interpret_news,
     "media_archive_interpreter": _interpret_media_archive,
     "public_domain_interpreter": _interpret_public_domain,
+    "shakespeare_interpreter": _interpret_shakespeare,
 }
 
 
