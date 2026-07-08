@@ -129,6 +129,35 @@ def test_response_parser_accepts_output_audio_camel_case(monkeypatch):
     assert tuple(audio["waveform"].shape) == (1, 1, 2)
 
 
+def test_response_parser_accepts_live_interactions_steps_audio(monkeypatch):
+    _clear_keys(monkeypatch)
+    monkeypatch.setenv("OTR_GOOGLE_API_KEY", "KEY")
+    monkeypatch.setattr(
+        G,
+        "_post_interaction",
+        lambda api_key, payload: {
+            "object": "interaction",
+            "status": "completed",
+            "steps": [
+                {
+                    "type": "model_output",
+                    "content": [
+                        {
+                            "type": "audio",
+                            "mime_type": "audio/l16",
+                            "sample_rate": 24000,
+                            "data": _pcm_b64(1, 2, 3),
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    audio = AE.get_engine("google_tts").generate_voice("hello", "Kore", None, 1)
+    assert tuple(audio["waveform"].shape) == (1, 1, 3)
+    assert int(audio["sample_rate"]) == 24000
+
+
 def test_key_redacted_from_sanitized_errors(monkeypatch):
     _clear_keys(monkeypatch)
     monkeypatch.setenv("OTR_GOOGLE_API_KEY", "SECRET123")

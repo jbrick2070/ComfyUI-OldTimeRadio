@@ -185,21 +185,74 @@ def _post_interaction(api_key: str, payload: dict) -> dict:
     return json.loads(raw.decode("utf-8"))
 
 
-def _extract_audio_data(response: dict) -> str:
+def _sample_rate_from(block: dict) -> int:
+    raw = block.get("sample_rate", block.get("sampleRate", _SAMPLE_RATE))
+    try:
+        sample_rate = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise GoogleTTSError(
+            "Google TTS response audio sample_rate was not an integer"
+        ) from exc
+    if sample_rate <= 0:
+        raise GoogleTTSError("Google TTS response audio sample_rate was invalid")
+    return sample_rate
+
+
+def _audio_block(data: str, block: dict) -> dict:
+    mime_type = str(block.get("mime_type") or block.get("mimeType") or "").lower()
+    if mime_type and mime_type not in ("audio/l16", "audio/pcm"):
+        raise GoogleTTSError(
+            "Google TTS response audio MIME %r is unsupported; expected audio/l16"
+            % mime_type
+        )
+    return {
+        "data": data,
+        "sample_rate": _sample_rate_from(block),
+        "mime_type": mime_type or "audio/l16",
+    }
+
+
+def _extract_audio_data(response: dict) -> dict:
     if not isinstance(response, dict):
         raise GoogleTTSError("Google TTS response was not a JSON object")
+
     for key in ("output_audio", "outputAudio"):
         block = response.get(key)
         if isinstance(block, dict):
             data = block.get("data")
             if isinstance(data, str) and data.strip():
-                return data
+                return _audio_block(data, block)
+
+    steps = response.get("steps")
+    if isinstance(steps, list):
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            content = step.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                data = block.get("data")
+                kind = str(block.get("type") or "").lower()
+                mime_type = str(
+                    block.get("mime_type") or block.get("mimeType") or ""
+                ).lower()
+                if (
+                    isinstance(data, str)
+                    and data.strip()
+                    and (kind == "audio" or mime_type.startswith("audio/"))
+                ):
+                    return _audio_block(data, block)
+
     raise GoogleTTSError(
-        "Google TTS response did not include output_audio.data/outputAudio.data"
+        "Google TTS response did not include audio data in output_audio, "
+        "outputAudio, or steps[].content[]"
     )
 
 
-def _pcm16le_to_audio(pcm: bytes) -> dict:
+def _pcm16le_to_audio(pcm: bytes, sample_rate: int = _SAMPLE_RATE) -> dict:
     if not pcm:
         raise GoogleTTSError("Google TTS response audio was empty")
     if len(pcm) % 2:
@@ -209,17 +262,18 @@ def _pcm16le_to_audio(pcm: bytes) -> dict:
 
     arr = np.frombuffer(pcm, dtype="<i2").copy()
     wav_np = (arr.astype(np.float32) / 32768.0).reshape(1, 1, -1)
-    return {"waveform": torch.from_numpy(wav_np), "sample_rate": _SAMPLE_RATE}
+    return {"waveform": torch.from_numpy(wav_np), "sample_rate": sample_rate}
 
 
 def _audio_from_response(response: dict) -> dict:
+    block = _extract_audio_data(response)
     try:
-        pcm = base64.b64decode(_extract_audio_data(response), validate=True)
+        pcm = base64.b64decode(block["data"], validate=True)
     except Exception as exc:  # noqa: BLE001
         raise GoogleTTSError(
             "Google TTS response audio was not valid base64 PCM: %s" % exc
         ) from exc
-    return _pcm16le_to_audio(pcm)
+    return _pcm16le_to_audio(pcm, int(block["sample_rate"]))
 
 
 def _preserve_stage_tags(text: str) -> tuple[str, dict[str, str]]:
