@@ -172,15 +172,16 @@ def _configured_index() -> int:
         return 0
 
 
-def fetch_media_archive_rss(*, bank: Any, technical_model: str = "") -> dict:
+def fetch_media_archive_rss(*, bank: Any, technical_model: str = "",
+                            source_ref: str = "") -> dict:
     """Registered fetcher body for ``media_archive_rss``.
 
-    ``bank`` and ``technical_model`` are accepted for the shared fetcher
-    contract. The feed choice itself is deterministic: gather usable entries
-    from configured feeds and select ``OTR_MEDIA_ARCHIVE_ITEM_INDEX`` modulo the
-    entry count.
+    ``bank``, ``technical_model``, and ``source_ref`` are accepted for the
+    shared fetcher contract. RSS feeds ignore ``source_ref``; the feed choice
+    itself is deterministic: gather usable entries from configured feeds and
+    select ``OTR_MEDIA_ARCHIVE_ITEM_INDEX`` modulo the entry count.
     """
-    del bank, technical_model
+    del bank, technical_model, source_ref
     payloads: list[dict] = []
     errors: list[str] = []
     for feed_url in _configured_feeds():

@@ -82,6 +82,19 @@ SOURCE_PAYLOAD_KEYS = frozenset({
 })
 
 
+@dataclass(frozen=True)
+class SourceFetchResult:
+    """Fetcher return with strict payload plus optional provenance sidecars.
+
+    The payload remains the exact seven-key legacy contract. Rights/provenance
+    metadata travels beside it so new banks can stamp source information
+    without smuggling unknown keys through ``validate_source_payload``.
+    """
+    payload: dict
+    source_meta: dict | None = None
+    source_rights: dict | None = None
+
+
 def validate_source_payload(payload, origin: str) -> dict:
     """Fail-loud shape check; returns a SHALLOW COPY of the payload.
 
@@ -118,6 +131,39 @@ def validate_source_payload(payload, origin: str) -> dict:
             f"deliver a non-empty seed"
         )
     return dict(payload)
+
+
+def _copy_sidecar(sidecar, *, origin: str, name: str) -> dict:
+    if sidecar is None:
+        return {}
+    if not isinstance(sidecar, dict):
+        raise SourcePayloadContractError(
+            f"{origin}: {name} sidecar must be dict or None, got "
+            f"{type(sidecar).__name__}"
+        )
+    return dict(sidecar)
+
+
+def normalize_fetch_result(result, origin: str) -> tuple[dict, dict, dict]:
+    """Validate a fetcher result and return payload/meta/rights copies.
+
+    Legacy fetchers may still return a raw payload dict. Source Banks v2
+    fetchers can return ``SourceFetchResult`` to carry attribution and rights
+    sidecars without changing the exact payload key set.
+    """
+    if isinstance(result, SourceFetchResult):
+        payload = validate_source_payload(result.payload, origin)
+        source_meta = _copy_sidecar(
+            result.source_meta, origin=origin, name="source_meta")
+        source_rights = _copy_sidecar(
+            result.source_rights, origin=origin, name="source_rights")
+        return payload, source_meta, source_rights
+    if isinstance(result, dict):
+        return validate_source_payload(result, origin), {}, {}
+    raise SourcePayloadContractError(
+        f"{origin}: fetcher result must be a source payload dict or "
+        f"SourceFetchResult, got {type(result).__name__}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +262,8 @@ def validate_interpreter_result(result, origin: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _fetch_science_rss(*, bank, technical_model: str) -> dict:
+def _fetch_science_rss(*, bank, technical_model: str,
+                       source_ref: str = "") -> dict:
     """science_rss: verbatim wrapper around the writer's RSS fetcher.
 
     Forwards technical_model POSITIONALLY -- the S31 B6 slot-label/id
@@ -225,7 +272,7 @@ def _fetch_science_rss(*, bank, technical_model: str) -> dict:
     (2026-07-05): style_slug removed -- the fetch/rerank chain is
     style-agnostic now, there is no style value yet at this pre-contract
     sourcing stage."""
-    del bank  # science fetch needs no bank fields; contract signature only
+    del bank, source_ref  # science fetch ignores Source Banks v2 references
     try:
         from . import OTR_LedgerScriptWriter as _writer
     except ImportError:  # pragma: no cover -- flat-import test harnesses
@@ -268,14 +315,15 @@ def _interpret_news(*, bank, payload: dict, technical_fn,
         raise SourceInterpretError(str(exc)) from exc
 
 
-def _fetch_media_archive_rss(*, bank, technical_model: str) -> dict:
+def _fetch_media_archive_rss(*, bank, technical_model: str,
+                             source_ref: str = "") -> dict:
     """media_archive_rss: RSS/Atom media-history feed normalizer."""
     try:
         from . import _otr_media_archive_sources as _mas
     except ImportError:  # pragma: no cover -- flat-import test harnesses
         import _otr_media_archive_sources as _mas  # type: ignore
     return _mas.fetch_media_archive_rss(
-        bank=bank, technical_model=technical_model)
+        bank=bank, technical_model=technical_model, source_ref=source_ref)
 
 
 def _interpret_media_archive(*, bank, payload: dict, technical_fn,
@@ -311,7 +359,7 @@ class FetcherEntry:
 
     seed_source is REGISTRY metadata (kibitz r1: the payload shape stays
     frozen; "rss_fetch" keeps the science ledger stamps byte-identical)."""
-    fetch: object  # callable(*, bank, technical_model) -> dict
+    fetch: object  # callable(*, bank, technical_model, source_ref="") -> result
     seed_source: str
 
 
@@ -380,12 +428,14 @@ def resolve_interpreter(bank):
 __all__ = [
     "FetcherEntry",
     "SOURCE_PAYLOAD_KEYS",
+    "SourceFetchResult",
     "SourceContractMissingError",
     "SourceInterpretError",
     "SourcePayloadContractError",
     "SourcePayloadError",
     "UnknownFetcherError",
     "UnknownInterpreterError",
+    "normalize_fetch_result",
     "registered_fetcher_ids",
     "registered_interpreter_ids",
     "resolve_fetcher",

@@ -1254,6 +1254,8 @@ def _resolve_inputs(
         }, origin="_resolve_inputs custom_premise")
         news_seed = custom
         seed_source = "custom_premise"
+        source_meta = {}
+        source_rights = {}
     else:
         # S31 B6 Fix 1: pass `technical_model`. Post-S31 B3, the RSS
         # rerank path inside `_fetch_rss_seed_or_die` routes through
@@ -1279,15 +1281,19 @@ def _resolve_inputs(
         # pre-contract sourcing stage, and none is needed for rerank.
         _fetch_bank = _otr_story_routing.get_bank(source_bank or "science_news")
         _fetch_entry = _otr_source_payload.resolve_fetcher(_fetch_bank)
-        news_article = _otr_source_payload.validate_source_payload(
-            _fetch_entry.fetch(
-                bank=_fetch_bank,
-                technical_model=technical_model,
-            ),
-            origin=(
-                f"_resolve_inputs fetch (bank={_fetch_bank.source_bank_id!r}, "
-                f"fetcher={_fetch_bank.fetcher!r})"
-            ),
+        _fetch_origin = (
+            f"_resolve_inputs fetch (bank={_fetch_bank.source_bank_id!r}, "
+            f"fetcher={_fetch_bank.fetcher!r})"
+        )
+        news_article, source_meta, source_rights = (
+            _otr_source_payload.normalize_fetch_result(
+                _fetch_entry.fetch(
+                    bank=_fetch_bank,
+                    technical_model=technical_model,
+                    source_ref=source_ref,
+                ),
+                origin=_fetch_origin,
+            )
         )
         news_seed = news_article["seed_text"]
         seed_source = _fetch_entry.seed_source
@@ -1343,6 +1349,8 @@ def _resolve_inputs(
         "google_api_slot_a_model": str(google_api_slot_a_model or ""),
         "google_api_slot_b_model": str(google_api_slot_b_model or ""),
         "source_ref": str(source_ref or ""),
+        "source_meta": dict(source_meta),
+        "source_rights": dict(source_rights),
     }
 
 
@@ -2796,6 +2804,9 @@ class OTR_LedgerScriptWriter:
         # Stage 2C: stamp the authoritative story-path selection (resolved
         # dict is the single source; run() gated it runnable already).
         meta["source_bank"] = resolved["source_bank"]
+        meta["source_ref"] = resolved["source_ref"]
+        meta["source_meta"] = dict(resolved["source_meta"])
+        meta["source_rights"] = dict(resolved["source_rights"])
         # Stage 3C: stamp the visual style -- THE threading channel: every
         # downstream visual composer reads meta["visual_style"] via
         # get_visual_style(meta) off the serialized ledger (stamp precedes
@@ -5365,6 +5376,7 @@ class OTR_LedgerScriptWriter:
             "include_act_breaks":    resolved["include_act_breaks"],
             "optimization_profile":  resolved["optimization_profile"],
             "seed_source":           resolved["seed_source"],
+            "source_ref":            resolved["source_ref"],
         }
         # S30 B2b: top-level slot stamps + per-phase routing trace.
         # `gen_params_by_phase` records the slot + resolved model for

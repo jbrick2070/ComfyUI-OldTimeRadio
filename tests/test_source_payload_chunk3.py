@@ -93,6 +93,50 @@ def test_payload_validator_non_dict():
         osp.validate_source_payload("nope", origin="t")
 
 
+def test_normalize_fetch_result_accepts_legacy_dict():
+    src = _payload()
+    payload, meta, rights = osp.normalize_fetch_result(src, origin="t")
+    assert payload == src and payload is not src
+    assert meta == {}
+    assert rights == {}
+
+
+def test_normalize_fetch_result_accepts_source_fetch_result_and_copies_sidecars():
+    source_meta = {"title": "The Time Machine"}
+    source_rights = {"license_status": "public_domain_us"}
+    result = osp.SourceFetchResult(
+        payload=_payload(),
+        source_meta=source_meta,
+        source_rights=source_rights,
+    )
+
+    payload, meta, rights = osp.normalize_fetch_result(result, origin="t")
+
+    assert payload == _payload()
+    assert meta == source_meta and meta is not source_meta
+    assert rights == source_rights and rights is not source_rights
+
+
+def test_normalize_fetch_result_none_sidecars_become_empty_dicts():
+    result = osp.SourceFetchResult(payload=_payload())
+    _payload_out, meta, rights = osp.normalize_fetch_result(result, origin="t")
+    assert meta == {}
+    assert rights == {}
+
+
+def test_normalize_fetch_result_rejects_unknown_result_type():
+    with pytest.raises(osp.SourcePayloadContractError, match="fetcher result"):
+        osp.normalize_fetch_result(["bad"], origin="t")
+
+
+@pytest.mark.parametrize("field", ["source_meta", "source_rights"])
+def test_normalize_fetch_result_rejects_non_dict_sidecars(field):
+    kwargs = {"payload": _payload(), field: ["bad"]}
+    result = osp.SourceFetchResult(**kwargs)
+    with pytest.raises(osp.SourcePayloadContractError, match=field):
+        osp.normalize_fetch_result(result, origin="t")
+
+
 # ---------------------------------------------------------------------------
 # (2) registry resolution
 # ---------------------------------------------------------------------------
@@ -266,7 +310,7 @@ def test_shipped_pipeline_flags():
 # (4) science byte-identity -- wrapper forwarding pins
 # ---------------------------------------------------------------------------
 
-def test_science_rss_wrapper_forwards_exact_args(monkeypatch):
+def test_science_rss_wrapper_forwards_exact_args_and_ignores_source_ref(monkeypatch):
     """Style-engine consolidation (2026-07-05): the fetch/rerank chain is
     style-agnostic now -- _fetch_rss_seed_or_die takes only model_id, and
     the wrapper forwards it POSITIONALLY (single-arg call)."""
@@ -280,9 +324,32 @@ def test_science_rss_wrapper_forwards_exact_args(monkeypatch):
     monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
     bank = routing.get_bank("science_news")
     entry = osp.resolve_fetcher(bank)
-    out = entry.fetch(bank=bank, technical_model="tm-id")
+    out = entry.fetch(bank=bank, technical_model="tm-id",
+                      source_ref="ignored://source")
     assert calls["args"] == ("tm-id",)
     assert out == _payload()
+
+
+def test_media_archive_wrapper_forwards_source_ref_keyword(monkeypatch):
+    seen = {}
+
+    def _fake(**kw):
+        seen.update(kw)
+        return _payload(source="Media History Archive")
+
+    import nodes._otr_media_archive_sources as mas
+    monkeypatch.setattr(mas, "fetch_media_archive_rss", _fake)
+    bank = routing.get_bank("media_archive")
+    entry = osp.resolve_fetcher(bank)
+    out = entry.fetch(bank=bank, technical_model="tm-id",
+                      source_ref="archive://item")
+
+    assert out["source"] == "Media History Archive"
+    assert seen == {
+        "bank": bank,
+        "technical_model": "tm-id",
+        "source_ref": "archive://item",
+    }
 
 
 def test_news_interpreter_wrapper_forwards_exact_kwargs(monkeypatch):
@@ -355,6 +422,69 @@ def test_resolve_inputs_missing_contract_propagates():
                        match="public_domain_story"):
         writer._resolve_inputs(custom_premise="",
                                source_bank="public_domain_story")
+
+
+def test_resolve_inputs_passes_source_ref_and_returns_sidecars(monkeypatch):
+    import nodes.OTR_LedgerScriptWriter as writer
+
+    seen = {}
+
+    def _fake_fetch(**kw):
+        seen.update(kw)
+        return osp.SourceFetchResult(
+            payload=_payload(seed_text="seed from fetcher"),
+            source_meta={"source_ref": kw["source_ref"]},
+            source_rights={"license_status": "public_domain_us"},
+        )
+
+    monkeypatch.setitem(
+        osp._FETCHERS,
+        "science_rss",
+        osp.FetcherEntry(fetch=_fake_fetch, seed_source="rss_fetch"),
+    )
+
+    out = writer._resolve_inputs(custom_premise="",
+                                 source_bank="science_news",
+                                 source_ref="pd://fixture")
+
+    assert seen["source_ref"] == "pd://fixture"
+    assert out["news_seed"] == "seed from fetcher"
+    assert out["source_ref"] == "pd://fixture"
+    assert out["source_meta"] == {"source_ref": "pd://fixture"}
+    assert out["source_rights"] == {"license_status": "public_domain_us"}
+
+
+def test_resolve_inputs_custom_premise_returns_empty_sidecars():
+    import nodes.OTR_LedgerScriptWriter as writer
+
+    out = writer._resolve_inputs(custom_premise="a quiet custom seed")
+
+    assert out["source_ref"] == ""
+    assert out["source_meta"] == {}
+    assert out["source_rights"] == {}
+
+
+def test_writer_stamps_source_sidecars_into_meta():
+    tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
+    run_fn = next(
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.FunctionDef) and n.name == "run"
+    )
+    assignments = set()
+    for node in ast.walk(run_fn):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if (isinstance(target, ast.Subscript)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "meta"
+                    and isinstance(target.slice, ast.Constant)
+                    and isinstance(target.slice.value, str)):
+                assignments.add(target.slice.value)
+
+    assert "source_ref" in assignments
+    assert "source_meta" in assignments
+    assert "source_rights" in assignments
 
 
 def test_writer_resolves_outside_try_and_catches_only_interpret_error():

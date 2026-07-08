@@ -55,7 +55,8 @@ def test_resolve_inputs_rss_uses_technical_model():
     tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
     resolve_fn = _find_function(tree, "_resolve_inputs")
 
-    # (a) writer side: no direct call; entry.fetch(technical_model=...).
+    # (a) writer side: no direct call; entry.fetch(technical_model=...,
+    # source_ref=...).
     fetch_call = None
     for sub in ast.walk(resolve_fn):
         if not isinstance(sub, ast.Call):
@@ -76,12 +77,21 @@ def test_resolve_inputs_rss_uses_technical_model():
     assert "technical_model" in kw, (
         "entry.fetch(...) must pass technical_model= explicitly."
     )
+    assert "source_ref" in kw, (
+        "entry.fetch(...) must pass source_ref= explicitly so Source Banks "
+        "v2 fetchers can fail loud on unsupported references."
+    )
     assert (isinstance(kw["technical_model"], ast.Name)
             and kw["technical_model"].id == "technical_model"), (
         "S31 B6 Fix 1 (chunk-3 form): entry.fetch must receive the "
         "`technical_model` parameter (the slot label routes through "
         "`request_slot(\"technical\", ...)`), not "
         "`creative_writing_model`."
+    )
+    assert (isinstance(kw["source_ref"], ast.Name)
+            and kw["source_ref"].id == "source_ref"), (
+        "entry.fetch must receive the source_ref parameter, not a constant "
+        "or a resolved default."
     )
 
     # (b) wrapper side: sole positional into _fetch_rss_seed_or_die
