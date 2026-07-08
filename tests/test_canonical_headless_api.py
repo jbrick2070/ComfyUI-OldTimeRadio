@@ -184,3 +184,9 @@ def test_headless_wrapper_clears_stale_extra_env_hook_before_boot():
     assert "_marathon_extra_env.cmd" in src
     assert "removing stale extra-env hook" in src
     assert "Remove-Item -LiteralPath $StaleExtraEnv -Force" in src
+
+
+def test_headless_wrapper_does_not_assign_reserved_pid_variable():
+    src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
+    assert "foreach ($pid " not in src
+    assert "$listenerPid" in src

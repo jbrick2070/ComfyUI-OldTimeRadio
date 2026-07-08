@@ -62,9 +62,9 @@ function Stop-OtrPython {
     }
     Start-Sleep -Seconds 2
     $listeners = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
-    foreach ($pid in ($listeners.OwningProcess | Select-Object -Unique)) {
-        Say ("stopping :8000 listener pid={0}" -f $pid)
-        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+    foreach ($listenerPid in ($listeners.OwningProcess | Select-Object -Unique)) {
+        Say ("stopping :8000 listener pid={0}" -f $listenerPid)
+        Stop-Process -Id $listenerPid -Force -ErrorAction SilentlyContinue
     }
 }
 
