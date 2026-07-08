@@ -365,7 +365,7 @@ class TestStoryOrchestratorCodePatterns:
     # inside the orchestrator+loader source union. Those substrings
     # lived ONLY inside the SCRIPT_SYSTEM_PROMPT constant, which was
     # itself an orphan from the eec4718 LPL extraction sprint (no live
-    # consumer; verified via 8-search audit recorded in `SPRINT.md` §B).
+    # consumer; verified via historical 8-search audit.
     # SCRIPT_SYSTEM_PROMPT + SCAFFOLDING_PREAMBLE were deleted at C2b
     # per the no-legacy-back-compat standing directive. With the
     # constant gone, the test's contract is vacuously defunct -- a
@@ -612,5 +612,4 @@ class TestVRAMGuardianNode:
 # Audio clean-break 1c: TestAudioGenCanonicalSFX deleted -- the AudioGen / SFX
 # node (batch_audiogen_generator.py) was retired (SFX is out of the v2 audio
 # infrastructure), so its source-pattern tests no longer apply.
-
 

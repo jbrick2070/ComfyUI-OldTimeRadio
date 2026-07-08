@@ -1,7 +1,7 @@
 """tests/test_cast_invariants.py -- the R1-R9 regression bar for the cast
 name<->gender<->voice coherence sprint.
 
-Green here (plus the cast-relevant suite wrapped by test_cast.sh) is the
+Green here plus the focused cast/voice pytest suites is the
 per-sprint + wave gate. Hermetic: no GPU, no I/O beyond reading the golden
 fixture, no ComfyUI imports. Every LLM call goes through a stub.
 

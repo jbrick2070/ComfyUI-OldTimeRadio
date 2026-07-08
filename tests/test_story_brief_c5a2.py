@@ -68,7 +68,7 @@ def execute_fn(writer_ast) -> ast.FunctionDef:
     """Return the writer's `run` method body. The method is named `run`
     (the ComfyUI node-execution entrypoint convention); kept the fixture
     name `execute_fn` for readability of the assertions below since
-    SPRINT.md spec narratives say "execute()" throughout."""
+    Historical spec narratives say "execute()" throughout."""
     for node in ast.walk(writer_ast):
         if isinstance(node, ast.FunctionDef) and node.name == "run":
             return node

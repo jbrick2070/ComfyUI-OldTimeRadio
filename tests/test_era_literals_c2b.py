@@ -1,6 +1,6 @@
 """Sprint C C2b: era literal cleanbreak -- orchestrator (reduced scope).
 
-C1 audit (executed at commit b01feda, recorded in `SPRINT.md` §B) plus
+C1 audit (executed at commit b01feda) plus
 the C2b 8-search audit (chat thread, 2026-05-15) confirmed that
 `SCRIPT_SYSTEM_PROMPT` and `SCAFFOLDING_PREAMBLE` were orphan constants
 from the `eec4718` LPL extraction sprint -- the new

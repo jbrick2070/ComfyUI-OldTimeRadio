@@ -1,6 +1,6 @@
 """Sprint C C4: VRAM envelope lock-in (regression-guard tests only).
 
-Per SPRINT.md §A.7 + §A.8 + §A.9: the four envelope items below all
+Per the C4 envelope plan: the four envelope items below all
 shipped in earlier sprints (S21.1 ceiling + context cap, S30 B1b
 Gemma-4-E4B override, S31 B4 non-blocking _run_with_timeout). C4 ships
 no production code change -- it pins the constants so future drift

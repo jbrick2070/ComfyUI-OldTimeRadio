@@ -21,7 +21,7 @@ test_audio_byte_identical invariant). NO FALLBACKS (fallback_engine=None);
 assert_usable fails LOUD (probes BOTH pycairo AND ffmpeg, separate messages).
 Cold-import clean (V-12: cairo / soundfile / PIL / scope_draw imported lazily
 inside load/assert_usable/render_clip -- cairo is NEVER at module scope,
-matching pycairo NOT being added to requirements.video.txt, so a box without
+matching pycairo NOT being added to the main requirements, so a box without
 system libcairo never breaks any OTHER engine's install). UTF-8, no BOM,
 ASCII source.
 

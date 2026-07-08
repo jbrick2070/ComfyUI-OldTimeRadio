@@ -258,7 +258,7 @@ CAPABILITIES = {
                     "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     # viz_mxc_mandala (2026-06-30): Cosmic Radio Mandala -- pycairo vector CPU
     # painter, no GPU/shaders. required_toolchain None: pycairo is NOT in
-    # requirements.video.txt (lazy-imported + probed by assert_usable so a box
+    # the main requirements (lazy-imported + probed by assert_usable so a box
     # without system libcairo never breaks any OTHER engine's install).
     "viz_mxc_mandala": {"required_toolchain": None,
                         "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},

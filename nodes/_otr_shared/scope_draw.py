@@ -582,7 +582,7 @@ def paint_golden_camera_frame(w, h, fi, total, fps, vol, freq, wave, signal, los
 # scanlines/vignette/grain machinery as paint_frame/paint_rainbow_frame).
 # cairo is imported LOCALLY inside paint_mandala only -- NOT at module scope
 # anywhere in this file (V-12 cold-import clean; pycairo is not in
-# requirements.video.txt, so a box without system libcairo never breaks any
+# the main requirements, so a box without system libcairo never breaks any
 # OTHER engine's install). Ported from the operator-approved prototype
 # (docs/2026-06-30-viz-rainbow/mandala_proto.py); ring/spoke/band coefficients
 # are a build-time LOOK pass (2026-06-30: 48 solid spectrum wedges + 9 bolder

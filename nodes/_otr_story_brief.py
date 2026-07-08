@@ -16,7 +16,7 @@ budget on a JSON validation pass).
 C5a1 ships the module ONLY -- writer wiring at K.5.5 lands at C5a2.
 
 Design references:
-- `SPRINT.md` Sprint C: L-6 fail-loud pattern, L-8 8-key meta delta,
+- Sprint C: L-6 fail-loud pattern, L-8 8-key meta delta,
   E-17 scoped try/except, E-18 repair temp clamp, E-21 technical_fn-
   only signature, R-06 CRITICAL prefix, R-01 single-load cache profile.
 - `docs/2026-05-12-story-brief-v2-design-refinements.md` (post-C0b):

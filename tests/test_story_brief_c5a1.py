@@ -5,7 +5,7 @@ here runs against a plain dict fixture and a fake `technical_fn`
 closure. No writer wiring is exercised at C5a1 -- those tests land
 at C5a2.
 
-Coverage map (per SPRINT.md C5a1 pytest table):
+Coverage map (per C5a1 pytest table):
 
   Input builder (refinement section 2):
     1. caps long episode
