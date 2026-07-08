@@ -66,6 +66,11 @@ function Stop-OtrPython {
         Say ("stopping :8000 listener pid={0}" -f $listenerPid)
         Stop-Process -Id $listenerPid -Force -ErrorAction SilentlyContinue
     }
+    for ($i = 0; $i -lt 10; $i++) {
+        $remaining = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+        if (-not $remaining) { return }
+        Start-Sleep -Seconds 1
+    }
 }
 
 function Wait-Comfy {

@@ -190,3 +190,9 @@ def test_headless_wrapper_does_not_assign_reserved_pid_variable():
     src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
     assert "foreach ($pid " not in src
     assert "$listenerPid" in src
+
+
+def test_headless_wrapper_waits_after_port_listener_kill():
+    src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
+    assert "for ($i = 0; $i -lt 10; $i++)" in src
+    assert "if (-not $remaining) { return }" in src
