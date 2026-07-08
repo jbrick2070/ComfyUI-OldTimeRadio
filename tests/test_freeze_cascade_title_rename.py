@@ -23,7 +23,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-WORKFLOW_PATH = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+WORKFLOW_PATH = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
 def test_freeze_cascade_node_title_is_phase_0_10_not_double_dot() -> None:

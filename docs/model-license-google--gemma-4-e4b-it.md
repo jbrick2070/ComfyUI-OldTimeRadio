@@ -40,7 +40,7 @@ Gemma 4 license document: https://ai.google.dev/gemma/docs/gemma_4_license
 ## OTR disposition
 
 - Shipped default writer model, bound to BOTH the creative and the
-  technical slot in `workflows/otr_scifi_16gb_full.json` (node id=1).
+  technical slot in `workflows/otr_canonical.json` (node id=1).
 - `prompt_profile = modern`. Eligible for the creative slot AND the
   technical slot.
 - Default workflow JSON binding allowed without further review --

@@ -248,8 +248,8 @@ def load_llm(
             max_memory = {0: "6.8GiB", "cpu": "32GiB"}
 
         # TF32 OFF by default for byte-identical determinism (I-2 / C-1). The
-        # run_comfy_otr launcher additionally exports NVIDIA_TF32_OVERRIDE=0 so
-        # TF32 is disabled globally BEFORE torch imports. matmul precision stays
+        # The canonical headless launcher exports NVIDIA_TF32_OVERRIDE=0 so TF32
+        # is disabled globally BEFORE torch imports. matmul precision stays
         # 'high' for LLM throughput -- the env override gates TF32 when a
         # determinism run is engaged. See nodes/_otr_determinism.py.
         torch.backends.cuda.matmul.allow_tf32 = False

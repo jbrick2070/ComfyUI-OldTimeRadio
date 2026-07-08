@@ -48,7 +48,7 @@ _ORCHESTRATOR = _REPO_ROOT / "nodes" / "story_orchestrator.py"
 
 
 # ---------------------------------------------------------------------------
-# Tokenize-aware code-context scanner (mirrors docs/_s28_forbidden_sweep)
+# Tokenize-aware code-context scanner (mirrors tests/_s28_forbidden_sweep)
 # ---------------------------------------------------------------------------
 
 

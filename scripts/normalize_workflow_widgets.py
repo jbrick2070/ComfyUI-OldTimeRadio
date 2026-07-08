@@ -12,7 +12,7 @@ seed_slot + 1 with a fixed string value, NOT a /object_info
 declared widget, so the schema walk in this script cannot see it
 and treats the value as type-incompatible-with-INT noise.
 
-Empirical evidence: run against workflows/otr_scifi_16gb_full.json
+Empirical evidence: run against workflows/otr_canonical.json
 on 2026-05-17 stripped 8 legitimate companion strings and broke 5
 guardrail tests (test_writer_seed_control_is_fixed,
 test_humo_seed_control_is_fixed, test_writer_both_slots_mistral_nemo,
@@ -85,7 +85,7 @@ Run via:
 
   & C:\\Users\\jeffr\\Documents\\ComfyUI\\.venv\\Scripts\\python.exe ^
     scripts\\normalize_workflow_widgets.py ^
-    --workflow workflows\\otr_scifi_16gb_full.json
+    --workflow workflows\\otr_canonical.json
 
 Optional flags:
   --comfyui-url <url>   default: http://127.0.0.1:8000

@@ -39,7 +39,7 @@ from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
     _resolve_inputs,
 )
 
-_CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_scifi_16gb_full.json"
+_CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 
 
 @pytest.fixture(autouse=True)

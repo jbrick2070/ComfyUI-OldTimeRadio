@@ -132,7 +132,7 @@ EXPLICITLY NOT AUTHORED (stay Python -- legacy sentinel or conditional/interpola
       str for present; `get_pack_prompt` raises on absent;
   (e) **dormancy guard** -- no production file under `nodes/` imports/calls
       `load_pack`/`get_pack_prompt*` (grep-style AST/text assertion).
-- Chunk verification (not pytest): `git diff --quiet -- workflows/otr_scifi_16gb_full.json`
+- Chunk verification (not pytest): `git diff --quiet -- workflows/otr_canonical.json`
   (no workflow change this chunk). NO production call-site change.
 
 **Stage 1b (SEPARATE -- own kibitz + Fable gate) -- first live consumer.**

@@ -681,7 +681,7 @@ class TestVideoRenderBatchMasterAudioInput:
     def test_widgets_values_unchanged_seven_slots(self):
         """forceInput master_audio_path must NOT add a widgets_values slot."""
         import json, os
-        wf_path = os.path.join(_REPO, "workflows", "otr_scifi_16gb_full.json")
+        wf_path = os.path.join(_REPO, "workflows", "otr_canonical.json")
         with open(wf_path, encoding="utf-8") as f:
             wf = json.load(f)
         n92 = next(n for n in wf["nodes"] if n["id"] == 92)
@@ -698,7 +698,7 @@ class TestVideoRenderBatchMasterAudioInput:
         routes master audio from EpisodeAssembler.output_path, replacing the
         legacy link 262 (procgen-mp4 -> render_batch). Link 262 must be gone."""
         import json, os
-        wf_path = os.path.join(_REPO, "workflows", "otr_scifi_16gb_full.json")
+        wf_path = os.path.join(_REPO, "workflows", "otr_canonical.json")
         with open(wf_path, encoding="utf-8") as f:
             wf = json.load(f)
         # Legacy link 262 (procgen-mp4 source) must be cut

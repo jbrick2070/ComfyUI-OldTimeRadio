@@ -3,7 +3,7 @@ to the canonical ComfyUI workflow shape so the Vue 3 frontend's Zod
 validator accepts it on UI load.
 
 Anchored against the live-known-good shape of
-`workflows/otr_scifi_16gb_full.json` (which loads cleanly in ComfyUI
+`workflows/otr_canonical.json` (which loads cleanly in ComfyUI
 Desktop) plus the example shipped by Nvidia_RTX_Nodes_ComfyUI. Any
 hand-built workflow JSON (anything emitted by `outputs/_build_*.py`
 helpers rather than exported by the ComfyUI UI) must pass these
@@ -38,7 +38,7 @@ NODE_REQUIRED = {'id', 'type', 'pos', 'size', 'flags', 'order',
                  'mode', 'inputs', 'outputs', 'properties'}
 
 # Allowed keys per input dict. Mirrors what the production workflow
-# (`workflows/otr_scifi_16gb_full.json`) actually carries on its inputs
+# (`workflows/otr_canonical.json`) actually carries on its inputs
 # in real-world use, since that workflow is known to load cleanly
 # through ComfyUI's frontend Zod validator. `shape` is observed on
 # optional inputs (LiteGraph optional-socket marker, value 7).
@@ -105,7 +105,7 @@ class TestWorkflowZodShape:
     # ComfyUI accepts it. Either Zod is lenient on those, or the field
     # is normalized in the loader. Only assert what is genuinely
     # contract-required by both known-good workflows
-    # (otr_scifi_16gb_full.json + Nvidia rtx_video_upscale.json).
+    # (otr_canonical.json + Nvidia rtx_video_upscale.json).
 
     def test_no_unknown_input_keys(self, wf_path: Path) -> None:
         """Catches `shape: 7` and similar fields that production

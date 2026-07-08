@@ -21,7 +21,7 @@ from nodes._otr_shared import role_slots as RS
 from nodes._otr_shared import slot_matrix as SM
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_WF = os.path.join(_REPO, "workflows", "otr_scifi_16gb_full.json")
+_WF = os.path.join(_REPO, "workflows", "otr_canonical.json")
 
 
 # ---------------------------------------------------------------------------
@@ -181,11 +181,12 @@ def test_workflow_json_node87_matches_live_widget_model():
     }
     assert "allow_auto_fallback" not in names87
     assert "episode_duration_target" not in names87
-    # character_video_model is now video slot 3 (widgets index 2); the pinned
-    # engine must be a registered engine (no inherit sentinel any more).
+    # character_video_model is now video slot 3 (widgets index 2); the saved
+    # value must be one of the live dropdown choices (display labels are valid).
     pin = n87["widgets_values"][2]
-    from nodes._otr_video_engines import registry as vreg
-    assert vreg.is_registered(pin), pin
+    from nodes.otr_video_director import OTRVideoDirector
+    choices = OTRVideoDirector.INPUT_TYPES()["required"]["character_video_model"][0]
+    assert pin in choices, pin
     # node 3: sfx overlay gone, script_json input stays on slot 2.
     # The source is CastLock.ledger_json so SceneSequencer sees the same
     # role-repaired ledger as the pre-rendered voice buses.

@@ -318,7 +318,7 @@ Only after fixture tests pass:
 
 For a headless/API media run, obey the workflow source-of-truth rule:
 
-- Load `workflows/otr_scifi_16gb_full.json`.
+- Load `workflows/otr_canonical.json`.
 - If the smoke is meant to run media by default, change the real JSON in the
   same commit:
   - node 1 widget slot 23: `media_archive`

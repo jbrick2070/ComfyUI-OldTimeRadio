@@ -1,6 +1,6 @@
 """tests/test_node_temp_hygiene.py -- system-temp hygiene ratchet (2026-06-30).
 
-The soak hygiene gate (_otr_soak_capstone.assert_no_stray_writes) fails a leg if a
+The retired soak hygiene gate failed a leg if a
 new ``otr*``-named entry appears in the system temp dir. On 2026-06-30 the overnight
 combo soak scored 11 cleanly-rendered legs SOAK_FAIL because
 ``otr_scene_aware_scopes`` wrote its scopes intermediate to ``tempfile.gettempdir()``

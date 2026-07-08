@@ -9,8 +9,8 @@ Covers:
     the promoted package module agree with scripts/otr_api on EVERY OTR node
     type (the offline /object_info adapter replicates _serialized_slot_names
     semantics -- forceInput consumes no slot, seed companions injected).
-  * IDENTITY gate (bootstrap): to_api_prompt(master) ==
-    to_api_prompt(apply_profile(master, 16gb_full)) -- dict equality.
+  * Profile gate: applying a capability profile intentionally retargets the
+    lean canonical workflow, while leaving the input workflow untouched.
   * apply_profile is PURE (input workflow untouched) and never writes node-63's
     workflow_json_path (stamping is emit_snapshot's job, S3).
   * Coverage, direction 1: every managed mapping target is a REAL widget slot
@@ -37,7 +37,7 @@ from nodes._otr_shared import capability_profiles as cp
 from nodes._otr_shared.capability_profiles import ProfileError
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-MASTER = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+MASTER = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 _SCRIPTS = REPO_ROOT / "scripts"
 if str(_SCRIPTS) not in sys.path:
@@ -107,14 +107,14 @@ def test_api_prompt_parity_on_master(schemas, master_copy):
 
 
 # ---------------------------------------------------------------------------
-# IDENTITY gate (S2 CI gate, bootstrap-green by extraction)
+# Profile application gate
 # ---------------------------------------------------------------------------
-def test_identity_apply_16gb_profile_is_a_noop(schemas, master_copy):
-    applied = wa.apply_profile(master_copy, "16gb_full", schemas=schemas)
-    assert wa.workflow_to_api_prompt(master_copy, schemas) == \
+def test_apply_cloud_profile_retargets_canonical(schemas, master_copy):
+    applied = wa.apply_profile(master_copy, "cloud_all", schemas=schemas)
+    assert wa.workflow_to_api_prompt(master_copy, schemas) != \
         wa.workflow_to_api_prompt(applied, schemas), (
-        "apply_profile(master, 16gb_full) must be an api-prompt no-op; master "
-        "and profile have diverged -- change them TOGETHER"
+        "cloud_all should be an explicit profile override, not the saved "
+        "canonical baseline"
     )
 
 
@@ -197,7 +197,7 @@ def test_apply_cloud_all_lands_cloud_only_routes(schemas, master_copy):
 
 
 def test_apply_profile_rejects_typoed_key(schemas, master_copy):
-    prof = copy.deepcopy(cp.load_profile("16gb_full"))
+    prof = copy.deepcopy(cp.load_profile("cloud_all"))
     prof["role_overrides"]["announcer_visualz"] = "ltx_video"
     with pytest.raises(ProfileError, match="no widget-mapping entry"):
         wa.apply_profile(master_copy, prof, schemas=schemas)
@@ -210,7 +210,7 @@ def test_apply_profile_rejects_ambiguous_node_type(schemas, master_copy):
     clone["id"] = 9999
     dup["nodes"].append(clone)
     with pytest.raises(ProfileError, match="occurs 2x"):
-        wa.apply_profile(dup, "16gb_full", schemas=schemas)
+        wa.apply_profile(dup, "cloud_all", schemas=schemas)
 
 
 # ---------------------------------------------------------------------------
@@ -316,12 +316,12 @@ def test_script_patch_creative_refuses_managed_names(schemas, master_copy):
 
 
 def test_apply_profile_to_workflow_headless_seam(schemas, master_copy, capsys):
-    """The script-lane seam drives the SAME applier: identity on 16gb_full,
-    LOUD resolved-profile print."""
-    applied = otr_api.apply_profile_to_workflow(master_copy, "16gb_full", schemas)
+    """The script-lane seam drives the SAME applier and prints the resolved
+    profile so a headless mutation is visible in logs."""
+    applied = otr_api.apply_profile_to_workflow(master_copy, "cloud_all", schemas)
     out = capsys.readouterr().out
-    assert "RESOLVED PROFILE 16gb_full" in out
-    assert wa.workflow_to_api_prompt(applied, schemas) == \
+    assert "RESOLVED PROFILE cloud_all" in out
+    assert wa.workflow_to_api_prompt(applied, schemas) != \
         wa.workflow_to_api_prompt(master_copy, schemas)
 
 

@@ -14,7 +14,7 @@ same channel as every other OTR node failure.
 INPUT_TYPES:
   - workflow_json_path (STRING, optional default): absolute path to the
     workflow JSON. If empty, falls back to the canonical fixture path
-    under workflows/otr_scifi_16gb_full.json relative to this file.
+    under workflows/otr_canonical.json relative to this file.
   - validate_anyway (BOOLEAN, default True): set False to skip the
     check for diagnostic loads (e.g. running a deliberately-broken
     workflow to inspect intermediate state).
@@ -45,7 +45,7 @@ log = logging.getLogger("OTR.workflow_validator")
 # filling the canonical path keeps the widget usable for the common
 # case (running the canonical workflow on this checkout).
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_WORKFLOW_PATH = _REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+_DEFAULT_WORKFLOW_PATH = _REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
 def _resolve_workflow_path(path: str) -> Path:

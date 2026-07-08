@@ -212,7 +212,7 @@ C5 `transplant_work/` - staged production edits, lab-only:
      failure), _otr_story_brief_helpers + otr_meta_brief_image_prompt +
      otr_shot_lock (policy seam reads), news_interpreter (science-only
      confinement), whitelists (scripts/otr_api.py, _otr_workflow_apply.py).
-   - `workflows/otr_scifi_16gb_full.json` working copy: widget-append plan
+   - `workflows/otr_canonical.json` working copy: widget-append plan
      documented, NOT applied until production tests exist (tomorrow).
 
 Priority order tonight: C1 -> C2 -> C3 green -> C4 -> C5 as far as context

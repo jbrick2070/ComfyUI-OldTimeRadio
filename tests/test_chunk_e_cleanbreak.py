@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_canonical.json"
 sys.path.insert(0, str(REPO_ROOT))
 
 

@@ -1,5 +1,5 @@
 # tests/test_llm_slot_sweep.py -- regression suite for the LLM-slot-tag
-# CI sweep (docs/_s28_llm_slot_sweep.py).
+# CI sweep helper.
 #
 # Validates that:
 #   1. Every LLM call site in nodes/ carries a ``# LLM slot:`` tag.
@@ -24,8 +24,8 @@ _TEST_DIR = pathlib.Path(__file__).resolve().parent
 _REPO_ROOT = _TEST_DIR.parent
 NODES_DIR = str(_REPO_ROOT / "nodes")
 
-# Import the sweep module from docs/.
-sys.path.insert(0, str(_REPO_ROOT / "docs"))
+# Import the sweep helper from tests/.
+sys.path.insert(0, str(_TEST_DIR))
 from _s28_llm_slot_sweep import (  # noqa: E402
     CALL_SITE_NAMES,
     EXEMPT_FILES,

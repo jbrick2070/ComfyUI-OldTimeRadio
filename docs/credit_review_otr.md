@@ -2,7 +2,7 @@
 
 **Reviewer:** Fable (read-only pass, 2026-07-03)
 **Repo:** `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio`
-**Workflow of record:** `workflows\otr_scifi_16gb_full.json` (22 nodes, parsed live)
+**Workflow of record:** `workflows\otr_canonical.json` (22 nodes, parsed live)
 **Scope:** Read-only audit. No code changed. Answers the operator ask: really enrich the end-roll — add image/video model info, all voice models per character, and everything creditable from the JSON/ledger. Font +50%.
 
 ## TL;DR
@@ -35,7 +35,7 @@
 
 ### 1.2 The tail chain (how the roll reaches the published mp4)
 
-Wiring verified from `otr_scifi_16gb_full.json` links:
+Wiring verified from `otr_canonical.json` links:
 
 ```
 12 SignalLostVideo (procgen mp4 incl. HUD tail)
@@ -176,7 +176,7 @@ Made with OTR v2.0-alpha on <GPU> — 100% generated, no humans were harmed
 1. **P0 — Font bump (4 lines, `video_engine.py:1331-1334`)** with the three coupled knobs from §2: scale `_SCROLL_PPS` (1319), revisit the 90 s clamp (1352-1356), verify against `OTR_MAX_CREDITS_TAIL_S=45` (mux). Consider naming the sizes (`_HUD_FONT_SCALE`) instead of four new magic numbers.
 2. **P1 — Cast & Voices from `meta.voice_cast_decision` + `cast_voice_slots`** (no wiring needed — data is already in the wire ledger; render in `_parse_hud_data`/`_build_left` and `_write_story_treatment:1820-1838`). Fixes the currently-blank character voices. Add music engine + announcer engine labels; retire/extend `_PRESET_DESC`.
 3. **P1 — Durability fix:** dispatcher stamps `meta.image_engines` into the ledger **singleton** (mirror `_stamp_render_engines_meta`), and CastLock stamps its `voice_engine`/`voice_ref_id` cast back to the singleton. Even before the seam fix, the on-disk record becomes complete.
-4. **P2 — Delivered-engine credits via a LATE render (Option A, §3.3):** feed `92.1 clip_manifest_json` (+ `91.0 patched_ledger_json`) into an end-of-graph credits step (extend node 93 or a small new node) — same change updates `otr_scifi_16gb_full.json` in the same commit per §0. Avoid Option B (rewire into node 12) unless the episode finalize/rename is first moved to the terminal node — hazard documented at `video_engine.py:2286-2315`.
+4. **P2 — Delivered-engine credits via a LATE render (Option A, §3.3):** feed `92.1 clip_manifest_json` (+ `91.0 patched_ledger_json`) into an end-of-graph credits step (extend node 93 or a small new node) — same change updates `otr_canonical.json` in the same commit per §0. Avoid Option B (rewire into node 12) unless the episode finalize/rename is first moved to the terminal node — hazard documented at `video_engine.py:2286-2315`.
 5. **P3 — Polish:** footer says **"OTR v1.0"** (line 1500 — stale); left-panel telemetry labels CORE/FLUX/MEM actually show the *LLM* name/speed (1460-1466 via 1040-1066) — mislabelled as FLUX; single-green-channel legibility check after the blend (§1.2); cap left-panel cast overflow at bigger type.
 6. **P4 — Debug credits card** env-gated, with the per-clip E5 receipts and fallback trail.
 
@@ -188,4 +188,4 @@ Made with OTR v2.0-alpha on <GPU> — 100% generated, no humans were harmed
 
 ## 8. Verification note
 
-All claims grounded on the Windows repo via file tools + a Desktop Commander Python REPL (never the Linux mount): read `nodes\video_engine.py` (headers 1-68, fonts 69-100/990-1027, dossier/HUD 1040-1625, treatment 1628-1950, render_video 2041-2440), `otr_video_render_batch.py:20-90`, `otr_image_gen_dispatcher.py:480-540/650-700/790-815`, `cast_lock.py:400-655`, `_otr_voice_node_common.py` (grep), `batch_character_voices.py`, `stable_audio_theme.py` (grep), `otr_shot_lock.py:169-221`, `_otr_ledger_consumers.py:51-68`, `otr_silent_composite.py` + `otr_post_upscale_procgen_blend.py` + `otr_master_audio_mux.py` (credits-tail sections), `tests\test_hud_dossier_bug3.py`; parsed `otr_scifi_16gb_full.json` (all 22 nodes, all 52 links, widget values for nodes 12/80-83/87/88/91-93); inspected 40 recent on-disk ledgers plus the `shadows_in_the_room` and `telemetry_of_lies` treatments (2026-07-03) for the empirical RE/IE/voice findings. Not found anywhere: any other drawtext/cv2.putText credits path — `video_engine.py` is the only credits renderer.
+All claims grounded on the Windows repo via file tools + a Desktop Commander Python REPL (never the Linux mount): read `nodes\video_engine.py` (headers 1-68, fonts 69-100/990-1027, dossier/HUD 1040-1625, treatment 1628-1950, render_video 2041-2440), `otr_video_render_batch.py:20-90`, `otr_image_gen_dispatcher.py:480-540/650-700/790-815`, `cast_lock.py:400-655`, `_otr_voice_node_common.py` (grep), `batch_character_voices.py`, `stable_audio_theme.py` (grep), `otr_shot_lock.py:169-221`, `_otr_ledger_consumers.py:51-68`, `otr_silent_composite.py` + `otr_post_upscale_procgen_blend.py` + `otr_master_audio_mux.py` (credits-tail sections), `tests\test_hud_dossier_bug3.py`; parsed `otr_canonical.json` (all 22 nodes, all 52 links, widget values for nodes 12/80-83/87/88/91-93); inspected 40 recent on-disk ledgers plus the `shadows_in_the_room` and `telemetry_of_lies` treatments (2026-07-03) for the empirical RE/IE/voice findings. Not found anywhere: any other drawtext/cv2.putText credits path — `video_engine.py` is the only credits renderer.

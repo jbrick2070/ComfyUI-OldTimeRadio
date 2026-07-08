@@ -5,9 +5,9 @@ build_ltx_av_q_bakeoff_workflow.py
 Emit the STANDALONE, ISOLATED LTX-AV *QUALITY* bakeoff workflow JSON
 (``scripts/otr_ltx_av_q_bakeoff_distilled_native.json``).
 
-This is a FORK of build_ltx_av_bakeoff_workflow.py for the 2026-06-27 LTX-AV
-quality bakeoff (PLAN v5). The differences from the quant-bakeoff builder are
-deliberate and load-bearing:
+This is the retained isolated builder for the 2026-06-27 LTX-AV quality bakeoff
+(PLAN v5). The differences from the retired quant-bakeoff builder are deliberate
+and load-bearing:
 
   1. RECIPE = ``distilled_native`` (NOT sharp_lora). The graph drops the SHARP
      LoRA entirely: UnetLoaderGGUF feeds CFGGuider.model DIRECTLY. NO

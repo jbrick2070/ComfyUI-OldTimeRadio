@@ -198,7 +198,7 @@ _NODE_MODULES = {
     # OTR_VideoPlan -- DELETED in CW-1 (2026-06-06) of the OTR video platform
     # build. Its prompt-generation + planning was absorbed by OTR_ShotLock
     # (M4 per-beat creative derivation). The legacy FLUX/HuMo/LTX render chain
-    # it fed was unwired from otr_scifi_16gb_full.json in the same commit; the
+    # it fed was unwired from otr_canonical.json in the same commit; the
     # type is in the workflow validator's DELETED_NODE_TYPES sentinel so a
     # stale workflow referencing it fails loudly (must be re-saved).
     # OTR_FixedShotDurationStub -- registration REMOVED in the Chunk E

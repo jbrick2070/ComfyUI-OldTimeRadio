@@ -42,7 +42,7 @@ No fallbacks. No hidden models. No hidden engines. Unknown id = hard error.
 - No back-compat shims, no fallbacks, no tracebacks papering over the transition.
 - BUT tests move WITH the schema in the SAME commit -- the suite stays GREEN per chunk
   (CLAUDE.md), even though the end-to-end FEATURE is incomplete until the last stage.
-- Every node/widget change lands in `workflows/otr_scifi_16gb_full.json` in the same
+- Every node/widget change lands in `workflows/otr_canonical.json` in the same
   commit + re-validate (CLAUDE.md invariant 6). Commit AND push per green chunk.
 
 ## STAGE ORDER (each stage = its own hardened sub-plan before coding it)

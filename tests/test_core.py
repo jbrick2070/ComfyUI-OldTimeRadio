@@ -390,7 +390,7 @@ class TestWorkflowJSONFull:
 
     @pytest.fixture(scope="class")
     def wf(self):
-        return _load_workflow("otr_scifi_16gb_full.json")
+        return _load_workflow("otr_canonical.json")
 
     def test_required_keys(self, wf):
         for k in ["nodes", "links", "last_node_id", "last_link_id"]:

@@ -29,7 +29,7 @@ _REPO_ROOT = _HERE.parent
 _VISUAL_DIR = _REPO_ROOT / "visual"
 _WORKFLOWS_DIR = _REPO_ROOT / "workflows"
 _NODES_DIR = _REPO_ROOT / "nodes"
-_WORKFLOW_FULL = _WORKFLOWS_DIR / "otr_scifi_16gb_full.json"
+_WORKFLOW_FULL = _WORKFLOWS_DIR / "otr_canonical.json"
 
 # The era literals C2a retired.
 _RETIRED_ERA_LITERALS = (
@@ -46,7 +46,7 @@ _EXPECTED_NEUTRAL_STRINGS = (
 
 
 # ---------------------------------------------------------------------------
-# Helpers -- tokenize-aware Python scanner mirroring docs/_s28_forbidden_sweep
+# Helpers -- tokenize-aware Python scanner mirroring tests/_s28_forbidden_sweep
 # ---------------------------------------------------------------------------
 
 

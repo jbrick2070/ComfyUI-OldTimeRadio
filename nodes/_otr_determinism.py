@@ -3,8 +3,8 @@
 Two layers, deliberately separated:
 
   * ``assert_determinism_env_ready()`` -- a pure ``os.environ`` check (no CUDA,
-    never ``cuda.is_initialized()`` per C-1) confirming the run_comfy_otr
-    launcher exported the determinism env BEFORE python/torch started.
+    never ``cuda.is_initialized()`` per C-1) confirming the headless launcher
+    exported the determinism env BEFORE python/torch started.
   * ``deterministic_inference(seed)`` -- a SCOPED context manager that pins
     strict determinism (``use_deterministic_algorithms(True, warn_only=False)``
     + SDPA MATH backend) and seeds every RNG around ONE audio forward, then
@@ -56,8 +56,8 @@ def assert_determinism_env_ready(strict: bool = True) -> bool:
         want = ", ".join(f"{k}={REQUIRED_DETERMINISM_ENV[k]!r}" for k in bad)
         got = ", ".join(f"{k}={bad[k]!r}" for k in bad)
         raise RuntimeError(
-            "Determinism env not ready -- launch via "
-            "scripts/run_comfy_otr.{bat,ps1}. "
+            "Determinism env not ready -- launch via the canonical headless "
+            "wrapper. "
             f"Expected {want}; got {got}. (See C-1.)"
         )
     return not bad

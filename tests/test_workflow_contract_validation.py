@@ -31,7 +31,7 @@ from nodes._workflow_validation import (
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-CANONICAL_WORKFLOW = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+CANONICAL_WORKFLOW = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
 def _load_canonical_workflow() -> dict:

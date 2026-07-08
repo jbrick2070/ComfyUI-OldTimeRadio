@@ -31,7 +31,7 @@ import pytest
 
 
 PACK_ROOT = Path(__file__).resolve().parent.parent
-SWEEP_PATH = PACK_ROOT / "docs" / "_s28_forbidden_sweep.py"
+SWEEP_PATH = PACK_ROOT / "tests" / "_s28_forbidden_sweep.py"
 
 
 def _run_sweep_subprocess() -> tuple[int, str]:

@@ -176,7 +176,7 @@ Import placement:
 Workflow JSON:
 
 - If adding `google_tts` to an existing dropdown changes node widget choices or
-  defaults, update `workflows/otr_scifi_16gb_full.json` in the same code change.
+  defaults, update `workflows/otr_canonical.json` in the same code change.
 - Widgets are positional; only append optional widgets. Do not insert mid-vector.
 
 ## Adapter Contract

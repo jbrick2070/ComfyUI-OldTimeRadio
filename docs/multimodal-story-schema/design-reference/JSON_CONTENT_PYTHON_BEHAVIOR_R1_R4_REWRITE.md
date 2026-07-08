@@ -134,7 +134,7 @@ The rewrite is ready to transplant only when these are true:
   previews.
 - Production `meta.news` compatibility is verified against the actual consumer
   code, not guessed.
-- `otr_scifi_16gb_full.json` remains untouched until the transplant chunk.
+- `otr_canonical.json` remains untouched until the transplant chunk.
 
 ## One-Sentence Version
 

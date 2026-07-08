@@ -23,7 +23,7 @@ from nodes import _otr_workflow_validator as wv
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
 def _capture_log(logger_name: str) -> tuple[logging.Logger, StringIO]:
@@ -65,7 +65,7 @@ class TestValidatorEmptyPathFallback:
         joined = "\n".join(rec.getMessage() for rec in caplog.records)
         assert "workflow_json_path widget empty" in joined
         assert "_DEFAULT_WORKFLOW_PATH" in joined
-        assert "otr_scifi_16gb_full.json" in joined
+        assert "otr_canonical.json" in joined
 
     def test_explicit_path_does_not_log_fallback(self, caplog):
         """When the widget carries an explicit non-empty path the

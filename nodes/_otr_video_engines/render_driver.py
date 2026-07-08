@@ -7,7 +7,7 @@ NO FALLBACKS (operator directive 2026-07-02: NO fallbacks / NO auto-defaults
 anywhere): a HARD render failure is classified via the A-S7 retry taxonomy for
 the error message and then RAISES :class:`RenderError` LOUD -- there is NO
 engine swap, NO chain, NO still-image floor. The dropdown values saved in
-``workflows/otr_scifi_16gb_full.json`` are the ONLY defaults. The frozen
+``workflows/otr_canonical.json`` are the ONLY defaults. The frozen
 ``ledger['audio']`` section is read-only throughout (V-1 / the audio spine is
 frozen).
 

@@ -1,6 +1,6 @@
 """Sprint D D3 -- forbidden-sweep scope and carve-out behavior.
 
-The sweep at `docs/_s28_forbidden_sweep.py` plus its driver test
+The sweep helper at `tests/_s28_forbidden_sweep.py` plus its driver test
 already covers these properties at D3 landing:
 
   1. The driver only diffs `*.py` files (`git diff ... -- "*.py"`).
@@ -47,10 +47,10 @@ SWEEP_TEST_SRC = REPO_ROOT / "tests" / "test_b7_forbidden_sweep.py"
 
 
 def _load_classify_lines():
-    """Import classify_lines from docs/_s28_forbidden_sweep.py
+    """Import classify_lines from tests/_s28_forbidden_sweep.py
     without running the module body (which auto-walks the diff file).
     """
-    sweep_path = REPO_ROOT / "docs" / "_s28_forbidden_sweep.py"
+    sweep_path = REPO_ROOT / "tests" / "_s28_forbidden_sweep.py"
     spec = importlib.util.spec_from_file_location("_s28_sweep_for_test", sweep_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

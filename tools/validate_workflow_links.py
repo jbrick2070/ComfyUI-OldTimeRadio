@@ -11,7 +11,7 @@ removed outputs without needing ComfyUI to load the graph.
 
 Usage:
   python tools/validate_workflow_links.py
-  python tools/validate_workflow_links.py --workflow workflows/otr_scifi_16gb_full.json
+  python tools/validate_workflow_links.py --workflow workflows/otr_canonical.json
   python tools/validate_workflow_links.py --strict-types  # fail if any node type is missing from NODE_CLASS_MAPPINGS
 """
 from __future__ import annotations

@@ -79,7 +79,7 @@ def _is_allowed_director_surface(value: str) -> bool:
     return any(s in value for s in ALLOWED_DIRECTOR_SUBSTRINGS)
 
 WORKFLOW_PATHS = (
-    pathlib.Path("workflows/otr_scifi_16gb_full.json"),
+    pathlib.Path("workflows/otr_canonical.json"),
 )
 
 

@@ -154,7 +154,7 @@ def test_pre_halt_no_cuda_error_illegal_address():
 )
 def test_real_comfyui_queue_halt_subprocess_smoke():
     """Future Option C: spin up real ComfyUI in a subprocess, load
-    workflows/otr_scifi_16gb_full.json, force a ScriptWriter timeout,
+    workflows/otr_canonical.json, force a ScriptWriter timeout,
     assert ComfyUI's actual queue halts. Stub remains skipped until
     ComfyUI ships a CI harness."""
     raise NotImplementedError(

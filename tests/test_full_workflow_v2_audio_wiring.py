@@ -28,7 +28,7 @@ _REPO = Path(__file__).resolve().parent.parent
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
-_WF_PATH = _REPO / "workflows" / "otr_scifi_16gb_full.json"
+_WF_PATH = _REPO / "workflows" / "otr_canonical.json"
 
 # Registry key -> the node id the builder assigns (build order, ids 80-83).
 NEW_NODE_IDS = {
@@ -195,13 +195,20 @@ def test_widget_vectors_exact(by_id):
 
 
 def test_force_input_sockets_have_no_widget_key(by_id):
-    """Native forceInput sockets must not carry a ``widget`` key (matches the
-    node-22 gate_signal encoding; legacy widget-converted inputs do carry one)."""
+    """Native linked forceInput sockets must not carry a ``widget`` key.
+
+    ComfyUI's saved LiteGraph represents dropdown widgets as inputs with a
+    ``widget`` key; those are intentionally ignored here. The contract is that
+    linked data/gate sockets stay native, not widget-converted.
+    """
+    native_socket_names = {"script_json", "ledger_json", "gate_in"}
     for nid in NEW_NODE_IDS.values():
         for inp in by_id[nid]["inputs"]:
-            assert "widget" not in inp, (
-                "node %s socket %r has a widget key" % (nid, inp.get("name"))
-            )
+            if inp.get("name") in native_socket_names:
+                assert "widget" not in inp, (
+                    "node %s socket %r has a widget key"
+                    % (nid, inp.get("name"))
+                )
 
 
 # --------------------------------------------------------------------------- #

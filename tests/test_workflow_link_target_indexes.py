@@ -9,7 +9,7 @@ ComfyUI workflow JSONs hold connection data in TWO places:
 
 The two tables should agree on which slot index each link targets
 on the destination node. Pre-S31 B6 Fix 3, four rows in
-`workflows/otr_scifi_16gb_full.json` had `dst_slot` off-by-one
+`workflows/otr_canonical.json` had `dst_slot` off-by-one
 relative to the actual position of that input in the target node's
 `inputs[]` array:
 

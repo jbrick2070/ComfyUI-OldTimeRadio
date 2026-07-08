@@ -5,7 +5,7 @@ build_humo_bakeoff_workflow.py
 Emits the per-leg STANDALONE HuMo bakeoff graph as a ComfyUI ``/prompt`` API JSON
 (roundtables/2026-06-27-humo-optim/final.md, item 2). DIAGNOSTIC ONLY -- it
 reuses ``HuMoEngine._build_graph`` READ-ONLY for the node templates and edits
-NOTHING in production (eng_humo.py / otr_scifi_16gb_full.json / the OTR pack
+NOTHING in production (eng_humo.py / otr_canonical.json / the OTR pack
 __init__.py).
 
 How it works

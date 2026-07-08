@@ -1,7 +1,7 @@
 """All-slots profile builder for the canonical-JSON soak (C5, 2026-06-30;
 rip-sfx-broll 2026-07-01: shrunk from five roles to three).
 
-The slot-audit soak must drive the REAL workflow (workflows/otr_scifi_16gb_full.json)
+The slot-audit soak must drive the REAL workflow (workflows/otr_canonical.json)
 with ALL video roles set INDEPENDENTLY -- announcer / music / character -- via the
 capability-profile role_overrides, so the applier patches each OTR_VideoDirector
 video widget (by node TYPE through ``config/profiles/widget_mapping.json``, never a

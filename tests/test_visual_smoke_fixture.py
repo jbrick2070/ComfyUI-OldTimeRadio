@@ -31,7 +31,7 @@ if str(_SCRIPTS) not in sys.path:
 import otr_visual_smoke as vs  # noqa: E402
 from otr_api import load_workflow, _serialized_slot_names  # noqa: E402
 
-_WORKFLOW = _REPO / "workflows" / "otr_scifi_16gb_full.json"
+_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 _SCHEMAS_FIXTURE = _REPO / "tests" / "fixtures" / "smoke_schemas.json"
 
 

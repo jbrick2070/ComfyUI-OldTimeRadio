@@ -117,7 +117,7 @@ into BatchLTXRender's existing inline ComfyUI graph pattern.
    than KSamplerSelect("euler") on the same model? I'm specifically
    worried about samplers that retain extra state across steps.
 
-6. **Backward compat.** OTR's existing `otr_scifi_16gb_full.json`
+6. **Backward compat.** OTR's existing `otr_canonical.json`
    workflow JSON has the v0.9 chain wired in. If I add a v2.3 engine
    path inside BatchLTXRender Python, do I also need to update the
    workflow JSON to load 2.3 + LoRAs + Gemma, or can the Python node

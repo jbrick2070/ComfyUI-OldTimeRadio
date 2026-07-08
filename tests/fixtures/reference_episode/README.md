@@ -8,7 +8,7 @@ every time we iterate on video.
 ## Provenance
 
 - **Run timestamp:** 2026-04-23 23:04:18
-- **Source log:** full pipeline executed `workflows/otr_scifi_16gb_full.json`
+- **Source log:** full pipeline executed `workflows/otr_canonical.json`
   (pre-dead-sidecar-removal version). Audio pipeline + POC ffmpeg video
   completed cleanly. Sidecar FLUX errored out on all 11 shots (BUG-046 family)
   — irrelevant for this fixture, which only needs the script + the legacy

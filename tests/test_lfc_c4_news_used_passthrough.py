@@ -211,7 +211,7 @@ class TestNewsUsedWiringChainContract:
         import json
         wf = json.loads(
             (Path(__file__).resolve().parents[1]
-             / "workflows" / "otr_scifi_16gb_full.json").read_text(
+             / "workflows" / "otr_canonical.json").read_text(
                 encoding="utf-8"
             )
         )

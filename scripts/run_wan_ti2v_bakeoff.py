@@ -8,9 +8,8 @@ per-leg s/it + peak VRAM + peak SYSTEM RAM, and writing each clip to
 ``output/otr/episodes/_bakeoff_wan/<clamp>__<quant>.mp4`` for a side-by-side
 speed + quality + survivability compare on a low-VRAM (6-8 GB) target.
 
-Why a SEPARATE runner from run_ltx_av_bakeoff.py (do NOT just clone it):
-  The LTX runner boots the server ONCE and loops every leg in that single
-  session. That is WRONG for this bakeoff for two independent reasons the
+Why this runner owns a fresh boot per leg:
+  A one-server loop is WRONG for this bakeoff for two independent reasons the
   2026-06-27 convergence roundtable nailed:
     1. ``--reserve-vram`` (the VRAM clamp) is a startup-only global -- it cannot
        be mutated live over HTTP, so each clamp tier needs its own boot.

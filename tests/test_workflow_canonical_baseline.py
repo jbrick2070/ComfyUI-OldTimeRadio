@@ -26,7 +26,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
 def _load_canonical_workflow() -> dict:
@@ -50,24 +50,8 @@ class TestWriterCanonicalModelSlots:
     pin here.
     """
 
-    def test_writer_both_slots_mistral_nemo(self):
-        """Sprint 10A step 2 reconciliation (2026-05-26):
-        canonical writer model is mistralai/Mistral-Nemo-Instruct-2407
-        on both creative and technical slots.
-
-        Replaces the prior Sprint C3 destination of google/gemma-4-E4B-it.
-        The three live runs on 2026-05-25 / 2026-05-26 (handoff entries
-        signal_lost_bioluminescent_trench_descent, pending_20260525_223109,
-        pending_20260526_053338) all ran on Mistral-Nemo per the soak
-        logs; the workflow JSON had drifted to gemma-4-E4B-it but the
-        running Desktop session was on Mistral-Nemo the whole time.
-        Sprint 10A step 2 picked Mistral-Nemo as canonical (rationale:
-        C7 byte-identical audio baseline, no auth gating, broad chat-
-        template + grammar-constrained-decoding support, validated in
-        3 live runs vs zero for gemma-4-E4B-it on the current pipeline
-        shape) and flipped the workflow JSON to match. This test pins
-        the new destination.
-        """
+    def test_writer_ships_fast_30_word_model_slots(self):
+        """Canonical workflow is the quick 30-word smoke canvas."""
         n = _node_by_id(_load_canonical_workflow(), 1)
         assert n.get("type") == "OTR_LedgerScriptWriter"
         widgets = n.get("widgets_values", [])
@@ -82,14 +66,16 @@ class TestWriterCanonicalModelSlots:
         #   [2] num_characters
         #   [3] creative_writing_model
         #   [4] technical_model
-        expected = "mistralai/Mistral-Nemo-Instruct-2407"
-        assert widgets[3] == expected, (
-            f"writer creative_writing_model must be {expected!r} per "
-            f"Sprint 10A step 2 reconciliation; got {widgets[3]!r}."
+        assert widgets[1] == 30
+        expected_creative = "unsloth/gemma-4-12b-it-GGUF"
+        expected_technical = "mistralai/Mistral-Nemo-Instruct-2407"
+        assert widgets[3] == expected_creative, (
+            f"writer creative_writing_model must be {expected_creative!r}; "
+            f"got {widgets[3]!r}."
         )
-        assert widgets[4] == expected, (
-            f"writer technical_model must be {expected!r} per "
-            f"Sprint 10A step 2 reconciliation; got {widgets[4]!r}."
+        assert widgets[4] == expected_technical, (
+            f"writer technical_model must be {expected_technical!r}; "
+            f"got {widgets[4]!r}."
         )
 
 

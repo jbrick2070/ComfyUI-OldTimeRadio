@@ -11,8 +11,8 @@ Covers:
     names (`seed`/`noise_seed`) banned; every managed target is a REAL widget
     on a REAL node type (verified against INPUT_TYPES); managed node types are
     unique in the master graph.
-  * S0 16gb extraction: the 16gb_full profile's values EQUAL the master
-    workflow's saved widget values (the identity-bootstrap precondition).
+  * S0 profile separation: the lean canonical workflow is allowed to differ
+    from the heavier 16gb_full profile; profile application is explicit.
   * S1 declarations: every registered engine has a CAPABILITIES row and vice
     versa, in all three namespaces; rows validate.
   * S1 enable-set: derived availability with reason codes; every profile
@@ -33,7 +33,7 @@ import pytest
 from nodes._otr_shared import capability_profiles as cp
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-MASTER = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+MASTER = REPO_ROOT / "workflows" / "otr_canonical.json"
 TIERS = ("16gb_full", "8gb_lite", "cpu_floor")
 
 
@@ -170,9 +170,9 @@ def test_managed_node_types_unique_in_master():
             )
 
 
-def test_16gb_profile_extracted_from_master_values():
-    """BOOTSTRAP precondition for the S2 identity gate: the 16gb profile IS the
-    master's current values, so apply_profile(master, 16gb) is a no-op."""
+def test_16gb_profile_is_separate_from_lean_canonical_values():
+    """The saved workflow is the quick 30-word canonical. 16gb_full remains a
+    named heavier profile and must not be assumed to equal the saved canvas."""
     mapping = cp.load_widget_mapping()
     profile = cp.load_profile("16gb_full")
     wf = json.loads(MASTER.read_text(encoding="utf-8"))
@@ -190,16 +190,16 @@ def test_16gb_profile_extracted_from_master_values():
 
     from nodes._otr_workflow_apply import build_offline_schemas, serialized_slot_names
     schemas = build_offline_schemas()
+    differences = []
     for dotted, value in flat.items():
         entry = mapping["managed"][dotted]
         for node_type, widget in entry["targets"]:
             node = nodes_by_type[node_type]
             slots = serialized_slot_names(node_type, schemas)
             idx = slots.index(widget)
-            assert node["widgets_values"][idx] == value, (
-                f"{dotted}: master {node_type}.{widget} = "
-                f"{node['widgets_values'][idx]!r} but 16gb_full says {value!r}"
-            )
+            if node["widgets_values"][idx] != value:
+                differences.append((dotted, node_type, widget))
+    assert differences, "16gb_full unexpectedly matches the lean canonical"
 
 
 # ---------------------------------------------------------------------------

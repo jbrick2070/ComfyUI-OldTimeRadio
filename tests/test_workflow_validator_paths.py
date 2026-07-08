@@ -19,7 +19,7 @@ import pathlib
 from nodes import _otr_workflow_validator as wv
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-CANONICAL_REL = os.path.join("workflows", "otr_scifi_16gb_full.json")
+CANONICAL_REL = os.path.join("workflows", "otr_canonical.json")
 
 
 def test_empty_path_resolves_to_canonical_default():

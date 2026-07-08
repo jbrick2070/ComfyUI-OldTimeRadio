@@ -10,7 +10,7 @@ from nodes.OTR_LedgerFreezeCascade import (
 )
 
 REPO = Path(__file__).resolve().parent.parent
-WF = json.loads((REPO / "workflows" / "otr_scifi_16gb_full.json").read_text(encoding="utf-8"))
+WF = json.loads((REPO / "workflows" / "otr_canonical.json").read_text(encoding="utf-8"))
 
 _BASE5_NAMES = ("script_text", "script_json", "news_used",
                 "estimated_minutes", "freeze_verdict")

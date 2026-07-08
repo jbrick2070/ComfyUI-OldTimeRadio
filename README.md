@@ -8,8 +8,8 @@ walk away, and a complete episode lands in your output folder.
 themes (Stable Audio) → 48 kHz master mix → model-agnostic video (HuMo / LTX / Wan / CRT
 visualizer) → final MP4.
 
-100% local by default. No API keys required. (An optional hosted-LLM path exists; it stays
-off unless you turn it on.)
+100% local by default. No API keys required. Optional hosted LLM and all-cloud
+routes exist; they stay off unless you turn them on.
 
 > **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
 > Model Platform below). Check out `v2.0-alpha` to get the current pipeline.
@@ -47,7 +47,7 @@ it names any missing weight and where it expects it.
 
 ### 4. Run it
 
-1. Drag **`workflows/otr_scifi_16gb_full.json`** into the ComfyUI canvas.
+1. Drag **`workflows/otr_canonical.json`** into the ComfyUI canvas.
 2. Hit **Queue Prompt**.
 3. Walk away. Script, voices, music, mastering, and video all run automatically.
 4. Find the finished episode in **`output/otr/obs/`**.
@@ -56,8 +56,9 @@ it names any missing weight and where it expects it.
 
 ## Requirements
 
-- **GPU:** an NVIDIA card with ~16 GB VRAM for the full 14B video tier. Lower-VRAM and
-  CPU-only tiers exist (see Profiles) and degrade gracefully.
+- **GPU:** an NVIDIA card is recommended for the local video engines. The shipped
+  canonical workflow is the quick 30-word smoke canvas; heavier/local/cloud
+  routing is handled by explicit profile overrides.
 - **OS:** Windows or Linux. Tested heavily on Windows + RTX (Blackwell/sm_120).
 - **Disk:** the model set is large (tens of GB). Episodes are a few dozen MB each.
 
@@ -90,28 +91,47 @@ beat; every chain ends at a guaranteed CRT "radio-floor" clip, so a missing or O
 
 **Roles** (each selectable in `OTR_VideoDirector`):
 
-| Role | What it is | Default engine (16 GB profile) |
+| Role | What it is | Canonical default |
 |------|------------|-------------------------------|
-| `announcer_visual` | the announcer bookends | `humo_14B_169` (16:9 talking face) |
-| `music_visual` | opening/closing theme bookends | `humo_14B_169` (radio-face still) |
-| `character_video` | character dialogue beats | `humo_14B_169` (audio-driven face) |
-| `scene_broll` | scene b-roll | `wan_ti2v` |
-| `background_abstract` | text-only background | `ltx_video` |
+| `announcer_visual` | the announcer bookends | procedural visualizer |
+| `music_visual` | opening/closing theme bookends | procedural visualizer |
+| `character_video` | character dialogue beats | procedural visualizer / still floor |
+| `scene_broll` | scene b-roll | canonical policy driven |
+| `background_abstract` | text-only background | canonical policy driven |
 
 **Engines available:** HuMo (audio-driven face, 14B + 1.7B tiers), LTX (text/image→video and
 audio-in), Wan (TI2V / I2V), and the cheap CPU floors (CRT **visualizer**, Ken-Burns, flat
 still, station card). Audio-driven engines are offered only where audio exists; everything is
 single-resident under a 14.5 GB ceiling and request-hash deterministic.
 
-### Profiles (per-tier presets)
+### Headless canonical path
 
-Apply a capability profile to retarget every engine for your hardware in one step:
+Agents and API tests use exactly one workflow file: `workflows/otr_canonical.json`.
+By default, the headless wrapper applies no profile and leaves the saved dropdowns
+alone. Explicit profiles are still available for deliberate route testing, such as
+`cloud_all` for the hosted Partner API path.
 
-- **`16gb_full`** — the full 14B video tier (default above).
-- **`8gb_lite`** — lighter engines for ~8 GB cards.
-- **`cpu_floor`** — CPU/procedural only (the CRT visualizer + still floors).
+Headless/API smoke runs must use the canonical workflow wrapper:
 
-Headless: `python scripts/queue_smoke.py --profile 16gb_full` queues one episode.
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Words 30
+```
+
+For a no-queue validation of the exact API prompt shape:
+
+```
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_canonical_api_run.py --offline-schemas --dry-run --words 30
+```
+
+Cloud route example:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile cloud_all -Words 30
+```
+
+That path always loads `workflows/otr_canonical.json`; engine dropdowns move only
+through explicit profiles, and ad-hoc `--set` patches are limited to creative/story
+widgets.
 
 ### Optional: hosted LLM via OpenRouter (off by default)
 
@@ -119,6 +139,7 @@ The writer runs locally (Mistral-Nemo) out of the box. You can optionally route 
 and/or technical slot to a hosted frontier model via OpenRouter — it only activates when you
 set both `OPENROUTER_API_KEY` and `OTR_ENABLE_OPENROUTER=1`, is cost-guarded, and fails closed.
 Full walkthrough: [`docs/openrouter-setup.md`](docs/openrouter-setup.md).
+The docs index is [`docs/README.md`](docs/README.md).
 
 ---
 
@@ -140,7 +161,8 @@ appear there as they render.
   `PYTHONIOENCODING=utf-8`; a non-UTF-8 console crashes on the first emoji log line.
 - **An engine "fails loudly" mid-render** — that's by design; check the log for the missing
   model/dependency. The beat falls back to a CRT floor so the episode still completes.
-- **Out of VRAM on the 14B tier** — apply the `8gb_lite` or `cpu_floor` profile.
+- **Out of VRAM on a local video tier** — use the canonical procedural path or an
+  explicit lighter/cloud profile.
 - **No audio under the end credits** — known limitation: the credits scroll can outlast the
   master mix's closing theme. Tracked for a fix.
 - **Nodes don't appear after install** — restart ComfyUI; confirm you're on the `v2.0-alpha`

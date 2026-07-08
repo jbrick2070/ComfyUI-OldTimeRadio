@@ -52,7 +52,7 @@ from nodes._otr_creative_prompt_router import (  # noqa: E402
     resolve_creative_system_prompt,
 )
 
-_CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_scifi_16gb_full.json"
+_CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 _NON_RUNNABLE_BANK = "public_domain_story"  # runnable:false lane pack (2B)
 
 

@@ -92,7 +92,7 @@
      "STRING",
      {
       "multiline": false,
-      "default": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_scifi_16gb_full.json"
+      "default": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_canonical.json"
      }
     ],
     "validate_anyway": [

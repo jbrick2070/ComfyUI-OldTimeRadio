@@ -4,7 +4,7 @@ Two assertions:
 
   test_default_workflow_validator_passes_on_shipped_default
       The actual default-shipped workflow JSON
-      (`workflows/otr_scifi_16gb_full.json`) MUST pass the
+      (`workflows/otr_canonical.json`) MUST pass the
       check_default_workflow_creative_binding gate. Both writer
       slots bind to Mistral-Nemo (mit_equivalent, modern) so the
       validator returns zero violations.
@@ -34,7 +34,7 @@ from tools.audit_workflow_schema import (  # noqa: E402
 )
 
 
-WORKFLOW_PATH = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+WORKFLOW_PATH = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
 def test_default_workflow_validator_passes_on_shipped_default() -> None:

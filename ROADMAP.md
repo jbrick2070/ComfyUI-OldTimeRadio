@@ -200,7 +200,7 @@ Each profile should document:
 
 The canonical workflow remains:
 
-- `workflows/otr_scifi_16gb_full.json`
+- `workflows/otr_canonical.json`
 
 Exported tier workflows should be generated from the canonical workflow by a
 script, not hand-maintained:
@@ -329,4 +329,4 @@ green-chunk workflow.
 - `docs/ROADMAP_HISTORY.md`
 - `docs/multimodal-story-schema/MEDIA_ARCHIVE_QA_HANDOFF.md`
 - `docs/google_tts_ideas.md`
-- `workflows/otr_scifi_16gb_full.json`
+- `workflows/otr_canonical.json`

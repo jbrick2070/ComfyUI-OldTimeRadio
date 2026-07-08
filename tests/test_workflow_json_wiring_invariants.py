@@ -1,6 +1,6 @@
 """Sprint D D0d -- workflow JSON wiring invariants.
 
-Five structural assertions on workflows/otr_scifi_16gb_full.json that
+Five structural assertions on workflows/otr_canonical.json that
 pin the D0d rewires against regression:
 
   test_no_ledger_json_input_sources_from_signal_lost_video_path_output
@@ -42,7 +42,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-WORKFLOW_PATH = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+WORKFLOW_PATH = REPO_ROOT / "workflows" / "otr_canonical.json"
 VALIDATOR_SRC = REPO_ROOT / "nodes" / "_otr_workflow_validator.py"
 PORTRAIT_SRC = REPO_ROOT / "visual" / "batch_flux_portrait_render.py"
 

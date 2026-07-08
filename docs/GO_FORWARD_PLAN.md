@@ -137,7 +137,7 @@ Doc ownership:
 
 ## Standing Rules
 
-- `workflows/otr_scifi_16gb_full.json` is the canonical workflow.
+- `workflows/otr_canonical.json` is the canonical workflow.
 - Any node/widget/wiring change must update that workflow in the same change.
 - Do not revert unrelated/user changes.
 - Fix root causes, not shims.
@@ -155,4 +155,4 @@ Doc ownership:
 - `docs/GO_FORWARD_ARCHIVE.md`
 - `docs/google_tts_ideas.md`
 - `docs/multimodal-story-schema/MEDIA_ARCHIVE_QA_HANDOFF.md`
-- `workflows/otr_scifi_16gb_full.json`
+- `workflows/otr_canonical.json`

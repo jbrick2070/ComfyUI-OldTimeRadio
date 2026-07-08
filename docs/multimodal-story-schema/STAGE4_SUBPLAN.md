@@ -134,7 +134,7 @@ Python: DEFAULT_PROFANITY_TERMS :140 (SFW), structure regexes, engines.
   threading so constants can't drift back.
 - Loop vars: `imp` NOT `alias` -- precedent test_visual_styles_3a.py:340-341
   (CW-6; B7 marker \balias\b is code-context enforced). B7 sweeps *.py ONLY
-  (JSON invisible) -- verified against docs/_s28_forbidden_sweep.py; the six
+  (JSON invisible) -- verified against tests/_s28_forbidden_sweep.py; the six
   vocabularies collide with ZERO markers (checked word-for-word).
 - Science-lane byte-parity: the 7 pinned test files (sonnet-2 list) pass
   UNCHANGED; corpus parity on reasons/spans/flags; audio FROZEN; suite +

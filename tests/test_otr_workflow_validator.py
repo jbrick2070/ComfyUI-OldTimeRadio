@@ -38,7 +38,7 @@ class TestCanonicalWorkflow:
         """Sanity: the node's default path resolves at the canonical
         workflow fixture this repo ships with."""
         assert _DEFAULT_WORKFLOW_PATH.exists()
-        assert _DEFAULT_WORKFLOW_PATH.name == "otr_scifi_16gb_full.json"
+        assert _DEFAULT_WORKFLOW_PATH.name == "otr_canonical.json"
 
     def test_validate_canonical_workflow_passes(self):
         """The canonical workflow JSON must pass the same contract

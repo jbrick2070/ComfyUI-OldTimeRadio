@@ -14,7 +14,7 @@ Current state:
   - `OTR_UpstreamStoryLabValidator`
   - `OTR_StoryPackPreview`
 - The production workflow remains untouched:
-  `ComfyUI-OldTimeRadio\workflows\otr_scifi_16gb_full.json`.
+  `ComfyUI-OldTimeRadio\workflows\otr_canonical.json`.
 - The lab has 12 fixture story packs and validates from its own folder with
   `scripts\validate_lab.py`.
 - The live nodes hash `nodes.py`, `src\`, and `fixtures\` through `IS_CHANGED`

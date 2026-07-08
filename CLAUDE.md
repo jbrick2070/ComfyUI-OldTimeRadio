@@ -7,7 +7,7 @@
   You are the judge. Escalate to me only if the panel still leaves it unresolved.
 - This file is hard rules + the real Cowork operating model for this repo + hard-won gotchas.
 ## 0. WORKFLOW SOURCE OF TRUTH (hard)
-`C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_scifi_16gb_full.json`
+`C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json`
 IS my workflow.
 - ANY json / node / wiring / widget change MUST be made IN that file, in the SAME change as the code.
   Code that is not wired into this JSON is DEAD -- "your updates are for naught" (the 2026-06-13 §4D

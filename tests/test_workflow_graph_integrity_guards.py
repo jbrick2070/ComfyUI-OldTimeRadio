@@ -22,7 +22,7 @@ sys.path.insert(0, str(REPO / "tests"))
 
 from nodes._otr_workflow_validator import widget_vector_drift  # noqa: E402
 
-CANONICAL = REPO / "workflows" / "otr_scifi_16gb_full.json"
+CANONICAL = REPO / "workflows" / "otr_canonical.json"
 WF = json.loads(CANONICAL.read_text(encoding="utf-8"))
 NODES = WF.get("nodes") or []
 LINKS = WF.get("links") or []

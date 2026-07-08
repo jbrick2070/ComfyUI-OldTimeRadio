@@ -25,7 +25,7 @@ from nodes._workflow_validation import (  # noqa: E402
 )
 
 
-CANONICAL_WORKFLOW = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+CANONICAL_WORKFLOW = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
 def _otr_mappings_via_existing_test_helper() -> dict:
@@ -92,26 +92,26 @@ def test_production_workflow_visual_structure_pinned():
         "node 86 OTR_CaptionBurn now OWNS the burn (burn_captions must be ON)")
     assert n86["widgets_values"][1] == "sdh_standard", "node 86 caption style regressed"
 
-    # -- 2. the LTX radio open ------------------------------------------------
+    # -- 2. lean visual defaults ---------------------------------------------
     n87 = nodes[87]
     assert n87["type"] == "OTR_VideoDirector"
     wv87 = n87["widgets_values"]
-    # 2026-06-29: keep the broad/cheap visible video slots on viz_green
-    # (renamed from visualizer 2026-06-30, item 2), but route character beats
-    # through the Route-A 14B wide HuMo lane. Values are bare engine ids so the
-    # capability-profile validator + 16gb-identity profile stay consistent.
-    assert wv87[0] == "viz_green", (
-        "announcer_video_model regressed off the viz_green default: %r" % wv87[0])
-    assert wv87[1] == "viz_green", (
-        "music_video_model regressed off the viz_green default: %r" % wv87[1])
+    # 2026-07-07: the repo canonical is the operator-saved 30-word test canvas,
+    # with CPU visualizers and z_image_turbo stills. Heavy/video profiles are
+    # explicit profile overrides, not saved-workflow defaults.
+    assert wv87[0].startswith("viz_mxc_cpu"), (
+        "announcer_video_model regressed off the lean visualizer default: %r" % wv87[0])
+    assert wv87[1].startswith("viz_mxc_mandala"), (
+        "music_video_model regressed off the lean mandala default: %r" % wv87[1])
     # rip-sfx-broll (2026-07-01): widgets_values shrank 19 -> 15; clean-UI removals
     # (2026-07-03) dropped allow_auto_fallback (15->14), episode_duration_target
     # (14->13), then consolidated the legacy catch-all video slot -> character promoted to video
     # slot 3 (13->12; character_video_model is widgets index 2 now).
     assert len(wv87) == 12, wv87
-    assert wv87[2] == "humo_14B_169", (
-        "character_video_model must stay on the Route-A 14B motion lane: %r"
+    assert wv87[2].startswith("viz_camera"), (
+        "character_video_model must stay on the lean camera visualizer lane: %r"
         % wv87[2])
+    assert wv87[3:6] == ["z_image_turbo", "z_image_turbo", "z_image_turbo"]
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])
@@ -130,7 +130,7 @@ def test_production_workflow_visual_structure_pinned():
     assert links[250][1:5] == [86, 0, 95, 0]   # caption final -> credits roll
     assert links[274][1:5] == [95, 0, 85, 0]   # credits roll -> terminal mux
     assert links[275][1:5] == [92, 1, 95, 1]   # clip manifest -> credits roll
-    assert links[276][1:5] == [95, 1, 85, 6]   # declared credits tail -> mux
+    assert links[276][1:5] == [95, 1, 85, 3]   # declared credits tail -> mux
     n95 = nodes[95]
     assert n95["type"] == "OTR_CreditsRoll"
     assert not n95.get("widgets_values"), "node 95 has zero widgets (two forceInputs)"

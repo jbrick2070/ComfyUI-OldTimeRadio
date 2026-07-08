@@ -50,7 +50,7 @@ for _p in (_HERE, _REPO):
 DEFAULT_RENDER_NODE = 92          # OTR_VideoRenderBatch
 DEFAULT_VALIDATOR_NODE = 63       # OTR_WorkflowValidator (OUTPUT_NODE; optional)
 SMOKE_IMAGE_DONE = "OTR_SMOKE_IMAGE_DONE"   # opaque gate token; node never parses it
-WORKFLOW_PATH = os.path.join(_REPO, "workflows", "otr_scifi_16gb_full.json")
+WORKFLOW_PATH = os.path.join(_REPO, "workflows", "otr_canonical.json")
 STATE_INPUT_NAME = "node_episode_input.json"
 
 

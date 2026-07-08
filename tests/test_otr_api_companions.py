@@ -19,7 +19,7 @@ These tests exercise:
      count still rejects.
 
 The OTR_LedgerScriptWriter schema in the fixtures mirrors node 1's
-widgets_values dump from `workflows/otr_scifi_16gb_full.json`. The
+widgets_values dump from `workflows/otr_canonical.json`. The
 `seed` widget was removed (BUG-LOCAL-269/270), so the writer no longer
 carries a seed value or a control_after_generate companion. The
 `style` / `style_custom` widgets were later deleted outright by the
@@ -69,7 +69,7 @@ _REPO = Path(__file__).resolve().parent.parent
 # Jeffrey 2026-05-18 overnight reconcile: single workflow source of
 # truth -- _bughunt.json sibling deleted. Round-trip fixture now reads
 # the canonical _full.json directly.
-_CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_scifi_16gb_full.json"
+_CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 
 
 def _writer_schemas() -> dict:
@@ -167,7 +167,7 @@ def _writer_schemas() -> dict:
 
 def _writer_node_fixture() -> dict:
     """Workflow fixture with node 1 carrying the widgets_values layout
-    dumped from workflows/otr_scifi_16gb_full.json. The `seed` widget +
+    dumped from workflows/otr_canonical.json. The `seed` widget +
     its companion were removed in BUG-LOCAL-269/270. The `style` /
     `style_custom` widgets were later deleted outright by the
     2026-07-05 style-engine consolidation, shifting every slot from

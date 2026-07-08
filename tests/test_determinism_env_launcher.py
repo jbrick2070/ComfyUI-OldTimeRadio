@@ -1,4 +1,4 @@
-"""R0a (b) tests: determinism env contract, the run_comfy_otr launchers, the
+"""R0a (b) tests: determinism env contract, the canonical headless launcher, the
 scoped ``deterministic_inference`` CM, and the model-loader TF32 flip."""
 from pathlib import Path
 
@@ -16,8 +16,7 @@ from nodes._otr_determinism import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-_BAT = REPO_ROOT / "scripts" / "run_comfy_otr.bat"
-_PS1 = REPO_ROOT / "scripts" / "run_comfy_otr.ps1"
+_LAUNCH_CMD = REPO_ROOT / "scripts" / "_otr_soak_server_launch.cmd"
 _LOADER = REPO_ROOT / "nodes" / "_otr_model_loader.py"
 
 
@@ -54,14 +53,12 @@ def test_env_status_reports_actual(monkeypatch):
 
 # --- launchers: values present AND set before python (C-1 ordering) --------
 
-@pytest.mark.parametrize("path", [_BAT, _PS1])
-def test_launcher_exists(path):
-    assert path.is_file(), f"missing launcher: {path}"
+def test_launcher_exists():
+    assert _LAUNCH_CMD.is_file(), f"missing launcher: {_LAUNCH_CMD}"
 
 
-@pytest.mark.parametrize("path", [_BAT, _PS1])
-def test_launcher_sets_all_env_before_python(path):
-    text = path.read_text(encoding="utf-8")
+def test_launcher_sets_all_env_before_python():
+    text = _LAUNCH_CMD.read_text(encoding="utf-8")
     lines = text.splitlines()
 
     def _is_comment(ln: str) -> bool:
@@ -79,9 +76,13 @@ def test_launcher_sets_all_env_before_python(path):
     assert py_idx is not None, "launcher must invoke main.py"
     for key, val in REQUIRED_DETERMINISM_ENV.items():
         key_idx = first_code_line_containing(key)
-        assert key_idx is not None, f"{path.name} does not set {key}"
-        assert val in lines[key_idx], f"{path.name}: {key} must be set to {val}"
-        assert key_idx < py_idx, f"{path.name}: {key} must be exported before python"
+        assert key_idx is not None, f"{_LAUNCH_CMD.name} does not set {key}"
+        assert val in lines[key_idx], (
+            f"{_LAUNCH_CMD.name}: {key} must be set to {val}"
+        )
+        assert key_idx < py_idx, (
+            f"{_LAUNCH_CMD.name}: {key} must be exported before python"
+        )
 
 
 # --- model-loader TF32 flip pinned ----------------------------------------

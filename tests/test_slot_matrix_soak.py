@@ -3,7 +3,7 @@ the all-slots canonical-JSON soak.
 
 The live GPU soak is gated, but its load-bearing wiring is proven here on the CPU:
 
-  * the REAL workflow (workflows/otr_scifi_16gb_full.json) is loaded and ALL
+  * the REAL workflow (workflows/otr_canonical.json) is loaded and ALL
     THREE video slots are set INDEPENDENTLY via the capability-profile
     role_overrides -> apply_profile patches the OTR_VideoDirector video-model
     widgets BY NODE TYPE (config/profiles/widget_mapping.json; no node ids),
@@ -34,7 +34,7 @@ from nodes._otr_shared.capability_profiles import load_profile
 from nodes._otr_video_engines import registry as vreg
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-CANONICAL = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+CANONICAL = REPO_ROOT / "workflows" / "otr_canonical.json"
 _HAS_FFMPEG = shutil.which("ffmpeg") is not None
 
 #: distinct, capability-eligible engine per slot.

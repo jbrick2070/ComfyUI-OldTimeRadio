@@ -332,7 +332,7 @@ class TestWorkflowJson:
 # docs/2026-07-05-style-dropdown-blast-radius/RIP_OUT_PLAN.md.
 # ---------------------------------------------------------------------------
 
-_CANONICAL_WORKFLOW = "otr_scifi_16gb_full.json"
+_CANONICAL_WORKFLOW = "otr_canonical.json"
 
 
 class TestVoicePathCleanbreakWiring:

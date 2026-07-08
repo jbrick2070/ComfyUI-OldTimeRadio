@@ -32,7 +32,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from nodes import _otr_model_catalog as catalog  # noqa: E402
 
-WORKFLOW_PATH = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+WORKFLOW_PATH = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 D1A_NEW_FIELDS = (
     "prompt_profile",

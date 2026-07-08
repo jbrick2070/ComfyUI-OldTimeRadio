@@ -22,7 +22,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-WF_PATH = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+WF_PATH = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 CASCADE_NODE_ID = 62
 

@@ -29,7 +29,7 @@ COMFYUI_OUTPUT_DIR = os.environ.get(
     r"C:\Users\jeffr\Documents\ComfyUI\output"
 )
 _WORKFLOW_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "workflows", "otr_scifi_16gb_full.json"
+    os.path.dirname(__file__), "..", "workflows", "otr_canonical.json"
 )
 
 # Types that are never stored in widgets_values — always come via links

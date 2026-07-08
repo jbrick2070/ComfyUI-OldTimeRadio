@@ -11,7 +11,7 @@ Live evidence gathered this review:
 ```text
 pytest (lab)                     5 passed in 0.23s
 scripts/validate_lab.py          OK upstream_story_lab / story_packs=12 / pd_manifests=3
-workflows/otr_scifi_16gb_full.json  git status clean; last commit touching it:
+workflows/otr_canonical.json  git status clean; last commit touching it:
                                  6bad6e5b 2026-07-01 "rip-sfx-broll: delete the dead
                                  sfx subsystem + scene_broll/background_abstract roles"
 grep sfx (production nodes/tests)   all remaining hits are loud-rejection sites,
@@ -249,7 +249,7 @@ REVISED TRANSPLANT PLAN:
    OTR_LedgerScriptWriter.py:1348-1372 becomes science-only), meta stamps
    added, new widgets appended only at the end of existing widget lists,
    whitelist updates in `scripts/otr_api.py` and `nodes/_otr_workflow_apply.py`.
-10. Workflow JSON last: edit only `workflows/otr_scifi_16gb_full.json`,
+10. Workflow JSON last: edit only `workflows/otr_canonical.json`,
     append-only widgets, forceInput sockets for linked policy JSON, then
     validator + JSON round-trip + link referential integrity + widget/input
     audit, all green before commit.
@@ -273,7 +273,7 @@ TEST / VALIDATION GATES (must pass before workflow JSON edits):
 - Production: widget-vector append-only test, workflow validator, JSON
   round-trip, link referential integrity audit, widget/input audit,
   otr_api/workflow_apply whitelist parity.
-- Git: `workflows/otr_scifi_16gb_full.json` clean until the explicit
+- Git: `workflows/otr_canonical.json` clean until the explicit
   transplant commit.
 
 OPEN QUESTIONS:

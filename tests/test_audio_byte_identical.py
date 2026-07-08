@@ -38,7 +38,7 @@ if _REPO_ROOT not in sys.path:
 _FIXTURES = os.path.join(_HERE, "fixtures")
 _BASELINE_WAV = os.path.join(_FIXTURES, "baseline_v1.5.wav")
 _BASELINE_SHA = os.path.join(_FIXTURES, "baseline_v1.5.sha256")
-_WORKFLOW = os.path.join(_HERE, "..", "workflows", "otr_scifi_16gb_full.json")
+_WORKFLOW = os.path.join(_HERE, "..", "workflows", "otr_canonical.json")
 
 # Fixed seed for deterministic audio output.
 # These override the workflow's randomized seeds at runtime.

@@ -18,7 +18,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE = REPO_ROOT / "nodes" / "otr_shot_duration_calculator.py"
-CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
+CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_canonical.json"
 VALIDATION_MOD = REPO_ROOT / "nodes" / "_workflow_validation.py"
 
 

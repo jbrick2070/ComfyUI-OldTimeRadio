@@ -8,7 +8,7 @@ an unnecessary torch/CUDA teardown.
 
 These tests inspect the source file (the runtime path needs a real
 LLM + GPU which we can't fake at test time). The runtime assertion
-(VRAM ~= pre-cascade reading) lives in scripts/smoke_check.py from
+(VRAM ~= pre-cascade reading) lives in the canonical headless smoke path from
 commit 12.7.
 """
 from __future__ import annotations
