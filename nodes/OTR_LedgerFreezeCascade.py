@@ -211,23 +211,23 @@ class OTR_LedgerFreezeCascade:
                         "Default ON."
                     ),
                 }),
-                # ---- Sprint 6 -- critic-to-render coupling --------
-                # These four widgets steer which lines BatchHumoRender
-                # renders downstream. The cascade computes the plan
-                # from the post-reroll critic report + the widgets
-                # and stamps `meta.render_plan`; HuMo reads + honours
-                # it. All four default to behave-as-before so existing
-                # workflows render unchanged unless an operator opts in.
+                # ---- Sprint 6 -- legacy critic-to-render receipt ---
+                # These four widgets are retained for workflow compatibility
+                # and story-QA telemetry. The real episode renderer now treats
+                # `meta.render_plan` as informational only: ShotLock's
+                # video.shots list is the visible delivery authority, so a
+                # story-QA plan can never remove a voiced beat's video.
                 "render_selection": (
                     ("all", "dramatic_peaks_only"),
                     {
                         "default": "all",
                         "tooltip": (
-                            "Sprint 6 -- render selection mode. 'all' "
-                            "(default) keeps every character line; "
-                            "'dramatic_peaks_only' reorders to the "
-                            "critic's render_priority list so the most "
-                            "dramatically loaded lines come first."
+                            "Legacy Sprint 6 story-QA receipt only. The "
+                            "real episode renderer ignores meta.render_plan "
+                            "and renders every ShotLock shot. 'all' keeps "
+                            "the receipt in ledger order; "
+                            "'dramatic_peaks_only' reorders the receipt to "
+                            "the critic's render_priority list."
                         ),
                     },
                 ),
@@ -237,34 +237,30 @@ class OTR_LedgerFreezeCascade:
                     "max": 999,
                     "step": 1,
                     "tooltip": (
-                        "Sprint 6 -- cap on plan length. Default 6. "
-                        "0 disables the cap (every selected line "
-                        "renders). Applied after render_selection / "
-                        "protagonist_only / manual_line_ids."
+                        "Legacy Sprint 6 receipt cap. Default 6. 0 disables "
+                        "the cap in meta.render_plan. This no longer limits "
+                        "real episode rendering; ShotLock video.shots renders "
+                        "in full."
                     ),
                 }),
                 "protagonist_only": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "Sprint 6 -- restrict the render plan to the "
-                        "protagonist's lines (the character with the "
-                        "most CHARACTER-role beats, ties broken by "
-                        "cast-roster order). Default OFF. NOTE: "
-                        "manual_line_ids (below), when non-empty, "
-                        "silently supersedes this toggle -- the explicit "
-                        "line_id list wins over the protagonist filter."
+                        "Legacy Sprint 6 receipt toggle. Restricts "
+                        "meta.render_plan to the protagonist's lines, but "
+                        "does not restrict real episode rendering. "
+                        "manual_line_ids, when non-empty, supersedes this "
+                        "toggle in the receipt."
                     ),
                 }),
                 "manual_line_ids": ("STRING", {
                     "default": "",
                     "multiline": False,
                     "tooltip": (
-                        "Sprint 6 -- comma-separated explicit override. "
-                        "When non-empty, supersedes render_selection / "
-                        "flat_lines exclusion / arc_verdict gating. The "
-                        "operator's hand wins -- ship exactly these "
-                        "line_ids, in this order (capped by "
-                        "render_max_n)."
+                        "Legacy Sprint 6 receipt override. When non-empty, "
+                        "supersedes render_selection / flat_lines exclusion "
+                        "/ arc_verdict gating inside meta.render_plan. It "
+                        "does not select which real episode shots render."
                     ),
                 }),
             },

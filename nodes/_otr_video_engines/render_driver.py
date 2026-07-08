@@ -2019,7 +2019,7 @@ def run_episode(ledger, *, oom_shot_id=None,
     ledger, canvas=canvas)`` is called per shot for a per-beat portrait + audio
     + prompt request (see :func:`run_real_episode`)."""
     ledger = copy.deepcopy(ledger)
-    _warn_if_legacy_render_plan_present(ledger)
+    _log_if_legacy_render_plan_present(ledger)
     section = ledger["video"]
     clips, new_shots, trace = {}, [], []
     # S-C C1 (audio_motion_profile): per-shot resolved conditioning-WAV rows
@@ -2141,7 +2141,7 @@ def run_episode(ledger, *, oom_shot_id=None,
             "vram_peak_mb": vram_peak, "audio_motion_rows": amp_rows}
 
 
-def _warn_if_legacy_render_plan_present(ledger):
+def _log_if_legacy_render_plan_present(ledger):
     """Do not let story-QA render_plan metadata drop real episode shots.
 
     ``meta.render_plan`` was introduced for the retired/separate HuMo batch as
@@ -2159,13 +2159,30 @@ def _warn_if_legacy_render_plan_present(ledger):
     shots = section.get("shots") or []
     if not isinstance(shots, list) or not shots:
         return ledger
-    _LOG.info(
+
+    def _safe_count(value):
+        if isinstance(value, (list, tuple, set)):
+            return len(value)
+        return 0
+
+    line_ids_n = _safe_count(plan.get("line_ids"))
+    excluded_n = _safe_count(plan.get("excluded_flat_lines"))
+    try:
+        applied_max_n = int(plan.get("applied_max_n") or 0)
+    except (TypeError, ValueError):
+        applied_max_n = 0
+    blocked = bool(plan.get("blocked"))
+    mode = str(plan.get("selection_mode") or "")
+    active_legacy_filter = (
+        blocked or excluded_n > 0 or applied_max_n > 0
+        or mode not in ("", "all")
+    )
+    log_fn = _LOG.warning if active_legacy_filter else _LOG.info
+    log_fn(
         "[OTR video] render_plan present but ignored by episode renderer "
-        "(mode=%s line_ids=%d blocked=%s); rendering all %d ShotLock shot(s)",
-        plan.get("selection_mode"),
-        len(plan.get("line_ids") or []),
-        bool(plan.get("blocked")),
-        len(shots))
+        "(mode=%s line_ids=%d excluded=%d blocked=%s applied_max_n=%d); "
+        "rendering all %d ShotLock shot(s)",
+        mode, line_ids_n, excluded_n, blocked, applied_max_n, len(shots))
     return ledger
 
 

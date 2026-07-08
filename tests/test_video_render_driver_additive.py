@@ -449,7 +449,7 @@ def test_run_episode_ignores_render_plan_for_visible_shots(record_registry):
     led["meta"] = {"render_plan": {
         "line_ids": ["b002"],
         "selection_mode": "all",
-        "blocked": False,
+        "blocked": True,
         "applied_max_n": 1,
         "excluded_flat_lines": ["b003"],
     }}
@@ -463,6 +463,20 @@ def test_run_episode_ignores_render_plan_for_visible_shots(record_registry):
     assert calls == ["shot_b001", "shot_b002", "shot_b003"]
     assert [s["shot_id"] for s in out["ledger"]["video"]["shots"]] == [
         "shot_b001", "shot_b002", "shot_b003"]
+    assert sorted(out["clips"]) == ["shot_b001", "shot_b002", "shot_b003"]
+
+
+def test_run_episode_legacy_render_plan_log_tolerates_bad_line_ids(record_registry):
+    led = _real_ledger()
+    led["meta"] = {"render_plan": {
+        "line_ids": 3,
+        "selection_mode": "all",
+        "blocked": False,
+        "applied_max_n": 0,
+    }}
+
+    out = rd.run_episode(led, request_builder=rd.build_request_from_shot)
+    assert sorted(out["clips"]) == ["shot_b001", "shot_b002"]
 
 
 # --------------------------------------------------------------------------- #

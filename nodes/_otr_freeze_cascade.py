@@ -1071,15 +1071,15 @@ def run_freeze_cascade(
         # No terminal-skip, no early return -- execution continues to the
         # Phase 6 render plan + Phase 7/8/10 ship path below.
 
-    # ---- Sprint 6: critic -> render coupling -----------------------
+    # ---- Sprint 6: critic -> legacy render-plan receipt -------------
     # Compute the render plan AFTER the reroll completes (so the plan
     # sees the FINAL critic report + cycle_count + reroll_history) and
     # BEFORE Phase 7 / 8 / 10 freeze the ledger. The plan rides on
-    # `meta.render_plan` -- BatchHumoRender reads it to filter which
-    # lines actually get rendered, gate on arc_verdict, and apply
-    # render_max_n. build_render_plan NEVER raises (PD1) -- a degraded
-    # computation returns None and the stamp is skipped, which makes
-    # HuMo fall back to its pre-Sprint-6 render-all behaviour.
+    # `meta.render_plan` as story-QA telemetry/legacy receipt only. The real
+    # episode renderer renders every ShotLock video.shots row so story-QA
+    # metadata can never remove a voiced beat's visible coverage.
+    # build_render_plan NEVER raises (PD1) -- a degraded computation returns
+    # None and the stamp is skipped.
     #
     # BUG-LOCAL-273 fix (cont.): refresh ledger_data + meta again before the
     # Sprint 6 stamp. The Sprint 5C reroll above may have triggered an
@@ -1107,15 +1107,13 @@ def run_freeze_cascade(
             render_plan["source_cycle_count"],
             len(render_plan["excluded_flat_lines"]),
         )
-        # BUG-LOCAL-274 fix: persist the render_plan stamp to disk so
-        # OTR_BatchHumoRender (a separate node invocation that loads the
-        # ledger via _load_ledger_with_path from *_ledger.json) actually
-        # sees it. Phase 10's later save would normally cover this, but
-        # the belt-and-braces save here makes the contract explicit and
-        # survives any future Phase 10 refactor. Production Ledger.save()
-        # never raises (Prime Directive 1). Defensive getattr handles
-        # test fixtures that stub `led` as a SimpleNamespace without a
-        # save method (test_lfc_phase_7_8_readiness, etc.).
+        # BUG-LOCAL-274 fix retained: persist the render_plan receipt to disk
+        # for audit/legacy readers. Phase 10's later save would normally cover
+        # this, but the belt-and-braces save here makes the contract explicit
+        # and survives any future Phase 10 refactor. Production Ledger.save()
+        # never raises (Prime Directive 1). Defensive getattr handles test
+        # fixtures that stub `led` as a SimpleNamespace without a save method
+        # (test_lfc_phase_7_8_readiness, etc.).
         _save_fn = getattr(led, "save", None)
         if callable(_save_fn):
             try:
@@ -1123,8 +1121,8 @@ def run_freeze_cascade(
             except Exception as _save_exc:  # noqa: BLE001 -- PD1
                 log.warning(
                     "[LFC] post-render-plan save failed (%s: %s); "
-                    "render_plan lives in-memory only -- HuMo will "
-                    "fall back to render-all", type(_save_exc).__name__,
+                    "render_plan receipt lives in-memory only",
+                    type(_save_exc).__name__,
                     _save_exc,
                 )
 

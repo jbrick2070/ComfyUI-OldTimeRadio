@@ -1,21 +1,20 @@
-"""nodes/_otr_render_plan.py -- Sprint 6 critic-to-render coupling.
+"""nodes/_otr_render_plan.py -- Sprint 6 legacy critic render-plan receipt.
 
 Sprint 5B's story critic emits per-line dramatic verdicts -- a
 `render_priority` ordering (dramatic peaks first), a `flat_lines` list,
 and a whole-episode `arc_verdict`. Sprint 5C's reroll loop acts on
 `reroll_targets` and stamps `cycle_count` + `reroll_history`. This
-module is the bridge: it reads those signals plus 4 operator widgets and
-computes a `render_plan` -- which line_ids the downstream video render
-(BatchHumoRender) should actually render, in what order, capped at how
-many, and whether the whole render is BLOCKED because the arc verdict
-never cleared.
+module reads those signals plus 4 operator widgets and computes a
+`render_plan` receipt: which line_ids the story critic would prioritize, in
+what order, capped at how many, and whether the whole render would have been
+BLOCKED because the arc verdict never cleared.
 
-The plan rides on `meta.render_plan` -- a passive stamp HuMo (or any
-future render-side consumer) reads + honours. When all four widgets are
-at their defaults AND the arc-verdict gate does not fire, the plan
-simply lists every character line_id in ledger order and HuMo behaves
-exactly as it does pre-Sprint-6 (the filter is a no-op when the plan
-contains every line).
+The plan rides on `meta.render_plan` as passive story-QA telemetry. The real
+episode renderer deliberately ignores it as a delivery filter and renders every
+ShotLock `video.shots` row, so a story-QA receipt can never remove a voiced
+beat's visible coverage. When all four widgets are at their defaults AND the
+arc-verdict gate does not fire, the receipt simply lists every character
+line_id in ledger order.
 
 WIDGETS (live on `OTR_LedgerFreezeCascade`'s node surface).
   render_selection     "all" | "dramatic_peaks_only" -- default "all".
@@ -33,9 +32,8 @@ WIDGETS (live on `OTR_LedgerFreezeCascade`'s node surface).
 ARC-VERDICT GATE.
   When `cycle_count >= MAX_REROLL_CYCLES` (i.e. the reroll loop already
   ran its cap) AND `arc_verdict in ("mid_collapse", "flat")`, the plan
-  is stamped `blocked=True` with `line_ids=[]`. HuMo treats `blocked`
-  as "render nothing" -- the operator must rerun or override before
-  video gets produced on a script the critic still rejects.
+  is stamped `blocked=True` with `line_ids=[]`. This is retained as a
+  story-QA receipt; it does not suppress real episode rendering.
 
 FLAT-LINE EXCLUSION.
   Lines the critic flagged in `flat_lines` are dropped from the plan
@@ -45,8 +43,7 @@ FLAT-LINE EXCLUSION.
 
 PRIME DIRECTIVES.
   * PD1 (audio is king): `build_render_plan` NEVER raises. Any internal
-    failure degrades to "stamp nothing" (return None) so HuMo falls back
-    to its pre-Sprint-6 behaviour (render everything).
+    failure degrades to "stamp nothing" (return None).
   * PD3 (JSON-wiring): the 4 widgets live on `OTR_LedgerFreezeCascade`;
     the workflow JSON's `widgets_values` array carries their defaults.
   * PD6: this module makes NO LLM calls -- it is pure dict / list
