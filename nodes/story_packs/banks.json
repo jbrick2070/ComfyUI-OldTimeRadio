@@ -67,7 +67,7 @@
       "source_bank_id": "public_domain_story",
       "label": "Public Domain",
       "source_kind": "public_domain_source",
-      "interpreter": "",
+      "interpreter": "public_domain_interpreter",
       "fetcher": "public_domain_source",
       "default_story_model": "faithful_radio_adaptation",
       "default_story_pipeline": "legacy_many_pass",

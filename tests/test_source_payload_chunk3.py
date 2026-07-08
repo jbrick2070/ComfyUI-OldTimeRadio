@@ -158,13 +158,12 @@ def test_empty_id_bank_raises_missing_contract(bank_id):
         osp.resolve_interpreter(bank)
 
 
-def test_public_domain_bank_resolves_fetcher_but_not_interpreter():
+def test_public_domain_bank_resolves_both_contracts_but_is_not_runnable():
     bank = routing.get_bank("public_domain_story")
     entry = osp.resolve_fetcher(bank)
     assert entry.seed_source == "public_domain_source"
     assert callable(entry.fetch)
-    with pytest.raises(osp.SourceContractMissingError, match="public_domain_story"):
-        osp.resolve_interpreter(bank)
+    assert callable(osp.resolve_interpreter(bank))
     assert bank.runnable is False
     assert bank.defaults["source_ref"] == "gutenberg-time-machine-sample:arrival"
     assert bank.defaults["manifest_path"].endswith("manifest.sample.json")

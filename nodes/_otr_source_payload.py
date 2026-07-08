@@ -359,6 +359,28 @@ def _interpret_media_archive(*, bank, payload: dict, technical_fn,
         raise SourceInterpretError(str(exc)) from exc
 
 
+def _interpret_public_domain(*, bank, payload: dict, technical_fn,
+                             model_id: str):
+    """public_domain_interpreter: faithful public-domain adaptation brain.
+
+    Translates ONLY PublicDomainInterpreterError -> SourceInterpretError.
+    Contract/shape bugs and unexpected exceptions propagate hard.
+    """
+    del bank
+    try:
+        from . import _otr_public_domain_sources as _pds
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        import _otr_public_domain_sources as _pds  # type: ignore
+    try:
+        return _pds.build_public_domain_briefs(
+            technical_fn=technical_fn,
+            payload=payload,
+            model_id=model_id,
+        )
+    except _pds.PublicDomainInterpreterError as exc:
+        raise SourceInterpretError(str(exc)) from exc
+
+
 # ---------------------------------------------------------------------------
 # registries + resolution
 # ---------------------------------------------------------------------------
@@ -386,6 +408,7 @@ _FETCHERS: "dict[str, FetcherEntry]" = {
 _INTERPRETERS: "dict[str, object]" = {
     "news_interpreter": _interpret_news,
     "media_archive_interpreter": _interpret_media_archive,
+    "public_domain_interpreter": _interpret_public_domain,
 }
 
 
