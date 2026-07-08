@@ -161,13 +161,18 @@ def test_lane_pack_resolves_with_exact_keys(bank_id, model_id):
     assert routing.get_bank(bank_id).default_story_model == model_id
 
 
-@pytest.mark.parametrize("bank_id", sorted(
-    b for b, _ in LANE_PACK_KEYS if b != "media_archive"))
+@pytest.mark.parametrize("bank_id", ["custom_source_bank"])
 def test_lane_bank_not_runnable(bank_id):
     """The lane execution paths do not exist yet: run-intent must raise LOUD
     (never a silent fall-through to the science path)."""
     with pytest.raises(routing.StoryBankNotRunnableError):
         routing.require_runnable_bank(bank_id)
+
+
+def test_public_domain_lane_is_runnable():
+    """Public-domain now has fetcher, interpreter, story rules, default
+    source_ref, and all production seams, so it can pass the run-intent gate."""
+    assert routing.require_runnable_bank("public_domain_story").runnable is True
 
 
 def test_media_archive_lane_is_runnable():

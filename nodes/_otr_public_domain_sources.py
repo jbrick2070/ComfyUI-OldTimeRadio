@@ -17,7 +17,10 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, Field, field_validator
 
-from ._otr_source_payload import SourceFetchResult, validate_source_payload
+try:
+    from . import _otr_source_payload as _osp
+except ImportError:  # pragma: no cover -- flat import harnesses
+    import _otr_source_payload as _osp  # type: ignore
 
 try:
     from ._otr_structured_call import StructuredCallFailedError, structured_call
@@ -325,19 +328,18 @@ def payload_from_manifest_unit(
             f"Excerpt: {excerpt}"
         ),
     }
-    return validate_source_payload(payload, origin=f"public_domain {resolved.source_ref}")
+    return _osp.validate_source_payload(
+        payload, origin=f"public_domain {resolved.source_ref}")
 
 
 def fetch_public_domain_source(
     *,
     bank: Any,
     source_ref: str = "",
-) -> SourceFetchResult:
+) -> "_osp.SourceFetchResult":
     """Load a manifest-local public-domain unit and return payload + sidecars.
 
-    The bank is intentionally allowed to stay non-runnable while this fetcher
-    exists; the interpreter/runnable flip is a later chunk. Blank source_ref
-    uses the explicit bank default, otherwise it fails loud.
+    Blank source_ref uses the explicit bank default, otherwise it fails loud.
     """
     defaults = getattr(bank, "defaults", {}) or {}
     if not isinstance(defaults, dict):
@@ -366,7 +368,7 @@ def fetch_public_domain_source(
             f"{text_path}"
         ) from exc
 
-    return SourceFetchResult(
+    return _osp.SourceFetchResult(
         payload=payload_from_manifest_unit(resolved, text=text),
         source_meta=source_meta_from_unit(resolved),
         source_rights=source_rights_from_unit(resolved),

@@ -94,7 +94,7 @@
         "announcer_intro_safe_system",
         "announcer_outro_system"
       ],
-      "runnable": false,
+      "runnable": true,
       "guide_ref": ""
     },
     {

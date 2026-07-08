@@ -7,7 +7,7 @@ kibitz-runs/2026-07-05-multimodal-2c/r4/final.md).
 Pins:
   1. Widget surface: source_bank stays pinned at slot 23; choices come
      LIVE from the routing registry (exact list, registry order, including
-     non-runnable banks -- the honest-error contract); default science_news.
+     non-runnable custom banks -- the honest-error contract); default science_news.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
      (deliberate exception to the "INPUT_TYPES must never raise"
      convention; no baked-in fallback choice list).
@@ -53,7 +53,8 @@ from nodes._otr_creative_prompt_router import (  # noqa: E402
 )
 
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
-_NON_RUNNABLE_BANK = "public_domain_story"  # runnable:false lane pack (2B)
+_PUBLIC_DOMAIN_BANK = "public_domain_story"
+_NON_RUNNABLE_BANK = "custom_source_bank"
 
 
 # ---------------------------------------------------------------------------
@@ -77,8 +78,9 @@ class TestWidgetSurface:
         choices, meta = spec["optional"]["source_bank"]
         assert choices == list(routing.list_bank_ids())
         assert meta["default"] == "science_news"
-        # The honest-error contract: non-runnable banks ARE listed.
+        # The honest-error contract: non-runnable custom banks ARE listed.
         assert _NON_RUNNABLE_BANK in choices
+        assert _PUBLIC_DOMAIN_BANK in choices
 
     def test_default_is_a_runnable_bank(self):
         bank = routing.require_runnable_bank("science_news")
@@ -181,13 +183,13 @@ class TestThreading:
         other = resolve_creative_system_prompt(
             "mistralai/Mistral-Nemo-Instruct-2407",
             phase="line_composer_system",
-            source_bank_id=_NON_RUNNABLE_BANK)
+            source_bank_id=_PUBLIC_DOMAIN_BANK)
         assert science != other, (
             "source_bank_id did not change the resolved prompt -- the "
             "widget would be dead"
         )
         # Cross-check against the lane pack on disk.
-        pack_path = (_REPO / "nodes" / "story_packs" / _NON_RUNNABLE_BANK /
+        pack_path = (_REPO / "nodes" / "story_packs" / _PUBLIC_DOMAIN_BANK /
                      "faithful_radio_adaptation.json")
         pack = json.loads(pack_path.read_text(encoding="utf-8"))
         assert other == pack["prompt_stages"]["line_composer_system"]
@@ -229,11 +231,11 @@ class TestThreading:
             creative_fn=lambda *a, **k: "A quiet line about the machine.",
             req=req,
             creative_repo_id="mistralai/Mistral-Nemo-Instruct-2407",
-            source_bank_id=_NON_RUNNABLE_BANK,
+            source_bank_id=_PUBLIC_DOMAIN_BANK,
             _story_rules=resolve_story_rules("science_news"),
         )
         assert out.text
-        assert seen and all(s == _NON_RUNNABLE_BANK for s in seen)
+        assert seen and all(s == _PUBLIC_DOMAIN_BANK for s in seen)
 
     def test_every_recursive_compose_line_call_forwards_the_bank(self):
         # AST pin (kibitz r3 M2): compose_line's recursive self-calls and
@@ -294,8 +296,8 @@ class TestResolvedSurface:
         resolved = _resolve_inputs(custom_premise="test premise")
         assert resolved["source_bank"] == "science_news"
         resolved2 = _resolve_inputs(
-            custom_premise="test premise", source_bank=_NON_RUNNABLE_BANK)
-        assert resolved2["source_bank"] == _NON_RUNNABLE_BANK
+            custom_premise="test premise", source_bank=_PUBLIC_DOMAIN_BANK)
+        assert resolved2["source_bank"] == _PUBLIC_DOMAIN_BANK
 
 
 # ---------------------------------------------------------------------------

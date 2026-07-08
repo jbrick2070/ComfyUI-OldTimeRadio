@@ -12,7 +12,7 @@ Pins:
      INPUT_TYPES (deliberate convention exception -- no baked-in list).
   3. Gate order: an unknown visual_style raises UnknownVisualStyleError
      with ZERO side effects, and the bank gate fires BEFORE the style gate
-     (non-runnable public-domain bank wins even when both are bad).
+     (non-runnable custom bank wins even when both are bad).
   4. Refine capture carries visual_style (the 2C signature-filtered fix).
   5. _resolve_inputs carries visual_style as the authoritative value.
   6. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name lands
@@ -99,7 +99,7 @@ class TestGateOrder:
     def test_bank_gate_fires_before_style_gate(self):
         node = OTR_LedgerScriptWriter()
         with pytest.raises(routing.StoryBankNotRunnableError):
-            node.run(source_bank="public_domain_story",
+            node.run(source_bank="custom_source_bank",
                      visual_style="no_such_style")
 
     def test_every_registered_style_passes_the_gate(self, monkeypatch):

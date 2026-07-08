@@ -17,7 +17,7 @@ from nodes._otr_public_domain_sources import (
     _MAX_KEY_TERMS,
     build_public_domain_briefs,
 )
-from nodes._otr_source_payload import SourceInterpretError, validate_interpreter_result
+from nodes._otr_source_payload import validate_interpreter_result
 
 REPO = Path(__file__).resolve().parents[1]
 MODULE_PATH = REPO / "nodes" / "_otr_public_domain_sources.py"
@@ -87,7 +87,7 @@ def test_wrapper_translates_only_public_domain_interpreter_error():
             interpreter="public_domain_interpreter",
         )
         interp_fn = osp.resolve_interpreter(bank)
-        with pytest.raises(SourceInterpretError, match="test-boom") as ei:
+        with pytest.raises(osp.SourceInterpretError, match="test-boom") as ei:
             interp_fn(
                 bank=bank,
                 payload=_sample_payload(),

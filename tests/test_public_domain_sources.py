@@ -19,6 +19,21 @@ SAMPLE_MANIFEST = (
 MODULE_PATH = REPO / "nodes" / "_otr_public_domain_sources.py"
 
 
+@pytest.fixture(autouse=True)
+def _production_story_routing_root(monkeypatch):
+    """Keep these tests independent of synthetic registry tests run earlier."""
+    from nodes import _otr_story_routing as routing
+
+    monkeypatch.setattr(
+        routing,
+        "_STORY_PACKS_ROOT",
+        REPO / "nodes" / "story_packs",
+    )
+    routing._clear_caches()
+    yield
+    routing._clear_caches()
+
+
 def _manifest():
     return pd.load_public_domain_manifest(SAMPLE_MANIFEST)
 
