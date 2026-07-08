@@ -377,6 +377,11 @@ CAPABILITIES = {
     # only; missing Google key fails loud at invoke.
     "google_omni_video": {"required_toolchain": None, "requires_sidecar": False,
                           "cpu_ok": True, "model_requirements": []},
+    # google_veo_video (2026-07-08): direct Google Veo 3.1 BYO API text-to-video
+    # lane via predictLongRunning. Provider-side render, no local weights/VRAM.
+    # Selectable only; missing Google key fails loud at invoke.
+    "google_veo_video": {"required_toolchain": None, "requires_sidecar": False,
+                         "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 

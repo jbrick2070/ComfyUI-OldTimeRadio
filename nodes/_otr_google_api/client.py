@@ -193,6 +193,28 @@ def get_json(
     return parsed
 
 
+def post_json(
+    path: str,
+    payload: dict[str, Any],
+    *,
+    timeout_s: int | None = None,
+    _api_key: str | None = None,
+    _post: Any | None = None,
+) -> dict[str, Any]:
+    """POST a Google API JSON resource using the shared BYO-key auth."""
+    if not isinstance(payload, dict):
+        raise GoogleAPIRequestShapeError("Google payload must be a dict.")
+    key = _api_key or resolve_api_key()
+    timeout = int(timeout_s or os.environ.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
+    post = _post or _post_json
+    parsed = post(path, payload, api_key=key, timeout_s=timeout)
+    if not isinstance(parsed, dict):
+        raise GoogleAPIRequestShapeError(
+            "Google API JSON POST did not return a JSON object."
+        )
+    return parsed
+
+
 def download_media(
     path_or_url: str,
     *,
@@ -271,5 +293,6 @@ __all__ = [
     "create_interaction",
     "download_media",
     "get_json",
+    "post_json",
     "resolve_api_key",
 ]
