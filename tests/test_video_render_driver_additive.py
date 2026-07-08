@@ -660,10 +660,10 @@ def test_character_3d_request_missing_inputs_fails_closed():
         VideoRequest.model_validate(req)
 
 
-def test_google_text_only_request_prunes_audio_and_init_refs():
-    """Direct Google video is strict text-to-video today: the shared builder
-    must not hand it per-beat audio or still refs just because those are
-    available elsewhere in the episode."""
+def test_google_veo_request_prunes_audio_but_keeps_scene_still():
+    """Direct Google Veo cannot consume OTR audio refs, but it can use Veo's
+    documented start-image path. The shared builder must keep the per-beat
+    scene still and prune only unsupported audio/video refs."""
     from nodes._otr_video_engines.schemas import VideoRequest
 
     led = {
@@ -676,7 +676,7 @@ def test_google_text_only_request_prunes_audio_and_init_refs():
         "images": {"images": [
             {"object_id": "c07", "kind": "portrait", "path": "X:/img/c07.png"},
             {"object_id": "still_b010", "kind": "scene_character",
-             "path": "X:/img/still_b010.png"},
+             "beat_id": "b010", "path": "X:/img/still_b010.png"},
         ]},
         "video": {"video_revision": 1, "fps": 25, "shots": [
             {"shot_id": "shot_b010", "source_line_ids": ["b010"],
@@ -691,7 +691,36 @@ def test_google_text_only_request_prunes_audio_and_init_refs():
     assert req["family_hint"] == "text_to_video"
     assert req["text_prompt"]
     assert req["audio_ref"] is None
-    assert "init_image" not in req["asset_refs"]
+    assert req["asset_refs"]["init_image"] == "X:/img/still_b010.png"
+    assert req["observability"]["init_source"] == "scene_still"
+
+
+def test_google_veo_video_art_music_open_uses_scene_still_and_style_prompt():
+    """A Google all-cloud music/open beat must not fall back to the generic
+    1940s-studio host prompt. It should carry the generated scene still plus the
+    selected video_art motion/style language."""
+    led = _still_pan_opener_ledger()
+    led["meta"] = {
+        "visual_style": "video_art",
+        "style": "media archive mystery",
+        "story_brief_terms": {
+            "setting": ["film archive vault", "catalog desk"],
+            "atmosphere": ["contemplative signal mystery"],
+        },
+    }
+    shot = dict(led["video"]["shots"][0])
+    shot["engine_id"] = "google_veo_video"
+    shot["family"] = "text_to_video"
+    shot["creative"] = {}
+    req = rd.build_request_from_shot(shot, led)
+    prompt = req["text_prompt"].lower()
+    assert req["audio_ref"] is None
+    assert req["asset_refs"]["init_image"] == "X:/img/still_b000_music_open.png"
+    assert "a 1940s radio studio" not in prompt
+    assert "phosphor" in prompt
+    assert "feedback" in prompt or "video-art" in prompt or "video art" in prompt
+    assert req["observability"]["visual_style"] == "video_art"
+    assert req["observability"]["prompt_source"] == "motion_role"
 
 
 def test_google_video_is_provider_side_not_local_for_reclaim():

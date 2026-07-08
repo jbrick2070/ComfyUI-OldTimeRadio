@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import base64
 import pathlib
 import shutil
 import subprocess
@@ -90,6 +91,10 @@ def test_google_veo_video_registers_and_capabilities():
     assert eng.default_roles == ()
     assert eng.required_inputs == ("text_prompt",)
     assert eng.native is False
+    assert eng.strict_text_only is False
+    assert eng.accepts_still is True
+    assert eng.accepts_init_image is True
+    assert eng.accepts_audio_ref is False
     assert eng.render_aspect == "wide"
     row = vreg.CAPABILITIES["google_veo_video"]
     assert row["cpu_ok"] is True
@@ -140,9 +145,7 @@ def test_bad_shape_fails_before_request(monkeypatch):
     eng = vreg.get_engine("google_veo_video")
     with pytest.raises(GoogleAPIRequestShapeError, match="blank text_prompt"):
         eng.render_clip(_req(text_prompt="  "), {})
-    with pytest.raises(GoogleAPIRequestShapeError, match="text-to-video only"):
-        eng.render_clip(_req(init_image="portrait.png"), {})
-    with pytest.raises(GoogleAPIRequestShapeError, match="text-to-video only"):
+    with pytest.raises(GoogleAPIRequestShapeError, match="audio/base_clip"):
         eng.render_clip(_req(audio_ref={"path": "voice.wav"}), {})
     monkeypatch.setenv("OTR_GOOGLE_VIDEO_MODEL_ID", "gemini-omni-flash-preview")
     with pytest.raises(GoogleAPIRequestShapeError, match="unsupported model"):
@@ -216,9 +219,50 @@ def test_request_shape_sends_predict_long_running_payload(monkeypatch, tmp_path)
     assert "no guns" in lower
     assert "no knives" in lower
     assert "no smoking" in lower
-    forbidden = {"seed", "tools", "audio", "image", "lastFrame", "referenceImages"}
+    forbidden = {"seed", "tools", "audio", "lastFrame", "referenceImages"}
     assert forbidden.isdisjoint(payload)
     assert forbidden.isdisjoint(payload["instances"][0])
+
+
+def test_request_payload_accepts_init_image_and_reference_images(monkeypatch, tmp_path):
+    _clear_video_env(monkeypatch)
+    first = tmp_path / "first.png"
+    ref1 = tmp_path / "ref1.png"
+    ref2 = tmp_path / "ref2.jpg"
+    first.write_bytes(b"\x89PNG\r\n\x1a\npng-bytes")
+    ref1.write_bytes(b"\x89PNG\r\n\x1a\nref-one")
+    ref2.write_bytes(b"\xff\xd8\xff\xe0ref-two")
+
+    payload = G._request_payload(
+        "veo-3.1-generate-preview",
+        _req(asset_refs={
+            "init_image": str(first),
+            "reference_images": [str(ref1), {"path": str(ref2)}],
+        }),
+    )
+    instance = payload["instances"][0]
+    assert set(instance) == {"prompt", "image", "referenceImages"}
+    assert instance["image"]["inlineData"]["mimeType"] == "image/png"
+    assert base64.b64decode(instance["image"]["inlineData"]["data"]) == first.read_bytes()
+    assert len(instance["referenceImages"]) == 2
+    assert instance["referenceImages"][0]["referenceType"] == "asset"
+    assert payload["parameters"]["durationSeconds"] == 8
+
+    with pytest.raises(GoogleAPIRequestShapeError, match="reference_images require"):
+        G._request_payload(
+            "veo-3.1-lite-generate-preview",
+            _req(asset_refs={"reference_images": [str(ref1)]}),
+        )
+    with pytest.raises(GoogleAPIRequestShapeError, match="last_frame requires"):
+        G._request_payload(
+            "veo-3.1-generate-preview",
+            _req(asset_refs={"last_frame": str(ref1)}),
+        )
+    with pytest.raises(GoogleAPIRequestShapeError, match="missing/absent"):
+        G._request_payload(
+            "veo-3.1-generate-preview",
+            _req(asset_refs={"init_image": str(tmp_path / "missing.png")}),
+        )
 
 
 def test_duration_aspect_and_lite_resolution_clamps(monkeypatch):

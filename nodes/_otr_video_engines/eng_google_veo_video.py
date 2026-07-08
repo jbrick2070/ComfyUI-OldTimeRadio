@@ -1,10 +1,11 @@
 """Google Veo 3.1 direct BYO-key video adapter.
 
-Direct Google Gemini API lane for short text-to-video clips using Veo's
+Direct Google Gemini API lane for short video clips using Veo's
 ``predictLongRunning`` REST endpoint. This adapter is not a Comfy Cloud Partner
-node and it never invokes a local video model. The first shipped surface is
-text-to-video only; image/video/reference extension paths fail loud before
-network until those request shapes are wired and tested.
+node and it never invokes a local video model. It supports text-to-video plus
+Veo's documented start-image/reference-image request shapes. Audio and video
+extension inputs still fail loud before network until those shapes are wired
+and tested.
 
 Import-time stays light: no Google SDK, PIL, NumPy, Torch, network, or Comfy
 runtime imports happen at module scope.
@@ -12,6 +13,8 @@ runtime imports happen at module scope.
 from __future__ import annotations
 
 import hashlib
+import base64
+import mimetypes
 import os
 import time
 from pathlib import Path
@@ -37,6 +40,10 @@ SUPPORTED_ASPECTS = ("16:9", "9:16")
 SUPPORTED_DURATIONS_S = (4, 6, 8)
 SUPPORTED_RESOLUTIONS = ("720p", "1080p", "4k")
 LITE_UNSUPPORTED_RESOLUTIONS = ("4k",)
+REFERENCE_IMAGE_MODELS = (
+    "veo-3.1-generate-preview",
+    "veo-3.1-fast-generate-preview",
+)
 OUTPUT_FPS = 24
 _TIMEOUT_S = 900
 _POLL_INTERVAL_S = 10
@@ -86,28 +93,108 @@ def _prompt(request) -> str:
     return append_visual_safety_clause(text)
 
 
-def _reject_unsupported_inputs(request) -> None:
+def _ref_path(ref) -> str:
+    if isinstance(ref, dict):
+        for key in ("path", "file", "filename", "uri"):
+            value = ref.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    if isinstance(ref, str):
+        return ref.strip()
+    return ""
+
+
+def _assets(request) -> dict:
     assets = _req_get(request, "asset_refs") or {}
-    a_get = assets.get if isinstance(assets, dict) else (
-        lambda k, d=None: getattr(assets, k, d)
-    )
-    init_image = a_get("init_image") or _req_get(request, "init_image")
-    reference_images = a_get("reference_images") or _req_get(request, "reference_images")
-    last_frame = a_get("last_frame") or _req_get(request, "last_frame")
+    return assets if isinstance(assets, dict) else {}
+
+
+def _asset_ref(request, *keys: str):
+    assets = _assets(request)
+    for key in keys:
+        value = assets.get(key)
+        if value:
+            return value
+    for key in keys:
+        value = _req_get(request, key)
+        if value:
+            return value
+    return None
+
+
+def _init_image_ref(request):
+    return _asset_ref(request, "init_image", "image", "still")
+
+
+def _last_frame_ref(request):
+    return _asset_ref(request, "last_frame")
+
+
+def _reference_image_refs(request) -> list:
+    raw = _asset_ref(request, "reference_images")
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple)):
+        refs = list(raw)
+    else:
+        refs = [raw]
+    refs = [r for r in refs if _ref_path(r)]
+    if len(refs) > 3:
+        raise GoogleAPIRequestShapeError(
+            "google_veo_video.render_clip: reference_images supports at most "
+            "3 images (no request sent)"
+        )
+    return refs
+
+
+def _mime_for_image(path: str) -> str:
+    mime = mimetypes.guess_type(path)[0] or ""
+    if mime not in ("image/png", "image/jpeg", "image/webp"):
+        raise GoogleAPIRequestShapeError(
+            "google_veo_video.render_clip: unsupported image MIME for %r; "
+            "expected png, jpeg, or webp (no request sent)" % path
+        )
+    return mime
+
+
+def _inline_image(ref, *, field: str) -> dict:
+    path = _ref_path(ref)
+    if not path:
+        raise GoogleAPIRequestShapeError(
+            "google_veo_video.render_clip: %s image ref was blank "
+            "(no request sent)" % field
+        )
+    p = Path(path)
+    if not p.is_file():
+        raise GoogleAPIRequestShapeError(
+            "google_veo_video.render_clip: %s image missing/absent on disk "
+            "%r (no request sent)" % (field, path)
+        )
+    data = p.read_bytes()
+    if not data:
+        raise GoogleAPIRequestShapeError(
+            "google_veo_video.render_clip: %s image %r was empty "
+            "(no request sent)" % (field, path)
+        )
+    return {
+        "inlineData": {
+            "mimeType": _mime_for_image(path),
+            "data": base64.b64encode(data).decode("ascii"),
+        }
+    }
+
+
+def _reject_unsupported_inputs(request) -> None:
     audio_ref = _req_get(request, "audio_ref")
     base_clip_ref = _req_get(request, "base_clip_ref")
     reference_videos = _req_get(request, "reference_videos")
-    if (
-        init_image
-        or reference_images
-        or last_frame
-        or audio_ref
-        or base_clip_ref
-        or reference_videos
-    ):
+    assets = _assets(request)
+    if assets.get("reference_videos"):
+        reference_videos = assets.get("reference_videos")
+    if audio_ref or base_clip_ref or reference_videos:
         raise GoogleAPIRequestShapeError(
-            "google_veo_video.render_clip: this adapter is text-to-video only; "
-            "image/audio/base_clip/reference inputs are not supported yet "
+            "google_veo_video.render_clip: audio/base_clip/reference video "
+            "inputs are not supported by this adapter yet "
             "(no request sent)"
         )
 
@@ -156,8 +243,8 @@ def _duration_target_s(request) -> float:
     return 8.0
 
 
-def _duration_s(request, *, resolution: str) -> int:
-    if resolution in ("1080p", "4k"):
+def _duration_s(request, *, resolution: str, has_reference_images: bool = False) -> int:
+    if resolution in ("1080p", "4k") or has_reference_images:
         return 8
     target = _duration_target_s(request)
     if target <= 5:
@@ -185,9 +272,36 @@ def _resolution(model: str) -> str:
 def _request_payload(model: str, request) -> dict:
     _reject_unsupported_inputs(request)
     resolution = _resolution(model)
-    duration = _duration_s(request, resolution=resolution)
+    init_image = _init_image_ref(request)
+    last_frame = _last_frame_ref(request)
+    refs = _reference_image_refs(request)
+    if last_frame and not init_image:
+        raise GoogleAPIRequestShapeError(
+            "google_veo_video.render_clip: last_frame requires init_image "
+            "(no request sent)"
+        )
+    if refs and model not in REFERENCE_IMAGE_MODELS:
+        raise GoogleAPIRequestShapeError(
+            "google_veo_video.render_clip: reference_images require a Veo 3.1 "
+            "or Veo 3.1 Fast model, got %r (no request sent)" % model
+        )
+    duration = _duration_s(request, resolution=resolution,
+                           has_reference_images=bool(refs))
+    instance = {"prompt": _prompt(request)}
+    if init_image:
+        instance["image"] = _inline_image(init_image, field="init_image")
+    if last_frame:
+        instance["lastFrame"] = _inline_image(last_frame, field="last_frame")
+    if refs:
+        instance["referenceImages"] = [
+            {
+                "image": _inline_image(ref, field="reference_images"),
+                "referenceType": "asset",
+            }
+            for ref in refs
+        ]
     return {
-        "instances": [{"prompt": _prompt(request)}],
+        "instances": [instance],
         "parameters": {
             "aspectRatio": _aspect(request),
             "durationSeconds": duration,
@@ -296,6 +410,17 @@ def _write_provider_video(
     path.write_bytes(data)
     operation_name = str(operation.get("name") or digest[:16])
     resolution = _resolution(model)
+    refs = _reference_image_refs(request)
+    init_image = _init_image_ref(request)
+    last_frame = _last_frame_ref(request)
+    if last_frame:
+        input_mode = "interpolation"
+    elif refs:
+        input_mode = "reference_images"
+    elif init_image:
+        input_mode = "image_to_video"
+    else:
+        input_mode = "text_to_video"
     return {
         "path": str(path),
         "content_type": "video/mp4",
@@ -303,9 +428,14 @@ def _write_provider_video(
         "provider_job_id": operation_name.rsplit("/", 1)[-1],
         "raw_meta": {
             "model": model,
+            "input_mode": input_mode,
+            "input_image_count": (1 if init_image else 0) + len(refs)
+            + (1 if last_frame else 0),
             "output_resolution": resolution,
             "output_fps": OUTPUT_FPS,
-            "output_duration_s": _duration_s(request, resolution=resolution),
+            "output_duration_s": _duration_s(
+                request, resolution=resolution,
+                has_reference_images=bool(refs)),
             "operation_name": operation_name,
         },
     }
@@ -313,7 +443,7 @@ def _write_provider_video(
 
 @register
 class GoogleVeoVideoEngine:
-    """Registered as ``google_veo_video``. Direct Veo text-to-video, BYO key."""
+    """Registered as ``google_veo_video``. Direct Veo video, BYO key."""
 
     name = "google_veo_video"
     roles = ("announcer_visual", "music_visual", "character_video")
@@ -326,7 +456,13 @@ class GoogleVeoVideoEngine:
     invocability_reason = ""
     native = False
     provider_side = True
-    strict_text_only = True
+    strict_text_only = False
+    accepts_audio_ref = False
+    accepts_base_clip_ref = False
+    accepts_init_image = True
+    accepts_reference_images = True
+    accepts_last_frame = True
+    accepts_still = True
     render_aspect = "wide"
 
     def load(self) -> None:

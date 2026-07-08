@@ -956,34 +956,58 @@ def _is_cloud_video_engine(engine_id: str) -> bool:
 
 
 def _prune_strict_text_only_request(req: dict, engine_id: str) -> dict:
-    """Remove optional refs a strict text-only provider adapter cannot accept.
+    """Remove optional refs the selected provider adapter cannot accept.
 
     The full episode builder often has per-beat audio and stills available even
     when the selected video engine is text-to-video. Local engines may use some
-    of those optional refs, so this is opt-in per adapter; strict text-only
-    Google providers should receive exactly text/canvas/timing/seeds.
+    of those optional refs, so this is opt-in per adapter; provider adapters can
+    declare ``accepts_*`` booleans to keep useful refs like Veo start frames
+    while still pruning unsupported audio/video refs before invoke.
     """
     eid = str(engine_id or "")
     try:
-        strict = bool(
-            eid and _vreg.is_registered(eid)
-            and getattr(_vreg.get_engine(eid), "strict_text_only", False)
-        )
+        eng = _vreg.get_engine(eid) if eid and _vreg.is_registered(eid) else None
+        strict = bool(eng and getattr(eng, "strict_text_only", False))
     except Exception:  # noqa: BLE001 -- unknown engine validates later
+        eng = None
         strict = False
-    if not strict:
+    if not strict and eng is None:
         return req
 
+    def _accepts(attr: str, default: bool = True) -> bool:
+        if strict:
+            return False
+        if eng is None or not hasattr(eng, attr):
+            return default
+        return bool(getattr(eng, attr))
+
+    accepts_audio = _accepts("accepts_audio_ref")
+    accepts_base_clip = _accepts("accepts_base_clip_ref")
+    accepts_init = _accepts("accepts_init_image")
+    accepts_refs = _accepts("accepts_reference_images")
+    accepts_last_frame = _accepts("accepts_last_frame")
+
     removed = []
-    if req.get("audio_ref") is not None:
+    if not accepts_audio and req.get("audio_ref") is not None:
         req["audio_ref"] = None
         removed.append("audio_ref")
-    if req.get("base_clip_ref"):
+    if not accepts_base_clip and req.get("base_clip_ref"):
         req["base_clip_ref"] = None
         removed.append("base_clip_ref")
 
     assets = dict(req.get("asset_refs") or {})
-    for key in ("init_image", "image", "still", "reference_images", "last_frame"):
+    image_keys = ("init_image", "image", "still")
+    for key in image_keys:
+        if not accepts_init and key in assets:
+            assets.pop(key, None)
+            removed.append("asset_refs.%s" % key)
+    if not accepts_refs and "reference_images" in assets:
+        assets.pop("reference_images", None)
+        removed.append("asset_refs.reference_images")
+    if not accepts_last_frame and "last_frame" in assets:
+        assets.pop("last_frame", None)
+        removed.append("asset_refs.last_frame")
+    for key in ("reference_videos",):
         if key in assets:
             assets.pop(key, None)
             removed.append("asset_refs.%s" % key)
@@ -991,10 +1015,22 @@ def _prune_strict_text_only_request(req: dict, engine_id: str) -> dict:
 
     if removed:
         _LOG.info(
-            "[OTR.render_driver] strict text-only engine %s: pruned unsupported "
+            "[OTR.render_driver] engine %s: pruned unsupported "
             "request ref(s) %s before invoke",
             eid, ", ".join(removed))
     return req
+
+
+def _is_strict_text_only_engine(engine_id: str) -> bool:
+    """True for provider adapters that must receive text only."""
+    eid = str(engine_id or "")
+    try:
+        return bool(
+            eid and _vreg.is_registered(eid)
+            and getattr(_vreg.get_engine(eid), "strict_text_only", False)
+        )
+    except Exception:  # noqa: BLE001 -- unknown engine validates later
+        return False
 
 
 def _radio_is_host_redirect_applies(engine_id: str) -> bool:
@@ -1239,7 +1275,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         and _family not in ("audio_driven_face", "character_3d")
         and _eng_id != "ltx_audio_in"
     )
-    if ((_family in _SCENE_INIT_FAMILIES or _engine_scene_init_required)
+    _engine_scene_init_optional = bool(
+        _eng_id and _vreg.is_registered(_eng_id)
+        and getattr(_vreg.get_engine(_eng_id), "provider_side", False)
+        and getattr(_vreg.get_engine(_eng_id), "accepts_still", False)
+        and _family not in ("audio_driven_face", "character_3d")
+        and _eng_id not in ("ltx_audio_in", "still_pan", "still_flat", "still_word")
+    )
+    if ((_family in _SCENE_INIT_FAMILIES
+            or _engine_scene_init_required
+            or _engine_scene_init_optional)
             and not _requires_fodder):
         # NB: mesh_stage is family=image_to_video (IN _SCENE_INIT_FAMILIES), so
         # without the not-_requires_fodder guard this override would clobber the
@@ -1797,7 +1842,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # default for text engines. Precedence: M4 creative prompt (finished at
     # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
     # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
-    if (str(shot.get("engine_id") or "") in ("ltx_video", "wan_i2v", "ltx_audio_in")
+    _engine_id = str(shot.get("engine_id") or "")
+    _strict_text_only = _is_strict_text_only_engine(_engine_id)
+    _google_text_provider = _engine_id in ("google_veo_video", "google_omni_video")
+    if ((_engine_id in (
+            "ltx_video", "wan_i2v", "ltx_audio_in",
+            "google_veo_video", "google_omni_video")
+            or _strict_text_only)
             and not text_prompt and not _is_char_face_beat):
         # Round 5 F2: synthetic-open detection by STRUCTURE -- the ShotLock
         # beat-id suffix is definitive; empty source_line_ids counts only
@@ -1881,6 +1932,34 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                     "[OTR.render_driver] IA2V TALKING register: motion-clause "
                     "override on announcer bookend %s IGNORED (lip-sync "
                     "register outranks it)", shot.get("shot_id"))
+            if (_google_text_provider
+                    and _field_source.startswith("motion_registers:")):
+                try:
+                    from .._otr_story_brief_helpers import (  # type: ignore
+                        finish_visual_prompt, get_open_subject)
+                except ImportError:  # pragma: no cover -- flat test imports
+                    from _otr_story_brief_helpers import (  # type: ignore
+                        finish_visual_prompt, get_open_subject)
+                _meta = (ledger or {}).get("meta") or {}
+                _subject = get_open_subject(
+                    _shot_role, _is_synthetic_open, _meta, style=_vstyle)
+                _role_hint = (
+                    "single luminous radio receiver as the only visible "
+                    "subject")
+                if _shot_role == "announcer_visual":
+                    _role_hint = (
+                        "anthropomorphic radio receiver as the only visible "
+                        "host subject")
+                scene_prompt = finish_visual_prompt(
+                    _meta,
+                    f"{_subject}, {_role_hint}, {scene_prompt}",
+                    max_chars=620, style_tail=True, era_profile="still",
+                    style=_vstyle)
+                _field_source = (
+                    "open_subjects:%s+motion_registers:%s" %
+                    (("synthetic" if _is_synthetic_open
+                      else ("announcer" if _shot_role == "announcer_visual"
+                            else "default")), _motion_key))
             _LOG.warning("[OTR.render_driver] LTX MOTION: %s beat %s motion-"
                          "centric prompt (role=%s, %d chars): %.90s...",
                          _shot_role, shot.get("shot_id"), _motion_key,
