@@ -1,8 +1,7 @@
 """tests/test_visual_styles_b.py
 
 Visual-style TOTAL COVERAGE chunk B (STAGE3_TOTAL_COVERAGE_SUBPLAN v5 FINAL)
--- the 4 non-default packs (anime / cartoon / paper_origami /
-archival_documentary) AUTHOR the A1/A2-consumed field set in their own
+-- the non-default packs AUTHOR the A1/A2-consumed field set in their own
 voice. The r4 header requirement: every authored field CHANGED from the A1
 sci-fi defaults. Per-surface forced-meta delta tests + per-surface
 NEGATIVE-VOCAB smokes (r1 codex OPT: a styled surface must not carry the
@@ -27,7 +26,7 @@ _REPO = Path(__file__).resolve().parent.parent
 _STYLES_DIR = _REPO / "nodes" / "visual_styles"
 
 _NON_DEFAULT_IDS = ("anime", "archival_documentary", "cartoon",
-                    "paper_origami")
+                    "paper_origami", "storybook_engraving")
 
 #: The chunk-B AUTHORED field set (A1/A2-consumed surfaces). still_word_*
 #: fields are chunk-C and stay at the sci-fi defaults.

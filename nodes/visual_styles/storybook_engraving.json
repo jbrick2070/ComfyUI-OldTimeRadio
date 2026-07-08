@@ -1,0 +1,62 @@
+{
+  "style_id": "storybook_engraving",
+  "label": "Storybook Engraving",
+  "positive_tail": "storybook engraving illustration, fine ink hatching, hand-tinted color, theatrical illustrated plate",
+  "image_grade_tail": "crisp etched linework, warm hand-colored paper texture",
+  "broadcast_tail": "illustrated radio-play plate, clear antique print composition",
+  "allow_radio_tails": false,
+  "forbidden_terms": [
+    "photorealistic",
+    "35mm film",
+    "film grain",
+    "anime",
+    "cartoon",
+    "neon",
+    "futuristic",
+    "blood",
+    "gun",
+    "guns",
+    "knife",
+    "knives",
+    "smoking",
+    "cigarette"
+  ],
+  "era_tail": "classic illustrated storybook plate aesthetic",
+  "schema_version": "v2",
+  "portrait_look": "engraved storybook character portrait, fine crosshatching, hand-tinted costume color, warm parchment ground",
+  "portrait_look_talking": "engraved storybook talking portrait, clean ink contour, gentle hand-tinted color, readable lips",
+  "portrait_instruction_look": "illustrated as a hand-tinted storybook engraving, theatrical and era-consistent",
+  "scene_instruction_look": "hand-tinted engraved storybook scene, fine ink hatching, shallow theatrical staging",
+  "announcer_subject_face": "its tuning dial etched into an expressive storybook face -- two bright dial-eyes and a pleated speaker-grille mouth, an anthropomorphic engraved radio hosting the broadcast",
+  "announcer_subject_ltx_mouth": "{form} as a living engraved appliance face: its wide speaker grille bends into a large expressive mouth, clear inked lips open mid-speech, and its two round tuning dials are bright eyes -- a face-forward anthropomorphic radio rendered as hand-tinted line engraving, the radio cabinet itself filling the frame",
+  "announcer_subject_object": "presented as a tabletop radio rendered in fine line engraving, its wood cabinet, woven grille and glowing dial hand-tinted on warm paper",
+  "radio_object_look": "warm etched plate lighting, crisp paper texture",
+  "plate_look": "storybook stage set rendered in hand-tinted engraving",
+  "non_character_emblem_fallback": "a single emblematic engraved object representing {base}",
+  "still_word_title_mood_style": "abstract hand-tinted engraved mood plate, symbolic non-literal composition on warm paper, no lettering",
+  "open_subjects": {
+    "synthetic": "{form} warming up on an engraved tabletop, hand-tinted dials and tubes, warm paper glow",
+    "announcer": "{form} in an engraved broadcast booth, glowing warmly, etched dials and tubes",
+    "default": "{form} glowing warmly as a hand-tinted engraved radio, dials and tubes"
+  },
+  "motion_registers": {
+    "announcer": "Continuous shot, same console throughout. Etched dial needle glides. Hand-tinted highlights shimmer. Paper grain breathes softly. Slow illustrated dolly forward.",
+    "music_open": "Continuous shot, same console throughout. Dial sweeps across frequencies. Ink hatching brightens line by line. Paper glow rises. Measured dolly push forward.",
+    "music_close": "Continuous shot, same console throughout. Dial settles. Hand-tinted glow fades to amber. Ink shadows deepen gently. Slow dolly pull back.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Fine hatching ripples with rhythm. Paper texture shimmers. Slow orbit around speaker."
+  },
+  "still_word_typography": {
+    "noir": "engraved condensed capitals, sharp ink hatching",
+    "sci-fi": "etched geometric capitals, precise engraved edges",
+    "western": "hand-cut engraved slab capitals, rugged ink texture",
+    "pulp": "bold engraved poster capitals, thick hatched shadow",
+    "default": "clean storybook engraved capitals, even ink weight"
+  },
+  "still_word_backdrop": {
+    "noir": "deep charcoal ink-wash paper gradient, low etched lamplight",
+    "sci-fi": "cool steel-blue paper gradient, crisp engraved rim light",
+    "western": "warm ochre parchment gradient, low golden etched light",
+    "pulp": "rich crimson paper gradient, dramatic hatched side light",
+    "default": "warm umber paper gradient, gentle engraved center light"
+  }
+}

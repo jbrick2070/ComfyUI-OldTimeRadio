@@ -6,7 +6,7 @@ per STAGE3_SUBPLAN v5 section 4 + the r4 verify-at-build checklist).
 
 Pins:
   1. Widget surface: visual_style stays pinned at slot 24; choices ==
-     list_style_ids() exactly (registry order, all 5 styles live); default
+     list_style_ids() exactly (registry order, all styles live); default
      sci_fi_radio.
   2. Registration fail-loud: a broken style registry RAISES out of
      INPUT_TYPES (deliberate convention exception -- no baked-in list).
@@ -64,9 +64,9 @@ class TestWidgetSurface:
         choices, meta = spec["optional"]["visual_style"]
         assert choices == list(vs.list_style_ids())
         assert meta["default"] == "sci_fi_radio"
-        # ALL styles are live (no execution lane); the 4 non-defaults listed.
+        # ALL styles are live (no execution lane); known non-defaults listed.
         for sid in ("anime", "cartoon", "paper_origami",
-                    "archival_documentary"):
+                    "archival_documentary", "storybook_engraving"):
             assert sid in choices
 
 

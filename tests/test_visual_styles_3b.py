@@ -1,12 +1,12 @@
 """tests/test_visual_styles_3b.py
 
-Multi-modal story schema STAGE 3 CHUNK 3B -- the four non-default visual-style
-packs (anime / cartoon / paper_origami / archival_documentary), ADDRESSABLE but
+Multi-modal story schema STAGE 3 CHUNK 3B -- the non-default visual-style
+packs, ADDRESSABLE but
 DORMANT (no production episode can select them until the 3C widget stamps
 meta["visual_style"]; addressability is proven HERE by forced meta only).
 
 Pins (STAGE3_SUBPLAN v5 section 3):
-  1. Registry sweep covers all 5 packs; per-pack the v1 EXACT schema holds
+  1. Registry sweep covers all packs; per-pack the v1 EXACT schema holds
      (the loader enforces; these tests pin the authored VALUES + flags).
   2. Forced-meta spot tests: each non-default pack CHANGES the finished
      prompt at every TAIL seam; allow_radio_tails=false drops the broadcast
@@ -31,7 +31,7 @@ _REPO = Path(__file__).resolve().parent.parent
 _STYLES_DIR = _REPO / "nodes" / "visual_styles"
 
 _ALL_IDS = ("anime", "archival_documentary", "cartoon", "paper_origami",
-            "sci_fi_radio")
+            "sci_fi_radio", "storybook_engraving")
 _NON_DEFAULT_IDS = tuple(i for i in _ALL_IDS if i != "sci_fi_radio")
 
 # Chunk A1 (2026-07-05): the schema is v2 -- the v1 tail keys PLUS the 11
@@ -73,7 +73,7 @@ def _fresh_registry():
 # 1. Registry + authored values
 # ---------------------------------------------------------------------------
 class TestRegistry:
-    def test_all_five_registered_in_order(self):
+    def test_all_registered_in_order(self):
         assert vs.list_style_ids() == _ALL_IDS
 
     @pytest.mark.parametrize("style_id", _ALL_IDS)

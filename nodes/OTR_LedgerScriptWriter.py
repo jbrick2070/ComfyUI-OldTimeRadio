@@ -2162,8 +2162,9 @@ class OTR_LedgerScriptWriter:
                             "style language (tails); story content is "
                             "untouched. sci_fi_radio = the production look "
                             "(default, byte-identical). anime / cartoon / "
-                            "paper_origami / archival_documentary are live "
-                            "immediately. Unknown id fails LOUD before any "
+                            "paper_origami / archival_documentary / "
+                            "storybook_engraving are live immediately. "
+                            "Unknown id fails LOUD before any "
                             "story work."
                         ),
                     },
