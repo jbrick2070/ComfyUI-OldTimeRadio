@@ -82,3 +82,10 @@ try:  # pragma: no cover - trivial guard
     from . import eng_cloud_image as _eng_cloud_image  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+# Direct Google Gemini/Nano Banana BYO API stills adapter. Not a Partner node and
+# not local GPU; registers as an external image engine with native=False.
+try:  # pragma: no cover - trivial guard
+    from . import eng_google_image as _eng_google_image  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

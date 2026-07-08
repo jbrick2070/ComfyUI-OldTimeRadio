@@ -146,6 +146,8 @@ CAPABILITIES = {
     # `ideo` -- plain cloud Ideogram scene-still (S1+1). node_key cloud_ideogram_v4.
     "ideo": {"required_toolchain": None,
              "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "google_image": {"required_toolchain": None,
+                     "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 

@@ -815,14 +815,20 @@ def _safe_engine(engine_id):
 
 
 def _is_cloud_image_engine(engine_id):
-    """True for Partner/cloud image engines, including friendly aliases whose
-    registry id is not ``cloud_*`` but whose adapter declares a cloud node_key."""
+    """True for external image engines that do not need the local GPU lease.
+
+    Includes Partner/cloud image engines and direct BYO API engines that declare
+    ``native=False``. Local wrappers omit ``native`` or set it truthy, so they
+    keep the lease behavior.
+    """
     eid = str(engine_id or "")
     if eid.startswith("cloud_"):
         return True
     eng = _safe_engine(eid)
     if eng is None:
         return False
+    if getattr(eng, "native", True) is False:
+        return True
     node_key = str(getattr(eng, "node_key", "") or "")
     return node_key.startswith("cloud_")
 
