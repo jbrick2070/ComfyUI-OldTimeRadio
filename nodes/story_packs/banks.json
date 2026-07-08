@@ -115,6 +115,7 @@
         "title_form_label": "Shakespeare radio adaptation",
         "coda_mode": "source_attribution",
         "manifest_path": "config/source_banks/shakespeare/curated_scenes.sample.json",
+        "selection_mode": "random",
         "source_ref": "folger-macbeth:act1-scene3-witches"
       },
       "required_seams": [

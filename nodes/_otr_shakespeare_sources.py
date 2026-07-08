@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html
 import json
+import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -258,6 +259,18 @@ def resolve_shakespeare_scene(manifest: dict[str, Any], source_ref: str) -> Shak
     raise ShakespeareSourceRefError(f"unknown shakespeare source_ref {ref!r}")
 
 
+def select_shakespeare_scene_ref(manifest: dict[str, Any], *, rng: Any | None = None) -> str:
+    """Pick a curated scene from a validated manifest for blank source_ref runs."""
+    checked = validate_shakespeare_manifest(manifest)
+    scenes = checked["scenes"]
+    chooser = rng if rng is not None else random.SystemRandom()
+    try:
+        scene = chooser.choice(scenes)
+    except AttributeError:  # pragma: no cover -- defensive for minimal RNG shims
+        scene = scenes[chooser.randrange(len(scenes))]
+    return str(scene["source_ref"])
+
+
 def canonicalize_shakespeare_text(text: Any, *, max_chars: int = 12000) -> str:
     """Normalize a curated Shakespeare scene excerpt."""
     raw = html.unescape(str(text or "")).replace("\ufeff", "")
@@ -348,7 +361,11 @@ def source_meta_from_scene(resolved: ShakespeareScene) -> dict[str, Any]:
 
 
 def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceFetchResult":
-    """Load a manifest-local curated Shakespeare scene."""
+    """Load a manifest-local curated Shakespeare scene.
+
+    Explicit source_ref pins a scene. Blank source_ref defaults to a random
+    manifest scene so the Shakespeare pack behaves like a story deck.
+    """
     defaults = getattr(bank, "defaults", {}) or {}
     if not isinstance(defaults, dict):
         raise ShakespeareManifestError("shakespeare bank defaults must be a dict")
@@ -356,15 +373,26 @@ def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceF
         str(defaults.get("manifest_path", "")),
         key="manifest_path",
     )
-    effective_ref = str(source_ref or defaults.get("source_ref", "") or "").strip()
+    manifest = load_shakespeare_manifest(manifest_path)
+    effective_ref = str(source_ref or "").strip()
+    selection_mode = str(defaults.get("selection_mode", "random") or "random").strip().lower()
+    if not effective_ref:
+        if selection_mode in {"random", "random_scene", "shuffle"}:
+            effective_ref = select_shakespeare_scene_ref(manifest)
+        elif selection_mode in {"fixed", "default", "pinned"}:
+            effective_ref = str(defaults.get("source_ref", "") or "").strip()
+        else:
+            bank_id = getattr(bank, "source_bank_id", "shakespeare")
+            raise ShakespeareManifestError(
+                f"source_bank {bank_id!r} has unsupported Shakespeare "
+                f"selection_mode {selection_mode!r}; expected random or fixed"
+            )
     if not effective_ref:
         bank_id = getattr(bank, "source_bank_id", "shakespeare")
         raise ShakespeareSourceRefError(
-            f"source_bank {bank_id!r} requires source_ref or defaults.source_ref; "
-            "there is no fallback"
+            f"source_bank {bank_id!r} fixed selection requires defaults.source_ref"
         )
 
-    manifest = load_shakespeare_manifest(manifest_path)
     resolved = resolve_shakespeare_scene(manifest, effective_ref)
     text_path = manifest_path.parent / resolved.scene["text_path"]
     try:
@@ -594,6 +622,7 @@ __all__ = [
     "parse_folger_scene",
     "payload_from_scene",
     "resolve_shakespeare_scene",
+    "select_shakespeare_scene_ref",
     "source_meta_from_scene",
     "source_rights_from_scene",
     "validate_shakespeare_manifest",

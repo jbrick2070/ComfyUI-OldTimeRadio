@@ -6,6 +6,7 @@ import ast
 import importlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -38,15 +39,61 @@ def _manifest():
     return shx.load_shakespeare_manifest(SAMPLE_MANIFEST)
 
 
+def _write_two_scene_manifest(tmp_path: Path) -> tuple[Path, str, str]:
+    manifest = _manifest()
+    first = dict(manifest["scenes"][0])
+    second = dict(first)
+    first["text_path"] = "fixtures/first.txt"
+    second.update({
+        "source_ref": "folger-temp:act2-scene1-second",
+        "play_code": "Tmp",
+        "play_title": "Tempest",
+        "act": 2,
+        "scene": 1,
+        "scene_label": "Act 2, Scene 1 - a second selected scene",
+        "synopsis": "A second fixture scene proves blank source_ref can draw from the deck.",
+        "text_path": "fixtures/second.txt",
+    })
+    manifest["scenes"] = [first, second]
+    fixtures = tmp_path / "fixtures"
+    fixtures.mkdir()
+    (fixtures / "first.txt").write_text(
+        "FIRST WITCH: A first fixture line.", encoding="utf-8")
+    (fixtures / "second.txt").write_text(
+        "PROSPERO: A second fixture line.", encoding="utf-8")
+    manifest_path = tmp_path / "curated_scenes.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path, first["source_ref"], second["source_ref"]
+
+
 def test_sample_manifest_validates():
     manifest = _manifest()
     assert manifest["schema_version"] == "v1"
+    assert len(manifest["scenes"]) >= 10
     scene = manifest["scenes"][0]
     assert scene["source_ref"] == "folger-macbeth:act1-scene3-witches"
     assert scene["play_title"] == "Macbeth"
     assert scene["commercial_use_allowed"] is False
     assert scene["license_label"] == "CC BY-NC 3.0"
     assert scene["recommended_word_budget"] == 300
+
+
+def test_scene_deck_has_source_links_and_safe_prompt_terms():
+    manifest = _manifest()
+    forbidden = ("blood", "gun", "guns", "knife", "knives", "smoking", "cigarette")
+    play_titles = {scene["play_title"] for scene in manifest["scenes"]}
+    assert len(play_titles) >= 8
+    for scene in manifest["scenes"]:
+        assert scene["source_url"].startswith(
+            "https://www.folger.edu/explore/shakespeares-works/")
+        text_path = SAMPLE_MANIFEST.parent / scene["text_path"]
+        assert text_path.is_file()
+        hay = " ".join([
+            scene["synopsis"],
+            scene["scene_label"],
+            text_path.read_text(encoding="utf-8"),
+        ]).casefold()
+        assert not any(term in hay for term in forbidden)
 
 
 def test_manifest_unknown_keys_and_rights_fail_loud():
@@ -98,6 +145,17 @@ def test_resolve_shakespeare_scene_fails_loud():
         shx.resolve_shakespeare_scene(_manifest(), "Mac:nope")
 
 
+def test_select_shakespeare_scene_ref_uses_manifest_deck(tmp_path):
+    manifest_path, _first_ref, second_ref = _write_two_scene_manifest(tmp_path)
+    manifest = shx.load_shakespeare_manifest(manifest_path)
+
+    class PickSecond:
+        def choice(self, items):
+            return items[1]
+
+    assert shx.select_shakespeare_scene_ref(manifest, rng=PickSecond()) == second_ref
+
+
 def test_payload_from_scene_has_exact_legacy_keys():
     resolved = shx.resolve_shakespeare_scene(
         _manifest(),
@@ -129,16 +187,21 @@ def test_sidecars_are_separate_and_noncommercial():
     assert "source_meta" not in payload
 
 
-def test_fetch_shakespeare_scene_uses_default_ref_and_sidecars():
+def test_fetch_shakespeare_scene_blank_ref_selects_from_manifest_and_sidecars(monkeypatch):
     from nodes import _otr_story_routing as routing
 
     bank = routing.get_bank("shakespeare")
+    monkeypatch.setattr(
+        shx,
+        "select_shakespeare_scene_ref",
+        lambda manifest: "folger-macbeth:act1-scene3-witches",
+    )
     result = shx.fetch_shakespeare_scene(bank=bank)
     payload, meta, rights = osp.normalize_fetch_result(
         result, origin="shakespeare_folger")
     assert set(payload) == osp.SOURCE_PAYLOAD_KEYS
     assert payload["headline"] == "Macbeth, Act 1, Scene 3"
-    assert "Three witches greet Macbeth" in payload["summary"]
+    assert "Three watchers greet Macbeth" in payload["summary"]
     assert "FIRST WITCH" in payload["full_text"]
     assert meta["source_ref"] == "folger-macbeth:act1-scene3-witches"
     assert meta["play_title"] == "Macbeth"
@@ -146,8 +209,34 @@ def test_fetch_shakespeare_scene_uses_default_ref_and_sidecars():
     assert rights["license_url"] == "https://www.folger.edu/copyright-policy/"
 
 
-def test_fetch_shakespeare_scene_honors_explicit_ref():
+def test_fetch_shakespeare_scene_blank_ref_randomizes_across_manifest(
+    tmp_path, monkeypatch,
+):
+    manifest_path, _first_ref, second_ref = _write_two_scene_manifest(tmp_path)
+    bank = SimpleNamespace(
+        source_bank_id="shakespeare",
+        defaults={"manifest_path": str(manifest_path)},
+    )
+    monkeypatch.setattr(
+        shx,
+        "select_shakespeare_scene_ref",
+        lambda manifest: second_ref,
+    )
+
+    result = shx.fetch_shakespeare_scene(bank=bank)
+
+    assert result.source_meta["source_ref"] == second_ref
+    assert result.source_meta["play_title"] == "Tempest"
+    assert "second fixture line" in result.payload["full_text"]
+
+
+def test_fetch_shakespeare_scene_honors_explicit_ref(monkeypatch):
     from nodes import _otr_story_routing as routing
+
+    def _should_not_randomize(_manifest):
+        raise AssertionError("explicit source_ref should bypass random selection")
+
+    monkeypatch.setattr(shx, "select_shakespeare_scene_ref", _should_not_randomize)
 
     bank = routing.get_bank("shakespeare")
     result = shx.fetch_shakespeare_scene(
@@ -158,15 +247,16 @@ def test_fetch_shakespeare_scene_honors_explicit_ref():
 
 
 def test_fetch_shakespeare_scene_missing_defaults_fail_loud():
-    from types import SimpleNamespace
-
     bank = SimpleNamespace(source_bank_id="shakespeare", defaults={})
     with pytest.raises(shx.ShakespeareManifestError, match="manifest_path"):
         shx.fetch_shakespeare_scene(bank=bank)
 
     bank = SimpleNamespace(
         source_bank_id="shakespeare",
-        defaults={"manifest_path": str(SAMPLE_MANIFEST)},
+        defaults={
+            "manifest_path": str(SAMPLE_MANIFEST),
+            "selection_mode": "fixed",
+        },
     )
     with pytest.raises(shx.ShakespeareSourceRefError, match="source_ref"):
         shx.fetch_shakespeare_scene(bank=bank)
