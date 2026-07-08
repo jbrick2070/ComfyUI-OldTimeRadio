@@ -192,11 +192,18 @@ def test_dropdown_empty_cache_marks_all_curated_not_downloaded(empty_hub_root):
     assert {e.repo_id for e in entries} == active_ids
     by_id = catalog._by_repo_id()
     for e in entries:
-        if by_id[e.repo_id].provider != "local":
+        provider = by_id[e.repo_id].provider
+        if provider == "gguf_native":
+            assert isinstance(e.on_disk, bool)
+            assert e.label == e.repo_id + catalog.LOCAL_GGUF_SUFFIX
+            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
+        elif provider != "local":
             assert e.on_disk is True
             assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
         else:
             assert e.on_disk is False
+            if catalog._is_google_gemma_local_row(e.repo_id):
+                assert catalog.LOCAL_HF_SUFFIX in e.label
             assert e.label.endswith(catalog.NOT_DOWNLOADED_SUFFIX)
 
 
@@ -208,11 +215,16 @@ def test_dropdown_with_mistral_nemo_marks_only_that_on_disk(hub_root_with_mistra
             assert e.on_disk is True
             assert e.label == catalog.DEFAULT_LLM
             assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
+        elif by_id.get(e.repo_id) and by_id[e.repo_id].provider == "gguf_native":
+            assert e.label == e.repo_id + catalog.LOCAL_GGUF_SUFFIX
+            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
         elif by_id.get(e.repo_id) and by_id[e.repo_id].provider != "local":
             assert e.on_disk is True
             assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
         else:
             assert e.on_disk is False
+            if catalog._is_google_gemma_local_row(e.repo_id):
+                assert catalog.LOCAL_HF_SUFFIX in e.label
             assert e.label.endswith(catalog.NOT_DOWNLOADED_SUFFIX)
 
 
@@ -343,6 +355,31 @@ def test_validator_strips_not_downloaded_suffix(empty_hub_root, monkeypatch):
     labelled = catalog.DEFAULT_LLM + catalog.NOT_DOWNLOADED_SUFFIX
     out = catalog.validate_model_id(labelled, hub_root=empty_hub_root)
     assert out == catalog.DEFAULT_LLM
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        (
+            catalog.TEST_TECHNICAL_LLM + catalog.LOCAL_HF_SUFFIX,
+            catalog.TEST_TECHNICAL_LLM,
+        ),
+        (
+            catalog.TEST_TECHNICAL_LLM
+            + catalog.LOCAL_HF_SUFFIX
+            + catalog.NOT_DOWNLOADED_SUFFIX,
+            catalog.TEST_TECHNICAL_LLM,
+        ),
+        (
+            "unsloth/gemma-4-12b-it-GGUF" + catalog.LOCAL_GGUF_SUFFIX,
+            "unsloth/gemma-4-12b-it-GGUF",
+        ),
+    ],
+)
+def test_validator_strips_local_display_suffixes(empty_hub_root, monkeypatch, label, expected):
+    monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
+    out = catalog.validate_model_id(label, hub_root=empty_hub_root)
+    assert out == expected
 
 
 def test_validator_admits_curated(empty_hub_root):

@@ -46,6 +46,8 @@ _REMOVED_GEMMA4_12B_MODEL_IDS: frozenset[str] = frozenset({"google/gemma-4-12b-i
 # present in the local HF cache. Validator strips this before any
 # allow-list check; outputs / meta keys MUST broadcast the stripped id.
 NOT_DOWNLOADED_SUFFIX = " [NOT DOWNLOADED]"
+LOCAL_HF_SUFFIX = " [LOCAL HF]"
+LOCAL_GGUF_SUFFIX = " [LOCAL GGUF]"
 
 # ---------------------------------------------------------------------------
 # CuratedModel dataclass + curated set
@@ -536,6 +538,42 @@ def _snapshot_is_causal_lm(snapshot_path: str | None) -> bool:
     return any(isinstance(a, str) and a.endswith("ForCausalLM") for a in archs)
 
 
+def _is_google_gemma_local_row(repo_id: str) -> bool:
+    """True for local Google-owned Gemma HF rows that need a UI label.
+
+    Direct Google API models live behind ``google_api:slot-a/b`` and the
+    separate slot pickers. Rows matching this predicate are local HuggingFace
+    weights despite their ``google/...`` namespace, so the dropdown labels must
+    say so visibly.
+    """
+    return isinstance(repo_id, str) and repo_id.startswith("google/gemma")
+
+
+def _display_label_for_local_row(repo_id: str, *, local_kind: str = "hf") -> str:
+    """Return the user-facing label for a local model row.
+
+    The returned label is still a string COMBO value, so
+    ``_strip_label_suffix`` must keep it round-trippable to ``repo_id``.
+    """
+    if local_kind == "gguf":
+        return repo_id + LOCAL_GGUF_SUFFIX
+    if _is_google_gemma_local_row(repo_id):
+        return repo_id + LOCAL_HF_SUFFIX
+    return repo_id
+
+
+def _gguf_native_row_on_disk() -> bool:
+    """Side-effect-free GGUF presence probe for dropdown metadata."""
+    try:
+        from . import _otr_gguf_backend as _gguf
+    except Exception:  # noqa: BLE001 -- catalog dropdowns must be import-safe
+        return False
+    try:
+        return _gguf.resolve_gguf_path().exists()
+    except Exception:  # noqa: BLE001 -- keep INPUT_TYPES import-safe
+        return False
+
+
 def scan_local_llm_cache(hub_root: Path | None = None) -> list[ScanResult]:
     """Walk HF_HOME/hub/models--*/snapshots/* and return one ScanResult
     per resolved snapshot. Offline-only -- no HF API calls.
@@ -591,7 +629,17 @@ def build_dropdown_choices(
     entries: list[DropdownEntry] = []
     active = _active_curated_models()
     for m in active:
-        if getattr(m, "provider", "local") != "local":
+        provider = getattr(m, "provider", "local")
+        if provider == "gguf_native":
+            on_disk = _gguf_native_row_on_disk()
+            entries.append(DropdownEntry(
+                _display_label_for_local_row(m.repo_id, local_kind="gguf"),
+                m.repo_id,
+                on_disk,
+                curated=True,
+            ))
+            continue
+        if provider != "local":
             # Remote (OpenRouter / Comfy Credits): no local weights, so the
             # [NOT DOWNLOADED] suffix would be misleading. Show the clean
             # named handle and treat it as available (selectable) whenever
@@ -600,7 +648,9 @@ def build_dropdown_choices(
             entries.append(DropdownEntry(m.repo_id, m.repo_id, True, curated=True))
             continue
         on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
-        label = m.repo_id if on_disk else m.repo_id + NOT_DOWNLOADED_SUFFIX
+        label = _display_label_for_local_row(m.repo_id)
+        if not on_disk:
+            label += NOT_DOWNLOADED_SUFFIX
         entries.append(DropdownEntry(label, m.repo_id, on_disk, curated=True))
     curated_ids = {m.repo_id for m in active}
     for repo_id, result in scan.items():
@@ -617,7 +667,12 @@ def build_dropdown_choices(
         # are the explicit writer set. See BUG-LOCAL-257.
         if not _snapshot_is_causal_lm(result.snapshot_path):
             continue
-        entries.append(DropdownEntry(repo_id, repo_id, True, curated=False))
+        entries.append(DropdownEntry(
+            _display_label_for_local_row(repo_id),
+            repo_id,
+            True,
+            curated=False,
+        ))
     return entries
 
 
@@ -1001,10 +1056,18 @@ def _structural_reject(model_id: str) -> str | None:
 
 
 def _strip_label_suffix(model_id: str) -> str:
-    """Strip the [NOT DOWNLOADED] suffix if present."""
+    """Strip UI-only dropdown suffixes from a selected model id."""
     s = model_id.strip()
-    if s.endswith(NOT_DOWNLOADED_SUFFIX):
-        return s[: -len(NOT_DOWNLOADED_SUFFIX)].rstrip()
+    for suffix in (
+        NOT_DOWNLOADED_SUFFIX,
+        LOCAL_HF_SUFFIX,
+        LOCAL_GGUF_SUFFIX,
+    ):
+        if s.endswith(suffix):
+            s = s[: -len(suffix)].rstrip()
+    for suffix in (LOCAL_HF_SUFFIX, LOCAL_GGUF_SUFFIX):
+        if s.endswith(suffix):
+            s = s[: -len(suffix)].rstrip()
     return s
 
 
@@ -1623,6 +1686,8 @@ __all__ = [
     "TEST_TECHNICAL_LLM",
     "TEST_OVERSIZED_LLM",
     "NOT_DOWNLOADED_SUFFIX",
+    "LOCAL_HF_SUFFIX",
+    "LOCAL_GGUF_SUFFIX",
     "ALLOW_PATTERNS",
     "HARD_VRAM_CONTEXT_LIMIT",
     "CURATED_CONTEXT_OVERRIDES",

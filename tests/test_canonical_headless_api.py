@@ -120,7 +120,7 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     director = _node(prompt, "OTR_VideoDirector")
     assert writer["inputs"]["target_words"] == 30
     assert writer["inputs"]["creative_writing_model"] == \
-        "unsloth/gemma-4-12b-it-GGUF"
+        "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]"
     assert writer["inputs"]["technical_model"] == \
         "mistralai/Mistral-Nemo-Instruct-2407"
     assert str(director["inputs"]["announcer_video_model"]).startswith("viz_")

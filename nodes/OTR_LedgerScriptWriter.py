@@ -1701,8 +1701,8 @@ class OTR_LedgerScriptWriter:
             "optional": {
                 # S30 B2a: single model_id widget replaced by two slots.
                 # The catalog dropdown_choices() call scans the local HF
-                # cache live and applies the [NOT DOWNLOADED] suffix to
-                # curated entries that aren't on disk yet. Labels are
+                # cache live and applies display-only suffixes such as
+                # [LOCAL HF], [LOCAL GGUF], and [NOT DOWNLOADED]. Labels are
                 # stripped via _otr_model_catalog._strip_label_suffix
                 # before any consumer / meta stamp gets the value -- raw
                 # widget strings never reach downstream nodes.
@@ -1715,7 +1715,8 @@ class OTR_LedgerScriptWriter:
                             "(outline, cast, dialogue composer, polish, "
                             "style picker invention). Mistral-Nemo is "
                             "the C7 byte-identical audio baseline. "
-                            "Suffix tags like [NOT DOWNLOADED] are "
+                            "Suffix tags like [LOCAL HF], [LOCAL GGUF], "
+                            "and [NOT DOWNLOADED] are "
                             "stripped before HF lookup. To use a remote "
                             "OpenRouter model, set OPENROUTER_API_KEY and "
                             "pick OpenRouter A/B "
