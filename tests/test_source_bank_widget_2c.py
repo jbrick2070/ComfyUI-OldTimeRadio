@@ -5,7 +5,7 @@ widget on OTR_LedgerScriptWriter (kibitz-converged plan,
 kibitz-runs/2026-07-05-multimodal-2c/r4/final.md).
 
 Pins:
-  1. Widget surface: source_bank is the LAST optional entry; choices come
+  1. Widget surface: source_bank stays pinned at slot 23; choices come
      LIVE from the routing registry (exact list, registry order, including
      non-runnable banks -- the honest-error contract); default science_news.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
@@ -61,12 +61,14 @@ _NON_RUNNABLE_BANK = "public_domain_story"  # runnable:false lane pack (2B)
 # ---------------------------------------------------------------------------
 class TestWidgetSurface:
     def test_source_bank_positional_pin(self):
-        # Stage 3C (2026-07-06) appended visual_style at the END;
-        # source_bank now sits at -2 (renamed from ..._is_last_optional).
+        # Stage 3C (2026-07-06) appended visual_style after source_bank;
+        # Google API (2026-07-08) appended its slot pair after visual_style.
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
-        order = list(spec["optional"].keys())
-        assert order[-2] == "source_bank"
-        assert order[-1] == "visual_style"
+        order = list(spec["required"].keys()) + list(spec["optional"].keys())
+        assert order[23] == "source_bank"
+        assert order[24] == "visual_style"
+        assert order[25] == "google_api_slot_a_model"
+        assert order[26] == "google_api_slot_b_model"
 
     def test_choices_are_exactly_the_registry_in_order(self):
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
@@ -305,7 +307,7 @@ class TestHeadlessSurface:
         assert "source_bank" in pkg_wl
         assert "source_bank" in otr_api.CREATIVE_WHITELIST
 
-    def test_patch_widget_by_name_lands_slot_25(self):
+    def test_patch_widget_by_name_lands_slot_23(self):
         import otr_api
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         schemas = {
@@ -320,7 +322,9 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "source_bank", "science_news", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        # 25 after the style-engine consolidation removed 2 widgets;
-        # source_bank stays at slot 23 (was 25 pre-rip-out).
-        assert len(node1["widgets_values"]) == 25
+        # The Google API selectors were appended after visual_style; source_bank
+        # stays at slot 23 (was 25 before the style-engine consolidation).
+        assert len(node1["widgets_values"]) == 27
         assert node1["widgets_values"][23] == "science_news"
+        assert node1["widgets_values"][25] == "(select Google API model)"
+        assert node1["widgets_values"][26] == "(select Google API model)"

@@ -36,6 +36,8 @@ os.environ.setdefault("PYTORCH_NO_CUDA_MEMORY_CACHING", "1")
 # decorators. The decorators are guarded already, but pin the device
 # string for any module that reads it eagerly.
 os.environ.setdefault("OTR_TEST_MODE", "1")
+for _google_key_env in ("OTR_GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+    os.environ.pop(_google_key_env, None)
 
 
 # ---------------------------------------------------------------------------

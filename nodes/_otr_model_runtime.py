@@ -38,6 +38,8 @@ from . import _otr_loader_backends
 from . import _otr_model_catalog
 from . import _otr_model_loader
 from . import _otr_openrouter_backend
+from ._otr_google_api import llm as _otr_google_api_llm
+from ._otr_google_api import models as _otr_google_api_models
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +170,10 @@ BACKENDS_BY_KEY: dict[str, Any] = {
     # resident local model (C2).
     _otr_comfy_backend.COMFY_BACKEND_KEY:
         _otr_comfy_backend.ComfyCreditsBackend(),
+    # Google Gemini API own-key remote lane. Zero local VRAM; concrete model
+    # resolves from the writer's google_api_slot_a/b widgets.
+    _otr_google_api_models.GOOGLE_API_BACKEND_KEY:
+        _otr_google_api_llm.GoogleAPIBackend(),
     # Native GGUF Gemma 4 12B path: in-process llama-cpp-python, no sidecar.
     _otr_gguf_backend.GGUF_BACKEND_KEY:
         _otr_gguf_backend.GGUFNativeBackend(),

@@ -605,6 +605,9 @@ def _build_truncating_generate_fn(
     if cache_entry.get("provider") == "comfy_credits":
         from . import _otr_comfy_backend as _occ
         return _occ.make_comfy_credits_generate_fn(cache_entry)
+    if cache_entry.get("provider") == "google_api":
+        from ._otr_google_api import llm as _gai_llm
+        return _gai_llm.make_google_api_generate_fn(cache_entry)
     # [Local OpenAI] External local server lane for Gemma 4 12B. Same
     # provider-tag dispatch; zero ComfyUI-process VRAM.
     if cache_entry.get("provider") == "gguf_native":
@@ -1167,6 +1170,10 @@ def _resolve_inputs(
     # Stage 3C (2026-07-06): the visual_style widget selection; same
     # authoritative-value contract (gated by resolve_visual_style in run()).
     visual_style: str = "sci_fi_radio",
+    # Google BYO API direct LLM lane (2026-07-08). Stable handles stay in
+    # creative/technical_model; concrete Gemini model ids live here.
+    google_api_slot_a_model: str = "",
+    google_api_slot_b_model: str = "",
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1330,6 +1337,8 @@ def _resolve_inputs(
         "source_bank": str(source_bank or "science_news"),
         # Stage 3C: the ONE authoritative visual_style value (gated in run()).
         "visual_style": str(visual_style or "sci_fi_radio"),
+        "google_api_slot_a_model": str(google_api_slot_a_model or ""),
+        "google_api_slot_b_model": str(google_api_slot_b_model or ""),
     }
 
 
@@ -1643,6 +1652,8 @@ class OTR_LedgerScriptWriter:
         # "(enable Comfy Credits)" sentinel until OTR_ENABLE_COMFY_CREDITS=1.
         _comfy_slot_a_choices = _otr_model_catalog.comfy_catalog_dropdown_choices("a")
         _comfy_slot_b_choices = _otr_model_catalog.comfy_catalog_dropdown_choices("b")
+        _google_slot_a_choices = _otr_model_catalog.google_api_catalog_dropdown_choices("a")
+        _google_slot_b_choices = _otr_model_catalog.google_api_catalog_dropdown_choices("b")
         return {
             "required": {
                 "episode_title": ("STRING", {
@@ -2094,7 +2105,7 @@ class OTR_LedgerScriptWriter:
                 ),
                 # Stage 2C (multi-modal story schema, 2026-07-05) -- the
                 # story-path source_bank selector, APPENDED at the END of
-                # optional (widgets_values slot 25, BUG-LOCAL-097). Choices
+                # optional as combined widget slot 23, BUG-LOCAL-097. Choices
                 # come LIVE from the lazy story-routing registry (stable bank
                 # IDS as values; labels belong in tooltips only). NOTE: this
                 # call may RAISE (StoryRoutingError) -- a DELIBERATE exception
@@ -2121,7 +2132,7 @@ class OTR_LedgerScriptWriter:
                     },
                 ),
                 # Stage 3C (2026-07-06) -- the VISUAL STYLE selector, APPENDED
-                # at the END (widgets_values slot 26, BUG-LOCAL-097). Choices
+                # at the END as combined widget slot 24, BUG-LOCAL-097. Choices
                 # LIVE from the lazy visual-style registry; may RAISE
                 # (VisualStyleError) -- the same deliberate INPUT_TYPES
                 # exception as source_bank above (no-fallback law; a broken
@@ -2141,6 +2152,37 @@ class OTR_LedgerScriptWriter:
                             "paper_origami / archival_documentary are live "
                             "immediately. Unknown id fails LOUD before any "
                             "story work."
+                        ),
+                    },
+                ),
+                # Google BYO API direct LLM slot pickers (2026-07-08),
+                # APPENDED after source_bank/visual_style as combined widget
+                # slots 25/26. Passive: these bind concrete Gemini model ids
+                # only when creative_writing_model / technical_model selects
+                # google_api:slot-a/b. Choices are network-free at INPUT_TYPES.
+                "google_api_slot_a_model": (
+                    _google_slot_a_choices,
+                    {
+                        "default": _google_slot_a_choices[0],
+                        "tooltip": (
+                            "Google Gemini API model bound to "
+                            "'google_api:slot-a' (creative slot). Env-only "
+                            "auth: OTR_GOOGLE_API_KEY, GEMINI_API_KEY, or "
+                            "GOOGLE_API_KEY. Passive until the main model "
+                            "dropdown selects google_api:slot-a. No local "
+                            "fallback."
+                        ),
+                    },
+                ),
+                "google_api_slot_b_model": (
+                    _google_slot_b_choices,
+                    {
+                        "default": _google_slot_b_choices[0],
+                        "tooltip": (
+                            "Google Gemini API model bound to "
+                            "'google_api:slot-b' (technical slot). Use a "
+                            "structured-output capable text model for JSON "
+                            "passes. Env-only auth, no local fallback."
                         ),
                     },
                 ),
@@ -2438,6 +2480,11 @@ class OTR_LedgerScriptWriter:
         # production look, byte-identical. Validated fail-loud beside the
         # bank gate; stamped at meta["visual_style"] (the threading channel).
         visual_style="sci_fi_radio",
+        # Google BYO API slot pickers (2026-07-08), appended after visual_style.
+        # Default "" => unset; selecting google_api:slot-a/b with an unset slot
+        # fails loud before the HTTP request.
+        google_api_slot_a_model="",
+        google_api_slot_b_model="",
         # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
         # _refine_loop when a refine pass re-enters this body. All default to the
         # no-op so a normal (non-refine) call is byte-identical.
@@ -2558,6 +2605,15 @@ class OTR_LedgerScriptWriter:
         except Exception:  # noqa: BLE001 -- budget/binding setup is best-effort
             pass
 
+        try:
+            from ._otr_google_api import models as _gai_models
+            _gai_models.set_slot_bindings(
+                slot_a=google_api_slot_a_model,
+                slot_b=google_api_slot_b_model,
+            )
+        except Exception:  # noqa: BLE001 -- non-Google runs must stay unaffected
+            pass
+
         # --- A. Resolve all widget inputs (RSS fetch happens here) -----
         resolved = _resolve_inputs(
             target_words=target_words,
@@ -2590,6 +2646,8 @@ class OTR_LedgerScriptWriter:
             source_bank=source_bank,
             # Stage 3C: the visual_style widget selection (gated above).
             visual_style=visual_style,
+            google_api_slot_a_model=google_api_slot_a_model,
+            google_api_slot_b_model=google_api_slot_b_model,
         )
 
         # Stage 4 (2026-07-06): resolve the bank's story-content RULES once
@@ -5522,6 +5580,15 @@ class OTR_LedgerScriptWriter:
             # run records which remote model would serve each slot and how
             # fresh discovery was. {} when remote is disabled (C1 byte-ident).
             meta.update(_orb.openrouter_run_meta())
+        except Exception:  # noqa: BLE001 -- provenance must never break a run
+            pass
+
+        try:
+            from ._otr_google_api import models as _gai_models
+            meta.update(_gai_models.google_api_run_meta(
+                resolved["creative_writing_model"],
+                resolved["technical_model"],
+            ))
         except Exception:  # noqa: BLE001 -- provenance must never break a run
             pass
 

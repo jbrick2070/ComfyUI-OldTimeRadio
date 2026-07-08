@@ -604,6 +604,8 @@ class TestWriterB2aSurface:
         #  22  story_scaffold
         #  23  source_bank
         #  24  visual_style
+        #  25  google_api_slot_a_model
+        #  26  google_api_slot_b_model
         # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270);
         # the 2026-05-29 lean-down brought the vector to 19; S2 (2026-06-01)
         # appended the OpenRouter pair; Comfy Credits appended its sibling
@@ -613,11 +615,12 @@ class TestWriterB2aSurface:
         # appended visual_style -- bringing the vector to 27. The 2026-07-05
         # style-engine consolidation then DELETED style + style_custom
         # (slots 8/9), dropping the vector to 25 and shifting every
-        # subsequent slot down by 2.
-        assert len(wv) == 25, (
-            f"writer widgets_values length drift: {len(wv)} (expected 25 "
-            f"post style-engine consolidation: 27 minus the deleted "
-            f"style/style_custom pair)"
+        # subsequent slot down by 2. The Google BYO API direct LLM lane
+        # appended two passive model pickers on 2026-07-08, bringing the
+        # vector back to 27 without moving any prior slot.
+        assert len(wv) == 27, (
+            f"writer widgets_values length drift: {len(wv)} (expected 27 "
+            f"after appending the Google API slot picker pair)"
         )
         # Slot 14: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
@@ -696,6 +699,14 @@ class TestWriterB2aSurface:
         assert wv[24] in _vstyles.list_style_ids(), (
             f"visual_style (slot 24) value {wv[24]!r} is not a registered "
             f"style id: {_vstyles.list_style_ids()!r}"
+        )
+        assert wv[25] == "(select Google API model)", (
+            f"google_api_slot_a_model (slot 25) must ship the unselected "
+            f"sentinel; got {wv[25]!r}"
+        )
+        assert wv[26] == "(select Google API model)", (
+            f"google_api_slot_b_model (slot 26) must ship the unselected "
+            f"sentinel; got {wv[26]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

@@ -5,7 +5,7 @@ widget on OTR_LedgerScriptWriter (workflow slot 26; the 2C playbook applied
 per STAGE3_SUBPLAN v5 section 4 + the r4 verify-at-build checklist).
 
 Pins:
-  1. Widget surface: visual_style is the LAST optional entry; choices ==
+  1. Widget surface: visual_style stays pinned at slot 24; choices ==
      list_style_ids() exactly (registry order, all 5 styles live); default
      sci_fi_radio.
   2. Registration fail-loud: a broken style registry RAISES out of
@@ -50,10 +50,12 @@ def _fresh_registry():
 
 
 class TestWidgetSurface:
-    def test_visual_style_is_last_optional(self):
+    def test_visual_style_positional_pin(self):
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
-        order = list(spec["optional"].keys())
-        assert order[-1] == "visual_style"
+        order = list(spec["required"].keys()) + list(spec["optional"].keys())
+        assert order[24] == "visual_style"
+        assert order[25] == "google_api_slot_a_model"
+        assert order[26] == "google_api_slot_b_model"
 
     def test_choices_are_exactly_the_registry(self):
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
@@ -155,7 +157,7 @@ class TestHeadlessSurface:
         assert "visual_style" in pkg_wl
         assert "visual_style" in otr_api.CREATIVE_WHITELIST
 
-    def test_patch_widget_by_name_lands_slot_26(self):
+    def test_patch_widget_by_name_lands_slot_24(self):
         import otr_api
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         schemas = {
@@ -170,6 +172,8 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "visual_style", "anime", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 25
+        assert len(node1["widgets_values"]) == 27
         assert node1["widgets_values"][24] == "anime"
         assert node1["widgets_values"][23] == "science_news"
+        assert node1["widgets_values"][25] == "(select Google API model)"
+        assert node1["widgets_values"][26] == "(select Google API model)"

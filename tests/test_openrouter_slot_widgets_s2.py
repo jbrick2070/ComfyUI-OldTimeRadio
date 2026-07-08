@@ -3,8 +3,8 @@
 Pins the 2026-06-01 go-forward plan S2 contract (indices shifted -2 by
 the 2026-07-05 style-engine consolidation, which deleted the style /
 style_custom widgets that used to sit at [8, 9]):
-  * openrouter_slot_a_model / openrouter_slot_b_model are APPENDED at the
-    END of the optional block (indices 17/18); the existing [0..16] widget
+  * openrouter_slot_a_model / openrouter_slot_b_model are pinned at
+    indices 17/18; the existing [0..16] widget
     order is byte-for-byte unchanged (saved workflows bind by index --
     the BUG-LOCAL-258/253 index-drift trap).
   * creative_writing_model's default is CONDITIONAL: openrouter:slot-a when
@@ -53,9 +53,10 @@ def remote_on(monkeypatch):
 
 def test_widget_order_appends_slots_at_end():
     """The widget KEYS are env-independent: [0..16] frozen, OpenRouter slots
-    at 17/18, Comfy Credits slots appended at 19/20 (2026-06-01). Indices
-    shifted -2 by the 2026-07-05 style-engine consolidation (style /
-    style_custom widgets deleted)."""
+    at 17/18, Comfy Credits slots at 19/20 (2026-06-01), and the Google
+    API slots appended at 25/26 (2026-07-08). Indices shifted -2 by the
+    2026-07-05 style-engine consolidation (style / style_custom widgets
+    deleted)."""
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
     assert order[:17] == _EXPECTED_0_18, f"index drift in [0..16]: {order[:17]}"
@@ -67,7 +68,9 @@ def test_widget_order_appends_slots_at_end():
     assert order[22] == "story_scaffold"          # scaffold toggle (2026-06-24)
     assert order[23] == "source_bank"             # Stage 2C (2026-07-05)
     assert order[24] == "visual_style"            # Stage 3C (2026-07-06)
-    assert len(order) == 25
+    assert order[25] == "google_api_slot_a_model" # Google API (2026-07-08)
+    assert order[26] == "google_api_slot_b_model" # Google API (2026-07-08)
+    assert len(order) == 27
 
 
 # --- conditional creative default; technical never flips --------------------

@@ -158,6 +158,11 @@ def _writer_schemas() -> dict:
                     "visual_style": (
                         ["sci_fi_radio"], {"default": "sci_fi_radio"},
                     ),
+                    # Google API BYO-key lane (2026-07-08): appended at
+                    # indices 25/26 after visual_style to keep all older
+                    # positional widgets stable.
+                    "google_api_slot_a_model": ("STRING", {"default": ""}),
+                    "google_api_slot_b_model": ("STRING", {"default": ""}),
                 },
                 "optional": {},
             }
@@ -207,6 +212,8 @@ def _writer_node_fixture() -> dict:
                     "auto",                                   # 22 story_scaffold
                     "science_news",                           # 23 source_bank (2C)
                     "sci_fi_radio",                           # 24 visual_style (3C)
+                    "(select Google API model)",                # 25 google_api_slot_a_model
+                    "(select Google API model)",                # 26 google_api_slot_b_model
                 ],
             }
         ],
@@ -451,16 +458,17 @@ def test_round_trip_canonical_node1_inputs_correct():
     S2 (2026-06-01) appended openrouter_slot_a_model +
     openrouter_slot_b_model, Comfy Credits (2026-06-01) appended
     comfy_slot_a_model + comfy_slot_b_model, the refine loop, the
-    story-scaffold toggle, Stage 2C (source_bank), and Stage 3C
-    (visual_style) all appended at the END so creative/technical stay
-    at wv[3]/wv[4]. The 2026-07-05 style-engine consolidation then
-    deleted the `style` / `style_custom` widgets outright (they used to
-    sit at slots 8/9), dropping the vector from 27 to 25.
+    story-scaffold toggle, Stage 2C (source_bank), Stage 3C
+    (visual_style), and Google API slot pickers all appended at the END
+    so creative/technical stay at wv[3]/wv[4]. The 2026-07-05
+    style-engine consolidation then deleted the `style` / `style_custom`
+    widgets outright (they used to sit at slots 8/9), dropping the vector
+    from 27 to 25 before the 2026-07-08 Google pair brought it to 27.
     """
     dump = _dump_canonical_node1()
-    # 25 post style-engine consolidation (27 minus the deleted
-    # style/style_custom pair).
-    assert len(dump) == 25, f"node 1 widgets_values length drift: {len(dump)}"
+    # 27: 25 post style-engine consolidation plus the appended Google API
+    # slot pair.
+    assert len(dump) == 27, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

@@ -76,7 +76,7 @@ LLM_CACHE: dict[str, Any] = {
     "cache_entry": None,
 }
 
-_REMOTE_CACHE_PROVIDERS = frozenset({"openrouter", "comfy_credits"})
+_REMOTE_CACHE_PROVIDERS = frozenset({"openrouter", "comfy_credits", "google_api"})
 
 
 # ---------------------------------------------------------------------------
@@ -821,7 +821,7 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     # path below. Remote rows are zero-VRAM and do not disturb a resident
     # local model. The GGUF row is different: it is in-process VRAM and must
     # participate in the singleton cache/teardown discipline.
-    _REMOTE_DISPATCH_BACKENDS = ("openrouter_http", "comfy_credits_http")
+    _REMOTE_DISPATCH_BACKENDS = ("openrouter_http", "comfy_credits_http", "google_api_http")
     _GGUF_DISPATCH_BACKENDS = ("gguf_native",)
     _virtual_row = _otr_catalog._by_repo_id().get(normalized)
     if (
@@ -1007,6 +1007,9 @@ def make_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "comfy_credits":
         from ._otr_comfy_backend import make_comfy_credits_generate_fn
         return make_comfy_credits_generate_fn(cache_entry)
+    if cache_entry.get("provider") == "google_api":
+        from ._otr_google_api.llm import make_google_api_generate_fn
+        return make_google_api_generate_fn(cache_entry)
     # Native GGUF lane: in-process llama-cpp-python, no daemon or port.
     if cache_entry.get("provider") == "gguf_native":
         from ._otr_gguf_backend import make_gguf_generate_fn
@@ -1102,6 +1105,9 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "comfy_credits":
         from ._otr_comfy_backend import make_comfy_credits_generate_fn
         return make_comfy_credits_generate_fn(cache_entry)
+    if cache_entry.get("provider") == "google_api":
+        from ._otr_google_api.llm import make_google_api_generate_fn
+        return make_google_api_generate_fn(cache_entry)
     # Native GGUF lane: in-process llama-cpp-python, no daemon or port.
     if cache_entry.get("provider") == "gguf_native":
         from ._otr_gguf_backend import make_gguf_generate_fn

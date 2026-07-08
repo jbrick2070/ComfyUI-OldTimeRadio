@@ -76,6 +76,7 @@ class CuratedModel:
         "transformers_gptq_int4",
         "openrouter_http",
         "comfy_credits_http",
+        "google_api_http",
         "gguf_native",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
@@ -100,12 +101,13 @@ class CuratedModel:
     # every existing row uses; "openrouter" = a virtual row behind the
     # own-key OpenRouter API (S2); "comfy_credits" = a virtual row behind
     # ComfyUI's credit-billed partner-node proxy (2026-06-01);
+    # "google_api" = a virtual row behind the user's Gemini API key;
     # "gguf_native" = a virtual row backed by an in-process llama-cpp-python
     # GGUF loader. It is local VRAM, not a remote/HTTP zero-VRAM row.
     # Default "local" so every pre-existing row and any older fixture that
     # omits the field still constructs unchanged.
     provider: Literal[
-        "local", "openrouter", "comfy_credits", "gguf_native",
+        "local", "openrouter", "comfy_credits", "google_api", "gguf_native",
     ] = "local"
 
 
@@ -304,6 +306,45 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
     )
 
 
+def _google_api_virtual_rows() -> tuple[CuratedModel, ...]:
+    """The two virtual Google API rows -- present only when a Gemini API key
+    is configured. They target the Gemini API / Interactions surface. API keys
+    are read from environment at call time and never at import time."""
+    try:
+        from ._otr_google_api import models as _gai
+    except Exception:  # noqa: BLE001 -- catalog import must stay robust
+        return ()
+    if not _gai.google_api_enabled():
+        return ()
+    common = dict(
+        requires_auth=False,
+        loader_backend=_gai.GOOGLE_API_BACKEND_KEY,
+        vram_fit_tier="PASS",
+        approx_safetensors_gb=0.0,
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=_gai.DEFAULT_CONTEXT_WINDOW,
+        license="gated_terms",
+        license_audit_status="research_lane",
+        provider=_gai.GOOGLE_API_PROVIDER,
+    )
+    return (
+        CuratedModel(
+            repo_id=_gai.GOOGLE_API_SLOT_A_ID,
+            notes="Google Gemini API remote model A (own-key, zero local VRAM). "
+            "Concrete model comes from google_api_slot_a_model.",
+            **common,
+        ),
+        CuratedModel(
+            repo_id=_gai.GOOGLE_API_SLOT_B_ID,
+            notes="Google Gemini API remote model B (own-key, zero local VRAM). "
+            "Concrete model comes from google_api_slot_b_model.",
+            **common,
+        ),
+    )
+
+
 def _gguf_native_virtual_rows() -> tuple[CuratedModel, ...]:
     """The native GGUF Gemma 4 12B row.
 
@@ -370,6 +411,7 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
         _curated_with_gguf_native_peer()
         + _openrouter_virtual_rows()
         + _comfy_virtual_rows()
+        + _google_api_virtual_rows()
     )
 
 
@@ -909,6 +951,25 @@ def comfy_catalog_dropdown_choices(slot: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Google API slot model picker dropdowns (2026-07-08, direct BYO lane)
+# ---------------------------------------------------------------------------
+
+
+def google_api_catalog_dropdown_choices(slot: str) -> list[str]:
+    """Concrete Gemini model choices for google_api_slot_<slot>_model.
+
+    Network-free at INPUT_TYPES time: the list is the sentinel, then static
+    official text seeds when a key is present, plus any valid on-disk cache
+    entries. The actual key is read only by the backend at call time.
+    """
+    try:
+        from ._otr_google_api import models as _gai
+    except Exception:  # noqa: BLE001 -- INPUT_TYPES must stay robust
+        return ["(select Google API model)"]
+    return _gai.google_api_model_choices(slot)
+
+
+# ---------------------------------------------------------------------------
 # Validator
 # ---------------------------------------------------------------------------
 
@@ -1048,6 +1109,13 @@ def validate_model_id(
             f"is not enabled. Set OTR_ENABLE_COMFY_CREDITS=1 and log in to a "
             f"Comfy account with credits, then restart ComfyUI in a fresh "
             f"terminal. See docs/comfy-credits-setup.md."
+        )
+
+    if normalized.startswith("google_api:"):
+        raise UnknownModelError(
+            f"{normalized!r} is a Google API remote model, but no Gemini API "
+            f"key is configured. Set OTR_GOOGLE_API_KEY, GEMINI_API_KEY, or "
+            f"GOOGLE_API_KEY, then restart ComfyUI. No local fallback is used."
         )
 
     raise UnknownModelError(
@@ -1572,6 +1640,7 @@ __all__ = [
     "OPENROUTER_EMPTY_CACHE_SENTINEL",
     "comfy_catalog_dropdown_choices",
     "COMFY_ENABLE_SENTINEL",
+    "google_api_catalog_dropdown_choices",
     "validate_model_id",
     "estimate_model_size_gb",
     "auto_download_if_missing",
