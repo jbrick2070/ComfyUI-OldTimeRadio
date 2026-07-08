@@ -2164,7 +2164,8 @@ class OTR_LedgerScriptWriter:
                             "(default, byte-identical). anime / cartoon / "
                             "paper_origami / archival_documentary / "
                             "shakespeare_stage_realism / "
-                            "storybook_engraving are live immediately. "
+                            "storybook_engraving / video_art are live "
+                            "immediately. "
                             "Unknown id fails LOUD before any "
                             "story work."
                         ),

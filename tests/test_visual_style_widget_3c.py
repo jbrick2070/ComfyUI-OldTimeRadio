@@ -67,7 +67,7 @@ class TestWidgetSurface:
         # ALL styles are live (no execution lane); known non-defaults listed.
         for sid in ("anime", "cartoon", "paper_origami",
                     "archival_documentary", "shakespeare_stage_realism",
-                    "storybook_engraving"):
+                    "storybook_engraving", "video_art"):
             assert sid in choices
 
 

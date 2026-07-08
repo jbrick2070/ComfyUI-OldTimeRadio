@@ -27,7 +27,7 @@ _STYLES_DIR = _REPO / "nodes" / "visual_styles"
 
 _NON_DEFAULT_IDS = ("anime", "archival_documentary", "cartoon",
                     "paper_origami", "shakespeare_stage_realism",
-                    "storybook_engraving")
+                    "storybook_engraving", "video_art")
 
 #: The chunk-B AUTHORED field set (A1/A2-consumed surfaces). still_word_*
 #: fields are chunk-C and stay at the sci-fi defaults.

@@ -40,7 +40,7 @@ _STYLES_DIR = _REPO / "nodes" / "visual_styles"
 
 _NON_DEFAULT_IDS = ("anime", "archival_documentary", "cartoon",
                     "paper_origami", "shakespeare_stage_realism",
-                    "storybook_engraving")
+                    "storybook_engraving", "video_art")
 _GENRE_KEYS = ("noir", "sci-fi", "western", "pulp", "default")
 
 #: brief text that DRIVES each genre through _still_word_genre (status "ok" +

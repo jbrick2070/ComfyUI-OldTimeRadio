@@ -49,7 +49,7 @@ _PACK = _STYLES_DIR / "sci_fi_radio.json"
 
 _ALL_IDS = ("anime", "archival_documentary", "cartoon", "paper_origami",
             "sci_fi_radio", "shakespeare_stage_realism",
-            "storybook_engraving")
+            "storybook_engraving", "video_art")
 _NON_DEFAULT_IDS = tuple(i for i in _ALL_IDS if i != "sci_fi_radio")
 
 _NEW_STR_FIELDS = (

@@ -32,7 +32,7 @@ _STYLES_DIR = _REPO / "nodes" / "visual_styles"
 
 _ALL_IDS = ("anime", "archival_documentary", "cartoon", "paper_origami",
             "sci_fi_radio", "shakespeare_stage_realism",
-            "storybook_engraving")
+            "storybook_engraving", "video_art")
 _NON_DEFAULT_IDS = tuple(i for i in _ALL_IDS if i != "sci_fi_radio")
 
 # Chunk A1 (2026-07-05): the schema is v2 -- the v1 tail keys PLUS the 11
