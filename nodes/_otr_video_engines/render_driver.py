@@ -2544,6 +2544,52 @@ def _safe_clip_basename(text):
     return re.sub(r"[^A-Za-z0-9_.-]", "_", str(text or ""))[:80]
 
 
+def resolve_episode_id_for_clip_persistence(episode_id):
+    """Rename-proof the episode id used for durable clip/SFX persistence.
+
+    VideoRenderBatch receives the ShotLock ledger while the episode is still
+    named ``pending_<ts>``. SignalLostVideo may rename that episode directory to
+    the title slug before clips are rendered, so writing to
+    ``episodes/pending_<ts>/clips`` can re-create a stale folder and strand the
+    provider clips/SFX away from the real episode. Mirror the stills/master-audio
+    rename contract: if the pending dir is gone, re-key to the newest ledger's
+    episode dir and log loudly. Test mode leaves the id untouched unless tests
+    call the helper directly with the env cleared.
+    """
+    eid = str(episode_id or "").strip()
+    if not eid or not eid.startswith("pending_"):
+        return eid
+    if os.environ.get("OTR_TEST_MODE") == "1":
+        return eid
+    try:
+        from pathlib import Path
+        from .._otr_ledger import find_most_recent_ledger
+        from .._otr_paths import otr_episodes_root
+
+        episodes_root = Path(otr_episodes_root())
+        pending_dir = episodes_root / eid
+        if pending_dir.is_dir():
+            return eid
+        ledger_path = find_most_recent_ledger([episodes_root])
+        if not ledger_path:
+            return eid
+        new_episode_dir = Path(ledger_path).parent.parent
+        if (
+            new_episode_dir.is_dir()
+            and new_episode_dir.parent == episodes_root
+            and new_episode_dir.name != eid
+        ):
+            _LOG.warning(
+                "[OTR video] LOUD re-resolve: episode_id %r is a stale pending "
+                "id (dir renamed before clip persistence); clips/SFX re-keyed "
+                "to newest ledger episode dir %r.",
+                eid, new_episode_dir.name)
+            return new_episode_dir.name
+    except Exception as exc:  # noqa: BLE001 -- never block render on probe
+        _LOG.warning("[OTR video] clip episode-id re-resolve skipped: %s", exc)
+    return eid
+
+
 def persist_episode_clips(result, episode_id):
     """Move each rendered per-beat clip from the janitor-swept ``_shared/tmp``
     scratch tier to the DURABLE ``episodes/<ep>/clips/`` workspace (clip-fill
@@ -2559,6 +2605,7 @@ def persist_episode_clips(result, episode_id):
     clips = (result or {}).get("clips") or {}
     if not episode_id or not clips:
         return result
+    episode_id = resolve_episode_id_for_clip_persistence(episode_id)
     try:
         from .._otr_paths import otr_clips_dir
         dest_dir = str(otr_clips_dir(str(episode_id)))

@@ -297,6 +297,7 @@ class OTRVideoRenderBatch:
                         _cap_exc)
         episode_id = str(ledger.get("episode_id")
                          or (ledger.get("meta") or {}).get("episode_id") or "")
+        manifest_episode_id = episode_id
         # Per-beat motion clause (opt-in OTR_LTX_MOTION_CLAUSE=1; default OFF -> no-op,
         # byte-identical). Pre-render pass: fills ledger['video']['shots'][i]
         # ['motion_clause'] from each beat's dialogue + cast; render reads it read-only.
@@ -317,8 +318,10 @@ class OTRVideoRenderBatch:
         # episodes/<ep>/clips/ workspace BEFORE building the manifest, so the
         # manifest (and the composite) reference stable paths the sweep won't
         # delete. Best-effort + LOUD; never aborts the render.
-        _rd.persist_episode_clips(ep, episode_id)
-        manifest = _rd.build_clip_manifest(ep, episode_id=episode_id)
+        manifest_episode_id = _rd.resolve_episode_id_for_clip_persistence(
+            episode_id)
+        _rd.persist_episode_clips(ep, manifest_episode_id)
+        manifest = _rd.build_clip_manifest(ep, episode_id=manifest_episode_id)
         # Round 5 F2 (warn-only): the per-beat brief-composed prompts must
         # actually DIFFER -- an all-equal sha set means the beat clauses never
         # landed (the 2026-06-10 "one terse prompt x3" eyeball failure).
@@ -329,7 +332,7 @@ class OTRVideoRenderBatch:
                         diversity.get("n"), diversity.get("sha8s"))
         report = {
             "ok": manifest["clip_count"] > 0, "mode": "episode",
-            "episode_id": episode_id, "n_beats": manifest["n_beats"],
+            "episode_id": manifest_episode_id, "n_beats": manifest["n_beats"],
             "clip_count": manifest["clip_count"],
             "engine_histogram": manifest["engine_histogram"],
             "video_revision": manifest["video_revision"],

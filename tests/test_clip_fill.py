@@ -178,6 +178,72 @@ def test_persist_skips_directory_clips(monkeypatch, tmp_path):
     assert result["clips"]["s"]["path"] == str(tmp_path)   # dir clip untouched
 
 
+def test_resolve_stale_pending_clip_episode_to_renamed_dir(monkeypatch, tmp_path):
+    from nodes._otr_video_engines import render_driver as rd
+    import nodes._otr_paths as paths
+
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root = tmp_path / "otr" / "episodes"
+    final = root / "signal_lost_final"
+    audio = final / "audio"
+    audio.mkdir(parents=True)
+    (audio / "signal_lost_final_ledger.json").write_text(
+        '{"episode_id":"signal_lost_final"}', encoding="utf-8")
+    monkeypatch.setattr(paths, "otr_episodes_root", lambda: root)
+
+    assert rd.resolve_episode_id_for_clip_persistence(
+        "pending_20260708_010101") == "signal_lost_final"
+
+
+def test_persist_rekeys_sfx_to_renamed_episode_clips(monkeypatch, tmp_path):
+    from nodes._otr_video_engines import render_driver as rd
+    import nodes._otr_paths as paths
+
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root = tmp_path / "otr" / "episodes"
+    final = root / "signal_lost_final"
+    audio = final / "audio"
+    audio.mkdir(parents=True)
+    (audio / "signal_lost_final_ledger.json").write_text(
+        '{"episode_id":"signal_lost_final"}', encoding="utf-8")
+    monkeypatch.setattr(paths, "otr_episodes_root", lambda: root)
+    monkeypatch.setattr(
+        paths, "otr_clips_dir",
+        lambda eid: root / eid / "clips")
+
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    clip_src = scratch / "shot.mp4"
+    sfx_src = scratch / "shot.sfx.wav"
+    clip_src.write_bytes(b"mp4")
+    sfx_src.write_bytes(b"wav")
+    result = {
+        "clips": {
+            "shot_b001": {
+                "type": "video",
+                "path": str(clip_src),
+                "sfx_stem_path": str(sfx_src),
+                "engine_id": "google_vid_sfx_veo_fast",
+            }
+        },
+        "ledger": {"video": {"shots": [{
+            "shot_id": "shot_b001",
+            "role": "character_video",
+            "engine_id": "google_vid_sfx_veo_fast",
+        }]}},
+    }
+
+    rd.persist_episode_clips(result, "pending_20260708_010101")
+
+    clip = result["clips"]["shot_b001"]
+    assert str(final / "clips") in clip["path"]
+    assert str(final / "clips") in clip["sfx_stem_path"]
+    assert (final / "clips").is_dir()
+    assert not (root / "pending_20260708_010101").exists()
+    assert not clip_src.exists()
+    assert not sfx_src.exists()
+
+
 # --------------------------------------------------------------------------- #
 # Piece 5 -- composite underrun guard
 # --------------------------------------------------------------------------- #
