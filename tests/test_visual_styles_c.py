@@ -39,7 +39,7 @@ _REPO = Path(__file__).resolve().parent.parent
 _STYLES_DIR = _REPO / "nodes" / "visual_styles"
 
 _NON_DEFAULT_IDS = ("anime", "archival_documentary", "cartoon",
-                    "paper_origami", "shakespeare_stage_realism",
+                    "paper_origami", "recur_frac", "shakespeare_stage_realism",
                     "storybook_engraving", "video_art")
 _GENRE_KEYS = ("noir", "sci-fi", "western", "pulp", "default")
 
