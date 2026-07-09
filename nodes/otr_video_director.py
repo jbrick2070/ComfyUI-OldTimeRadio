@@ -199,7 +199,8 @@ class OTRVideoDirector:
                 "character_video_model": (video, {
                     "tooltip": (
                         "Video model for CHARACTER beats (face + audio, role C). "
-                        "Shipped default humo_14B_169 (the Route-A 14B lane)."
+                        "Uses the saved dropdown value; profiles only retarget "
+                        "this when explicitly applied."
                     ),
                 }),
                 "announcer_image_model": (image, {

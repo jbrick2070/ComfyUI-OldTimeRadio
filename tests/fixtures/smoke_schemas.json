@@ -41,7 +41,7 @@
     "engine": [
      "STRING",
      {
-      "default": "humo_1.7B"
+      "default": "viz_camera"
      }
     ],
     "portrait_path": [

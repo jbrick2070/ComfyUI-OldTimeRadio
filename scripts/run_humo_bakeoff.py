@@ -20,8 +20,9 @@ LEGS (fixed still c02_466a19906ccb.png + audio c02_b002_line.wav + seed 0):
                           + LTX VAEs, NOT Whisper), THEN leg (ii) in the SAME resident
                           session -> the production-true cross-engine peak.
 
-Boot-per-leg WITHOUT FLOOR (FLOOR clears OTR_ENABLE_HUMO -> HuMoEngine.assert_usable
-fails closed); the launcher's default branch sets OTR_ENABLE_HUMO=1. reset_box does a
+Boot-per-leg with the explicit HUMO lane (default/no-lane boots keep heavy engines
+OFF; HuMoEngine.assert_usable fails closed unless the launcher is given HUMO).
+reset_box does a
 SELECTIVE CIM kill (by command line, excl. THIS pid) -- the Comfy server + port 8000
 owners + the cmd.exe soak shell + any stale run_humo_bakeoff.py -- NEVER a blanket
 python kill (that would sever the MCP pythons). Reset before EVERY leg.
@@ -31,7 +32,7 @@ MB box ceiling is the OOM-abort guard, REPORTED separately (not the gate).
 OUTPUT: SaveImage PNG batch -> production wrapper_bridge.encode_frames_to_silent_mp4
 (SILENT); ffprobe-verified (no audio stream) -> otr/episodes/_bakeoff_humo/<leg>.mp4.
 
-  python run_humo_bakeoff.py --dry-validate   # boot once no-FLOOR, assert manifests, NO render
+  python run_humo_bakeoff.py --dry-validate   # boot once in HUMO lane, assert manifests, NO render
   python run_humo_bakeoff.py                  # full 4-leg bakeoff (GPU)
 
 STOP after the sweep + report; the operator eyeballs the clips before any production
@@ -188,8 +189,8 @@ def reset_box():
 
 
 def boot_server(server_log_path):
-    """Boot headless ComfyUI via the proven launcher WITHOUT a profile arg, so the
-    launcher's default branch sets OTR_ENABLE_HUMO=1 (FLOOR/LTX/WAN would clear it).
+    """Boot headless ComfyUI via the proven launcher with the explicit HUMO lane.
+    Default/no-lane launcher boots keep heavy engines off; HuMo bakeoffs opt in.
     No --reserve-vram (production HuMo runs fully resident)."""
     env = dict(os.environ)
     env.pop("CUDA_VISIBLE_DEVICES", None)
@@ -200,9 +201,9 @@ def boot_server(server_log_path):
         env["PYTORCH_CUDA_ALLOC_CONF"] = alloc      # allocator A/B (Step A)
     else:
         env.pop("PYTORCH_CUDA_ALLOC_CONF", None)
-    log("booting ComfyUI :%d (no-FLOOR, OTR_ENABLE_HUMO=1, ALLOC_CONF=%s) -> %s"
+    log("booting ComfyUI :%d (HUMO lane, OTR_ENABLE_HUMO=1, ALLOC_CONF=%s) -> %s"
         % (PORT, alloc or "<default>", server_log_path))
-    return subprocess.Popen([SOAK_LAUNCH_CMD, server_log_path],
+    return subprocess.Popen([SOAK_LAUNCH_CMD, server_log_path, "HUMO"],
                             cwd=os.path.dirname(SOAK_LAUNCH_CMD), env=env)
 
 
@@ -749,7 +750,7 @@ def write_results(results):
 
 
 # --------------------------------------------------------------------------- #
-# dry-validate: boot once no-FLOOR, assert every leg manifest + registration, NO render
+# dry-validate: boot once in HUMO lane, assert every leg manifest + registration, NO render
 # --------------------------------------------------------------------------- #
 def dry_validate():
     server_log = os.path.join(BAKEOFF_DIR, "comfy_server_dryvalidate.log")
@@ -819,7 +820,7 @@ def stage_assets():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-validate", action="store_true",
-                    help="boot once no-FLOOR, assert every leg manifest, render NOTHING")
+                    help="boot once in HUMO lane, assert every leg manifest, render NOTHING")
     ap.add_argument("--only", default=None,
                     help="run only the leg whose label contains this substring")
     ap.add_argument("--alloc-conf", default=None,

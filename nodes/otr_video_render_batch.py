@@ -1,10 +1,9 @@
 """OTR_VideoRenderBatch -- the in-process render entry that walks the registry
 video engines via :mod:`nodes._otr_video_engines.render_driver` (A-S7.5).
 
-Three modes: ``soak`` runs the full-episode A-S7.5 soak (the A-ship gate -- 40
-beats, all roles, a forced mid-episode character_3d OOM converging
-triposg_talk -> humo -> humo_1.7B -> still_motion with LOUD
-restamps, run TWICE back-to-back for determinism, frozen audio untouched);
+Three modes: ``soak`` runs the full-episode A-S7.5 diagnostic soak (40 beats,
+all roles, forced mid-episode fallback-trail testing with LOUD restamps, run
+TWICE back-to-back for determinism, frozen audio untouched);
 ``single`` renders
 ONE shot via one engine (the focused in-process forward validation); ``episode``
 renders one REAL per-beat clip per shot from a ShotLock-planned ledger
@@ -46,7 +45,7 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             "vram_peak_mb": clip.get("vram_peak_mb"),
             # family = the engine's render family (audio_driven_face / text_to_video /
             # image_to_video ...) -- the human-readable suffix the credits MODELS.VIDEO
-            # rows show (e.g. "humo . audio-driven face"). Sourced from the manifest
+            # rows show (e.g. "visualizer . camera"). Sourced from the manifest
             # clip row (render_driver stamps clip["family"]); None on engines that
             # don't stamp it (the None IS the receipt, never a fallback).
             "family": clip.get("family"),
@@ -162,7 +161,7 @@ class OTRVideoRenderBatch:
                 )}),
             },
             "optional": {
-                "engine": ("STRING", {"default": "humo_1.7B", "tooltip": (
+                "engine": ("STRING", {"default": "viz_camera", "tooltip": (
                     "Diagnostic harness only -- read ONLY in mode=single (forces the "
                     "single engine to render). Inert in mode=soak and mode=episode "
                     "(episode routes each beat by its planned per-role engine)."
@@ -203,7 +202,7 @@ class OTRVideoRenderBatch:
         }
 
     def render(self, mode, beats, oom_index, frame_count,
-               engine="humo_1.7B", portrait_path="", audio_path="",
+               engine="viz_camera", portrait_path="", audio_path="",
                patched_ledger_json="{}", master_audio_path="",
                image_done=""):
         # ``image_done`` is the W4 ordering gate (opaque STRING token from
@@ -213,9 +212,9 @@ class OTRVideoRenderBatch:
         # /prompt, not a background HTTP-route thread): only there does ComfyUI's
         # model_management evict the umt5/whisper encoders between encode and
         # sample, keeping the heavy in-process forward under the VRAM ceiling.
-        # Single resident heavy engine; the per-beat detach reclaim lives inside
-        # the engines (eng_humo: wrapper_bridge.reclaim_idle_models, NO
-        # unload_all_models). The frozen audio section is read-only throughout.
+        # Single resident engine; any per-beat detach/reclaim behavior lives inside
+        # the selected engine wrapper. The frozen audio section is read-only
+        # throughout.
         import os
         from ._otr_video_engines import render_driver as _rd
         manifest_payload = ""

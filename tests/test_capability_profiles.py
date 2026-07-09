@@ -342,5 +342,5 @@ def test_two_heavy_roles_still_validate():
     decls = _declarations_by_registry()
     enabled = cp.enabled_engines(profile, decls["video"])
     assert "ltx_audio_in" in enabled and "humo" in enabled
-    assert "humo_1.7B" in enabled       # the new default stays in the enable-set
+    assert "humo_1.7B" in enabled       # legacy selectable engine stays registered
     cp.cross_validate_profile(profile, cp.load_widget_mapping(), decls)

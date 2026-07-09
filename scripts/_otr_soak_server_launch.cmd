@@ -1,11 +1,13 @@
 @echo off
 rem v1.4 capstone headless server launch -- verified recipe (docs/VIDEO_BUILD_HANDOFF.md)
-rem usage: _otr_soak_server_launch.cmd <logfile> [FLOOR | LTX | WAN]
-rem   (default)  humo:5 production path (OTR_ENABLE_HUMO=1)
-rem   FLOOR      heavy engines OFF (the still-floor soak leg). NOTE: the old
+rem usage: _otr_soak_server_launch.cmd <logfile> [FLOOR | HUMO | LTX | WAN]
+rem   (default)  heavy engines OFF. Video model selection belongs to the
+rem              workflow dropdown/profile, not an implicit launcher switch.
+rem   FLOOR      heavy engines OFF (same as default). NOTE: the old
 rem              token "HUMO=0" NEVER matched -- cmd splits arguments on "=",
 rem              so %2 arrived as "HUMO" and the else-branch enabled HuMo
 rem              (2026-06-10 marathon catch).
+rem   HUMO       explicit legacy HuMo lane for bakeoffs/single-engine probes.
 rem   LTX        Sage-free boot lane: LTX opt-in ON, HuMo OFF (BUG-070)
 rem   WAN        Wan i2v opt-in ON, HuMo OFF
 set HF_HOME=C:\ComfyUI-Models\huggingface
@@ -60,6 +62,9 @@ set OTR_GPU_LEASE_DIR=%OTR_TMP%
 if /i "%2"=="FLOOR" (
   set OTR_ENABLE_HUMO=
   echo [launch] heavy engines OFF ^(floor leg^)
+) else if /i "%2"=="HUMO" (
+  set OTR_ENABLE_HUMO=1
+  echo [launch] HUMO lane: explicit OTR_ENABLE_HUMO=1
 ) else if /i "%2"=="LTX" (
   set OTR_ENABLE_HUMO=
   set OTR_ENABLE_LTX_VIDEO=1
@@ -77,7 +82,8 @@ if /i "%2"=="FLOOR" (
   set OTR_WAN_TI2V_VAE_NAME=wan2.2_vae.safetensors
   echo [launch] WAN lane: OTR_ENABLE_WAN_I2V=1 + OTR_ENABLE_WAN_TI2V=1, HuMo OFF
 ) else (
-  set OTR_ENABLE_HUMO=1
+  set OTR_ENABLE_HUMO=
+  echo [launch] heavy engines OFF ^(default no-lane^)
 )
 rem Canonical headless boots do not consume hidden per-leg env hook files.
 rem Harnesses that need a special env must pass it explicitly in their own
