@@ -41,6 +41,10 @@ V3_MODEL_IDS = {
         "env": "OTR_CLOUD_SEEDREAM_MODEL",
         "default": "seedream-4-0-250828",
     },
+    "cloud_krea_2_turbo": {
+        "env": "OTR_CLOUD_KREA_MODEL",
+        "default": "Krea 2 Medium Turbo",
+    },
     # video rows (grounded from installed comfy_api_nodes, 2026-07-06):
     "cloud_seedance_2": {
         "env": "OTR_CLOUD_SEEDANCE_MODEL",

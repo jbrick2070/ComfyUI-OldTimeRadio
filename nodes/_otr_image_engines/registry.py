@@ -143,6 +143,10 @@ CAPABILITIES = {
                             "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     "cloud_seedream_2": {"required_toolchain": None,
                          "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "cloud_krea_2_turbo": {"required_toolchain": None,
+                           "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "cloud_luma_photon_flash": {"required_toolchain": None,
+                                "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
     # `ideo` -- plain cloud Ideogram scene-still (S1+1). node_key cloud_ideogram_v4.
     "ideo": {"required_toolchain": None,
              "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},

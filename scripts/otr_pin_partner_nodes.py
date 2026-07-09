@@ -100,6 +100,12 @@ CURATED_ROWS = {
     "cloud_seedream_2":       ("ByteDanceSeedreamNodeV2", "BYTEDANCE", 0,
                                "stills; cheapest stylization tier "
                                "(~7.4-8.4cr/image)"),
+    "cloud_krea_2_turbo":     ("Krea2ImageNode", "KREA", 0,
+                               "stills; cheap Krea 2 Medium Turbo "
+                               "(3.17cr/run)"),
+    "cloud_luma_photon_flash": ("LumaImageGenerationNode", "LUMA", 0,
+                                "stills; cheapest Luma Photon Flash "
+                                "(0.57cr/run)"),
     "cloud_elevenlabs_voice_selector": ("ElevenLabsVoiceSelector",
                                "ELEVENLABS", 0,
                                "AUX helper, no billing; produces the "

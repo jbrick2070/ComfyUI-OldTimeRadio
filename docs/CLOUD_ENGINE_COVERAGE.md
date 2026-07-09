@@ -36,6 +36,8 @@ before it made any cloud call). So bookend positions are N/A for face engines.
 | flux_pro | **PASS** | -- | -- | live 2026-07-04: minted the announcer portrait |
 | nano_banana_2 | -- | **FIXED** (retest) | -- | model must be the DYNAMICCOMBO_V3 DICT {model: slug} not a bare slug (Gemini node reads model["model"]); fixed @606dc7f1 |
 | seedream_2 | UNTESTED | UNTESTED | UNTESTED | adapter shipped; ByteDance node model:str (NOT a dict -- different from Gemini); no live run |
+| krea_2_turbo | UNTESTED | UNTESTED | UNTESTED | adapter shipped as `cloud_krea_2_turbo`; Krea2ImageNode text-only Medium Turbo, ~3.17cr/run |
+| luma_photon_flash | UNTESTED | UNTESTED | UNTESTED | adapter shipped as `cloud_luma_photon_flash`; Luma Photon Flash text-only, ~0.57cr/run |
 | ideogram (ideo_word words-specialist) | UNTESTED | UNTESTED | UNTESTED | plain `ideo` PASS; words-variant not yet run |
 
 ## CLOUD VIDEO  (positions: announcer_visual, music_visual, character_video)
@@ -87,7 +89,7 @@ RULE (kling lesson): face/avatar VIDEO engines (kling_avatar, seedance) must be 
 trip the RADIO-IS-HOST redirect -> ltx_audio_in -> radio-face-still-missing RenderError.
 
 ## OPEN / NEXT
-- CLOUD IMAGE sweep: recraft, flux_pro, nano_banana_2, seedream_2, ideogram-words (force image roles; video=still_word fast, audio local).
+- CLOUD IMAGE sweep: recraft, flux_pro, nano_banana_2, seedream_2, krea_2_turbo, luma_photon_flash, ideogram-words (force image roles; video=still_word fast, audio local).
 - CLOUD VIDEO: confirm kling_avatar on character_video; seedance_2 needs the V3-expansion pin before it can be tested.
 - CLOUD AUDIO: elevenlabs announcer_voice position (force announcer to elevenlabs).
 - Then MIX passes (coherent same-model combos) + the 800w all-visualizer credits run.

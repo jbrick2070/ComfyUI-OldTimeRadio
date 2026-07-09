@@ -14,8 +14,20 @@ from nodes._otr_shared.cloud_media_canonical import (
 from nodes._otr_image_engines import eng_cloud_image as eci
 from nodes._otr_image_engines import registry as ireg
 
-_CLOUD_ROWS = ("cloud_flux_pro",
-               "cloud_nano_banana_2", "cloud_seedream_2")
+_CLOUD_ROWS = (
+    "cloud_flux_pro",
+    "cloud_nano_banana_2",
+    "cloud_seedream_2",
+    "cloud_krea_2_turbo",
+    "cloud_luma_photon_flash",
+)
+_CLOUD_ENGINES = (
+    eci.FluxPro,
+    eci.NanoBanana2,
+    eci.Seedream2,
+    eci.Krea2Turbo,
+    eci.LumaPhotonFlash,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -36,7 +48,7 @@ def test_capabilities_match_registry_exactly():
 
 
 def test_cloud_image_rows_never_default():
-    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
+    for eng in _CLOUD_ENGINES:
         assert tuple(eng.default_roles) == ()
     for role in ("announcer_visual", "music_visual", "character_video"):
         default = ireg.default_engine_for_role(role)
@@ -44,13 +56,13 @@ def test_cloud_image_rows_never_default():
 
 
 def test_required_inputs_is_text_prompt():
-    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
+    for eng in _CLOUD_ENGINES:
         assert eng.required_inputs == ("text_prompt",)
 
 
 def test_prepare_does_not_crash_on_none_triple():
     # the dispatcher calls prepare(None, None, None).
-    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2):
+    for eng in _CLOUD_ENGINES:
         assert eng.prepare(None, None, None) == {}
 
 
@@ -167,6 +179,85 @@ def test_seedream_rejects_unknown_model(monkeypatch):
     assert "OTR_CLOUD_SEEDREAM_MODEL" in str(ei.value)
 
 
+def test_krea_2_turbo_inputs_resolve_model(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_KREA_MODEL", "Krea 2 Medium Turbo")
+    ins = eci.Krea2Turbo._partner_inputs(_req())
+    assert set(ins) == {"model", "prompt", "seed"}
+    # Krea2ImageNode.execute bracket-reads model["model"] and requires the
+    # nested aspect_ratio/resolution/creativity DynamicCombo values.
+    assert ins["model"] == {
+        "model": "Krea 2 Medium Turbo",
+        "aspect_ratio": "16:9",
+        "resolution": "1K",
+        "creativity": "medium",
+    }
+    _assert_visual_safety(ins["prompt"])
+    high = eci.Krea2Turbo._partner_inputs(_req(seed=3736360535))
+    assert high["seed"] == 2147483647
+
+
+def test_krea_2_turbo_default_selector_matches_installed_menu(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_KREA_MODEL", raising=False)
+    ins = eci.Krea2Turbo._partner_inputs(_req())
+    assert ins["model"]["model"] == "Krea 2 Medium Turbo"
+
+
+def test_krea_2_turbo_rejects_unknown_model(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_KREA_MODEL", "krea-2-medium-turbo")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.Krea2Turbo._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_KREA_MODEL" in str(ei.value)
+
+
+def test_luma_photon_flash_inputs(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_LUMA_PHOTON_MODEL", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT", raising=False)
+    ins = eci.LumaPhotonFlash._partner_inputs(_req())
+    assert set(ins) == {
+        "prompt", "model", "aspect_ratio", "seed", "style_image_weight",
+    }
+    assert ins["model"] == "photon-flash-1"
+    assert ins["aspect_ratio"] == "16:9"
+    assert ins["style_image_weight"] == 1.0
+    assert eci.LumaPhotonFlash._est_usd() == 0.0027
+    _assert_visual_safety(ins["prompt"])
+
+
+def test_luma_photon_flash_env_overrides(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_LUMA_PHOTON_MODEL", "photon-1")
+    monkeypatch.setenv("OTR_CLOUD_LUMA_PHOTON_ASPECT", "1:1")
+    monkeypatch.setenv("OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT", "0.6")
+    ins = eci.LumaPhotonFlash._partner_inputs(_req())
+    assert ins["model"] == "photon-1"
+    assert ins["aspect_ratio"] == "1:1"
+    assert ins["style_image_weight"] == 0.6
+
+
+def test_luma_photon_flash_rejects_unknown_model(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_LUMA_PHOTON_MODEL", "ray-flash")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.LumaPhotonFlash._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_LUMA_PHOTON_MODEL" in str(ei.value)
+
+
+def test_luma_photon_flash_rejects_stale_aspect(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_LUMA_PHOTON_ASPECT", "3:2")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.LumaPhotonFlash._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_LUMA_PHOTON_ASPECT" in str(ei.value)
+
+
+def test_luma_photon_flash_rejects_bad_style_weight(monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT", "1.5")
+    with pytest.raises(CloudMediaError) as ei:
+        eci.LumaPhotonFlash._partner_inputs(_req())
+    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
+    assert "OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT" in str(ei.value)
+
+
 def test_ideo_registered_and_inputs(monkeypatch):
     monkeypatch.delenv("OTR_CLOUD_IDEOGRAM_SPEED", raising=False)
     monkeypatch.delenv("OTR_CLOUD_IDEOGRAM_EST_USD", raising=False)
@@ -212,7 +303,7 @@ def test_ideogram_accepts_live_pixel_alias(monkeypatch):
 
 
 def test_cloud_image_adapters_fail_loud_on_blank_prompt():
-    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2, eci.Ideo):
+    for eng in (*_CLOUD_ENGINES, eci.Ideo):
         with pytest.raises(CloudMediaError) as ei:
             eng._partner_inputs(_req(prompt="   "))
         assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
@@ -220,7 +311,7 @@ def test_cloud_image_adapters_fail_loud_on_blank_prompt():
 
 def test_cloud_image_adapters_preserve_explicit_zero_seed():
     req = _req(seed=0, request_seed=12345)
-    for eng in (eci.FluxPro, eci.NanoBanana2, eci.Seedream2, eci.Ideo):
+    for eng in (*_CLOUD_ENGINES, eci.Ideo):
         assert eng._partner_inputs(req)["seed"] == 0
 
 

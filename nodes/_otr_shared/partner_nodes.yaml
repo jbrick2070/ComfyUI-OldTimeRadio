@@ -1,7 +1,7 @@
 pin_meta:
   combo_options_excluded: true
   comfyui_commit: bb131be9e83d2f773c90f1d6f1e4b248a498c8c5
-  generated_utc: '2026-07-03T08:11:28.358288+00:00'
+  generated_utc: '2026-07-09T06:58:09.958013+00:00'
   generator: scripts/otr_pin_partner_nodes.py
   schema_version: pin-2026-07-02
 rows:
@@ -180,6 +180,67 @@ rows:
     provider_id: KLING
     return_types:
     - VIDEO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_krea_2_turbo:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/image/Krea
+    class_name: Krea2ImageNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_krea
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional: {}
+      required:
+        model: COMFY_DYNAMICCOMBO_V3
+        prompt: STRING
+        seed: INT
+    is_async: true
+    notes: stills; cheap Krea 2 Medium Turbo (3.17cr/run)
+    provider_id: KREA
+    return_types:
+    - IMAGE
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_luma_photon_flash:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/image/Luma
+    class_name: LumaImageGenerationNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_luma
+    inputs:
+      hidden:
+        api_key_comfy_org: API_KEY_COMFY_ORG
+        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
+        comfy_usage_source: COMFY_USAGE_SOURCE
+        unique_id: UNIQUE_ID
+      optional:
+        character_image: IMAGE
+        image_luma_ref: LUMA_REF
+        style_image: IMAGE
+      required:
+        aspect_ratio: COMBO
+        model: COMBO
+        prompt: STRING
+        seed: INT
+        style_image_weight: FLOAT
+    is_async: true
+    notes: stills; cheapest Luma Photon Flash (0.57cr/run)
+    provider_id: LUMA
+    return_types:
+    - IMAGE
     seed_supported: true
     selected_output: 0
     status: OK

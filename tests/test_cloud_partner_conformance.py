@@ -138,6 +138,7 @@ def test_v3_model_ids_never_forward_placeholder():
         DYNAMICCOMBO_PLACEHOLDER, resolve_model_id)
     for node_key in (
         "cloud_nano_banana_2", "cloud_seedream_2",
+        "cloud_krea_2_turbo",
         "cloud_seedance_2", "cloud_wan_i2v",
     ):
         rid = resolve_model_id(node_key)
