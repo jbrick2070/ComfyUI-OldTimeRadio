@@ -181,6 +181,15 @@ def test_media_archive_lane_is_runnable():
     assert routing.require_runnable_bank("media_archive").runnable is True
 
 
+def test_media_archive_drama_seeds_sidecar_is_not_a_story_pack():
+    """The seed deck is JSON-owned config beside the media pack, not a
+    story_model. The registry sweep should admit it without making it routable.
+    """
+    assert routing.require_runnable_bank("media_archive").runnable is True
+    with pytest.raises(routing.UnknownStoryModelError):
+        routing.resolve_story_pack("media_archive", "drama_seeds")
+
+
 def test_simple4_pack_strict_load_raises():
     """The simple_4 pack carries ONLY pipeline-declared seams -- a strict
     load_pack must reject it (routing is the only admission path)."""

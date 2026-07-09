@@ -19,12 +19,16 @@ from unittest.mock import patch
 import pytest
 
 from nodes._otr_media_archive_interpreter import (
+    DRAMA_SEED_SCHEMA_VERSION,
     MediaArchiveBriefs,
     MediaArchiveInterpreterError,
     PROMPT_VERSION,
     SCHEMA_VERSION,
     _MAX_KEY_TERMS,
+    _build_prompt,
     build_media_archive_briefs,
+    load_drama_seeds,
+    select_drama_seed,
 )
 from nodes._otr_source_payload import (
     SourceInterpretError,
@@ -254,7 +258,65 @@ class TestMaxAttemptsGuard:
 
 
 # ---------------------------------------------------------------------------
-# (7) import posture
+# (7) deterministic dramatic seed deck
+# ---------------------------------------------------------------------------
+
+class TestDramaSeedDeck:
+    def test_seed_deck_schema_loads(self):
+        path = (
+            REPO / "nodes" / "story_packs" / "media_archive"
+            / "drama_seeds.json"
+        )
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        assert raw["schema_version"] == DRAMA_SEED_SCHEMA_VERSION
+        assert load_drama_seeds(path) == tuple(raw["seeds"])
+
+    def test_seed_deck_has_exact_unique_required_titles(self):
+        seeds = load_drama_seeds()
+        assert len(seeds) == 15
+        assert len(set(seeds)) == 15
+        assert "The China Girl Mystery" in seeds
+
+    def test_seed_deck_forbidden_drift_terms_absent(self):
+        hay = " ".join(load_drama_seeds()).casefold()
+        forbidden = (
+            "national treasure", "nancy drew", "spaceship",
+            "mission control", "laboratory containment", "murder",
+            "corpse", "ghost", "phantom", "serial killer",
+        )
+        for term in forbidden:
+            assert term not in hay
+
+    def test_same_payload_selects_same_seed(self):
+        payload = _sample_payload()
+        assert select_drama_seed(payload) == select_drama_seed(dict(payload))
+
+    def test_different_payloads_can_select_different_seeds(self):
+        picks = set()
+        for idx in range(30):
+            payload = _sample_payload()
+            payload["headline"] = f"Archive discovery number {idx}"
+            payload["link"] = f"https://example.test/archive/{idx}"
+            picks.add(select_drama_seed(payload))
+        assert len(picks) > 1
+
+    def test_prompt_injects_exactly_one_selected_seed(self):
+        payload = _sample_payload()
+        selected = select_drama_seed(payload)
+        prompt = _build_prompt(payload)[0]["content"]
+        assert prompt.count("Dramatic seed lens:") == 1
+        assert prompt.count(f"Dramatic seed lens: {selected}") == 1
+        assert "National Treasure" not in prompt
+        assert "Nancy Drew" not in prompt
+
+    def test_prompt_preserves_source_truth(self):
+        prompt = _build_prompt(_sample_payload())[0]["content"]
+        assert "RSS/source material remains the source of truth" in prompt
+        assert "seed is not source fact" in prompt
+
+
+# ---------------------------------------------------------------------------
+# (8) import posture
 # ---------------------------------------------------------------------------
 
 class TestImportPosture:

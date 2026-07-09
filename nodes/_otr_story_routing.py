@@ -39,6 +39,9 @@ _STORY_PACKS_ROOT = Path(__file__).resolve().parent / "story_packs"
 _BANKS_FILENAME = "banks.json"
 _PIPELINES_FILENAME = "pipelines.json"
 _REGISTRY_FILENAMES = frozenset({_BANKS_FILENAME, _PIPELINES_FILENAME})
+_PACK_SIDECAR_FILENAMES_BY_BANK = {
+    "media_archive": frozenset({"drama_seeds.json"}),
+}
 
 _VALID_PASS_SLOTS = frozenset({"creative", "technical"})
 
@@ -317,6 +320,10 @@ def _pack_path(bank_id: str, model_id: str) -> Path:
     return _STORY_PACKS_ROOT / bank_id / f"{model_id}.json"
 
 
+def _is_pack_sidecar(bank_id: str, filename: str) -> bool:
+    return filename in _PACK_SIDECAR_FILENAMES_BY_BANK.get(bank_id, frozenset())
+
+
 def _load_routed_pack(path: Path, pipelines: "dict[str, StoryPipeline]") -> StoryPack:
     """Load a pack with its OWN pipeline's declared seams (two-phase: peek the
     header for story_pipeline_id, then validate with that pipeline's seams)."""
@@ -350,6 +357,8 @@ def _sweep_and_crossref(banks: "dict[str, SourceBank]",
             )
         # Every pack inside must validate + match its path coordinates.
         for pack_file in sorted(entry.glob("*.json")):
+            if _is_pack_sidecar(bank_id, pack_file.name):
+                continue
             pack = _load_routed_pack(pack_file, pipelines)
             model_id = pack_file.stem
             if pack.source_bank_id != bank_id or pack.story_model_id != model_id:
@@ -484,7 +493,8 @@ def resolve_story_pack(source_bank_id: str, story_model_id: str | None = None) -
     bank = get_bank(source_bank_id)
     model_id = story_model_id if story_model_id is not None else bank.default_story_model
     path = _pack_path(bank.source_bank_id, model_id)
-    if not path.is_file():
+    if (not path.is_file()
+            or _is_pack_sidecar(bank.source_bank_id, path.name)):
         raise UnknownStoryModelError(
             f"unknown story_model {model_id!r} for bank "
             f"{bank.source_bank_id!r}: no pack at {path}"

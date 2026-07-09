@@ -8,6 +8,9 @@ validators.
 from __future__ import annotations
 
 import hashlib
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Callable
 
 from pydantic import BaseModel, Field, field_validator
@@ -20,12 +23,32 @@ except ImportError:  # pragma: no cover - flat test imports
 
 PROMPT_VERSION = "media_archive_interpreter_v1"
 SCHEMA_VERSION = "media_archive_briefs_v1"
+DRAMA_SEED_SCHEMA_VERSION = "media_archive_drama_seeds_v1"
 
 _MAX_CASTING_BRIEF_CHARS = 900
 _MAX_SCRIPT_BRIEF_CHARS = 1200
 _MAX_CLOSE_BRIEF_CHARS = 500
 _MAX_KEY_TERMS = 7
 _MAX_KEY_TERM_CHARS = 80
+_DRAMA_SEEDS_PATH = (
+    Path(__file__).resolve().parent
+    / "story_packs"
+    / "media_archive"
+    / "drama_seeds.json"
+)
+_DRAMA_SEED_FORBIDDEN_TERMS = (
+    "national treasure",
+    "nancy drew",
+    "spaceship",
+    "mission control",
+    "laboratory containment",
+    "alien invasion",
+    "murder",
+    "corpse",
+    "ghost",
+    "phantom",
+    "serial killer",
+)
 
 
 class MediaArchiveInterpreterError(RuntimeError):
@@ -88,6 +111,97 @@ def _source_hash(payload: dict) -> str:
     return h.hexdigest()[:16]
 
 
+def load_drama_seeds(path: str | Path | None = None) -> tuple[str, ...]:
+    """Load and validate the JSON-owned media archive dramatic seed deck."""
+    seed_path = str(path or _DRAMA_SEEDS_PATH)
+    return _load_drama_seeds_cached(seed_path)
+
+
+@lru_cache(maxsize=4)
+def _load_drama_seeds_cached(seed_path: str) -> tuple[str, ...]:
+    path = Path(seed_path)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise MediaArchiveInterpreterError(
+            attempts=0,
+            reason=f"could not read media archive drama seeds: {exc}",
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise MediaArchiveInterpreterError(
+            attempts=0,
+            reason=f"malformed media archive drama seeds JSON: {exc}",
+        ) from exc
+
+    if not isinstance(raw, dict):
+        raise MediaArchiveInterpreterError(
+            attempts=0,
+            reason="media archive drama seeds root must be an object",
+        )
+    if raw.get("schema_version") != DRAMA_SEED_SCHEMA_VERSION:
+        raise MediaArchiveInterpreterError(
+            attempts=0,
+            reason=(
+                "media archive drama seeds schema_version must be %r"
+                % DRAMA_SEED_SCHEMA_VERSION
+            ),
+        )
+    seeds_raw = raw.get("seeds")
+    if not isinstance(seeds_raw, list):
+        raise MediaArchiveInterpreterError(
+            attempts=0,
+            reason="media archive drama seeds must have a seeds list",
+        )
+
+    seeds: list[str] = []
+    for idx, seed in enumerate(seeds_raw):
+        if not isinstance(seed, str):
+            raise MediaArchiveInterpreterError(
+                attempts=0,
+                reason=f"media archive drama seed {idx} must be a string",
+            )
+        title = " ".join(seed.split()).strip()
+        if not title:
+            raise MediaArchiveInterpreterError(
+                attempts=0,
+                reason=f"media archive drama seed {idx} is empty",
+            )
+        hay = title.casefold()
+        for term in _DRAMA_SEED_FORBIDDEN_TERMS:
+            if term in hay:
+                raise MediaArchiveInterpreterError(
+                    attempts=0,
+                    reason=(
+                        f"media archive drama seed {title!r} contains "
+                        f"forbidden term {term!r}"
+                    ),
+                )
+        seeds.append(title)
+
+    if len(seeds) != len(set(seeds)):
+        raise MediaArchiveInterpreterError(
+            attempts=0,
+            reason="media archive drama seeds must be unique",
+        )
+    if not seeds:
+        raise MediaArchiveInterpreterError(
+            attempts=0,
+            reason="media archive drama seeds cannot be empty",
+        )
+    return tuple(seeds)
+
+
+def select_drama_seed(payload: dict, seeds: tuple[str, ...] | None = None) -> str:
+    """Select one seed deterministically from the RSS/source payload hash."""
+    deck = seeds or load_drama_seeds()
+    if not deck:
+        raise MediaArchiveInterpreterError(
+            attempts=0,
+            reason="media archive drama seeds cannot be empty",
+        )
+    return deck[int(_source_hash(payload), 16) % len(deck)]
+
+
 def _build_prompt(payload: dict) -> list[dict[str, str]]:
     headline = str(payload.get("headline", "")).strip()
     source = str(payload.get("source", "")).strip()
@@ -95,6 +209,7 @@ def _build_prompt(payload: dict) -> list[dict[str, str]]:
     link = str(payload.get("link", "")).strip()
     summary = str(payload.get("summary", "")).strip()
     full_text = str(payload.get("full_text", "")).strip()
+    drama_seed = select_drama_seed(payload)
     source_block = "\n".join(
         part for part in (
             f"Title: {headline}",
@@ -115,11 +230,15 @@ def _build_prompt(payload: dict) -> list[dict[str, str]]:
         "researching, or preserving media history: film archives, forgotten "
         "recordings, lost broadcasts, restoration projects, librarians, "
         "historians, projectionists, collectors, and archivists.\n\n"
-        "Tone: curious, humane, optimistic, public-broadcast mystery. Think "
-        "National Treasure or Nancy Drew by way of archive documentaries. "
+        "Tone: curious, humane, optimistic, public-broadcast mystery. Use the "
+        "selected dramatic seed as the compact adventure lens. "
         "No crime thriller, murder, weapons, horror, sci-fi anthology, "
         "spaceship, mission control, laboratory containment, or generic "
         "experiment emergency.\n\n"
+        f"Dramatic seed lens: {drama_seed}\n"
+        "Source-truth rule: RSS/source material remains the source of truth. "
+        "The dramatic seed is only a fictional lens; the seed is not source "
+        "fact and must not create source facts.\n\n"
         "Return ONE JSON object only with exactly these keys:\n"
         "{\n"
         "  \"casting_brief\": \"80-700 chars; likely human roles and voices\",\n"
@@ -212,7 +331,10 @@ def build_media_archive_briefs(
 
 
 __all__ = [
+    "DRAMA_SEED_SCHEMA_VERSION",
     "MediaArchiveBriefs",
     "MediaArchiveInterpreterError",
     "build_media_archive_briefs",
+    "load_drama_seeds",
+    "select_drama_seed",
 ]
