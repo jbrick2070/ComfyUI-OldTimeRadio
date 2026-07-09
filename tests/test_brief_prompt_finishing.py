@@ -107,6 +107,28 @@ def test_image_no_person_analyzer_render_proceeds():
     assert "lantern glow" in entry2["prompt"]          # finished
 
 
+def test_literal_announcer_cast_row_uses_radio_host_lane():
+    """A canonical cast row named ANNOUNCER is an announcer visual, not a normal
+    character portrait. The live Google SFX smoke hit this when c01 carried only
+    a role sentence, which correctly fails the character appearance gate."""
+    cast = [{"char_id": "c01", "name": "ANNOUNCER",
+             "character_description": (
+                 "Period radio announcer; reads the science story and frames "
+                 "the drama between beats.")}]
+
+    def fail_if_called(_prompt):
+        raise AssertionError("announcer cast row must not call portrait LLM")
+
+    out, _warns = mbp.derive_image_prompts(
+        cast, _OK_META, llm_fn=fail_if_called)
+    entry = mbp.objects_by_id(out)["c01"]
+    assert entry["role"] == "announcer_visual"
+    assert entry["source"] == "announcer_template"
+    assert entry["radio_host_style"] in {"console_face", "radio_object"}
+    assert "negative_prompt" in entry
+    assert "weathered face" not in entry["prompt"]
+
+
 def test_shotlock_m4_prompt_hash_matches_finished_prompt():
     from nodes import otr_shot_lock as sl
     ledger = {

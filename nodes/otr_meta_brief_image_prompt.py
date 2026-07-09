@@ -1609,12 +1609,15 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         cid = str(char.get("char_id") or "")
         if not cid:
             continue
+        _is_announcer_row = bool(
+            char.get("_synthetic_announcer")
+            or str(char.get("name") or "").strip().upper() == "ANNOUNCER")
         appearance = _appearance_for_char([char], cid)
         # Framing aspect: synthetic announcers follow announcer_visual, cast
         # characters follow character_video -- so a WIDE video engine gets a
         # head-and-shoulders still the wide render won't decapitate (2026-06-17).
         _aspect = (still_aspects or {}).get(
-            "announcer_visual" if char.get("_synthetic_announcer")
+            "announcer_visual" if _is_announcer_row
             else "character_video", "portrait")
         # TALKING lane (S4b): a cast portrait whose character_video engine
         # lip-syncs (the ia2v register) is the render INIT for the mouth --
@@ -1622,7 +1625,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # (mirrors the ltx_radio_mouth split that fixed the radio bookends).
         # Synthetic announcers keep their radio-host path untouched.
         _talking = bool((talking_roles or {}).get("character_video")) and (
-            not char.get("_synthetic_announcer"))
+            not _is_announcer_row)
         # C1 + E (2026-07-01 brief-driven radio-host): the synthetic announcer /
         # radio-host prompt is BRIEF-DRIVEN and stamped DIRECTLY -- SKIP the LLM
         # refine. The refine instruction (_build_char_prompt_request: "Do not
@@ -1632,7 +1635,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # finishes (era tail + grade), so the loop's LLM / consistency /
         # gear-scrub / finish steps are all bypassed for this row (also saves an
         # LLM call). The negative is populated on the object row.
-        if char.get("_synthetic_announcer"):
+        if _is_announcer_row:
             # RADIO FACE LOGIC (2026-07-04): the announcer portrait gets a FACE
             # only when an AUDIO-DRIVEN engine will animate it -- i.e. HuMo hosts
             # opted ON AND the RESOLVED announcer engine family (after
@@ -1720,9 +1723,6 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # equipment (the c01 giant-mic catch). The ANNOUNCER keeps his radio
         # styling by design (radio-grounding gate): synthetic announcer rows
         # AND a cast row literally named ANNOUNCER are exempt.
-        _is_announcer_row = bool(
-            char.get("_synthetic_announcer")
-            or str(char.get("name") or "").strip().upper() == "ANNOUNCER")
         if not _is_announcer_row:
             _scrubbed = _scrub_gear_words(prompt)
             if _scrubbed != prompt:
