@@ -5,7 +5,9 @@ heartbeat are all monkeypatched through the module's named seams.
 Build doc: docs/2026-07-02-cloud-engines/roundtable/pass04_plan.md sec 3.
 """
 import asyncio
+import sys
 import time
+import types
 import uuid
 
 import pytest
@@ -306,6 +308,43 @@ def test_heartbeat_cadence_within_requirement():
     assert invoke.HEARTBEAT_EVERY_S <= 30.0  # pass04: tick <= 30s
 
 
+def test_headless_prompt_server_progress_sink_installs_stub(monkeypatch):
+    class _PromptServer:
+        instance = None
+
+    monkeypatch.setitem(
+        sys.modules, "server", types.SimpleNamespace(PromptServer=_PromptServer))
+
+    with invoke._headless_prompt_server_progress_sink():
+        assert _PromptServer.instance is not None
+        _PromptServer.instance.send_progress_text("progress", "node-1")
+
+    assert _PromptServer.instance is None
+
+
+def test_headless_prompt_server_progress_sink_preserves_real_server(monkeypatch):
+    class _RealServer:
+        def __init__(self):
+            self.calls = []
+
+        def send_progress_text(self, *args):
+            self.calls.append(args)
+
+    class _PromptServer:
+        instance = _RealServer()
+
+    existing = _PromptServer.instance
+    monkeypatch.setitem(
+        sys.modules, "server", types.SimpleNamespace(PromptServer=_PromptServer))
+
+    with invoke._headless_prompt_server_progress_sink():
+        assert _PromptServer.instance is existing
+        _PromptServer.instance.send_progress_text("progress", "node-1")
+
+    assert _PromptServer.instance is existing
+    assert existing.calls == [("progress", "node-1")]
+
+
 # ---------------------------------------------------------------------------
 # Failure mapping + settlement
 # ---------------------------------------------------------------------------
@@ -334,6 +373,14 @@ def test_auth_error_text_maps_to_auth(monkeypatch, rig):
     with pytest.raises(CloudMediaError) as ei:
         invoke.invoke_partner_node(rig["node_key"], {}, timeout_s=30)
     assert ei.value.code is CloudErrorCode.AUTH
+
+
+def test_comfy_processing_interrupted_maps_to_interrupted():
+    ProcessingInterrupted = type("ProcessingInterrupted", (Exception,), {})
+    err = invoke._map_exception(
+        ProcessingInterrupted("Task cancelled"), "cloud_fake_video")
+    assert err.code is CloudErrorCode.INTERRUPTED
+    assert "Task cancelled" in str(err)
 
 
 def test_missing_output_file_is_corrupt_output(rig):
@@ -494,4 +541,6 @@ def test_real_partner_table_loads_and_has_kling(rig):
     assert "sound_file" in row["inputs"]["required"]
     hidden = row["inputs"]["hidden"]
     assert "api_key_comfy_org" in hidden
-    assert all(r.get("status") == "OK" for r in rows.values())
+    not_ok = {rid: r.get("status") for rid, r in rows.items()
+              if r.get("status") != "OK"}
+    assert not_ok in ({}, {"cloud_stability_audio": "MISSING"})

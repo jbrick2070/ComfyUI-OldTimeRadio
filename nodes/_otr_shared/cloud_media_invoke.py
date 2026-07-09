@@ -334,6 +334,33 @@ def _run_with_watchdog(coro, *, timeout_s: float, node_key: str) -> Any:
             last_beat = now
 
 
+@contextlib.contextmanager
+def _headless_prompt_server_progress_sink():
+    """Comfy API nodes send progress through PromptServer.instance. Direct
+    headless smokes have no server, so provide a no-op sink only in that case."""
+    try:
+        from server import PromptServer
+    except Exception:
+        yield
+        return
+    current = getattr(PromptServer, "instance", None)
+    if current is not None and callable(getattr(current, "send_progress_text", None)):
+        yield
+        return
+
+    class _NoopPromptServer:
+        def send_progress_text(self, *_args, **_kwargs):
+            return None
+
+    stub = _NoopPromptServer()
+    try:
+        PromptServer.instance = stub
+        yield
+    finally:
+        if getattr(PromptServer, "instance", None) is stub:
+            PromptServer.instance = current
+
+
 # ---------------------------------------------------------------------------
 # The partner call itself (runs on the loop thread)
 # ---------------------------------------------------------------------------
@@ -388,20 +415,21 @@ async def _call_partner_v3(node_cls, row: dict, fn_name: str,
         else:
             real_inputs[key] = val
     clone = node_cls.PREPARE_CLASS_CLONE({"hidden_inputs": hidden_inputs})
-    if row.get("class_name") == "GeminiNanoBanana2V2":
-        return await _call_gemini_nano_banana2_v2(clone, real_inputs)
-    entry = fn_name or getattr(clone, "FUNCTION", "EXECUTE_NORMALIZED_ASYNC")
-    fn = getattr(clone, entry, None)
-    if fn is None:
-        raise CloudMediaError(
-            CloudErrorCode.UNSUPPORTED_SCHEMA,
-            f"pinned function {entry!r} missing on V3 node "
-            f"{row.get('class_name')!r}; re-pin the partner table",
-        )
-    result = fn(**real_inputs)
-    if inspect.isawaitable(result):
-        result = await result
-    return result
+    with _headless_prompt_server_progress_sink():
+        if row.get("class_name") == "GeminiNanoBanana2V2":
+            return await _call_gemini_nano_banana2_v2(clone, real_inputs)
+        entry = fn_name or getattr(clone, "FUNCTION", "EXECUTE_NORMALIZED_ASYNC")
+        fn = getattr(clone, entry, None)
+        if fn is None:
+            raise CloudMediaError(
+                CloudErrorCode.UNSUPPORTED_SCHEMA,
+                f"pinned function {entry!r} missing on V3 node "
+                f"{row.get('class_name')!r}; re-pin the partner table",
+            )
+        result = fn(**real_inputs)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
 
 
 async def _call_gemini_nano_banana2_v2(cls, inputs: dict) -> Any:
@@ -699,6 +727,9 @@ _RELEASE_CODES = frozenset({
 def _map_exception(exc: BaseException, node_key: str) -> CloudMediaError:
     if isinstance(exc, CloudMediaError):
         return exc
+    if type(exc).__name__ == "ProcessingInterrupted":
+        return CloudMediaError(CloudErrorCode.INTERRUPTED,
+                               f"{node_key}: {exc}")
     if isinstance(exc, (asyncio.CancelledError,
                         concurrent.futures.CancelledError)):
         return CloudMediaError(CloudErrorCode.INTERRUPTED,
