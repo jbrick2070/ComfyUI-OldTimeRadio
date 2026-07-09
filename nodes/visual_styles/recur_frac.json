@@ -1,9 +1,9 @@
 {
   "style_id": "recur_frac",
   "label": "Infinite Recursive VGA",
-  "positive_tail": "Infinite Recursive VGA style, pristine raster geometry, recursive fractal GPU image field, emissive shader surfaces, nested spatial tunnels, vector curvature, subpixel light lattice, volumetric bloom, synthetic luminous black, hyper-coherent electronic color",
-  "image_grade_tail": "laser cyan, spectral magenta, acid green, ultraviolet blue, molten amber, deep graphite black, additive luminance bloom, diffraction skin, reflective vector membranes, impossible computed depth",
-  "broadcast_tail": "pristine computational signal surface, recursive raster bloom, modern cathode luminosity, stable self-similar light architecture",
+  "positive_tail": "surreal recursive fractal style, Infinite Recursive VGA, pristine raster geometry, recursive fractal GPU image field, emissive shader surfaces, nested spatial tunnels, vector curvature, subpixel light lattice, volumetric bloom, synthetic luminous black, hyper-coherent electronic color",
+  "image_grade_tail": "surreal recursive fractal style palette, laser cyan, spectral magenta, acid green, ultraviolet blue, molten amber, deep graphite black, additive luminance bloom, diffraction skin, reflective vector membranes, impossible computed depth",
+  "broadcast_tail": "surreal recursive fractal style signal surface, pristine computational geometry, recursive raster bloom, modern cathode luminosity, stable self-similar light architecture",
   "allow_radio_tails": false,
   "forbidden_terms": [
     "anime",
@@ -38,40 +38,40 @@
   ],
   "era_tail": "ultra-modern recursive fractal display world with scale-invariant computational depth",
   "schema_version": "v2",
-  "portrait_look": "synthetic recursive GPU portrait, emissive glass and diffraction highlights, nested raster light echoes, deep graphite-black glow",
-  "portrait_look_talking": "fractal recursive talking portrait, readable lips, clean front light, subpixel raster glow, controlled volumetric bloom",
-  "portrait_instruction_look": "ultra-modern recursive GPU-rendered with pristine raster geometry, emissive shader surfaces, and coherent fractal depth",
-  "scene_instruction_look": "Infinite Recursive VGA scene with nested self-similar geometry, pristine raster lattices, volumetric bloom, and impossible computed depth",
-  "announcer_subject_face": "its tuning dial arranged as a recursive luminous face -- two nested dial-eyes and a radiant vector mouth, an anthropomorphic radio host formed from folded raster light",
-  "announcer_subject_ltx_mouth": "{form} as a living recursive raster appliance face: its wide speaker grille resolves into a large luminous vector mouth, clear radiant lips open mid-speech, and its two glass tuning dials contain smaller dial-eyes within them -- a face-forward anthropomorphic radio built from emissive shader glass and graphite-black glow, the radio cabinet filling the frame",
-  "announcer_subject_object": "presented as a pristine recursive raster radio object, graphite cabinet, luminous dial lattice, reflective vector membranes and volumetric electronic haze",
-  "radio_object_look": "emissive glass, graphite-black depth, laser cyan and magenta raster highlights",
-  "plate_look": "recursive raster architecture, luminous black void depth, vector membranes and volumetric electronic haze",
-  "non_character_emblem_fallback": "a single recursive luminous emblem representing {base}, self-embedded across multiple scales",
-  "still_word_title_mood_style": "abstract recursive raster mood image, luminous nested geometry and volumetric shader light in a symbolic non-literal composition, no lettering",
+  "portrait_look": "surreal recursive fractal style synthetic GPU portrait, emissive glass and diffraction highlights, nested raster light echoes, deep graphite-black glow",
+  "portrait_look_talking": "surreal recursive fractal style talking portrait, readable lips, clean front light, subpixel raster glow, controlled volumetric bloom",
+  "portrait_instruction_look": "surreal recursive fractal style, Infinite Recursive VGA rendering with pristine raster geometry, emissive shader surfaces, and coherent fractal depth",
+  "scene_instruction_look": "surreal recursive fractal style scene with surreal recursive background depth, nested self-similar geometry, recursive fractal light structures, pristine raster lattices, volumetric bloom, and impossible computed depth",
+  "announcer_subject_face": "its tuning dial arranged as a surreal recursive fractal style luminous face -- two nested dial-eyes and a radiant vector mouth, an anthropomorphic radio host formed from folded raster light",
+  "announcer_subject_ltx_mouth": "{form} as a living surreal recursive fractal style raster appliance face: its wide speaker grille resolves into a large luminous vector mouth, clear radiant lips open mid-speech, and its two glass tuning dials contain smaller dial-eyes within them -- a face-forward anthropomorphic radio built from emissive shader glass and graphite-black glow, the radio cabinet filling the frame",
+  "announcer_subject_object": "presented as a pristine surreal recursive fractal style raster radio object, graphite cabinet, luminous dial lattice, reflective vector membranes and volumetric electronic haze",
+  "radio_object_look": "surreal recursive fractal style emissive glass, graphite-black depth, laser cyan and magenta raster highlights",
+  "plate_look": "surreal recursive fractal style background architecture, luminous black void depth, vector membranes and volumetric electronic haze",
+  "non_character_emblem_fallback": "a single surreal recursive fractal style luminous emblem representing {base}, self-embedded across multiple scales",
+  "still_word_title_mood_style": "abstract surreal recursive fractal style background mood image, luminous nested geometry and volumetric shader light in a symbolic non-literal composition, no lettering",
   "open_subjects": {
-    "synthetic": "{form} warming up inside a recursive raster chamber, glowing dials nested inside smaller dials, cyan magenta and acid-green light",
-    "announcer": "{form} in a luminous computational signal booth, dial lights echoing inward, pristine raster lattices and volumetric bloom",
-    "default": "{form} glowing as recursive raster hardware, nested dial geometry, vector membranes and luminous black depth"
+    "synthetic": "{form} warming up inside a surreal recursive fractal style background chamber, glowing dials nested inside smaller dials, cyan magenta and acid-green light",
+    "announcer": "{form} in a surreal recursive fractal style signal booth, dial lights echoing inward, pristine raster lattices and volumetric bloom",
+    "default": "{form} glowing as surreal recursive fractal style raster hardware, nested dial geometry, vector membranes and luminous black depth"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Raster lattices breathe. Nested dial echoes fold inward. Cyan and magenta corridors open inside the grille. Slow recursive push forward.",
-    "music_open": "Continuous shot, same console throughout. Dial sweep ignites nested raster tunnels. Subpixel lattices expand radially. Emissive chambers fold inward. Smooth push forward.",
-    "music_close": "Continuous shot, same console throughout. Dial settles. Recursive tunnels contract into luminous black. Raster lines dim in layers. Slow pull back.",
-    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Vector membranes ripple. Nested light echoes orbit the speaker. Slow Moebius-like turn."
+    "announcer": "Surreal recursive fractal style. Continuous shot, same console throughout. Raster lattices breathe. Nested dial echoes fold inward. Cyan and magenta corridors open inside the grille. Slow recursive push forward.",
+    "music_open": "Surreal recursive fractal style. Continuous shot, same console throughout. Dial sweep ignites nested raster tunnels. Subpixel lattices expand radially. Emissive chambers fold inward. Smooth push forward.",
+    "music_close": "Surreal recursive fractal style. Continuous shot, same console throughout. Dial settles. Recursive tunnels contract into luminous black. Raster lines dim in layers. Slow pull back.",
+    "music_inter": "Surreal recursive fractal style. Continuous shot, same console throughout. Dial steady, glowing. Vector membranes ripple. Nested light echoes orbit the speaker. Slow Moebius-like turn."
   },
   "still_word_typography": {
-    "noir": "razor-clean luminous capitals, thin cyan strokes with magenta inner echoes",
-    "sci-fi": "precision raster capitals, vector-cut edges with ultraviolet core glow",
-    "western": "heavy luminous slab capitals, amber edge bloom over graphite depth",
-    "pulp": "high-voltage display capitals, thick spectral shadow and radiant bevel",
-    "default": "clean recursive raster capitals, bright subpixel edges and stable glow"
+    "noir": "surreal recursive fractal style luminous capitals, razor-clean thin cyan strokes with magenta inner echoes",
+    "sci-fi": "surreal recursive fractal style precision raster capitals, vector-cut edges with ultraviolet core glow",
+    "western": "surreal recursive fractal style heavy luminous slab capitals, amber edge bloom over graphite depth",
+    "pulp": "surreal recursive fractal style high-voltage display capitals, thick spectral shadow and radiant bevel",
+    "default": "surreal recursive fractal style clean raster capitals, bright subpixel edges and stable glow"
   },
   "still_word_backdrop": {
-    "noir": "deep graphite-black field with cyan lattice corridors and low magenta haze",
-    "sci-fi": "ultraviolet black field with nested coordinate grids and acid-green portals",
-    "western": "molten amber graphite field with luminous raster folds",
-    "pulp": "spectral magenta and cyan field with recursive bloom chambers",
-    "default": "active graphite-black field with nested cyan magenta raster light"
+    "noir": "surreal recursive fractal style background, deep graphite-black field with cyan lattice corridors and low magenta haze",
+    "sci-fi": "surreal recursive fractal style background, ultraviolet black field with nested coordinate grids and acid-green portals",
+    "western": "surreal recursive fractal style background, molten amber graphite field with luminous raster folds",
+    "pulp": "surreal recursive fractal style background, spectral magenta and cyan field with recursive bloom chambers",
+    "default": "surreal recursive fractal style background, active graphite-black field with nested cyan magenta raster light"
   }
 }

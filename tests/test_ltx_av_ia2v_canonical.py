@@ -316,7 +316,7 @@ def test_char_face_beat_gets_compact_talking_prompt(ia2v_env, tmp_path,
 
 
 @pytest.mark.parametrize(("style_id", "prefix"), [
-    ("recur_frac", "fractal recursive face visible"),
+    ("recur_frac", "surreal recursive fractal style face visible"),
     ("video_art", "video-art feedback face visible"),
 ])
 def test_char_face_compact_prompt_keeps_non_default_style_cue(

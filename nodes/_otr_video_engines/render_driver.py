@@ -616,7 +616,7 @@ _IA2V_TALKING_CLAUSE_CHARACTER = (
 
 
 def _compact_style_talking_cue(vstyle):
-    """Two-token pack cue for IA2V character prompts.
+    """Compact pack cue for IA2V character prompts.
 
     The talking register is deliberately tiny for lip-sync; long style tails
     drown the speech tokens. Non-default packs still need one blunt cue close
@@ -627,7 +627,12 @@ def _compact_style_talking_cue(vstyle):
         return ""
     raw = str(getattr(vstyle, "portrait_look_talking", "") or "").strip()
     words = re.findall(r"[A-Za-z0-9][A-Za-z0-9-]*", raw)
-    return " ".join(words[:2]).strip()
+    limit = 2
+    for i, word in enumerate(words[:4]):
+        if word.lower() == "style":
+            limit = i + 1
+            break
+    return " ".join(words[:limit]).strip()
 
 
 def _ia2v_talking_register_active(engine_id):
