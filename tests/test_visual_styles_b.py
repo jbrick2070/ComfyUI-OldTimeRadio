@@ -211,8 +211,12 @@ class TestSurfaceDeltas:
                                              _led(dict(_META_BRIEF)))
         assert styled["text_prompt"] != default["text_prompt"]
         s = vs.resolve_visual_style(style_id)
-        assert styled["text_prompt"].startswith(
-            s.motion_registers["music_open"][:60])
+        assert styled["text_prompt"].lower().startswith(
+            rd._compact_style_talking_cue(s).lower())
+        motion_body = s.motion_registers["music_open"]
+        if "." in motion_body:
+            motion_body = motion_body.split(".", 1)[1].strip()
+        assert motion_body[:40] in styled["text_prompt"]
         assert styled["observability"]["visual_style"] == style_id
 
 
@@ -253,7 +257,8 @@ class TestVideoArtCondensedCue:
                "images": {"images": []}}
 
         req = rd.build_request_from_shot(shot, led)
-        assert req["text_prompt"].startswith("Video-art feedback.")
+        assert req["text_prompt"].startswith("video-art feedback style.")
+        assert "Continuous shot" in req["text_prompt"]
         assert (req["observability"]["prompt_field_source"]
                 == "motion_registers:music_open")
         assert req["observability"]["visual_style"] == "video_art"
@@ -308,6 +313,73 @@ class TestRecursiveFractalExplicitStyleCue:
         assert (req["observability"]["prompt_field_source"]
                 == "motion_registers:music_open")
         assert req["observability"]["visual_style"] == "recur_frac"
+
+    def test_recursive_fractal_style_cue_hits_character_m4_video_prompt(
+            self, _single_pass_recipe):
+        shot = {"shot_id": "shot_b002", "beat_id": "b002",
+                "engine_id": "ltx_audio_in", "role": "character_video",
+                "family": "audio_conditioned_video",
+                "target_frame_count": 25, "source_line_ids": ["b002"],
+                "char_id": "c01",
+                "creative": {"text_prompt": "face visible, speaking to camera",
+                             "source": "m4"}}
+        led = {"meta": _meta_for("recur_frac"),
+               "video": {"video_revision": 1, "shots": []},
+               "lines": [{"line_id": "b002", "char_id": "c01",
+                          "start_s": 0.0, "dur_s": 2.0}],
+               "images": {"images": [
+                   {"object_id": "still_b002", "beat_id": "b002",
+                    "kind": "scene_character",
+                    "path": "X:/img/still_b002.png"}]}}
+
+        req = rd.build_request_from_shot(shot, led)
+        assert req["text_prompt"].startswith(
+            "surreal recursive fractal style. face visible")
+        assert req["observability"]["prompt_source"] == "m4"
+        assert req["observability"]["visual_style"] == "recur_frac"
+
+    def test_recursive_fractal_style_cue_hits_character_fallback_prompt(
+            self, _single_pass_recipe):
+        shot = {"shot_id": "shot_b002", "beat_id": "b002",
+                "engine_id": "ltx_audio_in", "role": "character_video",
+                "family": "audio_conditioned_video",
+                "target_frame_count": 25, "source_line_ids": ["b002"],
+                "char_id": "c01", "creative": {}}
+        led = {"meta": _meta_for("recur_frac"),
+               "video": {"video_revision": 1, "shots": []},
+               "lines": [{"line_id": "b002", "char_id": "c01",
+                          "start_s": 0.0, "dur_s": 2.0}],
+               "images": {"images": [
+                   {"object_id": "still_b002", "beat_id": "b002",
+                    "kind": "scene_character",
+                    "path": "X:/img/still_b002.png"}]}}
+
+        req = rd.build_request_from_shot(shot, led)
+        assert req["text_prompt"].startswith(
+            "surreal recursive fractal style. close-up cinematic portrait")
+        assert req["observability"]["prompt_source"] == "default_scrubbed"
+
+    def test_recursive_fractal_style_cue_hits_brief_video_prompt(
+            self, _single_pass_recipe):
+        shot = {"shot_id": "shot_b010", "beat_id": "b010",
+                "engine_id": "ltx_video", "role": "background_video",
+                "family": "image_to_video", "target_frame_count": 25,
+                "source_line_ids": ["b010"], "char_id": "",
+                "creative": {}}
+        led = {"meta": _meta_for("recur_frac"),
+               "video": {"video_revision": 1, "shots": []},
+               "lines": [{"line_id": "b010", "char_id": "",
+                          "start_s": 0.0, "dur_s": 2.0,
+                          "text": "The well glows."}],
+               "images": {"images": [
+                   {"object_id": "still_b010", "beat_id": "b010",
+                    "kind": "scene_beat",
+                    "path": "X:/img/still_b010.png"}]}}
+
+        req = rd.build_request_from_shot(shot, led)
+        assert req["text_prompt"].startswith(
+            "surreal recursive fractal style.")
+        assert req["observability"]["prompt_source"] == "brief+beat"
 
 
 # ---------------------------------------------------------------------------

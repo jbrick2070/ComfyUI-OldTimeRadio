@@ -1422,6 +1422,18 @@ def _mesh_fodder_subject(meta, char_entry, line, setting, role,
         meta, char_entry, line, setting, role, style=style)[0]
 
 
+def _mesh_style_spice(style) -> str:
+    """Short non-default style cue for clean 3D fodder stills.
+
+    Mesh fodder must stay isolated and simple; use only the first positive-tail
+    clause so flat/empty-era packs still reach the 3D image stream.
+    """
+    if str(getattr(style, "style_id", "") or "") == "sci_fi_radio":
+        return ""
+    raw = str(getattr(style, "positive_tail", "") or "").strip()
+    return raw.split(",", 1)[0].strip().rstrip(".")
+
+
 def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role,
                                 style=None) -> str:
     """``"{subject}, {scaffold}"`` -- the isolated-subject still
@@ -1442,6 +1454,9 @@ def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role,
     subject = _mesh_fodder_subject(meta, char_entry, line, setting, role,
                                    style=_vstyle)
     out = "%s, %s" % (subject, MESH_FODDER_POS_SCAFFOLD)
+    spice = _mesh_style_spice(_vstyle)
+    if spice and spice.lower() not in out.lower():
+        out = "%s, %s" % (out, spice)
     # C4 (2026-07-01): the mesh radio inherits the brief's era TEXTURE (trimmed
     # still profile: atmosphere line + palette/lighting top-2), so a non-1940s
     # brief carries through to the meshed object. The isolation scaffold above

@@ -142,7 +142,7 @@ class TestMotionRegisters:
         meta = dict(_META_BRIEF)
         meta["visual_style"] = "leaktest"
         req = rd.build_request_from_shot(_shot(), _led(meta))
-        assert req["text_prompt"].startswith("Paper radio unfolds.")
+        assert "Paper radio unfolds." in req["text_prompt"]
         assert req["observability"]["visual_style"] == "leaktest"
 
     def test_missing_console_key_raises_never_remaps(self, _single_pass_recipe,

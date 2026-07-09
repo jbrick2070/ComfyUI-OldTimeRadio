@@ -625,7 +625,9 @@ def _compact_style_talking_cue(vstyle):
     """
     if str(getattr(vstyle, "style_id", "") or "") == "sci_fi_radio":
         return ""
-    raw = str(getattr(vstyle, "portrait_look_talking", "") or "").strip()
+    raw = str(getattr(vstyle, "positive_tail", "") or "").strip()
+    if not raw:
+        raw = str(getattr(vstyle, "portrait_look_talking", "") or "").strip()
     words = re.findall(r"[A-Za-z0-9][A-Za-z0-9-]*", raw)
     limit = 2
     for i, word in enumerate(words[:4]):
@@ -633,6 +635,31 @@ def _compact_style_talking_cue(vstyle):
             limit = i + 1
             break
     return " ".join(words[:limit]).strip()
+
+
+def _prefix_video_style_cue(vstyle, prompt):
+    """Put the selected non-default visual style at the front of video text.
+
+    This is intentionally a short cue, not a full style tail. Long tails dilute
+    LTX/IA2V talking prompts and can crowd out identity/motion tokens.
+    """
+    prompt = str(prompt or "").strip()
+    cue = _compact_style_talking_cue(vstyle)
+    if not prompt or not cue:
+        return prompt
+    low_prompt = prompt.lower()
+    low_cue = cue.lower().rstrip(".")
+    if low_prompt.startswith(low_cue):
+        return prompt
+    if low_cue.endswith(" style"):
+        base_cue = low_cue[: -len(" style")].strip()
+        if base_cue and low_prompt.startswith(base_cue):
+            rest = prompt[len(base_cue):].lstrip()
+            if rest.startswith("."):
+                rest = rest[1:].lstrip()
+            return ("%s. %s" % (cue.rstrip("."), rest)
+                    if rest else "%s." % cue.rstrip("."))
+    return "%s. %s" % (cue.rstrip("."), prompt)
 
 
 def _ia2v_talking_register_active(engine_id):
@@ -1842,6 +1869,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             text_prompt = (text_prompt.rstrip().rstrip(",")
                            + ", stable centered subject, full face clearly "
                            "visible, generous headroom, comfortably composed")
+        text_prompt = _prefix_video_style_cue(_vstyle, text_prompt)
         req["text_prompt"] = text_prompt
         _stamp_prompt_meta(req, "m4", text_prompt,
                            subsource=str(creative.get("source") or ""),
@@ -1869,11 +1897,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 # must talk too.
                 _cf_fallback = ("close-up cinematic portrait of a person "
                                 "who %s" % _IA2V_TALKING_CLAUSE_CHARACTER)
+            _cf_fallback = _prefix_video_style_cue(_vstyle, _cf_fallback)
             req["text_prompt"] = _cf_fallback
             _stamp_prompt_meta(req, "default_scrubbed", _cf_fallback,
                                beat=_beat_id_for_shot(shot))
         else:
-            _stamp_prompt_meta(req, "default", req.get("text_prompt", ""),
+            _default_prompt = _prefix_video_style_cue(
+                _vstyle, req.get("text_prompt", ""))
+            req["text_prompt"] = _default_prompt
+            _stamp_prompt_meta(req, "default", _default_prompt,
                                beat=_beat_id_for_shot(shot))
     # SCENE PROMPTS for text-driven engines (gap-audit fix F2, roundtable-
     # hardened: docs/2026-06-10-brief-downstream-gaps/). Any ltx_video /
@@ -2003,6 +2035,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                     (("synthetic" if _is_synthetic_open
                       else ("announcer" if _shot_role == "announcer_visual"
                             else "default")), _motion_key))
+            scene_prompt = _prefix_video_style_cue(_vstyle, scene_prompt)
             _LOG.warning("[OTR.render_driver] LTX MOTION: %s beat %s motion-"
                          "centric prompt (role=%s, %d chars): %.90s...",
                          _shot_role, shot.get("shot_id"), _motion_key,
@@ -2043,6 +2076,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             scene_prompt = finish_visual_prompt(
                 _meta, f"{core}, {', '.join(clauses)}",
                 max_chars=188, style_tail=False, era_profile="still")
+            scene_prompt = _prefix_video_style_cue(_vstyle, scene_prompt)
             _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
                          "composed from the episode brief (%d chars): "
                          "%.90s...", _shot_role, shot.get("shot_id"),

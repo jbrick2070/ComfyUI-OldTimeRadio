@@ -190,6 +190,8 @@ class TestForcedMetaDeltas:
         s_mesh_empty = imgp._compose_mesh_fodder_prompt(
             {"visual_style": style_id}, None, {}, "", "music_visual")
         style = vs.resolve_visual_style(style_id)
+        assert style.positive_tail.split(",", 1)[0] in s_mesh
+        assert style.positive_tail.split(",", 1)[0] in s_mesh_empty
         if style.era_tail != helpers.ERA_TAIL_DEFAULT:
             assert d_mesh_empty != s_mesh_empty
         assert imgp.MESH_FODDER_POS_SCAFFOLD in d_mesh and \
