@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import ast
+import math
 import pathlib
 import shutil
 import subprocess
 
+import numpy as np
 import pytest
 
 from nodes._otr_google_api.client import GoogleAPIRequestShapeError
@@ -50,7 +52,7 @@ def _clear_video_env(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
-def _mp4_fixture(tmp_path, *, with_audio: bool) -> pathlib.Path:
+def _mp4_fixture(tmp_path, *, with_audio: bool, audio_filter: str = "") -> pathlib.Path:
     out = tmp_path / ("provider_av.mp4" if with_audio else "provider_v.mp4")
     cmd = [
         _FFMPEG,
@@ -63,11 +65,14 @@ def _mp4_fixture(tmp_path, *, with_audio: bool) -> pathlib.Path:
         "testsrc=size=128x72:rate=12:duration=1",
     ]
     if with_audio:
+        audio_src = "sine=frequency=330:duration=1"
+        if audio_filter:
+            audio_src += "," + audio_filter
         cmd += [
             "-f",
             "lavfi",
             "-i",
-            "sine=frequency=330:duration=1",
+            audio_src,
         ]
     cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
     if with_audio:
@@ -99,6 +104,42 @@ def _audio_streams(path: pathlib.Path) -> list[dict]:
     )
     doc = json.loads(p.stdout or "{}")
     return [s for s in doc.get("streams") or [] if s.get("codec_type") == "audio"]
+
+
+def _audio_rms_dbfs(path: pathlib.Path) -> float:
+    p = subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-f",
+            "f32le",
+            "-",
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
+    audio = np.frombuffer(p.stdout, dtype=np.float32)
+    rms = float(np.sqrt(np.mean(np.square(audio.astype(np.float64)))))
+    return 20.0 * math.log10(max(rms, 1e-12))
+
+
+def _clear_sfx_loudness_env(monkeypatch):
+    for name in (
+        "OTR_SFX_STEM_TARGET_RMS_DBFS",
+        "OTR_SFX_STEM_MAX_BOOST_DB",
+        "OTR_SFX_STEM_MAX_CUT_DB",
+        "OTR_SFX_STEM_GATE_DBFS",
+        "OTR_SFX_STEM_PEAK_CEILING",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 def test_sfx_prompt_helper_terms_and_idempotency():
@@ -236,7 +277,9 @@ def test_extract_sfx_fails_loud_on_no_audio_provider_mp4(tmp_path):
 
 
 @pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
-def test_extract_sfx_emits_48k_stereo_wav_from_provider_mp4(tmp_path):
+def test_extract_sfx_emits_normalized_48k_stereo_wav_from_provider_mp4(
+    tmp_path, monkeypatch):
+    _clear_sfx_loudness_env(monkeypatch)
     src = _mp4_fixture(tmp_path, with_audio=True)
     raw = {"path": str(src), "content_type": "video/mp4", "duration_s": None,
            "provider_job_id": "with-audio", "raw_meta": {}}
@@ -250,6 +293,24 @@ def test_extract_sfx_emits_48k_stereo_wav_from_provider_mp4(tmp_path):
     assert streams[0]["codec_name"] == "pcm_s16le"
     assert streams[0]["sample_rate"] == "48000"
     assert int(streams[0]["channels"]) == 2
+    assert any("sfx_rms_normalized target=-20.0dBFS" in w
+               for w in asset.validation_warnings)
+    assert -21.0 <= _audio_rms_dbfs(asset.path) <= -19.0
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_extract_sfx_boosts_low_google_bed_without_burying_it(
+    tmp_path, monkeypatch):
+    _clear_sfx_loudness_env(monkeypatch)
+    src = _mp4_fixture(tmp_path, with_audio=True, audio_filter="volume=0.15")
+    raw = {"path": str(src), "content_type": "video/mp4", "duration_s": None,
+           "provider_job_id": "quiet-audio", "raw_meta": {}}
+
+    asset = extract_sfx_bed_from_provider_video(raw)
+
+    assert -21.0 <= _audio_rms_dbfs(asset.path) <= -19.0
+    assert any("gain=" in w and "after=" in w
+               for w in asset.validation_warnings)
 
 
 @pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
