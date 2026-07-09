@@ -84,6 +84,10 @@ CURATED_ROWS = {
                                "music/b-roll reactive default; audio-ref + identity"),
     "cloud_wan_i2v":          ("Wan2ImageToVideoApi", "WAN", 0,
                                "mute_only OPT-DOWN row (operator amendment)"),
+    "cloud_vidu_q2_i2v":      ("Vidu2ImageToVideoNode", "VIDU", 0,
+                               "cheap Vidu Q2 image-to-video row; served by "
+                               "cloud_vidu_q2_pro_fast_720p with "
+                               "model=viduq2-pro-fast, resolution=720p"),
     # word_razzle Phase 1 (2026-07-03): the animated word-card i2v row. The
     # --audit-i2v Phase 0 verdict picked PixverseImageToVideoNode -- promptable,
     # non-V3, REQUIRED image init + prompt + seed + duration_seconds +

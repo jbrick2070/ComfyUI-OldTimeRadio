@@ -366,6 +366,19 @@ CAPABILITIES = {
                       "cpu_ok": True, "model_requirements": []},
     "cloud_wan_i2v_audio": {"required_toolchain": None, "requires_sidecar": False,
                             "cpu_ok": True, "model_requirements": []},
+    # cloud_vidu_q2_pro_fast_720p (2026-07-09): cheap Comfy Cloud Vidu Q2
+    # image-to-video row, fixed to viduq2-pro-fast at 720p. Provider-side
+    # render, cpu_ok. Selectable only; missing OTR_COMFY_API_KEY fails loud at
+    # invoke.
+    "cloud_vidu_q2_pro_fast_720p": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "cpu_ok": True, "model_requirements": []},
+    # Explicit SFX sibling: same Vidu Q2 pro-fast 720p partner row, but provider
+    # audio is extracted as a separate .sfx.wav stem. If the provider returns no
+    # audio, it fails loud instead of silently degrading to a visual-only clip.
+    "cloud_vidu_q2_pro_fast_720p_sfx": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "cpu_ok": True, "model_requirements": []},
     # word_razzle (Phase 1, 2026-07-03): the animated word-card cloud i2v engine
     # (Pixverse row cloud_pixverse_i2v). Provider-side render, cpu_ok. Selectable;
     # NO enable flag (dropdown pick is the enable; missing OTR_COMFY_API_KEY

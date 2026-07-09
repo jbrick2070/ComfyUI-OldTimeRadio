@@ -8,6 +8,8 @@ Four rows from the S0 pin table, invoked through the S0 bridge
     cloud_seedance_2     required_audio_ref   (init_image, audio_ref)
     cloud_wan_i2v        mute_only            (init_image, text_prompt)
     cloud_wan_i2v_audio  required_audio_ref   (init_image, audio_ref)
+    cloud_vidu_q2_pro_fast_720p mute_only     (init_image, text_prompt)
+    cloud_vidu_q2_pro_fast_720p_sfx mute_only (init_image, text_prompt)
 
 S3-CORE SCOPE: rows REGISTER unconditionally (registry-IS-the-menu C6) with
 empty ``default_roles`` -- selectable, NEVER automatic. Operator directive
@@ -38,6 +40,7 @@ import re
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .._otr_story_brief_helpers import (
+    append_sfx_audio_safety_clause,
     append_visual_safety_clause,
     visual_safety_negative,
 )
@@ -138,6 +141,20 @@ _WAN_NEGATIVE_DEFAULT = visual_safety_negative(
     "melting geometry, warped face, distorted hands, drifting text, unreadable "
     "text, black frame, pillarbox bars")
 
+_VIDU_Q2_MODEL = "viduq2-pro-fast"
+_VIDU_Q2_RESOLUTION = "720p"
+_VIDU_Q2_MOVEMENT_AMPLITUDES = ("auto", "small", "medium", "large")
+_VIDU_Q2_SMOOTH_MARKER = (
+    "Vidu Q2 i2v motion; preserve the still and move gently.")
+_VIDU_Q2_SMOOTH_MOTION_CLAUSE = (
+    "Generate one continuous image-to-video shot from the supplied start "
+    "frame. Preserve the subject identity, composition, period-radio visual "
+    "style, lighting, and aspect ratio. Use gentle physically continuous "
+    "motion with subtle parallax. No sudden reframing, jump cuts, rapid zooms, "
+    "melting geometry, warped faces, drifting text, black frames, or bars. "
+    f"{_VIDU_Q2_SMOOTH_MARKER}")
+_VIDU_Q2_PROMPT_VARIANT = "vidu_q2_pro_fast_720p_smooth_v1"
+
 
 def _condition_kling_avatar_prompt(prompt: str) -> "tuple[str, dict]":
     original = str(prompt or "")
@@ -165,6 +182,23 @@ def _condition_wan_prompt(prompt: str) -> "tuple[str, dict]":
         conditioned = original
     else:
         conditioned = original.rstrip() + "\n\n" + _WAN_SMOOTH_MOTION_CLAUSE
+    return conditioned, {
+        "changed": conditioned != original,
+        "original_sha8": _sha8(original),
+        "conditioned_sha8": _sha8(conditioned),
+        "original_excerpt": _log_excerpt(original),
+        "conditioned_excerpt": _log_excerpt(conditioned),
+    }
+
+
+def _condition_vidu_q2_prompt(prompt: str) -> "tuple[str, dict]":
+    original = str(prompt)
+    if not original.strip():
+        raise ValueError("Vidu Q2 prompt conditioner requires non-empty prompt")
+    if _VIDU_Q2_SMOOTH_MARKER in original:
+        conditioned = original
+    else:
+        conditioned = original.rstrip() + "\n\n" + _VIDU_Q2_SMOOTH_MOTION_CLAUSE
     return conditioned, {
         "changed": conditioned != original,
         "original_sha8": _sha8(original),
@@ -337,18 +371,7 @@ class _CloudVideoBase:
     def _partner_inputs(self, request) -> dict:
         raise NotImplementedError
 
-    def render_clip(self, request, prepared):
-        from .._otr_shared.cloud_media_invoke import invoke_partner_node
-        inputs = self._partner_inputs(request)
-        _LOG.warning(
-            "[OTR video] CLOUD render: %s -> partner %s (est<=$%.2f, "
-            "timeout %.0fs, shot %s)", self.name, self.node_key, _est_usd(),
-            _timeout_s(), _req_get(request, "shot_id"))
-        return invoke_partner_node(
-            self.node_key, inputs,
-            timeout_s=_timeout_s(), estimated_usd=_est_usd())
-
-    def canonicalize(self, raw, request, profile):
+    def _canonical_video_asset(self, raw, request):
         from .._otr_shared.cloud_media_canonical import (
             canonicalize_video, cloud_delivery_wh)
         canvas = _req_get(request, "canvas") or {}
@@ -364,9 +387,23 @@ class _CloudVideoBase:
         tw, th = cloud_delivery_wh(
             rw, rh, land_env="OTR_CLOUD_VIDEO_CANVAS",
             port_env="OTR_CLOUD_VIDEO_CANVAS_PORTRAIT")
-        asset = canonicalize_video(raw, {
+        return canonicalize_video(raw, {
             "w": tw, "h": th, "fps": int(c_get("fps", 25) or 25),
         })
+
+    def render_clip(self, request, prepared):
+        from .._otr_shared.cloud_media_invoke import invoke_partner_node
+        inputs = self._partner_inputs(request)
+        _LOG.warning(
+            "[OTR video] CLOUD render: %s -> partner %s (est<=$%.2f, "
+            "timeout %.0fs, shot %s)", self.name, self.node_key, _est_usd(),
+            _timeout_s(), _req_get(request, "shot_id"))
+        return invoke_partner_node(
+            self.node_key, inputs,
+            timeout_s=_timeout_s(), estimated_usd=_est_usd())
+
+    def canonicalize(self, raw, request, profile):
+        asset = self._canonical_video_asset(raw, request)
         frame_count = int(round((asset.duration_s or 0.0) * (asset.fps or 0.0)))
         return {
             "clip_id": _req_get(request, "shot_id") or f"{self.name}_clip",
@@ -668,6 +705,73 @@ class CloudWanI2VAudioEngine(CloudWanI2VEngine):
         return inputs
 
 
+class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
+    """Vidu Q2 pro-fast image-to-video, fixed to the cheap 720p tier."""
+
+    name = "cloud_vidu_q2_pro_fast_720p"
+    node_key = "cloud_vidu_q2_i2v"
+    family = "image_to_video"
+    required_inputs = ("init_image", "text_prompt")
+    reactivity = "mute_only"
+    wants_provider_sfx = False
+
+    def _movement_amplitude(self) -> str:
+        return self._choice(
+            "OTR_CLOUD_VIDU_Q2_MOVEMENT", "auto",
+            _VIDU_Q2_MOVEMENT_AMPLITUDES, transform=str.lower)
+
+    def _conditioned_prompt(self, request):
+        prompt = self._text_prompt_input(request)
+        if self.wants_provider_sfx:
+            prompt = append_sfx_audio_safety_clause(prompt)
+        return _condition_vidu_q2_prompt(prompt)
+
+    def _partner_inputs(self, request):
+        prompt, prompt_meta = self._conditioned_prompt(request)
+        log_fields = dict(prompt_meta)
+        duration = self._duration_seconds(
+            request, env="OTR_CLOUD_VIDU_Q2_DURATION",
+            default=5, min_s=1, max_s=10)
+        log_fields.update({
+            "engine": self.name,
+            "prompt_variant": _VIDU_Q2_PROMPT_VARIANT,
+            "vidu_requested_duration_s": duration,
+            "vidu_model": _VIDU_Q2_MODEL,
+            "vidu_resolution": _VIDU_Q2_RESOLUTION,
+            "sfx_audio_requested": bool(self.wants_provider_sfx),
+        })
+        _LOG.info("[OTR.cloud.vidu_q2] prompt_conditioner %s",
+                  json.dumps(log_fields, sort_keys=True))
+        return {
+            "model": _VIDU_Q2_MODEL,
+            "image": self._init_image_input(request),
+            "prompt": prompt,
+            "duration": duration,
+            "seed": self._seed_i32(request),
+            "resolution": _VIDU_Q2_RESOLUTION,
+            "movement_amplitude": self._movement_amplitude(),
+        }
+
+
+class CloudViduQ2ProFast720pSfxEngine(CloudViduQ2ProFast720pEngine):
+    """Vidu Q2 pro-fast 720p with provider audio preserved as an SFX stem."""
+
+    name = "cloud_vidu_q2_pro_fast_720p_sfx"
+    wants_provider_sfx = True
+
+    def canonicalize(self, raw, request, profile):
+        from .._otr_shared.cloud_media_canonical import (
+            extract_sfx_bed_from_provider_video)
+        sfx = extract_sfx_bed_from_provider_video(raw)
+        clip = super().canonicalize(raw, request, profile)
+        clip.update({
+            "sfx_stem_path": str(sfx.path),
+            "sfx_duration_s": sfx.duration_s,
+            "sfx_sha256": sfx.sha256,
+        })
+        return clip
+
+
 # word_razzle Phase 1 (2026-07-03): the ANIMATED word-card cloud i2v engine.
 # Pixverse is the --audit-i2v Phase-0 pick (promptable, non-V3, required image
 # init + prompt + seed + duration_seconds + motion_mode). A word_razzle beat's
@@ -749,12 +853,18 @@ KlingAvatar = CloudKlingAvatarEngine()
 Seedance2 = CloudSeedance2Engine()
 WanI2V = CloudWanI2VEngine()
 WanI2VAudio = CloudWanI2VAudioEngine()
+ViduQ2ProFast720p = CloudViduQ2ProFast720pEngine()
+ViduQ2ProFast720pSfx = CloudViduQ2ProFast720pSfxEngine()
 WordRazzle = CloudWordRazzleEngine()
 
-for _eng in (KlingAvatar, Seedance2, WanI2V, WanI2VAudio, WordRazzle):
+for _eng in (
+        KlingAvatar, Seedance2, WanI2V, WanI2VAudio,
+        ViduQ2ProFast720p, ViduQ2ProFast720pSfx, WordRazzle):
     register(_eng)
 
 __all__ = [
     "CloudKlingAvatarEngine", "CloudSeedance2Engine",
-    "CloudWanI2VEngine", "CloudWanI2VAudioEngine", "CloudWordRazzleEngine",
+    "CloudWanI2VEngine", "CloudWanI2VAudioEngine",
+    "CloudViduQ2ProFast720pEngine", "CloudViduQ2ProFast720pSfxEngine",
+    "CloudWordRazzleEngine",
 ]
