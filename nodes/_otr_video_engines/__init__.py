@@ -187,3 +187,10 @@ try:  # pragma: no cover - trivial guard
     from . import eng_google_veo_video as _eng_google_veo_video  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+# Explicit opt-in Google video SFX-bed engines. These preserve provider audio
+# only as separate .sfx.wav stems; the canonical video clip remains silent.
+try:  # pragma: no cover - trivial guard
+    from . import eng_google_vid_sfx as _eng_google_vid_sfx  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass

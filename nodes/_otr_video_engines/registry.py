@@ -382,6 +382,17 @@ CAPABILITIES = {
     # Selectable only; missing Google key fails loud at invoke.
     "google_veo_video": {"required_toolchain": None, "requires_sidecar": False,
                          "cpu_ok": True, "model_requirements": []},
+    # google_vid_sfx_* (2026-07-08): explicit opt-in Google video engines that
+    # keep provider audio only as separate SFX/foley stems. The canonical video
+    # output remains silent; OTR_MasterAudioMux mixes the SFX bed later.
+    "google_vid_sfx_omni": {"required_toolchain": None, "requires_sidecar": False,
+                            "cpu_ok": True, "model_requirements": []},
+    "google_vid_sfx_veo_lite": {"required_toolchain": None, "requires_sidecar": False,
+                                "cpu_ok": True, "model_requirements": []},
+    "google_vid_sfx_veo_fast": {"required_toolchain": None, "requires_sidecar": False,
+                                "cpu_ok": True, "model_requirements": []},
+    "google_vid_sfx_veo_pro": {"required_toolchain": None, "requires_sidecar": False,
+                               "cpu_ok": True, "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 

@@ -31,6 +31,7 @@ __all__ = [
     "canonicalize_audio",
     "canonicalize_image",
     "canonicalize_video",
+    "extract_sfx_bed_from_provider_video",
     "cloud_delivery_wh",
 ]
 
@@ -422,4 +423,81 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
         container="mp4",
         provider_job_id=validated.get("provider_job_id"),
         validation_warnings=warnings,
+    )
+
+
+def _provider_video_path(raw) -> "tuple[Path, Optional[str]]":
+    if isinstance(raw, (str, os.PathLike)):
+        path = Path(raw)
+        if not path.is_file() or path.stat().st_size == 0:
+            raise CloudMediaError(
+                CloudErrorCode.CORRUPT_OUTPUT,
+                f"SFX unavailable: provider video missing or empty: {path}")
+        return path, None
+    validated = validate_partner_result(dict(raw))
+    return Path(validated["path"]), validated.get("provider_job_id")
+
+
+def extract_sfx_bed_from_provider_video(raw, out_path: str | os.PathLike | None = None) -> CanonicalAsset:
+    """Extract provider video audio as a raw SFX bed.
+
+    This is intentionally separate from :func:`canonicalize_audio`: SFX stems are
+    foley/ambience material mixed underneath the frozen master later, not
+    dialogue clips that should be RMS-leveled like local speech.
+    """
+    import hashlib
+    import shutil
+    import subprocess
+
+    src, provider_job_id = _provider_video_path(raw)
+    probe = _ffprobe_streams(str(src))
+    if not probe["audio"]:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"SFX unavailable: provider video {src} has no audio stream")
+    ffmpeg = shutil.which(os.environ.get("OTR_FFMPEG") or "ffmpeg") \
+        or shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            "ffmpeg not found -- cannot extract provider SFX bed")
+    dst = Path(out_path) if out_path else src.with_suffix(".sfx.wav")
+    try:
+        res = subprocess.run(
+            [ffmpeg, "-y", "-v", "error", "-i", str(src), "-map", "0:a:0",
+             "-vn", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le",
+             str(dst)],
+            capture_output=True, text=True, timeout=600)
+        if res.returncode != 0:
+            raise RuntimeError(res.stderr.strip()[-300:])
+    except CloudMediaError:
+        raise
+    except Exception as exc:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"SFX extraction failed for {src}: {exc}")
+    if not dst.is_file() or dst.stat().st_size == 0:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"SFX extraction wrote no output: {dst}")
+    post = _ffprobe_streams(str(dst))
+    if not post["audio"]:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"SFX extraction output {dst} has no audio stream")
+    sha = hashlib.sha256()
+    with open(dst, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            sha.update(chunk)
+    return CanonicalAsset(
+        path=dst,
+        sha256=sha.hexdigest(),
+        media_type="audio",
+        duration_s=post["duration_s"],
+        width=None,
+        height=None,
+        fps=None,
+        container="wav",
+        provider_job_id=provider_job_id,
+        validation_warnings=(),
     )

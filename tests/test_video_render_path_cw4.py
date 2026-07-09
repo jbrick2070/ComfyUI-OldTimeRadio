@@ -10,6 +10,7 @@ ComfyUI smoke (operator), not covered here.
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import subprocess
 import sys
@@ -17,7 +18,10 @@ import pathlib
 
 import pytest
 
-from nodes.otr_master_audio_mux import mux_master_audio, audio_pcm_sha, OTRMasterAudioMux
+from nodes.otr_master_audio_mux import (
+    mux_master_audio, audio_pcm_sha, OTRMasterAudioMux,
+    compile_sfx_bed_from_manifest,
+)
 from nodes.otr_silent_composite import (
     normalize_to_silent_canonical, count_audio_streams, probe_video, OTRSilentComposite,
     plan_timeline_segments, assemble_silent_timeline, count_video_frames,
@@ -51,6 +55,16 @@ def _silent_video(path, dur=2.0, with_audio=False):
     _ff(*args)
 
 
+def _audio_stream_info(path):
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a:0",
+         "-show_entries", "stream=codec_name,sample_rate,channels",
+         "-of", "json", str(path)],
+        check=True, capture_output=True, text=True, timeout=60).stdout
+    streams = json.loads(out or "{}").get("streams") or []
+    return streams[0] if streams else {}
+
+
 # --------------------------------------------------------------------------- #
 # OTR_MasterAudioMux -- the terminal, audio-critical node
 # --------------------------------------------------------------------------- #
@@ -67,6 +81,7 @@ def test_master_audio_mux_stream_hash_byte_identical(tmp_path):
     assert audio_pcm_sha(final) == audio_pcm_sha(str(master))
     # and the final actually carries exactly one audio stream
     assert count_audio_streams(final) == 1
+    assert "audio_mode=master_copy" in "\n".join(report)
 
 
 @needs_ffmpeg
@@ -98,6 +113,75 @@ def test_master_audio_mux_missing_inputs_fail_closed(tmp_path):
     with pytest.raises(ValueError):
         mux_master_audio(str(tmp_path / "nope.mp4"), str(tmp_path / "nope.wav"),
                          str(tmp_path / "o.mkv"))
+
+
+@needs_ffmpeg
+def test_sfx_bed_compile_rejects_invalid_manifest_rows(tmp_path):
+    stem = tmp_path / "stem.wav"
+    _sine(stem, 1.0)
+    base = {"fps": 25, "clips": [
+        {"shot_id": "sfx", "sfx_stem_path": str(stem),
+         "start_s": 0.0, "target_frame_count": 25},
+    ]}
+    for patch, msg in (
+        ({"sfx_stem_path": str(tmp_path / "missing.wav")}, "stem missing"),
+        ({"start_s": "bad"}, "start_s"),
+        ({"target_frame_count": 0}, "target_frame_count"),
+    ):
+        doc = json.loads(json.dumps(base))
+        doc["clips"][0].update(patch)
+        with pytest.raises(ValueError, match=msg):
+            compile_sfx_bed_from_manifest(
+                json.dumps(doc), out_path=tmp_path / "bad.wav")
+    bad_fps = dict(base)
+    bad_fps["fps"] = 0
+    with pytest.raises(ValueError, match="fps must be > 0"):
+        compile_sfx_bed_from_manifest(
+            json.dumps(bad_fps), out_path=tmp_path / "bad_fps.wav")
+
+
+@needs_ffmpeg
+def test_sfx_mux_mixes_against_reference_pcm_sha_and_keeps_archival_pcm(
+    tmp_path, monkeypatch):
+    master = tmp_path / "master.wav"
+    silent = tmp_path / "silent.mp4"
+    sfx = tmp_path / "clip.sfx.wav"
+    bed = tmp_path / "episode.sfx_mix.wav"
+    final = tmp_path / "final.mkv"
+    _sine(master, 2.0)
+    _silent_video(silent, 2.0)
+    _ff("-f", "lavfi", "-i", "sine=frequency=880:duration=2",
+        "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(sfx))
+    manifest = {
+        "fps": 25,
+        "clips": [
+            {"shot_id": "shot_sfx", "sfx_stem_path": str(sfx),
+             "start_s": 0.0, "target_frame_count": 50},
+        ],
+    }
+    compiled = compile_sfx_bed_from_manifest(
+        json.dumps(manifest), out_path=str(bed))
+    info = _audio_stream_info(compiled)
+    assert info["codec_name"] == "pcm_s16le"
+    assert info["sample_rate"] == "48000"
+    assert int(info["channels"]) == 2
+
+    monkeypatch.setenv("OTR_SFX_BED_GAIN", "2.5")
+    out, report = mux_master_audio(
+        str(silent), str(master), str(final), fps=25,
+        sfx_bed_path=compiled, sfx_gain=0.25)
+    text = "\n".join(report)
+    assert out == str(final)
+    assert "audio_mode=sfx_mixed" in text
+    assert "sfx_gain=1.000000" in text
+    assert _audio_stream_info(out)["codec_name"] == "pcm_s16le"
+    fields = {}
+    for line in report:
+        if "=" in line:
+            k, v = line.split("=", 1)
+            fields[k] = v
+    assert fields["mixed_reference_pcm_sha"] == fields["output_pcm_sha"]
+    assert fields["source_master_pcm_sha"] != fields["output_pcm_sha"]
 
 
 def test_master_audio_mux_is_output_node():

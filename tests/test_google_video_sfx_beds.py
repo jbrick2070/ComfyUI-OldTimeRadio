@@ -1,0 +1,284 @@
+"""Google video SFX-bed engine regressions."""
+from __future__ import annotations
+
+import ast
+import pathlib
+import shutil
+import subprocess
+
+import pytest
+
+from nodes._otr_google_api.client import GoogleAPIRequestShapeError
+from nodes._otr_shared.cloud_media_backend import CloudMediaError
+from nodes._otr_shared.cloud_media_canonical import extract_sfx_bed_from_provider_video
+from nodes._otr_story_brief_helpers import append_sfx_audio_safety_clause
+from nodes._otr_video_engines import eng_google_omni_video as OMNI
+from nodes._otr_video_engines import eng_google_veo_video as VEO
+from nodes._otr_video_engines import eng_google_vid_sfx as SFX
+from nodes._otr_video_engines import registry as vreg
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+SRC = REPO_ROOT / "nodes" / "_otr_video_engines" / "eng_google_vid_sfx.py"
+_FFMPEG = shutil.which("ffmpeg")
+
+
+def _req(**over):
+    r = {
+        "shot_id": "shot_sfx_001",
+        "text_prompt": "a storm-lit radio tower, slow cinematic drift",
+        "seed_bundle": {"request_seed": 9},
+        "canvas": {"w": 832, "h": 448, "fps": 25},
+        "timing": {"target_frame_count": 125},
+    }
+    r.update(over)
+    return r
+
+
+def _clear_video_env(monkeypatch):
+    for name in (
+        "OTR_GOOGLE_VEO_MODEL_ID",
+        "OTR_GOOGLE_OMNI_MODEL_ID",
+        "OTR_GOOGLE_VIDEO_MODEL_ID",
+        "OTR_GOOGLE_VIDEO_MODEL",
+        "OTR_GOOGLE_VEO_ASPECT",
+        "OTR_GOOGLE_VIDEO_ASPECT",
+        "OTR_GOOGLE_VEO_DURATION_S",
+        "OTR_GOOGLE_VIDEO_DURATION_S",
+        "OTR_GOOGLE_VEO_RESOLUTION",
+        "OTR_GOOGLE_VIDEO_RESOLUTION",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def _mp4_fixture(tmp_path, *, with_audio: bool) -> pathlib.Path:
+    out = tmp_path / ("provider_av.mp4" if with_audio else "provider_v.mp4")
+    cmd = [
+        _FFMPEG,
+        "-v",
+        "error",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=size=128x72:rate=12:duration=1",
+    ]
+    if with_audio:
+        cmd += [
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=330:duration=1",
+        ]
+    cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
+    if with_audio:
+        cmd += ["-c:a", "aac", "-shortest"]
+    else:
+        cmd += ["-an"]
+    cmd.append(str(out))
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+    return out
+
+
+def _audio_streams(path: pathlib.Path) -> list[dict]:
+    import json
+
+    p = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-print_format",
+            "json",
+            "-show_streams",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    doc = json.loads(p.stdout or "{}")
+    return [s for s in doc.get("streams") or [] if s.get("codec_type") == "audio"]
+
+
+def test_sfx_prompt_helper_terms_and_idempotency():
+    out = append_sfx_audio_safety_clause("rain on roof")
+    lower = out.lower()
+    for term in (
+        "environmental ambience and foley only",
+        "no spoken words",
+        "no singing",
+        "no lyrics",
+        "no narration",
+        "no voiceover",
+        "no intelligible speech",
+        "no subtitles",
+        "no captions",
+        "no readable text",
+        "no blood",
+        "no guns",
+        "no knives",
+        "no smoking",
+    ):
+        assert term in lower
+    assert append_sfx_audio_safety_clause(out) == out
+
+
+def test_google_vid_sfx_engines_register_and_capabilities():
+    for name, model in SFX.SFX_ENGINE_MODEL_IDS.items():
+        assert vreg.is_registered(name)
+        eng = vreg.get_engine(name)
+        assert eng.model == model
+        assert eng.family == "text_to_video"
+        assert eng.required_inputs == ("text_prompt",)
+        assert eng.provider_side is True
+        assert eng.accepts_audio_ref is False
+        row = vreg.CAPABILITIES[name]
+        assert row == {
+            "required_toolchain": None,
+            "requires_sidecar": False,
+            "cpu_ok": True,
+            "model_requirements": [],
+        }
+
+
+def test_sfx_module_has_no_heavy_or_google_sdk_imports_at_module_scope():
+    tree = ast.parse(SRC.read_text(encoding="utf-8"))
+    module_imports = set()
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            module_imports.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            module_imports.add(node.module.split(".")[0])
+    assert "google" not in module_imports
+    assert "PIL" not in module_imports
+    assert "torch" not in module_imports
+    assert "numpy" not in module_imports
+
+
+def test_sfx_model_ids_ignore_hostile_env_vars(monkeypatch):
+    _clear_video_env(monkeypatch)
+    monkeypatch.setenv("GEMINI_API_KEY", "KEY")
+    monkeypatch.setenv("OTR_GOOGLE_VEO_MODEL_ID", "hostile-model")
+    monkeypatch.setenv("OTR_GOOGLE_OMNI_MODEL_ID", "hostile-omni")
+    monkeypatch.setenv("OTR_GOOGLE_VIDEO_MODEL_ID", "hostile-shared")
+    seen = {}
+
+    def _post(path, payload, **kwargs):
+        seen["path"] = path
+        seen["payload"] = payload
+        return {"name": "operations/sfx-op"}
+
+    def _get(path, **kwargs):
+        return {
+            "name": "operations/sfx-op",
+            "done": True,
+            "response": {
+                "generateVideoResponse": {
+                    "generatedSamples": [
+                        {"video": {"uri": "https://example.test/sfx.mp4"}}
+                    ]
+                }
+            },
+        }
+
+    monkeypatch.setattr(SFX, "post_json", _post)
+    monkeypatch.setattr(SFX, "get_json", _get)
+    monkeypatch.setattr(SFX, "download_media", lambda uri, **kwargs: b"mp4")
+    vreg.get_engine("google_vid_sfx_veo_fast").render_clip(_req(), {})
+    assert seen["path"] == (
+        "/v1beta/models/veo-3.1-fast-generate-preview:predictLongRunning")
+    assert "generateAudio" not in seen["payload"]["parameters"]
+
+
+def test_veo_sfx_payload_prompts_audio_and_base_veo_stays_silent(monkeypatch):
+    _clear_video_env(monkeypatch)
+    sfx_payload = SFX._veo_sfx_payload(
+        "veo-3.1-lite-generate-preview",
+        _req(),
+        engine_name="google_vid_sfx_veo_lite",
+    )
+    base_payload = VEO._request_payload("veo-3.1-lite-generate-preview", _req())
+    assert "generateAudio" not in sfx_payload["parameters"]
+    assert "generateAudio" not in base_payload["parameters"]
+    assert "no spoken words" in sfx_payload["instances"][0]["prompt"].lower()
+    with pytest.raises(GoogleAPIRequestShapeError, match="OTR audio"):
+        SFX._veo_sfx_payload(
+            "veo-3.1-lite-generate-preview",
+            _req(audio_ref={"path": "voice.wav"}),
+            engine_name="google_vid_sfx_veo_lite",
+        )
+
+
+def test_omni_sfx_payload_rejects_audio_ref():
+    payload = SFX._omni_sfx_payload(
+        "gemini-omni-flash-preview",
+        _req(),
+        engine_name="google_vid_sfx_omni",
+    )
+    assert payload["model"] == "gemini-omni-flash-preview"
+    assert "no spoken words" in payload["input"].lower()
+    with pytest.raises(GoogleAPIRequestShapeError, match="OTR audio"):
+        SFX._omni_sfx_payload(
+            "gemini-omni-flash-preview",
+            _req(audio_ref={"path": "voice.wav"}),
+            engine_name="google_vid_sfx_omni",
+        )
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_extract_sfx_fails_loud_on_no_audio_provider_mp4(tmp_path):
+    src = _mp4_fixture(tmp_path, with_audio=False)
+    raw = {"path": str(src), "content_type": "video/mp4", "duration_s": None,
+           "provider_job_id": "no-audio", "raw_meta": {}}
+    with pytest.raises(CloudMediaError, match="SFX unavailable"):
+        extract_sfx_bed_from_provider_video(raw)
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_extract_sfx_emits_48k_stereo_wav_from_provider_mp4(tmp_path):
+    src = _mp4_fixture(tmp_path, with_audio=True)
+    raw = {"path": str(src), "content_type": "video/mp4", "duration_s": None,
+           "provider_job_id": "with-audio", "raw_meta": {}}
+    asset = extract_sfx_bed_from_provider_video(raw)
+    assert asset.path.suffix == ".wav"
+    assert asset.path.name.endswith(".sfx.wav")
+    assert asset.media_type == "audio"
+    assert asset.provider_job_id == "with-audio"
+    streams = _audio_streams(asset.path)
+    assert len(streams) == 1
+    assert streams[0]["codec_name"] == "pcm_s16le"
+    assert streams[0]["sample_rate"] == "48000"
+    assert int(streams[0]["channels"]) == 2
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_sfx_canonicalize_returns_silent_clip_plus_sfx_stem(tmp_path):
+    src = _mp4_fixture(tmp_path, with_audio=True)
+    raw = {"path": str(src), "content_type": "video/mp4", "duration_s": None,
+           "provider_job_id": "sfx-job", "raw_meta": {}}
+    clip = vreg.get_engine("google_vid_sfx_veo_lite").canonicalize(raw, _req(), {})
+    assert clip["engine_id"] == "google_vid_sfx_veo_lite"
+    assert clip["has_audio"] is False
+    assert pathlib.Path(clip["path"]).is_file()
+    assert pathlib.Path(clip["sfx_stem_path"]).is_file()
+    assert clip["sfx_duration_s"] > 0
+    assert len(clip["sfx_sha256"]) == 64
+    assert _audio_streams(pathlib.Path(clip["path"])) == []
+    assert _audio_streams(pathlib.Path(clip["sfx_stem_path"]))
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_existing_google_video_engines_stay_silent(tmp_path):
+    src = _mp4_fixture(tmp_path, with_audio=True)
+    raw = {"path": str(src), "content_type": "video/mp4", "duration_s": None,
+           "provider_job_id": "silent-job", "raw_meta": {}}
+    for name, module in (
+        ("google_veo_video", VEO),
+        ("google_omni_video", OMNI),
+    ):
+        clip = vreg.get_engine(name).canonicalize(dict(raw), _req(), {})
+        assert clip["engine_id"] == name
+        assert clip["has_audio"] is False
+        assert "sfx_stem_path" not in clip
+        assert _audio_streams(pathlib.Path(clip["path"])) == []

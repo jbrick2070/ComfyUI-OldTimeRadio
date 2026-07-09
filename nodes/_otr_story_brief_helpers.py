@@ -48,6 +48,12 @@ VISUAL_SAFETY_NEGATIVE_PROMPT = (
     "blood, gore, violence, guns, firearms, weapons, knives, blades, "
     "smoking, cigarettes, cigars, tobacco"
 )
+SFX_AUDIO_SAFETY_CLAUSE = (
+    "environmental ambience and foley only, no spoken words, no singing, "
+    "no lyrics, no narration, no voiceover, no intelligible speech, "
+    "no subtitles, no captions, no readable text, no blood, no guns, "
+    "no knives, no smoking"
+)
 
 
 def append_visual_safety_clause(prompt: str) -> str:
@@ -64,6 +70,22 @@ def append_visual_safety_clause(prompt: str) -> str:
             and "no knives" in folded and "no smoking" in folded):
         return text
     return f"{text}, {VISUAL_SAFETY_POSITIVE_CLAUSE}"
+
+
+def append_sfx_audio_safety_clause(prompt: str) -> str:
+    """Append the opt-in Google video SFX prompt contract.
+
+    The SFX video lane may keep provider audio only as a separate ambience/foley
+    stem. This helper keeps the normal visual safety ask and adds the audio
+    boundary in one pure, idempotent step.
+    """
+    text = append_visual_safety_clause(prompt)
+    if not text:
+        return ""
+    folded = text.lower()
+    if "no spoken words" in folded:
+        return text
+    return f"{text}, {SFX_AUDIO_SAFETY_CLAUSE}"
 
 
 def visual_safety_negative(extra: str = "") -> str:

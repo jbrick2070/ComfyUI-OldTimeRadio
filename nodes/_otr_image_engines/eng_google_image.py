@@ -35,6 +35,7 @@ SUPPORTED_MODELS = (
 SUPPORTED_ASPECTS = (
     "1:1", "3:2", "2:3", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9",
 )
+REQUEST_MIME_TYPES = ("image/jpeg",)
 SUPPORTED_MIME_TYPES = ("image/png", "image/jpeg")
 SUPPORTED_IMAGE_SIZES = {
     "gemini-3.1-flash-image": ("1K", "2K", "4K"),
@@ -77,11 +78,11 @@ def _selected_model() -> str:
 
 
 def _selected_mime() -> str:
-    mime = str(os.environ.get("OTR_GOOGLE_IMAGE_MIME") or "image/png").strip().lower()
-    if mime not in SUPPORTED_MIME_TYPES:
+    mime = str(os.environ.get("OTR_GOOGLE_IMAGE_MIME") or "image/jpeg").strip().lower()
+    if mime not in REQUEST_MIME_TYPES:
         raise GoogleAPIRequestShapeError(
             "google_image.generate: unsupported MIME %r; expected one of %r"
-            % (mime, SUPPORTED_MIME_TYPES)
+            % (mime, REQUEST_MIME_TYPES)
         )
     return mime
 
@@ -284,6 +285,7 @@ __all__ = [
     "DEFAULT_MODEL",
     "GoogleImage",
     "GoogleImageEngine",
+    "REQUEST_MIME_TYPES",
     "SUPPORTED_ASPECTS",
     "SUPPORTED_IMAGE_SIZES",
     "SUPPORTED_MIME_TYPES",

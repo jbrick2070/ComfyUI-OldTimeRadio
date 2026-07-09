@@ -95,6 +95,18 @@ OOM_ENGINES = frozenset({"soak_oom_3d", "humo", "humo_1.7B"})
 #: The M1 frozen master-audio PCM marker the soak threads through + asserts is
 #: byte-identical after the run (the decision layer must never touch audio).
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
+_GOOGLE_SILENT_TEXT_PROVIDERS = frozenset({
+    "google_veo_video",
+    "google_omni_video",
+})
+_GOOGLE_VIDEO_SFX_ENGINES = frozenset({
+    "google_vid_sfx_omni",
+    "google_vid_sfx_veo_lite",
+    "google_vid_sfx_veo_fast",
+    "google_vid_sfx_veo_pro",
+})
+_GOOGLE_PROVIDER_PROMPT_ENGINES = (
+    _GOOGLE_SILENT_TEXT_PROVIDERS | _GOOGLE_VIDEO_SFX_ENGINES)
 
 
 class OomSignal(RuntimeError):
@@ -773,6 +785,8 @@ def _stamp_prompt_meta(req, source, prompt, *, subsource="", beat=""):
 
 def _apply_visual_safety_prompt(req, shot) -> None:
     engine_id = str((shot or {}).get("engine_id") or "").strip()
+    if engine_id in _GOOGLE_VIDEO_SFX_ENGINES:
+        return
     if not _is_cloud_video_engine(engine_id):
         return
     prompt = str(req.get("text_prompt") or "").strip()
@@ -1844,10 +1858,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
     _engine_id = str(shot.get("engine_id") or "")
     _strict_text_only = _is_strict_text_only_engine(_engine_id)
-    _google_text_provider = _engine_id in ("google_veo_video", "google_omni_video")
-    if ((_engine_id in (
-            "ltx_video", "wan_i2v", "ltx_audio_in",
-            "google_veo_video", "google_omni_video")
+    _google_text_provider = _engine_id in _GOOGLE_SILENT_TEXT_PROVIDERS
+    _google_prompt_provider = _engine_id in _GOOGLE_PROVIDER_PROMPT_ENGINES
+    if ((_engine_id in ("ltx_video", "wan_i2v", "ltx_audio_in")
+            or _google_prompt_provider
             or _strict_text_only)
             and not text_prompt and not _is_char_face_beat):
         # Round 5 F2: synthetic-open detection by STRUCTURE -- the ShotLock
@@ -2562,31 +2576,52 @@ def persist_episode_clips(result, episode_id):
                 str(shot.get("role") or ""), str(shot.get("engine_id") or ""))
     import shutil
     moved = 0
+    moved_sfx = 0
     for sid, clip in clips.items():
         if not isinstance(clip, dict):
             continue
-        if str(clip.get("type") or "video") == "directory":
-            continue                     # 3D frame dir -- already a real dir asset
-        src = str(clip.get("path") or "")
-        if not src or not os.path.isfile(src):
-            continue
-        if os.path.dirname(os.path.abspath(src)) == os.path.abspath(dest_dir):
-            continue                     # already persisted (idempotent re-run)
         role, eng = shot_meta.get(str(sid), ("", str(clip.get("engine_id") or "")))
         stem = "_".join(p for p in (str(sid), role, eng) if p) or str(sid)
-        dst = os.path.join(dest_dir, _safe_clip_basename(stem) + ".mp4")
+        safe_stem = _safe_clip_basename(stem)
+        if str(clip.get("type") or "video") != "directory":
+            src = str(clip.get("path") or "")
+            if src and os.path.isfile(src):
+                dst = os.path.join(dest_dir, safe_stem + ".mp4")
+                if os.path.dirname(os.path.abspath(src)) != os.path.abspath(dest_dir):
+                    try:
+                        if os.path.abspath(src) != os.path.abspath(dst):
+                            shutil.move(src, dst)
+                            clip["path"] = dst
+                            moved += 1
+                    except Exception as exc:  # noqa: BLE001 -- one bad move never aborts
+                        _LOG.warning(
+                            "[OTR video] persist_episode_clips: move FAILED %s -> "
+                            "%s (%s) -- clip stays in tmp", src, dst, exc)
+        sfx_src = str(clip.get("sfx_stem_path") or "")
+        if not sfx_src:
+            continue
+        if not os.path.isfile(sfx_src):
+            _LOG.warning(
+                "[OTR video] persist_episode_clips: SFX stem missing before "
+                "persist %s -- clearing dangling path", sfx_src)
+            clip["sfx_stem_path"] = ""
+            continue
+        sfx_dst = os.path.join(dest_dir, safe_stem + ".sfx.wav")
+        if os.path.dirname(os.path.abspath(sfx_src)) == os.path.abspath(dest_dir):
+            continue
         try:
-            if os.path.abspath(src) == os.path.abspath(dst):
-                continue
-            shutil.move(src, dst)
-            clip["path"] = dst
-            moved += 1
-        except Exception as exc:         # noqa: BLE001 -- one bad move never aborts
-            _LOG.warning("[OTR video] persist_episode_clips: move FAILED %s -> "
-                         "%s (%s) -- clip stays in tmp", src, dst, exc)
-    if moved:
-        _LOG.info("[OTR video] persisted %d clip(s) to episodes/%s/clips/",
-                  moved, episode_id)
+            if os.path.abspath(sfx_src) != os.path.abspath(sfx_dst):
+                shutil.move(sfx_src, sfx_dst)
+            clip["sfx_stem_path"] = sfx_dst
+            moved_sfx += 1
+        except Exception as exc:         # noqa: BLE001 -- clear swept tmp paths
+            _LOG.warning(
+                "[OTR video] persist_episode_clips: SFX move FAILED %s -> "
+                "%s (%s) -- clearing dangling path", sfx_src, sfx_dst, exc)
+            clip["sfx_stem_path"] = ""
+    if moved or moved_sfx:
+        _LOG.info("[OTR video] persisted %d clip(s) and %d SFX stem(s) to "
+                  "episodes/%s/clips/", moved, moved_sfx, episode_id)
     return result
 
 
@@ -2688,6 +2723,11 @@ def build_clip_manifest(result, *, episode_id=""):
                     "(bg_still_path) -- the textured 3D hero composites over the "
                     "floor/black fallback (LOUD; expected a per-beat scene still)",
                     bid)
+        sfx_stem = str(clip.get("sfx_stem_path") or "")
+        if sfx_stem:
+            row["sfx_stem_path"] = sfx_stem
+            row["sfx_duration_s"] = clip.get("sfx_duration_s")
+            row["sfx_sha256"] = clip.get("sfx_sha256")
         rows.append(row)
         if exists:
             hist[eid] = hist.get(eid, 0) + 1

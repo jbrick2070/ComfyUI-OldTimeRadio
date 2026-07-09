@@ -101,6 +101,10 @@ def test_bad_shape_fails_before_request(monkeypatch):
     monkeypatch.setenv("OTR_GOOGLE_IMAGE_MODEL_ID", "imagen-4.0-generate")
     with pytest.raises(GoogleAPIRequestShapeError, match="unsupported model"):
         eng.render_image(_req(), {})
+    monkeypatch.delenv("OTR_GOOGLE_IMAGE_MODEL_ID", raising=False)
+    monkeypatch.setenv("OTR_GOOGLE_IMAGE_MIME", "image/png")
+    with pytest.raises(GoogleAPIRequestShapeError, match="unsupported MIME"):
+        eng.render_image(_req(), {})
 
 
 def test_request_shape_sends_interactions_image_format(monkeypatch):
@@ -125,7 +129,7 @@ def test_request_shape_sends_interactions_image_format(monkeypatch):
     assert "tools" not in payload
     assert payload["response_format"] == {
         "type": "image",
-        "mime_type": "image/png",
+        "mime_type": "image/jpeg",
         "aspect_ratio": "16:9",
         "image_size": "2K",
     }
