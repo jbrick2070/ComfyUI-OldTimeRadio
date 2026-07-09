@@ -140,6 +140,17 @@ def test_missing_title_or_style_raises():
             cr.build_credits_layout(led, w=1920, h=1080, manifest={})
 
 
+def test_scaffold_off_style_receipt_is_explicit_not_visual_fallback():
+    led = _led()
+    del led["meta"]["style"]
+    led["meta"]["visual_style"] = "recur_frac"
+    led["meta"]["story_scaffold_enabled"] = False
+    led["meta"]["story_style_status"] = "story_scaffold_off"
+    lay = cr.build_credits_layout(led, w=1920, h=1080, manifest={"clips": []})
+    assert "story_scaffold_off" in lay["meta_strip"]
+    assert "recur_frac" not in lay["meta_strip"]
+
+
 # --------------------------------------------------------------------------- #
 # COL 1 -- MODELS (video family suffix from the S-B stamp) + PRODUCTION LEDGER
 # --------------------------------------------------------------------------- #

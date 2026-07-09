@@ -172,6 +172,16 @@ class TestCleanLedger:
         assert data["meta"]["freeze_verdict"] == "frozen_with_warns"
         assert data["meta"]["cleanup_locked"] is True
 
+    def test_scaffold_off_style_receipt_is_not_missing_style_warning(self):
+        data = _clean_ledger_data()
+        del data["meta"]["style"]
+        data["meta"]["visual_style"] = "recur_frac"
+        data["meta"]["story_scaffold_enabled"] = False
+        data["meta"]["story_style_status"] = "story_scaffold_off"
+        rep = _LFC.run_gap_audit(data, label="pre")
+        assert "meta.style is missing" not in rep.warnings
+        assert rep.is_clean
+
     def test_phase_10_accepts_ledger_obj(self):
         led = _ledger_obj(_clean_ledger_data())
         rep = _LFC.phase_10_gap_audit_post_and_freeze(led)

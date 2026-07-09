@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -111,3 +112,29 @@ class TestApplyScaffoldEnv:
         assert os.environ[_ENV] == "0"
         W._apply_story_scaffold_env("auto")
         assert _ENV not in os.environ
+
+
+class TestStoryStyleReceipt:
+    def test_scaffold_off_receipt_never_uses_visual_style(self):
+        meta = {"visual_style": "recur_frac"}
+        W._stamp_story_style_receipt(
+            meta, contract=None, scaffold_enabled=False)
+        assert meta["visual_style"] == "recur_frac"
+        assert "style" not in meta
+        assert meta["story_scaffold_enabled"] is False
+        assert meta["story_style_status"] == W.STORY_STYLE_STATUS_SCAFFOLD_OFF
+
+    def test_contract_receipt_clears_scaffold_off_status(self):
+        meta = {
+            "visual_style": "recur_frac",
+            "story_style_status": W.STORY_STYLE_STATUS_SCAFFOLD_OFF,
+        }
+        W._stamp_story_style_receipt(
+            meta,
+            contract=SimpleNamespace(slug="locked_room_suspense"),
+            scaffold_enabled=True,
+        )
+        assert meta["visual_style"] == "recur_frac"
+        assert meta["style"] == "locked_room_suspense"
+        assert meta["story_scaffold_enabled"] is True
+        assert "story_style_status" not in meta

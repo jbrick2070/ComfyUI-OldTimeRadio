@@ -204,6 +204,15 @@ Story planning is words-only; this constant is never used to derive
 a target_seconds input to the LLM. Mirrors legacy at
 story_orchestrator.py:6584."""
 
+STORY_STYLE_STATUS_SCAFFOLD_OFF = "story_scaffold_off"
+"""Durable receipt for intentional no-story-style runs.
+
+This is deliberately NOT written to ``meta.style``. ``meta.style`` remains the
+story-grammar contract slug; ``meta.visual_style`` remains the visual prompt
+pack selector. When the scaffold is off, credits can prove the absence of
+``meta.style`` is intentional without ever borrowing the visual style id.
+"""
+
 
 # ---------------------------------------------------------------------------
 # Creativity preset maps (lifted verbatim from legacy at
@@ -1614,6 +1623,26 @@ def _apply_story_scaffold_env(scaffold) -> str:
     return s
 
 
+def _stamp_story_style_receipt(meta: dict, *, contract,
+                               scaffold_enabled: bool) -> None:
+    """Stamp the story-style receipt without crossing visual/story channels.
+
+    ``meta.style`` is only the story-grammar slug from ``contract``. If story
+    grammar is intentionally disabled, stamp a separate status receipt so late
+    consumers can distinguish "no story style by design" from "style build
+    failed." Never fill ``meta.style`` from ``meta.visual_style``.
+    """
+    meta["story_scaffold_enabled"] = bool(scaffold_enabled)
+    if contract is not None:
+        meta["style"] = contract.slug
+        meta.pop("story_style_status", None)
+    elif not scaffold_enabled:
+        meta.pop("style", None)
+        meta["story_style_status"] = STORY_STYLE_STATUS_SCAFFOLD_OFF
+    else:
+        meta.pop("story_style_status", None)
+
+
 # ---------------------------------------------------------------------------
 # Class
 # ---------------------------------------------------------------------------
@@ -2811,6 +2840,7 @@ class OTR_LedgerScriptWriter:
         meta["source_ref"] = resolved["source_ref"]
         meta["source_meta"] = dict(resolved["source_meta"])
         meta["source_rights"] = dict(resolved["source_rights"])
+        meta["story_scaffold"] = _scaffold
         # Stage 3C: stamp the visual style -- THE threading channel: every
         # downstream visual composer reads meta["visual_style"] via
         # get_visual_style(meta) off the serialized ledger (stamp precedes
@@ -3071,15 +3101,11 @@ class OTR_LedgerScriptWriter:
                     "style stays unset for this episode.", _contract_exc,
                 )
                 contract = None
-        # Canonical meta.style: derived from the contract so the freeze
-        # validator, _otr_story_brief.py, and meta.visual_plan.style keep
-        # working without a separate resolver. Ledger/meta-facing fields use
-        # the SLUG (controlled, snake_case); prompt-facing fields elsewhere
-        # use contract.label (prose). Absent when scaffold is off or the
-        # contract build failed -- the freeze validator already treats a
-        # missing meta.style as a warning, not an error.
-        if contract is not None:
-            meta["style"] = contract.slug
+        # Canonical story-style receipt: meta.style is derived ONLY from the
+        # story contract. If the scaffold is off, stamp an explicit status
+        # receipt instead; never borrow meta.visual_style for story metadata.
+        _stamp_story_style_receipt(
+            meta, contract=contract, scaffold_enabled=_style_grammar_on)
 
         # LLM slot: creative -- cast lock generates per-character
         # narrative descriptions (gender + character_description).
@@ -5501,11 +5527,11 @@ class OTR_LedgerScriptWriter:
             "scenes":     [],
             # Ledger-facing: the controlled slug (style-engine
             # consolidation, 2026-07-05), consistent with the canonical
-            # meta.style stamp set right after the contract was built.
+            # story-style receipt stamped below.
             "style":      (contract.slug if contract else ""),
         }
-        if contract is not None:
-            meta["style"] = contract.slug
+        _stamp_story_style_receipt(
+            meta, contract=contract, scaffold_enabled=_style_grammar_on)
 
         # --- K.5.5. meta.story_brief reflection pass ------------------
         # Per Sprint C final plan Q1 lock (K.5.5, E-01). Writes to meta

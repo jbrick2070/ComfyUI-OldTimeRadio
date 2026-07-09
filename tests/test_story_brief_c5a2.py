@@ -171,16 +171,18 @@ def _line_of(node: ast.AST) -> int:
 
 
 def test_call_site_is_k55_not_l5(execute_fn):
-    """Q1 lock (E-01): the K.5.5 call appears AFTER `meta["style"]`
-    is stamped AND BEFORE `script_text = _PL.assemble_script_text_from_ledger`.
+    """Q1 lock (E-01): the K.5.5 call appears AFTER the story-style
+    receipt is stamped AND BEFORE `script_text = _PL.assemble_script_text_from_ledger`.
     Locks the call site against future refactor that would push the
     call past the script_text assembly."""
     refl = _reflection_call(execute_fn)
 
-    # `meta["style"] = ...` stamps -- the K.5 closer.
-    style_stamps = _find_assign_to_subscript(execute_fn, "meta", "style")
-    assert style_stamps, "meta['style'] = ... not found in execute()"
-    last_style_stamp = max(style_stamps, key=_line_of)
+    # `_stamp_story_style_receipt(...)` is the K.5 closer. It owns the
+    # scaffold-off receipt path and prevents visual style fallback into
+    # story metadata.
+    style_receipts = _find_call_site(execute_fn, "_stamp_story_style_receipt")
+    assert style_receipts, "_stamp_story_style_receipt(...) not found in execute()"
+    last_style_receipt = max(style_receipts, key=_line_of)
 
     # `script_text = _PL.assemble_script_text_from_ledger(led.data)` -- L opener.
     assemble_calls = _find_call_site(
@@ -191,9 +193,9 @@ def test_call_site_is_k55_not_l5(execute_fn):
     )
     first_assemble = min(assemble_calls, key=_line_of)
 
-    assert _line_of(last_style_stamp) < _line_of(refl), (
+    assert _line_of(last_style_receipt) < _line_of(refl), (
         f"K.5.5 reflection call at line {_line_of(refl)} is BEFORE "
-        f"meta['style'] stamp at line {_line_of(last_style_stamp)}; "
+        f"story-style receipt at line {_line_of(last_style_receipt)}; "
         "must be AFTER per Q1 lock"
     )
     assert _line_of(refl) < _line_of(first_assemble), (

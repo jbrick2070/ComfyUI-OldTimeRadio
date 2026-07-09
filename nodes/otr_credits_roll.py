@@ -95,6 +95,9 @@ class CreditsDataError(RuntimeError):
     the no-fallback contract forbids a quiet placeholder."""
 
 
+_STORY_STYLE_STATUS_SCAFFOLD_OFF = "story_scaffold_off"
+
+
 def _require(container, key, source):
     v = (container or {}).get(key)
     if v is None or v == "" or v == {} or v == []:
@@ -102,6 +105,26 @@ def _require(container, key, source):
             f"required credits receipt missing: {source}.{key} -- the durable "
             f"stamp for it never landed (no-fallback: refusing a placeholder)")
     return v
+
+
+def _story_style_receipt(meta: dict) -> str:
+    """Return the durable story-style receipt for credits.
+
+    Normal runs require ``meta.style``. A story-scaffold-off run has no story
+    contract by design, so the writer stamps a separate explicit status. That
+    status is accepted only when paired with ``story_scaffold_enabled is False``;
+    a plain missing ``meta.style`` remains a hard data error.
+    """
+    style = (meta or {}).get("style")
+    if style is not None and style != "":
+        return str(style).strip()
+    if (
+        (meta or {}).get("story_scaffold_enabled") is False
+        and (meta or {}).get("story_style_status")
+        == _STORY_STYLE_STATUS_SCAFFOLD_OFF
+    ):
+        return _STORY_STYLE_STATUS_SCAFFOLD_OFF
+    return str(_require(meta, "style", "meta")).strip()
 
 
 # --------------------------------------------------------------------------- #
@@ -228,7 +251,7 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
 
     # --- hero / subtitle (title tweak: episode title is the HERO) -----------
     title = str(_require(meta, "episode_title", "meta")).strip()
-    style = str(_require(meta, "style", "meta")).strip()
+    style = _story_style_receipt(meta)
 
     # --- COL 1 -------------------------------------------------------------
     gp = meta.get("gen_params_initial") or {}

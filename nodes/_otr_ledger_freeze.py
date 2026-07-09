@@ -554,6 +554,13 @@ def _check_meta_invariants(
 
     for key in ("episode_title", "style"):
         val = meta.get(key)
+        if (
+            key == "style"
+            and val is None
+            and meta.get("story_scaffold_enabled") is False
+            and meta.get("story_style_status") == "story_scaffold_off"
+        ):
+            continue
         if val is None:
             warnings.append(f"meta.{key} is missing")
             continue
