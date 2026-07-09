@@ -15,8 +15,8 @@ it -- I-4 keeps the two casters on disjoint RNGs):
     seeded ``random.Random`` choice keyed on a ``stable_cast_seed`` derived from
     the slot. It walks a match ladder (g+t+r+age -> drop age -> drop role ->
     gender-only) and raises unless ``allow_voice_reuse``. The announcer voice is
-    pinned per engine via ``announcer_voice_ref`` (raises if the active
-    announcer engine has no reference).
+    resolved per engine via ``announcer_voice_ref``; curated announcer pools can
+    mix gender by episode seed, while legacy single-ref engines stay pinned.
 
 Import-time is side-effect-free (the bank + schema are read lazily on first
 use). UTF-8, no BOM, ASCII-only source.
@@ -622,18 +622,22 @@ def same_gender_voice_ref_for_preset(
     return cands[0].voice_ref_id if cands else ""
 
 
-def _google_announcer_gender(episode_seed) -> str:
+def _seeded_announcer_gender(engine: str, episode_seed) -> str:
     digest = hashlib.sha1(
-        ("google_tts_announcer:%s" % (episode_seed if episode_seed is not None else ""))
+        ("%s_announcer:%s" % (
+            str(engine or ""),
+            episode_seed if episode_seed is not None else "",
+        ))
         .encode("utf-8")
     ).hexdigest()
     return "male" if int(digest, 16) % 2 == 0 else "female"
 
 
-def _google_announcer_voice_ref(
-    bank: Tuple[VoiceBankEntry, ...], episode_seed=0,
+def _seeded_preferred_announcer_voice_ref(
+    bank: Tuple[VoiceBankEntry, ...], *, engine: str, episode_seed=0,
 ) -> VoiceBankEntry:
-    """Deterministic Google announcer selection.
+    """Deterministic preferred-announcer selection for engines with a curated
+    announcer pool.
 
     When both male- and female-coded preferred announcers are available, select
     the gender from the episode seed for a stable roughly 50/50 mix. Within the
@@ -641,18 +645,19 @@ def _google_announcer_voice_ref(
     """
     cands = [
         e for e in bank
-        if e.engine == "google_tts"
+        if e.engine == engine
         and "announcer_voice" in e.roles
         and e.quality_tier != "reject"
     ]
     if not cands:
-        raise VoiceCastingError("no announcer voice reference for engine 'google_tts'")
+        raise VoiceCastingError(
+            f"no announcer voice reference for engine {engine!r}")
     preferred = [e for e in cands if "preferred_announcer" in e.style_tags]
     pool = preferred or cands
     by_gender = {}
     for entry in pool:
         by_gender.setdefault(entry.gender, []).append(entry)
-    wanted = _google_announcer_gender(episode_seed)
+    wanted = _seeded_announcer_gender(engine, episode_seed)
     if "male" in by_gender and "female" in by_gender:
         pool = by_gender[wanted]
     elif wanted in by_gender:
@@ -674,12 +679,13 @@ def announcer_voice_ref(
     """The announcer reference for ``engine`` (E.1). Raise if none.
 
     Legacy engines keep their deterministic pin: the lowest ``voice_ref_id``
-    among announcer-role references. Google TTS mixes male/female preferred
-    announcer candidates by episode seed when both are available.
+    among announcer-role references. Google TTS and Chatterbox mix male/female
+    preferred announcer candidates by episode seed when both are available.
     """
     entries = bank if bank is not None else load_voice_bank()[0]
-    if engine == "google_tts":
-        return _google_announcer_voice_ref(entries, episode_seed=episode_seed)
+    if engine in ("google_tts", "chatterbox"):
+        return _seeded_preferred_announcer_voice_ref(
+            entries, engine=engine, episode_seed=episode_seed)
     cands = sorted(
         [e for e in entries if e.engine == engine and "announcer_voice" in e.roles],
         key=lambda e: e.voice_ref_id,

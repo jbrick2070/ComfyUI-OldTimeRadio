@@ -513,7 +513,7 @@ class CastLock:
             isinstance(entry, dict) and _is_announcer_entry(entry)
             for entry in cast
         )
-        if has_announcer and announcer_engine == "google_tts":
+        if has_announcer and announcer_engine in ("google_tts", "chatterbox"):
             announcer_ref = announcer_voice_ref(
                 announcer_engine, bank=bank_entries, episode_seed=episode_seed)
 
