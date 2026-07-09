@@ -125,6 +125,27 @@ def test_canonical_words_override_preserves_auto_act_count(tmp_path):
     assert writer["inputs"]["act_count"] == "auto"
 
 
+def test_visual_style_override_does_not_patch_story_fields(tmp_path):
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas",
+        "--dry-run",
+        "--profile", "none",
+        "--words", "320",
+        "--visual-style", "video_art",
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    assert "OTR_LedgerScriptWriter.visual_style='video_art'" in out
+    assert "OTR_LedgerScriptWriter.episode_title" not in out
+    assert "OTR_LedgerScriptWriter.custom_premise" not in out
+    prompt = json.loads(dump.read_text(encoding="utf-8"))
+    writer = _node(prompt, "OTR_LedgerScriptWriter")
+    assert writer["inputs"]["visual_style"] == "video_art"
+    assert writer["inputs"]["episode_title"] == ""
+    assert writer["inputs"]["custom_premise"] == ""
+
+
 def test_google_veo_media_profile_dry_run_builds_prompt(tmp_path):
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([

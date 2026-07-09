@@ -207,10 +207,22 @@ class TestMediaArchiveStylePool:
         b = CAT.select_style("archive recording", {"source_bank": "media_archive"}, 99)
         assert a == b
 
+    def test_visual_style_metadata_does_not_affect_story_style(self):
+        """Visual packs are downstream render metadata, not story grammar."""
+        premise = "archive recording"
+        base_meta = {"source_bank": "media_archive"}
+        base = CAT.select_style(premise, base_meta, 99)
+        for visual_style in ("sci_fi_radio", "recur_frac", "video_art"):
+            styled = CAT.select_style(
+                premise,
+                {**base_meta, "visual_style": visual_style},
+                99,
+            )
+            assert styled == base
+
     def test_media_archive_seed_varies(self):
         picks = {
             CAT.select_style("archive", {"source_bank": "media_archive"}, s)
             for s in range(30)
         }
         assert len(picks) > 1  # different seeds -> variety
-
