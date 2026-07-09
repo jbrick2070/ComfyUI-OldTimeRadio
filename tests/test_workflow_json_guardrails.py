@@ -624,6 +624,12 @@ class TestWriterB2aSurface:
             f"writer widgets_values length drift: {len(wv)} (expected 28 "
             f"after appending the Google API slot picker pair + source_ref)"
         )
+        # Slot 7: act_count must ship as "auto" so production derives the
+        # act structure from target_words instead of freezing a brittle count.
+        assert wv[7] == "auto", (
+            f"act_count (slot 7) must ship 'auto' so it follows target_words; "
+            f"got {wv[7]!r}"
+        )
         # Slot 14: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
         assert wv[14] is True, (

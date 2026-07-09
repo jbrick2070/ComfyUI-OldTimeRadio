@@ -106,6 +106,25 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     assert str(director["inputs"]["announcer_image_model"]).startswith("cloud_")
 
 
+def test_canonical_words_override_preserves_auto_act_count(tmp_path):
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas",
+        "--dry-run",
+        "--profile", "none",
+        "--words", "320",
+        "--source-bank", "media_archive",
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    assert "OTR_LedgerScriptWriter.target_words=320" in out
+    assert "OTR_LedgerScriptWriter.act_count" not in out
+    prompt = json.loads(dump.read_text(encoding="utf-8"))
+    writer = _node(prompt, "OTR_LedgerScriptWriter")
+    assert writer["inputs"]["target_words"] == 320
+    assert writer["inputs"]["act_count"] == "auto"
+
+
 def test_google_veo_media_profile_dry_run_builds_prompt(tmp_path):
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([
