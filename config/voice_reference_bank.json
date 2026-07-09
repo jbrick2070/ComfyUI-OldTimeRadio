@@ -1237,6 +1237,46 @@
       "commercial_clean": true
     },
     {
+      "voice_ref_id": "dia_announcer_male",
+      "engine": "dia",
+      "gender": "male",
+      "timbre": [
+        "authoritative",
+        "resonant"
+      ],
+      "roles": [
+        "announcer_voice"
+      ],
+      "age_band": "adult",
+      "style_tags": [
+        "preferred_announcer",
+        "british_leaning"
+      ],
+      "ref_path": "models/TTS/refs/indextts2/vz_peter_yearsley.wav",
+      "ref_sha256": "fbb3920fda7ae26a5a8b317ffcae1d55c0bd5d89d075205f5a52b1e924b83f51",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "dia_announcer_female",
+      "engine": "dia",
+      "gender": "female",
+      "timbre": [
+        "authoritative",
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice"
+      ],
+      "age_band": "adult",
+      "style_tags": [
+        "preferred_announcer",
+        "british_leaning"
+      ],
+      "ref_path": "models/TTS/refs/indextts2/vz_caro_davy.wav",
+      "ref_sha256": "40c692c005a0268a7a5b6ebae348077d3dca6a86eb6b12bd36e343bbcd71b5f6",
+      "commercial_clean": true
+    },
+    {
       "voice_ref_id": "dia_donor_c0a0",
       "engine": "dia",
       "gender": "male",

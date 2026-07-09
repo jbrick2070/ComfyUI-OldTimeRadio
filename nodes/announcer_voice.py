@@ -7,7 +7,7 @@ voice-node dispatch core with OTR_BatchCharacterVoices:
     self-contained Kokoro engine (audio clean-break 1b). One British voice is
     chosen per episode (seeded from episode_seed); the voice .pt is verified on
     local disk in a C-7 preflight (never fetched during execute).
-  * ``chatterbox`` (opt-in, flag-gated, ``per_line``) -> one frozen
+  * ``chatterbox`` / ``dia`` (opt-in, ``per_line``) -> one frozen
     ``ResolvedVoiceRequest`` per announcer line, prepared text, the adapter
     call, then ``pack_audio_batch`` into the Bark AUDIO-batch contract (C-4).
 
@@ -25,13 +25,13 @@ from ._otr_voice_node_common import OTRVoiceNodeBase, voice_input_types
 class AnnouncerVoice(OTRVoiceNodeBase):
     """Generic announcer-voice node. Registered as ``OTR_AnnouncerVoice``.
 
-    Engine order: kokoro (legacy byte-identical default) > chatterbox.
+    Engine order: kokoro (legacy byte-identical default) > chatterbox > dia.
     """
 
     ROLE = "announcer_voice"
     LINE_ROLES = ("announcer",)
     DONE_PREFIX = "announcer"
-    LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox")
+    LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox", "dia")
 
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"

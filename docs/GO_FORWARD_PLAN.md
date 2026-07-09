@@ -29,6 +29,11 @@ Recent green code chunks on `v2.0-alpha`:
   The smoke exposed a real no-reuse gap: distinct logical Chatterbox ids could
   share the same underlying WAV. The fix blocks same-asset/provider collisions
   when `allow_voice_reuse=False`.
+- Dia is now in the announcer on-deck lane: `dia` serves `announcer_voice`,
+  `announcer_dia_v1` is in the profile resolver, the announcer dropdown exposes
+  it explicitly, and the default voice bank has a British-leaning male/female
+  preferred announcer pair with seeded 50/50 selection and no-reuse separation
+  from character refs.
 
 Current runnable source banks in `nodes/story_packs/banks.json`:
 
@@ -86,12 +91,14 @@ Deliverables:
 
 Recommended live-smoke order:
 
-1. Done: full all-Chatterbox 30-word OBS smoke. Remaining: Dia one character
-   line and then a full all-Dia smoke if the sidecar path is healthy.
-2. Comfy Cloud stills: Luma Photon Flash, Krea 2 Turbo, Seedream 2, Nano Banana
+1. Done: full all-Chatterbox 30-word OBS smoke.
+2. Done: Dia cast/announcer contract is green in tests. Remaining: Dia one
+   character line plus Dia announcer line live sidecar smoke, then a full
+   all-Dia smoke if the sidecar path is healthy.
+3. Comfy Cloud stills: Luma Photon Flash, Krea 2 Turbo, Seedream 2, Nano Banana
    2.
-3. Cheap Comfy Cloud video: Vidu Q2 Pro Fast 720p.
-4. Local heavy visuals: Wan TI2V first; Qwen Image after CLIP/VAE preflight is
+4. Cheap Comfy Cloud video: Vidu Q2 Pro Fast 720p.
+5. Local heavy visuals: Wan TI2V first; Qwen Image after CLIP/VAE preflight is
    strengthened; Wan I2V after the 5B Wan path unless the 14B target is needed.
 
 ### 2. `original_radio` Source Bank
@@ -164,12 +171,12 @@ must be generated from canonical, not hand-maintained.
 
 ## Last Validation
 
-Latest Chatterbox alias-reuse fix chunk:
+Latest Dia announcer on-deck chunk:
 
 ```text
 pytest -q -p no:cacheprovider
 
-7046 passed, 31 skipped, 1 xfailed, 5 warnings
+7050 passed, 31 skipped, 1 xfailed, 5 warnings
 ```
 
 Bug Bible:
@@ -184,9 +191,9 @@ pytest -q -p no:cacheprovider tests\bug_bible_regression.py
 Focused voice/cast subset:
 
 ```text
-pytest -q -p no:cacheprovider tests\test_voice_bank.py tests\test_cast_lock.py tests\test_hybrid_voice_fit.py tests\test_tts_engine_sidecars.py
+pytest -q -p no:cacheprovider tests\test_model_slot_audit.py tests\test_voice_bank.py tests\test_audio_engine_adapters.py tests\test_engine_profiles.py tests\test_tts_engine_sidecars.py tests\test_announcer_voice.py
 
-90 passed
+114 passed
 ```
 
 Focused contract subset:
@@ -197,9 +204,10 @@ pytest -q -p no:cacheprovider tests\test_model_slot_audit.py tests\test_cloud_im
 83 passed
 ```
 
-No workflow JSON, node schema, or widget surface changed for the Chatterbox
-alias-reuse fix. The live smoke used the canonical workflow through the API with
-all TTS engines patched to Chatterbox for that prompt only.
+No workflow JSON edit was needed for the Dia announcer on-deck chunk: the
+canonical workflow already carries the `announcer_voice_engine` widget and the
+announcer node engine dropdown derives from the profile/registry menu. No live
+Dia sidecar smoke was run in this chunk.
 
 ## Standing Rules
 

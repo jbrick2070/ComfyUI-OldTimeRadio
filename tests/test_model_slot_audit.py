@@ -130,7 +130,7 @@ def test_requested_local_smoke_candidate_contracts_are_inspected(monkeypatch):
     assert chatterbox.sample_rate == 24000
 
     dia = audio_engines.get_engine("dia")
-    assert dia.roles == ("char_voice",)
+    assert dia.roles == ("char_voice", "announcer_voice")
     assert dia.interface == "per_line"
     assert dia.requires_voice_ref is True
     assert dia.missing_ref_fallback is None

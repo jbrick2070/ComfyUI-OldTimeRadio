@@ -32,7 +32,7 @@ def test_chatterbox_and_dia_registered_with_roles():
     cbx = AE.get_engine("chatterbox")
     dia = AE.get_engine("dia")
     assert "char_voice" in cbx.roles
-    assert dia.roles == ("char_voice",)
+    assert dia.roles == ("char_voice", "announcer_voice")
     assert cbx.requires_flag is None  # C6: registry IS the menu (no flag gate)
     assert dia.requires_flag is None
     assert cbx.commercial_clean is True and dia.commercial_clean is True
@@ -132,7 +132,7 @@ def test_bank_has_chatterbox_and_dia_pools():
     from nodes._otr_voice_bank import load_voice_bank
     bank, _ = load_voice_bank()
     cbx = [e for e in bank if e.engine == "chatterbox" and "char_voice" in e.roles]
-    dia = [e for e in bank if e.engine == "dia"]
+    dia = [e for e in bank if e.engine == "dia" and "char_voice" in e.roles]
     # FLOOR, not an exact count: the bank GROWS as public-domain voices are added
     # (scripts/otr_ingest_pd_voices.py). The original mirrored pools were 36 each.
     assert len(cbx) >= 36
@@ -241,6 +241,10 @@ def test_announcer_role_threads_to_caster():
                               char_id="ann", gender="male",
                               timbre=("authoritative", "resonant"), bank=bank)
     assert e.voice_ref_id == "cb_announcer_male"
+    d = assign_voice_for_slot(role="announcer_voice", engine="dia",
+                              char_id="ann", gender="male",
+                              timbre=("authoritative", "resonant"), bank=bank)
+    assert d.voice_ref_id == "dia_announcer_male"
 
 
 def test_resolve_clone_ref_path_accepts_role_kwarg():

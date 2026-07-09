@@ -182,6 +182,25 @@ profiles:
     license_state: clean
     warn_text: ""
 
+  - profile_id: announcer_dia_v1
+    role: announcer_voice
+    engine: dia
+    commercial_clean: true         # Apache-2.0 -> commercial-clean engine (safe to ship)
+    model_path: ""
+    model_sha256: ""
+    default_params: {}
+    allowed_voice_banks: [default, default_clean]
+    engine_impl_version: "1"
+    sample_rate: 44100             # Descript Audio Codec
+    requires_hf_token: false        # nari-labs/Dia-1.6B-0626 weights are ungated
+    rank: 3                         # announcer rank-3 (opt-in after chatterbox)
+    is_default: false
+    runtime: oop_venv               # Path B isolated worker (torch 2.8 nightly on sm_120)
+    needs_ref_clip: true            # zero-shot clone from a reference clip
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: clean
+    warn_text: ""
+
   # --- music ---
   - profile_id: music_musicgen_v1
     role: music

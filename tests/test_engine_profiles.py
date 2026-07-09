@@ -20,7 +20,7 @@ def test_load_resolver_and_source_hash():
     assert set(r.profile_ids()) == {
         "char_bark_v1", "char_chatterbox_v1", "char_indextts2_v1", "char_dia_v1",
         "char_kokoro_v1",
-        "announcer_kokoro_v1", "announcer_chatterbox_v1",
+        "announcer_kokoro_v1", "announcer_chatterbox_v1", "announcer_dia_v1",
         "music_musicgen_v1", "music_stable_audio_v1", "music_stable_audio_3_v1",
         # cloud ElevenLabs voice (cloud-audio S1, 2026-07-03)
         "char_elevenlabs_cloud_v1", "announcer_elevenlabs_cloud_v1",
@@ -108,6 +108,7 @@ def test_legacy_first_engines_pure_and_legacy_first():
     assert EP.legacy_first_engines("announcer_voice")[0] == "kokoro"
     assert EP.legacy_first_engines("music")[0] == "stable_audio_3"  # PROMOTED 2026-06-03
     assert EP.legacy_first_engines("char_voice")[-1] == "google_tts"
+    assert "dia" in EP.legacy_first_engines("announcer_voice")
     assert EP.legacy_first_engines("announcer_voice")[-1] == "google_tts"
     assert EP.legacy_first_engines("nonexistent_role") == []
 

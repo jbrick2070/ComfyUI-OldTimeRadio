@@ -55,7 +55,9 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
         "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
         "google_tts",
     ),
-    "announcer_voice": ("kokoro", "chatterbox", "elevenlabs", "google_tts"),
+    "announcer_voice": (
+        "kokoro", "chatterbox", "dia", "elevenlabs", "google_tts",
+    ),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.
     # sonilo (cloud, dropdown-opt-in) APPENDED 2026-07-03; google_lyria

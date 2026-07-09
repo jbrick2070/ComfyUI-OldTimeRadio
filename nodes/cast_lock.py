@@ -45,7 +45,7 @@ _CHAR_VOICE_ENGINES = (
     "auto", "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
     "google_tts")
 _ANNOUNCER_VOICE_ENGINES = (
-    "auto", "kokoro", "chatterbox", "elevenlabs", "google_tts")
+    "auto", "kokoro", "chatterbox", "dia", "elevenlabs", "google_tts")
 _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 
 
@@ -513,7 +513,7 @@ class CastLock:
             isinstance(entry, dict) and _is_announcer_entry(entry)
             for entry in cast
         )
-        if has_announcer and announcer_engine in ("google_tts", "chatterbox"):
+        if has_announcer and announcer_engine in ("google_tts", "chatterbox", "dia"):
             announcer_ref = announcer_voice_ref(
                 announcer_engine, bank=bank_entries, episode_seed=episode_seed)
 

@@ -42,6 +42,12 @@ def test_chatterbox_serves_both_voice_roles():
     assert "chatterbox" in AE.engines_for_role("announcer_voice")
 
 
+def test_dia_serves_both_voice_roles_as_opt_in():
+    assert "dia" in AE.engines_for_role("char_voice")
+    assert "dia" in AE.engines_for_role("announcer_voice")
+    assert AE.get_engine("dia").default_roles == ()
+
+
 def test_google_tts_serves_both_voice_roles_as_opt_in():
     assert "google_tts" in AE.engines_for_role("char_voice")
     assert "google_tts" in AE.engines_for_role("announcer_voice")

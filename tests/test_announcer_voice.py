@@ -95,9 +95,9 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
 
     it = A.INPUT_TYPES()
     engines = list(it["required"]["engine"][0])
-    # google_tts (direct BYO API, dropdown-opt-in) APPENDED after elevenlabs;
-    # index 0 stays the byte-identical kokoro.
-    assert engines == ["kokoro", "chatterbox", "elevenlabs", "google_tts"]
+    # Dia joins the local Path-B announcer lane; external providers stay after
+    # local engines and index 0 remains the byte-identical kokoro.
+    assert engines == ["kokoro", "chatterbox", "dia", "elevenlabs", "google_tts"]
     assert it["required"]["engine"][1]["default"] == "kokoro"
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
     assert list(A.INPUT_TYPES()["required"]["engine"][0]) == engines
@@ -112,7 +112,7 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
 
     monkeypatch.setattr(ep, "legacy_first_engines", _boom)
     engines = list(A.INPUT_TYPES()["required"]["engine"][0])
-    assert engines == ["kokoro", "chatterbox"]
+    assert engines == ["kokoro", "chatterbox", "dia"]
     assert engines
 
 

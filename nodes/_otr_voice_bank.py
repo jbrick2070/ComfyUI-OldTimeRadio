@@ -709,11 +709,12 @@ def announcer_voice_ref(
     """The announcer reference for ``engine`` (E.1). Raise if none.
 
     Legacy engines keep their deterministic pin: the lowest ``voice_ref_id``
-    among announcer-role references. Google TTS and Chatterbox mix male/female
-    preferred announcer candidates by episode seed when both are available.
+    among announcer-role references. Curated modern announcer pools mix
+    male/female preferred announcer candidates by episode seed when both are
+    available.
     """
     entries = bank if bank is not None else load_voice_bank()[0]
-    if engine in ("google_tts", "chatterbox"):
+    if engine in ("google_tts", "chatterbox", "dia"):
         return _seeded_preferred_announcer_voice_ref(
             entries, engine=engine, episode_seed=episode_seed)
     cands = sorted(

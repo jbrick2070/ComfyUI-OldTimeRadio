@@ -6,9 +6,9 @@ Jeffrey's films. It is dialogue-native and zero-shot, so it reuses the existing 
 reference bank. On Blackwell (RTX 5080, sm_120) it needs torch 2.8 nightly cu128
 (Nari issue #26) which would conflict with the main torch-2.10/cu130 venv -- so it
 runs in its OWN isolated venv as a supervised subprocess worker, driven over
-line-delimited JSON; ZERO shared torch. Opt-in behind OTR_ENABLE_DIA; a render
-fails CLOSED with a NAMED error until the Path B worker + venv are installed (C-7).
-``interface == "per_line"``; char_voice only this pass (no Dia announcer yet).
+line-delimited JSON; ZERO shared torch. A render fails CLOSED with a NAMED error
+until the Path B worker + venv are installed (C-7). ``interface == "per_line"``;
+serves character and announcer voice slots through the same reference-clip path.
 
 Subprocess lifecycle (bounded read + idempotent teardown) lives in ``_otr_sidecar``.
 
@@ -53,7 +53,7 @@ def _default(*parts):
 @register
 class DiaEngine:
     name = "dia"
-    roles = ("char_voice",)
+    roles = ("char_voice", "announcer_voice")
     default_roles = ()
     commercial_clean = True  # Apache-2.0
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
