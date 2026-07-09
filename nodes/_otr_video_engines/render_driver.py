@@ -615,6 +615,21 @@ _IA2V_TALKING_CLAUSE_CHARACTER = (
     "with the speech, subtle head and hand gestures. Static camera.")
 
 
+def _compact_style_talking_cue(vstyle):
+    """Two-token pack cue for IA2V character prompts.
+
+    The talking register is deliberately tiny for lip-sync; long style tails
+    drown the speech tokens. Non-default packs still need one blunt cue close
+    to the front of the prompt so the video model does not drift back to a
+    generic cinematic portrait.
+    """
+    if str(getattr(vstyle, "style_id", "") or "") == "sci_fi_radio":
+        return ""
+    raw = str(getattr(vstyle, "portrait_look_talking", "") or "").strip()
+    words = re.findall(r"[A-Za-z0-9][A-Za-z0-9-]*", raw)
+    return " ".join(words[:2]).strip()
+
+
 def _ia2v_talking_register_active(engine_id):
     """True iff ``engine_id`` is the ltx_audio_in lane AND its active recipe
     is the two-stage ia2v_canonical lip-sync graph (engine-owned decision --
@@ -1788,11 +1803,19 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # other engine (HuMo, wan, ltx_video) keeps the full M4 verbatim.
         if _is_char_face_beat and _talking_register:
             # fragment = the M4's first sentence; else last full CLAUSE under
-            # 120 chars (kibitz r2: comma-heavy identity openings have no
-            # period -- never hard-cut mid-word). Total is bounded by
-            # construction: 120 + 2 + len(clause)=114 = 236 <= the 240 budget
-            # (the old over-budget trimmer was dead code, removed).
-            _frag = text_prompt[:120]
+            # the remaining budget (kibitz r2: comma-heavy identity openings
+            # have no period -- never hard-cut mid-word). Non-default visual
+            # packs get a two-word cue first; the fragment shrinks so the
+            # proven IA2V talking clause still stays intact.
+            _style_cue = _compact_style_talking_cue(_vstyle)
+            _cue_prefix = ("%s " % _style_cue) if _style_cue else ""
+            _frag_budget = (
+                _LTX_MOTION_PROMPT_MAX
+                - len(_cue_prefix)
+                - len(_IA2V_TALKING_CLAUSE_CHARACTER)
+                - 1
+            )
+            _frag = text_prompt[:max(40, min(120, _frag_budget))]
             if "." in _frag:
                 _frag = _frag.rsplit(".", 1)[0]
             elif "," in _frag and len(text_prompt) > 120:
@@ -1802,12 +1825,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # "is talking..." so the fragment flows into it grammatically
             # ("...Lead Astronomer is talking to the viewer, ...").
             _frag = _frag.strip(" ,.") or "a person"
-            _talk = "%s %s" % (_frag, _IA2V_TALKING_CLAUSE_CHARACTER)
+            _talk = "%s%s %s" % (
+                _cue_prefix, _frag, _IA2V_TALKING_CLAUSE_CHARACTER)
             text_prompt = _talk
             _LOG.warning(
                 "[OTR.render_driver] IA2V TALKING register: character beat "
-                "%s M4 wall -> compact talking prompt (%d chars)",
-                _beat_id_for_shot(shot), len(text_prompt))
+                "%s M4 wall -> compact talking prompt (%d chars, style_cue=%r)",
+                _beat_id_for_shot(shot), len(text_prompt), _style_cue)
         elif (str(shot.get("engine_id") or "").startswith("ltx")
                 and _shot_role not in ("announcer_visual", "music_visual")):
             text_prompt = (text_prompt.rstrip().rstrip(",")

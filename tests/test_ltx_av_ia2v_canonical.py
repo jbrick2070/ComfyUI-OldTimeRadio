@@ -315,6 +315,24 @@ def test_char_face_beat_gets_compact_talking_prompt(ia2v_env, tmp_path,
     assert "xxxx" not in p                         # the 900-char wall is gone
 
 
+@pytest.mark.parametrize(("style_id", "prefix"), [
+    ("recur_frac", "fractal recursive face visible"),
+    ("video_art", "video-art feedback face visible"),
+])
+def test_char_face_compact_prompt_keeps_non_default_style_cue(
+        ia2v_env, tmp_path, monkeypatch, style_id, prefix):
+    from nodes._otr_video_engines import render_driver as rd
+
+    led = _ltx_ledger(tmp_path)
+    led["meta"] = {"visual_style": style_id}
+    req = rd.build_request_from_shot(_char_face_shot(), led)
+    p = req["text_prompt"]
+    assert p.startswith(prefix)
+    assert "lips opening and closing naturally in sync" in p
+    assert len(p) <= rd._LTX_MOTION_PROMPT_MAX
+    assert req["observability"]["visual_style"] == style_id
+
+
 def test_announcer_with_m4_still_gets_talking_register(ia2v_env, tmp_path,
                                                        monkeypatch):
     # kibitz r2 must-fix: an announcer bookend carrying an M4 creative prompt

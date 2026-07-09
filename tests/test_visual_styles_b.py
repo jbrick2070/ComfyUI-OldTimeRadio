@@ -216,6 +216,49 @@ class TestSurfaceDeltas:
         assert styled["observability"]["visual_style"] == style_id
 
 
+class TestVideoArtCondensedCue:
+    def test_video_art_cue_hits_still_surfaces(self):
+        s = vs.resolve_visual_style("video_art")
+        meta = _meta_for("video_art")
+        assert s.positive_tail.startswith("video-art feedback style")
+        assert s.portrait_look.startswith("video-art feedback portrait")
+        assert s.portrait_look_talking.startswith(
+            "video-art feedback talking portrait")
+        assert s.portrait_instruction_look.startswith(
+            "video-art feedback style")
+        assert s.scene_instruction_look.startswith("video-art feedback scene")
+
+        portrait = imgp.compose_image_prompt_fallback(
+            meta, _CHAR, "portrait", talking=True)
+        assert "video-art feedback talking portrait" in portrait
+
+        scene_req = imgp._build_char_scene_request(
+            _CHAR, meta, "village square", _LINE, style=s)
+        assert "style_look: video-art feedback scene" in scene_req
+
+        plate = imgp._compose_background_plate_prompt(
+            meta, "village square")
+        assert "video-art feedback environment" in plate
+
+    def test_video_art_cue_hits_video_motion_prompt(self, _single_pass_recipe):
+        shot = {"shot_id": "shot_b000_music_open", "beat_id": "b000",
+                "engine_id": "ltx_audio_in", "role": "music_visual",
+                "family": "audio_conditioned_video",
+                "target_frame_count": 25, "source_line_ids": [],
+                "char_id": "", "creative": {}}
+        led = {"meta": _meta_for("video_art"),
+               "video": {"video_revision": 1, "shots": []},
+               "lines": [{"line_id": "b000", "char_id": "",
+                          "start_s": 0.0, "dur_s": 2.0}],
+               "images": {"images": []}}
+
+        req = rd.build_request_from_shot(shot, led)
+        assert req["text_prompt"].startswith("Video-art feedback.")
+        assert (req["observability"]["prompt_field_source"]
+                == "motion_registers:music_open")
+        assert req["observability"]["visual_style"] == "video_art"
+
+
 # ---------------------------------------------------------------------------
 # 3. Negative-vocab smokes (r1 codex OPT): no pack's own forbidden term
 #    survives into any styled composed surface.

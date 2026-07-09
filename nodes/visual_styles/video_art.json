@@ -1,9 +1,9 @@
 {
   "style_id": "video_art",
-  "label": "video_art",
-  "positive_tail": "luminous recursive video art image, phosphor bloom, prismatic feedback halos, smooth field-shaped distortion, layered temporal planes",
-  "image_grade_tail": "saturated additive rainbow color, velvety charcoal darks, controlled luminance bloom, soft electronic shimmer",
-  "broadcast_tail": "contemplative signal-sculpture atmosphere, broadcast-era light behavior shaped by modern GPU recursion",
+  "label": "Video Art Feedback",
+  "positive_tail": "video-art feedback style, luminous recursive image field, phosphor bloom, prismatic halos, smooth field-shaped distortion, layered temporal planes",
+  "image_grade_tail": "video-art feedback glow, saturated additive rainbow color, velvety charcoal darks, controlled luminance bloom, soft electronic shimmer",
+  "broadcast_tail": "video-art feedback signal sculpture, contemplative luminous field behavior shaped by modern GPU recursion",
   "allow_radio_tails": false,
   "forbidden_terms": [
     "anime",
@@ -28,29 +28,29 @@
     "smoking",
     "cigarette"
   ],
-  "era_tail": "broadcast-era phosphor light fused with modern shader recursion and prismatic video feedback",
+  "era_tail": "video-art feedback field fused with phosphor light, modern shader recursion, and prismatic temporal planes",
   "schema_version": "v2",
-  "portrait_look": "luminous recursive video-art portrait, phosphor bloom, saturated red blue green overlap, soft feedback depth",
-  "portrait_look_talking": "luminous recursive video-art talking portrait, readable lips, translucent temporal layers, controlled phosphor glow",
-  "portrait_instruction_look": "rendered as contemplative video art with phosphor bloom, smooth field distortion, and recursive light echoes",
-  "scene_instruction_look": "luminous video-art scene, layered translucent planes, smooth signal-derived texture, sculptural prismatic drift",
-  "announcer_subject_face": "its tuning dial arranged as a luminous signal face -- two glowing dial-eyes and a soft speaker-grille mouth, an anthropomorphic radio formed from phosphor light",
-  "announcer_subject_ltx_mouth": "{form} as a living phosphor signal sculpture: its wide speaker grille shapes into a large expressive mouth, clear luminous lips open mid-speech, and its two glowing tuning dials are attentive eyes -- a face-forward anthropomorphic radio formed from layered video-art light, the cabinet filling the frame",
-  "announcer_subject_object": "presented as a luminous radio object inside a phosphor field, glowing dials, translucent color planes, soft feedback reflections",
-  "radio_object_look": "phosphor glow, saturated additive color overlap, soft electronic surface shimmer",
-  "plate_look": "luminous recursive video-art environment with layered temporal planes and smooth field curvature",
-  "non_character_emblem_fallback": "a single luminous signal-sculpture object representing {base}",
-  "still_word_title_mood_style": "abstract luminous video-art mood image, phosphor bloom and prismatic feedback planes in a symbolic non-literal composition, no lettering",
+  "portrait_look": "video-art feedback portrait, phosphor bloom, saturated red blue green overlap, soft recursive depth",
+  "portrait_look_talking": "video-art feedback talking portrait, readable lips, translucent temporal layers, controlled phosphor glow",
+  "portrait_instruction_look": "video-art feedback style with phosphor bloom, smooth field distortion, and recursive light echoes",
+  "scene_instruction_look": "video-art feedback scene, layered translucent planes, smooth signal-derived texture, sculptural prismatic drift",
+  "announcer_subject_face": "its tuning dial arranged as a video-art feedback face -- two glowing dial-eyes and a soft speaker-grille mouth, an anthropomorphic radio formed from phosphor light",
+  "announcer_subject_ltx_mouth": "{form} as a living video-art feedback sculpture: its wide speaker grille shapes into a large expressive mouth, clear luminous lips open mid-speech, and its two glowing tuning dials are attentive eyes -- a face-forward anthropomorphic radio formed from layered phosphor light, the cabinet filling the frame",
+  "announcer_subject_object": "presented as a video-art feedback radio object inside a phosphor field, glowing dials, translucent color planes, soft recursive reflections",
+  "radio_object_look": "video-art feedback glow, phosphor color overlap, soft electronic surface shimmer",
+  "plate_look": "video-art feedback environment with layered temporal planes, recursive glow, and smooth field curvature",
+  "non_character_emblem_fallback": "a single video-art feedback signal-sculpture object representing {base}",
+  "still_word_title_mood_style": "abstract video-art feedback mood image, phosphor bloom and prismatic temporal planes in a symbolic non-literal composition, no lettering",
   "open_subjects": {
-    "synthetic": "{form} emerging from layered phosphor planes, glowing dials and tubes, prismatic feedback halos",
-    "announcer": "{form} inside a luminous signal field, glowing warmly, red blue green phosphor overlap",
-    "default": "{form} glowing warmly as a phosphor video-art radio, dials and tubes suspended in color"
+    "synthetic": "{form} emerging in video-art feedback style, layered phosphor planes, glowing dials and tubes, prismatic halos",
+    "announcer": "{form} inside a video-art feedback signal field, glowing warmly, red blue green phosphor overlap",
+    "default": "{form} glowing warmly as a video-art feedback radio, dials and tubes suspended in color"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Phosphor bloom breathes gently. Rainbow planes drift and fold inward. Dial light echoes recursively. Slow sculptural push forward.",
-    "music_open": "Continuous shot, same console throughout. Dial sweep blooms into red blue green halos. Nested feedback reflections unfold softly. Color layers drift apart. Measured push forward.",
-    "music_close": "Continuous shot, same console throughout. Dial settles. Prismatic halos contract softly. Layered color planes dim to charcoal. Slow pull back.",
-    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Waveform light breathes across the surface. Translucent planes orbit slowly around the speaker."
+    "announcer": "Video-art feedback. Continuous shot, same console throughout. Phosphor bloom breathes. Rainbow planes fold inward. Dial light echoes recursively. Slow sculptural push forward.",
+    "music_open": "Video-art feedback. Continuous shot, same console throughout. Dial sweep blooms into red blue green halos. Nested reflections unfold softly. Measured push forward.",
+    "music_close": "Video-art feedback. Continuous shot, same console throughout. Dial settles. Prismatic halos contract softly. Layered color planes dim to charcoal. Slow pull back.",
+    "music_inter": "Video-art feedback. Continuous shot, same console throughout. Dial steady, glowing. Waveform light breathes across the surface. Translucent planes orbit slowly."
   },
   "still_word_typography": {
     "noir": "luminous phosphor capitals, narrow strokes with soft red-blue edge glow",
