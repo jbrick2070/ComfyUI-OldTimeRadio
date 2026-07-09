@@ -915,7 +915,7 @@ def _generate_title_from_script(
         "your candidates.\n\n"
         "Rules for the final title:\n"
         " - 2 to 5 words\n"
-        " - draw from a vivid image, key object, character, or "
+        " - draw from a vivid image, important object, character, or "
         "thematic tension actually present in the story\n"
         " - feel specific and memorable, not generic\n"
         " - avoid cliches like \"The Beginning\", \"Final Chapter\", "

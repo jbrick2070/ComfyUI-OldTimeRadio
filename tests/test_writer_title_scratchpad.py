@@ -181,6 +181,10 @@ def test_title_prompt_forces_scratchpad_and_is_news_free():
         assert forbidden.lower() not in prompt.lower(), (
             f"title prompt leaked news-seed token {forbidden!r}"
         )
+    assert "key object" not in prompt.lower(), (
+        "title prompt should not prime repeated 'key' mystery titles"
+    )
+    assert "important object" in prompt.lower()
     # The premise IS passed through deliberately.
     assert "lonely dish hears its own echo" in prompt
 
