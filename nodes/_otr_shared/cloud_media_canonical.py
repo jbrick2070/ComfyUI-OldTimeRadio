@@ -78,11 +78,11 @@ LOUDNESS_REFERENCE_SOURCE = (
 
 #: SFX beds reuse the local RMS leveler but with a deliberately lower target
 #: than dialogue. The final :mod:`OTR_MasterAudioMux` still applies
-#: ``OTR_SFX_BED_GAIN`` (default 0.80), so a normalized stem lands underneath
+#: ``OTR_SFX_BED_GAIN`` (default 0.72), so a normalized stem lands underneath
 #: the frozen master instead of competing with canonical TTS/music.
 SFX_LOUDNESS_REFERENCE_SOURCE = (
     "nodes.scene_sequencer._loudness_normalize_clip with "
-    "OTR_SFX_STEM_TARGET_RMS_DBFS=-20.0 dBFS, then OTR_SFX_BED_GAIN=0.80")
+    "OTR_SFX_STEM_TARGET_RMS_DBFS=-20.0 dBFS, then OTR_SFX_BED_GAIN=0.72")
 
 
 def _env_float(name: str, default: float, lo: float | None = None,

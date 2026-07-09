@@ -171,7 +171,7 @@ def test_sfx_mux_mixes_against_reference_pcm_sha_and_keeps_archival_pcm(
         str(silent), str(master), str(default_final), fps=25,
         sfx_bed_path=compiled)
     assert default_out == str(default_final)
-    assert "sfx_gain=0.800000" in "\n".join(default_report)
+    assert "sfx_gain=0.720000" in "\n".join(default_report)
 
     monkeypatch.setenv("OTR_SFX_BED_GAIN", "2.5")
     out, report = mux_master_audio(

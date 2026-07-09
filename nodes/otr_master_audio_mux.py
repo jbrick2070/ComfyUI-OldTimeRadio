@@ -29,6 +29,7 @@ import tempfile
 import logging
 
 log = logging.getLogger("OTR")
+DEFAULT_SFX_BED_GAIN = 0.72
 
 
 def _ffmpeg_bin(ffmpeg: str) -> str:
@@ -105,7 +106,7 @@ def _clamp01(value) -> float:
     try:
         v = float(value)
     except (TypeError, ValueError):
-        v = 0.80
+        v = DEFAULT_SFX_BED_GAIN
     return max(0.0, min(1.0, v))
 
 
@@ -113,7 +114,7 @@ def _sfx_gain(value=None) -> float:
     env = os.environ.get("OTR_SFX_BED_GAIN")
     if env not in (None, ""):
         return _clamp01(env)
-    return _clamp01(0.80 if value is None else value)
+    return _clamp01(DEFAULT_SFX_BED_GAIN if value is None else value)
 
 
 def _numeric(value, *, field: str, row_id: str) -> float:
@@ -132,7 +133,7 @@ def compile_sfx_bed_from_manifest(
     out_path,
     sample_rate=48000,
     channels=2,
-    gain=0.80,
+    gain=DEFAULT_SFX_BED_GAIN,
 ) -> str:
     """Compile clip-side SFX stems into one episode-length bed.
 
@@ -234,7 +235,7 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
                      duration_tol_frames: float = 1.0,
                      declared_credits_tail_s: float = 0.0,
                      sfx_bed_path: str = "",
-                     sfx_gain: float = 0.80):
+                     sfx_gain: float = DEFAULT_SFX_BED_GAIN):
     """Mux the frozen master audio onto the silent video; FAIL CLOSED.
 
     Pure function (used by the node + tests). Steps: validate inputs -> duration
