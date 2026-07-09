@@ -237,7 +237,7 @@ def test_sfx_model_ids_ignore_hostile_env_vars(monkeypatch):
         "google_vid_sfx_veo_fast", "veo-3.1-fast-generate-preview")
     assert seen["path"] == (
         "/v1beta/models/veo-3.1-fast-generate-preview:predictLongRunning")
-    assert "generateAudio" not in seen["payload"]["parameters"]
+    assert seen["payload"]["parameters"]["generateAudio"] is True
 
 
 def test_veo_sfx_submit_pacer_is_off_by_default_in_test_mode(monkeypatch):
@@ -282,7 +282,7 @@ def test_veo_sfx_payload_prompts_audio_and_base_veo_stays_silent(monkeypatch):
         engine_name="google_vid_sfx_veo_lite",
     )
     base_payload = VEO._request_payload("veo-3.1-lite-generate-preview", _req())
-    assert "generateAudio" not in sfx_payload["parameters"]
+    assert sfx_payload["parameters"]["generateAudio"] is True
     assert "generateAudio" not in base_payload["parameters"]
     assert "no spoken words" in sfx_payload["instances"][0]["prompt"].lower()
     with pytest.raises(GoogleAPIRequestShapeError, match="OTR audio"):

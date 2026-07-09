@@ -167,6 +167,7 @@ def _veo_sfx_payload(model: str, request, *, engine_name: str) -> dict:
         "parameters": {
             "aspectRatio": _veo._aspect(request),
             "durationSeconds": duration,
+            "generateAudio": True,
             "resolution": resolution,
             "sampleCount": 1,
         },
