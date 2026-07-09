@@ -316,7 +316,7 @@ def test_char_face_beat_gets_compact_talking_prompt(ia2v_env, tmp_path,
 
 
 @pytest.mark.parametrize(("style_id", "prefix"), [
-    ("recur_frac", "surreal recursive fractal style face visible"),
+    ("recur_frac", "recursive fractal light field face visible"),
     ("video_art", "video-art feedback style face visible"),
 ])
 def test_char_face_compact_prompt_keeps_non_default_style_cue(
@@ -346,6 +346,9 @@ def test_announcer_with_m4_still_gets_talking_register(ia2v_env, tmp_path,
                                        "on the window", "source": "m4"}
     req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
     assert "lips opening and closing" in req["text_prompt"]
+    assert "large expressive grille-mouth" in req["text_prompt"]
+    assert "face-forward vintage radio" in req["text_prompt"]
+    assert "cartoon" not in req["text_prompt"].lower()
     assert "rain on the window" not in req["text_prompt"]
 
 

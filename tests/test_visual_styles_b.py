@@ -268,31 +268,46 @@ class TestRecursiveFractalExplicitStyleCue:
     def test_recursive_fractal_style_cue_hits_still_surfaces(self):
         s = vs.resolve_visual_style("recur_frac")
         meta = _meta_for("recur_frac")
-        assert s.positive_tail.startswith("surreal recursive fractal style")
+        assert s.positive_tail.startswith("recursive fractal light field")
         assert s.portrait_look.startswith(
-            "surreal recursive fractal style")
+            "recursive fractal light field")
         assert s.portrait_look_talking.startswith(
-            "surreal recursive fractal style talking portrait")
+            "recursive fractal light field talking portrait")
         assert s.portrait_instruction_look.startswith(
-            "surreal recursive fractal style")
+            "recursive fractal light field")
         assert s.scene_instruction_look.startswith(
-            "surreal recursive fractal style scene")
+            "recursive fractal light field scene")
 
         portrait = imgp.compose_image_prompt_fallback(
             meta, _CHAR, "portrait", talking=True)
-        assert "surreal recursive fractal style talking portrait" in portrait
+        assert "recursive fractal light field talking portrait" in portrait
 
         scene_req = imgp._build_char_scene_request(
             _CHAR, meta, "village square", _LINE, style=s)
-        assert "style_look: surreal recursive fractal style scene" in scene_req
+        assert "style_look: recursive fractal light field scene" in scene_req
 
         plate = imgp._compose_background_plate_prompt(
             meta, "village square")
-        assert "surreal recursive fractal style background architecture" in plate
+        assert "recursive fractal light field background architecture" in plate
 
         word_card = imgp.compose_still_word_prompt(
             meta, "character_video", {"text": "Go."})
-        assert "surreal recursive fractal style" in word_card
+        assert "recursive fractal light field" in word_card
+
+    def test_recursive_fractal_style_cue_is_succinct_and_unique(self):
+        s = vs.resolve_visual_style("recur_frac")
+        cue = s.positive_tail.split(",", 1)[0]
+        assert cue == "recursive fractal light field"
+        assert len(cue.split()) == 4
+        raw = _raw("recur_frac")
+        assert "surreal" not in json.dumps(raw).lower()
+        assert "Infinite Recursive VGA" not in json.dumps(raw)
+        sibling_cues = {
+            sid: vs.resolve_visual_style(sid).positive_tail.split(",", 1)[0]
+            for sid in _NON_DEFAULT_IDS
+            if sid != "recur_frac"
+        }
+        assert cue not in sibling_cues.values()
 
     def test_recursive_fractal_style_cue_hits_video_motion_prompt(
             self, _single_pass_recipe):
@@ -309,7 +324,7 @@ class TestRecursiveFractalExplicitStyleCue:
 
         req = rd.build_request_from_shot(shot, led)
         assert req["text_prompt"].startswith(
-            "Surreal recursive fractal style.")
+            "Recursive fractal light field.")
         assert (req["observability"]["prompt_field_source"]
                 == "motion_registers:music_open")
         assert req["observability"]["visual_style"] == "recur_frac"
@@ -334,7 +349,7 @@ class TestRecursiveFractalExplicitStyleCue:
 
         req = rd.build_request_from_shot(shot, led)
         assert req["text_prompt"].startswith(
-            "surreal recursive fractal style. face visible")
+            "recursive fractal light field. face visible")
         assert req["observability"]["prompt_source"] == "m4"
         assert req["observability"]["visual_style"] == "recur_frac"
 
@@ -356,7 +371,7 @@ class TestRecursiveFractalExplicitStyleCue:
 
         req = rd.build_request_from_shot(shot, led)
         assert req["text_prompt"].startswith(
-            "surreal recursive fractal style. close-up cinematic portrait")
+            "recursive fractal light field. close-up cinematic portrait")
         assert req["observability"]["prompt_source"] == "default_scrubbed"
 
     def test_recursive_fractal_style_cue_hits_brief_video_prompt(
@@ -378,7 +393,7 @@ class TestRecursiveFractalExplicitStyleCue:
 
         req = rd.build_request_from_shot(shot, led)
         assert req["text_prompt"].startswith(
-            "surreal recursive fractal style.")
+            "recursive fractal light field.")
         assert req["observability"]["prompt_source"] == "brief+beat"
 
 

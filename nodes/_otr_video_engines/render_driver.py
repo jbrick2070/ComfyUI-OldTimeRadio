@@ -597,15 +597,16 @@ _LTX_MOTION_PROMPT_MAX = 240
 #: MUSIC bookends deliberately KEEP the console-motion register -- P2 proved
 #: LTX cannot lip-sync to music (motion 0.59); a talking prompt there would
 #: fight physics for nothing.
-#: VERBATIM the canonical wording (probe P8 2026-07-02: a paraphrased
-#: register scored HALF the canonical's articulation at identical params --
-#: 1.72 vs 3.32. The exact token pattern matters; do not "improve" it).
+#: Canonical token skeleton (probe P8 2026-07-02: a paraphrased register
+#: scored HALF the canonical's articulation at identical params -- 1.72 vs
+#: 3.32). Keep the talking/lips/sync pattern intact; the mouth material can be
+#: style-neutral so packs that forbid "cartoon" do not fight the prompt.
 _IA2V_TALKING_PROMPT_ANNOUNCER = (
-    "A vintage radio with a huge rubbery cartoon mouth is talking to the "
-    "viewer, its big grille-cloth lips opening and closing naturally in "
-    "sync with the speech, its round glass tuning-dial eyes glancing "
-    "subtly as it speaks. The radio sits still; static camera, warm "
-    "dramatic lighting.")
+    "A face-forward vintage radio with a large expressive grille-mouth is "
+    "talking to the viewer, its clear grille-cloth lips opening and closing "
+    "naturally in sync with the speech, its round glass tuning-dial eyes "
+    "glancing subtly as it speaks. The radio sits still; static camera, "
+    "warm dramatic lighting.")
 #: Character-beat talking clause (appended to a COMPACT identity fragment;
 #: the 900-char M4 identity/scene wall drowned the speech tokens). Mirrors
 #: the canonical token pattern ("talking to the viewer ... opening and
@@ -629,6 +630,9 @@ def _compact_style_talking_cue(vstyle):
     if not raw:
         raw = str(getattr(vstyle, "portrait_look_talking", "") or "").strip()
     words = re.findall(r"[A-Za-z0-9][A-Za-z0-9-]*", raw)
+    lowered = [word.lower() for word in words]
+    if lowered[:4] == ["recursive", "fractal", "light", "field"]:
+        return " ".join(words[:4]).strip()
     limit = 2
     for i, word in enumerate(words[:4]):
         if word.lower() == "style":
