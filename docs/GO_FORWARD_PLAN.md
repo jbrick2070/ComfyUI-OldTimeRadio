@@ -18,6 +18,11 @@ Recent green code chunks on `v2.0-alpha`:
 - `recur_frac` is now the concise `recursive fractal light field` pack; LTX
   audio-in talking prompts keep a face/mouth/lip-sync cue without cartoon
   wording. Commit: `ac919d99`.
+- Model-slot audit + pre-smoke contract inspection is green locally:
+  `docs/2026-07-09-model-slot-audit.md` now records the canonical kept local
+  matrix, retired/non-invocable ids, and the requested Chatterbox/Dia/Qwen/Wan
+  plus Comfy Cloud still/video readiness queue. `tests/test_model_slot_audit.py`
+  pins the canonical contracts and the newly inspected candidate surfaces.
 
 Current runnable source banks in `nodes/story_packs/banks.json`:
 
@@ -63,9 +68,25 @@ Decision rule:
 
 Deliverables:
 
-- A compact tested/retired model matrix.
-- Focused tests that prove unsupported engines fail loud.
-- At least one tiny canonical smoke covering the kept local paths.
+- Done: compact tested/retired model matrix.
+- Done: focused tests that prove unsupported engines fail loud.
+- Done: pre-live-smoke input/output contract inspection for `chatterbox`, `dia`,
+  `qwen_image`, `wan_ti2v`, `wan_i2v`, `cloud_nano_banana_2`,
+  `cloud_seedream_2`, `cloud_krea_2_turbo`, `cloud_luma_photon_flash`,
+  `cloud_vidu_q2_pro_fast_720p`, and its SFX sibling.
+- Done: canonical offline API dry-run from `workflows/otr_canonical.json`.
+- Remaining: live sidecar/GPU/provider smokes after the selective headless reset
+  and any required auth/asset preflight.
+
+Recommended live-smoke order:
+
+1. Chatterbox one character line, Chatterbox announcer line, Dia one character
+   line.
+2. Comfy Cloud stills: Luma Photon Flash, Krea 2 Turbo, Seedream 2, Nano Banana
+   2.
+3. Cheap Comfy Cloud video: Vidu Q2 Pro Fast 720p.
+4. Local heavy visuals: Wan TI2V first; Qwen Image after CLIP/VAE preflight is
+   strengthened; Wan I2V after the 5B Wan path unless the 14B target is needed.
 
 ### 2. `original_radio` Source Bank
 
@@ -137,12 +158,12 @@ must be generated from canonical, not hand-maintained.
 
 ## Last Validation
 
-Latest code chunk (`ac919d99`):
+Latest model-slot audit / pre-smoke inspection chunk:
 
 ```text
 pytest -q -p no:cacheprovider
 
-7038 passed, 31 skipped, 1 xfailed
+7042 passed, 31 skipped, 1 xfailed
 ```
 
 Bug Bible:
@@ -154,8 +175,17 @@ pytest -q -p no:cacheprovider tests\bug_bible_regression.py
 16 passed, 7 skipped, 3 xfailed
 ```
 
-This plan update is docs-only; no workflow JSON, node schema, or code surface
-changed.
+Focused contract subset:
+
+```text
+pytest -q -p no:cacheprovider tests\test_model_slot_audit.py tests\test_cloud_image_adapters.py tests\test_cloud_video_adapters.py
+
+83 passed
+```
+
+No workflow JSON, node schema, or live render surface changed. No live
+GPU/provider smoke was run in this chunk; the operator asked to inspect
+input/output contracts first.
 
 ## Standing Rules
 
