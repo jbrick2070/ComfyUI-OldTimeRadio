@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
+import os
+import threading
 import time
 from pathlib import Path
 
@@ -41,6 +44,55 @@ post_json = _veo.post_json
 get_json = _veo.get_json
 download_media = _veo.download_media
 create_interaction = _omni.create_interaction
+
+log = logging.getLogger("OTR.google_vid_sfx")
+_VEO_SFX_SUBMIT_LOCK = threading.Lock()
+_VEO_SFX_LAST_SUBMIT_AT = 0.0
+
+
+def _veo_sfx_submit_min_interval_s() -> float:
+    """Minimum spacing between Veo SFX predictLongRunning submissions.
+
+    The API Studio paid tier 1 quota for Veo long-running generation is tight
+    enough that a sequential six-shot episode can still trip a rolling-minute
+    429. This is pacing, not retry/fallback: each request is still attempted
+    exactly once, just not bunched.
+    """
+    raw = os.environ.get("OTR_GOOGLE_VEO_SFX_SUBMIT_MIN_INTERVAL_S", "").strip()
+    if not raw:
+        return 0.0 if os.environ.get("OTR_TEST_MODE") == "1" else 65.0
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise GoogleAPIRequestShapeError(
+            "OTR_GOOGLE_VEO_SFX_SUBMIT_MIN_INTERVAL_S must be numeric"
+        ) from exc
+    if value < 0:
+        raise GoogleAPIRequestShapeError(
+            "OTR_GOOGLE_VEO_SFX_SUBMIT_MIN_INTERVAL_S must be >= 0"
+        )
+    return min(value, 600.0)
+
+
+def _pace_veo_sfx_submit(*, engine_name: str, model: str) -> None:
+    interval = _veo_sfx_submit_min_interval_s()
+    if interval <= 0:
+        return
+    global _VEO_SFX_LAST_SUBMIT_AT
+    with _VEO_SFX_SUBMIT_LOCK:
+        now = time.monotonic()
+        wait_s = interval - (now - _VEO_SFX_LAST_SUBMIT_AT)
+        if wait_s > 0:
+            log.warning(
+                "[Google SFX] pacing %s/%s submit for %.1fs to respect "
+                "Veo predictLongRunning quota",
+                engine_name,
+                model,
+                wait_s,
+            )
+            time.sleep(wait_s)
+            now = time.monotonic()
+        _VEO_SFX_LAST_SUBMIT_AT = now
 
 
 def _req_get(request, key, default=None):
@@ -397,6 +449,7 @@ class _GoogleVeoSfxEngine(_GoogleVidSfxBase):
     def render_clip(self, request, prepared):  # noqa: ARG002
         api_key = resolve_api_key()
         payload = _veo_sfx_payload(self.model, request, engine_name=self.name)
+        _pace_veo_sfx_submit(engine_name=self.name, model=self.model)
         operation = post_json(
             f"/v1beta/models/{self.model}:predictLongRunning",
             payload,

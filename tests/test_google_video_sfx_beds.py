@@ -48,6 +48,7 @@ def _clear_video_env(monkeypatch):
         "OTR_GOOGLE_VIDEO_DURATION_S",
         "OTR_GOOGLE_VEO_RESOLUTION",
         "OTR_GOOGLE_VIDEO_RESOLUTION",
+        "OTR_GOOGLE_VEO_SFX_SUBMIT_MIN_INTERVAL_S",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -226,10 +227,51 @@ def test_sfx_model_ids_ignore_hostile_env_vars(monkeypatch):
     monkeypatch.setattr(SFX, "post_json", _post)
     monkeypatch.setattr(SFX, "get_json", _get)
     monkeypatch.setattr(SFX, "download_media", lambda uri, **kwargs: b"mp4")
+    monkeypatch.setattr(
+        SFX,
+        "_pace_veo_sfx_submit",
+        lambda *, engine_name, model: seen.setdefault("paced", (engine_name, model)),
+    )
     vreg.get_engine("google_vid_sfx_veo_fast").render_clip(_req(), {})
+    assert seen["paced"] == (
+        "google_vid_sfx_veo_fast", "veo-3.1-fast-generate-preview")
     assert seen["path"] == (
         "/v1beta/models/veo-3.1-fast-generate-preview:predictLongRunning")
     assert "generateAudio" not in seen["payload"]["parameters"]
+
+
+def test_veo_sfx_submit_pacer_is_off_by_default_in_test_mode(monkeypatch):
+    _clear_video_env(monkeypatch)
+    monkeypatch.setenv("OTR_TEST_MODE", "1")
+    assert SFX._veo_sfx_submit_min_interval_s() == 0.0
+
+
+def test_veo_sfx_submit_pacer_waits_between_live_submissions(monkeypatch):
+    _clear_video_env(monkeypatch)
+    monkeypatch.setenv("OTR_GOOGLE_VEO_SFX_SUBMIT_MIN_INTERVAL_S", "65")
+    monkeypatch.setattr(SFX, "_VEO_SFX_LAST_SUBMIT_AT", 0.0)
+    state = {"now": 100.0}
+    sleeps: list[float] = []
+
+    monkeypatch.setattr(SFX.time, "monotonic", lambda: state["now"])
+
+    def _sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        state["now"] += seconds
+
+    monkeypatch.setattr(SFX.time, "sleep", _sleep)
+
+    SFX._pace_veo_sfx_submit(
+        engine_name="google_vid_sfx_veo_fast",
+        model="veo-3.1-fast-generate-preview",
+    )
+    state["now"] += 10.0
+    SFX._pace_veo_sfx_submit(
+        engine_name="google_vid_sfx_veo_fast",
+        model="veo-3.1-fast-generate-preview",
+    )
+
+    assert sleeps == pytest.approx([55.0])
 
 
 def test_veo_sfx_payload_prompts_audio_and_base_veo_stays_silent(monkeypatch):
