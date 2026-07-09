@@ -23,6 +23,12 @@ Recent green code chunks on `v2.0-alpha`:
   matrix, retired/non-invocable ids, and the requested Chatterbox/Dia/Qwen/Wan
   plus Comfy Cloud still/video readiness queue. `tests/test_model_slot_audit.py`
   pins the canonical contracts and the newly inspected candidate surfaces.
+- All-Chatterbox 30-word OBS live smoke completed from a real `science_news`
+  MIT News source. Output landed in
+  `C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\signal_lost_the_allocation_key_20260709_162019_silent_procgen_blended_captioned_with_credits_final.mp4`.
+  The smoke exposed a real no-reuse gap: distinct logical Chatterbox ids could
+  share the same underlying WAV. The fix blocks same-asset/provider collisions
+  when `allow_voice_reuse=False`.
 
 Current runnable source banks in `nodes/story_packs/banks.json`:
 
@@ -80,8 +86,8 @@ Deliverables:
 
 Recommended live-smoke order:
 
-1. Chatterbox one character line, Chatterbox announcer line, Dia one character
-   line.
+1. Done: full all-Chatterbox 30-word OBS smoke. Remaining: Dia one character
+   line and then a full all-Dia smoke if the sidecar path is healthy.
 2. Comfy Cloud stills: Luma Photon Flash, Krea 2 Turbo, Seedream 2, Nano Banana
    2.
 3. Cheap Comfy Cloud video: Vidu Q2 Pro Fast 720p.
@@ -158,12 +164,12 @@ must be generated from canonical, not hand-maintained.
 
 ## Last Validation
 
-Latest model-slot audit / pre-smoke inspection chunk:
+Latest Chatterbox alias-reuse fix chunk:
 
 ```text
 pytest -q -p no:cacheprovider
 
-7042 passed, 31 skipped, 1 xfailed
+7046 passed, 31 skipped, 1 xfailed, 5 warnings
 ```
 
 Bug Bible:
@@ -175,6 +181,14 @@ pytest -q -p no:cacheprovider tests\bug_bible_regression.py
 16 passed, 7 skipped, 3 xfailed
 ```
 
+Focused voice/cast subset:
+
+```text
+pytest -q -p no:cacheprovider tests\test_voice_bank.py tests\test_cast_lock.py tests\test_hybrid_voice_fit.py tests\test_tts_engine_sidecars.py
+
+90 passed
+```
+
 Focused contract subset:
 
 ```text
@@ -183,9 +197,9 @@ pytest -q -p no:cacheprovider tests\test_model_slot_audit.py tests\test_cloud_im
 83 passed
 ```
 
-No workflow JSON, node schema, or live render surface changed. No live
-GPU/provider smoke was run in this chunk; the operator asked to inspect
-input/output contracts first.
+No workflow JSON, node schema, or widget surface changed for the Chatterbox
+alias-reuse fix. The live smoke used the canonical workflow through the API with
+all TTS engines patched to Chatterbox for that prompt only.
 
 ## Standing Rules
 

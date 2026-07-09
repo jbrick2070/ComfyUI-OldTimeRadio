@@ -481,7 +481,7 @@ class CastLock:
                        announcer_voice_engine="auto"):
         from ._otr_voice_bank import (
             CASTING_POLICY_VERSION, VoiceCastingError, announcer_voice_ref,
-            assign_voice_for_slot, load_voice_bank,
+            assign_voice_for_slot, load_voice_bank, voice_ref_usage_keys,
         )
         from ._otr_voice_node_common import coerce_int_seed
 
@@ -518,9 +518,12 @@ class CastLock:
                 announcer_engine, bank=bank_entries, episode_seed=episode_seed)
 
         used: set = set()
+        def _mark_used(ref) -> None:
+            used.update(voice_ref_usage_keys(ref))
+
         if (announcer_ref is not None and target_engine == announcer_engine
                 and not allow_voice_reuse):
-            used.add(announcer_ref.voice_ref_id)
+            _mark_used(announcer_ref)
         gated = 0
         for entry in cast:
             if not isinstance(entry, dict):
@@ -571,7 +574,7 @@ class CastLock:
                     hybrid_ref = voice_ref_entry(accepted, target_engine, bank_entries)
                     if hybrid_ref is not None:
                         self._stamp(entry, hybrid_ref)
-                        used.add(hybrid_ref.voice_ref_id)
+                        _mark_used(hybrid_ref)
                         gated += 0 if hybrid_ref.commercial_clean else 1
                         report.append(
                             f"  {char_id}: {hybrid_ref.voice_ref_id} "
@@ -605,7 +608,7 @@ class CastLock:
                 report.append(f"  {char_id}: NOT cast -- {exc}")
                 continue
             self._stamp(entry, ref)
-            used.add(ref.voice_ref_id)
+            _mark_used(ref)
             gated += 0 if ref.commercial_clean else 1
             report.append(
                 f"  {char_id}: {ref.voice_ref_id} ({ref.engine}, "

@@ -8,7 +8,9 @@ it -- I-4 keeps the two casters on disjoint RNGs):
     (the Wave-0 E.1 schema). ``load_voice_bank`` validates every entry against
     that schema (dependency-free), rejects duplicate ``voice_ref_id`` values,
     and caches by content sha (the ``voice_bank_id+sha`` re-baseline trigger).
-    Identity is ``voice_ref_id`` -- never the character name (I-9).
+    Durable identity is ``voice_ref_id`` -- never the character name (I-9);
+    no-reuse casting also treats same reference assets as collisions so alias ids
+    cannot sneak the same voice into a cast.
 
   * **The caster** -- ``assign_voice_for_slot`` scores the bank for one slot by
     gender(100) / timbre(40) / role(20) / age(10), stable-sorts, and makes ONE
@@ -321,6 +323,34 @@ def _matches(entry: VoiceBankEntry, dims, *, gender, timbre, role, age_band) -> 
     return True
 
 
+def _norm_ref_identity(ref_path: str) -> str:
+    p = str(ref_path or "").strip().replace("\\", "/").lower()
+    while "//" in p:
+        p = p.replace("//", "/")
+    return p
+
+
+def voice_ref_usage_keys(entry: VoiceBankEntry) -> set:
+    """Collision keys for no-reuse casting.
+
+    ``voice_ref_id`` remains the durable ledger identity; these keys only guard
+    runtime assignment so alias ids that share a WAV/provider voice cannot both
+    be selected when reuse is disabled.
+    """
+    keys = {str(entry.voice_ref_id or "")}
+    ref_path = _norm_ref_identity(getattr(entry, "ref_path", "") or "")
+    if ref_path:
+        keys.add(f"ref_path:{ref_path}")
+    provider_voice_id = str(getattr(entry, "provider_voice_id", "") or "").strip().lower()
+    if provider_voice_id:
+        keys.add(f"provider:{entry.engine}:{provider_voice_id}")
+    return {k for k in keys if k}
+
+
+def _entry_is_used(entry: VoiceBankEntry, used: set) -> bool:
+    return bool(voice_ref_usage_keys(entry) & used)
+
+
 def assign_voice_for_slot(
     *,
     role: str,
@@ -397,7 +427,7 @@ def assign_voice_for_slot(
                 e for e in candidates
                 if _matches(e, dims, gender=gender, timbre=timbre,
                             role=role, age_band=age_band)
-                and (not exclude_used or e.voice_ref_id not in used)
+                and (not exclude_used or not _entry_is_used(e, used))
             ]
             if pool:
                 return _pick(pool)
@@ -547,10 +577,10 @@ def validate_voice_proposal(
     if not pid or not engine or not gnorm:
         return ""
     used = set(used_ids or ())
-    if pid in used:
-        return ""
     entry = voice_ref_entry(pid, engine, bank)
     if entry is None:
+        return ""
+    if voice_ref_usage_keys(entry) & used:
         return ""
     if entry.gender != gnorm or getattr(entry, "quality_tier", "") == "reject":
         return ""

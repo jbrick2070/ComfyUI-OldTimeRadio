@@ -1769,6 +1769,7 @@ def lock_cast(
             from ._otr_voice_bank import (
                 VOICE_FIT_POLICY_VERSION, build_voice_cards,
                 default_char_engine, load_voice_bank, validate_voice_proposal,
+                voice_ref_entry, voice_ref_usage_keys,
             )
 
             vf_bank, vf_sha = load_voice_bank()
@@ -1789,7 +1790,11 @@ def lock_cast(
                     bank=vf_bank, used_ids=used_ref_ids,
                 )
                 if accepted:
-                    used_ref_ids.add(accepted)
+                    accepted_entry = voice_ref_entry(accepted, vf_engine, vf_bank)
+                    if accepted_entry is not None:
+                        used_ref_ids.update(voice_ref_usage_keys(accepted_entry))
+                    else:
+                        used_ref_ids.add(accepted)
                     reason = ""
                 elif not proposed:
                     reason = "no_proposal" if cards else "no_cards"

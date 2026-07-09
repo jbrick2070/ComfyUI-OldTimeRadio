@@ -21,6 +21,7 @@ from nodes._otr_voice_bank import (
     get_all_registered_voices,
     load_voice_bank,
     stable_cast_seed,
+    voice_ref_usage_keys,
 )
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -28,10 +29,10 @@ NODE_SRC = REPO_ROOT / "nodes" / "_otr_voice_bank.py"
 
 
 def _entry(vid, *, engine="chatterbox", gender="male", timbre=(),
-           roles=("char_voice",), age="adult", clean=True):
+           roles=("char_voice",), age="adult", clean=True, ref_path=None):
     return VoiceBankEntry(
         voice_ref_id=vid, engine=engine, gender=gender, timbre=tuple(timbre),
-        roles=tuple(roles), age_band=age, ref_path=f"refs/{vid}.wav",
+        roles=tuple(roles), age_band=age, ref_path=ref_path or f"refs/{vid}.wav",
         ref_sha256="pending", commercial_clean=clean,
     )
 
@@ -165,6 +166,20 @@ def test_caster_no_reuse_then_reuse():
     # ...but allow_voice_reuse re-walks the ladder permitting the used ref.
     chosen = _cast(bank, used_voice_ref_ids={"a"}, allow_voice_reuse=True)
     assert chosen.voice_ref_id == "a"
+
+
+def test_caster_blocks_aliases_with_same_ref_path():
+    used_ref = _entry("primary", timbre=["warm"], ref_path="refs/shared.wav")
+    alternate = _entry("voice_alt", timbre=["warm"], ref_path="refs/shared.wav")
+    with pytest.raises(VoiceCastingError):
+        _cast((alternate,), used_voice_ref_ids=voice_ref_usage_keys(used_ref))
+
+    chosen = _cast(
+        (alternate,),
+        used_voice_ref_ids=voice_ref_usage_keys(used_ref),
+        allow_voice_reuse=True,
+    )
+    assert chosen.voice_ref_id == "voice_alt"
 
 
 def test_caster_carries_commercial_status():
@@ -321,6 +336,10 @@ def test_chatterbox_castlock_uses_british_announcer_pair_and_separate_chars():
     assert ann["voice_ref_id"] in {"cb_announcer_male", "cb_announcer_female"}
     assert "british_leaning" in by_id[ann["voice_ref_id"]].style_tags
     assert ann["voice_ref_id"] not in {male["voice_ref_id"], female["voice_ref_id"]}
+    assert by_id[ann["voice_ref_id"]].ref_path not in {
+        by_id[male["voice_ref_id"]].ref_path,
+        by_id[female["voice_ref_id"]].ref_path,
+    }
     assert by_id[male["voice_ref_id"]].gender == "male"
     assert by_id[female["voice_ref_id"]].gender == "female"
 
