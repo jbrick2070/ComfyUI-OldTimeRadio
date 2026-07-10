@@ -165,6 +165,25 @@
       "guide_ref": "LLM-original lane: no source, no fetcher/interpreter; provenance is printed (news_used + HUD origin label + credits line), never spoken."
     },
     {
+      "source_bank_id": "scifi_fable2",
+      "label": "Sci-Fi Fable2 (LLM-first multipass)",
+      "source_kind": "article",
+      "interpreter": "",
+      "fetcher": "science_rss",
+      "default_story_model": "scifi_fable2_v1",
+      "default_story_pipeline": "fable2_multipass",
+      "defaults": {
+        "story_form_label": "science-fiction audio drama",
+        "source_material_label": "Science story",
+        "title_form_label": "science-fiction radio drama",
+        "coda_mode": "real_news_report",
+        "credits_source_line": "dramatized by machine from tonight's science wire"
+      },
+      "required_seams": [],
+      "runnable": false,
+      "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass."
+    },
+    {
       "source_bank_id": "custom_source_bank",
       "label": "+ Add Your Own",
       "source_kind": "custom",

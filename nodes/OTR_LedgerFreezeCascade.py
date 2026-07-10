@@ -349,8 +349,12 @@ class OTR_LedgerFreezeCascade:
         # writer's full budget was already spent. None (pre-stamp
         # ledger) keeps the documented BASELINE backstop.
         from ._otr_shared.llm_policy import policy_from_meta
-        _lfc_policy = policy_from_meta(led.get("meta") or {})
-        cache_entry = _OTRML.request_slot(
+        # `led` is the production Ledger HANDLE (dict lives at .data).
+        _lfc_data = getattr(led, "data", led)
+        _lfc_meta = (_lfc_data.get("meta") or {}) if isinstance(
+            _lfc_data, dict) else {}
+        _lfc_policy = policy_from_meta(_lfc_meta)
+        cache_entry = _OTRML.request_slot(  # LLM slot: technical
             "technical", resolved_technical_id, policy=_lfc_policy,
         )
         generate_fn = _OTRML.make_generate_fn(cache_entry)

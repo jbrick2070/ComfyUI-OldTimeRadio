@@ -1,5 +1,12 @@
 # OTR Go-Forward Plan
 
+**CODER SLOT CLAIMED: 2026-07-10 (scifi_fable2 S0 window; base `37dba723`).**
+Scope: S0 inert surfaces per docs/2026-07-10-scifi-fable2-architecture.md
+(registry rows, pack, deck, rules, markup parser, tests). No writer/runner/
+workflow edits. Other windows: do not touch nodes/story_packs/*.json,
+nodes/story_rules/scifi_fable2.json, nodes/_otr_fable2_markup.py,
+nodes/_otr_story_routing.py, tests/test_fable2_* until this claim is released.
+
 **Updated:** 2026-07-10 (early) -- HEAD `1c735c2d` + this docs commit
 **Branch:** `v2.0-alpha`
 **Status:** original_radio LIVE SMOKE GREEN 2026-07-10 ("Page in the
@@ -187,15 +194,22 @@ end-to-end sweep (section 3 below).
 Queued design item for the arc: demote `meta["news"]` to provenance-only
 + distinct-name migration (operator: "we can't just throw around meta").
 
-QUEUED CAMPAIGN (2026-07-10, analysis DONE, code NOT started): **lean-mean rip**
-(de-slop / ship-shape). Plan = `docs/2026-07-10-lean-mean-rip/RIP_PLAN.md` --
-r1-r4 converged same night (3 mechanical audits -> 3-Fable architect fan-out ->
-grounding -> Fable gate: CONVERGED after 7 must-fixes, folded). ~32-33k LOC
-deletion in waves W0-W8 + consolidations C1-C7 + giants split SW1-SW4. EXECUTES
-AFTER portability lands (operator lock); re-verify its REVISE-AFTER register
-(section 2) first -- NOTE the plan's baseline predates today's smoke-hardening
-commits (suite now 7151), R-7 re-grep rule applies. Operator eyeball pending on
-decision boxes D-1..D-6.
+QUEUED CAMPAIGN (2026-07-10, analysis DONE + VERIFIED, code NOT started):
+**lean-mean rip** (de-slop / ship-shape). Plan =
+`docs/2026-07-10-lean-mean-rip-final.md` @ `b9219478` (committed; the dated
+folder holds local round artifacts). r1-r4 converged same night (3 mechanical
+audits -> 3-Fable architect fan-out -> grounding -> Fable gate: CONVERGED after
+7 must-fixes, folded), THEN a 2-agent code-readiness sweep re-verified every
+claim against the REAL post-portability HEAD `20185542` (48 confirmed; 9
+amendments folded, incl. the quantified W5 obligation: remove node-1 inputs[9]
++ renumber link 279 dst_slot 34->33). ~32-33k LOC deletion in waves W0-W8 +
+consolidations C1-C7 + giants split SW1-SW4. Portability precondition is now
+MET (S0-S6 shipped + ratified). D-1..D-6 OPERATOR RATIFIED 2026-07-10 (plan @
+`e569880d`), D-2 codicil: rip RTXUpscale now; a FUTURE system-agnostic
+multi-GPU upscale campaign rebuilds against the `upscale_stage` profile
+reservation, honest-switch law (widgets land WITH a working engine). CLEARED
+TO EXECUTE post-portability-settle; execution-time gates = R-4 seam re-survey
++ R-7 re-grep only.
 
 ### 1. Model-Slot Audit And End-To-End Smokes (live smokes PARKED 2026-07-09)
 

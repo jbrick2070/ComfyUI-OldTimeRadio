@@ -909,9 +909,14 @@ meta.fable2).
 
 ## 14. Open items pinned for the coding window (verify before S0 code)
 
-1. Exact `config/cast_pools.py` symbols for the voice registry + announcer prebake
-   (`VOICE_REGISTRY` ~:344-358, `open_voice_pool` ~:477-503 confirmed present; menu ids are
-   assigned by python regardless -- section 9).
+1. RESOLVED (S0, 2026-07-10): `config/cast_pools.py` symbols pinned by direct read --
+   `VOICE_REGISTRY` (:344-358; `bark.presets` = `(preset, short)` pairs flattened from
+   `VOICE_PROFILES`, `kokoro.presets` = `ANNOUNCER_PRESETS`), `KNOWN_TTS_MODELS` (:362),
+   `pick_announcer(rng)` (:404), `open_voice_pool(taken: set) -> list[(preset,
+   short_description)]` (:477-503; short = gender + up to 2 vocal tags + age band,
+   sorted-tag deterministic). Gender for the menu builder comes from the `VOICE_PROFILES`
+   row (`(preset, gender, lang, tags)`), NOT from parsing the short description. Menu ids
+   m01.. are assigned by python regardless (section 9).
 2. RESOLVED (final code audit): locals-at-splice inventory verified -- everything the runner
    needs exists in the :3365-:3444 window (section 11); re-pin exact lines in the S1b commit.
 3. Preamble/postamble shot-numbering vs the legacy_reference_ledger fixture (shot_000
@@ -923,10 +928,15 @@ meta.fable2).
    coerce compose_flags to [] (fable2 rows without flags are schema-legal). (set_music
    RESOLVED r3/M1: cue ids opening/closing/inter_NN; no position field; sequencer maps
    "opening" -> music_open at scene_sequencer.py:1469.)
-5. MOSTLY RESOLVED (final code audit): canon = `EpisodeCanon` dataclass (`_otr_canon.py:159`)
-   + `write_episode_canon` (:212, atomic write). Runner constructs an EpisodeCanon; tail
-   stays the only WRITER. Remaining: copy the field-population pattern from the legacy
-   construction site.
+5. RESOLVED (S0, 2026-07-10): canon = `EpisodeCanon` dataclass (`_otr_canon.py:159`)
+   + `write_episode_canon` (:212, atomic write). Field-population pattern pinned from the
+   legacy construction site (writer ~:4206-4212): `_OTRC.episode_canon_from_outline_dict(
+   {"title": resolved["episode_title"] or outline.title, "premise": outline.premise,
+   "setting": outline.setting, "time_of_day": outline.time_of_day, "sound_palette": [...]})`.
+   fable2 maps: title=treatment.title, premise=treatment.dramatic_question line,
+   setting=treatment.setting, sound_palette=[] (no style contract), time_of_day derived at
+   S1b. Runner constructs the OBJECT only; the tail stays the only canon WRITER, and the
+   tail's J.5 block re-titles + writes it (writer :6060-6061).
 6. Slot-fn `max_new_tokens` pass-through at the splice (interpreter paths already thread it).
 7. Legacy coda real-news append fires in legacy composition (writer :5554-5556 -- r4 pin),
    NOT in the shared tail -- fable2 carries its read in the ledger already; pin with a
@@ -936,8 +946,21 @@ meta.fable2).
    (part of the S1a extraction).
 9. S0 runs the FULL suite (not only the new tests) before commit -- suite-wide bank/pack
    sweeps must stay green with the 9-seam non-production pack present.
-10. Frame deck authoring is S0's likeliest time sink: 12 authored cards is the shippable
-    minimum (the deal needs >= 3 distinct); grow to ~24 in S3.
+10. RESOLVED (S0, 2026-07-10): frame_deck.json authored -- 14 cards + 6 stances under the
+    `"stances"` key, schema `fable2_deck_v1` (`{cards:[{name,shape}], stances:[{name,note}]}`),
+    deck-lint test enforces uniqueness + the SFW deck law (no weapons/horror/smoking
+    vocabulary in cards or stances). Grow toward ~24 cards in S3.
+
+**S0 SHIPPED (2026-07-10, this coder window):** registry rows (bank inserted before
+custom_source_bank, runnable:false; fable2_multipass executable:false, registry-legal slots
+only), 9-seam pack, frame_deck.json + sidecar registration, detection-only rules file
+(cliche_replacements empty -- the v1 schema requires the key), `_otr_fable2_markup.py`
+(full defect enum, collected defects, separate character/announcer word counters,
+per-constituent lines), tests: test_fable2_markup.py / test_fable2_registry.py (incl.
+rss-not-spark pin, slot-enum rejection, custom-stays-last, deck lint, science_news pinned
+row) / test_fable2_prompt_snapshots.py (both pitch modes, critic-subset-of-audit, FORMAT
+block byte-identical across script/revision seams). NO writer/runner/workflow change.
+Next: S1a tail extraction (alone).
 
 ## 15. Kibitz hardening log
 

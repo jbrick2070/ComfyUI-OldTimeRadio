@@ -1,0 +1,88 @@
+{
+  "schema_version": "fable2_deck_v1",
+  "notes": "Frame cards give a pitch its SHAPE (whose eyes, what scale, what genre feel); stances give the writers' room its editorial posture for the night. Dealt by python (OTR_FABLE2_SEED reproducible); the P1 pitch pass copies card names verbatim into PitchSlate.frame_card. SFW deck law: no weapons, no horror, no smoking -- deck-lint test enforced.",
+  "cards": [
+    {
+      "name": "The Night Operator",
+      "shape": "Told through the one person on duty when the anomaly arrives; a small room against a very large sky; intimate procedural."
+    },
+    {
+      "name": "Two Rooms Apart",
+      "shape": "Two characters who never share a scene, joined only by a channel -- a wire, a pipe, a wall; the drama lives in the relay."
+    },
+    {
+      "name": "The Last Reading",
+      "shape": "An instrument gives its final measurement; the story is who believes it and what believing costs; quiet suspense."
+    },
+    {
+      "name": "The Understudy",
+      "shape": "Seen by the assistant who knows the machine better than its celebrated inventor; loyalty against credit; chamber drama."
+    },
+    {
+      "name": "Small Town, Big Signal",
+      "shape": "A rural community absorbs a discovery meant for capitals; kitchen and general store scale; warm ensemble comedy of manners."
+    },
+    {
+      "name": "The Long Wait",
+      "shape": "The discovery is slow -- a signal, a growth, a thaw -- and patience is the drama; scenes marked by what has not yet happened."
+    },
+    {
+      "name": "The Committee of Two",
+      "shape": "A decision that should take an institution falls to two people at a table after hours; civic stakes at domestic scale."
+    },
+    {
+      "name": "Letters Ahead",
+      "shape": "Messages arrive out of their proper order; the science bends distance or delay; a correspondence story with a fold in it."
+    },
+    {
+      "name": "The Caretaker's Clause",
+      "shape": "Someone maintains a machine they were told never to understand; duty against curiosity; a slow domestic mystery."
+    },
+    {
+      "name": "Homecoming Orbit",
+      "shape": "A traveler returns changed by the science while home has stayed still; reunion drama where the distance is the antagonist."
+    },
+    {
+      "name": "The Borrowed Voice",
+      "shape": "The science lets one person speak with or for another; ownership of words; two-hander built on who is really talking."
+    },
+    {
+      "name": "The Quiet Audit",
+      "shape": "An inspector arrives to close a project the very night it finally works; paperwork against wonder; deadpan procedural."
+    },
+    {
+      "name": "The Apprentice's Number",
+      "shape": "A junior's small correction to a great calculation; pride against proof; a duel fought entirely in politeness."
+    },
+    {
+      "name": "The Far Shore Relay",
+      "shape": "A chain of strangers must hand a fragile signal along, each link one scene; an ensemble story about trust between people who never meet."
+    }
+  ],
+  "stances": [
+    {
+      "name": "Wonder first",
+      "note": "Lead with awe; let the cost arrive quietly and late. The science is beautiful before it is trouble."
+    },
+    {
+      "name": "Kitchen-table stakes",
+      "note": "Keep the science at the scale of one household: a bill, a letter, a chair left empty. Cosmic causes, domestic effects."
+    },
+    {
+      "name": "Procedural calm",
+      "note": "Professionals doing procedure while the extraordinary leaks in at the edges; nobody raises their voice until the last scene."
+    },
+    {
+      "name": "Elegiac",
+      "note": "Something true is ending; the discovery is also the goodbye. Warm, unhurried, no bitterness."
+    },
+    {
+      "name": "Wry",
+      "note": "The anthology host's raised eyebrow; irony over alarm; the joke lands softly and the sting arrives a beat later."
+    },
+    {
+      "name": "Hearth and static",
+      "note": "Intimacy against distance: voices close to the microphone, the cosmos far away; the smaller the room, the bigger the sky."
+    }
+  ]
+}

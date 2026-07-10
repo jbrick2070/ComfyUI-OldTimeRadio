@@ -679,9 +679,9 @@ def _resolve_writer_llm(meta: dict, warnings: list):
         # under (ledger stamp); None = pre-stamp backstop.
         from ._otr_shared.llm_policy import policy_from_meta
 
-        entry = request_slot(
+        entry = request_slot(  # LLM slot: technical
             "technical", model_id,
-            policy=policy_from_meta(meta))  # LLM slot: technical
+            policy=policy_from_meta(meta))
         gen = make_generate_fn(entry)
 
         def _call(prompt: str) -> str:

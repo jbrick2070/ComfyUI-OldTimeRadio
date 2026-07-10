@@ -49,6 +49,41 @@
       ]
     },
     {
+      "story_pipeline_id": "fable2_multipass",
+      "label": "Fable2 Multipass (LLM-first whole-play markup)",
+      "executable": false,
+      "requires_source_contract": false,
+      "declared_seams": [
+        "fable2_dossier_system",
+        "fable2_pitch_system",
+        "fable2_select_system",
+        "fable2_treatment_system",
+        "fable2_script_system",
+        "fable2_critic_system",
+        "fable2_revision_system",
+        "fable2_casting_system",
+        "fable2_audit_system"
+      ],
+      "passes": [
+        {"pass_id": "dossier", "slot": "technical", "seam_refs": ["fable2_dossier_system"], "description": "P0: python-capped source digest -> DossierArtifact (facts, allowed numbers, entities, dramatizable vectors)."},
+        {"pass_id": "pitch_room", "slot": "creative", "seam_refs": ["fable2_pitch_system"], "description": "P1 CREATIVE 1: dossier + dealt frame cards + stance -> PitchSlate (3 pitches full mode, 1 in low-budget one-pitch mode)."},
+        {"pass_id": "pitch_select", "slot": "technical", "seam_refs": ["fable2_select_system"], "description": "P2a technical-judge: dossier + slate + stance -> PitchSelect (winner + rationale; skipped in one-pitch mode)."},
+        {"pass_id": "treatment", "slot": "creative", "seam_refs": ["fable2_treatment_system"], "description": "P2b creative: dossier + winning pitch + stance + N_MAX -> Treatment (cast shapes w/ registers, priced ending, news thread, news close read). Cast names are born here."},
+        {"pass_id": "script", "slot": "creative", "seam_refs": ["fable2_script_system"], "description": "P3 CREATIVE 2: treatment + digest + envelope -> COMPLETE play in strict markup; markup ladder + budget gate + truncation retry."},
+        {"pass_id": "critic", "slot": "technical", "seam_refs": ["fable2_critic_system"], "description": "P4 technical-judge: draft + treatment -> CriticNotes (never replacement dialogue; skipped in low-budget mode)."},
+        {"pass_id": "revision", "slot": "creative", "seam_refs": ["fable2_revision_system"], "description": "P5 CREATIVE 3: draft + notes + treatment -> COMPLETE play rewritten with verbatim-preserve law; keep-better-draft defect judge (skipped in low-budget mode)."},
+        {"pass_id": "casting_voices", "slot": "technical", "seam_refs": ["fable2_casting_system"], "description": "P6 technical-creative: winning parsed script + cast shapes + dealt voice menu -> CastingVoices (voices/portraits only; register authority stays with the treatment)."},
+        {"pass_id": "assemble", "slot": "technical", "seam_refs": [], "description": "P7: pure Python assembly, no LLM -- slot is registry metadata. ParsedScript + Treatment -> ledger rows with per-constituent verbatim proof gates; incremental led.save() per scene."},
+        {"pass_id": "ledger_audit", "slot": "technical", "seam_refs": ["fable2_audit_system"], "description": "P8 technical: assembled script view + treatment -> AuditFindings; evidence triage discards uncorroborated findings LOUDLY; confirmed findings = fail loud naming the defect (audit-only through S3)."}
+      ],
+      "notes": [
+        "Visible experiment; failure NEVER routes to legacy_many_pass.",
+        "Consumes the bank fetcher payload via the writer's shared fetch lane; interpreter intentionally empty -- the treatment IS the interpretation.",
+        "executable stays false until the runner ships (S1b); flipping it requires the runner in the same change.",
+        "Python judges; the LLM writes: every spoken ledger row must be traceable to a named LLM artifact (proof gate)."
+      ]
+    },
+    {
       "story_pipeline_id": "simple_4_prompt_experimental",
       "label": "Simple 4-Prompt Experimental",
       "executable": false,
