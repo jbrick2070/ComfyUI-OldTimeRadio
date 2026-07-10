@@ -143,19 +143,22 @@ HARD_CLASS_EVIDENCE: "dict[str, tuple[str, ...]]" = {
 # Kill authority per hard class (run-3 live catch 2026-07-10: the
 # confirm judge "proved" weapons_smoking with the verbatim quote
 # 'I don't care if the coils start to smoke' -- a grounded quote proves
-# the LINE EXISTS, not that it belongs to the CLASS). Radio is pure
-# dialogue: a weapon or tobacco act must be NAMED to be heard on air,
-# so for closed-vocabulary classes the lexicon is the only kill
-# authority and an uncorroborated flag is discarded LOUDLY (the meta
-# stamp + log keep it auditable; the operator eyeball reviews
-# discards). Open-phrasing classes keep the confirm-quote path.
+# the LINE EXISTS, not that it belongs to the CLASS; the first 420w
+# roll repeated the hole on news_source_framing by quoting the entire
+# -- perfectly clean -- intro line). Radio is pure dialogue: a weapon,
+# a tobacco act, NEWS FRAMING, or MACHINE ATTRIBUTION must be SAID in
+# words to exist on air, so every closed-vocabulary class takes the
+# lexicon as its only kill authority and an uncorroborated flag is
+# discarded LOUDLY (meta stamp + log keep it auditable; the operator
+# eyeball reviews discards). Only open-vocabulary modern_ip (brand /
+# franchise names are unenumerable) keeps the confirm-quote path.
 # Data here, not Python branches.
 KILL_POLICY_BY_CLASS: "dict[str, str]" = {
     "weapons_smoking": "lexicon_only",
     "anachronism_dependency": "lexicon_only",
+    "news_source_framing": "lexicon_only",
+    "machine_attribution": "lexicon_only",
     "modern_ip": "confirm",
-    "news_source_framing": "confirm",
-    "machine_attribution": "confirm",
 }
 
 

@@ -489,7 +489,7 @@ class TestQAGate:
                 {"class": "epilogue_missing",
                  "detail": "The closing line does not comment"},
             ]}),
-            json.dumps({"confirmed": []}),   # confirm pass drops both
+            # both hard classes are lexicon_only now: no confirm call.
             json.dumps({"findings": []}),    # re-judge after repair
         )
         meta = self._run(led, fn, monkeypatch,
@@ -513,14 +513,15 @@ class TestQAGate:
 
     def test_confirmed_hard_finding_still_kills(self, monkeypatch):
         # The confirm pass produces a verbatim script quote -> the
-        # kill goes through with the evidence recorded.
+        # kill goes through with the evidence recorded (modern_ip is
+        # the one remaining confirm-class).
         fn = _seq_fn(
             json.dumps({"findings": [
-                {"class": "news_source_framing",
-                 "detail": "the intro frames the tale"},
+                {"class": "modern_ip",
+                 "detail": "a franchise name is spoken"},
             ]}),
             json.dumps({"confirmed": [
-                {"class": "news_source_framing",
+                {"class": "modern_ip",
                  "quote": "This has been SIGNAL LOST."},
             ]}),
         )
@@ -574,19 +575,46 @@ class TestHardFindingTriage:
         assert not kills and len(discarded) == 1
         assert calls["n"] == 0, "lexicon_only class must never confirm"
 
+    def test_news_framing_is_lexicon_only(self):
+        # First 420w roll (2026-07-10): the confirm judge "proved"
+        # news_source_framing by quoting the ENTIRE (clean) intro line
+        # -- grounded, but with zero news wording. News framing is a
+        # closed vocabulary on radio: no lexicon hit -> discard, no
+        # confirm call.
+        calls = {"n": 0}
+
+        def tech_fn(messages, **kw):
+            calls["n"] += 1
+            return json.dumps({"confirmed": []})
+
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("news_source_framing",
+                           "sounds like a factual teaser")],
+            script=self._SCRIPT, technical_fn=tech_fn)
+        assert not kills and len(discarded) == 1
+        assert calls["n"] == 0, "news framing must never confirm"
+
+    def test_news_framing_lexicon_hit_still_kills(self):
+        script = self._SCRIPT + "\nANNOUNCER: This is tonight's news bulletin."
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("news_source_framing", "calls it a news bulletin")],
+            script=script, technical_fn=_seq_fn("{}"))
+        assert len(kills) == 1 and not discarded
+        assert "news" in kills[0][1]
+
     def test_confirm_drop_discards(self):
         fn = _seq_fn(json.dumps({"confirmed": []}))
         kills, discarded = ORR.triage_hard_findings(
-            [self._finding("news_source_framing", "sounds like a teaser")],
+            [self._finding("modern_ip", "sounds like a franchise nod")],
             script=self._SCRIPT, technical_fn=fn)
         assert not kills and len(discarded) == 1
 
     def test_confirm_grounded_quote_kills(self):
         fn = _seq_fn(json.dumps({"confirmed": [
-            {"class": "news_source_framing",
+            {"class": "modern_ip",
              "quote": "This has been SIGNAL LOST."}]}))
         kills, discarded = ORR.triage_hard_findings(
-            [self._finding("news_source_framing", "framed as a broadcast")],
+            [self._finding("modern_ip", "a branded catchphrase")],
             script=self._SCRIPT, technical_fn=fn)
         assert len(kills) == 1 and not discarded
         assert "SIGNAL LOST" in kills[0][1]
@@ -596,11 +624,10 @@ class TestHardFindingTriage:
         # the post-validator rejects it, the bounded ladder exhausts,
         # and the finding is discarded (never a kill without evidence).
         fn = _seq_fn(json.dumps({"confirmed": [
-            {"class": "news_source_framing",
-             "quote": "and now tonight's factual account"}]}))
+            {"class": "modern_ip",
+             "quote": "brought to you by a famous cola"}]}))
         kills, discarded = ORR.triage_hard_findings(
-            [self._finding("news_source_framing",
-                           "framed as though it were factual")],
+            [self._finding("modern_ip", "a brand is invoked")],
             script=self._SCRIPT, technical_fn=fn)
         assert not kills and len(discarded) == 1
 
