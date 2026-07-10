@@ -1,114 +1,170 @@
-# 720-word Story-Engine Bake-off -- the runway (2026-07-10 evening)
+# 720-word Story-Engine Bake-off -- runway v5 FINAL (kibitz r1-r4 CONVERGED)
 
-**Goal (operator directive):** a REAL bake-off of the story engines at 720 words --
-who writes the best episode. Contenders: (A) `scifi_fable2`, (B) `original_radio`,
-(C) `science_news`, (D) a **GPT-authored from-scratch sci-fi pack** running through
-the fable2 pipeline (same code, different creative voice -- measures pack
-authorship, not plumbing). Blind operator judging.
+**Arc:** kibitz 2026-07-10 evening, `kibitz-runs/2026-07-10-720-bakeoff/`
+(r1-r4; panel codex gpt-5.5 x4 + antigravity r3 manual + Claude anchor x4,
+judge Claude). r4 = precision pins only -> CONVERGED. $0 spend (local panel).
 
-**Baseline:** HEAD `47bf50f2` (r2-QA P0 fold shipped: FreezePolicy readonly freeze
-boundary, live-root veto, row-level merge ownership; suite 7463/31/1 + Bug Bible
-green). Governing spec for every precursor = `docs/2026-07-10-fable2-s2-QA-ANALYSIS-r2.md`
-(acceptance-shaped contracts + exact workflow deltas; claims verified at HEAD).
+**Baseline:** HEAD `b1cf0085` / `v2.0-alpha`. Already shipped, NOT
+re-implemented: r2-QA P0 fold @ `47bf50f2`. Spec shapes:
+`docs/2026-07-10-fable2-s2-QA-ANALYSIS-r2.md`; every graph/line literal is
+re-derived LIVE at build.
 
-**Why no multi-act scoping is needed:** 720 words sits inside S2 full-loop mode
-(120-900). Act-chunking is a >900w feature, deferred post-S3 by the ratified
-architecture. Nothing here waits on it.
+**Goal:** blind-judged 4-contender bake-off at 720 words: (A) scifi_fable2,
+(B) original_radio, (C) science_news, (D) GPT-authored fable2-pipeline voice
+pack. PART 1 = fable2 720-capable; PART 2 = qualification + event. 720w is
+inside S2's 120-900 band -- no act-chunking.
 
-## The chunks (each: code + tests -> suite + Bug Bible -> commit AND push)
+## PART 1
 
-**C1 -- P1.1 ownership/revision merge contract** (small, foundation for C2/C3).
-Adopt the r2 table: lines/music/clips owned-vs-durable classification; durable
-renderer fields survive only with matching source identity (prompt/spec hash for
-music cues, canonical-text hash for `text_for_tts`). Table-driven regression per
-field: replacement, deliberate clearing, same-spec persistence, changed-spec
-invalidation. Retire only explicitly superseded legacy merge tests; keep a legacy
-read-compat migration test.
+### C1 -- durable-field identity (BEFORE C3; blocking)
+Authored music fields (cue_id, description, generation_prompt,
+anchor_line_id, placement, target_duration_s, cue_spec_sha256) OWNED by
+memory; set_music extended to carry them (drops them today,
+production_ledger.py:1083-94). Durable render fields copy from disk ONLY on
+identity match; changed hash invalidates wav/cache/timing. **Hash pins
+(sorted-key JSON, no transient render fields):** `cue_spec_sha256` =
+sha256(sorted-key JSON of {generation_prompt, target_duration_s, placement,
+anchor_line_id}); lines `text_for_tts_source_sha256` = sha256(canonical
+text); clips render-spec hash = sha256(sorted-key JSON of source/render
+request fields, excluding outputs/timing). Supersede the blind-preserve
+text_for_tts test (test_production_ledger.py:273-292) with same-hash-retain
++ changed-hash-invalidate; keep a legacy read-compat migration test.
 
-**C2 -- P1.3 text_for_tts delivery routing** (proof-preserving pronunciation).
-Order inside the chunk: (1) capture the science_news byte-parity fixture FIRST
-(serialize synthesis request + ordering + canonical text pre-change); (2) Phase 7
-for fable2 writes ONLY `text_for_tts` + `text_for_tts_source_sha256` + a
-normalization receipt -- never canonical text/counts/proof (numbers->words and
-Dr.->Doctor move INTO delivery-field generation; re-enables the pronunciation we
-deliberately switched off in the P0 fold); (3) voice common resolves
-`delivery = line.get("text_for_tts") or canonical` -- for fable2, absent/empty/
-hash-mismatch is TERMINAL, no fallback; (4) assert science_news exact parity vs
-the fixture; (5) full-cascade spies: every synthesis input == text_for_tts,
-canonical text/proof unchanged.
+### C2 -- text_for_tts delivery routing
+(1) science_news byte-parity fixture FIRST (must pass before AND after
+C2/C3). (2) Fable2 Phase 7 stamps EVERY non-skipped voiced line -- even when
+delivery == canonical -- with text_for_tts + source sha + normalization
+receipt; canonical text/counts/proof untouched (numbers->words + Dr.->Doctor
+move here, restoring the pronunciation switched off in the P0 fold).
+(3) ONE resolver returning (canonical, delivery); policy/lane gate INSIDE the
+resolver (content-owned: absent/empty/stale sha = terminal BEFORE
+generation; legacy: passthrough, zero behavior change). Used for line
+filtering, neutral prep, adapter prep, delivery vectors, request hashing in
+_otr_voice_node_common.py. (4) **Two-bus clip contract:** per-bus expected
+line_id arrays (character bus node 81, announcer bus node 82); post-loop
+terminal check that consumed count == provided count on BOTH buses --
+shortfall AND surplus fail (SceneSequencer only catches shortfall today,
+scene_sequencer.py:838-868). (5) Sidecar audit: concrete list (indextts2 /
+chatterbox / dia), one-line uses-voice-common verdict each, recorded in the
+C2 commit message.
 
-**C3 -- P1.4 authoritative cue manifest + canonical workflow wiring** (the only
-chunk that touches `workflows/otr_canonical.json`; code + JSON in the SAME
-commit). `ledger.music[]` becomes the authored queue (cue_id, anchor_line_id,
-placement, generation_prompt, target_duration_s; `set_music()` must stop
-discarding anchors). StableAudioTheme: fixed 3-slot outputs -> `cue_audio_clips`
-+ `cue_manifest_json` + render_log + done; renders EVERY ledger prompt straight
-to the episode audio dir. SceneSequencer inserts inter-scene cues at authored
-boundaries; EpisodeAssembler shifts to master time. Exact graph delta (r2-spec'd):
-delete links 241/242/243; APPEND inputs 7 (`music_cue_audio`) + 8
-(`music_cue_manifest_json`) on node 3 SceneSequencer and node 7 EpisodeAssembler;
-add links 280 `[83,0,3,7,AUDIO]`, 281 `[83,1,3,8,STRING]`, 282 `[83,0,7,7,AUDIO]`,
-283 `[83,1,7,8,STRING]`; `last_link_id` 283. No widget change (crossfade, if ever,
-appends at END -- BUG-LOCAL-097). science_news gets a legacy manifest reproducing
-its present 3 slots exactly. Re-validate: OTR_WorkflowValidator + JSON round-trip
-+ link/widget audit in the same commit.
+### C3 -- cue manifest + canonical wiring (code + JSON + tests, ONE commit)
+- StableAudioTheme node 83 -> cue_audio_clips + cue_manifest_json +
+  render_log + done; every ledger.music[] prompt rendered straight to the
+  episode audio dir; legacy opening/closing SLICED from the batch via the
+  manifest.
+- **Link 243 disposition EXPLICIT:** remove it. SignalLostVideo.closing_audio
+  is declared AUDIO but unused (video_engine.py:~2081 declaration, ~2260
+  unused -- confirm live); retire the input in the same commit. Re-enumerate
+  ALL node-83 outbound links live before editing.
+- **Exact input spec:** SceneSequencer node 3 + EpisodeAssembler node 7 each
+  gain OPTIONAL forceInput sockets `music_cue_audio` (AUDIO) +
+  `music_cue_manifest_json` (STRING), appended AFTER all existing inputs, no
+  widget key (widgets_values untouched -- BUG-LOCAL-097). Canonical links
+  added by input NAME after live re-derivation.
+- **Manifest = versioned schema** (`manifest_version: 1`): rows carry cue_id
+  (unique), batch_index (in-bounds), sample_count (>0), sample_rate
+  (== AUDIO), prompt + prompt sha, seed, requested/actual duration, canonical
+  output path. ONE shared parse/validate helper used by SceneSequencer,
+  EpisodeAssembler, and tests. Slicing by manifest sample counts ONLY
+  (pack_audio_batch right-pads, base.py:104+); batch count == row count or
+  terminal. Keying = cue_id + batch_index, never positional.
+- SceneSequencer inserts inter-scene cues at authored boundaries (net-new
+  wiring: music rows are passthrough today) + stamps scene-relative timing;
+  EpisodeAssembler extracts opening/closing + shifts inter-scene to master
+  time; science_news legacy manifest = exact 3-slot parity.
+- SAME COMMIT: update tests/test_full_workflow_v2_audio_wiring.py +
+  tests/test_stable_audio_theme.py; ADD workflow audit failing on unlinked
+  cue/manifest outputs or stale legacy cue links; OTR_WorkflowValidator +
+  JSON round-trip + link referential + input-name + widgets_values-count
+  audits.
 
-**C4 -- P1.5 S2 full loop** (the big one; /kibitz the coding plan BEFORE writing
-it -- this doc is that kibitz input). Contracts per r2: mode bounds (30-119
-compact + P2a/P4/P5 stamped skipped; 120-900 full; 901+ rejected pre-creative);
-exactly 3 pitch cards ids {1,2,3} + validated select; exact quotient/remainder
-scene allocation (350 -> 117/117/116; 720 -> per-skeleton, sums exact, per-scene
-band validated in P3 AND P5); P3 receipts record ACTUAL max token budget +
-attempts; P4 critic + P5 revision consume normalized markup + all protected
-artifacts; pure `validate_revision_contract(...)` (rejects title/cast/speaker-set/
-scene-order/skeleton/coda-boundary/music changes, unnoted edits, budget
-violations; malformed rules fail loud); deterministic lexicographic
-keep-better judge (draft 2 wins only if eligible AND strictly lower); atomic
-immutable FinalDraft propagated to P6/P7/P8/lines/proof -- never a mixed-draft
-artifact. Acceptance matrix at 30/119/120/350/900/901 + fully mocked 350w loop
-+ negative revision cases per protected field.
+### C4a -- S2 pure contracts (LLM-free, ships first)
+Scene-count TABLE (word-band -> scene count), pinned + tested; exact
+quotient/remainder allocation VECTOR (kills the scalar per_scene_words
+drift). **Boundary verdicts explicit:** 30 + 119 = compact mode retained
+(P2a/P4/P5 stamped skipped); 120/350/720/900 = full mode accepted (720 row
+asserts the table's scene count + vector summing to exactly 720); 901 =
+terminal reject BEFORE any creative call. FinalDraft frozen dataclass (raw
+source, normalized source, ParsedScript, proof_map, P3/P5 receipts, score
+tuple, sha set) with a PURE constructor -- parse/proof/score extracted from
+the mutating _assemble path (today proof_map is built inside assembly while
+it saves incrementally, _otr_scifi_fable2.py:1647-1802). Pure
+validate_revision_contract (protected fields, unnoted edits, budgets;
+malformed rules fail loud). Deterministic lexicographic keep-better judge
+(draft 2 only if eligible AND strictly lower; tie keeps draft 1 + reason).
+Full negative matrix.
 
-**C5 -- live proof rolls.** 350w fable2 smoke (default lane) -> fold failures
-root-cause (kibitz every failure, standing rule) -> 720w verification roll,
-default lane + one LTX lane roll. Freeze must be `frozen_clean` with
-`content_mutations: 0` receipts; assets Test-Path'd in `otr\episodes\<ep>\` /
-`otr\obs\`.
+### C4b -- S2 loop wiring
+P2a 3-pitch select (ids {1,2,3} validated), P4 critic, P5 revision consuming
+normalized markup + protected artifacts; P3 receipts record ACTUAL max
+budget + attempts. Judge selects a FinalDraft; _assemble runs ONCE on the
+winner (losing drafts never touch ledger/proof). **SAME CHANGE, all four
+gate surfaces:** runner `_ONE_DRAFT_THRESHOLD` gate
+(_otr_scifi_fable2.py:~236-264), writer run()-entry
+assert_supported_target_words (OTR_LedgerScriptWriter.py:~3220),
+pipelines.json pass rows for P2a/P4/P5 (~:52-80), and the gate assertions in
+tests/test_fable2_artifacts.py:~676-679. Mocked full-loop test before live.
 
-**C6 -- P2.2 caption/credits sentinel alias + HuMo stale guard** (small; makes
-the rendered artifacts judgeable -- ANNOUNCER labels currently drop off sentinel
-rows). Route captions/credits through the alias-aware cast resolver; HuMo stale
-guard matches role/source-family/shot-lock predicate instead of a literal
-char_id.
+### C5 -- caption/credits alias + HuMo guard (before proof rolls)
+Captions: guarded import of _otr_ledger_consumers.cast_lookup with
+flat-import fallback (module is stdlib-only with a CLI path); test package
+import AND CLI execution. Credits: resolve the VOICE row through cast_lookup
+(ref_by_char is raw char_id today). HuMo stale guard:
+role/source-family/shot-lock predicate, not literal char_id.
 
-**C7 -- the bake-off itself.**
-- One pinned news story for all four contenders; seeds pinned via
-  OTR_CAST_SEED/OTR_STYLE_SEED for reproducibility (creative RNG is OS-entropy
-  otherwise).
-- Contender D: GPT (newest available via OpenRouter) authors a complete
-  fable2-pipeline pack from scratch -- all 10 seams + bank row (new bank id,
-  e.g. `scifi_gpt_pack`), subject to the same lint/registry gates; NO pipeline
-  code changes allowed. Claude may fix JSON-shape errors only, never wording.
-- 4 episodes x 720 words, rendered end to end; labels blinded (A/B/C/D shuffled)
-  for the operator listen.
-- Scorecard: story coherence, character distinctness, dialogue quality,
-  ending earned, news-seam integration, would-listen-again. Operator judgment
-  is final; no automated content gate (r2 P2.4).
-- Known honesty flags going in: original_radio 420w run undershot (239/420);
-  science_news is untuned at 720w. Report actuals, don't excuse them.
+### C5.5 -- proof rolls (lock scope: 350w + 720w default lane only)
+350w fable2 smoke -> triage: targeted tests -> fix at root (kibitz every
+failure per operator directive) -> rerun targeted tests -> rerun smoke ->
+proceed only when green -> 720w default-lane verification roll. Green bar:
+frozen_clean + content_mutations=0 receipt + assets Test-Path'd at canonical
+paths. (LTX roll cut from lock scope -- separate media-lane validation.)
 
-## Deliberately deferred (not on this runway)
-P2.1 retire-doctor-skip (global reviewer change; post-bake-off), P2.3 full S3
-soak cohorts (4x30 rolls -- after the bake-off proves the loop), >900w
-act-chunking, cloud OpenRouter slot pins (separate ratify gate).
+## PART 2
 
-## Open questions for the kibitz panel
-1. Chunk order: any hidden dependency that breaks C1->C4 sequencing (e.g. does
-   C3's set_music anchor change need C1's music identity hash first)?
-2. C4 blast radius: does the atomic-FinalDraft propagation require touching the
-   P6/P7/P8 call signatures in `_otr_scifi_fable2.py`, and is a staged
-   two-commit split safer?
-3. 720w single verification roll vs 3 rolls before calling C5 green?
-4. Contender D ground rules: is seam-count parity (10 seams) the right fairness
-   bar, or should D also author its own banks.json fetcher config?
-5. Anything in the r2 spec that contradicts the shipped P0 fold at `47bf50f2`
-   (receipt shape, policy names) that the C2-C4 specs should be re-based on?
+### C6 -- qualification gate (all four; SAME run-sheet JSON as the event)
+Run-sheet fields: contender id; FULL seed envelope with RESOLVED values
+(OTR_FABLE2_SEED A/D, OTR_ORIGINAL_SEED B, OTR_CAST_SEED, OTR_STYLE_SEED);
+provider/slot handle/resolved model slug/auth status/actual cost receipt --
+**missing slug, auth status, or cost receipt = qualification incomplete;
+contender excluded until rerun**; source id; ACTUAL word count (reported,
+not pass/fail); freeze verdict + receipt per-policy (A/D frozen_clean +
+content_mutations=0; B/C any non-terminal + doctor-edit/skip disclosure);
+output paths; rerun log. **Env hygiene:** the resident ComfyUI process
+bleeds env -- the runner SETS every envelope seed and CLEARS non-applicable
+ones before each contender. Contender B runs its no-source spark lane
+(news_close_brief hardwired empty + rejected if set,
+_otr_original_radio.py:515-516) -- scored WITHOUT the news-seam axis,
+stated. One 720w calibration roll each for B/C; tuning frozen after.
+
+### C7 -- event
+Pinned story for A/C/D. Contender D: reuses the scifi_fable2 frame deck
+(_DECK_PATH hardcoded + sidecar-whitelisted); authors pack SEAMS + bank row
+(`scifi_gpt_pack`, same pipeline); frozen committed authoring prompt;
+recorded model slug; JSON-shape repairs only, diffs logged, zero wording
+edits; passes the same lint (fable2-specific lint fixture = pipeline bug to
+root-fix, never a D exemption). 4 x 720w; SOFT-blind labels (stated); ONE
+logged rerun per failed render; scorecard: coherence, character
+distinctness, dialogue, ending earned, news-seam (A/C/D only),
+would-listen-again. Operator judgment final; no automated content gate.
+
+## VERIFY-AT-BUILD checklist (r4)
+1. science_news byte-parity fixture green before AND after C2/C3.
+2. Every run loads workflows/otr_canonical.json, never a copy.
+3. Node-83 outbound links re-enumerated live; link 243 disposition explicit.
+4. Validator + round-trip + link referential + input-name + widgets-count
+   audits green on the C3 commit.
+5. No unlinked cue/manifest outputs; no stale legacy cue links.
+6. Per-bus line_id order + exact consumed==provided clip counts (surplus
+   fails too).
+7. Captions package import AND CLI both pass.
+8. Boundary tests 30/119/120/350/720/900/901 with the stated verdicts.
+9. Runner sets + clears every envelope seed per contender.
+10. Proof rolls: frozen_clean, content_mutations=0, canonical-path assets.
+11. SignalLostVideo closing_audio confirmed unused live before retiring.
+12. C2 sidecar audit list in the commit message.
+
+## Deferred
+P2.1 doctor-skip retirement (disclosure instead), P2.3 soak cohorts, >900w
+act-chunk, cloud OpenRouter pins, source-consuming original_radio variant,
+LTX-lane validation roll.
