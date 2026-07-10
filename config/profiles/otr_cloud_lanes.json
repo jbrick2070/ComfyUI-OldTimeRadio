@@ -1,9 +1,8 @@
 {
-  "id": "cloud_all",
-  "display_name": "All cloud (Partner API)",
+  "id": "otr_cloud_lanes",
+  "display_name": "Cloud lanes (CPU-baseline host orchestrating the existing cloud lanes)",
   "status": "draft",
   "ratify_before_emit": [
-    "cloud_tier_name: operator ratifies the tier name (proposed: otr_cloud_lanes)",
     "openrouter_model_pins: operator ratifies concrete OpenRouter slugs for slot-a/slot-b before emission"
   ],
   "platform": "any",

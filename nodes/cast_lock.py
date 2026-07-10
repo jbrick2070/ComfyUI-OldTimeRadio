@@ -645,7 +645,7 @@ class CastLock:
 
         ``auto_registry`` uses the resolved target engine for casting; preserved
         ledgers still need the explicit engine choice recorded so profiles like
-        cloud_all cannot silently drift back to a local voice route.
+        otr_cloud_lanes cannot silently drift back to a local voice route.
 
         S4 platform-portability (2026-07-10): ``meta["voice_device"]`` rides
         the ledger exactly like the engine stamps -- every downstream voice

@@ -110,10 +110,10 @@ def test_api_prompt_parity_on_master(schemas, master_copy):
 # Profile application gate
 # ---------------------------------------------------------------------------
 def test_apply_cloud_profile_retargets_canonical(schemas, master_copy):
-    applied = wa.apply_profile(master_copy, "cloud_all", schemas=schemas)
+    applied = wa.apply_profile(master_copy, "otr_cloud_lanes", schemas=schemas)
     assert wa.workflow_to_api_prompt(master_copy, schemas) != \
         wa.workflow_to_api_prompt(applied, schemas), (
-        "cloud_all should be an explicit profile override, not the saved "
+        "otr_cloud_lanes should be an explicit profile override, not the saved "
         "canonical baseline"
     )
 
@@ -153,8 +153,8 @@ def _widget_value(nodes_by_type, schemas, node_type, widget):
     return nodes_by_type[node_type]["widgets_values"][slots.index(widget)]
 
 
-def test_apply_cloud_all_lands_cloud_only_routes(schemas, master_copy):
-    applied = wa.apply_profile(master_copy, "cloud_all", schemas=schemas)
+def test_apply_otr_cloud_lanes_lands_cloud_only_routes(schemas, master_copy):
+    applied = wa.apply_profile(master_copy, "otr_cloud_lanes", schemas=schemas)
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
 
     assert _widget_value(
@@ -197,7 +197,7 @@ def test_apply_cloud_all_lands_cloud_only_routes(schemas, master_copy):
 
 
 def test_apply_profile_rejects_typoed_key(schemas, master_copy):
-    prof = copy.deepcopy(cp.load_profile("cloud_all"))
+    prof = copy.deepcopy(cp.load_profile("otr_cloud_lanes"))
     prof["role_overrides"]["announcer_visualz"] = "ltx_video"
     with pytest.raises(ProfileError, match="no widget-mapping entry"):
         wa.apply_profile(master_copy, prof, schemas=schemas)
@@ -210,7 +210,7 @@ def test_apply_profile_rejects_ambiguous_node_type(schemas, master_copy):
     clone["id"] = 9999
     dup["nodes"].append(clone)
     with pytest.raises(ProfileError, match="occurs 2x"):
-        wa.apply_profile(dup, "cloud_all", schemas=schemas)
+        wa.apply_profile(dup, "otr_cloud_lanes", schemas=schemas)
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ def test_coverage_direction2_every_engine_combo_is_managed(schemas, master_copy,
 
 
 _ALL_COMMITTED_PROFILES = (
-    "16gb_full", "8gb_lite", "cpu_floor", "cloud_all",
+    "16gb_full", "8gb_lite", "cpu_floor", "otr_cloud_lanes",
     "google_veo_media", "google_omni_media", "google_veo_all",
     "google_omni_all",
 )
@@ -343,9 +343,9 @@ def test_script_patch_creative_refuses_managed_names(schemas, master_copy):
 def test_apply_profile_to_workflow_headless_seam(schemas, master_copy, capsys):
     """The script-lane seam drives the SAME applier and prints the resolved
     profile so a headless mutation is visible in logs."""
-    applied = otr_api.apply_profile_to_workflow(master_copy, "cloud_all", schemas)
+    applied = otr_api.apply_profile_to_workflow(master_copy, "otr_cloud_lanes", schemas)
     out = capsys.readouterr().out
-    assert "RESOLVED PROFILE cloud_all" in out
+    assert "RESOLVED PROFILE otr_cloud_lanes" in out
     assert wa.workflow_to_api_prompt(applied, schemas) != \
         wa.workflow_to_api_prompt(master_copy, schemas)
 

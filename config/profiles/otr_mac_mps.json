@@ -2,9 +2,6 @@
   "id": "otr_mac_mps",
   "display_name": "Apple Silicon MPS (draft, UNVERIFIED on hardware)",
   "status": "draft",
-  "ratify_before_emit": [
-    "mac_mps_vram_ceiling: operator ratifies llm.vram_ceiling_gb (initial smoke value 10.0) per the target machine's unified-memory size"
-  ],
   "platform": "mac",
   "device_backend": "mps",
   "gpu_vendor": "apple",

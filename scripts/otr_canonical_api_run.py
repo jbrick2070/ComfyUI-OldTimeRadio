@@ -161,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Run the canonical OTR workflow through the ComfyUI API."
     )
     parser.add_argument("--profile", default="none",
-                        help="explicit capability profile id, e.g. none or cloud_all")
+                        help="explicit capability profile id, e.g. none or otr_cloud_lanes")
     parser.add_argument("--words", type=int, default=None)
     parser.add_argument("--title", default=None)
     parser.add_argument("--premise", default=None)

@@ -2,21 +2,18 @@
   "id": "16gb_full",
   "display_name": "16 GB NVIDIA (full)",
   "status": "shipping",
-  "ratify_before_emit": [
-    "nv50_baseline_regeneration: role/slot overrides are STALE vs canonical (humo_14B_169/flux_gen1 vs viz/z_image) -- operator ratifies regenerating this profile FROM canonical before the identity variant emits"
-  ],
   "platform": "any",
   "device_backend": "cuda",
   "gpu_vendor": "nvidia",
   "toolchains": [],
   "allow_sidecars": true,
   "role_overrides": {
-    "announcer_visual": "viz_green",
-    "music_visual": "viz_green",
-    "character_visual": "humo_14B_169",
-    "announcer_image": "flux_gen1",
-    "music_image": "flux_gen1",
-    "character_image": "flux_gen1"
+    "announcer_visual": "viz_mxc_cpu",
+    "music_visual": "viz_mxc_mandala",
+    "character_visual": "viz_camera",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
   },
   "slot_overrides": {
     "voice_bank": "default",
@@ -24,7 +21,7 @@
     "char_voice_engine": "indextts2",
     "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",
-    "video_render_engine": "humo_1.7B"
+    "video_render_engine": "viz_camera"
   },
   "features": {
     "burn_captions": true,

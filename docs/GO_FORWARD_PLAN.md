@@ -42,12 +42,14 @@ Spec docs/2026-07-09-platform-portability-final.md executed end to end:
   `otr\obs\signal_lost_whispers_of_deception_20260710_043218_..._final.mp4`
   (57.2 MB). Suite 7251/31/1 + Bug Bible 17/7/3 green at ship.
 
-RATIFY QUEUE (operator; build_variants refuses these until cleared in the
-profile JSONs): (1) nv50 baseline regeneration from canonical (16gb_full
-is stale: humo_14B_169/flux_gen1 vs canonical viz/z_image); (2) cloud
-tier name (proposed otr_cloud_lanes) + OpenRouter slot pins; (3) mac_mps
-llm.vram_ceiling_gb (initial 10.0); (4) AMD/Mac verification strategy
-(rent hardware / ship draft-UNVERIFIED / defer).
+RATIFIED (operator, 2026-07-10 morning, all four): (1) 16gb_full
+REGENERATED from canonical (viz lanes + z_image_turbo) -- nv50 identity
+variant EMITTED; (2) cloud tier RENAMED cloud_all -> otr_cloud_lanes;
+OpenRouter slot pins = NEXT SESSION (the one remaining ratify gate --
+cloud variant still refused); (3) mac ceiling 10.0 ratified -- otr_mac_mps
+draft variant EMITTED; (4) AMD/Mac ship draft-UNVERIFIED behind the
+acceptance gates in their launch recipes. Post-ratification emission:
+7 variants + recipes committed (--check green).
 NEXT SMOKES: cpu tier on this box (--cpu; NOTE cpu_floor inherits
 canonical z_image_turbo images -- cuda-only, so the cpu smoke needs the
 google image lane + OTR_GOOGLE_API_KEY or pre-staged stills; surfaced by

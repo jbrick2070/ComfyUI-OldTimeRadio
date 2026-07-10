@@ -88,7 +88,7 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     rc, out = _run_main([
         "--offline-schemas",
         "--dry-run",
-        "--profile", "cloud_all",
+        "--profile", "otr_cloud_lanes",
         "--words", "30",
         "--source-bank", "science_news",
         "--dump-prompt", str(dump),
@@ -96,7 +96,7 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     assert rc == 0
     assert "workflows\\otr_canonical.json" in out or \
         "workflows/otr_canonical.json" in out
-    assert "profile=cloud_all" in out
+    assert "profile=otr_cloud_lanes" in out
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")

@@ -99,7 +99,7 @@ def test_google_media_profile_loads_and_validates(profile_id):
 # ---------------------------------------------------------------------------
 # S2 -- schema v2 sections (platform-portability, 2026-07-10)
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("profile_id", TIERS + GOOGLE_MEDIA_PROFILES + ("cloud_all",))
+@pytest.mark.parametrize("profile_id", TIERS + GOOGLE_MEDIA_PROFILES + ("otr_cloud_lanes",))
 def test_v2_sections_present_on_every_committed_profile(profile_id):
     prof = cp.load_profile(profile_id)
     for section in ("llm", "video", "image", "audio", "render", "preflight"):
@@ -507,12 +507,12 @@ def test_two_heavy_roles_still_validate():
     heavy roles yields a valid enable-set (single-heavy residency is
     wrapper_bridge's RUNTIME invariant, never a static profile rejection)."""
     profile = cp.load_profile("16gb_full")
-    # 2026-06-28 (operator): the 16gb master defaults announcer/music video to
-    # viz_green (the working/clean default -- no GPU, no FLUX since viz_green
-    # ignores init_image, no gated HuMo) and pins CHARACTER to humo_14B_169
-    # (2026-07-03: character is a first-class slot). humo_1.7B stays registered.
-    assert profile["role_overrides"]["announcer_visual"] == "viz_green"
-    assert profile["role_overrides"]["character_visual"] == "humo_14B_169"
+    # S6 ratification (2026-07-10): the nv50 profile is REGENERATED from
+    # canonical (viz lanes + z_image_turbo) -- the old humo/flux pins moved
+    # out. This test's subject is the two-heavy STATIC rule, so it forces
+    # heavy roles onto a copy below regardless of the committed defaults.
+    assert profile["role_overrides"]["announcer_visual"] == "viz_mxc_cpu"
+    assert profile["role_overrides"]["character_visual"] == "viz_camera"
     # Force TWO heavy roles to keep the static two-heavy regression green (single-
     # heavy residency is wrapper_bridge's RUNTIME invariant, never a static profile
     # rejection).
