@@ -10,10 +10,13 @@ Did:
   (operator skipped further live smokes). Synthesis:
   docs/2026-07-09-source-route-qa/QA_SYNTHESIS.md (local; dated dirs are
   gitignored).
-- FIXED+PUSHED 321bcc9c: closing-seam bank routing (QA F1) -- coda/announcer
+- FIXED+PUSHED closing-seam bank routing (QA F1) -- coda/announcer
   seams pack-route; PD+Shakespeare coda re-authored to bridge contract;
-  title_form_label wired; 30 tests. NOTE: a second actor (operator's Codex
-  loop) co-committed 40535ddc with dia hardening mid-session.
+  title_form_label wired; 30 tests. SHA CORRECTION (codex fan-out catch):
+  the CODE+TESTS live in `40535ddc` (the operator's Codex loop committed
+  the in-flight tree bundled with its dia hardening); `321bcc9c` on top
+  carries only docs (dated doc dirs gitignored). Cite 40535ddc for the
+  closing-seam code.
 - FIXED+PUSHED 5a09984c: produced-story meta split -- K.5.6 summary pass
   stamps meta["produced_story"]; credits/HUD/treatment/music repointed.
 - Seated tencent/hy3:free on the roundtable panel until 2026-07-21
@@ -44,8 +47,12 @@ Did:
   dropping the closing excerpt window at exact cap boundary -- also fixed
   in the older reflection builder it was copied from). Codex CLI not on
   system PATH from this session; operator pasting the brief into Codex
-  manually -- its report (if any) lands at docs/2026-07-09-source-route-qa/
-  local_fanout/codex_review_manual.md; triage it next session.
+  manually -- its report landed at docs/2026-07-09-source-route-qa/
+  local_fanout/codex_review_manual.md and was judged SAME SESSION: one
+  real BLOCKER-class bookkeeping catch (the 321bcc9c/40535ddc SHA mixup,
+  corrected in these docs); all its code checks CLEARED the current tree.
+  Fan-out verdict overall: architecture sound, 3 real minors total, all
+  fixed and pushed.
 
 Current step: original_radio campaign -- R1 CONVERGED (2 passes,
 ~$0.26 total). Next: /kibitz r2 (coding plan) on

@@ -8,9 +8,12 @@ campaign ACTIVE -> source-bank sweep -> portability.
 
 **Shipped 2026-07-09 evening (both pushed):**
 
-- Closing-seam routing fix (QA F1, `321bcc9c`): coda + announcer seams now
+- Closing-seam routing fix (QA F1): coda + announcer seams now
   pack-route per bank; PD/Shakespeare coda seams re-authored to the bridge
   contract; title pass reads banks.json `title_form_label`. 30 new tests.
+  CODE COMMIT = `40535ddc` (the operator's Codex loop committed the
+  in-flight tree, bundled with its dia hardening); `321bcc9c` carries
+  only docs. SHA corrected per the codex fan-out catch.
 - Produced-story meta split (`5a09984c`): K.5.6 `run_produced_story_summary`
   stamps `meta["produced_story"]` (logline/subject of the ACTUAL episode);
   credits/HUD/treatment premise + music last-ditch mood repointed. Operator
