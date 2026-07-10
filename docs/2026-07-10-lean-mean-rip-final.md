@@ -1,12 +1,13 @@
 # OTR Lean-Mean Rip -- De-Slop / Ship-Shape Campaign Plan
 
 **Date:** 2026-07-10 (analysis-only session; NO code changes tonight -- operator directive)
-**Status:** CODE-READY -- R4 Fable gate verdict: CONVERGED after must-fixes (MF-1..MF-7,
-all folded into the waves below). Pending operator eyeball. Executes AFTER the
-platform-portability build (S0-S6) lands -- NOTE: portability coding STARTED 2026-07-10
-(S0 shipped c32d7cbe/390e5015; S1 in flight in the coder window as this converged) --
-every assumption tied to portability is listed in the REVISE-AFTER register (section 2)
-and must be re-verified then.
+**Status:** CODE-READY, VERIFIED AGAINST REAL POST-PORTABILITY CODE. Portability
+S0-S6 SHIPPED same night (through `20185542`, operator ratifications folded, 7 variants
+emitted, suite 7251 green) -- so a 2-agent verification sweep re-checked EVERY concrete
+claim in this doc against that HEAD: 48 confirmed, 5 stale line-cites re-pointed, 4
+factual corrections folded (all marked VERIFIED-2026-07-10 inline). R4 Fable gate:
+CONVERGED after must-fixes MF-1..MF-7 (folded). The REVISE-AFTER register (section 2)
+is now largely RESOLVED with real answers. Pending: operator eyeball on D-1..D-6.
 **Method:** 3 mechanical inventory agents (sonnet, file:line grounded) -> 3 Fable
 architect fan-out takes (deletion-first / boundary-consolidation / ship-integrity) ->
 Claude judge synthesis -> grounding audit (12-point claim verification) -> Fable final
@@ -49,40 +50,50 @@ adjudicated by the judge against grounded evidence (section 8).
 
 ## 2. REVISE-AFTER-PORTABILITY Register (re-verify before executing any wave)
 
-This plan was written with portability ASSUMED LANDED per
-docs/2026-07-09-platform-portability-final.md. Before W1 executes, re-verify:
+This plan was written with portability ASSUMED LANDED; it then LANDED the same night
+(S0-S6 through `20185542`) and the register was re-verified against the real tree:
 
-- R-1. Writer widget count is 34 (six portability widgets appended at 28-33) and
-  widget_mapping.json v2 exempt_widget_names exists and lists perfect_run_spacesaver.
-  W5's removal arithmetic (section 4) assumes this layout.
-- R-2. scripts/build_variants.py exists with --check regeneration. W5 and W6 rely on
-  variants being REGENERATED, never hand-edited (one canonical edit, one regenerate run).
-- R-3. Portability S0 actually fixed: HuMo downloader filename mismatch, the missing
-  indextts2 install script, cpu_floor bark selection, loader :257 guard, image
-  dispatcher CPU skip. If any slipped, they graduate into W0 here.
-- R-4. The frozen LLMRuntimePolicy threading (S1) landed -- the writer's slot plumbing
-  (:345-766 today) will have moved/changed; SW-1's line ranges must be re-surveyed.
-- R-5. gate_in link (node 63 -> writer) exists; the validator asserts master_hash.
-  W5's epoch commit must keep both green.
-- R-6. Whether test_openrouter_* gained portability-era coverage (cloud tier uses
-  OpenRouter slots): re-run the W8 keep/cut triage against the post-S6 file list.
-- R-7. Line numbers throughout this doc are 2026-07-10 measurements -- treat every one
-  as "re-grep before cutting," not gospel.
+- R-1. RESOLVED-CONFIRMED: writer = 34 widgets (INPUT_TYPES :2115-2773; canonical
+  node-1 widgets_values length 34); config/profiles/widget_mapping.json version:2 with
+  perfect_run_spacesaver in exempt_widget_names (:445). W5's arithmetic holds.
+- R-2. RESOLVED-CONFIRMED: scripts/build_variants.py exists (--check at :329);
+  workflows/variants/ holds 7 emitted variant+recipe pairs (nv50 16gb_full, 8gb_lite,
+  cpu_floor, nv40_12gb, amd16, amd8, mac_mps). Cloud variant still REFUSED pending
+  OpenRouter pin ratification -- the last ratify gate.
+- R-3. RESOLVED-CONFIRMED: S0 fixes verified in code (loader guard _otr_model_loader
+  :143; dispatcher gen_fn=None raises :455; _detect_host mps/vendor validator
+  :249-256; installer trio _otr_{indextts2,dia,chatterbox}_install.ps1 shipped).
+  Nothing graduates into W0.
+- R-4. STILL LIVE: S1 threading landed (nodes/_otr_shared/llm_policy.py; instantiated
+  writer :1395); the writer grew to 6,876 LOC and the slot-plumbing/seeding seam
+  boundaries MOVED -- SW-1's line ranges MUST be re-surveyed at execution.
+- R-5. RESOLVED-CONFIRMED: gate_in wired as link 279 into the writer (forceInput,
+  consumes no widgets_values slot); validator asserts master_hash. See W5 for the
+  now-QUANTIFIED dst_slot obligation this creates.
+- R-6. RESOLVED: test_openrouter_* is still exactly 13 files post-S6; W8 triage base
+  unchanged. (Cloud pins ratification may add coverage later -- re-glance then.)
+- R-7. STILL LIVE: line numbers are 2026-07-10 measurements against `20185542` --
+  re-grep before cutting, always. Suite baseline at verification: 7251/31/1.
 
 ## 3. Doctrine Quick Fixes -- W0 (small, high-value, land first)
 
 - W0a. README.md:44-45 and :163 claim "the pipeline falls back to a guaranteed CRT
-  floor." Post NO-FALLBACKS rips this is either stale (delete the sentences) or the CRT
-  floor survives as a sanctioned explicit route (reword to "policy floor," never
-  "fallback"). Verify which by grepping the CRT-floor path first. Five-minute fix; the
-  README scripts a stranger's expectations at the exact moment they hit a missing model.
+  floor." VERIFIED-2026-07-10, RESOLVED: the CRT floor is a REAL, wired, sanctioned
+  node -- SignalLostVideoRenderer (video_engine.py:2028, registered as
+  OTR_SignalLostVideo, root __init__.py:163). So: REWORD both sentences to "policy
+  floor" / "explicit signal-lost route" -- never the word "fallback" -- do NOT delete.
+  The README scripts a stranger's expectations at the exact moment they hit a missing
+  model.
 - W0b. nodes/video_engine.py:2291-2306 -- exception swallow falls back to a hardcoded
   legacy audio path (output/otr/audio/). Direct house-law violation. Becomes a raise;
   test harness needs go through conftest stubs, not tolerated prod fallbacks.
 - W0c. nodes/video_engine.py:1815-1821 -- `except Exception: pass` around a JSON parse,
   zero logging. Raise or log-and-raise.
-- W0d. Four bare `except:` clauses (story_orchestrator.py x2, _otr_freeze_cascade.py,
-  _otr_model_loader.py) -> `except Exception` minimum, narrowed where obvious.
+- W0d. Bare `except:` clauses -- VERIFIED-2026-07-10 count is TWO, not four:
+  story_orchestrator.py:183 and _otr_model_loader.py:275 (the VRAM evict wrap; S0's
+  touch did not fix it). _otr_freeze_cascade.py is already clean (every clause is
+  `except Exception  # noqa: BLE001`). Both -> `except Exception` minimum, narrowed
+  where obvious.
 - W0e. nodes/_otr_casting.py:962-966 "Defensive fallback" on gender-pool exhaustion
   degrades quietly -> fail loud (bounded-repair may retry upstream, but never silent).
 - W0f. Delete scripts/normalize_workflow_widgets.py (~200 LOC) -- self-flagged "KNOWN
@@ -97,8 +108,9 @@ W0 is code-touching (b-e) -> full suite + Bug Bible + one 30-word smoke.
 ## 4. Deletion Waves W1-W8 (each = one commit-sized chunk with its test deltas)
 
 **W1. Inert text (~670 LOC, zero graph contact).**
-Delete OTR_LedgerScriptWriter.py:6363-6765 (403-line `__main__` self-test harness,
-unreachable, shadows the real 7,136-test suite). Delete story_orchestrator.py:185-252
+Delete the writer's 403-line `__main__` self-test harness -- VERIFIED-2026-07-10 now at
+OTR_LedgerScriptWriter.py:6474-6876 (file grew 6765->6876 with S5a's widgets; harness
+LOC unchanged). Unreachable; shadows the real suite. Delete story_orchestrator.py:185-252
 (68 lines: _truncate_at_sentence_boundary / _tail_at_sentence_boundary /
 _inject_scene_transitions each defined TWICE at module scope; the FIRST bodies are
 silently shadowed dead code -- the live _inject_scene_transitions is the LATER one and
@@ -115,10 +127,12 @@ otr_canonical.json; registry __init__ files carry tombstone comments only; the 8
 portability matrix names none of them. Keep-dark is the worst state: CAPABILITIES v2
 changes the engine contract, so dark scaffolds rot into things that LOOK resurrectable
 but need rewrites anyway. Shrink the __init__ tombstone essays to one line each.
-TEST DELTAS (R4 gate MF-4): test_capability_profiles.py:69-71 and
-test_workflow_apply.py:80-82 import hidream_i1/sd35_large at MODULE SCOPE (adapter
-registration) -- strip those imports in the same commit or two live platform test files
-ImportError. Also sweep test_model_slot_audit.py:103,
+TEST DELTAS (R4 gate MF-4, scope corrected by VERIFIED-2026-07-10): the hidream_i1/
+sd35_large imports in test_capability_profiles.py:69-71 and test_workflow_apply.py:80-82
+are FUNCTION-scoped (inside the _image_registry()/_registry_engine_ids() helpers), NOT
+module scope -- so deletion breaks the tests that CALL those helpers, not whole-file
+collection. Same fix (strip the imports same commit), smaller blast radius than the
+gate stated. Also sweep test_model_slot_audit.py:103,
 test_registry_is_the_menu_guard.py:63, test_image_dep_pilot.py:35,:78 (absence-asserts
 survive; comments rot). NOTE the W2->C2 dependency: the image twins hold the only
 non-None requires_flag values (hidream_i1.py:54, sd35_large.py:58) -- C2's vestige kill
@@ -130,8 +144,9 @@ slot_matrix.py (88), content_oracle.py (198), nsfw_frame_qc.py (198),
 cloud_media_cache.py (264)} and nodes/_otr_audio_cache.py (324). But the R4 gate (MF-3)
 REFUTED "only their own tests reference them" -- SEVEN LIVE test files import from the
 kill list, so a blind delete is a collection-error wave. Per-module rulings:
-- sidecar.py + cloud_media_cache.py: DELETE with their private tests (no live-test
-  importers).
+- sidecar.py + cloud_media_cache.py: DELETE (VERIFIED-2026-07-10: _otr_shared/
+  sidecar.py has ZERO importers of any kind, not even a private test; cloud_media_cache
+  keeps only its own test, which dies with it).
 - nsfw_frame_qc.py: DELETE + surgery on test_video_survival_guide_vectors.py:27.
 - _otr_audio_cache.py: DELETE + surgery on test_release_gate.py:127 -- the release-gate
   contract is LIVE; stub/inline the AudioCacheRecord shape there.
@@ -191,11 +206,14 @@ ffmpeg composite chain already owns; wiring it would create a second scaling aut
 The cockpit lie dies with it: writer widget perfect_run_spacesaver exists ONLY to serve
 RTXUpscale's cleanup, and OTR_PostUpscaleProcgenBlend's docstring narrates a dead
 1472x832-to-RTX-VSR pipeline (fix the docstring same commit).
-POSITIONAL REALITY (grounded): perfect_run_spacesaver = INPUT_TYPES index 9,
-canonical node-1 widgets_values[9]=false; pinned by test_workflow_json_guardrails
-(:591, :735 "drifted from slot 9"), test_openrouter_slot_widgets_s2:30,
-test_otr_api_companions (:38,:101,:202), test_meta_paths (:154,:161,:181). Removing slot
-9 shifts every later index left by one -- BUG-LOCAL-097 class if done casually.
+POSITIONAL REALITY (re-verified against the REAL post-S5 canonical, 34-entry array):
+perfect_run_spacesaver = INPUT_TYPES index 9, canonical node-1 widgets_values[9]=false
+-- CONFIRMED unchanged after S5a (portability appended at the end). Pinned by
+test_workflow_json_guardrails (:591, and the slot-9 assert now at :773 -- the old :735
+cite drifted after S5 fixture updates), test_openrouter_slot_widgets_s2:30,
+test_otr_api_companions (:38, :101, and the third pin now at :240), test_meta_paths
+(:154,:161,:181 -- dict keys, no positional drift). Removing slot 9 shifts every later
+index left by one -- BUG-LOCAL-097 class if done casually.
 RULING: one DECLARED SCHEMA EPOCH commit -- INPUT_TYPES removal + canonical
 widgets_values slot-9 removal + widget_mapping v2 exempt-list edit + otr_api parity
 fixtures + all FIVE pinning test files (the four above PLUS -- gate catch MF-2 --
@@ -206,12 +224,14 @@ fix + a validator DELETED_NODE_TYPES row -- then `build_variants.py` regenerates
 variant JSONs + recipes mechanically (this is why the wave waits for portability:
 variants are generated, so the rip costs one canonical edit + one regenerate, never
 nine hand-edits).
-SECOND POSITIONAL AXIS (gate catch MF-1 -- render-breaker class): the widget ALSO
-exists as a node-1 inputs[] entry ({"widget":{"name":"perfect_run_spacesaver"},
-"link":null} between creativity and min_p), and LINKS address inputs by dst_slot =
-index into that array. Today zero links enter node 1, but R-5 guarantees the gate_in
-link (63 -> writer) lands before this wave -- so the epoch commit MUST ALSO remove the
-node-1 inputs[] entry, renumber dst_slot on every link into node 1, and run a
+SECOND POSITIONAL AXIS (gate catch MF-1 -- render-breaker class, NOW QUANTIFIED against
+the real post-S5 canonical): the widget ALSO exists as a node-1 inputs[] entry
+({"widget":{"name":"perfect_run_spacesaver"},"link":null} between creativity and
+min_p), and LINKS address inputs by dst_slot = index into that array. VERIFIED
+2026-07-10: node-1 inputs[] mirrors widgets_values 1:1 for indices 0-33, plus gate_in
+appended at index 34 carrying link 279 -- the ONLY live link into node 1 (all 34
+widget-mirror entries swept: every other link is null). THE EXACT OBLIGATION: the epoch
+commit removes inputs[] index 9 AND renumbers link 279's dst_slot 34 -> 33, then runs a
 link-referential-integrity audit. widgets_values was never the only positional array.
 Append-only law's PURPOSE (protect saved graphs from silent drift) is honored: the
 saved-graph population is canonical + generated variants + the parity copy, all
@@ -246,7 +266,10 @@ gate THIS PLAN mandates), otr_ia2v_server_boot.cmd (:20 chains to it; ia2v is th
 production recipe), otr_mesh_stage_blender.py (live engine worker;
 test_video_mesh_stage.py:43), otr_video_soak.py (test_video_soak_fixture.py:21),
 otr_pin_partner_nodes.py (test_partner_nodes_pin.py:18, test_audit_i2v.py:18),
-profile_scope_render.py, otr_visual_smoke.py.
+profile_scope_render.py, otr_visual_smoke.py -- AND (verification catch, new tonight):
+scripts/build_variants.py (the variant generator itself -- load-bearing for W5/R-2) +
+the three sidecar installer scripts _otr_{indextts2,dia,chatterbox}_install.ps1
+(shipped by portability S0; referenced by engine error messages).
 TEST-DELTA TABLE REQUIRED (gate catch MF-5 -- this wave had none): every deleted or
 moved script lists its test coupling in the same commit. Known couplings:
 test_treatment_scanner_unicode.py:22 imports soak_operator (dies with it);
@@ -308,7 +331,9 @@ class (the registry doctrine's own words: "inheritance is never required").
   the W2-doomed image twins (hidream_i1.py:54, sd35_large.py:58). So: W2 lands FIRST,
   then C2 rips requires_flag + GATED_BY_FLAG across base + registry + engines + 3-4
   test files + dep-pilot getattr sites, one commit, blast radius stated. Audio keeps
-  generate_voice/generate_clip as protocol extensions.
+  generate_voice/generate_clip as protocol extensions. VERIFIED-2026-07-10: S3's
+  registry-v2 atomic commit did NOT unify audio -- video+image registries import the
+  base (:25 each), audio still hand-rolls; C2 is fully open, exactly as planned.
 - C3. Local image family: give it the base/helpers its cloud half already has
   (_CloudImageBase exists; the 6 local files carry a byte-identical 4-line _role_of).
   Mirror the existing shape; invent nothing.
@@ -346,7 +371,10 @@ class (the registry doctrine's own words: "inheritance is never required").
 
 ## 6. Structural Campaign SW (the two giants become designed-on-purpose)
 
-- SW-1. OTR_LedgerScriptWriter.py (6,765) -> package nodes/_otr_writer/ with
+- SW-1. OTR_LedgerScriptWriter.py (VERIFIED-2026-07-10: now 6,876 LOC after S5a; the
+  S1 policy threading moved the slot-plumbing/seeding seam boundaries -- _SlotScheduler
+  still :422 but downstream grew; RE-SURVEY all seam ranges before cutting, per R-4)
+  -> package nodes/_otr_writer/ with
   OTR_LedgerScriptWriter.py remaining as a FACADE re-exporting the class (node
   registration + ledger-stamped import paths stay byte-identical):
   slot_plumbing.py (today :345-766 -- NOTE R-4: post-S1 this code has already changed;
@@ -358,8 +386,9 @@ class (the registry doctrine's own words: "inheritance is never required").
   one visible ~1000-line spine. The God-method's sin is implicit state threading, not
   sequence. Full shatter mid-campaign is how a local gets lost. 80% of the win, 20% of
   the risk.
-- SW-2. INPUT_TYPES: from 612-line imperative method to a module-level ordered WIDGETS
-  table (name, type, default, tooltip, choice-builder) + a ~20-line renderer. The
+- SW-2. INPUT_TYPES: from a 659-line imperative method (VERIFIED-2026-07-10 now
+  :2115-2773 after S5a's six widgets) to a module-level ordered WIDGETS table (name,
+  type, default, tooltip, choice-builder) + a ~20-line renderer. The
   append-only law becomes a MACHINE CHECK: a frozen name-order manifest test that fails
   on any non-append edit. (Portability added widgets 28-33 by hand-count; after SW-2
   the next addition is a table row.) BUG-LOCAL-097 stops being folklore.
@@ -409,6 +438,15 @@ class (the registry doctrine's own words: "inheritance is never required").
   in two live platform test files (W2); W6 lacked a test-delta table and its keep-list
   missed the headless soak launcher chain this plan's own gates depend on; C2 vestige
   blast radius corrected. Gate verdict: CONVERGED after must-fixes -- no new round.
+- CODE-READINESS VERIFICATION (2-agent sweep vs HEAD `20185542`, post-portability,
+  same night): 48 claims CONFIRMED; 5 stale line-cites re-pointed (W1 harness
+  :6474-6876; guardrails slot-9 pin :773; companions third pin :240; SW-1/SW-2
+  ranges); 4 corrections folded (bare-except count is 2 not 4; W2 test imports are
+  function-scoped; W6 keep-list gained build_variants.py + the installer trio; dead
+  sidecar.py has zero importers at all). W0a resolved: CRT floor is the wired
+  OTR_SignalLostVideo node -> REWORD not delete. W5's dst_slot obligation quantified:
+  remove inputs[9], renumber link 279 dst_slot 34->33 (only live link into node 1).
+  S1's llm_policy.py is a live down payment on C6's canonicalize-at-boundary pattern.
 
 ## 9. Risk Register (merged panel + judge; each risk names its catching guard)
 
