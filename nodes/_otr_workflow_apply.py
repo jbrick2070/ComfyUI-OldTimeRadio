@@ -447,7 +447,10 @@ def _flatten_profile_values(profile: dict) -> dict:
     for k in ("creative_model", "technical_model",
               "openrouter_slot_a_model", "openrouter_slot_b_model",
               "comfy_slot_a_model", "comfy_slot_b_model",
-              "google_api_slot_a_model", "google_api_slot_b_model"):
+              "google_api_slot_a_model", "google_api_slot_b_model",
+              # S5: the six runtime-policy widgets (writer slots 28-33).
+              "device", "attn_impl", "quant_policy", "vram_ceiling_gb",
+              "gguf_n_ctx", "gguf_quant"):
         if k in llm:
             flat[f"llm.{k}"] = llm[k]
     rend = profile.get("render", {})

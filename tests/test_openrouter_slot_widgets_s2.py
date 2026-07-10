@@ -71,7 +71,15 @@ def test_widget_order_appends_slots_at_end():
     assert order[25] == "google_api_slot_a_model" # Google API (2026-07-08)
     assert order[26] == "google_api_slot_b_model" # Google API (2026-07-08)
     assert order[27] == "source_ref"              # Source Banks v2 (2026-07-08)
-    assert len(order) == 28
+    # S5 platform-portability (2026-07-10): the six explicit LLM
+    # runtime-policy widgets, appended at 28-33 (append-only).
+    assert order[28] == "llm_device"
+    assert order[29] == "llm_attn_impl"
+    assert order[30] == "llm_quant_policy"
+    assert order[31] == "llm_vram_ceiling_gb"
+    assert order[32] == "gguf_n_ctx"
+    assert order[33] == "gguf_quant"
+    assert len(order) == 34
 
 
 # --- conditional creative default; technical never flips --------------------

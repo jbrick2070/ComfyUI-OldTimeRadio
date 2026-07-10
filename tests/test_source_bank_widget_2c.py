@@ -327,9 +327,12 @@ class TestHeadlessSurface:
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
         # The Google API selectors and source_ref were appended after
         # visual_style; source_bank stays at slot 23 (was 25 before the
-        # style-engine consolidation).
-        assert len(node1["widgets_values"]) == 28
+        # style-engine consolidation). S5 platform-portability appended
+        # the six llm runtime-policy widgets at 28-33 (vector = 34).
+        assert len(node1["widgets_values"]) == 34
         assert node1["widgets_values"][23] == "science_news"
         assert node1["widgets_values"][25] == "(select Google API model)"
         assert node1["widgets_values"][26] == "(select Google API model)"
         assert node1["widgets_values"][27] == ""
+        assert node1["widgets_values"][28] == "cuda"
+        assert node1["widgets_values"][33] == "Q8_0"

@@ -2700,6 +2700,53 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
+                # S5 platform-portability (2026-07-10): the six EXPLICIT LLM
+                # runtime-policy widgets, APPENDED after source_ref as
+                # combined widget slots 28-33 (append-only; BUG-LOCAL-097).
+                # Defaults = the nv50 16 GB baseline, so an old workflow with
+                # a 28-slot vector resolves byte-identically. They feed
+                # _resolve_inputs' LLMRuntimePolicy 1:1 (S1) and are
+                # profile-managed via widget_mapping llm.* keys.
+                "llm_device": (
+                    ["cuda", "cpu", "mps"],
+                    {"default": "cuda",
+                     "tooltip": "EXPLICIT LLM device (platform profile "
+                                "value). No auto-detect; an unavailable "
+                                "device fails loud at load."},
+                ),
+                "llm_attn_impl": (
+                    ["sdpa", "flash_attention_2", "eager"],
+                    {"default": "sdpa",
+                     "tooltip": "Attention implementation for the "
+                                "transformers lane (the FA2 auto-probe is "
+                                "gone). sdpa = the proven baseline."},
+                ),
+                "llm_quant_policy": (
+                    ["bnb_nf4", "bnb_8bit", "none"],
+                    {"default": "bnb_nf4",
+                     "tooltip": "Quantization for the transformers lane. "
+                                "bnb lanes are OFF on ROCm/MPS/CPU tiers "
+                                "(missing bitsandbytes fails loud)."},
+                ),
+                "llm_vram_ceiling_gb": (
+                    "FLOAT",
+                    {"default": 14.5, "min": 0.0, "max": 96.0, "step": 0.1,
+                     "tooltip": "Pre-download VRAM-fit ceiling (GB). 0 "
+                                "DISABLES the gate (cpu tier only)."},
+                ),
+                "gguf_n_ctx": (
+                    "INT",
+                    {"default": 4096, "min": 512, "max": 32768, "step": 512,
+                     "tooltip": "GGUF lane context window. NO silent "
+                                "downgrade: a window that does not fit "
+                                "free VRAM fails loud."},
+                ),
+                "gguf_quant": (
+                    ["Q8_0", "Q6_K", "Q4_K_M"],
+                    {"default": "Q8_0",
+                     "tooltip": "GGUF artifact quant (filename + expected "
+                                "size come from the artifact table)."},
+                ),
             },
             # ComfyUI injects the logged-in account's credentials into these
             # hidden inputs at execution time (the API-nodes auth convention).
@@ -3002,6 +3049,14 @@ class OTR_LedgerScriptWriter:
         # Source Banks v2 reference widget (2026-07-08), appended after the
         # Google API pickers. Blank is inert for current science/media paths.
         source_ref="",
+        # S5 platform-portability (2026-07-10): the six explicit LLM
+        # runtime-policy widgets (slots 28-33). Defaults = nv50 baseline.
+        llm_device="cuda",
+        llm_attn_impl="sdpa",
+        llm_quant_policy="bnb_nf4",
+        llm_vram_ceiling_gb=14.5,
+        gguf_n_ctx=4096,
+        gguf_quant="Q8_0",
         # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
         # _refine_loop when a refine pass re-enters this body. All default to the
         # no-op so a normal (non-refine) call is byte-identical.
@@ -3166,6 +3221,13 @@ class OTR_LedgerScriptWriter:
             google_api_slot_a_model=google_api_slot_a_model,
             google_api_slot_b_model=google_api_slot_b_model,
             source_ref=source_ref,
+            # S5: the explicit LLM runtime-policy widgets -> LLMRuntimePolicy.
+            llm_device=llm_device,
+            llm_attn_impl=llm_attn_impl,
+            llm_quant_policy=llm_quant_policy,
+            llm_vram_ceiling_gb=llm_vram_ceiling_gb,
+            gguf_n_ctx=gguf_n_ctx,
+            gguf_quant=gguf_quant,
         )
 
         # Stage 4 (2026-07-06): resolve the bank's story-content RULES once

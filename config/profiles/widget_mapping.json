@@ -234,6 +234,60 @@
         ]
       ]
     },
+    "llm.device": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "llm_device"
+        ]
+      ]
+    },
+    "llm.attn_impl": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "llm_attn_impl"
+        ]
+      ]
+    },
+    "llm.quant_policy": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "llm_quant_policy"
+        ]
+      ]
+    },
+    "llm.vram_ceiling_gb": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "llm_vram_ceiling_gb"
+        ]
+      ]
+    },
+    "llm.gguf_n_ctx": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "gguf_n_ctx"
+        ]
+      ]
+    },
+    "llm.gguf_quant": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "gguf_quant"
+        ]
+      ]
+    },
     "render.fps": {
       "registry": null,
       "targets": [
