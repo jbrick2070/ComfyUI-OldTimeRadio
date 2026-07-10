@@ -1,9 +1,23 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-09
+**Updated:** 2026-07-09 (evening) -- HEAD `5a09984c`
 **Branch:** `v2.0-alpha`
-**Status:** new release order set: model-slot audit -> `original_radio` ->
-source-bank end-to-end sweep -> portability.
+**Status:** operator reorder 2026-07-09: static source-route QA DONE (5-agent
+fan-out; live smokes parked -- "we've smoked a lot") -> `original_radio`
+campaign ACTIVE -> source-bank sweep -> portability.
+
+**Shipped 2026-07-09 evening (both pushed):**
+
+- Closing-seam routing fix (QA F1, `321bcc9c`): coda + announcer seams now
+  pack-route per bank; PD/Shakespeare coda seams re-authored to the bridge
+  contract; title pass reads banks.json `title_form_label`. 30 new tests.
+- Produced-story meta split (`5a09984c`): K.5.6 `run_produced_story_summary`
+  stamps `meta["produced_story"]` (logline/subject of the ACTUAL episode);
+  credits/HUD/treatment premise + music last-ditch mood repointed. Operator
+  ruling: pre-gen source digest and post-gen story brief NEVER share a name.
+- QA synthesis (local, gitignored dir): docs/2026-07-09-source-route-qa/.
+- original_radio ARCHITECTURE_V1 + R1 roundtable artifacts (local):
+  docs/2026-07-09-original-radio/.
 
 This file is for short-term coordination only. Longer runway lives in
 `ROADMAP.md`; old sprint logs belong in `docs/GO_FORWARD_ARCHIVE.md`,
@@ -52,7 +66,21 @@ Unrelated local file present before this plan update and left untouched:
 
 ## Next Action
 
-### 1. Model-Slot Audit And End-To-End Smokes
+### 0. ACTIVE: `original_radio` campaign (operator 2026-07-09)
+
+Design doc: `docs/2026-07-09-original-radio/ARCHITECTURE_V1.md` (multi-pass
+LLM cascade: spark deck -> 3 pitches -> self-judge -> cast -> existing
+engine; disclosure-as-news_close_brief provenance; SAME-COMMIT trap set).
+Anchor review: `roundtable/pass01_anchor.md` (A1 num_characters widget +
+A2 key_terms grounding = must-fix in v2 of the doc). Review arc per
+CLAUDE.md section 8: R1 cloud roundtable (GPT+Gemini+DeepSeek+hy3:free)
+-> r2-r4 via /kibitz (local Codex+Antigravity). Build only after
+convergence; tests before runner; `runnable:true` flip LAST, gated on the
+30-word smoke. Related design item queued into the kibitz arc: demote
+`meta["news"]` to provenance-only + distinct-name migration (operator:
+"we can't just throw around meta").
+
+### 1. Model-Slot Audit And End-To-End Smokes (live smokes PARKED 2026-07-09)
 
 Inventory every local model/engine exposed through the production slots:
 
