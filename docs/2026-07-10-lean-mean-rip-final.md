@@ -7,7 +7,9 @@ emitted, suite 7251 green) -- so a 2-agent verification sweep re-checked EVERY c
 claim in this doc against that HEAD: 48 confirmed, 5 stale line-cites re-pointed, 4
 factual corrections folded (all marked VERIFIED-2026-07-10 inline). R4 Fable gate:
 CONVERGED after must-fixes MF-1..MF-7 (folded). The REVISE-AFTER register (section 2)
-is now largely RESOLVED with real answers. Pending: operator eyeball on D-1..D-6.
+is now largely RESOLVED with real answers. Decision boxes D-1..D-6: OPERATOR RATIFIED
+2026-07-10 (D-2 with a future-upscale codicil, section 7). CLEARED TO EXECUTE
+post-portability; execution-time gates = R-4 seam re-survey + R-7 re-grep only.
 **Method:** 3 mechanical inventory agents (sonnet, file:line grounded) -> 3 Fable
 architect fan-out takes (deletion-first / boundary-consolidation / ship-integrity) ->
 Claude judge synthesis -> grounding audit (12-point claim verification) -> Fable final
@@ -405,13 +407,29 @@ class (the registry doctrine's own words: "inheritance is never required").
   safe under append-only; rides the W5 epoch commit or portability S5 (profiles own
   those slot values post-portability), whichever executes first.
 
-## 7. Operator Decision Boxes (eyeball these; defaults chosen per your locks)
+## 7. Operator Decision Boxes -- ALL SIX RATIFIED (operator, 2026-07-10)
+
+The operator approved every default below, with one codicil on D-2 (see it). The
+campaign is now fully cleared to execute post-portability; remaining execution-time
+gates are only R-4 (seam re-survey) and R-7 (re-grep before cutting).
 
 - D-1. W5 window: DEFAULT post-portability (your sequencing lock; variants regenerate
   mechanically). ALTERNATIVE the panel prefers on cost: pre-S5, while writer=28 widgets
   and zero variants exist. Choosing it resequences portability -- your call.
 - D-2. RTXUpscale rip vs wire: panel UNANIMOUS rip (composite chain owns 1080p). It is
   922 LOC you once built -- eyeball before the epoch commit.
+  RATIFIED WITH CODICIL (operator 2026-07-10): rip NOW; a FUTURE system-agnostic
+  multi-GPU upscale campaign is planned for after this rip lands. Design constraints
+  recorded for that campaign: (1) it is a REBUILD against the portability stack --
+  registry rows with device_backends per engine (nvidia/amd/mps/cpu), per-tier profile
+  values, fail-loud on unsupported hardware -- NOT a resurrection of the vendor-locked
+  RTX-VSR node (git keeps the reference); (2) it plugs into the EXISTING name-only
+  `upscale_stage` profile reservation the portability plan deliberately kept (panel
+  tried to cut it 3x); (3) HONEST-SWITCH LAW: its widgets/profile fields land in the
+  SAME COMMIT as a working engine, `off` is a real enum value, selecting an unsupported
+  engine raises -- no cockpit switch ever again precedes or outlives its machine (the
+  spacesaver lesson); (4) new widgets APPEND at the end per positional law, variants
+  regenerate via build_variants.py.
 - D-3. scripts/ hybrid (delete concluded / dev/ for lab tooling / live stays): ratify
   the split list at execution; anything you still run moves at most one directory.
 - D-4. Tombstone age-gate policy (section 1.3): adopt as standing law?
