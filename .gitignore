@@ -70,7 +70,13 @@ day*_*.txt
 scripts/_*.ps1
 scripts/_*.py
 scripts/yoga_watchdog.py
-# Keep versioned dev scripts by exception (none currently)
+# Keep versioned dev scripts by exception (sidecar installers + workers the
+# engines' fail-closed errors point operators at -- these MUST ship):
+!scripts/_otr_chatterbox_install.ps1
+!scripts/_otr_chatterbox_worker.py
+!scripts/_otr_indextts2_worker.py
+!scripts/_otr_indextts2_install.ps1
+!scripts/_otr_idx_download_weights.py
 
 # Retired v1.x soak operator artifacts
 workflows/soak_target_api.json
