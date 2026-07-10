@@ -1,7 +1,8 @@
 # scifi_fable2 -- Code-Ready Architecture + Coding Plan (LLM-first multipass sci-fi lane)
 
 - Date: 2026-07-10 (overnight design session; autonomous per operator directive)
-- Status: CODE-READY DRAFT v4 (r1+r2+r3 hardened) -- NO code written. Kibitz log in section 15.
+- Status: **CODE-READY v5 -- FINAL, kibitz arc CONVERGED (r1-r4)** -- NO code written.
+  Kibitz log in section 15. This is the plan of record for the coding sprints.
 - Lineage: 3-Fable divergent design panel (Playhouse / Showrunner Ladder / Auteur Long-Pass)
   -> Claude judge synthesis -> operator constraints folded live -> kibitz rounds (codex panel +
   Claude anchor/judge; antigravity auto-lane down).
@@ -207,10 +208,13 @@ class Treatment(BaseModel):
     news_thread: str                      # 10-200; post_validator: >=1 content noun in dossier
     news_close_read: str                  # 80-420; the 1-2 sentence real-news close the
                                           # announcer speaks after the coda bridge.
-                                          # post_validator: every numeral in allowed_numbers;
-                                          # every proper noun in named_entities/provenance.
-                                          # (LLM-authored => the coda read satisfies the
-                                          # proof gate; python only appends it -- r1/C1.)
+                                          # post_validator (r4/S2, subset direction
+                                          # explicit): every numeral USED IN the read must
+                                          # appear in allowed_numbers, and every proper noun
+                                          # USED IN the read must appear in named_entities
+                                          # or the python-stamped provenance. (LLM-authored
+                                          # => the coda read satisfies the proof gate;
+                                          # python only appends it -- r1/C1.)
 
 class CriticNote(BaseModel):
     scene: int; speaker: str
@@ -276,7 +280,8 @@ COLLECTED (not first-fail); the runner quotes the full list in the reroll rung.
 
 Output: `ParsedScript {title, music_open, music_inter[(scene_after, text)...], music_close,
 announcer_intro[1-2], scenes[ParsedScene{n, setting, lines[ParsedLine{speaker,text}]}],
-announcer_outro[1-2], coda, spoken_word_count}`.
+announcer_outro[1-2], coda, character_word_count, announcer_word_count}` (r4/M4: character
+and announcer words are SEPARATE counters; the budget band gates character words only).
 `parse_fable2_markup(text, cast_names) -> (ParsedScript | None, defects)`. Pure;
 property-tested.
 
@@ -319,15 +324,17 @@ NAMED LLM artifact -- the winning draft for character/announcer/coda-bridge cons
 per-constituent artifact + span, and the merged row text must equal the space-join of its
 proven constituents;
 (b) parsed speaker set == cast row names (minus ANNOUNCER);
-(c) skeleton complete; (d) `spoken_word_count` within +/-20% of target; (e) every cast member
+(c) skeleton complete; (d) `character_word_count` within +/-20% of target (r4/M4; announcer
+words are metered separately by the envelope and reported, not banded); (e) every cast member
 speaks. Failure -> upstream reroll with the gate named; never silent-fix. Incremental
 `led.save()` after preamble and each scene.
 
 **Additive meta:** `meta.fable2 = {schema_version:"fable2_v1", mode, dossier, cards_dealt,
 stance, pitches, selection:{chosen_pitch_id, rationale}, treatment, draft1_sha256,
 final_sha256, better_draft_choice, critic, casting_stock_dealt, proof_map,
-parse:{defects_by_attempt, rerolls}, audit:{findings, discarded, coalesced_repair},
-pass_receipts:[{pass_id, model_id, attempts, temp, max_new_tokens, mode}], seed}`.
+parse:{defects_by_attempt, rerolls}, audit:{findings, discarded},
+pass_receipts:[{pass_id, model_id, attempts, temp, max_new_tokens, mode}], seed}` (r4/CUT1:
+no live-looking repair field until the deferred repair actually exists).
 
 ## 8. Runner spec (`nodes/_otr_scifi_fable2.py`)
 
@@ -346,14 +353,18 @@ _MAX_NEW_TOKENS = ...                    # section 3 table
 def run_scifi_fable2_episode(*, payload, pack, resolved, led, meta,
                              creative_fn, technical_fn,
                              slot_scheduler, source_bank_row, story_rules,
-                             episode_root, episode_id) -> WriterTailContext:
-    """Fill led + meta to the legacy writer's endpoint; return the TailContext
-    the shared tail consumes (r3/M2: the runner receives every ctx ingredient
-    -- slot_scheduler for helper_context attribution, source_bank_row for tail
-    defaults, story_rules for _defect_score -- and hands back ONE object).
-    `resolved` is consumed AS-IS; the runner never rebuilds it. The runner
-    builds the episode-canon OBJECT only -- the tail remains the ONLY canon
-    WRITER (single-writer rule). Raises Fable2Error subclasses."""
+                             episode_root, episode_id) -> "Fable2TailParts":
+    """Fill led + meta to the legacy writer's endpoint; return Fable2TailParts
+    -- a PLAIN dataclass defined IN THIS MODULE (r4/M3: the runner never
+    imports the writer; the WRITER constructs WriterTailContext from the
+    parts, so the import graph stays acyclic -- original_radio purity
+    precedent). Parts carry: outline_view fields (premise, title),
+    final_title_override, canon object, run_story_spine=False,
+    refine_active=False, and the fable2 meta handles. `resolved` is consumed
+    AS-IS; the runner never rebuilds it. The runner builds the episode-canon
+    OBJECT only -- the tail remains the ONLY canon WRITER (single-writer
+    rule). Raises Fable2Error subclasses. A no-model test imports this module
+    WITHOUT importing OTR_LedgerScriptWriter (pure-boundary pin)."""
 
 _pass_dossier(technical_fn, payload) -> DossierArtifact
 _deal(seed_env) -> (frame_cards3, stance)            # SystemRandom; OTR_FABLE2_SEED repro
@@ -407,8 +418,10 @@ no-op, stamped in `meta.fable2.notes`.
   carry STABLE IDS**: `{menu_id: "m01"..., gender, description}` (descriptions are derived
   from sorted tags and are not guaranteed unique -- cast_pools.py:477 -- so P6 orders BY
   menu_id and python validates BY menu_id, never by description string). The menu only ever
-  offers what exists, and a `cast_size > available(gender-compatible)` check raises
-  Fable2CastError BEFORE any LLM call.
+  offers what exists. Preflight (r4/S1): BEFORE P6, python checks TOTAL usable menu capacity
+  >= cast_size (gender is P6's choice, so gender-compatibility cannot be pre-checked);
+  AFTER P6, the gender+timbre assignment is validated and rerolled if infeasible; only then
+  does Fable2CastError raise.
 - ASSIGNMENT (python): filter by gender + ordered timbre, seeded tie-break, exclusion set.
   Characters -> bark presets c02..; ANNOUNCER stays python-owned c01/kokoro. The LLM invents
   the person; Python picks the larynx.
@@ -750,9 +763,13 @@ shared fetch lane hands the runner a validated RSS payload. **Pinned by test
 
 **pipelines.json append:** `story_pipeline_id: "fable2_multipass"`, `executable: false` (S0)
 -> `true` (with the runner), `requires_source_contract: false`, declared_seams = the 9 fable2
-seams, passes = section 3 rows, notes: "Visible experiment; failure NEVER routes to
-legacy_many_pass." + "Consumes the bank fetcher payload via the writer's shared fetch lane;
-interpreter intentionally empty -- the treatment IS the interpretation."
+seams, passes = section 3 rows **with registry-legal slots only** (r4/M2: `_VALID_PASS_SLOTS`
+= {creative, technical}, routing :50, :273-276 -- creative for P1/P2b/P3/P5, technical for
+P0/P2a/P4/P6/P7/P8; P7's row description reads "pure Python assembly, no LLM -- slot is
+registry metadata"; the judge/creative subtype language lives in descriptions), notes:
+"Visible experiment; failure NEVER routes to legacy_many_pass." + "Consumes the bank fetcher
+payload via the writer's shared fetch lane; interpreter intentionally empty -- the treatment
+IS the interpretation." A registry-load test pins this exact row.
 
 **Sidecar registration** (`_otr_story_routing.py:42-48`): add
 `"scifi_fable2": frozenset({"frame_deck.json"})`.
@@ -854,20 +871,27 @@ byte-identity-pinned.)
   + push; the smoke's ledger is then scrubbed and committed as
   `tests/fixtures/fable2/legacy_reference_ledger.json` for S1b. Nothing fable2-visible ships
   in S1a; it is pure derisking of the writer's most entangled region.
-- **S1b -- spine, live:** runner P0/P1(one-pitch)/P2b/P3/P6/P7 (one-draft mode), dispatch
-  map, voice menu + assigner + preflight, incremental saves, proof gates (incl. per-
-  constituent proof_map); flip runnable+executable SAME change; `test_fable2_artifacts.py`,
-  `test_fable2_assembly.py` (golden-chain vs `tests/fixtures/fable2/
-  legacy_reference_ledger.json`, captured from the S1a science smoke + scrubbed, plus the
-  golden happy-path fixture), ladder subset tests, the writer-level unmapped-runner raise
-  test, and the no-model contract test (smallest fable2 ledger through
+- **S1b -- spine, live:** runner P0/P1(one-pitch)/P2b/P3/P6/P7 **+ P8 audit (audit-only,
+  fail loud) -- the lane NEVER flips runnable without its audit (r4/M1)**; one-draft mode,
+  dispatch map, voice menu + assigner + preflight, incremental saves, proof gates (incl.
+  per-constituent proof_map); flip runnable+executable SAME change; `test_fable2_artifacts.py`,
+  `test_fable2_assembly.py` (golden-chain asserting fable2's OWN ledger contract; the
+  `tests/fixtures/fable2/legacy_reference_ledger.json` fixture -- captured from the S1a
+  science smoke + scrubbed -- serves ONLY as the row-role-ordering + tail-output-contract
+  reference, never a byte-match target (r4/CUT2); plus the golden happy-path fixture,
+  compose_flags-absent freeze assertion, and the role-set assertion: assembled fable2 role
+  set == the legacy role set), ladder subset tests, the writer-level unmapped-runner raise
+  test, the pure-import test (runner module imports WITHOUT OTR_LedgerScriptWriter --
+  r4/M3), and the no-model contract test (smallest fable2 ledger through
   assemble_script_text_from_ledger + set_music -- catches cue-id drift); 30-word live smoke;
   validator no-diff record.
 - **S2 -- full loop (drift law complete):** P1 three-pitch mode + deal + stances, P2a select,
-  P4 critic, P5 revision + keep-better-draft judge, P8 audit + evidence triage (audit-only,
-  fail loud); complete meta.fable2; `test_fable2_runner_ladders.py` full,
-  `test_fable2_vocab_contract.py`, registry slot-enum rejection test; 350-word live smoke +
-  register-distinctness spot audit.
+  P4 critic, P5 revision + keep-better-draft judge, evidence triage hardening on P8; complete
+  meta.fable2; `test_fable2_runner_ladders.py` full, `test_fable2_vocab_contract.py`,
+  registry slot-enum rejection test, critic-classes-subset-of-audit-classes snapshot,
+  low-budget-never-renders-select snapshot; 350-word live smoke + register-distinctness spot
+  audit. Envelope scene formula: `scenes = clamp(round(target_words/110), 1, 8)` (30w -> 1,
+  350w -> 3), tuned against the S1b/S2 smokes.
 - **S3 -- hardening + soak:** 3-article x 2-seed mini-soak with variety audit, Bug Bible
   entries (Three-File Contract), docs refresh, operator eyeball on two rendered episodes.
 - **Deferred post-S3 (build only on live evidence):** act-chunked long-episode mode (> 900
@@ -891,17 +915,20 @@ meta.fable2).
    convention asserted then adjusted to fixture truth).
 4. `set_beats` exact row shape (production_ledger.py:769-798). (set_music shape RESOLVED
    r3/M1: cue ids opening/closing/inter_NN; no position field.)
-5. Episode-canon build API for the runner (`_OTRC.write_episode_canon` confirmed in the tail;
-   the canon CONSTRUCTION call the legacy path uses upstream is the pin; runner builds the
-   OBJECT, tail stays the only WRITER).
+5. Episode-canon build API for the runner (`write_episode_canon` at `_otr_canon.py:212` --
+   r4 pin; the canon CONSTRUCTION call the legacy path uses upstream is the remaining pin;
+   runner builds the OBJECT, tail stays the only WRITER).
 6. Slot-fn `max_new_tokens` pass-through at the splice (interpreter paths already thread it).
-7. Legacy coda real-news append (compose_news_coda, _otr_line_composer.py:3442-3472) fires in
-   legacy composition (I.5), NOT in the shared tail -- fable2 carries its read in the ledger
-   already; pin with a no-double-append assertion in test_fable2_assembly.py.
-8. Wave-2 story-spine opt-out: confirm the orchestrator block honors ctx.run_story_spine
-   False without disturbing the legacy env-gated default (part of the S1a extraction).
+7. Legacy coda real-news append fires in legacy composition (writer :5554-5556 -- r4 pin),
+   NOT in the shared tail -- fable2 carries its read in the ledger already; pin with a
+   no-double-append assertion in test_fable2_assembly.py.
+8. Wave-2 story-spine opt-out: the orchestrator block sits at writer :6164-6171 (r4 pin);
+   confirm ctx.run_story_spine=False gates it without disturbing the legacy env default
+   (part of the S1a extraction).
 9. S0 runs the FULL suite (not only the new tests) before commit -- suite-wide bank/pack
    sweeps must stay green with the 9-seam non-production pack present.
+10. Frame deck authoring is S0's likeliest time sink: 12 authored cards is the shippable
+    minimum (the deal needs >= 3 distinct); grow to ~24 in S3.
 
 ## 15. Kibitz hardening log
 
@@ -947,3 +974,17 @@ meta.fable2).
   criterion; canon single-writer rule; resolved-as-is rule; S1a same-run byte-identity (no
   fixture circularity) + fixture captured at S1a end; full-suite S0 gate. Full judgment:
   kibitz-runs/2026-07-10-scifi-fable2/r3/final.md.
+- **r4 (convergence), 2026-07-10:** panel = codex (gpt-5.5 high) + Claude anchor; codex
+  verdict **"yes-with-fixes" -- the arc's first non-"no"; CONVERGED** (no new defect class).
+  Residuals folded: M1 P8 joins S1b before any runnable flip; M2 registry-legal slots for all
+  passes (P7 = technical, metadata-only description) + registry-load test; M3 runner returns
+  Fable2TailParts (plain, runner-local) and the WRITER builds WriterTailContext -- acyclic
+  import graph + pure-import test; M4 character_word_count vs announcer_word_count split
+  (band gates character words). S-fixes: two-stage voice preflight (total capacity pre-P6,
+  gender+timbre post-P6); news_close_read subset direction. CUTs: audit meta carries no
+  live-looking repair field; legacy fixture is an ordering/tail-contract reference, never a
+  byte-match target. Anchor folded: critic-subset-of-audit snapshot, scene-count formula,
+  12-card deck minimum, role-set + compose_flags-absent assertions. Codex verify-at-build
+  pins upgraded into section 14 (canon.py:212, coda :5554-5556, spine :6164-6171). Agent
+  calls across the arc: codex 4/4 OK, antigravity 0/2 (auto-lane down), Claude anchor+judge
+  x4. Full judgment: kibitz-runs/2026-07-10-scifi-fable2/r4/final.md.
