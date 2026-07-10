@@ -354,6 +354,19 @@ def test_dispatch_too_long_routes_to_too_many_words():
     assert "over the length budget" in text
 
 
+def test_dispatch_anchor_a2_routes_to_key_term_grounding():
+    # Live-smoke hardening 2026-07-09: the original_radio brief gate's
+    # "anchor A2" rejection must take the typed verbatim-copy route,
+    # not the generic default fallback.
+    err = PostValidationError(
+        "key_term 'grieving mother' not grounded in the concept text "
+        "(anchor A2)"
+    )
+    text = _content(_dispatch(err))
+    assert "COPIED verbatim" in text
+    assert "cast is FIXED" not in text
+
+
 def test_dispatch_unrecognised_content_failure_routes_to_default():
     # A news V1 rejection matches no typed marker -> the generic
     # default_repair_prompt_factory handles it. The default factory's
@@ -418,10 +431,58 @@ def test_deterministic_callback_none_falls_through_to_llm_prompt():
     assert "cast is FIXED" in text
 
 
+def test_deterministic_callback_consulted_for_anchor_a2():
+    # The A2 branch mirrors the locked-cast contract: a schema instance
+    # from the deterministic prune is handed straight back, no LLM turn.
+    resolved = _SampleSchema(title="Pruned", score=5)
+    calls: list = []
+
+    def deterministic_repair(failed_output, error):
+        calls.append(error)
+        return resolved
+
+    factory = rp.make_dispatching_repair_factory(
+        deterministic_repair=deterministic_repair,
+    )
+    err = PostValidationError(
+        "key_term 'grieving mother' not grounded in the concept text "
+        "(anchor A2)"
+    )
+    result = factory(
+        original_prompt=_ORIGINAL_PROMPT,
+        failed_output=_FAILED_OUTPUT,
+        error=err,
+    )
+    assert result is resolved
+    assert len(calls) == 1, "deterministic callback should run exactly once"
+
+
+def test_deterministic_callback_none_falls_to_a2_llm_prompt():
+    # Prune declined (too few grounded survivors) -> the typed A2 LLM
+    # repair prompt is built instead.
+    def deterministic_repair(failed_output, error):
+        return None
+
+    factory = rp.make_dispatching_repair_factory(
+        deterministic_repair=deterministic_repair,
+    )
+    err = PostValidationError(
+        "key_term 'zeppelin post' not grounded in the concept text "
+        "(anchor A2)"
+    )
+    result = factory(
+        original_prompt=_ORIGINAL_PROMPT,
+        failed_output=_FAILED_OUTPUT,
+        error=err,
+    )
+    text = _content(result)
+    assert "COPIED verbatim" in text
+
+
 def test_deterministic_callback_not_consulted_for_non_cast_errors():
-    # The callback must only ever run for the locked-cast branch. A
-    # JSON error, a schema error, and a non-cast content error must all
-    # leave it untouched.
+    # The callback must only ever run for the locked-cast and anchor-A2
+    # branches. A JSON error, a schema error, and other content errors
+    # must all leave it untouched.
     calls: list = []
 
     def deterministic_repair(failed_output, error):

@@ -254,6 +254,74 @@ class TestCreativeFront:
                 pack=self._pack(),
             )
 
+    def test_key_term_grounds_across_a_line_wrap(self):
+        # A2 normalization (live-smoke hardening 2026-07-09): the corpus
+        # joins fields with newlines and a field may wrap a phrase across
+        # a line break; a key_term copied verbatim must still ground.
+        sel = json.loads(_SELECT_JSON)
+        sel["pitch"]["logline"] = (
+            "MARA conceals a pawn\nticket from ELLIS at the lock")
+        briefs, _ = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=_seq_fn(_CONCEPT_JSON, json.dumps(sel)),
+            technical_fn=_seq_fn(_BRIEFS_JSON),
+            pack=self._pack(),
+        )
+        assert briefs.key_terms == ["pawn ticket", "ELLIS"]
+
+    def test_ungrounded_key_term_pruned_deterministically(self):
+        # The 2026-07-09 live-smoke failure class: one paraphrased
+        # key_term ('grieving mother') exhausted the ladder. With >= 2
+        # verbatim terms surviving, the A2 deterministic repair must
+        # prune the paraphrase and finish with NO second technical call.
+        calls = {"n": 0}
+        bad = json.dumps({
+            **json.loads(_BRIEFS_JSON),
+            "key_terms": ["pawn ticket", "ELLIS", "grieving mother"],
+        })
+
+        def tech_fn(messages, **kw):
+            calls["n"] += 1
+            return bad
+
+        briefs, _ = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
+            technical_fn=tech_fn,
+            pack=self._pack(),
+        )
+        assert briefs.key_terms == ["pawn ticket", "ELLIS"]
+        assert calls["n"] == 1, "prune must not spend an LLM repair call"
+
+    def test_prune_declines_below_two_grounded_terms(self):
+        # Only one grounded term would survive -> the prune declines,
+        # the typed A2 LLM repair turn runs (and re-fails on the canned
+        # reply), and the ladder exhausts loud.
+        calls = {"n": 0}
+        bad = json.dumps({
+            **json.loads(_BRIEFS_JSON),
+            "key_terms": ["pawn ticket", "ZEPPELIN"],
+        })
+
+        def tech_fn(messages, **kw):
+            calls["n"] += 1
+            if calls["n"] > 1:
+                # The repair turn must carry the typed A2 directive.
+                assert "COPIED verbatim" in json.dumps(messages)
+            return bad
+
+        with pytest.raises(StructuredCallFailedError):
+            ORR.build_original_briefs(
+                spark_atoms={"place": "the lock"},
+                num_characters=2,
+                creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
+                technical_fn=tech_fn,
+                pack=self._pack(),
+            )
+        assert calls["n"] == 2, "base + one typed LLM repair, then loud"
+
     def test_nonempty_close_brief_rejected(self):
         bad_briefs = json.dumps({
             **json.loads(_BRIEFS_JSON),

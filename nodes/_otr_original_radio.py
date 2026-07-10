@@ -40,12 +40,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 try:
+    from ._otr_json import parse_first_json_object
     from ._otr_structured_call import structured_call
     from ._otr_repair_prompts import make_dispatching_repair_factory
 except ImportError:  # pragma: no cover -- flat test/standalone load
+    from _otr_json import parse_first_json_object  # type: ignore
     from _otr_structured_call import structured_call  # type: ignore
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
 
@@ -305,6 +307,20 @@ def _concept_corpus(sel: SelectedConcept) -> str:
     return "\n".join(p for p in parts if p)
 
 
+def _norm_ws_lower(text: str) -> str:
+    """Whitespace-collapsed lowercase form for A2 verbatim matching.
+
+    The concept corpus joins model fields with newlines and the fields
+    themselves may wrap a phrase across lines, so a raw substring test
+    rejects a key_term that WAS copied verbatim but happens to span a
+    line break (or a double space). Collapsing every whitespace run to
+    one space keeps the check VERBATIM -- exact words, exact order --
+    while ignoring how the phrase wrapped. Live-smoke hardening
+    2026-07-09 (anchor A2).
+    """
+    return " ".join(text.split()).lower()
+
+
 def build_original_briefs(
     *,
     spark_atoms: "dict[str, str]",
@@ -417,7 +433,7 @@ def build_original_briefs(
         helper_name="original_select",
     )
     corpus = _concept_corpus(sel)
-    corpus_low = corpus.lower()
+    corpus_norm = _norm_ws_lower(corpus)
 
     # --- BRIEF (technical slot: the compat contract) ---------------------
     def _brief_gate(m: OriginalBriefsModel) -> "str | None":
@@ -431,7 +447,7 @@ def build_original_briefs(
             ts = str(t).strip()
             if not ts:
                 return "empty key_term"
-            if ts.lower() not in corpus_low:
+            if _norm_ws_lower(ts) not in corpus_norm:
                 return (f"key_term {ts!r} not grounded in the concept "
                         f"text (anchor A2)")
         if m.news_close_brief.strip():
@@ -447,6 +463,54 @@ def build_original_briefs(
             return str(exc)
         return None
 
+    def _prune_ungrounded_key_terms(
+        failed_output: str, error: BaseException,
+    ) -> "OriginalBriefsModel | None":
+        """Deterministic A2 repair: drop ungrounded key_terms, keep the rest.
+
+        Mirrors the cast-membership Levenshtein split (see the repair-
+        prompts module docstring): the dispatcher consults this BEFORE
+        building the LLM repair turn. Pruning to the grounded subset is
+        strictly stronger anti-drift than a paraphrase re-roll -- every
+        surviving term is a verbatim concept phrase -- and it is pure
+        text filtering: deterministic, seed-independent, no LLM spend.
+        Declines (returns None -> typed LLM repair) unless the pruned
+        instance passes the FULL brief gate, so a briefs set with any
+        other latent problem keeps its LLM repair rung instead of
+        burning the ladder's last attempt on a half-fix. Live-smoke
+        hardening 2026-07-09: the technical model paraphrased one
+        key_term twice and exhausted the ladder.
+        """
+        try:
+            data = parse_first_json_object(failed_output or "")
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        raw_terms = data.get("key_terms")
+        if not isinstance(raw_terms, list):
+            return None
+        kept = [
+            str(t) for t in raw_terms
+            if str(t).strip() and _norm_ws_lower(str(t)) in corpus_norm
+        ]
+        if len(kept) < 2:
+            return None
+        try:
+            candidate = OriginalBriefsModel.model_validate(
+                {**data, "key_terms": kept}
+            )
+        except ValidationError:
+            return None
+        if _brief_gate(candidate) is not None:
+            return None
+        log.info(
+            "[OTR_OriginalRadio] anchor A2 deterministic repair: pruned "
+            "%d ungrounded key_term(s), kept %d verbatim term(s)",
+            len(raw_terms) - len(kept), len(kept),
+        )
+        return candidate
+
     # LLM slot: technical -- structured compat briefs.
     briefs = structured_call(
         prompt=[
@@ -461,7 +525,9 @@ def build_original_briefs(
         slot_fn=technical_fn,
         base_temperature=0.3,
         structural_retry_temperature=0.2,
-        repair_prompt_factory=make_dispatching_repair_factory(),
+        repair_prompt_factory=make_dispatching_repair_factory(
+            deterministic_repair=_prune_ungrounded_key_terms,
+        ),
         post_validator=_brief_gate,
         max_new_tokens=900,
         max_attempts=3,

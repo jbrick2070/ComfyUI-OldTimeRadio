@@ -31,6 +31,16 @@ The seven failure classes:
                             to recover; this factory tells the model
                             to either supply a real replacement string
                             or OMIT the edit row entirely.
+  key_term_grounding_repair -- an original_radio key_term is not a
+                            verbatim substring of the concept text
+                            (anchor A2). Caught live 2026-07-09 on the
+                            first original_radio OBS smoke: the
+                            technical-slot model paraphrases despite
+                            the seam demanding verbatim terms, and the
+                            generic default repair did not recover.
+                            Like cast membership, the call site
+                            supplies a deterministic prune callback
+                            consulted BEFORE this LLM fallback.
 
 `cast_membership_repair` is special. The v4 plan requires it to NEVER
 call the LLM when the project's existing Levenshtein matcher resolves
@@ -93,6 +103,7 @@ __all__ = [
     "narration_leak_repair",
     "forbidden_name_repair",
     "payload_null_repair",
+    "key_term_grounding_repair",
     "make_dispatching_repair_factory",
 ]
 
@@ -307,6 +318,41 @@ def payload_null_repair(
     )
 
 
+def key_term_grounding_repair(
+    *,
+    original_prompt: Any,
+    failed_output: str,
+    error: BaseException,
+) -> list[dict[str, str]]:
+    """Repair prompt for a key_term that is not a verbatim concept phrase.
+
+    original_radio anchor A2 (ARCHITECTURE_V2): every key_term must be
+    an exact contiguous substring of the concept text (case- and
+    whitespace-run-insensitive). Local technical-slot models routinely
+    paraphrase ('grieving mother' for 'a mother, grieving') despite the
+    seam prompt already demanding verbatim terms -- caught live
+    2026-07-09 on the first original_radio 30-word OBS smoke, where the
+    generic default repair failed to recover and the ladder exhausted.
+    The deterministic prune at the call site resolves most cases with
+    no LLM call; this directive is the LLM fallback when too few
+    grounded terms survive the prune.
+    """
+    directive = (
+        "CRITICAL: One or more of your key_terms is NOT an exact "
+        f"phrase from the concept text: {_error_text(error)}. Every "
+        "key_term must be COPIED verbatim -- an exact contiguous "
+        "phrase, character for character -- from THE SELECTED CONCEPT "
+        "in the original instruction below. Do not paraphrase, "
+        "reorder, inflect, or summarize. Replace every rejected "
+        "key_term with a short concrete noun or name copied exactly "
+        "from that concept text, keeping 2-6 key_terms total. Return "
+        "ONE valid JSON object, no Markdown, no prose."
+    )
+    return _compose_repair(
+        directive, failed_output=failed_output, original_prompt=original_prompt,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher -- routes an Attempt-3 failure to the matching typed factory
 # ---------------------------------------------------------------------------
@@ -367,6 +413,7 @@ def make_dispatching_repair_factory(
             everything else                -> `schema_field_repair`
       * `PostValidationError`       -> classified by its message:
             "locked cast"                  -> cast membership
+            "anchor a2"                    -> key_term grounding
             "named_character"              -> forbidden name
             "dialogue_verb" / "plot_verb"  -> narration leak
             "too_long"                     -> too many words
@@ -374,12 +421,16 @@ def make_dispatching_repair_factory(
                                     -> `default_repair_prompt_factory`
 
     `deterministic_repair`, when supplied, is consulted for the cast-
-    membership case BEFORE the LLM prompt is built. If it returns a
-    pydantic instance, that instance is returned straight to
-    `structured_call`, which accepts it as a finished result and makes
-    no LLM repair call. If it returns None, the LLM
-    `cast_membership_repair` prompt is used instead. Call sites with no
-    locked cast omit the argument entirely.
+    membership and key_term-grounding cases BEFORE the LLM prompt is
+    built. If it returns a pydantic instance, that instance is returned
+    straight to `structured_call`, which accepts it as a finished
+    result and makes no LLM repair call. If it returns None, the
+    matching typed LLM prompt (`cast_membership_repair` /
+    `key_term_grounding_repair`) is used instead. Call sites with
+    neither a locked cast nor an A2 corpus omit the argument entirely;
+    a callback is only ever consulted for failure classes its own call
+    site can produce, so one kwarg serves both cases without
+    collision.
 
     The message-substring dispatch is deliberate: the project's
     `post_validator` functions return short, stable rejection codes
@@ -428,6 +479,18 @@ def make_dispatching_repair_factory(
                         # a finished result -- no LLM repair call.
                         return resolved
                 return cast_membership_repair(
+                    original_prompt=original_prompt,
+                    failed_output=failed_output,
+                    error=error,
+                )
+            if "anchor a2" in message:
+                if deterministic_repair is not None:
+                    resolved = deterministic_repair(failed_output, error)
+                    if resolved is not None:
+                        # Same contract as the cast branch: a schema
+                        # instance is a finished result -- no LLM call.
+                        return resolved
+                return key_term_grounding_repair(
                     original_prompt=original_prompt,
                     failed_output=failed_output,
                     error=error,
