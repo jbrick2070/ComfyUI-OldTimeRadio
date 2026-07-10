@@ -54,9 +54,17 @@ Did:
   Fan-out verdict overall: architecture sound, 3 real minors total, all
   fixed and pushed.
 
+- NEW OPERATOR FEATURE (late): post-composition INTRO REWRITE -- once the
+  story is done, rewrite the announcer intro from the PRODUCED first
+  scene + cast, spoiler-safe by input starvation (scene-1 rows only).
+  Spec: docs/2026-07-09-original-radio/INTRO_REWRITE_SPEC.md (shape A =
+  derive ProducedOpenBrief -> existing safe-open composer, anchor lean;
+  shape B = new rewrite seam). Runs BEFORE outro compose so the
+  tone-echo reads the final intro. Joins kibitz r2 scope.
+
 Current step: original_radio campaign -- R1 CONVERGED (2 passes,
 ~$0.26 total). Next: /kibitz r2 (coding plan) on
-docs/2026-07-09-original-radio/ARCHITECTURE_V4.md (+V2/V3 as context),
+docs/2026-07-09-original-radio/ARCHITECTURE_V4.md + INTRO_REWRITE_SPEC.md,
 then r3 wiring, r4 convergence, then build: tests first, SAME-COMMIT
 registry set SHIPPING runnable:true, pre-ship gates = suite + Bug Bible
 + mocked pipeline + live 30w smoke + operator eyeball.

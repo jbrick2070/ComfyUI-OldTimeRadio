@@ -81,9 +81,14 @@ spoken machine-disclosure; printed-layer provenance incl. bank-aware HUD
 label + unconditional credits line); no era frame (timeless raw story);
 RUNNABLE ON BUILD (no staged flips/switches/fallbacks; hard fails
 accepted); north star = max story complexity / max code elegance.
-NEXT: /kibitz r2 coding plan on V4, then r3 wiring, r4 convergence, then
-build (tests first; SAME-COMMIT set ships runnable:true; pre-ship gates
-= suite + Bug Bible + mocked pipeline + 30w smoke + operator eyeball).
+NEXT: /kibitz r2 coding plan on V4 PLUS the post-composition INTRO
+REWRITE feature (operator 2026-07-09 late; spec =
+docs/2026-07-09-original-radio/INTRO_REWRITE_SPEC.md -- rewrite the
+announcer intro from the PRODUCED first scene + cast, spoiler-safe by
+input starvation, all banks; kibitz picks shape A/B). Then r3 wiring,
+r4 convergence, then build (tests first; SAME-COMMIT set ships
+runnable:true; pre-ship gates = suite + Bug Bible + mocked pipeline +
+30w smoke + operator eyeball).
 Queued design item for the arc: demote `meta["news"]` to provenance-only
 + distinct-name migration (operator: "we can't just throw around meta").
 
