@@ -115,9 +115,12 @@ _ALL_FORBIDDEN = FORBIDDEN_TERMS + ANACHRONISM_TERMS
 # Data here, not Python branches: extend the lists, not the code.
 WEAPON_SMOKING_EVIDENCE: tuple[str, ...] = (
     "gun", "pistol", "rifle", "revolver", "shotgun", "firearm",
-    "derringer", "holster", "bullet", "ammunition", "knife", "dagger",
-    "blade", "bayonet", "cigarette", "cigar", "smoking", "tobacco",
-    "pipe smoke", "ashtray", "lit a pipe", "lights a pipe",
+    "derringer", "holster", "bullet", "ammunition", "weapon",
+    "six-shooter", "sixgun", "luger", "musket", "carbine",
+    "knife", "dagger", "blade", "bayonet", "switchblade", "stiletto",
+    "machete", "saber", "sabre", "sword",
+    "cigarette", "cigar", "smoking", "tobacco", "pipe smoke",
+    "ashtray", "lit a pipe", "lights a pipe", "smokes a", "lit up a",
 )
 NEWS_FRAMING_EVIDENCE: tuple[str, ...] = (
     "news", "report", "reported", "reporter", "bulletin", "headline",
@@ -135,6 +138,24 @@ HARD_CLASS_EVIDENCE: "dict[str, tuple[str, ...]]" = {
     # Brand/franchise names are unbounded: confirm-quote only.
     "modern_ip": (),
     "anachronism_dependency": ANACHRONISM_TERMS,
+}
+
+# Kill authority per hard class (run-3 live catch 2026-07-10: the
+# confirm judge "proved" weapons_smoking with the verbatim quote
+# 'I don't care if the coils start to smoke' -- a grounded quote proves
+# the LINE EXISTS, not that it belongs to the CLASS). Radio is pure
+# dialogue: a weapon or tobacco act must be NAMED to be heard on air,
+# so for closed-vocabulary classes the lexicon is the only kill
+# authority and an uncorroborated flag is discarded LOUDLY (the meta
+# stamp + log keep it auditable; the operator eyeball reviews
+# discards). Open-phrasing classes keep the confirm-quote path.
+# Data here, not Python branches.
+KILL_POLICY_BY_CLASS: "dict[str, str]" = {
+    "weapons_smoking": "lexicon_only",
+    "anachronism_dependency": "lexicon_only",
+    "modern_ip": "confirm",
+    "news_source_framing": "confirm",
+    "machine_attribution": "confirm",
 }
 
 
@@ -706,9 +727,11 @@ _QA_CONFIRM_SYSTEM = (
     "brand or franchise name; the modern technology the plot depends "
     "on) -- or DROP it.\n"
     "A threat, alarm, siren, lever, or menace WITHOUT a named weapon "
-    "is NOT weapons_smoking. A time-of-day opener or dramatic teaser "
-    "is NOT news_source_framing unless the tale is explicitly called "
-    "news, a report, or a true story, or a source is cited.\n"
+    "is NOT weapons_smoking; smoke or steam from machines, coils, or "
+    "overheating equipment is not either -- that class means a named "
+    "weapon or tobacco smoking. A time-of-day opener or dramatic "
+    "teaser is NOT news_source_framing unless the tale is explicitly "
+    "called news, a report, or a true story, or a source is cited.\n"
     "Return one JSON object only -- no prose, no fences. Schema:\n"
     '{ "confirmed": array (possibly EMPTY) of\n'
     '    { "class": the flagged class,\n'
@@ -819,20 +842,26 @@ def triage_hard_findings(
     string for the OriginalQAError / meta stamp."""
     kills: "list[tuple[QAFinding, str]]" = []
     unproven: "list[QAFinding]" = []
+    discarded: "list[QAFinding]" = []
     for f in findings:
         term = corroborate_hard_finding(f, script)
         if term is not None:
             kills.append((f, f"lexicon evidence {term!r}"))
-        else:
+        elif KILL_POLICY_BY_CLASS.get(f.finding_class) == "confirm":
             unproven.append(f)
-    discarded: "list[QAFinding]" = []
+        else:
+            # lexicon_only class with no lexicon hit: nothing nameable
+            # is on air -> the flag is judge noise. Discard (the caller
+            # logs it loudly and stamps meta for the operator eyeball).
+            discarded.append(f)
     if unproven:
-        confirmed, discarded = confirm_hard_findings(
+        confirmed, dropped = confirm_hard_findings(
             unproven, script=script, technical_fn=technical_fn,
         )
         kills.extend(
             (f, f"confirmed quote {q!r}") for f, q in confirmed
         )
+        discarded.extend(dropped)
     return kills, discarded
 
 
@@ -842,7 +871,8 @@ __all__ = [
     "OriginalBriefsModel", "QAFindings", "QAFinding", "QA_CLASSES",
     "REPAIR_ACTION_BY_CLASS", "build_original_briefs", "run_original_qa",
     "scan_forbidden", "DECK_AXES", "FORBIDDEN_TERMS", "ANACHRONISM_TERMS",
-    "HARD_CLASS_EVIDENCE", "ConfirmedFinding", "ConfirmedFindings",
+    "HARD_CLASS_EVIDENCE", "KILL_POLICY_BY_CLASS",
+    "ConfirmedFinding", "ConfirmedFindings",
     "corroborate_hard_finding", "confirm_hard_findings",
     "triage_hard_findings", "script_excerpt",
 ]

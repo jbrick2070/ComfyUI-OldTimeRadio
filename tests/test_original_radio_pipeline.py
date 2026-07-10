@@ -537,31 +537,53 @@ class TestHardFindingTriage:
         assert "pistol" in kills[0][1]
         assert calls["n"] == 0, "lexicon kill must not spend an LLM call"
 
+    def test_lexicon_only_class_discards_without_confirm(self):
+        # Run-3 live catch (2026-07-10): 'coils start to smoke' is not
+        # tobacco; a lexicon_only class with no lexicon hit is judge
+        # noise and must be discarded with ZERO LLM calls -- a grounded
+        # quote cannot prove class membership for a closed vocabulary.
+        calls = {"n": 0}
+
+        def tech_fn(messages, **kw):
+            calls["n"] += 1
+            return json.dumps({"confirmed": [
+                {"class": "weapons_smoking",
+                 "quote": "reaching for the lever by the door"}]})
+
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("weapons_smoking",
+                           "the coils start to smoke like doom")],
+            script=self._SCRIPT, technical_fn=tech_fn)
+        assert not kills and len(discarded) == 1
+        assert calls["n"] == 0, "lexicon_only class must never confirm"
+
     def test_confirm_drop_discards(self):
         fn = _seq_fn(json.dumps({"confirmed": []}))
         kills, discarded = ORR.triage_hard_findings(
-            [self._finding("weapons_smoking", "the sirens sound like doom")],
+            [self._finding("news_source_framing", "sounds like a teaser")],
             script=self._SCRIPT, technical_fn=fn)
         assert not kills and len(discarded) == 1
 
     def test_confirm_grounded_quote_kills(self):
         fn = _seq_fn(json.dumps({"confirmed": [
-            {"class": "weapons_smoking",
-             "quote": "reaching for the lever by the door"}]}))
+            {"class": "news_source_framing",
+             "quote": "This has been SIGNAL LOST."}]}))
         kills, discarded = ORR.triage_hard_findings(
-            [self._finding("weapons_smoking", "something menacing")],
+            [self._finding("news_source_framing", "framed as a broadcast")],
             script=self._SCRIPT, technical_fn=fn)
         assert len(kills) == 1 and not discarded
-        assert "lever" in kills[0][1]
+        assert "SIGNAL LOST" in kills[0][1]
 
     def test_confirm_ungrounded_quote_exhausts_to_discard(self):
         # The confirm judge invents a quote that is NOT in the script:
         # the post-validator rejects it, the bounded ladder exhausts,
         # and the finding is discarded (never a kill without evidence).
         fn = _seq_fn(json.dumps({"confirmed": [
-            {"class": "weapons_smoking", "quote": "a revolver gleamed"}]}))
+            {"class": "news_source_framing",
+             "quote": "and now tonight's factual account"}]}))
         kills, discarded = ORR.triage_hard_findings(
-            [self._finding("weapons_smoking", "something menacing")],
+            [self._finding("news_source_framing",
+                           "framed as though it were factual")],
             script=self._SCRIPT, technical_fn=fn)
         assert not kills and len(discarded) == 1
 
