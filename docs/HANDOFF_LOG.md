@@ -3,6 +3,36 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-09 ~night -- HEAD 604ccdd3 (v2.0-alpha)
+
+Did:
+- /kibitz r2 (coding plan) on ARCHITECTURE_V4 + INTRO_REWRITE_SPEC:
+  anchor-first, Codex auto green, agy auto timed out -> operator pasted
+  the manual prompt, its review judged. 3-way convergence; shape A
+  locked; synthesis = R2_CODING_PLAN.md. Operator left ("do r3-r4 and
+  start coding") -> full autonomy.
+- /kibitz r3 (wiring): 5 codex must-fixes verified+folded (seam-accessor
+  wall, briefs return shape, dual source_meta restamp, title-regen
+  staleness root-cause, QA-before-aggregates order) = R3_WIRING_DELTAS.md.
+  /kibitz r4: converged, pins P1-P8 (agy auto dead 3x; codex + anchor).
+- BUILT + PUSHED CHUNK A `181506e8` (intro rewrite all banks + title fix;
+  c5a2 pin retargeted to the script_text L-opener per its own docstring).
+- BUILT + PUSHED CHUNK B `604ccdd3` (the whole original_radio
+  SAME-COMMIT set, runnable:true). Mid-build catches fixed at root:
+  spark deck needed the routing pack-SIDECAR registration; the
+  bank-shape dispatch needed the runnable conjunct (custom keeps its
+  pinned LOUD SourceContractMissingError path).
+- Suite 7136/31/1 + Bug Bible 16/7/3 green after each chunk; AST/BOM/
+  0-byte verify clean; HEAD == origin. No workflow JSON diff.
+- Note: `3060fd3a` (portability brief) is the operator's own docs commit
+  from his other window -- audited, benign.
+Current step: original_radio campaign -- BUILD SHIPPED; remaining gates =
+live 30w original_radio smoke + OTR_WorkflowValidator no-diff record +
+OPERATOR EYEBALL (queued).
+Next: run the live 30w smoke (selective reset first), then eyeball, then
+the source-bank end-to-end sweep.
+Commits: 181506e8, 604ccdd3 (+ this docs commit) -- all pushed.
+
 ## 2026-07-09 ~evening -- HEAD 5a09984c (v2.0-alpha)
 
 Did:

@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-09 (evening) -- HEAD `5a09984c`
+**Updated:** 2026-07-09 (late) -- HEAD `5d28749a` + this docs commit
 **Branch:** `v2.0-alpha`
 **Status:** operator reorder 2026-07-09: static source-route QA DONE (5-agent
 fan-out; live smokes parked -- "we've smoked a lot") -> `original_radio`
@@ -71,24 +71,51 @@ Unrelated local file present before this plan update and left untouched:
 
 ### 0. ACTIVE: `original_radio` campaign (operator 2026-07-09)
 
-Design doc: `docs/2026-07-09-original-radio/ARCHITECTURE_V1.md` (multi-pass
-LLM cascade: spark deck -> 3 pitches -> self-judge -> cast -> existing
-engine; disclosure-as-news_close_brief provenance; SAME-COMMIT trap set).
-R1 CONVERGED after two live passes (~$0.26): **ARCHITECTURE_V4.md is the
-build spine** (V2 mechanics + V3 operator overrides + pass02 survivors).
-Operator locks: Hitchcock ironic epilogue AS the announcer outro (no
-spoken machine-disclosure; printed-layer provenance incl. bank-aware HUD
-label + unconditional credits line); no era frame (timeless raw story);
-RUNNABLE ON BUILD (no staged flips/switches/fallbacks; hard fails
+Build spine: **ARCHITECTURE_V4.md** (R1 converged x2, ~$0.26). Operator
+locks: Hitchcock epilogue AS the announcer outro; printed-layer provenance;
+no era frame; RUNNABLE ON BUILD (no flips/switches/fallbacks, hard fails
 accepted); north star = max story complexity / max code elegance.
-NEXT: /kibitz r2 coding plan on V4 PLUS the post-composition INTRO
-REWRITE feature (operator 2026-07-09 late; spec =
-docs/2026-07-09-original-radio/INTRO_REWRITE_SPEC.md -- rewrite the
-announcer intro from the PRODUCED first scene + cast, spoiler-safe by
-input starvation, all banks; kibitz picks shape A/B). Then r3 wiring,
-r4 convergence, then build (tests first; SAME-COMMIT set ships
-runnable:true; pre-ship gates = suite + Bug Bible + mocked pipeline +
-30w smoke + operator eyeball).
+R2 DONE (2026-07-09 late): /kibitz r2 -- Codex gpt-5.5 (auto) + Antigravity
+gemini-3.5-pro (operator-pasted manual after one auto timeout) + Claude
+anchor; 3-way convergence, no architecture change. Coding plan =
+**docs/2026-07-09-original-radio/R2_CODING_PLAN.md** (mirror:
+kibitz-runs/2026-07-09-original-radio/r2/final.md). Key r2 locks:
+intro-rewrite SHAPE A (derive ProducedOpenBrief -> existing safe-open
+composer; derive helper lives in _otr_story_brief.py); runtime dispatch on
+BANK SHAPE (empty fetcher+interpreter), NEVER pipe.requires_source_contract
+(routing law 88-91); original_multi_pass ships executable:true (sweep 4b
+elif demands it -- no sweep patch); build_original_briefs returns the
+validate_interpreter_result contract with news_close_brief="";
+story_rules/original_radio.json is load-bearing (outro rules resolve);
+provenance data-driven (bank defaults hud_origin_label + credits_source_line;
+news_used gets final title + origin_label via builder signature); KEEP
+news_coda_no_brief flag; keep-intro failure posture upheld (agy hard-fail
+logged as operator dial); no workflow JSON diff expected (registry-derived
+dropdown; source_bank already headless-whitelisted).
+R3 (wiring) + R4 (convergence) DONE same night (Codex + anchor; agy auto
+lane timed out 3x -- its r2 manual review is on the record). Artifacts:
+R3_WIRING_DELTAS.md + kibitz-runs/.../r4/final.md (r4 pins P1-P8).
+BUILD SHIPPED (operator away, autonomy directive):
+- CHUNK A `181506e8`: intro rewrite ALL banks (derive_produced_open_brief
+  in _otr_story_brief + writer I.4.9 block, keep-intro posture, flags
+  read-extend) + J.5 title-regen root-cause fix (ledger-assembled).
+- CHUNK B `604ccdd3`: the original_radio SAME-COMMIT set, runnable:true
+  -- registry rows (pipeline executable:true; spark deck registered as a
+  pack SIDECAR in routing), 13-stage pack w/ Hitchcock outro seam,
+  story_rules, _otr_original_radio.py (concept->select->brief +
+  whole-script QA w/ coalesced outro repair), writer bank-shape dispatch
+  (runnable+empty-empty), interpreter-shaped adapter + dual source_meta
+  restamp, provenance surfaces (news_used labels/final title, HUD origin
+  label x2, credits_source_line stamp+render).
+Both pushed; suite 7136 passed/31 skipped/1 xfailed + Bug Bible 16/7/3
+green; AST/BOM/0-byte verify clean. NO workflow JSON diff (source_bank
+menu derives from the registry).
+NEXT (remaining pre-ship gates): live 30-word original_radio OBS smoke
+(selective reset per section 4; select the lane via the headless
+source_bank patch) + run OTR_WorkflowValidator recording "no workflow
+diff" + OPERATOR EYEBALL of the smoke output (queued for his return;
+consider the 3-episode batch from V2 s7). Then the source-bank
+end-to-end sweep (section 3 below).
 Queued design item for the arc: demote `meta["news"]` to provenance-only
 + distinct-name migration (operator: "we can't just throw around meta").
 
