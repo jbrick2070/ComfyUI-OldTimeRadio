@@ -1312,13 +1312,29 @@ class Ledger:
             "music": "cue_id",
         }
         # Canonical row fields the in-memory Ledger OWNS outright: the
-        # disk merge must never resurrect stale values into them, even
-        # when the fresh in-memory value is deliberately falsy (external
-        # QA root-cause 2026-07-10; see the loop comment below).
+        # disk merge must never resurrect stale values into them --
+        # neither when the fresh in-memory value is deliberately falsy
+        # (external QA round 1, 2026-07-10) NOR when a fresh
+        # authoritative rebuild simply OMITS the key (external QA r2
+        # P0.2: `set_lines()` builds rows without `skip`/
+        # `tts_skip_reason`/`reviewer_skip_reason`, and the old
+        # key-presence test read that omission as "please restore old
+        # disk state" -- resurrecting a stale skip flag onto a newly
+        # non-empty line -> Phase 10 freeze error). Ownership is at the
+        # ROW level: a row present in memory is the authoritative
+        # composition; disk may only contribute out-of-band DURABLE
+        # renderer fields (bark_wav_path, timings, render stamps --
+        # BUG-LOCAL-108). Per-field source/revision identity for the
+        # durable set is the S2 P1.1 follow-up.
         _MERGE_OWNED_ROW_FIELDS = frozenset({
-            "text", "char_count", "word_count", "skip",
-            "tts_skip_reason", "reviewer_skip_reason", "speaker_role",
-            "char_id", "boundary", "compose_flags",
+            # composition / content
+            "text", "char_count", "word_count", "traits", "boundary",
+            "char_id", "speaker_role", "arc_phase", "compose_flags",
+            "beat_intent", "target_words", "dialogue_slot_id",
+            "shot_id", "beat_id",
+            # skip / editorial state
+            "skip", "tts_skip_reason", "reviewer_skip_reason",
+            "reviewer_note", "needs_render_realign",
         })
         for arr_name, key_field in ROW_KEYED.items():
             on_disk_rows = on_disk.get(arr_name) or []
@@ -1354,7 +1370,7 @@ class Ledger:
                 # bark_wav_path, timings, render stamps) -- those still
                 # copy forward.
                 for k, v in disk_row.items():
-                    if k in _MERGE_OWNED_ROW_FIELDS and k in row:
+                    if k in _MERGE_OWNED_ROW_FIELDS:
                         continue
                     if k not in row or row.get(k) in (None, "", [], {}):
                         row[k] = v

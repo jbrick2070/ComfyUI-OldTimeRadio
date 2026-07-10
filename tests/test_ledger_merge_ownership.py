@@ -85,20 +85,83 @@ def test_doctor_skip_stamps_the_phase10_contract():
     assert lines[0]["tts_skip_reason"] == "reviewer_skip: flat"
 
 
-def test_legacy_line_compose_capability_gate():
-    # QA regression 4 (lane gate): fable2's pack has no
-    # line_composer_system seam -> 5B/5C INAPPLICABLE; science_news has
-    # it -> applicable; resolution failure fails OPEN (legacy behavior).
-    from nodes._otr_freeze_cascade import _legacy_line_compose_applicable
+def test_freeze_policy_replaces_capability_gate():
+    # QA r2 P0.1/P1.2 supersedes the round-1 fail-open boolean: the
+    # policy is typed, resolved once, and a TAGGED bank that fails to
+    # resolve is TERMINAL -- never fail-open into legacy mutation.
+    # (Deeper cascade-level coverage: tests/test_freeze_policy_readonly.py)
+    from nodes._otr_freeze_cascade import resolve_freeze_policy
     from nodes import _otr_story_routing as ROUTING
     ROUTING._REGISTRY = None
     try:
-        assert _legacy_line_compose_applicable(
-            {"source_bank": "scifi_fable2"}) is False
-        assert _legacy_line_compose_applicable(
-            {"source_bank": "science_news"}) is True
-        assert _legacy_line_compose_applicable({}) is True
-        assert _legacy_line_compose_applicable(
-            {"source_bank": "no_such_bank"}) is True  # fail-open
+        assert resolve_freeze_policy(
+            {"source_bank": "scifi_fable2"}
+        ).run_legacy_content_passes is False
+        assert resolve_freeze_policy(
+            {"source_bank": "science_news"}
+        ).run_legacy_content_passes is True
+        assert resolve_freeze_policy({}).run_legacy_content_passes is True
+        bad = resolve_freeze_policy({"source_bank": "no_such_bank"})
+        assert bad.run_legacy_content_passes is False
+        assert bad.terminal_error  # terminal, NOT fail-open
     finally:
         ROUTING._REGISTRY = None
+
+
+def test_set_lines_rebuild_does_not_resurrect_stale_skip(tmp_path):
+    # QA r2 P0.2: persist a SKIPPED b001, rebuild it through the public
+    # set_lines() API with non-empty text (set_lines omits the skip
+    # family by schema), save, and assert the stale disk skip flag +
+    # reasons do NOT come back. Pre-fix the key-presence test read the
+    # omission as "restore old disk state" -> skip=True on a non-empty
+    # line -> Phase 10 freeze error.
+    led = _PL.new_ledger(episode_id="rebuild_own",
+                         out_dir=str(tmp_path / "ep"))
+    led.set_lines([_row()])
+    row = led.data["lines"][0]
+    row["skip"] = True
+    row["reviewer_skip_reason"] = "old"
+    row["tts_skip_reason"] = "reviewer_skip: old"
+    row["text"] = ""
+    row["char_count"] = 0
+    row["word_count"] = 0
+    led.save()  # skipped row now on disk
+    led.set_lines([_row(text="Fresh authoritative rebuild.")])
+    led.save()
+    merged = led.data["lines"][0]
+    assert merged["text"] == "Fresh authoritative rebuild."
+    assert "skip" not in merged
+    assert "tts_skip_reason" not in merged
+    assert "reviewer_skip_reason" not in merged
+    # reopen from disk: the persisted row is equally clean
+    import json
+    on_disk = json.loads(
+        Path(led.path).read_text(encoding="utf-8"))["lines"][0]
+    assert on_disk["text"] == "Fresh authoritative rebuild."
+    assert "skip" not in on_disk
+    assert "tts_skip_reason" not in on_disk
+    assert "reviewer_skip_reason" not in on_disk
+
+
+def test_set_lines_rebuild_with_empty_text_reflects_new_row(tmp_path):
+    # QA r2 P0.2 (variant): an explicitly EMPTY replacement text is the
+    # new authoritative state -- not an invitation to restore the old
+    # disk text (round-1 regression held at the rebuild boundary too).
+    led = _PL.new_ledger(episode_id="rebuild_empty",
+                         out_dir=str(tmp_path / "ep"))
+    led.set_lines([_row()])
+    led.save()
+    led.set_lines([_row(text="")])
+    led.save()
+    merged = led.data["lines"][0]
+    assert merged["text"] == ""
+    assert merged["word_count"] == 0
+    # durable out-of-band fields still survive a rebuild (BUG-108)
+    import json
+    p = Path(led.path)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    data["lines"][0]["bark_wav_path"] = "durable.wav"
+    p.write_text(json.dumps(data), encoding="utf-8")
+    led.set_lines([_row(text="Third rebuild.")])
+    led.save()
+    assert led.data["lines"][0]["bark_wav_path"] == "durable.wav"
