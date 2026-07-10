@@ -240,6 +240,21 @@ class OTRVideoDirector:
                     "forceInput": True,
                     "tooltip": "Optional ordering signal (opaque STRING).",
                 }),
+                # S5 platform-portability (2026-07-10): explicit device/dtype
+                # policy widgets (append-only; widget slots 12-13). Defaults
+                # = nv50 baseline; emitted in the v2 policy and enforced at
+                # the adapter boundary (S4).
+                "device_policy": (["cuda", "cpu", "mps"], {
+                    "default": "cuda",
+                    "tooltip": "EXPLICIT local video render device (platform "
+                               "profile value). No auto-detect.",
+                }),
+                "dtype_policy": (["fp8_ok", "no_fp8", "no_fp8_no_fp4"], {
+                    "default": "fp8_ok",
+                    "tooltip": "Dtype lanes allowed for local video engines "
+                               "(fp8/fp4 artifacts are OFF on ROCm/MPS "
+                               "tiers).",
+                }),
             },
         }
 

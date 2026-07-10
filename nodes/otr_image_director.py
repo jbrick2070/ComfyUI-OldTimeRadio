@@ -300,6 +300,16 @@ class OTRImageDirector:
                     "multiline": True, "default": "", "forceInput": True,
                     "tooltip": "Optional ordering signal (opaque STRING).",
                 }),
+                # S5 platform-portability (2026-07-10): explicit dtype policy
+                # widget (append-only; widget slot 7). Default = nv50
+                # baseline; emitted in the v2 policy and enforced at the
+                # adapter boundary (S4).
+                "dtype_policy": (["fp8_ok", "no_fp8", "no_fp8_no_fp4"], {
+                    "default": "fp8_ok",
+                    "tooltip": "Dtype lanes allowed for local image engines "
+                               "(fp8/fp4 artifacts are OFF on ROCm/MPS "
+                               "tiers).",
+                }),
             },
         }
 

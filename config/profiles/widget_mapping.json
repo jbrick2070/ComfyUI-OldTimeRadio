@@ -383,6 +383,42 @@
           "beats"
         ]
       ]
+    },
+    "video.device_policy": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "device_policy"
+        ]
+      ]
+    },
+    "video.dtype_policy": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "dtype_policy"
+        ]
+      ]
+    },
+    "image.dtype_policy": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_ImageDirector",
+          "dtype_policy"
+        ]
+      ]
+    },
+    "audio.voice_device": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_CastLock",
+          "voice_device"
+        ]
+      ]
     }
   },
   "emit_only": {

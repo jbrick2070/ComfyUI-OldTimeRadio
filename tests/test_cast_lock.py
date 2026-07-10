@@ -61,9 +61,10 @@ def test_input_types_widget_surface():
         assert spec is not None and spec[1].get("forceInput") is True, key
     # delivery_profile surface removed 2026-07-04 (widget-audit Batch 1); single
     # option "neutral" -- the lock() kwarg still defaults + is validated/stamped.
+    # S5 platform-portability (2026-07-10): voice_device appended at slot 5.
     assert _serialized_slots(it) == [
         "voice_bank", "cast_voice_policy", "allow_voice_reuse",
-        "char_voice_engine", "announcer_voice_engine",
+        "char_voice_engine", "announcer_voice_engine", "voice_device",
     ]
     for name in ("ledger_json", "cast_lock_revision", "cast_report", "done"):
         assert name in CastLock.RETURN_NAMES

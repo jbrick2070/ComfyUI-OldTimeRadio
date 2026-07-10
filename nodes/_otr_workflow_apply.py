@@ -458,6 +458,18 @@ def _flatten_profile_values(profile: dict) -> dict:
               "composite_w", "composite_h", "frame_budget", "beats"):
         if k in rend:
             flat[f"render.{k}"] = rend[k]
+    # S5: director + castlock policy widgets.
+    vid = profile.get("video", {})
+    if "device_policy" in vid:
+        flat["video.device_policy"] = vid["device_policy"]
+    if "dtype_policy" in vid:
+        flat["video.dtype_policy"] = vid["dtype_policy"]
+    img = profile.get("image", {})
+    if "dtype_policy" in img:
+        flat["image.dtype_policy"] = img["dtype_policy"]
+    aud = profile.get("audio", {})
+    if "voice_device" in aud:
+        flat["audio.voice_device"] = aud["voice_device"]
     return flat
 
 

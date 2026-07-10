@@ -130,6 +130,16 @@ class CastLock:
                     "forceInput": True,
                     "tooltip": "Optional ordering signal (wire an upstream done).",
                 }),
+                # S5 platform-portability (2026-07-10): explicit voice device
+                # (append-only; widget slot 5). Stamped as meta.voice_device
+                # (S4) so every voice adapter + theme music reads ONE truth;
+                # the per-adapter waterfalls are gone.
+                "voice_device": (["cuda", "cpu", "mps"], {
+                    "default": "cuda",
+                    "tooltip": "EXPLICIT device for local voice/music "
+                               "engines (platform profile value). No "
+                               "auto-detect; unavailable devices fail loud.",
+                }),
             },
         }
 
