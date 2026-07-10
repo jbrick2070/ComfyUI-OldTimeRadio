@@ -1,5 +1,24 @@
 # OTR Go-Forward Plan
 
+**ACTIVE STEP (2026-07-10 evening): 720-word STORY-ENGINE BAKE-OFF RUNWAY.**
+Plan of record: `docs/2026-07-10-fable2-720-bakeoff-runway.md` (kibitz'd before
+C4 coding). Chunks C1-C7: P1.1 ownership/revision merge contract -> P1.3
+text_for_tts (science_news byte-parity fixture FIRST) -> P1.4 cue manifest +
+canonical workflow delta (links 241-243 out, 280-283 in, code+JSON same commit)
+-> P1.5 S2 full loop (3-pitch/P4/P5/keep-better judge, 120-900w) -> 350w + 720w
+live rolls -> P2.2 caption/credits alias + HuMo guard -> bake-off: fable2 vs
+original_radio vs science_news vs a GPT-authored from-scratch fable2-pipeline
+pack (operator-ratified contender D), one pinned news story, 720w each, blinded
+operator judging. 720w needs NO act-chunking (inside S2's 120-900 band).
+Precondition SHIPPED @ `47bf50f2`: r2-QA P0 fold -- FreezePolicy
+content_owned_readonly freeze boundary (fable2 skips reviewer/doctor/5B/A3/5C/
+escalation/A2/D3-mutation/Phase-7-normalization; read-only proof verification;
+tagged-unresolvable bank TERMINAL; freeze_capability_receipt w/ sha256 +
+content_mutations=0), live-root veto after reviewer save-rebind (P0.3), 19-field
+absent-key merge ownership (P0.2). Suite 7463/31/1 + Bug Bible green. Governing
+spec: `docs/2026-07-10-fable2-s2-QA-ANALYSIS-r2.md`. Deferred: P2.1
+retire-doctor-skip, P2.3 soak cohorts, >900w act-chunk, cloud pins.
+
 **scifi_fable2 S1b SHIPPED + FIRST GREEN EPISODE (2026-07-10 midday, this
 coder window; slot released).** Spine live per doc s13 + the s13.5
 deviation record: runner @ `a24b75c4`, 25-roll live-smoke hardening +
