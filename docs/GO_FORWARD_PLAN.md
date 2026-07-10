@@ -16,13 +16,15 @@ hardening doc), source-as-legality-authority subset gates, delete-only
 dossier entity filtering, nested-path clamp in _otr_structured_call.
 Next fable2 step = **S2: full loop** (P1 three-pitch + P2a select + P4
 critic + P5 revision + keep-better-draft; 350w live smoke; doc s13 S2
-test set). **BLOCKER before S2 / the LTX media-path roll:** the freeze
-cascade's Sprint-5C reroll failure path stamps skip=True (no
-tts_skip_reason, no breadcrumb) on its target rows when compose_line
-dies on fable2's legitimately-missing legacy line_composer_system seam
--> Phase 10 needs_full_rerun. Full external-QA brief (big problems +
-downstream landmine audit ask):
-`docs/2026-07-10-fable2-s1b-QA-PROBLEM-STATEMENT.md`.
+test set). **BLOCKER RESOLVED (external QA fold @ af378aad):** real
+chain was doctor-skip + stale-disk merge resurrection, NOT the 5C
+reroll -- ownership-aware merge + skip contract + 5B/5C lane capability
+gate shipped; **LTX media path GREEN: "The Butterfly's Gambit" in obs
+(1787s, character lane ltx_audio_in + stills)**. S2 must fold the QA
+runway items (proof-provenance/text_for_tts, inter-scene music wiring,
+caption/credits sentinel alias, HuMo stale guard, per-scene band
+allocation): `docs/2026-07-10-fable2-s1b-QA-ANALYSIS.md` (file:line
+pins) + the brief `docs/2026-07-10-fable2-s1b-QA-PROBLEM-STATEMENT.md`.
 
 **Updated:** 2026-07-10 midday -- HEAD `ff4c226d` (+ this session's
 follow-up commit)

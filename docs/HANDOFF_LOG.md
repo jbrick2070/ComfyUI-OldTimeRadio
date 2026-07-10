@@ -3,6 +3,26 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-10 ~14:20 -- HEAD af378aad (v2.0-alpha) [scifi_fable2 S1b coder window, QA fold]
+
+Did:
+- External QA analysis (docs/2026-07-10-fable2-s1b-QA-ANALYSIS.md) folded: it
+  OVERTURNED the 5C-mutator theory -- real chain = doctor 'skip' clears text ->
+  Ledger.save() stale-disk merge resurrects old text -> Phase 10 gap. P0 fixes
+  shipped @ af378aad: ownership-aware merge (_MERGE_OWNED_ROW_FIELDS), doctor
+  skip stamps tts_skip_reason, 5B/5C lane capability gate
+  (_legacy_line_compose_applicable; fable2 pack has no line_composer_system).
+  QA regression file tests/test_ledger_merge_ownership.py. Suite 7451/31/1.
+- LTX MEDIA PATH GREEN: "The Butterfly's Gambit" published to obs (1787s,
+  41.8 MB) -- character lane ltx_audio_in + stills; capability gate fired live;
+  freeze passed; canonical no-diff.
+Current step: fable2 S2 (full loop, 350w) with the QA runway items folded in:
+proof-provenance (doctor/Phase-7 rewrite after proof seal -> text_for_tts),
+inter-scene music wiring, caption/credits sentinel alias, HuMo stale guard,
+per-scene band allocation (all pinned w/ file:line in the QA analysis doc).
+Next: S2 in a fresh coder window; operator eyeball on both fable2 episodes.
+Commits: af378aad (+ this docs commit) -- pushed.
+
 ## 2026-07-10 ~13:15 -- HEAD 8e3d9228 (v2.0-alpha) [scifi_fable2 S1b coder window]
 
 Did:
