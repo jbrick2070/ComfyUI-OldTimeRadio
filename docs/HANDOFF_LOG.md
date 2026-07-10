@@ -3,6 +3,38 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-10 ~08:00 -- HEAD c932880f (v2.0-alpha) [scifi_fable2 coder window]
+
+Did:
+- scifi_fable2 S1a SHIPPED: writer tail (J.5 -> M save) extracted into
+  `_run_writer_tail(ctx)` + 17-field WriterTailContext (doc s11 pins);
+  moved body verified character-identical vs pre-extraction modulo the 2
+  pinned gates (title override precedence + run_story_spine gate, s14/8);
+  late _OTRC/_PL imports followed the tail. 11 new tests
+  (test_fable2_tail_context.py: ctx contract, no-closure, delegation,
+  same-run byte identity, spine gate both ways, title precedence x3,
+  refine stash x2). 3 AST pin modules updated to follow the move
+  (story_brief_c5a2 fixture, announcer title-regen pin, title scratchpad).
+  ROOT-CAUSE find: my byte-identity test leaked production_ledger._CURRENT
+  (singleton) -> broke lfc C4 tests downstream; autouse save/restore
+  fixture added. Commit `948c5a0a`.
+- ONE legacy science_news 30w live smoke on the extracted tail: RESULT
+  SUCCESS 555s (baseline band), "Etna's Secret" published to obs (60.7 MB,
+  Test-Path confirmed); J.5 regen fired live (title_source=
+  llm_post_composition). Ledger scrubbed (paths anonymized, article text
+  truncated, all keys/rows kept) -> tests/fixtures/fable2/
+  legacy_reference_ledger.json + README. Commit `c932880f`.
+- Gates: suite 7332/31/1 + Bug Bible 17/7/3 green at 948c5a0a (+ post-
+  fixture full-suite re-run green); BOM/AST/0-byte/HEAD==origin verified.
+  Also committed a leftover ENGINE_MATRIX docs hunk from the prior
+  session (`5f5820a7`).
+Current step: scifi_fable2 S1b -- spine, live (runner P0/P1-one-pitch/
+P2b/P3/P6/P7 + P8 audit-only; flip runnable+executable SAME change; doc
+s13 S1b test set; 30w live smoke; validator no-diff record).
+Next: S1b in a coder window (doc sections 5/8/11/13; re-pin splice lines
+in the S1b commit).
+Commits: 5f5820a7, 948c5a0a, c932880f (+ this docs commit) -- all pushed.
+
 ## 2026-07-10 ~06:45 -- HEAD d7379920 (v2.0-alpha) [scifi_fable2 coder window]
 
 Did:

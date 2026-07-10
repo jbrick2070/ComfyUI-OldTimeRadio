@@ -1,16 +1,19 @@
 # OTR Go-Forward Plan
 
-**CODER SLOT RELEASED (scifi_fable2 S0 window, 2026-07-10).** S0 SHIPPED --
-inert surfaces per docs/2026-07-10-scifi-fable2-architecture.md section 13
-(registry rows runnable:false/executable:false, 9-seam pack, frame deck +
-sidecar, detection-only rules, markup parser, 66 tests; doc s14 pins 1/5/10
-resolved). Next fable2 step = **S1a: the tail extraction ALONE** (writer
-`_run_writer_tail(ctx)` + byte-identity pin + one legacy science live smoke;
-NOTHING fable2-visible ships in S1a). NOTE: S0's staged files were swept
-into the freeze-cascade window's commit `d7379920` (content verified intact;
-full suite re-certified green at that HEAD: 7321/31/1 + Bug Bible 17/7/3).
+**scifi_fable2 S1a SHIPPED (2026-07-10 morning, this coder window; slot
+still claimed).** Tail extraction per doc s11/s13: `_run_writer_tail(ctx)`
++ 17-field `WriterTailContext` (@ `948c5a0a`, moved-body verified
+character-identical modulo the 2 pinned gates), 11 new pin tests, 3 AST
+call-site pin modules follow the move; ONE legacy science 30w live smoke
+GREEN on the extracted tail (etnas_secret, RESULT SUCCESS 555s, obs
+publish Test-Path'd); scrubbed fixture
+`tests/fixtures/fable2/legacy_reference_ledger.json` committed
+(@ `c932880f`). Nothing fable2-visible shipped. Next fable2 step =
+**S1b: spine, live** (runner P0/P1-one-pitch/P2b/P3/P6/P7 + P8 audit-only;
+flip runnable+executable SAME change; doc s13 S1b test set; 30w live
+smoke; validator no-diff record).
 
-**Updated:** 2026-07-10 -- HEAD `d7379920`
+**Updated:** 2026-07-10 -- HEAD `c932880f`
 **Branch:** `v2.0-alpha`
 **Status:** original_radio LIVE SMOKE GREEN 2026-07-10 ("Page in the
 Tempest" published to obs). Remaining gate = OPERATOR EYEBALL only ->
