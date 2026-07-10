@@ -3,6 +3,27 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-10 ~13:15 -- HEAD 8e3d9228 (v2.0-alpha) [scifi_fable2 S1b coder window]
+
+Did:
+- S1b SHIPPED: runner + dispatch + registry flips + 80+ tests @ a24b75c4;
+  25-roll live-smoke hardening (kibitz r2/r3/r4 + sonnet/opus fan-out per the
+  new kibitz-every-failure directive) @ ff4c226d + 8e3d9228. FIRST GREEN
+  EPISODE: "Einstein's Echo" in obs (570s); canonical no-diff + validator OK.
+- ROOT-CAUSE fix: reviewer role_mismatch flipped sentinel announcer rows to
+  character breadcrumb-lessly (sonnet+opus converged on reviewer.py role
+  branch); symmetric guard + breadcrumb + regression tests shipped.
+- OPEN BLOCKER: cascade 5C-reroll failure path stamps skip=True on target
+  rows when fable2's pack (correctly) lacks line_composer_system -> Phase 10
+  needs_full_rerun. LTX media roll (stills+ltx_audio_in via _tmp probe,
+  16gb_full + character_visual override) got 25 min deep; blocked on this.
+- External-QA brief written per operator: docs/2026-07-10-fable2-s1b-QA-
+  PROBLEM-STATEMENT.md (big problems + full downstream landmine audit ask).
+Current step: resolve the skip-mutator blocker (QA brief) -> green LTX-lane
+fable2 roll -> then fable2 S2 (full loop, 350w).
+Next: operator runs the QA brief through the external analyst; fold findings.
+Commits: a24b75c4, ff4c226d, 8e3d9228 (+ this docs commit) -- all pushed.
+
 ## 2026-07-10 ~08:00 -- HEAD c932880f (v2.0-alpha) [scifi_fable2 coder window]
 
 Did:

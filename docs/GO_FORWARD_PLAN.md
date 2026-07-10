@@ -1,19 +1,31 @@
 # OTR Go-Forward Plan
 
-**scifi_fable2 S1a SHIPPED (2026-07-10 morning, this coder window; slot
-still claimed).** Tail extraction per doc s11/s13: `_run_writer_tail(ctx)`
-+ 17-field `WriterTailContext` (@ `948c5a0a`, moved-body verified
-character-identical modulo the 2 pinned gates), 11 new pin tests, 3 AST
-call-site pin modules follow the move; ONE legacy science 30w live smoke
-GREEN on the extracted tail (etnas_secret, RESULT SUCCESS 555s, obs
-publish Test-Path'd); scrubbed fixture
-`tests/fixtures/fable2/legacy_reference_ledger.json` committed
-(@ `c932880f`). Nothing fable2-visible shipped. Next fable2 step =
-**S1b: spine, live** (runner P0/P1-one-pitch/P2b/P3/P6/P7 + P8 audit-only;
-flip runnable+executable SAME change; doc s13 S1b test set; 30w live
-smoke; validator no-diff record).
+**scifi_fable2 S1b SHIPPED + FIRST GREEN EPISODE (2026-07-10 midday, this
+coder window; slot released).** Spine live per doc s13 + the s13.5
+deviation record: runner @ `a24b75c4`, 25-roll live-smoke hardening +
+kibitz r2/r3/r4 folded @ `ff4c226d` (+ follow-up chunk this session) --
+**"Einstein's Echo" published to obs (RESULT SUCCESS 570s, 56.9 MB,
+Test-Path'd), canonical JSON NO-DIFF + OTR_WorkflowValidator OK
+recorded.** Key S1b deltas (details: doc s13.5 +
+`docs/2026-07-10-fable2-s1b-smoke-hardening.md`): P2c read-split
+(10th seam `fable2_news_read_system`), parser delete-only decoration
+normalization, 4-rung P3 ladder + few-shot + micro-episode line cap,
+one-word cast labels, sentinel announcer char_id (freeze-cascade
+mutator dodge -- ROOT MUTATOR STILL UNIDENTIFIED, open question in the
+hardening doc), source-as-legality-authority subset gates, delete-only
+dossier entity filtering, nested-path clamp in _otr_structured_call.
+Next fable2 step = **S2: full loop** (P1 three-pitch + P2a select + P4
+critic + P5 revision + keep-better-draft; 350w live smoke; doc s13 S2
+test set). **BLOCKER before S2 / the LTX media-path roll:** the freeze
+cascade's Sprint-5C reroll failure path stamps skip=True (no
+tts_skip_reason, no breadcrumb) on its target rows when compose_line
+dies on fable2's legitimately-missing legacy line_composer_system seam
+-> Phase 10 needs_full_rerun. Full external-QA brief (big problems +
+downstream landmine audit ask):
+`docs/2026-07-10-fable2-s1b-QA-PROBLEM-STATEMENT.md`.
 
-**Updated:** 2026-07-10 -- HEAD `c932880f`
+**Updated:** 2026-07-10 midday -- HEAD `ff4c226d` (+ this session's
+follow-up commit)
 **Branch:** `v2.0-alpha`
 **Status:** original_radio LIVE SMOKE GREEN 2026-07-10 ("Page in the
 Tempest" published to obs). Remaining gate = OPERATOR EYEBALL only ->
