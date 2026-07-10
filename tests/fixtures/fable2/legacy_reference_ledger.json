@@ -1,0 +1,1493 @@
+{
+  "schema_version": "l3-2026-05-14",
+  "episode_id": "signal_lost_etnas_secret_20260710_072427",
+  "commit": "948c5a0a",
+  "total_episode_dur_s": 62.629895833333336,
+  "total_char_count": 695,
+  "total_word_count": 117,
+  "total_dialogue_lines": 5,
+  "total_beats": 0,
+  "cast": [
+    {
+      "char_id": "c01",
+      "name": "ANNOUNCER",
+      "character_description": "Period radio announcer; reads the science story and frames the drama between beats.",
+      "gender": "female",
+      "tts_model": "kokoro",
+      "voice_preset": "bf_lily",
+      "voice_params": null,
+      "line_count": 1,
+      "word_count": 29,
+      "voice_ref_id": "bm_george",
+      "voice_engine": "kokoro",
+      "commercial_clean": true
+    },
+    {
+      "char_id": "c02",
+      "name": "LEMMY",
+      "character_description": "Genial communications officer, 50s, broad friendly Cockney accent, quick-witted and humorous with a warm grin, brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica",
+      "gender": "male",
+      "tts_model": "bark",
+      "voice_preset": "v2/en_speaker_8",
+      "voice_params": null,
+      "line_count": 2,
+      "word_count": 39,
+      "voice_ref_id": "vz_donor_marshal_indian",
+      "voice_engine": "indextts2",
+      "commercial_clean": true
+    },
+    {
+      "char_id": "c03",
+      "name": "ALICE SIMPSON",
+      "character_description": "30s, Geologist and Team Leader. Face: Oval, Intense brows, Straight nose, Thin mouth, Strong jawline, Prominent scar on left cheek. Presence: Carries the weight of the world on her shoulders. Voice: Authoritative yet soothing, like a warm cup of tea in a crisis.",
+      "gender": "female",
+      "tts_model": "bark",
+      "voice_preset": "v2/en_speaker_4",
+      "voice_params": null,
+      "line_count": 1,
+      "word_count": 14,
+      "voice_ref_id": "vz_caro_davy",
+      "voice_engine": "indextts2",
+      "commercial_clean": true
+    }
+  ],
+  "scenes": [],
+  "shots": [],
+  "beats": [],
+  "lines": [
+    {
+      "line_id": "b001",
+      "shot_id": null,
+      "beat_id": "b001",
+      "char_id": "announcer",
+      "text": "In the bright, tense silence of her office, Alice Simpson leans across her desk, a stack of incriminating papers clutched in her hand. She says, \"Lemmy, old friend, it seems we have a little problem.",
+      "traits": "welcoming",
+      "boundary": null,
+      "char_count": 199,
+      "word_count": 35,
+      "bark_wav_path": null,
+      "start_s": 9.5,
+      "dur_s": 13.893041666666667,
+      "speaker_role": "announcer",
+      "arc_phase": "scene",
+      "compose_flags": [
+        "announcer_intro",
+        "announcer_intro_rewritten"
+      ],
+      "beat_intent": "Open the episode and orient the listener.",
+      "target_words": 15,
+      "dialogue_slot_id": "d001",
+      "start_s_space": "master_mix"
+    },
+    {
+      "line_id": "b002",
+      "shot_id": null,
+      "beat_id": "b002",
+      "char_id": "c02",
+      "text": "Marco, old chap, let's not dance around the Etna. Spill the beans before I raise alarm.",
+      "traits": "Tense",
+      "boundary": null,
+      "char_count": 87,
+      "word_count": 16,
+      "bark_wav_path": null,
+      "start_s": 23.39304166666667,
+      "dur_s": 5.414604166666667,
+      "speaker_role": "character",
+      "arc_phase": "scene",
+      "compose_flags": [
+        "phantom_name:Marco",
+        "cliche_retry"
+      ],
+      "beat_intent": "Demands Marco reveal his mysterious findings under threat of public exposure; the scene is set: the trading log is already in play before the pressure builds",
+      "target_words": 10,
+      "dialogue_slot_id": "d002",
+      "start_s_space": "master_mix"
+    },
+    {
+      "line_id": "b003",
+      "shot_id": null,
+      "beat_id": "b003",
+      "char_id": "c03",
+      "text": "I've seen the data, Marco. Ancient pockets of magma, shifting plates... It's all here.",
+      "traits": "Tense",
+      "boundary": null,
+      "char_count": 86,
+      "word_count": 14,
+      "bark_wav_path": null,
+      "start_s": 28.807645833333332,
+      "dur_s": 5.135979166666667,
+      "speaker_role": "character",
+      "arc_phase": "scene",
+      "compose_flags": [
+        "phantom_name:Marco",
+        "phantom_name:Marco"
+      ],
+      "beat_intent": "Alice threatens to expose Marco's secret publicly if he doesn't cooperate, raising the stakes; what is personally at stake turns on the merger's disclosure",
+      "target_words": 10,
+      "dialogue_slot_id": "d003",
+      "start_s_space": "master_mix"
+    },
+    {
+      "line_id": "b004",
+      "shot_id": null,
+      "beat_id": "b004",
+      "char_id": "c02",
+      "text": "Prove it, Alice. Or I'll make sure your name becomes synonymous with false accusations... and you'll lose your team's trust in the process.",
+      "traits": "tense",
+      "boundary": null,
+      "char_count": 139,
+      "word_count": 23,
+      "bark_wav_path": null,
+      "start_s": 33.943625,
+      "dur_s": 8.0805625,
+      "speaker_role": "character",
+      "arc_phase": "scene",
+      "compose_flags": [],
+      "beat_intent": "Marco confronts Alice, demanding she prove her accusations or risk his retaliation; on-stage, they part over the merger's disclosure -- gaining and losing in one breath",
+      "target_words": 10,
+      "dialogue_slot_id": "d004",
+      "start_s_space": "master_mix"
+    },
+    {
+      "line_id": "b005",
+      "shot_id": null,
+      "beat_id": "b005",
+      "char_id": "c01",
+      "text": "Beyond the rolling hills of tonight's Sicilian vineyard: Europe's most active volcano, Mount Etna, might not fit into any known category of volcano formation, according to a new study.",
+      "traits": "reflective",
+      "boundary": null,
+      "char_count": 184,
+      "word_count": 29,
+      "bark_wav_path": null,
+      "start_s": 42.0241875,
+      "dur_s": 13.118041666666667,
+      "speaker_role": "announcer",
+      "arc_phase": "scene",
+      "compose_flags": [
+        "news_coda_bridge"
+      ],
+      "beat_intent": "Sign off on a single concrete final image or sound. Do NOT state, summarize, or resolve the outcome -- not who won or what was decided. The resolution belongs to the final beat.",
+      "target_words": 15,
+      "dialogue_slot_id": "d005",
+      "start_s_space": "master_mix"
+    }
+  ],
+  "music": [],
+  "clips": [],
+  "final_audio_path": null,
+  "final_video_path": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427_silent_procgen_blended_captioned\\signal_lost_etnas_secret_20260710_072427_silent_procgen_blended_captioned_with_credits_final.mp4",
+  "meta": {
+    "cast_status": "locked",
+    "requested_num_characters": 2,
+    "source_bank": "science_news",
+    "source_ref": "",
+    "source_meta": {},
+    "source_rights": {},
+    "story_scaffold": "auto",
+    "visual_style": "sci_fi_radio",
+    "story_quality_v2_enabled": true,
+    "news_seed": {
+      "headline": "Europe's most active volcano may have a secret origin",
+      "source": "Latest Science News -- ScienceDaily",
+      "url": "https://www.sciencedaily.com/releases/2026/07/260709160653.htm",
+      "date": "Fri, 10 Jul 2026 07:16:59 EDT",
+      "body_chars": 464,
+      "selected_at": "2026-07-10T07:19:53"
+    },
+    "paths": {
+      "ledger_path": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\audio\\signal_lost_etnas_secret_20260710_072427_ledger.json",
+      "episode_root": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427",
+      "audio_dir": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\audio",
+      "stills_dir": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\stills",
+      "portraits_dir": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\portraits",
+      "videos_dir": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\videos",
+      "composited_dir": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\composited",
+      "obs_final": "<OTR_OUTPUT>\\otr\\obs\\signal_lost_etnas_secret_20260710_072427.mp4",
+      "obs_dir": "<OTR_OUTPUT>\\otr\\obs",
+      "layout": "per-episode-workspace"
+    },
+    "schema_version": "l3-2026-05-14",
+    "news": {
+      "casting_brief": "Geologists, volcanologists, researchers, experts in tectonic plates and magma behavior.",
+      "script_brief": "A groundbreaking study challenges conventional wisdom about volcano formation, centering on Europe's most active volcano, Mount Etna. The investigation suggests Etna's unique origins could redefine our understanding of volcanic activity, potentially opening doors to new insights about Earth's geology.",
+      "news_close_brief": "Europe's most active volcano, Mount Etna, might not fit into any known category of volcano formation, according to a new study.",
+      "key_terms": [
+        "Mount Etna",
+        "ancient pockets of magma",
+        "shifting tectonic plates",
+        "classic ways volcanoes are thought to form"
+      ],
+      "source_hash": "d8bb763ea65df7789821fcf4757f8645f8263934a9c7eebf7a6620d3d93bc3d2",
+      "source_chars": 464,
+      "prompt_version": "news_interpreter_v1",
+      "schema_version": "l3-2026-05-14",
+      "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+      "decoder_profile": "default_v1",
+      "seed": 0,
+      "attempts": 1,
+      "attempt_failures": []
+    },
+    "story_quality": {
+      "l12_domain": "finance",
+      "conflict_objects": [
+        "the loan covenant",
+        "the merger's disclosure",
+        "the trading log"
+      ],
+      "conflict_types": [
+        "a clash between the quarter and the truth",
+        "a fight over whose money is at risk",
+        "a struggle over who takes the blame"
+      ],
+      "style_slug": "neighborhood_watch_paranoia",
+      "ending_tag": "bittersweet_parting",
+      "final_beat_crisis_nouns": 0,
+      "open_safe_fallback": false,
+      "body_gate_ungrounded_crisis": 0,
+      "body_gate_failed": 1,
+      "news_coda_emitted": true,
+      "news_coda_fallback": false,
+      "l1_rerolls": 0,
+      "l7_splits": 0,
+      "l7_split_failures": 0,
+      "ungrounded_crisis": {
+        "matches": 0,
+        "total": 128
+      }
+    },
+    "story_contract": {
+      "slug": "neighborhood_watch_paranoia",
+      "label": "neighborhood-watch paranoia",
+      "ending_tag": "bittersweet_parting",
+      "sound_world": "a porch, crickets, a screen door, radios, a dog, low voices"
+    },
+    "story_scaffold_enabled": true,
+    "style": "neighborhood_watch_paranoia",
+    "cast_locked": true,
+    "cast_contract_version": "cast-v1",
+    "cast_contract": {
+      "lemmy_hit": true,
+      "casting_attempts": [
+        1
+      ],
+      "num_characters_request": 2,
+      "num_characters_locked": 2,
+      "cast_seed": 1314442220,
+      "cast_seed_source": "OS entropy"
+    },
+    "cast_voice_slots": {
+      "c01": {
+        "gender": "female",
+        "timbre": [],
+        "role": "",
+        "age_band": "",
+        "speech_signature": "wry and indirect",
+        "description_digest": "5b91bc9dd708"
+      },
+      "c02": {
+        "gender": "male",
+        "timbre": [],
+        "role": "",
+        "age_band": "",
+        "speech_signature": "gruff, few words",
+        "description_digest": "07a0b0e8a314"
+      },
+      "c03": {
+        "gender": "female",
+        "timbre": [
+          "warm"
+        ],
+        "role": "lead",
+        "age_band": "adult",
+        "speech_signature": "measured, precise",
+        "description_digest": "fe980df44e1a"
+      }
+    },
+    "voice_cast_decision": {
+      "c03": {
+        "policy_version": "1",
+        "bank_sha": "90a371cfe95a1c198fd51d395ad60537654ada38187f2f18d8879ea2ea906a9d",
+        "engine": "indextts2",
+        "prompt_version": "voicefit-v1",
+        "seed": 1314442220,
+        "candidate_ids": [
+          "vz_caro_davy",
+          "vz_donor_3973",
+          "vz_donor_9a66",
+          "vz_donor_andrea",
+          "vz_donor_andrea_spanish",
+          "vz_donor_awais_shah",
+          "vz_donor_bathri",
+          "vz_donor_bijay",
+          "vz_donor_blake",
+          "vz_donor_erihppas",
+          "vz_donor_f179",
+          "vz_donor_glenn"
+        ],
+        "proposed_id": "vz_caro_davy",
+        "accepted_id": "vz_caro_davy",
+        "fallback_reason": ""
+      }
+    },
+    "words_per_beat_range": [
+      10,
+      50
+    ],
+    "story_quality_l12_enabled": true,
+    "grounded_nouns": [
+      "active",
+      "activity",
+      "alice",
+      "ancient",
+      "announcer",
+      "associated",
+      "because",
+      "belong",
+      "can",
+      "category",
+      "centering",
+      "challenges",
+      "classic",
+      "close-knit",
+      "confirmed",
+      "conventional",
+      "cracks",
+      "created",
+      "doesn't",
+      "doors",
+      "earth's",
+      "eruptions",
+      "etna",
+      "etna's",
+      "europe's",
+      "fit",
+      "form",
+      "formation",
+      "fourth",
+      "fueled",
+      "geologist",
+      "geologists",
+      "geology",
+      "global",
+      "groundbreaking",
+      "harboring",
+      "insights",
+      "instead",
+      "investigation",
+      "larger",
+      "lemmy",
+      "long",
+      "magma",
+      "may",
+      "mount",
+      "much",
+      "neighbor",
+      "neighborhood",
+      "new",
+      "opening",
+      "origin",
+      "origins",
+      "our",
+      "paranoia",
+      "plates",
+      "pockets",
+      "potentially",
+      "previously",
+      "processes",
+      "pushed",
+      "puzzled",
+      "rare",
+      "redefine",
+      "reshape",
+      "revealing",
+      "secret",
+      "secrets",
+      "shifting",
+      "sicily",
+      "simpson",
+      "small",
+      "study",
+      "submarine",
+      "suggests",
+      "suspects",
+      "tectonic",
+      "thought",
+      "three",
+      "through",
+      "trigger",
+      "understanding",
+      "unique",
+      "upward",
+      "volcanic",
+      "volcano",
+      "volcanoes",
+      "watch",
+      "ways",
+      "wisdom"
+    ],
+    "story_quality_grammar_enabled": true,
+    "specificity_anchors": [
+      "Mount Etna",
+      "ancient pockets of magma",
+      "shifting tectonic plates",
+      "classic ways volcanoes are thought to form"
+    ],
+    "central_object": "ancient pockets of magma",
+    "_specificity_anchors_injected": true,
+    "arc_shape": "heist",
+    "dramatic_state_source": "llm",
+    "dramatic_state": {
+      "dramatic_question": "Will Etna's true origins remain hidden, or will they revolutionize our understanding of volcanic activity?",
+      "character_a_wants": "To preserve Etna's classic status, maintaining the established understanding of volcano formation.",
+      "character_b_wants": "To prove Etna's unique origins, challenging conventional wisdom and rewriting volcanic history.",
+      "costly_choice_beat": "d004",
+      "ending_change": "The world's perception of Mount Etna shifts, with Etna's unique origins now recognized, reshaping our understanding of volcanic activity."
+    },
+    "continuity": {
+      "location": "A close-knit neighborhood watch in Sicily",
+      "active_props": [
+        "trading log"
+      ],
+      "facts": [
+        {
+          "fact": "Marco has mysterious geological findings",
+          "known_by": [
+            "LEMMY",
+            "ALICE SIMPSON"
+          ],
+          "hidden_from": [],
+          "established_beat": 1
+        },
+        {
+          "fact": "Alice threatens to expose Marco's secret",
+          "known_by": [
+            "LEMMY",
+            "ALICE SIMPSON"
+          ],
+          "hidden_from": [
+            "MARCO"
+          ],
+          "established_beat": 2
+        },
+        {
+          "fact": "Marco confronts Alice over the merger's disclosure",
+          "known_by": [
+            "LEMMY",
+            "ALICE SIMPSON"
+          ],
+          "hidden_from": [],
+          "established_beat": 3
+        }
+      ]
+    },
+    "slot_drama_contracts": {
+      "d001": {
+        "dialogue_slot_id": "d001",
+        "speaker": "ANNOUNCER",
+        "line_job": "Establish Etna's historical significance",
+        "hidden_pressure": "Avoid hinting at upcoming revelations",
+        "concrete_detail_required": [
+          "trading log"
+        ],
+        "state_before": "unresolved: To preserve Etna's classic status, maintaining the established understanding of volcano formation. vs To prove Etna's unique origins, challenging conventional wisdom and rewriting",
+        "state_after": "unresolved: To preserve Etna's classic status, maintaining the established understanding of volcano formation. vs To prove Etna's unique origins, challenging conventional wisdom and rewriting",
+        "must_turn": false
+      },
+      "d002": {
+        "dialogue_slot_id": "d002",
+        "speaker": "LEMMY",
+        "line_job": "Threatens Marco to reveal Etna's secrets",
+        "hidden_pressure": "Fear of public embarrassment",
+        "concrete_detail_required": [
+          "Mount Etna"
+        ],
+        "state_before": "tension carried forward, unresolved",
+        "state_after": "tension carried forward, unresolved",
+        "must_turn": false
+      },
+      "d003": {
+        "dialogue_slot_id": "d003",
+        "speaker": "ALICE SIMPSON",
+        "line_job": "Alice warns Marco about her intentions to reveal his secret",
+        "hidden_pressure": "Alice's desperation to protect her interests",
+        "concrete_detail_required": [
+          "ancient pockets of magma"
+        ],
+        "state_before": "tension carried forward, unresolved",
+        "state_after": "tension carried forward, unresolved",
+        "must_turn": false
+      },
+      "d004": {
+        "dialogue_slot_id": "d004",
+        "speaker": "LEMMY",
+        "line_job": "Argue for Etna's uniqueness, challenging conventional wisdom",
+        "hidden_pressure": "Fear of losing credibility if wrong",
+        "concrete_detail_required": [
+          "shifting tectonic plates",
+          "classic ways volcanoes are thought to form"
+        ],
+        "state_before": "unresolved: To preserve Etna's classic status, maintaining the established understanding of volcano formation. vs To prove Etna's unique origins, challenging conventional wisdom and rewriting",
+        "state_after": "The world's perception of Mount Etna shifts, with Etna's unique origins now recognized, reshaping our understanding of volcanic activity.",
+        "must_turn": true
+      },
+      "d005": {
+        "dialogue_slot_id": "d005",
+        "speaker": "ANNOUNCER",
+        "line_job": "Describe a visual or auditory cue hinting at Etna's uniqueness",
+        "hidden_pressure": "Implication of revelation's potential impact",
+        "concrete_detail_required": [
+          "classic ways volcanoes are thought to form"
+        ],
+        "state_before": "tension carried forward, unresolved",
+        "state_after": "tension carried forward, unresolved",
+        "must_turn": false
+      }
+    },
+    "slot_drama_contracts_audit": {
+      "count": 5,
+      "sources": {
+        "llm": 5
+      },
+      "episode_valid": true,
+      "reasons": []
+    },
+    "leak_floor_v2": {
+      "active": true,
+      "banned": [],
+      "filtered_key_terms": []
+    },
+    "allowed_roster": [
+      "ALICE SIMPSON",
+      "ANCIENT POCKETS OF MAGMA",
+      "ANNOUNCER",
+      "CLASSIC WAYS VOLCANOES ARE THOUGHT TO FORM",
+      "LEMMY",
+      "MOUNT ETNA",
+      "SHIFTING TECTONIC PLATES"
+    ],
+    "canon_header": "EPISODE_TITLE: TBD\nSETTING: A small town at the foot of Mount Etna, Sicily\nTIME: Late nights, just before dawn\nPREMISE: A close-knit neighborhood watch in Sicily suspects their own geologist neighbor of harboring secrets that could reshape our understanding of Earth's geology and trigger global paranoia.\n\nSpecificity anchors (when natural, ground a line in one of these concrete details; do not force them into every line):\n- Mount Etna\n- ancient pockets of magma\n- shifting tectonic plates\n- classic ways volcanoes are thought to form",
+    "outline_spine": "OUTLINE:\n  b001 ANNOUNCER (welcoming): Open the episode and orient the listener.\n  b002 LEMMY (Tense): Demands Marco reveal his mysterious findings under threat of public exposure; the scene is set: the trading log is already in play before the pressure builds\n  b003 ALICE SIMPSON (Tense): Alice threatens to expose Marco's secret publicly if he doesn't cooperate, raising the stakes; what is personally at stake turns on the merger's disclosure\n  b004 LEMMY (tense): Marco confronts Alice, demanding she prove her accusations or risk his retaliation; on-stage, they part over the merger's disclosure -- gaining and losing in one breath\n  b005 ANNOUNCER (reflective): Sign off on a single concrete final image or sound. Do NOT state, summarize, or resolve the outcome -- not who won or what was decided. The resolution belongs to the final beat.",
+    "theme": "A groundbreaking study challenges conventional wisdom about volcano formation, centering on Europe's most active volcano,",
+    "style_descriptor": "neighborhood-watch paranoia",
+    "exchange_prepass_audit": {
+      "beats_composed": 3,
+      "beat_ids": [
+        "b002",
+        "b003",
+        "b004"
+      ]
+    },
+    "line_dramatic_frame": {
+      "b002": {
+        "objective": "Threatens Marco to reveal Etna's secrets (ground it in: Mount Etna)",
+        "obstacle": "To preserve Etna's classic status, maintaining the established understanding of volcano formation.",
+        "turn": "",
+        "subtext": "Fear of public embarrassment",
+        "tension": 1,
+        "dramatic_question": "Will Etna's true origins remain hidden, or will they revolutionize our understanding of volcanic activity?",
+        "next_turn": "Alice threatens to expose Marco's secret publicly if he doesn't cooperate, raising the stakes; what is personally at stake turns on the merger's disclosure"
+      },
+      "b003": {
+        "objective": "Alice warns Marco about her intentions to reveal his secret (ground it in: ancient pockets of magma)",
+        "obstacle": "To prove Etna's unique origins, challenging conventional wisdom and rewriting volcanic history.",
+        "turn": "",
+        "subtext": "Alice's desperation to protect her interests",
+        "tension": 3,
+        "dramatic_question": "Will Etna's true origins remain hidden, or will they revolutionize our understanding of volcanic activity?",
+        "next_turn": "Marco confronts Alice, demanding she prove her accusations or risk his retaliation; on-stage, they part over the merger's disclosure -- gaining and losing in one breath"
+      },
+      "b004": {
+        "objective": "Argue for Etna's uniqueness, challenging conventional wisdom (ground it in: shifting tectonic plates, classic ways volcanoes are thought to form)",
+        "obstacle": "To preserve Etna's classic status, maintaining the established understanding of volcano formation.",
+        "turn": "unresolved: To preserve Etna's classic status, maintaining the established understanding of volcano formation. vs To prove Etna's unique origins, challenging conventional wisdom and rewriting -> The world's perception of Mount Etna shifts, with Etna's unique origins now recognized, reshaping our understanding of volcanic activity.",
+        "subtext": "Fear of losing credibility if wrong",
+        "tension": 5,
+        "dramatic_question": "Will Etna's true origins remain hidden, or will they revolutionize our understanding of volcanic activity?",
+        "next_turn": "Sign off on a single concrete final image or sound. Do NOT state, summarize, or resolve the outcome -- not who won or what was decided. The resolution belongs to the final beat."
+      }
+    },
+    "announcer_intro_rewrite": {
+      "status": "announcer_intro_rewritten"
+    },
+    "post_assembly_key_terms": {
+      "landed": [
+        "Mount Etna"
+      ],
+      "missing": [
+        "ancient pockets of magma",
+        "shifting tectonic plates",
+        "classic ways volcanoes are thought to form"
+      ],
+      "min_required": 2,
+      "passed": false,
+      "repair_pass": "deferred"
+    },
+    "compose_flag_summary": {
+      "announcer_intro": 1,
+      "announcer_intro_rewritten": 1,
+      "news_coda_bridge": 1
+    },
+    "character_word_count": 74,
+    "announcer_word_count": 64,
+    "total_word_count": 138,
+    "gen_params_initial": {
+      "target_words": 30,
+      "num_characters": 2,
+      "creative_writing_model": "mistralai/Mistral-Nemo-Instruct-2407",
+      "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
+      "creativity": "balanced",
+      "temperature": 0.85,
+      "top_p": 0.95,
+      "act_count": 1,
+      "include_act_breaks": true,
+      "optimization_profile": "Standard",
+      "seed_source": "rss_fetch",
+      "source_ref": ""
+    },
+    "llm_policy": {
+      "device": "cuda",
+      "attn_impl": "sdpa",
+      "quant_policy": "bnb_nf4",
+      "vram_ceiling_gb": 14.5,
+      "gguf_n_ctx": 4096,
+      "gguf_quant": "Q8_0",
+      "lane_allowlist": [
+        "transformers",
+        "gguf",
+        "openrouter",
+        "comfy_credits",
+        "google_api"
+      ]
+    },
+    "creative_writing_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "slot_transitions": 0,
+    "slot_calls_by_slot": {
+      "creative": 13,
+      "technical": 5
+    },
+    "slot_calls_by_helper": {
+      "build_news_briefs": {
+        "creative": 0,
+        "technical": 1
+      },
+      "lock_cast": {
+        "creative": 2,
+        "technical": 0
+      },
+      "generate_outline": {
+        "creative": 5,
+        "technical": 0
+      },
+      "dramatic_state": {
+        "creative": 0,
+        "technical": 2
+      },
+      "build_continuity_ledger": {
+        "creative": 0,
+        "technical": 1
+      },
+      "compose_line": {
+        "creative": 2,
+        "technical": 0
+      },
+      "compose_announcer_intro": {
+        "creative": 1,
+        "technical": 0
+      },
+      "derive_produced_open_brief": {
+        "creative": 0,
+        "technical": 1
+      },
+      "announcer_intro_rewrite": {
+        "creative": 1,
+        "technical": 0
+      },
+      "compose_news_coda": {
+        "creative": 1,
+        "technical": 0
+      },
+      "generate_title": {
+        "creative": 1,
+        "technical": 0
+      }
+    },
+    "slot_transitions_by_phase": [],
+    "gen_params_by_phase": {
+      "news_interpreter": {
+        "slot": "technical",
+        "model": "mistralai/Mistral-Nemo-Instruct-2407"
+      },
+      "cast_lock": {
+        "slot": "creative",
+        "model": "mistralai/Mistral-Nemo-Instruct-2407"
+      },
+      "outline": {
+        "slot": "creative",
+        "model": "mistralai/Mistral-Nemo-Instruct-2407"
+      },
+      "dialogue_composer": {
+        "slot": "creative",
+        "model": "mistralai/Mistral-Nemo-Instruct-2407"
+      },
+      "title_regen": {
+        "slot": "creative",
+        "model": "mistralai/Mistral-Nemo-Instruct-2407"
+      }
+    },
+    "episode_title": "Etna's Secret",
+    "title_source": "llm_post_composition",
+    "visual_plan": {
+      "characters": {
+        "ANNOUNCER": {
+          "portrait_prompt": "Period radio announcer; reads the science story and frames the drama between beats."
+        },
+        "LEMMY": {
+          "portrait_prompt": "Genial communications officer, 50s, broad friendly Cockney accent, quick-witted and humorous with a warm grin, brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica"
+        },
+        "ALICE SIMPSON": {
+          "portrait_prompt": "30s, Geologist and Team Leader. Face: Oval, Intense brows, Straight nose, Thin mouth, Strong jawline, Prominent scar on left cheek. Presence: Carries the weight of the world on her shoulders. Voice: Authoritative yet soothing, like a warm cup of tea in a crisis."
+        }
+      },
+      "scenes": [],
+      "style": "neighborhood_watch_paranoia"
+    },
+    "story_brief": "A tense negotiation between two old friends turns into a game of blackmail.",
+    "story_brief_status": "ok",
+    "story_brief_error": null,
+    "story_brief_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "story_brief_prompt_version": "v2",
+    "story_brief_source": "post_script_reflection",
+    "story_brief_char_count": 75,
+    "story_brief_terms": {
+      "setting": [
+        "Office",
+        "Desk",
+        "Papers",
+        "Vineyard",
+        "Volcano"
+      ],
+      "lighting": [
+        "Incandescent",
+        "Shadowed",
+        "Moonlit"
+      ],
+      "atmosphere": [
+        "Tense",
+        "Paranoid",
+        "Silent",
+        "Threatening",
+        "Hushed"
+      ]
+    },
+    "music_mood_terms": [
+      "Tense",
+      "Suspenseful",
+      "Menacing",
+      "Anxious",
+      "Quietly Intimidating"
+    ],
+    "visual_palette": [
+      "Dark Wood",
+      "Pale Papers",
+      "Moonlit Green",
+      "Red Glow",
+      "Smoky Shadows"
+    ],
+    "key_objects": [
+      "Desk",
+      "Papers",
+      "Communicator",
+      "Glass of Wine",
+      "Volcanic Rock"
+    ],
+    "tempo_hint": "Slowly building",
+    "atmosphere_line": "The tension in the room is palpable, each unspoken threat hanging heavy in the smoky silence.",
+    "produced_story": {
+      "logline": "Alice Simpson threatens Lemmy with exposing his bribes unless he keeps quiet about Marco's corruption, ending in a tense standoff.",
+      "subject": "Alice Simpson and Lemmy"
+    },
+    "produced_story_status": "ok",
+    "produced_story_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+    "produced_story_source": "llm_post_composition",
+    "story_spine_enabled": true,
+    "length_pass_report": {
+      "status": "APPLIED",
+      "tier1_edits": 0,
+      "tier2_edits": 0
+    },
+    "story_qa_verdict": {
+      "verdict": "SKIPPED",
+      "reason": "OTR_ENABLE_STORY_QA not set -- QA LLM gated off by default (BUG-LOCAL-302): no call, no tokens, no reject."
+    },
+    "anti_loop_report": {
+      "status": "ok",
+      "targets": 0,
+      "character_targets": 0,
+      "repaired": 0,
+      "kinds": {}
+    },
+    "delivery_hygiene_report": {
+      "scrubbed": 0,
+      "char_recomposed": 0,
+      "announcer_recomposed": 0,
+      "narration_recomposed": 0,
+      "stage_direction_recomposed": 0
+    },
+    "writer_llm_unload": "unloaded",
+    "ledger_scrub_status": "FAIL",
+    "story_spine_status": "ok",
+    "creative_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "creative_prompt_profile": "modern",
+    "slot_a_resolved_slug": "anthropic/claude-opus-4.8",
+    "slot_b_resolved_slug": "deepseek/deepseek-v4-pro",
+    "openrouter_catalog_source": "live",
+    "openrouter_catalog_fetched_at": "2026-06-18T22:44:44.221052+00:00",
+    "openrouter_catalog_staleness": "live",
+    "consistency_status": {
+      "ran": true,
+      "clean": true,
+      "defect_count": 0,
+      "defects": []
+    },
+    "vram_at_cascade_entry_gb": 7.802854627370834,
+    "gap_audit_pre": {
+      "label": "pre",
+      "errors": [],
+      "warnings": [
+        "line_id='b004' char_count=121 but text has 87 char(s)",
+        "cast[2] (char_id='c03') has no voice_preset yet (assigned by OTR_CastLock post-freeze)",
+        "cast char_id='c01' is not referenced by any non-skipped line"
+      ],
+      "info": {
+        "line_count": 5,
+        "voiced_beat_count": 5
+      }
+    },
+    "audit_passes": [
+      {
+        "phase_name": "phase_0_gap_audit_pre",
+        "started_at": "2026-07-10T14:22:00.890096+00:00",
+        "finished_at": "2026-07-10T14:22:00.890096+00:00",
+        "text_hash_before": 2386311685237241524,
+        "text_hash_after": 2386311685237241524,
+        "edits_proposed": 0,
+        "edits_applied": 0,
+        "failures": []
+      },
+      {
+        "phase_name": "phase_10_gap_audit_post_and_freeze",
+        "started_at": "2026-07-10T14:23:17.911830+00:00",
+        "finished_at": "2026-07-10T14:23:17.911830+00:00",
+        "text_hash_before": 5704507638174590698,
+        "text_hash_after": 5704507638174590698,
+        "edits_proposed": 0,
+        "edits_applied": 0,
+        "failures": []
+      }
+    ],
+    "reviewer_verdict": "improved",
+    "reviewer_disposition": {
+      "verdict": "improved",
+      "pre_audit_violations": 2,
+      "pre_audit_repairs_applied": 1,
+      "doctor_edits_proposed": 2,
+      "doctor_edits_applied": 2,
+      "post_audit_violations": 0
+    },
+    "cleanup_passes": [
+      {
+        "phase_name": "phase_1_2_9_reviewer_composite",
+        "started_at": "2026-07-10T14:22:00.890096+00:00",
+        "finished_at": "2026-07-10T14:22:21.588032+00:00",
+        "text_hash_before": 2386311685237241524,
+        "text_hash_after": 2231869541536352710,
+        "edits_proposed": 2,
+        "edits_applied": 2,
+        "failures": []
+      }
+    ],
+    "story_critic_report": {
+      "continuity_issues": [],
+      "voice_drift": [],
+      "flat_lines": [
+        {
+          "line_id": "b002",
+          "reason": "pressure"
+        },
+        {
+          "line_id": "b003",
+          "reason": "decision"
+        }
+      ],
+      "arc_verdict": "uneven",
+      "reroll_targets": [
+        {
+          "line_id": "b002",
+          "hint": "Instead of 'Spill the beans', consider 'Reveal your findings or face public scrutiny.'",
+          "failed_dimension": "pressure"
+        },
+        {
+          "line_id": "b003",
+          "hint": "Add a clear consequence for Marco if he doesn't cooperate, e.g., '...or I'll be forced to escalate this to the board.'",
+          "failed_dimension": "decision"
+        }
+      ],
+      "render_priority": [
+        "b004",
+        "b003",
+        "b002",
+        "b001",
+        "b005"
+      ]
+    },
+    "story_critic_status": {
+      "ran": true,
+      "validated": true,
+      "failure": ""
+    },
+    "reroll_escalation": {
+      "scope": "line",
+      "reason": "Stage 7 critic verdict='' failing_axes=[]; no structural hit AND no local+targets binding -- fall back to legacy line reroll",
+      "target_beat_ids": [],
+      "regeneration_hint": ""
+    },
+    "cycle_count": 2,
+    "reroll_history": [
+      {
+        "cycle": 1,
+        "line_id": "b002",
+        "hint": "[pressure] Find a way to make Alice's threat more personal to Marco, not just about the merger.",
+        "old_text": "Alice, I've seen the ledger. I know about Marco's little... side dealings. I could ruin your reputation, and the merger, with just a whisper.",
+        "new_text": "I've seen your log, Marco. Etna's secrets won't stay buried.",
+        "status": "rerolled",
+        "compose_flags": [
+          "phantom_name:Marco"
+        ]
+      },
+      {
+        "cycle": 1,
+        "line_id": "b003",
+        "hint": "[decision] Give Marco a clear choice or consequence to make his decision more impactful.",
+        "old_text": "And if you breathe a word, I'll make sure everyone knows how you've been greasing palms to get this deal done, Lemmy. Your precious merger will crumble.",
+        "new_text": "Either you share Etna's truth, Marco, or I'll unleash ancient magma's secrets to the world.",
+        "status": "rerolled",
+        "compose_flags": [
+          "phantom_name:Marco"
+        ]
+      },
+      {
+        "cycle": 2,
+        "line_id": "b002",
+        "hint": "[pressure] Add a sense of urgency or consequence to Alice's threat to make Marco reveal his findings.",
+        "old_text": "I've seen your log, Marco. Etna's secrets won't stay buried.",
+        "new_text": "Marco, old chap, let's not dance around the Etna. Spill the beans before I raise alarm.",
+        "status": "rerolled",
+        "compose_flags": [
+          "cliche_retry"
+        ]
+      },
+      {
+        "cycle": 2,
+        "line_id": "b003",
+        "hint": "[knowledge] Clarify what Alice knows and how she knows it to raise the stakes and make her threat more believable.",
+        "old_text": "Either you share Etna's truth, Marco, or I'll unleash ancient magma's secrets to the world.",
+        "new_text": "I've seen the data, Marco. Ancient pockets of magma, shifting plates... It's all here.",
+        "status": "rerolled",
+        "compose_flags": [
+          "phantom_name:Marco"
+        ]
+      }
+    ],
+    "reroll_outstanding": [
+      "b002",
+      "b003"
+    ],
+    "reroll_diverged": false,
+    "reroll_verdict": "needs_full_rerun",
+    "reroll_disposition": {
+      "verdict": "needs_full_rerun",
+      "cycles_run": 2,
+      "lines_rerolled": 4,
+      "final_arc_verdict": "uneven",
+      "final_reroll_targets": 2
+    },
+    "a2_ship_through": {
+      "reason": "reroll_exhausted_or_structural_escalation",
+      "cycles_run": 2,
+      "residual_structural_errors": [],
+      "residual_warnings": [
+        "cast[2] (char_id='c03') has no voice_preset yet (assigned by OTR_CastLock post-freeze)"
+      ]
+    },
+    "render_plan": {
+      "line_ids": [
+        "b002",
+        "b003",
+        "b004"
+      ],
+      "selection_mode": "all",
+      "blocked": false,
+      "blocked_reason": "",
+      "applied_max_n": 0,
+      "source_cycle_count": 2,
+      "source_arc_verdict": "uneven",
+      "candidate_pool_size": 3,
+      "excluded_flat_lines": []
+    },
+    "audio_readiness": {
+      "lines_scanned": 5,
+      "lines_normalized": 0,
+      "abbreviations_expanded": 0,
+      "symbols_expanded": 0,
+      "numbers_expanded": 0,
+      "unparseable_numbers": [],
+      "warnings": []
+    },
+    "readiness_passes": [
+      {
+        "phase_name": "phase_7_audio_readiness",
+        "started_at": "2026-07-10T14:23:17.910317+00:00",
+        "finished_at": "2026-07-10T14:23:17.911830+00:00",
+        "text_hash_before": 5704507638174590698,
+        "text_hash_after": 5704507638174590698,
+        "edits_proposed": 0,
+        "edits_applied": 0,
+        "failures": []
+      },
+      {
+        "phase_name": "phase_8_video_readiness",
+        "started_at": "2026-07-10T14:23:17.911830+00:00",
+        "finished_at": "2026-07-10T14:23:17.911830+00:00",
+        "text_hash_before": 5704507638174590698,
+        "text_hash_after": 5704507638174590698,
+        "edits_proposed": 0,
+        "edits_applied": 0,
+        "failures": []
+      }
+    ],
+    "video_readiness": {
+      "cast_total": 3,
+      "cast_with_portrait": 0,
+      "cast_missing_portrait": [
+        "c01",
+        "c02",
+        "c03"
+      ],
+      "voiced_lines": 5,
+      "voiced_lines_with_visual_mapping": 0,
+      "voiced_lines_missing_visual": [
+        "b001",
+        "b002",
+        "b003",
+        "b004",
+        "b005"
+      ],
+      "warnings": [
+        "3 cast row(s) without portrait: ['c01', 'c02', 'c03']",
+        "5 voiced line(s) reference a speaker with no portrait"
+      ]
+    },
+    "gap_audit_post": {
+      "label": "post",
+      "errors": [],
+      "warnings": [
+        "cast[2] (char_id='c03') has no voice_preset yet (assigned by OTR_CastLock post-freeze)"
+      ],
+      "info": {
+        "line_count": 5,
+        "voiced_beat_count": 5
+      }
+    },
+    "cleanup_locked": true,
+    "freeze_timestamp": "2026-07-10T14:23:17.911830+00:00",
+    "freeze_verdict": "frozen_with_doctor_edits",
+    "freeze_warn_taxonomy": {
+      "structural_error": [],
+      "story_accuracy_warning": [],
+      "cosmetic_warning": [
+        "cast[2] (char_id='c03') has no voice_preset yet (assigned by OTR_CastLock post-freeze)"
+      ]
+    },
+    "freeze_disposition": {
+      "verdict": "frozen_with_doctor_edits",
+      "reviewer_disposition": {
+        "verdict": "improved",
+        "pre_audit_violations": 2,
+        "pre_audit_repairs_applied": 1,
+        "doctor_edits_proposed": 2,
+        "doctor_edits_applied": 2,
+        "post_audit_violations": 0
+      },
+      "gap_audit_pre": {
+        "errors": [],
+        "warnings": [
+          "line_id='b004' char_count=121 but text has 87 char(s)",
+          "cast[2] (char_id='c03') has no voice_preset yet (assigned by OTR_CastLock post-freeze)",
+          "cast char_id='c01' is not referenced by any non-skipped line"
+        ],
+        "info": {
+          "line_count": 5,
+          "voiced_beat_count": 5
+        }
+      },
+      "gap_audit_post": {
+        "errors": [],
+        "warnings": [
+          "cast[2] (char_id='c03') has no voice_preset yet (assigned by OTR_CastLock post-freeze)"
+        ],
+        "info": {
+          "line_count": 5,
+          "voiced_beat_count": 5
+        }
+      }
+    },
+    "freeze_phase_telemetry": [
+      {
+        "phase": "phase_0_gap_audit_pre",
+        "bucket": "audit_passes",
+        "skipped": false,
+        "changed": false,
+        "warnings": 0,
+        "edits_proposed": 0,
+        "edits_applied": 0
+      },
+      {
+        "phase": "phase_1_2_9_reviewer_composite",
+        "bucket": "cleanup_passes",
+        "skipped": false,
+        "changed": true,
+        "warnings": 0,
+        "edits_proposed": 2,
+        "edits_applied": 2
+      },
+      {
+        "phase": "phase_7_audio_readiness",
+        "bucket": "readiness_passes",
+        "skipped": false,
+        "changed": false,
+        "warnings": 0,
+        "edits_proposed": 0,
+        "edits_applied": 0
+      },
+      {
+        "phase": "phase_10_gap_audit_post_and_freeze",
+        "bucket": "audit_passes",
+        "skipped": false,
+        "changed": false,
+        "warnings": 0,
+        "edits_proposed": 0,
+        "edits_applied": 0
+      },
+      {
+        "phase": "phase_8_video_readiness",
+        "bucket": "readiness_passes",
+        "skipped": false,
+        "changed": false,
+        "warnings": 0,
+        "edits_proposed": 0,
+        "edits_applied": 0
+      }
+    ],
+    "freeze_unload_ok": true,
+    "cast_lock_revision": 1,
+    "cast_voice_policy": "auto_registry",
+    "delivery_profile_id": "neutral",
+    "delivery_profile_version": "1",
+    "voice_bank_id": "default",
+    "char_voice_engine": "indextts2",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "procgen_path": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\audio\\signal_lost_etnas_secret_20260710_072427.mp4",
+    "phase_ms": {
+      "scene_sequencer": 116,
+      "audio_enhance": 431,
+      "episode_assembler": 64
+    },
+    "git_commit": "948c5a0a",
+    "image_engines": {
+      "by_role": {},
+      "image_revision": 1
+    },
+    "render_engines": {
+      "histogram": {
+        "viz_mxc_mandala": 1,
+        "viz_mxc_cpu": 2,
+        "viz_camera": 3
+      },
+      "video_revision": 1,
+      "by_role": {
+        "music_visual": {
+          "viz_mxc_mandala": 1
+        },
+        "announcer_visual": {
+          "viz_mxc_cpu": 2
+        },
+        "character_video": {
+          "viz_camera": 3
+        }
+      },
+      "vram_peak_mb": 2900,
+      "per_clip": [
+        {
+          "shot_id": "shot_b000_music_open",
+          "role": "music_visual",
+          "delivered_engine": "viz_mxc_mandala",
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        },
+        {
+          "shot_id": "shot_b001",
+          "role": "announcer_visual",
+          "delivered_engine": "viz_mxc_cpu",
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        },
+        {
+          "shot_id": "shot_b002",
+          "role": "character_video",
+          "delivered_engine": "viz_camera",
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        },
+        {
+          "shot_id": "shot_b003",
+          "role": "character_video",
+          "delivered_engine": "viz_camera",
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        },
+        {
+          "shot_id": "shot_b004",
+          "role": "character_video",
+          "delivered_engine": "viz_camera",
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        },
+        {
+          "shot_id": "shot_b005",
+          "role": "announcer_visual",
+          "delivered_engine": "viz_mxc_cpu",
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        }
+      ],
+      "by_engine": {
+        "viz_mxc_mandala": {
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        },
+        "viz_mxc_cpu": {
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        },
+        "viz_camera": {
+          "recipe": null,
+          "quant": null,
+          "use_lora": null,
+          "render_canvas": null,
+          "vram_peak_mb": null,
+          "family": "abstract"
+        }
+      }
+    },
+    "audio_motion_profile": {
+      "version": "amp-1",
+      "count": 6,
+      "ok_count": 6,
+      "fields": [
+        "duration_s",
+        "rms_dbfs",
+        "peak_dbfs",
+        "dynamic_range_db",
+        "silence_ratio",
+        "onset_s",
+        "brightness",
+        "speech_vs_music"
+      ]
+    },
+    "post_upscale_blend": {
+      "source_mp4": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\signal_lost_etnas_secret_20260710_072427_silent.mp4",
+      "procgen_mp4": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\audio\\signal_lost_etnas_secret_20260710_072427.mp4",
+      "blended_mp4": "<OTR_OUTPUT>\\otr\\episodes\\signal_lost_etnas_secret_20260710_072427\\signal_lost_etnas_secret_20260710_072427_silent_procgen_blended.mp4",
+      "blend_mode": "screen",
+      "blend_opacity": 1.0
+    },
+    "obs_final_path": "<OTR_OUTPUT>\\otr\\obs\\signal_lost_etnas_secret_20260710_072427_silent_procgen_blended_captioned_with_credits_final.mp4"
+  },
+  "audio_gates": [
+    {
+      "gate": "post_scene_sequencer",
+      "dur_s": 45.64222916666667,
+      "sample_count": 2190827,
+      "sample_rate": 48000,
+      "sha256_first_kb": "f9dfd8ddb149e8470f1692eda2e7a8ee"
+    },
+    {
+      "gate": "post_audio_enhance",
+      "dur_s": 45.64222916666667,
+      "sample_count": 2190827,
+      "sample_rate": 48000,
+      "sha256_first_kb": "a2fd32eaf40c698f0c222b858ee17ea2"
+    },
+    {
+      "gate": "post_episode_assembler",
+      "dur_s": 62.629895833333336,
+      "sample_count": 3006235,
+      "sample_rate": 48000,
+      "sha256_first_kb": "01be4a016d8dfa9e5c2023f531265a02"
+    }
+  ],
+  "transitions": [
+    {
+      "from_line_id": "opening_theme",
+      "to_line_id": "scene_audio",
+      "crossfade_ms": 500,
+      "boundary_s": 10.0
+    },
+    {
+      "from_line_id": "scene_audio",
+      "to_line_id": "closing_theme",
+      "crossfade_ms": 500,
+      "boundary_s": 54.64222916666667
+    }
+  ],
+  "images": {
+    "image_revision": 1,
+    "episode_id": "signal_lost_etnas_secret_20260710_072427",
+    "granularity_by_role": {
+      "announcer_image_model": "per_object",
+      "music_image_model": "per_object",
+      "character_image_model": "per_object"
+    },
+    "images": [],
+    "cache_index": {},
+    "warnings": [
+      "episode stills dir re-resolved: stale 'pending_20260710_071953' -> 'signal_lost_etnas_secret_20260710_072427' (title rename happened before image dispatch; LOUD)"
+    ]
+  },
+  "audio_motion_profiles": [
+    {
+      "id": "shot_b000_music_open",
+      "start_s": 0.0,
+      "dur_s": 9.5,
+      "profile_version": "amp-1",
+      "ok": true,
+      "duration_s": 9.52,
+      "rms_dbfs": -13.974,
+      "peak_dbfs": -2.33,
+      "dynamic_range_db": 6.118,
+      "silence_ratio": 0.0147,
+      "onset_s": 0.14,
+      "brightness": 0.0778,
+      "speech_vs_music": "music"
+    },
+    {
+      "id": "shot_b001",
+      "start_s": 0.0,
+      "dur_s": 0.0,
+      "profile_version": "amp-1",
+      "ok": true,
+      "duration_s": 13.893061,
+      "rms_dbfs": -12.217,
+      "peak_dbfs": -1.939,
+      "dynamic_range_db": 26.744,
+      "silence_ratio": 0.1816,
+      "onset_s": 0.0,
+      "brightness": 0.0957,
+      "speech_vs_music": "mixed"
+    },
+    {
+      "id": "shot_b002",
+      "start_s": 0.0,
+      "dur_s": 0.0,
+      "profile_version": "amp-1",
+      "ok": true,
+      "duration_s": 5.414626,
+      "rms_dbfs": -18.082,
+      "peak_dbfs": -2.416,
+      "dynamic_range_db": 24.02,
+      "silence_ratio": 0.1963,
+      "onset_s": 0.04,
+      "brightness": 0.1255,
+      "speech_vs_music": "mixed"
+    },
+    {
+      "id": "shot_b003",
+      "start_s": 0.0,
+      "dur_s": 0.0,
+      "profile_version": "amp-1",
+      "ok": true,
+      "duration_s": 5.135986,
+      "rms_dbfs": -15.646,
+      "peak_dbfs": -2.435,
+      "dynamic_range_db": 32.484,
+      "silence_ratio": 0.1602,
+      "onset_s": 0.04,
+      "brightness": 0.1236,
+      "speech_vs_music": "mixed"
+    },
+    {
+      "id": "shot_b004",
+      "start_s": 0.0,
+      "dur_s": 0.0,
+      "profile_version": "amp-1",
+      "ok": true,
+      "duration_s": 8.080567,
+      "rms_dbfs": -18.439,
+      "peak_dbfs": -4.17,
+      "dynamic_range_db": 23.56,
+      "silence_ratio": 0.1609,
+      "onset_s": 0.06,
+      "brightness": 0.1646,
+      "speech_vs_music": "mixed"
+    },
+    {
+      "id": "shot_b005",
+      "start_s": 0.0,
+      "dur_s": 0.0,
+      "profile_version": "amp-1",
+      "ok": true,
+      "duration_s": 13.11805,
+      "rms_dbfs": -12.088,
+      "peak_dbfs": -1.848,
+      "dynamic_range_db": 29.688,
+      "silence_ratio": 0.1695,
+      "onset_s": 0.32,
+      "brightness": 0.0925,
+      "speech_vs_music": "mixed"
+    }
+  ]
+}
