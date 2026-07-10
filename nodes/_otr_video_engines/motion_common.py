@@ -311,30 +311,37 @@ def _cost_model_for(engine_name):
     return float(overhead), float(per_frame)
 
 
+class MotionBudgetError(RuntimeError):
+    """The STATIC frame budget cannot fit the live VRAM cost model.
+
+    S4 platform-portability (2026-07-10): the render NEVER resizes itself --
+    lower the frame_count widget, free VRAM, or pick a lighter engine."""
+
+
 def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
                               canvas_w, canvas_h, engine_name):
-    """PREDICT the largest 4n+1 clip length an engine can render this beat without
-    over-committing VRAM -- the clip-fill fix (GO_FORWARD 2026-06-18).
+    """S4 platform-portability REWRITE (2026-07-10): the frame budget is the
+    STATIC widget value -- geometry only (engine motion floor + 4n+1 snap),
+    NEVER a VRAM-adaptive resize. The pre-S4 version silently shrank
+    tight-VRAM clips toward the floor (output length varied with host state
+    -- exactly the auto-adapt class this campaign kills; the clip-fill era
+    is superseded by the per-tier frame_budget widget).
 
-    Cost model: ``vram ~= overhead + per_frame_at_res * frames`` where
-    ``per_frame_at_res`` scales the telemetry per-frame cost by the canvas pixel
-    area vs the reference. ``budget = free * margin`` -- clamped on LIVE FREE VRAM
-    ONLY (no policy ceiling; the operator's tier JSON owns the OOM budget now).
-    The affordable frame count is capped at the beat's audio-derived
-    ``target_frame_count``, floored at the engine's motion floor, and snapped to a
-    valid 4n+1.
-
-    ``free_vram_mb_value`` ``None`` / <= 0 (no NVML/torch -- the CPU box) -> trust
-    the target. The render then loop/ping-pong-extends this (possibly short)
-    render up to the full target, so a tight budget yields short MOTION, never a
-    freeze. Pure (no GPU read here -- the caller passes ``free_vram_mb()``);
+    The cost model (``vram ~= overhead + per_frame_at_res * frames``,
+    ``budget = free * margin``) is KEPT as a fail-loud PREDICTION: if the
+    static target cannot fit, this RAISES :class:`MotionBudgetError` before
+    the engine burns a doomed forward. ``free_vram_mb_value`` None / <= 0
+    (no NVML/torch -- the CPU box) skips the prediction (geometry only).
+    Pure (no GPU read here -- the caller passes ``free_vram_mb()``);
     CPU-tested."""
     from . import wrapper_bridge as _wb
     target = max(1, int(target_frame_count or 1))
     floor = int(FRAME_MOTION_FLOOR.get(engine_name, _DEFAULT_MOTION_FLOOR))
-    # No live VRAM reading -> trust the audio-derived target (clamped to floor).
+    snapped = _wb.quantize_frames_4n1(target, min_frames=floor,
+                                      max_frames=target)
+    # No live VRAM reading -> geometry only (CPU box / cloud lanes).
     if free_vram_mb_value is None or float(free_vram_mb_value) <= 0:
-        return _wb.quantize_frames_4n1(target, min_frames=floor, max_frames=target)
+        return snapped
     overhead, per_frame = _cost_model_for(engine_name)
     pixels = max(1, int(canvas_w) * int(canvas_h))
     per_frame_at_res = per_frame * (pixels / float(_FRAME_COST_REF_PIXELS))
@@ -343,15 +350,17 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
     except (TypeError, ValueError):
         margin = _BUDGET_MARGIN
     budget_mb = float(free_vram_mb_value) * margin
-    if per_frame_at_res <= 0:
-        affordable = target
-    else:
+    if per_frame_at_res > 0:
         affordable = int((budget_mb - overhead) / per_frame_at_res)
-    # Never exceed the beat target; the 4n+1 snap clamps below it. A budget that
-    # cannot even fit the motion floor still returns the floor (it WINS) -- a real
-    # over-budget at the floor surfaces LOUD at the render-window NVML probe.
-    predicted = max(1, min(target, affordable))
-    return _wb.quantize_frames_4n1(predicted, min_frames=floor, max_frames=target)
+        if affordable < snapped:
+            raise MotionBudgetError(
+                "engine %s: static frame budget %d (snapped %d) exceeds the "
+                "cost-model's affordable %d frames (free=%.0f MB, "
+                "margin=%.2f). NO silent resize -- lower the frame_count "
+                "widget, free VRAM, or pick a lighter engine."
+                % (engine_name, target, snapped, max(0, affordable),
+                   float(free_vram_mb_value), margin))
+    return snapped
 
 
 # --------------------------------------------------------------------------- #

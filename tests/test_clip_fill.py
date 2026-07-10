@@ -17,6 +17,8 @@ from __future__ import annotations
 import logging
 import os
 
+import pytest
+
 from nodes._otr_video_engines import motion_common as mc
 from nodes._otr_video_engines import wrapper_bridge as wb
 
@@ -38,19 +40,34 @@ def test_budget_none_free_trusts_target(monkeypatch):
     assert mc.compute_real_frame_budget(0, 33, 1472, 832, "wan_ti2v") == 33
 
 
-def test_budget_predicts_fewer_frames_under_pressure(monkeypatch):
+def test_budget_raises_under_pressure(monkeypatch):
+    """S4 platform-portability rewrite (2026-07-10): the frame budget is now a
+    STATIC 4n+1-snapped target (geometry only) -- it NEVER shrinks to fit live
+    VRAM anymore. When the cost model predicts the snapped target will not
+    fit, compute_real_frame_budget RAISES MotionBudgetError instead of
+    returning a smaller frame count. Same pressure inputs as the pre-S4 test.
     # overhead 7000 + 185/frame @1472x832; budget = free*0.85 (no policy ceiling
     # post-VRAM-rip -- the operator's tier JSON owns the OOM budget).
-    # free 14775 -> 12558.75 budget -> (12558.75-7000)/185 = 30 -> 4n+1 snap 33.
+    # free 14775 -> 12558.75 budget -> (12558.75-7000)/185 = 30 affordable, which
+    # cannot fit the snapped target 277 (4n+1 <= 280) -> raises.
+    """
     _clear_cost_env(monkeypatch)
-    assert mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v") == 33
+    with pytest.raises(mc.MotionBudgetError):
+        mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v")
 
 
-def test_budget_motion_floor_wins_when_starved(monkeypatch):
-    # 8 GB free cannot fit a frame past the 7000 MB overhead -> the 17-frame motion
-    # floor wins (never 0 -- a beat always carries motion).
+def test_budget_raises_when_starved(monkeypatch):
+    """S4 rewrite: the old expectation was floor-wins-shrink (the 17-frame
+    motion floor). NEW: static budget, raise-never-resize -- starved VRAM
+    that cannot even cover the per-engine overhead makes the affordable frame
+    count negative, which is always below the snapped target -> raises,
+    never silently shrinks to the motion floor.
+    # 8 GB free cannot fit a frame past the 7000 MB overhead -> affordable < 0
+    # < snapped(277) -> MotionBudgetError.
+    """
     _clear_cost_env(monkeypatch)
-    assert mc.compute_real_frame_budget(8000.0, 280, 1472, 832, "wan_ti2v") == 17
+    with pytest.raises(mc.MotionBudgetError):
+        mc.compute_real_frame_budget(8000.0, 280, 1472, 832, "wan_ti2v")
 
 
 def test_budget_never_exceeds_target(monkeypatch):
@@ -61,11 +78,21 @@ def test_budget_never_exceeds_target(monkeypatch):
 
 
 def test_budget_scales_cost_with_pixel_area(monkeypatch):
-    # A smaller canvas affords MORE frames (per-frame cost scales with pixel area).
+    """S4 rewrite: old expectation was bigger-canvas -> fewer predicted frames
+    (a shrink). NEW: the snapped target (277 for target=280 on wan_ti2v) is
+    canvas-independent -- per-frame VRAM cost still scales with pixel area, so
+    at a free-VRAM level where the smaller canvas's cheaper per-frame cost
+    affords the full snapped target, the SAME free level's larger canvas
+    (costlier per frame) cannot afford it and raises instead of shrinking.
+    # overhead 7000 + 185/frame @1472x832 (big); 185*480/1472=60.33/frame @832x480 (small).
+    # free 40000 -> budget 34000: big affordable (34000-7000)/185=145 < 277 -> raises;
+    # small affordable (34000-7000)/60.33=447 >= 277 -> returns the snapped target 277.
+    """
     _clear_cost_env(monkeypatch)
-    big = mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v")
-    small = mc.compute_real_frame_budget(14775.0, 280, 832, 480, "wan_ti2v")
-    assert small > big
+    small = mc.compute_real_frame_budget(40000.0, 280, 832, 480, "wan_ti2v")
+    assert small == 277
+    with pytest.raises(mc.MotionBudgetError):
+        mc.compute_real_frame_budget(40000.0, 280, 1472, 832, "wan_ti2v")
 
 
 def test_budget_env_overrides_cost_model(monkeypatch):

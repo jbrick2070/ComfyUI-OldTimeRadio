@@ -463,6 +463,24 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     ImageDirector already fails closed on it, so reaching here means the
     policy was hand-crafted or stale -- a malformed POLICY, not a normal miss.
     """
+    # S4 platform-portability (2026-07-10): a NON-EMPTY policy must be
+    # version 2. A v1 policy means a stale OTR_ImageDirector emitted it --
+    # fail LOUD before any LLM/API/render work burns on it.
+    if image_policy and int((image_policy or {}).get("policy_version") or 0) != 2:
+        raise ValueError(
+            "OTR_ImageGenDispatcher: image_policy carries policy_version="
+            f"{(image_policy or {}).get('policy_version')!r}; expected 2. "
+            "Re-run OTR_ImageDirector (stale/hand-crafted policy).")
+    # Real host facts + the episode device/dtype policy for ADAPTER-level
+    # usability (S4): the adapter-side enforcement protocol existed since
+    # the registry protocol but was never called on the image path.
+    from ._otr_shared.host_caps import build_host_caps
+    _host_caps = build_host_caps()
+    _adapter_profile = {
+        "policy_version": 2,
+        "device_policy": str((image_policy or {}).get("device_policy") or "cuda"),
+        "dtype_policy": str((image_policy or {}).get("dtype_policy") or "fp8_ok"),
+    }
     locked_3d = set((image_policy or {}).get("locked_3d_slots") or [])
     gran_by_slot = (image_policy or {}).get("granularity") or {}
     viol = sorted(s for s in locked_3d if gran_by_slot.get(s) == "per_beat")
@@ -646,6 +664,31 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 f"role '{role}' ({exc}). NO FALLBACK -- enable the engine "
                 f"(its flag) + provide its weights, or select a usable engine "
                 f"in the OTR_VideoDirector dropdown."
+            ) from exc
+        # S4: ADAPTER-level usability with REAL host facts + the episode
+        # policy (the registry-level check above is name/role only; every
+        # image adapter declares assert_usable(host_caps, profile, ...)
+        # but it was never called on this path -- the campaign's most
+        # consequential wiring catch, image side). Stubs without the
+        # method skip; a legacy 2-arg signature keeps working.
+        try:
+            _eng = _ireg.get_engine(engine_id)
+            _eng = _eng() if isinstance(_eng, type) else _eng
+            _adapter_assert = getattr(_eng, "assert_usable", None)
+            if callable(_adapter_assert):
+                try:
+                    _adapter_assert(host_caps=_host_caps,
+                                    profile=_adapter_profile,
+                                    request_template=None)
+                except TypeError:
+                    _adapter_assert(host_caps=_host_caps,
+                                    profile=_adapter_profile)
+        except Exception as exc:  # noqa: BLE001  (EngineUnusable et al.)
+            raise ImageRenderError(
+                f"{oid}: image engine '{engine_id}' failed ADAPTER-level "
+                f"usability for role '{role}' ({exc}). NO FALLBACK -- fix "
+                f"the engine's weights/flags/host requirements or select "
+                f"a usable engine."
             ) from exc
         if gen_fn is None:
             # S0 portability (2026-07-10): a pending target with no way to
@@ -859,7 +902,9 @@ def _inprocess_gen_fn(request):
     prepared = None
     prep = getattr(eng, "prepare", None)
     if callable(prep):
-        prepared = prep(None, None, None)
+        # S4: real host facts instead of the old (None, None, None).
+        from ._otr_shared.host_caps import build_host_caps
+        prepared = prep(build_host_caps(), {}, {})
     try:
         return eng.render_image(request, prepared)
     finally:

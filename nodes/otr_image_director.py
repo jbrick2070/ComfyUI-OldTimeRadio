@@ -311,7 +311,8 @@ class OTRImageDirector:
     def direct(self, announcer_granularity,
                music_granularity, character_granularity, fresh_cap,
                seed_mode, request_seed, video_policy_json="",
-               custom_models_json="{}", gate_in=""):
+               custom_models_json="{}", gate_in="",
+               dtype_policy="fp8_ok"):
         warnings: list = []
         custom = self._parse_json_obj(custom_models_json, "custom_models_json", warnings)
         video_policy = self._parse_video_policy_required(video_policy_json)
@@ -357,7 +358,15 @@ class OTRImageDirector:
             cap = 1
 
         policy = {
-            "policy_version": 1,
+            # S4 platform-portability (2026-07-10): version 2 adds the
+            # explicit dtype policy (default = nv50 baseline; the S5
+            # widget feeds it). device_policy forwards from the video
+            # policy so the dispatcher sees ONE device truth.
+            "policy_version": 2,
+            "dtype_policy": str(dtype_policy or "fp8_ok"),
+            "device_policy": str(
+                (video_policy.get("device_policy")
+                 if isinstance(video_policy, dict) else None) or "cuda"),
             "image_models": resolved,
             "granularity": granularity,
             "locked_3d_slots": sorted(locked),

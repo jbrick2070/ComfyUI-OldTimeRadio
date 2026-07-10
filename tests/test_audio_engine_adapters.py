@@ -98,25 +98,42 @@ def test_kokoro_is_per_line_after_cleanbreak_1b():
     assert AE.get_engine("kokoro").interface == "per_line"
 
 
-def test_kokoro_device_falls_back_to_cpu_without_cuda_or_mps(monkeypatch):
+def test_kokoro_uses_explicit_requested_device(monkeypatch):
+    """S4 platform-portability (2026-07-10): the cuda->mps->cpu auto-waterfall
+    (_kokoro_device) is DELETED. The device is now EXPLICIT: the voice node
+    threads the CastLock ledger stamp (meta.voice_device) onto the adapter as
+    ``requested_device``; load() passes it straight to KPipeline (a device the
+    host cannot provide fails LOUD inside KPipeline itself -- no silent
+    downgrade path to cover here)."""
+    import sys
+    import types
+
     from nodes._otr_audio_engines import eng_kokoro
 
-    class _Cuda:
-        @staticmethod
-        def is_available():
-            return False
+    # (i) the waterfall helper no longer exists on the module.
+    assert getattr(eng_kokoro, "_kokoro_device", None) is None
 
-    class _Mps:
-        @staticmethod
-        def is_available():
-            return False
+    # (ii) KPipeline receives the adapter's requested_device verbatim.
+    captured = {}
 
-    class _Torch:
-        cuda = _Cuda()
-        backends = type("_Backends", (), {"mps": _Mps()})()
+    class _FakeKPipeline:
+        def __init__(self, lang_code, device, repo_id):
+            captured["lang_code"] = lang_code
+            captured["device"] = device
+            captured["repo_id"] = repo_id
 
-    monkeypatch.setitem(__import__("sys").modules, "torch", _Torch)
-    assert eng_kokoro._kokoro_device() == "cpu"
+    fake_kokoro_module = types.SimpleNamespace(KPipeline=_FakeKPipeline)
+    monkeypatch.setitem(sys.modules, "kokoro", fake_kokoro_module)
+
+    explicit = eng_kokoro.KokoroEngine()
+    explicit.requested_device = "cpu"
+    explicit.load()
+    assert captured["device"] == "cpu"
+
+    # requested_device unset -> the nv50 baseline default ("cuda").
+    default_device = eng_kokoro.KokoroEngine()
+    default_device.load()
+    assert captured["device"] == "cuda"
 
 
 def test_musicgen_is_clip_after_cleanbreak_1c():

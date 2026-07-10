@@ -659,7 +659,8 @@ class TestDispatcherStillSpine:
                 requires_flag=None, required_inputs=("text_prompt",),
                 engine_version="1")
             ledger = {"episode_id": "ep_scene", "cast": []}
-            policy = {"image_models": {
+            policy = {"policy_version": 2,
+                "image_models": {
                 "music_image_model": {"engine_id": "flux_gen1"},
                 "character_image_model": {"engine_id": "flux_gen1"}},
                 "seed": {"mode": "request_hash", "request_seed": 3}}
@@ -917,7 +918,8 @@ class TestDispatcherStillSpine:
                 default_roles=(), commercial_clean=True, requires_flag=None,
                 required_inputs=("text_prompt",), engine_version="1")
             ledger = {"cast": [{"char_id": "c1", "name": "X"}]}
-            policy = {"image_models": {
+            policy = {"policy_version": 2,
+                "image_models": {
                 "character_image_model": {"engine_id": "flux_gen1"}},
                 "seed": {"request_seed": 0}}
             payload = {"version": 1, "objects": [{

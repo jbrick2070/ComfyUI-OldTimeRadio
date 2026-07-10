@@ -2174,18 +2174,27 @@ def _assert_family_inputs_satisfiable(engine_name, request):
             "request to an engine)" % (engine_name, fam, missing))
 
 
-def _render_one(engine_name, request, *, force_oom):
+def _render_one(engine_name, request, *, force_oom, host_caps=None,
+                profile=None):
     """Attempt ONE candidate engine: assert_usable -> prepare -> render_clip ->
     canonicalize, always teardown. ``force_oom`` raises BEFORE any work (the
     soak's deterministic mid-episode OOM -- it precedes the family-input check
     so the soak's expected OOM trail is exactly preserved). Raises on failure;
-    returns the canonical clip dict on success."""
+    returns the canonical clip dict on success.
+
+    S4 platform-portability (2026-07-10): ``host_caps``/``profile`` carry
+    REAL host facts (build_host_caps) + the ledger-stamped v2 device/dtype
+    policy down to the adapter boundary -- the empty-dict boundary here was
+    the campaign's most consequential wiring catch. ``None`` (direct debug
+    callers) degrades to the old empty dicts."""
     if force_oom:
         raise OomSignal("forced soak OOM on %s" % engine_name)
     _assert_family_inputs_satisfiable(engine_name, request)
     if not _vreg.is_registered(engine_name):
         raise LookupError("engine %r is not registered" % engine_name)
     eng = _vreg.get_engine(engine_name)
+    _caps = host_caps if host_caps is not None else {}
+    _prof = profile if profile is not None else {}
     prepared = None
     try:
         # M3 delta (d): pass the request as the assert_usable template so an
@@ -2195,12 +2204,13 @@ def _render_one(engine_name, request, *, force_oom):
         # (TypeError -> retry without it); real usability rejections raise
         # EngineUnusable, never TypeError, so this never masks one.
         try:
-            eng.assert_usable(host_caps={}, profile={}, request_template=request)
+            eng.assert_usable(host_caps=_caps, profile=_prof,
+                              request_template=request)
         except TypeError:
-            eng.assert_usable(host_caps={}, profile={})
-        prepared = eng.prepare(host_caps={}, profile={}, session_ctx={})
+            eng.assert_usable(host_caps=_caps, profile=_prof)
+        prepared = eng.prepare(host_caps=_caps, profile=_prof, session_ctx={})
         raw = eng.render_clip(request, prepared)
-        return eng.canonicalize(raw, request, {})
+        return eng.canonicalize(raw, request, _prof)
     finally:
         if prepared is not None:
             try:
@@ -2209,7 +2219,8 @@ def _render_one(engine_name, request, *, force_oom):
                 pass
 
 
-def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None):
+def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
+                host_caps=None, profile=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
     2026-06-16 'this is art, not a space shuttle'; hardened 2026-07-02 NO
     fallbacks / NO auto-defaults directive): a HARD render failure RAISES
@@ -2223,7 +2234,8 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None):
     out_shot = dict(shot)
     force = (sid == oom_shot_id and eng in (oom_engines or frozenset()))
     try:
-        clip = _render_one(eng, request, force_oom=force)
+        clip = _render_one(eng, request, force_oom=force,
+                           host_caps=host_caps, profile=profile)
     except Exception as exc:              # noqa: BLE001 - no fallback: fail LOUD
         kind = _rt.FailureKind.OOM if force else classify_failure(exc)
         _LOG.error(
@@ -2255,6 +2267,16 @@ def run_episode(ledger, *, oom_shot_id=None,
     ledger = copy.deepcopy(ledger)
     _log_if_legacy_render_plan_present(ledger)
     section = ledger["video"]
+    # S4 platform-portability (2026-07-10): build REAL host facts ONCE and
+    # carry the ledger-stamped v2 device/dtype policy to every adapter's
+    # assert_usable/prepare (was hardcoded {} at every call).
+    from .._otr_shared.host_caps import build_host_caps
+    _episode_host_caps = build_host_caps()
+    _episode_profile = {
+        "policy_version": 2,
+        "device_policy": str(section.get("device_policy") or "cuda"),
+        "dtype_policy": str(section.get("dtype_policy") or "fp8_ok"),
+    }
     clips, new_shots, trace = {}, [], []
     # S-C C1 (audio_motion_profile): per-shot resolved conditioning-WAV rows
     # (the per-line voice clip OR the read-only master slice) for the post-render
@@ -2340,7 +2362,8 @@ def run_episode(ledger, *, oom_shot_id=None,
         except Exception:  # noqa: BLE001 -- profiling collection is never fatal
             pass
         clip, out_shot, attempts, used = render_shot(
-            shot, request, oom_engines=oom_engines, oom_shot_id=oom_shot_id)
+            shot, request, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
+            host_caps=_episode_host_caps, profile=_episode_profile)
         # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
         # raises RenderError; there are no runtime fallback decisions and no
         # AS-2 family-change group prune (the family can never change here).

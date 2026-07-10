@@ -185,6 +185,51 @@ def test_indextts2_named_install_scripts_exist():
 
 
 # --------------------------------------------------------------------------
+# S4: host_caps shape + the CastLock voice_device ledger stamp
+# --------------------------------------------------------------------------
+
+def test_build_host_caps_minimum_shape():
+    """Verify-at-build register: the minimum host_caps shape every adapter
+    receives (S4 killed the empty-dict adapter boundary)."""
+    from nodes._otr_shared.host_caps import build_host_caps
+
+    caps = build_host_caps()
+    assert set(caps) == {"cuda_available", "mps_available", "vendor",
+                         "total_vram_gb"}
+    assert isinstance(caps["cuda_available"], bool)
+    assert isinstance(caps["mps_available"], bool)
+    assert caps["vendor"] in ("none", "nvidia", "amd", "apple")
+    assert isinstance(caps["total_vram_gb"], float)
+    if caps["cuda_available"]:
+        assert caps["total_vram_gb"] > 0
+
+
+def test_cast_lock_stamps_voice_device():
+    """S4: meta.voice_device rides the ledger like the engine stamps --
+    every voice adapter + theme music reads ONE explicit device."""
+    import json
+
+    from nodes.cast_lock import CastLock
+
+    led = {"episode_id": "ep_vd", "cast": [], "meta": {}}
+    out = CastLock().lock(script_json=json.dumps(led),
+                          cast_voice_policy="preserve_ledger",
+                          voice_device="cpu")
+    patched = json.loads(out[0])
+    assert patched["meta"]["voice_device"] == "cpu"
+    # Default = the nv50 baseline.
+    out2 = CastLock().lock(script_json=json.dumps(led),
+                           cast_voice_policy="preserve_ledger")
+    assert json.loads(out2[0])["meta"]["voice_device"] == "cuda"
+    # Invalid device fails loud.
+    import pytest as _pytest
+    with _pytest.raises(ValueError, match="voice_device"):
+        CastLock().lock(script_json=json.dumps(led),
+                        cast_voice_policy="preserve_ledger",
+                        voice_device="tpu")
+
+
+# --------------------------------------------------------------------------
 # HuMo artifact alignment: script vs engine default vs registry label
 # --------------------------------------------------------------------------
 

@@ -607,6 +607,7 @@ def test_shotlock_end_to_end_stamps_video_section():
         "meta": {"story_brief_terms": {"setting": ["a station"]}},
     }
     policy = json.dumps({
+        "policy_version": 2,
         "video_models": {"announcer_video_model": {"engine_id": "", "custom": False},
                          "music_video_model": {"engine_id": "", "custom": False},
                          "character_video_model": {"engine_id": "", "custom": False}},

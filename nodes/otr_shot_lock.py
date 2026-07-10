@@ -1045,6 +1045,16 @@ class OTRShotLock:
         except (ValueError, TypeError):
             policy = {}
 
+        # S4 platform-portability (2026-07-10): a NON-EMPTY policy must be
+        # version 2 (device_policy/dtype_policy present). A v1 policy here
+        # means a stale OTR_VideoDirector emitted it -- fail LOUD before
+        # any render work burns on it.
+        if policy and int(policy.get("policy_version") or 0) != 2:
+            raise ValueError(
+                "OTR_ShotLock: video_policy_json carries policy_version="
+                f"{policy.get('policy_version')!r}; expected 2. Re-run "
+                "OTR_VideoDirector (stale/hand-crafted policy).")
+
         canvas = (policy.get("canvas") or {})
         fps = int(canvas.get("fps") or 25)
         report: list = []
@@ -1091,6 +1101,13 @@ class OTRShotLock:
         revision = int(meta.get("video_revision") or 0) + 1
         video_section = {
             "video_revision": revision,
+            # S4: the v2 policy stamps ride the ledger so render_driver
+            # (and every adapter's assert_usable) sees the SAME device/
+            # dtype truth the directors emitted. Defaults = nv50 baseline
+            # (tolerates an empty policy in unit fixtures).
+            "policy_version": 2,
+            "device_policy": str(policy.get("device_policy") or "cuda"),
+            "dtype_policy": str(policy.get("dtype_policy") or "fp8_ok"),
             "canonical_canvas": {
                 "w": int(canvas.get("w") or 832),
                 "h": int(canvas.get("h") or 480),

@@ -69,10 +69,20 @@ def main():
     _proto = os.fdopen(_saved_fd, "w", buffering=1, encoding="utf-8")
 
     try:
+        # S4 platform-portability (2026-07-10): the device is EXPLICIT (the
+        # adapter passes --device from the CastLock ledger stamp; default
+        # cuda = nv50 baseline). The old cuda->cpu waterfall is deleted --
+        # an unavailable device fails LOUD in from_pretrained.
+        import argparse
+        _ap = argparse.ArgumentParser()
+        _ap.add_argument("--device", default="cuda",
+                         choices=("cuda", "cpu", "mps"))
+        _args, _ = _ap.parse_known_args()
+
         import torch  # noqa: F401  (surfaces a venv/torch problem as a clean error)
         import torchaudio
         from chatterbox.tts import ChatterboxTTS
-        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        dev = _args.device
         model = ChatterboxTTS.from_pretrained(device=dev)
     except Exception as e:
         emit({"ready": False, "error": "%s: %s" % (type(e).__name__, e),

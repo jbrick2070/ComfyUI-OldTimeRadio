@@ -139,6 +139,13 @@ class StableAudioTheme:
         try:
             engine = assert_usable(engine, ROLE)  # FAIL CLOSED (6-class)
             adapter = get_engine(engine)
+            # S4 platform-portability (2026-07-10): theme music reads the
+            # SAME CastLock ledger stamp (meta.voice_device) the voice nodes
+            # do -- ONE explicit device truth per episode. Adapters without
+            # a local device (sonilo/google/comfy-native SA3) ignore it.
+            from ._otr_voice_node_common import _voice_device_from_ledger
+            adapter.requested_device = _voice_device_from_ledger(
+                ledger_json, script_json)
             interface = getattr(adapter, "interface", "clip")
 
             if interface == "clip":

@@ -227,6 +227,28 @@ def build_engine_combo(role, fallback) -> list:
     return engines
 
 
+def _voice_device_from_ledger(ledger_json, script_json="") -> str:
+    """The explicit voice device from the CastLock ledger stamp
+    (``meta.voice_device``, S4). Falls back to the script ledger's meta,
+    then the nv50 baseline ``cuda``. NEVER probes hardware -- the stamp is
+    the single source of truth; a wrong device fails loud at the adapter."""
+    import json as _json
+
+    for raw in (ledger_json, script_json):
+        if not raw:
+            continue
+        try:
+            led = _json.loads(raw)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(led, dict):
+            dev = ((led.get("meta") or {}).get("voice_device") or "")
+            dev = str(dev).strip().lower()
+            if dev in ("cuda", "cpu", "mps"):
+                return dev
+    return "cuda"
+
+
 def voice_input_types(role, fallback) -> dict:
     """The shared INPUT_TYPES for a v2 voice node (1a / 1b).
 
@@ -324,6 +346,13 @@ class OTRVoiceNodeBase:
         try:
             engine = assert_usable(engine, self.ROLE)  # FAIL CLOSED (6-class)
             adapter = get_engine(engine)
+            # S4 platform-portability (2026-07-10): thread the EXPLICIT voice
+            # device (CastLock ledger stamp meta.voice_device; default cuda =
+            # nv50 baseline) into the adapter as an attribute -- no signature
+            # churn; adapters without a local device (cloud lanes) ignore it.
+            # The old per-adapter cuda->mps->cpu waterfalls are deleted.
+            adapter.requested_device = _voice_device_from_ledger(
+                ledger_json, script_json)
             interface = getattr(adapter, "interface", "per_line")
             sr_hint = int(getattr(adapter, "sample_rate", 24000) or 24000)
 

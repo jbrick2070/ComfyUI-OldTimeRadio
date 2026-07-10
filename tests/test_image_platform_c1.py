@@ -391,7 +391,8 @@ def test_dispatcher_halts_on_3d_per_beat_policy():
     dispatched."""
     with pytest.raises(ValueError, match="HALT"):
         disp.dispatch_images(
-            {}, {"locked_3d_slots": ["character_image_model"],
+            {}, {"policy_version": 2,
+                 "locked_3d_slots": ["character_image_model"],
                  "granularity": {"character_image_model": "per_beat"}},
             {"version": 1, "objects": []}, gen_fn=lambda req: None)
 
@@ -613,6 +614,7 @@ def test_cloud_image_adapter_bypasses_local_gpu_residency(
             AssertionError("cloud image adapter must not probe local GPU")))
     ledger = {"episode_id": "ep_cloud_image", "cast": [{"char_id": "c1"}]}
     policy = {
+        "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "ideo_alias"}},
         "seed": {"request_seed": 0},
         "granularity": {},
@@ -643,6 +645,7 @@ def test_gen_fn_none_for_pending_target_raises(clean_image_registry, tmp_path):
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_no_genfn", "cast": [{"char_id": "c1"}]}
     policy = {
+        "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
         "video_models": {"character_video_model": {"engine_id": "still_motion"}},
         "seed": {"request_seed": 0},
@@ -660,6 +663,7 @@ def test_dispatch_appends_visual_safety_to_image_requests(
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_safety", "cast": [{"char_id": "c1"}]}
     policy = {
+        "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
         "video_models": {"character_video_model": {"engine_id": "still_motion"}},
         "seed": {"request_seed": 0},
@@ -696,6 +700,7 @@ def test_dispatch_renders_forced_ltx_announcer_radio_face(
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "announcer_visual=ltx_audio_in")
     ledger = {"episode_id": "ep_radio_face", "cast": []}
     policy = {
+        "policy_version": 2,
         "image_models": {
             "announcer_image_model": {"engine_id": "flux_gen1"},
             "character_image_model": {"engine_id": "flux_gen1"}},
@@ -755,6 +760,7 @@ def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, 
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_vis", "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {
+        "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
         "video_models": {
             "announcer_video_model": {"engine_id": "viz_green"},
@@ -784,6 +790,7 @@ def test_dispatch_still_made_when_video_engine_needs_init_image(clean_image_regi
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_wan", "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {
+        "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
         "video_models": {"character_video_model": {"engine_id": "wan_ti2v"}},
         "seed": {"request_seed": 0}, "granularity": {}}
@@ -803,7 +810,8 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_test",
               "cast": [{"char_id": "c1", "name": "BABA"}]}
-    policy = {"image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     lockdir = tmp_path / "lease.lockdir"
@@ -866,7 +874,8 @@ def test_dispatcher_hard_fails_on_unusable_engine(clean_image_registry, tmp_path
     wrong-engine render."""
     clean_image_registry._registry.clear()  # nothing registered -> assert_usable fails
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
-    policy = {"image_models": {"character_image_model": {"engine_id": "ghost"}},
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "ghost"}},
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "x, y", "ph"))
     with pytest.raises(disp.ImageRenderError):
@@ -971,7 +980,8 @@ def test_dispatcher_accepts_sidecar_path_handoff(clean_image_registry, tmp_path)
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_test",
               "cast": [{"char_id": "c1", "name": "BABA"}]}
-    policy = {"image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     side = _write_png(tmp_path / "from_sidecar.png", val=77)
@@ -997,7 +1007,8 @@ def test_dispatcher_hard_fails_on_truncated_handoff(clean_image_registry, tmp_pa
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
-    policy = {"image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     empty = tmp_path / "truncated.png"
@@ -1075,7 +1086,8 @@ def test_dispatcher_hard_fails_on_render_failure(clean_image_registry, tmp_path)
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
-    policy = {"image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
 
@@ -1253,7 +1265,8 @@ def test_dispatcher_mints_non_cast_announcer_portrait(clean_image_registry, tmp_
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_test",
               "cast": [{"char_id": "c1", "name": "EDNA"}]}
-    policy = {"image_models": {
+    policy = {"policy_version": 2,
+              "image_models": {
                   "character_image_model": {"engine_id": "flux_gen1"},
                   "announcer_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}, "granularity": {}}
@@ -1289,7 +1302,8 @@ def test_dispatch_persists_radio_host_style_fresh_and_cache_hit(
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_test", "cast": []}
-    policy = {"image_models": {
+    policy = {"policy_version": 2,
+              "image_models": {
                   "character_image_model": {"engine_id": "flux_gen1"},
                   "announcer_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}, "granularity": {}}
@@ -1323,7 +1337,8 @@ def test_dispatch_persists_still_word_provenance(clean_image_registry, tmp_path)
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     ledger = {"episode_id": "ep_test", "cast": []}
-    policy = {"image_models": {
+    policy = {"policy_version": 2,
+              "image_models": {
                   "character_image_model": {"engine_id": "flux_gen1"}},
               "seed": {"request_seed": 0}, "granularity": {}}
     obj = {"object_id": "still_b001", "kind": "scene_open",

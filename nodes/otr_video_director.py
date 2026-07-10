@@ -256,7 +256,8 @@ class OTRVideoDirector:
                fps, canvas_w, canvas_h,
                seed_mode, request_seed,
                custom_models_json="{}",
-               gate_in=""):
+               gate_in="",
+               device_policy="cuda", dtype_policy="fp8_ok"):
         warnings: list = []
         custom = self._parse_custom(custom_models_json, warnings)
         descriptors = _registry_descriptors()
@@ -286,7 +287,14 @@ class OTRVideoDirector:
                     "EMPTY engine. Pick a model -- NO FALLBACK." % (role, slot))
 
         policy = {
-            "policy_version": 1,
+            # S4 platform-portability (2026-07-10): version 2 adds the
+            # explicit device/dtype policy fields (defaults = nv50
+            # baseline; the S5 widgets feed them 1:1). Every consumer
+            # (ImageDirector, ShotLock, dispatcher, render_driver)
+            # asserts policy_version == 2.
+            "policy_version": 2,
+            "device_policy": str(device_policy or "cuda"),
+            "dtype_policy": str(dtype_policy or "fp8_ok"),
             "video_models": resolved_video,
             # Per-role still aspect, resolved from each slot's selected engine, so
             # the image node mints character stills to MATCH the chosen video

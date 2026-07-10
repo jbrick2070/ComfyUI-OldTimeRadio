@@ -143,7 +143,8 @@ class CastLock:
     def lock(self, script_json, voice_bank="default",
              cast_voice_policy="preserve_ledger", delivery_profile="neutral",
              allow_voice_reuse=False, char_voice_engine="auto",
-             announcer_voice_engine="auto", gate_in=""):
+             announcer_voice_engine="auto", gate_in="",
+             voice_device="cuda"):
         from . import _otr_ledger_consumers as _OTRLC
         from ._otr_delivery_profiles import (
             DELIVERY_PROFILE_VERSION, get_delivery_profile,
@@ -181,10 +182,12 @@ class CastLock:
             self._auto_registry(
                 led, cast, voice_bank, allow_voice_reuse, report,
                 char_voice_engine=char_voice_engine,
-                announcer_voice_engine=announcer_voice_engine)
+                announcer_voice_engine=announcer_voice_engine,
+                voice_device=voice_device)
         else:
             self._stamp_voice_engine_selection(
-                led, voice_bank, char_voice_engine, announcer_voice_engine)
+                led, voice_bank, char_voice_engine, announcer_voice_engine,
+                voice_device=voice_device)
             report.append(
                 f"preserve_ledger: {len(cast)} cast entries preserved "
                 f"(no re-cast)"
@@ -478,7 +481,8 @@ class CastLock:
     # ------------------------------------------------------------------ #
     def _auto_registry(self, led, cast, voice_bank, allow_voice_reuse, report,
                        char_voice_engine="auto",
-                       announcer_voice_engine="auto"):
+                       announcer_voice_engine="auto",
+                       voice_device="cuda"):
         from ._otr_voice_bank import (
             CASTING_POLICY_VERSION, VoiceCastingError, announcer_voice_ref,
             assign_voice_for_slot, load_voice_bank, voice_ref_usage_keys,
@@ -500,7 +504,7 @@ class CastLock:
         voice_decisions = meta.get("voice_cast_decision") or {}
         target_engine, announcer_engine = self._stamp_voice_engine_selection(
             led, voice_bank, char_voice_engine, announcer_voice_engine,
-            bank_entries=bank_entries)
+            bank_entries=bank_entries, voice_device=voice_device)
 
         if target_engine is None:
             report.append(
@@ -625,17 +629,30 @@ class CastLock:
     def _stamp_voice_engine_selection(self, led, voice_bank,
                                       char_voice_engine="auto",
                                       announcer_voice_engine="auto",
-                                      bank_entries=None):
+                                      bank_entries=None,
+                                      voice_device="cuda"):
         """Stamp requested voice-engine routing even when cast rows are preserved.
 
         ``auto_registry`` uses the resolved target engine for casting; preserved
         ledgers still need the explicit engine choice recorded so profiles like
         cloud_all cannot silently drift back to a local voice route.
+
+        S4 platform-portability (2026-07-10): ``meta["voice_device"]`` rides
+        the ledger exactly like the engine stamps -- every downstream voice
+        adapter (and theme music) reads the SAME explicit device; the old
+        per-adapter cuda->mps->cpu waterfalls are gone.
         """
         meta = led.get("meta")
         if not isinstance(meta, dict):
             meta = {}
             led["meta"] = meta
+
+        _dev = str(voice_device or "cuda").strip().lower()
+        if _dev not in ("cuda", "cpu", "mps"):
+            raise ValueError(
+                f"OTR_CastLock: voice_device {voice_device!r} is not one of "
+                "cuda/cpu/mps -- NO silent default.")
+        meta["voice_device"] = _dev
 
         requested = str(char_voice_engine or "auto").strip() or "auto"
         target_engine = None

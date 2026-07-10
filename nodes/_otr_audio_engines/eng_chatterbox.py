@@ -96,8 +96,13 @@ class ChatterboxEngine:
         err_path = os.path.join(_REPO_ROOT, "_otr_chatterbox_worker.err")
         stderr = open(err_path, "ab", buffering=0)
         try:
+            # S4 platform-portability (2026-07-10): the worker device is
+            # EXPLICIT (CastLock ledger stamp threaded as requested_device;
+            # default cuda = nv50 baseline). No worker-side waterfall.
+            _dev = getattr(self, "requested_device", None) or "cuda"
             proc = subprocess.Popen(
-                [py, worker], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                [py, worker, "--device", str(_dev)],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=stderr, text=True, encoding="utf-8", bufsize=1)
         except Exception:
             stderr.close()

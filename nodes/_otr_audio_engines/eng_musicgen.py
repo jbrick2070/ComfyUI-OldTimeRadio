@@ -53,7 +53,11 @@ class MusicGenEngine:
             os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")),
             "hub",
         )
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # S4 platform-portability: EXPLICIT device (theme node threads the
+        # CastLock ledger stamp as requested_device; default cuda = nv50
+        # baseline). The cuda->cpu waterfall is deleted -- a device the host
+        # cannot provide fails LOUD at .to(device).
+        device = getattr(self, "requested_device", None) or "cuda"
         dtype = torch.float16 if device == "cuda" else torch.float32
         self._processor = AutoProcessor.from_pretrained(
             self.model_id, cache_dir=cache_dir,
@@ -96,7 +100,8 @@ class MusicGenEngine:
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # S4: same explicit device the model was loaded on (no re-probe).
+        device = getattr(self, "requested_device", None) or "cuda"
         max_new_tokens = int(float(duration_s) * _MUSICGEN_TOKENS_PER_SEC) + 8
         inputs = self._processor(
             text=[prompt], padding=True, return_tensors="pt",

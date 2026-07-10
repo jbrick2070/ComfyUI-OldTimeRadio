@@ -227,19 +227,29 @@ def test_floor_length_honors_target_without_vram_read(monkeypatch):
 
 
 def test_floor_length_predicts_from_live_vram(monkeypatch):
-    # With a live free-VRAM read the predictor bounds the target by the budget:
+    """S4 platform-portability rewrite (2026-07-10): motion_common's frame
+    budget never shrinks a beat's target anymore -- it RAISES MotionBudgetError
+    when the live-VRAM cost model cannot afford the (hard-cap-clamped) snapped
+    target. _floor_length first clamps target=280 down to the engine's native
+    hard cap (177, a valid 4n+1) before budgeting; at BOTH VRAM levels below
+    (a clean-box free=14775 and a tight free=8000) the cost model cannot
+    afford 177 frames at 1472x832, so both calls now raise instead of
+    returning a shrunken prediction.
     # overhead 7000 + 185/frame @1472x832; budget = free*0.85 (no policy ceiling
     # post-VRAM-rip -- the operator's tier JSON owns the OOM budget).
+    # free 14775 -> budget 12558.75 -> affordable (12558.75-7000)/185=30 < 177 -> raises.
+    # free 8000  -> budget 6800.00  -> affordable (6800.00-7000)/185=-1 < 177 -> raises.
+    """
     _clear_floor_env(monkeypatch)
     from nodes._otr_video_engines import motion_common as mc
-    # ~5080 clean box: free ~14775 -> budget 12558.75 -> (12558.75-7000)/185 = 30 -> 33.
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 14775.0)
-    assert WanTi2vEngine()._floor_length(280, 1472, 832) == 33
-    # Tight VRAM (8 GB free) cannot fit even one frame past overhead -> the motion
-    # floor (17) WINS (a beat always carries some motion; the render-window NVML
-    # probe is the real over-budget guard).
+    with pytest.raises(mc.MotionBudgetError):
+        WanTi2vEngine()._floor_length(280, 1472, 832)
+    # Tight VRAM (8 GB free) cannot fit even one frame past overhead either --
+    # still a raise (never a silent floor-wins shrink to 17).
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 8000.0)
-    assert WanTi2vEngine()._floor_length(280, 1472, 832) == 17
+    with pytest.raises(mc.MotionBudgetError):
+        WanTi2vEngine()._floor_length(280, 1472, 832)
 
 
 def test_floor_max_override_is_an_absolute_hard_cap(monkeypatch):
