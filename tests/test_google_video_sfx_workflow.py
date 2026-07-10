@@ -32,7 +32,10 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     nodes = {n["id"]: n for n in wf["nodes"]}
     n85 = nodes[85]
     n92 = nodes[92]
-    assert wf["last_link_id"] == 278
+    # S5 platform-portability (2026-07-10): OLD pin 278 -> NEW pin 279 (link
+    # 279 = OTR_WorkflowValidator.validation_report -> node-1 gate_in; this
+    # file's link IDs 85/92-side are unaffected, only the vector's ceiling).
+    assert wf["last_link_id"] == 279
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",

@@ -140,6 +140,16 @@ end-to-end sweep (section 3 below).
 Queued design item for the arc: demote `meta["news"]` to provenance-only
 + distinct-name migration (operator: "we can't just throw around meta").
 
+QUEUED CAMPAIGN (2026-07-10, analysis DONE, code NOT started): **lean-mean rip**
+(de-slop / ship-shape). Plan = `docs/2026-07-10-lean-mean-rip/RIP_PLAN.md` --
+r1-r4 converged same night (3 mechanical audits -> 3-Fable architect fan-out ->
+grounding -> Fable gate: CONVERGED after 7 must-fixes, folded). ~32-33k LOC
+deletion in waves W0-W8 + consolidations C1-C7 + giants split SW1-SW4. EXECUTES
+AFTER portability lands (operator lock); re-verify its REVISE-AFTER register
+(section 2) first -- NOTE the plan's baseline predates today's smoke-hardening
+commits (suite now 7151), R-7 re-grep rule applies. Operator eyeball pending on
+decision boxes D-1..D-6.
+
 ### 1. Model-Slot Audit And End-To-End Smokes (live smokes PARKED 2026-07-09)
 
 Inventory every local model/engine exposed through the production slots:

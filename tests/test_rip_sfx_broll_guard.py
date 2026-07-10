@@ -171,7 +171,11 @@ def test_workflow_json_node87_matches_live_widget_model():
     # 2026-07-03 clean-UI: the node settled at 12 widgets (allow_auto_fallback,
     # episode_duration_target, and the legacy catch-all video slot were removed;
     # character promoted to video slot 3 = widgets index 2).
-    assert len(n87["widgets_values"]) == 12, n87["widgets_values"]
+    # S5 platform-portability (2026-07-10): OLD pin 12 -> NEW pin 14
+    # (+device_policy="cuda" appended at index 12, +dtype_policy="fp8_ok"
+    # appended at index 13; both append-only, character_video_model stays
+    # at index 2).
+    assert len(n87["widgets_values"]) == 14, n87["widgets_values"]
     names87 = {i.get("name") for i in n87["inputs"]}
     # the per-role MODEL widgets are EXACTLY the six live ones -- a closed check
     # that catches any legacy model widget leaking back into the canonical JSON.

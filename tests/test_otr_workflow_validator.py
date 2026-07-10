@@ -189,8 +189,21 @@ class TestAdversarialWorkflow:
 # GATE B S2: stamp widgets + startup assertion + runtime env export
 # ---------------------------------------------------------------------------
 
-def _host(has_cuda=True, vram_mb=16384, platform="win"):
-    return {"has_cuda": has_cuda, "vram_mb": vram_mb, "platform": platform}
+def _host(has_cuda=True, vram_mb=16384, platform="win", has_mps=False,
+          vendor="nvidia"):
+    # S5 platform-portability (2026-07-10): OLD shape had no "has_mps" /
+    # "vendor" keys. _assert_stamp now also asserts device_backend=mps
+    # needs host has_mps, and a profile's gpu_vendor pin must match the
+    # detected host vendor (docs/2026-07-09-platform-portability-final.md
+    # section 1). The real _detect_host() always returns both keys; a stub
+    # missing them made host.get("vendor") resolve to None, which is
+    # "not in ('none', 'nvidia')" -- a false-positive vendor mismatch
+    # against the 16gb_full fixture profile (gpu_vendor="nvidia"). NEW
+    # shape adds both keys with defaults matching that fixture's cuda/
+    # nvidia profile so the pre-existing has_cuda=False call sites are
+    # unaffected (they short-circuit before the vendor check runs).
+    return {"has_cuda": has_cuda, "vram_mb": vram_mb, "platform": platform,
+            "has_mps": has_mps, "vendor": vendor}
 
 
 class TestStampAssertion:
@@ -220,6 +233,15 @@ class TestStampAssertion:
         # Post-VRAM-rip: the validator exports ONLY the active-profile id +
         # snapshot hash -- the OOM budget is owned by the operator's tier JSON,
         # so there is no VRAM-budget env export any more.
+        #
+        # S5 platform-portability (2026-07-10): _assert_stamp now also runs
+        # the semantic master_hash tripwire whenever master_hash is
+        # non-empty (nodes._otr_workflow_apply.semantic_master_hash vs the
+        # live file) -- pass "" explicitly (matches the default) so this
+        # test exercises the unstamped-hash / stamped-profile env-export
+        # path it is actually about, not the drift tripwire. _host()'s
+        # nvidia/cuda default now satisfies the new gpu_vendor-match assert
+        # too (see _host()'s docstring comment above).
         import os
         monkeypatch.setattr(WorkflowValidator, "_detect_host",
                             staticmethod(lambda: _host()))
@@ -227,7 +249,7 @@ class TestStampAssertion:
         monkeypatch.delenv("OTR_SNAPSHOT_HASH", raising=False)
         node = WorkflowValidator()
         (msg,) = node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
-                               profile_id="16gb_full")
+                               profile_id="16gb_full", master_hash="")
         assert "stamp OK" in msg
         assert os.environ["OTR_ACTIVE_PROFILE"] == "16gb_full"
         assert len(os.environ["OTR_SNAPSHOT_HASH"]) == 64

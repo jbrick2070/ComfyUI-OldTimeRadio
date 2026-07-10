@@ -186,8 +186,11 @@ def test_widget_vectors_exact(by_id):
     # CastLock (80): intentional index-workflow override (see docstring).
     # delivery_profile surface removed 2026-07-04 (widget-audit Batch 1); the
     # "neutral" kwarg default still applies + is validated/stamped by lock().
+    # S5 platform-portability (2026-07-10): OLD pin 5 widgets -> NEW pin 6
+    # (+voice_device="cuda" appended at index 5, the explicit audio device
+    # policy; append-only, never inserted).
     assert by_id[80]["widgets_values"] == [
-        "default", "auto_registry", True, "indextts2", "kokoro"]
+        "default", "auto_registry", True, "indextts2", "kokoro", "cuda"]
     for key, nid in NEW_NODE_IDS.items():
         if nid == 80:
             continue

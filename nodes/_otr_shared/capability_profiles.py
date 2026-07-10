@@ -103,6 +103,10 @@ _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
     "audio": (True, lambda v: isinstance(v, dict), "dict"),
     "render": (True, lambda v: isinstance(v, dict), "dict"),
     "preflight": (True, lambda v: isinstance(v, dict), "dict"),
+    # S5: OPTIONAL operator-ratification gate. While non-empty,
+    # scripts/build_variants.py REFUSES to emit this profile's variant;
+    # the operator ratifies each named decision and clears the list.
+    "ratify_before_emit": (False, _is_str_list, "list[str] (optional)"),
 }
 
 _SEED_POLICY_KEYS = {

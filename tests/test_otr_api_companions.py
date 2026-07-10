@@ -173,6 +173,44 @@ def _writer_schemas() -> dict:
     }
 
 
+def _writer_schemas_s5() -> dict:
+    """S5 platform-portability (2026-07-10) variant of ``_writer_schemas()``.
+
+    Kept as a SEPARATE helper (rather than extending ``_writer_schemas()``
+    in place) so the pre-existing ``patch_widget_by_name`` tests below --
+    which pair ``_writer_schemas()`` with the independent, frozen-in-time
+    28-slot ``_writer_node_fixture()`` synthetic double -- keep exercising
+    that fixed shape unmodified. Only ``test_round_trip_canonical_node1_
+    inputs_correct`` reads the REAL canonical workflow (now 34 widgets
+    wide), so only that test needs the extended schema.
+
+    Adds the six explicit LLM runtime-policy widgets appended after
+    source_ref at combined widget slots 28-33 (llm_device .. gguf_quant),
+    plus the gate_in forceInput socket (consumes no widgets_values slot),
+    mirroring the live node-1 INPUT_TYPES in nodes/OTR_LedgerScriptWriter.py.
+    """
+    schemas = _writer_schemas()
+    required = schemas["OTR_LedgerScriptWriter"]["input"]["required"]
+    required["llm_device"] = (
+        ["cuda", "cpu", "mps"], {"default": "cuda"},
+    )
+    required["llm_attn_impl"] = (
+        ["sdpa", "flash_attention_2", "eager"], {"default": "sdpa"},
+    )
+    required["llm_quant_policy"] = (
+        ["bnb_nf4", "bnb_8bit", "none"], {"default": "bnb_nf4"},
+    )
+    required["llm_vram_ceiling_gb"] = ("FLOAT", {"default": 14.5})
+    required["gguf_n_ctx"] = ("INT", {"default": 4096})
+    required["gguf_quant"] = (
+        ["Q8_0", "Q6_K", "Q4_K_M"], {"default": "Q8_0"},
+    )
+    required["gate_in"] = (
+        "STRING", {"default": "", "forceInput": True},
+    )
+    return schemas
+
+
 def _writer_node_fixture() -> dict:
     """Workflow fixture with node 1 carrying the widgets_values layout
     dumped from workflows/otr_canonical.json. The `seed` widget +
@@ -469,15 +507,25 @@ def test_round_trip_canonical_node1_inputs_correct():
     widgets outright (they used to sit at slots 8/9), dropping the vector
     from 27 to 25 before the 2026-07-08 Google pair and source_ref brought
     it to 28.
+
+    S5 platform-portability (2026-07-10): OLD pin 28 -> NEW pin 34. The six
+    explicit LLM runtime-policy widgets (llm_device, llm_attn_impl,
+    llm_quant_policy, llm_vram_ceiling_gb, gguf_n_ctx, gguf_quant) were
+    appended after source_ref at slots 28-33, and a gate_in forceInput
+    socket (OTR_WorkflowValidator.validation_report, link 279) was added
+    at inputs[34] -- a pure socket, so it consumes NO widgets_values slot
+    and the vector ceiling is 34, not 35. Uses _writer_schemas_s5() (the
+    28-slot _writer_schemas() plus the six new widgets + gate_in) so the
+    round-trip conversion sees a schema matching the live 34-wide vector.
     """
     dump = _dump_canonical_node1()
-    # 28: 25 post style-engine consolidation plus the appended Google API
-    # slot pair and source_ref.
-    assert len(dump) == 28, f"node 1 widgets_values length drift: {len(dump)}"
+    # 34: 28 (pre-S5) plus the six LLM runtime-policy widgets (28-33);
+    # gate_in is a forceInput socket and does not occupy a slot.
+    assert len(dump) == 34, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 
-    schemas = _writer_schemas()
+    schemas = _writer_schemas_s5()
     workflow = load_workflow(str(_CANONICAL_WORKFLOW))
     prompt = workflow_to_api_prompt(workflow, schemas)
 
@@ -490,6 +538,13 @@ def test_round_trip_canonical_node1_inputs_correct():
     assert n1_inputs["technical_model"] == expected_technical, (
         f"inputs['technical_model'] expected {expected_technical!r}; "
         f"got {n1_inputs['technical_model']!r}"
+    )
+    # S5: gate_in is a linked forceInput socket (link 279, source node 63
+    # OTR_WorkflowValidator out slot 0) -- account for it explicitly rather
+    # than leaving the new S5 wiring unasserted.
+    assert n1_inputs["gate_in"] == ["63", 0], (
+        f"inputs['gate_in'] expected link to node 63 slot 0; "
+        f"got {n1_inputs.get('gate_in')!r}"
     )
 
     # The writer no longer declares a `seed` input (BUG-LOCAL-269/270).

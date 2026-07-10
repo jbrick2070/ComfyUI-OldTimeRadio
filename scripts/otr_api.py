@@ -819,14 +819,13 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
 
 
 def normalize_stamp_widgets_for_live_schema(workflow: dict, schemas: dict) -> dict:
-    """STALE-SERVER COMPAT SHIM (2026-06-11): the master gained the three
-    node-63 stamp widgets (GATE B S2), but a long-running ComfyUI keeps the
-    OLD class until restart -- its live /object_info shows 3 validator slots
-    while the saved json carries 6, so API conversion refuses (correctly).
-    When the LIVE schema is the short one AND the three extra saved slots are
-    all EMPTY (the unstamped master), trim them LOUDLY so headless runs work
-    against the not-yet-restarted server. A STAMPED snapshot is NEVER trimmed
-    -- the stamp must not be silently dropped; restart the server instead."""
+    """S5 platform-portability (2026-07-10): the 2026-06-11 stale-server
+    TRIM shim is RETIRED. A widget vector that mismatches the live
+    INPUT_TYPES -- ANY node, stamped or not -- is a HARD FAIL: the old
+    soft-skip could submit a silently-reshaped graph, which is exactly the
+    drift class the variant pipeline exists to kill. Fixes: restart the
+    ComfyUI server (stale class) or regenerate the variant
+    (scripts/build_variants.py)."""
     for node in workflow.get("nodes", []):
         if node.get("type") != "OTR_WorkflowValidator":
             continue
@@ -835,28 +834,13 @@ def normalize_stamp_widgets_for_live_schema(workflow: dict, schemas: dict) -> di
         except KeyError:
             return workflow
         wv = node.get("widgets_values") or []
-        if len(live) == 3 and len(wv) == 6:
-            if any(str(v or "") for v in wv[3:]):
-                raise ValueError(
-                    "node 63 carries a NON-EMPTY stamp but the live server "
-                    "still runs the pre-stamp validator class -- RESTART "
-                    "ComfyUI to load the new code (the stamp is never "
-                    "silently dropped)."
-                )
-            print("[otr_api] LOUD stale-server shim: live validator schema "
-                  "predates the stamp widgets; trimming the 3 EMPTY stamp "
-                  "slots for this submit (restart ComfyUI to retire this "
-                  "shim).", flush=True)
-            # The OLD validator class also re-reads the canonical json from
-            # DISK and trips its own drift check on the new 6-slot master --
-            # skip it for this submit (validate_anyway=False), LOUD. The
-            # post-restart class re-enables itself automatically (and its
-            # stamp assertion can never be skipped this way by design).
-            print("[otr_api] LOUD stale-server shim: disabling the OLD "
-                  "validator's disk-side contract check for this submit "
-                  "(validate_anyway=False) -- it cannot parse the new "
-                  "6-slot master until the server restarts.", flush=True)
-            node["widgets_values"] = [wv[0], False, wv[2]]
+        if len(live) != len(wv):
+            raise ValueError(
+                "node 63 widget vector (%d values) does not match the live "
+                "OTR_WorkflowValidator schema (%d slots). NO soft skip: "
+                "RESTART ComfyUI (stale server class) or regenerate the "
+                "variant (scripts/build_variants.py)." % (len(wv), len(live))
+            )
     return workflow
 
 

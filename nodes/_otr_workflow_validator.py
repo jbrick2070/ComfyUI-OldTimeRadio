@@ -319,6 +319,21 @@ class WorkflowValidator:
                 f"profile {profile_id!r} requires CUDA but this host has none"
                 + (" (mac)" if host["platform"] == "mac" else "")
                 + f" -> suggested tier: {suggestion}")
+        # S5 host-reality extensions (platform-portability): MPS-backend
+        # profiles need a live MPS device; a vendor-pinned profile must
+        # match the detected vendor (ROCm presents as cuda -- the hip tell
+        # decides). ANY mismatch raises; the validator NEVER reconfigures.
+        if profile["device_backend"] == "mps" and not host.get("has_mps"):
+            problems.append(
+                f"profile {profile_id!r} requires MPS but this host has "
+                "none -> suggested tier: cpu_floor")
+        _pvendor = profile.get("gpu_vendor")
+        if (_pvendor in ("nvidia", "amd", "apple")
+                and (host.get("has_cuda") or host.get("has_mps"))
+                and host.get("vendor") not in ("none", _pvendor)):
+            problems.append(
+                f"profile {profile_id!r} targets gpu_vendor {_pvendor!r}; "
+                f"this host's vendor is {host.get('vendor')!r}")
         if profile["platform"] not in ("any", host["platform"]):
             problems.append(
                 f"profile {profile_id!r} targets platform "
@@ -329,6 +344,31 @@ class WorkflowValidator:
                 "OTR_WorkflowValidator: STAMP ASSERTION FAILED (the stamped "
                 "snapshot does not fit this machine; validate_anyway never "
                 "skips this):\n  " + "\n  ".join(problems))
+
+        # S5 drift tripwire: the stamped master_hash must MATCH the live
+        # semantic hash of the workflow file (node types + links + the
+        # profile-MANAGED widget set; creative widgets + the stamps
+        # themselves are excluded by construction). Pre-S5 the validator
+        # only LOGGED master_hash -- a hand-edited variant sailed through.
+        if (master_hash or "").strip():
+            try:
+                p = _resolve_workflow_path(workflow_json_path)
+                parsed = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as e:
+                raise ValueError(
+                    f"OTR_WorkflowValidator: stamped master_hash present but "
+                    f"the workflow file could not be parsed for the semantic "
+                    f"check ({e}) -- regenerate the variant "
+                    f"(scripts/build_variants.py).") from e
+            from ._otr_workflow_apply import semantic_master_hash
+            live = semantic_master_hash(parsed)
+            if live != master_hash.strip():
+                raise ValueError(
+                    "OTR_WorkflowValidator: MASTER-HASH MISMATCH -- the "
+                    f"variant was edited after emission (stamped "
+                    f"{master_hash.strip()[:12]}, live {live[:12]}). "
+                    "Variants are GENERATED, never hand-edited: regenerate "
+                    "via scripts/build_variants.py.")
 
         # Runtime export -- EVERY execution, not "if unset" (a long-running
         # server persists env across prompts; stale values are overwritten).

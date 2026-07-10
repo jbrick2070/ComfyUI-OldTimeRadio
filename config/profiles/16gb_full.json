@@ -2,6 +2,9 @@
   "id": "16gb_full",
   "display_name": "16 GB NVIDIA (full)",
   "status": "shipping",
+  "ratify_before_emit": [
+    "nv50_baseline_regeneration: role/slot overrides are STALE vs canonical (humo_14B_169/flux_gen1 vs viz/z_image) -- operator ratifies regenerating this profile FROM canonical before the identity variant emits"
+  ],
   "platform": "any",
   "device_backend": "cuda",
   "gpu_vendor": "nvidia",

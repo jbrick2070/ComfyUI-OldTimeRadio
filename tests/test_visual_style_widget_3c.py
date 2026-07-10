@@ -175,7 +175,11 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "visual_style", "anime", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 28
+        # S5 platform-portability (2026-07-10): OLD pin 28 -> NEW pin 34
+        # (llm_device..gguf_quant appended at 28-33; visual_style stays 24).
+        # schemas comes from the LIVE INPUT_TYPES() above, so this already
+        # reflects the new vector -- only the pin needed updating.
+        assert len(node1["widgets_values"]) == 34
         assert node1["widgets_values"][24] == "anime"
         assert node1["widgets_values"][23] == "science_news"
         assert node1["widgets_values"][25] == "(select Google API model)"

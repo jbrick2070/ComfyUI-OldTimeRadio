@@ -107,7 +107,10 @@ def test_production_workflow_visual_structure_pinned():
     # (2026-07-03) dropped allow_auto_fallback (15->14), episode_duration_target
     # (14->13), then consolidated the legacy catch-all video slot -> character promoted to video
     # slot 3 (13->12; character_video_model is widgets index 2 now).
-    assert len(wv87) == 12, wv87
+    # S5 platform-portability (2026-07-10): OLD pin 12 -> NEW pin 14
+    # (+device_policy="cuda" appended at index 12, +dtype_policy="fp8_ok"
+    # appended at index 13; character_video_model stays at index 2).
+    assert len(wv87) == 14, wv87
     assert wv87[2].startswith("viz_camera"), (
         "character_video_model must stay on the lean camera visualizer lane: %r"
         % wv87[2])

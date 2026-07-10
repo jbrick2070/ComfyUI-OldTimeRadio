@@ -424,6 +424,69 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# semantic master_hash -- the S5 drift tripwire (generator + validator share
+# THIS normalizer; docs/2026-07-09-platform-portability-final.md section 1)
+# ---------------------------------------------------------------------------
+def semantic_master_hash(workflow: dict, mapping: Optional[dict] = None,
+                         schemas: Optional[dict] = None) -> str:
+    """sha256 over node types + links (sorted) + the profile-MANAGED widget
+    VALUES only.
+
+    Excluded by construction: pos/size/UI keys (never read), the node-63
+    stamp widgets (only ``managed`` targets count -- the stamps live under
+    ``emit_only``), and every creative widget (title/premise/seeds stay
+    free to edit without tripping the wire). A byte hash would flag every
+    cosmetic save; THIS hash flags exactly the changes a platform variant
+    must not drift on: graph shape, wiring, and profile-managed values.
+    """
+    import hashlib
+
+    mapping = mapping if mapping is not None else load_widget_mapping()
+    schemas = schemas if schemas is not None else build_offline_schemas()
+
+    managed_targets = set()
+    for entry in mapping["managed"].values():
+        for node_type, widget in entry["targets"]:
+            managed_targets.add((node_type, widget))
+
+    types_part = sorted(
+        (int(n["id"]), str(n["type"])) for n in workflow.get("nodes", []))
+    links_part = sorted(
+        tuple(l) for l in (workflow.get("links") or []) if isinstance(l, list))
+
+    managed_part = []
+    for node in workflow.get("nodes", []):
+        ntype = node["type"]
+        if ntype not in schemas:
+            continue
+        slots = serialized_slot_names(ntype, schemas)
+        linked = {i.get("name") for i in (node.get("inputs") or [])
+                  if i.get("link") is not None}
+        wv = node.get("widgets_values", []) or []
+        if len(wv) == len(slots):
+            keeps = True
+        elif len(wv) == len(slots) - sum(1 for s in slots if s in linked):
+            keeps = False
+        else:
+            continue  # malformed vectors are the validator's job, not the hash's
+        idx = 0
+        for slot in slots:
+            if slot in linked and not keeps:
+                continue
+            if idx >= len(wv):
+                break
+            if (ntype, slot) in managed_targets:
+                managed_part.append((ntype, slot, wv[idx]))
+            idx += 1
+    managed_part.sort()
+
+    payload = json.dumps(
+        {"types": types_part, "links": links_part, "managed": managed_part},
+        ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
 # apply_profile -- the ONE applier
 # ---------------------------------------------------------------------------
 def _flatten_profile_values(profile: dict) -> dict:

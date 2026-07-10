@@ -607,6 +607,12 @@ class TestWriterB2aSurface:
         #  25  google_api_slot_a_model
         #  26  google_api_slot_b_model
         #  27  source_ref
+        #  28  llm_device                  "cuda"
+        #  29  llm_attn_impl               "sdpa"
+        #  30  llm_quant_policy            "bnb_nf4"
+        #  31  llm_vram_ceiling_gb         14.5
+        #  32  gguf_n_ctx                  4096
+        #  33  gguf_quant                  "Q8_0"
         # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270);
         # the 2026-05-29 lean-down brought the vector to 19; S2 (2026-06-01)
         # appended the OpenRouter pair; Comfy Credits appended its sibling
@@ -620,9 +626,19 @@ class TestWriterB2aSurface:
         # appended two passive model pickers on 2026-07-08, bringing the
         # vector back to 27; Source Banks v2 then appended source_ref as
         # slot 27 without moving any prior slot.
-        assert len(wv) == 28, (
-            f"writer widgets_values length drift: {len(wv)} (expected 28 "
-            f"after appending the Google API slot picker pair + source_ref)"
+        #
+        # S5 platform-portability (2026-07-10): OLD pin 28 -> NEW pin 34.
+        # The six explicit LLM runtime-policy widgets (llm_device ..
+        # gguf_quant) were appended after source_ref at slots 28-33
+        # (append-only, BUG-LOCAL-097). Defaults equal the nv50 16 GB
+        # baseline the writer already resolved to, so an old 28-slot
+        # workflow still resolves byte-identically. A gate_in forceInput
+        # socket was also added (OTR_WorkflowValidator.validation_report,
+        # link 279) but it is socket-only and consumes NO widgets_values
+        # slot, so the vector ceiling is 34, not 35.
+        assert len(wv) == 34, (
+            f"writer widgets_values length drift: {len(wv)} (expected 34 "
+            f"after appending the six S5 LLM runtime-policy widgets)"
         )
         # Slot 7: act_count must ship as "auto" so production derives the
         # act structure from target_words instead of freezing a brittle count.
@@ -718,6 +734,29 @@ class TestWriterB2aSurface:
         )
         assert wv[27] == "", (
             f"source_ref (slot 27) must ship blank/inert; got {wv[27]!r}"
+        )
+        # Slots 28-33: S5 platform-portability (2026-07-10) LLM
+        # runtime-policy tail, APPENDED after source_ref. Defaults equal
+        # the nv50 16 GB baseline so an old 28-slot workflow resolves
+        # byte-identically.
+        assert wv[28] == "cuda", (
+            f"llm_device (slot 28) must ship 'cuda' (nv50 baseline); "
+            f"got {wv[28]!r}"
+        )
+        assert wv[29] == "sdpa", (
+            f"llm_attn_impl (slot 29) must ship 'sdpa'; got {wv[29]!r}"
+        )
+        assert wv[30] == "bnb_nf4", (
+            f"llm_quant_policy (slot 30) must ship 'bnb_nf4'; got {wv[30]!r}"
+        )
+        assert wv[31] == 14.5, (
+            f"llm_vram_ceiling_gb (slot 31) must ship 14.5; got {wv[31]!r}"
+        )
+        assert wv[32] == 4096, (
+            f"gguf_n_ctx (slot 32) must ship 4096; got {wv[32]!r}"
+        )
+        assert wv[33] == "Q8_0", (
+            f"gguf_quant (slot 33) must ship 'Q8_0'; got {wv[33]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (
