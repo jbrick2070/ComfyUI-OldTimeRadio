@@ -214,6 +214,19 @@ reservation, honest-switch law (widgets land WITH a working engine). CLEARED
 TO EXECUTE post-portability-settle; execution-time gates = R-4 seam re-survey
 + R-7 re-grep only.
 
+NEXT-CODER-SESSION ITEM (operator 2026-07-10): **ENGINE_MATRIX.md** --
+device_backends must be END-USER VISIBLE, not hidden in registry rows.
+Spec: extend scripts/build_variants.py with an emit step rendering
+docs/ENGINE_MATRIX.md from the THREE registries' CAPABILITIES v2 rows
+(engine id, role, device_backends, requires_vendor, needs_fp8_te/fp4,
+practical_without_gpu, sidecar_conditional) + a reason-code legend
+(vendor pin / fp8 / NVML gate / cu128 / no-install-path). GENERATED,
+never hand-edited; `--check` regenerates + diffs it like the variants;
+README links it. Tests: pin emitted file == live registries (rides
+--check). NO workflow JSON / widget changes -- zero positional risk.
+Operator chose matrix-doc ONLY (recipes/validator/tooltip surfaces
+declined for now). Small chunk, lands BEFORE the lean-mean campaign.
+
 ### 1. Model-Slot Audit And End-To-End Smokes (live smokes PARKED 2026-07-09)
 
 Inventory every local model/engine exposed through the production slots:
