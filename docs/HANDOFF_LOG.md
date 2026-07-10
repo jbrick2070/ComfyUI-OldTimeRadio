@@ -27,10 +27,21 @@ Did:
   original_qa gate; disclosure must EXPLICITLY say machine-generated;
   cast pass collapsed; num_characters widget feeds the concept pass.
 
-Current step: original_radio campaign (GO_FORWARD section 0) -- R1 done,
-V2 on disk. Next: /kibitz r2 (coding plan) on ARCHITECTURE_V2.md (local
-Codex + Antigravity, $0), then r3 wiring, r4 convergence, then build
-(tests first, SAME-COMMIT registry set, runnable flip last).
-Operator taste calls pending: disclosure wording, era-frame text,
-3-episode eyeball batch before the flip.
+- R1 pass02 run on ARCHITECTURE_V3 (operator overrides: Hitchcock ironic
+  epilogue instead of spoken disclosure; NO era frame / raw timeless
+  story; RUNNABLE ON BUILD, no staged flips, no fallbacks, HARD FAILS
+  ACCEPTED; north star = max story complexity / max code elegance).
+  Panel 4x"no" -> judged -> **ARCHITECTURE_V4.md = BUILD SPINE**. Key:
+  the epilogue is the ANNOUNCER OUTRO line (empty news_close_brief
+  routes there; outro already knows the produced ending) -- zero new
+  passes; disclosure lives in the printed layer (news_used + bank-aware
+  HUD label replacing hardcoded "NEWS SEED" + unconditional credits
+  line); anachronism defense is prompt-side + lexicon only.
+
+Current step: original_radio campaign -- R1 CONVERGED (2 passes,
+~$0.26 total). Next: /kibitz r2 (coding plan) on
+docs/2026-07-09-original-radio/ARCHITECTURE_V4.md (+V2/V3 as context),
+then r3 wiring, r4 convergence, then build: tests first, SAME-COMMIT
+registry set SHIPPING runnable:true, pre-ship gates = suite + Bug Bible
++ mocked pipeline + live 30w smoke + operator eyeball.
 Commits: 62962121, (40535ddc co-authored), 321bcc9c, 5a09984c -- all pushed.

@@ -71,14 +71,18 @@ Unrelated local file present before this plan update and left untouched:
 Design doc: `docs/2026-07-09-original-radio/ARCHITECTURE_V1.md` (multi-pass
 LLM cascade: spark deck -> 3 pitches -> self-judge -> cast -> existing
 engine; disclosure-as-news_close_brief provenance; SAME-COMMIT trap set).
-Anchor review: `roundtable/pass01_anchor.md` (A1 num_characters widget +
-A2 key_terms grounding = must-fix in v2 of the doc). Review arc per
-CLAUDE.md section 8: R1 cloud roundtable (GPT+Gemini+DeepSeek+hy3:free)
--> r2-r4 via /kibitz (local Codex+Antigravity). Build only after
-convergence; tests before runner; `runnable:true` flip LAST, gated on the
-30-word smoke. Related design item queued into the kibitz arc: demote
-`meta["news"]` to provenance-only + distinct-name migration (operator:
-"we can't just throw around meta").
+R1 CONVERGED after two live passes (~$0.26): **ARCHITECTURE_V4.md is the
+build spine** (V2 mechanics + V3 operator overrides + pass02 survivors).
+Operator locks: Hitchcock ironic epilogue AS the announcer outro (no
+spoken machine-disclosure; printed-layer provenance incl. bank-aware HUD
+label + unconditional credits line); no era frame (timeless raw story);
+RUNNABLE ON BUILD (no staged flips/switches/fallbacks; hard fails
+accepted); north star = max story complexity / max code elegance.
+NEXT: /kibitz r2 coding plan on V4, then r3 wiring, r4 convergence, then
+build (tests first; SAME-COMMIT set ships runnable:true; pre-ship gates
+= suite + Bug Bible + mocked pipeline + 30w smoke + operator eyeball).
+Queued design item for the arc: demote `meta["news"]` to provenance-only
++ distinct-name migration (operator: "we can't just throw around meta").
 
 ### 1. Model-Slot Audit And End-To-End Smokes (live smokes PARKED 2026-07-09)
 
