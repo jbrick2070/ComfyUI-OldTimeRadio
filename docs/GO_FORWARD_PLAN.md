@@ -6,11 +6,56 @@
 Tempest" published to obs). Remaining gate = OPERATOR EYEBALL only ->
 then source-bank sweep -> portability.
 
-**CLAIMED 2026-07-10: PLATFORM-PORTABILITY BUILD (this coder window).**
-Executing docs/2026-07-09-platform-portability-final.md sprints S0->S6
-per operator directive. Claimed at HEAD `60430ca2`. One coder window at
-a time: do NOT open a second coder window in this repo until this claim
-is released here.
+**PLATFORM-PORTABILITY BUILD: S0-S6 SHIPPED overnight 2026-07-10 (this
+coder window; claim RELEASED -- ratify decisions + tier smokes remain).**
+Spec docs/2026-07-09-platform-portability-final.md executed end to end:
+
+- S0 `c32d7cbe`+`390e5015`: 7 committed-state defects (loader guard,
+  vram-node accel helpers, _detect_host mps/vendor + lying-CUDA fix,
+  dispatcher gen_fn raise, bark honest row + cpu_floor kokoro, HuMo
+  script/label alignment, indextts2 installer pair now SHIPPED).
+- S1 `af60c09e`: LLMRuntimePolicy end to end (FA2 probe + tag auto-quant
+  DELETED; lane backstop; policy-keyed LLM cache; GGUF artifact table;
+  n_ctx downgrade + preflight-tolerance now raises).
+- S2 `dd79f5b2`: profile schema v2 (+linux/+mps/+gpu_vendor/llm/video/
+  image/audio/render/preflight) + ALL 8 profiles migrated + widget_mapping
+  v2 (writer out of exempt_node_types; 20 creative names exempt).
+- S3 `e1f692e7`: registry CAPABILITIES v2 ATOMIC (device_backends
+  supersedes cpu_ok; vendor pins table-visible; humo fp8 flags). FABLE
+  GATE ran pre-commit: NO MUST-FIX.
+- S4 `2e31efb9`: policy v2 consumers -- REAL host_caps at every adapter
+  boundary (was {} everywhere), adapter-level image assert_usable (was
+  never called), CastLock meta.voice_device stamp, kokoro/musicgen/
+  chatterbox waterfalls DELETED, frame budget static + MotionBudgetError
+  (never resizes).
+- S5 `6fb5cc29`/`b60e9df3`/`b8bbadd3`/`6f0131da`: widgets (writer 28->34
+  slots 28-33; director 14/8; castlock 6) ATOMIC with canonical + mapping;
+  gate_in link 279 gates the WRITER; scripts/build_variants.py (+--check,
+  ratify_before_emit refusal); semantic master_hash ASSERTED by the
+  validator; otr_api soft-skip RETIRED (hard fail).
+- S6 `2bd212ec`: profiles otr_nv40_12gb / otr_amd16_rocm / otr_amd8_rocm
+  / otr_mac_mps (draft) added; EMITTED 5 variants + launch recipes
+  (8gb_lite, cpu_floor, nv40, amd16, amd8; --check green). REFUSED
+  pending ratification: 16gb_full, cloud_all, otr_mac_mps.
+- SMOKE GATE: 30w canonical live smoke on the FULL rebuilt stack =
+  RESULT SUCCESS in 543s (baseline 548s) -- published
+  `otr\obs\signal_lost_whispers_of_deception_20260710_043218_..._final.mp4`
+  (57.2 MB). Suite 7251/31/1 + Bug Bible 17/7/3 green at ship.
+
+RATIFY QUEUE (operator; build_variants refuses these until cleared in the
+profile JSONs): (1) nv50 baseline regeneration from canonical (16gb_full
+is stale: humo_14B_169/flux_gen1 vs canonical viz/z_image); (2) cloud
+tier name (proposed otr_cloud_lanes) + OpenRouter slot pins; (3) mac_mps
+llm.vram_ceiling_gb (initial 10.0); (4) AMD/Mac verification strategy
+(rent hardware / ship draft-UNVERIFIED / defer).
+NEXT SMOKES: cpu tier on this box (--cpu; NOTE cpu_floor inherits
+canonical z_image_turbo images -- cuda-only, so the cpu smoke needs the
+google image lane + OTR_GOOGLE_API_KEY or pre-staged stills; surfaced by
+the new adapter-level gate, decide before running), then the nv50
+identity re-soak after ratify (1). Bug Bible candidates queued:
+lying-CUDA is_available pattern; registry-row-vs-generation-path honesty;
+waterfall-deletion class. Longer wan-beat lanes now FAIL LOUD instead of
+shrinking (dial: frame_count widget / OTR_VIDEO_BUDGET_MARGIN).
 
 **Shipped 2026-07-09 evening (both pushed):**
 
