@@ -1,4 +1,4 @@
-# OTR Platform Portability -- Converged Plan (FINAL, 2026-07-09)
+# OTR Platform Portability -- Converged Plan (FINAL, fact-checked 2026-07-10)
 
 Campaign: analysis-only review window. Anchor + 5 file-grounded audits + R1 cloud
 roundtable (GPT-5.6 / Gemini 3.1 Pro / DeepSeek v4 Pro / Tencent Hy3, ~$0.15) + R2-R4
@@ -7,6 +7,36 @@ below was verified against the real files; round history + judgments live in
 docs/2026-07-09-platform-portability/ (gitignored working folder) and
 kibitz-runs/2026-07-09-platform-portability/. Grounded at 3060fd3a; loader/profile/
 registry/canonical files re-verified untouched by the coder window's parallel commits.
+Final QA pass on 2026-07-10 re-checked the plan against the real Windows repo state and
+found no blocking contradiction. The implementation cautions from that pass are folded
+into this document: use live registered engine ids, keep Comfy media auth separate from
+Comfy Credits LLM auth, and refuse variant emission until operator-ratified fields are
+locked.
+
+## FINAL FACT-CHECKED QA VERDICT
+
+**Verdict: GO as a planning artifact; not yet an emitted-variant artifact.** The plan is
+technically credible and matches the current codebase: profiles are still v1, MPS/Linux
+are rejected today, variant emission is not built, master_hash is logged but not enforced,
+validation gates the visual branch rather than the writer, CPU Bark is genuinely broken,
+the image dispatcher still has a CPU skip path, and render adapters still receive empty
+host/profile dictionaries. Those are real implementation tasks, not speculative risks.
+
+Three execution cautions are load-bearing:
+- Lock the remaining operator decisions before variant emission: cloud tier name/model
+  pins, Mac MPS VRAM ceiling, and AMD/Mac verification strategy.
+- Use exact registered ids and exact credential sources in schema/tests. "LTX-AV" is a
+  lane-family description; the live registered audio-in video engine id is
+  `ltx_audio_in`. `sonilo` is the real registered cloud music engine name.
+- Land workflow JSON, node widget changes, validator changes, profile migrations,
+  mapping updates, and tests atomically. Code that is not wired into
+  `workflows/otr_canonical.json` remains dead.
+
+Cloud auth must stay explicit by lane: OpenRouter LLM uses `OPENROUTER_API_KEY`; direct
+Google lanes prefer `OTR_GOOGLE_API_KEY` and accept the documented aliases where existing
+clients do; Comfy partner media lanes use `OTR_COMFY_API_KEY` or hidden Comfy account
+auth; Comfy Credits LLM uses hidden Comfy auth captured by the writer path and must not be
+treated as an `OTR_COMFY_API_KEY` lane.
 
 ## PAGE ONE -- GO / NO-GO SUMMARY (operator)
 
@@ -21,12 +51,14 @@ queue, and model-load time.
 Per-tier verdicts:
 - **NVIDIA 16 GB (nv50)**: GO -- identity variant; only tier with soak history.
 - **NVIDIA 12 / 8 GB**: GO, draft until smoke -- same stack, lower ceilings; wan_ti2v +
-  GGUF quant ladder are the proven levers. 14 GB-class lanes (ltx_av/ltx_video/
+  GGUF quant ladder are the proven levers. 14 GB-class lanes (`ltx_audio_in` /
+  ltx_video /
   wan_i2v/humo-14B) are OUT on these tiers.
 - **AMD ROCm Linux 16 / 8 GB**: CONDITIONAL GO, draft -- no code-level blocker on the
   selected lane set (torch-ROCm presents as "cuda"), but bnb is Preview (LLM quant lane
-  off), fp8/fp4 lanes off, sage off, ltx_av excluded by its NVML gate, dia excluded by
-  its cu128-only pin. UNVERIFIED on real hardware -- ships draft behind acceptance gates.
+  off), fp8/fp4 lanes off, sage off, `ltx_audio_in` excluded by its NVML gate, dia
+  excluded by its cu128-only pin. UNVERIFIED on real hardware -- ships draft behind
+  acceptance gates.
 - **Apple Silicon MPS**: CONDITIONAL GO, draft -- kokoro TTS, stable_audio_3 music,
   GGUF-Metal writer, viz/stills video; every fp8/fp4 lane excluded (Float8_e4m3fn
   unsupported); wan_ti2v is the only local-motion candidate and stays OFF until a
@@ -139,7 +171,7 @@ required_keys E (checked fail-loud at boot; aliases allowed for the Google key).
 Registry CAPABILITIES v2 -- ONE atomic commit across audio + video + IMAGE registries
 (_otr_image_engines/registry.py has rows too) + _DECL_KEYS
 (capability_profiles.py:236,255) + cross-validation tests: device_backends list
-(supersedes bare cpu_ok), requires_vendor ("nvidia" makes the ltx_av NVML gate
+(supersedes bare cpu_ok), requires_vendor ("nvidia" makes the `ltx_audio_in` NVML gate
 table-visible), needs_fp8_te / needs_fp4_te, practical_without_gpu,
 sidecar_conditional. Ruling (R4): bark = device_backends ["cuda"],
 practical_without_gpu false -- registry exclusion, NO bark code surgery this campaign.
@@ -274,14 +306,15 @@ presets; NEW otr_nv40_12gb, otr_amd16_rocm, otr_amd8_rocm, otr_mac_mps
 | render fps/composite | 25 / 1920x1080 | same | same | same | same | same | same | same |
 | canvas / frame_budget * / beats | 832x480 / 25 / 40 | 832x480 / 25 / 40 | 832x480 / 21 / 40 | 832x480 / 25 / 40 | 832x480 / 17 / 40 | 832x480 / 17 / 40 | 832x480 / 25 / 40 | 832x480 / 25 / 40 |
 | launch sage / args | true / [] | true / [] | true / [] | false / [] | false / [] | false / [] | false / [--cpu] | false / [--cpu] |
-| preflight.required_keys | [] | [] | [] | [] | [] | [OTR_GOOGLE_API_KEY] | [OTR_GOOGLE_API_KEY] | [OPENROUTER_API_KEY, OTR_GOOGLE_API_KEY, OTR_COMFY_API_KEY per lanes] |
+| preflight.required_keys | [] | [] | [] | [] | [] | [OTR_GOOGLE_API_KEY] | [OTR_GOOGLE_API_KEY] | [OPENROUTER_API_KEY, OTR_GOOGLE_API_KEY aliases, OTR_COMFY_API_KEY or hidden Comfy media auth per media lanes; Comfy Credits LLM uses hidden Comfy auth] |
 
 \* Values marked with the asterisk on draft tiers are INITIAL SMOKE VALUES (policy
 choices), not measured capacities -- each tier's first acceptance run calibrates them.
 cloud_lanes = cpu_only host baseline + cloud values; no failover -- a lane outage is a
 loud failure. wan_ti2v on mps stays unselected until a real-Mac smoke passes.
 
-Honest tier exclusions: nv40/nv30 -- no 14GB-class lanes; amd -- no ltx_av (NVML gate),
+Honest tier exclusions: nv40/nv30 -- no 14GB-class lanes; amd -- no `ltx_audio_in`
+(NVML gate),
 no dia (cu128 pin), no sage, no fp8 defaults, no nvvfx, .ps1-only sidecar installers
 need ports; mps -- additionally no bark, no bnb, no indextts2 (no install path); cpu --
 no diffusion video, no practical stable_audio_3, no local image gen (cloud lane or
