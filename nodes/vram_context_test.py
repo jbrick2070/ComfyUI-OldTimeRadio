@@ -80,6 +80,61 @@ _LLM_MODEL_CHOICES = [
 _DEFAULT_PROBE_LENGTHS = "2048,4096,6144,8192,12288,16384,20480,24576"
 
 
+def _accel_state() -> str:
+    """Live accelerator for the probe: ``cuda`` | ``mps`` | ``none``.
+
+    S0 portability (2026-07-10): every ``torch.cuda.*`` counter this node
+    used was UNGUARDED, so the diagnostics node crashed on exactly the
+    hosts it is most useful for. MPS gets the ``torch.mps`` equivalents
+    where they exist; a pure-CPU host still measures CPU RAM + wall time
+    with the VRAM columns honestly 0.
+    """
+    import torch
+    if torch.cuda.is_available():
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
+        return "mps"
+    return "none"
+
+
+def _accel_empty_cache(accel: str) -> None:
+    import torch
+    if accel == "cuda":
+        torch.cuda.empty_cache()
+    elif accel == "mps" and hasattr(getattr(torch, "mps", None), "empty_cache"):
+        torch.mps.empty_cache()
+
+
+def _accel_reset_peak(accel: str) -> None:
+    import torch
+    if accel == "cuda":
+        torch.cuda.reset_peak_memory_stats()
+    # MPS has no peak-reset API; _accel_peak_gb reports current allocation.
+
+
+def _accel_allocated_gb(accel: str) -> float:
+    import torch
+    if accel == "cuda":
+        return torch.cuda.memory_allocated() / 1e9
+    if accel == "mps" and hasattr(getattr(torch, "mps", None),
+                                  "current_allocated_memory"):
+        return torch.mps.current_allocated_memory() / 1e9
+    return 0.0
+
+
+def _accel_peak_gb(accel: str) -> float:
+    import torch
+    if accel == "cuda":
+        return torch.cuda.max_memory_allocated() / 1e9
+    if accel == "mps" and hasattr(getattr(torch, "mps", None),
+                                  "current_allocated_memory"):
+        # No max_memory_allocated on MPS -- current allocation is the
+        # honest floor (labelled as such in the report).
+        return torch.mps.current_allocated_memory() / 1e9
+    return 0.0
+
+
 def _nvml_used_bytes(device_index: int = 0) -> int:
     """Total VRAM used on this device by ALL processes (nvidia-smi truth)."""
     try:
@@ -238,9 +293,11 @@ class VRAMContextTest:
         # single LLM by widget for measurement, so it claims the
         # "technical" slot. NON_LLM_MODEL_WIDGET_OK = True keeps this
         # exempt from the two-slot writer rule (see class marker).
-        log.info("[VRAMContextTest] pre-loading %s ...", model_id)
-        torch.cuda.empty_cache()
-        torch.cuda.reset_peak_memory_stats()
+        accel = _accel_state()
+        log.info("[VRAMContextTest] pre-loading %s (accelerator=%s) ...",
+                 model_id, accel)
+        _accel_empty_cache(accel)
+        _accel_reset_peak(accel)
         load_t0 = time.time()
         try:
             cache_entry = _OTRML.request_slot("technical", model_id)
@@ -252,7 +309,7 @@ class VRAMContextTest:
             log.exception("[VRAMContextTest] load failed: %s", exc)
             return (msg,)
         load_s = time.time() - load_t0
-        base_torch_gb = torch.cuda.memory_allocated() / 1e9
+        base_torch_gb = _accel_allocated_gb(accel)
         base_nvml_gb = _nvml_used_bytes() / 1e9
         base_cpu_gb = _process_cpu_ram_bytes() / 1e9
         log.info(
@@ -269,8 +326,8 @@ class VRAMContextTest:
         gen_fn = _OTRML.make_generate_fn(cache_entry)
         results: list[dict] = []
         for n_target in lengths:
-            torch.cuda.empty_cache()
-            torch.cuda.reset_peak_memory_stats()
+            _accel_empty_cache(accel)
+            _accel_reset_peak(accel)
 
             n_paras = max(1, n_target // 80)
             prompt = _FILLER_PARAGRAPH * n_paras
@@ -298,7 +355,7 @@ class VRAMContextTest:
                     continue
             gen_s = time.time() - t0
 
-            peak_torch_gb = torch.cuda.max_memory_allocated() / 1e9
+            peak_torch_gb = _accel_peak_gb(accel)
             nvml_gb = _nvml_used_bytes() / 1e9
             cpu_gb = _process_cpu_ram_bytes() / 1e9
             log.info(
@@ -344,6 +401,12 @@ class VRAMContextTest:
             "",
             f"- **label**: {measurement_label or '_<none>_'}",
             f"- **profile**: {optimization_profile}",
+            f"- **accelerator**: {accel}"
+            + ("" if accel == "cuda" else
+               " (no CUDA -- VRAM torch column is "
+               + ("MPS current-allocation, no peak API" if accel == "mps"
+                  else "0; CPU RAM + wall time are the signal")
+               + ")"),
             f"- **load**: {load_s:.1f}s "
             f"(base torch {base_torch_gb:.2f} / nvml {base_nvml_gb:.2f} / "
             f"cpu {base_cpu_gb:.2f} GB)",

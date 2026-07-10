@@ -182,8 +182,14 @@ def assert_usable(name: str, role: str) -> str:
 # render (slowly) with no GPU -- the cpu_floor tier filter.
 # ---------------------------------------------------------------------------
 CAPABILITIES = {
+    # S0 portability ruling (R4, 2026-07-10): bark's GENERATION path hardcodes
+    # CUDA (_otr_bark_lib._generate_single_line force-moves inputs to
+    # torch.device("cuda"), asserts input_ids.device.type == "cuda", and
+    # monkeypatches torch.tensor/arange to default device="cuda"), so the old
+    # cpu_ok=True row was a lie -- cpu_floor selected bark and crashed on the
+    # first line. Registry exclusion ONLY; no bark code surgery this campaign.
     "bark": {"required_toolchain": None,
-             "requires_sidecar": False, "cpu_ok": True,
+             "requires_sidecar": False, "cpu_ok": False,
              "model_requirements": ["suno-bark"]},
     "kokoro": {"required_toolchain": None,
                "requires_sidecar": False, "cpu_ok": True,

@@ -448,10 +448,13 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     objects only -- never bare char_id maps; no dual-schema shims).
 
     ``gen_fn(request: dict) -> (numpy uint8 array | .png path)`` is the only GPU
-    step (injected in tests; the real Flux path on the operator smoke). Returns
-    ``(patched_ledger, image_done, report, warnings)``. Never raises on a normal
-    miss; ``assert_usable`` failures are recorded as warnings + skipped
-    (fail-closed: that object simply has no image, never a silent wrong engine).
+    step (injected in tests; the wired node passes the in-process engine path).
+    Returns ``(patched_ledger, image_done, report, warnings)``. Fail-loud
+    contract: an unusable selected engine raises ``ImageRenderError`` (NO
+    FALLBACKS, operator 2026-06-18), and a pending target reached with
+    ``gen_fn=None`` raises ``ImageRenderError`` too (S0 portability,
+    2026-07-10 -- the old "skipped on CPU" warning let an episode "succeed"
+    with missing stills).
 
     EXCEPTION -- the downstream 3D HALT (3D plan section 3): a policy whose
     ``locked_3d_slots`` carry ``granularity == per_beat`` RAISES before any
@@ -645,8 +648,16 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 f"in the OTR_VideoDirector dropdown."
             ) from exc
         if gen_fn is None:
-            warnings.append(f"{oid}: no gen_fn (GPU render is the operator smoke); skipped on CPU")
-            continue
+            # S0 portability (2026-07-10): a pending target with no way to
+            # render it is a HARD FAIL, never a silent skip. The old branch
+            # warned "skipped on CPU" and continued, so an episode could
+            # "succeed" with missing stills. Inject a gen_fn (tests) or
+            # dispatch via OTRImageGenDispatcher (in-process engine path).
+            raise ImageRenderError(
+                f"{oid}: image target requires generation but no gen_fn was "
+                f"provided (engine '{engine_id}', role '{role}'). NO SILENT "
+                "SKIP -- inject a gen_fn or dispatch via the node."
+            )
         request = {
             "request_id": key, "role": role, "object_id": oid,
             "kind": kind, "char_id": char_id, "beat_id": beat_id,

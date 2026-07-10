@@ -276,9 +276,14 @@ CAPABILITIES = {
     # image engine mints the still. cpu class, cpu_ok True, no model assets.
     "still_word": {"required_toolchain": None,
                    "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    # S0 portability (2026-07-10): the requirement label now names the artifact
+    # family the engine DEFAULT resolves (eng_humo._HUMO_DEFAULT_UNET = Kijai's
+    # Wan2_1-HuMo-14B fp8-scaled UNET, fetched by scripts/download_humo_models
+    # .ps1). The old "HuMo-17B" label pointed fresh installs at Comfy-Org's
+    # differently-named file the engine never looks for.
     "humo": {"required_toolchain": None,
              "requires_sidecar": False, "cpu_ok": False,
-             "model_requirements": ["HuMo-17B"]},
+             "model_requirements": ["HuMo-14B-KJ"]},
     "humo_1.7B": {"required_toolchain": None,
                   "requires_sidecar": False, "cpu_ok": False,
                   "model_requirements": ["HuMo-1.7B"]},
@@ -293,7 +298,7 @@ CAPABILITIES = {
     # cast does NOT apply -- giving the operator the 06-09 quality in the 16:9 look.
     "humo_14B_169": {"required_toolchain": None,
                      "requires_sidecar": False, "cpu_ok": False,
-                     "model_requirements": ["HuMo-17B"]},
+                     "model_requirements": ["HuMo-14B-KJ"]},
     # GGUF splice (2026-06-15): the production LTX video recipe is the frozen
     # mini -- 22B GGUF unet + distilled LoRA @0.70 + Gemma-3 encoder + LTX video
     # VAE + projection ckpt (the 5-artifact tuple). Heavy 22B class. The 2026-06-16

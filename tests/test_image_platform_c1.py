@@ -634,6 +634,26 @@ def test_cloud_image_adapter_bypasses_local_gpu_residency(
     assert led["images"]["images"][0]["engine_id"] == "ideo_alias"
 
 
+def test_gen_fn_none_for_pending_target_raises(clean_image_registry, tmp_path):
+    """S0 portability (2026-07-10): a pending image target reached with
+    gen_fn=None is a HARD ImageRenderError, never the old silent
+    'skipped on CPU' warning that let an episode succeed with missing
+    stills."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"episode_id": "ep_no_genfn", "cast": [{"char_id": "c1"}]}
+    policy = {
+        "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+        "video_models": {"character_video_model": {"engine_id": "still_motion"}},
+        "seed": {"request_seed": 0},
+        "granularity": {},
+    }
+    with pytest.raises(disp.ImageRenderError, match="no gen_fn"):
+        disp.dispatch_images(
+            ledger, policy, _payload(_pobj("c1", "a lab portrait", "h1")),
+            output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
+
+
 def test_dispatch_appends_visual_safety_to_image_requests(
         clean_image_registry, tmp_path):
     clean_image_registry._registry.clear()

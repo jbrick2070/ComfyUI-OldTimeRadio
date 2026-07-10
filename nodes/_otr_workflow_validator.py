@@ -247,23 +247,48 @@ class WorkflowValidator:
     # ------------------------------------------------------------------ #
     @staticmethod
     def _detect_host() -> dict:
-        """Cheap host reality: platform + CUDA presence + total VRAM (MB).
-        Separated for testability (tests monkeypatch this)."""
+        """Cheap host reality: platform + CUDA/MPS presence + vendor + total
+        VRAM (MB). Separated for testability (tests monkeypatch this).
+
+        S0 portability (2026-07-10): ``has_mps`` + ``vendor`` are ADDITIVE
+        keys -- existing consumers key on platform/has_cuda/vram_mb and are
+        unchanged. ROCm presents itself as CUDA, so ``torch.version.hip`` is
+        the vendor tell; Apple Silicon reports via torch.backends.mps."""
         import platform as _platform
         sysname = _platform.system()
         info = {
             "platform": ("mac" if sysname == "Darwin"
                          else "win" if sysname == "Windows" else "any"),
             "has_cuda": False,
+            "has_mps": False,
+            "vendor": "none",
             "vram_mb": 0,
         }
         try:
             import torch
-            if torch.cuda.is_available():
-                info["has_cuda"] = True
-                info["vram_mb"] = int(
-                    torch.cuda.get_device_properties(0).total_memory
-                    // (1024 * 1024))
+            try:
+                if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                    # Read props BEFORE claiming CUDA: a stack that answers
+                    # is_available() but cannot open device 0 (e.g.
+                    # CUDA_VISIBLE_DEVICES='') is NOT usable CUDA. The pre-S0
+                    # code claimed has_cuda=True with vram_mb=0 here -- a lying
+                    # host report that would pass cuda-tier stamps on a box
+                    # that cannot render.
+                    props = torch.cuda.get_device_properties(0)
+                    info["has_cuda"] = True
+                    info["vram_mb"] = int(props.total_memory // (1024 * 1024))
+                    info["vendor"] = ("amd"
+                                      if getattr(torch.version, "hip", None)
+                                      else "nvidia")
+            except Exception:  # noqa: BLE001 -- unusable CUDA = no CUDA
+                info["has_cuda"] = False
+                info["vram_mb"] = 0
+                info["vendor"] = "none"
+            _mps = getattr(torch.backends, "mps", None)
+            if _mps is not None and _mps.is_available():
+                info["has_mps"] = True
+                if info["vendor"] == "none":
+                    info["vendor"] = "apple"
         except Exception:  # noqa: BLE001 -- detection must never crash
             pass
         return info

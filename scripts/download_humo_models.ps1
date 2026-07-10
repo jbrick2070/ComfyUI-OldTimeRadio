@@ -31,10 +31,16 @@ function Ensure-Dir {
 # Each entry: { url; subdir under models/; filename }
 $files = @(
     @{
-        url = 'https://huggingface.co/Comfy-Org/HuMo_ComfyUI/resolve/main/split_files/diffusion_models/humo_17B_fp8_e4m3fn.safetensors'
+        # S0 portability fix (2026-07-10): fetch the artifact the humo engine
+        # default actually resolves (eng_humo._HUMO_DEFAULT_UNET -- the Kijai
+        # 14B fp8-scaled UNET). The old entry fetched Comfy-Org's
+        # differently-named 17B file the engine never looks for, so a fresh
+        # install downloaded ~16 GB and still reported humo not installed.
+        # Size verified on HF: 17,892,294,098 bytes.
+        url = 'https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled/resolve/main/HuMo/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors'
         subdir = 'diffusion_models'
-        filename = 'humo_17B_fp8_e4m3fn.safetensors'
-        approx_gb = 10
+        filename = 'Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors'
+        approx_gb = 17
     },
     @{
         url = 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors'

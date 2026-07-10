@@ -103,6 +103,48 @@ class ModelLoaderError(RuntimeError):
 
 
 # ---------------------------------------------------------------------------
+# S0 portability helpers (docs/2026-07-09-platform-portability-final.md)
+# ---------------------------------------------------------------------------
+
+
+def _plan_max_memory(model_id: str, total_vram: float, *, cuda_available: bool):
+    """VRAM-budget plan for the transformers loader.
+
+    Returns the ``max_memory`` dict for ``from_pretrained`` or ``None``.
+    The integer key ``0`` names CUDA device 0, so on a CUDA-less host the
+    only honest plan is ``None`` (plain CPU/MPS load). The pre-S0 code
+    built the CUDA-keyed dict from model-id string tags alone, handing
+    transformers a device map for hardware that does not exist on
+    cpu/mps hosts (fresh-install breaker).
+    """
+    if not cuda_available:
+        return None
+    sid = (model_id or "").lower()
+    is_actually_2b = any(tag in sid for tag in ("2b-it", "2b_it")) or sid.endswith("2b")
+    if total_vram >= 12.0:
+        return {0: f"{total_vram - 2.5:.1f}GiB", "cpu": "32GiB"}
+    if is_actually_2b:
+        return {0: "3.2GiB", "cpu": "32GiB"}
+    if any(tag in sid for tag in ("9b", "12b", "e4b", "4b-it")):
+        return {0: "6.8GiB", "cpu": "32GiB"}
+    return None
+
+
+def _apply_matmul_precision_policy() -> None:
+    """TF32 OFF for byte-identical determinism (I-2 / C-1); Ampere+ (sm80+)
+    gets 'high' matmul precision for LLM throughput. The capability probe is
+    GUARDED: ``torch.cuda.get_device_capability()`` raises on a CUDA-less
+    host (the S0 loader:257 crash), and the sm80 check only means anything
+    on CUDA anyway. The canonical headless launcher additionally exports
+    NVIDIA_TF32_OVERRIDE=0 before torch imports; see nodes/_otr_determinism.py."""
+    import torch
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+    if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
+        torch.set_float32_matmul_precision('high')
+
+
+# ---------------------------------------------------------------------------
 # load_llm -- wraps tuple return into dict
 # ---------------------------------------------------------------------------
 
@@ -235,27 +277,17 @@ def load_llm(
             _runtime_log(f"[StoryOrchestrator] Zero-Prime VRAM State: {free_gb:.1f}GB Free. Capacity: {total_vram:.1f}GB")
 
         # -- VRAM Budgeting (Early Allocation) --
-        max_memory = None
-        is_actually_2b = any(tag in _stripped_model_id.lower() for tag in ("2b-it", "2b_it")) or _stripped_model_id.lower().endswith("2b")
+        # S0 portability: keyed on the live backend -- the CUDA-device-0 plan
+        # is only built when CUDA exists (see _plan_max_memory).
+        max_memory = _plan_max_memory(
+            _stripped_model_id, total_vram,
+            cuda_available=torch.cuda.is_available())
+        if max_memory is not None and total_vram >= 12.0:
+            _runtime_log(f"[StoryOrchestrator] Sovereignty Buffer Active: {total_vram - 2.5:.1f}GB Budget")
 
-        if total_vram >= 12.0:
-            budget_gb = total_vram - 2.5
-            max_memory = {0: f"{budget_gb:.1f}GiB", "cpu": "32GiB"}
-            _runtime_log(f"[StoryOrchestrator] Sovereignty Buffer Active: {budget_gb:.1f}GB Budget")
-        elif is_actually_2b:
-            max_memory = {0: "3.2GiB", "cpu": "32GiB"}
-        elif any(tag in _stripped_model_id.lower() for tag in ("9b", "12b", "e4b", "4b-it")):
-            max_memory = {0: "6.8GiB", "cpu": "32GiB"}
-
-        # TF32 OFF by default for byte-identical determinism (I-2 / C-1). The
-        # The canonical headless launcher exports NVIDIA_TF32_OVERRIDE=0 so TF32
-        # is disabled globally BEFORE torch imports. matmul precision stays
-        # 'high' for LLM throughput -- the env override gates TF32 when a
-        # determinism run is engaged. See nodes/_otr_determinism.py.
-        torch.backends.cuda.matmul.allow_tf32 = False
-        torch.backends.cudnn.allow_tf32 = False
-        if torch.cuda.get_device_capability()[0] >= 8:
-            torch.set_float32_matmul_precision('high')
+        # TF32 off + Ampere+ matmul precision (guarded off-CUDA; S0 fix for
+        # the unguarded get_device_capability crash on cpu/mps hosts).
+        _apply_matmul_precision_policy()
 
         # -- VRAM Hardening v1.4: Strict Handoff --
         try:
