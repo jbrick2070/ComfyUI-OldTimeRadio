@@ -79,7 +79,11 @@ def test_widget_order_appends_slots_at_end():
     assert order[31] == "llm_vram_ceiling_gb"
     assert order[32] == "gguf_n_ctx"
     assert order[33] == "gguf_quant"
-    assert len(order) == 34
+    # gate_in (S5 validation-order fix) is a forceInput SOCKET -- present
+    # in the INPUT_TYPES key order but consumes NO widgets_values slot
+    # (the serialized widget vector stays 34).
+    assert order[34] == "gate_in"
+    assert len(order) == 35
 
 
 # --- conditional creative default; technical never flips --------------------

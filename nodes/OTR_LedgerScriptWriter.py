@@ -2747,6 +2747,19 @@ class OTR_LedgerScriptWriter:
                      "tooltip": "GGUF artifact quant (filename + expected "
                                 "size come from the artifact table)."},
                 ),
+                # S5 gate_in (2026-07-10, validation-order fix): the
+                # OTR_WorkflowValidator report gates the WRITER now (link
+                # 279), so an invalid variant fails BEFORE any LLM work
+                # burns -- previously only OTR_VideoDirector was gated
+                # (link 269) and a bad variant wasted the whole story
+                # phase first. forceInput: consumes NO widgets_values slot.
+                "gate_in": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "forceInput": True,
+                    "tooltip": "Ordering/validation signal (wire "
+                               "OTR_WorkflowValidator.validation_report).",
+                }),
             },
             # ComfyUI injects the logged-in account's credentials into these
             # hidden inputs at execution time (the API-nodes auth convention).
@@ -3057,6 +3070,9 @@ class OTR_LedgerScriptWriter:
         llm_vram_ceiling_gb=14.5,
         gguf_n_ctx=4096,
         gguf_quant="Q8_0",
+        # S5 gate_in (validation-order fix): opaque ordering signal from
+        # OTR_WorkflowValidator -- never parsed, just sequenced.
+        gate_in="",
         # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
         # _refine_loop when a refine pass re-enters this body. All default to the
         # no-op so a normal (non-refine) call is byte-identical.
