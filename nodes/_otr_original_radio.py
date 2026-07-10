@@ -44,11 +44,17 @@ from pydantic import BaseModel, Field, ValidationError
 
 try:
     from ._otr_json import parse_first_json_object
-    from ._otr_structured_call import structured_call
+    from ._otr_structured_call import (
+        StructuredCallFailedError,
+        structured_call,
+    )
     from ._otr_repair_prompts import make_dispatching_repair_factory
 except ImportError:  # pragma: no cover -- flat test/standalone load
     from _otr_json import parse_first_json_object  # type: ignore
-    from _otr_structured_call import structured_call  # type: ignore
+    from _otr_structured_call import (  # type: ignore
+        StructuredCallFailedError,
+        structured_call,
+    )
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
 
 
@@ -98,6 +104,38 @@ ANACHRONISM_TERMS: tuple[str, ...] = (
 )
 
 _ALL_FORBIDDEN = FORBIDDEN_TERMS + ANACHRONISM_TERMS
+
+# Evidence lexicons for the episode-KILLING QA classes (live-smoke
+# hardening 2026-07-10: the first original_radio smoke died on a judge
+# that invented 'weapons_smoking' for a weaponless threat line and
+# 'news_source_framing' for a plain dramatic teaser). A hard-class
+# finding may kill the episode only when (a) one of these terms
+# corroborates it in the quoted detail or the script, or (b) the ONE
+# bounded confirm re-judge produces a verbatim script quote for it.
+# Data here, not Python branches: extend the lists, not the code.
+WEAPON_SMOKING_EVIDENCE: tuple[str, ...] = (
+    "gun", "pistol", "rifle", "revolver", "shotgun", "firearm",
+    "derringer", "holster", "bullet", "ammunition", "knife", "dagger",
+    "blade", "bayonet", "cigarette", "cigar", "smoking", "tobacco",
+    "pipe smoke", "ashtray", "lit a pipe", "lights a pipe",
+)
+NEWS_FRAMING_EVIDENCE: tuple[str, ...] = (
+    "news", "report", "reported", "reporter", "bulletin", "headline",
+    "correspondent", "according to", "true story", "sources say",
+    "dispatch", "journalist", "press conference", "this really happened",
+)
+MACHINE_ATTRIBUTION_EVIDENCE: tuple[str, ...] = (
+    "machine", "computer", "generated", "algorithm", "artificial",
+    "automaton", "automated", "synthetic", "fabricated by",
+)
+HARD_CLASS_EVIDENCE: "dict[str, tuple[str, ...]]" = {
+    "weapons_smoking": WEAPON_SMOKING_EVIDENCE,
+    "news_source_framing": NEWS_FRAMING_EVIDENCE,
+    "machine_attribution": MACHINE_ATTRIBUTION_EVIDENCE,
+    # Brand/franchise names are unbounded: confirm-quote only.
+    "modern_ip": (),
+    "anachronism_dependency": ANACHRONISM_TERMS,
+}
 
 
 def scan_forbidden(text: str, *, origin: str) -> None:
@@ -559,6 +597,12 @@ def build_original_briefs(
 # Whole-script QA (the writer owns repair + fail-loud)
 # ---------------------------------------------------------------------------
 
+def script_excerpt(led: Any, cap: int = 6000) -> str:
+    """Public alias of the QA excerpt builder -- the writer's QA gate
+    reuses the exact text the judge saw for evidence corroboration."""
+    return _script_excerpt(led, cap=cap)
+
+
 def _script_excerpt(led: Any, cap: int = 6000) -> str:
     data = getattr(led, "data", led)
     rows = []
@@ -626,10 +670,179 @@ def run_original_qa(
     )
 
 
+# ---------------------------------------------------------------------------
+# Hard-finding evidence triage (live-smoke hardening 2026-07-10)
+# ---------------------------------------------------------------------------
+#
+# The first live original_radio smoke died on a single uncorroborated
+# 12B judgment: THREE findings in one pass ('weapons_smoking' for a
+# lever-and-sirens threat, 'news_source_framing' for a dramatic teaser,
+# 'epilogue_missing' with the ironic outro plainly present). The
+# episode-killing decision now demands EVIDENCE: a lexicon hit
+# (deterministic, data above) or a verbatim script quote from ONE
+# bounded confirm re-judge. Unproven findings are discarded LOUDLY
+# (caller logs + stamps meta) -- never silently. Confirmed findings
+# kill exactly as before: a dead episode is fine, a shipped bad one is
+# not. Epilogue-class repair mechanics are untouched (r4 P3/P4).
+
+
+class ConfirmedFinding(BaseModel):
+    finding_class: str = Field(default="", alias="class")
+    quote: str = Field(default="")
+
+    model_config = {"populate_by_name": True}
+
+
+class ConfirmedFindings(BaseModel):
+    confirmed: list[ConfirmedFinding] = Field(default_factory=list)
+
+
+_QA_CONFIRM_SYSTEM = (
+    "You are re-auditing an old-time-radio script you previously "
+    "flagged. For each flagged class, either PROVE it -- copy the exact "
+    "on-air words that constitute the violation (the named weapon or "
+    "smoking act itself; the words calling the tale news, a report, or "
+    "a true story; the words attributing the story to a machine; the "
+    "brand or franchise name; the modern technology the plot depends "
+    "on) -- or DROP it.\n"
+    "A threat, alarm, siren, lever, or menace WITHOUT a named weapon "
+    "is NOT weapons_smoking. A time-of-day opener or dramatic teaser "
+    "is NOT news_source_framing unless the tale is explicitly called "
+    "news, a report, or a true story, or a source is cited.\n"
+    "Return one JSON object only -- no prose, no fences. Schema:\n"
+    '{ "confirmed": array (possibly EMPTY) of\n'
+    '    { "class": the flagged class,\n'
+    '      "quote": the offending words COPIED VERBATIM from the '
+    "script } }"
+)
+
+
+def corroborate_hard_finding(finding: QAFinding, script: str) -> "str | None":
+    """Deterministic evidence check for an episode-killing finding.
+
+    Returns the evidence term found in the finding's quoted detail or
+    the script excerpt (whitespace-normalized, case-insensitive), or
+    None when the class has no lexicon hit -- the caller then runs the
+    bounded confirm re-judge. Pure text; no LLM."""
+    terms = HARD_CLASS_EVIDENCE.get(finding.finding_class) or ()
+    hay = " " + _norm_ws_lower(finding.detail + " " + script) + " "
+    for term in terms:
+        if term in hay:
+            return term
+    return None
+
+
+def confirm_hard_findings(
+    findings: "Sequence[QAFinding]",
+    *,
+    script: str,
+    technical_fn: Callable[..., str],
+) -> "tuple[list[tuple[QAFinding, str]], list[QAFinding]]":
+    """ONE bounded confirm re-judge for uncorroborated hard findings.
+
+    Returns (confirmed, discarded): confirmed pairs each finding with
+    the verbatim script quote the judge produced for it (the post-
+    validator rejects quotes that are not literally in the script, so
+    a kill is always evidence-backed); discarded carries every finding
+    the confirm pass dropped or could not ground. A confirm ladder that
+    exhausts means the judge failed to produce grounded evidence twice
+    -- the evidence bar is not met, so everything is discarded (the
+    CALLER logs the discard loudly and stamps it on meta)."""
+    flagged = sorted({f.finding_class for f in findings})
+    script_norm = _norm_ws_lower(script)
+
+    def _confirm_gate(m: ConfirmedFindings) -> "str | None":
+        for c in m.confirmed:
+            if c.finding_class not in flagged:
+                return f"class {c.finding_class!r} was not flagged"
+            if not c.quote.strip():
+                return f"class {c.finding_class!r}: empty quote"
+            if _norm_ws_lower(c.quote) not in script_norm:
+                return (f"quote {c.quote!r} is not verbatim from the "
+                        f"script")
+        return None
+
+    try:
+        # LLM slot: technical -- evidence confirm re-judge, not narrative.
+        result = structured_call(
+            prompt=[
+                {"role": "system", "content": _QA_CONFIRM_SYSTEM},
+                {"role": "user", "content": (
+                    "FLAGGED CLASSES: " + ", ".join(flagged)
+                    + "\n\nORIGINAL FINDINGS:\n"
+                    + "\n".join(f"- {f.finding_class}: {f.detail}"
+                                for f in findings)
+                    + "\n\nTHE FULL SPOKEN SCRIPT:\n" + script
+                    + "\n\nProve or drop now."
+                )},
+            ],
+            schema=ConfirmedFindings,
+            slot_fn=technical_fn,
+            base_temperature=0.2,
+            structural_retry_temperature=0.1,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            post_validator=_confirm_gate,
+            max_new_tokens=600,
+            max_attempts=2,
+            helper_name="original_qa_confirm",
+        )
+    except StructuredCallFailedError:
+        log.warning(
+            "[OTR_OriginalRadio] original_qa confirm ladder exhausted "
+            "without grounded evidence; discarding %d unproven hard "
+            "finding(s)", len(list(findings)),
+        )
+        return [], list(findings)
+
+    quotes = {c.finding_class: c.quote for c in result.confirmed}
+    confirmed: "list[tuple[QAFinding, str]]" = []
+    discarded: "list[QAFinding]" = []
+    for f in findings:
+        if f.finding_class in quotes:
+            confirmed.append((f, quotes[f.finding_class]))
+        else:
+            discarded.append(f)
+    return confirmed, discarded
+
+
+def triage_hard_findings(
+    findings: "Sequence[QAFinding]",
+    *,
+    script: str,
+    technical_fn: Callable[..., str],
+) -> "tuple[list[tuple[QAFinding, str]], list[QAFinding]]":
+    """Evidence triage for episode-killing findings.
+
+    Deterministic lexicon corroboration first (no LLM spend); anything
+    unproven takes the ONE confirm re-judge. Returns (kills, discarded)
+    where each kill pairs the finding with a human-readable evidence
+    string for the OriginalQAError / meta stamp."""
+    kills: "list[tuple[QAFinding, str]]" = []
+    unproven: "list[QAFinding]" = []
+    for f in findings:
+        term = corroborate_hard_finding(f, script)
+        if term is not None:
+            kills.append((f, f"lexicon evidence {term!r}"))
+        else:
+            unproven.append(f)
+    discarded: "list[QAFinding]" = []
+    if unproven:
+        confirmed, discarded = confirm_hard_findings(
+            unproven, script=script, technical_fn=technical_fn,
+        )
+        kills.extend(
+            (f, f"confirmed quote {q!r}") for f, q in confirmed
+        )
+    return kills, discarded
+
+
 __all__ = [
     "OriginalRadioError", "OriginalDeckError", "OriginalBriefsError",
     "OriginalQAError", "SparkDraw", "load_spark_deck", "draw_spark_atoms",
     "OriginalBriefsModel", "QAFindings", "QAFinding", "QA_CLASSES",
     "REPAIR_ACTION_BY_CLASS", "build_original_briefs", "run_original_qa",
     "scan_forbidden", "DECK_AXES", "FORBIDDEN_TERMS", "ANACHRONISM_TERMS",
+    "HARD_CLASS_EVIDENCE", "ConfirmedFinding", "ConfirmedFindings",
+    "corroborate_hard_finding", "confirm_hard_findings",
+    "triage_hard_findings", "script_excerpt",
 ]

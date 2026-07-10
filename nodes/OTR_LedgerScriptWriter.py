@@ -1647,6 +1647,55 @@ def _run_original_qa_gate(
             pack=pack,
         )
 
+    def _triage_or_raise(found, *, repaired: bool) -> "list[str]":
+        """Evidence bar for the episode-killing classes (2026-07-10
+        live-smoke hardening: the first smoke died on THREE judge
+        hallucinations in one pass). Kills require lexicon evidence or
+        a confirm-pass verbatim quote; unproven hard findings are
+        DISCARDED LOUDLY (returned for the meta stamp). Epilogue-class
+        findings pass through untouched (r4 P3/P4 repair semantics)."""
+        hard = [
+            f for f in found.findings
+            if _OTROR.REPAIR_ACTION_BY_CLASS.get(f.finding_class, "fail")
+            == "fail"
+        ]
+        if not hard:
+            return []
+        kills, discarded = _OTROR.triage_hard_findings(
+            hard,
+            script=_OTROR.script_excerpt(led),
+            technical_fn=technical_fn,
+        )
+        if discarded:
+            log.warning(
+                "[OTR_LedgerScriptWriter] original_qa: DISCARDED %d "
+                "unproven hard finding(s) (no lexicon evidence, no "
+                "grounded confirm quote): %s",
+                len(discarded),
+                "; ".join(f"{f.finding_class}: {f.detail}"
+                          for f in discarded),
+            )
+        if kills:
+            meta["original_qa"] = {
+                "status": "failed",
+                "classes": [f.finding_class for f in found.findings],
+                "repaired": repaired,
+                "evidence": [
+                    f"{f.finding_class}: {ev}" for f, ev in kills
+                ],
+                "discarded": [f.finding_class for f in discarded],
+            }
+            led.save()
+            raise _OTROR.OriginalQAError(
+                "original_qa: unrepairable finding class(es) "
+                f"{[f.finding_class for f, _ in kills]}; "
+                + "; ".join(
+                    f"{f.finding_class}: {f.detail} [{ev}]"
+                    for f, ev in kills
+                )
+            )
+        return [f.finding_class for f in discarded]
+
     findings = _judge()
     if not findings.findings:
         meta["original_qa"] = {"status": "clean", "repaired": False}
@@ -1654,22 +1703,27 @@ def _run_original_qa_gate(
         log.info("[OTR_LedgerScriptWriter] original_qa: clean")
         return
 
+    discarded_classes = _triage_or_raise(findings, repaired=False)
     classes = [f.finding_class for f in findings.findings]
-    fail_classes = [
-        c for c in classes
-        if _OTROR.REPAIR_ACTION_BY_CLASS.get(c, "fail") == "fail"
+    epilogue_findings = [
+        f for f in findings.findings
+        if _OTROR.REPAIR_ACTION_BY_CLASS.get(f.finding_class, "fail")
+        == "recompose_outro"
     ]
-    if fail_classes:
+    if not epilogue_findings:
+        # Every finding was an unproven hard flag, now discarded: the
+        # episode is clean by the evidence bar. Stamp the discard so
+        # soak/eyeball can audit it -- loud, never silent.
         meta["original_qa"] = {
-            "status": "failed", "classes": classes, "repaired": False,
+            "status": "clean_after_discard", "repaired": False,
+            "discarded": discarded_classes,
         }
         led.save()
-        raise _OTROR.OriginalQAError(
-            f"original_qa: unrepairable finding class(es) {fail_classes}; "
-            f"details: "
-            + "; ".join(f"{f.finding_class}: {f.detail}"
-                        for f in findings.findings)
+        log.info(
+            "[OTR_LedgerScriptWriter] original_qa: clean after "
+            "discarding unproven finding(s) %s", discarded_classes,
         )
+        return
 
     # Epilogue classes only -> ONE coalesced outro re-compose (r4 P4).
     log.warning(
@@ -1721,19 +1775,37 @@ def _run_original_qa_gate(
     led.save()
 
     refindings = _judge()
+    all_discarded: "list[str]" = list(discarded_classes)
     if refindings.findings:
-        reclasses = [f.finding_class for f in refindings.findings]
+        # Hard classes on the re-judge take the SAME evidence bar
+        # (kills raise inside the triage); epilogue classes still
+        # dirty after the ONE bounded repair raise per r4 P4.
+        all_discarded += _triage_or_raise(refindings, repaired=True)
+        still_epilogue = [
+            f for f in refindings.findings
+            if _OTROR.REPAIR_ACTION_BY_CLASS.get(f.finding_class, "fail")
+            == "recompose_outro"
+        ]
+        if still_epilogue:
+            reclasses = [f.finding_class for f in refindings.findings]
+            meta["original_qa"] = {
+                "status": "failed", "classes": reclasses,
+                "repaired": True, "discarded": sorted(set(all_discarded)),
+            }
+            led.save()
+            raise _OTROR.OriginalQAError(
+                f"original_qa: still dirty after the bounded repair "
+                f"({[f.finding_class for f in still_epilogue]}); details: "
+                + "; ".join(f"{f.finding_class}: {f.detail}"
+                            for f in still_epilogue)
+            )
+    if all_discarded:
         meta["original_qa"] = {
-            "status": "failed", "classes": reclasses, "repaired": True,
+            "status": "clean_after_discard", "repaired": True,
+            "discarded": sorted(set(all_discarded)),
         }
-        led.save()
-        raise _OTROR.OriginalQAError(
-            f"original_qa: still dirty after the bounded repair "
-            f"({reclasses}); details: "
-            + "; ".join(f"{f.finding_class}: {f.detail}"
-                        for f in refindings.findings)
-        )
-    meta["original_qa"] = {"status": "clean", "repaired": True}
+    else:
+        meta["original_qa"] = {"status": "clean", "repaired": True}
     led.save()
     log.info("[OTR_LedgerScriptWriter] original_qa: clean after repair")
 

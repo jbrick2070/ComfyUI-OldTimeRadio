@@ -456,6 +456,115 @@ class TestQAGate:
             self._run(_qa_ledger(), fn, monkeypatch,
                       compose_text="Another closing line.")
 
+    def test_hallucinated_hard_findings_discarded_then_clean(self, monkeypatch):
+        # The 2026-07-09 live-smoke trio: weapons on a weaponless
+        # threat, news framing on a teaser, epilogue_missing with the
+        # outro present. Evidence bar: confirm drops the hard pair;
+        # the epilogue class takes the ONE bounded repair; re-judge
+        # clean -> episode survives, discards stamped for audit.
+        led = _qa_ledger()
+        fn = _seq_fn(
+            json.dumps({"findings": [
+                {"class": "weapons_smoking",
+                 "detail": "the sirens will be the last thing you hear"},
+                {"class": "news_source_framing",
+                 "detail": "Late tonight in a dim office"},
+                {"class": "epilogue_missing",
+                 "detail": "The closing line does not comment"},
+            ]}),
+            json.dumps({"confirmed": []}),   # confirm pass drops both
+            json.dumps({"findings": []}),    # re-judge after repair
+        )
+        meta = self._run(led, fn, monkeypatch,
+                         compose_text="A dry closing line.")
+        assert meta["original_qa"]["status"] == "clean_after_discard"
+        assert meta["original_qa"]["repaired"] is True
+        assert sorted(meta["original_qa"]["discarded"]) == [
+            "news_source_framing", "weapons_smoking"]
+
+    def test_all_hard_discarded_no_epilogue_continues(self, monkeypatch):
+        fn = _seq_fn(
+            json.dumps({"findings": [
+                {"class": "weapons_smoking",
+                 "detail": "the sirens sound ominous"},
+            ]}),
+            json.dumps({"confirmed": []}),
+        )
+        meta = self._run(_qa_ledger(), fn, monkeypatch)
+        assert meta["original_qa"]["status"] == "clean_after_discard"
+        assert meta["original_qa"]["discarded"] == ["weapons_smoking"]
+
+    def test_confirmed_hard_finding_still_kills(self, monkeypatch):
+        # The confirm pass produces a verbatim script quote -> the
+        # kill goes through with the evidence recorded.
+        fn = _seq_fn(
+            json.dumps({"findings": [
+                {"class": "news_source_framing",
+                 "detail": "the intro frames the tale"},
+            ]}),
+            json.dumps({"confirmed": [
+                {"class": "news_source_framing",
+                 "quote": "This has been SIGNAL LOST."},
+            ]}),
+        )
+        with pytest.raises(ORR.OriginalQAError, match="confirmed quote"):
+            self._run(_qa_ledger(), fn, monkeypatch)
+
+
+# ---------------------------------------------------------------------------
+# 6b. Hard-finding evidence triage (pure module, live-smoke hardening)
+# ---------------------------------------------------------------------------
+
+class TestHardFindingTriage:
+    _SCRIPT = ("ANNOUNCER: Good evening.\n"
+               "MARA: I am reaching for the lever by the door.\n"
+               "ANNOUNCER: This has been SIGNAL LOST.")
+
+    def _finding(self, cls, detail):
+        return ORR.QAFinding.model_validate({"class": cls, "detail": detail})
+
+    def test_lexicon_corroboration_kills_without_llm(self):
+        calls = {"n": 0}
+
+        def tech_fn(messages, **kw):
+            calls["n"] += 1
+            return "{}"
+
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("weapons_smoking", "MARA draws a pistol")],
+            script=self._SCRIPT, technical_fn=tech_fn)
+        assert len(kills) == 1 and not discarded
+        assert "pistol" in kills[0][1]
+        assert calls["n"] == 0, "lexicon kill must not spend an LLM call"
+
+    def test_confirm_drop_discards(self):
+        fn = _seq_fn(json.dumps({"confirmed": []}))
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("weapons_smoking", "the sirens sound like doom")],
+            script=self._SCRIPT, technical_fn=fn)
+        assert not kills and len(discarded) == 1
+
+    def test_confirm_grounded_quote_kills(self):
+        fn = _seq_fn(json.dumps({"confirmed": [
+            {"class": "weapons_smoking",
+             "quote": "reaching for the lever by the door"}]}))
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("weapons_smoking", "something menacing")],
+            script=self._SCRIPT, technical_fn=fn)
+        assert len(kills) == 1 and not discarded
+        assert "lever" in kills[0][1]
+
+    def test_confirm_ungrounded_quote_exhausts_to_discard(self):
+        # The confirm judge invents a quote that is NOT in the script:
+        # the post-validator rejects it, the bounded ladder exhausts,
+        # and the finding is discarded (never a kill without evidence).
+        fn = _seq_fn(json.dumps({"confirmed": [
+            {"class": "weapons_smoking", "quote": "a revolver gleamed"}]}))
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("weapons_smoking", "something menacing")],
+            script=self._SCRIPT, technical_fn=fn)
+        assert not kills and len(discarded) == 1
+
 
 # ---------------------------------------------------------------------------
 # 7. Provenance surfaces
