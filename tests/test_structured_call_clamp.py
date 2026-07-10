@@ -60,6 +60,37 @@ def test_overlong_plus_other_error_surfaces_the_other_error():
         sc._parse_and_validate(raw, _Shape)
 
 
+class _NestedItem(BaseModel):
+    hook: str = Field(max_length=20)
+
+
+class _NestedShape(BaseModel):
+    pitches: list[_NestedItem]
+
+
+def test_nested_list_field_is_clamped_not_aborted():
+    # scifi_fable2 S1b live smoke (2026-07-10): pitches.0.hook overflowed
+    # and the old top-level-only clamp skipped it -> whole episode died.
+    raw = ('{"pitches": [{"hook": "this hook is far far far too long to '
+           'survive the cap"}]}')
+    inst = sc._parse_and_validate(raw, _NestedShape)
+    assert len(inst.pitches[0].hook) <= 20
+
+
+def test_nested_clamp_reports_the_full_path():
+    bad = {"pitches": [{"hook": "x" * 60}]}
+    try:
+        _NestedShape.model_validate(bad)
+    except ValidationError as ve:
+        repaired, clamped = sc._clamp_overlong_strings(bad, ve)
+        assert clamped == ["pitches.0.hook"]
+        assert len(repaired["pitches"][0]["hook"]) <= 20
+        # the ORIGINAL dict is never mutated (deep copy)
+        assert len(bad["pitches"][0]["hook"]) == 60
+    else:  # pragma: no cover
+        pytest.fail("expected a ValidationError")
+
+
 def test_helper_returns_none_when_nothing_clampable():
     try:
         _Shape.model_validate({"time_of_day": "ok", "beats": "bad"})

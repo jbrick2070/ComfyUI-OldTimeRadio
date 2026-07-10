@@ -173,6 +173,17 @@ class TestScriptLadder:
         assert fn.calls[1]["temperature"] < fn.calls[0]["temperature"]
         reroll_msg = fn.calls[1]["msgs"][-1]["content"]
         assert "BAD_LINE_SHAPE" in reroll_msg
+        # Strict role alternation -- local chat templates raise jinja
+        # TemplateError on consecutive same-role messages (first S1b live
+        # smoke); the FORMAT example play rides an assistant few-shot
+        # turn (fourth S1b live smoke: prompt-side bans alone never cured
+        # the **bold**/(paren) habits).
+        for call in fn.calls:
+            assert [m["role"] for m in call["msgs"]] == [
+                "system", "user", "assistant", "user"]
+            assert call["msgs"][2]["content"].startswith(
+                "TITLE: The Long Count")
+            assert call["msgs"][2]["content"].endswith("END.")
 
     def test_truncation_retry_adds_25_percent_tokens_once(self):
         fn = _ScriptedFn([_TRUNCATED_MARKUP, _GOOD_MARKUP])
@@ -196,12 +207,15 @@ class TestScriptLadder:
             _run_script_pass(fn)
 
     def test_ladder_exhaustion_fails_loud_naming_the_pass(self):
-        fn = _ScriptedFn([_BAD_SHAPE_MARKUP] * 3)
+        fn = _ScriptedFn([_BAD_SHAPE_MARKUP] * 4)
         with pytest.raises(F2.Fable2ScriptError, match="script"):
             _run_script_pass(fn)
-        assert len(fn.calls) == 3  # one per rung; temps never rise
+        # one per rung (4 rungs since the 10th live smoke); temps never
+        # rise (2B principle; the final rung repeats 0.30)
+        assert len(fn.calls) == 4
         temps = [c["temperature"] for c in fn.calls]
         assert temps == sorted(temps, reverse=True)
+        assert temps[-1] == 0.30
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +353,8 @@ def _e2e_run(tmp_path, monkeypatch):
 
     technical = _ScriptedFn([
         _DOSSIER_JSON,                       # P0 dossier
+        json.dumps({                         # P2c news read (read-split)
+            "news_close_read": _TREATMENT_DICT["news_close_read"]}),
         _casting_json,                       # P6 casting
         json.dumps({"findings": []}),        # P8 audit
     ])
@@ -400,17 +416,23 @@ class TestEndToEndSpine:
         # receipts: 7 passes, each stamped with the mode (r2 anchor)
         receipts = f2["pass_receipts"]
         assert [r["pass_id"] for r in receipts] == [
-            "dossier", "pitch_room", "treatment", "script",
+            "dossier", "pitch_room", "treatment", "news_read", "script",
             "casting_voices", "assemble", "ledger_audit"]
         assert all(r["mode"] == "one_pitch_one_draft" for r in receipts)
         llm_receipts = [r for r in receipts if r["pass_id"] != "assemble"]
         assert all(r["attempts"] >= 1 for r in llm_receipts)
+        # the read-split stamped the P2c read onto the treatment
+        assert f2["treatment"]["news_close_read"] == (
+            _TREATMENT_DICT["news_close_read"])
         # writer-shared meta stamps
         assert meta["news"] is None
         assert meta["num_characters_locked"] == 2
         assert meta["cast_status"] == "locked"
-        # exactly 3 technical + 3 creative calls on the happy path
-        assert len(technical.calls) == 3
+        # credits receipt (25th live smoke): the fable2 seed is the
+        # episode's seed receipt
+        assert meta["episode_seed"] == 42
+        # exactly 4 technical + 3 creative calls on the happy path
+        assert len(technical.calls) == 4
         assert len(creative.calls) == 3
 
     def test_seed_reproduces_the_deal_across_runs(self, tmp_path,

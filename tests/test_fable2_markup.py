@@ -144,12 +144,99 @@ class TestDefectClasses:
         hits = [d for d in defects if d.code is D.UNKNOWN_SPEAKER]
         assert hits and hits[0].detail == "IVOR"
 
-    def test_paren_or_bracket(self):
+    def test_speaker_line_delivery_tag_is_stripped_not_a_defect(self):
+        # S1b live-smoke hardening (2026-07-10): short parenthetical
+        # delivery tags on SPEAKER lines are delete-only NORMALIZED
+        # (legacy stage_dir_stripped precedent) and COLLECTED, never a
+        # reroll defect. The spoken words survive untouched.
         text = GOLDEN.replace(
             "MARA: Then we have until nine.",
-            "MARA: Then we have until nine (checks the clock).")
+            "MARA: (checks the clock) Then we have until nine.")
+        script, defects = _parse(text)
+        assert script is not None, defects
+        spoken = [ln.text for sc in script.scenes for ln in sc.lines]
+        assert "Then we have until nine." in spoken
+        assert not any("checks the clock" in t for t in spoken)
+        assert any("stage_direction_stripped" in n
+                   for n in script.normalizations)
+
+    def test_markdown_bold_labels_are_stripped_not_a_defect(self):
+        text = GOLDEN.replace("TITLE: The Glass Meridian",
+                              "**TITLE: The Glass Meridian**")
+        script, defects = _parse(text)
+        assert script is not None, defects
+        assert script.title == "The Glass Meridian"
+        assert any("markdown_emphasis_stripped" in n
+                   for n in script.normalizations)
+
+    def test_clean_parse_records_no_normalizations(self):
+        script, defects = _parse(GOLDEN)
+        assert script is not None, defects
+        assert script.normalizations == ()
+
+    def test_paren_on_labeled_line_stays_a_defect(self):
+        text = GOLDEN.replace(
+            "MUSIC: closing brass, resolving",
+            "MUSIC: closing brass (fade slowly), resolving")
         _, defects = _parse(text)
         assert D.PAREN_OR_BRACKET in _codes(defects)
+
+    def test_embedded_paren_group_stays_a_defect(self):
+        # kibitz r2 M1: an EMBEDDED group can be spoken/source content
+        # ("The sample (A17) moved.") -- only LINE-LEADING delivery tags
+        # normalize; anything embedded stays a hard defect.
+        text = GOLDEN.replace(
+            "MARA: Then we have until nine.",
+            "MARA: The sample (A17) moved before nine.")
+        _, defects = _parse(text)
+        assert D.PAREN_OR_BRACKET in _codes(defects)
+
+    def test_digit_bearing_leading_group_stays_a_defect(self):
+        text = GOLDEN.replace(
+            "MARA: Then we have until nine.",
+            "MARA: (at 9:15) Then we have until nine.")
+        _, defects = _parse(text)
+        assert D.PAREN_OR_BRACKET in _codes(defects)
+
+    def test_all_stage_direction_line_stays_a_defect(self):
+        # A speaker line that is NOTHING but a delivery tag has no spoken
+        # words to keep -- that is a real defect, not a normalization.
+        text = GOLDEN.replace(
+            "MARA: Then we have until nine.",
+            "MARA: (long pause)")
+        _, defects = _parse(text)
+        assert D.BAD_LINE_SHAPE in _codes(defects)
+
+    def test_coda_terminal_period_normalizes_to_pivot_colon(self):
+        # 15th live smoke (2026-07-10): the pivot colon is a STRUCTURAL
+        # seam marker, not a spoken word -- terminal '.' normalizes,
+        # flagged; the words stay untouched.
+        text = GOLDEN.replace(
+            "CODA: Beyond tonight's quiet hillside, a real measurement "
+            "waits:",
+            "CODA: Beyond tonight's quiet hillside, a real measurement "
+            "waits.")
+        script, defects = _parse(text)
+        assert script is not None, defects
+        assert script.coda.endswith(":")
+        assert any("coda_pivot_colon_normalized" in n
+                   for n in script.normalizations)
+
+    def test_normalize_helper_matches_parser_view(self):
+        from nodes._otr_fable2_markup import normalize_fable2_markup_text
+        text = GOLDEN.replace(
+            "MARA: Then we have until nine.",
+            "**MARA:** (dryly) Then we have until nine.")
+        norm = normalize_fable2_markup_text(text)
+        assert "MARA: Then we have until nine." in norm
+        assert "**" not in norm and "(dryly)" not in norm
+        script, defects = _parse(text)
+        assert script is not None, defects
+        # every parsed constituent is a substring of the normalized draft
+        # (the proof-gate property the runner relies on)
+        for sc in script.scenes:
+            for ln in sc.lines:
+                assert ln.text in norm
 
     def test_bracket_flagged_on_any_line_shape(self):
         text = GOLDEN.replace(
@@ -199,9 +286,12 @@ class TestDefectClasses:
         assert hits and hits[0].detail == "NOOR"
 
     def test_coda_shape(self):
+        # 15th live smoke (2026-07-10): a terminal '.' NORMALIZES to the
+        # pivot colon (structural seam marker, not a spoken word); the
+        # defect-worthy coda shape is an INNER sentence break.
         text = GOLDEN.replace(
             "CODA: Beyond tonight's quiet hillside, a real measurement waits:",
-            "CODA: Beyond tonight's quiet hillside, a real measurement waits.")
+            "CODA: The hillside sleeps. A real measurement waits:")
         _, defects = _parse(text)
         assert D.CODA_SHAPE in _codes(defects)
 
@@ -357,7 +447,10 @@ class TestProperties:
             (lambda t: t.split("\n", 1)[1], D.MISSING_TITLE),
             (lambda t: t + "ANNOUNCER: encore.\n", D.CONTENT_AFTER_END),
             (lambda t: t.replace("SCENE 1:", "SCENE 7:", 1), D.SCENE_ORDER),
-            (lambda t: t.replace("report waits:", "report waits.", 1),
+            # A terminal '.' now NORMALIZES to the pivot colon (15th live
+            # smoke); the defect-worthy shape is an inner sentence break.
+            (lambda t: t.replace("report waits:",
+                                 "report ends. It waits:", 1),
              D.CODA_SHAPE),
         )
         for _ in range(10):

@@ -80,10 +80,24 @@ class TestSeamShapes:
                 "dramatic_question", "cast_shapes", "priced_ending",
                 "news_thread", "news_close_read",
                 'never "ANNOUNCER"',
-                "these exact names are the ONLY legal speakers in the script",
+                "these exact names are the ONLY legal speakers in the",
                 "priced_ending is required for ALL FOUR shapes",
-                "Use only numbers from allowed_numbers",
                 "SFW. No weapons, no smoking."):
+            assert needle in flat
+        # S1b read-split: the treatment no longer writes the factual
+        # close -- the seam says so explicitly.
+        assert "do NOT write it here" in flat
+
+    def test_news_read_seam_contract(self, stages):
+        # P2c (S1b read-split, kibitz r2 Q1): single-purpose factual
+        # close under the anti-invention subset laws.
+        flat = _flat(stages["fable2_news_read_system"])
+        for needle in (
+                "news_close_read", "Copy, never invent",
+                "allowed_numbers",
+                "NEVER name the drama's fictional characters",
+                "FORBIDDEN NAMES",
+                "no computed totals or averages"):
             assert needle in flat
 
     def test_script_seam_format_block(self, stages):

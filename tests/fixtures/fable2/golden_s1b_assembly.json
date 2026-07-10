@@ -8,8 +8,8 @@
       "tts_model": "kokoro",
       "voice_preset": "bf_lily",
       "voice_params": null,
-      "line_count": 3,
-      "word_count": 40
+      "line_count": 0,
+      "word_count": 0
     },
     {
       "char_id": "c02",
@@ -154,7 +154,7 @@
       "shot_id": "shot_003",
       "scene_id": null,
       "speaker": "ANNOUNCER",
-      "char_id": "c01",
+      "char_id": "announcer",
       "line_ids": [
         "shot_003_b1"
       ],
@@ -166,7 +166,7 @@
       "shot_id": "shot_003",
       "scene_id": null,
       "speaker": "ANNOUNCER",
-      "char_id": "c01",
+      "char_id": "announcer",
       "line_ids": [
         "shot_003_b2"
       ],
@@ -178,7 +178,7 @@
       "shot_id": "shot_003",
       "scene_id": null,
       "speaker": "ANNOUNCER",
-      "char_id": "c01",
+      "char_id": "announcer",
       "line_ids": [
         "shot_003_b3"
       ],
@@ -331,7 +331,7 @@
       "line_id": "shot_003_b1",
       "shot_id": "shot_003",
       "beat_id": "shot_003_b1",
-      "char_id": "c01",
+      "char_id": "announcer",
       "text": "Vera got her answer, though the antenna kept the better half.",
       "traits": null,
       "boundary": "shot_start",
@@ -351,7 +351,7 @@
       "line_id": "shot_003_b2",
       "shot_id": "shot_003",
       "beat_id": "shot_003_b2",
-      "char_id": "c01",
+      "char_id": "announcer",
       "text": "Beyond tonight's cliff-top signal, a real transmission waits:",
       "traits": null,
       "boundary": "beat_start",
@@ -371,7 +371,7 @@
       "line_id": "shot_003_b3",
       "shot_id": "shot_003",
       "beat_id": "shot_003_b3",
-      "char_id": "c01",
+      "char_id": "announcer",
       "text": "Tonight's story grew from a real survey: instruments on Mount Etna mapped 1,200 new vents this season, work led by Doctor Rossi.",
       "traits": null,
       "boundary": "beat_start",

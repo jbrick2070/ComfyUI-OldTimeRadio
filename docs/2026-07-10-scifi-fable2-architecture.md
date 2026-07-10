@@ -911,6 +911,37 @@ deck-lint test covers cards AND stances. Word-band accounting: the +/-20% band a
 CHARACTER words; announcer words are metered separately by the envelope (both reported in
 meta.fable2).
 
+## 13.5 S1b live-smoke deviations (2026-07-10, documented; kibitz r2 on the record)
+
+Thirteen consecutive 30w live rolls drove these evidence-backed deviations from the
+ratified plan (kibitz run: `kibitz-runs/2026-07-10-fable2-s1b-hardening/r2/final.md`,
+codex verdict "yes-with-fixes -- converging, not structurally wrong"):
+
+1. **READ-SPLIT (P2c `news_read`)**: 7 of 13 rolls died when ONE P2b call had to satisfy
+   the whole treatment AND a subset-law-compliant factual read; the typed repair could
+   not converge. The close is now its OWN technical pass (seam `fable2_news_read_system`,
+   temp 0.20, 300 tokens) whose output the runner stamps onto `treatment.news_close_read`
+   -- downstream contract (assembly, proof-artifact name) unchanged. The r4/S2 subset laws
+   live in `_make_read_validator`: numerals TOKEN-EXACT against allowed_numbers + the
+   source digest; proper nouns (possessives stripped; calendar/honorific/discourse
+   stopwords) word-boundary against dossier+provenance+digest; fictional cast names
+   hard-banned CASE-SENSITIVELY; all failures accumulate into one teaching message.
+   LEGALITY AUTHORITY = THE SOURCE (the 12B's own extraction gaps killed legitimate reads).
+2. **Parser decoration normalization (delete-only, flagged)**: markdown emphasis anywhere
+   + LINE-LEADING letters-only delivery tags on speaker lines strip (legacy
+   `stage_dir_stripped` precedent); every strip lands in ParsedScript.normalizations +
+   meta + a LOUD log. Embedded/digit-bearing groups stay hard PAREN_OR_BRACKET defects
+   (kibitz M1). Proof artifact = the same-normalized draft (`normalize_fable2_markup_text`);
+   draft1_sha256 still hashes the RAW draft.
+3. **P3 ladder = 4 rungs** (0.75/0.5/0.3/0.3) + assistant-turn few-shot of the seam
+   example (small local models imitate their own turns; prompt-side bans alone never
+   cured the habits) + skeleton recap in the reroll message.
+4. **CastShape names ONE word, schema-enforced** (no titles/initials -- "DR. VERONICA
+   VOSS" invited mid-script shortening -> UNKNOWN_SPEAKER).
+5. **_clamp_overlong_strings walks NESTED loc paths** (shared-core fix; pitches.0.hook
+   overflow previously aborted the run).
+6. Multiple inter-scene MUSIC cues all survive assembly (kibitz M4).
+
 ## 14. Open items pinned for the coding window (verify before S0 code)
 
 1. RESOLVED (S0, 2026-07-10): `config/cast_pools.py` symbols pinned by direct read --

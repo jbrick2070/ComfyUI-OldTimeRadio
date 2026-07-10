@@ -25,6 +25,25 @@ Contract (architecture doc section 6):
 
 Python judges; the LLM writes: this module never rewrites, trims, or repairs
 a spoken word -- a defective draft is rerolled upstream, never patched here.
+
+DECORATION NORMALIZATION (S1b live-smoke hardening, 2026-07-10): the local
+12B model persistently decorates otherwise-correct drafts with markdown
+emphasis (``**TITLE:**``) and parenthetical delivery tags (``(softly)``)
+through EVERY prompt-side ban including an assistant-turn few-shot (5 live
+rolls of evidence). Both are NON-SPOKEN notation, and the repo already
+ships the operator-ratified precedent for exactly this class (the legacy
+composer's ``stage_dir_stripped`` compose flag). So the parser now applies
+a DELETE-ONLY pre-lex normalization -- markdown emphasis markers stripped
+everywhere; LINE-LEADING parenthetical/bracket delivery tags (letters
+only, never digits) stripped from SPEAKER-line text only -- with every
+strip COLLECTED into
+``ParsedScript.normalizations`` (stamped to meta + logged by the runner;
+the operator eyeball reviews them). Deletion never writes a word: every
+surviving word is LLM-authored, so the proof-gate guarantee holds against
+the same-normalized draft (``normalize_fable2_markup_text``). Parens and
+brackets anywhere ELSE (TITLE/MUSIC/SCENE/CODA lines, unbalanced
+leftovers, groups over the length cap) remain hard PAREN_OR_BRACKET
+defects, and every other defect class stays reroll-strict.
 """
 from __future__ import annotations
 
@@ -38,6 +57,7 @@ __all__ = [
     "ParsedLine",
     "ParsedScene",
     "ParsedScript",
+    "normalize_fable2_markup_text",
     "parse_fable2_markup",
     "render_defects",
 ]
@@ -54,6 +74,82 @@ _RE_SPEAKER = re.compile(r"^([A-Z][A-Z0-9 .'-]{1,24}):\s*(.+)$")
 
 _PAREN_OR_BRACKET_CHARS = frozenset("()[]")
 _QUOTE_CHARS = frozenset('"“”„«»')
+
+# --- decoration normalization (delete-only; see module docstring) -----------
+_RE_MD_BOLD = re.compile(r"\*\*\*?(.+?)\*\*\*?")     # **bold** / ***both***
+_RE_MD_STAR = re.compile(r"\*(.+?)\*")               # *italic*
+# LINE-LEADING delivery tags on SPEAKER text only: "(softly)", "(over
+# radio, quick)", "[beat]" -- letters/punctuation, NO digits, short.
+# kibitz r2 M1 (2026-07-10): an EMBEDDED or digit-bearing group can be
+# spoken/source content ("The sample (A17) moved.") -- stripping it
+# against the same-normalized proof artifact would make the deletion
+# invisible, so anything beyond a leading delivery tag stays a hard
+# PAREN_OR_BRACKET defect.
+_RE_LEADING_DELIVERY = re.compile(r"^[(\[][a-zA-Z ,.'\-]{1,40}[)\]]\s*")
+
+
+def _strip_markdown(line: str) -> "tuple[str, bool]":
+    out = _RE_MD_BOLD.sub(r"\1", line)
+    out = _RE_MD_STAR.sub(r"\1", out)
+    return out.strip(), out != line
+
+
+def _normalize_line(line: str) -> "tuple[str, tuple[str, ...]]":
+    """Delete-only decoration strip for ONE non-blank line. Returns the
+    normalized line + note tags. Classification-order aware: the labeled
+    shapes (TITLE/MUSIC/SCENE/CODA/END) only get the markdown strip;
+    speaker-shaped lines also get delivery groups stripped from the TEXT
+    part. Never adds, reorders, or rewrites a word."""
+    notes: "list[str]" = []
+    line, md = _strip_markdown(line)
+    if md:
+        notes.append("markdown_emphasis_stripped")
+    coda = _RE_CODA.match(line)
+    if coda:
+        # The pivot colon is a STRUCTURAL seam marker (the splice into
+        # the factual close), not a spoken word (15th live smoke
+        # 2026-07-10: an otherwise-perfect draft died on a terminal
+        # period). Terminal '.', '...' or missing punctuation normalizes
+        # to ':' -- flagged; python owns structure, never words.
+        text = coda.group(1).strip()
+        fixed = text.rstrip().rstrip(".:…").rstrip() + ":"
+        if fixed != text:
+            notes.append("coda_pivot_colon_normalized")
+            line = f"CODA: {fixed}"
+        return line, tuple(notes)
+    if (_RE_TITLE.match(line) or _RE_MUSIC.match(line)
+            or _RE_SCENE.match(line) or _RE_END.match(line)):
+        return line, tuple(notes)
+    m = _RE_SPEAKER.match(line)
+    if m:
+        name, text = m.group(1), m.group(2)
+        stripped_any = False
+        while True:
+            lead = _RE_LEADING_DELIVERY.match(text)
+            if lead is None:
+                break
+            text = text[lead.end():].lstrip()
+            stripped_any = True
+        if stripped_any:
+            notes.append("stage_direction_stripped")
+            line = f"{name}: {text}".rstrip() if text else f"{name}:"
+    return line, tuple(notes)
+
+
+def normalize_fable2_markup_text(text: str) -> str:
+    """The whole-draft form of the per-line normalization -- the runner
+    stores THIS as the verbatim-proof artifact so proof spans and parsed
+    constituents share one normalization (delete-only: every word in the
+    result is LLM-authored)."""
+    out: "list[str]" = []
+    for raw in str(text).splitlines():
+        line = raw.strip()
+        if not line:
+            out.append("")
+            continue
+        norm, _notes = _normalize_line(line)
+        out.append(norm)
+    return "\n".join(out)
 
 
 class Fable2ParseDefect(enum.Enum):
@@ -117,6 +213,9 @@ class ParsedScript:
     coda: str
     character_word_count: int
     announcer_word_count: int
+    # Delete-only decoration strips applied pre-lex ("line N: tag"); the
+    # runner stamps these to meta.fable2.parse + logs them LOUD.
+    normalizations: "tuple[str, ...]" = ()
 
 
 def render_defects(defects: "tuple[ParseDefect, ...]") -> str:
@@ -230,9 +329,16 @@ class _Parse:
             self.skeleton("announcer outro missing before the CODA", no)
             self.state = _POSTAMBLE
         self.coda = text
-        if not text.rstrip().endswith(":"):
+        # Terminal punctuation was normalized to ':' pre-lex
+        # (coda_pivot_colon_normalized); what remains defect-worthy is a
+        # coda that is not ONE clause (an inner sentence break) or that
+        # somehow still lacks the pivot colon.
+        stripped = text.rstrip().rstrip(":").rstrip()
+        if not text.rstrip().endswith(":") or any(
+                ch in stripped for ch in ".!?"):
             self.defect(Fable2ParseDefect.CODA_SHAPE,
-                        "CODA must be one pivot clause ending with a colon",
+                        "CODA must be ONE pivot clause (no inner "
+                        "sentence breaks), ending with a colon",
                         no)
 
     def on_end(self, no: int) -> None:
@@ -292,6 +398,7 @@ def parse_fable2_markup(text: str, cast_names) -> (
     never rewrites a spoken word.
     """
     p = _Parse(cast_names)
+    normalizations: "list[str]" = []
     for no, raw in enumerate(str(text).splitlines(), start=1):
         line = raw.strip()
         if not line:
@@ -299,6 +406,12 @@ def parse_fable2_markup(text: str, cast_names) -> (
         if p.state == _DONE:
             p.defect(Fable2ParseDefect.CONTENT_AFTER_END, line[:80], no)
             continue
+        line, notes = _normalize_line(line)
+        normalizations.extend(f"line {no}: {n}" for n in notes)
+        if not line:
+            continue  # the whole line was decoration
+        # Post-normalization leftovers -- parens/brackets on labeled
+        # lines, unbalanced groups, over-cap asides -- stay HARD defects.
         if any(ch in _PAREN_OR_BRACKET_CHARS for ch in line):
             p.defect(Fable2ParseDefect.PAREN_OR_BRACKET, line[:80], no)
         m = _RE_TITLE.match(line)
@@ -365,5 +478,6 @@ def parse_fable2_markup(text: str, cast_names) -> (
         coda=p.coda or "",
         character_word_count=character_words,
         announcer_word_count=announcer_words,
+        normalizations=tuple(normalizations),
     )
     return script, ()

@@ -258,6 +258,30 @@ def test_no_double_append_of_the_news_read(tmp_path):
     assert text.count(_NEWS_READ) == 1
 
 
+def test_multiple_inter_cues_after_one_scene_all_survive(tmp_path):
+    # kibitz r2 M4: the old dict-keyed collapse silently dropped every
+    # inter cue after the first.
+    markup = _MARKUP.replace(
+        "MUSIC: single sustained violin note, rising",
+        "MUSIC: single sustained violin note, rising\n"
+        "MUSIC: distant kettle drums, answering")
+    parsed, defects = parse_fable2_markup(markup, _CAST_NAMES)
+    assert parsed is not None, defects
+    led = _PL.new_ledger(episode_id="fable2_intercues",
+                         out_dir=str(tmp_path / "ep7"))
+    meta = led.data.setdefault("meta", {})
+    meta["fable2"] = {"_winning_draft_text": markup}
+    F2._assemble(led, parsed, _treatment(), _CAST_ROWS, _PAYLOAD, meta,
+                 target_words=50)
+    assert [r["cue_id"] for r in led.data["music"]] == [
+        "opening", "inter_01", "inter_02", "closing"]
+    inter_rows = [r for r in led.data["lines"]
+                  if r["speaker_role"] == "music_inter"]
+    assert len(inter_rows) == 2
+    ids = [r["line_id"] for r in inter_rows]
+    assert len(set(ids)) == 2, ids
+
+
 def test_boundary_stamps(tmp_path):
     led, _parsed, _meta = _assembled(tmp_path)
     by_shot: dict = {}
@@ -291,9 +315,12 @@ def test_row_role_ordering_follows_legacy_reference(tmp_path):
     spoken = [r for r in led.data["lines"]
               if r["speaker_role"] in ("character", "announcer")]
     assert spoken[0]["speaker_role"] == "announcer"
-    assert spoken[0]["char_id"] == "announcer"      # fixture-truth intro
+    assert spoken[0]["char_id"] == "announcer"
     assert spoken[-1]["speaker_role"] == "announcer"
-    assert spoken[-1]["char_id"] == "c01"           # fixture-truth close
+    # 22nd live smoke: ALL announcer rows carry the SENTINEL char_id --
+    # exempt from every cast-keyed downstream mutator by design (the
+    # legacy fixture's c01 postamble was a legacy-lane quirk).
+    assert spoken[-1]["char_id"] == "announcer"
     assert {r["speaker_role"] for r in spoken[1:-1]} >= {"character"}
 
 

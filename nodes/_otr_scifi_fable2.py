@@ -50,6 +50,7 @@ try:
         ANNOUNCER_NAME,
         Fable2ParseDefect,
         ParsedScript,
+        normalize_fable2_markup_text,
         parse_fable2_markup,
         render_defects,
     )
@@ -75,6 +76,7 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         ANNOUNCER_NAME,
         Fable2ParseDefect,
         ParsedScript,
+        normalize_fable2_markup_text,
         parse_fable2_markup,
         render_defects,
     )
@@ -171,9 +173,13 @@ _TEMP = {
 }
 
 
-def _MARKUP_LADDER_TEMPS(t: float) -> tuple[float, float, float]:
-    """The markup ladder NEVER raises temperature (2B principle)."""
-    return (t, round(t * 0.66, 2), 0.30)
+def _MARKUP_LADDER_TEMPS(t: float) -> "tuple[float, ...]":
+    """The markup ladder NEVER raises temperature (2B principle). Four
+    rungs (10th live smoke 2026-07-10: with the format wars won, rolls
+    were dying on ONE small skeleton slip per attempt -- e.g. a missing
+    closing MUSIC line -- so depth, not temperature, is the lever; the
+    final rung repeats 0.30 with the defect quote)."""
+    return (t, round(t * 0.66, 2), 0.30, 0.30)
 
 
 _MAX_BUDGET_REROLLS = 2
@@ -187,7 +193,10 @@ _DIGEST_CHAR_CAP = 3600
 # _script_token_budget instead.
 _MAX_NEW_TOKENS = {
     "dossier": 700, "pitch_room": 900, "pitch_select": 300,
-    "treatment": 1100, "critic": 800, "casting_voices": 1000,
+    "treatment": 1100, "critic": 800,
+    # 18th live smoke 2026-07-10: 1000 truncated a verbose 2-cast JSON
+    # mid-object -> the extractor salvaged an inner entry -> schema fail.
+    "casting_voices": 1400,
     "ledger_audit": 700,
 }
 
@@ -207,6 +216,21 @@ def _script_token_budget(target_words: int) -> int:
     """P3/P5 output budget: markup overhead ~1.5x words, ~1.35 tok/word,
     +200 skeleton overhead; floor 1200, cap 4200."""
     return min(4200, max(1200, int(target_words * 2.2) + 200))
+
+
+_WORD_BAND_ABS_FLOOR = 25
+
+
+def _word_band(target_words: int) -> "tuple[float, float]":
+    """CHARACTER-word acceptance band: +/-20% (r4/M4) with an ABSOLUTE
+    slack floor of +/-25 words (17th live smoke 2026-07-10: at 30 words
+    the proportional band is 12 words wide -- whole-play word-count
+    precision no 12B has; the band's purpose is render-length control,
+    and +/-25 words is ~15 seconds of dialogue). At production lengths
+    (>=125 words) the proportional band governs unchanged."""
+    tw = int(target_words)
+    slack = max(tw * _TOTAL_WORD_BAND, _WORD_BAND_ABS_FLOOR)
+    return (max(1.0, tw - slack), tw + slack)
 
 
 def assert_supported_target_words(target_words: int) -> None:
@@ -311,14 +335,40 @@ class CastShape(BaseModel):
     pressure: str = Field(min_length=5, max_length=120)
     register: str = Field(min_length=5, max_length=90)
 
+    @field_validator("name", mode="before")
+    @classmethod
+    def _normalize_name_label(cls, v):
+        """Deterministic LABEL normalization (19th live smoke
+        2026-07-10: the model titles its scientists reflexively --
+        'DR. HARRIS' -- and the repair rung would not converge). The
+        surname IS the LLM's chosen name; python strips the banned
+        title tokens and keeps the LAST word (radio-billing surname
+        convention -- the doc's own example is VOSS). Never invents a
+        character; only normalizes the label shape."""
+        if not isinstance(v, str):
+            return v
+        tokens = [t for t in v.strip().upper().split()
+                  if t.rstrip(".") not in _HONORIFIC_TOKENS]
+        if tokens:
+            return tokens[-1].replace(".", "")
+        return v
+
     @field_validator("name")
     @classmethod
-    def _name_all_caps_not_announcer(cls, v: str) -> str:
+    def _name_all_caps_one_word_not_announcer(cls, v: str) -> str:
         v = v.strip()
         if not v or v != v.upper():
             raise ValueError(f"cast name must be ALL CAPS, got {v!r}")
         if v == ANNOUNCER_NAME:
             raise ValueError("cast name must never be ANNOUNCER")
+        # kibitz r2 S1 + 12th live smoke ("DR. VERONICA VOSS" shortened
+        # to "VOSS" mid-script -> UNKNOWN_SPEAKER): one word, no titles,
+        # no initials -- normalized above; anything still multiword here
+        # is unrecoverable.
+        if " " in v or "." in v:
+            raise ValueError(
+                f"cast name must be ONE word with no titles or initials "
+                f"(like VERA or BRANNIGAN), got {v!r}")
         return v
 
 
@@ -330,7 +380,14 @@ class Treatment(BaseModel):
     turn: str = Field(min_length=10, max_length=250)
     priced_ending: dict[str, str]
     news_thread: str = Field(min_length=10, max_length=200)
-    news_close_read: str = Field(min_length=80, max_length=420)
+    # S1b read-split (kibitz r2 Q1 ruling, pulled forward 2026-07-10
+    # after 13 live rolls: 7 died in the combined pass's read gates and
+    # the typed repair could not converge): the factual close is now
+    # authored by its OWN low-temp technical pass (P2c, seam
+    # fable2_news_read_system) and stamped onto the treatment by the
+    # runner -- so the field is optional at P2b and the downstream
+    # contract (assembly + proof artifact name) is unchanged.
+    news_close_read: str = Field(default="", max_length=420)
 
     @field_validator("dramatic_question")
     @classmethod
@@ -403,8 +460,28 @@ class CastVoice(BaseModel):
     pressure: str = Field(min_length=5, max_length=120)
 
 
+class NewsCloseRead(BaseModel):
+    """P2c: the 1-2 sentence factual close (read-split, S1b)."""
+
+    news_close_read: str = Field(min_length=80, max_length=420)
+
+
 class CastingVoices(BaseModel):
     cast: list[CastVoice] = Field(min_length=1, max_length=8)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_unwrapped(cls, data):
+        """Wrapper tolerance (18th live smoke 2026-07-10): a truncated
+        or envelope-dropping response can arrive as a BARE list of cast
+        entries or a single entry dict -- wrap it so the SPEAKER-SET
+        equality gate (which teaches) judges it instead of a raw schema
+        error the repair cannot act on."""
+        if isinstance(data, list):
+            return {"cast": data}
+        if isinstance(data, dict) and "cast" not in data and "name" in data:
+            return {"cast": [data]}
+        return data
 
 
 _AUDIT_CLASSES = (
@@ -423,8 +500,12 @@ class AuditFinding(BaseModel):
         "word_budget", "subtext_flat",
         "speaker_not_in_cast", "verbatim_break", "skeleton_break",
         "news_source_framing", "machine_attribution", "weapons_smoking"]
-    scene: int = Field(ge=0)
-    speaker: str
+    # P8 is a REPORTING pass: a finding without a speaker/scene is still
+    # triage-able (speaker "" is the documented scene-level form; 21st
+    # live smoke 2026-07-10: a schema abort over a missing speaker field
+    # killed an otherwise-complete episode).
+    scene: int = Field(default=0, ge=0)
+    speaker: str = ""
     detail: str = Field(min_length=10, max_length=200)
 
 
@@ -515,6 +596,30 @@ _PROPER_STOPWORDS = frozenset({
     "These", "Those", "They", "We", "But", "And", "Or", "For", "From",
     "With", "When", "Where", "While", "After", "Before", "Tonight",
     "Scientists", "Researchers", "Astronomers", "Engineers", "Doctors",
+    # Calendar vocabulary is era-neutral factual date language, not an
+    # invented entity (first live smoke 2026-07-10: a legitimate read
+    # died on 'June').
+    "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December",
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+    "Sunday", "Spring", "Summer", "Autumn", "Fall", "Winter",
+    # Honorifics are titles, not entities (sixth live smoke 2026-07-10:
+    # a legitimate read died on 'Dr' before 'Raman', which WAS in the
+    # dossier). The surname beside them still faces the corpus check.
+    "Dr", "Doctor", "Mr", "Mrs", "Ms", "Miss", "Professor", "Prof",
+    "Sir", "Madam", "Captain", "Commander", "Colonel", "Lieutenant",
+    "Sergeant", "Reverend",
+    # Sentence-opening discourse words (kibitz r2 M2, 2026-07-10: the
+    # blanket sentence-initial skip was an INVENTION HOLE -- an invented
+    # source name at sentence start sailed through -- so every capital
+    # now faces the corpus and only genuinely generic words are exempt).
+    "However", "Meanwhile", "Across", "Together", "Still", "Yet",
+    "According", "Since", "Because", "Despite", "Beyond", "Inside",
+    "Outside", "Under", "Over", "Near", "Now", "Then", "Here", "There",
+    "Every", "Each", "Some", "Many", "Most", "More", "One", "Two",
+    "Three", "First", "Second", "Third", "Last", "Next", "New", "Old",
+    "Today", "Yesterday", "Tomorrow", "Earlier", "Later", "Recently",
+    "Soon", "Instruments", "Teams", "Officials",
 })
 
 
@@ -534,6 +639,55 @@ def _scan_lexicon(text: str, lexicon) -> "str | None":
 # SFW early gates on pitch/treatment prose (weapons/smoking only -- the
 # audit's other kill classes need the performed script to exist).
 _EARLY_SFW_LEXICON = WEAPON_SMOKING_EVIDENCE
+
+
+# Spelled-number equivalence (16th live smoke 2026-07-10: the story said
+# "seven days" / "Eighth day"; the dossier correctly extracted 7 and 8 as
+# digits and the verbatim gate killed a faithful extraction).
+_ONES = ("zero", "one", "two", "three", "four", "five", "six", "seven",
+         "eight", "nine", "ten", "eleven", "twelve", "thirteen",
+         "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+         "nineteen")
+_TENS = {20: "twenty", 30: "thirty", 40: "forty", 50: "fifty",
+         60: "sixty", 70: "seventy", 80: "eighty", 90: "ninety"}
+_ORDINALS = ("zeroth", "first", "second", "third", "fourth", "fifth",
+             "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh",
+             "twelfth", "thirteenth", "fourteenth", "fifteenth",
+             "sixteenth", "seventeenth", "eighteenth", "nineteenth")
+
+# Title tokens stripped from cast-name LABELS (19th live smoke).
+_HONORIFIC_TOKENS = frozenset({
+    "DR", "DOCTOR", "MR", "MRS", "MS", "MISS", "PROF", "PROFESSOR",
+    "CAPTAIN", "CAPT", "COMMANDER", "CMDR", "COLONEL", "COL",
+    "LIEUTENANT", "LT", "SERGEANT", "SGT", "REVEREND", "REV", "SIR",
+    "MADAM", "MAJOR", "MAJ", "GENERAL", "GEN",
+})
+
+
+def _spelled_forms(tok: str) -> "tuple[str, ...]":
+    """Cardinal + ordinal word forms for a small integer token (0-100),
+    hyphen and space compound variants included; () for anything else."""
+    if not tok.isdigit():
+        return ()
+    n = int(tok)
+    if n > 100:
+        return ()
+    forms: "list[str]" = []
+    if n < 20:
+        forms.append(_ONES[n])
+        forms.append(_ORDINALS[n])
+    elif n == 100:
+        forms += ["hundred", "one hundred", "hundredth"]
+    else:
+        tens, ones = (n // 10) * 10, n % 10
+        base = _TENS[tens]
+        if ones == 0:
+            forms += [base, base.rstrip("y") + "ieth"]
+        else:
+            forms += [f"{base}-{_ONES[ones]}", f"{base} {_ONES[ones]}",
+                      f"{base}-{_ORDINALS[ones]}",
+                      f"{base} {_ORDINALS[ones]}"]
+    return tuple(forms)
 
 
 # ---------------------------------------------------------------------------
@@ -657,19 +811,49 @@ def _deal_voice_menu(cast_size: int) -> VoiceMenu:
 # ---------------------------------------------------------------------------
 
 def _make_dossier_validator(digest: str):
-    """Copy-never-invent gate: every entity and allowed number must appear
-    in the capped source digest."""
-    hay = _norm_ws(digest).casefold()
+    """Copy-never-invent gate: every allowed number must appear verbatim
+    in the capped source digest; every named entity's CONTENT TOKENS must
+    all appear there (word-boundary). Token-level for entities because a
+    faithful extraction may reorder a phrase -- the second S1b live smoke
+    (2026-07-10) killed a grounded dossier over "Amsterdam's canals" vs
+    the story's "the canals of Amsterdam". Typographic apostrophes are
+    normalized; possessive 's is stripped before the token check."""
+    hay = _norm_ws(digest).casefold().replace("’", "'")
 
     def _check(m: DossierLLM) -> "str | None":
         for num in m.allowed_numbers:
-            if _norm_ws(num).casefold() not in hay:
-                return f"allowed_number {num!r} not present in the story text"
+            norm = _norm_ws(num).casefold().replace("’", "'")
+            if norm in hay:
+                continue
+            # spelled-number equivalence: "seven days" in the story
+            # legalizes the extracted digit 7 (16th live smoke)
+            if any(_word_re(f).search(hay)
+                   for f in _spelled_forms(norm.rstrip(".,"))):
+                continue
+            return f"allowed_number {num!r} not present in the story text"
         ents = (m.named_entities.people + m.named_entities.places
                 + m.named_entities.things)
+        hay_words = {w.strip(".,;:!?'\"()") for w in hay.split()}
         for ent in ents:
-            if _norm_ws(ent).casefold() not in hay:
-                return f"named entity {ent!r} not present in the story text"
+            for tok in _norm_ws(ent).replace("’", "'").split():
+                tok = tok.strip(".,;:!?'\"()").casefold()
+                if tok.endswith("'s"):
+                    tok = tok[:-2]
+                if len(tok) <= 2:
+                    continue
+                if _word_re(tok).search(hay):
+                    continue
+                # Demonym/inflection tolerance (24th live smoke
+                # 2026-07-10: the story said 'Scottish', the faithful
+                # extraction said 'Scotland'): a shared prefix of >= 4
+                # chars with any source word is the same referent, not
+                # an invention. The READ gate stays word-boundary strict
+                # against its own corpus.
+                if any(len(tok) >= 4 and w[:4] == tok[:4]
+                       for w in hay_words if len(w) >= 4):
+                    continue
+                return (f"named entity {ent!r} not present in the "
+                        f"story text (token {tok!r} missing)")
         return None
 
     return _check
@@ -713,43 +897,31 @@ def _make_pitch_validator(cards, mode: str, n_max: int):
 
 
 def _make_treatment_validator(dossier: DossierLLM, n_max: int,
-                              provenance: "dict[str, str]"):
-    """Grounding gates: cast ceiling, news_thread grounded in the dossier,
-    news_close_read subset laws (r4/S2, subset direction explicit), SFW."""
+                              provenance: "dict[str, str]",
+                              digest: str = ""):
+    """Grounding gates for P2b: cast ceiling, news_thread grounded in the
+    dossier, SFW. The factual-read subset laws moved to
+    ``_make_read_validator`` with the P2c read-split (S1b, 2026-07-10)."""
     ents = (dossier.named_entities.people + dossier.named_entities.places
             + dossier.named_entities.things)
-    ent_corpus = _norm_ws(
-        " ".join(ents + list(provenance.values()))).casefold()
     dossier_corpus = _norm_ws(" ".join(
         dossier.facts_to_keep + dossier.dramatizable_vectors + ents
         + dossier.allowed_numbers)).casefold()
 
     def _check(m: Treatment) -> "str | None":
+        # kibitz r2 S3: ACCUMULATE every content failure so the single
+        # typed-repair attempt sees the whole target.
+        errs: "list[str]" = []
         if len(m.cast_shapes) > n_max:
-            return f"cast_shapes {len(m.cast_shapes)} > N_MAX {n_max}"
+            errs.append(f"cast_shapes {len(m.cast_shapes)} > N_MAX {n_max}")
         thread_tokens = [
             t.strip(".,;:!?'\"()").casefold()
             for t in m.news_thread.split() if len(t) > 3
         ]
         if not any(t and t in dossier_corpus for t in thread_tokens):
-            return ("news_thread shares no content noun with the dossier "
-                    "-- it must extrapolate the real science")
-        for tok in _RE_NUMERAL.findall(m.news_close_read):
-            tok = tok.rstrip(".,")
-            if not any(tok in num for num in dossier.allowed_numbers):
-                return (f"news_close_read numeral {tok!r} not in "
-                        f"allowed_numbers {dossier.allowed_numbers}")
-        for match in _RE_PROPER.finditer(m.news_close_read):
-            word = match.group(0)
-            if word in _PROPER_STOPWORDS:
-                continue
-            start = match.start()
-            head = m.news_close_read[:start].rstrip()
-            if not head or head[-1] in ".!?":
-                continue  # sentence-initial capital, not a proper noun
-            if word.casefold() not in ent_corpus:
-                return (f"news_close_read proper noun {word!r} not in the "
-                        f"dossier entities or provenance")
+            errs.append(
+                "news_thread shares no content noun with the dossier "
+                "-- it must extrapolate the real science")
         hit = _scan_lexicon(
             " ".join([m.title, m.setting, m.turn,
                       m.priced_ending.get("choice", ""),
@@ -758,7 +930,87 @@ def _make_treatment_validator(dossier: DossierLLM, n_max: int,
                         for c in m.cast_shapes]),
             _EARLY_SFW_LEXICON)
         if hit:
-            return f"treatment carries forbidden term {hit!r} (SFW)"
+            errs.append(f"treatment carries forbidden term {hit!r} (SFW)")
+        if errs:
+            return "; ".join(errs[:6])
+        return None
+
+    return _check
+
+
+def _make_read_validator(dossier: DossierLLM,
+                         provenance: "dict[str, str]",
+                         digest: str,
+                         cast_names: "list[str]"):
+    """P2c factual-read subset laws (r4/S2 anti-invention direction).
+
+    LEGALITY AUTHORITY = THE SOURCE (S1b live-smoke hardening 2026-07-10,
+    rolls 1/6/7/8): the noun + numeral corpora are the WHOLE dossier +
+    the python-stamped provenance + the python-capped SOURCE DIGEST.
+    Nothing outside the source can pass; invented numerals and names die
+    here. Word-boundary matching (never substring); numerals token-exact
+    (kibitz r2 M3); NO sentence-initial skip (kibitz r2 M2 -- it was an
+    invention hole); possessives are grammar; the drama's characters are
+    hard-banned CASE-SENSITIVELY (a cast named HOPE must not outlaw the
+    word 'hope'). All failures accumulate into ONE teaching message."""
+    ents = (dossier.named_entities.people + dossier.named_entities.places
+            + dossier.named_entities.things)
+    noun_corpus = _norm_ws(" ".join(
+        dossier.facts_to_keep + dossier.dramatizable_vectors + ents
+        + list(provenance.values()) + [str(digest)]))
+    legal_numerals = {
+        t.rstrip(".,")
+        for src in (list(dossier.allowed_numbers) + [str(digest)])
+        for t in _RE_NUMERAL.findall(src)
+    }
+    source_hay = _norm_ws(
+        " ".join(dossier.facts_to_keep + [str(digest)])).casefold()
+
+    def _check(m: NewsCloseRead) -> "str | None":
+        errs: "list[str]" = []
+        text = m.news_close_read
+        for name in cast_names:
+            # SOURCE LEGALITY BEATS THE FICTIONAL BAN (14th live smoke
+            # 2026-07-10: the drama named its character after the REAL
+            # person in the story -- 'JIM' for NASA's Jim Ross -- and the
+            # ban outlawed factual reporting of the real name).
+            if _word_re(name).search(noun_corpus):
+                continue
+            name_re = re.compile(
+                r"\b(?:" + re.escape(name) + r"|"
+                + re.escape(name.title()) + r")\b")
+            if name_re.search(text):
+                errs.append(
+                    f"the read names the fictional character {name!r} -- "
+                    f"this is REAL NEWS about the source story: use only "
+                    f"real names from the source, never the drama's "
+                    f"characters")
+        for tok in _RE_NUMERAL.findall(text):
+            tok = tok.rstrip(".,")
+            if tok in legal_numerals:
+                continue
+            # spelled-number equivalence, same as the dossier gate (23rd
+            # live smoke 2026-07-10: the story spelled 'twenty')
+            if any(_word_re(f).search(source_hay)
+                   for f in _spelled_forms(tok)):
+                continue
+            errs.append(
+                f"numeral {tok!r} not in allowed_numbers "
+                f"{dossier.allowed_numbers} or the source text -- "
+                f"never compute or invent a number")
+        for match in _RE_PROPER.finditer(text):
+            word = match.group(0)
+            if word.endswith("'s"):
+                word = word[:-2]
+            if word in _PROPER_STOPWORDS:
+                continue
+            if not _word_re(word).search(noun_corpus):
+                errs.append(
+                    f"proper noun {word!r} not in the dossier or "
+                    f"provenance -- use only real names from the source "
+                    f"story")
+        if errs:
+            return "; ".join(errs[:6])
         return None
 
     return _check
@@ -811,7 +1063,6 @@ def _build_digest(payload: "dict[str, Any]") -> str:
 
 
 def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
-    fn, box = _counting(technical_fn)
     try:
         # LLM slot: technical -- P0 dossier (structured JSON extraction).
         return structured_call(
@@ -821,7 +1072,7 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
                 {"role": "user", "content": f"SCIENCE STORY:\n{digest}"},
             ],
             schema=DossierLLM,
-            slot_fn=fn,
+            slot_fn=technical_fn,
             base_temperature=_TEMP["dossier"],
             structural_retry_temperature=_TEMP["dossier"] / 2.0,
             repair_prompt_factory=make_dispatching_repair_factory(),
@@ -836,7 +1087,6 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
 
 def _pass_pitch(creative_fn, pack, dossier: DossierLLM, cards, stance,
                 *, n_max: int, mode: str) -> PitchSlate:
-    fn, box = _counting(creative_fn)
     count = 1 if mode == "one_pitch" else 3
     cards_text = "\n".join(
         f"CARD {i + 1}: {c['name']} -- {c['shape']}"
@@ -859,7 +1109,7 @@ def _pass_pitch(creative_fn, pack, dossier: DossierLLM, cards, stance,
                 {"role": "user", "content": user},
             ],
             schema=PitchSlate,
-            slot_fn=fn,
+            slot_fn=creative_fn,
             base_temperature=_TEMP["pitch_room"],
             structural_retry_temperature=round(_TEMP["pitch_room"] / 2, 2),
             repair_prompt_factory=make_dispatching_repair_factory(),
@@ -874,8 +1124,8 @@ def _pass_pitch(creative_fn, pack, dossier: DossierLLM, cards, stance,
 
 def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
                     stance, *, n_max: int,
-                    provenance: "dict[str, str]") -> Treatment:
-    fn, box = _counting(creative_fn)
+                    provenance: "dict[str, str]",
+                    digest: str = "") -> Treatment:
     user = (
         f"SOURCE DOSSIER:\n"
         f"{json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)}\n\n"
@@ -894,18 +1144,68 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
                 {"role": "user", "content": user},
             ],
             schema=Treatment,
-            slot_fn=fn,
+            slot_fn=creative_fn,
             base_temperature=_TEMP["treatment"],
             structural_retry_temperature=_TEMP["treatment"] / 2.0,
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_treatment_validator(
-                dossier, n_max, provenance),
+                dossier, n_max, provenance, digest),
             max_new_tokens=_MAX_NEW_TOKENS["treatment"],
             helper_name="fable2_treatment",
         )
     except StructuredCallFailedError as exc:
         raise Fable2TreatmentError(
             "treatment", str(exc.last_error), exc.attempts) from exc
+
+
+def _pass_news_read(technical_fn, pack, dossier: DossierLLM,
+                    provenance: "dict[str, str]", digest: str,
+                    cast_names: "list[str]") -> NewsCloseRead:
+    """P2c (read-split, S1b 2026-07-10): the factual close gets its own
+    single-purpose low-temp technical pass -- 7 of the first 13 live
+    rolls died when one combined P2b call had to satisfy the whole
+    treatment AND a subset-law-compliant read."""
+    user = (
+        f"SOURCE DOSSIER:\n"
+        f"{json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)}\n\n"
+        f"PROVENANCE: {json.dumps(provenance, ensure_ascii=False)}\n\n"
+        # kibitz r3 M1: the validator authorizes source-digest facts, so
+        # the model must SEE the digest it may quote from.
+        f"SOURCE STORY TEXT (you may use its names and numbers "
+        f"verbatim):\n{digest}\n\n"
+        f"FORBIDDEN NAMES (the drama's fictional characters -- never use "
+        f"them here): {', '.join(cast_names) or '(none)'}\n\n"
+        f"Write the closing news read now."
+    )
+    try:
+        # LLM slot: technical -- P2c factual close (read-split).
+        return structured_call(
+            prompt=[
+                {"role": "system",
+                 "content": _seam(pack, "fable2_news_read_system")},
+                {"role": "user", "content": user},
+            ],
+            schema=NewsCloseRead,
+            slot_fn=technical_fn,
+            base_temperature=0.20,
+            structural_retry_temperature=0.10,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            post_validator=_make_read_validator(
+                dossier, provenance, digest, cast_names),
+            max_new_tokens=300,
+            helper_name="fable2_news_read",
+        )
+    except StructuredCallFailedError as exc:
+        raise Fable2TreatmentError(
+            "news_read", str(exc.last_error), exc.attempts) from exc
+
+
+def _micro_episode_line_cap(target_words: int) -> int:
+    """Tiny-budget structural cap: dialogue LINES, not word arithmetic
+    (20th live smoke 2026-07-10: the model wrote 107 character words for
+    target 30 through every numeric hint -- small models follow concrete
+    line counts, not word counts)."""
+    return max(4, int(target_words) // 7)
 
 
 def _script_user_prompt(treatment: Treatment, digest: str,
@@ -915,6 +1215,15 @@ def _script_user_prompt(treatment: Treatment, digest: str,
         f"- {c.name} ({c.role}): wants {c.want}; pressure {c.pressure}; "
         f"register: {c.register}"
         for c in treatment.cast_shapes)
+    micro = ""
+    if envelope.total_words < 60:
+        cap = _micro_episode_line_cap(envelope.total_words)
+        micro = (
+            f" MICRO-EPISODE (hard): this is under a minute of air -- "
+            f"write AT MOST {cap} character dialogue lines TOTAL across "
+            f"all scenes, each line under 10 words; every line must "
+            f"carry the whole turn."
+        )
     return (
         f"TREATMENT:\n"
         f"{json.dumps(treatment.model_dump(), ensure_ascii=False, indent=2)}"
@@ -925,9 +1234,35 @@ def _script_user_prompt(treatment: Treatment, digest: str,
         f"{envelope.per_scene_words} character-dialogue words per scene "
         f"(plus or minus 30%); total CHARACTER dialogue target "
         f"{envelope.total_words} words (announcer lines are metered "
-        f"separately and stay lean: 1-2 intro lines, 1-2 outro lines).\n\n"
+        f"separately and stay lean: 1-2 intro lines, 1-2 outro lines)."
+        f"{micro}\n\n"
+        # Recency anchor (first S1b live smokes, 2026-07-10): the local
+        # 12B model reverts to screenplay habits unless the LAST thing it
+        # reads re-states the format law.
+        f"FORMAT REMINDER (hard): every line is exactly LABEL: spoken "
+        f"words. PLAIN TEXT ONLY -- no markdown, no asterisks. NO "
+        f"parentheses or performance notes anywhere: never (pauses), "
+        f"never (raspy), never (over radio); delivery lives in the words "
+        f"themselves. The ANNOUNCER speaks ONLY in the intro and the "
+        f"outro -- never inside or between scenes (a MUSIC line may sit "
+        f"between scenes instead). End with ANNOUNCER outro -> CODA -> "
+        f"MUSIC (closing) -> END.\n\n"
         f"Write the complete episode now."
     )
+
+
+def _extract_format_example(seam_text: str) -> str:
+    """Pull the seam's FORMAT example play (TITLE: The Long Count .. END.)
+    for the few-shot assistant turn. The seam remains the single source
+    of truth; extraction failing = the pack drifted = fail loud."""
+    start = seam_text.find("TITLE: The Long Count")
+    end = seam_text.find("\nEND.", start)
+    if start < 0 or end < 0:
+        raise Fable2ScriptError(
+            "script",
+            "fable2_script_system seam lost its FORMAT example play -- "
+            "the few-shot anchor cannot be built")
+    return seam_text[start:end + len("\nEND.")]
 
 
 def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
@@ -936,13 +1271,20 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
     """P3: whole-play markup with the markup ladder (defect-quoting
     reroll at falling temperature), the truncation retry (+25% tokens,
     ONCE, on MISSING_END), and the budget gate reroll (max 2, numeric
-    hint). Python never repairs a word -- defective drafts reroll."""
+    hint). Python never repairs a word -- defective drafts reroll.
+
+    Few-shot anchor (live-smoke hardening 2026-07-10): the local 12B
+    model kept decorating labels (**bold**) and injecting parenthetical
+    delivery tags through EVERY prompt-side ban, but small models
+    faithfully imitate their OWN prior turns -- so the seam's FORMAT
+    example play rides in an ASSISTANT message before the real request
+    (system/user/assistant/user keeps the template's role alternation)."""
     system = _seam(pack, "fable2_script_system")
+    example = _extract_format_example(system)
     base_user = _script_user_prompt(treatment, digest, envelope, cast_names)
     temps = _MARKUP_LADDER_TEMPS(_TEMP["script"])
     tokens = _script_token_budget(envelope.total_words)
-    lo = envelope.total_words * (1.0 - _TOTAL_WORD_BAND)
-    hi = envelope.total_words * (1.0 + _TOTAL_WORD_BAND)
+    lo, hi = _word_band(envelope.total_words)
 
     defects_by_attempt: "list[list[str]]" = []
     budget_rerolls = 0
@@ -954,12 +1296,21 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
     for temp in temps:
         while True:
             attempts += 1
+            # Strict role alternation: local chat templates (Mistral-Nemo
+            # jinja) raise TemplateError on consecutive same-role messages
+            # (caught by the first S1b live smoke). Reroll text is folded
+            # INTO the final user message; the few-shot example play rides
+            # an assistant turn.
+            user_content = (
+                f"{base_user}\n\n{extra_user}" if extra_user else base_user)
             msgs = [
                 {"role": "system", "content": system},
-                {"role": "user", "content": base_user},
+                {"role": "user", "content": (
+                    "Before the real assignment: show the exact output "
+                    "FORMAT once, as a tiny example episode.")},
+                {"role": "assistant", "content": example},
+                {"role": "user", "content": user_content},
             ]
-            if extra_user:
-                msgs.append({"role": "user", "content": extra_user})
             # LLM slot: creative -- P3 whole-play markup (CREATIVE 2;
             # raw text, not structured_call: the markup ladder above is
             # this pass's own retry law).
@@ -985,7 +1336,12 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
                 extra_user = (
                     "Your previous draft violated the FORMAT. Fix EVERY "
                     "defect below and output the COMPLETE episode again "
-                    "(top to bottom, TITLE: first, END. last):\n"
+                    "(top to bottom, TITLE: first, END. last). PLAIN TEXT "
+                    "ONLY: never asterisks, never markdown, never bold "
+                    "labels, no parenthetical stage directions. The "
+                    "REQUIRED SKELETON, in order: TITLE -> MUSIC (opening) "
+                    "-> ANNOUNCER intro -> SCENE 1..N -> ANNOUNCER outro "
+                    "-> CODA -> MUSIC (closing) -> END.\n"
                     f"{rendered}"
                 )
                 break  # next rung: same prompt at LOWER temperature
@@ -1004,12 +1360,19 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
                 verb = ("EXPAND the dialogue"
                         if parsed.character_word_count < lo
                         else "TIGHTEN the dialogue")
+                structural = ""
+                if (parsed.character_word_count > hi
+                        and envelope.total_words < 60):
+                    cap = _micro_episode_line_cap(envelope.total_words)
+                    structural = (
+                        f" Cut LINES, not words: at most {cap} character "
+                        f"dialogue lines total, each under 10 words.")
                 extra_user = (
                     f"Your draft's CHARACTER dialogue totals "
                     f"{parsed.character_word_count} words; the target is "
                     f"{envelope.total_words} (acceptable {int(lo)} to "
                     f"{int(hi)}). {verb} to hit the target and output the "
-                    f"COMPLETE episode again."
+                    f"COMPLETE episode again.{structural}"
                 )
                 continue  # same rung, numeric hint
             return raw, parsed, {
@@ -1039,7 +1402,6 @@ def _pass_casting(slot_fn, pack, parsed: ParsedScript, treatment: Treatment,
                   menu: VoiceMenu) -> CastingVoices:
     """P6 (registry slot: technical; temp 0.40): voices + portraits ONLY --
     register authority stays with the treatment (r1/A3)."""
-    fn, box = _counting(slot_fn)
     speakers = _speakers_in_order(parsed)
     script_view = _script_view(parsed, treatment, include_news_read=False)
     shapes = json.dumps(
@@ -1063,7 +1425,7 @@ def _pass_casting(slot_fn, pack, parsed: ParsedScript, treatment: Treatment,
                 {"role": "user", "content": user},
             ],
             schema=CastingVoices,
-            slot_fn=fn,
+            slot_fn=slot_fn,
             base_temperature=_TEMP["casting_voices"],
             structural_retry_temperature=_TEMP["casting_voices"] / 2.0,
             repair_prompt_factory=make_dispatching_repair_factory(),
@@ -1180,8 +1542,7 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
             and parsed.scenes):
         raise Fable2AssembleError("assemble", "skeleton incomplete")
     # Gate (d): CHARACTER words within the band (post-P3-gate re-assert).
-    lo = target_words * (1.0 - _TOTAL_WORD_BAND)
-    hi = target_words * (1.0 + _TOTAL_WORD_BAND)
+    lo, hi = _word_band(target_words)
     if not (lo <= parsed.character_word_count <= hi):
         raise Fable2AssembleError(
             "assemble",
@@ -1205,11 +1566,12 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
     music_rows: "list[dict]" = []
     proof_map: "list[dict]" = []
 
-    def _music_sentinel(shot_id: str, role: str) -> dict:
+    def _music_sentinel(shot_id: str, role: str, seq: int = 0) -> dict:
         # Exact sentinel row shape (r2/M5 + r3/M1): text "", char_id ==
         # speaker_role == the role string, NO line-level cue_id (music[]
-        # is the cue authority).
-        lid = f"{shot_id}_music"
+        # is the cue authority). `seq` disambiguates MULTIPLE inter cues
+        # after one scene (kibitz r2 M4); the first keeps the stable id.
+        lid = f"{shot_id}_music" if seq == 0 else f"{shot_id}_music_{seq + 1}"
         return {
             "line_id": lid, "beat_id": lid, "shot_id": shot_id,
             "char_id": role, "speaker_role": role, "boundary": None,
@@ -1258,7 +1620,11 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
     led.save()
 
     # --- scenes -------------------------------------------------------
-    inter_by_scene = {n: cue for n, cue in parsed.music_inter}
+    # kibitz r2 M4 (2026-07-10): a dict keyed on the scene silently
+    # dropped every inter cue after the first; keep them ALL, in order.
+    inter_by_scene: "dict[int, list[str]]" = {}
+    for n, cue in parsed.music_inter:
+        inter_by_scene.setdefault(n, []).append(cue)
     inter_seq = 0
     for scene in parsed.scenes:
         scene_id = f"s{scene.n:02d}"
@@ -1286,18 +1652,25 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
                 texts, "winning_draft", draft_norm)
             line_rows.append(row)
             _beat(row, scene_id, speaker)
-        if scene.n in inter_by_scene:
+        for k, cue in enumerate(inter_by_scene.get(scene.n, [])):
             inter_seq += 1
-            line_rows.append(_music_sentinel(shot_id, "music_inter"))
+            line_rows.append(_music_sentinel(shot_id, "music_inter", k))
             music_rows.append({
                 "cue_id": f"inter_{inter_seq:02d}",
-                "description": inter_by_scene[scene.n],
-                "generation_prompt": inter_by_scene[scene.n],
+                "description": cue,
+                "generation_prompt": cue,
             })
         led.set_lines(line_rows)
         led.save()
 
-    # --- postamble: final shot (fixture-truth announcer char_id "c01") --
+    # --- postamble: final shot. ALL fable2 announcer rows carry the
+    # SENTINEL char_id "announcer" (22nd live smoke 2026-07-10: a
+    # cast-keyed downstream mutator in the freeze cascade flipped a c01
+    # postamble row to character+skip with no breadcrumb -> Phase 10
+    # critical gap. The sentinel id is exempt from every cast-keyed
+    # code path by design; the announcer TTS bus keys on speaker_role.
+    # The legacy fixture's c01 postamble was a legacy-lane quirk fable2
+    # does not copy.) --------------------------------------------------
     post_shot = f"shot_{parsed.scenes[-1].n + 1:03d}"
     shot_rows.append({
         "shot_id": post_shot, "scene_id": None, "description": "postamble",
@@ -1306,7 +1679,7 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
     for text in parsed.announcer_outro:
         k += 1
         row = _spoken_row(
-            f"{post_shot}_b{k}", post_shot, "c01", "announcer", text,
+            f"{post_shot}_b{k}", post_shot, "announcer", "announcer", text,
             "shot_start" if k == 1 else "beat_start",
             [text], "winning_draft", draft_norm)
         line_rows.append(row)
@@ -1314,8 +1687,9 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
     # CODA bridge row (announcer-spoken pivot, from the draft).
     k += 1
     row = _spoken_row(
-        f"{post_shot}_b{k}", post_shot, "c01", "announcer", parsed.coda,
-        "beat_start", [parsed.coda], "winning_draft", draft_norm)
+        f"{post_shot}_b{k}", post_shot, "announcer", "announcer",
+        parsed.coda, "beat_start", [parsed.coda], "winning_draft",
+        draft_norm)
     line_rows.append(row)
     _beat(row, None, ANNOUNCER_NAME)
     # News-read row: LLM-authored (treatment.news_close_read),
@@ -1324,7 +1698,7 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
     # append by construction (doc s14 item 7).
     k += 1
     row = _spoken_row(
-        f"{post_shot}_b{k}", post_shot, "c01", "announcer",
+        f"{post_shot}_b{k}", post_shot, "announcer", "announcer",
         treatment.news_close_read, "beat_start",
         [treatment.news_close_read], "treatment.news_close_read",
         news_read_norm)
@@ -1374,7 +1748,6 @@ def _script_view(parsed: ParsedScript, treatment: Treatment,
 
 def _pass_audit(technical_fn, pack, view: str,
                 treatment: Treatment) -> AuditFindings:
-    fn, box = _counting(technical_fn)
     user = (
         f"ASSEMBLED EPISODE:\n{view}\n\n"
         f"TREATMENT:\n"
@@ -1390,7 +1763,7 @@ def _pass_audit(technical_fn, pack, view: str,
                 {"role": "user", "content": user},
             ],
             schema=AuditFindings,
-            slot_fn=fn,
+            slot_fn=technical_fn,
             base_temperature=_TEMP["ledger_audit"],
             structural_retry_temperature=_TEMP["ledger_audit"] / 2.0,
             repair_prompt_factory=make_dispatching_repair_factory(),
@@ -1543,6 +1916,12 @@ def run_scifi_fable2_episode(
 
     seed = _resolve_seed()
     rng = random.Random(seed)
+    # Credits receipt (25th live smoke 2026-07-10: OTR_CreditsRoll
+    # requires meta.cast_contract.cast_seed OR meta.episode_seed; the
+    # legacy cast-lock stamps the former, fable2 has no cast lock). The
+    # fable2 seed GOVERNS the deal + the voice draw -- it IS this
+    # episode's seed receipt.
+    meta["episode_seed"] = seed
 
     receipts: "list[dict]" = []
 
@@ -1610,11 +1989,22 @@ def run_scifi_fable2_episode(
     with _helper_ctx(slot_scheduler, "fable2_treatment"):
         treatment = _pass_treatment(
             counting_cre2, pack, dossier, pitch, stance,
-            n_max=n_max, provenance=provenance)
+            n_max=n_max, provenance=provenance, digest=digest)
     _receipt("treatment", creative_model, cre2_box["calls"],
              _TEMP["treatment"], _MAX_NEW_TOKENS["treatment"])
     cast_names = [c.name for c in treatment.cast_shapes]
     meta["num_characters_locked"] = len(cast_names)
+
+    # --- P2c: factual close (read-split; S1b deviation, kibitz r2 Q1) ----
+    counting_tech_read, tech_read_box = _counting(technical_fn)
+    with _helper_ctx(slot_scheduler, "fable2_news_read"):
+        read = _pass_news_read(
+            counting_tech_read, pack, dossier, provenance, digest,
+            cast_names)
+    _receipt("news_read", technical_model, tech_read_box["calls"],
+             0.20, 300)
+    treatment = treatment.model_copy(
+        update={"news_close_read": read.news_close_read})
     f2["treatment"] = treatment.model_dump()
 
     # --- P3: script (markup ladder) ---------------------------------------
@@ -1632,7 +2022,16 @@ def run_scifi_fable2_episode(
     f2["parse"] = {
         "defects_by_attempt": parse_meta["defects_by_attempt"],
         "rerolls": parse_meta["rerolls"],
+        "normalizations": list(parsed.normalizations),
     }
+    if parsed.normalizations:
+        log.warning(
+            "[scifi_fable2] parser stripped %d decoration(s) from the "
+            "winning draft (delete-only; stamped at "
+            "meta.fable2.parse.normalizations for the operator eyeball): %s",
+            len(parsed.normalizations),
+            "; ".join(parsed.normalizations[:12]),
+        )
 
     # --- P6: casting/voices ------------------------------------------------
     menu = _deal_voice_menu(len(cast_names))
@@ -1651,7 +2050,10 @@ def run_scifi_fable2_episode(
     f2["casting"] = [c.model_dump() for c in casting.cast]
 
     # --- P7: assembly (pure python; proof gates; incremental saves) --------
-    f2["_winning_draft_text"] = draft_text
+    # The proof artifact is the SAME-normalized draft (delete-only strip;
+    # every word LLM-authored) so constituent spans and parsed text share
+    # one normalization. draft1_sha256 above hashes the RAW draft.
+    f2["_winning_draft_text"] = normalize_fable2_markup_text(draft_text)
     _assemble(led, parsed, treatment, cast_rows, payload, meta,
               target_words=target)
     _receipt("assemble", "python", 0, 0.0, 0)

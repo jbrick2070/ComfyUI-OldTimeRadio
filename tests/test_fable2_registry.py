@@ -25,7 +25,8 @@ _PACK_DIR = _REPO / "nodes" / "story_packs" / "scifi_fable2"
 
 _FABLE2_SEAMS = frozenset({
     "fable2_dossier_system", "fable2_pitch_system", "fable2_select_system",
-    "fable2_treatment_system", "fable2_script_system", "fable2_critic_system",
+    "fable2_treatment_system", "fable2_news_read_system",
+    "fable2_script_system", "fable2_critic_system",
     "fable2_revision_system", "fable2_casting_system", "fable2_audit_system",
 })
 
@@ -105,6 +106,7 @@ class TestPipelineRow:
             ("pitch_room", "creative"),
             ("pitch_select", "technical"),
             ("treatment", "creative"),
+            ("news_read", "technical"),   # P2c, S1b read-split
             ("script", "creative"),
             ("critic", "technical"),
             ("revision", "creative"),

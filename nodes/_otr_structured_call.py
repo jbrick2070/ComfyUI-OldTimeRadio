@@ -420,33 +420,57 @@ def _parse_and_validate(
 def _clamp_overlong_strings(
     data: object, ve: "ValidationError"
 ) -> Optional[tuple[dict, list[str]]]:
-    """Given a ValidationError, clamp every top-level ``string_too_long`` field
-    in ``data`` to the ``max_length`` carried in that error's ``ctx`` (pydantic
-    supplies it), trimming at a word boundary where possible. Returns
-    ``(repaired_dict, clamped_field_names)`` or ``None`` when nothing is
-    clampable (so the caller re-raises the original error untouched)."""
+    """Given a ValidationError, clamp every ``string_too_long`` field in
+    ``data`` -- at ANY depth the error's ``loc`` path reaches (nested
+    models / list items included; the scifi_fable2 S1b live smoke
+    2026-07-10 overflowed ``pitches.0.hook`` and the old top-level-only
+    clamp skipped it) -- to the ``max_length`` carried in that error's
+    ``ctx`` (pydantic supplies it), trimming at a word boundary where
+    possible. Returns ``(repaired_dict, clamped_field_paths)`` or
+    ``None`` when nothing is clampable (so the caller re-raises the
+    original error untouched)."""
     if not isinstance(data, dict):
         return None
-    out = dict(data)
+    import copy
+    out = copy.deepcopy(data)
     clamped: list[str] = []
     for err in ve.errors():
         if err.get("type") != "string_too_long":
             continue
         loc = err.get("loc") or ()
-        if len(loc) != 1:  # top-level scalar fields only (covers the known cases)
-            continue
-        key = loc[0]
         max_len = (err.get("ctx") or {}).get("max_length")
-        val = out.get(key)
-        if not isinstance(max_len, int) or not isinstance(val, str):
+        if not loc or not isinstance(max_len, int):
             continue
-        if len(val) <= max_len:
+        # Walk the loc path to the leaf's parent container.
+        node: object = out
+        reachable = True
+        for key in loc[:-1]:
+            if isinstance(node, dict) and key in node:
+                node = node[key]
+            elif (isinstance(node, list) and isinstance(key, int)
+                    and 0 <= key < len(node)):
+                node = node[key]
+            else:
+                reachable = False
+                break
+        if not reachable:
+            continue
+        leaf = loc[-1]
+        if isinstance(node, dict) and leaf in node:
+            val = node[leaf]
+        elif (isinstance(node, list) and isinstance(leaf, int)
+                and 0 <= leaf < len(node)):
+            val = node[leaf]
+        else:
+            continue
+        if not isinstance(val, str) or len(val) <= max_len:
             continue
         cut = val[:max_len].rstrip()
         if " " in cut:  # prefer a clean word boundary over a mid-word chop
             cut = cut.rsplit(" ", 1)[0].rstrip()
-        out[key] = cut or val[:max_len]
-        clamped.append(str(key))
+        new_val = cut or val[:max_len]
+        node[leaf] = new_val  # type: ignore[index]
+        clamped.append(".".join(str(k) for k in loc))
     return (out, clamped) if clamped else None
 
 

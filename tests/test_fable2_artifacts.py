@@ -117,9 +117,32 @@ class TestModels:
         with pytest.raises(ValidationError):
             _dossier(dramatizable_vectors=["only one vector here, sadly"])
 
-    def test_cast_shape_name_all_caps(self):
-        with pytest.raises(ValidationError, match="ALL CAPS"):
-            F2.CastShape(name="Vera", role="scientist",
+    def test_cast_shape_name_case_canonicalizes(self):
+        # Label normalization canonicalizes case (labels are uppercase
+        # by convention; the words stay the LLM's).
+        shape = F2.CastShape(name="Vera", role="scientist",
+                             want="to be believed today",
+                             pressure="the committee doubts",
+                             register="clipped and dry")
+        assert shape.name == "VERA"
+
+    def test_cast_shape_name_label_normalizes_to_one_word(self):
+        # 12th + 19th live smokes: the model titles its scientists
+        # reflexively; python strips the banned title tokens and keeps
+        # the surname (the LLM's own choice) -- deterministic label
+        # normalization, never a new character.
+        shape = F2.CastShape(name="DR. VERONICA VOSS", role="scientist",
+                             want="to be believed today",
+                             pressure="the committee doubts",
+                             register="clipped and dry")
+        assert shape.name == "VOSS"
+        shape2 = F2.CastShape(name="Professor Harris", role="mentor",
+                              want="to secure the funding",
+                              pressure="investors expect news",
+                              register="calm and measured")
+        assert shape2.name == "HARRIS"
+        with pytest.raises(ValidationError):
+            F2.CastShape(name="DR.", role="scientist",
                          want="to be believed today",
                          pressure="the committee doubts",
                          register="clipped and dry")
@@ -198,6 +221,48 @@ class TestDossierValidator:
             "people": ["Professor Nobody"], "places": [], "things": []})
         err = check(bad)
         assert err and "Professor Nobody" in err
+
+    def test_spelled_numbers_legalize_extracted_digits(self):
+        # 16th live smoke (2026-07-10): "seven days" / "Eighth day" in
+        # the story legalize the extracted digits 7 and 8.
+        check = F2._make_dossier_validator(
+            "The heat lasted seven days, the eighth day this year on "
+            "Mount Etna, Doctor Rossi said. 1,200. heat sensors.")
+        ok = _dossier(allowed_numbers=["7", "8", "1,200"])
+        assert check(ok) is None
+        bad = _dossier(allowed_numbers=["9"])
+        err = check(bad)
+        assert err and "'9'" in err
+
+    def test_demonym_inflection_is_legal(self):
+        # 24th live smoke (2026-07-10): 'Scottish' in the story vs the
+        # faithful extraction 'Scotland' -- same referent, not invention.
+        check = F2._make_dossier_validator(
+            "The Scottish government provides a support package for pig "
+            "farmers. Doctor Rossi. Mount Etna. 1,200. heat sensors.")
+        ok = _dossier(named_entities={
+            "people": ["Doctor Rossi"], "places": ["Scotland"],
+            "things": ["heat sensors"]})
+        assert check(ok) is None
+
+    def test_reordered_entity_phrase_is_legal(self):
+        # 2nd live smoke (2026-07-10): "Amsterdam's canals" vs the
+        # story's "the canals of Amsterdam" -- token-level presence, not
+        # contiguous-phrase substring.
+        check = F2._make_dossier_validator(
+            "Researchers steered the robots through the canals of "
+            "Amsterdam before any tremor. Doctor Rossi led the team. "
+            "Mount Etna. 1,200. heat sensors.")
+        ok = _dossier(named_entities={
+            "people": ["Doctor Rossi"],
+            "places": ["Amsterdam's canals", "Mount Etna"],
+            "things": ["heat sensors"]})
+        assert check(ok) is None
+        bad = _dossier(named_entities={
+            "people": ["Doctor Rossi"],
+            "places": ["Rotterdam harbor"], "things": []})
+        err = check(bad)
+        assert err and "Rotterdam" in (err or "")
 
 
 def _pitch_dict(pid: int, card: str, **over) -> dict:
@@ -315,6 +380,9 @@ class TestPitchValidator:
 
 
 class TestTreatmentValidator:
+    """P2b gates only -- the factual-read subset laws moved to
+    TestReadValidator with the S1b read-split (kibitz r2 Q1)."""
+
     def _check(self):
         return F2._make_treatment_validator(_dossier(), 4, _PROVENANCE)
 
@@ -330,25 +398,172 @@ class TestTreatmentValidator:
             news_thread="a haunted lighthouse keeps its own visitor log"))
         assert err and "news_thread" in err
 
-    def test_news_close_read_numeral_subset_law(self):
-        # r4/S2 subset direction: read numerals must appear in
-        # allowed_numbers. '1,200' passes (base); '7' fails.
-        err = self._check()(_treatment(news_close_read=(
-            "Tonight's story grew from a real survey: 7 teams mapped new "
-            "vents on Mount Etna this season, led by Doctor Rossi.")))
-        assert err and "'7'" in err
-
-    def test_news_close_read_proper_noun_subset_law(self):
-        err = self._check()(_treatment(news_close_read=(
-            "Tonight's story grew from a real survey: instruments in "
-            "Geneva mapped new vents this season, led by Doctor Rossi.")))
-        assert err and "Geneva" in err
-
     def test_sfw_gate(self):
         shapes = _treatment_dict()["cast_shapes"]
         shapes[0]["pressure"] = "the committee wants her cigarette case"
         err = self._check()(_treatment(cast_shapes=shapes))
         assert err and "cigarette" in err
+
+    def test_empty_news_close_read_is_legal_at_p2b(self):
+        # S1b read-split: P2b no longer writes the read.
+        assert self._check()(_treatment(news_close_read="")) is None
+
+
+def _read(text: str) -> F2.NewsCloseRead:
+    return F2.NewsCloseRead(news_close_read=text)
+
+
+class TestReadValidator:
+    """P2c factual-close subset laws (S1b read-split; every case below
+    is a live-smoke scar from 2026-07-10)."""
+
+    def _check(self, dossier=None, digest=_DIGEST, cast=("VERA", "DOKU")):
+        return F2._make_read_validator(
+            dossier or _dossier(), _PROVENANCE, digest, list(cast))
+
+    def test_grounded_read_passes(self):
+        assert self._check()(_read(
+            "Tonight's story grew from a real survey: instruments on "
+            "Mount Etna mapped 1,200 new vents this season, work led by "
+            "Doctor Rossi.")) is None
+
+    def test_numeral_subset_law(self):
+        # r4/S2 subset direction: '1,200' passes (base); '7' fails.
+        err = self._check()(_read(
+            "Tonight's story grew from a real survey: 7 teams mapped new "
+            "vents on Mount Etna this season, led by Doctor Rossi."))
+        assert err and "'7'" in err
+
+    def test_numeral_check_is_token_exact_never_substring(self):
+        # kibitz r2 M3: '20' must not ride inside '1,200' or a date.
+        err = self._check()(_read(
+            "Tonight's story grew from a real survey: 20 teams mapped "
+            "1,200 new vents on Mount Etna, work led by Doctor Rossi."))
+        assert err and "'20'" in err
+
+    def test_sentence_initial_invented_name_is_caught(self):
+        # kibitz r2 M2: the old sentence-initial skip was an invention
+        # hole -- 'Ganymede' at sentence start must die.
+        err = self._check()(_read(
+            "Tonight's story grew from a real survey. Ganymede teams "
+            "mapped 1,200 new vents on Mount Etna, work led by "
+            "Doctor Rossi."))
+        assert err and "Ganymede" in err
+
+    def test_validator_accumulates_all_errors(self):
+        # kibitz r2 S3: one repair attempt must see the WHOLE target.
+        err = self._check()(_read(
+            "Tonight's story grew from a real survey: 7 teams from "
+            "Geneva mapped new vents on Mount Etna, led by Doctor "
+            "Rossi."))
+        assert err and "'7'" in err and "Geneva" in err
+
+    def test_proper_noun_subset_law(self):
+        err = self._check()(_read(
+            "Tonight's story grew from a real survey: instruments in "
+            "Geneva mapped 1,200 new vents this season, led by Doctor "
+            "Rossi."))
+        assert err and "Geneva" in err
+
+    def test_honorifics_are_legal(self):
+        # 6th live smoke: 'Dr' is a title, not an entity.
+        assert self._check()(_read(
+            "Tonight's story grew from a real survey: instruments on "
+            "Mount Etna mapped 1,200 new vents this season, said "
+            "Dr. Rossi of the instrument team.")) is None
+
+    def test_never_names_the_fictional_cast(self):
+        # 9th live smoke: the read is REAL NEWS.
+        err = self._check()(_read(
+            "Tonight's story grew from a real survey: Vera watched "
+            "instruments on Mount Etna map 1,200 new vents this season, "
+            "work led by Doctor Rossi."))
+        assert err and "VERA" in err and "REAL NEWS" in err
+
+    def test_cast_name_gate_is_case_sensitive(self):
+        # 11th live smoke: a character named HOPE must not outlaw the
+        # common word 'hope'.
+        assert self._check(cast=("HOPE", "DOKU"))(_read(
+            "Tonight's story grew from a real survey: instruments on "
+            "Mount Etna mapped 1,200 new vents this season, and the "
+            "team's hope is a calmer year, said Doctor Rossi.")) is None
+        err = self._check(cast=("HOPE", "DOKU"))(_read(
+            "Tonight's story grew from a real survey: Hope watched "
+            "instruments on Mount Etna map 1,200 new vents this season, "
+            "work led by Doctor Rossi."))
+        assert err and "HOPE" in err
+
+    def test_cast_name_borrowed_from_the_real_source_stays_legal(self):
+        # 14th live smoke (2026-07-10): the drama named its character
+        # after the REAL person in the story ('JIM' for NASA's Jim
+        # Ross) -- factual reporting of a source name is never leakage.
+        assert self._check(cast=("ROSSI", "DOKU"))(_read(
+            "Tonight's story grew from a real survey: instruments on "
+            "Mount Etna mapped 1,200 new vents this season, work led by "
+            "Doctor Rossi.")) is None
+
+    def test_source_digest_widens_the_corpus(self):
+        # 8th live smoke: legality authority = the SOURCE.
+        check = self._check(
+            digest=_DIGEST + " The Catania observatory logged 88 tremors.")
+        assert check(_read(
+            "Tonight's story grew from a real survey: the Catania "
+            "observatory logged 88 tremors while instruments mapped "
+            "1,200 new vents on Mount Etna.")) is None
+        err = check(_read(
+            "Tonight's story grew from a real survey: the Catania "
+            "observatory logged 99 tremors while instruments mapped "
+            "1,200 new vents on Mount Etna."))
+        assert err and "'99'" in err
+
+    def test_spelled_source_numbers_legalize_read_digits(self):
+        # 23rd live smoke (2026-07-10): the story spelled 'twenty'; the
+        # read's digit 20 is the same fact.
+        check = self._check(
+            digest=_DIGEST + " The county deployed twenty heat teams.")
+        assert check(_read(
+            "Tonight's story grew from a real survey: 20 heat teams "
+            "joined the effort as instruments on Mount Etna mapped "
+            "1,200 new vents, work led by Doctor Rossi.")) is None
+
+    def test_possessive_of_dossier_noun_is_legal(self):
+        # 7th live smoke: "Rossi's" is grammar, not a new entity.
+        assert self._check()(_read(
+            "Tonight's story grew from a real survey: Rossi's instrument "
+            "team mapped 1,200 new vents on Mount Etna this season, a "
+            "record for the observatory.")) is None
+
+    def test_calendar_words_are_legal(self):
+        # 1st live smoke: a legitimate read died on 'June'.
+        assert self._check()(_read(
+            "Tonight's story grew from a real survey: through June, "
+            "instruments on Mount Etna mapped 1,200 new vents, work led "
+            "by Doctor Rossi.")) is None
+
+    def test_nouns_from_dossier_facts_are_legal(self):
+        # 2nd live smoke: 'ISS'-class names live in the FACTS.
+        dossier = _dossier(facts_to_keep=[
+            "A survey mapped 1,200 new vents on Mount Etna this season.",
+            "The Copernicus lander relayed the vent map to Doctor Rossi.",
+            "The vents released measurable heat before any tremor.",
+        ])
+        assert self._check(dossier=dossier)(_read(
+            "Tonight's story grew from a real survey: the Copernicus "
+            "lander relayed a map of 1,200 new vents on Mount Etna, "
+            "work led by Doctor Rossi.")) is None
+
+    def test_noun_check_is_word_boundary(self):
+        # 'ISS' must never ride inside 'mission'.
+        dossier = _dossier(facts_to_keep=[
+            "A survey mapped 1,200 new vents on Mount Etna this season.",
+            "The mission plan kept Doctor Rossi on the north slope.",
+            "The vents released measurable heat before any tremor.",
+        ])
+        err = self._check(dossier=dossier)(_read(
+            "Tonight's story grew from a real survey: the ISS relayed "
+            "readings of 1,200 new vents mapped on Mount Etna by "
+            "Doctor Rossi."))
+        assert err and "ISS" in err
 
 
 class TestCastingValidator:
@@ -400,6 +615,17 @@ class TestCastingValidator:
             self._voice("VERA", "male", "m02"),
             self._voice("DOKU", "male", "m02")])
         assert "already taken" in (check(cv) or "")
+
+    def test_casting_accepts_unwrapped_shapes(self):
+        # 18th live smoke (2026-07-10): a truncated response salvaged as
+        # a bare list / single entry must reach the TEACHING gates, not
+        # die as a raw schema error.
+        bare_list = F2.CastingVoices.model_validate(
+            [self._voice("VERA", "female", "m01")])
+        assert [c.name for c in bare_list.cast] == ["VERA"]
+        single = F2.CastingVoices.model_validate(
+            self._voice("DOKU", "male", "m02"))
+        assert [c.name for c in single.cast] == ["DOKU"]
 
 
 # ---------------------------------------------------------------------------
