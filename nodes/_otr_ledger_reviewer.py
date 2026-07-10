@@ -1083,8 +1083,37 @@ def apply_deterministic_cast_repairs(
                     "character (D3).", v.line_id, _row_cid,
                 )
                 continue
+            # Symmetric closure of the D3/b011 guard (fable2 S1b live
+            # smokes 2026-07-10; sonnet+opus grounded fan-out CONVERGED
+            # here): never honour expected="character" on a row whose
+            # char_id is a NON-CHARACTER SENTINEL (announcer / music_*).
+            # The sentinel char_id fixes the row's role by contract; the
+            # LLM auditor kept misreading the announcer's long factual
+            # news-read line as character narration, and this bare
+            # assignment silently flipped it -> the render demanded a
+            # lip-sync portrait for the announcer (IA2V TALKING) or the
+            # freeze died on a phantom skip row.
+            if (expected_role == "character"
+                    and _row_cid.lower()
+                    in _PL._NON_CHARACTER_CHAR_ID_SENTINELS):
+                log.warning(
+                    "[OTR_LedgerReviewer] role_mismatch on line_id=%s: "
+                    "REJECTED expected='character' for sentinel "
+                    "char_id=%s; the sentinel fixes the role by "
+                    "contract.", v.line_id, _row_cid,
+                )
+                continue
             if expected_role in _ALLOWED_SPEAKER_ROLES:
+                _prev_role = str(line.get("speaker_role") or "none")
                 line["speaker_role"] = expected_role
+                # Breadcrumb (same forensic law as role_coerce): a role
+                # repair must never be silent -- this was the ONLY
+                # speaker_role write in the repo without one.
+                _PL.append_compose_flag(
+                    line,
+                    f"role_mismatch_repair:prev={_prev_role},"
+                    f"new={expected_role},src=deterministic_cast_repair",
+                )
                 repaired += 1
             else:
                 log.warning(

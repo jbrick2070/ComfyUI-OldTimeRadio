@@ -913,9 +913,14 @@ meta.fable2).
 
 ## 13.5 S1b live-smoke deviations (2026-07-10, documented; kibitz r2 on the record)
 
-Thirteen consecutive 30w live rolls drove these evidence-backed deviations from the
-ratified plan (kibitz run: `kibitz-runs/2026-07-10-fable2-s1b-hardening/r2/final.md`,
-codex verdict "yes-with-fixes -- converging, not structurally wrong"):
+TWENTY-FIVE consecutive 30w live rolls (the 26th went GREEN: "Einstein's Echo"
+published to obs, 570s) drove these evidence-backed deviations from the ratified
+plan. Full per-roll ledger: `docs/2026-07-10-fable2-s1b-smoke-hardening.md`;
+kibitz arc r2/r3/r4 on the record under
+`kibitz-runs/2026-07-10-fable2-s1b-hardening/` (r2 "converging, not
+structurally wrong"; r4 residuals folded: FORMAT-example names reserved in the
+treatment validator; every-announcer-row sentinel assertion + freeze gap-audit
+test):
 
 1. **READ-SPLIT (P2c `news_read`)**: 7 of 13 rolls died when ONE P2b call had to satisfy
    the whole treatment AND a subset-law-compliant factual read; the typed repair could

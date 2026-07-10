@@ -63,24 +63,24 @@ def _treatment_dict(**over) -> dict:
     d = {
         "title": "The Long Count",
         "dramatic_question": (
-            "Will Vera trust her own instruments before the village "
+            "Will Sela trust her own instruments before the village "
             "stops trusting her?"),
         "setting": "a volcano observatory above a village at night",
         "cast_shapes": [
-            {"name": "VERA", "role": "instrument scientist",
+            {"name": "SELA", "role": "instrument scientist",
              "want": "to be believed before the mountain proves her right",
              "pressure": "the committee reads her charts as noise",
              "register": "clipped, front-loaded, swallows apologies"},
-            {"name": "DOKU", "role": "village liaison",
+            {"name": "DARROW", "role": "village liaison",
              "want": "to keep the village calm one more season",
              "pressure": "his cousin farms the north slope",
              "register": "slow warm circling, answers with stories"},
         ],
         "turn": (
-            "The heat readings Vera hid to protect her credibility are "
+            "The heat readings Sela hid to protect her credibility are "
             "the only proof that would move the village in time."),
         "priced_ending": {
-            "choice": "Vera publishes the readings under her own name",
+            "choice": "Sela publishes the readings under her own name",
             "cost_paid": "her seat on the committee, surrendered in writing",
         },
         "news_thread": (
@@ -120,11 +120,11 @@ class TestModels:
     def test_cast_shape_name_case_canonicalizes(self):
         # Label normalization canonicalizes case (labels are uppercase
         # by convention; the words stay the LLM's).
-        shape = F2.CastShape(name="Vera", role="scientist",
+        shape = F2.CastShape(name="Sela", role="scientist",
                              want="to be believed today",
                              pressure="the committee doubts",
                              register="clipped and dry")
-        assert shape.name == "VERA"
+        assert shape.name == "SELA"
 
     def test_cast_shape_name_label_normalizes_to_one_word(self):
         # 12th + 19th live smokes: the model titles its scientists
@@ -156,7 +156,7 @@ class TestModels:
 
     def test_treatment_needs_question_mark(self):
         with pytest.raises(ValidationError, match="[?]"):
-            _treatment(dramatic_question="Vera trusts her instruments now.")
+            _treatment(dramatic_question="Sela trusts her instruments now.")
 
     def test_treatment_registers_must_differ_in_mechanism(self):
         # BOTH directions of _REGISTER_OVERLAP_MAX (0.5): identical
@@ -173,14 +173,14 @@ class TestModels:
 
     def test_treatment_cast_names_unique(self):
         shapes = _treatment_dict()["cast_shapes"]
-        shapes[1]["name"] = "VERA"
+        shapes[1]["name"] = "SELA"
         with pytest.raises(ValidationError, match="unique"):
             _treatment(cast_shapes=shapes)
 
     def test_critic_note_never_replacement_dialogue(self):
         with pytest.raises(ValidationError, match="replacement dialogue"):
-            F2.CriticNote(scene=1, speaker="VERA", problem="register_bleed",
-                          note="Change it to this. VERA: I never doubted "
+            F2.CriticNote(scene=1, speaker="SELA", problem="register_bleed",
+                          note="Change it to this. SELA: I never doubted "
                                "the mountain for a second.")
 
     def test_critic_revise_requires_a_note(self):
@@ -210,59 +210,70 @@ class TestDossierValidator:
     def test_grounded_dossier_passes(self):
         assert F2._make_dossier_validator(_DIGEST)(_dossier()) is None
 
-    def test_invented_number_rejected(self):
-        check = F2._make_dossier_validator(_DIGEST)
-        err = check(_dossier(allowed_numbers=["7,777"]))
-        assert err and "7,777" in err
+    def test_unverifiable_number_is_dropped_not_rerolled(self):
+        # 30th live smoke (2026-07-10): converted/computed figures are
+        # unbounded -- python DROPS what the source cannot corroborate;
+        # the read's numeral legality only ever SHRINKS.
+        filtered, dropped = F2._filter_dossier_entities(
+            _dossier(allowed_numbers=["7,777", "1,200"]), _DIGEST)
+        assert dropped == ["7,777"]
+        assert filtered.allowed_numbers == ["1,200"]
+        assert F2._make_dossier_validator(_DIGEST)(
+            _dossier(allowed_numbers=["7,777"])) is None
 
-    def test_invented_entity_rejected(self):
-        check = F2._make_dossier_validator(_DIGEST)
+    def test_unverifiable_entity_is_dropped_not_rerolled(self):
+        # 28th live smoke (2026-07-10): world-knowledge expansions (CMU
+        # -> Carnegie Mellon) are unbounded -- python DROPS what the
+        # source cannot corroborate (delete-only) instead of killing the
+        # run; the read corpus never widens with them.
         bad = _dossier(named_entities={
-            "people": ["Professor Nobody"], "places": [], "things": []})
-        err = check(bad)
-        assert err and "Professor Nobody" in err
+            "people": ["Professor Nobody", "Doctor Rossi"],
+            "places": [], "things": []})
+        filtered, dropped = F2._filter_dossier_entities(bad, _DIGEST)
+        assert dropped == ["Professor Nobody"]
+        assert filtered.named_entities.people == ["Doctor Rossi"]
+        # the validator itself no longer rejects entities
+        assert F2._make_dossier_validator(_DIGEST)(bad) is None
 
     def test_spelled_numbers_legalize_extracted_digits(self):
         # 16th live smoke (2026-07-10): "seven days" / "Eighth day" in
-        # the story legalize the extracted digits 7 and 8.
-        check = F2._make_dossier_validator(
-            "The heat lasted seven days, the eighth day this year on "
-            "Mount Etna, Doctor Rossi said. 1,200. heat sensors.")
-        ok = _dossier(allowed_numbers=["7", "8", "1,200"])
-        assert check(ok) is None
-        bad = _dossier(allowed_numbers=["9"])
-        err = check(bad)
-        assert err and "'9'" in err
+        # the story legalize the extracted digits 7 and 8; an
+        # uncorroborated 9 drops.
+        digest = ("The heat lasted seven days, the eighth day this year "
+                  "on Mount Etna, Doctor Rossi said. 1,200. heat sensors.")
+        filtered, dropped = F2._filter_dossier_entities(
+            _dossier(allowed_numbers=["7", "8", "9", "1,200"]), digest)
+        assert dropped == ["9"]
+        assert filtered.allowed_numbers == ["7", "8", "1,200"]
 
-    def test_demonym_inflection_is_legal(self):
+    def test_demonym_inflection_is_kept(self):
         # 24th live smoke (2026-07-10): 'Scottish' in the story vs the
         # faithful extraction 'Scotland' -- same referent, not invention.
-        check = F2._make_dossier_validator(
-            "The Scottish government provides a support package for pig "
-            "farmers. Doctor Rossi. Mount Etna. 1,200. heat sensors.")
         ok = _dossier(named_entities={
             "people": ["Doctor Rossi"], "places": ["Scotland"],
             "things": ["heat sensors"]})
-        assert check(ok) is None
+        filtered, dropped = F2._filter_dossier_entities(
+            ok,
+            "The Scottish government provides a support package for pig "
+            "farmers. Doctor Rossi. Mount Etna. 1,200. heat sensors.")
+        assert dropped == []
+        assert filtered.named_entities.places == ["Scotland"]
 
-    def test_reordered_entity_phrase_is_legal(self):
-        # 2nd live smoke (2026-07-10): "Amsterdam's canals" vs the
+    def test_reordered_entity_phrase_is_kept(self):
+        # 5th live smoke (2026-07-10): "Amsterdam's canals" vs the
         # story's "the canals of Amsterdam" -- token-level presence, not
-        # contiguous-phrase substring.
-        check = F2._make_dossier_validator(
+        # contiguous-phrase substring; 'Rotterdam harbor' still drops.
+        digest = (
             "Researchers steered the robots through the canals of "
             "Amsterdam before any tremor. Doctor Rossi led the team. "
             "Mount Etna. 1,200. heat sensors.")
-        ok = _dossier(named_entities={
+        mixed = _dossier(named_entities={
             "people": ["Doctor Rossi"],
-            "places": ["Amsterdam's canals", "Mount Etna"],
+            "places": ["Amsterdam's canals", "Rotterdam harbor"],
             "things": ["heat sensors"]})
-        assert check(ok) is None
-        bad = _dossier(named_entities={
-            "people": ["Doctor Rossi"],
-            "places": ["Rotterdam harbor"], "things": []})
-        err = check(bad)
-        assert err and "Rotterdam" in (err or "")
+        filtered, dropped = F2._filter_dossier_entities(mixed, digest)
+        assert dropped == ["Rotterdam harbor"]
+        assert filtered.named_entities.places == ["Amsterdam's canals"]
 
 
 def _pitch_dict(pid: int, card: str, **over) -> dict:
@@ -408,6 +419,20 @@ class TestTreatmentValidator:
         # S1b read-split: P2b no longer writes the read.
         assert self._check()(_treatment(news_close_read="")) is None
 
+    def test_format_example_names_are_reserved(self):
+        # kibitz r4 M1 (roll 22 aired the few-shot example's VERA/DOKU
+        # cast): example names are reserved unless the SOURCE story
+        # itself carries the name.
+        shapes = _treatment_dict()["cast_shapes"]
+        shapes[0]["name"] = "VERA"
+        err = self._check()(_treatment(cast_shapes=shapes))
+        assert err and "FORMAT-example" in err
+        # source-authorized: the story really is about a Vera
+        check = F2._make_treatment_validator(
+            _dossier(), 4, _PROVENANCE,
+            digest=_DIGEST + " Vera Kowalska led the survey.")
+        assert check(_treatment(cast_shapes=shapes)) is None
+
 
 def _read(text: str) -> F2.NewsCloseRead:
     return F2.NewsCloseRead(news_close_read=text)
@@ -417,7 +442,7 @@ class TestReadValidator:
     """P2c factual-close subset laws (S1b read-split; every case below
     is a live-smoke scar from 2026-07-10)."""
 
-    def _check(self, dossier=None, digest=_DIGEST, cast=("VERA", "DOKU")):
+    def _check(self, dossier=None, digest=_DIGEST, cast=("SELA", "DARROW")):
         return F2._make_read_validator(
             dossier or _dossier(), _PROVENANCE, digest, list(cast))
 
@@ -475,19 +500,19 @@ class TestReadValidator:
     def test_never_names_the_fictional_cast(self):
         # 9th live smoke: the read is REAL NEWS.
         err = self._check()(_read(
-            "Tonight's story grew from a real survey: Vera watched "
+            "Tonight's story grew from a real survey: Sela watched "
             "instruments on Mount Etna map 1,200 new vents this season, "
             "work led by Doctor Rossi."))
-        assert err and "VERA" in err and "REAL NEWS" in err
+        assert err and "SELA" in err and "REAL NEWS" in err
 
     def test_cast_name_gate_is_case_sensitive(self):
         # 11th live smoke: a character named HOPE must not outlaw the
         # common word 'hope'.
-        assert self._check(cast=("HOPE", "DOKU"))(_read(
+        assert self._check(cast=("HOPE", "DARROW"))(_read(
             "Tonight's story grew from a real survey: instruments on "
             "Mount Etna mapped 1,200 new vents this season, and the "
             "team's hope is a calmer year, said Doctor Rossi.")) is None
-        err = self._check(cast=("HOPE", "DOKU"))(_read(
+        err = self._check(cast=("HOPE", "DARROW"))(_read(
             "Tonight's story grew from a real survey: Hope watched "
             "instruments on Mount Etna map 1,200 new vents this season, "
             "work led by Doctor Rossi."))
@@ -497,7 +522,7 @@ class TestReadValidator:
         # 14th live smoke (2026-07-10): the drama named its character
         # after the REAL person in the story ('JIM' for NASA's Jim
         # Ross) -- factual reporting of a source name is never leakage.
-        assert self._check(cast=("ROSSI", "DOKU"))(_read(
+        assert self._check(cast=("ROSSI", "DARROW"))(_read(
             "Tonight's story grew from a real survey: instruments on "
             "Mount Etna mapped 1,200 new vents this season, work led by "
             "Doctor Rossi.")) is None
@@ -588,32 +613,32 @@ class TestCastingValidator:
         }
 
     def test_valid_casting_passes(self):
-        check = F2._make_casting_validator(self._menu(), ["VERA", "DOKU"])
+        check = F2._make_casting_validator(self._menu(), ["SELA", "DARROW"])
         cv = F2.CastingVoices(cast=[
-            self._voice("VERA", "female", "m01"),
-            self._voice("DOKU", "male", "m02")])
+            self._voice("SELA", "female", "m01"),
+            self._voice("DARROW", "male", "m02")])
         assert check(cv) is None
 
     def test_speaker_set_equality_gate(self):
-        check = F2._make_casting_validator(self._menu(), ["VERA", "DOKU"])
-        cv = F2.CastingVoices(cast=[self._voice("VERA", "female", "m01")])
+        check = F2._make_casting_validator(self._menu(), ["SELA", "DARROW"])
+        cv = F2.CastingVoices(cast=[self._voice("SELA", "female", "m01")])
         assert "speakers" in (check(cv) or "")
 
     def test_unknown_menu_id_rejected(self):
-        check = F2._make_casting_validator(self._menu(), ["VERA"])
-        cv = F2.CastingVoices(cast=[self._voice("VERA", "female", "m99")])
+        check = F2._make_casting_validator(self._menu(), ["SELA"])
+        cv = F2.CastingVoices(cast=[self._voice("SELA", "female", "m99")])
         assert "m99" in (check(cv) or "")
 
     def test_gender_mismatch_rejected(self):
-        check = F2._make_casting_validator(self._menu(), ["VERA"])
-        cv = F2.CastingVoices(cast=[self._voice("VERA", "female", "m02")])
+        check = F2._make_casting_validator(self._menu(), ["SELA"])
+        cv = F2.CastingVoices(cast=[self._voice("SELA", "female", "m02")])
         assert "gender" in (check(cv) or "")
 
     def test_duplicate_timbre_rejected(self):
-        check = F2._make_casting_validator(self._menu(), ["VERA", "DOKU"])
+        check = F2._make_casting_validator(self._menu(), ["SELA", "DARROW"])
         cv = F2.CastingVoices(cast=[
-            self._voice("VERA", "male", "m02"),
-            self._voice("DOKU", "male", "m02")])
+            self._voice("SELA", "male", "m02"),
+            self._voice("DARROW", "male", "m02")])
         assert "already taken" in (check(cv) or "")
 
     def test_casting_accepts_unwrapped_shapes(self):
@@ -621,11 +646,11 @@ class TestCastingValidator:
         # a bare list / single entry must reach the TEACHING gates, not
         # die as a raw schema error.
         bare_list = F2.CastingVoices.model_validate(
-            [self._voice("VERA", "female", "m01")])
-        assert [c.name for c in bare_list.cast] == ["VERA"]
+            [self._voice("SELA", "female", "m01")])
+        assert [c.name for c in bare_list.cast] == ["SELA"]
         single = F2.CastingVoices.model_validate(
-            self._voice("DOKU", "male", "m02"))
-        assert [c.name for c in single.cast] == ["DOKU"]
+            self._voice("DARROW", "male", "m02"))
+        assert [c.name for c in single.cast] == ["DARROW"]
 
 
 # ---------------------------------------------------------------------------

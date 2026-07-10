@@ -364,6 +364,38 @@ class TestDeterministicCastRepairs:
         )
         assert n == 1
         assert led.data["lines"][0]["speaker_role"] == "character"
+        # forensic law (fable2 S1b hardening 2026-07-10): a role repair
+        # is never silent -- the breadcrumb rides the row.
+        assert any("role_mismatch_repair" in f
+                   for f in led.data["lines"][0].get("compose_flags") or [])
+
+    def test_role_mismatch_sentinel_char_id_rejected(self, tmp_path):
+        # fable2 S1b live smokes (2026-07-10; sonnet+opus grounded
+        # fan-out CONVERGED on this hole): the LLM auditor kept
+        # misreading the announcer's long factual news read as
+        # character narration, and the bare repair silently flipped it
+        # -> the render then demanded a lip-sync portrait for the
+        # announcer (IA2V TALKING register). A NON-CHARACTER SENTINEL
+        # char_id (announcer / music_*) fixes the row's role by
+        # contract; the repair must refuse.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "announcer",
+                  "Tonight's story grew from a real report about the "
+                  "survey teams and the work they led this season.",
+                  role="announcer"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="role_mismatch",
+                found="announcer", expected="character",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 0
+        assert led.data["lines"][0]["speaker_role"] == "announcer"
+        assert not (led.data["lines"][0].get("compose_flags") or [])
 
     def test_alias_used_substituted(self, tmp_path):
         led = _build_ledger(tmp_path, [

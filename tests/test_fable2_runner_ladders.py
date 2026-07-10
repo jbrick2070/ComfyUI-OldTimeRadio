@@ -52,10 +52,10 @@ _GOOD_MARKUP = "\n".join([
     "ANNOUNCER: Tonight, one antenna, two signals, and a woman who "
     "refused to choose.",
     "SCENE 1: A cliff-top listening station before dawn",
-    "VERA: Play it again, and this time keep the gain low.",
-    "DOKU: The tape is the tape, Vera. It will not change for us.",
-    "VERA: Then we change the question we are asking it.",
-    "ANNOUNCER: Vera got her answer, though the antenna kept the "
+    "SELA: Play it again, and this time keep the gain low.",
+    "DARROW: The tape is the tape, Sela. It will not change for us.",
+    "SELA: Then we change the question we are asking it.",
+    "ANNOUNCER: Sela got her answer, though the antenna kept the "
     "better half.",
     "CODA: Beyond tonight's cliff-top signal, a real transmission waits:",
     "MUSIC: closing theme, warm brass",
@@ -70,14 +70,14 @@ _BAD_SHAPE_MARKUP = _GOOD_MARKUP.replace(
     "this line matches no shape at all")
 
 _FAT_MARKUP = _GOOD_MARKUP.replace(
-    "VERA: Then we change the question we are asking it.",
-    "VERA: Then we change the question we are asking it tonight, "
+    "SELA: Then we change the question we are asking it.",
+    "SELA: Then we change the question we are asking it tonight, "
     "because the committee will not sit for the mountain, and the "
     "mountain has never once agreed to sit for the committee, and "
     "somebody in this room must finally choose which of the two "
     "keeps the log.")  # blows past the 36-word band ceiling
 
-_CAST = ["VERA", "DOKU"]
+_CAST = ["SELA", "DARROW"]
 
 
 def _treatment() -> F2.Treatment:
@@ -87,24 +87,24 @@ def _treatment() -> F2.Treatment:
 _TREATMENT_DICT = {
     "title": "The Long Count",
     "dramatic_question": (
-        "Will Vera trust her own instruments before the village stops "
+        "Will Sela trust her own instruments before the village stops "
         "trusting her?"),
     "setting": "a volcano observatory above a village at night",
     "cast_shapes": [
-        {"name": "VERA", "role": "instrument scientist",
+        {"name": "SELA", "role": "instrument scientist",
          "want": "to be believed before the mountain proves her right",
          "pressure": "the committee reads her charts as noise",
          "register": "clipped, front-loaded, swallows apologies"},
-        {"name": "DOKU", "role": "village liaison",
+        {"name": "DARROW", "role": "village liaison",
          "want": "to keep the village calm one more season",
          "pressure": "his cousin farms the north slope",
          "register": "slow warm circling, answers with stories"},
     ],
     "turn": (
-        "The heat readings Vera hid to protect her credibility are the "
+        "The heat readings Sela hid to protect her credibility are the "
         "only proof that would move the village in time."),
     "priced_ending": {
-        "choice": "Vera publishes the readings under her own name",
+        "choice": "Sela publishes the readings under her own name",
         "cost_paid": "her seat on the committee, surrendered in writing",
     },
     "news_thread": (
@@ -231,7 +231,7 @@ def _parsed_good():
 
 def _finding(cls, detail="the judge says something is wrong here"):
     return F2.AuditFindings(findings=[{
-        "finding_class": cls, "scene": 1, "speaker": "VERA",
+        "finding_class": cls, "scene": 1, "speaker": "SELA",
         "detail": detail}])
 
 
@@ -336,13 +336,13 @@ def _e2e_run(tmp_path, monkeypatch):
         desc = ("Mid-forties, wind-burned, one pencil behind the ear, "
                 "taps the barometer twice before speaking.")
         return json.dumps({"cast": [
-            {"name": "VERA", "role": "instrument scientist",
+            {"name": "SELA", "role": "instrument scientist",
              "character_description": desc, "gender": "female",
              "age_band": "40s", "register": "clipped and front-loaded",
              "timbre": female.menu_id,
              "want": "to be believed before dawn",
              "pressure": "the committee reads her charts as noise"},
-            {"name": "DOKU", "role": "village liaison",
+            {"name": "DARROW", "role": "village liaison",
              "character_description": desc.replace("her", "his"),
              "gender": "male", "age_band": "50s",
              "register": "slow warm circling",

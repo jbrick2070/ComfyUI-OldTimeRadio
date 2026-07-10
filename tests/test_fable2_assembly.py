@@ -317,11 +317,27 @@ def test_row_role_ordering_follows_legacy_reference(tmp_path):
     assert spoken[0]["speaker_role"] == "announcer"
     assert spoken[0]["char_id"] == "announcer"
     assert spoken[-1]["speaker_role"] == "announcer"
-    # 22nd live smoke: ALL announcer rows carry the SENTINEL char_id --
-    # exempt from every cast-keyed downstream mutator by design (the
-    # legacy fixture's c01 postamble was a legacy-lane quirk).
-    assert spoken[-1]["char_id"] == "announcer"
+    # 22nd live smoke + kibitz r4 M2: EVERY announcer row carries the
+    # SENTINEL char_id -- exempt from every cast-keyed downstream
+    # mutator by design (the legacy fixture's c01 postamble was a
+    # legacy-lane quirk).
+    for r in spoken:
+        if r["speaker_role"] == "announcer":
+            assert r["char_id"] == "announcer", r["line_id"]
     assert {r["speaker_role"] for r in spoken[1:-1]} >= {"character"}
+
+
+def test_assembled_ledger_passes_the_freeze_gap_audit(tmp_path):
+    # kibitz r4 M2: run the assembled fable2 ledger through the freeze
+    # module's own gap audit -- zero critical gaps, no skip rows, and
+    # the Phase-10 contract facts (roles legal, char_ids resolvable)
+    # hold BEFORE any live cascade touches it.
+    from nodes import _otr_ledger_freeze as FREEZE
+    led, _parsed, _meta = _assembled(tmp_path)
+    report = FREEZE.run_gap_audit(led.data, label="fable2_s1b_test")
+    assert report.errors == [], report.errors
+    for r in led.data["lines"]:
+        assert not r.get("skip"), r["line_id"]
 
 
 def test_line_id_equals_beat_id_and_beats_reference_lines(tmp_path):

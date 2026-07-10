@@ -367,8 +367,8 @@ class CastShape(BaseModel):
         # is unrecoverable.
         if " " in v or "." in v:
             raise ValueError(
-                f"cast name must be ONE word with no titles or initials "
-                f"(like VERA or BRANNIGAN), got {v!r}")
+                f"cast name must be ONE invented word with no titles or "
+                f"initials, got {v!r}")
         return v
 
 
@@ -454,16 +454,23 @@ class CastVoice(BaseModel):
     character_description: str = Field(min_length=40, max_length=240)
     gender: Literal["male", "female"]
     age_band: Literal["20s", "30s", "40s", "50s", "60s"]
-    register: str = Field(min_length=5, max_length=90)
+    # register/want/pressure are descriptive PAPERWORK (r1/A3: register
+    # authority stays with the treatment; these never drive the voice or
+    # the portrait). 31st live smoke 2026-07-10: a casting that omitted
+    # them schema-aborted a run -- paperwork tolerance, defaults allowed.
+    register: str = Field(default="", max_length=90)
     timbre: str
-    want: str = Field(min_length=5, max_length=120)
-    pressure: str = Field(min_length=5, max_length=120)
+    want: str = Field(default="", max_length=120)
+    pressure: str = Field(default="", max_length=120)
 
 
 class NewsCloseRead(BaseModel):
-    """P2c: the 1-2 sentence factual close (read-split, S1b)."""
+    """P2c: the 1-2 sentence factual close (read-split, S1b). Floor 40,
+    not the doc's 80 -- the 27th live smoke killed a perfectly factual
+    78-char read; brevity is a style preference, never a correctness
+    gate (the seam still asks for 1-2 wire-desk sentences)."""
 
-    news_close_read: str = Field(min_length=80, max_length=420)
+    news_close_read: str = Field(min_length=40, max_length=420)
 
 
 class CastingVoices(BaseModel):
@@ -663,6 +670,12 @@ _HONORIFIC_TOKENS = frozenset({
     "MADAM", "MAJOR", "MAJ", "GENERAL", "GEN",
 })
 
+# Names that appear in the pack's FORMAT/schema EXAMPLES (kibitz r4 M1:
+# roll 22 aired a VERA/DOKU cast copied from the few-shot example). A
+# generated cast may not reuse them unless the SOURCE story itself
+# carries the name.
+_RESERVED_EXAMPLE_NAMES = frozenset({"VERA", "DOKU", "BRANNIGAN", "VOSS"})
+
 
 def _spelled_forms(tok: str) -> "tuple[str, ...]":
     """Cardinal + ordinal word forms for a small integer token (0-100),
@@ -821,42 +834,73 @@ def _make_dossier_validator(digest: str):
     hay = _norm_ws(digest).casefold().replace("’", "'")
 
     def _check(m: DossierLLM) -> "str | None":
-        for num in m.allowed_numbers:
-            norm = _norm_ws(num).casefold().replace("’", "'")
-            if norm in hay:
-                continue
-            # spelled-number equivalence: "seven days" in the story
-            # legalizes the extracted digit 7 (16th live smoke)
-            if any(_word_re(f).search(hay)
-                   for f in _spelled_forms(norm.rstrip(".,"))):
-                continue
-            return f"allowed_number {num!r} not present in the story text"
-        ents = (m.named_entities.people + m.named_entities.places
-                + m.named_entities.things)
-        hay_words = {w.strip(".,;:!?'\"()") for w in hay.split()}
-        for ent in ents:
-            for tok in _norm_ws(ent).replace("’", "'").split():
-                tok = tok.strip(".,;:!?'\"()").casefold()
-                if tok.endswith("'s"):
-                    tok = tok[:-2]
-                if len(tok) <= 2:
-                    continue
-                if _word_re(tok).search(hay):
-                    continue
-                # Demonym/inflection tolerance (24th live smoke
-                # 2026-07-10: the story said 'Scottish', the faithful
-                # extraction said 'Scotland'): a shared prefix of >= 4
-                # chars with any source word is the same referent, not
-                # an invention. The READ gate stays word-boundary strict
-                # against its own corpus.
-                if any(len(tok) >= 4 and w[:4] == tok[:4]
-                       for w in hay_words if len(w) >= 4):
-                    continue
-                return (f"named entity {ent!r} not present in the "
-                        f"story text (token {tok!r} missing)")
+        # Neither entities NOR numbers are rerolled here: unverifiable
+        # ones are DROPPED by _filter_dossier_entities after the call
+        # (28th + 30th live smokes 2026-07-10: world-knowledge
+        # expansions and converted figures are unbounded; no reroll can
+        # fix knowledge). Delete-only filtering keeps the anti-invention
+        # property -- dropping an allowed number only SHRINKS what the
+        # factual read may speak.
         return None
 
     return _check
+
+
+def _entity_in_source(ent: str, hay: str, hay_words: "set[str]") -> bool:
+    for tok in _norm_ws(ent).replace("’", "'").split():
+        tok = tok.strip(".,;:!?'\"()").casefold()
+        if tok.endswith("'s"):
+            tok = tok[:-2]
+        if len(tok) <= 2:
+            continue
+        if _word_re(tok).search(hay):
+            continue
+        # Demonym/inflection tolerance (24th live smoke: 'Scottish' vs
+        # 'Scotland'): a shared prefix of >= 4 chars with any source
+        # word is the same referent.
+        if any(len(tok) >= 4 and w[:4] == tok[:4]
+               for w in hay_words if len(w) >= 4):
+            continue
+        return False
+    return True
+
+
+def _filter_dossier_entities(dossier: DossierLLM,
+                             digest: str) -> "tuple[DossierLLM, list[str]]":
+    """Delete-only entity filtering (python judges): entities the source
+    text cannot corroborate are DROPPED from the extraction and reported
+    -- never rerolled (world-knowledge expansions like CMU -> Carnegie
+    Mellon are unbounded) and never allowed to widen the READ gate's
+    legality corpus."""
+    hay = _norm_ws(digest).casefold().replace("’", "'")
+    hay_words = {w.strip(".,;:!?'\"()") for w in hay.split()}
+    dropped: "list[str]" = []
+    kept: "dict[str, list[str]]" = {}
+    for field_name in ("people", "places", "things"):
+        vals = getattr(dossier.named_entities, field_name)
+        kept[field_name] = []
+        for ent in vals:
+            if _entity_in_source(ent, hay, hay_words):
+                kept[field_name].append(ent)
+            else:
+                dropped.append(ent)
+    # Numbers too (30th live smoke): an allowed number the source text
+    # cannot corroborate (verbatim or spelled) is dropped -- shrinking
+    # the read's numeral legality, never widening it.
+    kept_numbers: "list[str]" = []
+    for num in dossier.allowed_numbers:
+        norm = _norm_ws(num).casefold().replace("’", "'")
+        if norm in hay or any(
+                _word_re(f).search(hay)
+                for f in _spelled_forms(norm.rstrip(".,"))):
+            kept_numbers.append(num)
+        else:
+            dropped.append(num)
+    if not dropped:
+        return dossier, []
+    return dossier.model_copy(update={
+        "named_entities": NamedEntities(**kept),
+        "allowed_numbers": kept_numbers}), dropped
 
 
 def _make_pitch_validator(cards, mode: str, n_max: int):
@@ -904,9 +948,15 @@ def _make_treatment_validator(dossier: DossierLLM, n_max: int,
     ``_make_read_validator`` with the P2c read-split (S1b, 2026-07-10)."""
     ents = (dossier.named_entities.people + dossier.named_entities.places
             + dossier.named_entities.things)
+    # Thread grounding corpus includes the SOURCE DIGEST (29th live
+    # smoke 2026-07-10: a thread naming the story's own subject failed
+    # because the filtered dossier alone was the corpus -- the source is
+    # the legality authority everywhere).
     dossier_corpus = _norm_ws(" ".join(
         dossier.facts_to_keep + dossier.dramatizable_vectors + ents
-        + dossier.allowed_numbers)).casefold()
+        + dossier.allowed_numbers + [str(digest)])).casefold()
+
+    example_hay = _norm_ws(str(digest)).casefold()
 
     def _check(m: Treatment) -> "str | None":
         # kibitz r2 S3: ACCUMULATE every content failure so the single
@@ -914,6 +964,15 @@ def _make_treatment_validator(dossier: DossierLLM, n_max: int,
         errs: "list[str]" = []
         if len(m.cast_shapes) > n_max:
             errs.append(f"cast_shapes {len(m.cast_shapes)} > N_MAX {n_max}")
+        # kibitz r4 M1 (roll 22 aired the few-shot example's cast): the
+        # FORMAT-example names are reserved unless the source story
+        # itself carries the name.
+        for shape in m.cast_shapes:
+            if (shape.name in _RESERVED_EXAMPLE_NAMES
+                    and not _word_re(shape.name).search(example_hay)):
+                errs.append(
+                    f"cast name {shape.name!r} copies a FORMAT-example "
+                    f"name -- invent a period-plausible name of your own")
         thread_tokens = [
             t.strip(".,;:!?'\"()").casefold()
             for t in m.news_thread.split() if len(t) > 3
@@ -1036,8 +1095,11 @@ def _make_casting_validator(menu: VoiceMenu, speakers: "list[str]"):
                 return (f"{c.name}: timbre {c.timbre!r} is not a menu id "
                         f"(pick from the AVAILABLE VOICE STOCK)")
             if entry.gender != c.gender:
+                legal = [e.menu_id for e in menu.entries
+                         if e.gender == c.gender]
                 return (f"{c.name}: menu id {c.timbre} is {entry.gender}, "
-                        f"but gender is {c.gender!r}")
+                        f"but gender is {c.gender!r} -- pick one of the "
+                        f"{c.gender} ids instead: {', '.join(legal)}")
             if c.timbre in taken:
                 return (f"{c.name}: timbre {c.timbre} already taken -- "
                         f"two characters never share a voice")
@@ -1177,27 +1239,45 @@ def _pass_news_read(technical_fn, pack, dossier: DossierLLM,
         f"them here): {', '.join(cast_names) or '(none)'}\n\n"
         f"Write the closing news read now."
     )
-    try:
-        # LLM slot: technical -- P2c factual close (read-split).
-        return structured_call(
-            prompt=[
-                {"role": "system",
-                 "content": _seam(pack, "fable2_news_read_system")},
-                {"role": "user", "content": user},
-            ],
-            schema=NewsCloseRead,
-            slot_fn=technical_fn,
-            base_temperature=0.20,
-            structural_retry_temperature=0.10,
-            repair_prompt_factory=make_dispatching_repair_factory(),
-            post_validator=_make_read_validator(
-                dossier, provenance, digest, cast_names),
-            max_new_tokens=300,
-            helper_name="fable2_news_read",
+    validator = _make_read_validator(dossier, provenance, digest, cast_names)
+    # Bounded outer retry (32nd live smoke 2026-07-10: on a thin source
+    # the model keeps reaching for a figure; the SECOND outer attempt
+    # demands a NUMERAL-FREE read, which cannot fail the numeral gate).
+    last_exc: "Exception | None" = None
+    for outer in range(2):
+        prompt_user = user if outer == 0 else (
+            user + "\n\nHARD CONSTRAINT for this attempt: write the read "
+            "with NO numerals at all -- no figures, no dates; state the "
+            "finding in plain words only."
         )
-    except StructuredCallFailedError as exc:
-        raise Fable2TreatmentError(
-            "news_read", str(exc.last_error), exc.attempts) from exc
+        try:
+            # LLM slot: technical -- P2c factual close (read-split).
+            return structured_call(
+                prompt=[
+                    {"role": "system",
+                     "content": _seam(pack, "fable2_news_read_system")},
+                    {"role": "user", "content": prompt_user},
+                ],
+                schema=NewsCloseRead,
+                slot_fn=technical_fn,
+                base_temperature=0.20,
+                structural_retry_temperature=0.10,
+                repair_prompt_factory=make_dispatching_repair_factory(),
+                post_validator=validator,
+                max_new_tokens=300,
+                helper_name="fable2_news_read",
+            )
+        except StructuredCallFailedError as exc:
+            last_exc = exc
+            log.warning(
+                "[scifi_fable2] news_read outer attempt %d exhausted "
+                "(%s)%s", outer + 1, exc.last_error,
+                "; retrying with the numeral-free hard constraint"
+                if outer == 0 else "",
+            )
+    raise Fable2TreatmentError(
+        "news_read", str(getattr(last_exc, "last_error", last_exc)),
+        getattr(last_exc, "attempts", 0)) from last_exc
 
 
 def _micro_episode_line_cap(target_words: int) -> int:
@@ -1956,13 +2036,21 @@ def run_scifi_fable2_episode(
         dossier = _pass_dossier(counting_tech, pack, digest)
     _receipt("dossier", technical_model, tech_box["calls"],
              _TEMP["dossier"], _MAX_NEW_TOKENS["dossier"])
+    dossier, dropped_entities = _filter_dossier_entities(dossier, digest)
+    if dropped_entities:
+        log.warning(
+            "[scifi_fable2] dossier: DROPPED %d entity(ies) the source "
+            "text cannot corroborate (delete-only; world-knowledge "
+            "expansions never widen the read corpus): %s",
+            len(dropped_entities), "; ".join(dropped_entities))
     provenance = {
         "headline": str(payload.get("headline") or ""),
         "source": str(payload.get("source") or ""),
         "date": str(payload.get("date") or ""),
         "link": str(payload.get("link") or ""),
     }
-    f2["dossier"] = {**dossier.model_dump(), "provenance": provenance}
+    f2["dossier"] = {**dossier.model_dump(), "provenance": provenance,
+                     "dropped_entities": dropped_entities}
 
     # --- deal + P1: pitch room (ONE-PITCH mode, r2/M3) --------------------
     deck = _load_frame_deck()
