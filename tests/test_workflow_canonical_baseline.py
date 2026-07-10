@@ -67,7 +67,10 @@ class TestWriterCanonicalModelSlots:
         #   [3] creative_writing_model
         #   [4] technical_model
         assert widgets[1] == 30
-        expected_creative = "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]"
+        # 2026-07-10 live-smoke fix: creative slot = mistral-nemo
+        # (gemma-4-12b Q8 cannot hold n_ctx 4096 on 16 GB; the silent
+        # 2048 downgrade truncated the original_concept JSON emission).
+        expected_creative = "mistralai/Mistral-Nemo-Instruct-2407"
         expected_technical = "mistralai/Mistral-Nemo-Instruct-2407"
         assert widgets[3] == expected_creative, (
             f"writer creative_writing_model must be {expected_creative!r}; "

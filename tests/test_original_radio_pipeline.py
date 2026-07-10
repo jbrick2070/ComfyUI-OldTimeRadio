@@ -456,6 +456,23 @@ class TestQAGate:
             self._run(_qa_ledger(), fn, monkeypatch,
                       compose_text="Another closing line.")
 
+    def test_epilogue_missing_refuted_when_outro_exists(self, monkeypatch):
+        # Run-5 live catch (2026-07-10): the re-judge re-claimed
+        # 'epilogue_missing' about the recomposed non-empty outro row
+        # it had just been shown. Python refutes the absence claim
+        # deterministically; the episode survives, discard stamped.
+        led = _qa_ledger()
+        fn = _findings_fn(
+            [{"class": "epilogue_missing", "detail": "no closing line"}],
+            [{"class": "epilogue_missing",
+              "detail": "still no closing line"}],
+        )
+        meta = self._run(led, fn, monkeypatch,
+                         compose_text="A wry recomposed closing line.")
+        assert meta["original_qa"]["status"] == "clean_after_discard"
+        assert meta["original_qa"]["repaired"] is True
+        assert meta["original_qa"]["discarded"] == ["epilogue_missing"]
+
     def test_hallucinated_hard_findings_discarded_then_clean(self, monkeypatch):
         # The 2026-07-09 live-smoke trio: weapons on a weaponless
         # threat, news framing on a teaser, epilogue_missing with the

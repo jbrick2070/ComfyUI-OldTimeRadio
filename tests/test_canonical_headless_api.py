@@ -256,8 +256,11 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")
     assert writer["inputs"]["target_words"] == 30
+    # 2026-07-10 live-smoke fix: creative slot moved to mistral-nemo
+    # (gemma-4-12b Q8 cannot hold n_ctx 4096 on the 16GB box; the
+    # silent 2048 downgrade truncated original_concept JSON).
     assert writer["inputs"]["creative_writing_model"] == \
-        "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]"
+        "mistralai/Mistral-Nemo-Instruct-2407"
     assert writer["inputs"]["technical_model"] == \
         "mistralai/Mistral-Nemo-Instruct-2407"
     assert str(director["inputs"]["announcer_video_model"]).startswith("viz_")

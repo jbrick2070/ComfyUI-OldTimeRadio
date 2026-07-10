@@ -1786,6 +1786,35 @@ def _run_original_qa_gate(
             if _OTROR.REPAIR_ACTION_BY_CLASS.get(f.finding_class, "fail")
             == "recompose_outro"
         ]
+        # epilogue_missing is deterministically refutable (run-5 live
+        # catch 2026-07-10: the re-judge claimed "no closing announcer
+        # line" about the non-empty outro row it had just been shown,
+        # twice, and killed a survivable episode). The row we recomposed
+        # either exists non-empty or it does not -- Python checks that,
+        # not the judge. A refuted claim is discarded LOUDLY; the
+        # subjective epilogue classes (moralizes / contradicts) still
+        # raise per r4 P4.
+        if still_epilogue:
+            _outro_text = ""
+            for _ln in led.data.get("lines") or []:
+                if _ln.get("line_id") == last_announcer_id:
+                    _outro_text = str(_ln.get("text") or "").strip()
+                    break
+            _refuted = [
+                f for f in still_epilogue
+                if f.finding_class == "epilogue_missing" and _outro_text
+            ]
+            if _refuted:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] original_qa: REFUTED "
+                    "'epilogue_missing' deterministically -- outro row "
+                    "%s exists with %d chars; discarding the judge "
+                    "claim", last_announcer_id, len(_outro_text),
+                )
+                all_discarded += [f.finding_class for f in _refuted]
+                still_epilogue = [
+                    f for f in still_epilogue if f not in _refuted
+                ]
         if still_epilogue:
             reclasses = [f.finding_class for f in refindings.findings]
             meta["original_qa"] = {
