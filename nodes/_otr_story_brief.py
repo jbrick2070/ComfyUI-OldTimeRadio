@@ -1232,3 +1232,190 @@ def run_produced_story_summary(
         "produced_story_model_id": technical_model_id,
         "produced_story_source": _PRODUCED_STORY_SOURCE,
     }
+
+
+# ---------------------------------------------------------------------------
+# Produced OPEN brief -- post-composition intro-rewrite derive pass
+# (INTRO_REWRITE_SPEC 2026-07-09, kibitz r2-r4 shape A).
+#
+# Same meta-split family as the produced-story summary above: the in-loop
+# intro was starved to a PRE-GEN SafeOpenBrief (outline-derived, writer
+# ~3438); this pass derives the same field shape from the PRODUCED scene-1
+# rows + cast roster so the writer can recompose the intro through the
+# existing routed safe-open composer. Spoiler safety is STRUCTURAL: the
+# input builder slices scene 1 only -- the pass cannot reveal what it
+# never saw.
+#
+# Failure posture differs from run_produced_story_summary BY DESIGN
+# (kibitz r4 P1): this function RAISES on ladder exhaustion / empty input;
+# the WRITER's rewrite block catches and keeps the in-loop intro. The
+# never-raise boundary lives at the caller, where the keep-intro decision
+# is made.
+# ---------------------------------------------------------------------------
+
+# Mirrors the reflection/produced-story JSON-compliance settings (3.2).
+_PRODUCED_OPEN_TEMPERATURE: float = 0.3
+_PRODUCED_OPEN_STRUCTURAL_RETRY_TEMPERATURE: float = 0.2
+_PRODUCED_OPEN_MAX_NEW_TOKENS: int = 320
+# Scene-1 excerpt budget (chars) -- keep the technical call tight
+# (kibitz r2 codex S2: derive runs on the technical slot between two
+# creative-slot passes; a small prompt keeps the swap cheap).
+_PRODUCED_OPEN_EXCERPT_CAP: int = 1200
+
+
+class ProducedOpenBriefModel(BaseModel):
+    """Derived no-spoiler OPEN brief -- SafeOpenBrief field parity.
+
+    Field-for-field the shape `_otr_line_composer.SafeOpenBrief` accepts
+    (minus `era`, which the WRITER threads from meta["period"] for parity
+    with the in-loop construction). Schema stays loose; the content gate
+    is `_validate_produced_open` (post_validator), which enforces
+    non-emptiness and roster membership."""
+    setting: str = Field(default="")
+    time_of_day: str = Field(default="")
+    opening_status_quo: str = Field(default="")
+    cast: list[str] = Field(default_factory=list)
+
+
+_PRODUCED_OPEN_PROMPT = """\
+You are preparing the radio announcer's opening for a finished episode.
+Below are the CAST ROSTER and the spoken lines of SCENE 1 ONLY. From them,
+extract a no-spoiler opening brief. Return ONE JSON object, keys exactly:
+  "setting"            -- where scene 1 takes place (concrete place words)
+  "time_of_day"        -- when, if the lines say or imply it, else ""
+  "opening_status_quo" -- one sentence: where things stand as scene 1 opens
+  "cast"               -- the roster names that actually appear in scene 1
+Rules: use ONLY information visible in the scene-1 lines; never invent
+names not on the roster; never hint at how the story might end; plain
+prose values, no markup. JSON only -- no commentary.
+
+"""
+
+
+def _build_produced_open_input(
+    led: Any,
+    first_announcer_line_id: str,
+) -> "tuple[str, list[str]]":
+    """Scene-1 input slice + cast roster for the derive pass.
+
+    Scene-1 rule (matches the writer's scene convention: music-marker rows
+    reset the conversational window, writer ~4921): skip the in-loop intro
+    row itself, skip any leading non-spoken rows (e.g. the intro->scene-1
+    music marker), collect spoken rows (character/announcer, non-empty
+    text) until the NEXT non-spoken row, capped at
+    `_PRODUCED_OPEN_EXCERPT_CAP` chars. Raises ValueError when no scene-1
+    spoken row exists (caller keeps the in-loop intro)."""
+    ledger = _ledger_data(led)
+    lines: Sequence[dict] = ledger.get("lines") or []
+    cast: Sequence[dict] = ledger.get("cast") or []
+
+    roster = [
+        (row.get("name") or "").strip()
+        for row in cast
+        if isinstance(row, dict) and (row.get("name") or "").strip()
+    ]
+
+    collected: list[dict] = []
+    started = False
+    used = 0
+    for ln in lines:
+        if not isinstance(ln, dict):
+            continue
+        if ln.get("line_id") == first_announcer_line_id:
+            # The in-loop intro row: excluded from its own rewrite input,
+            # and it does NOT start the scene (a marker may follow it).
+            continue
+        role = str(ln.get("speaker_role") or "").lower()
+        text = str(ln.get("text") or "").strip()
+        spoken = role in ("character", "announcer") and bool(text)
+        if not spoken:
+            if started:
+                break  # scene break: first non-spoken row after content
+            continue   # leading marker/empty row before scene 1
+        started = True
+        collected.append(ln)
+        used += len(text)
+        if used >= _PRODUCED_OPEN_EXCERPT_CAP:
+            break
+    if not collected:
+        raise ValueError(
+            "produced-open derive: no scene-1 spoken rows in the ledger"
+        )
+
+    parts: list[str] = []
+    parts.append("CAST ROSTER: " + (", ".join(roster) if roster else "(none)"))
+    parts.append(f"SCENE 1 ({len(collected)} spoken lines):")
+    parts.extend(f"  {_format_line(ln)}" for ln in collected)
+    return "\n".join(parts), roster
+
+
+def _validate_produced_open(
+    model: ProducedOpenBriefModel,
+    roster: "list[str]",
+) -> "str | None":
+    """Content gate (structured_call post_validator contract).
+
+    Rejects: an all-empty brief (nothing for the composer to starve on),
+    and any cast name not on the roster (case-insensitive) -- the derive
+    pass must never introduce a name the episode does not have."""
+    if not model.setting.strip() and not model.opening_status_quo.strip():
+        return "setting and opening_status_quo both empty"
+    lowered = {n.lower(): n for n in roster}
+    for name in model.cast:
+        if str(name).strip().lower() not in lowered:
+            return f"cast name {name!r} is not on the roster"
+    return None
+
+
+def derive_produced_open_brief(
+    led: Any,
+    *,
+    first_announcer_line_id: str,
+    technical_fn: Callable[..., str],
+    technical_model_id: str = "",
+) -> ProducedOpenBriefModel:
+    """Run the produced-open derive pass; return the validated brief.
+
+    LLM slot: technical -- structured JSON extraction, not narrative
+    composition (E-21 posture; same slot family as the produced-story
+    summary). RAISES on failure (ValueError for an empty scene slice,
+    StructuredCallFailedError on ladder exhaustion): the writer's rewrite
+    block owns the keep-intro decision (kibitz r4 P1). Cast names in the
+    returned model are normalized to roster casing and de-duplicated,
+    order preserved."""
+    input_text, roster = _build_produced_open_input(
+        led, first_announcer_line_id,
+    )
+    messages = [
+        {"role": "user", "content": _PRODUCED_OPEN_PROMPT + input_text},
+    ]
+
+    def _content_validator(model: ProducedOpenBriefModel) -> "str | None":
+        return _validate_produced_open(model, roster)
+
+    # LLM slot: technical -- structured JSON derive pass.
+    model = structured_call(
+        prompt=messages,
+        schema=ProducedOpenBriefModel,
+        slot_fn=technical_fn,
+        base_temperature=_PRODUCED_OPEN_TEMPERATURE,
+        structural_retry_temperature=(
+            _PRODUCED_OPEN_STRUCTURAL_RETRY_TEMPERATURE
+        ),
+        repair_prompt_factory=make_dispatching_repair_factory(),
+        post_validator=_content_validator,
+        max_new_tokens=_PRODUCED_OPEN_MAX_NEW_TOKENS,
+        max_attempts=3,
+        helper_name="derive_produced_open_brief",
+    )
+    log.info(
+        "[OTR_ProducedOpen] derive ok (model=%s, cast=%d, setting=%r)",
+        technical_model_id, len(model.cast), model.setting[:60],
+    )
+    lowered = {n.lower(): n for n in roster}
+    normalized: list[str] = []
+    for name in model.cast:
+        cased = lowered.get(str(name).strip().lower())
+        if cased and cased not in normalized:
+            normalized.append(cased)
+    return model.model_copy(update={"cast": normalized})

@@ -185,13 +185,28 @@ def test_call_site_is_k55_not_l5(execute_fn):
     last_style_receipt = max(style_receipts, key=_line_of)
 
     # `script_text = _PL.assemble_script_text_from_ledger(led.data)` -- L opener.
-    assemble_calls = _find_call_site(
-        execute_fn, "assemble_script_text_from_ledger",
+    # kibitz r3 D4 (2026-07-09): the J.5 title-regen fix added a SECOND,
+    # EARLIER assemble call (`assembled_script = ...`) so the title reads
+    # the real post-loop ledger. This pin's intent -- per its own docstring
+    # -- is the L-opener `script_text = ...` ASSIGNMENT specifically, so
+    # select by assignment target instead of min() over every call.
+    script_text_assigns = [
+        node
+        for node in ast.walk(execute_fn)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(t, ast.Name) and t.id == "script_text"
+            for t in node.targets
+        )
+        and isinstance(node.value, ast.Call)
+        and getattr(node.value.func, "attr", getattr(
+            node.value.func, "id", "")) == "assemble_script_text_from_ledger"
+    ]
+    assert script_text_assigns, (
+        "`script_text = ...assemble_script_text_from_ledger(...)` L-opener "
+        "assignment not found in execute()"
     )
-    assert assemble_calls, (
-        "assemble_script_text_from_ledger call not found in execute()"
-    )
-    first_assemble = min(assemble_calls, key=_line_of)
+    first_assemble = min(script_text_assigns, key=_line_of)
 
     assert _line_of(last_style_receipt) < _line_of(refl), (
         f"K.5.5 reflection call at line {_line_of(refl)} is BEFORE "

@@ -145,6 +145,7 @@ from . import _otr_source_payload as _otr_source_payload
 # import (not hot-path) so a typo / refactor surfaces at module load
 # time rather than during the first script generation.
 from ._otr_story_brief import (
+    derive_produced_open_brief,
     run_produced_story_summary,
     run_story_brief_reflection,
 )
@@ -1445,6 +1446,52 @@ def _build_cast_rows(cast_names) -> tuple:
         })
         char_id_by_name[name] = cid
     return cast_rows, char_id_by_name
+
+
+def _apply_intro_rewrite_result(led, first_announcer_id, new_text, flag):
+    """Apply the intro-rewrite outcome to the ledger intro row.
+
+    Sits OUTSIDE the rewrite try/except BY DESIGN (kibitz r4 P1): a
+    missing intro row is ledger corruption -> RuntimeError, never
+    swallowed as a "rewrite failure". Flags are READ-EXTEND-PATCH
+    (patch_line_fields REPLACES the field; the row carries in-loop
+    telemetry -- announcer_intro / open_safe_fallback -- that must
+    survive the rewrite). ``new_text`` None = the rewrite failed:
+    the in-loop text stands and only the failure flag lands.
+    """
+    # Lazy dual import (repo import-isolation convention -- the ledger
+    # helpers are run()-local everywhere else in this module).
+    try:
+        from . import _otr_ledger as _OTRL
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        import _otr_ledger as _OTRL  # type: ignore
+
+    row = None
+    for _ln in led.data.get("lines") or []:
+        if isinstance(_ln, dict) and _ln.get("line_id") == first_announcer_id:
+            row = _ln
+            break
+    if row is None:
+        raise RuntimeError(
+            f"[OTR_LedgerScriptWriter] intro rewrite: no ledger row with "
+            f"line_id={first_announcer_id!r} -- ledger skeleton and outline "
+            f"have drifted apart (corruption, not a rewrite failure)"
+        )
+    flags = list(row.get("compose_flags") or [])
+    if new_text:
+        if not _OTRL.patch_line_text(led.data, first_announcer_id, new_text):
+            raise RuntimeError(
+                f"[OTR_LedgerScriptWriter] intro rewrite: patch_line_text "
+                f"returned False for line_id={first_announcer_id!r}"
+            )
+    flags.append(flag)
+    if not _OTRL.patch_line_fields(
+        led.data, first_announcer_id, {"compose_flags": flags},
+    ):
+        raise RuntimeError(
+            f"[OTR_LedgerScriptWriter] intro rewrite: patch_line_fields "
+            f"returned False for line_id={first_announcer_id!r}"
+        )
 
 
 def _build_news_payload(outline, news_seed: str, seed_source: str) -> str:
@@ -4983,6 +5030,88 @@ class OTR_LedgerScriptWriter:
             if token:
                 script_text_parts.append(token)
 
+        # --- I.4.9. Post-composition announcer-intro REWRITE ----------
+        # (INTRO_REWRITE_SPEC 2026-07-09, kibitz r2-r4, shape A.) The
+        # in-loop intro was starved to the PRE-GEN SafeOpenBrief
+        # (outline-derived, section F above); now the script exists,
+        # derive a PRODUCED open brief from scene-1 rows + cast (input
+        # starvation again -- the derive pass never sees past scene 1)
+        # and recompose the intro through the SAME routed safe-open
+        # composer. Runs BEFORE the I.5 outro pass so the outro
+        # tone-echo (the ledger read below) sees the FINAL intro, and
+        # BEFORE the J aggregates so flags/word counts stay fresh.
+        # Failure posture: keep the in-loop intro (REAL composed
+        # content, not a canned template -- same never-raise family as
+        # K.5.5/K.5.6), stamp announcer_intro_rewrite_failed, log LOUD.
+        # Only the derive + compose calls sit inside the try (kibitz r4
+        # P1): row lookup/patch runs OUTSIDE it and RAISES on a missing
+        # row (corruption, not a rewrite failure). Degenerate outline
+        # (first == last announcer beat: the single bookend row) skips
+        # the rewrite entirely -- mirror of the outro-pass guard.
+        if (
+            first_announcer_id is not None
+            and last_announcer_id is not None
+            and first_announcer_id != last_announcer_id
+        ):
+            _rw_text = None
+            _rw_flag = "announcer_intro_rewrite_failed"
+            try:
+                # LLM slot: technical -- structured scene-1 derive.
+                with slot_scheduler.helper_context(
+                    "derive_produced_open_brief"
+                ):
+                    _rw_brief = derive_produced_open_brief(
+                        led,
+                        first_announcer_line_id=first_announcer_id,
+                        technical_fn=technical_generate_fn,
+                        technical_model_id=str(resolved["technical_model"]),
+                    )
+                # LLM slot: creative -- the SAME routed safe-open intro
+                # composer the in-loop pass uses; story_scaffold=True
+                # UNCONDITIONALLY (the rewrite is defined for all banks,
+                # independent of the style-grammar lever). era threads
+                # meta["period"] for parity with the in-loop
+                # SafeOpenBrief construction (timeless lanes starve it).
+                with slot_scheduler.helper_context(
+                    "announcer_intro_rewrite"
+                ):
+                    _rw_res = _OTRLC.compose_announcer_intro(
+                        creative_fn=creative_generate_fn,
+                        script_brief="",
+                        creative_repo_id=resolved["creative_writing_model"],
+                        story_scaffold=True,
+                        safe_open_brief=_OTRLC.SafeOpenBrief(
+                            setting=_rw_brief.setting,
+                            time_of_day=_rw_brief.time_of_day,
+                            opening_status_quo=_rw_brief.opening_status_quo,
+                            cast=tuple(_rw_brief.cast),
+                            era=str(meta.get("period", "") or ""),
+                        ),
+                        source_bank_id=resolved["source_bank"],
+                    )
+                _rw_text = _rw_res.text
+                _rw_flag = "announcer_intro_rewritten"
+            except Exception as _rw_exc:  # noqa: BLE001 -- a polish pass
+                # must never kill a finished episode; the in-loop intro
+                # stands (it is real composed content, not a template).
+                log.warning(
+                    "[OTR_LedgerScriptWriter] announcer intro REWRITE "
+                    "failed (%s: %s) -- keeping the in-loop intro (LOUD).",
+                    type(_rw_exc).__name__, str(_rw_exc)[:200],
+                )
+            _apply_intro_rewrite_result(
+                led, first_announcer_id, _rw_text, _rw_flag,
+            )
+            meta.setdefault("announcer_intro_rewrite", {})["status"] = (
+                _rw_flag
+            )
+            led.save()
+            log.info(
+                "[OTR_LedgerScriptWriter] announcer intro rewrite: %s "
+                "(line %s)",
+                _rw_flag, first_announcer_id,
+            )
+
         # --- I.5. News-wiring overlay (Phase 2B: operates on ledger) --
         # Two operations on `led.data["lines"]` AFTER the progressive
         # composer loop completes.
@@ -5360,7 +5489,14 @@ class OTR_LedgerScriptWriter:
             final_title = resolved["episode_title"]
             title_source = "user"
         else:
-            assembled_script = "\n\n".join(script_text_parts).strip()
+            # kibitz r3 D4 (2026-07-09) ROOT-CAUSE FIX: assemble from the
+            # CANONICAL ledger, not the in-flight script_text_parts list.
+            # script_text_parts still holds the in-loop tokens -- it never
+            # saw the I.5 outro overwrite (title regen was reading the
+            # deterministic PLACEHOLDER close), and it would never see the
+            # I.4.9 intro rewrite. Same authority the slot-0 output uses
+            # (section L below); script_text_parts stays diagnostic-only.
+            assembled_script = _PL.assemble_script_text_from_ledger(led.data)
             # LLM slot: creative -- title regen is a narrative pass
             # (scratchpad: extract physical details, draft candidates,
             # commit a final title). One LLM call produces the whole
