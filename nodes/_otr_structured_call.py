@@ -387,6 +387,20 @@ def parse_validate_tolerant(
     return validate_tolerant_data(data, schema, post_validator=post_validator)
 
 
+def _raw_head(raw: "str | None", cap: int = 400) -> str:
+    """Sanitized head of a failed model output for the ladder WARNING
+    logs (live-smoke hardening 2026-07-10: three production stage
+    failures in one night were undiagnosable because the raw output
+    was never logged). Whitespace runs collapse to single spaces so
+    the log line stays one line and greppable."""
+    if not raw:
+        return "<empty>"
+    head = " ".join(str(raw).split())
+    if len(head) > cap:
+        return head[:cap] + "..."
+    return head
+
+
 def _parse_and_validate(
     raw: str,
     schema: type[T],
@@ -570,8 +584,9 @@ def structured_call(
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
-                "[OTR_StructuredCall] '%s' attempt %d failed: %s",
-                helper_name, attempts_run, exc,
+                "[OTR_StructuredCall] '%s' attempt %d failed: %s | raw "
+                "head: %s", helper_name, attempts_run, exc,
+                _raw_head(last_raw),
             )
 
     # --- Structural retry: SAME prompt, lower temperature -- ONLY for a JSON
@@ -601,8 +616,9 @@ def structured_call(
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
-                "[OTR_StructuredCall] '%s' attempt %d failed: %s",
-                helper_name, attempts_run, exc,
+                "[OTR_StructuredCall] '%s' attempt %d failed: %s | raw "
+                "head: %s", helper_name, attempts_run, exc,
+                _raw_head(last_raw),
             )
 
     # --- Typed repair at a static low temperature (the final rung). ---
@@ -654,8 +670,9 @@ def structured_call(
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
-                "[OTR_StructuredCall] '%s' attempt %d (repair) failed: %s",
-                helper_name, attempts_run, exc,
+                "[OTR_StructuredCall] '%s' attempt %d (repair) failed: "
+                "%s | raw head: %s",
+                helper_name, attempts_run, exc, _raw_head(last_raw),
             )
 
     # --- Ladder exhausted: fail loud. ---
