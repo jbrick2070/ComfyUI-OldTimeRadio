@@ -54,12 +54,13 @@ class LoaderBackend(Protocol):
     `make_generate_fn`, etc) continues to consume it unchanged.
     """
 
-    def load(self, repo_id: str, row: Any) -> dict[str, Any]:
+    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
         """Load the model and return a cache_entry dict.
 
         Args:
             repo_id: canonical HuggingFace repo_id (no UI suffix).
             row: the CuratedModel row from _otr_model_catalog.
+            policy: the S1 LLMRuntimePolicy (None = nv50 baseline).
 
         Returns:
             cache_entry dict matching legacy load_llm shape.

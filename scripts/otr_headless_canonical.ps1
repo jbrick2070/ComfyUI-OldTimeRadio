@@ -9,7 +9,7 @@
 
   Examples:
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 `
-      -Profile cloud_all -Words 30 -Set OTR_LedgerScriptWriter.source_bank=science_news
+      -Profile otr_cloud_lanes -Words 30 -Set OTR_LedgerScriptWriter.source_bank=science_news
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 `
       -NoBoot -Profile none -Words 30 -DryRun

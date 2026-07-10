@@ -98,6 +98,13 @@ def _committed_profile_ids() -> list[str]:
         if p.stem == "widget_mapping":
             continue
         out.append(p.stem)
+    # Stem-collision guard (post-ship audit): a bare id X and a prefixed
+    # otr_X would map to the SAME variant filename -- refuse loudly.
+    for pid in out:
+        if not pid.startswith("otr_") and f"otr_{pid}" in out:
+            raise EmitRefused(
+                f"profile ids '{pid}' and 'otr_{pid}' collide on the "
+                f"variant filename otr_{pid}.json -- rename one.")
     return out
 
 
@@ -252,8 +259,10 @@ def cmd_emit(profile_ids: list[str], explicit: bool) -> int:
             refused.append((pid, str(e)))
             continue
         (REPO / rel).write_text(_dump(variant), encoding="utf-8")
+        # newline="\n": platform-safe by construction (Windows universal
+        # newlines otherwise bake CRLF into locally-regenerated recipes).
         (VARIANTS_DIR / f"{_variant_stem(pid)}.launch.md").write_text(
-            recipe, encoding="utf-8")
+            recipe, encoding="utf-8", newline="\n")
         emitted.append(rel)
         print(f"EMITTED {rel} (+ launch recipe)")
     for pid, why in refused:
@@ -301,15 +310,26 @@ def cmd_check() -> int:
             failures.append(f"{rpath.name}: launch recipe missing")
         elif rpath.read_text(encoding="utf-8") != recipe:
             failures.append(f"{rpath.name}: recipe DRIFT vs regeneration")
-        # Stamp agreement on the DISK variant.
+        # Stamp agreement on the DISK variant -- resolved BY NAME against
+        # the live validator schema (post-ship audit: positional wv[3..5]
+        # was the exact drift class the widget rules exist to prevent).
+        from nodes._otr_workflow_apply import serialized_slot_names
         wf = json.loads(disk)
         nid = _validator_node_id(wf)
         vnode = next(n for n in wf["nodes"] if int(n["id"]) == nid)
         wv = vnode.get("widgets_values") or []
+        slots = serialized_slot_names("OTR_WorkflowValidator", schemas)
         live_hash = semantic_master_hash(wf, mapping=mapping,
                                          schemas=schemas)
-        if len(wv) < 6 or wv[3] != pid or wv[4] != live_hash or \
-                wv[5] != GENERATED_BY:
+        try:
+            stamped = {name: wv[slots.index(name)]
+                       for name in ("profile_id", "master_hash",
+                                    "generated_by")}
+        except (ValueError, IndexError):
+            stamped = {}
+        if (stamped.get("profile_id") != pid
+                or stamped.get("master_hash") != live_hash
+                or stamped.get("generated_by") != GENERATED_BY):
             failures.append(f"{vpath.name}: stamp disagreement "
                             f"(profile_id/master_hash/generated_by)")
     for f in failures:

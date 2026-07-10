@@ -71,12 +71,18 @@ class StableAudioMusicEngine:
         self.load()
         seed = int(seed)
         torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
 
         from stable_audio_tools.inference.generation import generate_diffusion_cond
 
-        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        # Post-ship audit fix (2026-07-10): EXPLICIT device -- the theme
+        # node stamps the CastLock ledger device onto every music adapter
+        # as requested_device; this legacy engine was the one adapter the
+        # S4 waterfall sweep missed (the spec listed kokoro/musicgen/
+        # chatterbox by name). No probe, no fallback: an unavailable
+        # device fails loud downstream.
+        dev = getattr(self, "requested_device", None) or "cuda"
+        if dev == "cuda":
+            torch.cuda.manual_seed_all(seed)
         kwargs = supported_kwargs(
             generate_diffusion_cond,
             steps=100,

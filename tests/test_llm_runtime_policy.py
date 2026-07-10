@@ -293,3 +293,61 @@ def test_resolve_inputs_rejects_bad_policy_enum():
 
     with pytest.raises(lp.LLMPolicyError):
         _resolve_inputs(custom_premise="test premise", llm_device="tpu")
+
+
+# --------------------------------------------------------------------------
+# Post-ship audit (2026-07-10): the ledger policy stamp + downstream readers
+# --------------------------------------------------------------------------
+
+def test_policy_from_meta_roundtrip_and_failure_modes():
+    pol = lp.LLMRuntimePolicy(device="cpu", quant_policy="none",
+                              vram_ceiling_gb=0, gguf_quant="Q4_K_M")
+    stamp = {"device": pol.device, "attn_impl": pol.attn_impl,
+             "quant_policy": pol.quant_policy,
+             "vram_ceiling_gb": pol.vram_ceiling_gb,
+             "gguf_n_ctx": pol.gguf_n_ctx, "gguf_quant": pol.gguf_quant,
+             "lane_allowlist": list(pol.lane_allowlist)}
+    assert lp.policy_from_meta({"llm_policy": stamp}) == pol
+    # Absent stamp -> None (pre-stamp ledgers keep the BASELINE backstop).
+    assert lp.policy_from_meta({}) is None
+    assert lp.policy_from_meta(None) is None
+    # Present-but-malformed stamp fails LOUD.
+    with pytest.raises(lp.LLMPolicyError):
+        lp.policy_from_meta({"llm_policy": "not-a-dict"})
+    with pytest.raises(lp.LLMPolicyError):
+        lp.policy_from_meta({"llm_policy": {"device": "cuda"}})
+
+
+def test_writer_stamps_llm_policy_into_meta_source():
+    """The writer must stamp meta['llm_policy'] (the freeze cascade +
+    shot-lock derivation read it back). Source-level pin."""
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parents[1] / "nodes"
+           / "OTR_LedgerScriptWriter.py").read_text(encoding="utf-8")
+    assert 'meta["llm_policy"]' in src
+
+
+def test_downstream_llm_consumers_thread_the_ledger_policy():
+    """FreezeCascade + shot-lock request_slot calls carry
+    policy=policy_from_meta(...) -- the post-ship audit's MUST-FIX."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[1] / "nodes"
+    lfc = (root / "OTR_LedgerFreezeCascade.py").read_text(encoding="utf-8")
+    assert "policy_from_meta" in lfc
+    assert "policy=_lfc_policy" in lfc
+    sl = (root / "otr_shot_lock.py").read_text(encoding="utf-8")
+    assert "policy=policy_from_meta(meta)" in sl
+
+
+def test_stable_audio_music_has_no_device_waterfall():
+    """eng_stable_audio was the adapter the S4 sweep missed: it must read
+    requested_device (theme-node stamp), never probe cuda."""
+    import inspect
+
+    from nodes._otr_audio_engines import eng_stable_audio as sa
+
+    src = inspect.getsource(sa)
+    assert 'getattr(self, "requested_device"' in src
+    assert 'dev = "cuda" if torch.cuda.is_available() else "cpu"' not in src

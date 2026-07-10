@@ -675,8 +675,13 @@ def _resolve_writer_llm(meta: dict, warnings: list):
         # cache entry (a same-model call is a cache HIT, no reload) ->
         # make_generate_fn(entry) -> gen(messages, ...).
         from ._otr_model_loader import make_generate_fn, request_slot  # type: ignore
+        # Post-ship audit fix (2026-07-10): same policy the writer ran
+        # under (ledger stamp); None = pre-stamp backstop.
+        from ._otr_shared.llm_policy import policy_from_meta
 
-        entry = request_slot("technical", model_id)  # LLM slot: technical
+        entry = request_slot(
+            "technical", model_id,
+            policy=policy_from_meta(meta))  # LLM slot: technical
         gen = make_generate_fn(entry)
 
         def _call(prompt: str) -> str:

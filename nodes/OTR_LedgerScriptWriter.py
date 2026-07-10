@@ -6089,6 +6089,20 @@ class OTR_LedgerScriptWriter:
             "seed_source":           resolved["seed_source"],
             "source_ref":            resolved["source_ref"],
         }
+        # Post-ship audit fix (2026-07-10): stamp the resolved runtime
+        # policy into the ledger so DOWNSTREAM LLM consumers (freeze
+        # cascade reviewer, shot-lock derivation) run under the SAME
+        # policy -- not a silent nv50-baseline fallback on other tiers.
+        _pol = resolved["llm_policy"]
+        meta["llm_policy"] = {
+            "device": _pol.device,
+            "attn_impl": _pol.attn_impl,
+            "quant_policy": _pol.quant_policy,
+            "vram_ceiling_gb": _pol.vram_ceiling_gb,
+            "gguf_n_ctx": _pol.gguf_n_ctx,
+            "gguf_quant": _pol.gguf_quant,
+            "lane_allowlist": list(_pol.lane_allowlist),
+        }
         # S30 B2b: top-level slot stamps + per-phase routing trace.
         # `gen_params_by_phase` records the slot + resolved model for
         # each writer-level LLM phase that fired. Critic / cascade

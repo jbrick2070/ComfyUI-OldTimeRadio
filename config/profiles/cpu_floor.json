@@ -10,7 +10,10 @@
   "role_overrides": {
     "announcer_visual": "still_flat",
     "music_visual": "viz_green",
-    "character_visual": "still_motion"
+    "character_visual": "still_motion",
+    "announcer_image": "google_image",
+    "music_image": "google_image",
+    "character_image": "google_image"
   },
   "slot_overrides": {
     "voice_bank": "default",
@@ -69,7 +72,7 @@
   },
   "preflight": {
     "required_models": [],
-    "required_keys": []
+    "required_keys": ["OTR_GOOGLE_API_KEY"]
   },
   "launch": {
     "sage_attention": false,

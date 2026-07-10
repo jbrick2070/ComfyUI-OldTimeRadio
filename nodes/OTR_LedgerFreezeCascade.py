@@ -342,8 +342,16 @@ class OTR_LedgerFreezeCascade:
         resolved_technical_id = _OTRMI.require_model(
             technical_model, slot="technical",
         )
+        # Post-ship audit fix (2026-07-10): run the reviewer under the
+        # SAME runtime policy the writer stamped into the ledger
+        # (meta.llm_policy) -- an unthreaded call here reloaded the LLM
+        # under the nv50 baseline on every non-baseline tier, after the
+        # writer's full budget was already spent. None (pre-stamp
+        # ledger) keeps the documented BASELINE backstop.
+        from ._otr_shared.llm_policy import policy_from_meta
+        _lfc_policy = policy_from_meta(led.get("meta") or {})
         cache_entry = _OTRML.request_slot(
-            "technical", resolved_technical_id,
+            "technical", resolved_technical_id, policy=_lfc_policy,
         )
         generate_fn = _OTRML.make_generate_fn(cache_entry)
         # LFC commit 12, ADR section 6.4: build the polish-specific

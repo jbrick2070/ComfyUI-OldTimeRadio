@@ -128,6 +128,32 @@ class LLMRuntimePolicy:
 BASELINE_POLICY = LLMRuntimePolicy()
 
 
+def policy_from_meta(meta: Any) -> "LLMRuntimePolicy | None":
+    """Rebuild the writer-stamped policy from ledger ``meta['llm_policy']``
+    (post-ship audit fix, 2026-07-10): downstream LLM consumers that only
+    hold the LEDGER (freeze cascade, shot-lock derivation) read the SAME
+    policy the writer ran under instead of silently falling back to the
+    nv50 baseline. Returns None when the stamp is absent (pre-stamp
+    ledgers -- callers keep the documented BASELINE backstop); a PRESENT
+    but malformed stamp fails loud."""
+    raw = (meta or {}).get("llm_policy") if isinstance(meta, dict) else None
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise LLMPolicyError(f"ledger meta.llm_policy is malformed: {raw!r}")
+    try:
+        return LLMRuntimePolicy(
+            device=raw["device"], attn_impl=raw["attn_impl"],
+            quant_policy=raw["quant_policy"],
+            vram_ceiling_gb=raw["vram_ceiling_gb"],
+            gguf_n_ctx=raw["gguf_n_ctx"], gguf_quant=raw["gguf_quant"],
+            lane_allowlist=tuple(raw.get("lane_allowlist") or ALL_LANES),
+        )
+    except (KeyError, TypeError) as e:
+        raise LLMPolicyError(
+            f"ledger meta.llm_policy is malformed ({e!r}): {raw!r}") from e
+
+
 def lane_for_row(row: Any) -> str:
     """Lane token for a catalog row (None row = transformers lane)."""
     lb = getattr(row, "loader_backend", None) if row is not None else None
@@ -153,4 +179,5 @@ __all__ = [
     "LLMPolicyError",
     "LLMRuntimePolicy",
     "lane_for_row",
+    "policy_from_meta",
 ]

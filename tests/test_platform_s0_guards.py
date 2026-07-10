@@ -162,6 +162,16 @@ def test_cpu_floor_profile_is_runnable_on_cpu():
         assert avail.get(eng) == cp.REASON_OK, (slot, eng)
     assert prof["slot_overrides"]["char_voice_engine"] == "kokoro"
     assert prof["slot_overrides"]["voice_bank"] == "default"
+    # Post-ship audit (2026-07-10): the IMAGE roles must be overridden too
+    # -- inheriting canonical's cuda-only z_image_turbo shipped a GPU
+    # engine on the no-GPU tier. Every image override must fit cpu.
+    from nodes._otr_image_engines import registry as ireg_caps
+
+    img_avail = cp.availability(prof, ireg_caps.CAPABILITIES)
+    for slot in ("announcer_image", "music_image", "character_image"):
+        eng = prof["role_overrides"].get(slot)
+        assert eng, f"cpu_floor must override {slot} (canonical is cuda-only)"
+        assert img_avail.get(eng) == cp.REASON_OK, (slot, eng)
 
 
 # --------------------------------------------------------------------------
