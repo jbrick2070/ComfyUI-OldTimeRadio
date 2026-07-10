@@ -152,6 +152,11 @@ Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's 
 - **Never dry-run, never pre-compute the cost -- just spend and run it LIVE,** then state the
   actual spend after. (Only backstop = the global >= $20-or-irreversible gate, which roundtable
   passes never reach in practice.)
+- **ARC ROUTING (operator directive 2026-07-09): R1 (ideas/high-level) = cloud `/roundtable`
+  on the highest frontier models (that's where paid diversity earns its keep); R2-R4 (coding /
+  wiring / convergence) = `/kibitz` (local Codex + Antigravity) ALWAYS PREFERRED -- $0, file-
+  grounded. R1 via kibitz is also fine when economy matters. OpenRouter is paid except
+  `tencent/hy3:free` (until 2026-07-21), so default mechanical review to the local panel.
 - Artifacts under `docs/<YYYY-MM-DD>-<topic>/roundtable/` (pass00..passNN_plan.md +
   passNN_judgment.md), UTF-8 no BOM, ASCII where practical.
 ## 9. MODEL ROUTING -- when to spend Fable (operator directive 2026-07-03)
