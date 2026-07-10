@@ -436,6 +436,25 @@ def _flatten_profile_values(profile: dict) -> dict:
         flat["seed_policy.request_seed"] = sp["request_seed"]
     if "seed_mode" in sp:
         flat["seed_policy.seed_mode"] = sp["seed_mode"]
+    # S2 platform-portability (2026-07-10): widget-mapped v2 sections whose
+    # targets EXIST today. llm model keys -> the writer's 8 existing model
+    # widgets; render.* -> the fps/canvas/composite/frame-budget widget set.
+    # The llm RUNTIME fields (device/attn/quant/gguf/...) and the
+    # video/image/audio policy fields flatten in S5 WITH their widgets --
+    # flattening them earlier would fail apply (no mapping target), and a
+    # mapping target must never name a widget that does not exist yet.
+    llm = profile.get("llm", {})
+    for k in ("creative_model", "technical_model",
+              "openrouter_slot_a_model", "openrouter_slot_b_model",
+              "comfy_slot_a_model", "comfy_slot_b_model",
+              "google_api_slot_a_model", "google_api_slot_b_model"):
+        if k in llm:
+            flat[f"llm.{k}"] = llm[k]
+    rend = profile.get("render", {})
+    for k in ("fps", "canvas_w", "canvas_h", "composite_res",
+              "composite_w", "composite_h", "frame_budget", "beats"):
+        if k in rend:
+            flat[f"render.{k}"] = rend[k]
     return flat
 
 

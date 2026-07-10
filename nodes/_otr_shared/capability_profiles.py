@@ -56,11 +56,31 @@ class ProfileError(ValueError):
 
 
 # ---------------------------------------------------------------------------
-# S0 -- profile shape
+# S0 -- profile shape (schema v2: platform-portability S2, 2026-07-10 --
+# docs/2026-07-09-platform-portability-final.md section 2)
 # ---------------------------------------------------------------------------
-_PLATFORMS = ("any", "win", "mac")
-_DEVICE_BACKENDS = ("cuda", "cpu")  # mps deliberately absent in v1 (parked)
+_PLATFORMS = ("any", "win", "mac", "linux")
+_DEVICE_BACKENDS = ("cuda", "cpu", "mps")  # ROCm presents as "cuda"
 _STATUSES = ("shipping", "draft")
+_GPU_VENDORS = ("nvidia", "amd", "apple", "none")
+_DTYPE_POLICIES = ("fp8_ok", "no_fp8", "no_fp8_no_fp4")
+_DEVICE_POLICIES = ("cuda", "cpu", "mps")
+
+
+def _is_positive_int(v: Any) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and v > 0
+
+
+def _is_res_string(v: Any) -> bool:
+    if not isinstance(v, str):
+        return False
+    parts = v.split("x")
+    return len(parts) == 2 and all(p.isdigit() and int(p) > 0 for p in parts)
+
+
+def _is_str_list(v: Any) -> bool:
+    return isinstance(v, list) and all(isinstance(s, str) and s for s in v)
+
 
 # key -> (required, validator-callable, human description)
 _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
@@ -69,6 +89,7 @@ _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
     "status": (True, lambda v: v in _STATUSES, f"one of {_STATUSES}"),
     "platform": (True, lambda v: v in _PLATFORMS, f"one of {_PLATFORMS}"),
     "device_backend": (True, lambda v: v in _DEVICE_BACKENDS, f"one of {_DEVICE_BACKENDS}"),
+    "gpu_vendor": (True, lambda v: v in _GPU_VENDORS, f"one of {_GPU_VENDORS}"),
     "toolchains": (True, lambda v: isinstance(v, list) and all(isinstance(t, str) for t in v), "list[str]"),
     "allow_sidecars": (True, lambda v: isinstance(v, bool), "bool"),
     "role_overrides": (True, lambda v: _is_str_dict(v), "dict[str, str]"),
@@ -76,6 +97,12 @@ _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
     "features": (True, lambda v: isinstance(v, dict), "dict"),
     "seed_policy": (True, lambda v: isinstance(v, dict), "dict"),
     "launch": (True, lambda v: isinstance(v, dict), "dict"),
+    "llm": (True, lambda v: isinstance(v, dict), "dict"),
+    "video": (True, lambda v: isinstance(v, dict), "dict"),
+    "image": (True, lambda v: isinstance(v, dict), "dict"),
+    "audio": (True, lambda v: isinstance(v, dict), "dict"),
+    "render": (True, lambda v: isinstance(v, dict), "dict"),
+    "preflight": (True, lambda v: isinstance(v, dict), "dict"),
 }
 
 _SEED_POLICY_KEYS = {
@@ -88,7 +115,79 @@ _SEED_POLICY_KEYS = {
 _LAUNCH_KEYS = {
     "sage_attention": lambda v: isinstance(v, bool),
     "extra_args": lambda v: isinstance(v, list) and all(isinstance(a, str) for a in v),
+    # v2: launch-only env vars for the generated recipe (names -> values;
+    # secrets NEVER go here -- key NAMES belong in preflight.required_keys).
+    "env": lambda v: isinstance(v, dict) and all(
+        isinstance(k, str) and k and isinstance(val, str) for k, val in v.items()),
 }
+
+# --- v2 sections -------------------------------------------------------
+_VIDEO_KEYS = {
+    "device_policy": lambda v: v in _DEVICE_POLICIES,
+    "dtype_policy": lambda v: v in _DTYPE_POLICIES,
+}
+_IMAGE_KEYS = {
+    "dtype_policy": lambda v: v in _DTYPE_POLICIES,
+}
+_AUDIO_KEYS = {
+    "voice_device": lambda v: v in _DEVICE_POLICIES,
+}
+_RENDER_KEYS = {
+    "fps": _is_positive_int,
+    "canvas_w": _is_positive_int,
+    "canvas_h": _is_positive_int,
+    "composite_res": _is_res_string,
+    "composite_w": _is_positive_int,
+    "composite_h": _is_positive_int,
+    "frame_budget": _is_positive_int,
+    "beats": _is_positive_int,
+}
+_PREFLIGHT_KEYS = {
+    "required_models": _is_str_list,
+    "required_keys": _is_str_list,
+}
+
+# llm section: 8 model keys (widget-mapped 1:1 to the writer's existing
+# model widgets) + the 7 runtime-policy fields. The runtime fields are
+# validated by CONSTRUCTING an LLMRuntimePolicy -- ONE enum truth
+# (nodes/_otr_shared/llm_policy.py), zero duplication.
+_LLM_MODEL_KEYS = (
+    "creative_model", "technical_model",
+    "openrouter_slot_a_model", "openrouter_slot_b_model",
+    "comfy_slot_a_model", "comfy_slot_b_model",
+    "google_api_slot_a_model", "google_api_slot_b_model",
+)
+_LLM_RUNTIME_KEYS = (
+    "device", "attn_impl", "quant_policy", "vram_ceiling_gb",
+    "gguf_n_ctx", "gguf_quant", "lane_allowlist",
+)
+
+
+def _validate_llm_section(sub: Any, source: str) -> None:
+    allowed = set(_LLM_MODEL_KEYS) | set(_LLM_RUNTIME_KEYS)
+    unknown = set(sub) - allowed
+    if unknown:
+        raise ProfileError(f"profile {source}: unknown llm key(s) {sorted(unknown)!r}")
+    missing = [k for k in (*_LLM_MODEL_KEYS, *_LLM_RUNTIME_KEYS) if k not in sub]
+    if missing:
+        raise ProfileError(f"profile {source}: llm missing key(s) {missing!r}")
+    for k in _LLM_MODEL_KEYS:
+        v = sub[k]
+        if not isinstance(v, str):
+            raise ProfileError(f"profile {source}: llm.{k} must be a str; got {v!r}")
+        if k in ("creative_model", "technical_model") and not v:
+            raise ProfileError(f"profile {source}: llm.{k} must be non-empty")
+    from .llm_policy import LLMPolicyError, LLMRuntimePolicy
+    try:
+        LLMRuntimePolicy(
+            device=sub["device"], attn_impl=sub["attn_impl"],
+            quant_policy=sub["quant_policy"],
+            vram_ceiling_gb=sub["vram_ceiling_gb"],
+            gguf_n_ctx=sub["gguf_n_ctx"], gguf_quant=sub["gguf_quant"],
+            lane_allowlist=tuple(sub["lane_allowlist"]),
+        )
+    except (LLMPolicyError, TypeError) as e:
+        raise ProfileError(f"profile {source}: llm section invalid: {e}") from e
 
 
 def _is_str_dict(v: Any) -> bool:
@@ -115,7 +214,15 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
         if k in profile and not check(profile[k]):
             raise ProfileError(f"profile {source}: key {k!r} must be {desc}; got {profile[k]!r}")
 
-    for sub_name, sub_spec in (("seed_policy", _SEED_POLICY_KEYS), ("launch", _LAUNCH_KEYS)):
+    for sub_name, sub_spec in (
+        ("seed_policy", _SEED_POLICY_KEYS),
+        ("launch", _LAUNCH_KEYS),
+        ("video", _VIDEO_KEYS),
+        ("image", _IMAGE_KEYS),
+        ("audio", _AUDIO_KEYS),
+        ("render", _RENDER_KEYS),
+        ("preflight", _PREFLIGHT_KEYS),
+    ):
         sub = profile[sub_name]
         unknown = set(sub) - set(sub_spec)
         if unknown:
@@ -126,6 +233,9 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
         for k, check in sub_spec.items():
             if not check(sub[k]):
                 raise ProfileError(f"profile {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
+
+    # v2: the llm section (constructor-based validation; ONE enum truth).
+    _validate_llm_section(profile["llm"], source)
 
     # features: bool/str values only in v1 (widget-backed BOOLEANs + COMBO styles)
     for k, v in profile["features"].items():
@@ -170,7 +280,8 @@ def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
 # ---------------------------------------------------------------------------
 _MAPPING_SECTIONS = ("managed", "emit_only")
 _MAPPING_KEYS = ("version", "_comment", "managed", "emit_only",
-                 "exempt_node_types", "never_patch_widget_names")
+                 "exempt_node_types", "exempt_widget_names",
+                 "never_patch_widget_names")
 _REGISTRY_NAMES = ("video", "audio", "image")
 
 
@@ -220,6 +331,25 @@ def validate_widget_mapping_shape(mapping: Any, source: str = "<dict>") -> dict:
                         f"mapping {source}: entry {key!r} targets forbidden widget "
                         f"name {t[1]!r} (companion-slot trap)"
                     )
+    # v2: per-node-type widget-name exemptions (the coverage audit's
+    # fine-grained sibling of exempt_node_types). Shape:
+    # {node_type: [widget_name, ...]}.
+    ewn = mapping.get("exempt_widget_names")
+    if ewn is not None:
+        if not isinstance(ewn, dict):
+            raise ProfileError(
+                f"mapping {source}: exempt_widget_names must be a dict of "
+                f"node_type -> [widget names]")
+        for ntype, names in ewn.items():
+            if not isinstance(ntype, str) or not ntype or ntype.isdigit():
+                raise ProfileError(
+                    f"mapping {source}: exempt_widget_names key {ntype!r} "
+                    f"must be a node TYPE (raw ids banned)")
+            if not isinstance(names, list) or not names or not all(
+                    isinstance(n, str) and n for n in names):
+                raise ProfileError(
+                    f"mapping {source}: exempt_widget_names[{ntype!r}] must "
+                    f"be a non-empty list of widget names")
     return mapping
 
 

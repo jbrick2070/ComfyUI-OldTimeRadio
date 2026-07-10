@@ -4,6 +4,7 @@
   "status": "draft",
   "platform": "any",
   "device_backend": "cpu",
+  "gpu_vendor": "none",
   "toolchains": [],
   "allow_sidecars": false,
   "role_overrides": {
@@ -29,8 +30,50 @@
     "cast_seed_env": null,
     "style_seed_env": null
   },
+  "llm": {
+    "device": "cpu",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 0,
+    "gguf_n_ctx": 2048,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]",
+    "technical_model": "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": ["gguf", "openrouter", "comfy_credits", "google_api"]
+  },
+  "video": {
+    "device_policy": "cpu",
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "image": {
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "audio": {
+    "voice_device": "cpu"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 25,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [],
+    "required_keys": []
+  },
   "launch": {
     "sage_attention": false,
-    "extra_args": []
+    "extra_args": ["--cpu"],
+    "env": {}
   }
 }

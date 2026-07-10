@@ -244,6 +244,10 @@ def test_coverage_direction2_every_engine_combo_is_managed(schemas, master_copy,
             for node_type, widget in entry["targets"]:
                 managed_targets.add((node_type, widget))
     exempt_types = set(mapping["exempt_node_types"])
+    # S2 (v2 mapping): fine-grained per-node-type widget-name exemptions.
+    # The writer LEFT exempt_node_types; its 20 creative widgets are exempt
+    # by NAME and its 8 model widgets are managed via llm.*.
+    exempt_widgets = mapping.get("exempt_widget_names", {}) or {}
 
     missing = []
     for node in master_copy["nodes"]:
@@ -253,6 +257,8 @@ def test_coverage_direction2_every_engine_combo_is_managed(schemas, master_copy,
         schema = schemas[ntype].get("input", {}) or {}
         for section in ("required", "optional"):
             for widget, spec in (schema.get(section, {}) or {}).items():
+                if widget in (exempt_widgets.get(ntype) or []):
+                    continue
                 type_def = spec[0] if isinstance(spec, (list, tuple)) and len(spec) > 0 else spec
                 if not isinstance(type_def, (list, tuple)):
                     continue  # not an inline-choices COMBO
@@ -264,6 +270,25 @@ def test_coverage_direction2_every_engine_combo_is_managed(schemas, master_copy,
         f"engine-valued COMBO widgets not managed by the applier (add to "
         f"config/profiles/widget_mapping.json or exempt them): {missing}"
     )
+
+
+_ALL_COMMITTED_PROFILES = (
+    "16gb_full", "8gb_lite", "cpu_floor", "cloud_all",
+    "google_veo_media", "google_omni_media", "google_veo_all",
+    "google_omni_all",
+)
+
+
+@pytest.mark.parametrize("profile_id", _ALL_COMMITTED_PROFILES)
+def test_apply_every_committed_profile_patches_clean(
+        schemas, master_copy, mapping, profile_id):
+    """S2: every committed v2 profile applies onto the canonical master
+    without an unmapped-key or widget-validation refusal -- proves the
+    new llm.* / render.* managed entries end to end (incl. the GGUF
+    dropdown label and the openrouter: admit path)."""
+    out = wa.apply_profile(master_copy, profile_id, mapping=mapping,
+                           schemas=schemas)
+    assert out is not master_copy
 
 
 def test_coverage_every_request_seed_widget_is_managed(schemas, master_copy, mapping):

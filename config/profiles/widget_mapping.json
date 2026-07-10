@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "_comment": "GATE B S0 (2026-06-10): the SINGLE checked-in map from profile keys to graph widgets. Read from REAL INPUT_TYPES (verified by tests/test_capability_profiles.py + tests/test_workflow_apply.py). Consumed by BOTH the applier (nodes/_otr_workflow_apply.py) and the coverage tests. Keys are dotted profile paths; targets are [node_type, widget_name] pairs -- raw node ids are BANNED (nodes are found by type, which must be unique in the graph). 'registry' names the engine namespace whose enable-set validates the value (null = not an engine value).",
+  "version": 2,
+  "_comment": "GATE B S0 (2026-06-10) + platform-portability S2 (2026-07-10): the SINGLE checked-in map from profile keys to graph widgets. Read from REAL INPUT_TYPES (verified by tests/test_capability_profiles.py + tests/test_workflow_apply.py). Consumed by BOTH the applier (nodes/_otr_workflow_apply.py) and the coverage tests. Keys are dotted profile paths; targets are [node_type, widget_name] pairs -- raw node ids are BANNED (nodes are found by type, which must be unique in the graph). 'registry' names the engine namespace whose enable-set validates the value (null = not an engine value). v2: the writer LEFT exempt_node_types; its 20 CREATIVE widgets are exempt by NAME (exempt_widget_names) and its 8 model widgets are managed via llm.*; render.* maps the fps/canvas/composite/frame-budget widget set. The llm RUNTIME keys (device/attn/quant/gguf/...) and video/image/audio policy keys gain managed entries in S5 WITH their widgets -- a mapping target must never name a widget that does not exist yet.",
   "managed": {
     "role_overrides.announcer_visual": {
       "registry": "video",
@@ -161,6 +161,174 @@
           "seed_mode"
         ]
       ]
+    },
+    "llm.creative_model": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "creative_writing_model"
+        ]
+      ]
+    },
+    "llm.technical_model": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "technical_model"
+        ]
+      ]
+    },
+    "llm.openrouter_slot_a_model": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "openrouter_slot_a_model"
+        ]
+      ]
+    },
+    "llm.openrouter_slot_b_model": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "openrouter_slot_b_model"
+        ]
+      ]
+    },
+    "llm.comfy_slot_a_model": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "comfy_slot_a_model"
+        ]
+      ]
+    },
+    "llm.comfy_slot_b_model": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "comfy_slot_b_model"
+        ]
+      ]
+    },
+    "llm.google_api_slot_a_model": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "google_api_slot_a_model"
+        ]
+      ]
+    },
+    "llm.google_api_slot_b_model": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_LedgerScriptWriter",
+          "google_api_slot_b_model"
+        ]
+      ]
+    },
+    "render.fps": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_SignalLostVideo",
+          "fps"
+        ],
+        [
+          "OTR_SilentComposite",
+          "fps"
+        ],
+        [
+          "OTR_MasterAudioMux",
+          "fps"
+        ],
+        [
+          "OTR_CaptionBurn",
+          "fps"
+        ],
+        [
+          "OTR_VideoDirector",
+          "fps"
+        ]
+      ]
+    },
+    "render.canvas_w": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "canvas_w"
+        ]
+      ]
+    },
+    "render.canvas_h": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "canvas_h"
+        ]
+      ]
+    },
+    "render.composite_res": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_SignalLostVideo",
+          "resolution"
+        ]
+      ]
+    },
+    "render.composite_w": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_SilentComposite",
+          "canvas_w"
+        ],
+        [
+          "OTR_SceneAwareScopes",
+          "out_w"
+        ]
+      ]
+    },
+    "render.composite_h": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_SilentComposite",
+          "canvas_h"
+        ],
+        [
+          "OTR_SceneAwareScopes",
+          "out_h"
+        ]
+      ]
+    },
+    "render.frame_budget": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_VideoRenderBatch",
+          "frame_count"
+        ]
+      ]
+    },
+    "render.beats": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_VideoRenderBatch",
+          "beats"
+        ]
+      ]
     }
   },
   "emit_only": {
@@ -174,9 +342,31 @@
       ]
     }
   },
-  "exempt_node_types": [
-    "OTR_LedgerScriptWriter"
-  ],
+  "exempt_node_types": [],
+  "exempt_widget_names": {
+    "OTR_LedgerScriptWriter": [
+      "episode_title",
+      "target_words",
+      "num_characters",
+      "custom_premise",
+      "include_act_breaks",
+      "act_count",
+      "creativity",
+      "perfect_run_spacesaver",
+      "min_p",
+      "repetition_penalty",
+      "max_new_tokens_cap",
+      "lemmy_cameo",
+      "use_exchange",
+      "enable_production_stage3_validators",
+      "news_briefs_required",
+      "refine_target_grade",
+      "story_scaffold",
+      "source_bank",
+      "visual_style",
+      "source_ref"
+    ]
+  },
   "never_patch_widget_names": [
     "seed",
     "noise_seed"

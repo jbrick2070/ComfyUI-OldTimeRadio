@@ -96,6 +96,85 @@ def test_google_media_profile_loads_and_validates(profile_id):
     assert profile["id"] == profile_id
 
 
+# ---------------------------------------------------------------------------
+# S2 -- schema v2 sections (platform-portability, 2026-07-10)
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("profile_id", TIERS + GOOGLE_MEDIA_PROFILES + ("cloud_all",))
+def test_v2_sections_present_on_every_committed_profile(profile_id):
+    prof = cp.load_profile(profile_id)
+    for section in ("llm", "video", "image", "audio", "render", "preflight"):
+        assert isinstance(prof[section], dict), section
+    assert prof["gpu_vendor"] in ("nvidia", "amd", "apple", "none")
+    assert isinstance(prof["launch"]["env"], dict)
+
+
+@pytest.mark.parametrize("section,key,value,match", [
+    ("llm", "device", "tpu", "llm section invalid"),
+    ("llm", "quant_policy", "gptq", "llm section invalid"),
+    ("llm", "gguf_quant", "Q5_K", "llm section invalid"),
+    ("llm", "lane_allowlist", [], "llm section invalid"),
+    ("llm", "creative_model", "", "llm.creative_model"),
+    ("video", "dtype_policy", "fp4_only", "video.dtype_policy"),
+    ("image", "dtype_policy", "anything_goes", "image.dtype_policy"),
+    ("audio", "voice_device", "dsp", "audio.voice_device"),
+    ("render", "fps", 0, "render.fps"),
+    ("render", "composite_res", "1080p", "render.composite_res"),
+    ("preflight", "required_keys", [1], "preflight.required_keys"),
+])
+def test_v2_bad_section_values_rejected(section, key, value, match):
+    bad = copy.deepcopy(cp.load_profile("16gb_full"))
+    bad[section][key] = value
+    with pytest.raises(cp.ProfileError, match=match):
+        cp.validate_profile_shape(bad)
+
+
+def test_v2_unknown_llm_key_rejected():
+    bad = copy.deepcopy(cp.load_profile("16gb_full"))
+    bad["llm"]["surprise_lane"] = "x"
+    with pytest.raises(cp.ProfileError, match="unknown llm key"):
+        cp.validate_profile_shape(bad)
+
+
+def test_v2_missing_section_rejected():
+    bad = copy.deepcopy(cp.load_profile("16gb_full"))
+    del bad["render"]
+    with pytest.raises(cp.ProfileError, match="missing required key"):
+        cp.validate_profile_shape(bad)
+
+
+def test_v2_llm_section_matches_runtime_policy_enums():
+    """ONE enum truth: the llm section validates by CONSTRUCTING an
+    LLMRuntimePolicy, so profile enums can never drift from runtime."""
+    from nodes._otr_shared.llm_policy import LLMRuntimePolicy
+
+    prof = cp.load_profile("cpu_floor")
+    pol = LLMRuntimePolicy(
+        device=prof["llm"]["device"],
+        attn_impl=prof["llm"]["attn_impl"],
+        quant_policy=prof["llm"]["quant_policy"],
+        vram_ceiling_gb=prof["llm"]["vram_ceiling_gb"],
+        gguf_n_ctx=prof["llm"]["gguf_n_ctx"],
+        gguf_quant=prof["llm"]["gguf_quant"],
+        lane_allowlist=tuple(prof["llm"]["lane_allowlist"]),
+    )
+    assert pol.device == "cpu"
+    assert pol.vram_ceiling_gb == 0
+    assert "transformers" not in pol.lane_allowlist
+
+
+def test_v2_mapping_declares_exempt_widget_names():
+    mapping = cp.load_widget_mapping()
+    assert mapping["version"] == 2
+    assert mapping["exempt_node_types"] == []
+    ewn = mapping["exempt_widget_names"]
+    assert "OTR_LedgerScriptWriter" in ewn
+    assert "source_bank" in ewn["OTR_LedgerScriptWriter"]
+    # The writer's 8 model widgets are MANAGED (not exempt).
+    assert "creative_writing_model" not in ewn["OTR_LedgerScriptWriter"]
+    assert "llm.creative_model" in mapping["managed"]
+    assert "render.frame_budget" in mapping["managed"]
+
+
 def test_unknown_top_level_key_rejected():
     profile = cp.load_profile("16gb_full")
     bad = copy.deepcopy(profile)
@@ -111,10 +190,27 @@ def test_missing_required_key_rejected():
         cp.validate_profile_shape(bad)
 
 
+# S2 platform-portability (2026-07-10): mps + linux are FIRST-CLASS enum
+# values now (schema v2). The rejection list keeps genuinely-invalid values.
+@pytest.mark.parametrize("key,value", [
+    ("device_backend", "mps"),
+    ("device_backend", "cpu"),
+    ("platform", "linux"),
+    ("platform", "mac"),
+    ("gpu_vendor", "amd"),
+    ("gpu_vendor", "apple"),
+])
+def test_v2_enum_values_accepted(key, value):
+    prof = copy.deepcopy(cp.load_profile("16gb_full"))
+    prof[key] = value
+    assert cp.validate_profile_shape(prof) is prof
+
+
 @pytest.mark.parametrize("key,value,match", [
-    ("device_backend", "mps", "device_backend"),       # mps parked in v1
-    ("platform", "linux", "platform"),
+    ("device_backend", "rocm", "device_backend"),  # ROCm presents as cuda
+    ("platform", "bsd", "platform"),
     ("status", "experimental", "status"),
+    ("gpu_vendor", "intel", "gpu_vendor"),
 ])
 def test_bad_enum_values_rejected(key, value, match):
     bad = copy.deepcopy(cp.load_profile("16gb_full"))
