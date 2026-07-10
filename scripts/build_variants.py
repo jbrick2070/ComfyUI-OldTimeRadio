@@ -77,6 +77,21 @@ def _validator_node_id(workflow: dict) -> int:
     return int(hits[0]["id"])
 
 
+def _variant_stem(profile_id: str) -> str:
+    """otr_<id>, without double-prefixing ids that already carry otr_."""
+    return profile_id if profile_id.startswith("otr_") else f"otr_{profile_id}"
+
+
+def _profile_id_from_stem(stem: str) -> str:
+    """Inverse of _variant_stem against the COMMITTED profile ids."""
+    committed = set(_committed_profile_ids())
+    if stem in committed:
+        return stem
+    if stem.startswith("otr_") and stem[len("otr_"):] in committed:
+        return stem[len("otr_"):]
+    return stem
+
+
 def _committed_profile_ids() -> list[str]:
     out = []
     for p in sorted(Path(PROFILE_DIR).glob("*.json")):
@@ -108,7 +123,7 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
                             schemas=schemas)
     master_hash = semantic_master_hash(applied, mapping=mapping,
                                        schemas=schemas)
-    variant_rel = f"workflows/variants/otr_{profile_id}.json"
+    variant_rel = f"workflows/variants/{_variant_stem(profile_id)}.json"
     nid = _validator_node_id(applied)
     for widget, value in (
         ("workflow_json_path", variant_rel),
@@ -237,7 +252,7 @@ def cmd_emit(profile_ids: list[str], explicit: bool) -> int:
             refused.append((pid, str(e)))
             continue
         (REPO / rel).write_text(_dump(variant), encoding="utf-8")
-        (VARIANTS_DIR / f"otr_{pid}.launch.md").write_text(
+        (VARIANTS_DIR / f"{_variant_stem(pid)}.launch.md").write_text(
             recipe, encoding="utf-8")
         emitted.append(rel)
         print(f"EMITTED {rel} (+ launch recipe)")
@@ -269,7 +284,7 @@ def cmd_check() -> int:
               ("FAILED" if failures else "OK"))
         return 1 if failures else 0
     for vpath in committed:
-        pid = vpath.stem[len("otr_"):]
+        pid = _profile_id_from_stem(vpath.stem)
         try:
             regen, rel, recipe = build_variant(
                 pid, schemas=schemas, mapping=mapping, canonical=canonical)
@@ -281,7 +296,7 @@ def cmd_check() -> int:
         if disk != _dump(regen):
             failures.append(f"{vpath.name}: DRIFT vs regeneration "
                             "(variants are generated, never hand-edited)")
-        rpath = VARIANTS_DIR / f"otr_{pid}.launch.md"
+        rpath = VARIANTS_DIR / f"{_variant_stem(pid)}.launch.md"
         if not rpath.is_file():
             failures.append(f"{rpath.name}: launch recipe missing")
         elif rpath.read_text(encoding="utf-8") != recipe:

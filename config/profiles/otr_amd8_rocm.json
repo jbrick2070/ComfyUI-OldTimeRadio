@@ -1,0 +1,82 @@
+{
+  "id": "otr_amd8_rocm",
+  "display_name": "AMD 8 GB ROCm Linux (draft, UNVERIFIED on hardware)",
+  "status": "draft",
+  "platform": "linux",
+  "device_backend": "cuda",
+  "gpu_vendor": "amd",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "viz_mxc_cpu",
+    "music_visual": "viz_mxc_mandala",
+    "character_visual": "wan_ti2v",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
+  },
+  "slot_overrides": {
+    "voice_bank": "default",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "kokoro",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "musicgen",
+    "video_render_engine": "wan_ti2v"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "cuda",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 6.8,
+    "gguf_n_ctx": 2048,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]",
+    "technical_model": "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": ["transformers", "gguf", "openrouter", "comfy_credits", "google_api"]
+  },
+  "video": {
+    "device_policy": "cuda",
+    "dtype_policy": "no_fp8"
+  },
+  "image": {
+    "dtype_policy": "no_fp8"
+  },
+  "audio": {
+    "voice_device": "cuda"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 17,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [],
+    "required_keys": []
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": [],
+    "env": {}
+  }
+}

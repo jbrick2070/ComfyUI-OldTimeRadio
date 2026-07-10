@@ -1,0 +1,85 @@
+{
+  "id": "otr_mac_mps",
+  "display_name": "Apple Silicon MPS (draft, UNVERIFIED on hardware)",
+  "status": "draft",
+  "ratify_before_emit": [
+    "mac_mps_vram_ceiling: operator ratifies llm.vram_ceiling_gb (initial smoke value 10.0) per the target machine's unified-memory size"
+  ],
+  "platform": "mac",
+  "device_backend": "mps",
+  "gpu_vendor": "apple",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "viz_mxc_cpu",
+    "music_visual": "viz_mxc_mandala",
+    "character_visual": "still_motion",
+    "announcer_image": "google_image",
+    "music_image": "google_image",
+    "character_image": "google_image"
+  },
+  "slot_overrides": {
+    "voice_bank": "default",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "kokoro",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "still_motion"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "mps",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 10.0,
+    "gguf_n_ctx": 4096,
+    "gguf_quant": "Q6_K",
+    "creative_model": "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]",
+    "technical_model": "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": ["gguf", "openrouter", "comfy_credits", "google_api"]
+  },
+  "video": {
+    "device_policy": "mps",
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "image": {
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "audio": {
+    "voice_device": "mps"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 17,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [],
+    "required_keys": ["OTR_GOOGLE_API_KEY"]
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": [],
+    "env": {}
+  }
+}
