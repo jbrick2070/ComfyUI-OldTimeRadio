@@ -2,6 +2,12 @@
 
 - Date: 2026-07-10
 - Status: ANALYSIS ONLY -- no code changed. This doc is the input for a later coding sprint.
+- OPERATOR DIRECTIVE (2026-07-10, after review): LLM-first story quality -- the LLM leans in and
+  writes the good story; Python judges/validates/rerolls but never rewrites story text; dormant
+  py guardrails lean EXCISE, not wire. The actionable plan now lives in
+  `docs/2026-07-10-llm-first-story-edit-pass.md` (edit waves E1-E16 + excision X1-X4); section 6
+  below is superseded by it. F8 and F10 are re-scoped there (no new replacement tables;
+  salvage-then-delete the dormant fields).
 - Scope: the two "media pack" story lanes (LLM prompts + Python pipeline) judged for STORY QUALITY:
   will they produce compelling, varied radio dramas on the production writer (Mistral-Nemo class 12B)?
 - Method: Claude anchor review (grounded, file-level) + two Fable subagent fan-out reviews (one per
@@ -232,7 +238,9 @@ cost.
 - Line seam paragraph repeats "archive object" / "missing context" / "non-violent"; "archive
   object" risks leaking into spoken dialogue as curator-speak (no regex guards it).
 
-## 6. Prioritized coding plan (for the later sprint)
+## 6. Prioritized coding plan (SUPERSEDED 2026-07-10 by the LLM-first edit pass doc)
+
+Kept for the record; execute from `docs/2026-07-10-llm-first-story-edit-pass.md` instead.
 
 P1 -- architecture (biggest story-quality lift, both lanes):
 1. F1 pitch room: default ON or widget (+ otr_canonical.json in same change; append-at-END law).
@@ -270,3 +278,85 @@ Anchor review: Claude (Cowork), direct file reads. Fan-out: two Fable subagents 
 media_archive lane), read-only, Windows paths. Judge: Claude -- every surviving claim re-verified
 against the repo at HEAD on 2026-07-10; canonical-workflow widget map extracted by a temp probe
 script (deleted after run). No code, pack, rules, or workflow files were modified.
+
+## 9. Codex QA Addendum (2026-07-10)
+
+QA verdict: I spot-checked the high-risk claims against the current Windows tree and found no
+blocking falsehoods. The memo's center of gravity is right: the issue is not JSON plumbing; it is
+where story pressure is introduced and how lane-specific craft language reaches the writer. My
+additions below are sprint-shaping, not reversals.
+
+### A1 -- Gate matrix correction
+
+Section 6 says pack edits should re-validate via `OTR_WorkflowValidator` + JSON round-trip. That is
+right for workflow edits, but pack-only changes should have their own explicit gate: JSON parse +
+story-pack registry/routing tests + active-prompt contradiction tests. Reserve `OTR_WorkflowValidator`
+for actual `workflows/otr_canonical.json` changes like a pitch-room widget. This matters because
+F5/F7/F8/F9/F11/F13 are mostly pack/rules JSON work; validating the workflow alone would give false
+confidence.
+
+### A2 -- Pitch-room enablement should be explicit in the workflow
+
+Prefer an appended `pitch_room` / `enable_pitch_room` writer widget, set ON in
+`otr_canonical.json`, over silently changing the env default. `nodes/_otr_pitch_room.py:71-76` and
+`tests/test_pitch_room.py:5` pin the default-OFF contract; production wants the room lit, but old
+workflows should not wake up without an explicit saved value. If the widget lands, apply the full
+widget-order guardrail path: append at the end, update canonical JSON in the same change, run
+workflow JSON guardrails, `OTR_WorkflowValidator`, JSON round-trip, and link/widget audit.
+
+### A3 -- Seam coverage should be derived, not hand-maintained
+
+F11 is real, but the root is broader: `legacy_many_pass` has `declared_seams: []` while its pass
+metadata names `exchange_system` (`nodes/story_packs/pipelines.json:9`, `:18`). Science/media banks
+then omit `exchange_system` from `required_seams` (`nodes/story_packs/banks.json:22`, `:53`). Add
+the missing seam now, then add a registry test that computes `passes[].seam_refs` for each runnable
+default pipeline and requires every active seam to be covered by pipeline-declared or bank-required
+seams. This turns F11 from a one-off patch into a recurring guard.
+
+### A4 -- Add a lane vocabulary contract test
+
+F3/F9/F10 are one bug class: authored lane intent is not the same as active prompt vocabulary. Add
+LLM-free tests that render the active line-composer prompt for science and media with both
+`conflict_object` present and absent, then assert (a) the active prompt uses the bank's
+`source_grounding_label` (`nodes/story_packs/banks.json:16`, `:47`), (b) no active prompt contains
+that lane's `forbidden_leakage_terms`, and (c) banned/cliche rules do not collide with allowed
+domain terms like "ghost image" or "phantom signal". A synthetic media `LineRequest` with empty
+`conflict_object` would have caught the live "news facts" fallback at
+`nodes/_otr_line_composer.py:1632`.
+
+### A5 -- Seed deck v2 needs pressure, not only nouns
+
+F6 should become a small story-contract object, not just better title text. Minimum fields:
+`title`, `want`, `obstacle`, `forced_choice`, `paid_cost`, and `allowed_object_language`. Keep the
+deterministic hash pick (`nodes/_otr_media_archive_interpreter.py:194-200`), but render the full
+object in the lens block. The existing tests currently pin 15 unique string titles and even require
+"The China Girl Mystery" (`tests/test_media_archive_interpreter.py:275-278`), so the schema bump
+must update tests deliberately instead of trying to preserve that fixture by inertia.
+
+### A6 -- The first green coding chunk should be low-blast-radius prompt/data work
+
+I would still treat F1/F2 as the highest leverage architecture fixes, but the first commit should
+probably be: F5 media craft block, F7 paid-ending rule, F9 terminology scoping, F11 seam coverage,
+and F13 coda example variety. That gives an immediate media-lane lift without touching the writer
+call order or workflow surface. Then do F1/F2/F3 as a second chunk with broader prompt snapshots
+and workflow tests.
+
+### A7 -- Add evaluation fixtures that test shape, not exact prose
+
+For this sprint, exact golden dialogue will be brittle. Better gates: prompt snapshots for the
+rendered macro/beat/line prompts; three fixed science and three fixed media source payloads; and
+structural assertions on generated outlines/scripts: opposed wants present before outline, at
+least one paid cost in media resolution, no lane leakage terms, no repeated coda opener shape across
+the fixture set, and no generic "mission control" / "archive object" dialogue unless the source
+explicitly warrants it. Run the real 12B smoke after unit tests, but keep unit gates LLM-free.
+
+### A8 -- Central tension should become operational state
+
+F2 should not stop at printing `central_tension` into a prompt. Convert it into explicit opposed
+wants before outline time, or reject/repair generic central tensions that only ask "can they solve
+it?" The pipeline already has a better target vocabulary in dramatic state: who wants what, what
+blocks them, what question the scene answers. The outline should consume that object, not just a
+macro-field sentence.
+
+Addendum scope: markdown-only. No code, pack, rules, workflow, tests, or generated assets were
+modified by this addendum.
