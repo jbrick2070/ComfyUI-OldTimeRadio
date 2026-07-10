@@ -1,8 +1,9 @@
 # scifi_fable2 -- Code-Ready Architecture + Coding Plan (LLM-first multipass sci-fi lane)
 
 - Date: 2026-07-10 (overnight design session; autonomous per operator directive)
-- Status: **CODE-READY v5 -- FINAL, kibitz arc CONVERGED (r1-r4)** -- NO code written.
-  Kibitz log in section 15. This is the plan of record for the coding sprints.
+- Status: **CODE-READY v5 -- FINAL, kibitz arc CONVERGED (r1-r4) + FINAL CODE AUDIT PASSED**
+  -- NO code written. Kibitz + audit log in section 15. Plan of record for the coding
+  sprints; S0 can start.
 - Lineage: 3-Fable divergent design panel (Playhouse / Showrunner Ladder / Auteur Long-Pass)
   -> Claude judge synthesis -> operator constraints folded live -> kibitz rounds (codex panel +
   Claude anchor/judge; antigravity auto-lane down).
@@ -776,10 +777,13 @@ IS the interpretation." A registry-load test pins this exact row.
 
 **Dispatch splice (writer):** module-level `_RUNNER_BY_PIPELINE` map consulted ONCE after the
 shared front (bank resolve -> runnable gate -> science_rss fetch -> validate_source_payload ->
-D.1 new_ledger + meta stamps) and BEFORE the news_interpreter branch (~:3320 at today's HEAD;
-pinned in the S1b commit). **Splice-line selection criterion (r3 anchor): the earliest point
-where payload, resolved, led, meta, episode_root, episode_id, and slot_scheduler ALL exist --
-the S0 read produces a locals-at-splice inventory** (open item 14.2). Hit -> runner; miss ->
+D.1 new_ledger + meta stamps) and BEFORE the D.2 news-interpreter branch. **Splice window
+VERIFIED by final code audit (2026-07-10): slot_scheduler + generate fns are built at C
+(~:3331-3345), D.1 `new_ledger` + `episode_id = led.episode_id` + `episode_root` land at
+~:3362-3365, D.2 interpretation starts ~:3444 -- so the splice sits in the :3365-:3444 window
+where payload, resolved, led, meta, episode_id, episode_root, slot_scheduler, and the bound
+bank row ALL exist.** (Line numbers drift while a coder window is active; the criterion is
+authoritative, the numbers are re-pinned in the S1b commit.) Hit -> runner; miss ->
 existing branches byte-identical (legacy_many_pass and the original bank-shape branch are NOT
 in the map). A runnable, executable pipeline id with no registered runner raises loud IN THE
 WRITER (routing's `executable` stays metadata-only -- r3/S1); a writer-level test pins the
@@ -908,16 +912,21 @@ meta.fable2).
 1. Exact `config/cast_pools.py` symbols for the voice registry + announcer prebake
    (`VOICE_REGISTRY` ~:344-358, `open_voice_pool` ~:477-503 confirmed present; menu ids are
    assigned by python regardless -- section 9).
-2. Locals-at-splice inventory (r3 anchor): enumerate which of payload/resolved/led/meta/
-   episode_root/episode_id/slot_scheduler exist at ~:3320 and pin the exact splice line by
-   the section-11 criterion.
+2. RESOLVED (final code audit): locals-at-splice inventory verified -- everything the runner
+   needs exists in the :3365-:3444 window (section 11); re-pin exact lines in the S1b commit.
 3. Preamble/postamble shot-numbering vs the legacy_reference_ledger fixture (shot_000
    convention asserted then adjusted to fixture truth).
-4. `set_beats` exact row shape (production_ledger.py:769-798). (set_music shape RESOLVED
-   r3/M1: cue ids opening/closing/inter_NN; no position field.)
-5. Episode-canon build API for the runner (`write_episode_canon` at `_otr_canon.py:212` --
-   r4 pin; the canon CONSTRUCTION call the legacy path uses upstream is the remaining pin;
-   runner builds the OBJECT, tail stays the only WRITER).
+4. RESOLVED (final code audit): `set_beats` row shape confirmed at production_ledger.py
+   :769-798 = {beat_id, shot_id, scene_id, speaker, char_id, line_ids[], start_s, dur_s};
+   `set_scenes` (:741-752) and `set_shots` (:754-767) confirmed for the scenes/shots rows;
+   set_lines (:1042-1061) confirmed to carry shot_id + default speaker_role "character" +
+   coerce compose_flags to [] (fable2 rows without flags are schema-legal). (set_music
+   RESOLVED r3/M1: cue ids opening/closing/inter_NN; no position field; sequencer maps
+   "opening" -> music_open at scene_sequencer.py:1469.)
+5. MOSTLY RESOLVED (final code audit): canon = `EpisodeCanon` dataclass (`_otr_canon.py:159`)
+   + `write_episode_canon` (:212, atomic write). Runner constructs an EpisodeCanon; tail
+   stays the only WRITER. Remaining: copy the field-population pattern from the legacy
+   construction site.
 6. Slot-fn `max_new_tokens` pass-through at the splice (interpreter paths already thread it).
 7. Legacy coda real-news append fires in legacy composition (writer :5554-5556 -- r4 pin),
    NOT in the shared tail -- fable2 carries its read in the ledger already; pin with a
@@ -988,3 +997,24 @@ meta.fable2).
   pins upgraded into section 14 (canon.py:212, coda :5554-5556, spine :6164-6171). Agent
   calls across the arc: codex 4/4 OK, antigravity 0/2 (auto-lane down), Claude anchor+judge
   x4. Full judgment: kibitz-runs/2026-07-10-scifi-fable2/r4/final.md.
+- **FINAL CODE AUDIT (operator-requested, 2026-07-10 post-arc):** Claude re-verified every
+  load-bearing repo claim directly against HEAD. CONFIRMED verbatim: set_cast (:696-739
+  mandatory tts_model/voice_preset, S26-B3), set_scenes/set_shots/set_beats shapes,
+  set_lines row shape + speaker_role default + compose_flags coercion (:1021-1061),
+  set_music field set with NO position (:1083-1095), apply_music_timings keyed on cue_id,
+  _recompute_totals auto-fills cast counts, sequencer passthrough role trio + legal role set
+  (scene_sequencer :781-819) + "opening"->music_open mapping (:1469), assemble_script_text
+  renders character/announcer and skips music (:1341-1362),
+  test_every_runnable_bank_declares_a_title_form_label (:297), "+ Add Your Own stays last"
+  (test_original_radio_pipeline :41), _bank_has_no_source_contract = runnable AND both empty
+  (:1568-1584 -- fable2 immune by fetcher), EpisodeCanon + write_episode_canon
+  (_otr_canon :159/:212), structured_call slot-fn contract + per-call max_new_tokens
+  (:24/:458-467), pick_announcer (:404) + open_voice_pool (:477), I.5 news-wiring overlay
+  lives in legacy composition not the tail. ONE CORRECTION folded: the splice reference
+  "~:3320" was too early -- slot_scheduler is built ~:3331-3345 and D.1 lands :3362-3365;
+  the splice window is :3365-:3444 (section 11 updated; criterion authoritative, lines
+  drift while a coder window is active). Open items 2/4/5 RESOLVED; remaining open items:
+  3 (shot-numbering vs fixture), 5-remnant (canon field-population pattern), 6
+  (max_new_tokens pass-through pin), 7 (no-double-append assertion), 8 (spine opt-out
+  wiring), 9 (full suite), 10 (deck authoring), 1 (menu metadata shape). VERDICT:
+  **code-ready confirmed; S0 can start.**
