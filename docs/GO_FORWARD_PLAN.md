@@ -1,10 +1,10 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-09 (late) -- HEAD `5d28749a` + this docs commit
+**Updated:** 2026-07-10 (early) -- HEAD `1c735c2d` + this docs commit
 **Branch:** `v2.0-alpha`
-**Status:** operator reorder 2026-07-09: static source-route QA DONE (5-agent
-fan-out; live smokes parked -- "we've smoked a lot") -> `original_radio`
-campaign ACTIVE -> source-bank sweep -> portability.
+**Status:** original_radio LIVE SMOKE GREEN 2026-07-10 ("Page in the
+Tempest" published to obs). Remaining gate = OPERATOR EYEBALL only ->
+then source-bank sweep -> portability.
 
 **Shipped 2026-07-09 evening (both pushed):**
 
@@ -110,11 +110,26 @@ BUILD SHIPPED (operator away, autonomy directive):
 Both pushed; suite 7136 passed/31 skipped/1 xfailed + Bug Bible 16/7/3
 green; AST/BOM/0-byte verify clean. NO workflow JSON diff (source_bank
 menu derives from the registry).
-NEXT (remaining pre-ship gates): live 30-word original_radio OBS smoke
-(selective reset per section 4; select the lane via the headless
-source_bank patch) + run OTR_WorkflowValidator recording "no workflow
-diff" + OPERATOR EYEBALL of the smoke output (queued for his return;
-consider the 3-episode batch from V2 s7). Then the source-bank
+SMOKE GATE GREEN (2026-07-10 early): live 30w original_radio OBS smoke
+PUBLISHED -- `otr\obs\signal_lost_page_in_the_tempest_20260710_010652_
+silent_procgen_blended_captioned_with_credits_final.mp4` (48 MB, RESULT
+SUCCESS, 548s; disclosure line explicit machine-generated; QA meta
+clean_after_discard w/ discards stamped). Validator record:
+OTR_WorkflowValidator OK in the green run -- 23 nodes / 55 links /
+widget_vector_drift=0; the LANE produced NO workflow diff (registry-
+derived dropdown confirmed); the only canonical diff since 604ccdd3 is
+the deliberate creative-slot fix (d526c8b7). It took SIX live-smoke
+hardening commits to get here -- 5 judge/ladder root fixes + 1 workflow
+config fix (7f459e21, 75173fc4, a61ab2ed, 6fdf3f6e, d526c8b7, 1c735c2d;
+details in HANDOFF_LOG 2026-07-10). Suite 7151/31/1 + Bug Bible 17/7/3
+green; bible +BUG-11.26.
+REMAINING GATE: OPERATOR EYEBALL of the published episode (consider the
+3-episode batch from V2 s7). Content items FOR the eyeball, not gates:
+(a) outro/dialogue name drift (outro names 'Harold', cast-external;
+run-2 had 'Eliza'), (b) stage directions leaked into a spoken line one
+run ('(smashes a nearby console)'), (c) script lines arrive quote-
+wrapped, (d) nemo premise drifted sci-fi in 2 of 4 rolls (period-legit
+Dimension-X flavor; timeless-rule tension). Then the source-bank
 end-to-end sweep (section 3 below).
 Queued design item for the arc: demote `meta["news"]` to provenance-only
 + distinct-name migration (operator: "we can't just throw around meta").
@@ -238,21 +253,21 @@ must be generated from canonical, not hand-maintained.
 
 ## Last Validation
 
-Latest Dia announcer on-deck chunk:
+Post live-smoke hardening (2026-07-10):
 
 ```text
 pytest -q -p no:cacheprovider
 
-7050 passed, 31 skipped, 1 xfailed, 5 warnings
+7151 passed, 31 skipped, 1 xfailed, 5 warnings
 ```
 
-Bug Bible:
+Bug Bible (bible now 156 entries, +BUG-11.26):
 
 ```text
 cd C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide
 pytest -q -p no:cacheprovider tests\bug_bible_regression.py
 
-16 passed, 7 skipped, 3 xfailed
+17 passed, 7 skipped, 3 xfailed
 ```
 
 Focused voice/cast subset:

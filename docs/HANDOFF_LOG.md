@@ -3,6 +3,38 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-10 ~01:30 -- HEAD 1c735c2d + docs (v2.0-alpha)
+
+Did:
+- LIVE 30w original_radio OBS smoke: GREEN on roll 6 -- "Page in the
+  Tempest" published (otr\obs\...20260710_010652...final.mp4, 48 MB,
+  RESULT SUCCESS, 548s). Five real production bugs found+fixed at root
+  across the failed rolls, each with tests, suite+bible green, pushed:
+  7f459e21 (A2 verbatim grounding: ws-normalized match + typed repair +
+  deterministic key_term prune -- the prune FIRED live on a later roll),
+  75173fc4 (original_qa evidence bar: hard kills need lexicon
+  corroboration or a confirm-pass verbatim quote; discards stamped LOUD),
+  a61ab2ed (kill authority per class: weapons/anachronism lexicon-only
+  -- a grounded quote proves the line, not the class), 6fdf3f6e (ladder
+  logs raw-output head on every failure -- exposed gemma truncation),
+  d526c8b7 (creative slot -> nemo in canonical: gemma-4 Q8 cannot hold
+  n_ctx 4096 on 16GB, the silent 2048 downgrade truncated concept JSON;
+  enforces the standing bake-off rejection), 1c735c2d (epilogue_missing
+  deterministically refuted when the outro row exists + slot pins
+  retargeted).
+- Bug Bible +BUG-11.26 (verbatim-grounding gates) + static tripwire +
+  kebab fix, pushed (survival guide @ 1a01037).
+- Validator record: OTR_WorkflowValidator OK in the green run (23/55,
+  drift=0); the lane itself = NO workflow diff.
+Current step: original_radio pre-ship -- smoke + validator gates GREEN;
+OPERATOR EYEBALL is the only remaining gate (content notes in
+GO_FORWARD section 0: name drift, stage-direction leak, quote-wrapped
+lines, sci-fi premise tension).
+Next: operator eyeballs the published mp4; then source-bank e2e sweep.
+Commits: 7f459e21, 75173fc4, a61ab2ed, 6fdf3f6e, d526c8b7, 1c735c2d
+(+ this docs commit) -- all pushed. Operator's own windows added
+b288d8b6, bff86af9 (portability docs, benign).
+
 ## 2026-07-09 ~night -- HEAD 604ccdd3 (v2.0-alpha)
 
 Did:
