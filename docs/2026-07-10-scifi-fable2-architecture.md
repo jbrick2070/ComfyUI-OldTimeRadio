@@ -783,9 +783,13 @@ VERIFIED by final code audit (2026-07-10): slot_scheduler + generate fns are bui
 ~:3362-3365, D.2 interpretation starts ~:3444 -- so the splice sits in the :3365-:3444 window
 where payload, resolved, led, meta, episode_id, episode_root, slot_scheduler, and the bound
 bank row ALL exist.** (Line numbers drift while a coder window is active; the criterion is
-authoritative, the numbers are re-pinned in the S1b commit.) Hit -> runner; miss ->
-existing branches byte-identical (legacy_many_pass and the original bank-shape branch are NOT
-in the map). A runnable, executable pipeline id with no registered runner raises loud IN THE
+authoritative.) **S1b re-pin (2026-07-10, shipped):** `_RUNNER_BY_PIPELINE` +
+`_resolve_lane_runner` at writer :1589 (module level, above
+`_bank_has_no_source_contract`); the run()-entry word/refine gates at :3205 (immediately
+after the bank + visual-style gates, before the scaffold env mutation); the dispatch splice
+at :3568 (after the D.1 skeleton save + BUG-LOCAL-290 sweep, before the D.2 comment). Hit
+-> runner; miss -> existing branches byte-identical (legacy_many_pass and the original
+bank-shape branch are NOT in the map). A runnable, executable pipeline id with no registered runner raises loud IN THE
 WRITER (routing's `executable` stays metadata-only -- r3/S1); a writer-level test pins the
 raise.
 

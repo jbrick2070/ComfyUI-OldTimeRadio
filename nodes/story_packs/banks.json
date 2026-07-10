@@ -180,8 +180,8 @@
         "credits_source_line": "dramatized by machine from tonight's science wire"
       },
       "required_seams": [],
-      "runnable": false,
-      "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass."
+      "runnable": true,
+      "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass. S1b: low-budget one-draft spine only (target_words < 120); the full loop lands at S2."
     },
     {
       "source_bank_id": "custom_source_bank",

@@ -51,7 +51,7 @@
     {
       "story_pipeline_id": "fable2_multipass",
       "label": "Fable2 Multipass (LLM-first whole-play markup)",
-      "executable": false,
+      "executable": true,
       "requires_source_contract": false,
       "declared_seams": [
         "fable2_dossier_system",
@@ -79,7 +79,7 @@
       "notes": [
         "Visible experiment; failure NEVER routes to legacy_many_pass.",
         "Consumes the bank fetcher payload via the writer's shared fetch lane; interpreter intentionally empty -- the treatment IS the interpretation.",
-        "executable stays false until the runner ships (S1b); flipping it requires the runner in the same change.",
+        "executable:true = the runner exists: nodes/_otr_scifi_fable2.py via the writer's _RUNNER_BY_PIPELINE dispatch (S1b, same-change flip). S1b ships the low-budget one-draft spine (P2a/P4/P5 land at S2).",
         "Python judges; the LLM writes: every spoken ledger row must be traceable to a named LLM artifact (proof gate)."
       ]
     },

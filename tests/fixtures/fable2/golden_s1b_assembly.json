@@ -1,0 +1,437 @@
+{
+  "cast": [
+    {
+      "char_id": "c01",
+      "name": "ANNOUNCER",
+      "character_description": "Period radio announcer.",
+      "gender": "female",
+      "tts_model": "kokoro",
+      "voice_preset": "bf_lily",
+      "voice_params": null,
+      "line_count": 3,
+      "word_count": 40
+    },
+    {
+      "char_id": "c02",
+      "name": "VERA",
+      "character_description": "Mid-forties, wind-burned, one pencil behind the ear, taps the barometer twice before speaking.",
+      "gender": "female",
+      "tts_model": "bark",
+      "voice_preset": "v2/en_speaker_9",
+      "voice_params": null,
+      "line_count": 2,
+      "word_count": 29
+    },
+    {
+      "char_id": "c03",
+      "name": "DOKU",
+      "character_description": "Broad-shouldered liaison in a mended coat, keeps a pocket ledger, folds every argument into a story.",
+      "gender": "male",
+      "tts_model": "bark",
+      "voice_preset": "v2/en_speaker_6",
+      "voice_params": null,
+      "line_count": 2,
+      "word_count": 22
+    }
+  ],
+  "scenes": [
+    {
+      "scene_id": "s01",
+      "description": "A cliff-top listening station, an hour before dawn",
+      "env": null,
+      "line_count": 3,
+      "word_count": 30
+    },
+    {
+      "scene_id": "s02",
+      "description": "The station generator room, minutes later",
+      "env": null,
+      "line_count": 2,
+      "word_count": 21
+    }
+  ],
+  "shots": [
+    {
+      "shot_id": "shot_000",
+      "scene_id": null,
+      "description": "preamble",
+      "visual_prompt": "",
+      "png_path": null,
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "description": "A cliff-top listening station, an hour before dawn",
+      "visual_prompt": "",
+      "png_path": null,
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "shot_id": "shot_002",
+      "scene_id": "s02",
+      "description": "The station generator room, minutes later",
+      "visual_prompt": "",
+      "png_path": null,
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "shot_id": "shot_003",
+      "scene_id": null,
+      "description": "postamble",
+      "visual_prompt": "",
+      "png_path": null,
+      "start_s": null,
+      "dur_s": null
+    }
+  ],
+  "beats": [
+    {
+      "beat_id": "shot_000_b1",
+      "shot_id": "shot_000",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "line_ids": [
+        "shot_000_b1"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b1",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "VERA",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b1"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b2",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "DOKU",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b2"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_002_b1",
+      "shot_id": "shot_002",
+      "scene_id": "s02",
+      "speaker": "DOKU",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_002_b1"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_002_b2",
+      "shot_id": "shot_002",
+      "scene_id": "s02",
+      "speaker": "VERA",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_002_b2"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_003_b1",
+      "shot_id": "shot_003",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "c01",
+      "line_ids": [
+        "shot_003_b1"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_003_b2",
+      "shot_id": "shot_003",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "c01",
+      "line_ids": [
+        "shot_003_b2"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_003_b3",
+      "shot_id": "shot_003",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "c01",
+      "line_ids": [
+        "shot_003_b3"
+      ],
+      "start_s": null,
+      "dur_s": null
+    }
+  ],
+  "lines": [
+    {
+      "line_id": "shot_000_music",
+      "shot_id": "shot_000",
+      "beat_id": "shot_000_music",
+      "char_id": "music_open",
+      "text": "",
+      "traits": null,
+      "boundary": null,
+      "char_count": 0,
+      "word_count": 0,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "music_open",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_000_b1",
+      "shot_id": "shot_000",
+      "beat_id": "shot_000_b1",
+      "char_id": "announcer",
+      "text": "Tonight, a story of one antenna and the woman who refused to choose.",
+      "traits": null,
+      "boundary": "shot_start",
+      "char_count": 68,
+      "word_count": 13,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_001_b1",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b1",
+      "char_id": "c02",
+      "text": "Play it again, and this time keep the gain low. The mountain does not repeat itself for committees.",
+      "traits": null,
+      "boundary": "shot_start",
+      "char_count": 99,
+      "word_count": 18,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_001_b2",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b2",
+      "char_id": "c03",
+      "text": "The tape is the tape, Vera. It will not change for us.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 54,
+      "word_count": 12,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_001_music",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_music",
+      "char_id": "music_inter",
+      "text": "",
+      "traits": null,
+      "boundary": null,
+      "char_count": 0,
+      "word_count": 0,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "music_inter",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_002_b1",
+      "shot_id": "shot_002",
+      "beat_id": "shot_002_b1",
+      "char_id": "c03",
+      "text": "You pulled the log pages. I checked the binding twice.",
+      "traits": null,
+      "boundary": "shot_start",
+      "char_count": 54,
+      "word_count": 10,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_002_b2",
+      "shot_id": "shot_002",
+      "beat_id": "shot_002_b2",
+      "char_id": "c02",
+      "text": "I pulled one page. The one with my name on it.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 46,
+      "word_count": 11,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_003_b1",
+      "shot_id": "shot_003",
+      "beat_id": "shot_003_b1",
+      "char_id": "c01",
+      "text": "Vera got her answer, though the antenna kept the better half.",
+      "traits": null,
+      "boundary": "shot_start",
+      "char_count": 61,
+      "word_count": 11,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_003_b2",
+      "shot_id": "shot_003",
+      "beat_id": "shot_003_b2",
+      "char_id": "c01",
+      "text": "Beyond tonight's cliff-top signal, a real transmission waits:",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 61,
+      "word_count": 8,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_003_b3",
+      "shot_id": "shot_003",
+      "beat_id": "shot_003_b3",
+      "char_id": "c01",
+      "text": "Tonight's story grew from a real survey: instruments on Mount Etna mapped 1,200 new vents this season, work led by Doctor Rossi.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 128,
+      "word_count": 21,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_003_music",
+      "shot_id": "shot_003",
+      "beat_id": "shot_003_music",
+      "char_id": "music_close",
+      "text": "",
+      "traits": null,
+      "boundary": null,
+      "char_count": 0,
+      "word_count": 0,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "music_close",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    }
+  ],
+  "music": [
+    {
+      "cue_id": "opening",
+      "description": "slow theremin swell, distant telegraph clicks",
+      "generation_prompt": "slow theremin swell, distant telegraph clicks",
+      "wav_path": null,
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "cue_id": "inter_01",
+      "description": "single sustained violin note, rising",
+      "generation_prompt": "single sustained violin note, rising",
+      "wav_path": null,
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "cue_id": "closing",
+      "description": "closing theme, warm brass, resolving",
+      "generation_prompt": "closing theme, warm brass, resolving",
+      "wav_path": null,
+      "start_s": null,
+      "dur_s": null
+    }
+  ]
+}

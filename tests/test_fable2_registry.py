@@ -1,7 +1,7 @@
 """scifi_fable2 registry surfaces -- S0 inert pins (architecture doc s11/s13).
 
 Covers: bank row (inserted BEFORE custom_source_bank; rss-payload-not-spark),
-pipeline row (registry-legal slots only; executable:false), sidecar
+pipeline row (registry-legal slots only; executable flips at S1b), sidecar
 registration, frame-deck lint (SFW deck law), detection-only story rules,
 and the science_news untouched pin. Pure Python; no GPU, no LLM.
 """
@@ -50,9 +50,9 @@ class TestBankRow:
         assert ids[-1] == "custom_source_bank"
         assert ids[-2] == "scifi_fable2"
 
-    def test_row_shape_inert(self):
+    def test_row_shape_runnable_s1b(self):
         bank = ROUTING.get_bank("scifi_fable2")
-        assert bank.runnable is False               # S0: inert
+        assert bank.runnable is True                # S1b: runner shipped
         assert bank.fetcher == "science_rss"
         assert bank.interpreter == ""
         assert bank.default_story_model == "scifi_fable2_v1"
@@ -75,9 +75,11 @@ class TestBankRow:
         assert W._bank_has_no_source_contract(
             ROUTING.get_bank("scifi_fable2")) is False
 
-    def test_run_gate_blocks_inert_bank(self):
-        with pytest.raises(ROUTING.StoryBankNotRunnableError):
-            ROUTING.require_runnable_bank("scifi_fable2")
+    def test_run_gate_admits_runnable_bank(self):
+        # S1b flip: the runnable gate now admits the bank (the runner
+        # ships in the SAME change -- sweep rule b).
+        bank = ROUTING.require_runnable_bank("scifi_fable2")
+        assert bank.source_bank_id == "scifi_fable2"
 
 
 # ---------------------------------------------------------------------------
@@ -85,9 +87,9 @@ class TestBankRow:
 # ---------------------------------------------------------------------------
 
 class TestPipelineRow:
-    def test_row_shape_inert(self):
+    def test_row_shape_executable_s1b(self):
         pipe = ROUTING.get_pipeline("fable2_multipass")
-        assert pipe.executable is False             # S0: no runner yet
+        assert pipe.executable is True              # S1b: runner shipped
         assert pipe.requires_source_contract is False
         assert pipe.declared_seams == _FABLE2_SEAMS
         assert any("NEVER routes to legacy_many_pass" in n

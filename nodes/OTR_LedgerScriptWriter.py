@@ -1566,6 +1566,57 @@ def _apply_intro_rewrite_result(led, first_announcer_id, new_text, flag):
         )
 
 
+def _run_fable2_lane(**kwargs):
+    """Lane entry for `fable2_multipass` (scifi_fable2 S1b, doc s11).
+
+    Late-imports the PURE runner module (r4/M3: the runner never imports
+    this writer; the import points one way only) and returns its
+    Fable2TailParts. All failures are Fable2Error subclasses naming the
+    pass -- NO fallback to legacy_many_pass, ever."""
+    try:
+        from . import _otr_scifi_fable2 as _F2
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        import _otr_scifi_fable2 as _F2  # type: ignore
+    return _F2.run_scifi_fable2_episode(**kwargs)
+
+
+# scifi_fable2 S1b (doc s11): pipeline-id -> lane runner. Consulted
+# exactly ONCE per run, after the shared front (bank resolve -> runnable
+# gate -> fetch -> validate -> D.1 ledger + meta stamps) and BEFORE the
+# D.2 news-interpreter branch. legacy_many_pass and original_multi_pass
+# are deliberately NOT in the map -- their execution lanes are the
+# writer's own inline branches (byte-identical on a map miss).
+_RUNNER_BY_PIPELINE = {
+    "fable2_multipass": _run_fable2_lane,
+}
+
+# The two pipelines whose execution lane IS this writer's inline body.
+_LEGACY_INLINE_PIPELINES = frozenset({
+    "legacy_many_pass", "original_multi_pass",
+})
+
+
+def _resolve_lane_runner(pipeline_id: str):
+    """Map hit -> the lane runner; known inline lane -> None (existing
+    branches run byte-identically); anything else -> RAISE (r3/S1: a
+    runnable bank whose pipeline has no registered execution lane is a
+    wiring bug -- routing's `executable` stays metadata-only and never
+    gates this; there is NO fallback)."""
+    runner = _RUNNER_BY_PIPELINE.get(pipeline_id)
+    if runner is not None:
+        return runner
+    if pipeline_id in _LEGACY_INLINE_PIPELINES:
+        return None
+    raise RuntimeError(
+        f"[OTR_LedgerScriptWriter] source bank pipeline {pipeline_id!r} "
+        f"reached run() with no registered lane runner "
+        f"(_RUNNER_BY_PIPELINE) and it is not a legacy inline lane "
+        f"{sorted(_LEGACY_INLINE_PIPELINES)}. The pipeline's execution "
+        f"lane is not built; there is no fallback. Register the runner in "
+        f"the SAME change that flips the bank runnable."
+    )
+
+
 def _bank_has_no_source_contract(bank) -> bool:
     """The original-lane runtime dispatch (kibitz r2-r4, r4 P8).
 
@@ -3151,6 +3202,29 @@ class OTR_LedgerScriptWriter:
         # Every REGISTERED style is valid to run (styles are prompt-tail
         # deltas; no execution lane to gate).
         _otr_visual_styles.resolve_visual_style(visual_style)
+        # scifi_fable2 S1b entry gates (r3/M4): the lane's word-budget gate
+        # runs HERE -- before the story-scaffold env mutation, the refine
+        # gate, the budget resets, and _resolve_inputs (the RSS fetch) --
+        # so an unsupported target_words fails ONCE, loud and cheap, with
+        # zero side effects. Keyed on the BANK's declared pipeline (not the
+        # bank id) so a future fable2-family bank inherits the gate. The
+        # runner re-asserts defensively at its own entry. The refine loop
+        # is unsupported on this lane S1-S3 (WriterTailContext law) -- a
+        # non-Off refine widget fails loud here too.
+        if str(getattr(_source_bank_row, "default_story_pipeline", "")
+               or "") == "fable2_multipass":
+            try:
+                from . import _otr_scifi_fable2 as _F2GATE
+            except ImportError:  # pragma: no cover -- flat/standalone load
+                import _otr_scifi_fable2 as _F2GATE  # type: ignore
+            _F2GATE.assert_supported_target_words(int(target_words))
+            if _refine_active or refine_target_grade != "Off":
+                raise RuntimeError(
+                    "[OTR_LedgerScriptWriter] the scifi_fable2 lane does "
+                    "not support the refine loop (S1-S3; "
+                    "ctx.refine_active MUST be False). Set "
+                    "refine_target_grade to 'Off' for this bank."
+                )
         # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the
         # process env FIRST, before generate_outline + every style-grammar read,
         # so this single control governs the whole bundled scaffold: the style
@@ -3490,6 +3564,64 @@ class OTR_LedgerScriptWriter:
                 "raised %s: %s -- continuing without sweep.",
                 type(_sweep_exc).__name__, str(_sweep_exc)[:200],
             )
+
+        # --- scifi_fable2 S1b: pipeline-runner dispatch (doc s11) -------
+        # Consulted exactly ONCE, here: after the shared front (bank
+        # resolve -> runnable gate -> science_rss fetch ->
+        # validate_source_payload -> D.1 new_ledger + meta stamps +
+        # skeleton save) and BEFORE the D.2 news-interpreter branch.
+        # Hit -> the lane runner fills led/meta to the tail boundary and
+        # the writer hands off to _run_writer_tail (the runner returns
+        # plain Fable2TailParts; the WRITER builds WriterTailContext --
+        # r4/M3 acyclic import graph). Miss (legacy_many_pass / the
+        # original bank-shape branch) -> everything below runs
+        # byte-identically. An unknown pipeline raises LOUD inside
+        # _resolve_lane_runner (r3/S1).
+        _pipeline_id = str(getattr(
+            _source_bank_row, "default_story_pipeline", "") or "")
+        _lane_runner = _resolve_lane_runner(_pipeline_id)
+        if _lane_runner is not None:
+            if _refine_active:
+                raise RuntimeError(
+                    "[OTR_LedgerScriptWriter] refine re-entry reached the "
+                    "fable2 dispatch -- the lane forbids the refine loop "
+                    "(S1-S3) and the entry gate should have raised."
+                )
+            _parts = _lane_runner(
+                payload=dict(resolved["news_article"]),
+                pack=_otr_story_routing.resolve_story_pack(
+                    _source_bank_row.source_bank_id),
+                resolved=resolved,
+                led=led,
+                meta=meta,
+                creative_fn=creative_generate_fn,
+                technical_fn=technical_generate_fn,
+                slot_scheduler=slot_scheduler,
+                source_bank_row=_source_bank_row,
+                story_rules=story_rules,
+                episode_root=episode_root,
+                episode_id=episode_id,
+            )
+            _tail_ctx = WriterTailContext(
+                led=led,
+                meta=meta,
+                resolved=resolved,
+                outline_view=_parts.outline_view,
+                canon=_parts.canon,
+                episode_root=episode_root,
+                episode_id=episode_id,
+                contract=None,           # no style contract ("" slug path)
+                style_grammar_on=False,  # receipt stamp honest
+                source_bank_row=_source_bank_row,
+                slot_scheduler=slot_scheduler,
+                creative_fn=creative_generate_fn,
+                technical_fn=technical_generate_fn,
+                cast_seed=None,
+                refine_active=False,
+                run_story_spine=_parts.run_story_spine,
+                final_title_override=_parts.final_title_override,
+            )
+            return self._run_writer_tail(_tail_ctx)
 
         # D.2 News interpretation. Read the full article (currently
         # discarded after RSS fetch -- see _fetch_rss_seed_or_die change
