@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from .client import (
+    GoogleAPIError,
     GoogleAPIRequestShapeError,
     create_interaction,
 )
@@ -97,7 +98,15 @@ def _extract_text(body: dict[str, Any]) -> str:
 class GoogleAPIBackend:
     """Zero-VRAM LoaderBackend adapter for Google Gemini Interactions API."""
 
-    def load(self, repo_id: str, row: Any) -> dict[str, Any]:
+    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
+        # S1 policy contract: remote lane -- asserts the lane_allowlist
+        # admits it (defense in depth behind request_slot's backstop) and
+        # deliberately IGNORES every hardware field; zero local compute.
+        if policy is not None and not policy.admits_lane("google_api"):
+            raise GoogleAPIError(
+                f"{repo_id}: 'google_api' lane is not admitted by the "
+                f"profile lane_allowlist {list(policy.lane_allowlist)}."
+            )
         model_id = resolve_model_for_slot(repo_id)
         context_window = int(
             getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW)

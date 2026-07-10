@@ -32,6 +32,17 @@ DEFAULT_OUTPUT_TOKENS_CAP = 512
 DEFAULT_N_BATCH = 512
 DEFAULT_N_GPU_LAYERS = -1
 
+# S1 platform-portability (2026-07-10): quant -> (filename, expected size)
+# artifact table. Known quants FAIL LOUD on a byte-size mismatch (truncated
+# or wrong file); entries whose size is None are absence-checked only (the
+# box has never carried them -- pin the size when one is first derived).
+# GEMMA4_12B_GGUF_PATH remains the explicit whole-path escape hatch.
+GGUF_ARTIFACTS: dict[str, tuple[str, int | None]] = {
+    "Q8_0": ("gemma-4-12b-it-Q8_0.gguf", EXPECTED_Q8_0_SIZE_BYTES),
+    "Q6_K": ("gemma-4-12b-it-Q6_K.gguf", None),
+    "Q4_K_M": ("gemma-4-12b-it-Q4_K_M.gguf", None),
+}
+
 _DLL_DIR_HANDLES: list[Any] = []
 _PRELOADED_DLLS: list[Any] = []
 _DLL_RUNTIME_PREPARED = False
@@ -72,19 +83,33 @@ def _models_root() -> Path:
     return Path(raw).expanduser()
 
 
-def default_gguf_path() -> Path:
+def default_gguf_path(quant: str = "Q8_0") -> Path:
+    filename, _size = gguf_artifact_for_quant(quant)
     return (
         _models_root()
         / "LLM"
         / "converted"
         / "gemma-4-12b-it"
-        / DEFAULT_GGUF_FILENAME
+        / filename
     )
 
 
-def resolve_gguf_path() -> Path:
+def gguf_artifact_for_quant(quant: str) -> tuple[str, int | None]:
+    """(filename, expected_size) for a policy gguf_quant. Unknown quants
+    FAIL LOUD -- the policy enum and this table must agree."""
+    try:
+        return GGUF_ARTIFACTS[quant]
+    except KeyError:
+        raise GGUFNativeConfigError(
+            f"gguf_quant {quant!r} has no artifact-table entry "
+            f"(known: {sorted(GGUF_ARTIFACTS)}). Add the filename + size "
+            "to GGUF_ARTIFACTS -- no guessed filenames."
+        ) from None
+
+
+def resolve_gguf_path(quant: str = "Q8_0") -> Path:
     raw = os.environ.get("GEMMA4_12B_GGUF_PATH")
-    return Path(raw).expanduser() if raw else default_gguf_path()
+    return Path(raw).expanduser() if raw else default_gguf_path(quant)
 
 
 def _site_packages_candidates() -> list[Path]:
@@ -240,23 +265,34 @@ def _llamacpp_response_format(response_format: dict | None) -> dict | None:
 class GGUFNativeBackend:
     """LoaderBackend adapter for in-process llama-cpp-python GGUF inference."""
 
-    def load(self, repo_id: str, row: Any) -> dict[str, Any]:
-        model_path = resolve_gguf_path()
+    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
+        # S1 platform-portability (2026-07-10): resolve the explicit policy
+        # (None = nv50 baseline: cuda / Q8_0 / n_ctx 4096 -- identical to
+        # the previous hardcoded behavior).
+        from ._otr_shared.llm_policy import BASELINE_POLICY
+        _policy = policy if policy is not None else BASELINE_POLICY
+
+        quant = _policy.gguf_quant
+        expected_name, expected_size = gguf_artifact_for_quant(quant)
+        model_path = resolve_gguf_path(quant)
         if not model_path.exists():
             raise GGUFNativeConfigError(
-                f"Missing Gemma 4 12B Q8_0 GGUF file: {model_path}. "
-                f"Download {DEFAULT_GGUF_FILENAME} from {ROW_ID} and place it "
-                "under C:\\ComfyUI-Models\\LLM\\converted\\gemma-4-12b-it\\, "
-                "or set GEMMA4_12B_GGUF_PATH."
+                f"Missing Gemma 4 12B {quant} GGUF file: {model_path}. "
+                f"Download/convert {expected_name} from {ROW_ID} and place "
+                "it under C:\\ComfyUI-Models\\LLM\\converted\\"
+                "gemma-4-12b-it\\, or set GEMMA4_12B_GGUF_PATH."
+                + (f" Expected size: {expected_size} bytes."
+                   if expected_size else "")
             )
         if (
-            model_path.name == DEFAULT_GGUF_FILENAME
-            and model_path.stat().st_size != EXPECTED_Q8_0_SIZE_BYTES
+            model_path.name == expected_name
+            and expected_size is not None
+            and model_path.stat().st_size != expected_size
         ):
             raise GGUFNativeConfigError(
-                f"Incomplete Gemma 4 12B Q8_0 GGUF file: {model_path} has "
-                f"{model_path.stat().st_size} bytes, expected "
-                f"{EXPECTED_Q8_0_SIZE_BYTES}. Let the download finish or "
+                f"Incomplete Gemma 4 12B {quant} GGUF file: {model_path} "
+                f"has {model_path.stat().st_size} bytes, expected "
+                f"{expected_size}. Let the download finish or "
                 "delete the partial file and retry."
             )
 
@@ -268,46 +304,54 @@ class GGUFNativeBackend:
         except Exception as exc:
             log.warning("[GGUFNative] VRAM eviction failed (non-fatal): %s", exc)
 
+        # n_ctx precedence: explicit env escape hatch > policy. The policy
+        # default (4096) equals the old row-derived default.
+        n_ctx = _int_env("GEMMA4_12B_N_CTX", _policy.gguf_n_ctx)
         context_window = int(
             getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW)
             or DEFAULT_CONTEXT_WINDOW
         )
-        n_ctx = _int_env("GEMMA4_12B_N_CTX", context_window)
 
-        # 2. VRAM Gate Preflight Check
+        # 2. VRAM Gate Preflight Check. S1: FAIL LOUD, never adapt --
+        # the old silent 4096->2048 downgrade truncated the
+        # original_concept JSON mid-generation (root cause behind
+        # d526c8b7); the old "preflight failed (proceeding anyway)"
+        # tolerance loaded blind. Both are raises now. A cpu-device
+        # policy skips the gate outright (no VRAM to fit).
         import torch
-        if torch.cuda.is_available() and not _bool_env("OTR_TEST_MODE", False):
+        if (_policy.device == "cuda" and torch.cuda.is_available()
+                and not _bool_env("OTR_TEST_MODE", False)):
             try:
                 free_bytes, total_bytes = torch.cuda.mem_get_info()
-                free_gb = free_bytes / (1024 ** 3)
-                # Estimation: weights (12.07 GB) + SWA KV Cache (~0.7 GB per 1024 context cells) + safety overhead
-                # At 4096 context, total needed is ~14.9 GB. At 2048 context, total is ~13.5 GB.
-                estimated_needed_gb = 12.07 + (n_ctx / 1024.0) * 0.7 + 0.1
-                log.info(
-                    "[GGUFNative] VRAM Preflight: Free=%.2f GB | Estimated Needed=%.2f GB (n_ctx=%d)",
-                    free_gb, estimated_needed_gb, n_ctx
-                )
-                if free_gb < estimated_needed_gb:
-                    if n_ctx > 2048 and free_gb >= 13.5:
-                        log.warning(
-                            "[GGUFNative] Tight VRAM (Free=%.2f GB < Needed=%.2f GB). "
-                            "Dynamically downgrading context window from %d to 2048 to fit 16GB GPU.",
-                            free_gb, estimated_needed_gb, n_ctx
-                        )
-                        n_ctx = 2048
-                    elif free_gb < 13.0:
-                        raise GGUFNativeConfigError(
-                            f"Insufficient VRAM for GGUF loading. Free VRAM is {free_gb:.2f} GB, "
-                            f"but {estimated_needed_gb:.2f} GB is needed for Q8_0 weights. "
-                            f"Evict other resident CUDA processes or free display RAM."
-                        )
-            except GGUFNativeConfigError:
-                raise
             except Exception as exc:
-                log.warning("[GGUFNative] VRAM preflight check failed (proceeding anyway): %s", exc)
+                raise GGUFNativeConfigError(
+                    f"VRAM preflight probe failed ({exc!r}) -- refusing to "
+                    "load a ~13 GB GGUF blind. Fix the CUDA runtime or set "
+                    "llm device policy to cpu."
+                ) from exc
+            free_gb = free_bytes / (1024 ** 3)
+            # Estimation: weights (12.07 GB) + SWA KV Cache (~0.7 GB per
+            # 1024 context cells) + safety overhead. At 4096 context the
+            # total needed is ~14.9 GB; at 2048 it is ~13.5 GB.
+            estimated_needed_gb = 12.07 + (n_ctx / 1024.0) * 0.7 + 0.1
+            log.info(
+                "[GGUFNative] VRAM Preflight: Free=%.2f GB | Estimated Needed=%.2f GB (n_ctx=%d)",
+                free_gb, estimated_needed_gb, n_ctx
+            )
+            if free_gb < estimated_needed_gb:
+                raise GGUFNativeConfigError(
+                    f"Insufficient VRAM for GGUF n_ctx={n_ctx}: free "
+                    f"{free_gb:.2f} GB < needed {estimated_needed_gb:.2f} "
+                    f"GB. Lower gguf_n_ctx (policy), free VRAM, or pick a "
+                    "smaller quant. NO silent context downgrade (the old "
+                    "4096->2048 downgrade truncated generations)."
+                )
 
         n_batch = _int_env("GEMMA4_12B_N_BATCH", DEFAULT_N_BATCH)
-        n_gpu_layers = _int_env("GEMMA4_12B_N_GPU_LAYERS", DEFAULT_N_GPU_LAYERS)
+        # Device policy: cuda offloads all layers (-1); cpu keeps every
+        # layer on host (0). The env stays the explicit escape hatch.
+        _default_layers = DEFAULT_N_GPU_LAYERS if _policy.device == "cuda" else 0
+        n_gpu_layers = _int_env("GEMMA4_12B_N_GPU_LAYERS", _default_layers)
         verbose = _bool_env("GEMMA4_12B_VERBOSE", False)
 
         log.info(

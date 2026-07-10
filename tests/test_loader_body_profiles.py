@@ -111,30 +111,35 @@ def test_load_llm_standard_profile():
     )
 
 
-def test_load_llm_obsidian_profile():
-    """Obsidian profile maps to `requested_quantized = True` (via the
-    `is_obsidian = "Obsidian" in optimization_profile` predicate) and
-    then to the NF4 BitsAndBytesConfig branch."""
+def test_load_llm_nf4_comes_from_policy():
+    """S1 platform-portability REWRITE (was: Obsidian-profile predicate).
+    Quantization is an EXPLICIT policy field now: the NF4 branch keys on
+    `_policy.quant_policy == "bnb_nf4"` and the deleted Obsidian/tag
+    machinery must stay deleted."""
     body = _loader_load_llm_source()
-    assert 'is_obsidian = "Obsidian" in optimization_profile' in body, (
-        "Obsidian decision predicate missing from ported body."
+    assert 'needs_4bit = _policy.quant_policy == "bnb_nf4"' in body, (
+        "NF4 must be selected by the explicit policy field."
     )
-    # Obsidian feeds requested_quantized -> needs_4bit -> NF4 config.
-    assert "requested_quantized" in body
+    assert 'is_obsidian = "Obsidian" in optimization_profile' not in body, (
+        "the deleted Obsidian auto-quant predicate is back."
+    )
+    assert "vram_safe_tags = (" not in body, (
+        "the deleted tag-based auto-quant predicate is back."
+    )
     assert 'bnb_4bit_quant_type="nf4"' in body, (
-        "Obsidian path requires NF4 quant type in BitsAndBytesConfig; "
-        "literal `bnb_4bit_quant_type=\"nf4\"` not found in ported body."
+        "NF4 quant type literal missing from BitsAndBytesConfig."
     )
     assert "bnb_4bit_use_double_quant=True" in body
 
 
-def test_load_llm_8bit_profile():
-    """`[8-bit]` UI label maps to `needs_8bit = "8-bit" in
-    model_id_full.lower()` and the 8-bit BitsAndBytesConfig branch
-    (distinct from the 4-bit NF4 branch)."""
+def test_load_llm_8bit_comes_from_policy():
+    """S1 platform-portability REWRITE (was: '[8-bit]' UI-label
+    predicate). The 8-bit branch keys on `_policy.quant_policy ==
+    "bnb_8bit"`; bitsandbytes missing while a bnb policy is set is a
+    HARD FAIL (no silent bf16 fallback)."""
     body = _loader_load_llm_source()
-    assert 'needs_8bit = "8-bit" in model_id_full.lower()' in body, (
-        "8-bit predicate missing from ported body."
+    assert 'needs_8bit = _policy.quant_policy == "bnb_8bit"' in body, (
+        "8-bit must be selected by the explicit policy field."
     )
     # 8-bit branch must construct its own BitsAndBytesConfig.
     assert "load_in_8bit=True" in body
@@ -147,6 +152,8 @@ def test_load_llm_8bit_profile():
     assert "elif needs_4bit:" in body, (
         "8-bit and 4-bit must be on `if`/`elif` branches, not parallel."
     )
+    # Missing bitsandbytes under a bnb policy raises, never bf16-falls-back.
+    assert "NO silent bf16 fallback" in body
 
 
 # ---------------------------------------------------------------------------

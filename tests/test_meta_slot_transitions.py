@@ -65,7 +65,9 @@ def _stub_request_slot(monkeypatch):
 
     monkeypatch.setattr(
         _OTRML, "request_slot",
-        lambda slot, model_id: {"model": None, "tokenizer": None},
+        # S1: mirrors the production signature (policy kwarg threaded by
+        # the scheduler); the stub ignores it.
+        lambda slot, model_id, policy=None: {"model": None, "tokenizer": None},
     )
 
 

@@ -872,11 +872,21 @@ class OpenRouterBackend:
 
     # --- protocol: load -------------------------------------------------
 
-    def load(self, repo_id: str, row: Any) -> dict[str, Any]:
+    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
         """Return a remote cache_entry. No network call fires here -- a
         bad slug surfaces at generate time, and load must stay cheap so
         the writer's per-call request_slot is fast (C2: it must not
-        touch the resident local model)."""
+        touch the resident local model).
+
+        S1 policy contract: this remote lane ASSERTS the profile
+        lane_allowlist admits it (defense in depth behind request_slot's
+        backstop) and deliberately IGNORES every hardware field
+        (device/attn/quant/gguf) -- the lane uses zero local compute."""
+        if policy is not None and not policy.admits_lane("openrouter"):
+            raise OpenRouterConfigError(
+                f"{repo_id}: 'openrouter' lane is not admitted by the "
+                f"profile lane_allowlist {list(policy.lane_allowlist)}."
+            )
         if not openrouter_enabled():
             raise OpenRouterConfigError(
                 f"{repo_id} selected but OpenRouter is not enabled. Set "

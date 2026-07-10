@@ -300,7 +300,11 @@ class VRAMContextTest:
         _accel_reset_peak(accel)
         load_t0 = time.time()
         try:
-            cache_entry = _OTRML.request_slot("technical", model_id)
+            # S1: diagnostics probe the nv50 BASELINE policy explicitly
+            # (the same resolved values production defaults to).
+            from ._otr_shared.llm_policy import BASELINE_POLICY
+            cache_entry = _OTRML.request_slot(
+                "technical", model_id, policy=BASELINE_POLICY)
         except Exception as exc:
             msg = (
                 f"## VRAM Context Test\n\n"

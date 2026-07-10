@@ -39,13 +39,15 @@ from nodes import _otr_model_loader as loader  # noqa: E402
 from nodes import _otr_model_runtime as runtime  # noqa: E402
 
 # AST-pinned signature snapshot of the legacy load_llm function at
-# D1b authorship time. If a future commit modifies the load_llm
-# signature, the adapter delegate may break -- catches the drift.
+# D1b authorship time (+ the S1 platform-portability `policy` kwarg,
+# 2026-07-10). If a future commit modifies the load_llm signature, the
+# adapter delegate may break -- catches the drift.
 EXPECTED_LOAD_LLM_PARAMS = (
     ("model_id",            None),     # positional
     ("device",              "cuda"),
     ("optimization_profile", "Standard"),
     ("context_cap",         None),
+    ("policy",              None),     # S1 LLMRuntimePolicy (None=baseline)
 )
 
 

@@ -376,7 +376,9 @@ def test_slot_scheduler_transitions_match_dag(monkeypatch):
     class _StubCache(dict):
         pass
 
-    def fake_request_slot(slot, model_id):
+    def fake_request_slot(slot, model_id, policy=None):
+        # S1: mirrors the production signature (policy threaded by the
+        # scheduler); the stub ignores it.
         return _StubCache({
             "model":       MagicMock(),
             "tokenizer":   MagicMock(),

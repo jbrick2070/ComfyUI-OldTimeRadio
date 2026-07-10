@@ -58,7 +58,7 @@ class _LegacyTransformersBackendBase:
     its own load implementation.
     """
 
-    def load(self, repo_id: str, row: Any) -> dict[str, Any]:
+    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
         # Sprint D D4: precondition gate fires before the legacy
         # load delegate. Rows whose context_window is below
         # HARD_VRAM_CONTEXT_LIMIT raise here instead of silently
@@ -66,8 +66,10 @@ class _LegacyTransformersBackendBase:
         # have context_window=8192 which matches the default
         # HARD_VRAM_CONTEXT_LIMIT so this is a no-op for them; a
         # sub-limit period model would trip the precondition.
+        # S1: the explicit LLMRuntimePolicy threads straight through to
+        # load_llm (None = nv50 baseline resolved there).
         _otr_loader_backends.check_context_window(row)
-        return _otr_model_loader.load_llm(repo_id)
+        return _otr_model_loader.load_llm(repo_id, policy=policy)
 
     def generate(
         self, model: Any, messages: list[dict], **kwargs: Any,
@@ -120,12 +122,13 @@ class TransformersGPTQInt4Backend:
     pull weights or execute generation.
     """
 
-    def load(self, repo_id: str, row: Any) -> dict[str, Any]:  # noqa: ARG002
+    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:  # noqa: ARG002
         # Sprint D D4: precondition fires FIRST. A row whose
         # context_window is below HARD_VRAM_CONTEXT_LIMIT trips this
         # before the NotImplementedError, surfacing the context-
         # window mismatch as the dominant error rather than the
-        # deferred-feature one.
+        # deferred-feature one. (S1: policy accepted for protocol
+        # uniformity; the scaffold raises before using it.)
         _otr_loader_backends.check_context_window(row)
         raise NotImplementedError(
             "TransformersGPTQInt4Backend.load is a D1b scaffold; the "

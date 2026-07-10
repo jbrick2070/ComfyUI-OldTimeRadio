@@ -155,6 +155,7 @@ def load_llm(
     device: str = "cuda",
     optimization_profile: str = "Standard",
     context_cap: int | None = None,
+    policy: Any = None,
 ) -> dict[str, Any]:
     """Load an LLM and return a cache_entry dict.
 
@@ -200,12 +201,19 @@ def load_llm(
         # Strip [BETA] or [8-bit] labels used in the UI dropdown
         _stripped_model_id = model_id_full.split(" ")[0]
 
-        # Decide whether the requested model + profile combination
-        # needs quantization. Mirrors the legacy predicate exactly.
-        is_obsidian = "Obsidian" in optimization_profile
-        vram_safe_tags = ("9b", "12b", "14b", "24b", "26b", "27b", "31b", "70b", "e4b", "4b-it", "a4b", "2b", "2b-it", "efficiency", "nemo", "qwen", "mistral", "instruct", "gemma")
-        requested_quantized = is_obsidian or "4-bit" in model_id_full.lower() or \
-                              any(tag in model_id_full.lower() for tag in vram_safe_tags)
+        # S1 platform-portability (2026-07-10): resolve the EXPLICIT runtime
+        # policy (None = the nv50 16 GB baseline -- identical resolved
+        # values to the deleted auto machinery below). policy.device wins
+        # over the legacy `device` kwarg: one source of truth.
+        from ._otr_shared.llm_policy import BASELINE_POLICY
+        _policy = policy if policy is not None else BASELINE_POLICY
+        device = _policy.device
+
+        # S1: quantization is an EXPLICIT policy field. The legacy tag
+        # predicate (Obsidian profile + "4-bit"/"9b"/"12b"/"nemo"/...
+        # model-id substrings) is DELETED -- its resolved value for every
+        # production id was NF4, which is exactly the policy default.
+        requested_quantized = _policy.quant_policy in ("bnb_nf4", "bnb_8bit")
 
         # 2026-04-29: per-model context cap. See full rationale in the
         # original story_orchestrator._load_llm header (S30 B8 hash
@@ -321,70 +329,57 @@ def load_llm(
 
         load_dtype = torch.bfloat16
 
-        # Attention selector: Flash Attention 2 (preferred) -> SDPA
-        # (mandatory fallback on Blackwell sm_120 / Windows / torch 2.10)
-        # -> SageAttention. The resolved value below is the single
-        # source of truth for `attn_implementation` in common_kwargs --
-        # it is logged on every load so the choice is auditable.
-        attn_impl = "sdpa"
-        try:
-            from importlib.metadata import distribution, PackageNotFoundError
-            try:
-                distribution("flash-attn")
-                import flash_attn  # noqa: F401
-                attn_impl = "flash_attention_2"
-                log.info("[StoryOrchestrator] Flash Attention 2 available - using flash_attention_2")
-            except (PackageNotFoundError, ImportError):
-                log.info(
-                    "[StoryOrchestrator] Flash Attention 2: NOT AVAILABLE - no prebuilt wheel exists "
-                    "for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. "
-                    "SageAttention + SDPA active. Performance unaffected. Do not attempt install."
-                )
-        except Exception as _fa_err:
-            log.info("[StoryOrchestrator] FA2 probe failed (%s) - using SDPA fallback", _fa_err)
-        _runtime_log(f"[StoryOrchestrator] Attention selector resolved: attn_implementation={attn_impl}")
+        # S1: attention implementation is an EXPLICIT policy field. The FA2
+        # auto-probe (distribution('flash-attn') + import) is DELETED -- on
+        # the Blackwell sm_120 / Windows / torch 2.10 baseline it always
+        # resolved to sdpa, which is the policy default. An FA2 wheel
+        # appearing later is honoured by setting llm_attn_impl explicitly,
+        # not by a probe. Still the single source of truth for
+        # `attn_implementation` in common_kwargs, logged on every load.
+        attn_impl = _policy.attn_impl
+        _runtime_log(f"[StoryOrchestrator] Attention selector (policy): attn_implementation={attn_impl}")
 
-        # 4-bit / 8-bit quantization config.
+        # 4-bit / 8-bit quantization -- EXPLICIT policy, no model-id tag
+        # magic (S1; the "2bit"/"3bit" wing-ding upgrade + vram_safe_tags
+        # predicate are deleted with it). bitsandbytes missing while the
+        # policy requires it is a HARD FAIL: silently proceeding at
+        # bfloat16 OOMs a 16 GB card at ~24 GiB -- the exact fallback
+        # class BUG-LOCAL-098 exists to catch.
         quant_config = None
-        needs_8bit = "8-bit" in model_id_full.lower()
-        is_unstable_quant = any(tag in model_id_full.lower() for tag in ("2bit", "3bit", "2-bit", "3-bit"))
-        needs_4bit = requested_quantized or is_unstable_quant or \
-                     any(tag in model_id_full.lower() for tag in vram_safe_tags)
+        needs_8bit = _policy.quant_policy == "bnb_8bit"
+        needs_4bit = _policy.quant_policy == "bnb_nf4"
 
-        if is_unstable_quant:
-            _runtime_log(f"[StoryOrchestrator] [EMOJI]- WING DING PROTECTION: Unstable Bit-Depth ({model_id_full}) UPGRADED to 4-bit NF4")
-        elif needs_4bit:
-            _runtime_log(f"[StoryOrchestrator] Quantizing: 4-bit NF4 for {model_id_full}")
-
+        if needs_8bit or needs_4bit:
+            try:
+                from transformers import BitsAndBytesConfig
+            except ImportError as _bnb_err:
+                raise ModelLoaderError(
+                    f"llm.quant_policy={_policy.quant_policy!r} requires "
+                    "bitsandbytes, which is not importable on this host. "
+                    "Set llm.quant_policy='none' in the platform profile "
+                    "(bnb lanes are OFF on ROCm/MPS/CPU tiers) or install "
+                    "bitsandbytes. NO silent bf16 fallback."
+                ) from _bnb_err
         if needs_8bit:
-            try:
-                from transformers import BitsAndBytesConfig
-                quant_config = BitsAndBytesConfig(
-                    load_in_8bit=True,
-                    llm_int8_enable_fp32_cpu_offload=True,
-                )
-                log.info("[StoryOrchestrator] Enabling 8-bit quantization")
-            except ImportError:
-                log.warning("[StoryOrchestrator] Large model but bitsandbytes not installed!")
+            quant_config = BitsAndBytesConfig(
+                load_in_8bit=True,
+                llm_int8_enable_fp32_cpu_offload=True,
+            )
+            log.info("[StoryOrchestrator] Enabling 8-bit quantization (policy)")
         elif needs_4bit:
-            try:
-                from transformers import BitsAndBytesConfig
-                # BUG-LOCAL-098: instantiate BitsAndBytesConfig FRESH
-                # per call. transformers mutates internal flags during
-                # from_pretrained; a reused instance silently skips
-                # quantization on the second call -> fp16 fallback ->
-                # OOM at 24 GiB on 16 GiB GPU.
-                quant_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_compute_dtype=torch.bfloat16,
-                    bnb_4bit_use_double_quant=True,
-                    bnb_4bit_quant_type="nf4",
-                )
-                log.info("[StoryOrchestrator] [EMOJI] Enabling 4-bit quantization (NF4) for Ultra-Low VRAM")
-                _runtime_log("[StoryOrchestrator] [EMOJI] 4-bit NF4 active")
-            except ImportError:
-                log.warning("[StoryOrchestrator] Large model but bitsandbytes not installed - "
-                            "loading at bfloat16 may OOM. Run: pip install bitsandbytes")
+            # BUG-LOCAL-098: instantiate BitsAndBytesConfig FRESH per
+            # call. transformers mutates internal flags during
+            # from_pretrained; a reused instance silently skips
+            # quantization on the second call -> fp16 fallback -> OOM at
+            # 24 GiB on 16 GiB GPU.
+            quant_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+            )
+            log.info("[StoryOrchestrator] Enabling 4-bit quantization (NF4, policy)")
+            _runtime_log("[StoryOrchestrator] 4-bit NF4 active (policy)")
 
         from transformers import AutoTokenizer, AutoModelForCausalLM
 
@@ -792,7 +787,7 @@ def invalidate_cache_no_gpu_teardown() -> None:
     LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
 
 
-def request_slot(slot: str, model_id: str) -> dict[str, Any]:
+def request_slot(slot: str, model_id: str, policy: Any = None) -> dict[str, Any]:
     """Slot-aware entry point. Loads (or reuses cached) LLM, handling
     cache reuse vs full teardown automatically.
 
@@ -821,11 +816,19 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     """
     from . import _otr_model_catalog as _otr_catalog
     from ._otr_model_inputs import VRAMFitFailedError
+    from ._otr_shared.llm_policy import BASELINE_POLICY, lane_for_row
 
     if slot not in ("creative", "technical"):
         raise ModelLoaderError(
             f"request_slot: slot must be 'creative' or 'technical', got {slot!r}"
         )
+
+    # S1 platform-portability (2026-07-10): resolve the explicit runtime
+    # policy. None = the nv50 baseline (an API backstop for direct callers;
+    # every production call-site threads a real policy).
+    if policy is None:
+        log.info("[Selector] slot=%s policy=None -> nv50 BASELINE", slot)
+    _policy = policy if policy is not None else BASELINE_POLICY
 
     # Step 1: normalize.
     normalized = _otr_catalog.validate_model_id(model_id)
@@ -856,6 +859,19 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     _REMOTE_DISPATCH_BACKENDS = ("openrouter_http", "comfy_credits_http", "google_api_http")
     _GGUF_DISPATCH_BACKENDS = ("gguf_native",)
     _virtual_row = _otr_catalog._by_repo_id().get(normalized)
+
+    # S1 runtime lane backstop: the profile's lane_allowlist is enforced at
+    # validate/emit time upstream; this is the last line of defense so a
+    # hand-crafted workflow cannot smuggle a disallowed lane through. NO
+    # FALLBACK: pick an admitted lane or change the platform profile.
+    _lane = lane_for_row(_virtual_row)
+    if not _policy.admits_lane(_lane):
+        raise ModelLoaderError(
+            f"request_slot: lane '{_lane}' (model {normalized!r}) is not "
+            f"admitted by the profile lane_allowlist "
+            f"{list(_policy.lane_allowlist)} -- NO FALLBACK."
+        )
+
     if (
         _virtual_row is not None
         and getattr(_virtual_row, "loader_backend", None) in _REMOTE_DISPATCH_BACKENDS
@@ -866,7 +882,9 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
             "resident local model left in place, no-evict)",
             slot, normalized,
         )
-        return get_backend_for_row(_virtual_row).load(normalized, _virtual_row)
+        return get_backend_for_row(_virtual_row).load(
+            normalized, _virtual_row, policy=_policy,
+        )
 
     if (
         _virtual_row is not None
@@ -877,9 +895,19 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
             LLM_CACHE.get("model_id") == normalized
             and LLM_CACHE.get("cache_entry") is not None
         ):
-            log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
-            LLM_CACHE["slot"] = slot
-            return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
+            # S1: a resident model only counts as a hit when it was loaded
+            # under the SAME artifact-shaping policy (device / attn /
+            # quant / gguf fields). Silent stale-policy reuse is the bug
+            # class this campaign kills.
+            if LLM_CACHE.get("policy_key") == _policy.cache_key():
+                log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
+                LLM_CACHE["slot"] = slot
+                return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
+            log.info(
+                "[Selector] policy change for %s (%s -> %s): full teardown",
+                normalized, LLM_CACHE.get("policy_key"), _policy.cache_key(),
+            )
+            unload_llm()
         if LLM_CACHE.get("model_id") not in (None, normalized):
             log.info(
                 "[Selector] slot transition: %s -> %s (full teardown)",
@@ -888,45 +916,63 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
             )
             unload_llm()
         cache_entry = get_backend_for_row(_virtual_row).load(
-            normalized, _virtual_row,
+            normalized, _virtual_row, policy=_policy,
         )
         LLM_CACHE["model_id"] = normalized
         LLM_CACHE["slot"] = slot
         LLM_CACHE["cache_entry"] = cache_entry
+        LLM_CACHE["policy_key"] = _policy.cache_key()
         return cache_entry
 
-    # Step 2: cache hit on the same model id (regardless of slot).
+    # Step 2: cache hit on the same model id (regardless of slot) -- policy
+    # keyed (S1): a mismatched policy_key is a MISS + teardown, never reuse.
     if LLM_CACHE.get("model_id") == normalized and LLM_CACHE.get("cache_entry") is not None:
-        log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
-        LLM_CACHE["slot"] = slot
-        return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
+        if LLM_CACHE.get("policy_key") == _policy.cache_key():
+            log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
+            LLM_CACHE["slot"] = slot
+            return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
+        log.info(
+            "[Selector] policy change for %s (%s -> %s): full teardown",
+            normalized, LLM_CACHE.get("policy_key"), _policy.cache_key(),
+        )
+        unload_llm()
 
     # Step 3: context cap (never raises).
     ctx_verdict = _otr_catalog.resolve_context_cap(normalized)
 
-    # Step 4: VRAM fit (never raises).
-    fit_verdict = _otr_catalog.check_vram_fit(normalized, ctx_verdict.value)
-
-    # Step 5: FAIL escalates BEFORE any network/disk work. A 70B pick on
-    # a 16 GB card must not trigger snapshot_download or a disk-space
-    # pre-check pass; both waste minutes on a doomed-to-OOM load.
-    if fit_verdict.tier == "FAIL":
-        raise VRAMFitFailedError(
-            f"VRAMFitFailedError: {normalized!r}: {fit_verdict.reason}. "
-            f"ctx_cap={ctx_verdict.tier}@{ctx_verdict.value}",
-            estimated_gb=fit_verdict.estimated_gb,
-            ceiling_gb=fit_verdict.ceiling_gb,
+    # Step 4: VRAM fit (never raises). Ceiling comes from the policy (S1);
+    # 0 = gate DISABLED (cpu tier -- there is no VRAM to fit).
+    if _policy.vram_ceiling_gb > 0:
+        fit_verdict = _otr_catalog.check_vram_fit(
+            normalized, ctx_verdict.value,
+            ceiling_gb=_policy.vram_ceiling_gb,
         )
 
-    # Step 6: combined caution log (everything below PASS/PASS).
-    if not (fit_verdict.tier == "PASS" and ctx_verdict.tier == "PASS"):
+        # Step 5: FAIL escalates BEFORE any network/disk work. A 70B pick on
+        # a 16 GB card must not trigger snapshot_download or a disk-space
+        # pre-check pass; both waste minutes on a doomed-to-OOM load.
+        if fit_verdict.tier == "FAIL":
+            raise VRAMFitFailedError(
+                f"VRAMFitFailedError: {normalized!r}: {fit_verdict.reason}. "
+                f"ctx_cap={ctx_verdict.tier}@{ctx_verdict.value}",
+                estimated_gb=fit_verdict.estimated_gb,
+                ceiling_gb=fit_verdict.ceiling_gb,
+            )
+
+        # Step 6: combined caution log (everything below PASS/PASS).
+        if not (fit_verdict.tier == "PASS" and ctx_verdict.tier == "PASS"):
+            log.info(
+                "[Selector] proceeding with caution: ctx_cap=%s@%d, "
+                "vram_fit=%s@%.1f GB",
+                ctx_verdict.tier,
+                ctx_verdict.value,
+                fit_verdict.tier,
+                fit_verdict.estimated_gb,
+            )
+    else:
         log.info(
-            "[Selector] proceeding with caution: ctx_cap=%s@%d, "
-            "vram_fit=%s@%.1f GB",
-            ctx_verdict.tier,
-            ctx_verdict.value,
-            fit_verdict.tier,
-            fit_verdict.estimated_gb,
+            "[Selector] VRAM-fit gate disabled by policy "
+            "(vram_ceiling_gb=0, cpu tier)"
         )
 
     # Step 7: ensure on-disk + handle gating / disk-space pre-flight.
@@ -957,7 +1003,9 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     # for the dict update; the empty_cache + ipc_collect + synchronize
     # still fire and drop the orphan.
     try:
-        cache_entry = load_llm(normalized, context_cap=ctx_verdict.value)
+        cache_entry = load_llm(
+            normalized, context_cap=ctx_verdict.value, policy=_policy,
+        )
     except Exception:
         log.warning(
             "[Selector] load_llm raised for %s; running unload_llm() "
@@ -970,10 +1018,11 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
             log.exception("[Selector] unload_llm() also raised; continuing")
         raise
 
-    # Step 9: cache.
+    # Step 9: cache (policy-keyed, S1).
     LLM_CACHE["model_id"] = normalized
     LLM_CACHE["slot"] = slot
     LLM_CACHE["cache_entry"] = cache_entry
+    LLM_CACHE["policy_key"] = _policy.cache_key()
     return cache_entry
 
 

@@ -400,7 +400,17 @@ class ComfyCreditsBackend:
     is a no-op (nothing is resident; the resident local model is never
     touched -- C2 no-evict)."""
 
-    def load(self, repo_id: str, row: Any) -> dict[str, Any]:
+    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
+        # S1 policy contract: remote lane -- asserts the lane_allowlist
+        # admits it (defense in depth behind request_slot's backstop) and
+        # deliberately IGNORES every hardware field; zero local compute.
+        # Auth stays the hidden comfy-org inputs captured by set_auth()
+        # from the writer's run() -- the policy carries NO credentials.
+        if policy is not None and not policy.admits_lane("comfy_credits"):
+            raise ComfyCreditsConfigError(
+                f"{repo_id}: 'comfy_credits' lane is not admitted by the "
+                f"profile lane_allowlist {list(policy.lane_allowlist)}."
+            )
         if not comfy_credits_enabled():
             raise ComfyCreditsConfigError(
                 f"{repo_id} selected but Comfy Credits is not enabled. Set "

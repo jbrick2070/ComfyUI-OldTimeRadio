@@ -114,11 +114,14 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 # S30 B2a: catalog drives the dropdown_choices() for the two model widgets
 # at INPUT_TYPES() registration time. Pure-Python module, no torch /
 # transformers / GPU work -- safe at module-import time.
 from . import _otr_model_catalog as _otr_model_catalog  # noqa: E501
+# S1 platform-portability: the explicit LLM runtime policy (stdlib-only).
+from ._otr_shared import llm_policy as _llm_policy
 
 # Stage 2C (multi-modal story schema, 2026-07-05): the story-routing layer
 # supplies the source_bank dropdown (list_bank_ids at INPUT_TYPES) and the
@@ -439,11 +442,16 @@ class _SlotScheduler:
         top_p: float,
         min_p: float,
         repetition_penalty: float,
+        policy: Any = None,
     ):
         self.ids = {
             "creative": creative_id,
             "technical": technical_id,
         }
+        # S1 platform-portability: the frozen LLMRuntimePolicy threaded
+        # into every request_slot call (None = nv50 baseline, resolved
+        # by request_slot itself).
+        self.policy = policy
         self.sampling = {
             "top_p": float(top_p),
             "min_p": float(min_p or 0.0),
@@ -468,7 +476,7 @@ class _SlotScheduler:
         from . import _otr_model_loader as _OTRML
 
         resolved_id = self.ids[slot]
-        cache_entry = _OTRML.request_slot(slot, resolved_id)
+        cache_entry = _OTRML.request_slot(slot, resolved_id, policy=self.policy)
         if (
             self._last_resolved_id is not None
             and self._last_resolved_id != resolved_id
@@ -1196,6 +1204,16 @@ def _resolve_inputs(
     # Source Banks v2 (2026-07-08): optional external source reference for
     # source-bank lanes. Blank is intentionally inert until a bank consumes it.
     source_ref: str = "",
+    # S1 platform-portability (2026-07-10): the explicit LLM runtime policy
+    # fields. Defaults EQUAL today's resolved nv50 16 GB baseline, so the
+    # explicit policy reproduces current behavior exactly; the S5 writer
+    # widgets feed these 1:1 (llm_device .. gguf_quant, append-only).
+    llm_device: str = "cuda",
+    llm_attn_impl: str = "sdpa",
+    llm_quant_policy: str = "bnb_nf4",
+    llm_vram_ceiling_gb: float = 14.5,
+    gguf_n_ctx: int = 4096,
+    gguf_quant: str = "Q8_0",
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1370,6 +1388,18 @@ def _resolve_inputs(
         # / technical_model. No "stamp both" hedge.
         "creative_writing_model": creative_writing_model,
         "technical_model":        technical_model,
+        # S1 platform-portability: the ONE frozen policy object threaded
+        # _SlotScheduler -> request_slot -> backend.load. Validated at
+        # construction (LLMPolicyError on a bad enum -- fail loud here,
+        # before any model work).
+        "llm_policy": _llm_policy.LLMRuntimePolicy(
+            device=str(llm_device),
+            attn_impl=str(llm_attn_impl),
+            quant_policy=str(llm_quant_policy),
+            vram_ceiling_gb=float(llm_vram_ceiling_gb),
+            gguf_n_ctx=int(gguf_n_ctx),
+            gguf_quant=str(gguf_quant),
+        ),
         "include_act_breaks":   bool(include_act_breaks),
         "act_count":            int(act_count_int),
         "creativity":           str(creativity),
@@ -3227,6 +3257,9 @@ class OTR_LedgerScriptWriter:
             # Phase 4 v4 (2026-05-11) sampling knobs.
             min_p=resolved["min_p"],
             repetition_penalty=resolved["repetition_penalty"],
+            # S1 platform-portability: the explicit runtime policy rides
+            # every request_slot call this scheduler makes.
+            policy=resolved["llm_policy"],
         )
         # LLM slot: creative -- bulk writer path (outline, cast,
         # dialogue, polish, style picker, title regen).
