@@ -225,7 +225,17 @@
       "compose_flags": [],
       "beat_intent": null,
       "target_words": null,
-      "dialogue_slot_id": null
+      "dialogue_slot_id": null,
+      "text_for_tts": "Tonight, a story of one antenna and the woman who refused to choose.",
+      "text_for_tts_source_sha256": "0ca0b68c377f23ead90ee59276496c4ab26712cab01c1cca4ed06ec577678639",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
     },
     {
       "line_id": "shot_001_b1",
@@ -245,7 +255,17 @@
       "compose_flags": [],
       "beat_intent": null,
       "target_words": null,
-      "dialogue_slot_id": null
+      "dialogue_slot_id": null,
+      "text_for_tts": "Play it again, and this time keep the gain low. The mountain does not repeat itself for committees.",
+      "text_for_tts_source_sha256": "a438fc67dc6de6581e3cb2b44bfcc2df22172467da598079f3a61d2e6f5fb896",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
     },
     {
       "line_id": "shot_001_b2",
@@ -265,7 +285,17 @@
       "compose_flags": [],
       "beat_intent": null,
       "target_words": null,
-      "dialogue_slot_id": null
+      "dialogue_slot_id": null,
+      "text_for_tts": "The tape is the tape, Vera. It will not change for us.",
+      "text_for_tts_source_sha256": "6c835bd9e4471e1d640188f5bc64b9e8c5dcda67da5c6b940ba0c4e345404d46",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
     },
     {
       "line_id": "shot_001_music",
@@ -305,7 +335,17 @@
       "compose_flags": [],
       "beat_intent": null,
       "target_words": null,
-      "dialogue_slot_id": null
+      "dialogue_slot_id": null,
+      "text_for_tts": "You pulled the log pages. I checked the binding twice.",
+      "text_for_tts_source_sha256": "3fbb7e2bd0c76f0e4c04152c1247a5639781abb109562596b5de8bd04a63047d",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
     },
     {
       "line_id": "shot_002_b2",
@@ -325,7 +365,17 @@
       "compose_flags": [],
       "beat_intent": null,
       "target_words": null,
-      "dialogue_slot_id": null
+      "dialogue_slot_id": null,
+      "text_for_tts": "I pulled one page. The one with my name on it.",
+      "text_for_tts_source_sha256": "084c53f596d5830f1b2539247a0af83b19f159c261d5701b477eb51a420e1e0e",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
     },
     {
       "line_id": "shot_003_b1",
@@ -345,7 +395,17 @@
       "compose_flags": [],
       "beat_intent": null,
       "target_words": null,
-      "dialogue_slot_id": null
+      "dialogue_slot_id": null,
+      "text_for_tts": "Vera got her answer, though the antenna kept the better half.",
+      "text_for_tts_source_sha256": "da8f7603e3074b19195a6f376f6d448ed48c72233d627e67490348445c75b3ef",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
     },
     {
       "line_id": "shot_003_b2",
@@ -365,7 +425,17 @@
       "compose_flags": [],
       "beat_intent": null,
       "target_words": null,
-      "dialogue_slot_id": null
+      "dialogue_slot_id": null,
+      "text_for_tts": "Beyond tonight's cliff-top signal, a real transmission waits:",
+      "text_for_tts_source_sha256": "3b0fab97dadcfd8d1ca89120c0e128cdbc8d938a6300a8a32c10bbb4977c4f19",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
     },
     {
       "line_id": "shot_003_b3",
@@ -385,7 +455,17 @@
       "compose_flags": [],
       "beat_intent": null,
       "target_words": null,
-      "dialogue_slot_id": null
+      "dialogue_slot_id": null,
+      "text_for_tts": "Tonight's story grew from a real survey: instruments on Mount Etna mapped one thousand, two hundred new vents this season, work led by Doctor Rossi.",
+      "text_for_tts_source_sha256": "0bf060cc83b0f8ad551ff690cca803d18cc7e5eaba682fa86c313a382066c5b5",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 1,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": true
+      }
     },
     {
       "line_id": "shot_003_music",

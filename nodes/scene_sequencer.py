@@ -592,6 +592,36 @@ def _generate_bark_for_line(text, voice_preset, temperature=0.7):
     return np.concatenate(all_audio), sample_rate
 
 
+def _verify_bus_clip_counts(
+    *,
+    announcer_consumed: int,
+    announcer_provided: int,
+    character_consumed: int,
+    character_provided: int,
+    announcer_line_ids: "list | None" = None,
+    character_line_ids: "list | None" = None,
+) -> None:
+    """C2 (S2 P1.3) two-bus terminal check. `consumed` MUST equal
+    `provided` on BOTH the announcer bus (node 82) and the character bus
+    (node 81). A SURPLUS (provided > consumed) means the voice nodes
+    emitted more clips than there are dialogue lines for that bus, leaving
+    orphan clips unused and the timeline mis-aligned; a SHORTFALL is
+    already caught mid-loop, and is caught here too if reached. Either
+    direction raises ValueError naming both buses + the routed line_ids.
+    No silent tolerance."""
+    if (announcer_consumed != announcer_provided
+            or character_consumed != character_provided):
+        raise ValueError(
+            f"SceneSequencer: clip-count MISMATCH after assembly -- "
+            f"announcer bus {announcer_consumed}/{announcer_provided} "
+            f"consumed (lines {list(announcer_line_ids or [])}), character "
+            f"bus {character_consumed}/{character_provided} consumed (lines "
+            f"{list(character_line_ids or [])}). Consumed must equal "
+            f"provided on BOTH buses -- a surplus leaves orphan clips and a "
+            f"mis-aligned timeline; fix the upstream clip count."
+        )
+
+
 class SceneSequencer:
     """Render a script scene: TTS for each line, music passthrough, pauses."""
 
@@ -730,6 +760,12 @@ class SceneSequencer:
         announcer_clips = self._extract_clips_from_audio(announcer_audio_clips)
         tts_clip_idx = 0
         announcer_clip_idx = 0
+        # C2 (S2 P1.3): per-bus expected line_id arrays. Node 82 = announcer
+        # bus, node 81 = character bus. Recorded as each dialogue line is
+        # routed so the post-loop terminal check can report exactly which
+        # lines consumed which bus when a count mismatch is found.
+        announcer_bus_line_ids: list = []
+        character_bus_line_ids: list = []
         log.info(
             "[SceneSequencer] Pre-rendered clips: %d TTS, %d ANNOUNCER",
             len(tts_clips), len(announcer_clips),
@@ -841,12 +877,14 @@ class SceneSequencer:
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
                     segment_np = _level_dialogue_clip(segment_np)
                     announcer_clip_idx += 1
+                    announcer_bus_line_ids.append(item.get("line_id"))
                     render_log.append(f"[{global_idx}] ANNOUNCER (Kokoro): {line[:40]}...")
                 elif tts_clip_idx < len(tts_clips):
                     clip_np, clip_sr = tts_clips[tts_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
                     segment_np = _level_dialogue_clip(segment_np)
                     tts_clip_idx += 1
+                    character_bus_line_ids.append(item.get("line_id"))
                     render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
                 else:
                     # NO-FALLBACK (operator 2026-07-03): a dialogue line with NO
@@ -900,6 +938,21 @@ class SceneSequencer:
                         "dur_s": float(seg_len) / float(sample_rate),
                     })
                 current_sample_pos += seg_len
+
+        # C2 (S2 P1.3) TWO-BUS TERMINAL CHECK: consumed == provided on BOTH
+        # buses. The mid-loop else-branch already fails loud on a SHORTFALL
+        # (more dialogue lines than clips). This catches the mirror defect a
+        # shortfall check misses -- a SURPLUS (the voice node emitted MORE
+        # clips than there are dialogue lines for that bus), which otherwise
+        # left orphan clips silently unused and a mis-aligned timeline.
+        _verify_bus_clip_counts(
+            announcer_consumed=announcer_clip_idx,
+            announcer_provided=len(announcer_clips),
+            character_consumed=tts_clip_idx,
+            character_provided=len(tts_clips),
+            announcer_line_ids=announcer_bus_line_ids,
+            character_line_ids=character_bus_line_ids,
+        )
 
         # Log clip usage stats
         render_log.append(f"--- Audio units assembled: {len(all_segments)}")

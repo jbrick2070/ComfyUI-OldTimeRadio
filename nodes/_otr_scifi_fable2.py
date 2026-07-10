@@ -1799,6 +1799,21 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
 
     f2["proof_map"] = proof_map
     f2.pop("_winning_draft_text", None)
+
+    # Content-owned Phase 7 (720-bakeoff C2 / S2 P1.3): stamp the TTS
+    # DELIVERY text (Dr. -> Doctor, digits -> words) onto a separate
+    # text_for_tts field WITHOUT touching the sealed canonical text /
+    # counts / proof map. This restores the pronunciation the P0 fold
+    # switched off (the freeze cascade skips legacy Phase 7 under
+    # content_owned_readonly) and is what the voice node speaks via the
+    # delivery resolver. Stamped BEFORE save so the C1 durable-identity
+    # merge carries it forward across the downstream cast-lock re-saves
+    # (canonical text is asserted unchanged for this lane, so the stamp
+    # is retained; a changed line would invalidate it -> resolver fails
+    # loud rather than speaking stale delivery text).
+    from ._otr_readiness import stamp_text_for_tts_delivery
+    stamp_text_for_tts_delivery(led)
+
     led.save()
 
 

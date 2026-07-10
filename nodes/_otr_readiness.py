@@ -32,6 +32,7 @@ Status: LFC Phase 7 + 8 (2026-05-11).
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
@@ -47,6 +48,9 @@ __all__ = [
     "phase_8_video_readiness",
     "ABBREV_EXPANSIONS",
     "SYMBOL_REPLACEMENTS",
+    "normalize_for_delivery",
+    "text_for_tts_source_sha256",
+    "stamp_text_for_tts_delivery",
 ]
 
 
@@ -275,6 +279,105 @@ def phase_7_audio_readiness(led) -> AudioReadinessReport:
         rep.numbers_expanded,
     )
     return rep
+
+
+# ---------------------------------------------------------------------------
+# Content-owned delivery stamping (720-bakeoff C2 / S2 P1.3)
+# ---------------------------------------------------------------------------
+#
+# Legacy lanes (science_news, public_domain, ...) run
+# `phase_7_audio_readiness`, which REWRITES canonical `line.text` in place
+# (Dr. -> Doctor, digits -> words). That is a proof breaker for a
+# content-owned lane whose canonical text is sealed against a proof map,
+# so the freeze cascade SKIPS Phase 7 under `content_owned_readonly`
+# (r2 P0.1) -- which switched the pronunciation normalization OFF for
+# fable2. C2 restores it WITHOUT touching canonical: the SAME
+# normalization is stamped onto a separate `text_for_tts` delivery field
+# (+ a source-text sha for staleness detection + a receipt), leaving
+# `text`/counts/proof pristine. The voice node speaks `text_for_tts` via
+# the delivery resolver (`_otr_text_delivery`); the C1 durable-identity
+# merge keeps the stamp alive across incremental saves only while the
+# canonical text is unchanged (a changed line invalidates it -> the
+# resolver then fails loud rather than speaking stale delivery text).
+
+
+def text_for_tts_source_sha256(canonical_text: str) -> str:
+    """SHA256 hex of the canonical line text -- the staleness key stored
+    as ``text_for_tts_source_sha256`` and re-checked by the delivery
+    resolver. Raw-UTF8 bytes so the stamp side and the resolver side are
+    trivially identical."""
+    return hashlib.sha256((canonical_text or "").encode("utf-8")).hexdigest()
+
+
+def normalize_for_delivery(text: str) -> "tuple[str, dict]":
+    """Compute the TTS DELIVERY text from a canonical line WITHOUT
+    mutating anything: the same deterministic normalization
+    `phase_7_audio_readiness` applies (abbreviations -> full words,
+    symbols -> words, digits -> num2words), returned as a value plus a
+    per-line receipt. Pure + deterministic -> C7-safe. When num2words is
+    absent the numeric step is skipped (receipt records it), matching the
+    legacy phase-7 degradation exactly."""
+    original = text or ""
+    num2words_fn = _try_import_num2words()
+    expanded = _expand_abbreviations(original)
+    abbrev_hits = sum(1 for k in ABBREV_EXPANSIONS if k in original)
+    expanded_2 = _expand_symbols(expanded)
+    sym_hits = sum(1 for k in SYMBOL_REPLACEMENTS if k in expanded)
+    expanded_3, unparseable = _expand_numbers(
+        expanded_2, num2words_fn=num2words_fn,
+    )
+    num_hits = sum(1 for _ in _NUM_TOKEN_RE.finditer(original)) - len(unparseable)
+    receipt = {
+        "abbreviations_expanded": int(abbrev_hits),
+        "symbols_expanded": int(sym_hits),
+        "numbers_expanded": int(max(0, num_hits)),
+        "unparseable_numbers": list(unparseable),
+        "num2words_available": num2words_fn is not None,
+        "changed": expanded_3 != original,
+    }
+    return expanded_3, receipt
+
+
+def stamp_text_for_tts_delivery(led) -> dict:
+    """Content-owned Phase 7 (720-bakeoff C2 / S2 P1.3): stamp
+    ``text_for_tts`` + ``text_for_tts_source_sha256`` + a normalization
+    receipt on EVERY non-skipped voiced line -- even when the delivery
+    text equals canonical -- so the delivery resolver always has a
+    verified source of truth. Canonical ``text`` / ``char_count`` /
+    ``word_count`` / proof map are NEVER touched. Returns a summary dict
+    (also stamped on ``meta.text_for_tts_delivery``). Deterministic; no
+    LLM; never raises."""
+    ledger_data = led.data if hasattr(led, "data") else led
+    stamped = 0
+    changed = 0
+    for ln in ledger_data.get("lines") or []:
+        if not isinstance(ln, dict):
+            continue
+        if ln.get("skip"):
+            continue
+        role = (ln.get("speaker_role") or "").strip().lower()
+        if role not in ("character", "announcer"):
+            continue
+        canonical = ln.get("text") or ""
+        if not canonical.strip():
+            continue
+        delivery, receipt = normalize_for_delivery(canonical)
+        ln["text_for_tts"] = delivery
+        ln["text_for_tts_source_sha256"] = text_for_tts_source_sha256(canonical)
+        ln["text_for_tts_receipt"] = receipt
+        stamped += 1
+        if receipt["changed"]:
+            changed += 1
+    summary = {
+        "mode": "content_owned_delivery_stamp",
+        "lines_stamped": int(stamped),
+        "lines_delivery_differs": int(changed),
+    }
+    ledger_data.setdefault("meta", {})["text_for_tts_delivery"] = summary
+    log.info(
+        "[delivery-stamp] stamped=%d (delivery-differs=%d)", stamped, changed,
+    )
+    return summary
 
 
 # ---------------------------------------------------------------------------

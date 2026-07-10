@@ -400,6 +400,9 @@ class OTRVoiceNodeBase:
         )
         from ._otr_determinism import deterministic_inference
         from ._otr_script_prep import prepare_text as _neutral_prepare_text
+        from ._otr_text_delivery import (
+            delivery_mode_for_meta, resolve_line_delivery,
+        )
 
         sr = int(getattr(adapter, "sample_rate", 24000) or 24000)
         # Prefer the cast-locked ledger; fall back to the frozen writer ledger.
@@ -422,6 +425,11 @@ class OTRVoiceNodeBase:
         episode_seed = coerce_int_seed(meta.get("episode_seed"))
         cast_lock_revision = int(meta.get("cast_lock_revision") or 0)
         mono = (stereo_policy == "mono_safe")
+        # C2 (S2 P1.3): resolve the delivery mode ONCE. LEGACY lanes speak
+        # canonical text (already Phase-7-normalized in place -> byte-
+        # identical spine); content-owned lanes speak the verified
+        # text_for_tts stamp (stale/absent = terminal before generation).
+        _delivery_mode = delivery_mode_for_meta(meta)
 
         prep = getattr(adapter, "prepare_text", None)
         # Per-line delivery (emotion) vector for expressive engines (indextts2
@@ -451,7 +459,15 @@ class OTRVoiceNodeBase:
             f"(profile {profile.profile_id})"
         ]
         for occ, ln in enumerate(lines):
-            text = (ln.get("text") or "").strip()
+            # C2 (S2 P1.3): resolve canonical vs delivery through the ONE
+            # resolver. `text` is the DELIVERY string every downstream
+            # surface (delivery vector, adapter/neutral prep, request
+            # hashing) consumes. LEGACY -> delivery == canonical (byte-
+            # identical); content-owned -> the verified text_for_tts stamp
+            # (this raises TextDeliveryError BEFORE generation on an
+            # absent/stale stamp).
+            canonical_text, _delivery_text = resolve_line_delivery(ln, _delivery_mode)
+            text = _delivery_text.strip()
             char_id = str(ln.get("char_id") or "")
             line_id = str(ln.get("line_id") or "")
             cast = _OTRLC.cast_lookup(led, char_id)
@@ -490,7 +506,8 @@ class OTRVoiceNodeBase:
                     f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} "
                     f"cleans to EMPTY spoken text (stage-direction-only?). No "
                     f"silent-clip fallback (no-fallback rip) -- the writer must not "
-                    f"emit voiced lines with no dialogue. Original text: {text!r}"
+                    f"emit voiced lines with no dialogue. Canonical text: "
+                    f"{canonical_text!r}"
                 )
             request = build_resolved_request(
                 role=self.ROLE,
