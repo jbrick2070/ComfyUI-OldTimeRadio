@@ -135,6 +135,12 @@ Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's 
   aliases, record the resolved model in the manifest). Lean panel of genuinely different
   families beats many near-duplicates -- diversity is the point, correctness comes from the
   grounding step.
+- **UNTIL 2026-07-21 (operator directive 2026-07-09): ALSO seat `tencent/hy3:free` on every
+  panel** -- Tencent Hy3, 295B MoE (21B active), 262K ctx, $0/$0 on OpenRouter, listing expires
+  July 21 2026. Pass it via `--models` (skill panel.config.json is a read-only cache). Free =
+  no budget impact; a 4th genuinely different family, strongest on ideas/R1 rounds. Uses a
+  configurable reasoning effort like the other reasoning panelists. REMOVE this line after
+  2026-07-21 or when the slug 404s.
 - **Cowork (Claude) is ALWAYS a code-aware grounded PANELIST *and* the sole judge.** Write your
   own grounded review FIRST (every claim checked against the real Windows files via Desktop
   Commander, never the lagging Linux mount), THEN ground the panel's reviews, discard the
