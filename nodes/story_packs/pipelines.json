@@ -27,6 +27,28 @@
       ]
     },
     {
+      "story_pipeline_id": "original_multi_pass",
+      "label": "Original Multi-Pass (LLM-original creative front)",
+      "executable": true,
+      "requires_source_contract": false,
+      "declared_seams": [
+        "original_concept_system",
+        "original_select_system",
+        "original_brief_system",
+        "original_qa_system"
+      ],
+      "passes": [
+        {"pass_id": "original_concept", "slot": "creative", "seam_refs": ["original_concept_system"], "description": "Spark atoms (+ optional operator hint) -> THREE pitched concepts, exactly N dramatic roles each."},
+        {"pass_id": "original_select", "slot": "creative", "seam_refs": ["original_select_system"], "description": "Story-editor pick: winning concept + cast wants/pressures + selection_rationale (audit trail)."},
+        {"pass_id": "original_brief", "slot": "technical", "seam_refs": ["original_brief_system"], "description": "Concept -> interpreter-result compat briefs; news_close_brief hardwired empty (the close is the announcer outro epilogue)."},
+        {"pass_id": "original_qa", "slot": "technical", "seam_refs": ["original_qa_system"], "description": "Post-composition whole-script hard-rule audit; writer owns one coalesced outro repair, then fail loud."}
+      ],
+      "notes": [
+        "executable:true = the runner exists: the production writer's bank-shape branch (empty fetcher+interpreter) IS this pipeline's execution lane (sweep 4b; kibitz r2-r4).",
+        "requires_source_contract stays validation-time metadata -- runtime dispatch is on the BANK row shape, never this field (registry law)."
+      ]
+    },
+    {
       "story_pipeline_id": "simple_4_prompt_experimental",
       "label": "Simple 4-Prompt Experimental",
       "executable": false,

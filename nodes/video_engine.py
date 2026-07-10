@@ -1247,14 +1247,22 @@ def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
             voices[str(k)] = str(v)
 
     # News seeds (handle JSON-list format)
+    # kibitz r2-r4 provenance: the first entry may carry a bank-aware
+    # origin_label (original_radio stamps "STORY ORIGIN"); legacy payloads
+    # have no such key and keep the "NEWS SEED" default at draw time.
     news_seeds = []
+    news_origin_label = ""
     _nr = (news_used or "").strip()
     if _nr.startswith("["):
         try:
+            _entries = json.loads(_nr)
             news_seeds = [
                 str(s.get("headline", s) if isinstance(s, dict) else s)
-                for s in json.loads(_nr)[:2]
+                for s in _entries[:2]
             ]
+            if _entries and isinstance(_entries[0], dict):
+                news_origin_label = str(
+                    _entries[0].get("origin_label") or "")
         except Exception:
             news_seeds = [_nr[:100]]
     elif _nr:
@@ -1327,6 +1335,7 @@ def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
         "duration_s": duration_s,
         "resolution": f"{W}x{H}",
         "news_seeds": news_seeds,
+        "news_origin_label": news_origin_label,
         "cast":       cast,
         "scenes":     scenes,
         # BUG 3: the forensic model/engine dossier scrolls on the credits.
@@ -1463,8 +1472,10 @@ class _TelemetryHUDRenderer:
         d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
         y += P * 2
 
-        # News seed
-        d.text((P, y), "NEWS SEED", fill=CRT_AMBER, font=self.f_label)
+        # News seed (bank-aware origin label; legacy default "NEWS SEED")
+        d.text((P, y),
+               self.data.get("news_origin_label") or "NEWS SEED",
+               fill=CRT_AMBER, font=self.f_label)
         y += self._lhL
         for seed in self.data.get("news_seeds", [])[:2]:
             d.text((P, y), seed, fill=CRT_DIM, font=self.f_body)
@@ -1795,10 +1806,21 @@ def _write_story_treatment(out_path, episode_title, led,
             W_("    Total OpenRouter cost: $%.4f" % _total_cost)
         W_()
 
-        # News seed - may arrive as a JSON list ["headline 1", "headline 2", ...]
-        W_("NEWS SEED")
-        W_(BAR)
+        # News seed - may arrive as a JSON list ["headline 1", ...]; the
+        # first entry may carry a bank-aware origin_label (kibitz r2-r4;
+        # original_radio stamps "STORY ORIGIN"). Legacy default holds.
         _news_raw = (news_used or "").strip()
+        _origin_label = "NEWS SEED"
+        if _news_raw.startswith("["):
+            try:
+                _lbl_entries = _json.loads(_news_raw)
+                if _lbl_entries and isinstance(_lbl_entries[0], dict):
+                    _origin_label = str(
+                        _lbl_entries[0].get("origin_label") or "NEWS SEED")
+            except Exception:
+                pass
+        W_(_origin_label)
+        W_(BAR)
         if _news_raw.startswith("["):
             try:
                 _seeds = _json.loads(_news_raw)

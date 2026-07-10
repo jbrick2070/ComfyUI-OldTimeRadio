@@ -1,0 +1,98 @@
+{
+  "deck_id": "original_radio_spark_deck",
+  "deck_version": "v1",
+  "schema_version": "v2.0",
+  "notes": [
+    "Entropy source for the original_radio concept pass. Atoms are timeless,",
+    "SFW, weapon-free, smoke-free, and modern-tech-free by authoring rule;",
+    "the loader also runs the shared forbidden-term scan at load (fail loud).",
+    "Axis count and atom counts are schema-validated (min 6 per axis); the",
+    "deck grows freely after first production (kibitz r4 P7)."
+  ],
+  "axes": {
+    "place": [
+      "a canal lock keeper's stone cottage",
+      "the back room of a shuttered auction house",
+      "a tidal causeway that drowns twice a day",
+      "a rooming house above a printing shop",
+      "a branch-line railway halt in fog",
+      "a glassblower's workshop after hours",
+      "a river ferry frozen mid-crossing",
+      "an observatory dome with a cracked shutter",
+      "a lighthouse supply boat at anchor",
+      "a market square the morning after a fair",
+      "a telephone exchange on the night shift",
+      "an orchard bothy during harvest"
+    ],
+    "object": [
+      "a ledger with one page razored out",
+      "a wedding ring found inside a fish",
+      "a wax cylinder recording of a stranger's voice",
+      "a pawn ticket for an item never named",
+      "a lifeboat oar carved with two sets of initials",
+      "a jar of honey from hives nobody keeps",
+      "an unclaimed prize medal",
+      "a theatre costume with real bloodstains of beet dye",
+      "a map fold-worn along one impossible road",
+      "a clock that keeps somebody else's time",
+      "a bundle of letters tied with surveyor's twine",
+      "a christening gown posted with no note"
+    ],
+    "occupation": [
+      "a bell-founder's apprentice",
+      "a court stenographer",
+      "a piano tuner who works by ear alone",
+      "a switchboard operator",
+      "a canal dredger",
+      "a milliner with a single wealthy client",
+      "a rural postman on a bicycle",
+      "an insurance assessor of small disasters",
+      "a lamplighter behind on his round",
+      "a seed merchant's bookkeeper",
+      "a ferrywoman who never learned to swim",
+      "an understudy who has never gone on"
+    ],
+    "tension_verb": [
+      "conceals",
+      "inherits",
+      "forges",
+      "returns",
+      "overhears",
+      "misdelivers",
+      "barters",
+      "confesses",
+      "impersonates",
+      "rations",
+      "unearths",
+      "postpones"
+    ],
+    "texture": [
+      "wet rope and tar",
+      "lamp oil and cold brass",
+      "flour dust in lantern light",
+      "river mud drying on floorboards",
+      "beeswax and old hymnals",
+      "coal smoke settling before rain",
+      "starch and hot iron",
+      "cut hay through an open shutter",
+      "ink, blotting sand, and sealing wax",
+      "salt-stiff canvas",
+      "cellar apples and candle stubs",
+      "horsehair and rosin"
+    ],
+    "radio_device": [
+      "a repeated sound the audience learns to dread",
+      "one voice heard only through a wall",
+      "a countdown the characters keep mishearing",
+      "a message repeated until its meaning changes",
+      "a silence where a reply should be",
+      "two conversations interleaved on one line",
+      "a confession rehearsed to the wrong listener",
+      "an echo that answers a beat too late",
+      "a list read aloud that shortens each time",
+      "a knock whose pattern is a name",
+      "a song resumed exactly where it broke off",
+      "a stranger who knows the room by sound alone"
+    ]
+  }
+}

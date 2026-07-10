@@ -426,6 +426,16 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         flow.append(("intercept",
                      {"text": ">> SOURCE INTERCEPT: %s" % news["script_brief"]}))
 
+    # SOURCE line (kibitz r2-r4, printed-layer provenance): rendered when
+    # the writer stamped meta["credits_source_line"] from the bank row's
+    # defaults. Data-driven -- no bank branch here: original_radio's
+    # machine-generation disclosure is unconditional for that lane because
+    # its bank row always defines the default; banks without the default
+    # (science et al.) are byte-identical.
+    _src_line = str(meta.get("credits_source_line") or "")
+    if _src_line:
+        flow.append(("intercept", {"text": ">> SOURCE: %s" % _src_line}))
+
     # DIAGNOSTIC (seeded, no fabricated numbers)
     try:
         idx = int(seed) % len(_DIAGNOSTICS)

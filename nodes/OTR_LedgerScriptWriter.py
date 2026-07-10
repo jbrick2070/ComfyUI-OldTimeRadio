@@ -1258,7 +1258,48 @@ def _resolve_inputs(
     temperature, top_p = _resolve_creativity(creativity)
     custom = (custom_premise or "").strip()
 
-    if custom:
+    # kibitz r2-r4: bank-shape dispatch BEFORE the custom check (r3 D7).
+    # A source-contract-free bank (original_radio) has no fetch lane --
+    # resolve_fetcher below raises SourceContractMissingError LOUD by
+    # design -- and no source article exists yet: the creative front runs
+    # at D.2. The A-branch draws the spark entropy (single entropy point)
+    # and synthesizes the EXACT 7-key payload from the draw digest
+    # (seed_text non-empty is the only content requirement). A typed
+    # custom_premise on this lane is NOT a source article: it rides
+    # source_meta["operator_hint"] into the concept pass as material
+    # (kibitz r4 P2) -- never the payload.
+    _rb_bank = _otr_story_routing.get_bank(source_bank or "science_news")
+    if _bank_has_no_source_contract(_rb_bank):
+        try:
+            from . import _otr_original_radio as _OTROR
+        except ImportError:  # pragma: no cover -- flat standalone load
+            import _otr_original_radio as _OTROR  # type: ignore
+        _spark = _OTROR.draw_spark_atoms()
+        news_article = _otr_source_payload.validate_source_payload({
+            "headline":  "Original Radio Drama - " + _spark.digest,
+            "summary":   "",
+            "full_text": _spark.digest_long,
+            "source":    "Original (LLM)",
+            "date":      datetime.now().date().isoformat(),
+            "link":      "",
+            "seed_text": _spark.digest,
+        }, origin="_resolve_inputs original_radio")
+        news_seed = _spark.digest
+        seed_source = "original_llm"
+        source_meta = {
+            "kind": "original_llm",
+            "spark_atoms": dict(_spark.atoms),
+            "deck_version": _spark.deck_version,
+            "deck_hash": _spark.deck_hash,
+        }
+        if custom:
+            source_meta["operator_hint"] = custom
+            log.info(
+                "[OTR_LedgerScriptWriter] original lane: custom_premise "
+                "riding as operator_hint (%d chars)", len(custom),
+            )
+        source_rights = {"license_label": "synthetic original"}
+    elif custom:
         # Custom premise path: synthesize the same dict shape RSS
         # would produce so news_interpreter sees a uniform article
         # surface no matter how the story entered the writer.
@@ -1494,23 +1535,246 @@ def _apply_intro_rewrite_result(led, first_announcer_id, new_text, flag):
         )
 
 
-def _build_news_payload(outline, news_seed: str, seed_source: str) -> str:
+def _bank_has_no_source_contract(bank) -> bool:
+    """The original-lane runtime dispatch (kibitz r2-r4, r4 P8).
+
+    A RUNNABLE bank with NEITHER fetcher NOR interpreter is the original
+    lane: sweep rule 4a/4b guarantees every runnable source-contract bank
+    declares both ids. The runnable conjunct keeps custom_source_bank
+    (empty-empty but runnable:false) on its pinned LOUD path: in run() it
+    dies at require_runnable_bank; a DIRECT _resolve_inputs call on it
+    falls through to resolve_fetcher's SourceContractMissingError
+    (test_source_payload_chunk3 pin). This is BANK-row data --
+    pipeline.requires_source_contract stays validation-time-only per the
+    registry law (_otr_story_routing.py:88-91)."""
+    return (
+        bool(getattr(bank, "runnable", False))
+        and not getattr(bank, "fetcher", "")
+        and not getattr(bank, "interpreter", "")
+    )
+
+
+def _make_original_interpreter(*, creative_fn, resolved, meta):
+    """Interpreter-SHAPED adapter for the original_radio creative front.
+
+    Returned callable matches the resolve_interpreter contract
+    (bank=, payload=, technical_fn=, model_id= -> briefs-like), so the
+    writer's D.2 stamping path (validate_interpreter_result +
+    casting/script/key_terms unpack + the science halt surface) runs
+    byte-identically for both lanes. The payload arg is accepted and
+    ignored: the A-branch synthesized it from the spark digest; the
+    creative front reads the ATOMS from resolved["source_meta"].
+
+    Side effect (kibitz r3 D3): after the front returns, the sidecar
+    delta {selected_concept, pitches, selection_rationale, model_ids} is
+    merged into BOTH resolved["source_meta"] and meta["source_meta"] --
+    meta was COPIED from resolved at D.1, so a resolved-only mutation
+    would never reach the durable ledger.
+
+    Failure posture: OriginalBriefsError / StructuredCallFailedError
+    propagate PAST the science degrade except (which catches only
+    SourceInterpretError) -- this lane hard-fails, no degrade, no
+    news_briefs_required lever.
+    """
+    def _original_interpret(*, bank, payload, technical_fn, model_id):
+        try:
+            from . import _otr_original_radio as _OTROR
+        except ImportError:  # pragma: no cover -- flat test/standalone load
+            import _otr_original_radio as _OTROR  # type: ignore
+        source_meta = dict(resolved.get("source_meta") or {})
+        spark_atoms = dict(source_meta.get("spark_atoms") or {})
+        if not spark_atoms:
+            raise _OTROR.OriginalBriefsError(
+                "original lane: resolved['source_meta']['spark_atoms'] "
+                "missing -- the _resolve_inputs A-branch did not run"
+            )
+        briefs, delta = _OTROR.build_original_briefs(
+            spark_atoms=spark_atoms,
+            num_characters=int(resolved["num_characters"]),
+            creative_fn=creative_fn,
+            technical_fn=technical_fn,
+            creative_model_id=str(resolved["creative_writing_model"]),
+            technical_model_id=str(model_id),
+            pack=_otr_story_routing.resolve_story_pack(bank.source_bank_id),
+            operator_hint=str(source_meta.get("operator_hint") or ""),
+        )
+        source_meta.update(delta)
+        resolved["source_meta"] = source_meta
+        meta["source_meta"] = dict(source_meta)
+        return briefs
+    return _original_interpret
+
+
+def _run_original_qa_gate(
+    led, meta, resolved, *,
+    bank_row,
+    technical_fn,
+    creative_fn,
+    first_announcer_id,
+    last_announcer_id,
+    script_brief,
+    nc_brief,
+):
+    """original_radio whole-script QA + the ONE coalesced bounded repair.
+
+    (kibitz r2-r4; V4 locks 2+7; r4 P3/P4.) Judge -> if dirty: any
+    fail-class finding raises OriginalQAError outright; epilogue-class
+    findings coalesce into ONE compose_announcer_outro re-run (the same
+    fictional-outro inputs the I.5 else-branch used), the outro row is
+    patched READ-EXTEND (news_coda_no_brief survives; kibitz r4 P3) --
+    then ONE re-judge; still dirty -> OriginalQAError. This lane does NOT
+    inherit stage-3 ship-on-exhaustion."""
+    try:
+        from . import _otr_original_radio as _OTROR
+        from . import _otr_line_composer as _OTRLC
+        from . import _otr_ledger as _OTRL
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        import _otr_original_radio as _OTROR  # type: ignore
+        import _otr_line_composer as _OTRLC  # type: ignore
+        import _otr_ledger as _OTRL  # type: ignore
+
+    pack = _otr_story_routing.resolve_story_pack(bank_row.source_bank_id)
+    concept_text = str(
+        (meta.get("source_meta") or {}).get("concept_corpus") or ""
+    )
+
+    def _judge():
+        return _OTROR.run_original_qa(
+            led,
+            technical_fn=technical_fn,
+            technical_model_id=str(resolved["technical_model"]),
+            concept_text=concept_text,
+            pack=pack,
+        )
+
+    findings = _judge()
+    if not findings.findings:
+        meta["original_qa"] = {"status": "clean", "repaired": False}
+        led.save()
+        log.info("[OTR_LedgerScriptWriter] original_qa: clean")
+        return
+
+    classes = [f.finding_class for f in findings.findings]
+    fail_classes = [
+        c for c in classes
+        if _OTROR.REPAIR_ACTION_BY_CLASS.get(c, "fail") == "fail"
+    ]
+    if fail_classes:
+        meta["original_qa"] = {
+            "status": "failed", "classes": classes, "repaired": False,
+        }
+        led.save()
+        raise _OTROR.OriginalQAError(
+            f"original_qa: unrepairable finding class(es) {fail_classes}; "
+            f"details: "
+            + "; ".join(f"{f.finding_class}: {f.detail}"
+                        for f in findings.findings)
+        )
+
+    # Epilogue classes only -> ONE coalesced outro re-compose (r4 P4).
+    log.warning(
+        "[OTR_LedgerScriptWriter] original_qa dirty (%s) -- one bounded "
+        "outro re-compose", classes,
+    )
+    intro_text = ""
+    _final_char_line = ""
+    for _ln in led.data.get("lines") or []:
+        if _ln.get("line_id") == first_announcer_id:
+            intro_text = str(_ln.get("text") or "")
+            break
+    for _ln in reversed(led.data.get("lines") or []):
+        if str(_ln.get("speaker_role") or "").strip() == "character":
+            _t = str(_ln.get("text") or "").strip()
+            if _t:
+                _final_char_line = _t
+                break
+    outro_res = _OTRLC.compose_announcer_outro(
+        creative_fn=creative_fn,
+        script_brief=script_brief,
+        news_close_brief=nc_brief,
+        intro_text=intro_text,
+        creative_repo_id=resolved["creative_writing_model"],
+        ending_change=str(
+            (meta.get("dramatic_state") or {}).get("ending_change") or ""
+        ),
+        final_character_line=_final_char_line,
+        source_bank_id=resolved["source_bank"],
+    )
+    # READ-EXTEND the outro row (r4 P3): news_coda_no_brief + the in-place
+    # telemetry survive; QA repair appends its own marker.
+    row = None
+    for _ln in led.data.get("lines") or []:
+        if _ln.get("line_id") == last_announcer_id:
+            row = _ln
+            break
+    if row is None:
+        raise RuntimeError(
+            f"[OTR_LedgerScriptWriter] original_qa repair: no outro row "
+            f"line_id={last_announcer_id!r}"
+        )
+    _flags = list(row.get("compose_flags") or [])
+    _OTRL.patch_line_text(led.data, last_announcer_id, outro_res.text)
+    _OTRL.patch_line_fields(
+        led.data, last_announcer_id,
+        {"compose_flags": _flags + ["original_qa_outro_recomposed"]},
+    )
+    led.save()
+
+    refindings = _judge()
+    if refindings.findings:
+        reclasses = [f.finding_class for f in refindings.findings]
+        meta["original_qa"] = {
+            "status": "failed", "classes": reclasses, "repaired": True,
+        }
+        led.save()
+        raise _OTROR.OriginalQAError(
+            f"original_qa: still dirty after the bounded repair "
+            f"({reclasses}); details: "
+            + "; ".join(f"{f.finding_class}: {f.detail}"
+                        for f in refindings.findings)
+        )
+    meta["original_qa"] = {"status": "clean", "repaired": True}
+    led.save()
+    log.info("[OTR_LedgerScriptWriter] original_qa: clean after repair")
+
+
+def _build_news_payload(
+    outline,
+    news_seed: str,
+    seed_source: str,
+    *,
+    source_label: str = "",
+    origin_label: str = "",
+    headline_override: str = "",
+) -> str:
     """Build the slot-2 news_used JSON string.
 
-    1-element JSON array matching legacy article shape
-    (story_orchestrator.py:5141-5283 + RECON 4(b)). seed_source flags
+    1-element JSON array matching legacy article shape. seed_source flags
     whether the body came from a user-typed custom_premise or from the
-    RSS fetcher.
+    RSS fetcher. (The old story_orchestrator:5141 pointer is stale --
+    kibitz r4 P5: real consumers are the FreezeCascade passthrough +
+    video_engine's HUD/treatment readers.)
+
+    kibitz r2-r4 provenance surface: the three keyword args are
+    DATA-DRIVEN extensions resolved by the caller (bank defaults +
+    final title). All default "" -> legacy lanes byte-identical.
+    origin_label, when present, rides the entry dict; the video HUD
+    reads it with "NEWS SEED" as the legacy default.
     """
-    news = [{
-        "headline":  outline.title,
+    source = source_label or (
+        "User Seed" if seed_source == "custom_premise" else "RSS Auto-Fetch"
+    )
+    entry = {
+        "headline":  headline_override or outline.title,
         "summary":   outline.premise[:500],
         "full_text": news_seed,
-        "source":    "User Seed" if seed_source == "custom_premise" else "RSS Auto-Fetch",
+        "source":    source,
         "date":      datetime.now().date().isoformat(),
         "link":      "",
-    }]
-    return json.dumps(news, indent=2, ensure_ascii=False)
+    }
+    if origin_label:
+        entry["origin_label"] = origin_label
+    return json.dumps([entry], indent=2, ensure_ascii=False)
 
 
 def _otr_body_gate_hint(reasons, sq_entry) -> str:
@@ -2896,6 +3160,18 @@ class OTR_LedgerScriptWriter:
         meta["source_ref"] = resolved["source_ref"]
         meta["source_meta"] = dict(resolved["source_meta"])
         meta["source_rights"] = dict(resolved["source_rights"])
+        # kibitz r2-r4 provenance: any bank whose defaults define
+        # credits_source_line gets it stamped (data-driven -- the
+        # original_radio row always defines it, so its credits line is
+        # UNCONDITIONAL for that lane; science defines none and stays
+        # byte-identical). The credits roll renders the stamp when
+        # present -- no bank branch in the credits code.
+        _credits_line = str(
+            (_source_bank_row.defaults or {}).get("credits_source_line")
+            or ""
+        )
+        if _credits_line:
+            meta["credits_source_line"] = _credits_line
         meta["story_scaffold"] = _scaffold
         # Stage 3C: stamp the visual style -- THE threading channel: every
         # downstream visual composer reads meta["visual_style"] via
@@ -2974,7 +3250,23 @@ class OTR_LedgerScriptWriter:
         # sits OUTSIDE the try by design (a missing/unknown contract raises
         # SourceContractMissingError/UnknownInterpreterError LOUD -- never
         # caught by the degrade branch below).
-        _interp = _otr_source_payload.resolve_interpreter(_source_bank_row)
+        # kibitz r2-r4: the original lane swaps in an interpreter-SHAPED
+        # adapter (same call contract) so the whole stamping path below --
+        # validate_interpreter_result, meta["news"], the briefs unpack --
+        # runs byte-identically for both lanes. Its failures
+        # (OriginalBriefsError / StructuredCallFailedError) are NOT
+        # SourceInterpretError, so the science degrade/halt branch below
+        # never catches them: this lane hard-fails, no degrade, and the
+        # news_briefs_required lever does not apply.
+        if _bank_has_no_source_contract(_source_bank_row):
+            _interp = _make_original_interpreter(
+                creative_fn=creative_generate_fn,
+                resolved=resolved,
+                meta=meta,
+            )
+        else:
+            _interp = _otr_source_payload.resolve_interpreter(
+                _source_bank_row)
         try:
             # LLM slot: technical -- news_interpreter emits GBNF +
             # pydantic-validated briefs (V0-V2 schema). Structured-
@@ -5242,6 +5534,26 @@ class OTR_LedgerScriptWriter:
                 last_announcer_id, outro_res.compose_flags,
             )
 
+            # --- I.5.5. original_radio whole-script QA gate ------------
+            # (kibitz r2-r4; V4 locks 2+7.) Runs ONLY on the original
+            # lane, immediately after the outro write and BEFORE the
+            # key_terms audit + J aggregates (r3 D5: flags/word counts
+            # stay fresh; K.5.6 + news_used read post-repair text).
+            # Failure raises OriginalQAError: hard fail accepted --
+            # a dead episode is fine, a shipped bad one is not.
+            if _bank_has_no_source_contract(_source_bank_row):
+                with slot_scheduler.helper_context("original_qa"):
+                    _run_original_qa_gate(
+                        led, meta, resolved,
+                        bank_row=_source_bank_row,
+                        technical_fn=technical_generate_fn,
+                        creative_fn=creative_generate_fn,
+                        first_announcer_id=first_announcer_id,
+                        last_announcer_id=last_announcer_id,
+                        script_brief=script_brief,
+                        nc_brief=nc_brief,
+                    )
+
         nc_key_terms = tuple(news_meta.get("key_terms") or ())
         if nc_key_terms:
             landed, missing = _OTRNW.post_assembly_keyterm_check(
@@ -5882,8 +6194,23 @@ class OTR_LedgerScriptWriter:
                 _cons_exc,
             )
         script_json = json.dumps(led.data, indent=2, ensure_ascii=False)
+        # kibitz r2-r4 provenance: bank-defaults-driven labels; the
+        # original lane stamps source "Original (LLM)" (via seed_source
+        # mapping below), headline = the FINAL title (codex r3 catch:
+        # outline.title predates J.5 regen), and the HUD origin label.
+        # Legacy lanes pass "" everywhere -> byte-identical payload.
+        _bank_defaults = dict(_source_bank_row.defaults or {})
         news_json = _build_news_payload(
             outline, resolved["news_seed"], resolved["seed_source"],
+            source_label=(
+                "Original (LLM)"
+                if resolved["seed_source"] == "original_llm" else ""
+            ),
+            origin_label=str(_bank_defaults.get("hud_origin_label") or ""),
+            headline_override=(
+                final_title
+                if resolved["seed_source"] == "original_llm" else ""
+            ),
         )
 
         actual_word_count = sum(

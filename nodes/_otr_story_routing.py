@@ -41,6 +41,10 @@ _PIPELINES_FILENAME = "pipelines.json"
 _REGISTRY_FILENAMES = frozenset({_BANKS_FILENAME, _PIPELINES_FILENAME})
 _PACK_SIDECAR_FILENAMES_BY_BANK = {
     "media_archive": frozenset({"drama_seeds.json"}),
+    # original_radio (kibitz r2-r4): the spark deck is entropy data for the
+    # concept pass, not a story pack -- _otr_original_radio validates it
+    # with its own schema at load.
+    "original_radio": frozenset({"spark_deck.json"}),
 }
 
 _VALID_PASS_SLOTS = frozenset({"creative", "technical"})
