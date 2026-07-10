@@ -1836,6 +1836,11 @@ def apply_doctor_edits(
         elif edit.action == "skip":
             line["skip"] = True
             line["reviewer_skip_reason"] = edit.payload or "skip"
+            # Phase-10 skip contract (external QA 2026-07-10): every
+            # skip path must stamp tts_skip_reason -- reviewer_skip_
+            # reason alone fails the freeze gap audit.
+            line["tts_skip_reason"] = (
+                f"reviewer_skip: {edit.payload or 'skip'}")
             # Wiring-review #14 belt-and-suspenders.
             line["text"] = ""
             line["char_count"] = 0

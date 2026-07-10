@@ -1311,6 +1311,15 @@ class Ledger:
             "clips": "line_id",
             "music": "cue_id",
         }
+        # Canonical row fields the in-memory Ledger OWNS outright: the
+        # disk merge must never resurrect stale values into them, even
+        # when the fresh in-memory value is deliberately falsy (external
+        # QA root-cause 2026-07-10; see the loop comment below).
+        _MERGE_OWNED_ROW_FIELDS = frozenset({
+            "text", "char_count", "word_count", "skip",
+            "tts_skip_reason", "reviewer_skip_reason", "speaker_role",
+            "char_id", "boundary", "compose_flags",
+        })
         for arr_name, key_field in ROW_KEYED.items():
             on_disk_rows = on_disk.get(arr_name) or []
             in_mem_rows = in_mem.get(arr_name) or []
@@ -1332,7 +1341,21 @@ class Ledger:
                 # null in memory. Never overwrite a present in-mem
                 # value with a disk value -- in-memory is fresher
                 # for rows the Ledger class actually manages.
+                #
+                # OWNERSHIP-AWARE (external QA root-cause, 2026-07-10,
+                # fable2 S1b): canonical OWNED content/state fields are
+                # NEVER restored from disk when the key exists in
+                # memory, even when the in-memory value is falsy -- a
+                # Script Doctor "skip" edit intentionally clears text to
+                # "" and the old rule resurrected the STALE disk text
+                # into the cleared row (skip=True + non-empty text ->
+                # Phase 10 critical gap, dead run). The merge exists for
+                # out-of-band DURABLE extension fields (BUG-LOCAL-108:
+                # bark_wav_path, timings, render stamps) -- those still
+                # copy forward.
                 for k, v in disk_row.items():
+                    if k in _MERGE_OWNED_ROW_FIELDS and k in row:
+                        continue
                     if k not in row or row.get(k) in (None, "", [], {}):
                         row[k] = v
         return in_mem

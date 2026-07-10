@@ -267,6 +267,31 @@ class FreezeDisposition:
 # ---------------------------------------------------------------------------
 
 
+def _legacy_line_compose_applicable(meta: dict) -> bool:
+    """Capability check for the 5B/5C/Stage-7 quality machinery
+    (external QA, 2026-07-10): those passes re-compose lines through the
+    pack's `line_composer_system` seam, so they are APPLICABLE only when
+    the episode's bank resolves a pack that declares it. A lane that
+    deliberately omits the seam (scifi_fable2 -- its own P4/P5/P8 loop
+    owns content quality) must be SKIPPED cleanly, never half-run into
+    an exhaustion verdict. Fail-open to True (legacy behavior) on any
+    resolution error -- the gate must never break a legacy freeze."""
+    try:
+        from . import _otr_story_routing as _RT
+        bank_id = str((meta or {}).get("source_bank") or "")
+        if not bank_id:
+            return True
+        pack = _RT.resolve_story_pack(bank_id)
+        stages = getattr(pack, "prompt_stages", None) or {}
+        return bool(str(stages.get("line_composer_system") or "").strip())
+    except Exception as exc:  # noqa: BLE001 -- never break a legacy freeze
+        log.warning(
+            "[LFC] _legacy_line_compose_applicable: resolution failed "
+            "(%s); defaulting to applicable.", exc,
+        )
+        return True
+
+
 def _hash_lines_text(ledger_data: dict) -> int:
     """Cheap fingerprint of line.text values for idempotency checks.
 
@@ -757,6 +782,8 @@ def run_freeze_cascade(
     # cascade-side second polish opportunity was never exercised.
 
     # ---- Phase 1 + 2: reviewer composite (Phase 9 retired S33 B3) ----
+    # (The lane capability gate for the 5B/5C/Stage-7 quality machinery
+    # lives at the 5B entry below; _legacy_line_compose_applicable.)
     started = _isoformat_utc_now()
     hash_before = _hash_lines_text(ledger_data)
     reviewer_disp = _OTRLR.review_ledger(generate_fn, led)
@@ -834,11 +861,36 @@ def run_freeze_cascade(
     # both saw clean()/defaults).
     ledger_data = led.data
     meta = ledger_data.setdefault("meta", {})
-    story_critic_report = _OTRSC.run_story_critic(
-        generate_fn,
-        ledger_data,
-        ledger_data.get("cast", []) or [],
-    )
+    # LANE CAPABILITY GATE (external QA root-cause, 2026-07-10, fable2
+    # S1b): the 5B critic -> 5C targeted reroll -> Stage-7/A2 machinery
+    # re-composes lines through the pack's line_composer_system seam. A
+    # lane whose pack deliberately does NOT declare that seam
+    # (scifi_fable2: its own P4/P5/P8 loop owns content quality) can
+    # never be re-composed here -- running the critic anyway names
+    # targets the reroll can only fail on, and the A2 exhaustion path
+    # stamps needs_full_rerun for a pass that was INAPPLICABLE, killing
+    # a structurally sound episode. Gate on the seam capability and
+    # stamp the disposition LOUDLY; the deterministic structural phases
+    # (gap audits, D3 sweep, Phase 10) still run unconditionally.
+    if not _legacy_line_compose_applicable(meta):
+        story_critic_report = _OTRSC.StoryCriticReport.clean()
+        meta["legacy_quality_passes"] = (
+            "inapplicable: the bank's pack declares no "
+            "line_composer_system seam -- the lane owns its own content "
+            "loop; 5B/5C/Stage-7 skipped by capability, NOT a failure"
+        )
+        log.warning(
+            "[LFC] Sprint 5B/5C SKIPPED (capability): pack has no "
+            "line_composer_system seam for bank %r -- the lane owns its "
+            "content loop; structural freeze continues.",
+            (meta.get("source_bank") or "?"),
+        )
+    else:
+        story_critic_report = _OTRSC.run_story_critic(
+            generate_fn,
+            ledger_data,
+            ledger_data.get("cast", []) or [],
+        )
     meta["story_critic_report"] = story_critic_report.model_dump()
     # story-ledger DRIFT (2026-06-25): derive observable critic provenance so a
     # fail-CLOSED critic (arc_verdict="unverified" == run_story_critic.clean())
