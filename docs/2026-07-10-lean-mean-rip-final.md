@@ -285,6 +285,10 @@ Deleted-script names land in test_canonical_headless_api.py's existing
 RETIRED_FULL_WORKFLOW_HARNESSES denylist (:28-61) or the W7 table.
 Policy line for README: "If it's in scripts/, a stranger may run it today; scripts/dev/
 is lab tooling." Also: `__pycache__` litter in scripts/ -- gitignore-verify.
+NOTE (operator 2026-07-10): docs/ENGINE_MATRIX.md -- a GENERATED engine x backend
+visibility table emitted by build_variants.py from the registries -- lands in the NEXT
+coder session, BEFORE this campaign (spec in GO_FORWARD_PLAN). W6's README policy line
+should link it; C2/W2 registry changes will regenerate it automatically via --check.
 
 **W7. Tombstone retirement (net ~3.0k LOC).**
 Grounded kill list (16 files, 3,179 LOC): test_no_orchestrator_legacy_symbols (442),
