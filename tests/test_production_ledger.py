@@ -330,6 +330,141 @@ class TestDualLedgerFix:
         assert len(merged["music"]) == 1
         assert merged["music"][0]["cue_id"] == "opening_theme"
 
+    # -- durable-field identity (S2 P1.1 / 720-bakeoff C1) -------------
+
+    def _seed_line_with_disk_render(self, tmp_out, in_mem_text, disk_text):
+        """Save a ledger with a single line, then simulate an audio node
+        writing DURABLE render fields onto the on-disk row (with its own
+        ``disk_text``). Return (led, path) with the in-memory line carrying
+        ``in_mem_text``, ready for a second .save() to exercise the merge."""
+        import json as _json
+        led = Ledger("durable_line", str(tmp_out))
+        led.set_lines([{"line_id": "l001", "text": disk_text,
+                        "char_id": "c01", "char_count": len(disk_text),
+                        "word_count": 1}])
+        led.save()
+        path = Path(led.path)
+        on_disk = _json.loads(path.read_text(encoding="utf-8"))
+        on_disk["lines"][0]["text_for_tts"] = disk_text
+        on_disk["lines"][0]["bark_wav_dur_s"] = 0.42
+        on_disk["lines"][0]["bark_wav_path"] = "/tmp/l001.wav"
+        on_disk["lines"][0]["start_s"] = 9.5
+        path.write_text(_json.dumps(on_disk, indent=2), encoding="utf-8")
+        # Point in-memory at the (possibly edited) text.
+        led.set_lines([{"line_id": "l001", "text": in_mem_text,
+                        "char_id": "c01", "char_count": len(in_mem_text),
+                        "word_count": 1}])
+        return led, path
+
+    def test_unchanged_line_text_retains_durable_render_fields(self, tmp_out):
+        """Same-hash-retain: an unedited line keeps the on-disk durable
+        render fields (BUG-108 preservation still holds)."""
+        import json as _json
+        led, path = self._seed_line_with_disk_render(
+            tmp_out, in_mem_text="hello", disk_text="hello")
+        led.save()
+        row = _json.loads(path.read_text(encoding="utf-8"))["lines"][0]
+        assert row["text"] == "hello"
+        assert row["text_for_tts"] == "hello"
+        assert row["bark_wav_dur_s"] == 0.42
+        assert row["bark_wav_path"] == "/tmp/l001.wav"
+        assert row["start_s"] == 9.5
+
+    def test_changed_line_text_invalidates_durable_render_fields(self, tmp_out):
+        """Changed-hash-invalidate: editing the line text drops the stale
+        on-disk render fields instead of gluing them onto the new text."""
+        import json as _json
+        led, path = self._seed_line_with_disk_render(
+            tmp_out, in_mem_text="a completely different line", disk_text="hello")
+        led.save()
+        row = _json.loads(path.read_text(encoding="utf-8"))["lines"][0]
+        assert row["text"] == "a completely different line"
+        # The stale render fields must NOT be resurrected onto the edit.
+        assert row.get("text_for_tts") is None
+        assert row.get("bark_wav_dur_s") is None
+        assert row.get("bark_wav_path") is None
+        assert row.get("start_s") is None
+
+    def test_legacy_music_row_without_hash_migrates_on_identity_match(self, tmp_out):
+        """Legacy read-compat: an on-disk music row written before
+        ``cue_spec_sha256`` existed still carries its durable wav forward,
+        because identity is recomputed from CONTENT (not a stored hash)."""
+        import json as _json
+        led = Ledger("legacy_music", str(tmp_out))
+        led.save()
+        path = Path(led.path)
+        on_disk = _json.loads(path.read_text(encoding="utf-8"))
+        # Legacy row: NO cue_spec_sha256, NO authored spec fields, just the
+        # old six-key shape + a rendered wav.
+        on_disk["music"] = [{
+            "cue_id": "opening", "description": "eerie theremin",
+            "generation_prompt": "eerie theremin", "wav_path": "/tmp/open.wav",
+            "start_s": 0.0, "dur_s": 12.0,
+        }]
+        path.write_text(_json.dumps(on_disk, indent=2), encoding="utf-8")
+        # Fresh in-memory authoring with the SAME generation_prompt.
+        led.set_music([{"cue_id": "opening", "description": "eerie theremin",
+                        "generation_prompt": "eerie theremin"}])
+        led.save()
+        row = _json.loads(path.read_text(encoding="utf-8"))["music"][0]
+        assert row["wav_path"] == "/tmp/open.wav"
+        assert row["dur_s"] == 12.0
+
+    def test_changed_music_cue_spec_invalidates_wav(self, tmp_out):
+        """Re-authoring a cue (different generation_prompt) invalidates the
+        stale rendered wav rather than keeping the wrong audio."""
+        import json as _json
+        led = Ledger("music_invalidate", str(tmp_out))
+        led.set_music([{"cue_id": "opening",
+                        "generation_prompt": "eerie theremin"}])
+        led.save()
+        path = Path(led.path)
+        on_disk = _json.loads(path.read_text(encoding="utf-8"))
+        on_disk["music"][0]["wav_path"] = "/tmp/old_theremin.wav"
+        on_disk["music"][0]["start_s"] = 0.0
+        on_disk["music"][0]["dur_s"] = 12.0
+        path.write_text(_json.dumps(on_disk, indent=2), encoding="utf-8")
+        # Re-author the cue with a NEW prompt (changed cue_spec).
+        led.set_music([{"cue_id": "opening",
+                        "generation_prompt": "bright brass fanfare"}])
+        led.save()
+        row = _json.loads(path.read_text(encoding="utf-8"))["music"][0]
+        assert row["generation_prompt"] == "bright brass fanfare"
+        assert row.get("wav_path") is None, "stale wav must not resurrect"
+        assert row.get("dur_s") is None
+
+    def test_set_music_carries_authored_fields_and_stamps_hash(self, tmp_out):
+        """set_music carries the authored cue-spec fields it dropped before
+        C1 and stamps a deterministic cue_spec_sha256."""
+        led = Ledger("music_authored", str(tmp_out))
+        led.set_music([{
+            "cue_id": "inter_01", "description": "rising strings",
+            "generation_prompt": "rising strings under dialogue",
+            "placement": "inter", "anchor_line_id": "shot_002_b1",
+            "target_duration_s": 4.0,
+        }])
+        row = led.data["music"][0]
+        assert row["placement"] == "inter"
+        assert row["anchor_line_id"] == "shot_002_b1"
+        assert row["target_duration_s"] == 4.0
+        h = row["cue_spec_sha256"]
+        assert isinstance(h, str) and len(h) == 64
+        # Deterministic: same spec -> same hash; changed prompt -> different.
+        led.set_music([{
+            "cue_id": "inter_01", "description": "rising strings",
+            "generation_prompt": "rising strings under dialogue",
+            "placement": "inter", "anchor_line_id": "shot_002_b1",
+            "target_duration_s": 4.0,
+        }])
+        assert led.data["music"][0]["cue_spec_sha256"] == h
+        led.set_music([{
+            "cue_id": "inter_01", "description": "rising strings",
+            "generation_prompt": "DIFFERENT prompt",
+            "placement": "inter", "anchor_line_id": "shot_002_b1",
+            "target_duration_s": 4.0,
+        }])
+        assert led.data["music"][0]["cue_spec_sha256"] != h
+
 
 # ---------------------------------------------------------------------------
 # Setters

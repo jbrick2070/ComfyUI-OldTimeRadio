@@ -469,10 +469,15 @@ def test_no_model_contract_smallest_ledger(tmp_path):
          "shot_id": "shot_002", "char_id": "music_close",
          "speaker_role": "music_close", "boundary": None, "text": ""},
     ])
-    # set_music preserves EXACTLY the assembler's field set -- no
-    # position field survives (r3/M1: dead metadata is dropped).
+    # set_music preserves EXACTLY the assembler's field set. 720-bakeoff
+    # C1 (S2 P1.1) added the authored cue-spec fields (anchor_line_id /
+    # placement / target_duration_s) + the derived durable-identity hash
+    # (cue_spec_sha256); the durable render fields (wav_path/start_s/dur_s)
+    # remain. No dead "position" metadata survives (r3/M1).
     for row in led.data["music"]:
         assert set(row) == {"cue_id", "description", "generation_prompt",
+                            "anchor_line_id", "placement", "target_duration_s",
+                            "cue_spec_sha256",
                             "wav_path", "start_s", "dur_s"}
     # the assembler bookends key on cue ids "opening"/"closing" -- any
     # cue-id drift here breaks bookend music downstream.

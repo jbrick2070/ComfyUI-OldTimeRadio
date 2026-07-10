@@ -51,6 +51,7 @@ Usage inside any OTR node:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -249,6 +250,101 @@ def _safe_int(v: Any, default: int = 0) -> int:
             return int(float(v))
         except (TypeError, ValueError):
             return default
+
+
+# ---------------------------------------------------------------------------
+# Durable-field identity (S2 P1.1 / 720-bakeoff C1)
+# ---------------------------------------------------------------------------
+#
+# The disk merge (BUG-LOCAL-108) carries out-of-band DURABLE renderer
+# fields (wav/cache/timing/render stamps) forward from an earlier on-disk
+# ledger so an incremental re-save does not destroy them. Before this fix
+# that copy-forward was BLIND: an edited line, a re-authored music cue, or
+# a changed clip render request would keep the STALE render bytes from the
+# previous pass (wrong audio glued to new text). C1 gates the copy-forward
+# on a per-row content IDENTITY: durable fields survive ONLY when identity
+# is unchanged; a changed identity invalidates them (dropped, never
+# resurrected). Identity is recomputed from CONTENT on both the in-memory
+# and on-disk rows -- never read from a stored hash -- so legacy on-disk
+# ledgers (written before the hash fields existed) migrate cleanly when
+# their content is unchanged.
+
+#: Authored music cue-spec fields hashed into ``cue_spec_sha256``. Ordered
+#: for readability only; the hash is over a sorted-key JSON so order is
+#: irrelevant to the digest.
+_MUSIC_CUE_SPEC_FIELDS = (
+    "generation_prompt", "target_duration_s", "placement", "anchor_line_id",
+)
+
+#: Clip render OUTPUT / timing fields excluded from the clip render-spec
+#: identity -- they are products of the render, not the request that
+#: produced it (l3 schema: clips[].warmup_pad_ms + humo_render_ms +
+#: mp4_dur_s + mp4_frames + audio_fed_to_humo_dur_s, plus shared per-row
+#: render stamps).
+_CLIP_OUTPUT_FIELDS = frozenset({
+    "warmup_pad_ms", "humo_render_ms", "mp4_dur_s", "mp4_frames",
+    "audio_fed_to_humo_dur_s", "start_s", "dur_s", "start_s_space",
+    "render_ms", "generated_dur_s", "audio_sample_hash",
+    "render_spec_sha256",
+})
+
+
+def _canonical_sha256(payload: Any) -> str:
+    """SHA256 hex of a canonical (sorted-key, compact) JSON encoding of
+    ``payload``. Deterministic across runs and machines. Falls back to
+    ``repr`` for non-JSON-serialisable payloads (best-effort; never
+    raises)."""
+    try:
+        blob = json.dumps(payload, sort_keys=True, ensure_ascii=False,
+                          separators=(",", ":"))
+    except (TypeError, ValueError):
+        blob = repr(payload)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _row_identity(arr_name: str, row: Dict[str, Any]) -> Optional[str]:
+    """Content identity for a ROW_KEYED row (lines / music / clips),
+    recomputed from the row's authored/source content. Returns ``None``
+    when identity is undefined OR the identity SOURCE IS EMPTY -- the
+    caller then falls back to the legacy (ungated) copy-forward.
+
+    The empty-source -> None rule is deliberate: a line whose text was
+    CLEARED to "" (a Script Doctor skip, or an authoritative empty
+    rebuild) has no new content to render, so there is nothing stale to
+    invalidate -- the out-of-band durable field (bark_wav_path, timings)
+    is preserved per the ownership/skip contract (BUG-108 +
+    test_ledger_merge_ownership). The identity gate only bites when the
+    in-memory content is MEANINGFUL and DIFFERS from disk -- i.e. an edit
+    that would otherwise glue a stale render onto changed text.
+
+    - lines: sha256 of the canonical line text (the source for
+      ``text_for_tts``); None when the text is empty/whitespace.
+    - music: sha256 of the authored cue spec
+      (``_MUSIC_CUE_SPEC_FIELDS``) == ``cue_spec_sha256``; None when the
+      whole spec is empty.
+    - clips: sha256 of the render-request fields, EXCLUDING render
+      outputs/timing (``_CLIP_OUTPUT_FIELDS``) and the ``line_id`` merge
+      key; None when no source fields remain.
+    """
+    if not isinstance(row, dict):
+        return None
+    if arr_name == "lines":
+        text = _safe_str(row.get("text"))
+        if not text.strip():
+            return None
+        return _canonical_sha256(text)
+    if arr_name == "music":
+        spec = {k: row.get(k) for k in _MUSIC_CUE_SPEC_FIELDS}
+        if not any(v not in (None, "", [], {}) for v in spec.values()):
+            return None
+        return _canonical_sha256(spec)
+    if arr_name == "clips":
+        spec = {k: v for k, v in row.items()
+                if k != "line_id" and k not in _CLIP_OUTPUT_FIELDS}
+        if not spec:
+            return None
+        return _canonical_sha256(spec)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1083,14 +1179,30 @@ class Ledger:
     def set_music(self, music_rows: Iterable[Dict[str, Any]]) -> "Ledger":
         rows: List[Dict[str, Any]] = []
         for r in music_rows or []:
-            rows.append({
+            row = {
                 "cue_id":            _safe_str(r.get("cue_id")),
                 "description":       _safe_str(r.get("description")) or None,
                 "generation_prompt": _safe_str(r.get("generation_prompt")) or None,
+                # Authored cue-spec fields (S2 P1.1 / C1): CARRIED so the
+                # durable-field identity (cue_spec_sha256) survives an
+                # incremental re-save. Dropped before this fix -- set_music
+                # silently discarded placement / anchor_line_id /
+                # target_duration_s, so a re-authored cue could not be told
+                # apart from its predecessor and kept a stale rendered wav.
+                "anchor_line_id":    _safe_str(r.get("anchor_line_id")) or None,
+                "placement":         _safe_str(r.get("placement")) or None,
+                "target_duration_s": _safe_float(r.get("target_duration_s")),
+                # Durable render fields -- identity-gated on cue_spec_sha256
+                # by _merge_with_disk (copied forward only on identity match).
                 "wav_path":          _safe_str(r.get("wav_path")) or None,
                 "start_s":           _safe_float(r.get("start_s")),
                 "dur_s":             _safe_float(r.get("dur_s")),
-            })
+            }
+            # Stamp the authored-spec identity with the SAME function the
+            # merge gate uses, so the persisted value and the gate agree
+            # by construction.
+            row["cue_spec_sha256"] = _row_identity("music", row)
+            rows.append(row)
         self.data["music"] = rows
         return self
 
@@ -1335,6 +1447,15 @@ class Ledger:
             # skip / editorial state
             "skip", "tts_skip_reason", "reviewer_skip_reason",
             "reviewer_note", "needs_render_realign",
+            # authored music cue spec (S2 P1.1 / C1): OWNED like line
+            # composition -- a re-authored cue must never have its spec
+            # resurrected from a stale disk row (that would make the
+            # identity falsely match and keep the wrong wav). cue_id is
+            # the merge key (never copied). The DURABLE music render
+            # fields (wav_path / start_s / dur_s) are deliberately NOT
+            # here: they copy forward on an identity MATCH.
+            "description", "generation_prompt", "anchor_line_id",
+            "placement", "target_duration_s", "cue_spec_sha256",
         })
         for arr_name, key_field in ROW_KEYED.items():
             on_disk_rows = on_disk.get(arr_name) or []
@@ -1353,6 +1474,21 @@ class Ledger:
                 if not key or key not in on_disk_map:
                     continue
                 disk_row = on_disk_map[key]
+                # DURABLE-FIELD IDENTITY (S2 P1.1 / C1): the copy-forward
+                # below exists only to preserve out-of-band DURABLE render
+                # fields (wav/cache/timing/render stamps). Those are valid
+                # ONLY while the row's authored/source content is unchanged.
+                # Recompute the content identity on BOTH sides (never from a
+                # stored hash, so legacy disk rows migrate) -- if they
+                # differ, the on-disk render is STALE: skip the whole
+                # copy-forward for this row so the stale wav/timing is
+                # dropped rather than glued onto the edited content. Owned
+                # composition fields are never copied regardless (below).
+                _id_mem = _row_identity(arr_name, row)
+                _id_disk = _row_identity(arr_name, disk_row)
+                if (_id_mem is not None and _id_disk is not None
+                        and _id_mem != _id_disk):
+                    continue
                 # Copy forward keys present on disk but absent or
                 # null in memory. Never overwrite a present in-mem
                 # value with a disk value -- in-memory is fresher
