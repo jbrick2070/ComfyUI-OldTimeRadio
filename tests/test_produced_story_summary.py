@@ -120,6 +120,49 @@ def test_gate_rejects_a_logline_that_names_nobody():
     assert reasons is not None and "names_no_cast_member" in reasons
 
 
+def test_gate_stopword_cast_name_cannot_trivially_pass():
+    """Local-fanout QA 2026-07-09: a cast name like 'The Stranger' must not
+    let a logline pass grounding just by containing 'the'."""
+    led = _ledger()
+    led["cast"] = [{"name": "The Stranger"}]
+    rejected = SB._validate_produced_story(
+        _model(
+            "A keeper argues with the light over a name that blinks until "
+            "dawn settles the question for good."
+        ),
+        led,
+    )
+    assert rejected is not None and "names_no_cast_member" in rejected
+    accepted = SB._validate_produced_story(
+        _model(
+            "The Stranger walks out of the fog, trades one true name for "
+            "the keeper's silence, and the light burns on."
+        ),
+        led,
+    )
+    assert accepted is None
+
+
+def test_builder_exact_cap_boundary_keeps_closing_window():
+    """Local-fanout QA 2026-07-09: with spoken lines exactly equal to
+    OPEN+CLOSE caps, the closing window must still be emitted (the old
+    strict-greater check silently dropped the whole second half)."""
+    led = _ledger()
+    total = (SB._PRODUCED_STORY_OPENING_CAP
+             + SB._PRODUCED_STORY_CLOSING_CAP)
+    led["lines"] = [
+        {"speaker_role": "character", "speaker": "MARA",
+         "text": f"Boundary line {i} about the reel."}
+        for i in range(total)
+    ]
+    text = SB._build_produced_story_input(led)
+    assert f"CLOSING ({SB._PRODUCED_STORY_CLOSING_CAP} lines):" in text
+    assert "MIDDLE (" not in text
+    # No overlap: the last opening row and first closing row differ.
+    assert f"Boundary line {SB._PRODUCED_STORY_OPENING_CAP - 1}" in text
+    assert f"Boundary line {SB._PRODUCED_STORY_OPENING_CAP}" in text
+
+
 def test_gate_skips_name_grounding_when_cast_is_empty():
     led = _ledger()
     led["cast"] = []

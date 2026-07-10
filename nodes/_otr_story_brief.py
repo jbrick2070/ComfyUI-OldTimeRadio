@@ -598,8 +598,14 @@ def _build_reflection_input(led: Any) -> str:
         parts.append(f"OPENING ({len(opening)} lines):")
         for ln in opening:
             parts.append(f"  {_clean(_format_line(ln))}")
-        if len(lines) > _OPENING_LINE_CAP + _CLOSING_LINE_CAP:
-            closing = lines[-_CLOSING_LINE_CAP:]
+        # Local-fanout QA 2026-07-09: same off-by-one as the produced-story
+        # builder -- the old strict `> OPEN + CLOSE` dropped the whole
+        # closing window at exact equality. Slice from max(OPEN, n-CLOSE)
+        # so windows never overlap and no tail rows are silently lost.
+        if len(lines) > _OPENING_LINE_CAP:
+            closing = lines[
+                max(_OPENING_LINE_CAP, len(lines) - _CLOSING_LINE_CAP):
+            ]
             parts.append(f"CLOSING ({len(closing)} lines):")
             for ln in closing:
                 parts.append(f"  {_clean(_format_line(ln))}")
@@ -1077,8 +1083,13 @@ def _build_produced_story_input(led: Any) -> str:
     opening = spoken[:_PRODUCED_STORY_OPENING_CAP]
     closing: list = []
     middle: list = []
-    if n > _PRODUCED_STORY_OPENING_CAP + _PRODUCED_STORY_CLOSING_CAP:
-        closing = spoken[-_PRODUCED_STORY_CLOSING_CAP:]
+    # Local-fanout QA 2026-07-09: any spoken rows beyond the opening window
+    # get a closing window (sliced to avoid overlap) -- the old strict
+    # `n > OPEN + CLOSE` dropped the whole second half at exact equality.
+    if n > _PRODUCED_STORY_OPENING_CAP:
+        closing = spoken[
+            max(_PRODUCED_STORY_OPENING_CAP, n - _PRODUCED_STORY_CLOSING_CAP):
+        ]
         mid_start = max(
             _PRODUCED_STORY_OPENING_CAP,
             n // 2 - _PRODUCED_STORY_MIDDLE_CAP // 2,
@@ -1127,7 +1138,10 @@ def _validate_produced_story(model: ProducedStoryModel, ledger: dict) -> str | N
         if not isinstance(row, dict):
             continue
         for tok in re.findall(r"[A-Za-z][A-Za-z'\-]+", row.get("name") or ""):
-            if len(tok) >= 3:
+            # Local-fanout QA 2026-07-09: exclude stopwords, or a cast name
+            # like "The Stranger" lets ANY logline containing "the" pass
+            # the grounding check.
+            if len(tok) >= 3 and tok.lower() not in _PROPER_NOUN_STOPWORDS:
                 name_tokens.add(tok.lower())
     if name_tokens:
         low = model.logline.lower()

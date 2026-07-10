@@ -38,6 +38,15 @@ Did:
   HUD label replacing hardcoded "NEWS SEED" + unconditional credits
   line); anachronism defense is prompt-side + lexicon only.
 
+- Local read-only fan-out QA (operator request) on the two shipped chunks:
+  Antigravity returned NO blockers/majors; 2 verified MINORs FIXED same
+  session (stopword bypass in produced-story cast grounding; off-by-one
+  dropping the closing excerpt window at exact cap boundary -- also fixed
+  in the older reflection builder it was copied from). Codex CLI not on
+  system PATH from this session; operator pasting the brief into Codex
+  manually -- its report (if any) lands at docs/2026-07-09-source-route-qa/
+  local_fanout/codex_review_manual.md; triage it next session.
+
 Current step: original_radio campaign -- R1 CONVERGED (2 passes,
 ~$0.26 total). Next: /kibitz r2 (coding plan) on
 docs/2026-07-09-original-radio/ARCHITECTURE_V4.md (+V2/V3 as context),
