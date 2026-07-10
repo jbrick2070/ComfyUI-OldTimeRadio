@@ -6,6 +6,12 @@
 Tempest" published to obs). Remaining gate = OPERATOR EYEBALL only ->
 then source-bank sweep -> portability.
 
+**CLAIMED 2026-07-10: PLATFORM-PORTABILITY BUILD (this coder window).**
+Executing docs/2026-07-09-platform-portability-final.md sprints S0->S6
+per operator directive. Claimed at HEAD `60430ca2`. One coder window at
+a time: do NOT open a second coder window in this repo until this claim
+is released here.
+
 **Shipped 2026-07-09 evening (both pushed):**
 
 - Closing-seam routing fix (QA F1): coda + announcer seams now
