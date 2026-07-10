@@ -1,6 +1,6 @@
 # OTR Dia Path-B install -- isolated venv (Nari Labs Dia, Apache-2.0 ->
-# COMMERCIAL-CLEAN). Blackwell (RTX 5080, sm_120) needs torch 2.8 nightly cu128
-# (Nari issue #26), which would conflict with the main venv -> isolate it.
+# COMMERCIAL-CLEAN). Blackwell (RTX 5080, sm_120) needs a CUDA cu128 torch
+# build, which would conflict with the main venv -> isolate it.
 # After it finishes: setx OTR_ENABLE_DIA 1, then RESTART ComfyUI.
 $ErrorActionPreference = "Stop"
 $Root = "C:\Users\jeffr\Documents\ComfyUI\dia"
@@ -12,16 +12,19 @@ if (Get-Command py -ErrorAction SilentlyContinue) { py -3.11 -m venv $Venv } els
 $VPy = Join-Path $Venv "Scripts\python.exe"
 & $VPy -m pip install --upgrade pip
 
-# 2) Blackwell torch FIRST (torch 2.8 nightly cu128). If a stable cu128 torch
-#    >= 2.8 exists when you run this, prefer it (drop --pre + the nightly index).
-& $VPy -m pip install --pre torch torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
-
-# 3) Dia from source (Apache-2.0). First model load downloads Dia-1.6B-0626 + the
-#    Descript Audio Codec.
+# 2) Dia from source (Apache-2.0). Its package currently pins older torch wheels,
+#    so install it BEFORE the Blackwell torch repair below.
 & $VPy -m pip install "git+https://github.com/nari-labs/dia.git"
-& $VPy -m pip install soundfile
 
-# 4) Smoke: import + cuda (NOT a render -- that downloads ~weights on first use).
+# 3) Blackwell torch LAST. Dia's dependency install can otherwise overwrite this
+#    with CPU torch and make CUDA silently unavailable.
+& $VPy -m pip install --pre --upgrade --force-reinstall torch torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+
+# 4) Runtime audio helper. The worker loads WAV refs with soundfile and passes
+#    DAC codes to Dia, avoiding TorchCodec's Windows shared-FFmpeg dependency.
+& $VPy -m pip install --upgrade soundfile
+
+# 5) Smoke: import + cuda (NOT a render -- that downloads ~weights on first use).
 & $VPy -c "import torch; from dia.model import Dia; print('dia OK -- torch', torch.__version__, 'cuda', torch.cuda.is_available())"
 
 Write-Host ""

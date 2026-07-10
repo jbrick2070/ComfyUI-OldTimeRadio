@@ -88,12 +88,19 @@ def _count_phase_literal_in_router_calls(phase: str) -> tuple[int, list[str]]:
 @pytest.mark.parametrize("phase", [
     "outline",
     "line_composer_system",
+    # Closing layer (2026-07-09 QA F1). The announcer INTRO phases are
+    # wired through ONE call site with a CONDITIONAL phase expression
+    # (announcer_intro_system / announcer_intro_safe_system), which this
+    # literal counter cannot see -- their behavior is pinned by
+    # tests/test_closing_seams_bank_routing.py instead.
+    "coda_system",
+    "announcer_outro_system",
 ])
 def test_each_creative_phase_has_exactly_one_production_callsite(
     phase: str,
 ) -> None:
-    """Phase-name inventory: each of the 2 creative phases is wired
-    at exactly one production call site at D2b.
+    """Phase-name inventory: each literal-wired creative phase has
+    exactly one production call site.
     """
     count, hits = _count_phase_literal_in_router_calls(phase)
     assert count == 1, (

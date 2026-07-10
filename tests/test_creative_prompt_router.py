@@ -1,14 +1,14 @@
-"""Sprint D D2a -- creative prompt router resolver.
+"""Creative prompt router resolver.
 
-Five assertions per v3 plan:
+Core assertions:
 
   test_router_returns_modern_for_default_mistral_nemo
       The default writer slot (Mistral-Nemo) resolves to the modern
       phase prompt for every phase.
 
-  test_router_zero_production_callers_at_d2a_boundary
-      `resolve_creative_system_prompt` has zero production callers
-      at D2a. D2b will flip to exactly 4 (one per phase site).
+  test_router_production_caller_count_pinned
+      `resolve_creative_system_prompt` has the expected production
+      call sites for outline, line composition, and closing layers.
 
   test_router_raises_on_unknown_phase
       Typo at a call site fails loud with ValueError.
@@ -30,6 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from nodes import _otr_creative_prompt_router as router  # noqa: E402
+from nodes import _otr_compose_exchange  # noqa: E402
 from nodes import _otr_line_composer  # noqa: E402
 from nodes import _otr_model_catalog  # noqa: E402
 from nodes import _otr_outline  # noqa: E402
@@ -40,6 +41,14 @@ MISTRAL_NEMO = "mistralai/Mistral-Nemo-Instruct-2407"
 PHASES: tuple[str, ...] = (
     "outline",
     "line_composer_system",
+    "outline_macro_system",
+    "outline_phase_system",
+    "outline_beat_system",
+    "exchange_system",
+    "coda_system",
+    "announcer_intro_system",
+    "announcer_intro_safe_system",
+    "announcer_outro_system",
 )
 
 
@@ -56,8 +65,19 @@ def test_router_returns_modern_for_default_mistral_nemo() -> None:
     not object identity. outline stays object-identical (untouched).
     """
     expected_modern_by_phase = {
-        "outline":              _otr_outline._SYSTEM_PROMPT,
-        "line_composer_system": _otr_line_composer._SYSTEM_PROMPT,
+        "outline":                       _otr_outline._SYSTEM_PROMPT,
+        "line_composer_system":          _otr_line_composer._SYSTEM_PROMPT,
+        "outline_macro_system":          _otr_outline._MACRO_SYSTEM_PROMPT,
+        "outline_phase_system":          _otr_outline._PHASE_SYSTEM_PROMPT,
+        "outline_beat_system":           _otr_outline._BEAT_SYSTEM_PROMPT,
+        "exchange_system":               _otr_compose_exchange.EXCHANGE_SYSTEM_PROMPT,
+        "coda_system":                   (
+            _otr_line_composer._NEWS_CODA_SYSTEM
+            + _otr_line_composer._NEWS_CODA_SYSTEM_V2_EXAMPLES
+        ),
+        "announcer_intro_system":        _otr_line_composer._ANNOUNCER_INTRO_SYSTEM,
+        "announcer_intro_safe_system":   _otr_line_composer._ANNOUNCER_INTRO_SYSTEM_SAFE,
+        "announcer_outro_system":        _otr_line_composer._ANNOUNCER_OUTRO_SYSTEM,
     }
     for phase in PHASES:
         out = router.resolve_creative_system_prompt(MISTRAL_NEMO, phase)
@@ -95,8 +115,19 @@ def test_router_returns_modern_for_remote_slot_handles() -> None:
     (2026-06-18).
     """
     expected_modern_by_phase = {
-        "outline":              _otr_outline._SYSTEM_PROMPT,
-        "line_composer_system": _otr_line_composer._SYSTEM_PROMPT,
+        "outline":                       _otr_outline._SYSTEM_PROMPT,
+        "line_composer_system":          _otr_line_composer._SYSTEM_PROMPT,
+        "outline_macro_system":          _otr_outline._MACRO_SYSTEM_PROMPT,
+        "outline_phase_system":          _otr_outline._PHASE_SYSTEM_PROMPT,
+        "outline_beat_system":           _otr_outline._BEAT_SYSTEM_PROMPT,
+        "exchange_system":               _otr_compose_exchange.EXCHANGE_SYSTEM_PROMPT,
+        "coda_system":                   (
+            _otr_line_composer._NEWS_CODA_SYSTEM
+            + _otr_line_composer._NEWS_CODA_SYSTEM_V2_EXAMPLES
+        ),
+        "announcer_intro_system":        _otr_line_composer._ANNOUNCER_INTRO_SYSTEM,
+        "announcer_intro_safe_system":   _otr_line_composer._ANNOUNCER_INTRO_SYSTEM_SAFE,
+        "announcer_outro_system":        _otr_line_composer._ANNOUNCER_OUTRO_SYSTEM,
     }
     for handle in ("openrouter:slot-a", "openrouter:slot-b",
                    "comfy:slot-a", "comfy:slot-b", "some/uncurated-model"):
@@ -118,7 +149,7 @@ def test_router_raises_on_unknown_phase() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Caller-count invariants (D2a boundary)
+# Caller-count invariants
 # ---------------------------------------------------------------------------
 
 
@@ -169,24 +200,31 @@ def _count_callers(symbol_name: str, exclude_path: Path) -> tuple[int, list[str]
     return len(hits), hits
 
 
-def test_router_has_exactly_4_production_callers_at_d2b_boundary() -> None:
-    """`resolve_creative_system_prompt` has EXACTLY 4 production
-    call-site references at the D2b boundary -- one per creative
-    phase. Catches both under-wiring (missed phase) and over-wiring
-    (accidental extra call site).
+def test_router_production_caller_count_pinned() -> None:
+    """`resolve_creative_system_prompt` has EXACTLY 5 production
+    call-site references. Catches both under-wiring (missed phase)
+    and over-wiring (accidental extra call site).
 
     D2a shipped with 0 callers. D2b wired:
       _otr_outline.generate_outline      (phase="outline")
       _otr_line_composer.compose_line    (phase="line_composer_system")
+    Closing-layer QA F1 (2026-07-09) wired:
+      _otr_line_composer.compose_announcer_intro
+        (phase= conditional: announcer_intro_system /
+         announcer_intro_safe_system)
+      _otr_line_composer.compose_news_coda         (phase="coda_system")
+      _otr_line_composer.compose_announcer_outro
+        (phase="announcer_outro_system")
 
     The router module's own definition file is excluded -- this
     test counts CALL sites, not definitions or imports.
     """
     router_src = REPO_ROOT / "nodes" / "_otr_creative_prompt_router.py"
     count, hits = _count_callers("resolve_creative_system_prompt", router_src)
-    assert count == 2, (
+    assert count == 5, (
         f"resolve_creative_system_prompt has {count} production "
-        f"caller(s) at the D2b boundary; expected exactly 2. Hits:\n  "
+        f"caller(s); expected exactly 5 (outline, compose_line, "
+        f"announcer intro, news coda, announcer outro). Hits:\n  "
         + "\n  ".join(hits)
     )
 

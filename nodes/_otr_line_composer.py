@@ -3182,6 +3182,10 @@ def compose_announcer_intro(
     creative_repo_id: str | None = None,
     story_scaffold: bool = False,
     safe_open_brief: SafeOpenBrief | None = None,
+    # Closing-layer routing (2026-07-09 QA F1): the episode's story-path bank;
+    # the intro system prompts resolve from its pack seams. Default keeps
+    # every legacy caller byte-identical (science constants).
+    source_bank_id: str = "science_news",
 ) -> LineResult:
     """Compose the episode's opening announcer line.
 
@@ -3202,6 +3206,27 @@ def compose_announcer_intro(
     is supplied, the open is built by INPUT STARVATION from that brief only --
     ``script_brief`` is ignored, so the announcer cannot leak the outcome.
     """
+    # Closing-layer routing (2026-07-09 QA F1): resolve the system prompt
+    # through the creative router so each bank's authored pack seam actually
+    # reaches the LLM (they were authored + registry-REQUIRED but unrouted --
+    # every bank opened with the science constants). Science bank with repo
+    # None keeps the module constants by object identity (audio C7 fast path,
+    # mirrors compose_line's BUG-LOCAL-417 shape).
+    _use_safe = story_scaffold and safe_open_brief is not None
+    if creative_repo_id is None and source_bank_id == "science_news":
+        _intro_system = (
+            _ANNOUNCER_INTRO_SYSTEM_SAFE if _use_safe else _ANNOUNCER_INTRO_SYSTEM
+        )
+    else:
+        from ._otr_creative_prompt_router import resolve_creative_system_prompt
+        _intro_system = resolve_creative_system_prompt(
+            creative_repo_id,
+            phase=(
+                "announcer_intro_safe_system" if _use_safe
+                else "announcer_intro_system"
+            ),
+            source_bank_id=source_bank_id,
+        )
     # KILL 2 / announcer OPEN: the input-starvation path. The script_brief (which
     # can carry the outcome) is never read; the prompt is built from the
     # SafeOpenBrief setup fields only. On any failure -> fallback_safe_open, which
@@ -3232,7 +3257,7 @@ def compose_announcer_intro(
             "raise a quiet intrigue. Do NOT reveal how the story ends."
         )
         messages = [
-            {"role": "system", "content": _ANNOUNCER_INTRO_SYSTEM_SAFE},
+            {"role": "system", "content": _intro_system},
             {"role": "user", "content": "\n".join(user_parts)},
         ]
         raw = _announcer_generate(creative_fn, messages)
@@ -3264,7 +3289,7 @@ def compose_announcer_intro(
             "fallback (no-fallback rip 2026-07-03); fix the missing brief."
         )
     messages = [
-        {"role": "system", "content": _ANNOUNCER_INTRO_SYSTEM},
+        {"role": "system", "content": _intro_system},
         {
             "role": "user",
             "content": (
@@ -3416,7 +3441,11 @@ def _news_coda_fact_flags(raw_fact, cleaned_fact) -> "tuple[str, ...]":
 
 def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
                       cast_seed=0, creative_repo_id=None,
-                      arc_shape: str = "") -> LineResult:
+                      arc_shape: str = "",
+                      # Closing-layer routing (2026-07-09 QA F1): the bank
+                      # whose pack seam supplies the coda system prompt.
+                      # Default keeps legacy callers byte-identical.
+                      source_bank_id: str = "science_news") -> LineResult:
     """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
     clause from the premise + the safe intro tone (NEVER the outcome / the news
     fact); the real ``news_close_brief`` is appended deterministically, so the
@@ -3442,9 +3471,24 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
         return clean_one_line(f"{b} {fact}", max_chars=_CODA_TOTAL_MAX)
 
     # 2) dynamic bridge: setup-only inputs (NO ending_change / final_char / fact).
-    # S2 (2026-06-28): the system prompt is the constant + in-context
-    # premise->bridge examples.
-    _system = _NEWS_CODA_SYSTEM + _NEWS_CODA_SYSTEM_V2_EXAMPLES
+    # Closing-layer routing (2026-07-09 QA F1): the coda system prompt resolves
+    # from the bank's pack seam -- before this, EVERY bank got the science
+    # "the real news report is added AFTER your clause" framing on what is
+    # (for PD/Shakespeare/archive) a source-attribution note. The pack seam is
+    # the COMPLETE prompt: the science pack's coda_system already inlines the
+    # S2 V2 examples (pinned constant+examples by tests/test_story_pack_stage1),
+    # so nothing is appended on the routed path -- appending here would DOUBLE
+    # the examples. The science-default fast path keeps the legacy
+    # constant+examples assembly byte-identical (audio C7, mirrors
+    # compose_line's BUG-LOCAL-417 shape).
+    if creative_repo_id is None and source_bank_id == "science_news":
+        _system = _NEWS_CODA_SYSTEM + _NEWS_CODA_SYSTEM_V2_EXAMPLES
+    else:
+        from ._otr_creative_prompt_router import resolve_creative_system_prompt
+        _system = resolve_creative_system_prompt(
+            creative_repo_id, phase="coda_system",
+            source_bank_id=source_bank_id,
+        )
 
     def _msgs(retry: bool):
         u = f"Tonight's tale (setup only):\n{premise}"
@@ -3566,10 +3610,23 @@ def compose_announcer_outro(
             "hedge -- do not say it 'remains to be seen' or 'time will tell'."
         )
     user_parts.append("Write the announcer's closing line now.")
-    system_content = _ANNOUNCER_OUTRO_SYSTEM
+    # Closing-layer routing (2026-07-09 QA F1): the outro system prompt
+    # resolves from the bank's pack seam (Stage 4 threaded the bank id for
+    # the thesis gate but the SYSTEM prompt still hardcoded the science
+    # constant). Science bank with repo None keeps the constant (audio C7
+    # fast path, mirrors compose_line's BUG-LOCAL-417 shape).
+    if creative_repo_id is None and source_bank_id == "science_news":
+        _outro_base = _ANNOUNCER_OUTRO_SYSTEM
+    else:
+        from ._otr_creative_prompt_router import resolve_creative_system_prompt
+        _outro_base = resolve_creative_system_prompt(
+            creative_repo_id, phase="announcer_outro_system",
+            source_bank_id=source_bank_id,
+        )
+    system_content = _outro_base
     if resolved and ending:
         system_content = (
-            _ANNOUNCER_OUTRO_SYSTEM
+            _outro_base
             + "\n- The story resolved tonight: state the outcome; never "
               "hedge or defer it to the future."
         )

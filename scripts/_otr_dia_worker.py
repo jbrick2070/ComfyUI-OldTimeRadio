@@ -115,6 +115,40 @@ def _save(model, out, out_path):
     sf.write(out_path, arr, _SR)
 
 
+def _load_audio_prompt_codes(model, ref_path):
+    """Load a WAV reference without TorchCodec/FFmpeg and return Dia DAC codes.
+
+    Dia's public ``generate(audio_prompt=<path>)`` path delegates to
+    ``torchaudio.load``. Recent torchaudio builds route that through TorchCodec,
+    which is brittle on Windows unless shared FFmpeg DLLs and ABI-matched
+    torchcodec wheels are present. Our reference bank is WAV-only, so soundfile
+    is the smaller, deterministic loader here.
+    """
+    import soundfile as sf
+    import torch
+
+    data, sr = sf.read(ref_path, dtype="float32", always_2d=True)  # [T, C]
+    audio = torch.from_numpy(data.T).contiguous()                  # [C, T]
+    if int(sr) != _SR:
+        try:
+            import torchaudio
+            audio = torchaudio.functional.resample(audio, int(sr), _SR)
+        except Exception:
+            import numpy as np
+            ratio = _SR / float(sr)
+            n_out = int(round(audio.shape[-1] * ratio))
+            idx = np.linspace(0, audio.shape[-1] - 1, n_out)
+            arr = audio.numpy()
+            res = np.stack([
+                np.interp(idx, np.arange(audio.shape[-1]), arr[c])
+                for c in range(arr.shape[0])
+            ], axis=0).astype("float32")
+            audio = torch.from_numpy(res)
+    if audio.shape[0] > 1:
+        audio = torch.mean(audio, dim=0, keepdim=True)
+    return model._encode(audio.to(model.device))
+
+
 def main():
     global _proto
     _saved_fd = os.dup(1)
@@ -159,7 +193,8 @@ def main():
             prompt = _build_prompt(req.get("text"), req.get("ref_transcript"))
             # audio_prompt-only is the official clone path this pass; a supplied
             # transcript is already folded into the prompt by _build_prompt.
-            out = model.generate(prompt, audio_prompt=ref)
+            ref_codes = _load_audio_prompt_codes(model, ref)
+            out = model.generate(prompt, audio_prompt=ref_codes)
             _save(model, out, out_path)
             if not os.path.exists(out_path):
                 emit({"ok": False, "error": "generate produced no file at %s" % out_path})

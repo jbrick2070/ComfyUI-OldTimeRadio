@@ -216,6 +216,10 @@ def _recompose_announcer_tagline(
                 creative_fn=creative_generate_fn,
                 script_brief=script_brief,
                 creative_repo_id=repo,
+                # QA F1 (2026-07-09): pack-routed intro seam (mirrors the
+                # outro sibling below).
+                source_bank_id=str(
+                    meta.get("source_bank") or "science_news"),
             )
         else:
             res = _LC.compose_announcer_outro(

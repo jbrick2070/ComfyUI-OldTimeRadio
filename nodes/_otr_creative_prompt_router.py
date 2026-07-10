@@ -12,16 +12,15 @@ resolver dispatches on the catalog row's `prompt_profile`:
                                        from _otr_period_prompts for
                                        every creative phase
 
-The creative phases the resolver currently covers (see `Phase`):
-  outline               -- returns the modern constant, OBJECT-IDENTICAL
-                           (_otr_outline's `resolved is _SYSTEM_PROMPT`
-                           sentinel depends on it)
-  line_composer_system  -- Stage 1b (multi-modal schema): sourced from the
-                           science JSON story pack, byte-identical VALUE
-                           (not object-identity)
+The resolver covers the direct outline sentinel plus the pack-routed creative
+seams in `Phase`: line composer, outline stages, exchange, coda, and announcer
+intro/outro. The `outline` phase still returns the modern constant
+object-identically because _otr_outline's `resolved is _SYSTEM_PROMPT`
+sentinel depends on it. Pack-routed seams return byte-identical values from the
+selected story bank under the default science lane.
 
-Wired at exactly 2 production call sites (_otr_outline, _otr_line_composer);
-a caller-count test pins that count.
+A caller-count test pins the current production call sites so missed wiring and
+accidental extra calls both fail loudly.
 
 Sprint D D2c few-shot decision: `render_few_shot_block` from
 `_otr_period_prompts` is documented as OMIT for v1 (saves ~600
@@ -43,6 +42,19 @@ from typing import Literal
 from . import _otr_model_catalog
 from ._otr_line_composer import (
     _SYSTEM_PROMPT as _MODERN_LINE_COMPOSER_SYSTEM,
+)
+# Closing-layer seams (2026-07-09 source-route QA F1): the coda + announcer
+# prompts are pack-routed; the constants below remain as the science
+# extraction fixture (byte-identity pinned by tests/test_story_pack_stage1.py).
+# Before this, banks.json REQUIRED these four seams in every pack and the
+# registry sweep validated them -- but no phase ever routed them, so every
+# bank closed with the science-lane "real news report" framing.
+from ._otr_line_composer import (
+    _ANNOUNCER_INTRO_SYSTEM as _MODERN_ANNOUNCER_INTRO_SYSTEM,
+    _ANNOUNCER_INTRO_SYSTEM_SAFE as _MODERN_ANNOUNCER_INTRO_SAFE_SYSTEM,
+    _ANNOUNCER_OUTRO_SYSTEM as _MODERN_ANNOUNCER_OUTRO_SYSTEM,
+    _NEWS_CODA_SYSTEM as _MODERN_CODA_SYSTEM,
+    _NEWS_CODA_SYSTEM_V2_EXAMPLES as _MODERN_CODA_V2_EXAMPLES,
 )
 from ._otr_outline import _SYSTEM_PROMPT as _MODERN_OUTLINE_SYSTEM
 # Lane-enablement chunk 1 (2026-07-06): the three outline STAGE prompts are
@@ -77,6 +89,11 @@ Phase = Literal[
     # (pack-routed; dynamic craft bullets stay Python-owned in
     # _otr_compose_exchange.build_exchange_prompt).
     "exchange_system",
+    # Closing layer (2026-07-09 QA F1): coda + announcer seams, pack-routed.
+    "coda_system",
+    "announcer_intro_system",
+    "announcer_intro_safe_system",
+    "announcer_outro_system",
 ]
 
 
@@ -92,6 +109,13 @@ _MODERN_BY_PHASE: dict[str, str] = {
     "outline_phase_system": _MODERN_OUTLINE_PHASE_SYSTEM,
     "outline_beat_system":  _MODERN_OUTLINE_BEAT_SYSTEM,
     "exchange_system":      _MODERN_EXCHANGE_SYSTEM,
+    # coda_system's modern fixture matches the science PACK value, which
+    # inlines the S2 V2 examples (constant + examples, pinned by
+    # tests/test_story_pack_stage1.py) -- NOT the bare constant.
+    "coda_system":                 _MODERN_CODA_SYSTEM + _MODERN_CODA_V2_EXAMPLES,
+    "announcer_intro_system":      _MODERN_ANNOUNCER_INTRO_SYSTEM,
+    "announcer_intro_safe_system": _MODERN_ANNOUNCER_INTRO_SAFE_SYSTEM,
+    "announcer_outro_system":      _MODERN_ANNOUNCER_OUTRO_SYSTEM,
 }
 
 
@@ -120,6 +144,13 @@ _PHASE_TO_PACK_SEAM: dict[str, str] = {
     # Lane chunk 2 (2026-07-05): the exchange seam. A bank whose pack
     # lacks it fails LOUD at get_pack_prompt (lane-enablement item).
     "exchange_system":      "exchange_system",
+    # Closing layer (2026-07-09 QA F1): every runnable bank's pack already
+    # carries these four (banks.json required_seams + registry sweep); they
+    # were authored-but-unrouted. Fail-loud at get_pack_prompt if absent.
+    "coda_system":                 "coda_system",
+    "announcer_intro_system":      "announcer_intro_system",
+    "announcer_intro_safe_system": "announcer_intro_safe_system",
+    "announcer_outro_system":      "announcer_outro_system",
 }
 
 
@@ -134,7 +165,7 @@ def resolve_creative_system_prompt(
         repo_id: the canonical HF repo_id assigned to the writer's
             creative slot (the same value the writer stamps at
             `meta.creative_model` in D2b).
-        phase: one of the four creative-phase identifiers in `Phase`.
+        phase: one of the creative-phase identifiers in `Phase`.
         source_bank_id: the story-path bank whose pack supplies any
             pack-routed seam (Stage 2C widget selection). Default is the
             science lane -- all pre-2C callers stay byte-identical.
@@ -143,8 +174,8 @@ def resolve_creative_system_prompt(
         The system-prompt string for that (model, phase) pair.
 
     Raises:
-        ValueError: if `phase` is not one of the four declared
-            identifiers. Catches typos at the call site.
+        ValueError: if `phase` is not one of the declared identifiers.
+            Catches typos at the call site.
 
     A repo_id that is NOT a curated local model -- a remote slot handle
     (``openrouter:slot-a/b``, ``comfy:slot-a/b``), ``None`` (a legacy/

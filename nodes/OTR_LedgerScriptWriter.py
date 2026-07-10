@@ -827,6 +827,11 @@ def _generate_title_from_script(
     temperature: float = 0.85,
     premise: str = "",
     arc_verdict: str = "",
+    # QA F1 (2026-07-09): bank-aware title framing. The system prompt used to
+    # hardcode "sci-fi radio drama" for EVERY bank; the caller now threads the
+    # bank's banks.json `title_form_label` (first live consumer of that
+    # field). Default keeps legacy callers/self-tests byte-identical.
+    title_form_label: str = "sci-fi radio drama",
 ) -> str:
     """Generate a 2-5 word episode title via a forced scratchpad pass.
 
@@ -897,8 +902,9 @@ def _generate_title_from_script(
         parts.append(f"ARC:\n{arc_str[:300]}")
     story_block = "\n\n".join(parts)
 
+    _form = (title_form_label or "").strip() or "sci-fi radio drama"
     sys_msg = (
-        "You are titling a single episode of a sci-fi radio drama. "
+        f"You are titling a single episode of a {_form}. "
         "You receive the finished story material and propose an "
         "evocative 2-5 word episode title. You work on a scratchpad "
         "first, then commit to a final answer."
@@ -4857,6 +4863,8 @@ class OTR_LedgerScriptWriter:
                             ],
                             story_scaffold=_style_grammar_on,
                             safe_open_brief=safe_open_brief,
+                            # QA F1 (2026-07-09): pack-routed intro seam.
+                            source_bank_id=resolved["source_bank"],
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
@@ -5030,6 +5038,10 @@ class OTR_LedgerScriptWriter:
                         # S2 (story-quality v2, 2026-06-28): system examples +
                         # arc_shape-keyed curated fallback floor.
                         arc_shape=str(meta.get("arc_shape") or ""),
+                        # QA F1 (2026-07-09): pack-routed coda seam -- a
+                        # PD/Shakespeare/archive close is a source note, not
+                        # a "real news report" pivot.
+                        source_bank_id=resolved["source_bank"],
                     )
                 if not outro_res.text:
                     # Pathological (brief cleaned to empty) -- never ship an empty
@@ -5359,6 +5371,12 @@ class OTR_LedgerScriptWriter:
                     temperature=resolved["temperature"],
                     premise=outline.premise,
                     arc_verdict="",
+                    # QA F1 (2026-07-09): bank-aware framing via banks.json
+                    # title_form_label (science value == the old hardcode).
+                    title_form_label=str(
+                        (getattr(_source_bank_row, "defaults", {}) or {})
+                        .get("title_form_label") or "sci-fi radio drama"
+                    ),
                 )
             if regen_title:
                 final_title = regen_title

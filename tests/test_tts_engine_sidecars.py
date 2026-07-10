@@ -262,6 +262,27 @@ def test_dia_worker_normalizes_leading_speaker_tag():
     assert w._strip_lead_tag("[S2] x") == "x"
 
 
+def test_dia_worker_loads_wav_ref_without_torchcodec(tmp_path):
+    sf = pytest.importorskip("soundfile")
+    np = pytest.importorskip("numpy")
+    torch = pytest.importorskip("torch")
+    w = _load_script("_otr_dia_worker.py")
+    ref = tmp_path / "ref.wav"
+    sf.write(ref, np.zeros((128, 1), dtype="float32"), w._SR)
+
+    class Model:
+        device = torch.device("cpu")
+
+        def _encode(self, audio):
+            self.audio = audio
+            return torch.ones((3, 9), dtype=torch.int32)
+
+    model = Model()
+    codes = w._load_audio_prompt_codes(model, str(ref))
+    assert tuple(model.audio.shape) == (1, 128)
+    assert tuple(codes.shape) == (3, 9)
+
+
 # --- polish round 2: pipe closure, double-close, timeout clamp ------------- #
 class _ClosablePipe:
     def __init__(self):
