@@ -1,5 +1,24 @@
 # OTR Go-Forward Plan
 
+**CONTENDER LANE QUEUE (2026-07-10 night, operator-ratified).** Rival
+source-bank specs incoming: docs/2026-07-11-scifi-{codex,gemini,sonnet}-
+engine-spec.md. Lane law: (0) runway C1-C3 land FIRST (shared audio/merge
+contracts), then C4a/C4b + C5/C5.5 (fable2 720-proof); (1) ONE grounding
+window verifies all landed specs' contract claims -> buildable verdict each
+(repairs = JSON-shape only, logged, zero wording changes); (2) each
+contender then gets an UNINTERRUPTED serial lane -- kibitz r2->r3->r4 on its
+spec (r1 skipped: creative authorship is the contender's, panel may harden
+implementability/wiring ONLY; any creative "improvement" = rejected on
+authorship grounds) -> build in one coder window holding this file's slot
+(bank row + pipeline + pack + runner + tests; runnable/executable flipped
+same change; suite + Bug Bible; commit AND push per green chunk) -> 30w lane
+smoke root-fixed -> 720w qualification roll w/ run-sheet -> release slot ->
+next contender. Build order = most-buildable-first per grounding verdict.
+All builds on v2.0-alpha, serial, never two windows in the shared JSON
+(banks/pipelines/dispatch are collision surfaces). Builder windows = Sonnet
+(mechanical); kibitz = local codex+antigravity; Fable only at the event.
+Then C6 qualification sweep (all six incl. B/C calibrations) -> C7 event.
+
 **ACTIVE STEP (2026-07-10 evening): 720-word STORY-ENGINE BAKE-OFF RUNWAY.**
 Plan of record: `docs/2026-07-10-fable2-720-bakeoff-runway.md` (kibitz'd before
 C4 coding). Chunks C1-C7: P1.1 ownership/revision merge contract -> P1.3
