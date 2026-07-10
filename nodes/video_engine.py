@@ -1149,11 +1149,22 @@ def _build_hud_dossier(led):
         rl.append("Total OpenRouter cost: $%.4f" % total)
         sections.append({"header": "RESOLVED (OPENROUTER)", "lines": rl})
 
-    # 3. STORY SPINE -- what the episode was ABOUT (news + opposed wants)
+    # 3. STORY SPINE -- what the episode was ABOUT (produced story + wants).
+    # Meta split (2026-07-09): the premise is the PRODUCED story's logline
+    # (K.5.6 summary of the composed episode); the pre-generation source
+    # digest is printed as "Source:" when the logline exists, keeping the
+    # two concepts visibly distinct. Old ledgers keep the legacy read.
     sl = []
     news = meta.get("news") if isinstance(meta.get("news"), dict) else {}
-    if news:
+    produced = (meta.get("produced_story")
+                if isinstance(meta.get("produced_story"), dict) else {})
+    if produced.get("logline"):
+        sl.append("Premise:   %s" % str(produced["logline"]))
+        if news.get("script_brief"):
+            sl.append("Source:    %s" % g(news, "script_brief"))
+    elif news:
         sl.append("Premise:   %s" % g(news, "script_brief"))
+    if news:
         _kt = news.get("key_terms") or []
         if _kt:
             sl.append("Key terms: %s" % ", ".join(str(t) for t in _kt))
@@ -1807,15 +1818,28 @@ def _write_story_treatment(out_path, episode_title, led,
         # episode legible years later: what the story was ABOUT.
         W_("STORY SPINE")
         W_(BAR)
+        # Meta split (2026-07-09): Premise = the PRODUCED story's logline
+        # (what the composed episode is actually about); the interpreter's
+        # pre-generation digest prints as "Source brief" when the logline
+        # exists. Old ledgers keep the legacy labeling.
+        _produced = (meta.get("produced_story")
+                     if isinstance(meta.get("produced_story"), dict) else {})
         _newsd = meta.get("news") if isinstance(meta.get("news"), dict) else {}
+        if _produced.get("logline"):
+            W_(f"  Premise    :  {_produced['logline']}")
+            if _produced.get("subject"):
+                W_(f"  Subject    :  {_produced['subject']}")
         if _newsd:
-            W_(f"  Premise    :  {_g(_newsd, 'script_brief')}")
+            if _produced.get("logline"):
+                W_(f"  Source brief: {_g(_newsd, 'script_brief')}")
+            else:
+                W_(f"  Premise    :  {_g(_newsd, 'script_brief')}")
             _kt = _newsd.get("key_terms") or []
             if _kt:
                 W_("  Key terms  :  " + ", ".join(str(t) for t in _kt))
             W_(f"  Casting    :  {_g(_newsd, 'casting_brief')}")
             W_(f"  Sign-off   :  {_g(_newsd, 'news_close_brief')}")
-        else:
+        elif not _produced.get("logline"):
             W_("  (custom premise -- no structured news brief recorded)")
         _ds = meta.get("dramatic_state") if isinstance(meta.get("dramatic_state"), dict) else {}
         if _ds:

@@ -968,3 +968,253 @@ def run_story_brief_reflection(
         technical_model_id=technical_model_id,
         prompt_version=prompt_version,
     )
+
+
+# ---------------------------------------------------------------------------
+# Produced-story summary (meta-split chunk 1, operator directive 2026-07-09)
+#
+# Operator ruling: `meta` was ALWAYS meant to carry a brief of the ACTUAL
+# produced story for downstream consumer prompts; the pre-generation
+# interpreter digest (`meta["news"]`) got conflated with it. The reflection
+# pass above is deliberately a MOOD board (its content gate rejects plot,
+# named characters, and dialogue verbs), so the FACTUAL consumers -- the
+# video HUD story spine, the story-treatment text, the credits premise --
+# kept printing the SOURCE digest as if it described the episode.
+#
+# This is the missing half: one more post-composition LLM pass that
+# summarizes what the produced episode is actually about -- real names
+# allowed, plot required, ending stated -- stamped under the quiet,
+# distinct key `meta["produced_story"]` (never inside `meta["news"]`;
+# per the operator, the two concepts never share a name again).
+# ---------------------------------------------------------------------------
+
+_PRODUCED_STORY_LOGLINE_MAX_CHARS: int = 320
+_PRODUCED_STORY_SUBJECT_MAX_CHARS: int = 60
+# The structured_call ladder requires the structural retry to be STRICTLY
+# COOLER than base (raising entropy during JSON-schema repair encourages
+# structural hallucination).
+_PRODUCED_STORY_TEMPERATURE: float = 0.3
+_PRODUCED_STORY_STRUCTURAL_RETRY_TEMPERATURE: float = 0.15
+_PRODUCED_STORY_MAX_NEW_TOKENS: int = 400
+_PRODUCED_STORY_SOURCE: str = "llm_post_composition"
+
+# Excerpt caps for the summary input -- opening / middle / closing windows
+# of the SPOKEN lines (character + announcer), real names intact.
+_PRODUCED_STORY_OPENING_CAP: int = 8
+_PRODUCED_STORY_MIDDLE_CAP: int = 6
+_PRODUCED_STORY_CLOSING_CAP: int = 8
+
+#: A line that opens with an ALL-CAPS speaker label ("MARA: ...") is a
+#: transcript row, not a summary sentence.
+_PRODUCED_STORY_SPEAKER_LABEL_REGEX: re.Pattern[str] = re.compile(
+    r"^[A-Z][A-Z0-9 _'\-]{1,30}:"
+)
+
+
+class ProducedStoryModel(BaseModel):
+    """Schema for the produced-story summary LLM output.
+
+    Deliberately the INVERSE posture of `StoryBriefModel`: plot and real
+    character names are REQUIRED content here, not rejected. Shape/length
+    only; content rules live in `_validate_produced_story`.
+    """
+
+    logline: str = Field(
+        min_length=20, max_length=_PRODUCED_STORY_LOGLINE_MAX_CHARS
+    )
+    subject: str = Field(
+        min_length=3, max_length=_PRODUCED_STORY_SUBJECT_MAX_CHARS
+    )
+
+
+_PRODUCED_STORY_PROMPT: str = """\
+Summarize this finished radio-drama episode. Return ONE JSON object,
+no Markdown:
+
+{
+  "logline": "1-2 sentences, under 320 chars: who the story was about and \
+what happened, including how it ended",
+  "subject": "a 2-6 word noun phrase naming the story's subject"
+}
+
+RULES:
+- Summarize the EPISODE text below, not any outside source or news item.
+- Use the character names exactly as they appear.
+- State what actually happened; do not tease or withhold the ending.
+- No quotation marks, brackets, or markup in either field.
+
+EPISODE:
+"""
+
+
+def _build_produced_story_input(led: Any) -> str:
+    """Build the summary-prompt input: title + REAL cast names + spoken-line
+    excerpts (opening / middle / closing windows).
+
+    The inverse of `_build_reflection_input`: no name scrubbing -- the whole
+    point of this pass is a summary grounded in the episode's actual names
+    and events. Accepts a Ledger object OR a raw dict (duck-typed via
+    `_ledger_data`), same as the reflection builder.
+    """
+    ledger = _ledger_data(led)
+    lines: Sequence[dict] = ledger.get("lines") or []
+    cast: Sequence[dict] = ledger.get("cast") or []
+
+    parts: list[str] = [f"TITLE: {_meta_title(ledger)}"]
+    names = [
+        (row.get("name") or "").strip()
+        for row in cast
+        if isinstance(row, dict) and (row.get("name") or "").strip()
+    ]
+    parts.append("CAST: " + (", ".join(names) if names else "(no cast)"))
+
+    spoken = [
+        ln for ln in lines
+        if (ln.get("speaker_role") or "").lower() in ("character", "announcer")
+        and (ln.get("text") or "").strip()
+    ]
+    n = len(spoken)
+    opening = spoken[:_PRODUCED_STORY_OPENING_CAP]
+    closing: list = []
+    middle: list = []
+    if n > _PRODUCED_STORY_OPENING_CAP + _PRODUCED_STORY_CLOSING_CAP:
+        closing = spoken[-_PRODUCED_STORY_CLOSING_CAP:]
+        mid_start = max(
+            _PRODUCED_STORY_OPENING_CAP,
+            n // 2 - _PRODUCED_STORY_MIDDLE_CAP // 2,
+        )
+        mid_rows = spoken[mid_start:mid_start + _PRODUCED_STORY_MIDDLE_CAP]
+        # Middle only earns a window when it adds rows beyond the other two.
+        if n > (_PRODUCED_STORY_OPENING_CAP + _PRODUCED_STORY_CLOSING_CAP
+                + _PRODUCED_STORY_MIDDLE_CAP):
+            middle = mid_rows
+    if opening:
+        parts.append(f"OPENING ({len(opening)} lines):")
+        parts.extend(f"  {_format_line(ln)}" for ln in opening)
+    if middle:
+        parts.append(f"MIDDLE ({len(middle)} lines):")
+        parts.extend(f"  {_format_line(ln)}" for ln in middle)
+    if closing:
+        parts.append(f"CLOSING ({len(closing)} lines):")
+        parts.extend(f"  {_format_line(ln)}" for ln in closing)
+    return "\n".join(parts)
+
+
+def _validate_produced_story(model: ProducedStoryModel, ledger: dict) -> str | None:
+    """Content gate for the produced-story summary. Returns a comma-joined
+    reason string to REJECT (advancing the structured_call ladder), or
+    ``None`` to accept.
+
+    Checks: no markup/quote chars, no brackets, no newlines, the logline is
+    prose (not a speaker-labeled transcript row), and -- when the episode
+    has a cast -- the logline actually names at least one cast member (the
+    grounding lever: a summary that names nobody is a summary of nothing).
+    """
+    reasons: list[str] = []
+    for field_name in ("logline", "subject"):
+        value = getattr(model, field_name)
+        if _QUOTE_OR_MARKUP_REGEX.search(value):
+            reasons.append(f"{field_name}_has_markup")
+        if "[" in value or "]" in value:
+            reasons.append(f"{field_name}_has_bracket")
+        if "\n" in value:
+            reasons.append(f"{field_name}_has_newline")
+    if _PRODUCED_STORY_SPEAKER_LABEL_REGEX.match(model.logline.strip()):
+        reasons.append("logline_is_speaker_labeled")
+    cast = ledger.get("cast") or []
+    name_tokens: set[str] = set()
+    for row in cast:
+        if not isinstance(row, dict):
+            continue
+        for tok in re.findall(r"[A-Za-z][A-Za-z'\-]+", row.get("name") or ""):
+            if len(tok) >= 3:
+                name_tokens.add(tok.lower())
+    if name_tokens:
+        low = model.logline.lower()
+        if not any(tok in low for tok in name_tokens):
+            reasons.append("logline_names_no_cast_member")
+    return ", ".join(reasons) if reasons else None
+
+
+def _produced_story_failure(reason: str, technical_model_id: str) -> dict:
+    """Sentinel delta for a failed summary pass -- status stamped LOUD,
+    `produced_story` itself absent so no consumer prints a broken value."""
+    return {
+        "produced_story_status": f"failed:{reason}",
+        "produced_story_model_id": technical_model_id,
+    }
+
+
+def run_produced_story_summary(
+    led: Any,
+    technical_fn: Callable[..., str],
+    *,
+    technical_model_id: str = "",
+) -> dict:
+    """Run the produced-story summary pass and return the meta delta.
+
+    LLM slot: technical -- structured JSON output, not narrative
+    composition (same E-21 posture as `run_story_brief_reflection`:
+    the signature accepts ONLY `technical_fn`).
+
+    Success delta:
+      produced_story           {"logline": ..., "subject": ...}
+      produced_story_status    "ok"
+      produced_story_model_id  the technical slot's model id
+      produced_story_source    "llm_post_composition"
+
+    Failure (exhausted ladder / raising slot fn) returns the sentinel
+    delta with `produced_story` ABSENT and a `failed:<reason>` status.
+    On every path the function returns a dict; it never raises -- a
+    post-hoc summary must never kill a finished episode.
+    """
+    ledger = _ledger_data(led)
+    user_message = _PRODUCED_STORY_PROMPT + _build_produced_story_input(led)
+    messages = [{"role": "user", "content": user_message}]
+
+    def _content_validator(model: ProducedStoryModel) -> str | None:
+        return _validate_produced_story(model, ledger)
+
+    # LLM slot: technical -- structured JSON summary pass.
+    try:
+        model = structured_call(
+            prompt=messages,
+            schema=ProducedStoryModel,
+            slot_fn=technical_fn,
+            base_temperature=_PRODUCED_STORY_TEMPERATURE,
+            structural_retry_temperature=(
+                _PRODUCED_STORY_STRUCTURAL_RETRY_TEMPERATURE
+            ),
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            post_validator=_content_validator,
+            max_new_tokens=_PRODUCED_STORY_MAX_NEW_TOKENS,
+            max_attempts=3,
+            helper_name="run_produced_story_summary",
+        )
+    except StructuredCallFailedError as exc:
+        log.warning(
+            "[OTR_ProducedStory] structured_call exhausted the retry ladder "
+            "after %d attempt(s) (last error: %s); stamping failed status",
+            exc.attempts, exc.last_error,
+        )
+        return _produced_story_failure(
+            "structured_call_failed", technical_model_id
+        )
+    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
+        log.warning(
+            "[OTR_ProducedStory] technical_fn raised %s: %s; stamping "
+            "failed status", type(exc).__name__, exc,
+        )
+        return _produced_story_failure(
+            "technical_fn_exception", technical_model_id
+        )
+
+    return {
+        "produced_story": {
+            "logline": model.logline.strip(),
+            "subject": model.subject.strip(),
+        },
+        "produced_story_status": "ok",
+        "produced_story_model_id": technical_model_id,
+        "produced_story_source": _PRODUCED_STORY_SOURCE,
+    }

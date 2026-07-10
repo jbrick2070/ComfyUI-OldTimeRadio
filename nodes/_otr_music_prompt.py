@@ -104,10 +104,20 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
         if atmosphere:
             mood_terms = atmosphere[:3]
         else:
+            # Meta split (2026-07-09): the last-ditch mood mining prefers
+            # the PRODUCED story's logline (a summary of the actual
+            # episode) over the pre-generation source digest; the digest
+            # survives only as the final floor for old ledgers.
+            produced = (meta.get("produced_story") or {}) if isinstance(meta, dict) else {}
+            if not isinstance(produced, dict):
+                produced = {}
             news_meta = (meta.get("news") or {}) if isinstance(meta, dict) else {}
             if not isinstance(news_meta, dict):
                 news_meta = {}
-            kw = _mood_suffix(news_meta.get("script_brief") or "").lstrip(", ").strip()
+            seed_text = (
+                produced.get("logline") or news_meta.get("script_brief") or ""
+            )
+            kw = _mood_suffix(seed_text).lstrip(", ").strip()
             mood_terms = [t.strip() for t in kw.split(",") if t.strip()] if kw else []
 
     setting_str = ", ".join(setting_terms[:2]) if setting_terms else ""

@@ -144,7 +144,10 @@ from . import _otr_source_payload as _otr_source_payload
 # reflection call site below the K.5 visual_plan stamp. Module-level
 # import (not hot-path) so a typo / refactor surfaces at module load
 # time rather than during the first script generation.
-from ._otr_story_brief import run_story_brief_reflection
+from ._otr_story_brief import (
+    run_produced_story_summary,
+    run_story_brief_reflection,
+)
 
 log = logging.getLogger("OTR")
 
@@ -5576,6 +5579,23 @@ class OTR_LedgerScriptWriter:
                 technical_model_id=resolved["technical_model"],
             )
         meta.update(_brief_delta)
+
+        # --- K.5.6. produced-story summary pass (meta split 2026-07-09) --
+        # Operator directive: `meta` carries a brief of the ACTUAL produced
+        # story for downstream consumers; the interpreter digest stays in
+        # meta["news"] as SOURCE provenance only. K.5.5 above is the mood
+        # board (content gate bans plot/names); this second reflection
+        # summarizes the composed episode itself -- real names + plot +
+        # stated ending -- under the distinct key meta["produced_story"].
+        # Same technical slot + never-raise sentinel posture as K.5.5.
+        # LLM slot: technical
+        with slot_scheduler.helper_context("produced_story_summary"):
+            _story_delta = run_produced_story_summary(
+                led,
+                technical_generate_fn,
+                technical_model_id=resolved["technical_model"],
+            )
+        meta.update(_story_delta)
 
         # --- Story-spine Wave 2: the post-script passes (Stage 2.5 length
         # pass / Stage 3 QA router / Stage 3.5 micro-repair / unload /

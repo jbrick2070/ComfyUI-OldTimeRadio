@@ -376,7 +376,16 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     news = meta.get("news") if isinstance(meta.get("news"), dict) else {}
     ds = (meta.get("dramatic_state")
           if isinstance(meta.get("dramatic_state"), dict) else {})
-    if news.get("script_brief"):
+    # Meta split (2026-07-09): the premise line is the PRODUCED story's
+    # logline (K.5.6 post-composition summary) -- the actual episode, not
+    # the pre-generation source digest. Old ledgers without the field keep
+    # the legacy news read. The SOURCE INTERCEPT block below stays on
+    # meta["news"] deliberately: that label IS the source.
+    produced = (meta.get("produced_story")
+                if isinstance(meta.get("produced_story"), dict) else {})
+    if produced.get("logline"):
+        spine.append(("Premise:", str(produced["logline"])))
+    elif news.get("script_brief"):
         spine.append(("Premise:", str(news["script_brief"])))
     if ds.get("dramatic_question"):
         spine.append(("Question:", str(ds["dramatic_question"])))
