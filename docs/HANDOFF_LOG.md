@@ -3,6 +3,41 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-10 ~02:45 -- HEAD 636d78cf (v2.0-alpha) [original_radio window]
+
+Did (operator overnight directive: "run two more 420w, analyze, optimize
+the original path, prompts not py"):
+- 420w night batch, 4 rolls total. PUBLISHED: "Ashes of the Pawn"
+  (otr\obs\signal_lost_ashes_of_the_pawn_20260710_014548_..._final.mp4,
+  18 min e2e). Roll A died at QA: the confirm judge "proved"
+  news_source_framing by quoting the CLEAN intro verbatim -- fixed at
+  root (3d32b265: news_source_framing + machine_attribution join
+  weapons as lexicon-only kill classes; suite 7153 green then). Roll C
+  died HONESTLY: writer armed a climax ("holding his revolver") --
+  correct lexicon kill. Roll D died at concept: empty cast name x2
+  (archetype "The Stenographer").
+- ANALYSIS (leg 1): 239/420 words (thin brief -> thin outline);
+  key_terms landed 1/5 (story diverged from concept); intro
+  ventriloquized a character quote; ZERO quote-wrapped lines and ZERO
+  stage directions at 420w (30w observations did not recur); no audible
+  name drift (visual portrait prompt invented "Ferrywoman Edith" --
+  eyeball item); outro button landed well.
+- OPTIMIZED (prompt/data only, 636d78cf, pack JSON): concept demands
+  non-empty CAPS personal names w/ example; script_brief demands
+  episode-shape (opening/two turns/closing image) + key_term weaving +
+  no-arms menace rule; both intro seams forbid quoting characters.
+- NOT re-verified live: the portability coder window claimed the repo
+  mid-session (S1 in flight, 9 py files dirty + llm_policy.py
+  untracked); full suite red from ITS tree, my lane tests 42/42 green.
+  NEXT lane action = one 420w verification roll AFTER the portability
+  window settles, then eyeball all published episodes.
+Current step: original_radio pre-ship -- operator eyeball (now 2
+episodes in obs: page_in_the_tempest 30w, ashes_of_the_pawn 420w) +
+one post-tune 420w verification roll.
+Next: eyeball; verification roll; source-bank e2e sweep.
+Commits: 3d32b265, 636d78cf (+ this docs commit) -- pushed. Suite was
+7153 green pre-portability-dirt; Bug Bible 17/7/3.
+
 ## 2026-07-10 ~01:30 -- HEAD 1c735c2d + docs (v2.0-alpha)
 
 Did:
