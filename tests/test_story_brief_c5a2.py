@@ -65,14 +65,26 @@ def writer_ast() -> ast.AST:
 
 @pytest.fixture(scope="module")
 def execute_fn(writer_ast) -> ast.FunctionDef:
-    """Return the writer's `run` method body. The method is named `run`
-    (the ComfyUI node-execution entrypoint convention); kept the fixture
-    name `execute_fn` for readability of the assertions below since
-    Historical spec narratives say "execute()" throughout."""
+    """Return the writer method that OWNS the K.5.5 reflection site.
+
+    Originally the `run` method (the ComfyUI node-execution entrypoint;
+    the fixture name `execute_fn` mirrors the historical spec's
+    "execute()" wording). scifi_fable2 S1a (2026-07-10): the whole tail
+    (J.5 -> M save, including K.5.5/K.5.6) moved into the extracted
+    `_run_writer_tail` (architecture doc sections 11/13) -- every
+    call-site pin below follows it there. The placement laws are
+    unchanged: receipt stamp before the reflection, reflection before
+    the script_text assembly and the M ledger save."""
     for node in ast.walk(writer_ast):
-        if isinstance(node, ast.FunctionDef) and node.name == "run":
+        if (
+            isinstance(node, ast.FunctionDef)
+            and node.name == "_run_writer_tail"
+        ):
             return node
-    raise AssertionError("OTR_LedgerScriptWriter.run not found")
+    raise AssertionError(
+        "OTR_LedgerScriptWriter._run_writer_tail not found "
+        "(the S1a tail extraction owns K.5.5)"
+    )
 
 
 def _find_call_site(execute_node, target_name: str) -> list[ast.Call]:

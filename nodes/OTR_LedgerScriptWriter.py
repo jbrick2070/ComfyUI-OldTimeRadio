@@ -112,6 +112,7 @@ import json
 import logging
 import os
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -2097,6 +2098,55 @@ def _stamp_story_style_receipt(meta: dict, *, contract,
 # ---------------------------------------------------------------------------
 # Class
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class WriterTailContext:
+    """Everything the writer's tail consumes -- scifi_fable2 S1a (r1/C2,
+    fields PINNED r2 by direct read of the tail body; one name only).
+
+    The tail (`OTR_LedgerScriptWriter._run_writer_tail`) spans, in order:
+    J.5 title regen -> canon write -> K meta stamps -> K.5 visual_plan ->
+    K.5.5 story-brief reflection -> K.5.6 produced-story summary ->
+    Wave-2 story-spine orchestrator (or the writer-LLM unload) ->
+    REJECT gate -> provenance stamps -> L return assembly -> M save.
+
+    The legacy path BUILDS this from its run() locals (byte-identical
+    behavior: final_title_override=None, run_story_spine=True keeps the
+    env-gated spine default). The fable2 lane (S1b+) builds it from its
+    parsed artifacts. The tail consumes ONLY this context -- no closure
+    over run() locals; `self` is touched solely for the refine stash.
+    """
+
+    led: Any
+    meta: dict
+    resolved: dict
+    outline_view: Any          # needs: .premise, .title (regen grounding +
+                               # fallback + consistency guard + news payload).
+                               # fable2: premise = treatment.dramatic_question
+                               # line, title = treatment.title
+    canon: Any                 # episode canon object; the tail is the only
+                               # canon WRITER (J.5 re-titles + writes it)
+    episode_root: Any
+    episode_id: str
+    contract: Any | None       # style contract; fable2 = None ("" slug path)
+    style_grammar_on: bool     # fable2 = False (receipt stamp honest)
+    source_bank_row: Any       # defaults: title_form_label, hud_origin_label
+    slot_scheduler: Any
+    creative_fn: Any
+    technical_fn: Any
+    cast_seed: Any             # refine stash only
+    refine_active: bool        # fable2: MUST be False S1-S3 (refine loop
+                               # unsupported on this lane)
+    run_story_spine: bool      # legacy True (env-gated as today); fable2
+                               # FALSE -- its P4/P5/P8 loop is the lane's
+                               # equivalent; revisit post-S3
+    final_title_override: str | None
+                               # r3/M3: fable2 sets the play's parsed TITLE
+                               # here (title_source="fable2_script_title").
+                               # Tail precedence: user-typed episode_title >
+                               # override > LLM regen. Legacy passes None ->
+                               # byte-identical behavior.
 
 
 class OTR_LedgerScriptWriter:
@@ -5982,6 +6032,68 @@ class OTR_LedgerScriptWriter:
         )
         led.save()
 
+        # --- Tail handoff (scifi_fable2 S1a extraction) ----------------
+        # Everything from J.5 to the M save lives in _run_writer_tail and
+        # consumes ONLY the context below. The legacy path builds it from
+        # its locals: final_title_override=None (LLM regen path as today)
+        # and run_story_spine=True (the env-gated spine default decides
+        # inside the tail) keep the behavior byte-identical.
+        _tail_ctx = WriterTailContext(
+            led=led,
+            meta=meta,
+            resolved=resolved,
+            outline_view=outline,
+            canon=canon,
+            episode_root=episode_root,
+            episode_id=episode_id,
+            contract=contract,
+            style_grammar_on=_style_grammar_on,
+            source_bank_row=_source_bank_row,
+            slot_scheduler=slot_scheduler,
+            creative_fn=creative_generate_fn,
+            technical_fn=technical_generate_fn,
+            cast_seed=cast_seed,
+            refine_active=_refine_active,
+            run_story_spine=True,
+            final_title_override=None,
+        )
+        return self._run_writer_tail(_tail_ctx)
+
+    def _run_writer_tail(
+        self, ctx: "WriterTailContext",
+    ) -> tuple[str, str, str, float, str]:
+        """The writer's tail: J.5 title regen -> canon write -> K meta
+        stamps -> K.5 visual_plan -> K.5.5/K.5.6 reflections -> Wave-2
+        story-spine orchestrator (or writer-LLM unload) -> REJECT gate ->
+        provenance stamps -> L return assembly -> M save.
+
+        Consumes ONLY ``ctx`` (scifi_fable2 S1a extraction -- no closure
+        over run() locals). ``self`` is touched solely for the
+        ``self._refine_last`` stash when ``ctx.refine_active``. Returns
+        ``(script_text, script_json, news_json, est_minutes,
+        technical_model)`` -- the writer's output tuple.
+        """
+        # Late imports (pure modules -- same no-load-at-import law as
+        # run()'s section B; these two were run() locals pre-extraction).
+        from . import _otr_canon as _OTRC
+        from . import production_ledger as _PL
+
+        led = ctx.led
+        meta = ctx.meta  # same object as led.data["meta"]; K re-derives it
+        resolved = ctx.resolved
+        outline = ctx.outline_view
+        canon = ctx.canon
+        episode_root = ctx.episode_root
+        episode_id = ctx.episode_id
+        contract = ctx.contract
+        _style_grammar_on = ctx.style_grammar_on
+        _source_bank_row = ctx.source_bank_row
+        slot_scheduler = ctx.slot_scheduler
+        creative_generate_fn = ctx.creative_fn
+        technical_generate_fn = ctx.technical_fn
+        cast_seed = ctx.cast_seed
+        _refine_active = ctx.refine_active
+
         # --- J.5. Post-composition title regen (late binding) ---------
         # Per Jeffrey 2026-05-10: when the user leaves episode_title
         # blank, regenerate the title from the FINAL story material via
@@ -6012,6 +6124,13 @@ class OTR_LedgerScriptWriter:
             # User typed a value; respect it verbatim.
             final_title = resolved["episode_title"]
             title_source = "user"
+        elif ctx.final_title_override is not None:
+            # r3/M3 (scifi_fable2): the lane's parsed play TITLE arrives
+            # via ctx; title regen NEVER runs for that lane (its assembly
+            # excludes title rows, so regen would discard the authored
+            # title). Legacy passes None -> this branch never fires there.
+            final_title = ctx.final_title_override
+            title_source = "fable2_script_title"
         else:
             # kibitz r3 D4 (2026-07-09) ROOT-CAUSE FIX: assemble from the
             # CANONICAL ledger, not the in-flight script_text_parts list.
@@ -6286,7 +6405,12 @@ class OTR_LedgerScriptWriter:
             from . import _otr_story_spine as _OTRSPINE
         except ImportError:  # pragma: no cover - standalone / test load
             import _otr_story_spine as _OTRSPINE  # type: ignore
-        if _OTRSPINE.enabled():
+        # S1a: ctx.run_story_spine gates the spine WITHOUT disturbing the
+        # legacy env default -- legacy passes True, so the env-gated
+        # _OTRSPINE.enabled() decides exactly as before; fable2 passes
+        # False (its P4/P5/P8 loop is the lane's equivalent) and takes
+        # the unload branch below.
+        if ctx.run_story_spine and _OTRSPINE.enabled():
             _OTRSPINE.run_post_script_spine(
                 led, meta, outline,
                 creative_generate_fn=creative_generate_fn,

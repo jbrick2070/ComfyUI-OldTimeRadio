@@ -216,10 +216,21 @@ class TestRunWiringPins:
         assert "_apply_intro_rewrite_result" in block
 
     def test_title_regen_assembles_from_ledger(self):
-        src = inspect.getsource(W.OTR_LedgerScriptWriter.run)
+        # scifi_fable2 S1a (2026-07-10): the J.5 title-regen block moved
+        # from run() into the extracted _run_writer_tail (tail
+        # extraction, architecture doc sections 11/13) -- the positive
+        # pin follows it; the stale-join negative pin covers BOTH
+        # methods so the regression cannot re-enter either.
+        tail_src = inspect.getsource(
+            W.OTR_LedgerScriptWriter._run_writer_tail)
+        run_src = inspect.getsource(W.OTR_LedgerScriptWriter.run)
         assert (
             "assembled_script = _PL.assemble_script_text_from_ledger(led.data)"
-            in src
+            in tail_src
         )
         # The stale in-flight join must be gone from the title path.
-        assert 'assembled_script = "\\n\\n".join(script_text_parts)' not in src
+        for src in (tail_src, run_src):
+            assert (
+                'assembled_script = "\\n\\n".join(script_text_parts)'
+                not in src
+            )

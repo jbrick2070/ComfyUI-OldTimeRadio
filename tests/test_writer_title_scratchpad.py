@@ -288,28 +288,38 @@ def test_post_hoc_title_substitution_is_removed():
 
 
 def test_title_call_passes_premise_for_grounding():
-    """AST scan: the J.5 `_generate_title_from_script(...)` call inside
-    the writer's `run` method passes the outline `premise` keyword so
-    the scratchpad is grounded in the story spine, not just the
-    dialogue excerpts. (The module also has self-test calls in its
-    `__main__` block that pass no premise -- those are scoped out by
-    walking only the `run` method body.)"""
+    """AST scan: the J.5 `_generate_title_from_script(...)` call passes
+    the outline `premise` keyword so the scratchpad is grounded in the
+    story spine, not just the dialogue excerpts. (The module also has
+    self-test calls in its `__main__` block that pass no premise --
+    those are scoped out by walking only the owning method body.)
+
+    scifi_fable2 S1a (2026-07-10): the J.5 block moved from `run` into
+    the extracted `_run_writer_tail` (tail extraction, architecture doc
+    sections 11/13) -- the pin follows it there.
+    """
     tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
 
-    run_fn = None
+    tail_fn = None
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.ClassDef)
             and node.name == "OTR_LedgerScriptWriter"
         ):
             for sub in node.body:
-                if isinstance(sub, ast.FunctionDef) and sub.name == "run":
-                    run_fn = sub
+                if (
+                    isinstance(sub, ast.FunctionDef)
+                    and sub.name == "_run_writer_tail"
+                ):
+                    tail_fn = sub
                     break
-    assert run_fn is not None, "writer must have an OTR_LedgerScriptWriter.run"
+    assert tail_fn is not None, (
+        "writer must have OTR_LedgerScriptWriter._run_writer_tail "
+        "(the S1a tail extraction owns J.5)"
+    )
 
     title_calls = [
-        node for node in ast.walk(run_fn)
+        node for node in ast.walk(tail_fn)
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
@@ -317,7 +327,7 @@ def test_title_call_passes_premise_for_grounding():
         )
     ]
     assert title_calls, (
-        "run() must call _generate_title_from_script in J.5"
+        "_run_writer_tail() must call _generate_title_from_script in J.5"
     )
     assert any(
         "premise" in {kw.arg for kw in call.keywords}
