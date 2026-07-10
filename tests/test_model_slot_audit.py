@@ -184,7 +184,7 @@ def test_requested_cloud_smoke_candidate_contracts_are_inspected():
         engine = image_registry.get_engine(engine_id)
         assert engine.required_inputs == ("text_prompt",)
         assert engine.default_roles == ()
-        assert image_registry.CAPABILITIES[engine_id]["cpu_ok"] is True
+        assert "cpu" in image_registry.CAPABILITIES[engine_id]["device_backends"]
         assert image_registry.CAPABILITIES[engine_id]["model_requirements"] == []
 
     vidu = video_registry.get_engine("cloud_vidu_q2_pro_fast_720p")

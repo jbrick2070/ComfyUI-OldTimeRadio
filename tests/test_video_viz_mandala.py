@@ -41,7 +41,7 @@ def test_registered_with_capability_row():
     assert eng.fallback_engine is None and eng.engine_version == "1"
     assert eng.render_aspect == "wide"
     assert NAME in vreg.CAPABILITIES
-    assert vreg.CAPABILITIES[NAME]["cpu_ok"] is True
+    assert "cpu" in vreg.CAPABILITIES[NAME]["device_backends"]
     assert vreg.CAPABILITIES[NAME]["required_toolchain"] is None
 
 

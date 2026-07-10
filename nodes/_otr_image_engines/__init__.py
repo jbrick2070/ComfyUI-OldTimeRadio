@@ -31,9 +31,11 @@ except Exception:  # noqa: BLE001
     pass
 
 # C2 (build-or-NO-GO, default-OFF): the Z-Image-Turbo adapter -- a 2nd image
-# engine proving the model-agnostic layer holds >=2 engines. Cold-import clean;
-# greyed until OTR_ENABLE_ZIMAGE=1 + its cu128 sidecar exists. Separate guard so
-# a quirk in one adapter never blocks the other from registering.
+# engine proving the model-agnostic layer holds >=2 engines. Cold-import clean.
+# IN-PROCESS since 2026-06-18 (see z_image_turbo.py header: "No sidecar") --
+# its registry row is requires_sidecar: False; do NOT "fix" it back to a
+# sidecar from this comment (the old cu128-sidecar wording misled). Separate
+# guard so a quirk in one adapter never blocks the other from registering.
 try:  # pragma: no cover - trivial guard
     from . import z_image_turbo as _z_image_turbo  # noqa: F401
 except Exception:  # noqa: BLE001

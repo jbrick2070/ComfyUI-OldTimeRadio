@@ -104,12 +104,16 @@ assert_usable = _IMAGE_REGISTRY.assert_usable
 # ships its own row here; zero profile edits.
 # ---------------------------------------------------------------------------
 CAPABILITIES = {
-    "flux_gen1": {"required_toolchain": None,
-                  "requires_sidecar": False, "cpu_ok": False,
-                  "model_requirements": ["flux.1-dev"]},
-    "flux2_klein": {"required_toolchain": None,
-                    "requires_sidecar": False, "cpu_ok": False,
-                    "model_requirements": ["flux.2-klein"]},
+    "flux_gen1": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["flux.1-dev"]},
+    "flux2_klein": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["flux.2-klein"]},
     # hidream_i1 CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
     # (NotImplementedError render) is unregistered; the registry-consistency
     # invariant forbids a row without a registered engine.
@@ -118,40 +122,67 @@ CAPABILITIES = {
     # steady diffusion+VAE residency is ~7 GB (TE offloads before sampling) and
     # the render-window resident peak read ~12.2 GB, well under the 14.5 GB
     # ceiling. The engine's render_image reclaims after decode (single-resident).
-    "lumina_image": {"required_toolchain": None,
-                     "requires_sidecar": False, "cpu_ok": False,
-                     "model_requirements": ["lumina-image-2"]},
-    "qwen_image": {"required_toolchain": None,
-                   "requires_sidecar": False, "cpu_ok": False,
-                   "model_requirements": ["qwen-image"]},
+    "lumina_image": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["lumina-image-2"]},
+    "qwen_image": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["qwen-image"]},
     # sd35_large CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
     # (NotImplementedError render) is unregistered; the registry-consistency
     # invariant forbids a row without a registered engine.
     # MEASURED 2026-06-18 on the 5080 (nvfp4 + qwen3-4b fp8 TE): the nvfp4
     # diffusion steady residency is ~4.3-5 GB (TE offloaded before sampling); the
     # transient TE+diffusion LOAD peak hit ~10 GB but ComfyUI manages it down.
-    "z_image_turbo": {"required_toolchain": None,
-                      "requires_sidecar": False, "cpu_ok": False,
-                      "model_requirements": ["z-image-turbo"]},
+    "z_image_turbo": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["z-image-turbo"]},
     # Cloud partner STILLS (S1 stills lane 2026-07-03): no local weights, no
     # VRAM, CPU-side (the provider does the compute; canonicalize_image is a
     # pure PIL op). The registry-consistency invariant (test_capability_profiles
     # :217) requires ONE row per registered engine and vice versa.
-    "cloud_flux_pro": {"required_toolchain": None,
-                       "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "cloud_nano_banana_2": {"required_toolchain": None,
-                            "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "cloud_seedream_2": {"required_toolchain": None,
-                         "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "cloud_krea_2_turbo": {"required_toolchain": None,
-                           "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "cloud_luma_photon_flash": {"required_toolchain": None,
-                                "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "cloud_flux_pro": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
+    "cloud_nano_banana_2": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
+    "cloud_seedream_2": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
+    "cloud_krea_2_turbo": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
+    "cloud_luma_photon_flash": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
     # `ideo` -- plain cloud Ideogram scene-still (S1+1). node_key cloud_ideogram_v4.
-    "ideo": {"required_toolchain": None,
-             "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
-    "google_image": {"required_toolchain": None,
-                     "requires_sidecar": False, "cpu_ok": True, "model_requirements": []},
+    "ideo": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
+    "google_image": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
 }
 __all__.append("CAPABILITIES")
 

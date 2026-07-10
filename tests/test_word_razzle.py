@@ -22,7 +22,7 @@ from nodes._otr_video_engines import registry as vreg
 def test_word_razzle_registered_and_capabilities():
     assert vreg.is_registered("word_razzle")
     row = vreg.CAPABILITIES["word_razzle"]
-    assert row["cpu_ok"] is True
+    assert "cpu" in row["device_backends"]
     assert set(vreg.CAPABILITIES) == set(vreg.all_engine_names())   # invariant
 
 

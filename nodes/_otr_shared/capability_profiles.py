@@ -363,10 +363,22 @@ def load_widget_mapping(path: Optional[str] = None) -> dict:
 # ---------------------------------------------------------------------------
 # S1 -- capability declarations + the derived enable-set
 # ---------------------------------------------------------------------------
+# Registry CAPABILITIES v2 (platform-portability S3, 2026-07-10): the bare
+# v1 ``cpu_ok`` bool is SUPERSEDED by an explicit ``device_backends`` list +
+# ``practical_without_gpu`` + vendor/dtype table-visibility. A v1 row (any
+# row still carrying ``cpu_ok``) is REJECTED outright -- the old false bark
+# row cannot survive v2 semantics.
 _DECL_KEYS = {
     "required_toolchain": lambda v: v is None or (isinstance(v, str) and bool(v)),
     "requires_sidecar": lambda v: isinstance(v, bool),
-    "cpu_ok": lambda v: isinstance(v, bool),
+    "device_backends": lambda v: (
+        isinstance(v, (list, tuple)) and bool(v)
+        and all(b in _DEVICE_BACKENDS for b in v)),
+    "requires_vendor": lambda v: v is None or v in ("nvidia", "amd", "apple"),
+    "needs_fp8_te": lambda v: isinstance(v, bool),
+    "needs_fp4_te": lambda v: isinstance(v, bool),
+    "practical_without_gpu": lambda v: isinstance(v, bool),
+    "sidecar_conditional": lambda v: isinstance(v, bool),
     "model_requirements": lambda v: isinstance(v, (list, tuple)) and all(isinstance(m, str) for m in v),
 }
 
@@ -376,6 +388,9 @@ REASON_OK = "ok"
 REASON_REQUIRES_CUDA = "requires_cuda"
 REASON_MISSING_TOOLCHAIN = "missing_toolchain"
 REASON_SIDECARS_DISABLED = "sidecars_disabled"
+# v2 additions:
+REASON_REQUIRES_VENDOR = "requires_vendor"
+REASON_IMPRACTICAL_ON_CPU = "impractical_on_cpu"
 
 
 def validate_declaration(name: str, decl: Any, source: str = "<registry>") -> dict:
@@ -396,13 +411,23 @@ def validate_declaration(name: str, decl: Any, source: str = "<registry>") -> di
 
 def _fit_reason(decl: dict, profile: dict) -> str:
     """Why does (or doesn't) ONE engine declaration fit ONE profile?
-    Per-engine fit ONLY -- CUDA / toolchain / sidecar gating, never a VRAM
-    tier or budget (the operator's tier JSON owns the OOM budget now) and
-    never co-residency (that is a runtime invariant)."""
-    if profile["device_backend"] == "cpu" and not decl["cpu_ok"]:
-        # On a CPU floor the only question is whether the engine can run on
-        # CPU at all -- there is no GPU residency to gate.
+    Per-engine fit ONLY -- backend / vendor / toolchain / sidecar gating,
+    never a VRAM tier or budget (the operator's tier JSON owns the OOM
+    budget now) and never co-residency (that is a runtime invariant).
+
+    v2 (S3): ``device_backends`` supersedes the bare ``cpu_ok`` bool; a
+    profile backend the engine does not list is a mismatch (the code stays
+    ``requires_cuda`` -- vocabulary continuity for the validator/wizard/
+    logs, and the missing backend IS cuda for every current local row).
+    ``practical_without_gpu`` keeps technically-cpu-capable-but-impractical
+    engines off the cpu floor; ``requires_vendor`` makes the NVML/cu128
+    vendor pins table-visible."""
+    if profile["device_backend"] not in decl["device_backends"]:
         return REASON_REQUIRES_CUDA
+    if profile["device_backend"] == "cpu" and not decl["practical_without_gpu"]:
+        return REASON_IMPRACTICAL_ON_CPU
+    if decl["requires_vendor"] and profile.get("gpu_vendor") != decl["requires_vendor"]:
+        return REASON_REQUIRES_VENDOR
     if decl["required_toolchain"] and decl["required_toolchain"] not in profile["toolchains"]:
         return REASON_MISSING_TOOLCHAIN
     if decl["requires_sidecar"] and not profile["allow_sidecars"]:

@@ -38,5 +38,5 @@ def test_wan_ti2v_row_capabilities():
     row = vreg.CAPABILITIES["wan_ti2v"]
     assert row["required_toolchain"] is None
     assert row["requires_sidecar"] is False
-    assert row["cpu_ok"] is False
+    assert row["device_backends"] == ["cuda"]
     assert row["model_requirements"] == ["wan2.2-ti2v-5b"]

@@ -39,7 +39,7 @@ def test_google_lyria_registers_and_capabilities():
     assert eng.sample_rate == 44100
     assert eng.fixed_provider_duration_s == 30
     row = R.CAPABILITIES["google_lyria"]
-    assert row["cpu_ok"] is True
+    assert "cpu" in row["device_backends"] and row["practical_without_gpu"] is True
     assert row["requires_sidecar"] is False
     assert row["model_requirements"] == []
 

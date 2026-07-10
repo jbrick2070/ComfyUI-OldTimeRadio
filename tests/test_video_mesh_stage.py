@@ -324,7 +324,7 @@ def test_engine_family_map_and_no_fallback():
 
 def test_capability_row_present():
     row = vreg.CAPABILITIES["mesh_stage"]
-    assert row["cpu_ok"] is False              # the mesher needs the GPU
+    assert row["device_backends"] == ["cuda"]  # the mesher needs the GPU
     assert row["required_toolchain"] is None   # compile-free core nodes
     assert row["requires_sidecar"] is False    # in-process (NOT the cu128 lane)
     assert "hunyuan3d-dit-v2-mv" in row["model_requirements"]

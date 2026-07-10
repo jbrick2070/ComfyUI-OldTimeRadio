@@ -143,7 +143,7 @@ def test_bark_registry_row_is_cuda_only():
     lie. Registry exclusion, no bark code surgery this campaign."""
     from nodes._otr_audio_engines import registry as areg
 
-    assert areg.CAPABILITIES["bark"]["cpu_ok"] is False
+    assert areg.CAPABILITIES["bark"]["device_backends"] == ["cuda"] and areg.CAPABILITIES["bark"]["practical_without_gpu"] is False
 
 
 def test_cpu_floor_profile_is_runnable_on_cpu():

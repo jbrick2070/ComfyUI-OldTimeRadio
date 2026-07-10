@@ -179,7 +179,12 @@ def test_google_vid_sfx_engines_register_and_capabilities():
         assert row == {
             "required_toolchain": None,
             "requires_sidecar": False,
-            "cpu_ok": True,
+            "device_backends": ["cuda", "cpu", "mps"],
+            "requires_vendor": None,
+            "needs_fp8_te": False,
+            "needs_fp4_te": False,
+            "practical_without_gpu": True,
+            "sidecar_conditional": False,
             "model_requirements": [],
         }
 

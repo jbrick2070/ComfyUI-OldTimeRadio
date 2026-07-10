@@ -49,7 +49,7 @@ def test_google_image_registers_and_capabilities():
     assert eng.required_inputs == ("text_prompt",)
     assert eng.native is False
     row = ireg.CAPABILITIES["google_image"]
-    assert row["cpu_ok"] is True
+    assert "cpu" in row["device_backends"] and row["practical_without_gpu"] is True
     assert row["requires_sidecar"] is False
     assert row["model_requirements"] == []
 

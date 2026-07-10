@@ -39,7 +39,7 @@ def test_all_cloud_image_rows_registered_with_capabilities():
     for name in _CLOUD_ROWS:
         assert ireg.is_registered(name), name
         row = ireg.CAPABILITIES[name]
-        assert row["cpu_ok"] is True and row["model_requirements"] == []
+        assert "cpu" in row["device_backends"] and row["practical_without_gpu"] is True and row["model_requirements"] == []
 
 
 def test_capabilities_match_registry_exactly():

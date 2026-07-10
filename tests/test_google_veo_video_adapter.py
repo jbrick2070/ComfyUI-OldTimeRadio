@@ -97,7 +97,7 @@ def test_google_veo_video_registers_and_capabilities():
     assert eng.accepts_audio_ref is False
     assert eng.render_aspect == "wide"
     row = vreg.CAPABILITIES["google_veo_video"]
-    assert row["cpu_ok"] is True
+    assert "cpu" in row["device_backends"] and row["practical_without_gpu"] is True
     assert row["requires_sidecar"] is False
     assert row["model_requirements"] == []
     assert "google_veo_video" in vreg.engines_for_role("music_visual")

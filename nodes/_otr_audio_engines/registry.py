@@ -178,9 +178,14 @@ def assert_usable(name: str, role: str) -> str:
 # GATE B S1 -- per-engine capability DECLARATIONS (the registry TABLE, not the
 # adapters). Consumed by nodes/_otr_shared/capability_profiles.py to DERIVE
 # the per-profile enable-set. DATA ONLY: this block changes no audio runtime
-# behavior (the frozen audio spine is untouched). cpu_ok = the engine can
-# render (slowly) with no GPU -- the cpu_floor tier filter.
+# behavior (the frozen audio spine is untouched).
 # ---------------------------------------------------------------------------
+# CAPABILITIES v2 (platform-portability S3, 2026-07-10): device_backends
+# SUPERSEDES the bare cpu_ok bool (a row still carrying cpu_ok is REJECTED
+# by validate_declaration). requires_vendor makes the cu128 sidecar pins
+# table-visible; practical_without_gpu keeps technically-cpu-capable-but-
+# impractical engines off the cpu floor; needs_fp8_te/needs_fp4_te flag
+# fp8/fp4 artifact dependencies (excluded on ROCm/MPS tiers).
 CAPABILITIES = {
     # S0 portability ruling (R4, 2026-07-10): bark's GENERATION path hardcodes
     # CUDA (_otr_bark_lib._generate_single_line force-moves inputs to
@@ -188,40 +193,92 @@ CAPABILITIES = {
     # monkeypatches torch.tensor/arange to default device="cuda"), so the old
     # cpu_ok=True row was a lie -- cpu_floor selected bark and crashed on the
     # first line. Registry exclusion ONLY; no bark code surgery this campaign.
-    "bark": {"required_toolchain": None,
-             "requires_sidecar": False, "cpu_ok": False,
+    "bark": {"required_toolchain": None, "requires_sidecar": False,
+             "device_backends": ["cuda"], "requires_vendor": None,
+             "needs_fp8_te": False, "needs_fp4_te": False,
+             "practical_without_gpu": False, "sidecar_conditional": False,
              "model_requirements": ["suno-bark"]},
-    "kokoro": {"required_toolchain": None,
-               "requires_sidecar": False, "cpu_ok": True,
+    "kokoro": {"required_toolchain": None, "requires_sidecar": False,
+               "device_backends": ["cuda", "cpu", "mps"],
+               "requires_vendor": None,
+               "needs_fp8_te": False, "needs_fp4_te": False,
+               "practical_without_gpu": True, "sidecar_conditional": False,
                "model_requirements": ["kokoro-82m"]},
-    "indextts2": {"required_toolchain": None,
-                  "requires_sidecar": True, "cpu_ok": False,
+    # indextts2 / chatterbox / dia: isolated sidecar venvs pinned to cu128
+    # torch (uv.lock / installer pins) -> vendor-locked nvidia until a
+    # ROCm/Metal port of the sidecar installs exists.
+    "indextts2": {"required_toolchain": None, "requires_sidecar": True,
+                  "device_backends": ["cuda"], "requires_vendor": "nvidia",
+                  "needs_fp8_te": False, "needs_fp4_te": False,
+                  "practical_without_gpu": False,
+                  "sidecar_conditional": False,
                   "model_requirements": ["indextts2"]},
-    "chatterbox": {"required_toolchain": None,
-                   "requires_sidecar": True, "cpu_ok": False,
+    "chatterbox": {"required_toolchain": None, "requires_sidecar": True,
+                   "device_backends": ["cuda"], "requires_vendor": "nvidia",
+                   "needs_fp8_te": False, "needs_fp4_te": False,
+                   "practical_without_gpu": False,
+                   "sidecar_conditional": False,
                    "model_requirements": ["chatterbox"]},
-    "dia": {"required_toolchain": None,
-            "requires_sidecar": True, "cpu_ok": False,
+    "dia": {"required_toolchain": None, "requires_sidecar": True,
+            "device_backends": ["cuda"], "requires_vendor": "nvidia",
+            "needs_fp8_te": False, "needs_fp4_te": False,
+            "practical_without_gpu": False, "sidecar_conditional": False,
             "model_requirements": ["dia-1.6b"]},
-    "musicgen": {"required_toolchain": None,
-                 "requires_sidecar": False, "cpu_ok": True,
+    "musicgen": {"required_toolchain": None, "requires_sidecar": False,
+                 "device_backends": ["cuda", "cpu", "mps"],
+                 "requires_vendor": None,
+                 "needs_fp8_te": False, "needs_fp4_te": False,
+                 "practical_without_gpu": True,
+                 "sidecar_conditional": False,
                  "model_requirements": ["musicgen-small"]},
-    "stable_audio_music": {"required_toolchain": None, "requires_sidecar": False,
-                           "cpu_ok": False, "model_requirements": ["stable-audio-open"]},
+    "stable_audio_music": {"required_toolchain": None,
+                           "requires_sidecar": False,
+                           "device_backends": ["cuda"],
+                           "requires_vendor": None,
+                           "needs_fp8_te": False, "needs_fp4_te": False,
+                           "practical_without_gpu": False,
+                           "sidecar_conditional": False,
+                           "model_requirements": ["stable-audio-open"]},
+    # stable_audio_3 is comfy-native: Comfy core owns its device layer, and
+    # the mac_mps tier ships it as the music engine (verify-at-build item).
     "stable_audio_3": {"required_toolchain": None, "requires_sidecar": False,
-                       "cpu_ok": False, "model_requirements": ["stable-audio-open-3"]},
+                       "device_backends": ["cuda", "mps"],
+                       "requires_vendor": None,
+                       "needs_fp8_te": False, "needs_fp4_te": False,
+                       "practical_without_gpu": False,
+                       "sidecar_conditional": False,
+                       "model_requirements": ["stable-audio-open-3"]},
     # Cloud engines (cloud-audio 2026-07-03): no local model/sidecar/GPU -- they
-    # run on Comfy Cloud via invoke_partner_node, so cpu_ok=True (usable on the
-    # cpu_floor tier; the "cost" is credits + auth, enforced at invoke, not VRAM).
+    # run on Comfy Cloud via invoke_partner_node, so every backend fits (the
+    # "cost" is credits + auth, enforced at invoke, not VRAM).
     "elevenlabs": {"required_toolchain": None, "requires_sidecar": False,
-                   "cpu_ok": True, "model_requirements": []},
+                   "device_backends": ["cuda", "cpu", "mps"],
+                   "requires_vendor": None,
+                   "needs_fp8_te": False, "needs_fp4_te": False,
+                   "practical_without_gpu": True,
+                   "sidecar_conditional": False,
+                   "model_requirements": []},
     "sonilo": {"required_toolchain": None, "requires_sidecar": False,
-               "cpu_ok": True, "model_requirements": []},
+               "device_backends": ["cuda", "cpu", "mps"],
+               "requires_vendor": None,
+               "needs_fp8_te": False, "needs_fp4_te": False,
+               "practical_without_gpu": True, "sidecar_conditional": False,
+               "model_requirements": []},
     # Direct Google/Gemini BYO API: no local model/sidecar/GPU and not a Comfy
     # Partner node. Auth/cost/fail-loud behavior is enforced by the adapter and
     # direct_api profile metadata.
     "google_tts": {"required_toolchain": None, "requires_sidecar": False,
-                   "cpu_ok": True, "model_requirements": []},
+                   "device_backends": ["cuda", "cpu", "mps"],
+                   "requires_vendor": None,
+                   "needs_fp8_te": False, "needs_fp4_te": False,
+                   "practical_without_gpu": True,
+                   "sidecar_conditional": False,
+                   "model_requirements": []},
     "google_lyria": {"required_toolchain": None, "requires_sidecar": False,
-                     "cpu_ok": True, "model_requirements": []},
+                     "device_backends": ["cuda", "cpu", "mps"],
+                     "requires_vendor": None,
+                     "needs_fp8_te": False, "needs_fp4_te": False,
+                     "practical_without_gpu": True,
+                     "sidecar_conditional": False,
+                     "model_requirements": []},
 }

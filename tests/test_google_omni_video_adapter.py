@@ -80,7 +80,7 @@ def test_google_omni_video_registers_and_capabilities():
     assert eng.accepts_still is True
     assert eng.accepts_init_image is True
     row = vreg.CAPABILITIES["google_omni_video"]
-    assert row["cpu_ok"] is True
+    assert "cpu" in row["device_backends"] and row["practical_without_gpu"] is True
     assert row["requires_sidecar"] is False
     assert row["model_requirements"] == []
     assert "google_omni_video" in vreg.engines_for_role("music_visual")

@@ -175,6 +175,70 @@ def test_v2_mapping_declares_exempt_widget_names():
     assert "render.frame_budget" in mapping["managed"]
 
 
+# ---------------------------------------------------------------------------
+# S3 -- registry CAPABILITIES v2 (platform-portability, 2026-07-10)
+# ---------------------------------------------------------------------------
+def test_v1_cpu_ok_row_cannot_survive_v2_semantics():
+    """The spec's structural proof: a v1 row (bare cpu_ok bool) is REJECTED
+    outright by the v2 declaration schema -- unknown key AND missing v2
+    keys. The old false bark row cannot come back."""
+    v1_bark = {"required_toolchain": None, "requires_sidecar": False,
+               "cpu_ok": True, "model_requirements": ["suno-bark"]}
+    with pytest.raises(cp.ProfileError, match="unknown key"):
+        cp.validate_declaration("bark", v1_bark)
+
+
+def test_v2_every_registry_row_validates():
+    for namespace, decls in _declarations_by_registry().items():
+        for name, decl in decls.items():
+            cp.validate_declaration(name, decl, source=namespace)
+            assert "cpu_ok" not in decl, (namespace, name)
+
+
+def test_v2_vendor_pins_gate_amd_hosts():
+    """dia / indextts2 / chatterbox (cu128 sidecars) and ltx_audio_in
+    (NVML gate) are vendor-locked nvidia: an AMD cuda profile must see
+    REASON_REQUIRES_VENDOR, an nvidia one REASON_OK-or-sidecar-gated."""
+    amd = copy.deepcopy(cp.load_profile("16gb_full"))
+    amd["gpu_vendor"] = "amd"
+    decls = _declarations_by_registry()
+    audio_avail = cp.availability(amd, decls["audio"])
+    for eng in ("dia", "indextts2", "chatterbox"):
+        assert audio_avail[eng] == cp.REASON_REQUIRES_VENDOR, eng
+    video_avail = cp.availability(amd, decls["video"])
+    assert video_avail["ltx_audio_in"] == cp.REASON_REQUIRES_VENDOR
+
+    nv = cp.load_profile("16gb_full")
+    nv_audio = cp.availability(nv, decls["audio"])
+    assert nv_audio["indextts2"] == cp.REASON_OK
+    assert cp.availability(nv, decls["video"])["ltx_audio_in"] == cp.REASON_OK
+
+
+def test_v2_bark_excluded_from_cpu_but_fine_on_cuda():
+    decls = _declarations_by_registry()["audio"]
+    floor = cp.load_profile("cpu_floor")
+    assert cp.availability(floor, decls)["bark"] == cp.REASON_REQUIRES_CUDA
+    nv = cp.load_profile("16gb_full")
+    assert cp.availability(nv, decls)["bark"] == cp.REASON_OK
+
+
+def test_v2_stable_audio_3_lists_mps_but_not_cpu():
+    """The mac_mps tier ships stable_audio_3 as its music engine (Comfy
+    core owns its device layer); the cpu floor keeps musicgen."""
+    decls = _declarations_by_registry()["audio"]
+    row = decls["stable_audio_3"]
+    assert "mps" in row["device_backends"]
+    assert "cpu" not in row["device_backends"]
+    assert "cpu" in decls["musicgen"]["device_backends"]
+
+
+def test_v2_humo_fp8_dependency_is_table_visible():
+    decls = _declarations_by_registry()["video"]
+    assert decls["humo"]["needs_fp8_te"] is True
+    assert decls["humo_14B_169"]["needs_fp8_te"] is True
+    assert decls["humo_1.7B"]["needs_fp8_te"] is False
+
+
 def test_unknown_top_level_key_rejected():
     profile = cp.load_profile("16gb_full")
     bad = copy.deepcopy(profile)
@@ -332,7 +396,14 @@ def test_declaration_unknown_key_rejected():
     with pytest.raises(cp.ProfileError, match="unknown key"):
         cp.validate_declaration("x", {
             "required_toolchain": None,
-            "requires_sidecar": False, "cpu_ok": True, "model_requirements": [],
+            "requires_sidecar": False,
+            "device_backends": ["cuda", "cpu", "mps"],
+            "requires_vendor": None,
+            "needs_fp8_te": False,
+            "needs_fp4_te": False,
+            "practical_without_gpu": True,
+            "sidecar_conditional": False,
+            "model_requirements": [],
             "speed": "fast",
         })
 
@@ -342,13 +413,25 @@ def test_availability_reason_codes():
     # budget gating (the operator's tier JSON owns the OOM budget now).
     decls = {
         "gpu_heavy": {"required_toolchain": None, "requires_sidecar": False,
-                      "cpu_ok": False, "model_requirements": []},
+                      "device_backends": ["cuda"], "requires_vendor": None,
+                      "needs_fp8_te": False, "needs_fp4_te": False,
+                      "practical_without_gpu": False, "sidecar_conditional": False,
+                      "model_requirements": []},
         "side": {"required_toolchain": None, "requires_sidecar": True,
-                 "cpu_ok": False, "model_requirements": []},
+                 "device_backends": ["cuda"], "requires_vendor": None,
+                 "needs_fp8_te": False, "needs_fp4_te": False,
+                 "practical_without_gpu": False, "sidecar_conditional": False,
+                 "model_requirements": []},
         "compiled": {"required_toolchain": "cu128_toolkit", "requires_sidecar": False,
-                     "cpu_ok": False, "model_requirements": []},
+                     "device_backends": ["cuda"], "requires_vendor": None,
+                     "needs_fp8_te": False, "needs_fp4_te": False,
+                     "practical_without_gpu": False, "sidecar_conditional": False,
+                     "model_requirements": []},
         "procgen": {"required_toolchain": None, "requires_sidecar": False,
-                    "cpu_ok": True, "model_requirements": []},
+                    "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+                    "needs_fp8_te": False, "needs_fp4_te": False,
+                    "practical_without_gpu": True, "sidecar_conditional": False,
+                    "model_requirements": []},
     }
     lite = cp.load_profile("8gb_lite")
     avail = cp.availability(lite, decls)

@@ -36,7 +36,7 @@ def test_google_tts_registers_and_capabilities():
     assert eng.voice_ref_field == "provider_voice_id"
     assert eng.missing_ref_fallback is None
     row = R.CAPABILITIES["google_tts"]
-    assert row["cpu_ok"] is True
+    assert "cpu" in row["device_backends"] and row["practical_without_gpu"] is True
     assert row["requires_sidecar"] is False
     assert row["model_requirements"] == []
 
