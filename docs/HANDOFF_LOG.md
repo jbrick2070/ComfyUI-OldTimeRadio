@@ -3,6 +3,32 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-10 ~06:45 -- HEAD d7379920 (v2.0-alpha) [scifi_fable2 coder window]
+
+Did:
+- scifi_fable2 S0 SHIPPED (all inert, doc = 2026-07-10-scifi-fable2-architecture.md):
+  banks.json row before custom_source_bank + fable2_multipass pipeline row
+  (registry-legal slots); 9-seam pack scifi_fable2_v1.json (FORMAT block
+  byte-identical script/revision); frame_deck.json 14 cards + 6 stances +
+  sidecar registration; detection-only story_rules (empty replacements);
+  _otr_fable2_markup.py parser (full defect enum, collected defects, split
+  word counters, per-constituent lines); 66 new tests incl. rss-not-spark,
+  slot-enum rejection, deck lint, science_news pinned row. Doc s14 pins
+  1/5/10 resolved in-doc. science_news untouched; NO workflow diff.
+- COMMIT NOTE: my staged S0 files were swept into the freeze-cascade
+  window's commit d7379920 mid-session (one bundled commit, pushed). Content
+  verified file-by-file; full suite re-certified at that HEAD.
+- Gates at HEAD: suite 7321 passed/31 skipped/1 xfailed; Bug Bible 17/7/3;
+  BOM/AST/JSON verify clean; HEAD == origin.
+Current step: scifi_fable2 S1a -- tail extraction ALONE (writer
+_run_writer_tail(ctx) + WriterTailContext, byte-identity pin
+test_fable2_tail_context.py, ONE legacy science live smoke, then scrub the
+ledger into tests/fixtures/fable2/legacy_reference_ledger.json). Nothing
+fable2-visible ships in S1a.
+Next: fresh coder window claims the slot, reads doc sections 11+13+14, does
+S1a only, then S1b (spine + runnable flip same change).
+Commits: none under my own SHA (work rode d7379920); this docs commit.
+
 ## 2026-07-10 ~02:45 -- HEAD 636d78cf (v2.0-alpha) [original_radio window]
 
 Did (operator overnight directive: "run two more 420w, analyze, optimize

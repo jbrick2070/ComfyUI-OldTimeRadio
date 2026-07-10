@@ -1,13 +1,16 @@
 # OTR Go-Forward Plan
 
-**CODER SLOT CLAIMED: 2026-07-10 (scifi_fable2 S0 window; base `37dba723`).**
-Scope: S0 inert surfaces per docs/2026-07-10-scifi-fable2-architecture.md
-(registry rows, pack, deck, rules, markup parser, tests). No writer/runner/
-workflow edits. Other windows: do not touch nodes/story_packs/*.json,
-nodes/story_rules/scifi_fable2.json, nodes/_otr_fable2_markup.py,
-nodes/_otr_story_routing.py, tests/test_fable2_* until this claim is released.
+**CODER SLOT RELEASED (scifi_fable2 S0 window, 2026-07-10).** S0 SHIPPED --
+inert surfaces per docs/2026-07-10-scifi-fable2-architecture.md section 13
+(registry rows runnable:false/executable:false, 9-seam pack, frame deck +
+sidecar, detection-only rules, markup parser, 66 tests; doc s14 pins 1/5/10
+resolved). Next fable2 step = **S1a: the tail extraction ALONE** (writer
+`_run_writer_tail(ctx)` + byte-identity pin + one legacy science live smoke;
+NOTHING fable2-visible ships in S1a). NOTE: S0's staged files were swept
+into the freeze-cascade window's commit `d7379920` (content verified intact;
+full suite re-certified green at that HEAD: 7321/31/1 + Bug Bible 17/7/3).
 
-**Updated:** 2026-07-10 (early) -- HEAD `1c735c2d` + this docs commit
+**Updated:** 2026-07-10 -- HEAD `d7379920`
 **Branch:** `v2.0-alpha`
 **Status:** original_radio LIVE SMOKE GREEN 2026-07-10 ("Page in the
 Tempest" published to obs). Remaining gate = OPERATOR EYEBALL only ->
