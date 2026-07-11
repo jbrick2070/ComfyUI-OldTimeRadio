@@ -39,7 +39,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: launcher-path boot succeeds; any new boot path asserts UTF-8 env
 - bible-worthy: yes -- Windows console-codec boot killer, hits any custom node that prints unicode at import
 - confidence: MED (sourced from operating-rules doc, no dated incident log)
-- status: OPEN
+- status: PROMOTED BUG-02.15
 
 ## PBUG-20260616-01 -- LTX-AV soak VRAM peak 15.8GB over the 14.5GB cap
 - surfaced: LTX full-episode soak, 2026-06-16 (976ab329)
@@ -49,7 +49,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: full-episode soak VRAM peak check; assert S9 offload state matches the reverted decision
 - bible-worthy: yes -- "the obvious offload fix measurably did nothing" is worth pinning so it isn't retried blind
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-07.17
 
 ## PBUG-20260618-01 -- remote creative slot crashed episode with KeyError
 - surfaced: live run with creative_model='openrouter:slot-a', 2026-06-18
@@ -59,7 +59,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: full episode with a remote slot handle completes, modern prompt used
 - bible-worthy: yes -- exact-match lookup vs non-curated id, recurring trap
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.27
 
 ## PBUG-20260618-02 -- visualizer soak found 4-bug integration cluster
 - surfaced: Task 2 visualizer soak, 2026-06-18 (4a92ed66, 21 clips)
@@ -69,7 +69,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: visualizer soak forcing silent/0-frame beats, status=success
 - bible-worthy: yes -- soak-found cluster, four distinct root causes
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-07.18
 
 ## PBUG-20260620-01 -- published episode bars overlay read the silent source
 - surfaced: obs-final render pipeline, 2026-06-20 (8d7e6604 verification)
@@ -79,7 +79,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: obs final render, assert bars track master audio amplitude
 - bible-worthy: yes -- defect shipped to a published artifact
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-08.07
 
 ## PBUG-20260622-01 -- UnboundLocalError crashed every episode at flag-stamp
 - surfaced: night-soak window, 2026-06-22 (096ef64e)
@@ -89,7 +89,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: end-to-end test exercising the L2/L7 stamp; lint for mid-function shadowed imports
 - bible-worthy: yes -- Python scoping trap invisible to unit tests
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-05.10
 
 ## PBUG-20260622-02 -- announcer coerced to character role, voice engine crash
 - surfaced: live-smoke, 2026-06-22 (ffe23245, "(live-smoke)" tag)
@@ -99,7 +99,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: episode with announcer keyed as ordinary cast id renders clean
 - bible-worthy: yes -- naming-convention trap in role coercion
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-07.19
 
 ## PBUG-20260622-03 -- stage-direction-only character line crashed voice render
 - surfaced: live-smoked fix set, 2026-06-22 (f8a8645e)
@@ -109,7 +109,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: force a stage-direction-only line through; assert recompose path, no crash
 - bible-worthy: yes -- degenerate-content class
 - confidence: MED
-- status: OPEN
+- status: PROMOTED BUG-07.20
 
 ## PBUG-20260623-01 -- refine-loop save failures racing the freeze cascade
 - surfaced: live-smoke, 2026-06-23 (9f29f644)
@@ -119,7 +119,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: repeated refine-loop runs, zero save failures, freeze lands
 - bible-worthy: yes -- race class, easy to reintroduce with future cleanup code
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-12.48
 
 ## PBUG-20260702-01 -- night-queue proof9c: VRAM ceiling breach, zero clips
 - surfaced: overnight night-queue run, 2026-07-02 (4dd79dbe verdict)
@@ -149,7 +149,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: short-duration Sonilo request completes
 - bible-worthy: yes -- cloud-API contract violation class
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-09.05
 
 ## PBUG-20260704-02 -- nano_banana_2 TypeError: string indices must be integers
 - surfaced: live cloud-image coverage sweep, 2026-07-04 (606dc7f1)
@@ -159,7 +159,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: live nano_banana_2 render completes
 - bible-worthy: yes -- dict-vs-string contract mismatch across V3 cloud nodes
 - confidence: MED
-- status: OPEN
+- status: PROMOTED BUG-09.06
 
 ## PBUG-20260709-01 -- distinct Chatterbox voice ids shared one WAV
 - surfaced: all-Chatterbox 30w OBS live smoke, 2026-07-09
@@ -169,7 +169,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: resolve N ids under allow_voice_reuse=False, assert distinct WAV hashes
 - bible-worthy: yes -- no-reuse-gate class for any engine with shared assets
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-07.21
 
 ## PBUG-20260710-01 -- gemma-4 Q8 silent n_ctx downgrade truncated concept JSON
 - surfaced: original_radio live 30w smoke, 2026-07-10
@@ -179,7 +179,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: request n_ctx over capacity, assert raise not downgrade (S1 test should already pin)
 - bible-worthy: yes -- silent-downgrade class, though S1 now kills it globally
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.28
 
 ## PBUG-20260710-02 -- epilogue_missing false-positive killed a roll with outro present
 - surfaced: original_radio live smoke hardening, 2026-07-10
@@ -189,7 +189,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: fixture with outro row at retargeted slot, assert no false kill
 - bible-worthy: check overlap with BUG-11.26 family at fan-out (this commit was NOT in the four folded into 11.26)
 - confidence: MED
-- status: OPEN
+- status: PROMOTED (folded into BUG-11.26 law d, no new entry)
 
 ## PBUG-20260710-03 -- QA judge "proved" a violation by quoting clean text
 - surfaced: original_radio 420w night batch Roll A, 2026-07-10
@@ -206,7 +206,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: construct a P3 reroll, assert strict role alternation
 - bible-worthy: yes -- chat-template alternation, easy to reintroduce in any lane
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.29
 
 ## PBUG-20260710-05 -- fable2 casting JSON truncated at 1000-token budget
 - surfaced: scifi_fable2 30w live smoke roll 18, 2026-07-10
@@ -216,7 +216,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: near-ceiling casting payload completes without the salvage path firing
 - bible-worthy: yes -- token-ceiling truncation-then-salvage class, already recurred cross-lane
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.30
 
 ## PBUG-20260710-06 -- fable2 word-band exhaustion: proportional band too narrow at small targets
 - surfaced: scifi_fable2 30w live smoke roll 17, 2026-07-10
@@ -226,7 +226,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: unit test _word_band at target=30, absolute floor governs
 - bible-worthy: yes -- same defect class flagged UNFIXED in original_radio P1-1; not yet generalized
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.31
 
 ## PBUG-20260710-07 -- fable2 announcer row silently mutated to character+skip, reason null
 - surfaced: scifi_fable2 30w live smoke roll 22, 2026-07-10
@@ -236,7 +236,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: trace/assert every cast-keyed mutation path; no path may flip announcer without stamping a reason
 - bible-worthy: yes, HIGH PRIORITY -- silent data corruption with unresolved root cause
 - confidence: MED
-- status: OPEN (ROOT CAUSE OPEN)
+- status: PROMOTED BUG-11.32 (ROOT CAUSE OPEN)
 
 ## PBUG-20260710-08 -- fable2 injected fictional character into the real-news read
 - surfaced: scifi_fable2 30w live smoke roll 9, 2026-07-10
@@ -246,7 +246,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: fixture with fictional name in read output, assert gate rejects with repair prompt
 - bible-worthy: yes -- fiction/fact bleed class, distinct from verbatim grounding
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.33
 
 ## PBUG-20260710-09 -- fable2 CODA terminal punctuation killed a clean draft
 - surfaced: scifi_fable2 30w live smoke roll 15, 2026-07-10
@@ -256,7 +256,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: CODA ending '.' normalizes before parse, no false kill
 - bible-worthy: yes -- structural-punctuation-as-parser-key class; original_radio P2-2 flags same risk
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.34
 
 ## PBUG-20260710-10 -- scifi bake-off canonical smoke halted at Codex P0: source-span mismatch
 - surfaced: first scifi_codex canonical 30w live smoke (roll 2a), 2026-07-10
@@ -266,7 +266,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: offset-span fixture converges within the repair ladder budget
 - bible-worthy: yes -- evidence-span contract class, cross-lane by construction
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.35
 
 ## PBUG-20260711-01 -- scifi bake-off Codex P0: evidence-ID shape F0/F1 vs required F01/F02
 - surfaced: scifi bake-off canonical 30w smoke roll 2b, 2026-07-10/11
@@ -276,7 +276,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: fixture returning unpadded IDs, assert repair converges to padded shape within budget; pin pad width in schema tests
 - bible-worthy: yes -- ID-shape contract drift, second member of the P0-contract class with PBUG-20260710-10
 - confidence: HIGH
-- status: OPEN (roll 3 exposed the NEXT defect rather than hiding it -- see PBUG-20260711-02)
+- status: PROMOTED BUG-11.36 (roll 3 exposed the NEXT defect rather than hiding it -- see PBUG-20260711-02)
 
 ## PBUG-20260711-02 -- scifi bake-off Codex P0: correct ID, wrong quote offsets (span-integrity)
 - surfaced: scifi bake-off canonical 30w smoke roll 3, 2026-07-11
@@ -286,7 +286,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: offset-shifted exact-quote fixture reindexes deterministically; ID normalizer pins F0 -> F01 (NOT F00 -- an actual test defect caught during this fix); dialogue field asserted byte-identical through repair
 - bible-worthy: yes -- completes the P0 evidence-contract trilogy (span fidelity / ID shape / offset integrity); strong class entry at fan-out
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.37
 
 ## PBUG-20260711-03 -- Codex creative score pass returned legacy Markdown shape
 - surfaced: scifi bake-off canonical 30w smoke, Codex P3, 2026-07-11
@@ -296,7 +296,7 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: capture a typed pass prompt for each lane and assert the schema's required top-level keys are named; live smoke must reach the next pass without legacy-key drift
 - bible-worthy: yes -- live structured-output contract failure, with cross-lane prevention
 - confidence: HIGH
-- status: OPEN
+- status: PROMOTED BUG-11.38
 
 ## PBUG-20260711-04 -- Codex P0 used a full quote with truncated or wrong source field metadata
 - surfaced: scifi bake-off canonical 30w smoke, Codex P0, 2026-07-11
@@ -317,3 +317,10 @@ already promoted). Confidence tags preserved from the sweep.
 - bible-worthy: yes -- shared structured-call integrity defect across source packs
 - confidence: HIGH
 - status: OPEN
+
+## FAN-OUT RECORD -- 2026-07-11 (operator-triggered)
+23 entries promoted to the Bible (156 -> 179) @ survival-guide commit d50d773;
+1 folded into BUG-11.26 law d (epilogue false-kill class); suite 17 passed /
+7 skipped / 3 xfailed green; all 23 as non-testable notes (runtime-only
+verifies), per the existing note pattern. Held OPEN: PBUG-20260702-01 (no
+root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
