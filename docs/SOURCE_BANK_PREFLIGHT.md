@@ -89,9 +89,24 @@ line* -- it does **not** mean "no second chance."
 Beat -> shot -> scene -> line -> char. Walk the graph in a unit test. A dangling id dies
 in the render, twenty minutes later.
 
+**2.7 Do your creative rolls draw OS entropy?**
+Creative RNGs must not seed themselves. Reproducibility comes ONLY from the
+`OTR_CAST_SEED` / `OTR_STYLE_SEED` env overrides. A pack that plants its own fixed seed
+ships the same episode forever -- and looks perfectly healthy in every test.
+
 ---
 
 ## GATE 3 -- after R3 (wiring). The arithmetic nobody does.
+
+**3.0 Is your pack actually WIRED?**
+Code that is not reachable from `workflows/otr_canonical.json` (plus the bank registry) is
+dead, however good it is.
+- Killed us: a node and a new blend input shipped, tested green, and ran **dormant in
+  production** -- nobody had wired it (2026-06-13).
+- Run `OTR_WorkflowValidator`, then audit widget-count vs live `INPUT_TYPES` and link
+  referential integrity. `widgets_values` is POSITIONAL: only ever APPEND a new optional
+  widget at the END -- inserting mid-list silently shifts every saved value
+  (BUG-LOCAL-097).
 
 **3.1 Does your prompt FIT?**
 `context_cap` is 8192. `max_input_tokens = context_cap - max_new_tokens`. If your prompt

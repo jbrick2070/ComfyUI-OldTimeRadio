@@ -92,7 +92,7 @@ You fill it through the `Ledger` object (`nodes/production_ledger.py`):
 | `led.set_scenes(rows)` | `scene_id`, `env`, `description` | yes (>=1) |
 | `led.set_shots(rows)` | `shot_id`, `scene_id`, `description`, `visual_prompt` | yes (>=1) |
 | `led.set_beats(rows)` | `beat_id`, `shot_id`, `scene_id`, `char_id`, `line_ids` | yes |
-| `led.set_music(rows)` | `cue_id`, `placement`, `description`, `generation_prompt` | yes |
+| `led.set_music(rows)` | `cue_id`, `placement`, `description`, `generation_prompt` | if your form has music -- an empty list is legal, the render tail supports a silent bus |
 
 **The table is plumbing, not dramaturgy.** It looks like a film crew's anatomy -- scenes,
 shots, beats -- because the render tail downstream consumes those rows. Do not mistake it
@@ -140,11 +140,16 @@ The listener is in the dark. They cannot see a title card, a set, or a face. If 
 tells them where they are, they spend the first half of your episode working it out instead
 of feeling it.
 
-**The hard rule: at some point, the announcer must GROUND the story.** Give the listener
+**The hard rule: at some point, some voice must GROUND the story.** Give the listener
 context for what they are hearing, and bring them back out at the end. An episode that
 simply *begins* -- mid-argument, unlocated, unexplained -- does not admit anyone into a
 story. It just starts one, and leaves the listener outside it. (We shipped exactly that
 episode. It was technically perfect and dramatically inert.)
+
+The announcer is the classic instrument for this, and if your cast has one, grounding is
+its job. But the law is the *grounding*, not the role: a pack with no announcer is legal,
+provided some voice still does that work -- a diegetic frame, a narrator inside the story,
+a letter read aloud. Invent the instrument. Just do not skip the note.
 
 *Where* the grounding falls, and what shape it takes, is yours. Nothing requires it to come
 first: opening cold -- mid-scene, mid-sentence, the listener lost for a moment -- is a
