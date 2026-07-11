@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 
 _PADDED_ID = re.compile(r"^(?P<prefix>[FEN])(?P<number>\d{1,2})$")
+_SOURCE_FIELDS = ("headline", "summary", "full_text", "seed_text")
 
 
 def _occurrences(text: str, needle: str) -> list[int]:
@@ -86,12 +87,28 @@ def repair_literal_source_metadata(
                 quote = node.get("quote")
                 start = node.get("start")
                 source = payload.get(field) if isinstance(field, str) else None
-                if isinstance(source, str) and isinstance(quote, str) and isinstance(start, int):
-                    if source[start:node.get("end", start)] != quote:
-                        positions = _occurrences(source, quote)
-                        if not positions:
-                            raise ValueError(f"quote is not literal in payload[{field!r}]")
-                        new_start = min(positions, key=lambda position: abs(position - start))
+                if isinstance(quote, str) and isinstance(start, int):
+                    same_field_positions = (
+                        _occurrences(source, quote)
+                        if isinstance(source, str) else []
+                    )
+                    if same_field_positions:
+                        candidate_fields = [(field, same_field_positions)]
+                    else:
+                        candidate_fields = [
+                            (candidate, positions)
+                            for candidate in _SOURCE_FIELDS
+                            if isinstance(payload.get(candidate), str)
+                            and (positions := _occurrences(payload[candidate], quote))
+                        ]
+                        if len(candidate_fields) != 1:
+                            raise ValueError(
+                                f"quote is absent or ambiguous in source payload for field {field!r}"
+                            )
+                    corrected_field, positions = candidate_fields[0]
+                    new_start = min(positions, key=lambda position: abs(position - start))
+                    if node.get("field") != corrected_field or node.get("start") != new_start or node.get("end") != new_start + len(quote):
+                        node["field"] = corrected_field
                         node["start"] = new_start
                         node["end"] = new_start + len(quote)
                         changed = True

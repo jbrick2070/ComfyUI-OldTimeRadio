@@ -32,6 +32,21 @@ def test_repair_refuses_paraphrased_quote():
     assert repair_literal_source_metadata(raw, FactIndexV4, payload, zero_padded_ids=True) is None
 
 
+def test_repair_rehomes_exact_quote_only_when_field_label_is_wrong():
+    payload = {"headline": "short title", "full_text": "full literal evidence here"}
+    raw = (
+        '{"facts":[{"fact_id":"F0","claim":"claim",'
+        '"source_spans":[{"field":"headline","start":0,"end":6,'
+        '"quote":"full literal evidence here"}]}],"entities":[],"numbers":[],'
+        '"tone":"measured","payload_sha256":"digest"}'
+    )
+    repaired = repair_literal_source_metadata(raw, FactIndexV4, payload, zero_padded_ids=True)
+    assert repaired is not None
+    span = repaired.facts[0].source_spans[0]
+    assert span.field == "full_text"
+    assert payload[span.field][span.start:span.end] == span.quote
+
+
 def test_all_lane_schema_seams_name_exact_top_level_keys():
     assert "facts" in codex_schema_instruction(FactIndexV4)
     assert "facts" in gemini_schema_instruction(FactIndexV4)
