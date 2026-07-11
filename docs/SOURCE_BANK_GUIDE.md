@@ -1,4 +1,4 @@
-# Writing your own OTR source pack
+# The OTR Source Bank Guide
 
 > **Your pack can do whatever it wants, as long as it fills the ledger and uses the LLMs
 > obediently to make the best ledger story it can.**
@@ -175,7 +175,7 @@ Failing that test, it is a **note**: record it, log it, stamp it on `meta`, and 
 If your gate cannot name the offending item AND the reason AND a way to fix it, it is not
 a gate.
 
-*(The graveyard of gates that broke this rule is in `SOURCE_PACK_PREFLIGHT.md`. Read it
+*(The graveyard of gates that broke this rule is in `SOURCE_BANK_PREFLIGHT.md`. Read it
 when you have finished designing -- not now.)*
 
 ---
@@ -234,7 +234,7 @@ do. Make your validators role-aware, or do not give your roles different contrac
 Design freely first. Build the thing you actually want to hear. **Then**, once you have
 designed it (R1), coded it (R2) and wired it (R3), walk the pre-flight:
 
-> **`docs/SOURCE_PACK_PREFLIGHT.md`**
+> **`docs/SOURCE_BANK_PREFLIGHT.md`**
 
 That is where every bug this pipeline has ever died of is written down, as a checklist you
 run at the gates. It is deliberately NOT in this document: a list of failure modes read

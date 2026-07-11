@@ -1,4 +1,4 @@
-# Source-pack pre-flight -- read this LAST, not first
+# Source-bank pre-flight -- read this LAST, not first
 
 **Do not read this while you are designing.** It is a list of ways episodes have actually
 died, and if you carry it into a blank page you will build something defensive and dull.
@@ -13,7 +13,7 @@ Then, when you have:
 ...come back here and walk the gauntlet. Every item below is a real corpse. Each one cost
 a 15-minute render, and most of them were invisible to the unit tests.
 
-Companion docs: `WRITING_YOUR_OWN_SOURCE_PACK.md` (the contract),
+Companion docs: `SOURCE_BANK_GUIDE.md` (the contract),
 `docs/PROD_BUG_LOG.md` (every live failure, dated), and the Bug Bible in the
 `comfyui-custom-node-survival-guide` repo (the cross-project classes).
 
