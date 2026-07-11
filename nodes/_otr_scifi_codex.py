@@ -464,7 +464,9 @@ def invoke_codex_structured(
                 "validation error. Every required nested graph field must be present. Copy "
                 "parent scene_id into each shot and beat, copy a valid shot_id into each beat, "
                 "copy each beat's speaker from the cast row matching its char_id, and provide "
-                "every required visual_prompt without dropping existing content."
+                "every required visual_prompt without dropping existing content. For every "
+                "script line, set boundary to shot_start for the first line in a shot, "
+                "beat_start for the first line in a beat, or continue otherwise."
             )
         return [
             {"role": "system", "content": "\n".join(seams) + schema_instruction + "\n" + repair_rules},
