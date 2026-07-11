@@ -35,7 +35,10 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # S5 platform-portability (2026-07-10): OLD pin 278 -> NEW pin 279 (link
     # 279 = OTR_WorkflowValidator.validation_report -> node-1 gate_in; this
     # file's link IDs 85/92-side are unaffected, only the vector's ceiling).
-    assert wf["last_link_id"] == 279
+    # 720-bakeoff C3 (2026-07-11): music cue fanout added links 280-283 (node
+    # 83 -> nodes 3/7), so the ceiling is now 283; the 85/92 SFX-manifest link
+    # IDs below are untouched.
+    assert wf["last_link_id"] == 283
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",

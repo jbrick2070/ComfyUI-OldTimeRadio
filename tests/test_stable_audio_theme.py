@@ -80,9 +80,11 @@ def test_input_types_widget_vector_exact():
     # stereo_policy surface removed 2026-07-04 (widget-audit Batch 1); single
     # option "mono_safe" -- the generate() kwarg still defaults to "mono_safe".
     assert _serialized_slots(it) == ["engine"]
-    for name in ("opening_theme_audio", "closing_theme_audio",
-                 "interstitial_theme_audio", "done"):
-        assert name in T.RETURN_NAMES
+    # 720-bakeoff C3: the 3-AUDIO opening/closing/interstitial surface is
+    # retired -- ONE cue batch + manifest + render_log + done.
+    assert T.RETURN_NAMES == (
+        "cue_audio_clips", "cue_manifest_json", "render_log", "done")
+    assert T.RETURN_TYPES == ("AUDIO", "STRING", "STRING", "STRING")
 
 
 def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
@@ -119,18 +121,75 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
 
 
 def test_musicgen_clip_renders_three_cues(monkeypatch):
+    """Legacy lane (no ledger.music[]): SYNTHESIZE the 3 fixed cues into ONE
+    padded batch + a manifest with one row per cue (720-bakeoff C3)."""
     from nodes._otr_resolved_request import assert_audio_batch_contract
+    from nodes import _otr_cue_manifest as CM
     from nodes.stable_audio_theme import StableAudioTheme
 
     calls = []
     _stub_musicgen_generate_clip(monkeypatch, calls)
     out = StableAudioTheme().generate(script_json=_ledger(), engine="musicgen")
-    assert isinstance(out, tuple) and len(out) == 5
+    assert isinstance(out, tuple) and len(out) == 4
     assert len(calls) == 3  # opening / closing / interstitial via _render_clips
-    for i in range(3):
-        assert_audio_batch_contract(out[i], where=f"test.cue{i}")
-    assert isinstance(out[3], str)
-    assert out[4].startswith("music:done")
+    cue_audio, manifest_json, render_log, done = out
+    assert_audio_batch_contract(cue_audio, where="test.cue_batch")
+    assert int(cue_audio["waveform"].shape[0]) == 3   # 3 batch rows
+    manifest = CM.parse_manifest(manifest_json, batch_size=3)
+    assert manifest is not None
+    placements = sorted(r["placement"] for r in manifest["cues"])
+    assert placements == ["closing", "interstitial", "opening"]
+    cue_ids = sorted(r["cue_id"] for r in manifest["cues"])
+    assert cue_ids == ["closing", "interstitial", "opening"]
+    # every row maps to a real batch index + positive sample_count
+    for r in manifest["cues"]:
+        assert 0 <= r["batch_index"] < 3
+        assert r["sample_count"] > 0
+        assert r["cue_spec_sha256"] is None       # synth cue, no ledger row
+        assert r["anchor_line_id"] is None
+    assert isinstance(render_log, str)
+    assert done.startswith("music:done")
+    assert "cues=3" in done
+
+
+def test_fable2_music_rows_render_by_cue_id(monkeypatch):
+    """fable2 lane: one clip per authored ledger.music[] row, keyed by cue_id,
+    carrying its placement + anchor_line_id into the manifest (720-bakeoff C3).
+    inter_NN maps to placement 'interstitial' (MF-B: never a KeyError)."""
+    import json
+
+    from nodes import _otr_cue_manifest as CM
+    from nodes.stable_audio_theme import StableAudioTheme
+
+    calls = []
+    _stub_musicgen_generate_clip(monkeypatch, calls)
+    ledger = json.dumps({
+        "schema_version": "l3-2026-05-14",
+        "cast": [], "lines": [], "meta": {},
+        "music": [
+            {"cue_id": "opening", "placement": "opening",
+             "anchor_line_id": "shot_000_music",
+             "generation_prompt": "slow open", "target_duration_s": 12.0},
+            {"cue_id": "inter_01", "placement": "interstitial",
+             "anchor_line_id": "shot_001_music",
+             "generation_prompt": "bridge", "target_duration_s": 4.0},
+            {"cue_id": "closing", "placement": "closing",
+             "anchor_line_id": "shot_002_music",
+             "generation_prompt": "resolve", "target_duration_s": 8.0},
+        ],
+    })
+    out = StableAudioTheme().generate(script_json=ledger, engine="musicgen")
+    assert len(calls) == 3
+    # authored prompts pass through verbatim (composer NOT invoked)
+    assert {c["prompt"] for c in calls} == {"slow open", "bridge", "resolve"}
+    manifest = CM.parse_manifest(out[1], batch_size=3)
+    by_cue = CM.index_by_cue_id(manifest)
+    assert set(by_cue) == {"opening", "inter_01", "closing"}
+    assert by_cue["inter_01"]["placement"] == "interstitial"
+    assert by_cue["inter_01"]["anchor_line_id"] == "shot_001_music"
+    # anchor index is intact for the sequencer's boundary resolution
+    by_anchor = CM.index_by_anchor_line_id(manifest)
+    assert by_anchor["shot_001_music"]["cue_id"] == "inter_01"
 
 
 def test_musicgen_clip_prompt_from_meta_brief(monkeypatch):

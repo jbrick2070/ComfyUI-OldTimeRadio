@@ -241,14 +241,30 @@ def test_audio_nodes_ledger_from_castlock(by_id, links_by_id):
         assert _src(links_by_id, link) == (80, 0)
 
 
-def test_theme_cue_fanout_by_name(by_id, links_by_id):
-    """opening_theme_audio -> EpisodeAssembler; closing_theme_audio ->
-    EpisodeAssembler AND SignalLost (mutation-rigor on the closing fanout)."""
+def test_music_cue_fanout_by_name(by_id, links_by_id):
+    """720-bakeoff C3: node 83 emits ONE padded cue batch + a manifest.
+    cue_audio_clips fans out to SceneSequencer + EpisodeAssembler
+    (music_cue_audio); cue_manifest_json fans out to both
+    (music_cue_manifest_json). The legacy opening/closing theme links
+    (241/242/243) are GONE, and node 7's opening/closing + node 12's
+    closing_audio inputs stay DECLARED but unlinked (BUG-LOCAL-097)."""
     theme = by_id[83]
-    opening = [_dst(links_by_id, by_id, i) for i in _out_links(theme, "opening_theme_audio")]
-    assert opening == [(7, "opening_theme_audio")]
-    closing = sorted(_dst(links_by_id, by_id, i) for i in _out_links(theme, "closing_theme_audio"))
-    assert closing == [(7, "closing_theme_audio"), (12, "closing_audio")]
+    names = [o.get("name") for o in theme.get("outputs") or []]
+    assert names == ["cue_audio_clips", "cue_manifest_json", "render_log", "done"]
+    audio = sorted(
+        _dst(links_by_id, by_id, i) for i in _out_links(theme, "cue_audio_clips"))
+    assert audio == [(3, "music_cue_audio"), (7, "music_cue_audio")]
+    manifest = sorted(
+        _dst(links_by_id, by_id, i) for i in _out_links(theme, "cue_manifest_json"))
+    assert manifest == [
+        (3, "music_cue_manifest_json"), (7, "music_cue_manifest_json")]
+    # Legacy theme links retired; declarations kept + unlinked.
+    assert 241 not in links_by_id
+    assert 242 not in links_by_id
+    assert 243 not in links_by_id
+    assert _in_link(by_id[7], "opening_theme_audio") is None
+    assert _in_link(by_id[7], "closing_theme_audio") is None
+    assert _in_link(by_id[12], "closing_audio") is None
 
 
 def test_scene_sequencer_audio_inputs(by_id, links_by_id):

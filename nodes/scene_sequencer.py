@@ -669,6 +669,25 @@ class SceneSequencer:
                     "tooltip": "Shift all dialogue clips on the timeline (ms). "
                                "Positive = delay, negative = advance."
                 }),
+                # 720-bakeoff C3: the music bus. The theme node (node 83) emits
+                # ALL cues in ONE padded AUDIO batch + a manifest that maps each
+                # batch row to a cue. The sequencer inserts INTERSTITIAL cues
+                # inline at their music_inter boundary line (resolved by
+                # anchor_line_id); opening/closing are prepended/appended by
+                # EpisodeAssembler. Optional -- legacy lanes leave both unwired
+                # and every music line stays a passthrough (byte-parity).
+                "music_cue_audio": ("AUDIO", {
+                    "tooltip": "Padded AUDIO batch of every music cue from "
+                               "OTR_StableAudioTheme. Sliced per manifest "
+                               "sample_count; never the padded tail."
+                }),
+                "music_cue_manifest_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "forceInput": True,
+                    "tooltip": "Cue manifest JSON from OTR_StableAudioTheme "
+                               "(maps cue_id/anchor_line_id -> batch row)."
+                }),
             },
         }
 
@@ -713,7 +732,8 @@ class SceneSequencer:
                  tts_audio_clips=None,
                  announcer_audio_clips=None,
                  start_line=0, end_line=999, output_dir=DEFAULT_OUT,
-                 dialogue_offset_ms=0.0):
+                 dialogue_offset_ms=0.0,
+                 music_cue_audio=None, music_cue_manifest_json=""):
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")
         # Schema l3 (2026-04-28): track wall-clock for meta.phase_ms.scene_sequencer.
@@ -770,6 +790,30 @@ class SceneSequencer:
             "[SceneSequencer] Pre-rendered clips: %d TTS, %d ANNOUNCER",
             len(tts_clips), len(announcer_clips),
         )
+
+        # 720-bakeoff C3: the music bus. Parse the cue manifest (fail-loud on
+        # a malformed non-empty manifest; "" -> None = no music bus wired).
+        # Only INTERSTITIAL cues are inserted inline here, at their music_inter
+        # boundary line, resolved by anchor_line_id -- opening/closing are the
+        # EpisodeAssembler's job. music_positions records each inserted cue in
+        # SCENE-AUDIO space for the ledger.music[] write-back below.
+        from . import _otr_cue_manifest as _CM
+        _music_manifest = _CM.parse_manifest(music_cue_manifest_json)
+        _music_by_anchor = (
+            _CM.index_by_anchor_line_id(_music_manifest) if _music_manifest else {}
+        )
+        _music_batch_wf = None
+        _music_batch_sr = None
+        if _music_manifest is not None and music_cue_audio is not None:
+            if isinstance(music_cue_audio, dict):
+                _music_batch_wf = music_cue_audio.get("waveform")
+                _music_batch_sr = int(
+                    music_cue_audio.get("sample_rate")
+                    or _music_manifest.get("sample_rate"))
+            else:
+                _music_batch_wf = music_cue_audio
+                _music_batch_sr = int(_music_manifest.get("sample_rate"))
+        _music_positions: list[dict] = []
 
         # We accumulate silence/audio segments as numpy arrays
         sample_rate = 48000  # standardize output
@@ -852,11 +896,51 @@ class SceneSequencer:
             # -- LEDGER ROLE DISPATCH --------------------------------------
 
             if item_type == "music":
-                # Passthrough -- music_open / music_close / music_inter
-                # lines retain whatever the writer initialized them
-                # with (start_s=None, dur_s=None). EpisodeAssembler /
-                # MusicGen handle music timing downstream.
                 line_id_for_log = item.get("line_id") or "?"
+                # 720-bakeoff C3: INTERSTITIAL cues are inserted inline on the
+                # THIRD (music) bus -- own index, never touches the announcer /
+                # character clip counts (MF-F). Resolve the boundary sentinel
+                # line (which carries NO cue_id) to its cue by anchor_line_id
+                # (MF-C), slice the cue out of the padded batch by its manifest
+                # sample_count (MF-G: direct slice, no silence-trim), and
+                # resample the manifest rate -> 48000 before insertion.
+                _cue_row = (
+                    _music_by_anchor.get(str(line_id_for_log))
+                    if (speaker_role == "music_inter" and _music_by_anchor
+                        and _music_batch_wf is not None)
+                    else None
+                )
+                if _cue_row is not None:
+                    _bi = int(_cue_row["batch_index"])
+                    _sc = int(_cue_row["sample_count"])
+                    _cue_slice = _music_batch_wf[_bi, :, :_sc]
+                    _cue_np = _cue_slice.detach().cpu().numpy().squeeze()
+                    _cue_np = _resample_audio(
+                        _cue_np, int(_music_batch_sr), sample_rate)
+                    _seg_len = len(_cue_np)
+                    if _seg_len > 0:
+                        all_segments.append(_cue_np.astype(np.float32))
+                        _music_positions.append({
+                            "anchor_line_id": str(line_id_for_log),
+                            "cue_id": _cue_row.get("cue_id"),
+                            "start_s": float(current_sample_pos) / float(sample_rate),
+                            "dur_s": float(_seg_len) / float(sample_rate),
+                            "shot_id": item.get("shot_id"),
+                        })
+                        current_sample_pos += _seg_len
+                    render_log.append(
+                        f"[{global_idx}] MUSIC insert (inter): "
+                        f"{_cue_row.get('cue_id')} {_seg_len} samples"
+                    )
+                    log.info(
+                        "[SceneSequencer] inserted interstitial music %s "
+                        "(anchor=%s) %d samples",
+                        _cue_row.get("cue_id"), line_id_for_log, _seg_len,
+                    )
+                    continue
+                # Passthrough -- music_open / music_close (EpisodeAssembler
+                # prepends/appends the theme audio) and any music_inter with
+                # no manifest cue (legacy lanes: byte-parity preserved).
                 log.info(
                     "[SceneSequencer] passthrough music line %s (role=%s)",
                     line_id_for_log, speaker_role,
@@ -1044,6 +1128,28 @@ class SceneSequencer:
                     # deleted ledger.sfx[] mirror walk lives in git
                     # history.)
 
+                    # 720-bakeoff C3: write the inserted INTERSTITIAL cue
+                    # timings back to ledger.music[] in SCENE-AUDIO space
+                    # (matched by anchor_line_id). EpisodeAssembler shifts
+                    # these scene_audio rows to master_mix (MF-H) and then
+                    # mirrors them into ledger.lines[] for visual coverage.
+                    _music_positioned = 0
+                    if _music_positions:
+                        _by_anchor = {
+                            p["anchor_line_id"]: p for p in _music_positions
+                        }
+                        for _mrow in (_led.get("music") or []):
+                            _p = _by_anchor.get(
+                                str(_mrow.get("anchor_line_id") or ""))
+                            if _p is None:
+                                continue
+                            _mrow["start_s"] = float(_p["start_s"])
+                            _mrow["dur_s"] = float(_p["dur_s"])
+                            _mrow["start_s_space"] = "scene_audio"
+                            if _p.get("shot_id") and not _mrow.get("shot_id"):
+                                _mrow["shot_id"] = _p["shot_id"]
+                            _music_positioned += 1
+
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     )
@@ -1053,9 +1159,9 @@ class SceneSequencer:
                     log.info(
                         "[SceneSequencer] schema-l3 ledger update: phase_ms=%d "
                         "gate=post_scene_sequencer dur=%.1fs "
-                        "lines_positioned=%d/%d",
+                        "lines_positioned=%d/%d music_inter_positioned=%d",
                         _phase_ms, total_sec,
-                        _matched, len(dialogue_positions),
+                        _matched, len(dialogue_positions), _music_positioned,
                     )
         except Exception as _meta_exc:
             log.warning(
@@ -1115,17 +1221,56 @@ class EpisodeAssembler:
                     "default": 500, "min": 0, "max": 3000, "step": 100,
                     "tooltip": "Crossfade between theme and content"
                 }),
+                # 720-bakeoff C3: the music bus. When a manifest is wired, the
+                # opening/closing themes are sliced out of this padded batch
+                # (by sample_count) and fed through the SAME segment/crossfade
+                # machinery as the legacy opening_theme_audio/closing_theme_audio
+                # inputs -- which stay DECLARED but unlinked (BUG-LOCAL-097
+                # widget-slot-drift guard). Legacy lanes (no manifest) fall back
+                # to the theme inputs untouched.
+                "music_cue_audio": ("AUDIO", {
+                    "tooltip": "Padded AUDIO batch of every music cue from "
+                               "OTR_StableAudioTheme."
+                }),
+                "music_cue_manifest_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "forceInput": True,
+                    "tooltip": "Cue manifest JSON from OTR_StableAudioTheme "
+                               "(maps placement -> batch row)."
+                }),
             },
         }
 
     def assemble(self, scene_audio, episode_title,
                  opening_theme_audio=None, closing_theme_audio=None,
                  opening_duration_sec=10.0, closing_duration_sec=8.0,
-                 crossfade_ms=500):
+                 crossfade_ms=500,
+                 music_cue_audio=None, music_cue_manifest_json=""):
 
         # Schema l3: phase wall-clock for meta.phase_ms.episode_assembler.
         import time as _time
         _phase_t0 = _time.time()
+
+        # 720-bakeoff C3: prefer the manifest path. Slice the opening/closing
+        # cues out of the padded batch and bind them to the SAME local vars the
+        # legacy theme inputs use, so every downstream segment / crossfade /
+        # BUG-106 shift / placement / mirror step below is unchanged. "" ->
+        # None means no music bus is wired (legacy) -> theme inputs are used.
+        from . import _otr_cue_manifest as _CM
+        _cue_manifest = _CM.parse_manifest(music_cue_manifest_json)
+        if _cue_manifest is not None and music_cue_audio is not None:
+            _by_placement: dict = {}
+            for _r in _cue_manifest.get("cues", []):
+                _by_placement.setdefault(_r["placement"], _r)
+            _op = self._cue_from_batch(
+                music_cue_audio, _cue_manifest, _by_placement.get("opening"))
+            _cl = self._cue_from_batch(
+                music_cue_audio, _cue_manifest, _by_placement.get("closing"))
+            if _op is not None:
+                opening_theme_audio = _op
+            if _cl is not None:
+                closing_theme_audio = _cl
 
         # Extract main scene waveform
         if isinstance(scene_audio, dict):
@@ -1391,6 +1536,30 @@ class EpisodeAssembler:
                                 _cl["start_s"] = float(_cl["start_s"]) + _shift_s
                                 _cl["start_s_space"] = "master_mix"
                                 _shifted_clips += 1
+
+                        # 720-bakeoff C3 (MF-H): the SceneSequencer inserts
+                        # INTERSTITIAL music cues inline and writes their timing
+                        # to ledger.music[] in scene_audio space. Shift those
+                        # rows to master_mix by the SAME offset as lines/clips,
+                        # BEFORE the music placement + mirror loops below, so the
+                        # interstitials land at the right master-timeline spot
+                        # and get mirrored into ledger.lines[] for video
+                        # coverage (opening/closing are stamped directly below).
+                        _shifted_music = 0
+                        for _mrow in (_led.get("music") or []):
+                            if (
+                                _mrow.get("start_s_space") == "scene_audio"
+                                and isinstance(_mrow.get("start_s"), (int, float))
+                            ):
+                                _mrow["start_s"] = float(_mrow["start_s"]) + _shift_s
+                                _mrow["start_s_space"] = "master_mix"
+                                _shifted_music += 1
+                        if _shifted_music:
+                            log.info(
+                                "[EpisodeAssembler] BUG-106/C3 music shift: "
+                                "+%.3fs applied to %d interstitial cue(s)",
+                                _shift_s, _shifted_music,
+                            )
 
                     # BUG-LOCAL-107: stamp the music cue placements.
                     # Opening theme starts at master t=0 and ends at
@@ -1720,6 +1889,33 @@ class EpisodeAssembler:
             "[EpisodeAssembler] emit audio_done signal: %s", audio_done,
         )
         return (audio_out, output_path, info, audio_done)
+
+    @staticmethod
+    def _cue_from_batch(music_cue_audio, manifest, row):
+        """Slice one cue out of the padded music batch as a standalone AUDIO
+        dict (by manifest sample_count -- never the padded tail, MF-G). Returns
+        None when the row is absent or the batch index is out of range."""
+        if row is None:
+            return None
+        wf = (
+            music_cue_audio.get("waveform")
+            if isinstance(music_cue_audio, dict) else music_cue_audio
+        )
+        if wf is None:
+            return None
+        try:
+            batch_index = int(row["batch_index"])
+            sample_count = int(row["sample_count"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if batch_index < 0 or batch_index >= int(wf.shape[0]):
+            return None
+        sliced = wf[batch_index:batch_index + 1, :, :sample_count]  # [1, C, sc]
+        sliced = sliced.clone() if hasattr(sliced, "clone") else sliced
+        return {
+            "waveform": sliced,
+            "sample_rate": int(manifest.get("sample_rate")),
+        }
 
     def _extract_waveform(self, audio, target_sr=None):
         """Extract waveform tensor from AUDIO input, resampling to target_sr if needed.

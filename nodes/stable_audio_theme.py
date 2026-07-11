@@ -64,11 +64,12 @@ class StableAudioTheme:
 
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"
-    RETURN_TYPES = ("AUDIO", "AUDIO", "AUDIO", "STRING", "STRING")
-    RETURN_NAMES = (
-        "opening_theme_audio", "closing_theme_audio", "interstitial_theme_audio",
-        "render_log", "done",
-    )
+    # 720-bakeoff C3: ONE padded AUDIO batch of ALL cues + the manifest that
+    # maps each batch row back to a cue (opening / closing / interstitial,
+    # fable2 authored cues included). The old three-AUDIO opening/closing/
+    # interstitial surface is retired -- consumers slice by manifest sample_count.
+    RETURN_TYPES = ("AUDIO", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("cue_audio_clips", "cue_manifest_json", "render_log", "done")
     OUTPUT_NODE = False
 
     @classmethod
@@ -130,12 +131,15 @@ class StableAudioTheme:
                  stereo_policy="mono_safe"):
         from ._otr_audio_engines import (
             EngineUnusable, EngineUsabilityReason, assert_usable, get_engine,
+            pack_audio_batch,
         )
+        from ._otr_audio_engines.base import canonical_audio, mono_safe
+        from . import _otr_cue_manifest as _CM
 
         render_log: list = []
-        cues = None
+        cue_rows = None   # list of per-cue dicts (clip + authored metadata)
         adapter = None
-        n_cues = 0
+        sr = 44100
         try:
             engine = assert_usable(engine, ROLE)  # FAIL CLOSED (6-class)
             adapter = get_engine(engine)
@@ -149,8 +153,8 @@ class StableAudioTheme:
             interface = getattr(adapter, "interface", "clip")
 
             if interface == "clip":
-                cues, lines = self._render_clips(
-                    adapter, engine, script_json, ledger_json, stereo_policy,
+                cue_rows, sr, lines = self._render_clips(
+                    adapter, engine, script_json, ledger_json,
                 )
                 render_log.extend(lines)
             else:
@@ -159,16 +163,63 @@ class StableAudioTheme:
                     f"engine {engine!r} declares unsupported interface "
                     f"{interface!r} for role {ROLE!r}",
                 )
-            n_cues = len(_CUE_SLOTS)
         finally:
             # I-7: free single-engine residency in finally, BEFORE 'done'.
             self._teardown(adapter)
 
-        if cues is None:
-            from ._otr_resolved_request import empty_audio_batch
+        mono = (stereo_policy == "mono_safe")
+        canon = mono_safe if mono else canonical_audio
 
-            sr = int(getattr(adapter, "sample_rate", 44100) or 44100)
-            cues = {slot: empty_audio_batch(sr) for slot in _CUE_SLOTS}
+        if not cue_rows:
+            # Engine produced nothing (fail-closed already raised for a bad
+            # engine; this is the empty-ledger / no-cue floor). Emit the
+            # canonical empty batch + an empty (but valid) manifest.
+            srx = int(sr or getattr(adapter, "sample_rate", 44100) or 44100)
+            cue_audio = pack_audio_batch([], sample_rate=srx, mono=mono)
+            manifest_json = _CM.dumps(_CM.build_manifest(srx, []))
+            n_cues = 0
+        else:
+            clips = [row["clip"] for row in cue_rows]
+            # Exact per-cue length AFTER channel canonicalization but BEFORE
+            # the batch right-pad, so a consumer's [bi, :, :sample_count]
+            # slice recovers the cue with ZERO padding (MF-G: no silence trim).
+            sample_counts = [
+                int(canon(clip)["waveform"].shape[-1]) for clip in clips
+            ]
+            cue_audio = pack_audio_batch(clips, sample_rate=int(sr), mono=mono)
+            packed = cue_audio["waveform"]  # [B, C, max_T]
+
+            audio_dir = self._episode_audio_dir()
+            manifest_rows = []
+            for bi, row in enumerate(cue_rows):
+                sample_count = sample_counts[bi]
+                # Slice the exact (unpadded) cue out of the packed batch and
+                # persist it to the episode audio dir (canonical path first,
+                # never tmp -- CLAUDE.md section 6). Byte-identical to what the
+                # consumer slices at [bi, :, :sample_count].
+                cue_slice = packed[bi, :, :sample_count]
+                output_path = ""
+                if audio_dir is not None:
+                    output_path = self._write_cue_wav(
+                        audio_dir, row["cue_id"], cue_slice, int(sr))
+                manifest_rows.append({
+                    "cue_id": row["cue_id"],
+                    "batch_index": bi,
+                    "sample_count": sample_count,
+                    "sample_rate": int(sr),
+                    "prompt": row["prompt"],
+                    "prompt_sha256": _CM.prompt_sha256(row["prompt"]),
+                    "cue_spec_sha256": row.get("cue_spec_sha256"),
+                    "placement": row["placement"],
+                    "anchor_line_id": row.get("anchor_line_id"),
+                    "seed": int(row["seed"]),
+                    "requested_duration_s": float(row["requested_duration_s"]),
+                    "actual_duration_s": float(sample_count) / float(sr),
+                    "output_path": output_path,
+                })
+            manifest_json = _CM.dumps(_CM.build_manifest(int(sr), manifest_rows))
+            n_cues = len(manifest_rows)
+
         # S2 durable persistence (credits enrichment 2026-07-03): the music
         # engine had NO durable provenance path -- node 83's ``done`` output
         # is unlinked in the workflow JSON, so ``music:done:engine=...`` died
@@ -182,16 +233,18 @@ class StableAudioTheme:
         )
 
         done = f"music:done:engine={engine}:cues={int(n_cues)}"
-        return (
-            cues["opening"], cues["closing"], cues["interstitial"],
-            "\n".join(render_log), done,
-        )
+        return (cue_audio, manifest_json, "\n".join(render_log), done)
 
     # ------------------------------------------------------------------ #
-    def _render_clips(self, adapter, engine, script_json, ledger_json,
-                      stereo_policy):
-        """Per-cue clip generation for stable_audio_music (clip interface)."""
-        from ._otr_audio_engines import pack_audio_batch
+    def _render_clips(self, adapter, engine, script_json, ledger_json):
+        """Render every cue for this episode into raw clips + metadata.
+
+        fable2 lane: one clip per authored ``ledger.music[]`` row (each carries
+        its own generation_prompt / placement / anchor_line_id). Legacy lane
+        (no ledger.music[]): SYNTHESIZE the three fixed cues via
+        compose_music_prompt with the SLOT seed key -- byte-identical to the
+        pre-C3 opening/closing/interstitial render.
+        """
         from ._otr_engine_profiles import (
             assert_model_available, assert_token_for_profile, require_resolver,
         )
@@ -203,27 +256,171 @@ class StableAudioTheme:
         assert_token_for_profile(profile)   # MISSING_HF_TOKEN if HF-gated
         assert_model_available(profile)
         sr = int(profile.sample_rate or getattr(adapter, "sample_rate", 44100))
-        mono = (stereo_policy == "mono_safe")
 
-        meta = _load_meta(ledger_json, script_json)
+        led = self._load_ledger(ledger_json, script_json)
+        meta = (led.get("meta") or {}) if isinstance(led, dict) else {}
+        music_rows = (led.get("music") or []) if isinstance(led, dict) else []
         music_seed_base = _seed_to_int64(
             "music_rng_seed_v1", coerce_int_seed(meta.get("episode_seed")),
         )
 
-        cues = {}
+        cue_specs = self._resolve_cue_specs(meta, music_rows)
+        cue_rows = []
         log_lines = [
-            f"music: rendering 3 cues on '{engine}' (profile {profile.profile_id})"
+            f"music: rendering {len(cue_specs)} cue(s) on '{engine}' "
+            f"(profile {profile.profile_id})"
         ]
-        for slot in _CUE_SLOTS:
-            prompt, duration_s = compose_music_prompt(meta, slot)
-            engine_seed = _seed_to_int64(music_seed_base, slot)  # G1 theme seed
+        for spec in cue_specs:
+            prompt = spec["prompt"]
+            duration_s = spec["requested_duration_s"]
+            engine_seed = _seed_to_int64(music_seed_base, spec["seed_key"])  # G1
             # G1: scope determinism + seed/restore around the single forward
             # (non-strict; bit_exact is gated on the F pilot -- see voice path).
             with deterministic_inference(engine_seed, warn_only=True):
                 clip = adapter.generate_clip(prompt, duration_s, engine_seed)
-            cues[slot] = pack_audio_batch([clip], sample_rate=sr, mono=mono)
-            log_lines.append(f"  [{slot}] {duration_s:.0f}s at {sr} Hz")
-        return cues, log_lines
+            cue_rows.append({
+                "cue_id": spec["cue_id"],
+                "placement": spec["placement"],
+                "prompt": prompt,
+                "seed": int(engine_seed),
+                "requested_duration_s": float(duration_s),
+                "anchor_line_id": spec.get("anchor_line_id"),
+                "cue_spec_sha256": spec.get("cue_spec_sha256"),
+                "clip": clip,
+            })
+            log_lines.append(
+                f"  [{spec['cue_id']}/{spec['placement']}] "
+                f"{duration_s:.0f}s at {sr} Hz")
+        return cue_rows, sr, log_lines
+
+    # ------------------------------------------------------------------ #
+    def _resolve_cue_specs(self, meta, music_rows):
+        """Build the ordered cue-spec list. fable2 (authored music[]) vs legacy
+        (synthesize the 3 fixed cues, byte-parity slot seed keys)."""
+        from ._otr_music_prompt import CUE_DURATIONS, compose_music_prompt
+
+        specs: list = []
+        if music_rows:
+            for row in music_rows:
+                cue_id = str(row.get("cue_id") or "").strip()
+                if not cue_id:
+                    continue
+                placement = self._canonical_placement(row.get("placement"), cue_id)
+                prompt = row.get("generation_prompt") or row.get("description") or ""
+                if str(prompt).strip():
+                    dur = row.get("target_duration_s")
+                    duration_s = (
+                        float(dur)
+                        if isinstance(dur, (int, float)) and float(dur) > 0.0
+                        else float(CUE_DURATIONS[placement])
+                    )
+                else:
+                    # Authored row with no prompt: compose from the brief by
+                    # placement (MF-B: map placement -> canonical cue so
+                    # compose_music_prompt never KeyErrors on inter_NN).
+                    prompt, duration_s = compose_music_prompt(meta, placement)
+                specs.append({
+                    "cue_id": cue_id,
+                    "placement": placement,
+                    "prompt": str(prompt),
+                    "requested_duration_s": float(duration_s),
+                    "seed_key": cue_id,
+                    "anchor_line_id": row.get("anchor_line_id"),
+                    "cue_spec_sha256": row.get("cue_spec_sha256"),
+                })
+        else:
+            for slot in _CUE_SLOTS:
+                prompt, duration_s = compose_music_prompt(meta, slot)
+                specs.append({
+                    "cue_id": slot,
+                    "placement": slot,
+                    "prompt": prompt,
+                    "requested_duration_s": float(duration_s),
+                    "seed_key": slot,
+                    "anchor_line_id": None,
+                    "cue_spec_sha256": None,
+                })
+        return specs
+
+    @staticmethod
+    def _canonical_placement(placement, cue_id):
+        """Map an authored placement / cue_id to one of opening/closing/
+        interstitial (MF-B: the composer + CUE_DURATIONS tables are keyed on
+        these, so inter_NN must resolve to 'interstitial')."""
+        p = (placement or "").strip().lower()
+        if p in ("opening", "closing", "interstitial"):
+            return p
+        cid = (cue_id or "").strip().lower()
+        if cid in ("opening", "closing", "interstitial"):
+            return cid
+        if cid.startswith("inter"):
+            return "interstitial"
+        return "interstitial"
+
+    # ------------------------------------------------------------------ #
+    def _load_ledger(self, *sources):
+        """Full ledger dict from the first parseable source (empty on miss)."""
+        from . import _otr_ledger_consumers as _OTRLC
+
+        for src in sources:
+            if not (src or "").strip():
+                continue
+            try:
+                return _OTRLC.load_ledger(src)
+            except Exception:  # noqa: BLE001 -- fall back to the neutral default
+                continue
+        return {}
+
+    @staticmethod
+    def _episode_audio_dir():
+        """The in-flight episode audio dir (the ledger's parent), created if
+        needed. None when headless / no ledger is in flight."""
+        import pathlib
+
+        try:
+            from . import _otr_ledger as _OTRL  # type: ignore
+            lp = _OTRL.in_flight_ledger_path()
+            if lp is not None:
+                d = pathlib.Path(lp).parent
+                d.mkdir(parents=True, exist_ok=True)
+                return d
+        except Exception:  # noqa: BLE001
+            return None
+        return None
+
+    @staticmethod
+    def _write_cue_wav(audio_dir, cue_id, waveform, sample_rate):
+        """Write one cue's (unpadded) waveform to a 16-bit PCM wav in the
+        episode audio dir. Returns the path, or "" on failure (best-effort --
+        the manifest still carries the in-memory batch)."""
+        import pathlib
+        import wave
+
+        import numpy as np
+
+        try:
+            arr = (
+                waveform.detach().cpu().numpy()
+                if hasattr(waveform, "detach") else np.asarray(waveform)
+            )
+            arr = np.atleast_2d(arr)          # [C, T]
+            if arr.ndim > 2:
+                arr = arr.reshape(arr.shape[-2], arr.shape[-1])
+            pcm = (arr * 32767.0).clip(-32768, 32767).astype(np.int16)
+            n_ch = int(pcm.shape[0])
+            interleaved = pcm.T.copy(order="C")   # (T, C) for WAV
+            safe = "".join(
+                c if (c.isalnum() or c in "._-") else "_" for c in str(cue_id)
+            )
+            path = str(pathlib.Path(audio_dir) / f"music_cue_{safe}.wav")
+            with wave.open(path, "wb") as wav_f:
+                wav_f.setnchannels(n_ch)
+                wav_f.setsampwidth(2)             # 16-bit
+                wav_f.setframerate(int(sample_rate))
+                wav_f.writeframes(interleaved.tobytes())
+            return path
+        except Exception:  # noqa: BLE001
+            return ""
 
     # ------------------------------------------------------------------ #
     @staticmethod

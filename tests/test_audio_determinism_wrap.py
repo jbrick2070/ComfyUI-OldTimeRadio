@@ -147,8 +147,9 @@ def test_theme_clip_forward_runs_inside_deterministic_inference(monkeypatch):
         "generate_clip must run inside deterministic_inference"
     )
     assert torch.are_deterministic_algorithms_enabled() == before
-    for i in range(3):
-        assert_audio_batch_contract(out[i], where=f"test.cue{i}")
+    # 720-bakeoff C3: ONE padded cue batch (3 rows) + manifest, not 3 AUDIOs.
+    assert_audio_batch_contract(out[0], where="test.cue_batch")
+    assert int(out[0]["waveform"].shape[0]) == 3
 
 
 # --------------------------------------------------------------------------- #
