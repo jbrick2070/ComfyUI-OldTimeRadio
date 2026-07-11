@@ -355,6 +355,30 @@ class _PromptMustFitMessages(list[dict[str, str]]):
     _otr_prompt_must_fit = True
 
 
+def outline_output_token_budget(requested_words: int, beat_count: int) -> int:
+    """Reserve P3 output WITHOUT eating the input budget its own repair needs.
+
+    P3 reserved a flat 3600 tokens. The local context cap is 8192, so that leaves
+    only 4592 for input -- and the typed-repair prompt (failed artifact + the
+    validation error + the original request) is bigger than that. The guard then
+    LEFT-TRUNCATED it (live: "PROMPT_GUARD: Truncated 5408 -> 4592"), silently
+    cutting off the system/schema prefix. The model was not ignoring the repair
+    rules; it never received them. Every P3 repair was doomed before it was sent.
+
+    A 30-word outline does not need 3600 output tokens. Scale the reservation from
+    what the artifact actually costs -- the dialogue steer plus the per-beat graph
+    metadata -- so the repair prompt still fits inside the cap.
+    """
+    if (
+        not isinstance(requested_words, int)
+        or isinstance(requested_words, bool)
+        or not 30 <= requested_words <= 900
+    ):
+        raise SciFiGeminiTargetRangeError("requested_words must be 30..900")
+    beats = max(1, int(beat_count))
+    return min(3600, max(2000, int(requested_words * 3.0) + 110 * beats + 400))
+
+
 def validate_outline_cast_labels(outline: "OutlineV4") -> str | None:
     """The announcer is a fixed ROLE LABEL, not a character the writer invents.
 
@@ -686,7 +710,7 @@ def run_scifi_gemini_episode(
     p2 = invoke_gemini_structured(pass_id="P2", slot="technical", slot_fn=technical_fn, seam_ref="gemini_pitch_critique", pack=pack, typed_inputs={"pitches": p1.model_dump(mode="json")}, result_type=PitchSelectionV4, post_validator=lambda x: None, base_temperature=.22, structural_retry_temperature=.12, max_new_tokens=700, journal=journal)
     ids = [f"b{i:03d}" for i in range(1, 7)]
     bands = make_advisory_word_blueprint(int(resolved["target_words"]), ids)
-    p3 = invoke_gemini_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_outline", pack=pack, typed_inputs={"chosen_premise": p1.pitches[p2.selected_index].model_dump(mode="json"), "initial_outline_word_steer": {"requested_words": int(resolved["target_words"])}, "advisory_word_bands": [x.model_dump(mode="json") for x in bands]}, result_type=OutlineV4, post_validator=validate_outline_cast_labels, base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=3600, journal=journal)
+    p3 = invoke_gemini_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_outline", pack=pack, typed_inputs={"chosen_premise": p1.pitches[p2.selected_index].model_dump(mode="json"), "initial_outline_word_steer": {"requested_words": int(resolved["target_words"])}, "advisory_word_bands": [x.model_dump(mode="json") for x in bands]}, result_type=OutlineV4, post_validator=validate_outline_cast_labels, base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=outline_output_token_budget(int(resolved["target_words"]), len(bands)), journal=journal, prompt_must_fit=True)
     casts = {c.char_id: c for c in p3.cast}
     drafts: dict[str, SceneDraftV4] = {}
     for scene in p3.scenes:

@@ -250,6 +250,35 @@ def test_outline_rejects_and_then_repairs_a_renamed_announcer():
     assert repaired.premise == payload["premise"]
 
 
+def test_outline_output_reservation_leaves_room_for_its_own_repair_prompt():
+    """P3's output reservation must not eat the input budget its repair needs.
+
+    Live (2026-07-11): P3 reserved a flat 3600 tokens against an 8192 cap, leaving
+    4592 for input -- and the typed-repair prompt was 5408, so the guard
+    LEFT-TRUNCATED it and cut off the schema/instruction prefix. The model was not
+    ignoring the repair rules; it never received them. Every repair was doomed
+    before it was sent.
+    """
+    from nodes import _otr_scifi_gemini as lane
+
+    CONTEXT_CAP = 8192
+    OBSERVED_REPAIR_PROMPT_TOKENS = 5408
+
+    budget = lane.outline_output_token_budget(30, 5)
+    assert CONTEXT_CAP - budget > OBSERVED_REPAIR_PROMPT_TOKENS, (
+        "the 30-word P3 reservation must leave room for the observed repair prompt"
+    )
+    # It still scales up with the work, and stays inside the old ceiling.
+    assert lane.outline_output_token_budget(720, 12) <= 3600
+    assert (
+        lane.outline_output_token_budget(720, 12)
+        > lane.outline_output_token_budget(30, 5)
+    )
+    for bad in (True, 29, 901, 30.0):
+        with pytest.raises(lane.SciFiGeminiTargetRangeError):
+            lane.outline_output_token_budget(bad, 5)
+
+
 def test_outline_repair_fails_closed_without_an_owning_scene_id():
     import json as _json
 
