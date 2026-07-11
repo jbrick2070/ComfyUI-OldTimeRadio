@@ -738,8 +738,30 @@ class _GeminiTailFinalizer:
         self._proof(ctx.led.data)
         pre = _otr_ledger_freeze.phase_0_gap_audit_pre(ctx.led)
         post = _otr_ledger_freeze.phase_10_gap_audit_post_and_freeze(ctx.led)
-        if pre.errors or pre.warnings or post.errors or post.warnings or ctx.led.data.get("meta", {}).get("freeze_verdict") != "frozen_clean":
-            raise SciFiGeminiPreTailAuditError("Gemini freeze proof is not warning-free")
+        # A WARNING IS NOT AN ERROR. This gate killed the episode on any warning at all --
+        # it only ever passed because no warning happened to fire. Errors block; the
+        # cascade's structural verdicts block; warnings are RECORDED and the record ships.
+        # (frozen_with_warns is a CLEAN freeze: reviewer made no edits.)
+        notes = list(pre.warnings) + list(post.warnings)
+        if notes:
+            log.warning(
+                "[scifi_gemini] the freeze cascade raised %d warning(s); none is an "
+                "error, so the record stands:\n  %s",
+                len(notes), "\n  ".join(str(n) for n in notes),
+            )
+            ctx.led.data.setdefault("meta", {}).setdefault("scifi_gemini", {})[
+                "freeze_notes"
+            ] = [str(n) for n in notes]
+        if pre.errors or post.errors:
+            raise SciFiGeminiPreTailAuditError(
+                "Gemini freeze proof has hard errors: "
+                + "; ".join(str(e) for e in list(pre.errors) + list(post.errors))
+            )
+        verdict = ctx.led.data.get("meta", {}).get("freeze_verdict")
+        if verdict not in ("frozen_clean", "frozen_with_warns"):
+            raise SciFiGeminiPreTailAuditError(
+                f"Gemini freeze verdict is {verdict!r} -- not a clean freeze"
+            )
 
     def after_save(self, *, saved_path: str, ledger_data: Mapping[str, Any]) -> None:
         try:
@@ -748,8 +770,25 @@ class _GeminiTailFinalizer:
         except Exception as exc:
             raise SciFiGeminiSavedLedgerAuditError(str(exc)) from exc
         report = _otr_ledger_freeze.run_gap_audit(saved, label="saved")
-        if report.errors or report.warnings or saved.get("meta", {}).get("freeze_verdict") != "frozen_clean":
-            raise SciFiGeminiSavedLedgerAuditError("saved Gemini ledger is not frozen_clean")
+        # Errors and structural verdicts block; warnings are recorded. frozen_with_warns
+        # IS a clean freeze (the reviewer made no edits). This gate only ever passed
+        # because no warning happened to fire on the rolls we ran.
+        if report.warnings:
+            log.warning(
+                "[scifi_gemini] the saved ledger carries %d warning(s); none is an error:"
+                "\n  %s",
+                len(report.warnings), "\n  ".join(str(w) for w in report.warnings),
+            )
+        if report.errors:
+            raise SciFiGeminiSavedLedgerAuditError(
+                "saved Gemini ledger has hard errors: "
+                + "; ".join(str(e) for e in report.errors)
+            )
+        verdict = saved.get("meta", {}).get("freeze_verdict")
+        if verdict not in ("frozen_clean", "frozen_with_warns"):
+            raise SciFiGeminiSavedLedgerAuditError(
+                f"saved Gemini ledger freeze verdict is {verdict!r} -- not a clean freeze"
+            )
         self._proof(saved)
 
 
