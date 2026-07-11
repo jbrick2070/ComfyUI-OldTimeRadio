@@ -1395,8 +1395,19 @@ class _CodexTailFinalizer:
                 "Codex ledger freeze has hard errors: "
                 + "; ".join(str(e) for e in list(pre.errors) + list(post.errors))
             )
-        if ctx.led.data.get("meta", {}).get("freeze_verdict") != "frozen_clean":
-            raise CodexPreTailAuditError("Codex ledger did not reach frozen_clean")
+        # Same law as after_save, which this gate contradicted: a warning is not an
+        # error. `frozen_with_warns` IS a clean freeze -- the reviewer read the ledger
+        # and made no edits; the warns are soft gaps, i.e. notes. This line used to
+        # demand `frozen_clean` outright, so the identical ledger was illegal here and
+        # legal ten lines below, and a note could kill a finished episode (2026-07-11:
+        # "frozen_with_warns -- 2 soft gap(s)" killed a codex roll after P0-P8 passed).
+        # The structural verdicts -- frozen_with_doctor_edits, too_many_edits,
+        # needs_full_rerun -- still block, because those are defects, not notes.
+        verdict = ctx.led.data.get("meta", {}).get("freeze_verdict")
+        if verdict not in ("frozen_clean", "frozen_with_warns"):
+            raise CodexPreTailAuditError(
+                f"Codex ledger freeze verdict is {verdict!r} -- not a clean freeze"
+            )
 
     def after_save(self, *, saved_path: str, ledger_data: Mapping[str, Any]) -> None:
         try:

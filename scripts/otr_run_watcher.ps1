@@ -17,7 +17,12 @@ param(
     [Parameter(Mandatory = $true)][int]$WatchPid,
     [string]$StatusFile = 'C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\RUN_STATUS.txt',
     [string]$Label = 'OTR render',
-    [string]$ObsDir = 'C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr\obs',
+    # The REAL obs base is ComfyUI's output\ root -- `otr\` resolves there on disk, NOT
+    # under the custom_nodes package. Pointing at the package path made the watcher call
+    # a PUBLISHED run FAILED (2026-07-11): the episode was sitting in output\otr\obs the
+    # whole time. A watcher that reports a false negative is worse than no watcher, so
+    # this path is the one thing in here that must never be guessed.
+    [string]$ObsDir = 'C:\Users\jeffr\Documents\ComfyUI\output\otr\obs',
     [string]$ServerLog = 'C:\Users\jeffr\Documents\ComfyUI\comfyui_8000.log',
     [switch]$NoPopup
 )

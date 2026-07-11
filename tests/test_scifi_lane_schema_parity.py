@@ -263,6 +263,40 @@ def test_listener_review_repair_fails_closed_on_an_unmappable_issue():
     assert lane.repair_listener_review_shape(raw) is None
 
 
+def test_no_lane_demands_frozen_clean():
+    """`frozen_with_warns` is a CLEAN freeze and must never block a finished episode.
+
+    It means the reviewer read the ledger and made NO edits; the warns are soft gaps --
+    notes. The structural verdicts (frozen_with_doctor_edits, too_many_edits,
+    needs_full_rerun) are the ones that block, because those are defects.
+
+    Live case (2026-07-11, Codex, gemma-4-E4B): the pre-tail audit demanded
+    `frozen_clean` outright while the saved-ledger audit ten lines below accepted
+    `frozen_with_warns` -- so the IDENTICAL ledger was illegal before the save and legal
+    after it. "frozen_with_warns -- 2 soft gap(s)" killed a roll that had passed P0-P8.
+    Gemini and Sonnet had already been fixed; Codex was the last lane holding the stale
+    gate, and nothing was watching for the divergence.
+    """
+    import pathlib
+    import re
+
+    nodes = pathlib.Path(__file__).resolve().parents[1] / "nodes"
+    offenders = []
+    for lane in sorted(nodes.glob("_otr_scifi_*.py")):
+        for lineno, line in enumerate(lane.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#"):
+                continue
+            # An equality test against frozen_clean alone -- the membership form
+            # `not in ("frozen_clean", "frozen_with_warns")` is the correct gate.
+            if re.search(r'(?:!=|==)\s*["\']frozen_clean["\']', line):
+                offenders.append(f"{lane.name}:{lineno}: {line.strip()}")
+    assert not offenders, (
+        "a freeze gate compares against frozen_clean alone, so frozen_with_warns -- a "
+        "clean freeze with no reviewer edits -- would kill a finished episode:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
 def test_gemini_pitch_slate_still_pins_exactly_three_pitches():
     """The JSON-native fix must not loosen the three-pitch contract."""
     from nodes import _otr_scifi_gemini as lane
