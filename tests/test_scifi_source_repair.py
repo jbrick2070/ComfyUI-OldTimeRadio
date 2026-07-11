@@ -33,6 +33,19 @@ def test_repair_refuses_paraphrased_quote():
     assert repair_literal_source_metadata(raw, FactIndexV4, payload, zero_padded_ids=True) is None
 
 
+def test_repair_drops_unsupported_fact_but_keeps_literal_fact():
+    payload = {"full_text": "literal supported evidence"}
+    raw = (
+        '{"facts":['
+        '{"fact_id":"F0","claim":"unsupported", "source_spans":[{"field":"full_text","start":0,"end":5,"quote":"paraphrase"}]},'
+        '{"fact_id":"F1","claim":"supported", "source_spans":[{"field":"full_text","start":0,"end":7,"quote":"literal"}]}],'
+        '"entities":[],"numbers":[],"tone":"measured","payload_sha256":"digest"}'
+    )
+    repaired = repair_literal_source_metadata(raw, FactIndexV4, payload, zero_padded_ids=True)
+    assert repaired is not None
+    assert [fact.fact_id for fact in repaired.facts] == ["F02"]
+
+
 def test_repair_rehomes_exact_quote_only_when_field_label_is_wrong():
     payload = {"headline": "short title", "full_text": "full literal evidence here"}
     raw = (

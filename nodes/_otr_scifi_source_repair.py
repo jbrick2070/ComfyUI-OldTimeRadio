@@ -2,8 +2,8 @@
 
 This helper repairs only deterministic metadata defects observed in a typed
 P0 artifact: zero-padded identifiers and offsets for a quote that already
-occurs verbatim in the supplied source payload. It never changes claims,
-spoken text, or any other LLM-authored prose.
+occurs verbatim in the supplied source payload. Unsupported evidence rows are
+dropped; the helper never changes claims, spoken text, or other prose.
 """
 from __future__ import annotations
 
@@ -58,9 +58,9 @@ def repair_literal_source_metadata(
     """Return a validated metadata-only repair, or ``None`` to keep retry loud.
 
     A source span is repaired only when its existing quote is an exact
-    substring of the declared payload field. If it is paraphrased or absent,
-    this function refuses to guess and the normal typed-repair failure path
-    remains active.
+    substring of one unambiguous declared payload field. If it is paraphrased
+    or absent, its evidence row is dropped; if no supported fact remains, the
+    schema validation still fails loudly.
     """
     try:
         import json
@@ -72,6 +72,7 @@ def repair_literal_source_metadata(
         return None
     repaired = copy.deepcopy(data)
     changed = False
+    invalid_span_ids: set[int] = set()
 
     def visit(node: Any) -> None:
         nonlocal changed
@@ -102,9 +103,13 @@ def repair_literal_source_metadata(
                             and (positions := _occurrences(payload[candidate], quote))
                         ]
                         if len(candidate_fields) != 1:
-                            raise ValueError(
-                                f"quote is absent or ambiguous in source payload for field {field!r}"
-                            )
+                            invalid_span_ids.add(id(node))
+                            changed = True
+                            candidate_fields = []
+                    if not candidate_fields:
+                        for value in node.values():
+                            visit(value)
+                        return
                     corrected_field, positions = candidate_fields[0]
                     new_start = min(positions, key=lambda position: abs(position - start))
                     if node.get("field") != corrected_field or node.get("start") != new_start or node.get("end") != new_start + len(quote):
@@ -118,8 +123,49 @@ def repair_literal_source_metadata(
             for value in node:
                 visit(value)
 
+    def prune_unsupported_evidence() -> None:
+        nonlocal changed
+        for collection_name in ("facts", "verified_facts", "entities", "named_entities"):
+            collection = repaired.get(collection_name)
+            if not isinstance(collection, list):
+                continue
+            kept: list[Any] = []
+            for row in collection:
+                if not isinstance(row, dict) or not isinstance(row.get("source_spans"), list):
+                    continue
+                spans = [span for span in row["source_spans"] if id(span) not in invalid_span_ids]
+                if spans:
+                    row["source_spans"] = spans
+                    kept.append(row)
+                else:
+                    changed = True
+            if len(kept) != len(collection):
+                repaired[collection_name] = kept
+                changed = True
+        facts = {
+            row.get("fact_id")
+            for row in repaired.get("facts", [])
+            if isinstance(row, dict)
+        }
+        for collection_name in ("numbers", "key_numbers"):
+            collection = repaired.get(collection_name)
+            if not isinstance(collection, list):
+                continue
+            kept = []
+            for row in collection:
+                span = row.get("source_span") if isinstance(row, dict) else None
+                if not isinstance(row, dict) or not isinstance(span, dict) or id(span) in invalid_span_ids:
+                    changed = True
+                    continue
+                if row.get("fact_id") not in facts:
+                    changed = True
+                    continue
+                kept.append(row)
+            repaired[collection_name] = kept
+
     try:
         visit(repaired)
+        prune_unsupported_evidence()
         if not changed:
             return None
         return schema.model_validate(repaired)
