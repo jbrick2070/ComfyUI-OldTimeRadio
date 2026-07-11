@@ -372,7 +372,7 @@ already promoted). Confidence tags preserved from the sweep.
 - surfaced: scifi bake-off canonical 30w smoke roll 10, 2026-07-12
 - symptom: run halted before P0 with `RSS payload is below the 80/12 thinness floor`; Gemini and Sonnet remained not-started because the serialized smoke gate stopped at Codex
 - root cause: common science RSS selection returned a thin article to a lane whose source contract requires a substantial RSS body
-- fix: no code change yet; this roll is being rerun against the selector's next eligible source; repeated occurrence will require shared fetch-path hardening, not a weaker lane floor
+- fix: `d01cf8bc` makes the shared RSS selector inspect up to ten candidates for sci-fi v4, require the same >=400-char/80-word/12-unique-token source floor before selection, and fail at selection if none qualify; legacy `science_news` keeps its existing richest-body fallback
 - verify idea: canonical RSS fetch should either return a payload meeting the 80/12 floor or fail before queueing the sci-fi lane with a clear source-selection reason
 - bible-worthy: yes -- live shared source-precondition failure
 - confidence: HIGH
