@@ -127,7 +127,34 @@ This is not negotiable, and it is where most new packs go wrong.
 
 ---
 
-## 4. GATES -- what you are allowed to block on
+## 3b. THE ANNOUNCER -- somewhere, someone must ground the story
+
+The listener is in the dark. They cannot see a title card, a set, or a face. If nobody
+tells them where they are, they spend the first half of your episode working it out instead
+of feeling it.
+
+**The hard rule: at some point, the announcer must GROUND the story.** Give the listener
+context for what they are hearing, and bring them back out at the end. An episode that
+simply *begins* -- mid-argument, unlocated, unexplained -- does not admit anyone into a
+story. It just starts one, and leaves the listener outside it. (We shipped exactly that
+episode. It was technically perfect and dramatically inert.)
+
+**What we find works best:** the announcer opens the piece and closes it. Classic, and it
+is classic because it works.
+
+**What you are free to do instead:** open cold. Drop us straight into dialogue, mid-scene,
+mid-sentence. Let us be lost for a moment -- that is a legitimate and often thrilling
+choice. Bring the announcer in afterwards to tell us what we just heard and why it matters.
+Land the ending with the announcer, or hand it to a character and let the announcer close
+the frame a beat later. Or find a shape nobody has used.
+
+**What you may not do:** never ground it at all.
+
+And one thing worth saying plainly, because it is the trap: **the announcer FRAMES, it does
+not ARGUE.** The moment the announcer starts taking turns in the scene -- answering a
+character, pressing a point, joining the debate -- it stops being the voice of the show and
+becomes a fourth person in the room, and the listener loses the only orientation they had.
+If your announcer is trading lines with your cast, you have lost the frame.
 
 You will want to validate the model's output. Good. But a gate that blocks production may
 **only** block on something that is:
