@@ -147,5 +147,87 @@ def test_source_grounded_p0_refuses_to_be_left_truncated(module_name, invoke_nam
     pytest.fail(f"no P0 call found in {module_name}")
 
 
+def _outline_payload(*, drop_visual_prompt=False):
+    """A Gemini OutlineV4 shaped exactly like the failing live P3 artifact:
+    nested shots/beats with NO parent scene_id and NO beat order."""
+    shot = {"shot_id": "shot_001", "description": "The lab at night."}
+    if not drop_visual_prompt:
+        shot["visual_prompt"] = "A dim robotics lab, one monitor glowing."
+    return {
+        "title": "Signal Lost",
+        "premise": "A team weighs a machine's judgment.",
+        "setting": "University robotics lab",
+        "time_of_day": "night",
+        "cast": [
+            {"char_id": "announcer", "name": "ANNOUNCER",
+             "character_description": "The voice of the show.", "gender": "male"},
+            {"char_id": "c01", "name": "Dr. Hart",
+             "character_description": "Lead roboticist.", "gender": "female"},
+        ],
+        "scenes": [{
+            "scene_id": "s001",
+            "env": "lab",
+            "description": "The team reviews the trial.",
+            "shots": [shot],
+            "beats": [
+                {"beat_id": "b001", "line_id": "l001", "shot_id": "shot_001",
+                 "speaker": "Dr. Hart", "char_id": "c01", "speaker_role": "character",
+                 "intent": "report", "mood": "tense"},
+                {"beat_id": "b002", "line_id": "l002", "shot_id": "shot_001",
+                 "speaker": "Dr. Hart", "char_id": "c01", "speaker_role": "character",
+                 "intent": "press", "mood": "urgent"},
+            ],
+        }],
+        "music_cues": [{"cue_id": "music_open", "placement": "open",
+                        "description": "cold hum", "generation_prompt": "low drone",
+                        "anchor_beat_id": "b001"}],
+        "advisory_word_bands": [{"beat_id": "b001", "advisory_word_center": 15},
+                                {"beat_id": "b002", "advisory_word_center": 15}],
+    }
+
+
+def test_outline_repair_derives_parent_scene_and_beat_order():
+    """The MECHANICAL half: a shot nested in s001 IS in s001. Not a creative call."""
+    import json as _json
+
+    from nodes import _otr_scifi_gemini as lane
+
+    repaired = lane.repair_outline_metadata(_json.dumps(_outline_payload()))
+    assert repaired is not None
+    scene = repaired.scenes[0]
+    assert scene.shots[0].scene_id == "s001"
+    assert [b.scene_id for b in scene.beats] == ["s001", "s001"]
+    assert [b.order for b in scene.beats] == [1, 2]
+    # Authored content is untouched, byte for byte.
+    assert scene.shots[0].visual_prompt == "A dim robotics lab, one monitor glowing."
+    assert scene.beats[0].intent == "report"
+
+
+def test_outline_repair_refuses_to_invent_a_missing_visual_prompt():
+    """The CREATIVE half: Python must never author story/image content.
+
+    A missing visual_prompt fails closed so the typed creative repair still has to
+    write it -- the deterministic path may normalize metadata, never imagine.
+    """
+    import json as _json
+
+    from nodes import _otr_scifi_gemini as lane
+
+    assert lane.repair_outline_metadata(
+        _json.dumps(_outline_payload(drop_visual_prompt=True))
+    ) is None
+
+
+def test_outline_repair_fails_closed_without_an_owning_scene_id():
+    import json as _json
+
+    from nodes import _otr_scifi_gemini as lane
+
+    payload = _outline_payload()
+    del payload["scenes"][0]["scene_id"]
+    assert lane.repair_outline_metadata(_json.dumps(payload)) is None
+    assert lane.repair_outline_metadata("{not json") is None
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

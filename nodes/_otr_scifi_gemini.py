@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,8 +12,11 @@ from typing import Any, Callable, Literal, Mapping, MutableMapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+log = logging.getLogger("OTR")
+
 try:
     from ._otr_canon import EpisodeCanon
+    from ._otr_json import parse_first_json_object
     from ._otr_source_payload import validate_source_payload
     from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import schema_shape_instruction, structured_call
@@ -20,6 +24,7 @@ try:
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
     from _otr_canon import EpisodeCanon  # type: ignore
+    from _otr_json import parse_first_json_object  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
@@ -347,6 +352,63 @@ class _PromptMustFitMessages(list[dict[str, str]]):
     _otr_prompt_must_fit = True
 
 
+def repair_outline_metadata(failed_output: str) -> OutlineV4 | None:
+    """Normalize only the OutlineV4 fields the nesting already determines.
+
+    A shot or beat written INSIDE scene ``s001`` belongs to ``s001`` -- its
+    ``scene_id`` is not a creative decision, it is a fact of where the model put
+    it. A beat's ``order`` is likewise just its position in the emitted graph.
+    The local model routinely omits both (live: Gemini P3, 18 validation errors,
+    2026-07-11), so derive them from the parent instead of asking the model to
+    restate what it has already said.
+
+    This NEVER invents content. ``visual_prompt``, ``description``, ``intent``,
+    ``mood``, dialogue -- anything a writer had to think of -- is left exactly as
+    the model wrote it, and a missing one fails closed here so the creative typed
+    repair still has to author it. Parent scene missing its own ``scene_id``, or
+    any post-repair schema failure, also fails closed.
+    """
+    try:
+        data = parse_first_json_object(failed_output)
+    except Exception:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("scenes"), list):
+        return None
+
+    changed = False
+    beat_order = 0
+    for scene in data["scenes"]:
+        if not isinstance(scene, dict):
+            return None
+        scene_id = scene.get("scene_id")
+        if not isinstance(scene_id, str) or not scene_id:
+            # Without an owning scene id there is nothing authoritative to copy.
+            return None
+        for key in ("shots", "beats"):
+            children = scene.get(key)
+            if not isinstance(children, list):
+                return None
+            for child in children:
+                if not isinstance(child, dict):
+                    return None
+                if child.get("scene_id") != scene_id:
+                    child["scene_id"] = scene_id
+                    changed = True
+                if key == "beats":
+                    beat_order += 1
+                    if child.get("order") != beat_order:
+                        child["order"] = beat_order
+                        changed = True
+    if not changed:
+        return None
+    try:
+        return OutlineV4.model_validate(data)
+    except Exception:
+        # Creative fields are still missing (e.g. a shot with no visual_prompt).
+        # That is the model's work, not ours -- hand it back to the typed repair.
+        return None
+
+
 def invoke_gemini_structured(
     *, pass_id: str, slot: Literal["creative", "technical"], slot_fn: GenerateFn,
     seam_ref: str, pack: Any, typed_inputs: Mapping[str, Any],
@@ -387,11 +449,30 @@ def invoke_gemini_structured(
             if deterministic is not None:
                 return deterministic
         else:
+            # An OutlineV4 failure splits in two. The MECHANICAL half (a nested
+            # shot/beat's parent scene_id, a beat's order) is already implied by
+            # where the model put the node, so repair it deterministically rather
+            # than spending a call asking the model to restate itself. The
+            # CREATIVE half (a shot's visual_prompt) is authored work Python must
+            # never invent -- name it explicitly so the model writes it.
+            if result_type is OutlineV4:
+                deterministic = repair_outline_metadata(failed_output)
+                if deterministic is not None and post_validator(deterministic) is None:
+                    log.info(
+                        "[scifi_gemini:%s] deterministic OutlineV4 graph-metadata "
+                        "repair accepted; no LLM repair call made", pass_id,
+                    )
+                    return deterministic
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the selected premise, "
                 "scene outline, beats, and dialogue content; repair only fields named by the "
                 "validation error. Every required nested graph field must be present; copy each "
-                "beat speaker from the cast row matching its char_id."
+                "beat speaker from the cast row matching its char_id. "
+                "Copy the parent scene's scene_id into every shot and every beat nested inside "
+                "it, and number beats with a strictly increasing order starting at 1. "
+                "EVERY shot MUST carry a visual_prompt: one concrete, filmable image of that "
+                "shot -- subject, setting, and lighting -- never an empty string and never a "
+                "restatement of the shot description."
             )
         return [
             {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},
