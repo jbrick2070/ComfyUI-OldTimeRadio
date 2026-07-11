@@ -307,3 +307,13 @@ already promoted). Confidence tags preserved from the sweep.
 - bible-worthy: yes -- live source-evidence metadata failure, cross-lane helper
 - confidence: HIGH
 - status: OPEN
+
+## PBUG-20260711-05 -- JSON parser salvaged a nested fact from a broken outer artifact
+- surfaced: scifi bake-off canonical 30w smoke, Codex P0, 2026-07-11
+- symptom: malformed outer fact JSON was scanned past its first brace; the parser returned the first nested fact object, producing misleading missing-top-level-key errors and preventing the intended repair path
+- root cause: shared fallback scanning treated a nested child as a valid top-level object when the response began with an invalid outer object
+- fix: `5489baa8` fails closed when a response begins with malformed outer JSON instead of salvaging nested children; all source packs use the shared parser
+- verify idea: malformed outer-with-valid-child fixture raises a top-level parse error; valid leading prose plus a valid object still parses normally
+- bible-worthy: yes -- shared structured-call integrity defect across source packs
+- confidence: HIGH
+- status: OPEN
