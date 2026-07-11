@@ -139,6 +139,56 @@ class PostValidationError(ValueError):
     """
 
 
+def schema_shape_instruction(schema: type[BaseModel]) -> str:
+    """Describe required nested schema paths for weak local JSON writers.
+
+    The full JSON schema is already supplied as typed input, but compact path
+    inventory is more reliably followed by small local models. This describes
+    structure only; it never supplies or rewrites story content.
+    """
+    raw = schema.model_json_schema()
+    definitions = raw.get("$defs", {})
+    paths: list[str] = []
+    seen: set[tuple[str, str]] = set()
+
+    def walk(node: object, path: str) -> None:
+        if not isinstance(node, dict):
+            return
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith("#/$defs/"):
+            name = ref.rsplit("/", 1)[-1]
+            marker = (name, path)
+            if marker in seen:
+                return
+            seen.add(marker)
+            walk(definitions.get(name, {}), path)
+            return
+        if node.get("type") == "array":
+            walk(node.get("items", {}), f"{path}[*]")
+            return
+        required = node.get("required", [])
+        properties = node.get("properties", {})
+        if not isinstance(required, list) or not isinstance(properties, dict):
+            return
+        for name in required:
+            if not isinstance(name, str):
+                continue
+            child_path = f"{path}.{name}" if path else name
+            paths.append(child_path)
+            walk(properties.get(name, {}), child_path)
+
+    walk(raw, "")
+    compact = ", ".join(dict.fromkeys(paths))
+    if len(compact) > 2400:
+        compact = compact[:2397] + "..."
+    return (
+        "\nReturn exactly one JSON object, with no Markdown, headings, or prose. "
+        f"Its exact top-level keys are: {', '.join(schema.model_fields)}. "
+        "Every required nested path must be present, including repeated graph "
+        f"references. Required paths: {compact}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # repair_prompt_factory -- typed-repair prompt builder contract
 # ---------------------------------------------------------------------------

@@ -14,13 +14,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 try:
     from ._otr_source_payload import validate_source_payload
     from ._otr_scifi_source_repair import repair_literal_source_metadata
-    from ._otr_structured_call import structured_call
+    from ._otr_structured_call import schema_shape_instruction, structured_call
     from . import _otr_ledger_freeze
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
-    from _otr_structured_call import structured_call  # type: ignore
+    from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
     import _otr_ledger_freeze  # type: ignore
     from production_ledger import stamp_word_counts  # type: ignore
 
@@ -45,12 +45,7 @@ class _Strict(BaseModel):
 
 
 def _schema_instruction(schema: type[BaseModel]) -> str:
-    keys = ", ".join(schema.model_fields)
-    return (
-        "\nReturn exactly one JSON object, with no Markdown, headings, or prose. "
-        f"Its exact top-level keys are: {keys}. Do not copy input keys into the "
-        "output in place of these keys."
-    )
+    return schema_shape_instruction(schema)
 
 
 class SourceSpanV4(_Strict):

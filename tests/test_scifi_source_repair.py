@@ -1,5 +1,5 @@
 from nodes._otr_scifi_codex import FactIndexV4
-from nodes._otr_scifi_codex import _schema_instruction as codex_schema_instruction
+from nodes._otr_scifi_codex import RadioScoreV4, _schema_instruction as codex_schema_instruction
 from nodes._otr_scifi_gemini import _schema_instruction as gemini_schema_instruction
 from nodes._otr_scifi_sonnet import FragmentDossierV4, _schema_instruction as sonnet_schema_instruction
 from nodes._otr_json import parse_first_json_object
@@ -52,6 +52,7 @@ def test_all_lane_schema_seams_name_exact_top_level_keys():
     assert "facts" in codex_schema_instruction(FactIndexV4)
     assert "facts" in gemini_schema_instruction(FactIndexV4)
     assert "verified_facts" in sonnet_schema_instruction(FragmentDossierV4)
+    assert "scenes[*].shots[*].scene_id" in codex_schema_instruction(RadioScoreV4)
 
 
 def test_json_parser_does_not_salvage_nested_child_from_broken_outer_object():
