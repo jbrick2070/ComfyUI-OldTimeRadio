@@ -262,7 +262,7 @@ already promoted). Confidence tags preserved from the sweep.
 - surfaced: first scifi_codex canonical 30w live smoke (roll 2a), 2026-07-10
 - symptom: technical model returned a fact whose source_spans quote != the payload slice; validator correctly halted before any dialogue/media spend
 - root cause: repair prompt not explicit about field/start:end slice contract; typed repair reproduced the mismatch
-- fix: hardened originating-slot repair prompt showing required payload[field][start:end] identity + slice-mismatch diagnostics, applied to ALL THREE lanes (cross-lane audit found the same contract shape in Gemini/Sonnet P0)
+- fix: `40a765ac` hardened originating-slot repair prompt showing required payload[field][start:end] identity + slice-mismatch diagnostics, applied to ALL THREE lanes (cross-lane audit found the same contract shape in Gemini/Sonnet P0)
 - verify idea: offset-span fixture converges within the repair ladder budget
 - bible-worthy: yes -- evidence-span contract class, cross-lane by construction
 - confidence: HIGH
@@ -272,7 +272,7 @@ already promoted). Confidence tags preserved from the sweep.
 - surfaced: scifi bake-off canonical 30w smoke roll 2b, 2026-07-10/11
 - symptom: local model returned evidence IDs F0/F1/F2 where the v4 contract requires zero-padded F01/F02/F03; P0 validator halted the run
 - root cause: typed-repair contract didn't give the model explicit lexical ID mappings; ID-shape expectation implicit
-- fix: repair contract tightened at the shared lane boundary across Codex/Gemini/Sonnet -- explicit lexical ID mappings + recompute-quotes-from-payload-slice instruction (dialogue untouched, metadata repair deterministic); roll 3 rerun pending
+- fix: `731d49f7` repair contract tightened at the shared lane boundary across Codex/Gemini/Sonnet -- explicit lexical ID mappings + recompute-quotes-from-payload-slice instruction (dialogue untouched, metadata repair deterministic); roll 3 rerun pending
 - verify idea: fixture returning unpadded IDs, assert repair converges to padded shape within budget; pin pad width in schema tests
 - bible-worthy: yes -- ID-shape contract drift, second member of the P0-contract class with PBUG-20260710-10
 - confidence: HIGH
@@ -282,7 +282,7 @@ already promoted). Confidence tags preserved from the sweep.
 - surfaced: scifi bake-off canonical 30w smoke roll 3, 2026-07-11
 - symptom: after the ID repair converged (F0 -> F01 correct), the model repeated a quote with WRONG offsets -- a separate P0 span-integrity failure; validator halted honestly
 - root cause: repair contract fixed ID shape but did not force offsets to be recomputed against the payload slice
-- fix: fail-closed METADATA-ONLY repair module (nodes/_otr_scifi_source_repair.py + test): may reindex an EXACT quote already present in the source and normalize IDs; may NOT invent or rewrite dialogue. Dialogue rewrites remain the province of a later context-aware structured creative pass (premise + beats + cast lock + audit feedback in hand) -- operator ruling: never a blind Python hack or context-free LLM retry that breaks the story arc
+- fix: `731d49f7` fail-closed METADATA-ONLY repair module (nodes/_otr_scifi_source_repair.py + test): may reindex an EXACT quote already present in the source and normalize IDs; may NOT invent or rewrite dialogue. Dialogue rewrites remain the province of a later context-aware structured creative pass (premise + beats + cast lock + audit feedback in hand) -- operator ruling: never a blind Python hack or context-free LLM retry that breaks the story arc
 - verify idea: offset-shifted exact-quote fixture reindexes deterministically; ID normalizer pins F0 -> F01 (NOT F00 -- an actual test defect caught during this fix); dialogue field asserted byte-identical through repair
 - bible-worthy: yes -- completes the P0 evidence-contract trilogy (span fidelity / ID shape / offset integrity); strong class entry at fan-out
 - confidence: HIGH
