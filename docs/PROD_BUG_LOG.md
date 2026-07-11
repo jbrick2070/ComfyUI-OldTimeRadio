@@ -297,3 +297,13 @@ already promoted). Confidence tags preserved from the sweep.
 - bible-worthy: yes -- live structured-output contract failure, with cross-lane prevention
 - confidence: HIGH
 - status: OPEN
+
+## PBUG-20260711-04 -- Codex P0 used a full quote with truncated or wrong source field metadata
+- surfaced: scifi bake-off canonical 30w smoke, Codex P0, 2026-07-11
+- symptom: a full headline quote was returned with `headline[0:55]`, so the validator saw only a truncated payload slice and halted the lane
+- root cause: the model supplied a stale end offset and, in some artifacts, source-field labels did not identify the field containing the exact quote
+- fix: `55f3cf17` rehomes an exact quote only when exactly one allowed payload field contains it, then recomputes start/end; absent or ambiguous evidence still fails closed
+- verify idea: fixture with wrong field and offset rehomes to the unique literal field; fixture with absent or duplicate quote returns no repair
+- bible-worthy: yes -- live source-evidence metadata failure, cross-lane helper
+- confidence: HIGH
+- status: OPEN
