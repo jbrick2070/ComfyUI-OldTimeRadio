@@ -287,3 +287,13 @@ already promoted). Confidence tags preserved from the sweep.
 - bible-worthy: yes -- completes the P0 evidence-contract trilogy (span fidelity / ID shape / offset integrity); strong class entry at fan-out
 - confidence: HIGH
 - status: OPEN
+
+## PBUG-20260711-03 -- Codex creative score pass returned legacy Markdown shape
+- surfaced: scifi bake-off canonical 30w smoke, Codex P3, 2026-07-11
+- symptom: base and structural attempts returned Markdown prose; typed repair returned a legacy score object with missing `RadioScoreV4` keys and extra advisory-plan keys; the strict ladder halted before dialogue/media spend
+- root cause: the pack seam said JSON-only but did not state the exact current schema's top-level keys, so the local model copied input structure instead of the requested typed artifact
+- fix: `0d94c437` appends exact required top-level keys to every typed Codex/Gemini/Sonnet pass and repair seam; it preserves the full story context and forbids Markdown/prose
+- verify idea: capture a typed pass prompt for each lane and assert the schema's required top-level keys are named; live smoke must reach the next pass without legacy-key drift
+- bible-worthy: yes -- live structured-output contract failure, with cross-lane prevention
+- confidence: HIGH
+- status: OPEN
