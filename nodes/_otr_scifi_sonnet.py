@@ -12,12 +12,14 @@ from typing import Any, Callable, Literal, Mapping, MutableMapping, Sequence
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 try:
+    from ._otr_canon import EpisodeCanon
     from ._otr_source_payload import validate_source_payload
     from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import schema_shape_instruction, structured_call
     from . import _otr_ledger_freeze
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
+    from _otr_canon import EpisodeCanon  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
@@ -402,6 +404,19 @@ class SonnetTailParts:
     tail_finalizer: Any
 
 
+def _build_sonnet_episode_canon(frame: SessionFrameV4) -> EpisodeCanon:
+    """Build the complete shared-tail canon from the accepted archive frame."""
+    return EpisodeCanon(
+        title=frame.session_title,
+        premise=frame.session_premise,
+        setting=frame.scene_env,
+        # SessionFrameV4 deliberately carries no time/palette field. Keep
+        # their absence explicit instead of inventing canon detail.
+        time_of_day="",
+        sound_palette=[],
+    )
+
+
 def _assemble(led: Any, frame: SessionFrameV4, cast: Mapping[str, CastLockV4], events: Sequence[DraftLineV4], attestation: AttestationV4, meta: MutableMapping[str, Any]) -> dict[str, str]:
     led.set_cast([{"char_id": c.char_id, "name": c.name, "character_description": c.character_description, "gender": "unspecified", "tts_model": c.tts_model, "voice_preset": c.voice_preset} for c in cast.values()])
     led.set_scenes([{"scene_id": "scene_01", "description": frame.scene_description, "env": frame.scene_env}])
@@ -494,4 +509,16 @@ def run_scifi_sonnet_episode(
     actual = sum(len(_WORD_RE.findall(x)) for x in expected.values())
     meta["scifi_sonnet"]["word_receipt"] = {"requested_words": steer["requested_words"], "actual_split_words": actual, "actual_ledger_word_count": int(led.data.get("total_word_count") or 0)}
     meta["scifi_sonnet"]["dossier"] = p0.model_dump(mode="json")
-    return SonnetTailParts(outline_view=SimpleNamespace(title=p1.session_title, premise=p1.session_premise, setting=p1.scene_env), canon=SimpleNamespace(title=p1.session_title, premise=p1.session_premise), final_title_override=p1.session_title, run_story_spine=False, tail_finalizer=_SonnetTailFinalizer(expected))
+    canon = _build_sonnet_episode_canon(p1)
+    return SonnetTailParts(
+        outline_view=SimpleNamespace(
+            title=p1.session_title,
+            premise=p1.session_premise,
+            setting=p1.scene_env,
+            time_of_day=canon.time_of_day,
+        ),
+        canon=canon,
+        final_title_override=p1.session_title,
+        run_story_spine=False,
+        tail_finalizer=_SonnetTailFinalizer(expected),
+    )

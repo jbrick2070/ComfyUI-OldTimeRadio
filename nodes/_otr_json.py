@@ -24,10 +24,10 @@ from __future__ import annotations
 import json
 import re
 
-# ```json ... ``` / ``` ... ``` fenced block. Non-greedy ``{...}`` so the
-# first balanced object between fences wins.
+# ```json ... ``` / ``` ... ``` fenced block.  The body is decoded with
+# ``JSONDecoder.raw_decode`` below; a regex cannot balance nested braces.
 _JSON_FENCE_RE = re.compile(
-    r"```(?:json)?\s*(\{.*?\})\s*```",
+    r"```(?:json)?\s*(.*?)\s*```",
     re.DOTALL | re.IGNORECASE,
 )
 
@@ -36,48 +36,45 @@ def extract_first_json_block(raw: str) -> str:
     """Return the first complete top-level JSON object in ``raw`` as a
     substring, or ``""`` when none is found.
 
-    Primary form: a ```json ... ``` fenced block. Fallback: walk to the
-    first ``{`` and ``json.JSONDecoder().raw_decode`` from there --
-    raw_decode stops at the end of the first complete object, so any
-    trailing content (a second hallucinated object, a prose note) is
-    ignored rather than concatenated into the slice. Never raises.
+    Primary form: a ```json ... ``` fenced block. Fallback: decode from the
+    first ``{``. ``raw_decode`` stops at the end of the first complete object,
+    so trailing content (a second hallucinated object or prose note) is
+    ignored rather than concatenated into the slice. A malformed outer object
+    never falls through to one of its decodable child objects. Never raises.
     """
     if not raw:
         return ""
     text = raw.strip()
 
-    # Primary: a fenced JSON block. Non-greedy capture picks the first
-    # balanced {...} between fences.
+    decoder = json.JSONDecoder()
+
+    # Primary: a fenced JSON block. Decode the whole fence body rather than
+    # trying to balance nested braces with a regex. A malformed fenced outer
+    # object must fail closed; otherwise the fallback could wrongly salvage a
+    # valid nested scene/beat object as the model's top-level artifact.
     fence_match = _JSON_FENCE_RE.search(text)
     if fence_match:
         candidate = fence_match.group(1).strip()
         try:
-            if isinstance(json.loads(candidate), dict):
-                return candidate
+            obj, end = decoder.raw_decode(candidate)
         except json.JSONDecodeError:
-            pass
-
-    # Fallback: walk to the first '{' and raw_decode from there.
-    # raw_decode returns the parsed object plus the index where it
-    # ended, so trailing content after the first object is ignored.
-    decoder = json.JSONDecoder()
-    first_brace = text.find("{")
-    # When a response starts with an object, a malformed outer object must
-    # fail closed. Scanning onward into a nested object would silently turn a
-    # broken envelope into a plausible-looking child artifact and bypass the
-    # typed repair ladder (the sci-fi P0 live smoke exposed this exact drift).
-    outer_object = first_brace >= 0 and not text[:first_brace].strip()
-    for i, ch in enumerate(text):
-        if ch != "{":
-            continue
-        try:
-            obj, end = decoder.raw_decode(text[i:])
-        except json.JSONDecodeError:
-            if outer_object and i == first_brace:
-                return ""
-            continue
+            return ""
         if isinstance(obj, dict):
-            return text[i:i + end]
+            return candidate[:end]
+        return ""
+
+    # Fallback: raw_decode the first outer object. Scanning onward after that
+    # object fails would make a malformed envelope look valid by returning a
+    # nested child (the Codex P5 live smoke exposed this exact drift).
+    first_brace = text.find("{")
+    if first_brace < 0:
+        return ""
+    try:
+        obj, end = decoder.raw_decode(text[first_brace:])
+    except json.JSONDecodeError:
+        return ""
+    if isinstance(obj, dict):
+        return text[first_brace:first_brace + end]
     return ""
 
 

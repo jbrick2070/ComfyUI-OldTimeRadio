@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from nodes import _otr_scifi_gemini as lane
@@ -49,3 +51,24 @@ def test_clean_critique_and_spoken_rejections():
     assert lane._spoken_error("The signal arrives", "ORUM") is None
     with pytest.raises(lane.SciFiGeminiTargetRangeError):
         lane.validate_gemini_payload(_payload(), {"seed_source": "rss_fetch", "target_words": 901})
+
+
+def test_gemini_tail_canon_uses_complete_episode_canon_protocol(tmp_path):
+    from nodes import _otr_canon
+
+    outline = SimpleNamespace(
+        title="Ice Moon Signal",
+        premise="Will the team risk an answer to the quiet signal?",
+        setting="an orbital listening station",
+        time_of_day="night shift",
+    )
+    canon = lane._build_gemini_episode_canon(outline)
+
+    assert isinstance(canon, _otr_canon.EpisodeCanon)
+    assert canon.title == outline.title
+    assert canon.premise == outline.premise
+    assert canon.setting == outline.setting
+    assert canon.time_of_day == outline.time_of_day
+    assert canon.sound_palette == []
+    _otr_canon.write_episode_canon(tmp_path, canon)
+    assert _otr_canon.load_episode_canon(tmp_path) == canon

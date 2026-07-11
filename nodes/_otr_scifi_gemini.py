@@ -12,12 +12,14 @@ from typing import Any, Callable, Literal, Mapping, MutableMapping, Sequence
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 try:
+    from ._otr_canon import EpisodeCanon
     from ._otr_source_payload import validate_source_payload
     from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import schema_shape_instruction, structured_call
     from . import _otr_ledger_freeze
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
+    from _otr_canon import EpisodeCanon  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
@@ -419,6 +421,17 @@ class GeminiTailParts:
     tail_finalizer: Any
 
 
+def _build_gemini_episode_canon(outline: OutlineV4) -> EpisodeCanon:
+    """Build the complete shared-tail canon from Gemini's accepted outline."""
+    return EpisodeCanon(
+        title=outline.title,
+        premise=outline.premise,
+        setting=outline.setting,
+        time_of_day=outline.time_of_day,
+        sound_palette=[],
+    )
+
+
 def _assemble(led: Any, outline: OutlineV4, drafts: Mapping[str, SceneDraftV4], meta: MutableMapping[str, Any]) -> dict[str, str]:
     voice_map = {"announcer": ("kokoro", "bm_george"), "c01": ("bark", "v2/en_speaker_6"), "c02": ("bark", "v2/en_speaker_3"), "c03": ("bark", "v2/en_speaker_0")}
     led.set_cast([{"char_id": c.char_id, "name": c.name, "character_description": c.character_description, "gender": c.gender, "tts_model": voice_map[c.char_id][0], "voice_preset": voice_map[c.char_id][1]} for c in outline.cast])
@@ -490,4 +503,16 @@ def run_scifi_gemini_episode(
     actual = sum(len(_WORD_RE.findall(x)) for x in expected.values())
     meta["scifi_gemini"]["word_receipt"] = {"requested_words": int(resolved["target_words"]), "actual_split_words": actual, "actual_ledger_word_count": int(led.data.get("total_word_count") or 0)}
     meta["scifi_gemini"]["fact_index"] = p0.model_dump(mode="json")
-    return GeminiTailParts(outline_view=SimpleNamespace(title=p3.title, premise=p3.premise, setting=p3.setting), canon=SimpleNamespace(title=p3.title, premise=p3.premise), final_title_override=p3.title, run_story_spine=False, tail_finalizer=_GeminiTailFinalizer(expected))
+    canon = _build_gemini_episode_canon(p3)
+    return GeminiTailParts(
+        outline_view=SimpleNamespace(
+            title=p3.title,
+            premise=p3.premise,
+            setting=p3.setting,
+            time_of_day=canon.time_of_day,
+        ),
+        canon=canon,
+        final_title_override=p3.title,
+        run_story_spine=False,
+        tail_finalizer=_GeminiTailFinalizer(expected),
+    )

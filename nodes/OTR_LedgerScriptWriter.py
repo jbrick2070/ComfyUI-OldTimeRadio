@@ -338,6 +338,10 @@ _OPTIMIZATION_PROFILE_CHOICES = [
 # ---------------------------------------------------------------------------
 
 
+class PromptContextOverflowError(RuntimeError):
+    """A caller marked its prompt as unsliceable and it exceeded context."""
+
+
 # Tier 2 fix #16 (2026-05-11): rolling-buffer StoppingCriteria
 # class, hoisted to module scope so it is defined ONCE per process
 # rather than once per generate_fn build. transformers stays a lazy
@@ -588,8 +592,11 @@ def _build_truncating_generate_fn(
     min_p: float = 0.0,
     repetition_penalty: float = 1.0,
 ):
-    """Return a generate_fn that left-truncates oversized prompts and
-    forwards sampling controls to model.generate.
+    """Return a generate_fn that normally left-truncates oversized prompts.
+
+    A messages-list subclass may set ``_otr_prompt_must_fit = True``.  Those
+    provenance-sensitive callers fail loudly before generation instead of
+    losing the system/schema prefix to left truncation.
 
     Closure captures the four episode-level sampling knobs from the
     writer widgets: top_p, min_p, repetition_penalty. The per-call
@@ -657,6 +664,7 @@ def _build_truncating_generate_fn(
     def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
         import torch  # local import; never load torch at module import
         from . import _otr_loader_backends as _OTRLB
+        prompt_must_fit = bool(getattr(messages, "_otr_prompt_must_fit", False))
         if _system_role_supported[0] is None:
             _system_role_supported[0] = (
                 _OTRLB.tokenizer_supports_system_role(tokenizer)
@@ -673,6 +681,13 @@ def _build_truncating_generate_fn(
         max_input_tokens = max(64, context_cap - int(max_new_tokens))
         input_len = inputs["input_ids"].shape[-1]
         if input_len > max_input_tokens:
+            if prompt_must_fit:
+                raise PromptContextOverflowError(
+                    "prompt requires %d input tokens but only %d fit "
+                    "(context_cap=%d, max_new_tokens=%d); refusing to "
+                    "left-truncate an unsliceable provenance prompt"
+                    % (input_len, max_input_tokens, context_cap, max_new_tokens)
+                )
             trunc = input_len - max_input_tokens
             inputs["input_ids"] = inputs["input_ids"][:, trunc:]
             if "attention_mask" in inputs:
@@ -744,8 +759,19 @@ def _build_truncating_generate_fn(
                 else:
                     raise
         prompt_len = inputs["input_ids"].shape[1]
+        generated_ids = out[0][prompt_len:]
+        try:
+            generated_tokens = int(getattr(generated_ids, "shape", [len(generated_ids)])[-1])
+        except Exception:  # pragma: no cover - exotic backend sequence shape
+            generated_tokens = None
+        if generated_tokens == int(max_new_tokens):
+            log.info(
+                "[OTR_LedgerScriptWriter] OUTPUT_CAP: prompt_tokens=%d "
+                "generated_tokens=%d max_new_tokens=%d",
+                prompt_len, generated_tokens, max_new_tokens,
+            )
         decoded = tokenizer.decode(
-            out[0][prompt_len:], skip_special_tokens=True,
+            generated_ids, skip_special_tokens=True,
         )
         # Tier 1 fix #5 (2026-05-11): StoppingCriteria halts
         # generation but leaves the trigger bytes in the output
@@ -6764,6 +6790,39 @@ class OTR_LedgerScriptWriter:
         # Sprint 3E (2026-05-25): the former J.6 post-hoc title
         # substitution -- another such ledger-only mutation -- is gone
         # (late title binding means no provisional title in dialogue).
+        # Content-owned lanes seal canonical ``text`` before this shared
+        # tail, so their pronunciation-safe delivery string must be stamped
+        # here, after every writer-side text mutation and before the lane
+        # finalizer's Phase-10 freeze.  This is the one final producer
+        # boundary shared by every content-owned source bank; legacy lanes
+        # keep their byte-identical canonical-text delivery path.
+        from ._otr_readiness import stamp_text_for_tts_delivery
+        from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
+        if delivery_mode_for_meta(meta) == CONTENT_OWNED:
+            # Content-owned lane runners construct their own casts, so they
+            # bypass the legacy cast-lock producer that normally stamps the
+            # durable seed receipt.  The shared tail is still upstream of
+            # CastLock, freeze, and CreditsRoll; establish one authoritative
+            # episode seed here when the lane has not already supplied one.
+            # This seed drives deterministic downstream voice assignment and
+            # satisfies the no-fallback credits provenance contract.
+            _cast_contract = meta.get("cast_contract") or {}
+            _cast_seed = _cast_contract.get("cast_seed")
+            if _cast_seed is None and meta.get("episode_seed") is None:
+                _cast_seed, _cast_seed_source = _resolve_cast_rng_seed()
+                _cast_contract = dict(_cast_contract)
+                _cast_contract["cast_seed"] = int(_cast_seed)
+                _cast_contract["cast_seed_source"] = str(_cast_seed_source)
+                meta["cast_contract"] = _cast_contract
+                meta.setdefault("cast_contract_version", "cast-v1")
+                meta["episode_seed"] = int(_cast_seed)
+                log.info(
+                    "[OTR_LedgerScriptWriter] content-owned cast seed=%d "
+                    "(%s) stamped before freeze",
+                    _cast_seed, _cast_seed_source,
+                )
+            stamp_text_for_tts_delivery(led)
+
         if tail_finalizer is not None:
             tail_finalizer.before_save(ctx=ctx)
         script_text = _PL.assemble_script_text_from_ledger(led.data)

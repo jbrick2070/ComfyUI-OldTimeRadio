@@ -67,3 +67,19 @@ def test_sonnet_target_and_mode_fail_loud():
         lane.validate_sonnet_payload(_payload(), {"seed_source": "rss_fetch", "target_words": 901})
     with pytest.raises(lane.SonnetPackContractError):
         lane.select_warden_mode_block("[CLEAR MODE only]", "clear")
+
+
+def test_sonnet_tail_canon_uses_complete_episode_canon_protocol(tmp_path):
+    from nodes import _otr_canon
+
+    frame = _frame()
+    canon = lane._build_sonnet_episode_canon(frame)
+
+    assert isinstance(canon, _otr_canon.EpisodeCanon)
+    assert canon.title == frame.session_title
+    assert canon.premise == frame.session_premise
+    assert canon.setting == frame.scene_env
+    assert canon.time_of_day == ""
+    assert canon.sound_palette == []
+    _otr_canon.write_episode_canon(tmp_path, canon)
+    assert _otr_canon.load_episode_canon(tmp_path) == canon

@@ -1,25 +1,17 @@
-# Sci-Fi Gemini Engine Spec
-**BUILD-READY v3 -- r2-r4 self-hardened, model: Gemini 3.5 Flash**
+# Sci-Fi Gemini Engine Spec — CODE-READY v4 -- technical rewrite by Codex GPT-5, creative content unmodified
+
 
 ## Revision Log
-- **Round 1 (Creative Arc & Prompts):** Harmonized vision and corrected prompt shapes. Prompts in `scifi_gemini_v1.json` were converted from role-message lists to flat strings to satisfy the `StoryPack` string-validation contract (`_otr_story_pack.py:152`).
-- **Round 2 (Coding Reality):** Addressed ledger interface contracts. Added `tts_model`, `voice_preset`, and `gender` to `CastSchema` to conform to `production_ledger.py:807` constraints. Injected `shot_id` and looked up `char_id` dynamically during beat ledger construction. Removed direct canon writing from the runner to preserve the tail's single-canon-writer authority (`OTR_LedgerScriptWriter.py:6307`). Added `max_new_tokens` limits to avoid structured call truncation, resolved announcer role constraints, and aligned music sentinel IDs.
-- **Round 3 (Wiring Completeness):** Prevented boot validation crashes. Swapped `requires_source_contract: false` in `pipelines.json` to bypass interpreter checks in registry load sweeps (`_otr_story_routing.py:429`). Escaped literal JSON braces as `{{` and `}}` in prompt stage templates to prevent Python `.format()` KeyError crashes. Integrated telemetry contexts. Resolving beat loop double-booking nested list bug, setting opening cue duration to 12.0s and closing to 8.0s (start_s 0.0s) to match composer cache hashes. Added exact `otr_canonical.json` patch diff.
-- **Round 4 (Convergence Self-Audit):** Swapped the rigid ±10% per-beat word count critique gate for a scene-level ±20% budget tolerance, ensuring execution convergence. Resolved five MUST-FIX issues identified in Round 4:
-  1. Restored the missing `passes` array in the `pipelines.json` entry definition (MF-1).
-  2. Aligned workflow diff defaults and clarified remote Google API COMBO selection behavior (MF-2).
-  3. Made the cast Bark `voice_preset` validation conditional on `tts_model == "bark"` using a model-level validator (MF-3).
-  4. Defined the exact target dispatch dictionary literal shape for `_RUNNER_BY_PIPELINE` to avoid installation placement errors (MF-4).
-  5. Pinned the directory creation task and JSON structure for `story_packs/scifi_gemini/scifi_gemini_v1.json` (MF-5).
-  6. Replaced constant `"setup"` `arc_phase` assignments with a dynamic scene-relative progression in Python (SF-1).
-  7. Added a dedicated test module spec for `tests/test_scifi_gemini_runner.py` with concrete assertions (SF-2).
-  8. Enforced that outline prompt explicitly instructs Gemini to assign `shot_id` per beat to resolve the schema conflict (MF-2/r4).
 
----
-
+- **v4 (final technical rewrite):** Removes the duplicate v2 skeleton and
+  makes §4 the only Gemini runner authority. It converts the word blueprint
+  to advisory centers/recorded actual counts; adds clean-critique, cast-lock,
+  reject-only spoken-text, music-skip, payload/pin, finalizer, and freeze
+  corrections cited in §4. The philosophy, topology, pack prompt wording,
+  examples, and exactly-three-pitch creative design remain unmodified.
 ## 1. Design Philosophy
 Why this wins a blind listen:
-Audio drama depends on narrative flow, performance-driven pacing, and clear character contrast. Unlike dry text feeds, the listener's focus must be held by atmospheric world-building and character conflict. 
+Audio drama depends on narrative flow, performance-driven pacing, and clear character contrast. Unlike dry text feeds, the listener's focus must be held by atmospheric world-building and character conflict.
 
 The `scifi_gemini` engine separates fact Ingestion from dramatic dialogue drafting. It uses a **Write -> Critique -> Rewrite** pipeline that first extracts hard scientific discoveries and packages them into high-level dramatic premises. During the drafting loop, a critique pass checks that the dialogue incorporates the scientific core verbatim without resorting to exposition dumps or breaking the "show, don't tell" rule. This guarantees that while the science remains authentic, the audio drama plays as a tense, high-stakes narrative.
 
@@ -46,9 +38,9 @@ The `scifi_gemini` engine separates fact Ingestion from dramatic dialogue drafti
         "credits_source_line": "dramatized by machine from tonight's science wire"
       },
       "required_seams": [],
-      "runnable": true,
+      "runnable": false,
       "guide_ref": "Sci-Fi Gemini multi-pass loop spec bank."
-    },
+    }
 ```
 
 ### 2.2 `pipelines.json` Entry (`nodes\story_packs\pipelines.json`)
@@ -57,7 +49,7 @@ The `scifi_gemini` engine separates fact Ingestion from dramatic dialogue drafti
     {
       "story_pipeline_id": "scifi_gemini_multipass",
       "label": "Sci-Fi Gemini Multi-Pass (Write-Critique-Rewrite Loop)",
-      "executable": true,
+      "executable": false,
       "requires_source_contract": false,
       "declared_seams": [
         "gemini_fact_extraction",
@@ -91,7 +83,7 @@ The `scifi_gemini` engine separates fact Ingestion from dramatic dialogue drafti
           "pass_id": "gemini_outline",
           "slot": "creative",
           "seam_refs": ["gemini_scene_outline"],
-          "description": "Generate a detailed scene, shot, beat outline with target word counts."
+          "description": "Generate a detailed scene, shot, beat outline with advisory word-band centers."
         },
         {
           "pass_id": "gemini_draft",
@@ -103,7 +95,7 @@ The `scifi_gemini` engine separates fact Ingestion from dramatic dialogue drafti
           "pass_id": "gemini_critique",
           "slot": "technical",
           "seam_refs": ["gemini_scene_critique"],
-          "description": "Evaluate draft for word-count adherence and fact integration."
+          "description": "Evaluate fact integration, locked roster fidelity, dialogue-only safety, and SFW compliance."
         },
         {
           "pass_id": "gemini_rewrite",
@@ -116,11 +108,11 @@ The `scifi_gemini` engine separates fact Ingestion from dramatic dialogue drafti
         "Scientific RSS payload-driven multi-pass pipeline utilizing Gemini.",
         "Consumes the RSS news feed via resolved['news_article'] (Chunk 3 source contract)."
       ]
-    },
+    }
 ```
 
 ### 2.3 Pack JSON: `nodes\story_packs\scifi_gemini\scifi_gemini_v1.json`
-*(Prompts configured as flat strings with escaped braces to satisfy `.format()` calls. File must be created under the new directory `story_packs/scifi_gemini/`)*
+*(Prompts are flat strings. The runner sends the named seam text verbatim as its system message and the typed artifact/schema payload as a separate canonical-JSON user message; it never uses `.format()` or Python-authored prompt prose. File must be created under the new directory `story_packs/scifi_gemini/`.)*
 ```json
 {
   "schema_version": "v2.0",
@@ -128,37 +120,31 @@ The `scifi_gemini` engine separates fact Ingestion from dramatic dialogue drafti
   "story_model_id": "scifi_gemini_v1",
   "story_pipeline_id": "scifi_gemini_multipass",
   "prompt_stages": {
-    "gemini_fact_extraction": "You are a scientific data extraction engine. Analyze the provided RSS science news payload. Extract the core scientific discovery or phenomenon, at least 3 concrete quantitative facts/metrics, any key research entities/institutes mentioned, and the primary tone of the article. Return a JSON object matching this exact schema: {{\"facts\": [\"fact 1\", \"fact 2\", \"fact 3\"], \"tone\": \"optimistic/foreboding/etc\", \"entities\": [\"researcher 1\", \"institute 2\"]}}. Do not include markdown wraps or explanations.\n\nPayload:\n{payload_text}",
+    "gemini_fact_extraction": "You are a scientific data extraction engine. Analyze the provided RSS science news payload. Extract the core scientific discovery or phenomenon, every concrete quantitative fact/metric actually present (an empty numbers array is valid when none occurs), any key research entities/institutes mentioned, and the primary tone of the article. Return a JSON object matching this exact schema: {{\"facts\": [{{\"fact_id\": \"F01\", \"claim\": \"fact 1\", \"source_spans\": [{{\"field\": \"full_text\", \"start\": 0, \"end\": 6, \"quote\": \"fact 1\"}}]}}], \"numbers\": [], \"tone\": \"optimistic/foreboding/etc\", \"entities\": []}}. Do not include markdown wraps or explanations.\n\nPayload:\n{payload_text}",
     "gemini_pitch_generation": "You are a creative sci-fi audio drama writer. Read the extracted scientific facts: {facts}. Pitch exactly three distinct sci-fi premises (indices 0, 1, 2) that translate these facts into character-driven narrative stakes. For each pitch, define: 1) the premise hook, 2) the physical space setting, and 3) the tonal atmospheric qualities. Return a JSON object matching this exact schema: {{\"pitches\": [{{\"premise\": \"premise hook...\", \"setting\": \"location...\", \"tonal_palette\": \"cyberpunk/horror...\"}}]}}. Output must have exactly 3 pitches.",
     "gemini_pitch_critique": "You are an experienced audio drama director. Evaluate these three pitches: {pitches}. Select the pitch that offers the best dramatic pacing, auditory potential, and structural viability for a short radio play. Return a JSON object matching this schema: {{\"selected_index\": 0, \"rationale\": \"explanation for choice...\"}}.",
-    "gemini_scene_outline": "You are a structural audio drama outliner. For the chosen premise: {chosen_premise}, create a rigid ledger-ready outline matching the requested target words: {target_words} words total. Define a Cast list (up to 3 characters, each with a unique char_id from 'c01' to 'c03', name in ALL CAPS, character_description, tts_model, gender, and voice_preset), and a sequence of Scenes. Each Scene contains a scene_id ('scene_01', 'scene_02', etc.), env, description, and a list of Shots. Each Shot contains a shot_id ('shot_001', 'shot_002', etc.) and description. Do not list beats inside shots here; list them nested at the Scene level under a 'beats' array where each Beat has a beat_id ('b001', 'b002', etc.), shot_id (the ID of the shot this beat occurs in), speaker name, speaker_role ('character' or 'announcer'), intent, mood, and target_words (range 20 to 60 words). Total dialogue word count must aim for {target_words} words. Return a JSON matching this exact outline structure. No markdown formatting.",
-    "gemini_scene_draft": "You are an audio scriptwriter. Write the verbatim dialogue lines for the outline beats in this scene: {scene_outline}. For each beat, write the exact text spoken by the designated character or announcer. Do not write action directions or sound effects in the text. Return a JSON matching this schema: {{\"lines\": [{{\"beat_id\": \"b001\", \"text\": \"verbatim spoken line...\"}}]}}.",
-    "gemini_scene_critique": "You are a strict script editor. Evaluate the drafted lines: {drafted_lines} against the outline: {scene_outline} and the original science facts: {facts}.\n1. Word Count Check: Ensure the total word count of the lines is close to the scene's target word limit.\n2. Fact Integration: Confirm that the scientific facts are correctly and traceably integrated into the script.\n3. Dialogue-only: Ensure lines do not contain stage directions like (sighs) or [sfx].\nReturn a JSON object: {{\"passed\": true/false, \"feedback\": \"detailed notes if failed...\"}}.",
-    "gemini_scene_rewrite": "You are a script doctor. Rewrite the dialogue lines to resolve these critiques: {feedback}. Incorporate the original science facts: {facts}. Retain the exact outline structure: {scene_outline}. Below is the previous failed draft lines for reference:\n{previous_draft}\nReturn a JSON matching the same draft schema: {{\"lines\": [{{\"beat_id\": \"b001\", \"text\": \"revised verbatim spoken line...\"}}]}}."
+    "gemini_scene_outline": "You are a structural audio drama outliner. For the chosen premise: {chosen_premise}, create a rigid ledger-ready outline matching the requested target words: {target_words} words total. Define a Cast list containing ANNOUNCER (char_id 'announcer') plus the character IDs supplied in the word blueprint (c01 through c03 as applicable), with name in ALL CAPS, character_description, gender, tts_model, and voice_preset. Define a sequence of Scenes. Each Scene contains a scene_id ('scene_01', 'scene_02', etc.), env, description, and a list of Shots. Each Shot contains a shot_id ('shot_001', 'shot_002', etc.), description, and visual_prompt. Do not list beats inside shots here; list them nested at the Scene level under a 'beats' array where each Beat has a beat_id ('b001', 'b002', etc.), line_id, shot_id (the ID of the shot this beat occurs in), speaker name, speaker_role ('character' or 'announcer'), intent, mood, fact_ids, and the exact supplied target_words. Also return music_cues with cue_id, placement ('open', 'inter', or 'close'), description, generation_prompt, and anchor_beat_id. Total dialogue word count must equal {target_words} words. Return a JSON matching this exact outline structure. No markdown formatting.",
+    "gemini_scene_draft": "You are an audio scriptwriter. Write the verbatim dialogue lines for the outline beats in this scene: {scene_outline}. For each beat, write the exact text spoken by the designated character or announcer and return its fact_ids from the supplied fact index. Do not write action directions or sound effects in the text. Return a JSON matching this schema: {{\"lines\": [{{\"beat_id\": \"b001\", \"text\": \"verbatim spoken line...\", \"fact_ids\": [\"F01\"]}}]}}.",
+    "gemini_scene_critique": "You are a strict script editor. Evaluate the drafted lines: {drafted_lines} against the outline: {scene_outline} and the original science facts: {facts}.\n1. Word Count Check: Ensure the total word count of the lines equals the scene's target word limit.\n2. Fact Integration: Confirm that every audible scientific fact is correctly and traceably integrated into the script.\n3. Dialogue-only: Ensure lines do not contain stage directions like (sighs) or [sfx].\n4. Safety: Confirm all spoken text is SFW.\nReturn a JSON object: {{\"passed\": true/false, \"feedback\": \"detailed notes if failed...\", \"line_fact_ids\": {{\"b001\": [\"F01\"]}}, \"sfw_pass\": true}}.",
+    "gemini_scene_rewrite": "You are a script doctor. Rewrite the dialogue lines to resolve these critiques: {feedback}. Incorporate the original science facts: {facts}. Retain the exact outline structure: {scene_outline}. Below is the previous failed draft lines for reference:\n{previous_draft}\nReturn a JSON matching the same draft schema: {{\"lines\": [{{\"beat_id\": \"b001\", \"text\": \"revised verbatim spoken line...\", \"fact_ids\": [\"F01\"]}}]}}."
   }
 }
 ```
 
-### 2.4 Runner Module Dispatch & Integration (`nodes\OTR_LedgerScriptWriter.py`)
-Add wrapper function and targeted dispatch registration in `OTR_LedgerScriptWriter.py:1580`:
-```python
-def _run_scifi_gemini_lane(**kwargs):
-    """Lane entry for `scifi_gemini_multipass` (scifi_gemini, Spec v2)."""
-    try:
-        from . import _otr_scifi_gemini as _Gemini
-    except ImportError:
-        import _otr_scifi_gemini as _Gemini
-    return _Gemini.run_scifi_gemini_episode(**kwargs)
 
-# Wire into dispatch map (OTR_LedgerScriptWriter.py:1589):
-_RUNNER_BY_PIPELINE = {
-    "fable2_multipass": _run_fable2_lane,
-    "scifi_gemini_multipass": _run_scifi_gemini_lane,
-}
-```
+### 2.4 Runner Module Dispatch & Integration (`nodes\OTR_LedgerScriptWriter.py`) — v4
 
----
-
+The build adds one lazy wrapper, preserving the existing map:
+`"scifi_gemini_multipass": _run_scifi_gemini_lane` in
+`_RUNNER_BY_PIPELINE` (`nodes/OTR_LedgerScriptWriter.py:1589-1617`). The map
+call supplies `payload=dict(resolved["news_article"])`, routed pack, ledger,
+metadata, and only the injected `creative_fn`/`technical_fn` at
+`:3590-3604`; the writer then owns tail-context construction at `:3605-3624`.
+The wrapper imports `run_scifi_gemini_episode(**kwargs)` and does nothing
+else. This is a planned additive build change; the catalog JSON remains
+`runnable:false` / `executable:false` until it ships. It uses the shared
+TailFinalizer protocol named in the Codex v4 control plane, not a local
+variant.
 ## 3. Pipeline Topology
 
 ```mermaid
@@ -177,517 +163,292 @@ flowchart TD
 
 ---
 
-## 4. Ledger Assembly
 
-- **Five-Hierarchy Mapping**: 
-  The runner maps the outline fields directly into the `Ledger` singleton (`nodes\production_ledger.py`):
-  - `cast`: Set via `led.set_cast()` ([production_ledger.py:792](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/production_ledger.py#L792)), verifying `tts_model`, `voice_preset` (subject to Bark prefix validator when model is bark), and `gender` presence.
-  - `scenes`: Set via `led.set_scenes()` ([production_ledger.py:837](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/production_ledger.py#L837)).
-  - `shots`: Set via `led.set_shots()` ([production_ledger.py:850](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/production_ledger.py#L850)).
-  - `beats`: Set via `led.set_beats()` ([production_ledger.py:865](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/production_ledger.py#L865)), dynamically injecting `shot_id` and looking up `char_id` from the cast.
-  - `lines`: Set via `led.set_lines()` ([production_ledger.py:1080](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/production_ledger.py#L1080)), mapping `line_id` to `beat_id` 1:1, specifying `speaker_role`, `shot_id`, and `char_id` to avoid gap-audit failures.
-  - `music`: Set via `led.set_music()` ([production_ledger.py:1179](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/production_ledger.py#L1179)) placing music cues at boundaries (`opening` / `closing` cues, using `target_duration_s`).
-- **Verbatim Guarantee**: 
-  All spoken lines are kept exactly as output by the LLM. No Python string corrections are applied. Any syntax anomalies are corrected through the `gemini_rewrite` pass.
-- **Fact Traceability**: 
-  Scientific facts are stamped in `meta.news.key_terms` ([_otr_ledger_freeze.py:239](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_ledger_freeze.py#L239)). The critique pass matches facts in the draft, ensuring they are spoken verbatim.
-- **Single Writer Rule**:
-  The runner does not write canon.json to disk; it instantiates the `EpisodeCanon` object and returns it on `SciFiGeminiTailParts` so `_run_writer_tail()` remains the sole canon writer.
+## 4. v4 implementation control plane — sole technical authority
 
----
+This replaces the earlier v2/v3 runner prose and skeletons in their entirety.
+The §2 JSON artifacts, seven seams, topology, design philosophy, and all
+prompt wording/examples are unchanged. There is exactly one runner source of
+truth below; no archived `.format()` skeleton, second schema family, or
+replacement-map code survives.
 
-## 5. Validation Gates & Exception Taxonomy
-- **`SciFiGeminiError`**: Unified exception class for the lane. Raised when structured calls fail after retry limits or when outline referential integrity is violated.
-- **`StructuredCallFailedError`**: Raised by `_otr_structured_call.structured_call` ([_otr_structured_call.py:708](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_structured_call.py#L708)) if the retry ladder (Attempts: 1. Base (0.7 temp), 2. Structural (0.4 temp, syntax error only), 3. Low Temp Repair (0.1 temp)) fails validation. Wrapped inside the runner as `SciFiGeminiError`.
+### v4 revision log
 
----
+- Makes the largest-remainder word blueprint advisory only: `target_words`
+  appears once in initial outline sizing, is never an acceptance/retry gate,
+  and actual counts are recorded.
+- Adds pre-tail reject-only spoken-text/roster validation and structural
+  music skip stamps after `set_lines`, which drops those fields
+  (`nodes/production_ledger.py:1080-1167`;
+  `nodes/_otr_ledger_freeze.py:325-402`).
+- Re-verifies map/payload wiring at
+  `nodes/OTR_LedgerScriptWriter.py:1589-1617,3590-3624`, keeps exactly three
+  pitches, and makes a clean `SceneCritiqueV4.feedback` valid when empty.
+- References the one shared TailFinalizer protocol in
+  `docs/2026-07-11-scifi-codex-engine-spec.md`, “Shared TailFinalizer
+  protocol (canonical for all three lanes),” rather than declaring a variant.
 
-## 6. Word Count Budget Strategy
-- **Scaffold Budget allocation**: The budget is driven dynamically from `resolved["target_words"]`. The `gemini_outline` pass distributes this target across the generated scene beats.
-- **Scene-level Critique**: Rather than rigid beat-level limits, the critique pass validates word count at the scene and episode levels with a **±20%** tolerance, preventing excessive rewrite failures due to minor word count variance.
+### Input, slots, and word receipt
 
----
+`validate_gemini_payload` calls
+`_otr_source_payload.validate_source_payload(payload, origin="scifi_gemini")`
+and requires exactly seven string keys: `headline`, `summary`, `full_text`,
+`source`, `date`, `link`, `seed_text`
+(`nodes/_otr_source_payload.py:80-133`). The RSS article is already built at
+`nodes/OTR_LedgerScriptWriter.py:1081-1143` and supplied as
+`dict(resolved["news_article"])` at `:3590-3594`; the runner never fetches.
+Only `resolved["seed_source"] == "custom_premise"` identifies an
+operator-pinned story—the writer constructs its normal seven-key payload at
+`:1321-1335`. `science_rss` stamps `rss_fetch`
+(`nodes/_otr_source_payload.py:424-434`). Other sources raise
+`SciFiGeminiPayloadRouteError`; malformed/empty is
+`SciFiGeminiPayloadContractError`; RSS below 80 split words/12 distinct
+alphanumeric tokens and pinned input below 8/4 is
+`SciFiGeminiPayloadThinError`. No alternate source is allowed.
 
-## 7. Test Plan
-Create a new unit test module `tests/test_scifi_gemini_runner.py` containing the following verification assertions:
-```python
-import pytest
-from unittest.mock import MagicMock
-from nodes._otr_story_routing import resolve_story_pack, get_bank, get_pipeline
-from nodes._otr_scifi_gemini import run_scifi_gemini_episode, SciFiGeminiError
+`resolved["target_words"]` is a one-time integer 30–900 `WordSteerV4`.
+`make_advisory_word_blueprint` applies largest remainder to the locked
+voiced-beat order and emits `AdvisoryBeatBandV4.advisory_word_center` values.
+P3 `gemini_outline` is the only model input carrying
+`initial_outline_word_steer`; P4 may see bands embedded in the outline but
+never the requested value, and P5/P6/repair never see either. Centers are not
+targets: no validator compares text to them. Record only:
 
-def test_registry_resolution():
-    """Verify registry load successfully resolves bank and pipeline."""
-    bank = get_bank("scifi_gemini")
-    assert bank.default_story_pipeline == "scifi_gemini_multipass"
-    
-    pipe = get_pipeline("scifi_gemini_multipass")
-    assert "gemini_fact_extraction" in pipe.declared_seams
-    
-    pack = resolve_story_pack("scifi_gemini")
-    assert pack.story_pipeline_id == "scifi_gemini_multipass"
-
-def test_runner_empty_payload_raises():
-    """Verify that an empty payload results in an immediate SciFiGeminiError."""
-    led = MagicMock()
-    slot_scheduler = MagicMock()
-    with pytest.raises(SciFiGeminiError) as exc_info:
-        run_scifi_gemini_episode(
-            payload={},
-            pack=MagicMock(),
-            resolved={"target_words": 720},
-            led=led,
-            meta={},
-            creative_fn=MagicMock(),
-            technical_fn=MagicMock(),
-            slot_scheduler=slot_scheduler,
-            source_bank_row=MagicMock(),
-            story_rules=MagicMock(),
-            episode_root="/tmp",
-            episode_id="ep_test"
-        )
-    assert exc_info.value.pass_id == "gemini_fact_extraction"
-```
-The test suite can be run from Desktop Commander via:
-`$env:PYTHONUTF8=1; pytest -q tests/test_scifi_gemini_runner.py`
-
----
-
-## 8. Runner Python Skeleton (`nodes\_otr_scifi_gemini.py`)
-```python
-"""nodes/_otr_scifi_gemini.py - Sci-Fi Gemini Multi-Pass Runner Skeleton"""
-
-from dataclasses import dataclass
-import json
-import logging
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
-
-from . import _otr_canon as _OTRC
-from . import _otr_story_routing as _otr_story_routing
-from . import _otr_structured_call as _otr_structured_call
-from .production_ledger import Ledger
-
-log = logging.getLogger("OTR.scifi_gemini")
-
-# --- Custom Exception Taxonomy ---
-class SciFiGeminiError(RuntimeError):
-    """Unified exception class for the Sci-Fi Gemini lane."""
-    def __init__(self, pass_id: str, reason: str, attempts: int = 0):
-        super().__init__(f"[Sci-Fi Gemini: {pass_id}] {reason} (attempts: {attempts})")
-        self.pass_id = pass_id
-        self.reason = reason
-        self.attempts = attempts
-
-# --- Pass Token Budgets ---
-_MAX_NEW_TOKENS = {
-    "gemini_fact_extraction": 400,
-    "gemini_pitch_generation": 700,
-    "gemini_pitch_critique": 300,
-    "gemini_scene_outline": 2000,
-    "gemini_scene_draft": 1200,
-    "gemini_scene_critique": 600,
-    "gemini_scene_rewrite": 1200,
+~~~text
+meta.scifi_gemini.word_receipt = {
+  requested_words: int,
+  actual_split_words: int,
+  actual_ledger_word_count: int
 }
+~~~
 
-# --- Pydantic Schemas for Passes ---
-class FactExtractionSchema(BaseModel):
-    facts: List[str] = Field(..., description="Concrete facts, statistics, or metrics from the article.")
-    tone: str = Field(..., description="The tone of the source text (e.g. serious, optimistic, foreboding).")
-    entities: List[str] = Field(..., description="Core scientific entities, phenomena, or research entities.")
+A valid 719-, 721-, or otherwise nonmatching-word result succeeds. The sole
+count-related validator is tokenization safety needed to prevent freeze
+warnings: reject isolated numerals/symbol-only tokens and require numbers
+spelled as words so the ledger regex and split count agree
+(`nodes/production_ledger.py:216-219,1143-1147`;
+`nodes/_otr_ledger_freeze.py:372-388`). It is never a target gate.
 
-class PitchSchema(BaseModel):
-    premise: str = Field(..., description="High-level narrative hook incorporating the scientific facts.")
-    setting: str = Field(..., description="The physical setting/environment of the story.")
-    tonal_palette: str = Field(..., description="Atmospheric qualities (e.g., retro-futurism, deep-space horror).")
+The only model surface is the writer-injected `creative_fn` / `technical_fn`.
+Each pass calls `structured_call` with `post_validator: Callable[[T], str |
+None]` and the keyword-only repair factory contract
+(`nodes/_otr_structured_call.py:147-173,482-535`). Every call has exactly
+three attempts: base, lower JSON-syntax retry, then .10 typed repair for a
+schema/post-validator failure (`:547-712`). System content is the named pack
+seam verbatim and user content is canonical JSON; Python never `.format()`s a
+seam, loads a model, or changes dialogue.
 
-class PitchSlateSchema(BaseModel):
-    pitches: List[PitchSchema] = Field(..., min_length=3, max_length=3, description="Exactly three diverse concepts.")
+### Exact pass artifacts and validators
 
-class PitchSelectSchema(BaseModel):
-    selected_index: int = Field(..., description="The chosen pitch index (0, 1, or 2).")
-    rationale: str = Field(..., description="Why this pitch is optimal for audio drama pacing.")
+All types are strict, `extra="forbid"`, no aliases, and no text length clamps;
+semantic checks use validator strings because tolerant parsing can clip text
+(`nodes/_otr_structured_call.py:322-474`).
 
-class CastSchema(BaseModel):
-    char_id: str = Field(..., pattern=r"^c\d{2}$", description="Cast ID (e.g., c01, c02).")
-    name: str = Field(..., description="Uppercase name of the character.")
-    character_description: str = Field(..., description="Vocal qualities and narrative function.")
-    tts_model: str = Field(..., description="E.g., bark, kokoro.")
-    voice_preset: str = Field(..., description="Preset voice string (must start with 'v2/' for bark).")
-    gender: str = Field(..., description="gender details.")
+~~~text
+GeminiPayloadV4 = {
+  payload: SourcePayload7,
+  source_mode: Literal["rss","operator_pinned"],
+  payload_sha256: LowercaseSha256
+}
+SourceSpanV4 = {
+  field: Literal["headline","summary","full_text","seed_text"],
+  start: int >= 0, end: int > start, quote: Text
+}
+FactV4 = {fact_id:"F01".."F12", claim:Text,
+          source_spans:list[SourceSpanV4], numeric_tokens:list[str]}
+EntityV4 = {entity_id:"E01".."E12", name:Text,
+            source_spans:list[SourceSpanV4]}
+NumberV4 = {number_id:"N01".."N12", verbatim:Text, fact_id:str,
+            source_span:SourceSpanV4}
+FactIndexV4 = {facts:list[FactV4] (1..12), entities:list[EntityV4] (0..12),
+               numbers:list[NumberV4] (0..12), tone:Text,
+               payload_sha256:LowercaseSha256}
+PitchV4 = {premise:Text, setting:Text, tonal_palette:Text}
+PitchSlateV4 = {pitches:tuple[PitchV4,PitchV4,PitchV4]}
+PitchSelectionV4 = {selected_index:Literal[0,1,2], rationale:Text}
+CastV4 = {char_id:Literal["announcer","c01","c02","c03"], name:Text,
+          character_description:Text, gender:Text}
+AdvisoryBeatBandV4 = {beat_id:str, advisory_word_center:int}
+ShotV4 = {shot_id:str, scene_id:str, description:Text, visual_prompt:Text}
+BeatV4 = {beat_id:str, line_id:str, scene_id:str, shot_id:str, speaker:Text,
+          char_id:Literal["announcer","c01","c02","c03"],
+          speaker_role:Literal["character","announcer"], intent:Text,
+          mood:Text, fact_ids:list[str], order:int}
+MusicCueV4 = {cue_id:Literal["music_open","music_inter","music_close"],
+              placement:Literal["open","inter","close"], description:Text,
+              generation_prompt:Text, anchor_beat_id:str}
+SceneV4 = {scene_id:str, env:Text, description:Text, shots:list[ShotV4],
+           beats:list[BeatV4]}
+OutlineV4 = {title:Text, premise:Text, setting:Text, time_of_day:Text,
+             cast:list[CastV4], scenes:list[SceneV4],
+             music_cues:list[MusicCueV4],
+             advisory_word_bands:list[AdvisoryBeatBandV4]}
+LineFactUseV4 = {fact_id:str, spoken_claim:Text}
+DraftLineV4 = {beat_id:str, text:Text, fact_uses:list[LineFactUseV4],
+               non_fact:bool}
+SceneDraftV4 = {lines:list[DraftLineV4]}
+SceneCritiqueV4 = {passed:bool, feedback:str,
+                   line_fact_ids:dict[str,list[str]], sfw_pass:bool}
+~~~
 
-    @model_validator(mode="after")
-    def validate_voice_preset_for_bark(self) -> "CastSchema":
-        if self.tts_model == "bark" and not self.voice_preset.startswith("v2/"):
-            raise ValueError("Bark voice presets must start with 'v2/' namespace prefix.")
-        return self
+P0 requires `quote == payload[field][start:end]`, referenced facts/spans,
+and a payload-supported number/entity; absence is valid only when none is in
+the payload. P1 is **exactly three** pitches because the frozen seam/topology
+requires it. P2 selects only 0/1/2.
 
-class BeatSchema(BaseModel):
-    beat_id: str = Field(..., pattern=r"^b\d{3}$", description="Monotonic ID like b001, b002.")
-    shot_id: str = Field(..., pattern=r"^shot_\d{3}$", description="Target shot ID this beat is mapped to.")
-    speaker: str = Field(..., description="Uppercase speaker name or ANNOUNCER.")
-    speaker_role: str = Field(..., description="One of: character, announcer.")
-    intent: str = Field(..., description="Narrative action of this beat.")
-    target_words: int = Field(..., ge=20, le=60, description="Dialogue length budget in words.")
-    mood: str = Field(..., description="Emotional color of the delivery.")
+P3 creates one nonempty scene→shot→beat→line graph and locks cast labels:
+`announcer` is exactly `ANNOUNCER`, each other name is one canonical token,
+and every beat's `speaker` equals the locked label for its `char_id`
+verbatim. No later response introduces aliases/case variants, and Python does
+not normalize them. ALL-CAPS applies to roster labels only; spoken text may
+not contain all-caps lexical words. P3 emits the advisory bands but neither
+`BeatV4` nor any draft has a target-count field. Music placements are unique
+and each anchors a voiced beat.
 
-class ShotSchema(BaseModel):
-    shot_id: str = Field(..., pattern=r"^shot_\d{3}$")
-    scene_id: Optional[str] = Field(None, pattern=r"^scene_\d{2}$")
-    description: str = Field(..., description="Visual framing and action.")
+P4 returns one `DraftLineV4` for each locked beat. The runner stamps line,
+shot, char ID, and role from the immutable outline; it never infers a
+speaker. A P5 clean result is exactly
+`{passed:true, feedback:"", sfw_pass:true}`; P5 failed results require
+nonempty feedback and a real issue. P6 returns a complete replacement for
+that scene, preserves the exact beat set, and may run twice after P4. Neither
+P5 nor P6 evaluates requested length.
 
-class SceneSchema(BaseModel):
-    scene_id: str = Field(..., pattern=r"^scene_\d{2}$")
-    env: str = Field(..., description="Environment setting.")
-    description: str = Field(..., description="Dramatic description of the scene location.")
-    shots: List[ShotSchema] = Field(...)
-    beats: List[BeatSchema] = Field(...)
+Before accepting P4/P6 text, reject—not strip—newline/tab, brackets,
+parentheticals, markdown/backticks/asterisks/fences, a leading cast/role
+label, standalone stage/action cue, fully quoted line, all-caps lexical word
+of two+ letters, or a line beginning with its own cast first name and a
+vocative separator. Spoken acronyms use lowercase lexical form (for example
+`nasa`). This validator returns an LLM repair error; Python never changes
+text. It prevents the writer-tail scrubs/reattribution at
+`nodes/OTR_LedgerScriptWriter.py:6006-6158`, so the final receipt remains
+verbatim.
 
-class OutlineSchema(BaseModel):
-    title: str = Field(..., min_length=3, max_length=80)
-    premise: str = Field(..., min_length=10, max_length=400)
-    setting: str = Field(..., min_length=4, max_length=120)
-    time_of_day: str = Field(..., min_length=3, max_length=40)
-    cast: List[CastSchema] = Field(...)
-    scenes: List[SceneSchema] = Field(...)
+### Calls, ledger, finalizer, and skeleton
 
-class LineDraftSchema(BaseModel):
-    beat_id: str = Field(...)
-    text: str = Field(...)
+| Pass | slot | base / syntax / repair | max_new_tokens | bound |
+|---|---|---|---:|---|
+| P0 fact index | technical | .22 / .12 / .10 | 1,800 | one ladder |
+| P1 pitch slate | creative | .72 / .36 / .10 | 1,400 | exactly three |
+| P2 pitch selection | technical | .22 / .12 / .10 | 700 | one ladder |
+| P3 outline | creative | .68 / .30 / .10 | 3,600 | only word-steer call |
+| P4 scene draft | creative | .74 / .34 / .10 | 3,000 | one per scene |
+| P5 scene critique | technical | .20 / .10 / .10 | 1,400 | one per scene |
+| P6 scene rewrite | creative | .62 / .28 / .10 | 3,000 | ≤2 full replacements |
 
-class SceneDraftSchema(BaseModel):
-    lines: List[LineDraftSchema] = Field(...)
+P4→P5 is mandatory; only `passed:false` invokes P6→P5. A still-failed
+second rewrite raises `SciFiGeminiRewriteExhaustedError`. No word count starts
+this loop.
 
-class SceneCritiqueSchema(BaseModel):
-    passed: bool = Field(..., description="True if the scene matches the outline and word limits.")
-    feedback: str = Field(..., description="Specific directives to fix any gaps in dialogue or fact trace.")
+~~~python
+def run_scifi_gemini_episode(*, payload: dict[str, str], pack: Any,
+    resolved: Mapping[str, Any], led: Ledger, meta: dict[str, Any],
+    creative_fn: GenerateFn, technical_fn: GenerateFn, slot_scheduler: Any,
+    source_bank_row: SourceBank, story_rules: Mapping[str, Any],
+    episode_root: Path, episode_id: str) -> GeminiTailParts: ...
+def validate_gemini_payload(payload: Mapping[str, Any],
+    resolved: Mapping[str, Any]) -> GeminiPayloadV4: ...
+def make_advisory_word_blueprint(requested_words:int,
+    locked_beats:Sequence[str]) -> list[AdvisoryBeatBandV4]: ...
+def invoke_gemini_structured(*, pass_id:str,
+    slot:Literal["creative","technical"], slot_fn:GenerateFn, seam_ref:str,
+    typed_inputs:Mapping[str,Any], result_type:type[T],
+    post_validator:Callable[[T],str|None], base_temperature:float,
+    structural_retry_temperature:float, max_new_tokens:int,
+    journal:GeminiCallJournal) -> T: ...
+def validate_spoken_text_and_lock(draft:SceneDraftV4, outline:OutlineV4,
+    cast_lock:Mapping[str,CastV4]) -> None: ...
+def stamp_music_skip_contract_after_set_lines(led:Ledger,
+    music_line_ids:Sequence[str]) -> None: ...
+def record_word_receipt(meta:MutableMapping[str,Any], requested_words:int,
+    led:Ledger) -> None: ...
+~~~
 
-@dataclass
-class SciFiGeminiTailParts:
-    outline_view: Any
-    canon: Any
-    run_story_spine: bool
-    final_title_override: Optional[str] = None
+Assembly is exactly `set_cast`, `set_scenes`, `set_shots`, `set_beats`,
+`set_lines`, post-setter music skip stamps, `set_music`,
+`stamp_word_counts`; `clips=[]`. Use ANNOUNCER→`kokoro`/`bm_george` and
+c01/c02/c03→`bark` with
+`v2/en_speaker_6`/`v2/en_speaker_3`/`v2/en_speaker_0`; resolve every voice
+before assembly. Because `set_lines` drops skip fields, stamp known music
+sentinel rows `skip:true`, `text:""`, `tts_skip_reason:"music_cue"` afterward.
+Character/announcer rows are non-skipped with nonempty LLM text. Music
+anchors reference non-skipped lines. Setter shapes are
+`nodes/production_ledger.py:792-1207`; legal roles are
+`nodes/_otr_ledger_freeze.py:85-96`.
 
-class SimpleOutlineView:
-    def __init__(self, title: str, premise: str):
-        self.title = title
-        self.premise = premise
+Persist P0 spans, line fact IDs, accepted raw creative responses, per-line
+raw/text hashes, and call journal in `meta.scifi_gemini`, since `set_lines`
+drops arbitrary per-line provenance (`nodes/production_ledger.py:1138-1157`).
+Before tail, reparse receipts and require final in-memory equality plus a P0
+mapping for every audible source fact. The shared Codex v4 TailFinalizer then
+runs warning-free Phase 0/10 and saved-JSON identity/audit. It never edits
+text.
 
+Terminal errors: `SciFiGeminiPayloadContractError`,
+`SciFiGeminiPayloadRouteError`, `SciFiGeminiPayloadThinError`,
+`SciFiGeminiTargetRangeError`, `SciFiGeminiPackContractError`,
+`SciFiGeminiPassError`, `SciFiGeminiRewriteExhaustedError`,
+`SciFiGeminiVoiceInventoryError`, `SciFiGeminiSpokenTextError`,
+`SciFiGeminiGraphError`, `SciFiGeminiProvenanceError`,
+`SciFiGeminiPreTailAuditError`, `SciFiGeminiTailFinalizerMissingError`,
+`SciFiGeminiLedgerSaveError`, and `SciFiGeminiSavedLedgerAuditError`;
+`FreezeAssertionError` propagates. There is no word-budget error, fallback,
+warning acceptance, or Python text surgery.
 
-def run_scifi_gemini_episode(
-    *,
-    payload: Dict[str, Any],
-    pack: Any,
-    resolved: Dict[str, Any],
-    led: Ledger,
-    meta: Dict[str, Any],
-    creative_fn: Any,
-    technical_fn: Any,
-    slot_scheduler: Any,
-    source_bank_row: Any,
-    story_rules: Any,
-    episode_root: Any,
-    episode_id: str,
-) -> SciFiGeminiTailParts:
-    """Consumes source_rss payload, runs multi-pass loop, and populates the ledger."""
-    
-    # 1. Payload validation (Operator-pinned vs RSS feed entry point)
-    # Pinned/custom stories flow in via this same payload dict bypass.
-    if not payload or (not payload.get("headline", "").strip() and not payload.get("full_text", "").strip()):
-         raise SciFiGeminiError("gemini_fact_extraction", "News article payload is empty or malformed.")
+### v4 test plan
 
-    target_words = resolved.get("target_words", 720)
+1. Load catalog/pack JSON and assert global IDs, paths, prefixes, and seams
+   are unique.
+2. Run RSS and `custom_premise` payload fixtures through the map handoff;
+   pin detection must use `resolved["seed_source"]`, never a fetch.
+3. Spy on P0–P6: only injected slots run, tabled bounds apply, P3 alone gets
+   the steer, and a valid non-720 count never invokes P6.
+4. Assert exactly three pitches and both legal critique forms, including
+   clean `passed:true, feedback:""`.
+5. Parameterize every rejected spoken decoration/casing/self-vocative/token
+   form; assert LLM repair only and zero tail text mutation for accepted text.
+6. Build the full five-hierarchy ledger with locked cast, music skip reasons,
+   anchors, source spans/receipts, and verify warning-free Phase 0/10 plus
+   saved UTF-8/no-BOM parity.
+7. Corrupt a span, fact map, receipt hash, role, anchor, or skip reason and
+   assert the typed failure before output.
+## 9. Workflow and model-binding scope
 
-    # Reconstruct role prompts from pack flat strings for structured call
-    fact_extraction_prompt = pack.prompt_stages["gemini_fact_extraction"].format(
-        payload_text=json.dumps(payload, indent=2, ensure_ascii=False)
-    )
-
-    # 2. Extract Facts (Technical Slot)
-    with slot_scheduler.helper_context("gemini_fact_extraction"):
-        try:
-            extracted_facts = _otr_structured_call.structured_call(
-                prompt=fact_extraction_prompt,
-                schema=FactExtractionSchema,
-                slot_fn=technical_fn,
-                base_temperature=0.7,
-                structural_retry_temperature=0.4,
-                max_new_tokens=_MAX_NEW_TOKENS["gemini_fact_extraction"],
-                helper_name="gemini_fact_extraction"
-            )
-        except _otr_structured_call.StructuredCallFailedError as e:
-            raise SciFiGeminiError("gemini_fact_extraction", f"Fact extraction failed: {e}") from e
-
-    # Traceability: Stamp raw facts directly into meta.news.key_terms for Gap Audit
-    meta.setdefault("news", {})["key_terms"] = extracted_facts.facts
-
-    # 3. Pitch Premises (Creative Slot)
-    with slot_scheduler.helper_context("gemini_pitch_generation"):
-        try:
-            pitch_slate = _otr_structured_call.structured_call(
-                prompt=pack.prompt_stages["gemini_pitch_generation"].format(
-                    facts=", ".join(extracted_facts.facts)
-                ),
-                schema=PitchSlateSchema,
-                slot_fn=creative_fn,
-                base_temperature=0.7,
-                structural_retry_temperature=0.4,
-                max_new_tokens=_MAX_NEW_TOKENS["gemini_pitch_generation"],
-                helper_name="gemini_pitch_generation"
-            )
-        except _otr_structured_call.StructuredCallFailedError as e:
-            raise SciFiGeminiError("gemini_pitch_generation", f"Pitch generation failed: {e}") from e
-
-    # Length guard to prevent IndexError
-    if len(pitch_slate.pitches) != 3:
-        raise SciFiGeminiError("gemini_pitch_generation", f"Expected exactly 3 pitches, got {len(pitch_slate.pitches)}")
-
-    # 4. Select Premise (Technical Slot)
-    with slot_scheduler.helper_context("gemini_pitch_critique"):
-        try:
-            selected_pitch = _otr_structured_call.structured_call(
-                prompt=pack.prompt_stages["gemini_pitch_critique"].format(
-                    pitches=str(pitch_slate.model_dump())
-                ),
-                schema=PitchSelectSchema,
-                slot_fn=technical_fn,
-                base_temperature=0.7,
-                structural_retry_temperature=0.4,
-                max_new_tokens=_MAX_NEW_TOKENS["gemini_pitch_critique"],
-                helper_name="gemini_pitch_critique"
-            )
-        except _otr_structured_call.StructuredCallFailedError as e:
-            raise SciFiGeminiError("gemini_pitch_critique", f"Pitch critique failed: {e}") from e
-
-    if selected_pitch.selected_index not in (0, 1, 2):
-        raise SciFiGeminiError("gemini_pitch_critique", f"Invalid index selected: {selected_pitch.selected_index}")
-
-    chosen_premise = pitch_slate.pitches[selected_pitch.selected_index]
-
-    # 5. Build Outline (Creative Slot)
-    with slot_scheduler.helper_context("gemini_scene_outline"):
-        try:
-            outline = _otr_structured_call.structured_call(
-                prompt=pack.prompt_stages["gemini_scene_outline"].format(
-                    chosen_premise=str(chosen_premise.model_dump()),
-                    target_words=target_words
-                ),
-                schema=OutlineSchema,
-                slot_fn=creative_fn,
-                base_temperature=0.7,
-                structural_retry_temperature=0.4,
-                max_new_tokens=_MAX_NEW_TOKENS["gemini_scene_outline"],
-                helper_name="gemini_scene_outline"
-            )
-        except _otr_structured_call.StructuredCallFailedError as e:
-            raise SciFiGeminiError("gemini_scene_outline", f"Outline generation failed: {e}") from e
-
-    # Verify Outline Invariants & Cast references
-    beat_ids = []
-    cast_map = {c.name: c for c in outline.cast}
-    for scene in outline.scenes:
-        for beat in scene.beats:
-            beat_ids.append(beat.beat_id)
-            if beat.speaker_role == "character" and beat.speaker not in cast_map:
-                raise SciFiGeminiError("gemini_scene_outline", f"Beat speaker '{beat.speaker}' not registered in cast.")
-            elif beat.speaker_role == "announcer" and beat.speaker != "ANNOUNCER":
-                raise SciFiGeminiError("gemini_scene_outline", f"Announcer speaker must be named 'ANNOUNCER', got '{beat.speaker}'.")
-    if len(beat_ids) != len(set(beat_ids)):
-        raise SciFiGeminiError("gemini_scene_outline", "Outline outlines duplicate beat IDs.")
-
-    # Populate Ledger
-    led.set_cast([c.model_dump() for c in outline.cast])
-    led.set_scenes([{"scene_id": s.scene_id, "description": s.description, "env": s.env} for s in outline.scenes])
-    meta["cast_status"] = "locked"  # Match established contract
-
-    shot_rows = []
-    beat_rows = []
-    beat_shot_map = {}
-    beat_role_map = {}
-
-    for scene in outline.scenes:
-        # Build shots list
-        for shot in scene.shots:
-            shot_scene_id = shot.scene_id or scene.scene_id
-            shot_rows.append({
-                "shot_id": shot.shot_id,
-                "scene_id": shot_scene_id,
-                "description": shot.description
-            })
-        
-        # Build beats list (Iterate once at scene level to prevent double-booking nested duplicates)
-        total_beats = len(scene.beats)
-        for index, beat in enumerate(scene.beats):
-            # Calculate dynamic scene-relative arc phase progression
-            rel_pos = index / max(1, total_beats - 1)
-            if rel_pos < 0.3:
-                arc_phase = "setup"
-            elif rel_pos < 0.7:
-                arc_phase = "rising_action"
-            elif rel_pos < 0.9:
-                arc_phase = "climax"
-            else:
-                arc_phase = "resolution"
-
-            char_id = "announcer" if beat.speaker_role == "announcer" else cast_map[beat.speaker].char_id
-            beat_role_map[beat.beat_id] = (beat.speaker_role, char_id, arc_phase)
-            beat_shot_map[beat.beat_id] = beat.shot_id
-            beat_rows.append({
-                "beat_id": beat.beat_id,
-                "shot_id": beat.shot_id,
-                "scene_id": scene.scene_id,
-                "speaker": beat.speaker,
-                "char_id": char_id,
-                "line_ids": [beat.beat_id],
-                "arc_phase": arc_phase,
-            })
-            
-    led.set_shots(shot_rows)
-    led.set_beats(beat_rows)
-
-    # Set music sentinel cues. Target durations: opening 12.0s, closing 8.0s, start_s: 0.0s
-    music_rows = [
-        {"cue_id": "opening", "description": "Intro theme", "start_s": 0.0, "target_duration_s": 12.0, "placement": "music_open"},
-        {"cue_id": "closing", "description": "Outro theme", "start_s": 0.0, "target_duration_s": 8.0, "placement": "music_close"}
-    ]
-    led.set_music(music_rows)
-
-    # 6. Drafting Loop (Per Scene)
-    final_lines = []
-    for scene in outline.scenes:
-        draft_prompt = pack.prompt_stages["gemini_scene_draft"].format(
-            scene_outline=str(scene.model_dump())
-        )
-        
-        attempts = 0
-        passed = False
-        scene_draft = None
-        feedback = ""
-        
-        while attempts < 3 and not passed:
-            attempts += 1
-            if attempts == 1:
-                # Initial Draft
-                with slot_scheduler.helper_context("gemini_scene_draft"):
-                    try:
-                        scene_draft = _otr_structured_call.structured_call(
-                            prompt=draft_prompt,
-                            schema=SceneDraftSchema,
-                            slot_fn=creative_fn,
-                            base_temperature=0.7,
-                            structural_retry_temperature=0.4,
-                            max_new_tokens=_MAX_NEW_TOKENS["gemini_scene_draft"],
-                            helper_name="gemini_scene_draft"
-                        )
-                    except _otr_structured_call.StructuredCallFailedError as e:
-                        raise SciFiGeminiError("gemini_scene_draft", f"Scene draft structured call failed: {e}", attempts) from e
-            else:
-                # Rewrite on Critique
-                rewrite_prompt = pack.prompt_stages["gemini_scene_rewrite"].format(
-                    feedback=feedback,
-                    facts=", ".join(extracted_facts.facts),
-                    scene_outline=str(scene.model_dump()),
-                    previous_draft=json.dumps([l.model_dump() for l in scene_draft.lines] if scene_draft else [])
-                )
-                with slot_scheduler.helper_context("gemini_scene_rewrite"):
-                    try:
-                        scene_draft = _otr_structured_call.structured_call(
-                            prompt=rewrite_prompt,
-                            schema=SceneDraftSchema,
-                            slot_fn=creative_fn,
-                            base_temperature=0.7,
-                            structural_retry_temperature=0.4,
-                            max_new_tokens=_MAX_NEW_TOKENS["gemini_scene_rewrite"],
-                            helper_name="gemini_scene_rewrite"
-                        )
-                    except _otr_structured_call.StructuredCallFailedError as e:
-                        raise SciFiGeminiError("gemini_scene_rewrite", f"Scene rewrite structured call failed: {e}", attempts) from e
-            
-            # Referential Integrity Verification: Exact 1-to-1 Match
-            expected_beat_ids = {beat.beat_id for beat in scene.beats}
-            drafted_beat_ids = {line.beat_id for line in scene_draft.lines}
-            if expected_beat_ids != drafted_beat_ids:
-                passed = False
-                feedback = f"Drafted lines must match outline beats exactly. Missing: {expected_beat_ids - drafted_beat_ids}, Extra: {drafted_beat_ids - expected_beat_ids}."
-                continue
-
-            # Critique Pass
-            with slot_scheduler.helper_context("gemini_scene_critique"):
-                try:
-                    critique = _otr_structured_call.structured_call(
-                        prompt=pack.prompt_stages["gemini_scene_critique"].format(
-                            drafted_lines=json.dumps([l.model_dump() for l in scene_draft.lines]),
-                            scene_outline=str(scene.model_dump()),
-                            facts=", ".join(extracted_facts.facts)
-                        ),
-                        schema=SceneCritiqueSchema,
-                        slot_fn=technical_fn,
-                        base_temperature=0.7,
-                        structural_retry_temperature=0.4,
-                        max_new_tokens=_MAX_NEW_TOKENS["gemini_scene_critique"],
-                        helper_name="gemini_scene_critique"
-                    )
-                    passed = critique.passed
-                    feedback = critique.feedback
-                except _otr_structured_call.StructuredCallFailedError as e:
-                    passed = False
-                    feedback = f"Critique engine parse error: {e}. Please rebuild script lines ensuring facts are verbatim."
-
-        if not passed:
-            raise SciFiGeminiError("gemini_scene_critique", f"Scene {scene.scene_id} failed critique checks after max rewrites: {feedback}", attempts)
-
-        final_lines.extend(scene_draft.lines)
-
-    # Convert Line Schemas to Ledger shape and submit
-    ledger_lines = []
-    for line in final_lines:
-        role, char_id, arc_phase = beat_role_map.get(line.beat_id, ("character", None, "setup"))
-        shot_id = beat_shot_map.get(line.beat_id)
-        ledger_lines.append({
-            "line_id": line.beat_id,
-            "beat_id": line.beat_id,
-            "shot_id": shot_id,
-            "char_id": char_id,
-            "speaker_role": role,
-            "text": line.text,
-            "arc_phase": arc_phase
-        })
-    led.set_lines(ledger_lines)
-
-    # Build Episode Canon (Returned to Tail Context; Single Writer Rule observed)
-    canon = _OTRC.episode_canon_from_outline_dict({
-        "title": outline.title,
-        "premise": outline.premise,
-        "setting": outline.setting,
-        "time_of_day": outline.time_of_day,
-    })
-
-    return SciFiGeminiTailParts(
-        outline_view=SimpleOutlineView(title=outline.title, premise=outline.premise),
-        canon=canon,
-        run_story_spine=False,
-        final_title_override=outline.title
-    )
-```
-
----
-
-## 9. Workflow JSON Integration (Verbatim Diff)
-To wire the `scifi_gemini` lane into the canonical runner graph, the builder must apply the following patch atomically with code changes to [workflows/otr_canonical.json](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_canonical.json) to update node ID 1's `widgets_values` array. 
-
-> [!NOTE]
-> Setting `creative_writing_model` (index 3) to `"google_api:slot-a"` and `technical_model` (index 4) to `"google_api:slot-b"` routes these slots to the Google API remote driver. This virtual slot routing is recognized by `_SlotScheduler` only if a Gemini API key is configured in the environment (`GEMINI_API_KEY`, etc.). The concrete models are specified at indexes 25 and 26.
-
-```diff
--  "widgets_values": ["", 30, 2, "mistralai/Mistral-Nemo-Instruct-2407", "mistralai/Mistral-Nemo-Instruct-2407", "", true, "auto", "balanced", false, 0.05, 1.03, 200, "roll (~11% chance)", true, true, true, "(enable OpenRouter)", "(enable OpenRouter)", "(enable Comfy Credits)", "(enable Comfy Credits)", "Off", "auto", "science_news", "sci_fi_radio", "(select Google API model)", "(select Google API model)", "", "cuda", "sdpa", "bnb_nf4", 14.5, 4096, "Q8_0"]
-+  "widgets_values": ["", 720, 2, "google_api:slot-a", "google_api:slot-b", "", true, "auto", "balanced", false, 0.05, 1.03, 200, "roll (~11% chance)", true, true, true, "(enable OpenRouter)", "(enable OpenRouter)", "(enable Comfy Credits)", "(enable Comfy Credits)", "Off", "auto", "scifi_gemini", "sci_fi_radio", "gemini-flash-latest", "gemini-flash-lite-latest", "", "cuda", "sdpa", "bnb_nf4", 14.5, 4096, "Q8_0"]
-```
+No workflow JSON edit is implied or authorized by this source-bank spec. The
+operator binds local models to the writer's existing `creative` and `technical`
+slots; this lane receives only their `generate_fn` closures. The bank becomes
+selectable through its additive registry/map implementation, not by changing a
+widget default, remote-provider setting, or environment variable.
 
 ---
 
 ## 10. Staging and Production Checklist (For the Builder)
 1. **Directory & Artifact Setup:** Initialize `story_packs/scifi_gemini/` under `nodes/story_packs/`. Write `scifi_gemini_v1.json` to this directory (using the JSON schema in §2.3) atomically with `banks.json` and `pipelines.json` modifications.
-2. **Apply Workflow Diff:** Update node ID 1's `widgets_values` array inside `workflows/otr_canonical.json` as specified in Section 9. Run the workflow JSON audit suite (`OTR_WorkflowValidator` + JSON round-trip + widget-count audit) to confirm structural integrity before committing.
-3. **Registry and Dispatch Verification:** Verify that `_resolve_lane_runner("scifi_gemini_multipass")` correctly returns `_run_scifi_gemini_lane`. Run the newly created unit tests (`tests/test_scifi_gemini_runner.py`) using `pytest` to assert correct registration, schema validation, and exception behavior.
-4. **Interactive Smoke Run:** With `OTR_GOOGLE_API_KEY` set, run a single mock episode sweep against the newly wired `otr_canonical.json` to confirm all seven passes interleave and write verbatim lines to the ledger. Verify zero warnings in `phase_10_gap_audit_post_and_freeze`.
+2. **Registry and Dispatch Verification:** Verify that `_resolve_lane_runner("scifi_gemini_multipass")` correctly returns `_run_scifi_gemini_lane`, and that the common tail-finalizer hook is present with default `None` behavior for every existing lane. Run the new unit tests using stubbed supplied slot functions; no external model/provider configuration is required.
+3. **Contract Smoke:** Run valid RSS and pinned fixtures at targets 30, 720, and 900. Assert all seven creative/technical passes use only the injected closures, every spoken row is receipt-backed, Phase 10 is frozen_clean after tail/save, and a malformed, thin, untraceable, warning, or save-failure fixture stops loud before an output is returned.
+
+---
+
+
+## 11. v4 revision ledger and convergence self-audit
+
+| Hard contract | v4 verdict | Enforcement |
+|---|---|---|
+| Additive only | PASS | New registry rows, pack, runner map key, and shared optional finalizer only; no workflow/fetcher/network change. |
+| science_rss payload first and pinned path | PASS | Seven-key payload is supplied before P0; `seed_source` lives in `resolved`; malformed/thin inputs stop typed. |
+| Only creative/technical closures | PASS | P0–P6 use only the injected slot callable through `structured_call`. |
+| Complete five-hierarchy ledger and freeze | PASS | Setter order, cast lock, legal roles, skipped music reasons, anchors, Phase 0/10, and saved audit are all mandatory. |
+| Verbatim LLM dialogue | PASS | Pre-tail rejection prevents the live tail from changing accepted text; receipts prove final/saved equality. |
+| Traceable news facts | PASS | P0 exact spans plus per-line fact maps and receipt hashes are persisted and audited. |
+| 720 strategy | PASS | 720 is an advisory P3 steer; actual split/ledger counts are recorded, never accepted/rejected against it. |
+| Multi-pass/no text surgery/fail loud | PASS | P4→P5→P6 is bounded only by content defects; typed failure has no source/model/voice/text fallback. |
+| SFW, UTF-8 no BOM, placeholder-name rule | PASS | Frozen seam guardrails and v4 tests cover all three. |
+### Open questions for the operator
+
+1. The fixed ANNOUNCER and Bark preset values must be resolver-tested on the
+   build machine. An unavailable value is a typed inventory failure; this spec
+   intentionally does not authorize selecting a substitute.
+2. The optional TailFinalizer/title-source hook is a required additive writer
+   extension for all three source-bank builds. It preserves existing lanes by
+   defaulting to `None`; if the operator declines that extension, a mapped
+   runner cannot prove the final saved ledger after tail mutation, so this lane
+   must remain non-runnable.

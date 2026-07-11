@@ -91,3 +91,13 @@ def test_json_parser_does_not_salvage_nested_child_from_broken_outer_object():
         assert "no decodable top-level JSON object" in str(exc)
     else:
         raise AssertionError("broken outer JSON must not return its nested child")
+
+
+def test_json_parser_does_not_salvage_nested_child_from_broken_fenced_outer_object():
+    broken = "Here is the artifact.\n```json\n{\"facts\":[{\"fact_id\":\"F0\",\"claim\":\"child\"}\n```"
+    try:
+        parse_first_json_object(broken)
+    except ValueError as exc:
+        assert "no decodable top-level JSON object" in str(exc)
+    else:
+        raise AssertionError("broken fenced JSON must not return its nested child")

@@ -261,6 +261,104 @@ def test_tail_byte_identity_same_inputs(tmp_path, monkeypatch):
     assert out_a[4] == "stub/technical-model"
 
 
+@pytest.mark.parametrize(
+    "source_bank",
+    ("scifi_fable2", "scifi_codex", "scifi_gemini", "scifi_sonnet"),
+)
+def test_content_owned_tail_stamps_delivery_before_finalizer(
+    tmp_path, monkeypatch, source_bank,
+):
+    """Every sealed-content lane reaches its freeze hook with fresh delivery.
+
+    The shared writer tail is the final producer boundary: it stamps
+    pronunciation-safe delivery text after all writer-side work and before
+    a lane finalizer can execute its Phase-10 freeze.
+    """
+    from nodes._otr_readiness import text_for_tts_source_sha256
+    from nodes._otr_text_delivery import (
+        CONTENT_OWNED,
+        delivery_mode_for_meta,
+        resolve_line_delivery,
+    )
+
+    class _DeliveryProbe:
+        checked = False
+
+        def before_save(self, *, ctx):
+            cast_seed = (
+                (ctx.led.data["meta"].get("cast_contract") or {})
+                .get("cast_seed", ctx.led.data["meta"].get("episode_seed"))
+            )
+            assert cast_seed is not None
+            rows = [
+                row for row in ctx.led.data["lines"]
+                if row.get("text", "").strip()
+                and not row.get("skip")
+                and row.get("speaker_role") in {"character", "announcer"}
+            ]
+            assert rows
+            for row in rows:
+                canonical, delivery = resolve_line_delivery(
+                    row, CONTENT_OWNED,
+                )
+                assert canonical == row["text"]
+                assert delivery == row["text_for_tts"]
+                assert row["text_for_tts_source_sha256"] == (
+                    text_for_tts_source_sha256(canonical)
+                )
+            self.checked = True
+
+        def after_save(self, *, saved_path, ledger_data):
+            assert saved_path
+            assert ledger_data
+
+    monkeypatch.setenv("OTR_ENABLE_STORY_SPINE", "0")
+    ctx = _make_ctx(tmp_path / source_bank, monkeypatch, run_story_spine=False)
+    ctx.led.data["meta"]["source_bank"] = source_bank
+    before = {
+        row["line_id"]: row["text"]
+        for row in ctx.led.data["lines"]
+        if row.get("text", "").strip()
+        and not row.get("skip")
+        and row.get("speaker_role") in {"character", "announcer"}
+    }
+    probe = _DeliveryProbe()
+
+    OTR_LedgerScriptWriter()._run_writer_tail(ctx, tail_finalizer=probe)
+
+    assert probe.checked
+    assert delivery_mode_for_meta(ctx.led.data["meta"]) == CONTENT_OWNED
+    assert (
+        (ctx.led.data["meta"].get("cast_contract") or {}).get("cast_seed")
+        == ctx.led.data["meta"].get("episode_seed")
+    )
+    assert {
+        row["line_id"]: row["text"]
+        for row in ctx.led.data["lines"]
+        if row.get("line_id") in before
+    } == before
+
+
+def test_legacy_tail_does_not_introduce_delivery_stamps(tmp_path, monkeypatch):
+    """The shared content-owned repair does not alter legacy delivery."""
+    from nodes._otr_text_delivery import LEGACY, delivery_mode_for_meta
+
+    monkeypatch.setenv("OTR_ENABLE_STORY_SPINE", "0")
+    ctx = _make_ctx(tmp_path, monkeypatch, run_story_spine=False)
+    for row in ctx.led.data["lines"]:
+        row.pop("text_for_tts", None)
+        row.pop("text_for_tts_source_sha256", None)
+        row.pop("text_for_tts_receipt", None)
+
+    OTR_LedgerScriptWriter()._run_writer_tail(ctx)
+
+    assert delivery_mode_for_meta(ctx.led.data["meta"]) == LEGACY
+    assert all(
+        "text_for_tts" not in row
+        for row in ctx.led.data["lines"]
+    )
+
+
 # ---------------------------------------------------------------------------
 # run_story_spine gate (doc s14 item 8)
 # ---------------------------------------------------------------------------

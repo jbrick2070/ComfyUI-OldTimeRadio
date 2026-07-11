@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,13 +16,20 @@ from typing import Any, Callable, Literal, Mapping, MutableMapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+
+log = logging.getLogger("OTR")
+
 try:
+    from ._otr_canon import EpisodeCanon
+    from ._otr_json import parse_first_json_object
     from ._otr_source_payload import validate_source_payload
     from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import schema_shape_instruction, structured_call
     from . import _otr_ledger_freeze
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
+    from _otr_canon import EpisodeCanon  # type: ignore
+    from _otr_json import parse_first_json_object  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
@@ -138,6 +146,47 @@ class CastPlanV4(_Strict):
     cast: list[CastPlanRowV4] = Field(min_length=2, max_length=4)
 
 
+_CAST_NAME_RE = re.compile(r"(?:(?:Dr|Prof)\. )?[A-Z][a-z]+(?: [A-Z][a-z]+)*")
+
+
+def _is_canonical_character_name(name: str) -> bool:
+    """Accept ordinary title-cased full names without rewriting cast work."""
+    return bool(_CAST_NAME_RE.fullmatch(name))
+
+
+def _validate_cast_plan(cast: CastPlanV4) -> str | None:
+    """Lock the fixed roster before downstream score/script generation."""
+    by_id = {row.char_id: row for row in cast.cast}
+    if len(by_id) != len(cast.cast):
+        return "cast plan has duplicate char_id values"
+    announcer = by_id.get("announcer")
+    if announcer is None:
+        return "cast plan must contain the fixed announcer row"
+    if announcer.name != "ANNOUNCER":
+        return "announcer row must use the exact fixed name ANNOUNCER"
+    for row in cast.cast:
+        if row.char_id != "announcer" and not _is_canonical_character_name(row.name):
+            return f"cast name {row.name!r} is not a canonical Title-Case name"
+    return None
+
+
+def repair_cast_plan_metadata(failed_output: str) -> CastPlanV4 | None:
+    """Normalize the fixed announcer identity without changing character work."""
+    try:
+        cast = CastPlanV4.model_validate(parse_first_json_object(failed_output))
+    except Exception:
+        return None
+    rows = []
+    changed = False
+    for row in cast.cast:
+        if row.char_id == "announcer" and row.name != "ANNOUNCER":
+            rows.append(row.model_copy(update={"name": "ANNOUNCER"}))
+            changed = True
+        else:
+            rows.append(row)
+    return cast.model_copy(update={"cast": rows}) if changed else None
+
+
 class AdvisoryWordPlanV4(_Strict):
     advisory_total_center: int = Field(ge=1)
     per_beat: list[dict[str, Any]]
@@ -215,7 +264,11 @@ class ScriptLineV4(_Strict):
     arc_phase: str
     compose_flags: list[str] = []
     beat_intent: str
-    dialogue_slot_id: str
+    # The lane never builds a StoryRoom outline, so its accepted lines carry
+    # the ledger's explicit ``None`` slot value.  A slot is metadata, not
+    # dialogue, and making it nullable keeps the strict artifact aligned with
+    # production_ledger.set_lines without fabricating an authored identifier.
+    dialogue_slot_id: str | None
     fact_ids: list[str] = []
 
 
@@ -225,6 +278,349 @@ class ScriptArtifactV4(_Strict):
     scenes: list[dict[str, Any]] = Field(min_length=1)
     lines: list[ScriptLineV4] = Field(min_length=1)
     music_cues: list[MusicCueV4] = Field(min_length=1)
+
+
+_SCRIPT_ARTIFACT_FIELDS = frozenset(ScriptArtifactV4.model_fields)
+_SCRIPT_LINE_FIELDS = frozenset(ScriptLineV4.model_fields)
+_MUSIC_CUE_FIELDS = frozenset(MusicCueV4.model_fields)
+_SCRIPT_LINE_REPAIRABLE_FIELDS = frozenset({"shot_id", "boundary"})
+_SCRIPT_LINE_AUTHORED_FIELDS = frozenset({
+    "line_id", "beat_id", "char_id", "speaker_role", "text",
+    "arc_phase", "beat_intent", "dialogue_slot_id",
+})
+_SCRIPT_SCENE_FORBIDDEN_KEYS = frozenset({"speaker", "shots", "beats"})
+_SCRIPT_ARTIFACT_ROOT_INSTRUCTION = (
+    "\nSCRIPT ARTIFACT ROOT CONTRACT: Do not return a score, a scene, a beat, "
+    "or a patch. Return one root ScriptArtifactV4 object with exactly these root "
+    "keys: schema_version, title, scenes, lines, music_cues. The input "
+    "accepted_line_graph is a closed executable manifest: emit exactly one root-level "
+    "lines item for every listed line_id, in the listed order, and no other lines. "
+    "music_cues is separate cue metadata and never authorizes an additional music "
+    "line. Output scenes are lightweight scene records only "
+    "(scene_id, env, description); never nest shots or beats inside them."
+)
+
+
+class _PromptMustFitMessages(list[dict[str, str]]):
+    """Tell the local slot wrapper to fail before it slices this prompt."""
+
+    _otr_prompt_must_fit = True
+
+
+def _has_forbidden_script_scene_keys(scenes: object) -> bool:
+    """Reject score-shaped scene echoes without deleting story material."""
+    if not isinstance(scenes, list):
+        return True
+    return any(
+        not isinstance(scene, dict)
+        or bool(_SCRIPT_SCENE_FORBIDDEN_KEYS & set(scene))
+        for scene in scenes
+    )
+
+
+def _accepted_script_line_metadata(
+    score: RadioScoreV4,
+) -> dict[str, tuple[str, str, str]] | None:
+    """Build the executable score order, or fail closed on graph ambiguity.
+
+    This deliberately follows ``_assemble_ledger``: scene list order, then
+    each scene's beat list order, then each beat's ordered ``line_ids``.  The
+    model-facing ``BeatPlanV4.order`` field is not consumed by assembly, so it
+    must not silently redefine production boundary semantics here.
+    """
+    scene_ids: set[str] = set()
+    shot_ids: set[str] = set()
+    beat_ids: set[str] = set()
+    lines: dict[str, tuple[str, str, str]] = {}
+    previous_shot: str | None = None
+    previous_beat: str | None = None
+
+    for scene in score.scenes:
+        if not scene.scene_id or scene.scene_id in scene_ids:
+            return None
+        scene_ids.add(scene.scene_id)
+        scene_shot_ids: set[str] = set()
+        for shot in scene.shots:
+            if (
+                not shot.shot_id
+                or shot.shot_id in shot_ids
+                or shot.shot_id in scene_shot_ids
+                or shot.scene_id != scene.scene_id
+            ):
+                return None
+            shot_ids.add(shot.shot_id)
+            scene_shot_ids.add(shot.shot_id)
+
+        used_scene_shot_ids: set[str] = set()
+        for beat in scene.beats:
+            if (
+                not beat.beat_id
+                or beat.beat_id in beat_ids
+                or beat.scene_id != scene.scene_id
+                or beat.shot_id not in scene_shot_ids
+            ):
+                return None
+            beat_ids.add(beat.beat_id)
+            used_scene_shot_ids.add(beat.shot_id)
+            for line_id in beat.line_ids:
+                if not line_id or line_id in lines:
+                    return None
+                boundary = (
+                    "shot_start"
+                    if previous_shot != beat.shot_id
+                    else "beat_start"
+                    if previous_beat != beat.beat_id
+                    else "continue"
+                )
+                lines[line_id] = (beat.beat_id, beat.shot_id, boundary)
+                previous_shot = beat.shot_id
+                previous_beat = beat.beat_id
+
+        # A score with an orphaned shot cannot be used as an authoritative
+        # mapping source; guessing which beat owns it would be a content edit.
+        if used_scene_shot_ids != scene_shot_ids:
+            return None
+
+    return lines or None
+
+
+def _validate_radio_score_graph(
+    score: RadioScoreV4, advisory: AdvisoryWordPlanV4,
+) -> str | None:
+    """Accept only a score that closes the pre-P5 executable graph.
+
+    P3 is the last stage allowed to decide the score's beats and line manifest.
+    P5 may write line text but cannot safely invent a new line or infer where it
+    belongs.  Locking the advisory plan here makes the score a complete source
+    of truth before the metadata-only ScriptArtifactV4 repair ever runs.
+    """
+    if score.advisory_word_plan.model_dump(mode="json") != advisory.model_dump(mode="json"):
+        return "score advisory_word_plan does not exactly match the locked plan"
+
+    expected_beat_ids: list[str] = []
+    for row in advisory.per_beat:
+        beat_id = row.get("beat_id") if isinstance(row, dict) else None
+        if not isinstance(beat_id, str) or not beat_id:
+            return "locked advisory plan has an invalid beat ID"
+        expected_beat_ids.append(beat_id)
+    if len(set(expected_beat_ids)) != len(expected_beat_ids):
+        return "locked advisory plan has duplicate beat IDs"
+
+    observed_beats = [
+        beat
+        for scene in score.scenes
+        for beat in scene.beats
+    ]
+    if [beat.beat_id for beat in observed_beats] != expected_beat_ids:
+        return "score beat IDs do not exactly match the locked advisory order"
+    if [beat.order for beat in observed_beats] != list(range(1, len(observed_beats) + 1)):
+        return "score beat order must be consecutive and match assembly order"
+
+    line_metadata = _accepted_script_line_metadata(score)
+    if line_metadata is None:
+        return "score has missing or ambiguous executable line mappings"
+    line_ids = list(line_metadata)
+    canonical_line_ids = [f"l{i:03d}" for i in range(1, len(line_ids) + 1)]
+    if line_ids != canonical_line_ids:
+        return "score line IDs must be contiguous canonical IDs in assembly order"
+
+    seen_cue_ids: set[str] = set()
+    for cue in score.music_cues:
+        if cue.cue_id in seen_cue_ids:
+            return f"score has duplicate music cue {cue.cue_id!r}"
+        seen_cue_ids.add(cue.cue_id)
+        anchor = line_metadata.get(cue.anchor_line_id)
+        if anchor is None:
+            return f"music cue {cue.cue_id!r} anchors an unknown score line"
+        if cue.anchor_beat_id != anchor[0]:
+            return f"music cue {cue.cue_id!r} anchors the wrong score beat"
+    return None
+
+
+def repair_radio_score_metadata(
+    failed_output: str, advisory: AdvisoryWordPlanV4,
+) -> RadioScoreV4 | None:
+    """Derive cue anchor beats from an otherwise closed accepted score graph.
+
+    A cue's ``anchor_beat_id`` is executable metadata: once its anchor line is
+    known, the owning beat is not a creative choice.  Do not repair an unknown
+    anchor, missing beat, altered advisory plan, or noncanonical line manifest;
+    those require a complete score repair and must fail closed here.
+    """
+    try:
+        score = RadioScoreV4.model_validate(parse_first_json_object(failed_output))
+    except Exception:
+        return None
+    if score.advisory_word_plan.model_dump(mode="json") != advisory.model_dump(mode="json"):
+        return None
+    expected_beats = [str(row["beat_id"]) for row in advisory.per_beat]
+    observed_beats = [beat for scene in score.scenes for beat in scene.beats]
+    if [beat.beat_id for beat in observed_beats] != expected_beats:
+        return None
+    if [beat.order for beat in observed_beats] != list(range(1, len(observed_beats) + 1)):
+        return None
+    line_metadata = _accepted_script_line_metadata(score)
+    if line_metadata is None:
+        return None
+    line_ids = list(line_metadata)
+    if line_ids != [f"l{i:03d}" for i in range(1, len(line_ids) + 1)]:
+        return None
+
+    seen_cue_ids: set[str] = set()
+    cues: list[MusicCueV4] = []
+    changed = False
+    for cue in score.music_cues:
+        if cue.cue_id in seen_cue_ids:
+            return None
+        seen_cue_ids.add(cue.cue_id)
+        anchor = line_metadata.get(cue.anchor_line_id)
+        if anchor is None:
+            return None
+        if cue.anchor_beat_id != anchor[0]:
+            cue = cue.model_copy(update={"anchor_beat_id": anchor[0]})
+            changed = True
+        cues.append(cue)
+    if not changed:
+        return None
+    repaired = score.model_copy(update={"music_cues": cues})
+    return repaired if _validate_radio_score_graph(repaired, advisory) is None else None
+
+
+def repair_script_artifact_metadata(
+    failed_output: str, score: RadioScoreV4,
+) -> ScriptArtifactV4 | None:
+    """Normalize only deterministic ScriptArtifactV4 metadata, or return None.
+
+    The repair never creates, removes, or rewrites story text.  It uses the
+    already accepted score graph as the sole authority for line shot IDs and
+    boundary transitions, removes strict-model extras, and fails closed when a
+    graph or raw-line mapping is incomplete or ambiguous.
+    """
+    def refuse(reason: str) -> None:
+        log.info("[scifi_codex:ScriptArtifactV4] deterministic repair declined: %s", reason)
+
+    expected = _accepted_script_line_metadata(score)
+    if expected is None:
+        refuse("accepted score graph is missing or ambiguous")
+        return None
+    try:
+        data = parse_first_json_object(failed_output)
+    except Exception as exc:
+        refuse(f"failed output has no complete top-level object: {exc}")
+        return None
+    if not isinstance(data, dict):
+        refuse("top-level artifact is not an object")
+        return None
+    raw_lines = data.get("lines")
+    raw_music_cues = data.get("music_cues")
+    raw_scenes = data.get("scenes")
+    if (
+        not isinstance(raw_lines, list)
+        or not isinstance(raw_music_cues, list)
+        or _has_forbidden_script_scene_keys(raw_scenes)
+    ):
+        refuse("artifact has missing graph arrays or score-shaped scene fields")
+        return None
+
+    changed = data.get("schema_version") != "scifi_codex.script_artifact.v4"
+    repaired_lines: list[dict[str, Any]] = []
+    observed_line_ids: set[str] = set()
+    for raw_line in raw_lines:
+        if not isinstance(raw_line, dict):
+            refuse("script lines contain a non-object")
+            return None
+        line_id = raw_line.get("line_id")
+        if (
+            not isinstance(line_id, str)
+            or not line_id
+            or line_id in observed_line_ids
+            or line_id not in expected
+        ):
+            refuse(f"script line mapping is missing, duplicate, or unknown: {line_id!r}")
+            return None
+        observed_line_ids.add(line_id)
+        # The authored/script-meaning fields must already exist byte-for-byte.
+        # The remaining absent fields are Pydantic's declared neutral metadata
+        # defaults (skip/traits/compose flags/fact IDs); accepting those exact
+        # defaults does not invent dialogue, premise, beat, or intent content.
+        if not _SCRIPT_LINE_AUTHORED_FIELDS <= set(raw_line):
+            refuse(f"line {line_id} is missing an authored field")
+            return None
+        repaired_line = {
+            key: value for key, value in raw_line.items()
+            if key in _SCRIPT_LINE_FIELDS
+        }
+        if len(repaired_line) != len(raw_line):
+            changed = True
+        beat_id, shot_id, boundary = expected[line_id]
+        if raw_line.get("beat_id") != beat_id:
+            refuse(f"line {line_id} does not retain its accepted beat")
+            return None
+        if raw_line.get("shot_id") != shot_id:
+            changed = True
+        if raw_line.get("boundary") != boundary:
+            changed = True
+        repaired_line["shot_id"] = shot_id
+        repaired_line["boundary"] = boundary
+        repaired_lines.append(repaired_line)
+    if observed_line_ids != set(expected):
+        refuse("script line IDs do not exactly cover the accepted score graph")
+        return None
+
+    repaired_music_cues: list[dict[str, Any]] = []
+    for raw_cue in raw_music_cues:
+        if not isinstance(raw_cue, dict):
+            refuse("music cues contain a non-object")
+            return None
+        repaired_cue = {
+            key: value for key, value in raw_cue.items()
+            if key in _MUSIC_CUE_FIELDS
+        }
+        if len(repaired_cue) != len(raw_cue):
+            changed = True
+        repaired_music_cues.append(repaired_cue)
+
+    repaired = {
+        key: value for key, value in data.items()
+        if key in _SCRIPT_ARTIFACT_FIELDS
+    }
+    if len(repaired) != len(data):
+        changed = True
+    repaired["schema_version"] = "scifi_codex.script_artifact.v4"
+    repaired["lines"] = repaired_lines
+    repaired["music_cues"] = repaired_music_cues
+    if not changed:
+        refuse("artifact has no deterministic metadata defect")
+        return None
+    try:
+        return ScriptArtifactV4.model_validate(repaired)
+    except Exception as exc:
+        refuse(f"metadata-only result does not satisfy ScriptArtifactV4: {exc}")
+        return None
+
+
+def _validate_script_graph(script: ScriptArtifactV4, score: RadioScoreV4) -> None:
+    """Require the accepted artifact to retain the score's exact metadata graph."""
+    expected = _accepted_script_line_metadata(score)
+    if expected is None:
+        raise CodexGraphError("accepted score has missing or ambiguous script-line mappings")
+    if _has_forbidden_script_scene_keys(script.scenes):
+        raise CodexGraphError("script scenes contain forbidden score or legacy fields")
+    observed: dict[str, ScriptLineV4] = {}
+    for line in script.lines:
+        if not line.line_id or line.line_id in observed:
+            raise CodexGraphError("script artifact has a missing or duplicate line_id")
+        observed[line.line_id] = line
+    if set(observed) != set(expected):
+        raise CodexGraphError("script line IDs do not exactly match the accepted score graph")
+    for line_id, line in observed.items():
+        beat_id, shot_id, boundary = expected[line_id]
+        if line.beat_id != beat_id:
+            raise CodexGraphError(f"line {line_id} does not resolve to its accepted beat")
+        if line.shot_id != shot_id:
+            raise CodexGraphError(f"line {line_id} does not resolve to its accepted shot")
+        if line.boundary != boundary:
+            raise CodexGraphError(f"line {line_id} has an invalid accepted-order boundary")
 
 
 class StructureReviewV4(_Strict):
@@ -320,8 +716,67 @@ def validate_payload_envelope(
     return env, steer
 
 
+def _p0_evidence_projection(
+    envelope: PayloadEnvelopeV4,
+) -> tuple[dict[str, str], frozenset[str]]:
+    """Return the lossless, de-aliased source view P0 may cite.
+
+    A0 remains the full canonical seven-key payload: it is hashed and remains
+    the sole coordinate system for source-span validation.  P0 only needs
+    fields that ``SourceSpanV4`` permits, though.  In particular, the RSS
+    adapter commonly carries its fallback body as both ``summary`` and
+    ``full_text``, then derives ``seed_text`` from headline plus summary.
+    Repeating those aliases can push the model prompt past its context window
+    and make the low-level prompt guard discard the schema contract.
+
+    This projection never slices or rewrites text.  It builds a lossless
+    *coordinate cover*: retain a source string unless it is already an exact
+    substring of a retained one.  ``seed_text`` is considered first because a
+    derived headline+summary can legally contain a quote that crosses the two
+    original fields and therefore cannot be rehomed to either field alone.
+    The returned allowlist prevents a model repair from reintroducing an
+    omitted alias as a source-span field; the deterministic literal-span
+    repair rehomes exact quotes into this cover when needed.
+    """
+    payload = envelope.payload.model_dump(mode="json")
+    # A pinned premise is canonically supplied in seed_text; RSS seed_text is
+    # often a headline+summary superstring.  In both cases it is the best
+    # first field for preserving valid literal-span coordinates.
+    field_order = ["seed_text", "full_text", "headline", "summary"]
+
+    projected: dict[str, str] = {}
+    retained_values: list[str] = []
+    for field in field_order:
+        value = payload[field]
+        if value and not any(value in retained for retained in retained_values):
+            projected[field] = value
+            retained_values.append(value)
+    if not projected:
+        raise CodexPayloadShapeError("P0 has no legal source evidence fields")
+    return projected, frozenset(projected)
+
+
+def _p0_artifact_inputs(envelope: PayloadEnvelopeV4) -> dict[str, Any]:
+    """Build P0's compact model view without changing A0 provenance."""
+    evidence, allowed_fields = _p0_evidence_projection(envelope)
+    return {
+        "payload": {
+            "schema_version": envelope.schema_version,
+            "payload": evidence,
+            "source_mode": envelope.source_mode,
+            "source_digest": envelope.source_digest,
+        },
+        "allowed_source_fields": sorted(allowed_fields),
+    }
+
+
 def _span_ok(span: SourceSpanV4, payload: Mapping[str, str]) -> bool:
-    return span.quote == payload.get(span.field, "")[span.start:span.end]
+    source = payload.get(span.field)
+    return (
+        isinstance(source, str)
+        and 0 <= span.start < span.end <= len(source)
+        and span.quote == source[span.start:span.end]
+    )
 
 
 def _span_mismatch(span: SourceSpanV4, payload: Mapping[str, str]) -> str:
@@ -332,25 +787,46 @@ def _span_mismatch(span: SourceSpanV4, payload: Mapping[str, str]) -> str:
     )
 
 
-def _validate_fact_index(index: FactIndexV4, payload: Mapping[str, str]) -> str | None:
+def _validate_fact_index(
+    index: FactIndexV4,
+    payload: Mapping[str, str],
+    *,
+    allowed_source_fields: frozenset[str] | None = None,
+    expected_payload_sha256: str | None = None,
+) -> str | None:
+    def span_error(span: SourceSpanV4, owner: str) -> str | None:
+        if allowed_source_fields is not None and span.field not in allowed_source_fields:
+            return f"{owner} cites source field {span.field!r} outside the supplied P0 evidence"
+        if not _span_ok(span, payload):
+            return f"{owner} has a non-literal source span: {_span_mismatch(span, payload)}"
+        return None
+
+    if (
+        expected_payload_sha256 is not None
+        and index.payload_sha256 != expected_payload_sha256
+    ):
+        return "fact index payload_sha256 does not match the accepted A0 digest"
     fact_ids = {f.fact_id for f in index.facts}
     for fact in index.facts:
         if not fact.source_spans:
             return f"fact {fact.fact_id} must contain at least one source span"
         for span in fact.source_spans:
-            if not _span_ok(span, payload):
-                return f"fact {fact.fact_id} has a non-literal source span: {_span_mismatch(span, payload)}"
+            error = span_error(span, f"fact {fact.fact_id}")
+            if error is not None:
+                return error
     for number in index.numbers:
         if number.fact_id not in fact_ids:
             return f"number {number.number_id} does not resolve to a literal fact/span"
-        if not _span_ok(number.source_span, payload):
-            return f"number {number.number_id} has a non-literal source span: {_span_mismatch(number.source_span, payload)}"
+        error = span_error(number.source_span, f"number {number.number_id}")
+        if error is not None:
+            return error
     for entity in index.entities:
         if not entity.source_spans:
             return f"entity {entity.entity_id} must contain at least one source span"
         for span in entity.source_spans:
-            if not _span_ok(span, payload):
-                return f"entity {entity.entity_id} has a non-literal source span: {_span_mismatch(span, payload)}"
+            error = span_error(span, f"entity {entity.entity_id}")
+            if error is not None:
+                return error
     return None
 
 
@@ -376,8 +852,8 @@ def validate_spoken_text_and_roster(
     if locked.get("announcer") != "ANNOUNCER":
         raise CodexSpokenTextError("announcer must be named ANNOUNCER")
     for row in cast.cast:
-        if row.char_id != "announcer" and (not re.fullmatch(r"[A-Z][a-z]+", row.name) or " " in row.name):
-            raise CodexSpokenTextError(f"cast name {row.name!r} is not one canonical Title-Case token")
+        if row.char_id != "announcer" and not _is_canonical_character_name(row.name):
+            raise CodexSpokenTextError(f"cast name {row.name!r} is not a canonical Title-Case name")
     for line in script.lines:
         if line.char_id.startswith("music_"):
             if not line.skip or line.text or line.tts_skip_reason != "music_cue":
@@ -413,6 +889,26 @@ def make_advisory_word_blueprint(requested_words: int, locked_beats: Sequence[st
     )
 
 
+def _score_graph_contract(advisory: AdvisoryWordPlanV4) -> dict[str, Any]:
+    """Render the non-creative P3 graph constraints as model-visible data."""
+    beat_ids = [str(row["beat_id"]) for row in advisory.per_beat]
+    return {
+        "required_beat_ids": beat_ids,
+        "required_beat_orders": [
+            {"beat_id": beat_id, "order": index}
+            for index, beat_id in enumerate(beat_ids, start=1)
+        ],
+        "line_id_policy": (
+            "Flattened scene/beat line_ids must be unique contiguous canonical "
+            "IDs l001, l002, and so on, with no gaps."
+        ),
+        "music_anchor_policy": (
+            "Every music cue anchor_line_id must be one of those line_ids and "
+            "anchor_beat_id must be that line's owning beat_id."
+        ),
+    }
+
+
 def _script_output_token_budget(requested_words: int) -> int:
     """Reserve whole-script JSON output without erasing its input contract."""
     if (
@@ -421,7 +917,71 @@ def _script_output_token_budget(requested_words: int) -> int:
         or not 30 <= requested_words <= 900
     ):
         raise CodexTargetRangeError("requested_words must be 30..900")
-    return min(5400, max(2200, int(requested_words * 4.5) + 1200))
+    # A 30-word script still serializes the full, strict line graph.  The
+    # observed 2,200-token floor reached valid opening JSON but exhausted
+    # before its closing brace; 2,800 leaves ample room for the complete
+    # artifact while the compact P5 input remains below the 8k context cap.
+    return min(5400, max(2800, int(requested_words * 4.5) + 1200))
+
+
+def _script_artifact_context(score: RadioScoreV4) -> dict[str, Any]:
+    """Project the accepted score into a compact ScriptArtifactV4 context.
+
+    Passing the full nested score next to an unconstrained ``scenes`` output
+    field led the local writer to echo score scenes (including shots and
+    beats) instead of emitting the root ``lines`` array. The projection
+    preserves every script constraint while giving whole-script passes a flat,
+    authoritative line graph.
+    """
+    scenes: list[dict[str, str]] = []
+    line_graph: list[dict[str, Any]] = []
+    for scene in score.scenes:
+        scenes.append({
+            "scene_id": scene.scene_id,
+            "env": scene.env,
+            "description": scene.description,
+        })
+        for beat in scene.beats:
+            for line_id in beat.line_ids:
+                line_graph.append({
+                    "line_id": line_id,
+                    "beat_id": beat.beat_id,
+                    "shot_id": beat.shot_id,
+                    "char_id": beat.char_id,
+                    "speaker_role": beat.speaker_role,
+                    "arc_phase": beat.arc_phase,
+                    "beat_intent": beat.intent,
+                    "fact_ids": list(beat.fact_ids),
+                })
+    return {
+        "story_context": {
+            "title": score.title,
+            "premise": score.premise,
+            "setting": score.setting,
+            "scenes": scenes,
+        },
+        "accepted_line_graph": line_graph,
+        "accepted_line_ids": [row["line_id"] for row in line_graph],
+        "accepted_line_count": len(line_graph),
+        "music_cues": [cue.model_dump(mode="json") for cue in score.music_cues],
+    }
+
+
+def _script_artifact_inputs(
+    score: RadioScoreV4, fact_index: FactIndexV4, word_steer: WordSteerV4,
+) -> dict[str, Any]:
+    """Add P5-only fact and word-steer inputs to the shared script context."""
+    return {
+        **_script_artifact_context(score),
+        "fact_index": {
+            "facts": [
+                {"fact_id": fact.fact_id, "claim": fact.claim}
+                for fact in fact_index.facts
+            ],
+            "tone": fact_index.tone,
+        },
+        "initial_draft_word_steer": word_steer.model_dump(mode="json"),
+    }
 
 
 def invoke_codex_structured(
@@ -430,6 +990,9 @@ def invoke_codex_structured(
     result_type: type[BaseModel], post_validator: Callable[[BaseModel], str | None],
     base_temperature: float, structural_retry_temperature: float,
     max_new_tokens: int, call_journal: MutableMapping[str, Any],
+    repair_score: RadioScoreV4 | None = None,
+    repair_advisory: AdvisoryWordPlanV4 | None = None,
+    prompt_must_fit: bool = False,
 ) -> BaseModel:
     if not seam_refs:
         raise CodexPackContractError(f"{pass_id} has no prompt seam")
@@ -439,12 +1002,20 @@ def invoke_codex_structured(
         if not text:
             raise CodexPackContractError(f"missing Codex seam {seam!r}")
         seams.append(text)
+    script_artifact_pass = pass_id in {"P5", "P7", "P9"}
     body = {"pass_id": pass_id, "artifact_inputs": artifact_inputs, "result_json_schema": result_type.model_json_schema()}
     schema_instruction = _schema_instruction(result_type)
+    if script_artifact_pass:
+        schema_instruction += _SCRIPT_ARTIFACT_ROOT_INSTRUCTION
     messages = [{"role": "system", "content": "\n".join(seams) + schema_instruction}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
     calls: list[dict[str, Any]] = []
     def capture(messages_in, **kwargs):
-        raw = slot_fn(messages_in, **kwargs)
+        call_messages = (
+            _PromptMustFitMessages(messages_in)
+            if prompt_must_fit and isinstance(messages_in, list)
+            else messages_in
+        )
+        raw = slot_fn(call_messages, **kwargs)
         calls.append({
             "temperature": kwargs.get("temperature"),
             "max_new_tokens": kwargs.get("max_new_tokens"),
@@ -454,7 +1025,92 @@ def invoke_codex_structured(
         return raw
     def typed_repair_factory(*, original_prompt, failed_output, error):
         detail = str(error)
-        if pass_id == "P0":
+        if script_artifact_pass:
+            log.info(
+                "[scifi_codex:%s] attempting deterministic ScriptArtifactV4 metadata repair",
+                pass_id,
+            )
+            deterministic = (
+                repair_script_artifact_metadata(failed_output, repair_score)
+                if repair_score is not None
+                else None
+            )
+            # A deterministic metadata repair must still satisfy every content
+            # validator before it can replace the model's typed-repair call.
+            # Otherwise leave the original response for the creative repair.
+            if deterministic is not None:
+                deterministic_error = post_validator(deterministic)
+                if deterministic_error is None:
+                    return deterministic
+                expected_graph = (
+                    _accepted_script_line_metadata(repair_score)
+                    if repair_score is not None
+                    else None
+                )
+                l001 = next(
+                    (line for line in deterministic.lines if line.line_id == "l001"),
+                    None,
+                )
+                log.info(
+                    "[scifi_codex:%s] deterministic ScriptArtifactV4 repair "
+                    "rejected: %s; l001=%s expected=%s",
+                    pass_id, deterministic_error,
+                    (
+                        (l001.beat_id, l001.shot_id, l001.boundary)
+                        if l001 is not None else None
+                    ),
+                    expected_graph.get("l001") if expected_graph is not None else None,
+                )
+            repair_rules = (
+                "This is a typed repair of the same ScriptArtifactV4, not a new "
+                "creative response. Return one JSON object only. Its schema_version "
+                "MUST be the exact literal scifi_codex.script_artifact.v4. Preserve "
+                "every existing title, scene, beat, character intent, and line text. "
+                "Remove every forbidden extra key. For each script line, use the "
+                "accepted score graph's owning shot_id and set boundary to shot_start "
+                "when the accepted previous line is in another shot, beat_start when "
+                "it is in the same shot but another beat, or continue otherwise. "
+                "The accepted_line_graph is closed: return every and only its line IDs; "
+                "music_cues never create a line row."
+            )
+        elif pass_id in {"P3", "P3_rewrite"}:
+            deterministic = (
+                repair_radio_score_metadata(failed_output, repair_advisory)
+                if repair_advisory is not None
+                else None
+            )
+            if deterministic is not None and post_validator(deterministic) is None:
+                log.info(
+                    "[scifi_codex:%s] deterministic RadioScoreV4 cue-anchor repair accepted",
+                    pass_id,
+                )
+                return deterministic
+            repair_rules = (
+                "This is a typed repair of the same RadioScoreV4, not a new "
+                "unconstrained outline. The original request's score_graph_contract "
+                "and advisory_word_plan are locked executable metadata. Copy the "
+                "advisory_word_plan exactly. The flattened scenes[].beats array MUST "
+                "contain every and only required_beat_ids, in that exact order, with "
+                "the listed consecutive order values. Preserve existing title, premise, "
+                "scene/shot descriptions, and beat intent wherever present; if a locked "
+                "beat was omitted, add its complete score record using the existing "
+                "story's cause-and-response progression rather than inventing another "
+                "ID. Flatten all line_ids in assembly order into l001, l002, and so on "
+                "with no gaps, and make every music cue anchor an existing line and its "
+                "owning beat. Return one complete JSON object only."
+            )
+        elif pass_id == "P2":
+            deterministic = repair_cast_plan_metadata(failed_output)
+            if deterministic is not None and post_validator(deterministic) is None:
+                return deterministic
+            repair_rules = (
+                "This is a typed repair of the same CastPlanV4. Return one JSON "
+                "object only. Preserve every character description, gender, role, "
+                "and voice slot. The row whose char_id is announcer MUST have the "
+                "exact fixed name ANNOUNCER. Every non-announcer name must be one "
+                "canonical Title-Case name, and every char_id must occur exactly once."
+            )
+        elif pass_id == "P0":
             repair_rules = (
                 "This is a typed repair of the same artifact, not a new creative response. "
                 "Return one JSON object only. IDs are fixed lexical tokens: facts MUST use "
@@ -472,7 +1128,34 @@ def invoke_codex_structured(
                 zero_padded_ids=True,
             )
             if deterministic is not None:
-                return deterministic
+                # A0's digest is deterministic request metadata.  It is safe
+                # to restore it only after the literal-span repair has kept a
+                # concrete artifact; claims and source text remain untouched.
+                deterministic = deterministic.model_copy(update={
+                    "payload_sha256": body["artifact_inputs"]["payload"]["source_digest"],
+                })
+                deterministic_error = post_validator(deterministic)
+                if deterministic_error is None:
+                    return deterministic
+                log.info(
+                    "[scifi_codex:P0] deterministic literal-span repair "
+                    "declined: %s", deterministic_error,
+                )
+            try:
+                parsed = FactIndexV4.model_validate(parse_first_json_object(failed_output))
+            except Exception:
+                parsed = None
+            if parsed is not None:
+                expected_digest = body["artifact_inputs"]["payload"]["source_digest"]
+                if parsed.payload_sha256 != expected_digest:
+                    deterministic = parsed.model_copy(update={"payload_sha256": expected_digest})
+                    deterministic_error = post_validator(deterministic)
+                    if deterministic_error is None:
+                        return deterministic
+                    log.info(
+                        "[scifi_codex:P0] deterministic digest repair "
+                        "declined: %s", deterministic_error,
+                    )
         else:
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the existing premise, "
@@ -555,8 +1238,25 @@ class CodexTailParts:
     tail_finalizer: Any
 
 
+def _build_codex_episode_canon(
+    score: RadioScoreV4, script: ScriptArtifactV4, *, premise: str,
+) -> EpisodeCanon:
+    """Return the complete episode-canon protocol the shared tail writes."""
+    return EpisodeCanon(
+        title=script.title,
+        premise=premise,
+        setting=score.setting,
+        # RadioScoreV4 deliberately does not author a time-of-day field. An
+        # empty value records that absence honestly while still satisfying the
+        # shared EpisodeCanon protocol; do not invent a setting detail here.
+        time_of_day="",
+        sound_palette=[],
+    )
+
+
 def _validate_script_post(script: ScriptArtifactV4, cast: CastPlanV4, score: RadioScoreV4) -> str | None:
     try:
+        _validate_script_graph(script, score)
         validate_spoken_text_and_roster(script, cast, score)
     except ScifiCodexError as exc:
         return str(exc)
@@ -617,35 +1317,44 @@ def run_scifi_codex_episode(
 ) -> CodexTailParts:
     del slot_scheduler, source_bank_row, story_rules, episode_root, episode_id
     env, steer = validate_payload_envelope(payload, resolved)
+    p0_inputs = _p0_artifact_inputs(env)
+    p0_allowed_fields = frozenset(p0_inputs["allowed_source_fields"])
     script_token_budget = _script_output_token_budget(steer.requested_words)
     lane_meta: dict[str, Any] = {"source_digest": env.source_digest, "source_mode": env.source_mode, "call_journal": {}}
     meta["scifi_codex"] = lane_meta
     journal = lane_meta["call_journal"]
-    p0 = invoke_codex_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_fact_index_system",), artifact_inputs={"payload": env.model_dump(mode="json")}, result_type=FactIndexV4, post_validator=lambda x: _validate_fact_index(x, payload), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2000, call_journal=journal)
+    p0 = invoke_codex_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_fact_index_system",), artifact_inputs=p0_inputs, result_type=FactIndexV4, post_validator=lambda x: _validate_fact_index(x, payload, allowed_source_fields=p0_allowed_fields, expected_payload_sha256=env.source_digest), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2000, call_journal=journal, prompt_must_fit=True)
     p1 = invoke_codex_structured(pass_id="P1", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_question_system",), artifact_inputs={"fact_index": p0.model_dump(mode="json")}, result_type=DramaticQuestionV4, post_validator=lambda x: None, base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=1800, call_journal=journal)
-    p2 = invoke_codex_structured(pass_id="P2", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_pressure_cast_system",), artifact_inputs={"question": p1.model_dump(mode="json")}, result_type=CastPlanV4, post_validator=lambda x: None, base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=1600, call_journal=journal)
+    p2 = invoke_codex_structured(pass_id="P2", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_pressure_cast_system",), artifact_inputs={"question": p1.model_dump(mode="json")}, result_type=CastPlanV4, post_validator=_validate_cast_plan, base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=1600, call_journal=journal)
     beat_ids = [f"b{i:03d}" for i in range(max(3, min(12, len(p2.cast) * 3)))]
     advisory = make_advisory_word_blueprint(steer.requested_words, beat_ids)
-    p3 = invoke_codex_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"question": p1.model_dump(mode="json"), "cast": p2.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json")}, result_type=RadioScoreV4, post_validator=lambda x: None, base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=3600, call_journal=journal)
+    score_graph_contract = _score_graph_contract(advisory)
+    p3 = invoke_codex_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"question": p1.model_dump(mode="json"), "cast": p2.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=3600, call_journal=journal, repair_advisory=advisory)
     review = invoke_codex_structured(pass_id="P4", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json")}, result_type=StructureReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1800, call_journal=journal)
     score = p3
     if review.verdict == "rewrite":
-        score = invoke_codex_structured(pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json"), "review": review.model_dump(mode="json")}, result_type=RadioScoreV4, post_validator=lambda x: None, base_temperature=.55, structural_retry_temperature=.20, max_new_tokens=3600, call_journal=journal)
-    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs={"score": score.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json"), "initial_draft_word_steer": steer.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal)
+        score = invoke_codex_structured(pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json"), "review": review.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.55, structural_retry_temperature=.20, max_new_tokens=3600, call_journal=journal, repair_advisory=advisory)
+    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
     listener = invoke_codex_structured(pass_id="P6", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_listening_room_system",), artifact_inputs={"script": script.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ListenerReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2200, call_journal=journal)
-    script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={"previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal)
+    script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
     audit = invoke_codex_structured(pass_id="P8", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_final_audit_system", "codex_coda_contract_system"), artifact_inputs={"script": script.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json")}, result_type=FinalAuditV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2400, call_journal=journal)
     if audit.verdict == "rewrite":
-        script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={"previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal)
+        script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
     validate_spoken_text_and_roster(script, p2, score)
     expected = _assemble_ledger(led, score, p2, script, meta)
     actual = sum(_words(v) for v in expected.values())
     meta["scifi_codex"]["word_receipt"] = {"requested_words": steer.requested_words, "actual_split_words": actual, "actual_ledger_word_count": int(led.data.get("total_word_count") or 0)}
     meta["scifi_codex"]["fact_index"] = p0.model_dump(mode="json")
     meta["scifi_codex"]["script_digest"] = _script_digest(script)
+    canon = _build_codex_episode_canon(score, script, premise=p1.question)
     return CodexTailParts(
-        outline_view=SimpleNamespace(title=script.title, premise=p1.question, setting=score.setting),
-        canon=SimpleNamespace(title=script.title, premise=p1.question),
+        outline_view=SimpleNamespace(
+            title=script.title,
+            premise=p1.question,
+            setting=score.setting,
+            time_of_day=canon.time_of_day,
+        ),
+        canon=canon,
         final_title_override=script.title,
         run_story_spine=False,
         tail_finalizer=_CodexTailFinalizer(expected),
