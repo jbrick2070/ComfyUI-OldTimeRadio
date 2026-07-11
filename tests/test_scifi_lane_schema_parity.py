@@ -308,6 +308,39 @@ def test_outline_repair_drops_forbidden_extra_keys_without_touching_story():
     assert repaired.scenes[0].beats[0].intent == "report"
 
 
+def test_generic_extra_key_repair_saves_a_scene_draft_without_touching_dialogue():
+    """P4 threw away a whole scene -- dialogue and all -- over an extra key.
+
+    The model hands each drafted line a `fact_ids` list (the outline's beats carry
+    one) but DraftLineV4 has no such field, so extra="forbid" rejected the scene.
+    Pruning the unrequested key loses no authored work; the dialogue is untouched.
+    """
+    import json as _json
+
+    from nodes import _otr_scifi_gemini as lane
+
+    raw = _json.dumps({
+        "scene_id": "s001",
+        "lines": [
+            {"beat_id": "b001", "text": "The lab is quiet tonight.",
+             "fact_uses": [], "non_fact": True, "fact_ids": ["F01"]},
+            {"beat_id": "b002", "text": "Too quiet.",
+             "fact_uses": [], "non_fact": True, "fact_ids": []},
+        ],
+    })
+    repaired = lane.repair_forbidden_extra_keys(raw, lane.SceneDraftV4)
+    assert repaired is not None
+    assert [ln.text for ln in repaired.lines] == [
+        "The lab is quiet tonight.", "Too quiet.",
+    ]
+    assert not hasattr(repaired.lines[0], "fact_ids")
+
+    # A genuinely missing required field is the model's job, not ours.
+    assert lane.repair_forbidden_extra_keys(
+        _json.dumps({"scene_id": "s001"}), lane.SceneDraftV4
+    ) is None
+
+
 def test_outline_repair_fails_closed_without_an_owning_scene_id():
     import json as _json
 

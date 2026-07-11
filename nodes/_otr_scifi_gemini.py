@@ -394,6 +394,35 @@ def _nested_model(annotation: Any) -> type[BaseModel] | None:
     return None
 
 
+def repair_forbidden_extra_keys(
+    failed_output: str, result_type: type[BaseModel],
+) -> BaseModel | None:
+    """Drop keys the strict artifact forbids -- for ANY pass, not just the outline.
+
+    The local model garnishes every artifact it writes. It hands P4 a `fact_ids`
+    list on each drafted line because the outline's beats carry one, even though
+    DraftLineV4 has no such field -- and `extra="forbid"` rejects the whole scene
+    over it, dialogue and all.
+
+    An unrequested key is not authored content: the contract never had a slot for
+    it, so no part of the writer's work is lost by removing it. Everything the
+    schema DOES ask for -- the dialogue, the fact uses, the beat ids -- is left
+    byte-identical. Fails closed if the artifact is still invalid afterwards; a
+    genuinely missing field is the model's job, not ours.
+    """
+    try:
+        data = parse_first_json_object(failed_output)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    _prune_to_schema(data, result_type)
+    try:
+        return result_type.model_validate(data)
+    except Exception:
+        return None
+
+
 def outline_output_token_budget(requested_words: int, beat_count: int) -> int:
     """Reserve P3 output WITHOUT eating the input budget its own repair needs.
 
@@ -626,11 +655,24 @@ def invoke_gemini_structured(
                                 "missing_visual_prompts": missing_shots,
                             }, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
                         ]
+            # Any strict artifact can be rejected purely for keys the model added
+            # that the contract never asked for (P4 hands every drafted line a
+            # `fact_ids` list DraftLineV4 has no slot for, and the whole scene --
+            # dialogue included -- is thrown out over it). Pruning those loses no
+            # authored work, so try it for EVERY pass before spending an LLM call.
+            generic = repair_forbidden_extra_keys(failed_output, result_type)
+            if generic is not None and post_validator(generic) is None:
+                log.info(
+                    "[scifi_gemini:%s] deterministic repair dropped forbidden extra "
+                    "keys; no LLM repair call made", pass_id,
+                )
+                return generic
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the selected premise, "
                 "scene outline, beats, and dialogue content; repair only fields named by the "
                 "validation error. Every required nested graph field must be present; copy each "
                 "beat speaker from the cast row matching its char_id. "
+                "Return ONLY the keys the schema declares -- no extra fields. "
                 "Copy the parent scene's scene_id into every shot and every beat nested inside "
                 "it, and number beats with a strictly increasing order starting at 1. "
                 "EVERY shot MUST carry a visual_prompt: one concrete, filmable image of that "
