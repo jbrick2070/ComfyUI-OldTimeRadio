@@ -28,11 +28,6 @@ callables. No ABC inheritance chain. Adding a new backend means
 adding a class with the three callables and registering it in the
 BACKENDS_BY_KEY dispatch table.
 
-`compute_effective_context_limit(row)` is the helper D2c will use to
-cap prompt budget per backend. Mirror of CURATED_CONTEXT_OVERRIDES /
-HARD_VRAM_CONTEXT_LIMIT but reads from the new row-level
-context_window field (D1a) so per-row variance (a sub-limit native
-window) is respected without touching the legacy override dict.
 """
 from __future__ import annotations
 
@@ -79,29 +74,6 @@ class LoaderBackend(Protocol):
     def unload(self, model: Any) -> None:
         """Evict the model from VRAM and free its resources."""
         ...
-
-
-def compute_effective_context_limit(row: Any) -> int:
-    """Return the effective context-window cap for a row.
-
-    `min(HARD_VRAM_CONTEXT_LIMIT, row.context_window)`.
-
-    The HARD_VRAM_CONTEXT_LIMIT is the system-wide ceiling for VRAM
-    safety (overridable via OTR_HARD_VRAM_CONTEXT_LIMIT env). The
-    row.context_window field (D1a) carries the per-model native
-    context window. Effective limit is the smaller of the two so:
-      * Mistral-Nemo at 8192 native + 8192 limit = 8192 (no clamp).
-      * A 4096-native row + 8192 limit = 4096 (row wins, smaller).
-      * Hypothetical 16384-native model + 8192 limit = 8192 (limit wins).
-
-    Always returns int >= 0. Reading the field on a row constructed
-    pre-D1a (no context_window) raises AttributeError -- by design;
-    every catalog row carries the field after D1a.
-    """
-    return min(
-        int(_otr_model_catalog.HARD_VRAM_CONTEXT_LIMIT),
-        int(row.context_window),
-    )
 
 
 def check_context_window(row: Any) -> None:
@@ -334,7 +306,6 @@ def generate_kwargs_for_row(row: Any) -> dict[str, Any]:
 __all__ = [
     "LoaderBackend",
     "check_context_window",
-    "compute_effective_context_limit",
     "encode_messages_for_row",
     "normalize_messages_for_tokenizer",
     "stop_strings_for_row",

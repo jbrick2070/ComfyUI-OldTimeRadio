@@ -16,34 +16,33 @@ the other's job.
 Read this before anything else, because it is the most common misunderstanding:
 
 **A source pack is an ORIGINAL PATH, not a fork of an existing one.** It is not a
-"sci-fi lane with different prompts." The lanes that happen to ship today are science
-fiction because that is what somebody wanted to hear -- **the genre is theirs, not the
+"sci-fi lane with different prompts." The lanes that happen to ship today sound the way
+they do because that is what somebody wanted to hear -- **the genre is theirs, not the
 pipeline's.**
 
 Your pack owns:
 
-- **its source, or none at all.** Pull an RSS feed, a public-domain text, an archive, a
-  spark deck, a photograph, a single word -- or invent from nothing. (`original_radio` has
-  no fetcher at all: it draws atoms from a deck and writes the episode out of thin air.)
-- **its genre and its form.** And here is the actual brief: **invent a kind of radio drama
+- **its source, or none at all.** Anything that can seed an episode can be a source -- a
+  feed, a text, a photograph, a single word -- and inventing from nothing is just as
+  legitimate.
+- **its genre and its form.** Here is the actual brief: **invent a kind of radio drama
   that does not exist yet.** Not a version of one you have heard. Something a listener will
   genuinely enjoy and could not have got anywhere else.
-  **No guns. No blood. No violence. No swearing.** That is not a content warning bolted on
-  afterwards -- it is the constraint that forces the interesting answer. Tension is not
-  violence. Stakes are not gore. The most gripping thing a person can hear is another
-  person about to say something true. If your first instinct is a shootout, a murder, or a
-  monster, that instinct came from somewhere else; go past it.
 - **its dramatic architecture.** How many passes. What the passes ARE. What artifacts pass
   between them. Who judges what.
-- **its cast, its roles, its rules.** Two speakers who hate each other. One narrator alone.
-  A chorus. Someone who never speaks.
+- **its cast, its roles, its rules.** How many voices there are, what each one is for, what
+  each is allowed to know and to say -- even whether it speaks at all. There is no default
+  cast.
+
+One boundary on all of it: **No guns. No blood. No violence. No swearing.** That is not a
+content warning bolted on afterwards -- it is the constraint that forces the interesting
+answer. Tension is not violence. Stakes are not gore. If your first instinct is a shootout,
+a murder, or a monster, that instinct came from somewhere else; go past it. What holds a
+listener without those things is exactly what you are here to invent.
 
 The pipeline is old-time radio -- voices, music, a listener in the dark. Beyond that, this
-document tells you the **only** things you must obey, and everything else is a blank page.
-That is the whole point of a pack.
-
-This is not a style guide. It is the set of hard requirements a new source bank must meet
-to run. Everything not listed here is your design freedom.
+document is the complete list of what you must obey. Everything not in it is a blank page,
+and the blank page is the whole point. This is a contract, not a style guide.
 
 ---
 
@@ -95,6 +94,14 @@ You fill it through the `Ledger` object (`nodes/production_ledger.py`):
 | `led.set_beats(rows)` | `beat_id`, `shot_id`, `scene_id`, `char_id`, `line_ids` | yes |
 | `led.set_music(rows)` | `cue_id`, `placement`, `description`, `generation_prompt` | yes |
 
+**The table is plumbing, not dramaturgy.** It looks like a film crew's anatomy -- scenes,
+shots, beats -- because the render tail downstream consumes those rows. Do not mistake it
+for a description of what an episode IS. **One scene and one shot is a legal episode**, and
+not as a loophole: if your pack's true form is a single unbroken voice in an unchanging
+dark, then one scene and one shot is the honest shape of it, and you should say so in the
+ledger rather than inventing a crew's worth of structure to look respectable. Fill the
+table with the truth about your episode. It will render either way.
+
 **Hard rules:**
 
 - **Every id must resolve.** A beat names a shot that exists; a shot names a scene that
@@ -127,7 +134,7 @@ This is not negotiable, and it is where most new packs go wrong.
 
 ---
 
-## 3b. THE ANNOUNCER -- somewhere, someone must ground the story
+## 4. THE ANNOUNCER -- somewhere, someone must ground the story
 
 The listener is in the dark. They cannot see a title card, a set, or a face. If nobody
 tells them where they are, they spend the first half of your episode working it out instead
@@ -139,22 +146,21 @@ simply *begins* -- mid-argument, unlocated, unexplained -- does not admit anyone
 story. It just starts one, and leaves the listener outside it. (We shipped exactly that
 episode. It was technically perfect and dramatically inert.)
 
-**What we find works best:** the announcer opens the piece and closes it. Classic, and it
-is classic because it works.
-
-**What you are free to do instead:** open cold. Drop us straight into dialogue, mid-scene,
-mid-sentence. Let us be lost for a moment -- that is a legitimate and often thrilling
-choice. Bring the announcer in afterwards to tell us what we just heard and why it matters.
-Land the ending with the announcer, or hand it to a character and let the announcer close
-the frame a beat later. Or find a shape nobody has used.
-
-**What you may not do:** never ground it at all.
+*Where* the grounding falls, and what shape it takes, is yours. Nothing requires it to come
+first: opening cold -- mid-scene, mid-sentence, the listener lost for a moment -- is a
+legitimate and often thrilling choice, provided the frame arrives. Early, late, threaded
+through, split across the ends, or a shape nobody has used. The only illegal shape is its
+absence.
 
 And one thing worth saying plainly, because it is the trap: **the announcer FRAMES, it does
 not ARGUE.** The moment the announcer starts taking turns in the scene -- answering a
 character, pressing a point, joining the debate -- it stops being the voice of the show and
 becomes a fourth person in the room, and the listener loses the only orientation they had.
 If your announcer is trading lines with your cast, you have lost the frame.
+
+---
+
+## 5. GATES -- what you are allowed to block on
 
 You will want to validate the model's output. Good. But a gate that blocks production may
 **only** block on something that is:
@@ -174,7 +180,7 @@ when you have finished designing -- not now.)*
 
 ---
 
-## 5. RETRIES -- ask twice before you kill
+## 6. RETRIES -- ask twice before you kill
 
 Every structured pass in this pipeline gets a bounded retry ladder: base call ->
 structural retry -> typed repair. When a model's output is rejected, **tell it the actual
@@ -186,7 +192,7 @@ four source banks down with it.
 
 ---
 
-## 6. SEAMS -- your prompts live in the pack JSON
+## 7. SEAMS -- your prompts live in the pack JSON
 
 Your prompts belong in `nodes/story_packs/<your_bank>/<your_bank>.json` under
 `prompt_stages`, not in Python.
@@ -201,16 +207,15 @@ it feeds. Keep them in step.
 
 ---
 
-## 7. ROLES -- if your characters have different contracts, judge them differently
+## 8. ROLES -- if your characters have different contracts, judge them differently
 
-If your pack gives two speakers opposite jobs -- a literalist who may only state what the
-source supports, and a speculator licensed to extrapolate -- then a validator that applies
-one rule to both is broken by construction. It will fail the speculator for speculating.
-Make your validators role-aware, or do not give your roles different contracts.
+If your pack gives two speakers opposite jobs, a validator that applies one rule to both is
+broken by construction: it will fail one of them for doing exactly what you licensed it to
+do. Make your validators role-aware, or do not give your roles different contracts.
 
 ---
 
-## 8. WHAT YOU MUST NOT DO (the short list)
+## 9. WHAT YOU MUST NOT DO (the short list)
 
 - Do not create or load an LLM. Use the two slots.
 - Do not write story text in Python.
@@ -219,10 +224,12 @@ Make your validators role-aware, or do not give your roles different contracts.
 - Do not build a gate you cannot enumerate, corroborate, or repair.
 - Do not leave an id dangling.
 - Do not ship a canned line when the model fails -- retry, then fail closed.
+- Do not ship an episode nobody grounds -- and keep the announcer out of the argument.
+- Do not reach for guns, blood, violence, or swearing.
 
 ---
 
-## 9. HOW TO KNOW YOU ARE DONE
+## 10. HOW TO KNOW YOU ARE DONE
 
 Design freely first. Build the thing you actually want to hear. **Then**, once you have
 designed it (R1), coded it (R2) and wired it (R3), walk the pre-flight:
@@ -249,10 +256,11 @@ Run the 30-word smoke. It is the real gate.
 
 ---
 
-## 10. THE EXISTING BANKS, AS PROOF OF THE FREEDOM
+## 11. THE EXISTING BANKS, AS PROOF OF THE FREEDOM
 
-Ignore what these are *about*. Look at how differently they are BUILT. Every one fills the
-same ledger through the same two slots, and no two work alike:
+Ignore what these are *about*. Look at how differently they are BUILT. They are evidence,
+not a menu. Every one fills the same ledger through the same two slots, and no two work
+alike:
 
 - **one** runs a 10-pass ladder: extract facts -> pose a dramatic question -> cast ->
   build a score graph -> write the whole script -> review -> retake -> audit.

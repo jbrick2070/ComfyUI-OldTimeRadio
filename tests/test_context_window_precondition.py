@@ -64,8 +64,7 @@ def test_context_window_precondition_at_hard_limit_passes() -> None:
 
 def test_context_window_precondition_above_hard_limit_passes() -> None:
     """A row whose context_window exceeds HARD_VRAM_CONTEXT_LIMIT
-    passes silently. compute_effective_context_limit clamps the
-    used budget; the precondition is only about catastrophic
+    passes silently. The precondition is only about catastrophic
     undersize at the model level.
     """
     row = _FakeRow(context_window=catalog.HARD_VRAM_CONTEXT_LIMIT + 100_000)

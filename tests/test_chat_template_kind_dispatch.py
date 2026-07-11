@@ -18,10 +18,6 @@ Five assertions per v3 plan:
   test_stop_tokens_threaded_to_generate_kwargs
       generate_kwargs_for_row returns stop_strings as a list.
 
-  test_dispatch_path_uses_compute_effective_context_limit
-      AST snapshot proves compute_effective_context_limit is
-      exported from _otr_loader_backends and callable on a
-      CuratedModel row.
 """
 from __future__ import annotations
 
@@ -187,36 +183,6 @@ def test_stop_tokens_against_real_curated_rows() -> None:
 
 
 # ---------------------------------------------------------------------------
-# compute_effective_context_limit exported + usable
-# ---------------------------------------------------------------------------
-
-
-def test_dispatch_path_uses_compute_effective_context_limit() -> None:
-    """compute_effective_context_limit must be exported from
-    _otr_loader_backends so D2c dispatch consumers can cap prompt
-    budgets per row. AST snapshot confirms it's in __all__.
-    """
-    src = (REPO_ROOT / "nodes" / "_otr_loader_backends.py").read_text(
-        encoding="utf-8",
-    )
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if isinstance(target, ast.Name) and target.id == "__all__":
-                if isinstance(node.value, ast.List):
-                    names = [
-                        e.value for e in node.value.elts
-                        if isinstance(e, ast.Constant)
-                        and isinstance(e.value, str)
-                    ]
-                    assert "compute_effective_context_limit" in names, (
-                        f"compute_effective_context_limit missing "
-                        f"from _otr_loader_backends.__all__: {names}"
-                    )
-                    return
-    pytest.fail("no __all__ assignment found in _otr_loader_backends.py")
 
 
 if __name__ == "__main__":
