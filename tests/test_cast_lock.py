@@ -326,5 +326,76 @@ def test_source_is_ascii_no_em_dash():
     src.encode("ascii")
 
 
+# --------------------------------------------------------------------------- #
+# Content-owned lanes own their cast: CastLock must VERIFY, never REPLAY.
+#
+# A content-owned lane (scifi_codex / gemini / sonnet / fable2) builds its own
+# cast rows and stamps their voice_preset in the lane runner. The writer's
+# seeded picker never ran, so there is no sequence to replay and no
+# num_characters_request to replay it with. Live regression (2026-07-11): the
+# tail stamped meta.cast_contract.cast_seed as a credits receipt, CastLock took
+# that as "replay me", and assemble_pre_locked_rows died with
+# "num_characters must be 1-6, got 0" AFTER 14 minutes of generation.
+# --------------------------------------------------------------------------- #
+def _content_owned_cast():
+    return [
+        {"char_id": "announcer", "name": "ANNOUNCER",
+         "tts_model": "kokoro", "voice_preset": "bm_george"},
+        {"char_id": "c01", "name": "Dr. Hart",
+         "tts_model": "bark", "voice_preset": "v2/en_speaker_6"},
+        {"char_id": "c02", "name": "Elena Ruiz",
+         "tts_model": "bark", "voice_preset": "v2/en_speaker_3"},
+    ]
+
+
+def test_content_owned_lane_preserves_its_own_voices_without_replay():
+    from nodes.cast_lock import CastLock
+
+    cast = _content_owned_cast()
+    # A cast_seed in the contract must NOT drag a lane-owned cast into the
+    # writer-picker replay -- not even when num_characters_request is absent,
+    # which is exactly the live crash.
+    meta = {"source_bank": "scifi_codex", "episode_seed": 1234,
+            "cast_contract": {"cast_seed": 1234}}
+    report: list = []
+
+    CastLock._assign_bark_voices(cast, meta, report)
+
+    assert [row["voice_preset"] for row in cast] == [
+        "bm_george", "v2/en_speaker_6", "v2/en_speaker_3",
+    ]
+    assert any("content-owned" in line for line in report)
+
+
+def test_content_owned_lane_still_fails_on_colliding_bark_voices():
+    from nodes._otr_casting import CastingFailedError
+    from nodes.cast_lock import CastLock
+
+    cast = _content_owned_cast()
+    cast[2]["voice_preset"] = cast[1]["voice_preset"]  # duplicate bark voice
+    meta = {"source_bank": "scifi_codex", "episode_seed": 1234}
+
+    # Skipping the replay must not skip Gate 1: a lane-owned cast can never
+    # ship two bark rows on the same voice.
+    with pytest.raises(CastingFailedError):
+        CastLock._assign_bark_voices(cast, meta, [])
+
+
+def test_legacy_lane_without_cast_seed_still_preserves_presets():
+    from nodes.cast_lock import CastLock
+
+    cast = _content_owned_cast()
+    report: list = []
+
+    # A legacy / untagged ledger with no persisted cast_seed keeps its old
+    # behavior: nothing to replay, presets untouched, no invariant run.
+    CastLock._assign_bark_voices(cast, {}, report)
+
+    assert [row["voice_preset"] for row in cast] == [
+        "bm_george", "v2/en_speaker_6", "v2/en_speaker_3",
+    ]
+    assert any("no cast_seed" in line for line in report)
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

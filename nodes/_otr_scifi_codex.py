@@ -291,7 +291,11 @@ _SCRIPT_LINE_AUTHORED_FIELDS = frozenset({
 _SCRIPT_SCENE_FORBIDDEN_KEYS = frozenset({"speaker", "shots", "beats"})
 _SCRIPT_ARTIFACT_ROOT_INSTRUCTION = (
     "\nSCRIPT ARTIFACT ROOT CONTRACT: Do not return a score, a scene, a beat, "
-    "or a patch. Return one root ScriptArtifactV4 object with exactly these root "
+    "or a patch. Never echo the request envelope: pass_id, artifact_inputs, and "
+    "result_json_schema are INPUT keys and must not appear anywhere in your "
+    "output. Begin your response at the artifact root, with "
+    '{"schema_version": "scifi_codex.script_artifact.v4", ...}. '
+    "Return one root ScriptArtifactV4 object with exactly these root "
     "keys: schema_version, title, scenes, lines, music_cues. The input "
     "accepted_line_graph is a closed executable manifest: emit exactly one root-level "
     "lines item for every listed line_id, in the listed order, and no other lines. "
@@ -909,19 +913,43 @@ def _score_graph_contract(advisory: AdvisoryWordPlanV4) -> dict[str, Any]:
     }
 
 
-def _script_output_token_budget(requested_words: int) -> int:
-    """Reserve whole-script JSON output without erasing its input contract."""
+def _script_output_token_budget(
+    requested_words: int, accepted_line_count: int,
+) -> int:
+    """Reserve whole-script JSON output from BOTH drivers of its serialized size.
+
+    A ScriptArtifactV4 is not sized by its dialogue alone: it serializes the
+    strict per-line metadata graph (ids, boundary, arc phase, beat intent, flags)
+    for every accepted line.  A 30-word script with 13 lines pays nearly all of
+    that same metadata cost, so a budget derived from the word steer ALONE
+    under-reserves exactly when the accepted graph is wide -- the P7 live cap
+    (generated_tokens == max_new_tokens == 2800 -> truncated JSON -> "no
+    decodable top-level JSON object").  Scale on the line count too.
+    """
     if (
         not isinstance(requested_words, int)
         or isinstance(requested_words, bool)
         or not 30 <= requested_words <= 900
     ):
         raise CodexTargetRangeError("requested_words must be 30..900")
-    # A 30-word script still serializes the full, strict line graph.  The
-    # observed 2,200-token floor reached valid opening JSON but exhausted
-    # before its closing brace; 2,800 leaves ample room for the complete
-    # artifact while the compact P5 input remains below the 8k context cap.
-    return min(5400, max(2800, int(requested_words * 4.5) + 1200))
+    if (
+        not isinstance(accepted_line_count, int)
+        or isinstance(accepted_line_count, bool)
+        or accepted_line_count < 1
+    ):
+        raise CodexTargetRangeError("accepted_line_count must be a positive int")
+    # ~4.5 tokens per requested word of dialogue, ~130 tokens of strict metadata
+    # per accepted line, plus the artifact envelope (title, scenes, music cues).
+    # The 2,800 floor is the observed complete-artifact floor for the canonical
+    # 30-word graph; the 5,400 ceiling keeps the reservation inside the context
+    # cap alongside the pass input.
+    return min(
+        5400,
+        max(
+            2800,
+            int(requested_words * 4.5) + 130 * int(accepted_line_count) + 600,
+        ),
+    )
 
 
 def _script_artifact_context(score: RadioScoreV4) -> dict[str, Any]:
@@ -1319,7 +1347,6 @@ def run_scifi_codex_episode(
     env, steer = validate_payload_envelope(payload, resolved)
     p0_inputs = _p0_artifact_inputs(env)
     p0_allowed_fields = frozenset(p0_inputs["allowed_source_fields"])
-    script_token_budget = _script_output_token_budget(steer.requested_words)
     lane_meta: dict[str, Any] = {"source_digest": env.source_digest, "source_mode": env.source_mode, "call_journal": {}}
     meta["scifi_codex"] = lane_meta
     journal = lane_meta["call_journal"]
@@ -1334,6 +1361,15 @@ def run_scifi_codex_episode(
     score = p3
     if review.verdict == "rewrite":
         score = invoke_codex_structured(pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json"), "review": review.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.55, structural_retry_temperature=.20, max_new_tokens=3600, call_journal=journal, repair_advisory=advisory)
+    # The whole-script reservation is only knowable once the score's accepted
+    # line graph is final (P3, or P3_rewrite): the artifact serializes strict
+    # metadata for every accepted line, so the line count -- not the word steer
+    # alone -- drives its size.
+    accepted_line_count = len(_accepted_script_line_metadata(score) or ())
+    if not accepted_line_count:
+        raise CodexGraphError("accepted score has no line graph to budget for")
+    script_token_budget = _script_output_token_budget(steer.requested_words, accepted_line_count)
+    journal["script_token_budget"] = {"requested_words": steer.requested_words, "accepted_line_count": accepted_line_count, "max_new_tokens": script_token_budget}
     script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
     listener = invoke_codex_structured(pass_id="P6", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_listening_room_system",), artifact_inputs={"script": script.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ListenerReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2200, call_journal=journal)
     script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)

@@ -339,6 +339,23 @@ class CastLock:
         the post-assignment invariant is skipped (nothing was assigned).
         """
         from . import _otr_casting as _OTRCAST
+        from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
+
+        # A content-owned lane builds its OWN cast rows and stamps their
+        # voice_preset in the lane runner; the writer's seeded picker never ran,
+        # so there is no sequence to replay and no num_characters_request to
+        # replay it with. Replaying anyway would fabricate a cast that was never
+        # rolled and overwrite the voices the lane chose. VERIFY what the lane
+        # assigned instead -- the Gate 1 invariants still run, so a content-owned
+        # lane can never ship duplicate or non-v2/ bark voices.
+        if delivery_mode_for_meta(meta) == CONTENT_OWNED:
+            report.append(
+                "bark voices: content-owned lane owns its cast -- "
+                "voice_preset preserved (no writer replay)"
+            )
+            _OTRCAST._assert_unique_bark_voices(cast)
+            _OTRCAST._assert_voice_preset_invariant(cast)
+            return
 
         contract = (meta or {}).get("cast_contract") or {}
         cast_seed = contract.get("cast_seed")

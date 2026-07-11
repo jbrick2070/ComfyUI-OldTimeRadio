@@ -630,12 +630,25 @@ def test_p3_typed_repair_receives_the_locked_score_graph_contract():
 
 
 def test_script_output_token_budget_receipts_and_bounds():
-    assert lane._script_output_token_budget(30) == 2800
-    assert lane._script_output_token_budget(720) == 4440
-    assert lane._script_output_token_budget(900) == 5250
+    # The reservation scales on BOTH drivers of the serialized artifact: the
+    # dialogue word steer AND the accepted line count (every accepted line pays
+    # the strict per-line metadata cost, even in a 30-word script).
+    assert lane._script_output_token_budget(30, 13) == 2800    # floor holds
+    assert lane._script_output_token_budget(300, 13) == 3640   # 1350 + 1690 + 600
+    assert lane._script_output_token_budget(720, 13) == 5400   # ceiling holds
+    assert lane._script_output_token_budget(900, 40) == 5400   # ceiling holds
+    # A wider accepted graph reserves more output at the SAME word steer --
+    # this is the P7 live truncation (generated == max_new_tokens == 2800).
+    assert (
+        lane._script_output_token_budget(300, 30)
+        > lane._script_output_token_budget(300, 13)
+    )
     for invalid in (True, 29, 901, 30.0):
         with pytest.raises(lane.CodexTargetRangeError):
-            lane._script_output_token_budget(invalid)
+            lane._script_output_token_budget(invalid, 13)
+    for bad_count in (True, 0, -1, 13.0):
+        with pytest.raises(lane.CodexTargetRangeError):
+            lane._script_output_token_budget(30, bad_count)
 
 
 def test_only_whole_script_passes_use_dynamic_token_budget():

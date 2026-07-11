@@ -444,6 +444,34 @@ Only after the above is green, continue portability work:
 Canonical workflow remains `workflows/otr_canonical.json`; exported workflows
 must be generated from canonical, not hand-maintained.
 
+### 5. Legacy dead-code rip (operator directive 2026-07-11)
+
+Rip out legacy code paths that nothing calls any more. This is not cosmetic --
+dead paths actively cost us live rolls, because a reviewer (human or agent)
+cannot tell which lever is real and patches the dead one.
+
+Live example that triggered this directive (2026-07-11): `_otr_model_catalog`
+carries BOTH `CURATED_CONTEXT_OVERRIDES` + `resolve_context_cap` AND a per-row
+`CuratedModel.context_window` field, with `tests/test_effective_context_limit.py`
+describing itself as a "Mirror of the legacy CURATED_CONTEXT_OVERRIDES /
+resolve_context_cap path". Two levers, one truth, no marker for which is live --
+so the first proposed fix for the 720w context ceiling aimed at a table that may
+not be on the runtime path at all.
+
+Rules for the rip:
+- Prove a path is dead before removing it (no caller, no test that exercises the
+  RUNTIME behavior, not just the constant).
+- Remove it outright; do not leave it behind a flag or a comment saying "legacy".
+  A cleanbreak, per the standing cleanbreak framing.
+- Same-change test update. If a test only pins a dead constant, the test goes too.
+- Run the full suite + Bug Bible; commit and push per green chunk.
+
+Candidates to audit (unproven -- audit first, do not assume):
+- `_otr_model_catalog.CURATED_CONTEXT_OVERRIDES` / `resolve_context_cap` vs the
+  per-row `context_window` effective-limit path.
+- Anything else the source-bank v2 / VRAM-rip / portability waves superseded but
+  left standing.
+
 ## Last Validation
 
 Post live-smoke hardening (2026-07-10):

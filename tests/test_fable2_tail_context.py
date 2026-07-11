@@ -328,10 +328,16 @@ def test_content_owned_tail_stamps_delivery_before_finalizer(
 
     assert probe.checked
     assert delivery_mode_for_meta(ctx.led.data["meta"]) == CONTENT_OWNED
-    assert (
-        (ctx.led.data["meta"].get("cast_contract") or {}).get("cast_seed")
-        == ctx.led.data["meta"].get("episode_seed")
-    )
+    # The content-owned tail owes CreditsRoll a durable seed receipt, and
+    # meta.episode_seed is the receipt it accepts.
+    assert isinstance(ctx.led.data["meta"].get("episode_seed"), int)
+    # It must NOT claim meta.cast_contract.cast_seed: that key asserts the
+    # writer's seeded picker produced this cast and can be REPLAYED from it,
+    # which is false for a lane that builds its own cast. CastLock replays the
+    # picker whenever it sees cast_seed, and a lane-owned cast carries no
+    # num_characters_request -- claiming it detonated the replay live with
+    # "num_characters must be 1-6, got 0".
+    assert "cast_seed" not in (ctx.led.data["meta"].get("cast_contract") or {})
     assert {
         row["line_id"]: row["text"]
         for row in ctx.led.data["lines"]

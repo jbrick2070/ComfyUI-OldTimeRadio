@@ -6799,27 +6799,26 @@ class OTR_LedgerScriptWriter:
         from ._otr_readiness import stamp_text_for_tts_delivery
         from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
         if delivery_mode_for_meta(meta) == CONTENT_OWNED:
-            # Content-owned lane runners construct their own casts, so they
-            # bypass the legacy cast-lock producer that normally stamps the
-            # durable seed receipt.  The shared tail is still upstream of
-            # CastLock, freeze, and CreditsRoll; establish one authoritative
-            # episode seed here when the lane has not already supplied one.
-            # This seed drives deterministic downstream voice assignment and
-            # satisfies the no-fallback credits provenance contract.
-            _cast_contract = meta.get("cast_contract") or {}
-            _cast_seed = _cast_contract.get("cast_seed")
-            if _cast_seed is None and meta.get("episode_seed") is None:
-                _cast_seed, _cast_seed_source = _resolve_cast_rng_seed()
-                _cast_contract = dict(_cast_contract)
-                _cast_contract["cast_seed"] = int(_cast_seed)
-                _cast_contract["cast_seed_source"] = str(_cast_seed_source)
-                meta["cast_contract"] = _cast_contract
-                meta.setdefault("cast_contract_version", "cast-v1")
-                meta["episode_seed"] = int(_cast_seed)
+            # Content-owned lane runners construct their own cast rows and
+            # stamp their own voice presets, so they never run the writer's
+            # seeded cast picker.  They still owe the downstream credits
+            # contract a durable seed receipt, and this shared tail is the one
+            # producer boundary upstream of CastLock, freeze, and CreditsRoll.
+            #
+            # Stamp meta.episode_seed -- the receipt otr_credits_roll accepts --
+            # and NOT meta.cast_contract.cast_seed.  cast_seed is not a generic
+            # episode seed: it is a claim that the writer's picker produced this
+            # cast from that seed and can be REPLAYED from it.  CastLock replays
+            # the picker whenever it sees cast_seed, and a lane-owned cast has no
+            # num_characters_request to replay with, so claiming it detonates the
+            # replay (BUG: "num_characters must be 1-6, got 0").
+            if meta.get("episode_seed") is None:
+                _episode_seed, _episode_seed_source = _resolve_cast_rng_seed()
+                meta["episode_seed"] = int(_episode_seed)
                 log.info(
-                    "[OTR_LedgerScriptWriter] content-owned cast seed=%d "
+                    "[OTR_LedgerScriptWriter] content-owned episode seed=%d "
                     "(%s) stamped before freeze",
-                    _cast_seed, _cast_seed_source,
+                    _episode_seed, _episode_seed_source,
                 )
             stamp_text_for_tts_delivery(led)
 
