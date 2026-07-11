@@ -2976,6 +2976,35 @@ _ANNOUNCER_INTRO_MAX_CHARS = 300
 _ANNOUNCER_OUTRO_MIN_CHARS = 28
 _ANNOUNCER_OUTRO_MAX_CHARS = 340
 
+# An announcer line that misses the length window is a REJECTION, not a death sentence:
+# the model is asked again, with the reason. Only when it will not comply does the
+# episode stop -- and it still never ships a line Python wrote.
+_ANNOUNCER_ATTEMPTS = 3
+
+
+def _announcer_retry_note(cleaned: str, *, min_chars: int, max_chars: int) -> str:
+    """Tell the model exactly why its line was rejected, and what to do about it."""
+    n = len(cleaned)
+    if n > max_chars:
+        why = (
+            f"Your line was {n} characters; the hard limit is {max_chars}. It is too "
+            f"long. Cut it down -- one sentence, spoken aloud, no scene-setting prose."
+        )
+    elif n < min_chars:
+        why = (
+            f"Your line was only {n} characters; it must be at least {min_chars}. Give "
+            f"the listener something to hold on to."
+        )
+    else:
+        why = (
+            "Your line was rejected: it must be ONE spoken announcer line -- no speaker "
+            "label, no quotation marks, no stage directions, no line breaks."
+        )
+    return (
+        why
+        + " Rewrite it now and return ONLY the spoken line itself, nothing else."
+    )
+
 # Speaker-label prefixes that must never lead an announcer line.
 _ANNOUNCER_BAD_PREFIXES: tuple[str, ...] = (
     "ANNOUNCER:", "ANNOUNCER -", "HOST:", "NARRATOR:", "NARRATION:",
@@ -3300,24 +3329,49 @@ def compose_announcer_intro(
             {"role": "system", "content": _intro_system},
             {"role": "user", "content": "\n".join(user_parts)},
         ]
-        raw = _announcer_generate(creative_fn, messages)
-        cleaned = strip_line_formatting(raw or "")
-        ok, validated = validate_announcer_line(
-            cleaned,
-            min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
-            max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
-        )
-        if ok:
-            log.info(
-                "[OTR_AnnouncerPass] safe-open pass ok (model=%s, %d chars)",
-                creative_repo_id, len(validated),
+        # The no-fallback rule is right: never ship a canned open line Python wrote.
+        # But "no fallback" had been implemented as "no second chance" -- ONE call, and a
+        # line four characters too long killed the episode (live: original_radio died on
+        # an announcer intro that ran past the 300-char cap). Every structured pass in
+        # this system gets a retry ladder; the announcer got none, and the model can
+        # comply -- it was simply never asked twice. Retry with the ACTUAL reason, then
+        # still fail closed. No template ever speaks.
+        raw = None
+        for attempt in range(1, _ANNOUNCER_ATTEMPTS + 1):
+            raw = _announcer_generate(creative_fn, messages)
+            cleaned = strip_line_formatting(raw or "")
+            ok, validated = validate_announcer_line(
+                cleaned,
+                min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
+                max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
             )
-            return LineResult(text=validated, compose_flags=("announcer_intro",))
+            if ok:
+                log.info(
+                    "[OTR_AnnouncerPass] safe-open pass ok (model=%s, %d chars, "
+                    "attempt %d)", creative_repo_id, len(validated), attempt,
+                )
+                return LineResult(text=validated, compose_flags=("announcer_intro",))
+            if attempt < _ANNOUNCER_ATTEMPTS:
+                log.warning(
+                    "[OTR_AnnouncerPass] intro attempt %d rejected (%d chars, limit "
+                    "%d-%d); asking again with the reason",
+                    attempt, len(cleaned), _ANNOUNCER_INTRO_MIN_CHARS,
+                    _ANNOUNCER_INTRO_MAX_CHARS,
+                )
+                messages = messages[:2] + [
+                    {"role": "assistant", "content": cleaned},
+                    {"role": "user", "content": _announcer_retry_note(
+                        cleaned,
+                        min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
+                        max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
+                    )},
+                ]
         raise RuntimeError(
-            "[OTR_AnnouncerPass] safe-open announcer intro LLM failed validation "
-            "(model=%s, raw=%r). NO deterministic-template fallback (no-fallback "
-            "rip 2026-07-03) -- a failed announcer-intro LLM stops the episode; it "
-            "never silently ships a canned open line." % (creative_repo_id, raw)
+            "[OTR_AnnouncerPass] safe-open announcer intro LLM failed validation after "
+            "%d attempts (model=%s, raw=%r). NO deterministic-template fallback "
+            "(no-fallback rip 2026-07-03) -- a failed announcer-intro LLM stops the "
+            "episode; it never silently ships a canned open line."
+            % (_ANNOUNCER_ATTEMPTS, creative_repo_id, raw)
         )
     # LLM slot: creative -- announcer intro is a narrative framing
     # pass; routed through the writer's creative_writing_model slot.
@@ -3338,25 +3392,45 @@ def compose_announcer_intro(
             ),
         },
     ]
-    raw = _announcer_generate(creative_fn, messages)
-    cleaned = strip_line_formatting(raw or "")
-    ok, validated = validate_announcer_line(
-        cleaned,
-        min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
-        max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
-    )
-    if ok:
-        log.info(
-            "[OTR_AnnouncerPass] intro pass ok (model=%s, %d chars)",
-            creative_repo_id, len(validated),
+    # Same ladder as the safe-open path: a rejected line is asked again, with the reason.
+    # The episode still stops if the model will not comply, and no template ever speaks.
+    raw = None
+    for attempt in range(1, _ANNOUNCER_ATTEMPTS + 1):
+        raw = _announcer_generate(creative_fn, messages)
+        cleaned = strip_line_formatting(raw or "")
+        ok, validated = validate_announcer_line(
+            cleaned,
+            min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
+            max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
         )
-        return LineResult(
-            text=validated, compose_flags=("announcer_intro",),
-        )
+        if ok:
+            log.info(
+                "[OTR_AnnouncerPass] intro pass ok (model=%s, %d chars, attempt %d)",
+                creative_repo_id, len(validated), attempt,
+            )
+            return LineResult(
+                text=validated, compose_flags=("announcer_intro",),
+            )
+        if attempt < _ANNOUNCER_ATTEMPTS:
+            log.warning(
+                "[OTR_AnnouncerPass] intro attempt %d rejected (%d chars, limit %d-%d); "
+                "asking again with the reason",
+                attempt, len(cleaned), _ANNOUNCER_INTRO_MIN_CHARS,
+                _ANNOUNCER_INTRO_MAX_CHARS,
+            )
+            messages = messages[:2] + [
+                {"role": "assistant", "content": cleaned},
+                {"role": "user", "content": _announcer_retry_note(
+                    cleaned,
+                    min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
+                    max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
+                )},
+            ]
     raise RuntimeError(
-        "[OTR_AnnouncerPass] announcer intro LLM failed validation (model=%s, "
-        "raw=%r). NO deterministic-template fallback (no-fallback rip 2026-07-03) "
-        "-- a failed announcer-intro LLM stops the episode." % (creative_repo_id, raw)
+        "[OTR_AnnouncerPass] announcer intro LLM failed validation after %d attempts "
+        "(model=%s, raw=%r). NO deterministic-template fallback (no-fallback rip "
+        "2026-07-03) -- a failed announcer-intro LLM stops the episode."
+        % (_ANNOUNCER_ATTEMPTS, creative_repo_id, raw)
     )
 
 
@@ -3674,13 +3748,36 @@ def compose_announcer_outro(
         {"role": "system", "content": system_content},
         {"role": "user", "content": "\n\n".join(user_parts)},
     ]
-    raw = _announcer_generate(creative_fn, messages)
-    cleaned = strip_line_formatting(raw or "")
-    ok, validated = validate_announcer_line(
-        cleaned,
-        min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-        max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-    )
+    # Same ladder as the intro: a line that misses the length window is asked again with
+    # the reason, not executed on the spot. Quality misses below (hedged / thesis close)
+    # already recompose and keep the AI-written line; this covers outright rejection.
+    raw = None
+    cleaned = ""
+    ok, validated = False, ""
+    for _attempt in range(1, _ANNOUNCER_ATTEMPTS + 1):
+        raw = _announcer_generate(creative_fn, messages)
+        cleaned = strip_line_formatting(raw or "")
+        ok, validated = validate_announcer_line(
+            cleaned,
+            min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+            max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+        )
+        if ok or _attempt == _ANNOUNCER_ATTEMPTS:
+            break
+        log.warning(
+            "[OTR_AnnouncerPass] outro attempt %d rejected (%d chars, limit %d-%d); "
+            "asking again with the reason",
+            _attempt, len(cleaned), _ANNOUNCER_OUTRO_MIN_CHARS,
+            _ANNOUNCER_OUTRO_MAX_CHARS,
+        )
+        messages = messages[:2] + [
+            {"role": "assistant", "content": cleaned},
+            {"role": "user", "content": _announcer_retry_note(
+                cleaned,
+                min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+                max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+            )},
+        ]
     if ok:
         # F3 post-check: a resolved episode whose close still hedges is a
         # contradiction -- recompose ONCE with a stronger directive; if it
