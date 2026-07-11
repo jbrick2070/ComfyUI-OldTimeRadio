@@ -28,6 +28,13 @@ ROW_ID = "unsloth/gemma-4-12b-it-GGUF"
 DEFAULT_GGUF_FILENAME = "gemma-4-12b-it-Q8_0.gguf"
 EXPECTED_Q8_0_SIZE_BYTES = 12_669_646_240
 DEFAULT_CONTEXT_WINDOW = 4096
+
+# KV-cache cost per 1024 context cells, in GB. Conservative: the preflight would rather
+# refuse a load than OOM mid-generation. Override with GEMMA4_12B_KV_GB_PER_1K once the
+# real figure has been MEASURED on this box (log the resident VRAM after a load and
+# divide) -- a guessed constant that blocks a good config is as bad as one that lets a
+# bad config through.
+KV_GB_PER_1K_CTX = 0.7
 DEFAULT_OUTPUT_TOKENS_CAP = 512
 DEFAULT_N_BATCH = 512
 DEFAULT_N_GPU_LAYERS = -1
@@ -63,6 +70,13 @@ class GGUFNativeCallFailedError(GGUFNativeError):
 def _int_env(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, "") or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _float_env(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, "") or default)
     except (TypeError, ValueError):
         return default
 
@@ -330,13 +344,23 @@ class GGUFNativeBackend:
                     "llm device policy to cpu."
                 ) from exc
             free_gb = free_bytes / (1024 ** 3)
-            # Estimation: weights (12.07 GB) + SWA KV Cache (~0.7 GB per
-            # 1024 context cells) + safety overhead. At 4096 context the
-            # total needed is ~14.9 GB; at 2048 it is ~13.5 GB.
-            estimated_needed_gb = 12.07 + (n_ctx / 1024.0) * 0.7 + 0.1
+            # Estimation: weights + SWA KV cache (~0.7 GB per 1024 context cells)
+            # + safety overhead.
+            #
+            # The weight term MUST come from the file on disk. It was hardcoded to
+            # 12.07 GB -- the size of the Q8_0 -- so the gate refused every OTHER
+            # quant by pricing it as a Q8_0. A 7.12 GB Q4_K_M that fits comfortably
+            # would be rejected for needing VRAM it does not use. The quant is the
+            # one lever we have when a model will not fit; a gate that cannot see
+            # the quant cannot be reasoned with.
+            weights_gb = path.stat().st_size / (1024 ** 3)
+            kv_rate = _float_env("GEMMA4_12B_KV_GB_PER_1K", KV_GB_PER_1K_CTX)
+            kv_gb = (n_ctx / 1024.0) * kv_rate
+            estimated_needed_gb = weights_gb + kv_gb + 0.1
             log.info(
-                "[GGUFNative] VRAM Preflight: Free=%.2f GB | Estimated Needed=%.2f GB (n_ctx=%d)",
-                free_gb, estimated_needed_gb, n_ctx
+                "[GGUFNative] VRAM Preflight: Free=%.2f GB | Needed=%.2f GB "
+                "(weights=%.2f from %s, kv=%.2f @ n_ctx=%d)",
+                free_gb, estimated_needed_gb, weights_gb, path.name, kv_gb, n_ctx,
             )
             if free_gb < estimated_needed_gb:
                 raise GGUFNativeConfigError(

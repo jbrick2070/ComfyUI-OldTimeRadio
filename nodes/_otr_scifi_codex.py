@@ -633,10 +633,127 @@ class StructureReviewV4(_Strict):
     rationale: str = ""
 
 
+class ListenerIssueV4(_Strict):
+    """One diagnosis from the listening room.
+
+    `issues` used to be typed `list[dict[str, str]]` -- a shapeless container. The seam
+    names six diagnostic lenses (blurred causality, interchangeable voices, lecture,
+    unused sound, stalled pacing, overclaiming coda) but never said what ONE issue looks
+    like, so a model had to guess between a list of issues and a dict grouping issues
+    under those six lenses. Both readings are reasonable; we were winning a coin flip.
+    Gemma-4 called it the other way (`{"blurred_causality": [...]}`) and P6 died.
+
+    So the SHAPE is pinned here and the VOCABULARY is left to the model: `category` is
+    free text, not an enum, because a listener who coins a better word for the flaw than
+    our six is doing its job, and a schema should never reject it for that.
+    """
+
+    category: str
+    line_id: str | None = None
+    direction: str
+
+
 class ListenerReviewV4(_Strict):
     strengths: list[str] = []
-    issues: list[dict[str, str]] = []
+    issues: list[ListenerIssueV4] = []
     require_full_retake: bool = True
+
+
+# The listener's own words for the issue text.  Ordered by how directly the key names
+# "what the writer should do"; the first key present wins.  Python never writes the
+# direction -- it only finds which key the model put its sentence under.
+_LISTENER_DIRECTION_KEYS = (
+    "direction", "detail", "fix", "note", "issue", "problem",
+    "suggestion", "description", "comment", "text",
+)
+_LISTENER_CATEGORY_KEYS = ("category", "type", "kind", "lens", "label")
+_LISTENER_LINE_KEYS = ("line_id", "line", "line_ref", "id")
+
+
+def _listener_issue_from(item: object, category: str) -> ListenerIssueV4 | None:
+    """Map one loose issue into the typed shape, using only the model's own text."""
+    if isinstance(item, str):
+        return ListenerIssueV4(category=category, direction=item) if item.strip() else None
+    if not isinstance(item, Mapping):
+        return None
+
+    direction = next(
+        (
+            str(item[k]).strip()
+            for k in _LISTENER_DIRECTION_KEYS
+            if isinstance(item.get(k), str) and str(item[k]).strip()
+        ),
+        None,
+    )
+    if direction is None:
+        # A single unlabelled sentence is unambiguous; anything else would be a guess.
+        strings = [v.strip() for v in item.values() if isinstance(v, str) and v.strip()]
+        if len(strings) != 1:
+            return None
+        direction = strings[0]
+
+    label = next(
+        (
+            str(item[k]).strip()
+            for k in _LISTENER_CATEGORY_KEYS
+            if isinstance(item.get(k), str) and str(item[k]).strip()
+        ),
+        category,
+    )
+    line_id = next(
+        (
+            str(item[k]).strip()
+            for k in _LISTENER_LINE_KEYS
+            if isinstance(item.get(k), str) and str(item[k]).strip()
+        ),
+        None,
+    )
+    return ListenerIssueV4(category=label or "unlabelled", line_id=line_id, direction=direction)
+
+
+def repair_listener_review_shape(failed_output: str) -> ListenerReviewV4 | None:
+    """Flatten a grouped listener review into the flat typed shape.
+
+    A model told to look for six kinds of flaw may reasonably return
+    `{"blurred_causality": [...], "stalled_pacing": [...]}` instead of a flat list --
+    that is a container-shape choice, not a story defect, so Python is allowed to
+    normalize it.  It re-homes the model's sentences; it never writes one.  Fails
+    closed (returns None) on any issue it cannot map without inventing text, so the
+    typed repair still gets its turn rather than a diagnosis being silently dropped.
+    """
+    try:
+        raw = parse_first_json_object(failed_output)
+    except Exception:
+        return None
+    if not isinstance(raw, Mapping):
+        return None
+
+    issues_in = raw.get("issues")
+    flattened: list[ListenerIssueV4] = []
+    if isinstance(issues_in, Mapping):
+        for category, group in issues_in.items():
+            items = group if isinstance(group, list) else [group]
+            for item in items:
+                mapped = _listener_issue_from(item, str(category))
+                if mapped is None:
+                    return None
+                flattened.append(mapped)
+    elif isinstance(issues_in, list):
+        for item in issues_in:
+            mapped = _listener_issue_from(item, "unlabelled")
+            if mapped is None:
+                return None
+            flattened.append(mapped)
+    elif issues_in is not None:
+        return None
+
+    strengths = [s.strip() for s in raw.get("strengths") or [] if isinstance(s, str) and s.strip()]
+    retake = raw.get("require_full_retake")
+    return ListenerReviewV4(
+        strengths=strengths,
+        issues=flattened,
+        require_full_retake=retake if isinstance(retake, bool) else True,
+    )
 
 
 class FinalIssueV1(_Strict):
@@ -665,7 +782,12 @@ class FinalAuditV4(_Strict):
     issues: list[FinalIssueV1] = []
     line_checks: list[LineCheckV1] = []
     fact_checks: list[FactCheckV1] = []
-    observed_word_counts: dict[str, int]
+    # `observed_word_counts: dict[str, int]` was REQUIRED here, and the audit seam told
+    # the auditor to check the "exact word count" and pass only if every check is true.
+    # That made an LLM -- which cannot count words -- the enforcer of a word-count gate,
+    # and a disagreement it was bound to have could demand a full P9 rewrite. Word count
+    # is advisory and never a gate; Python already measures the real one objectively in
+    # the tail's word_receipt. Nothing ever read this field. Ripped, seam and all.
 
 
 GenerateFn = Callable[..., str]
@@ -1184,6 +1306,22 @@ def invoke_codex_structured(
                         "[scifi_codex:P0] deterministic digest repair "
                         "declined: %s", deterministic_error,
                     )
+        elif pass_id == "P6":
+            deterministic = repair_listener_review_shape(failed_output)
+            if deterministic is not None and post_validator(deterministic) is None:
+                log.info(
+                    "[scifi_codex:P6] deterministic listener-issue shape repair accepted",
+                )
+                return deterministic
+            repair_rules = (
+                "This is a typed repair of the same ListenerReviewV4, not a new review. "
+                "Preserve every strength and every diagnosis you already wrote, word for "
+                "word. issues MUST be a flat JSON array, never an object grouping issues "
+                "under category names. Each element is one object with category (your own "
+                "short label for the flaw), line_id (the exact line ID, or null when the "
+                "issue is about the whole play), and direction (what a writer should do). "
+                "Return one JSON object only."
+            )
         else:
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the existing premise, "

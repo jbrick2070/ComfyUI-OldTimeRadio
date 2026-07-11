@@ -87,6 +87,182 @@ def test_no_strict_lane_field_is_unrepresentable_in_json(module_name):
     )
 
 
+# A model-authored collection whose ITEM has no declared shape is a coin flip: the
+# model must guess whether to return a list of things or an object grouping those
+# things. Both readings satisfy `list[dict[str, str]]`-shaped prose, so which one you
+# get depends on the model, and the seam's wording, and the day.
+#
+# Live case (2026-07-11, Codex P6, gemma-4-E4B on the creative slot):
+#     issues: Input should be a valid list
+#       [type=list_type, input_value={'blur_of_causality': [{...}]}, input_type=dict]
+# `ListenerReviewV4.issues` was `list[dict[str, str]]` and the seam named six
+# diagnostic lenses. The model grouped its issues under those lenses -- a completely
+# reasonable reading of what we wrote -- and P6 exhausted its ladder and killed the
+# roll. Mistral had been guessing the other way and we mistook that for a contract.
+#
+# Each entry below is a field allowed to stay shapeless, with the reason it is NOT a
+# coin flip. Anything else must nest a real model. Add to this list only with a reason
+# that a NEW model, reading only the schema, could not misread.
+ALLOWED_SHAPELESS = {
+    # justification: Python BUILDS this plan and the model copies back the literal it
+    # was handed. The shape is demonstrated by value, not described in prose, so there
+    # is nothing for the model to guess.
+    "nodes._otr_scifi_codex.AdvisoryWordPlanV4.per_beat",
+    # justification: guarded. _has_forbidden_script_scene_keys pins the container to a
+    # list of dicts and rejects score-shaped echoes, and a deterministic repair covers
+    # the rest. The free keys inside are deliberate room for the script's scene prose.
+    "nodes._otr_scifi_codex.ScriptArtifactV4.scenes",
+    # justification: the source payload Python hands IN (headline/summary/full_text ->
+    # text), echoed back. A real mapping over known keys, never guessed.
+    "nodes._otr_scifi_gemini.GeminiPayloadV4.payload",
+    # justification: same input payload echo as the Gemini lane above.
+    "nodes._otr_scifi_sonnet.PayloadV4.payload",
+    # justification: a true mapping, not a collection -- line_id -> the fact IDs that
+    # line speaks. The key IS the identifier, so "should this have been a list?" has
+    # no second reading, which is exactly the ambiguity this guard exists to catch.
+    "nodes._otr_scifi_gemini.SceneCritiqueV4.line_fact_ids",
+}
+
+
+def test_no_lane_asks_a_model_to_count_words():
+    """No strict lane model may carry a model-reported word count.
+
+    Word count is advisory and never a gate (operator law). A field that asks the model
+    to report counts invites a seam that audits them -- and an LLM cannot count words,
+    so the gate fails on a measurement the model cannot make and the writer cannot fix.
+    Python measures the real count objectively at assembly (`word_receipt`).
+
+    Live case (2026-07-11): `FinalAuditV4.observed_word_counts` was REQUIRED, and
+    `codex_final_audit_system` told the auditor to check the "exact word count" and
+    "pass only if all checks are true" -- a word-count gate that could demand a full
+    P9 rewrite. Nothing in Python ever read the field.
+    """
+    offenders = []
+    for module_name in LANE_MODULES:
+        module = importlib.import_module(module_name)
+        for model_name, model in _strict_models(module):
+            for field_name in model.model_fields:
+                lowered = field_name.lower()
+                if "word" in lowered and ("count" in lowered or "len" in lowered):
+                    offenders.append(f"{module_name}.{model_name}.{field_name}")
+    assert not offenders, (
+        "these fields ask a model to report a word count -- Python measures words, "
+        "models write them:\n  " + "\n  ".join(offenders)
+    )
+
+
+@pytest.mark.parametrize("pack_path", sorted(
+    pathlib.Path(__file__).resolve().parents[1].joinpath("nodes", "story_packs").glob("*/*_v1.json")
+))
+def test_no_seam_audits_word_count(pack_path):
+    """A seam may steer toward a length. It may never make length a pass/fail check."""
+    import json
+
+    text = json.dumps(json.loads(pack_path.read_text(encoding="utf-8"))).lower()
+    forbidden = ("exact word count", "verify the word count", "correct word count")
+    hits = [phrase for phrase in forbidden if phrase in text]
+    assert not hits, (
+        f"{pack_path.name} makes word count auditable: {hits}. Word count is advisory; "
+        "gating on it asks a model to enforce something it cannot measure."
+    )
+
+
+def _is_shapeless(annotation) -> bool:
+    """True when a container's items have no declared shape (dict/Any, not a model)."""
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+    if annotation is typing.Any:
+        return True
+    if origin is dict or annotation is dict:
+        return True
+    if origin in (list, set, frozenset, tuple):
+        return any(_is_shapeless(arg) for arg in args)
+    if origin is typing.Union or str(origin) == "types.UnionType":
+        return any(_is_shapeless(a) for a in args if a is not type(None))
+    return False
+
+
+@pytest.mark.parametrize("module_name", LANE_MODULES)
+def test_no_model_authored_collection_is_shapeless(module_name):
+    """A collection the model FILLS must declare what one item looks like.
+
+    Otherwise the model has to guess between `[{...}, {...}]` and
+    `{"category": [{...}]}` -- and a schema that admits two readings will eventually
+    be read the other way. Nest a real model (see ListenerIssueV4) instead.
+    """
+    module = importlib.import_module(module_name)
+    violations = []
+    for model_name, model in _strict_models(module):
+        for field_name, field in model.model_fields.items():
+            path = f"{module_name}.{model_name}.{field_name}"
+            if path in ALLOWED_SHAPELESS:
+                continue
+            if _is_shapeless(field.annotation):
+                violations.append(f"{path}: {field.annotation!r}")
+    assert not violations, (
+        "these model-authored fields have no declared item shape, so the model must "
+        "guess the container -- nest a real model, or justify it in ALLOWED_SHAPELESS:"
+        "\n  " + "\n  ".join(violations)
+    )
+
+
+def test_listener_issue_is_typed_and_keeps_category_open():
+    """The P6 fix pins the SHAPE without pinning the listener's vocabulary."""
+    from nodes import _otr_scifi_codex as lane
+
+    issues = lane.ListenerReviewV4.model_fields["issues"]
+    assert typing.get_args(issues.annotation)[0] is lane.ListenerIssueV4, (
+        "issues must be a list of typed ListenerIssueV4, not a shapeless container"
+    )
+    # A listener that coins a better word for the flaw than our six is doing its job.
+    # Pinning `category` to an enum would reject it for that.
+    assert lane.ListenerIssueV4.model_fields["category"].annotation is str
+
+
+def test_listener_review_repair_flattens_grouped_issues_verbatim():
+    """The exact payload that killed the 2026-07-11 roll must now normalize.
+
+    Python re-homes the model's sentences into the right container. It must never
+    write one: every word in the repaired review has to appear in the raw output.
+    """
+    from nodes import _otr_scifi_codex as lane
+
+    raw = """{
+      "strengths": ["The cold open earns its silence."],
+      "issues": {
+        "blurred_causality": [
+          {"line_id": "l004", "direction": "Show the relay failing before Vesh names it."}
+        ],
+        "stalled_pacing": [
+          {"direction": "Cut the second corridor beat; it repeats the first."}
+        ]
+      },
+      "require_full_retake": true
+    }"""
+
+    review = lane.repair_listener_review_shape(raw)
+    assert review is not None
+    assert [i.category for i in review.issues] == ["blurred_causality", "stalled_pacing"]
+    assert review.issues[0].line_id == "l004"
+    assert review.issues[1].line_id is None
+    assert review.strengths == ["The cold open earns its silence."]
+    assert review.require_full_retake is True
+    for issue in review.issues:
+        assert issue.direction in raw, "Python may re-home the model's words, never write them"
+
+
+def test_listener_review_repair_fails_closed_on_an_unmappable_issue():
+    """Fail closed rather than silently drop a diagnosis.
+
+    If we cannot tell which of several strings is the direction, guessing would either
+    invent a critique or quietly lose one. Return None and let the typed repair ask.
+    """
+    from nodes import _otr_scifi_codex as lane
+
+    raw = '{"issues": {"pacing": [{"where": "l002", "why": "slow", "how": "trim"}]}}'
+    assert lane.repair_listener_review_shape(raw) is None
+
+
 def test_gemini_pitch_slate_still_pins_exactly_three_pitches():
     """The JSON-native fix must not loosen the three-pitch contract."""
     from nodes import _otr_scifi_gemini as lane
