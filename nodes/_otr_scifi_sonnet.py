@@ -345,7 +345,8 @@ def invoke_sonnet_structured(
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the continuity archive, "
                 "session frame, cast locks, and authored lines; repair only fields named by "
-                "the validation error. Every required nested field must be present."
+                "the validation error. Every required nested field must be present; preserve "
+                "the locked speaker/char_id mapping."
             )
         return [
             {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},

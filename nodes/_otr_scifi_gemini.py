@@ -362,7 +362,8 @@ def invoke_gemini_structured(
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the selected premise, "
                 "scene outline, beats, and dialogue content; repair only fields named by the "
-                "validation error. Every required nested graph field must be present."
+                "validation error. Every required nested graph field must be present; copy each "
+                "beat speaker from the cast row matching its char_id."
             )
         return [
             {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},
