@@ -3,6 +3,37 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-11 -- HEAD 2f335c28 (v2.0-alpha) [720-bakeoff C1/C2 coder window]
+
+Did:
+- C1 SHIPPED @ 9949bb6e: durable-field identity in production_ledger --
+  _row_identity gates the disk merge so durable render fields (wav/timing)
+  copy forward ONLY on unchanged content identity (lines=sha of text,
+  music=cue_spec_sha256, clips=render-spec); empty-source -> no gate (skip/
+  clear preserves durable per the ownership contract). set_music now carries
+  anchor_line_id/placement/target_duration_s + stamps cue_spec_sha256. 5 new
+  tests; golden fable2 fixture regenerated. Suite 7468/31/1 + Bible green.
+- C2 SHIPPED @ 2f335c28: text_for_tts delivery routing. _otr_readiness
+  stamps text_for_tts + source sha + receipt on fable2 voiced lines (canonical
+  untouched -- restores the pronunciation the P0 fold switched off). NEW
+  _otr_text_delivery resolver (LEGACY passthrough = byte-identical spine;
+  CONTENT_OWNED = verified stamp, absent/stale = terminal before gen). Voice
+  node routes prep/vector/hash through it. scene_sequencer two-bus surplus+
+  shortfall terminal check. 26 new tests incl. science_news byte-parity fixture.
+  Suite 7494/31/1 + Bible green.
+- C3 wiring kibitz'd (r3, Codex + Claude Code grounded; Antigravity timed out).
+  HARDENED spec = docs/2026-07-11-c3-cue-manifest-wiring/FINAL_HARDENED_PLAN.md.
+  Surfaced real build-breakers before touching the canonical JSON: legacy
+  ledger.music[] is empty (node 83 must synthesize legacy cues; inter_NN
+  KeyErrors compose_music_prompt), sentinel lines have no cue_id (use C1's
+  anchor_line_id), node-7 input deletion = widget-slot drift (keep declared),
+  music must be a 3rd bus, slice by sample_count (no silence-trim) + resample.
+Current step: 720-bakeoff C3 (cue manifest + canonical workflow wiring) --
+CODE-READY per the hardened spec; canonical-JSON rewire, one atomic commit.
+Next: build C3 in a fresh window from FINAL_HARDENED_PLAN.md (re-derive live
+literals per the VERIFY-AT-BUILD list); STOP after C3 green+pushed.
+Commits: 9949bb6e (C1), 2f335c28 (C2) -- both pushed. C3 docs this commit.
+
 ## 2026-07-10 ~14:20 -- HEAD af378aad (v2.0-alpha) [scifi_fable2 S1b coder window, QA fold]
 
 Did:

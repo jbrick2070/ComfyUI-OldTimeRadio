@@ -19,7 +19,25 @@ All builds on v2.0-alpha, serial, never two windows in the shared JSON
 (mechanical); kibitz = local codex+antigravity; Fable only at the event.
 Then C6 qualification sweep (all six incl. B/C calibrations) -> C7 event.
 
-**ACTIVE STEP (2026-07-10 evening): 720-word STORY-ENGINE BAKE-OFF RUNWAY.**
+**ACTIVE STEP (2026-07-11): 720-bakeoff chunk C3 (cue manifest + canonical
+workflow wiring), CODE-READY.** C1 (durable-field identity) + C2 (text_for_tts
+delivery routing) SHIPPED + pushed @ `2f335c28` / v2.0-alpha (suite 7494/31/1
++ Bug Bible 17/7/3 green). C3's wiring was kibitz'd (r3; Codex + Claude Code
+grounded, Antigravity timed out) -> HARDENED build spec =
+`docs/2026-07-11-c3-cue-manifest-wiring/FINAL_HARDENED_PLAN.md` (panel reviews
++ anchor alongside). Load-bearing hardening vs the runway C3 text: (a) legacy
+lanes do NOT populate ledger.music[] (only fable2 calls set_music) -> node 83
+must SYNTHESIZE opening/closing via compose_music_prompt, mapping placement ->
+opening/closing/interstitial so inter_NN never KeyErrors; (b) fable2 sentinel
+lines carry NO cue_id -> stamp music[].anchor_line_id + placement in assembly
+(uses C1's fields) and resolve boundaries by anchor_line_id; (c) do NOT delete
+node-7 opening/closing inputs (widget-slot drift, BUG-LOCAL-097) -> keep
+declared/unlinked + branch on manifest presence; node-12 closing_audio same
+(drop link 243 only); (d) music = THIRD bus, never C2's two-bus check; (e)
+slice by manifest sample_count via direct tensor slice (no silence-trim) +
+resample to consumer rate; (f) shift ledger.music[] scene_audio->master_mix.
+STOP after C3 green+pushed; C4a/C4b run in an Opus window.
+
 Plan of record: `docs/2026-07-10-fable2-720-bakeoff-runway.md` (kibitz'd before
 C4 coding). Chunks C1-C7: P1.1 ownership/revision merge contract -> P1.3
 text_for_tts (science_news byte-parity fixture FIRST) -> P1.4 cue manifest +
