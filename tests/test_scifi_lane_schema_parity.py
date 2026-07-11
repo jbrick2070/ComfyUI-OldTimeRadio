@@ -482,5 +482,96 @@ def test_no_lane_seam_treats_the_word_target_as_a_quota():
     )
 
 
+def _sonnet_line(lane, text, cites=(), non_fact=False, speaker="ORUM", char_id="c02"):
+    return lane.DraftLineV4(
+        text=text, cites=list(cites), non_fact=non_fact,
+        speaker=speaker, char_id=char_id, source_pass="P2a",
+    )
+
+
+def test_sonnet_ceremonial_line_may_cite_nothing_instead_of_a_fact_that_cannot_exist():
+    """`cites` required >= 1, so lines that state no fact cited a sentinel `fact_0`.
+
+    No such fact can ever exist: the P0 dossier contract is one-based (fact_1,
+    fact_2, ...). Every ceremonial line in the episode -- the cold open, the
+    Warden's rulings, the sign-off -- was carrying a FALSE citation, and the seal
+    and sign-off borrowed the attestation's real fact id for a claim they never
+    make. An honest empty is the truthful record.
+    """
+    from nodes import _otr_scifi_sonnet as lane
+
+    ceremonial = _sonnet_line(
+        lane, "The Archive is convened.", non_fact=True,
+        speaker="ANNOUNCER", char_id="announcer",
+    )
+    assert ceremonial.cites == []
+
+    # A line that states a fact must still cite one...
+    assert _sonnet_line(lane, "The wording says sixty kelvin.", cites=["fact_1"]).cites
+
+    # ...and the two may never disagree.
+    with pytest.raises(Exception):
+        _sonnet_line(lane, "x", cites=["fact_1"], non_fact=True)   # cites a fact it disclaims
+    with pytest.raises(Exception):
+        _sonnet_line(lane, "x", cites=[], non_fact=False)          # claims a fact, cites none
+
+    # The attestation contract is 1-3, matching every line schema it becomes.
+    assert lane.AttestationV4.model_fields["attestation_cites"].metadata
+
+
+def test_sonnet_rewrite_corrections_are_written_back_into_the_record():
+    """They never were -- which is why Sonnet has never completed a run.
+
+    The loop validated the doctor's corrections, threw them away, and re-audited
+    the UNCHANGED draft. The recheck re-read the very text it had just condemned,
+    so the audit could only exhaust. Python integrates the model's replacement
+    text; it authors none of it.
+    """
+    from nodes import _otr_scifi_sonnet as lane
+
+    events = [
+        _sonnet_line(lane, "cold open", non_fact=True,
+                     speaker="ANNOUNCER", char_id="announcer"),
+        _sonnet_line(lane, "ORUM says a wrong thing", cites=["fact_1"]),
+        _sonnet_line(lane, "THESSALY speculates", cites=["fact_2"],
+                     speaker="THESSALY", char_id="c03"),
+    ]
+    audited = lane._audited_line_indices(events)
+    assert audited == [1, 2], "the cold open is never numbered for the audit"
+
+    audit = lane.AuditVerdictV4.model_validate({
+        "status": "defect", "defects": ["line 0 misstates the wording"],
+        "flagged_line_refs": [0], "invented_fact_flags": [], "severity": "critical",
+        "sfw_pass": True,
+    })
+    rewrite = lane.RewriteResultV4.model_validate({
+        "corrected_lines": [{
+            "line_ref": 0, "speaker": "ORUM",
+            "text": "ORUM says the accurate thing", "cites": ["fact_1"],
+        }],
+        "vesh_resolution": "The record stands corrected.",
+    })
+
+    lane._apply_rewrite_corrections(events, audited, rewrite, audit, 0)
+
+    assert events[1].text == "ORUM says the accurate thing"
+    assert events[1].char_id == "c02"          # locked cast identity survives
+    assert events[1].source_pass == "P5:0"
+    assert events[2].text == "THESSALY speculates"   # untouched line is byte-identical
+    assert events[0].text == "cold open"
+
+    # A correction the audit never asked for, or asked for twice, is refused.
+    for bad in ([{"line_ref": 1, "speaker": "THESSALY", "text": "t", "cites": ["fact_2"]}],
+                [{"line_ref": 9, "speaker": "ORUM", "text": "t", "cites": ["fact_1"]}]):
+        with pytest.raises(lane.SonnetCompletenessError):
+            lane._apply_rewrite_corrections(
+                events, audited,
+                lane.RewriteResultV4.model_validate({
+                    "corrected_lines": bad, "vesh_resolution": "r",
+                }),
+                audit, 0,
+            )
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

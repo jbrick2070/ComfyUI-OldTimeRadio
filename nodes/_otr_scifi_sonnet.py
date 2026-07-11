@@ -164,7 +164,11 @@ class RewriteResultV4(_Strict):
 
 class AttestationV4(_Strict):
     attestation: str
-    attestation_cites: list[str] = Field(min_length=1, max_length=4)
+    # 1-3, not 1-4. The attestation becomes a DraftLineV4, and every line contract in
+    # this lane (CitedLineV4, RewriteLineV4, CalibrationEditV4, DraftLineV4) caps cites
+    # at 3. A 4-cite attestation validated here and then raised on construction one
+    # pass later -- the schema was promising something the record could not hold.
+    attestation_cites: list[str] = Field(min_length=1, max_length=3)
     vesh_final_seal: str
     sign_off: str
 
@@ -184,11 +188,94 @@ class CastLockV4(_Strict):
 
 
 class DraftLineV4(_Strict):
+    """One spoken line of the session record.
+
+    ``cites`` used to require at least one id, so the ceremonial lines -- the
+    Registrar's cold open, the Warden's rulings, the sign-off -- which state no
+    fact at all had nowhere to go, and the lane satisfied the schema by citing a
+    sentinel ``fact_0``. No such fact can ever exist: the P0 dossier contract is
+    one-based (``fact_1, fact_2, ...``). Every ceremonial line in the episode was
+    therefore carrying a FALSE citation to a fact that does not exist, and the
+    attestation's seal and sign-off borrowed a real fact id they never state.
+
+    A line that cites nothing is now allowed to cite nothing, and must SAY so:
+    ``non_fact`` marks it, and the two must agree. Honest empty beats a fabricated
+    reference.
+    """
+
     text: str
-    cites: list[str] = Field(min_length=1, max_length=3)
+    cites: list[str] = Field(default_factory=list, max_length=3)
     speaker: Literal["ANNOUNCER", "ORUM", "THESSALY", "VESH"]
     char_id: Literal["announcer", "c02", "c03", "c04"]
     source_pass: str
+    non_fact: bool = False
+
+    @model_validator(mode="after")
+    def _cites_match_the_claim(self):
+        if self.non_fact and self.cites:
+            raise ValueError("a non-factual line must not cite a fact")
+        if not self.non_fact and not self.cites:
+            raise ValueError("a factual line must cite at least one dossier id")
+        return self
+
+
+def _audited_line_indices(events: "list[DraftLineV4]") -> list[int]:
+    """The lines the audit actually numbers: the cited reading, nothing else.
+
+    The audit seam states its own contract plainly -- "ORUM and THESSALY
+    citation/extrapolation lines ONLY -- the Registrar's cold open and any Warden
+    lines are never part of this numbered list". The code was handing it
+    ``events[1:]``, which after the first defect round DOES contain Warden lines.
+    So the model's ``line_ref`` indices and our list disagreed the moment a rewrite
+    round happened -- and a mis-indexed correction rewrites the wrong line.
+    """
+    return [i for i, line in enumerate(events) if i > 0 and not line.non_fact]
+
+
+def _apply_rewrite_corrections(
+    events: "list[DraftLineV4]",
+    audited: list[int],
+    rewrite: "RewriteResultV4",
+    audit: "AuditVerdictV4",
+    round_no: int,
+) -> None:
+    """Write the script doctor's corrections back into the record.
+
+    They never were. The loop validated ``rewrite.corrected_lines``, threw them
+    away, and re-audited the UNCHANGED draft -- so the recheck re-read the very
+    text it had just condemned, and the audit could only exhaust. Sonnet has never
+    completed a run, and this is why.
+
+    Python integrates the model's replacement text; it authors none of it. A line
+    the doctor did not return stays byte-identical.
+    """
+    flagged = set(audit.flagged_line_refs)
+    seen: set[int] = set()
+    for item in rewrite.corrected_lines:
+        if item.line_ref < 0 or item.line_ref >= len(audited):
+            raise SonnetCompletenessError(
+                f"rewrite line reference {item.line_ref} is outside the audited draft"
+            )
+        if item.line_ref in seen:
+            raise SonnetCompletenessError(
+                f"rewrite returned line {item.line_ref} twice"
+            )
+        if flagged and item.line_ref not in flagged:
+            raise SonnetCompletenessError(
+                f"rewrite corrected line {item.line_ref}, which the audit never flagged"
+            )
+        seen.add(item.line_ref)
+        target = events[audited[item.line_ref]]
+        # char_id is the locked cast identity: the doctor may rewrite what a
+        # Reliquarian SAYS, never who is speaking.
+        events[audited[item.line_ref]] = DraftLineV4(
+            text=item.text,
+            cites=list(item.cites),
+            speaker=target.speaker,
+            char_id=target.char_id,
+            non_fact=False,
+            source_pass=f"P5:{round_no}",
+        )
 
 
 GenerateFn = Callable[..., str]
@@ -494,7 +581,7 @@ def run_scifi_sonnet_episode(
     for n in range(2):
         orum.append(invoke_sonnet_structured(pass_id=f"P2a:{n}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_literalist_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "frame": p1.model_dump(mode="json"), "line_index": n}, result_type=CitedLineV4, post_validator=lambda x: None, base_temperature=.55, structural_retry_temperature=.25, max_new_tokens=2200, journal=journal))
         thessaly.append(invoke_sonnet_structured(pass_id=f"P2b:{n}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_speculator_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "frame": p1.model_dump(mode="json"), "line_index": n}, result_type=CitedLineV4, post_validator=lambda x: None, base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=2600, journal=journal))
-    events: list[DraftLineV4] = [DraftLineV4(text=p1.registrar_cold_open, cites=["fact_0"], speaker="ANNOUNCER", char_id="announcer", source_pass="P1")]
+    events: list[DraftLineV4] = [DraftLineV4(text=p1.registrar_cold_open, cites=[], non_fact=True, speaker="ANNOUNCER", char_id="announcer", source_pass="P1")]
     for i, (a, b) in enumerate(zip(orum, thessaly)):
         events.append(DraftLineV4(text=a.text, cites=a.cites, speaker="ORUM", char_id="c02", source_pass="P2a"))
         events.append(DraftLineV4(text=b.text, cites=b.cites, speaker="THESSALY", char_id="c03", source_pass="P2b"))
@@ -503,28 +590,37 @@ def run_scifi_sonnet_episode(
     if audit.status == "clear":
         block = select_warden_mode_block(warden_seam, "clear")
         warden = invoke_sonnet_structured(pass_id="P4:clear", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_warden_system", pack=SimpleNamespace(prompt_stages={"sonnet_warden_system": block}), typed_inputs={"audit": audit.model_dump(mode="json")}, result_type=WardenSatisfiedV4, post_validator=lambda x: None, base_temperature=.60, structural_retry_temperature=.25, max_new_tokens=1400, journal=journal)
-        events.append(DraftLineV4(text=warden.vesh_satisfied, cites=["fact_0"], speaker="VESH", char_id="c04", source_pass="P4"))
+        events.append(DraftLineV4(text=warden.vesh_satisfied, cites=[], non_fact=True, speaker="VESH", char_id="c04", source_pass="P4"))
     else:
         for round_no in range(2):
             block = select_warden_mode_block(warden_seam, "defect")
             challenge = invoke_sonnet_structured(pass_id=f"P4:defect:{round_no}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_warden_system", pack=SimpleNamespace(prompt_stages={"sonnet_warden_system": block}), typed_inputs={"audit": audit.model_dump(mode="json")}, result_type=WardenChallengeV4, post_validator=lambda x: None, base_temperature=.70, structural_retry_temperature=.30, max_new_tokens=1400, journal=journal)
-            events.append(DraftLineV4(text=challenge.vesh_objection, cites=["fact_0"], speaker="VESH", char_id="c04", source_pass="P4"))
-            events.append(DraftLineV4(text=challenge.registrar_reopening, cites=["fact_0"], speaker="ANNOUNCER", char_id="announcer", source_pass="P4"))
-            rewrite = invoke_sonnet_structured(pass_id=f"P5:{round_no}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_rewrite_system", pack=pack, typed_inputs={"audit": audit.model_dump(mode="json"), "draft_lines": [e.model_dump(mode="json") for e in events[1:]]}, result_type=RewriteResultV4, post_validator=lambda x: None, base_temperature=.45, structural_retry_temperature=.20, max_new_tokens=3000, journal=journal)
-            for item in rewrite.corrected_lines:
-                if item.line_ref >= len(events) - 1:
-                    raise SonnetCompletenessError("rewrite line reference is outside the locked draft")
-            audit = invoke_sonnet_structured(pass_id=f"P3:recheck:{round_no}", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_audit_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "draft_lines": [e.model_dump(mode="json") for e in events[1:]], "coverage": {}}, result_type=AuditVerdictV4, post_validator=lambda x: None, base_temperature=.25, structural_retry_temperature=.12, max_new_tokens=2000, journal=journal)
+            events.append(DraftLineV4(text=challenge.vesh_objection, cites=[], non_fact=True, speaker="VESH", char_id="c04", source_pass="P4"))
+            events.append(DraftLineV4(text=challenge.registrar_reopening, cites=[], non_fact=True, speaker="ANNOUNCER", char_id="announcer", source_pass="P4"))
+            audited = _audited_line_indices(events)
+            rewrite = invoke_sonnet_structured(pass_id=f"P5:{round_no}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_rewrite_system", pack=pack, typed_inputs={"audit": audit.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in audited]}, result_type=RewriteResultV4, post_validator=lambda x: None, base_temperature=.45, structural_retry_temperature=.20, max_new_tokens=3000, journal=journal)
+            _apply_rewrite_corrections(events, audited, rewrite, audit, round_no)
+            audit = invoke_sonnet_structured(pass_id=f"P3:recheck:{round_no}", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_audit_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in _audited_line_indices(events)], "coverage": {}}, result_type=AuditVerdictV4, post_validator=lambda x: None, base_temperature=.25, structural_retry_temperature=.12, max_new_tokens=2000, journal=journal)
             if audit.status == "clear":
                 break
         if audit.status != "clear":
             raise SonnetAuditExhaustedError("Sonnet Warden audit remained defective after two rewrites")
-        events.append(DraftLineV4(text="The record holds now.", cites=["fact_0"], speaker="VESH", char_id="c04", source_pass="P5"))
+        # The Warden's closing ruling is a SPOKEN LINE, and it was hardcoded here as
+        # "The record holds now." -- Python authoring dialogue, which this lane is
+        # never allowed to do. It did not even need to: RewriteResultV4 already
+        # carries `vesh_resolution`, the Warden's on-air acknowledgment that the
+        # record is corrected. The model had written the line all along and the lane
+        # was throwing it away to speak for the character itself.
+        events.append(DraftLineV4(text=rewrite.vesh_resolution, cites=[], non_fact=True, speaker="VESH", char_id="c04", source_pass="P5"))
     att = invoke_sonnet_structured(pass_id="P6", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_attestation_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "events": [e.model_dump(mode="json") for e in events]}, result_type=AttestationV4, post_validator=lambda x: None, base_temperature=.50, structural_retry_temperature=.22, max_new_tokens=2600, journal=journal)
     events.extend([
-        DraftLineV4(text=att.attestation, cites=att.attestation_cites, speaker="ANNOUNCER", char_id="announcer", source_pass="P6"),
-        DraftLineV4(text=att.vesh_final_seal, cites=att.attestation_cites[:1], speaker="VESH", char_id="c04", source_pass="P6"),
-        DraftLineV4(text=att.sign_off, cites=att.attestation_cites[:1], speaker="ANNOUNCER", char_id="announcer", source_pass="P6"),
+        # The attestation IS the citation-anchored read -- it states the facts, so it
+        # cites them. The seal and the sign-off state nothing: they were borrowing the
+        # attestation's first fact id, claiming a source for a ceremonial line that
+        # never makes the claim. An honest empty is the truthful record.
+        DraftLineV4(text=att.attestation, cites=list(att.attestation_cites), speaker="ANNOUNCER", char_id="announcer", source_pass="P6"),
+        DraftLineV4(text=att.vesh_final_seal, cites=[], non_fact=True, speaker="VESH", char_id="c04", source_pass="P6"),
+        DraftLineV4(text=att.sign_off, cites=[], non_fact=True, speaker="ANNOUNCER", char_id="announcer", source_pass="P6"),
     ])
     validate_spoken_text_and_lock(events, cast)
     expected = _assemble(led, p1, cast, events, att, meta)
