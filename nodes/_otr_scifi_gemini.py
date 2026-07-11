@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import re
+import typing
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -355,6 +356,44 @@ class _PromptMustFitMessages(list[dict[str, str]]):
     _otr_prompt_must_fit = True
 
 
+def _prune_to_schema(data: Any, model: type[BaseModel]) -> None:
+    """Drop keys a strict model forbids, recursively, in place.
+
+    An unrequested key is NOT authored content: the contract never had a slot for
+    it, so nothing the writer meant to say lives there. Removing it discards no
+    story and invents nothing -- it just stops `extra="forbid"` from rejecting an
+    otherwise complete artifact because the model garnished it.
+    """
+    if not isinstance(data, dict):
+        return
+    fields = model.model_fields
+    for key in [k for k in data if k not in fields]:
+        del data[key]
+    for name, field in fields.items():
+        if name not in data:
+            continue
+        nested = _nested_model(field.annotation)
+        if nested is None:
+            continue
+        value = data[name]
+        if isinstance(value, list):
+            for item in value:
+                _prune_to_schema(item, nested)
+        else:
+            _prune_to_schema(value, nested)
+
+
+def _nested_model(annotation: Any) -> type[BaseModel] | None:
+    """The BaseModel inside `X`, `list[X]`, `X | None`, ... or None."""
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return annotation
+    for arg in typing.get_args(annotation):
+        found = _nested_model(arg)
+        if found is not None:
+            return found
+    return None
+
+
 def outline_output_token_budget(requested_words: int, beat_count: int) -> int:
     """Reserve P3 output WITHOUT eating the input budget its own repair needs.
 
@@ -433,6 +472,13 @@ def normalize_outline_graph_metadata(failed_output: str) -> dict[str, Any] | Non
         return None
     if not isinstance(data, dict) or not isinstance(data.get("scenes"), list):
         return None
+
+    # Strict models forbid extra keys, and the local model garnishes its output
+    # with fields nobody asked for (live: 5 x extra_forbidden after the truncation
+    # fix let it finally read the contract). An unrequested key is not authored
+    # content -- the contract never had a place for it -- so dropping it invents
+    # nothing and discards no story. Codex's script repair prunes exactly this way.
+    _prune_to_schema(data, OutlineV4)
 
     # The announcer's NAME is a fixed role label, not a character the writer
     # invented -- the show's cast contract says it is "ANNOUNCER" (Sonnet pins it

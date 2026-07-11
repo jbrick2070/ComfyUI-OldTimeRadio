@@ -279,6 +279,35 @@ def test_outline_output_reservation_leaves_room_for_its_own_repair_prompt():
             lane.outline_output_token_budget(bad, 5)
 
 
+def test_outline_repair_drops_forbidden_extra_keys_without_touching_story():
+    """Strict models forbid extras, and the model garnishes its output.
+
+    An unrequested key is not authored content -- the contract never had a slot for
+    it -- so dropping it invents nothing and discards no story. (Live: once the
+    truncation fix let the model finally READ the contract, its next failure was
+    5 x extra_forbidden.)
+    """
+    import json as _json
+
+    from nodes import _otr_scifi_gemini as lane
+
+    payload = _outline_payload()
+    payload["mood_board"] = "not in the schema"                    # root extra
+    payload["scenes"][0]["camera_notes"] = "nope"                  # scene extra
+    payload["scenes"][0]["shots"][0]["lens"] = "35mm"              # shot extra
+    payload["scenes"][0]["beats"][0]["subtext"] = "nope"           # beat extra
+    payload["cast"][0]["voice_preset"] = "bm_george"               # cast extra
+
+    repaired = lane.repair_outline_metadata(_json.dumps(payload))
+    assert repaired is not None
+    # Authored content survives byte for byte.
+    assert repaired.premise == payload["premise"]
+    assert repaired.scenes[0].shots[0].visual_prompt == (
+        "A dim robotics lab, one monitor glowing."
+    )
+    assert repaired.scenes[0].beats[0].intent == "report"
+
+
 def test_outline_repair_fails_closed_without_an_owning_scene_id():
     import json as _json
 
