@@ -318,6 +318,16 @@ already promoted). Confidence tags preserved from the sweep.
 - confidence: HIGH
 - status: OPEN
 
+## PBUG-20260711-06 -- Codex P3 omitted required nested scene graph fields
+- surfaced: scifi bake-off canonical 30w smoke, Codex P3, 2026-07-11
+- symptom: score JSON had the correct top-level artifact but omitted required nested `scene_id`, `shot_id`, and `visual_prompt` fields; strict validation halted before script/dialogue/media work
+- root cause: the prompt named top-level keys but hand-described no complete nested required-field tree, so the local model repeated an incomplete graph
+- fix: `b9cfc508` generates a compact required-path inventory from each Pydantic model's `model_json_schema()` and injects it into all three lane prompt builders
+- verify idea: assert `scenes[*].shots[*].scene_id` and equivalent nested paths appear in generated prompts; live smoke must pass P3 graph validation
+- bible-worthy: yes -- live nested-schema contract failure, same family as PBUG-20260711-03
+- confidence: HIGH
+- status: OPEN
+
 ## FAN-OUT RECORD -- 2026-07-11 (operator-triggered)
 23 entries promoted to the Bible (156 -> 179) @ survival-guide commit d50d773;
 1 folded into BUG-11.26 law d (epilogue false-kill class); suite 17 passed /
