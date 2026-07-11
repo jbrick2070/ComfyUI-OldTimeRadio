@@ -338,6 +338,16 @@ already promoted). Confidence tags preserved from the sweep.
 - confidence: HIGH
 - status: OPEN
 
+## PBUG-20260711-08 -- Codex P3 generic repair repeated an incomplete graph
+- surfaced: scifi bake-off canonical 30w smoke roll 7, Codex P3, 2026-07-11
+- symptom: base and generic typed repair both omitted required nested scene graph fields despite a valid top-level score object
+- root cause: non-P0 passes used the generic repair factory, which did not present the failed artifact and validation error with lane-specific graph-preservation instructions
+- fix: `a27206df` routes typed repair for every Codex/Gemini/Sonnet pass through a schema-aware failed-artifact/error prompt while preserving premise, beats, cast, and authored content
+- verify idea: force a nested graph validation failure and assert the repair prompt includes the failed artifact, exact validation error, schema paths, and context-preservation rule
+- bible-worthy: yes -- live repair-contract failure, cross-lane by construction
+- confidence: HIGH
+- status: OPEN
+
 ## FAN-OUT RECORD -- 2026-07-11 (operator-triggered)
 23 entries promoted to the Bible (156 -> 179) @ survival-guide commit d50d773;
 1 folded into BUG-11.26 law d (epilogue false-kill class); suite 17 passed /
