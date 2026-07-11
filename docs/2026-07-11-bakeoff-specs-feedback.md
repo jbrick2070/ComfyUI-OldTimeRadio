@@ -8,14 +8,16 @@ creative decision, put it in "Open questions for the operator".
 
 ## Global laws (apply to ALL three specs)
 
-1. **WORD COUNTS ARE ADVISORY ONLY -- NO BANDS, NO GATES (operator
-   directive).** Word targets exist solely to STEER the prompts toward the
-   ~720 scale. NO validator may reject, reroll, trim, or cut on word
-   count -- you cannot cut words if it costs narrative. Take what the LLM
-   gives: if the story lands at 640 or 810, ship it and RECORD the actual
-   word count in the run receipt. The only length concern a spec may keep
-   is the token budget being LARGE ENOUGH that generation is never
-   truncated mid-story. Narrative completeness always wins over length.
+1. **WORD COUNT IS A USER-SELECTED STEER, NEVER A GATE (operator
+   directive).** `target_words` is a user-selectable input (720 is merely
+   what this event will select -- specs must work at any user value in
+   30-900). It is used in ONE place: sizing/steering the prompt for the
+   draft. After a draft exists, NOTHING chases the number -- no validator
+   may reject, reroll, trim, pad, or cut on word count, because you cannot
+   cut words without losing narrative. The LLM writes what the story
+   needs; ship it and RECORD the actual count in the run receipt. The only
+   hard length rule a spec may keep: token budgets LARGE ENOUGH that
+   generation is never truncated mid-story.
 2. **THE LEDGER MUST STAY INTACT -- SPOKEN TEXT IS SACRED GROUND:**
    - NO stage directions or action text in any line row. Nothing like
      "(sighs)", "[pause]", "*leans in*", "(static crackles)" may reach
