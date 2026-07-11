@@ -53,6 +53,15 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
 
+def _schema_instruction(result_type: type[BaseModel]) -> str:
+    keys = ", ".join(result_type.model_fields)
+    return (
+        "\nReturn exactly one JSON object, with no Markdown, headings, or prose. "
+        f"Its exact top-level keys are: {keys}. Do not copy input keys into the "
+        "output in place of these keys."
+    )
+
+
 class SourceSpanV4(_Strict):
     field: Literal["headline", "summary", "full_text", "seed_text"]
     start: int = Field(ge=0)
@@ -425,7 +434,8 @@ def invoke_codex_structured(
             raise CodexPackContractError(f"missing Codex seam {seam!r}")
         seams.append(text)
     body = {"pass_id": pass_id, "artifact_inputs": artifact_inputs, "result_json_schema": result_type.model_json_schema()}
-    messages = [{"role": "system", "content": "\n".join(seams)}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
+    schema_instruction = _schema_instruction(result_type)
+    messages = [{"role": "system", "content": "\n".join(seams) + schema_instruction}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
     calls: list[dict[str, Any]] = []
     def capture(messages_in, **kwargs):
         raw = slot_fn(messages_in, **kwargs)
@@ -452,7 +462,7 @@ def invoke_codex_structured(
         if deterministic is not None:
             return deterministic
         return [
-            {"role": "system", "content": "\n".join(seams) + "\n" + repair_rules},
+            {"role": "system", "content": "\n".join(seams) + schema_instruction + "\n" + repair_rules},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": detail, "original_request": body}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
         ]
     try:

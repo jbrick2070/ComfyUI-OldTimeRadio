@@ -44,6 +44,15 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
 
+def _schema_instruction(schema: type[BaseModel]) -> str:
+    keys = ", ".join(schema.model_fields)
+    return (
+        "\nReturn exactly one JSON object, with no Markdown, headings, or prose. "
+        f"Its exact top-level keys are: {keys}. Do not copy input keys into the "
+        "output in place of these keys."
+    )
+
+
 class SourceSpanV4(_Strict):
     field: Literal["headline", "summary", "full_text", "seed_text"]
     start: int = Field(ge=0)
@@ -302,7 +311,7 @@ def _prompt(pack: Any, seam: str, pass_id: str, inputs: Mapping[str, Any], schem
     if not seam_text:
         raise SonnetPackContractError(f"missing Sonnet seam {seam!r}")
     body = {"pass_id": pass_id, "typed_inputs": inputs, "result_json_schema": schema.model_json_schema()}
-    return [{"role": "system", "content": seam_text}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
+    return [{"role": "system", "content": seam_text + _schema_instruction(schema)}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
 
 
 def invoke_sonnet_structured(
