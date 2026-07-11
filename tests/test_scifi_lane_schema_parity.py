@@ -19,6 +19,7 @@ length-pinned list.
 from __future__ import annotations
 
 import importlib
+import pathlib
 import typing
 
 import pytest
@@ -350,6 +351,59 @@ def test_outline_repair_fails_closed_without_an_owning_scene_id():
     del payload["scenes"][0]["scene_id"]
     assert lane.repair_outline_metadata(_json.dumps(payload)) is None
     assert lane.repair_outline_metadata("{not json") is None
+
+
+def test_no_lane_seam_treats_the_word_target_as_a_quota():
+    """The requested word count is a SCALE REQUEST, not a quota.
+
+    Live kill (2026-07-11, Gemini): the scene-critique seam ordered the critic to
+    "Ensure the total word count of the lines equals the scene's target word limit."
+    At 30 words over 6 beats that is ~5 words a beat -- exact equality is
+    unreachable, so the critic failed the scene, the bounded rewrite missed too, and
+    the run died with "scene scene_01 failed its bounded rewrite". The model was
+    obeying us.
+
+    Operator law: word count never causes trimming, padding, culling, or a rewrite.
+    It is a statistic recorded after the fact. Guard the seams so it cannot creep
+    back in as a gate.
+    """
+    import glob
+    import json as _json
+    import re
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    # A sentence that talks about the word target AND commands an exact match is a
+    # quota. A sentence that explicitly frames it as advisory is the cure, not the
+    # disease -- so it is not an offender even though it says the word "quota".
+    mentions = re.compile(r"word count|word target|target word", re.IGNORECASE)
+    commands = re.compile(
+        r"\b(must equal|equals|meet it exactly|match(es)? exactly|must match)\b",
+        re.IGNORECASE,
+    )
+    cures = re.compile(r"advisory|not a quota|never pad|never fail", re.IGNORECASE)
+
+    offenders = []
+    for path in glob.glob(str(repo / "nodes" / "story_packs" / "scifi_*" / "*.json")):
+        # The Codex pack is owned by a concurrent workstream; guard the lanes we own.
+        if "scifi_codex" in path:
+            continue
+        pack = _json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+        for seam, text in (pack.get("prompt_stages") or {}).items():
+            if not isinstance(text, str):
+                continue
+            for sentence in re.split(r"(?<=\.)\s+|\n", text):
+                if (
+                    mentions.search(sentence)
+                    and commands.search(sentence)
+                    and not cures.search(sentence)
+                ):
+                    offenders.append(
+                        f"{pathlib.Path(path).name}::{seam}: {sentence.strip()[:120]}"
+                    )
+    assert not offenders, (
+        "a lane seam is treating the advisory word target as a hard quota:\n  "
+        + "\n  ".join(offenders)
+    )
 
 
 if __name__ == "__main__":
