@@ -104,7 +104,15 @@ class PitchV4(_Strict):
 
 
 class PitchSlateV4(_Strict):
-    pitches: tuple[PitchV4, PitchV4, PitchV4]
+    # Exactly three pitches -- expressed as a length-pinned LIST, not a tuple.
+    # These artifacts are parsed from model-emitted JSON, and JSON has no tuple:
+    # the model can only ever send an array. Under _Strict (strict=True) Pydantic
+    # will NOT coerce a list into a tuple, so a tuple annotation here is
+    # unsatisfiable by construction -- the pass can never validate, no matter
+    # what the model writes. This killed the Gemini lane at P1 on its first live
+    # roll ("pitches: Input should be a valid tuple ... input_type=list").
+    # min_length == max_length == 3 keeps the exact same three-pitch contract.
+    pitches: list[PitchV4] = Field(min_length=3, max_length=3)
 
 
 class PitchSelectionV4(_Strict):
@@ -327,17 +335,35 @@ def _prompt(pack: Any, seam: str, pass_id: str, inputs: Mapping[str, Any], resul
     return [{"role": "system", "content": seam_text + _schema_instruction(result_type)}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
 
 
+class _PromptMustFitMessages(list[dict[str, str]]):
+    """Tell the local slot wrapper to fail before it slices this prompt.
+
+    Parity with the Codex lane: a provenance-bearing prompt (the source payload
+    plus its schema contract) must never be silently left-truncated. Losing the
+    system/schema prefix produces a confidently wrong artifact instead of an
+    honest failure.
+    """
+
+    _otr_prompt_must_fit = True
+
+
 def invoke_gemini_structured(
     *, pass_id: str, slot: Literal["creative", "technical"], slot_fn: GenerateFn,
     seam_ref: str, pack: Any, typed_inputs: Mapping[str, Any],
     result_type: type[BaseModel], post_validator: Callable[[BaseModel], str | None],
     base_temperature: float, structural_retry_temperature: float,
     max_new_tokens: int, journal: MutableMapping[str, Any],
+    prompt_must_fit: bool = False,
 ) -> BaseModel:
     prompt = _prompt(pack, seam_ref, pass_id, typed_inputs, result_type)
     attempts: list[dict[str, Any]] = []
     def capture(messages, **kwargs):
-        raw = slot_fn(messages, **kwargs)
+        call_messages = (
+            _PromptMustFitMessages(messages)
+            if prompt_must_fit and isinstance(messages, list)
+            else messages
+        )
+        raw = slot_fn(call_messages, **kwargs)
         attempts.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
         return raw
     def typed_repair_factory(*, original_prompt, failed_output, error):
@@ -481,7 +507,7 @@ def run_scifi_gemini_episode(
     lane_meta = {"source_digest": envelope.payload_sha256, "source_mode": envelope.source_mode, "call_journal": {}}
     meta["scifi_gemini"] = lane_meta
     journal = lane_meta["call_journal"]
-    p0 = invoke_gemini_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, seam_ref="gemini_fact_extraction", pack=pack, typed_inputs={"payload": envelope.model_dump(mode="json")}, result_type=FactIndexV4, post_validator=lambda x: _fact_validator(x, payload), base_temperature=.22, structural_retry_temperature=.12, max_new_tokens=1800, journal=journal)
+    p0 = invoke_gemini_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, seam_ref="gemini_fact_extraction", pack=pack, typed_inputs={"payload": envelope.model_dump(mode="json")}, result_type=FactIndexV4, post_validator=lambda x: _fact_validator(x, payload), base_temperature=.22, structural_retry_temperature=.12, max_new_tokens=1800, journal=journal, prompt_must_fit=True)
     p1 = invoke_gemini_structured(pass_id="P1", slot="creative", slot_fn=creative_fn, seam_ref="gemini_pitch_generation", pack=pack, typed_inputs={"facts": p0.model_dump(mode="json")}, result_type=PitchSlateV4, post_validator=lambda x: None, base_temperature=.72, structural_retry_temperature=.36, max_new_tokens=1400, journal=journal)
     p2 = invoke_gemini_structured(pass_id="P2", slot="technical", slot_fn=technical_fn, seam_ref="gemini_pitch_critique", pack=pack, typed_inputs={"pitches": p1.model_dump(mode="json")}, result_type=PitchSelectionV4, post_validator=lambda x: None, base_temperature=.22, structural_retry_temperature=.12, max_new_tokens=700, journal=journal)
     ids = [f"b{i:03d}" for i in range(1, 7)]

@@ -311,17 +311,35 @@ def _prompt(pack: Any, seam: str, pass_id: str, inputs: Mapping[str, Any], schem
     return [{"role": "system", "content": seam_text + _schema_instruction(schema)}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
 
 
+class _PromptMustFitMessages(list[dict[str, str]]):
+    """Tell the local slot wrapper to fail before it slices this prompt.
+
+    Parity with the Codex lane: a provenance-bearing prompt (the source payload
+    plus its schema contract) must never be silently left-truncated. Losing the
+    system/schema prefix produces a confidently wrong artifact instead of an
+    honest failure.
+    """
+
+    _otr_prompt_must_fit = True
+
+
 def invoke_sonnet_structured(
     *, pass_id: str, slot: Literal["creative", "technical"], slot_fn: GenerateFn,
     seam_ref: str, pack: Any, typed_inputs: Mapping[str, Any],
     result_type: type[BaseModel], post_validator: Callable[[BaseModel], str | None],
     base_temperature: float, structural_retry_temperature: float,
     max_new_tokens: int, journal: MutableMapping[str, Any],
+    prompt_must_fit: bool = False,
 ) -> BaseModel:
     prompt = _prompt(pack, seam_ref, pass_id, typed_inputs, result_type)
     attempts: list[dict[str, Any]] = []
     def capture(messages, **kwargs):
-        raw = slot_fn(messages, **kwargs)
+        call_messages = (
+            _PromptMustFitMessages(messages)
+            if prompt_must_fit and isinstance(messages, list)
+            else messages
+        )
+        raw = slot_fn(call_messages, **kwargs)
         attempts.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
         return raw
     def typed_repair_factory(*, original_prompt, failed_output, error):
@@ -464,7 +482,7 @@ def run_scifi_sonnet_episode(
     envelope, steer = validate_sonnet_payload(payload, resolved)
     meta["scifi_sonnet"] = {"source_digest": envelope.payload_sha256, "source_mode": envelope.source_mode, "call_journal": {}}
     journal = meta["scifi_sonnet"]["call_journal"]
-    p0 = invoke_sonnet_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_intake_system", pack=pack, typed_inputs={"payload": envelope.model_dump(mode="json")}, result_type=FragmentDossierV4, post_validator=lambda x: _dossier_validator(x, payload), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2000, journal=journal)
+    p0 = invoke_sonnet_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_intake_system", pack=pack, typed_inputs={"payload": envelope.model_dump(mode="json")}, result_type=FragmentDossierV4, post_validator=lambda x: _dossier_validator(x, payload), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2000, journal=journal, prompt_must_fit=True)
     p1 = invoke_sonnet_structured(pass_id="P1", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_frame_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "initial_session_word_steer": steer}, result_type=SessionFrameV4, post_validator=lambda x: None, base_temperature=.85, structural_retry_temperature=.40, max_new_tokens=2300, journal=journal)
     cast = lock_archive_cast(p1)
     orum = []

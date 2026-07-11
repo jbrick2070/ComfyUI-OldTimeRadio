@@ -26,11 +26,17 @@ def test_gemini_registry_and_exact_three_pitch_shape():
     bank = routing.get_bank("scifi_gemini")
     pipe = routing.get_pipeline("scifi_gemini_multipass")
     assert bank.runnable is True and pipe.executable is True
-    assert len(lane.PitchSlateV4(pitches=(
+    # The slate arrives as model-emitted JSON, so the pitches come in as a LIST.
+    # This test used to build it from a python tuple, which quietly agreed with a
+    # `tuple[...]` annotation that the real JSON path could never satisfy under
+    # strict mode -- the Gemini lane died at P1 on exactly that (2026-07-11).
+    # Validate the way production does: from a parsed JSON object.
+    slate = lane.PitchSlateV4.model_validate({"pitches": [
         {"premise": "a", "setting": "b", "tonal_palette": "c"},
         {"premise": "d", "setting": "e", "tonal_palette": "f"},
         {"premise": "g", "setting": "h", "tonal_palette": "i"},
-    )).pitches) == 3
+    ]})
+    assert len(slate.pitches) == 3
 
 
 def test_payload_pin_and_advisory_centers():
