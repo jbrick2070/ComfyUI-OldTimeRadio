@@ -348,6 +348,16 @@ already promoted). Confidence tags preserved from the sweep.
 - confidence: HIGH
 - status: OPEN
 
+## PBUG-20260711-09 -- Codex P3 repair omitted cast-locked speaker fields
+- surfaced: scifi bake-off canonical 30w smoke roll 8, Codex P3, 2026-07-11
+- symptom: schema-aware repair reduced the failure to two missing `speaker` fields on beats; the lane halted before script/media work
+- root cause: nested graph repair did not explicitly bind each beat's speaker to its cast row by `char_id`
+- fix: `fca99a5a` adds the cast-lock mapping rule to typed repair prompts for all three lanes
+- verify idea: force missing beat speakers and assert the repair prompt requires cast-row lookup by `char_id`; live Codex P3 must clear
+- bible-worthy: yes -- live cast/graph integrity contract failure, cross-lane prevention
+- confidence: HIGH
+- status: OPEN
+
 ## FAN-OUT RECORD -- 2026-07-11 (operator-triggered)
 23 entries promoted to the Bible (156 -> 179) @ survival-guide commit d50d773;
 1 folded into BUG-11.26 law d (epilogue false-kill class); suite 17 passed /
