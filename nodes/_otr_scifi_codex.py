@@ -413,6 +413,17 @@ def make_advisory_word_blueprint(requested_words: int, locked_beats: Sequence[st
     )
 
 
+def _script_output_token_budget(requested_words: int) -> int:
+    """Reserve whole-script JSON output without erasing its input contract."""
+    if (
+        not isinstance(requested_words, int)
+        or isinstance(requested_words, bool)
+        or not 30 <= requested_words <= 900
+    ):
+        raise CodexTargetRangeError("requested_words must be 30..900")
+    return min(5400, max(2200, int(requested_words * 4.5) + 1200))
+
+
 def invoke_codex_structured(
     *, pass_id: str, slot: Literal["creative", "technical"], slot_fn: GenerateFn,
     pack: Any, seam_refs: tuple[str, ...], artifact_inputs: Mapping[str, Any],
@@ -434,7 +445,12 @@ def invoke_codex_structured(
     calls: list[dict[str, Any]] = []
     def capture(messages_in, **kwargs):
         raw = slot_fn(messages_in, **kwargs)
-        calls.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
+        calls.append({
+            "temperature": kwargs.get("temperature"),
+            "max_new_tokens": kwargs.get("max_new_tokens"),
+            "raw_chars": len(str(raw)),
+            "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest(),
+        })
         return raw
     def typed_repair_factory(*, original_prompt, failed_output, error):
         detail = str(error)
@@ -468,9 +484,13 @@ def invoke_codex_structured(
                 "script line, set boundary to shot_start for the first line in a shot, "
                 "beat_start for the first line in a beat, or continue otherwise."
             )
+        compact_request = {
+            key: value for key, value in body.items()
+            if key != "result_json_schema"
+        }
         return [
             {"role": "system", "content": "\n".join(seams) + schema_instruction + "\n" + repair_rules},
-            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": detail, "original_request": body}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
+            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": detail, "original_request": compact_request}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
         ]
     try:
         # LLM slot: per-sub-pass injected creative/technical closure.
@@ -597,6 +617,7 @@ def run_scifi_codex_episode(
 ) -> CodexTailParts:
     del slot_scheduler, source_bank_row, story_rules, episode_root, episode_id
     env, steer = validate_payload_envelope(payload, resolved)
+    script_token_budget = _script_output_token_budget(steer.requested_words)
     lane_meta: dict[str, Any] = {"source_digest": env.source_digest, "source_mode": env.source_mode, "call_journal": {}}
     meta["scifi_codex"] = lane_meta
     journal = lane_meta["call_journal"]
@@ -610,12 +631,12 @@ def run_scifi_codex_episode(
     score = p3
     if review.verdict == "rewrite":
         score = invoke_codex_structured(pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json"), "review": review.model_dump(mode="json")}, result_type=RadioScoreV4, post_validator=lambda x: None, base_temperature=.55, structural_retry_temperature=.20, max_new_tokens=3600, call_journal=journal)
-    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs={"score": score.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json"), "initial_draft_word_steer": steer.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=6500, call_journal=journal)
+    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs={"score": score.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json"), "initial_draft_word_steer": steer.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal)
     listener = invoke_codex_structured(pass_id="P6", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_listening_room_system",), artifact_inputs={"script": script.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ListenerReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2200, call_journal=journal)
-    script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={"previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=6500, call_journal=journal)
+    script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={"previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal)
     audit = invoke_codex_structured(pass_id="P8", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_final_audit_system", "codex_coda_contract_system"), artifact_inputs={"script": script.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json")}, result_type=FinalAuditV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2400, call_journal=journal)
     if audit.verdict == "rewrite":
-        script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={"previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=6500, call_journal=journal)
+        script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={"previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal)
     validate_spoken_text_and_roster(script, p2, score)
     expected = _assemble_ledger(led, score, p2, script, meta)
     actual = sum(_words(v) for v in expected.values())

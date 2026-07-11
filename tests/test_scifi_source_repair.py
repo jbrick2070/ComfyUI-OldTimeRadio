@@ -1,5 +1,5 @@
 from nodes._otr_scifi_codex import FactIndexV4
-from nodes._otr_scifi_codex import RadioScoreV4, _schema_instruction as codex_schema_instruction
+from nodes._otr_scifi_codex import RadioScoreV4, ScriptArtifactV4, _schema_instruction as codex_schema_instruction
 from nodes._otr_scifi_gemini import _schema_instruction as gemini_schema_instruction
 from nodes._otr_scifi_sonnet import FragmentDossierV4, _schema_instruction as sonnet_schema_instruction
 from nodes._otr_json import parse_first_json_object
@@ -72,6 +72,13 @@ def test_all_lane_schema_seams_name_exact_top_level_keys():
 def test_schema_instruction_contains_every_required_path_for_nested_radio_score():
     instruction = codex_schema_instruction(RadioScoreV4)
     required_paths = schema_required_paths(RadioScoreV4)
+    assert required_paths
+    assert all(path in instruction for path in required_paths)
+
+
+def test_script_artifact_instruction_contains_every_required_path():
+    instruction = codex_schema_instruction(ScriptArtifactV4)
+    required_paths = schema_required_paths(ScriptArtifactV4)
     assert required_paths
     assert all(path in instruction for path in required_paths)
 
