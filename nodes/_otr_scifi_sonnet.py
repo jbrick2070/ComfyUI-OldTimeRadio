@@ -120,9 +120,13 @@ class CitedLineV4(_Strict):
 
 class AuditVerdictV4(_Strict):
     status: Literal["clear", "defect"]
-    defects: list[str] = Field(max_length=5)
-    flagged_line_refs: list[int] = Field(max_length=5)
-    invented_fact_flags: list[int] = Field(max_length=5)
+    # A "clear" verdict has no defects to list, and the model omits these keys
+    # rather than writing empty arrays. Requiring them makes a CLEAN audit fail
+    # validation -- the pass can only succeed by finding fault. Empty is the
+    # honest value for a clear verdict.
+    defects: list[str] = Field(default_factory=list, max_length=5)
+    flagged_line_refs: list[int] = Field(default_factory=list, max_length=5)
+    invented_fact_flags: list[int] = Field(default_factory=list, max_length=5)
     severity: Literal["critical", "advisory"]
     sfw_pass: bool
 

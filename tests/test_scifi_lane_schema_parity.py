@@ -218,6 +218,38 @@ def test_outline_repair_refuses_to_invent_a_missing_visual_prompt():
     ) is None
 
 
+def test_outline_rejects_and_then_repairs_a_renamed_announcer():
+    """The announcer is a fixed ROLE LABEL, not a character the writer invents.
+
+    CastLock's Gate 1 invariants skip the announcer row by the EXACT string
+    "ANNOUNCER". A model-chosen "Narrator" makes them judge the announcer's kokoro
+    preset (bm_george) as an invalid Bark voice and kill the run in the media tail.
+    Catch it at P3, where the metadata repair can normalize the label for free.
+    """
+    import json as _json
+
+    from nodes import _otr_scifi_gemini as lane
+
+    payload = _outline_payload()
+    payload["cast"][0]["name"] = "Narrator"
+    outline = lane.OutlineV4.model_validate(
+        lane.normalize_outline_graph_metadata(_json.dumps(_outline_payload()))
+    )
+    assert lane.validate_outline_cast_labels(outline) is None
+
+    renamed = lane.OutlineV4.model_validate(
+        {**lane.normalize_outline_graph_metadata(_json.dumps(payload)),
+         "cast": [{**payload["cast"][0], "name": "Narrator"}, payload["cast"][1]]}
+    )
+    assert "ANNOUNCER" in (lane.validate_outline_cast_labels(renamed) or "")
+
+    # ...and the deterministic repair normalizes the label without touching story.
+    repaired = lane.repair_outline_metadata(_json.dumps(payload))
+    assert repaired is not None
+    assert repaired.cast[0].name == "ANNOUNCER"
+    assert repaired.premise == payload["premise"]
+
+
 def test_outline_repair_fails_closed_without_an_owning_scene_id():
     import json as _json
 

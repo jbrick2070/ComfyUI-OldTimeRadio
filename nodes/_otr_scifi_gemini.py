@@ -204,7 +204,10 @@ class SceneDraftV4(_Strict):
 class SceneCritiqueV4(_Strict):
     passed: bool
     feedback: str
-    line_fact_ids: dict[str, list[str]]
+    # A clean critique has nothing to map, and the model omits the key entirely
+    # rather than writing `{}`. Requiring it turns "the scene is fine" into a
+    # validation failure. The empty map IS the honest value for a clean pass.
+    line_fact_ids: dict[str, list[str]] = Field(default_factory=dict)
     sfw_pass: bool
 
 
@@ -352,21 +355,53 @@ class _PromptMustFitMessages(list[dict[str, str]]):
     _otr_prompt_must_fit = True
 
 
-def repair_outline_metadata(failed_output: str) -> OutlineV4 | None:
-    """Normalize only the OutlineV4 fields the nesting already determines.
+def validate_outline_cast_labels(outline: "OutlineV4") -> str | None:
+    """The announcer is a fixed ROLE LABEL, not a character the writer invents.
+
+    CastLock's Gate 1 invariants (_assert_unique_bark_voices /
+    _assert_voice_preset_invariant) skip the announcer row by the EXACT string
+    "ANNOUNCER". Gemini leaves CastV4.name free-form, so the model returns
+    "Narrator" or "Announcer" -- and then those invariants judge the announcer's
+    kokoro preset (bm_george) as an invalid Bark voice and kill the run with
+    CastingFailedError, deep in the media tail, ~15 minutes in.
+
+    Reject it at P3 instead, where the deterministic repair can normalize the
+    label (and the beats that refer to it) without touching any story content.
+    Sonnet pins this with a Literal; Codex validates and repairs it. Parity.
+    """
+    for row in outline.cast:
+        if row.char_id == "announcer" and row.name != "ANNOUNCER":
+            return (
+                f"the announcer cast row must use the exact fixed name ANNOUNCER, "
+                f"not {row.name!r}"
+            )
+    for scene in outline.scenes:
+        for beat in scene.beats:
+            if beat.char_id == "announcer" and beat.speaker != "ANNOUNCER":
+                return (
+                    f"beat {beat.beat_id} is spoken by the announcer and must name "
+                    f"the speaker ANNOUNCER, not {beat.speaker!r}"
+                )
+    return None
+
+
+def normalize_outline_graph_metadata(failed_output: str) -> dict[str, Any] | None:
+    """Fill only the OutlineV4 fields the nesting already determines.
 
     A shot or beat written INSIDE scene ``s001`` belongs to ``s001`` -- its
     ``scene_id`` is not a creative decision, it is a fact of where the model put
     it. A beat's ``order`` is likewise just its position in the emitted graph.
-    The local model routinely omits both (live: Gemini P3, 18 validation errors,
-    2026-07-11), so derive them from the parent instead of asking the model to
-    restate what it has already said.
+    The local model reliably omits both (live: Gemini P3, 18 then 22 validation
+    errors, 2026-07-11), so derive them from the parent rather than spending a
+    call asking the model to restate what it has already said.
 
-    This NEVER invents content. ``visual_prompt``, ``description``, ``intent``,
-    ``mood``, dialogue -- anything a writer had to think of -- is left exactly as
-    the model wrote it, and a missing one fails closed here so the creative typed
-    repair still has to author it. Parent scene missing its own ``scene_id``, or
-    any post-repair schema failure, also fails closed.
+    Returns the normalized object even when it is still INVALID -- a shot may
+    still be missing its ``visual_prompt``, which is authored work this function
+    must never invent. Handing that nearly-complete object back to the creative
+    repair (instead of the raw failure plus a 22-error wall, most of it mechanical
+    noise) shrinks the model's remaining job to the part only it can do.
+
+    Fails closed (None) when there is nothing authoritative to copy FROM.
     """
     try:
         data = parse_first_json_object(failed_output)
@@ -375,7 +410,19 @@ def repair_outline_metadata(failed_output: str) -> OutlineV4 | None:
     if not isinstance(data, dict) or not isinstance(data.get("scenes"), list):
         return None
 
-    changed = False
+    # The announcer's NAME is a fixed role label, not a character the writer
+    # invented -- the show's cast contract says it is "ANNOUNCER" (Sonnet pins it
+    # with a Literal; Codex validates and repairs it). Gemini leaves CastV4.name
+    # free-form, so the model happily returns "Narrator" or "Announcer". That is
+    # not cosmetic: CastLock's Gate 1 invariants skip the announcer row by the
+    # EXACT string "ANNOUNCER", so a differently-cased name makes them judge the
+    # announcer's kokoro preset (bm_george) as an invalid Bark voice and kill the
+    # run with CastingFailedError. Normalize the label and every beat that refers
+    # to it, so the cast and the beats stay consistent.
+    for row in data.get("cast") or []:
+        if isinstance(row, dict) and row.get("char_id") == "announcer":
+            row["name"] = "ANNOUNCER"
+
     beat_order = 0
     for scene in data["scenes"]:
         if not isinstance(scene, dict):
@@ -391,21 +438,29 @@ def repair_outline_metadata(failed_output: str) -> OutlineV4 | None:
             for child in children:
                 if not isinstance(child, dict):
                     return None
-                if child.get("scene_id") != scene_id:
-                    child["scene_id"] = scene_id
-                    changed = True
+                child["scene_id"] = scene_id
                 if key == "beats":
                     beat_order += 1
-                    if child.get("order") != beat_order:
-                        child["order"] = beat_order
-                        changed = True
-    if not changed:
+                    child["order"] = beat_order
+                    if child.get("char_id") == "announcer":
+                        child["speaker"] = "ANNOUNCER"
+    return data
+
+
+def repair_outline_metadata(failed_output: str) -> OutlineV4 | None:
+    """The metadata-only repair: accept ONLY if the graph normalization is enough.
+
+    Never invents content. ``visual_prompt``, ``description``, ``intent``,
+    ``mood``, dialogue -- anything a writer had to think of -- is left exactly as
+    the model wrote it, and a missing one fails closed so the creative typed
+    repair still has to author it.
+    """
+    data = normalize_outline_graph_metadata(failed_output)
+    if data is None:
         return None
     try:
         return OutlineV4.model_validate(data)
     except Exception:
-        # Creative fields are still missing (e.g. a shot with no visual_prompt).
-        # That is the model's work, not ours -- hand it back to the typed repair.
         return None
 
 
@@ -455,7 +510,11 @@ def invoke_gemini_structured(
             # than spending a call asking the model to restate itself. The
             # CREATIVE half (a shot's visual_prompt) is authored work Python must
             # never invent -- name it explicitly so the model writes it.
-            if result_type is OutlineV4:
+            # Compare by NAME, not identity: this package is importable as both
+            # `nodes._otr_scifi_gemini` and `_otr_scifi_gemini` (see the try/except
+            # ImportError at the top), so the same class can exist as two distinct
+            # objects and `is` silently misses.
+            if getattr(result_type, "__name__", "") == "OutlineV4":
                 deterministic = repair_outline_metadata(failed_output)
                 if deterministic is not None and post_validator(deterministic) is None:
                     log.info(
@@ -463,6 +522,40 @@ def invoke_gemini_structured(
                         "repair accepted; no LLM repair call made", pass_id,
                     )
                     return deterministic
+                # Not fully repairable -- authored content is still missing. Hand
+                # the model the graph-NORMALIZED artifact and the single job only
+                # it can do, instead of the raw failure plus a wall of validation
+                # errors that is mostly mechanical noise we have already fixed.
+                normalized = normalize_outline_graph_metadata(failed_output)
+                if normalized is not None:
+                    missing_shots = [
+                        shot.get("shot_id")
+                        for scene in normalized.get("scenes", [])
+                        for shot in scene.get("shots", [])
+                        if not str(shot.get("visual_prompt") or "").strip()
+                    ]
+                    if missing_shots:
+                        log.info(
+                            "[scifi_gemini:%s] graph metadata normalized; asking the "
+                            "model only for %d missing visual_prompt(s)",
+                            pass_id, len(missing_shots),
+                        )
+                        return [
+                            {"role": "system", "content": prompt[0]["content"] + "\n" + (
+                                "This artifact is already structurally complete: every "
+                                "scene_id and beat order is correct. Change NOTHING else -- "
+                                "keep every title, premise, scene, shot, beat, id, and order "
+                                "exactly as given. Your ONLY job: write the missing "
+                                "visual_prompt for each shot listed in missing_visual_prompts. "
+                                "A visual_prompt is one concrete, filmable image of that shot "
+                                "-- subject, setting, lighting -- never empty, never a copy of "
+                                "the shot description. Return the COMPLETE object."
+                            )},
+                            {"role": "user", "content": json.dumps({
+                                "artifact": normalized,
+                                "missing_visual_prompts": missing_shots,
+                            }, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
+                        ]
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the selected premise, "
                 "scene outline, beats, and dialogue content; repair only fields named by the "
@@ -593,7 +686,7 @@ def run_scifi_gemini_episode(
     p2 = invoke_gemini_structured(pass_id="P2", slot="technical", slot_fn=technical_fn, seam_ref="gemini_pitch_critique", pack=pack, typed_inputs={"pitches": p1.model_dump(mode="json")}, result_type=PitchSelectionV4, post_validator=lambda x: None, base_temperature=.22, structural_retry_temperature=.12, max_new_tokens=700, journal=journal)
     ids = [f"b{i:03d}" for i in range(1, 7)]
     bands = make_advisory_word_blueprint(int(resolved["target_words"]), ids)
-    p3 = invoke_gemini_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_outline", pack=pack, typed_inputs={"chosen_premise": p1.pitches[p2.selected_index].model_dump(mode="json"), "initial_outline_word_steer": {"requested_words": int(resolved["target_words"])}, "advisory_word_bands": [x.model_dump(mode="json") for x in bands]}, result_type=OutlineV4, post_validator=lambda x: None, base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=3600, journal=journal)
+    p3 = invoke_gemini_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_outline", pack=pack, typed_inputs={"chosen_premise": p1.pitches[p2.selected_index].model_dump(mode="json"), "initial_outline_word_steer": {"requested_words": int(resolved["target_words"])}, "advisory_word_bands": [x.model_dump(mode="json") for x in bands]}, result_type=OutlineV4, post_validator=validate_outline_cast_labels, base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=3600, journal=journal)
     casts = {c.char_id: c for c in p3.cast}
     drafts: dict[str, SceneDraftV4] = {}
     for scene in p3.scenes:
