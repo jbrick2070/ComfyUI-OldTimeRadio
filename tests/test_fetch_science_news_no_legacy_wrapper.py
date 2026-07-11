@@ -156,6 +156,18 @@ def test_fetch_science_news_body_rerank_args():
     )
 
 
+def test_scifi_v4_source_floor_requires_length_words_and_token_diversity():
+    from nodes.story_orchestrator import _science_body_meets_v4_floor
+
+    diverse = " ".join(
+        ["alpha", "beta", "gamma", "delta", "epsilon", "zeta",
+         "eta", "theta", "iota", "kappa", "lambda", "mu"] * 7
+    )
+    assert _science_body_meets_v4_floor(diverse)
+    assert not _science_body_meets_v4_floor("alpha " * 90)
+    assert not _science_body_meets_v4_floor(" ".join(diverse.split()[:79]))
+
+
 # ---------------------------------------------------------------------------
 # Dead-code deletion + remaining-callers guard
 # ---------------------------------------------------------------------------

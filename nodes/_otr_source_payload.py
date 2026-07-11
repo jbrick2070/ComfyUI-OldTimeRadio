@@ -272,11 +272,20 @@ def _fetch_science_rss(*, bank, technical_model: str,
     (2026-07-05): style_slug removed -- the fetch/rerank chain is
     style-agnostic now, there is no style value yet at this pre-contract
     sourcing stage."""
-    del bank, source_ref  # science fetch ignores Source Banks v2 references
+    del source_ref  # science fetch ignores Source Banks v2 references
     try:
         from . import OTR_LedgerScriptWriter as _writer
     except ImportError:  # pragma: no cover -- flat-import test harnesses
         import OTR_LedgerScriptWriter as _writer  # type: ignore
+    # Sci-fi v4 validates the fetched body itself before any model call. Keep
+    # the legacy science_news forwarding surface byte-compatible, but make all
+    # three v4 lanes ask the shared selector for an eligible article instead of
+    # receiving the richest thin fallback and failing after model setup.
+    strict_v4_banks = {"scifi_codex", "scifi_gemini", "scifi_sonnet"}
+    if getattr(bank, "source_bank_id", "") in strict_v4_banks:
+        return _writer._fetch_rss_seed_or_die(
+            technical_model, require_science_floor=True
+        )
     return _writer._fetch_rss_seed_or_die(technical_model)
 
 

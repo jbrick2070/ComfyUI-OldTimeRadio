@@ -1661,8 +1661,22 @@ def _llm_rerank_with_bodies(
         return list(candidates_with_body)
 
 
+def _science_body_meets_v4_floor(
+    text: str, *, min_chars: int = 400, min_words: int = 80,
+    min_unique_tokens: int = 12,
+) -> bool:
+    """Return whether an RSS body can satisfy the sci-fi v4 payload gate."""
+    tokens = re.findall(r"[A-Za-z0-9]+", text.lower())
+    return (
+        len(text) >= min_chars
+        and len(tokens) >= min_words
+        and len(set(tokens)) >= min_unique_tokens
+    )
+
+
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
-                         model_id=None, optimization_profile="Standard"):
+                         model_id=None, optimization_profile="Standard",
+                         *, require_science_floor=False):
     """Fetch science stories from multiple RSS feeds in parallel.
 
     2026-04-29: now also (a) filters out previously-used URLs via
@@ -1868,7 +1882,12 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
     # grounded in real science. Anything below the floor is excluded
     # from the re-rank pool.
     CONTENT_FLOOR = 400
-    MAX_ATTEMPTS = 5
+    MIN_WORDS = 80
+    MIN_UNIQUE_TOKENS = 12
+    # The sci-fi v4 payload contract has a stricter semantic floor than the
+    # legacy writer. Inspect more candidates before failing so a thin RSS
+    # entry cannot starve an otherwise healthy fetch batch.
+    MAX_ATTEMPTS = 10 if require_science_floor else 5
 
     def _resolve_body(candidate: dict) -> dict:
         """Body resolver for one candidate. Pure; thread-safe."""
@@ -1920,14 +1939,24 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
 
     rich = [
         c for c in fetched
-        if len(c.get("full_text", "")) >= CONTENT_FLOOR
+        if (
+            _science_body_meets_v4_floor(
+                c.get("full_text", ""),
+                min_chars=CONTENT_FLOOR,
+                min_words=MIN_WORDS,
+                min_unique_tokens=MIN_UNIQUE_TOKENS,
+            )
+            if require_science_floor
+            else len(c.get("full_text", "")) >= CONTENT_FLOOR
+        )
     ]
 
     if rich:
         log.info(
             "[NewsFetcher] %d/%d candidate(s) passed content floor "
-            "(>=%d chars) -> body re-rank",
+            "(>=%d chars%s) -> body re-rank",
             len(rich), len(fetched), CONTENT_FLOOR,
+            ", >=80 words, >=12 unique tokens" if require_science_floor else "",
         )
         if model_id and len(rich) > 1:
             rich = _llm_rerank_with_bodies(
@@ -1936,6 +1965,13 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
                 optimization_profile=optimization_profile,
             )
         chosen = rich[0]
+    elif require_science_floor:
+        raise RuntimeError(
+            "No science RSS candidate met the v4 source floor "
+            f"(>={CONTENT_FLOOR} chars, >={MIN_WORDS} words, "
+            f">={MIN_UNIQUE_TOKENS} unique tokens) after inspecting "
+            f"{len(fetched)} candidates"
+        )
     else:
         # All candidates thin - take the richest available so the run
         # continues. Better a thin real story than a hard fail.

@@ -139,15 +139,11 @@ class PostValidationError(ValueError):
     """
 
 
-def schema_shape_instruction(schema: type[BaseModel]) -> str:
-    """Describe required nested schema paths for weak local JSON writers.
-
-    The full JSON schema is already supplied as typed input, but compact path
-    inventory is more reliably followed by small local models. This describes
-    structure only; it never supplies or rewrites story content.
-    """
+def schema_required_paths(schema: type[BaseModel]) -> tuple[str, ...]:
+    """Return every required schema path, resolving nested model refs."""
     raw = schema.model_json_schema()
     definitions = raw.get("$defs", {})
+    legacy_definitions = raw.get("definitions", {})
     paths: list[str] = []
     seen: set[tuple[str, str]] = set()
 
@@ -155,14 +151,21 @@ def schema_shape_instruction(schema: type[BaseModel]) -> str:
         if not isinstance(node, dict):
             return
         ref = node.get("$ref")
-        if isinstance(ref, str) and ref.startswith("#/$defs/"):
-            name = ref.rsplit("/", 1)[-1]
-            marker = (name, path)
-            if marker in seen:
+        if isinstance(ref, str):
+            prefix, _, name = ref.rpartition("/")
+            if prefix in {"#/$defs", "#/definitions"}:
+                marker = (ref, path)
+                if marker in seen:
+                    return
+                seen.add(marker)
+                target = definitions.get(name, legacy_definitions.get(name, {}))
+                walk(target, path)
                 return
-            seen.add(marker)
-            walk(definitions.get(name, {}), path)
-            return
+        for branch_key in ("anyOf", "oneOf", "allOf"):
+            branches = node.get(branch_key)
+            if isinstance(branches, list):
+                for branch in branches:
+                    walk(branch, path)
         if node.get("type") == "array":
             walk(node.get("items", {}), f"{path}[*]")
             return
@@ -178,9 +181,17 @@ def schema_shape_instruction(schema: type[BaseModel]) -> str:
             walk(properties.get(name, {}), child_path)
 
     walk(raw, "")
-    compact = ", ".join(dict.fromkeys(paths))
-    if len(compact) > 2400:
-        compact = compact[:2397] + "..."
+    return tuple(dict.fromkeys(paths))
+
+
+def schema_shape_instruction(schema: type[BaseModel]) -> str:
+    """Describe required nested schema paths for weak local JSON writers.
+
+    The full JSON schema is already supplied as typed input, but compact path
+    inventory is more reliably followed by small local models. This describes
+    structure only; it never supplies or rewrites story content.
+    """
+    compact = ", ".join(schema_required_paths(schema))
     return (
         "\nReturn exactly one JSON object, with no Markdown, headings, or prose. "
         f"Its exact top-level keys are: {', '.join(schema.model_fields)}. "

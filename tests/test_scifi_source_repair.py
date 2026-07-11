@@ -4,6 +4,7 @@ from nodes._otr_scifi_gemini import _schema_instruction as gemini_schema_instruc
 from nodes._otr_scifi_sonnet import FragmentDossierV4, _schema_instruction as sonnet_schema_instruction
 from nodes._otr_json import parse_first_json_object
 from nodes._otr_scifi_source_repair import repair_literal_source_metadata
+from nodes._otr_structured_call import schema_required_paths
 
 
 def test_repair_reindexes_exact_quote_and_zero_pads_ids_without_touching_claim():
@@ -66,6 +67,13 @@ def test_all_lane_schema_seams_name_exact_top_level_keys():
     assert "facts" in gemini_schema_instruction(FactIndexV4)
     assert "verified_facts" in sonnet_schema_instruction(FragmentDossierV4)
     assert "scenes[*].shots[*].scene_id" in codex_schema_instruction(RadioScoreV4)
+
+
+def test_schema_instruction_contains_every_required_path_for_nested_radio_score():
+    instruction = codex_schema_instruction(RadioScoreV4)
+    required_paths = schema_required_paths(RadioScoreV4)
+    assert required_paths
+    assert all(path in instruction for path in required_paths)
 
 
 def test_json_parser_does_not_salvage_nested_child_from_broken_outer_object():

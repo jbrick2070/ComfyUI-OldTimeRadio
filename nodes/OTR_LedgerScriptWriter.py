@@ -1078,7 +1078,9 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
     return random.SystemRandom().getrandbits(32), "OS entropy"
 
 
-def _fetch_rss_seed_or_die(model_id: str) -> dict:
+def _fetch_rss_seed_or_die(
+    model_id: str, *, require_science_floor: bool = False
+) -> dict:
     """Run the story_orchestrator RSS fetcher and return the article dict.
 
     Lifts the exact path the legacy writer used; if the fetcher returns
@@ -1105,6 +1107,7 @@ def _fetch_rss_seed_or_die(model_id: str) -> dict:
         news = _so._fetch_science_news(
             max_feeds=10, model_id=model_id,
             optimization_profile="Standard",
+            require_science_floor=require_science_floor,
         )
         if not news:
             raise RuntimeError(

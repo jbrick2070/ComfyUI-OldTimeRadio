@@ -351,6 +351,22 @@ def test_science_rss_wrapper_forwards_exact_args_and_ignores_source_ref(monkeypa
     assert out == _payload()
 
 
+def test_scifi_rss_wrapper_requests_v4_source_floor(monkeypatch):
+    calls = {}
+
+    def _fake(model_id, **kwargs):
+        calls["args"] = (model_id, kwargs)
+        return _payload()
+
+    import nodes.OTR_LedgerScriptWriter as writer
+    monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
+    bank = routing.get_bank("scifi_codex")
+    entry = osp.resolve_fetcher(bank)
+    entry.fetch(bank=bank, technical_model="tm-id",
+                source_ref="ignored://source")
+    assert calls["args"] == ("tm-id", {"require_science_floor": True})
+
+
 def test_media_archive_wrapper_forwards_source_ref_keyword(monkeypatch):
     seen = {}
 
