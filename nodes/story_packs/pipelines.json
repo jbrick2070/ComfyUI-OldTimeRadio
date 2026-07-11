@@ -298,7 +298,7 @@
     {
       "story_pipeline_id": "sonnet_archive_multipass",
       "label": "Sonnet Archive Multipass (Continuity Archive frame narrative)",
-      "executable": false,
+      "executable": true,
       "requires_source_contract": false,
       "declared_seams": [
         "sonnet_intake_system",

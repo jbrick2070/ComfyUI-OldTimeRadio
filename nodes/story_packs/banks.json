@@ -237,7 +237,7 @@
         "credits_source_line": "dramatized by machine from a recovered instrumental-age transmission"
       },
       "required_seams": [],
-      "runnable": false,
+      "runnable": true,
       "guide_ref": "Archive frame-narrative multipass lane: the intake pass IS the interpretation (empty interpreter, mirrors scifi_fable2's own contract at nodes/story_packs/banks.json:171). The retry loop is diegetic -- the Warden's objection and the Registrar's on-air reopening ARE the technical audit/rewrite cycle, not a hidden gate. Dossier is stamped at meta.sonnet_dossier, never meta.news (avoids a false gen_params_by_phase.news_interpreter stamp, nodes/OTR_LedgerScriptWriter.py:6390-6394). No fallback to legacy_many_pass, ever."
     },
     {

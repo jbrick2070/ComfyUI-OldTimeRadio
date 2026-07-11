@@ -1,0 +1,12 @@
+{
+  "rules_id": "scifi_sonnet",
+  "label": "Sci-Fi Sonnet v4",
+  "schema_version": "v1",
+  "cliche_patterns": [],
+  "stage_business_patterns": [],
+  "on_the_nose_patterns": [],
+  "banned_thesis_patterns": ["\\bthe moral is\\b", "\\bin summary\\b"],
+  "personal_cost_patterns": [],
+  "cliche_replacements": [],
+  "banned_phrases": ["according to the article", "breaking news"]
+}
