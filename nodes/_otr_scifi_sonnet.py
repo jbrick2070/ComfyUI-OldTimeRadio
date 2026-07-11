@@ -62,20 +62,20 @@ class PayloadV4(_Strict):
 
 
 class EvidenceFactV4(_Strict):
-    fact_id: str
+    fact_id: str = Field(pattern=r"fact_[0-9]+")
     claim: str
     source_spans: list[SourceSpanV4]
 
 
 class EvidenceNumberV4(_Strict):
-    number_id: str
+    number_id: str = Field(pattern=r"num_[0-9]+")
     verbatim: str
     fact_id: str
     source_span: SourceSpanV4
 
 
 class EvidenceEntityV4(_Strict):
-    entity_id: str
+    entity_id: str = Field(pattern=r"entity_[0-9]+")
     name: str
     source_spans: list[SourceSpanV4]
 
@@ -194,6 +194,11 @@ def _span_ok(span: SourceSpanV4, payload: Mapping[str, str]) -> bool:
     return span.quote == payload.get(span.field, "")[span.start:span.end]
 
 
+def _span_mismatch(span: SourceSpanV4, payload: Mapping[str, str]) -> str:
+    expected = payload.get(span.field, "")[span.start:span.end]
+    return f"{span.field}[{span.start}:{span.end}] expected {expected[:300]!r}; returned {span.quote[:300]!r}"
+
+
 def validate_sonnet_payload(payload: Mapping[str, Any], resolved: Mapping[str, Any]) -> tuple[PayloadV4, dict[str, int]]:
     try:
         clean = validate_source_payload(dict(payload), "scifi_sonnet")
@@ -219,14 +224,22 @@ def validate_sonnet_payload(payload: Mapping[str, Any], resolved: Mapping[str, A
 def _dossier_validator(dossier: FragmentDossierV4, payload: Mapping[str, str]) -> str | None:
     facts = {x.fact_id for x in dossier.verified_facts}
     for fact in dossier.verified_facts:
-        if not fact.source_spans or any(not _span_ok(span, payload) for span in fact.source_spans):
-            return f"fact {fact.fact_id} has a non-literal span"
+        if not fact.source_spans:
+            return f"fact {fact.fact_id} must contain a source span"
+        for span in fact.source_spans:
+            if not _span_ok(span, payload):
+                return f"fact {fact.fact_id} has a non-literal span: {_span_mismatch(span, payload)}"
     for number in dossier.key_numbers:
-        if number.fact_id not in facts or not _span_ok(number.source_span, payload):
+        if number.fact_id not in facts:
             return f"number {number.number_id} has an invalid fact/span reference"
+        if not _span_ok(number.source_span, payload):
+            return f"number {number.number_id} has an invalid source span: {_span_mismatch(number.source_span, payload)}"
     for entity in dossier.named_entities:
-        if not entity.source_spans or any(not _span_ok(span, payload) for span in entity.source_spans):
-            return f"entity {entity.entity_id} has a non-literal span"
+        if not entity.source_spans:
+            return f"entity {entity.entity_id} must contain a source span"
+        for span in entity.source_spans:
+            if not _span_ok(span, payload):
+                return f"entity {entity.entity_id} has a non-literal span: {_span_mismatch(span, payload)}"
     return None
 
 
@@ -303,9 +316,14 @@ def invoke_sonnet_structured(
         raw = slot_fn(messages, **kwargs)
         attempts.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
         return raw
+    def source_span_repair_factory(*, original_prompt, failed_output, error):
+        return [
+            {"role": "system", "content": prompt[0]["content"] + "\nRepair the JSON. Every quote MUST equal payload[field][start:end] exactly; do not paraphrase source text. Use fact_N/entity_N/num_N identifiers."},
+            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": str(error), "original_request": json.loads(prompt[1]["content"])}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
+        ]
     try:
         # LLM slot: per-sub-pass injected creative/technical closure.
-        result = structured_call(prompt=prompt, schema=result_type, slot_fn=capture, base_temperature=base_temperature, structural_retry_temperature=structural_retry_temperature, max_new_tokens=max_new_tokens, max_attempts=3, post_validator=post_validator, helper_name=f"scifi_sonnet:{pass_id}")
+        result = structured_call(prompt=prompt, schema=result_type, slot_fn=capture, base_temperature=base_temperature, structural_retry_temperature=structural_retry_temperature, max_new_tokens=max_new_tokens, max_attempts=3, post_validator=post_validator, repair_prompt_factory=(source_span_repair_factory if pass_id == "P0" else None), helper_name=f"scifi_sonnet:{pass_id}")
     except Exception as exc:
         raise SonnetPassError(f"{pass_id} failed: {exc}") from exc
     journal.setdefault("calls", []).append({"pass_id": pass_id, "slot": slot, "attempts": attempts, "accepted": result.model_dump(mode="json")})
@@ -446,4 +464,3 @@ def run_scifi_sonnet_episode(
     meta["scifi_sonnet"]["word_receipt"] = {"requested_words": steer["requested_words"], "actual_split_words": actual, "actual_ledger_word_count": int(led.data.get("total_word_count") or 0)}
     meta["scifi_sonnet"]["dossier"] = p0.model_dump(mode="json")
     return SonnetTailParts(outline_view=SimpleNamespace(title=p1.session_title, premise=p1.session_premise, setting=p1.scene_env), canon=SimpleNamespace(title=p1.session_title, premise=p1.session_premise), final_title_override=p1.session_title, run_story_spine=False, tail_finalizer=_SonnetTailFinalizer(expected))
-

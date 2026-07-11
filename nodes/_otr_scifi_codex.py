@@ -86,20 +86,20 @@ class WordSteerV4(_Strict):
 
 
 class FactV4(_Strict):
-    fact_id: str
+    fact_id: str = Field(pattern=r"F(?:0[1-9]|1[0-2])")
     claim: str
     source_spans: list[SourceSpanV4]
     numeric_tokens: list[str] = []
 
 
 class EntityV4(_Strict):
-    entity_id: str
+    entity_id: str = Field(pattern=r"E(?:0[1-9]|1[0-2])")
     name: str
     source_spans: list[SourceSpanV4]
 
 
 class NumberV4(_Strict):
-    number_id: str
+    number_id: str = Field(pattern=r"N(?:0[1-9]|1[0-2])")
     verbatim: str
     fact_id: str
     source_span: SourceSpanV4
@@ -318,17 +318,33 @@ def _span_ok(span: SourceSpanV4, payload: Mapping[str, str]) -> bool:
     return span.quote == payload.get(span.field, "")[span.start:span.end]
 
 
+def _span_mismatch(span: SourceSpanV4, payload: Mapping[str, str]) -> str:
+    expected = payload.get(span.field, "")[span.start:span.end]
+    return (
+        f"{span.field}[{span.start}:{span.end}] expected exact slice "
+        f"{expected[:300]!r}; returned quote {span.quote[:300]!r}"
+    )
+
+
 def _validate_fact_index(index: FactIndexV4, payload: Mapping[str, str]) -> str | None:
     fact_ids = {f.fact_id for f in index.facts}
     for fact in index.facts:
-        if not fact.source_spans or any(not _span_ok(s, payload) for s in fact.source_spans):
-            return f"fact {fact.fact_id} has a non-literal source span"
+        if not fact.source_spans:
+            return f"fact {fact.fact_id} must contain at least one source span"
+        for span in fact.source_spans:
+            if not _span_ok(span, payload):
+                return f"fact {fact.fact_id} has a non-literal source span: {_span_mismatch(span, payload)}"
     for number in index.numbers:
-        if number.fact_id not in fact_ids or not _span_ok(number.source_span, payload):
+        if number.fact_id not in fact_ids:
             return f"number {number.number_id} does not resolve to a literal fact/span"
+        if not _span_ok(number.source_span, payload):
+            return f"number {number.number_id} has a non-literal source span: {_span_mismatch(number.source_span, payload)}"
     for entity in index.entities:
-        if not entity.source_spans or any(not _span_ok(s, payload) for s in entity.source_spans):
-            return f"entity {entity.entity_id} has a non-literal source span"
+        if not entity.source_spans:
+            return f"entity {entity.entity_id} must contain at least one source span"
+        for span in entity.source_spans:
+            if not _span_ok(span, payload):
+                return f"entity {entity.entity_id} has a non-literal source span: {_span_mismatch(span, payload)}"
     return None
 
 
@@ -413,6 +429,12 @@ def invoke_codex_structured(
         raw = slot_fn(messages_in, **kwargs)
         calls.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
         return raw
+    def source_span_repair_factory(*, original_prompt, failed_output, error):
+        detail = str(error)
+        return [
+            {"role": "system", "content": "\n".join(seams) + "\nRepair the JSON artifact. Every source span quote MUST be byte-for-byte equal to the supplied payload[field][start:end]; do not paraphrase it. Use the exact zero-padded IDs required by the schema."},
+            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": detail, "original_request": body}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
+        ]
     try:
         # LLM slot: per-sub-pass injected creative/technical closure.
         result = structured_call(
@@ -420,6 +442,7 @@ def invoke_codex_structured(
             base_temperature=base_temperature,
             structural_retry_temperature=structural_retry_temperature,
             max_new_tokens=max_new_tokens, max_attempts=3,
+            repair_prompt_factory=(source_span_repair_factory if pass_id == "P0" else None),
             post_validator=post_validator, helper_name=f"scifi_codex:{pass_id}",
         )
     except Exception as exc:

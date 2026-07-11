@@ -62,20 +62,20 @@ class GeminiPayloadV4(_Strict):
 
 
 class FactV4(_Strict):
-    fact_id: str
+    fact_id: str = Field(pattern=r"F(?:0[1-9]|1[0-2])")
     claim: str
     source_spans: list[SourceSpanV4]
     numeric_tokens: list[str] = []
 
 
 class EntityV4(_Strict):
-    entity_id: str
+    entity_id: str = Field(pattern=r"E(?:0[1-9]|1[0-2])")
     name: str
     source_spans: list[SourceSpanV4]
 
 
 class NumberV4(_Strict):
-    number_id: str
+    number_id: str = Field(pattern=r"N(?:0[1-9]|1[0-2])")
     verbatim: str
     fact_id: str
     source_span: SourceSpanV4
@@ -202,6 +202,11 @@ def _span_ok(span: SourceSpanV4, payload: Mapping[str, str]) -> bool:
     return span.quote == payload.get(span.field, "")[span.start:span.end]
 
 
+def _span_mismatch(span: SourceSpanV4, payload: Mapping[str, str]) -> str:
+    expected = payload.get(span.field, "")[span.start:span.end]
+    return f"{span.field}[{span.start}:{span.end}] expected {expected[:300]!r}; returned {span.quote[:300]!r}"
+
+
 def validate_gemini_payload(payload: Mapping[str, Any], resolved: Mapping[str, Any]) -> GeminiPayloadV4:
     try:
         clean = validate_source_payload(dict(payload), "scifi_gemini")
@@ -232,14 +237,22 @@ def validate_gemini_payload(payload: Mapping[str, Any], resolved: Mapping[str, A
 def _fact_validator(index: FactIndexV4, payload: Mapping[str, str]) -> str | None:
     fact_ids = {x.fact_id for x in index.facts}
     for fact in index.facts:
-        if not fact.source_spans or any(not _span_ok(s, payload) for s in fact.source_spans):
-            return f"fact {fact.fact_id} has an invalid source span"
+        if not fact.source_spans:
+            return f"fact {fact.fact_id} must contain a source span"
+        for span in fact.source_spans:
+            if not _span_ok(span, payload):
+                return f"fact {fact.fact_id} has an invalid source span: {_span_mismatch(span, payload)}"
     for number in index.numbers:
-        if number.fact_id not in fact_ids or not _span_ok(number.source_span, payload):
+        if number.fact_id not in fact_ids:
             return f"number {number.number_id} has an invalid fact/span reference"
+        if not _span_ok(number.source_span, payload):
+            return f"number {number.number_id} has an invalid source span: {_span_mismatch(number.source_span, payload)}"
     for entity in index.entities:
-        if not entity.source_spans or any(not _span_ok(s, payload) for s in entity.source_spans):
-            return f"entity {entity.entity_id} has an invalid source span"
+        if not entity.source_spans:
+            return f"entity {entity.entity_id} must contain a source span"
+        for span in entity.source_spans:
+            if not _span_ok(span, payload):
+                return f"entity {entity.entity_id} has an invalid source span: {_span_mismatch(span, payload)}"
     return None
 
 
@@ -319,9 +332,14 @@ def invoke_gemini_structured(
         raw = slot_fn(messages, **kwargs)
         attempts.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
         return raw
+    def source_span_repair_factory(*, original_prompt, failed_output, error):
+        return [
+            {"role": "system", "content": prompt[0]["content"] + "\nRepair the JSON. Every quote MUST equal payload[field][start:end] exactly; do not paraphrase source text. Use zero-padded F01/E01/N01 identifiers."},
+            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": str(error), "original_request": json.loads(prompt[1]["content"])}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
+        ]
     try:
         # LLM slot: per-sub-pass injected creative/technical closure.
-        result = structured_call(prompt=prompt, schema=result_type, slot_fn=capture, base_temperature=base_temperature, structural_retry_temperature=structural_retry_temperature, max_new_tokens=max_new_tokens, max_attempts=3, post_validator=post_validator, helper_name=f"scifi_gemini:{pass_id}")
+        result = structured_call(prompt=prompt, schema=result_type, slot_fn=capture, base_temperature=base_temperature, structural_retry_temperature=structural_retry_temperature, max_new_tokens=max_new_tokens, max_attempts=3, post_validator=post_validator, repair_prompt_factory=(source_span_repair_factory if pass_id == "P0" else None), helper_name=f"scifi_gemini:{pass_id}")
     except Exception as exc:
         raise SciFiGeminiPassError(f"{pass_id} failed: {exc}") from exc
     journal.setdefault("calls", []).append({"pass_id": pass_id, "slot": slot, "attempts": attempts, "accepted": result.model_dump(mode="json")})
