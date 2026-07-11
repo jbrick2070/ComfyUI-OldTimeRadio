@@ -4162,6 +4162,22 @@ class OTR_LedgerScriptWriter:
                 "proceeding anyway",
                 beat_word_sum, resolved["target_words"], ratio,
             )
+        # Undershoot visibility (2026-07-11, 26-roll review P1-1): the drift
+        # check above is WARN-only and always will be -- word counts are
+        # ADVISORY (operator law: never reject, reroll, or trim on word count).
+        # But it only ever lived in a log line, so the operator eyeball could
+        # not see an episode's actual undershoot without re-deriving it from
+        # the ledger. Stamp the PLANNED budget here; section K adds the ACTUAL
+        # composed word count + ratio once the lines are final.
+        meta["word_budget"] = {
+            "target_words":         int(resolved["target_words"]),
+            "planned_voiced_words": int(beat_word_sum),
+            "planned_ratio":        round(float(ratio), 3),
+            "band":                 [WORD_BUDGET_RATIO_LO, WORD_BUDGET_RATIO_HI],
+            "planned_drift":        bool(
+                not (WORD_BUDGET_RATIO_LO <= ratio <= WORD_BUDGET_RATIO_HI)
+            ),
+        }
 
         # KILL 2 / announcer OPEN (2026-06-24): capture the no-spoiler open brief
         # NOW -- after the outline is final but BEFORE build_sq_data (below)
@@ -6340,6 +6356,53 @@ class OTR_LedgerScriptWriter:
             "seed_source":           resolved["seed_source"],
             "source_ref":            resolved["source_ref"],
         }
+        # Undershoot visibility, part 2 (2026-07-11, 26-roll review P1-1):
+        # stamp the ACTUAL composed voiced word count + drift ratio next to the
+        # planned budget, so the operator eyeball reads the real undershoot
+        # straight off meta.word_budget instead of re-deriving it from the
+        # lines. Counts VOICED (character) lines only -- the same population the
+        # planned budget covers (announcer beats carry fixed, non-scaling
+        # overhead). ADVISORY ONLY: nothing here rejects, rerolls, or trims;
+        # a drift logs WARN and the run proceeds, per operator law.
+        try:
+            _wb = meta.setdefault("word_budget", {})
+            _target_wb = int(_wb.get("target_words")
+                             or resolved["target_words"] or 1)
+            _actual_words = 0
+            for _row in (led.data.get("lines") or []):
+                if not isinstance(_row, dict):
+                    continue
+                if (_row.get("speaker_role") or "") != "character":
+                    continue
+                if _row.get("skip"):
+                    continue
+                _actual_words += len(str(_row.get("text") or "").split())
+            _actual_ratio = _actual_words / max(1, _target_wb)
+            _actual_drift = not (
+                WORD_BUDGET_RATIO_LO <= _actual_ratio <= WORD_BUDGET_RATIO_HI
+            )
+            _wb["actual_voiced_words"] = int(_actual_words)
+            _wb["actual_ratio"] = round(float(_actual_ratio), 3)
+            _wb["actual_drift"] = bool(_actual_drift)
+            if _actual_drift:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] WORD_BUDGET_ACTUAL_DRIFT: "
+                    "composed voiced lines total %d words, target %d "
+                    "(ratio=%.2f); ADVISORY ONLY, proceeding "
+                    "(stamped on meta.word_budget)",
+                    _actual_words, _target_wb, _actual_ratio,
+                )
+            else:
+                log.info(
+                    "[OTR_LedgerScriptWriter] word budget: composed %d voiced "
+                    "words, target %d (ratio=%.2f)",
+                    _actual_words, _target_wb, _actual_ratio,
+                )
+        except Exception as _wb_exc:  # noqa: BLE001 -- never break a render
+            log.warning(
+                "[OTR_LedgerScriptWriter] word_budget actual stamp failed "
+                "(non-fatal): %s", _wb_exc,
+            )
         # Post-ship audit fix (2026-07-10): stamp the resolved runtime
         # policy into the ledger so DOWNSTREAM LLM consumers (freeze
         # cascade reviewer, shot-lock derivation) run under the SAME

@@ -40,7 +40,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 try:
     from ._otr_json import parse_first_json_object
@@ -259,9 +259,54 @@ def draw_spark_atoms(deck: "dict | None" = None) -> SparkDraw:
 # Creative-front schemas (loose shells; content gates are post-validators)
 # ---------------------------------------------------------------------------
 
+#: Title tokens stripped from the LEADING edge of an LLM-generated cast name.
+#: Same token set fable2 uses (`_otr_scifi_fable2._HONORIFIC_TOKENS`, 19th live
+#: smoke 2026-07-10); kept lane-local rather than imported so this lane does not
+#: take a hard dependency on the fable2 module.
+_HONORIFIC_TOKENS = frozenset({
+    "DR", "DOCTOR", "MR", "MRS", "MS", "MISS", "PROF", "PROFESSOR",
+    "CAPTAIN", "CAPT", "COMMANDER", "CMDR", "COLONEL", "COL",
+    "LIEUTENANT", "LT", "SERGEANT", "SGT", "REVEREND", "REV", "SIR",
+    "MADAM", "MAJOR", "MAJ", "GENERAL", "GEN",
+})
+
+
+def strip_leading_honorifics(name: str) -> str:
+    """Deterministic cast-name LABEL normalization: drop LEADING honorific
+    tokens ('DR. ELI CROSS' -> 'ELI CROSS').
+
+    Local 12B-class models title their scientists/officers reflexively. Fable2
+    hit the same class (roll 19: 'DR. HARRIS' broke repair convergence) and
+    fixed it with a deterministic strip; original_radio's cast names ride
+    through every gate literally today (`_normalize_speaker` in _otr_outline.py
+    preserves INTERNAL punctuation by design, so it never removes the title).
+
+    Shape differs from fable2 on purpose: fable2 bills a ONE-WORD surname and
+    keeps only the last token, while original_radio bills a two-word period
+    personal name ("MARTHA VANE", "ELI CROSS"), so we strip only the leading
+    title tokens and keep the WHOLE remaining name. Never invents a character;
+    only normalizes the label shape (Python judges, the LLM writes). A name
+    that is nothing BUT a title is returned unchanged so this normalizer never
+    manufactures an empty cast name -- the existing empty-name gates own that.
+    """
+    if not isinstance(name, str):
+        return name
+    tokens = name.strip().split()
+    i = 0
+    while i < len(tokens) and tokens[i].rstrip(".").upper() in _HONORIFIC_TOKENS:
+        i += 1
+    kept = tokens[i:]
+    return " ".join(kept) if kept else name.strip()
+
+
 class CastSketchEntry(BaseModel):
     name: str = Field(default="")
     role: str = Field(default="")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _strip_honorifics(cls, v):
+        return strip_leading_honorifics(v) if isinstance(v, str) else v
 
 
 class ConceptPitch(BaseModel):
@@ -280,6 +325,11 @@ class SelectCastEntry(BaseModel):
     want: str = Field(default="")
     pressure: str = Field(default="")
     relationship: str = Field(default="")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _strip_honorifics(cls, v):
+        return strip_leading_honorifics(v) if isinstance(v, str) else v
 
 
 class SelectedPitch(BaseModel):

@@ -1255,6 +1255,48 @@ def _gender_to_pronouns(gender):
     return _PRONOUN_MAP.get(g, ("they", "them", "their"))
 
 
+_ONE_BREATH_MAX_WORDS = 24
+"""Per-beat word allocation at/below which a line stays ONE spoken breath.
+
+Undershoot root cause (2026-07-11, original_radio 26-roll review P1-1): the
+length rider below was TARGET-BLIND -- it told the model "one breath, concrete,
+no nested clauses" on EVERY voiced beat, whether the outline had allocated that
+beat 12 words or 53. At small targets that is correct radio craft; at the 720w
+scale (allocations of 20-53 words/beat) it actively FIGHTS the stated word
+target, and local 12B-class models obey the concrete cadence instruction over
+the bare number -- the mechanism behind the 239/420 (57%) undershoot.
+
+The fix is STEERING, never a gate: word counts remain advisory-only (operator
+law -- nothing here rejects, rerolls, or trims on word count). Beats at or below
+this threshold render the ORIGINAL one-breath rider byte-for-byte, so every
+short-target lane/test is unchanged; only beats the outline itself budgeted
+LARGE get the develop-the-beat steering."""
+
+
+def _length_steering(target_words) -> str:
+    """The per-beat length rider, SCALED to the beat's own word allocation.
+
+    Concrete technique steering, not a percentage -- percentages do not
+    reliably steer small local models; concrete craft instructions do."""
+    try:
+        tw = int(target_words)
+    except (TypeError, ValueError):
+        tw = 0
+    if tw <= 0 or tw <= _ONE_BREATH_MAX_WORDS:
+        # Byte-identical to the pre-2026-07-11 rider.
+        return ("Keep it spoken-length -- one breath, concrete, no "
+                "nested clauses.")
+    return (
+        f"This beat is budgeted about {tw} spoken words -- that is more than "
+        "one breath, so develop it across two or three spoken sentences "
+        "instead of stopping at the first. Let the reply complicate the "
+        "situation rather than merely answer it: state the thing, then press "
+        "it, resist it, or pay for it. Every sentence stays concrete and "
+        "speakable aloud -- length comes from developing the beat, never from "
+        "padding, restating, or nested clauses."
+    )
+
+
 def _build_user_prompt(req: LineRequest) -> str:
     """Render the per-beat user prompt for the composer.
 
@@ -1624,15 +1666,13 @@ def _build_user_prompt(req: LineRequest) -> str:
             f"conflict over {req.conflict_object}; do not invent people, "
             "places, or objects the premise does not imply, and do not "
             "retreat to generic control-room machinery (consoles, levers, "
-            "fuel cells, reactors). Keep it spoken-length -- one breath, "
-            "concrete, no nested clauses."
+            "fuel cells, reactors). " + _length_steering(req.target_words)
         )
     else:
         parts.append(
             "Ground this line in the news facts and this scene's premise; "
             "do not invent people, places, or objects the news does not "
-            "imply. Keep it spoken-length -- one breath, concrete, no "
-            "nested clauses."
+            "imply. " + _length_steering(req.target_words)
         )
     # L3 (story-quality LIFT, 2026-06-23): give the model an explicit place to
     # put non-spoken stage action so the deterministic post-strip removes it
