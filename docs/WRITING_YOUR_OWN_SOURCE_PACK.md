@@ -1,7 +1,15 @@
 # Writing your own OTR source pack
 
-**The whole contract, in one sentence:** you get two LLM slots and a ledger to fill;
-what happens in between is entirely yours, as long as it is bug-free and honest.
+> **Your pack can do whatever it wants, as long as it fills the ledger and uses the LLMs
+> obediently to make the best ledger story it can.**
+
+That is the entire contract. Two LLM slots, one ledger. What happens in between is yours,
+provided it is bug-free and honest.
+
+"Obediently" is doing real work in that sentence: **you drive the models, they do not drive
+you.** Every line the listener hears must be written by a model, and every decision about
+what is *acceptable* must be made by your code. Python judges. The LLM writes. Neither does
+the other's job.
 
 ## Your pack is not a variant of anything
 
@@ -17,12 +25,18 @@ Your pack owns:
 - **its source, or none at all.** Pull an RSS feed, a public-domain text, an archive, a
   spark deck, a photograph, a single word -- or invent from nothing. (`original_radio` has
   no fetcher at all: it draws atoms from a deck and writes the episode out of thin air.)
-- **its genre and its form.** Noir, farce, ghost story, courtroom, kitchen-sink domestic,
-  something with no name yet.
+- **its genre and its form.** And here is the actual brief: **invent a kind of radio drama
+  that does not exist yet.** Not a version of one you have heard. Something a listener will
+  genuinely enjoy and could not have got anywhere else.
+  **No guns. No blood. No violence. No swearing.** That is not a content warning bolted on
+  afterwards -- it is the constraint that forces the interesting answer. Tension is not
+  violence. Stakes are not gore. The most gripping thing a person can hear is another
+  person about to say something true. If your first instinct is a shootout, a murder, or a
+  monster, that instinct came from somewhere else; go past it.
 - **its dramatic architecture.** How many passes. What the passes ARE. What artifacts pass
   between them. Who judges what.
 - **its cast, its roles, its rules.** Two speakers who hate each other. One narrator alone.
-  A chorus.
+  A chorus. Someone who never speaks.
 
 The pipeline is old-time radio -- voices, music, a listener in the dark. Beyond that, this
 document tells you the **only** things you must obey, and everything else is a blank page.
