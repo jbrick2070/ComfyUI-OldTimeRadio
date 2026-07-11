@@ -394,3 +394,13 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - bible-worthy: yes -- live context-budget/structured-output contract failure
 - confidence: HIGH
 - status: OPEN
+
+## PBUG-20260711-13 -- Codex P5 typed repair retained two forbidden legacy metadata values
+- surfaced: scifi bake-off canonical 30w Codex reroll after `fdc413ed`, 2026-07-11
+- symptom: full-contract P5 base output failed eight fields; typed repair corrected six but retained `schema_version=scifi_codex.script_artifact.v1` and one `boundary=beat_end`, so strict ScriptArtifactV4 validation halted before publish
+- root cause: the repair prompt exposed the exact literal and boundary enum contract but the local model copied two legacy values from its own failed artifact; there is no deterministic metadata-only normalization for ScriptArtifactV4 yet
+- fix: not applied in this run; the operator's one-reroll/two-failure law stopped the bank and kept the 720 gate closed
+- verify idea: a metadata-only repair may set the schema literal, remove forbidden extra keys, map line shot IDs from the accepted score, and derive boundary from accepted shot/beat order without changing any dialogue; canonical Codex must then publish before Gemini/Sonnet or 720 starts
+- bible-worthy: yes -- live legacy-enum persistence in typed repair
+- confidence: HIGH
+- status: OPEN
