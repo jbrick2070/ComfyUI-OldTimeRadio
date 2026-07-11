@@ -338,32 +338,39 @@ def invoke_gemini_structured(
         raw = slot_fn(messages, **kwargs)
         attempts.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
         return raw
-    def source_span_repair_factory(*, original_prompt, failed_output, error):
-        repair_rules = (
-            "This is a typed repair of the same artifact, not a new creative response. "
-            "Return one JSON object only. IDs are fixed lexical tokens: facts MUST use "
-            "F01 through F12, entities MUST use E01 through E12, and numbers MUST use "
-            "N01 through N12. Never emit bare F0, F1, E0, or N0. If the failed artifact "
-            "used F0/F1/F2, change those references consistently to F01/F02/F03. "
-            "For every source span, calculate quote from the original request exactly as "
-            "payload[field][start:end]; do not paraphrase, infer, or retain a mismatched "
-            "span. Preserve valid claims and remove only unsupported facts."
-        )
-        deterministic = repair_literal_source_metadata(
-            failed_output,
-            FactIndexV4,
-            prompt[1]["content"] and json.loads(prompt[1]["content"])["typed_inputs"]["payload"]["payload"],
-            zero_padded_ids=True,
-        )
-        if deterministic is not None:
-            return deterministic
+    def typed_repair_factory(*, original_prompt, failed_output, error):
+        if pass_id == "P0":
+            repair_rules = (
+                "This is a typed repair of the same artifact, not a new creative response. "
+                "Return one JSON object only. IDs are fixed lexical tokens: facts MUST use "
+                "F01 through F12, entities MUST use E01 through E12, and numbers MUST use "
+                "N01 through N12. Never emit bare F0, F1, E0, or N0. If the failed artifact "
+                "used F0/F1/F2, change those references consistently to F01/F02/F03. "
+                "For every source span, calculate quote from the original request exactly as "
+                "payload[field][start:end]; do not paraphrase, infer, or retain a mismatched "
+                "span. Preserve valid claims and remove only unsupported facts."
+            )
+            deterministic = repair_literal_source_metadata(
+                failed_output,
+                FactIndexV4,
+                json.loads(prompt[1]["content"])["typed_inputs"]["payload"]["payload"],
+                zero_padded_ids=True,
+            )
+            if deterministic is not None:
+                return deterministic
+        else:
+            repair_rules = (
+                "This is a typed repair of the same artifact. Preserve the selected premise, "
+                "scene outline, beats, and dialogue content; repair only fields named by the "
+                "validation error. Every required nested graph field must be present."
+            )
         return [
             {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": str(error), "original_request": json.loads(prompt[1]["content"])}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
         ]
     try:
         # LLM slot: per-sub-pass injected creative/technical closure.
-        result = structured_call(prompt=prompt, schema=result_type, slot_fn=capture, base_temperature=base_temperature, structural_retry_temperature=structural_retry_temperature, max_new_tokens=max_new_tokens, max_attempts=3, post_validator=post_validator, repair_prompt_factory=(source_span_repair_factory if pass_id == "P0" else None), helper_name=f"scifi_gemini:{pass_id}")
+        result = structured_call(prompt=prompt, schema=result_type, slot_fn=capture, base_temperature=base_temperature, structural_retry_temperature=structural_retry_temperature, max_new_tokens=max_new_tokens, max_attempts=3, post_validator=post_validator, repair_prompt_factory=typed_repair_factory, helper_name=f"scifi_gemini:{pass_id}")
     except Exception as exc:
         raise SciFiGeminiPassError(f"{pass_id} failed: {exc}") from exc
     journal.setdefault("calls", []).append({"pass_id": pass_id, "slot": slot, "attempts": attempts, "accepted": result.model_dump(mode="json")})

@@ -436,26 +436,35 @@ def invoke_codex_structured(
         raw = slot_fn(messages_in, **kwargs)
         calls.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
         return raw
-    def source_span_repair_factory(*, original_prompt, failed_output, error):
+    def typed_repair_factory(*, original_prompt, failed_output, error):
         detail = str(error)
-        repair_rules = (
-            "This is a typed repair of the same artifact, not a new creative response. "
-            "Return one JSON object only. IDs are fixed lexical tokens: facts MUST use "
-            "F01 through F12, entities MUST use E01 through E12, and numbers MUST use "
-            "N01 through N12. Never emit bare F0, F1, E0, or N0. If the failed artifact "
-            "used F0/F1/F2, change those references consistently to F01/F02/F03. "
-            "For every source span, calculate quote from the original request exactly as "
-            "payload[field][start:end]; do not paraphrase, infer, or retain a mismatched "
-            "span. Preserve valid claims and remove only unsupported facts."
-        )
-        deterministic = repair_literal_source_metadata(
-            failed_output,
-            FactIndexV4,
-            body["artifact_inputs"]["payload"]["payload"],
-            zero_padded_ids=True,
-        )
-        if deterministic is not None:
-            return deterministic
+        if pass_id == "P0":
+            repair_rules = (
+                "This is a typed repair of the same artifact, not a new creative response. "
+                "Return one JSON object only. IDs are fixed lexical tokens: facts MUST use "
+                "F01 through F12, entities MUST use E01 through E12, and numbers MUST use "
+                "N01 through N12. Never emit bare F0, F1, E0, or N0. If the failed artifact "
+                "used F0/F1/F2, change those references consistently to F01/F02/F03. "
+                "For every source span, calculate quote from the original request exactly as "
+                "payload[field][start:end]; do not paraphrase, infer, or retain a mismatched "
+                "span. Preserve valid claims and remove only unsupported facts."
+            )
+            deterministic = repair_literal_source_metadata(
+                failed_output,
+                FactIndexV4,
+                body["artifact_inputs"]["payload"]["payload"],
+                zero_padded_ids=True,
+            )
+            if deterministic is not None:
+                return deterministic
+        else:
+            repair_rules = (
+                "This is a typed repair of the same artifact. Preserve the existing premise, "
+                "scene descriptions, beats, and content; repair only the fields named by the "
+                "validation error. Every required nested graph field must be present. Copy "
+                "parent scene_id into each shot and beat, copy a valid shot_id into each beat, "
+                "and provide every required visual_prompt without dropping existing content."
+            )
         return [
             {"role": "system", "content": "\n".join(seams) + schema_instruction + "\n" + repair_rules},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": detail, "original_request": body}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
@@ -467,7 +476,7 @@ def invoke_codex_structured(
             base_temperature=base_temperature,
             structural_retry_temperature=structural_retry_temperature,
             max_new_tokens=max_new_tokens, max_attempts=3,
-            repair_prompt_factory=(source_span_repair_factory if pass_id == "P0" else None),
+            repair_prompt_factory=typed_repair_factory,
             post_validator=post_validator, helper_name=f"scifi_codex:{pass_id}",
         )
     except Exception as exc:
