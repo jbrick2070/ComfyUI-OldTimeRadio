@@ -353,6 +353,49 @@ def test_outline_repair_fails_closed_without_an_owning_scene_id():
     assert lane.repair_outline_metadata("{not json") is None
 
 
+def test_scene_draft_must_cover_every_beat_in_its_scene():
+    """A skipped beat is AUTHORED work missing -- catch it where it can be rewritten.
+
+    Live: the model drafted no line for b004, the scene passed its critique anyway,
+    and the run died far downstream in `_assemble` with a bare "missing draft for
+    b004" -- after every generation had already been paid for. Python cannot invent
+    the dialogue, so the pass that owns it must demand it.
+    """
+    from nodes import _otr_scifi_gemini as lane
+
+    scene = lane.SceneV4.model_validate({
+        "scene_id": "s001", "env": "lab", "description": "d",
+        "shots": [{"shot_id": "sh1", "scene_id": "s001",
+                   "description": "d", "visual_prompt": "v"}],
+        "beats": [
+            {"beat_id": "b003", "line_id": "l003", "scene_id": "s001",
+             "shot_id": "sh1", "speaker": "Dr. Hart", "char_id": "c01",
+             "speaker_role": "character", "intent": "i", "mood": "m", "order": 1},
+            {"beat_id": "b004", "line_id": "l004", "scene_id": "s001",
+             "shot_id": "sh1", "speaker": "Dr. Hart", "char_id": "c01",
+             "speaker_role": "character", "intent": "i", "mood": "m", "order": 2},
+        ],
+    })
+
+    def draft(beat_ids):
+        return lane.SceneDraftV4.model_validate({
+            "lines": [
+                {"beat_id": b, "text": f"line for {b}", "fact_uses": [],
+                 "non_fact": True}
+                for b in beat_ids
+            ],
+        })
+
+    assert lane.validate_scene_draft_covers_beats(draft(["b003", "b004"]), scene) is None
+    assert "b004" in lane.validate_scene_draft_covers_beats(draft(["b003"]), scene)
+    assert "more than once" in lane.validate_scene_draft_covers_beats(
+        draft(["b003", "b003", "b004"]), scene
+    )
+    assert "outside this scene" in lane.validate_scene_draft_covers_beats(
+        draft(["b003", "b004", "b999"]), scene
+    )
+
+
 def test_no_lane_seam_treats_the_word_target_as_a_quota():
     """The requested word count is a SCALE REQUEST, not a quota.
 

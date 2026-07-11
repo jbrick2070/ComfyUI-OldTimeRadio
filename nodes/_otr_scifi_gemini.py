@@ -394,6 +394,35 @@ def _nested_model(annotation: Any) -> type[BaseModel] | None:
     return None
 
 
+def validate_scene_draft_covers_beats(
+    draft: "SceneDraftV4", scene: "SceneV4",
+) -> str | None:
+    """Every beat in the scene must get exactly one drafted line.
+
+    Nothing used to require this. The model quietly skipped a beat, the scene passed
+    its critique, and the run died much later in `_assemble` with a bare
+    "missing draft for b004" -- after all the generation was already paid for.
+
+    A missing line is AUTHORED work: Python cannot invent the dialogue, so it must
+    not try. Catch it at the pass that owns it, where the typed repair can ask the
+    model to write the line it forgot, and name the exact beat.
+    """
+    expected = [beat.beat_id for beat in scene.beats]
+    drafted = [line.beat_id for line in draft.lines]
+    duplicates = sorted({b for b in drafted if drafted.count(b) > 1})
+    if duplicates:
+        return f"beats drafted more than once: {', '.join(duplicates)}"
+    missing = [b for b in expected if b not in set(drafted)]
+    if missing:
+        return f"no drafted line for beat(s): {', '.join(missing)}"
+    foreign = [b for b in drafted if b not in set(expected)]
+    if foreign:
+        return (
+            f"drafted a line for beat(s) outside this scene: {', '.join(sorted(set(foreign)))}"
+        )
+    return None
+
+
 def repair_forbidden_extra_keys(
     failed_output: str, result_type: type[BaseModel],
 ) -> BaseModel | None:
@@ -802,13 +831,31 @@ def run_scifi_gemini_episode(
     casts = {c.char_id: c for c in p3.cast}
     drafts: dict[str, SceneDraftV4] = {}
     for scene in p3.scenes:
-        draft = invoke_gemini_structured(pass_id=f"P4:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_draft", pack=pack, typed_inputs={"scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x, s=scene: None, base_temperature=.74, structural_retry_temperature=.34, max_new_tokens=3000, journal=journal)
+        draft = invoke_gemini_structured(pass_id=f"P4:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_draft", pack=pack, typed_inputs={"scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x, s=scene: validate_scene_draft_covers_beats(x, s), base_temperature=.74, structural_retry_temperature=.34, max_new_tokens=3000, journal=journal)
         critique = invoke_gemini_structured(pass_id=f"P5:{scene.scene_id}", slot="technical", slot_fn=technical_fn, seam_ref="gemini_scene_critique", pack=pack, typed_inputs={"drafted_lines": draft.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneCritiqueV4, post_validator=lambda x: (("clean critique must have empty feedback" if x.passed and x.feedback else None) or ("failed critique needs feedback" if not x.passed and not x.feedback else None) or (None if x.sfw_pass else "SFW audit failed")), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1400, journal=journal)
         if not critique.passed:
-            draft = invoke_gemini_structured(pass_id=f"P6:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_rewrite", pack=pack, typed_inputs={"feedback": critique.feedback, "previous_draft": draft.model_dump(mode="json"), "facts": p0.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x: None, base_temperature=.62, structural_retry_temperature=.28, max_new_tokens=3000, journal=journal)
+            draft = invoke_gemini_structured(pass_id=f"P6:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_rewrite", pack=pack, typed_inputs={"feedback": critique.feedback, "previous_draft": draft.model_dump(mode="json"), "facts": p0.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x, s=scene: validate_scene_draft_covers_beats(x, s), base_temperature=.62, structural_retry_temperature=.28, max_new_tokens=3000, journal=journal)
             check = invoke_gemini_structured(pass_id=f"P5-recheck:{scene.scene_id}", slot="technical", slot_fn=technical_fn, seam_ref="gemini_scene_critique", pack=pack, typed_inputs={"drafted_lines": draft.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneCritiqueV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1400, journal=journal)
             if not check.passed:
-                raise SciFiGeminiRewriteExhaustedError(f"scene {scene.scene_id} failed its bounded rewrite")
+                # The critic is the only thing that knows WHY, and until now it took
+                # that reason to the grave: the run died with a bare "failed its
+                # bounded rewrite" and we were left guessing (the first guess -- an
+                # unreachable word-count quota in the seam -- was real, and still not
+                # the whole story). Record both verdicts before failing closed.
+                log.error(
+                    "[scifi_gemini:%s] bounded rewrite exhausted\n"
+                    "  first critique : %s\n"
+                    "  after rewrite  : %s",
+                    scene.scene_id, critique.feedback.strip(), check.feedback.strip(),
+                )
+                journal[f"rewrite_exhausted:{scene.scene_id}"] = {
+                    "first_critique": critique.feedback,
+                    "after_rewrite": check.feedback,
+                }
+                raise SciFiGeminiRewriteExhaustedError(
+                    f"scene {scene.scene_id} failed its bounded rewrite: "
+                    f"{check.feedback.strip() or critique.feedback.strip()}"
+                )
         validate_spoken_text_and_lock(draft, p3, casts)
         drafts[scene.scene_id] = draft
     expected = _assemble(led, p3, drafts, meta)
