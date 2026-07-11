@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +11,8 @@ from types import SimpleNamespace
 from typing import Any, Callable, Literal, Mapping, MutableMapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+log = logging.getLogger("OTR")
 
 try:
     from ._otr_canon import EpisodeCanon
@@ -252,18 +255,36 @@ def _apply_rewrite_corrections(
     flagged = set(audit.flagged_line_refs)
     seen: set[int] = set()
     for item in rewrite.corrected_lines:
+        # An index that does not exist points at no line we can correct. We refuse to
+        # guess which one was meant -- but we do not kill the episode over the doctor
+        # miscounting, either. Apply nothing for it and let the recheck stay the
+        # judge: if the defect really stands, the audit will say so and fail closed
+        # on its own terms. (Live: the doctor returned line_ref 4 for a 0..3 draft.)
         if item.line_ref < 0 or item.line_ref >= len(audited):
-            raise SonnetCompletenessError(
-                f"rewrite line reference {item.line_ref} is outside the audited draft"
+            log.warning(
+                "[scifi_sonnet:P5:%d] discarding a correction for line %d -- the "
+                "audited draft has only %d lines (0..%d); no line was changed",
+                round_no, item.line_ref, len(audited), len(audited) - 1,
             )
+            continue
+        # The same line returned twice IS incoherent -- two different texts for one
+        # line, and nothing to choose between them. Fail closed.
         if item.line_ref in seen:
             raise SonnetCompletenessError(
                 f"rewrite returned line {item.line_ref} twice"
             )
+        # A correction for a line the AUDIT never flagged is a different thing: it is
+        # coherent, just out of scope. The auditor decides what is defective, so we
+        # do not apply an edit nobody asked for -- but we also do not destroy a whole
+        # episode over the doctor being eager. Skip it, keep the original line exactly
+        # as the model first wrote it, and say so out loud.
         if flagged and item.line_ref not in flagged:
-            raise SonnetCompletenessError(
-                f"rewrite corrected line {item.line_ref}, which the audit never flagged"
+            log.info(
+                "[scifi_sonnet:P5:%d] ignoring an unflagged correction to line %d -- "
+                "the audit did not name it as a defect; the original line stands",
+                round_no, item.line_ref,
             )
+            continue
         seen.add(item.line_ref)
         target = events[audited[item.line_ref]]
         # char_id is the locked cast identity: the doctor may rewrite what a
@@ -585,7 +606,12 @@ def run_scifi_sonnet_episode(
     for i, (a, b) in enumerate(zip(orum, thessaly)):
         events.append(DraftLineV4(text=a.text, cites=a.cites, speaker="ORUM", char_id="c02", source_pass="P2a"))
         events.append(DraftLineV4(text=b.text, cites=b.cites, speaker="THESSALY", char_id="c03", source_pass="P2b"))
-    audit = invoke_sonnet_structured(pass_id="P3", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_audit_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "draft_lines": [e.model_dump(mode="json") for e in events[1:]], "coverage": {"count": len(events) - 1}}, result_type=AuditVerdictV4, post_validator=lambda x: None, base_temperature=.25, structural_retry_temperature=.12, max_new_tokens=2000, journal=journal)
+    # ONE numbering contract for the audit, everywhere. This used to pass `events[1:]`
+    # while the rewrite loop numbered the factual lines only -- identical today (just
+    # the cold open precedes), but two contracts for one thing is how a line_ref
+    # silently comes to mean two different lines.
+    audited = _audited_line_indices(events)
+    audit = invoke_sonnet_structured(pass_id="P3", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_audit_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in audited], "coverage": {"count": len(audited)}}, result_type=AuditVerdictV4, post_validator=lambda x: None, base_temperature=.25, structural_retry_temperature=.12, max_new_tokens=2000, journal=journal)
     warden_seam = str(pack.prompt_stages.get("sonnet_warden_system") or "")
     if audit.status == "clear":
         block = select_warden_mode_block(warden_seam, "clear")
@@ -604,7 +630,23 @@ def run_scifi_sonnet_episode(
             if audit.status == "clear":
                 break
         if audit.status != "clear":
-            raise SonnetAuditExhaustedError("Sonnet Warden audit remained defective after two rewrites")
+            # The auditor is the only thing that knows WHY, and it was taking the
+            # reason to the grave: "remained defective after two rewrites" names no
+            # line and no defect, so every diagnosis is a guess. Record what it
+            # actually objected to, and which lines it flagged, before failing closed.
+            log.error(
+                "[scifi_sonnet] Warden audit exhausted after two rewrites\n"
+                "  defects       : %s\n"
+                "  flagged lines : %s\n"
+                "  invented facts: %s",
+                "; ".join(audit.defects) or "(none named)",
+                audit.flagged_line_refs, audit.invented_fact_flags,
+            )
+            journal["audit_exhausted"] = audit.model_dump(mode="json")
+            raise SonnetAuditExhaustedError(
+                "Sonnet Warden audit remained defective after two rewrites: "
+                + ("; ".join(audit.defects) or "(the auditor named no defect)")
+            )
         # The Warden's closing ruling is a SPOKEN LINE, and it was hardcoded here as
         # "The record holds now." -- Python authoring dialogue, which this lane is
         # never allowed to do. It did not even need to: RewriteResultV4 already

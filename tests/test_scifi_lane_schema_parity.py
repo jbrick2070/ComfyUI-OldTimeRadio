@@ -560,17 +560,163 @@ def test_sonnet_rewrite_corrections_are_written_back_into_the_record():
     assert events[2].text == "THESSALY speculates"   # untouched line is byte-identical
     assert events[0].text == "cold open"
 
-    # A correction the audit never asked for, or asked for twice, is refused.
-    for bad in ([{"line_ref": 1, "speaker": "THESSALY", "text": "t", "cites": ["fact_2"]}],
-                [{"line_ref": 9, "speaker": "ORUM", "text": "t", "cites": ["fact_1"]}]):
-        with pytest.raises(lane.SonnetCompletenessError):
-            lane._apply_rewrite_corrections(
-                events, audited,
-                lane.RewriteResultV4.model_validate({
-                    "corrected_lines": bad, "vesh_resolution": "r",
-                }),
-                audit, 0,
-            )
+    # The same line returned twice is incoherent -- two texts for one line, nothing
+    # to choose between them. Fail closed.
+    with pytest.raises(lane.SonnetCompletenessError):
+        lane._apply_rewrite_corrections(
+            events, audited,
+            lane.RewriteResultV4.model_validate({
+                "corrected_lines": [
+                    {"line_ref": 0, "speaker": "ORUM", "text": "a", "cites": ["fact_1"]},
+                    {"line_ref": 0, "speaker": "ORUM", "text": "b", "cites": ["fact_1"]},
+                ],
+                "vesh_resolution": "r",
+            }),
+            audit, 0,
+        )
+
+    # An index that does not exist points at no line we can correct. Refuse the edit,
+    # but do not kill the episode over the doctor miscounting -- the recheck is still
+    # the judge (live: it returned line_ref 4 for a 0..3 draft).
+    kept = [line.text for line in events]
+    lane._apply_rewrite_corrections(
+        events, audited,
+        lane.RewriteResultV4.model_validate({
+            "corrected_lines": [
+                {"line_ref": 9, "speaker": "ORUM", "text": "t", "cites": ["fact_1"]},
+            ],
+            "vesh_resolution": "r",
+        }),
+        audit, 0,
+    )
+    assert [line.text for line in events] == kept
+
+    # An eager doctor correcting a line the AUDIT never flagged is coherent but out
+    # of scope. The auditor decides what is defective -- so the edit is ignored and
+    # the original line stands, rather than the whole episode dying over it (live:
+    # "rewrite corrected line 3, which the audit never flagged").
+    before = events[2].text
+    lane._apply_rewrite_corrections(
+        events, audited,
+        lane.RewriteResultV4.model_validate({
+            "corrected_lines": [
+                {"line_ref": 1, "speaker": "THESSALY", "text": "unasked-for edit",
+                 "cites": ["fact_2"]},
+            ],
+            "vesh_resolution": "r",
+        }),
+        audit, 0,
+    )
+    assert events[2].text == before
+
+
+# --------------------------------------------------------------------------- #
+# The two guards below exist because the lessons were NOT automatically carried
+# from one lane to the next. Codex, Gemini and Sonnet were each written
+# independently, so each one independently re-made the same mistakes: a seam that
+# asks for a field its schema forbids, and Python putting words in a character's
+# mouth. A lesson only survives as an executable guard that runs across ALL lanes.
+# --------------------------------------------------------------------------- #
+
+LANE_SOURCES = (
+    "nodes/_otr_scifi_codex.py",
+    "nodes/_otr_scifi_gemini.py",
+    "nodes/_otr_scifi_sonnet.py",
+)
+
+
+@pytest.mark.parametrize("source", LANE_SOURCES)
+def test_python_never_puts_words_in_a_characters_mouth(source):
+    """No lane may hand a spoken-text field a string Python wrote.
+
+    Live (Sonnet): the Warden's closing ruling was hardcoded as
+    `DraftLineV4(text="The record holds now.", ...)` -- Python speaking for a
+    character. It did not even need to: RewriteResultV4 already carried
+    `vesh_resolution`, the model's own line, and the lane was throwing it away.
+
+    A literal assigned to `text=` is dialogue no model authored. If a line must be
+    spoken, a model field must supply it. Python judges; the LLM writes.
+    """
+    import ast
+    import pathlib
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    tree = ast.parse((repo / source).read_text(encoding="utf-8"))
+
+    spoken = {"text", "premise", "title", "claim", "spoken_claim"}
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        for kw in node.keywords:
+            if kw.arg not in spoken:
+                continue
+            value = kw.value
+            if isinstance(value, ast.Constant) and isinstance(value.value, str) and value.value.strip():
+                offenders.append(
+                    f"{source}:{value.lineno}: {kw.arg}={value.value!r} -- Python authored this"
+                )
+            if isinstance(value, ast.JoinedStr):  # an f-string built into spoken text
+                offenders.append(
+                    f"{source}:{value.lineno}: {kw.arg}=<f-string> -- Python composed this"
+                )
+    assert not offenders, (
+        "Python is authoring story text; a model field must supply it:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_every_seam_example_validates_against_the_schema_it_feeds():
+    """A seam's worked example must be a legal instance of its own artifact.
+
+    This is the guard that would have caught most of today's kills on its own:
+      - gemini_scene_draft showed {"fact_ids": ["F01"]} while DraftLineV4 declares
+        `fact_uses` and forbids extras -- so the model obeyed the seam, strict mode
+        rejected it, and the repair then DELETED the model's fact attribution.
+      - gemini_scene_outline asked the cast for tts_model / voice_preset, which
+        CastV4 forbids.
+      - the rewrite seam reintroduced fact_ids after the draft seam was fixed.
+
+    When a seam and its schema disagree, the model is not wrong -- we are. So the
+    example the model is shown must itself validate.
+    """
+    import json as _json
+    import re
+
+    from nodes import _otr_scifi_gemini as gemini
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    pack = _json.loads(
+        (repo / "nodes" / "story_packs" / "scifi_gemini" / "scifi_gemini_v1.json")
+        .read_text(encoding="utf-8")
+    )
+    stages = pack["prompt_stages"]
+
+    # The seams whose worked example IS the pass's whole artifact.
+    checked = {
+        "gemini_scene_draft": gemini.SceneDraftV4,
+        "gemini_scene_rewrite": gemini.SceneDraftV4,
+    }
+
+    for seam, model in checked.items():
+        text = stages[seam]
+        # The examples are written with doubled braces for str.format.
+        example = text[text.index('{{"lines"'):].replace("{{", "{").replace("}}", "}")
+        # Take the first complete JSON object.
+        depth, end = 0, None
+        for i, ch in enumerate(example):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        assert end, f"{seam}: could not read its worked example"
+        payload = _json.loads(example[:end])
+
+        # It must validate -- extras forbidden, required fields present.
+        model.model_validate(payload)
 
 
 if __name__ == "__main__":
