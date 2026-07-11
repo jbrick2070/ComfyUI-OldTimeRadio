@@ -336,3 +336,14 @@ then r3 wiring, r4 convergence, then build: tests first, SAME-COMMIT
 registry set SHIPPING runnable:true, pre-ship gates = suite + Bug Bible
 + mocked pipeline + live 30w smoke + operator eyeball.
 Commits: 62962121, (40535ddc co-authored), 321bcc9c, 5a09984c -- all pushed.
+
+## 2026-07-11 -- original_codex56sol constrained implementation claim
+
+Operator authorized non-GPU Chunks A-C/E to begin while the current Sci-Fi Codex
+live run remains active. Base and origin were both
+`26952a7ea64d61a2178485ac2708e350b52f9b48` on `v2.0-alpha`. Prior-owner dirty
+files (`nodes/_otr_scifi_codex.py`, `scripts/otr_run_watcher.ps1`,
+`tests/test_scifi_lane_schema_parity.py`, and the cue-ledger prompt) and all live
+processes are excluded. Overlapping changes and Chunk D remain gated on operator
+release. First action: force-publish the locked fingerprint, comparison, and
+wording-corrected coding plan, then implement non-overlapping Chunk A surfaces.

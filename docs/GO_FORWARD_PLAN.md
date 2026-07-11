@@ -1,5 +1,19 @@
 # OTR Go-Forward Plan
 
+**CONSTRAINED CODER SLOT CLAIM (2026-07-11, Codex, `original_codex56sol`):**
+Operator authorized non-GPU implementation while the existing Sci-Fi Codex live
+run remains active. Base SHA: `26952a7ea64d61a2178485ac2708e350b52f9b48` on
+`v2.0-alpha`; origin matched at claim time. Scope: source-bank Chunks A-E, with
+GPU/live Chunk D deferred until the operator releases the active run. Known
+pre-existing dirty files, owned by the prior window and excluded from this claim:
+`nodes/_otr_scifi_codex.py`, `scripts/otr_run_watcher.ps1`,
+`tests/test_scifi_lane_schema_parity.py`, and
+`docs/2026-07-11-cue-ledger-r1-codex-prompt.md`. Do not edit, stage, revert,
+delete, commit, reset, or kill those files/processes. Any campaign change that
+would overlap one of those files waits for release; all other work proceeds
+serially. Next action: publish corrected locked planning artifacts, then Chunk A
+on non-overlapping surfaces.
+
 **CODER SLOT CLAIM (2026-07-11, Codex):** Implement the three additive
 CODE-READY v4 Sci-Fi bake-off lanes in serial order (Codex -> Gemini ->
 Sonnet), including registry/pack/runner/tests and the shared optional
