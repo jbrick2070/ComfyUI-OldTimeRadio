@@ -3,10 +3,33 @@
 **The whole contract, in one sentence:** you get two LLM slots and a ledger to fill;
 what happens in between is entirely yours, as long as it is bug-free and honest.
 
+## Your pack is not a variant of anything
+
+Read this before anything else, because it is the most common misunderstanding:
+
+**A source pack is an ORIGINAL PATH, not a fork of an existing one.** It is not a
+"sci-fi lane with different prompts." The lanes that happen to ship today are science
+fiction because that is what somebody wanted to hear -- **the genre is theirs, not the
+pipeline's.**
+
+Your pack owns:
+
+- **its source, or none at all.** Pull an RSS feed, a public-domain text, an archive, a
+  spark deck, a photograph, a single word -- or invent from nothing. (`original_radio` has
+  no fetcher at all: it draws atoms from a deck and writes the episode out of thin air.)
+- **its genre and its form.** Noir, farce, ghost story, courtroom, kitchen-sink domestic,
+  something with no name yet.
+- **its dramatic architecture.** How many passes. What the passes ARE. What artifacts pass
+  between them. Who judges what.
+- **its cast, its roles, its rules.** Two speakers who hate each other. One narrator alone.
+  A chorus.
+
+The pipeline is old-time radio -- voices, music, a listener in the dark. Beyond that, this
+document tells you the **only** things you must obey, and everything else is a blank page.
+That is the whole point of a pack.
+
 This is not a style guide. It is the set of hard requirements a new source bank must meet
-to run in this pipeline. Everything not listed here is your design freedom -- and the four
-banks that ship today (`scifi_codex`, `scifi_gemini`, `scifi_sonnet`, `scifi_fable2`)
-each fill the ledger by a completely different route. That is the point.
+to run. Everything not listed here is your design freedom.
 
 ---
 
@@ -102,21 +125,11 @@ You will want to validate the model's output. Good. But a gate that blocks produ
 
 Failing that test, it is a **note**: record it, log it, stamp it on `meta`, and ship.
 
-Real gates that killed real episodes here, every one of them removed:
-
-- an exact word-count quota nobody could hit (5 words per beat, equality demanded)
-- an episode-level fact rule enforced per scene -- scene 2 failed for not containing a
-  fact belonging to scene 1
-- an auditor failing a script because a line "adds no new information", in a 30-word
-  episode with a two-fact source
-- a hygiene check rejecting ALL-CAPS emphasis, in a lane whose characters are *named* in
-  all caps by schema -- it rejected a line for obeying the contract
-- a content class that could be flagged but never enumerated, corroborated, or repaired:
-  an unbounded hunch with a hardcoded `fail`. It was a coin flip the episode could only
-  lose.
-
 If your gate cannot name the offending item AND the reason AND a way to fix it, it is not
 a gate.
+
+*(The graveyard of gates that broke this rule is in `SOURCE_PACK_PREFLIGHT.md`. Read it
+when you have finished designing -- not now.)*
 
 ---
 
@@ -170,29 +183,50 @@ Make your validators role-aware, or do not give your roles different contracts.
 
 ## 9. HOW TO KNOW YOU ARE DONE
 
+Design freely first. Build the thing you actually want to hear. **Then**, once you have
+designed it (R1), coded it (R2) and wired it (R3), walk the pre-flight:
+
+> **`docs/SOURCE_PACK_PREFLIGHT.md`**
+
+That is where every bug this pipeline has ever died of is written down, as a checklist you
+run at the gates. It is deliberately NOT in this document: a list of failure modes read
+before you start will make you build something defensive and dull, and most of these bugs
+were in the *contract*, not the code -- they are invisible until you have a contract to
+check.
+
+Then, and only then:
+
 ```
 1. pytest -q                      # the whole suite, including the cross-lane guards
-2. the Bug Bible regression       # separate repo
-3. a live 30-word canonical run   # it must PUBLISH to otr\obs\ -- verify the file exists
+2. the Bug Bible regression       # comfyui-custom-node-survival-guide
+3. a live 30-word canonical run   # it must PUBLISH to otr\obs\ -- Test-Path the file
 ```
 
-A pack that passes the unit tests but has never published a 30-word episode is not done.
-Every single defect on the list in section 4 was invisible to the test suite and only
-appeared in a live render. **Run the 30-word smoke. It is the real gate.**
+**A pack that passes the unit tests but has never published a 30-word episode is not
+done.** Nearly every real defect here was green in CI and only appeared in a live render.
+Run the 30-word smoke. It is the real gate.
 
 ---
 
-## 10. THE FOUR BANKS, AS PROOF OF THE FREEDOM
+## 10. THE EXISTING BANKS, AS PROOF OF THE FREEDOM
 
-All four fill the same ledger. None of them work the same way:
+Ignore what these are *about*. Look at how differently they are BUILT. Every one fills the
+same ledger through the same two slots, and no two work alike:
 
-- **codex** -- a 10-pass ladder: fact index -> dramatic question -> cast -> score graph ->
-  whole script -> review -> retake -> audit.
-- **gemini** -- pitches three premises, critiques its own pitches, picks one, outlines,
-  then drafts and critiques **per scene**.
-- **sonnet** -- a far-future archive ceremony: it drafts **per line**, alternating a
-  literalist and a speculator, then runs an audit / warden / rewrite loop.
-- **fable2** -- a content-owned loop that seals its canonical text against a proof map.
+- **one** runs a 10-pass ladder: extract facts -> pose a dramatic question -> cast ->
+  build a score graph -> write the whole script -> review -> retake -> audit.
+- **one** pitches three premises, critiques its own pitches, picks a winner, outlines, then
+  drafts and critiques **scene by scene**.
+- **one** stages a ceremony: it drafts **line by line**, alternating two speakers with
+  *opposite* contracts -- a literalist who may only say what the source supports, and a
+  speculator licensed to reach past it -- then runs an audit / challenge / rewrite loop.
+- **one** has **no source at all**: it draws atoms from a spark deck and invents the
+  episode outright.
+- **one** seals its canonical text against a proof map so nothing downstream can touch a
+  word of it.
 
-Different pass counts, different artifacts, different judges. Same two slots. Same ledger.
-That gap is where your pack lives.
+Different pass counts. Different artifacts. Different judges. Different sources -- or none.
+One of them is not even in the same *genre* as the others.
+
+Same two slots. Same ledger. Everything between those two facts is yours, and the gap is
+enormous. **Do not build a variant of one of these. Build the thing nobody has built.**
