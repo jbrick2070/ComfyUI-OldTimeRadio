@@ -13,11 +13,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 try:
     from ._otr_source_payload import validate_source_payload
+    from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import structured_call
     from . import _otr_ledger_freeze
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
     from _otr_source_payload import validate_source_payload  # type: ignore
+    from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import structured_call  # type: ignore
     import _otr_ledger_freeze  # type: ignore
     from production_ledger import stamp_word_counts  # type: ignore
@@ -317,8 +319,25 @@ def invoke_sonnet_structured(
         attempts.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
         return raw
     def source_span_repair_factory(*, original_prompt, failed_output, error):
+        repair_rules = (
+            "This is a typed repair of the same artifact, not a new creative response. "
+            "Return one JSON object only. Use fact_1, fact_2, ... for facts; entity_1, "
+            "entity_2, ... for entities; and num_1, num_2, ... for numbers. Keep every "
+            "fact_id reference consistent. For every source span, calculate quote from "
+            "the original request exactly as payload[field][start:end]; do not paraphrase, "
+            "infer, or retain a mismatched span. Preserve valid claims and remove only "
+            "unsupported facts."
+        )
+        deterministic = repair_literal_source_metadata(
+            failed_output,
+            FragmentDossierV4,
+            json.loads(prompt[1]["content"])["typed_inputs"]["payload"]["payload"],
+            zero_padded_ids=False,
+        )
+        if deterministic is not None:
+            return deterministic
         return [
-            {"role": "system", "content": prompt[0]["content"] + "\nRepair the JSON. Every quote MUST equal payload[field][start:end] exactly; do not paraphrase source text. Use fact_N/entity_N/num_N identifiers."},
+            {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": str(error), "original_request": json.loads(prompt[1]["content"])}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
         ]
     try:

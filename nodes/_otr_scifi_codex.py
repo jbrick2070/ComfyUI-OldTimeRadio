@@ -17,11 +17,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 try:
     from ._otr_source_payload import validate_source_payload
+    from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import structured_call
     from . import _otr_ledger_freeze
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
     from _otr_source_payload import validate_source_payload  # type: ignore
+    from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import structured_call  # type: ignore
     import _otr_ledger_freeze  # type: ignore
     from production_ledger import stamp_word_counts  # type: ignore
@@ -431,8 +433,26 @@ def invoke_codex_structured(
         return raw
     def source_span_repair_factory(*, original_prompt, failed_output, error):
         detail = str(error)
+        repair_rules = (
+            "This is a typed repair of the same artifact, not a new creative response. "
+            "Return one JSON object only. IDs are fixed lexical tokens: facts MUST use "
+            "F01 through F12, entities MUST use E01 through E12, and numbers MUST use "
+            "N01 through N12. Never emit bare F0, F1, E0, or N0. If the failed artifact "
+            "used F0/F1/F2, change those references consistently to F01/F02/F03. "
+            "For every source span, calculate quote from the original request exactly as "
+            "payload[field][start:end]; do not paraphrase, infer, or retain a mismatched "
+            "span. Preserve valid claims and remove only unsupported facts."
+        )
+        deterministic = repair_literal_source_metadata(
+            failed_output,
+            FactIndexV4,
+            body["artifact_inputs"]["payload"]["payload"],
+            zero_padded_ids=True,
+        )
+        if deterministic is not None:
+            return deterministic
         return [
-            {"role": "system", "content": "\n".join(seams) + "\nRepair the JSON artifact. Every source span quote MUST be byte-for-byte equal to the supplied payload[field][start:end]; do not paraphrase it. Use the exact zero-padded IDs required by the schema."},
+            {"role": "system", "content": "\n".join(seams) + "\n" + repair_rules},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": detail, "original_request": body}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
         ]
     try:
