@@ -61,12 +61,20 @@ def extract_first_json_block(raw: str) -> str:
     # raw_decode returns the parsed object plus the index where it
     # ended, so trailing content after the first object is ignored.
     decoder = json.JSONDecoder()
+    first_brace = text.find("{")
+    # When a response starts with an object, a malformed outer object must
+    # fail closed. Scanning onward into a nested object would silently turn a
+    # broken envelope into a plausible-looking child artifact and bypass the
+    # typed repair ladder (the sci-fi P0 live smoke exposed this exact drift).
+    outer_object = first_brace >= 0 and not text[:first_brace].strip()
     for i, ch in enumerate(text):
         if ch != "{":
             continue
         try:
             obj, end = decoder.raw_decode(text[i:])
         except json.JSONDecodeError:
+            if outer_object and i == first_brace:
+                return ""
             continue
         if isinstance(obj, dict):
             return text[i:i + end]
