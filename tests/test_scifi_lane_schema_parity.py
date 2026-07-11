@@ -396,6 +396,39 @@ def test_scene_draft_must_cover_every_beat_in_its_scene():
     )
 
 
+def test_gemini_draft_seams_ask_for_the_schema_the_lane_actually_enforces():
+    """A seam may not ask the model for a field its strict schema forbids.
+
+    The draft and rewrite seams told the model to "return its fact_ids" and showed
+    `{"fact_ids": ["F01"]}` -- but DraftLineV4 has `fact_uses` and forbids extras. So
+    the model obeyed the seam, strict mode rejected the artifact, and the
+    extra-key repair then DELETED the model's fact attribution to make it validate.
+    The critic (correctly) reported "F01 is missing from line_fact_ids" and the run
+    died. A contract that contradicts itself is not a model failure.
+    """
+    import json as _json
+
+    from nodes import _otr_scifi_gemini as lane
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    pack = _json.loads(
+        (repo / "nodes" / "story_packs" / "scifi_gemini" / "scifi_gemini_v1.json")
+        .read_text(encoding="utf-8")
+    )
+    stages = pack["prompt_stages"]
+    draft_fields = set(lane.DraftLineV4.model_fields)
+
+    for seam in ("gemini_scene_draft", "gemini_scene_rewrite"):
+        text = stages[seam]
+        # The worked example must not SHOW a key the strict line model forbids.
+        assert '"fact_ids": ["F01"]' not in text, (
+            f"{seam} shows a fact_ids field that DraftLineV4 forbids"
+        )
+        # ...and must show the one it actually requires.
+        assert "fact_uses" in text, f"{seam} never mentions fact_uses"
+        assert "fact_uses" in draft_fields and "fact_ids" not in draft_fields
+
+
 def test_no_lane_seam_treats_the_word_target_as_a_quota():
     """The requested word count is a SCALE REQUEST, not a quota.
 
