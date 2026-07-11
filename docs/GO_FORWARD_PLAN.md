@@ -45,6 +45,20 @@ Post-C3 follow-up queued (operator 2026-07-11): richer music-still prompting
 (dedicated brief-driven visual prompt per cue vs reusing the cue description) --
 a SEPARATE chunk touching the image/video director prompt derivation, NOT C3.
 
+**DEAD-CODE RIP TARGET (operator ruling 2026-07-11): INTERSTITIAL AUDIO WAS
+DELIBERATELY RIPPED OUT and must NOT come back.** The C3 kibitz-r3 spec
+(MF-C/MF-F) reintroduced it, and C3 shipped it: SceneSequencer inserts an
+interstitial cue inline at a music_inter sentinel resolved by anchor_line_id,
+and node 83 synthesizes/renders an `interstitial` cue. It is INERT on every
+shipped lane (legacy music[] carries no anchor_line_id -> never resolves;
+live 720w confirmed music_inter_positioned=0), so the operator ruled LEAVE AS
+IS for now -- but it is dormant production code, exactly the class CLAUDE.md
+forbids. RIP in a follow-up (fold into the lean-mean rip): remove the
+interstitial branch in SceneSequencer's music dispatch, the `interstitial`
+cue from node 83's legacy synth set (_CUE_SLOTS) + CUE_DURATIONS/_CUE_CHARACTER
+if unused elsewhere, and the anchor_line_id insertion path + its tests. Do NOT
+re-add interstitial audio in any future chunk.
+
 Plan of record: `docs/2026-07-10-fable2-720-bakeoff-runway.md` (kibitz'd before
 C4 coding). Chunks C1-C7: P1.1 ownership/revision merge contract -> P1.3
 text_for_tts (science_news byte-parity fixture FIRST) -> P1.4 cue manifest +
