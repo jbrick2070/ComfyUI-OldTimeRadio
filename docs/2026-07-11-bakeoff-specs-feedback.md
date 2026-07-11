@@ -8,12 +8,14 @@ creative decision, put it in "Open questions for the operator".
 
 ## Global laws (apply to ALL three specs)
 
-1. **LOOSEN WORD-COUNT STRICTNESS.** The operator is NOT chasing exact
-   word counts -- creativity and flow win. Replace any exact per-beat or
-   per-line integer word target with a BAND (suggested: per-scene target
-   +/-25% with an absolute floor, total episode band 720 +/-15%). A roll
-   must never die because a beat came in at 71 words instead of 77.
-   Validators judge structure and legality, not arithmetic perfection.
+1. **WORD COUNTS ARE ADVISORY ONLY -- NO BANDS, NO GATES (operator
+   directive).** Word targets exist solely to STEER the prompts toward the
+   ~720 scale. NO validator may reject, reroll, trim, or cut on word
+   count -- you cannot cut words if it costs narrative. Take what the LLM
+   gives: if the story lands at 640 or 810, ship it and RECORD the actual
+   word count in the run receipt. The only length concern a spec may keep
+   is the token budget being LARGE ENOUGH that generation is never
+   truncated mid-story. Narrative completeness always wins over length.
 2. **THE LEDGER MUST STAY INTACT -- SPOKEN TEXT IS SACRED GROUND:**
    - NO stage directions or action text in any line row. Nothing like
      "(sighs)", "[pause]", "*leans in*", "(static crackles)" may reach
@@ -43,9 +45,9 @@ creative decision, put it in "Open questions for the operator".
 
 **scifi-codex (grade A-):** Your fixed P3 beat table (BT02=77, BT05=174,
 exact integers, zero tolerance) is the single biggest re-roll generator in
-any spec -- a small local LLM cannot hit exact word counts. Convert the
-table to bands per Global Law 1; keep the beat STRUCTURE (that is the
-creative spine, untouched). Keep the source-span fact index (quote must
+any spec -- a small local LLM cannot hit exact word counts. Make the table
+advisory prompt-steering only per Global Law 1 (no gate, no reroll, no
+trim); keep the beat STRUCTURE (that is the creative spine, untouched). Keep the source-span fact index (quote must
 equal exact payload slice) -- that is your best feature; just make its
 failure mode a bounded reroll of the offending beat, not a dead run.
 
@@ -67,7 +69,8 @@ spec so the builder writes a test for the clean-path schema first.
 ## Acceptance bar for the rewrite
 
 Each spec re-stamps "CODE-READY v4" with a revision log. A builder must be
-able to implement with zero creative decisions; a 720w episode must be
-able to land with imperfect-but-in-band word counts; and nothing a TTS
+able to implement with zero creative decisions; a ~720w episode ships at
+whatever length the story needs (actual count recorded, never gated); and
+nothing a TTS
 voice would mispronounce, spell out, or perform-as-text may survive to
 line.text.
