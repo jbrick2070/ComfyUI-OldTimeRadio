@@ -384,3 +384,13 @@ already promoted). Confidence tags preserved from the sweep.
 7 skipped / 3 xfailed green; all 23 as non-testable notes (runtime-only
 verifies), per the existing note pattern. Held OPEN: PBUG-20260702-01 (no
 root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
+
+## PBUG-20260711-12 -- Codex P5 output reservation truncated its own schema contract
+- surfaced: scifi bake-off canonical 30w smoke roll 11, Codex P5, 2026-07-11
+- symptom: both P5 attempts returned prose or a score-shaped object instead of `ScriptArtifactV4`; the prompt guard reported `Truncated ... -> 1692 tokens` before each call
+- root cause: P5 reserved a fixed 6500 output tokens inside an 8192-token context even for a 30-word script, leaving too little input budget for the failed artifact, graph, schema paths, and repair instructions
+- fix: `fdc413ed` scales Codex whole-script P5/P7/P9 output reservation from the requested word steer (30w = 2200 instead of 6500), keeps every generated required path, removes the duplicate full schema from typed repair, and records token-budget/raw-size receipts; eight Kibitz reviews converged on the exact call-site wiring
+- verify idea: 30w P5 prompt is not truncated, required ScriptArtifactV4 paths remain in the effective prompt, and canonical Codex reaches publish
+- bible-worthy: yes -- live context-budget/structured-output contract failure
+- confidence: HIGH
+- status: OPEN
