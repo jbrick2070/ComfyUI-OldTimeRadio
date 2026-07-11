@@ -368,6 +368,16 @@ already promoted). Confidence tags preserved from the sweep.
 - confidence: HIGH
 - status: OPEN
 
+## PBUG-20260711-11 -- Canonical RSS selector delivered a thin science payload
+- surfaced: scifi bake-off canonical 30w smoke roll 10, 2026-07-12
+- symptom: run halted before P0 with `RSS payload is below the 80/12 thinness floor`; Gemini and Sonnet remained not-started because the serialized smoke gate stopped at Codex
+- root cause: common science RSS selection returned a thin article to a lane whose source contract requires a substantial RSS body
+- fix: no code change yet; this roll is being rerun against the selector's next eligible source; repeated occurrence will require shared fetch-path hardening, not a weaker lane floor
+- verify idea: canonical RSS fetch should either return a payload meeting the 80/12 floor or fail before queueing the sci-fi lane with a clear source-selection reason
+- bible-worthy: yes -- live shared source-precondition failure
+- confidence: HIGH
+- status: OPEN
+
 ## FAN-OUT RECORD -- 2026-07-11 (operator-triggered)
 23 entries promoted to the Bible (156 -> 179) @ survival-guide commit d50d773;
 1 folded into BUG-11.26 law d (epilogue false-kill class); suite 17 passed /
