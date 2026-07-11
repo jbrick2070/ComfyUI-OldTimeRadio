@@ -1,286 +1,308 @@
-# The OTR Source Bank Guide
+# Build an Original OTR Source Bank
 
-> **Your pack can do whatever it wants, as long as it fills the ledger and uses the LLMs
-> obediently to make the best ledger story it can.**
+> Add one original, runnable source bank to the existing OTR workflow. The
+> outer workflow stays canonical. Inside that boundary, invent an independent
+> creative pipeline that fills the production ledger and hands it to the shared
+> writer tail.
 
-That is the entire contract. Two LLM slots, one ledger. What happens in between is yours,
-provided it is bug-free and honest.
+This is an implementation brief for a coding LLM. Before editing, read
+`AGENTS.md`, `CLAUDE.md`, and the live contract surfaces named below. Live
+code wins if this document is stale.
 
-"Obediently" is doing real work in that sentence: **you drive the models, they do not drive
-you.** Every line the listener hears must be written by a model, and every decision about
-what is *acceptable* must be made by your code. Python judges. The LLM writes. Neither does
-the other's job.
+## 1. Preserve the contract, not the existing designs
 
-## Your pack is not a variant of anything
+Treat existing OTR banks, runners, prompts, docs, tests, and workflows as
+integration-contract references only. Do not clone, rename, paraphrase, port,
+recombine, or imitate their genre, narrative frame, role system, pass graph,
+artifacts, prompts, validators, or dramatic logic. Reuse shared infrastructure
+only where the live contract requires it.
 
-Read this before anything else, because it is the most common misunderstanding:
+Start from an original listener experience, then derive the architecture it
+needs. Similarity forced by a shared API is acceptable; discretionary
+similarity to an existing lane is a design defect.
 
-**A source pack is an ORIGINAL PATH, not a fork of an existing one.** It is not a
-"sci-fi lane with different prompts." The lanes that happen to ship today sound the way
-they do because that is what somebody wanted to hear -- **the genre is theirs, not the
-pipeline's.**
+Originality is a design requirement, not a runtime score. Do not build an
+"originality gate" that asks a model to judge taste.
 
-Your pack owns:
+Ground compatibility against these live surfaces without using existing bank
+implementations as templates:
 
-- **its source, or none at all.** Anything that can seed an episode can be a source -- a
-  feed, a text, a photograph, a single word -- and inventing from nothing is just as
-  legitimate.
-- **its genre and its form.** Here is the actual brief: **invent a kind of radio drama
-  that does not exist yet.** Not a version of one you have heard. Something a listener will
-  genuinely enjoy and could not have got anywhere else.
-- **its dramatic architecture.** How many passes. What the passes ARE. What artifacts pass
-  between them. Who judges what.
-- **its cast, its roles, its rules.** How many voices there are, what each one is for, what
-  each is allowed to know and to say -- even whether it speaks at all. There is no default
-  cast.
+- `nodes/production_ledger.py` and `nodes/_otr_ledger_freeze.py`
+- `nodes/_otr_story_routing.py` and `nodes/_otr_story_pack.py`
+- `nodes/_otr_source_payload.py`
+- the runner dispatch and shared tail in `nodes/OTR_LedgerScriptWriter.py`
+- `nodes/story_packs/banks.json` and `nodes/story_packs/pipelines.json`
+- `workflows/otr_canonical.json`
 
-One boundary on all of it: **No guns. No blood. No violence. No swearing.** That is not a
-content warning bolted on afterwards -- it is the constraint that forces the interesting
-answer. Tension is not violence. Stakes are not gore. If your first instinct is a shootout,
-a murder, or a monster, that instinct came from somewhere else; go past it. What holds a
-listener without those things is exactly what you are here to invent.
+## 2. Design the experience freely
 
-The pipeline is old-time radio -- voices, music, a listener in the dark. Beyond that, this
-document is the complete list of what you must obey. Everything not in it is a blank page,
-and the blank page is the whole point. This is a contract, not a style guide.
+The bank owns its source strategy, genre, dramatic form, passes, intermediate
+artifacts, roles, authority boundaries, retry topology, and ledger-assembly
+method. It may use a source or invent from no source. It may use one model pass
+or many. It does not need an announcer. A music-free form must satisfy the
+live output behavior described under the ledger contract.
 
----
+A no-source bank still needs its own truthful initialization path. Do not use
+empty `fetcher` plus empty `interpreter` as a generic no-source marker: the
+current writer reserves that shape for the `original_radio` architecture.
+Add explicit bank/pipeline handling or a registered bank-specific local seed
+path instead of inheriting that design accidentally.
 
-## 1. THE TWO SLOTS -- you may not invent a third
+The result must still work as audio. Some voice must orient the listener and
+provide closure, but the device and placement are yours. If the canonical
+announcer role is used, it frames the program rather than joining character
+dialogue.
 
-You are handed exactly two callables:
+Keep the content SFW: no guns, blood, violence, or swearing. Treat that as a
+creative constraint, not a post-generation censor.
+
+## 3. Keep the three routing coordinates distinct
+
+- `source_bank_id` selects the source policy and bank defaults.
+- `story_model_id` selects the prompt pack at
+  `nodes/story_packs/<source_bank_id>/<story_model_id>.json`.
+- `story_pipeline_id` selects the pass graph and execution runner.
+
+The bank row, pack header, pipeline row, and runner dispatch must agree on
+those coordinates. JSON alone does not create an execution lane.
+
+Custom seam names belong in the pipeline's `declared_seams` and pass rows,
+and the pack must supply them. A bank's `required_seams` field accepts only
+the live shared production-seam allowlist.
+
+## 4. Use only the two supplied LLM slots
+
+A custom dispatched runner currently receives this interface:
 
 ```python
-def run_my_episode(*, pack, payload, resolved, led, meta,
-                   creative_fn: GenerateFn, technical_fn: GenerateFn, ...)
+def run_<bank>_episode(
+    *,
+    payload,
+    pack,
+    resolved,
+    led,
+    meta,
+    creative_fn,
+    technical_fn,
+    slot_scheduler,
+    source_bank_row,
+    story_rules,
+    episode_root,
+    episode_id,
+) -> MyBankTailParts:
+    ...
 ```
 
-- `creative_fn` -- the **creative** slot. Story, dialogue, character, image prompts.
-- `technical_fn` -- the **technical** slot. Extraction, audits, structured judgement.
+The live writer dispatch is the source of truth for the exact signature.
+`MyBankTailParts` is lane-defined; there is no shared `TailParts` class.
+It must expose `outline_view` with `title` and `premise`, an
+`EpisodeCanon`-compatible `canon` with `title`, `premise`, `setting`,
+`time_of_day`, and `sound_palette`, plus `final_title_override` and
+`run_story_spine`. An optional finalizer implements `before_save` and
+`after_save`.
 
-Both have the same signature: `fn(messages, *, temperature, max_new_tokens, stop=None) -> str`.
+`creative_fn` and `technical_fn` both accept messages plus generation
+settings. They are semantic slots, not promises about model size or provider:
 
-**Hard rules:**
+- use `creative_fn` for invention, dramatic writing, and creative revision;
+- use `technical_fn` for extraction, classification, structured review, and
+  evidence audits.
 
-- **You may NOT create a new LLM architecture.** No new loader, no new backend, no
-  direct `transformers` / API calls, no second model of your own. The operator chooses
-  the models in the workflow; your pack receives them. If your pack imports a model
-  library, it is wrong.
-- **You may use both slots, or just one.** Using `creative_fn` alone is legitimate.
-  Using only `technical_fn` is legitimate. Nothing requires you to use both.
-- **Call them as many times as you like**, in any order, with any prompts, for any
-  intermediate artifacts you invent. Nobody is counting your passes.
+Use either or both, as often as the design needs. All text generation must
+flow through these callables. Do not load a model, import an inference
+backend, call a model API directly, add a third model, or require a new model
+credential. Assume either slot may be a modest local LLM: keep each request
+self-contained, typed where useful, and within its resolved context limit.
 
-**Why:** the two slots are how VRAM, context caps, prompt truncation, quantisation and
-model routing stay under one roof. A pack that reaches around them breaks every one of
-those guarantees at once.
+Put model instructions in the pack's `prompt_stages`, not in Python. Use the
+slot scheduler's attribution context when available.
 
----
+## 5. Acquire sources without adding secrets
 
-## 2. THE LEDGER -- this is the deliverable
+Design-time research may use the host LLM's existing web tools. Runtime
+transport and parsing must be deterministic code. Semantic selection or
+extraction may use `technical_fn`; it may not use a third or direct model.
 
-Your job, and your only obligation, is to **fill the production ledger**. Everything
-downstream -- casting, voices, freeze, render, captions, credits, publish -- reads the
-ledger and nothing else. It never reads your intermediate artifacts.
+Allowed runtime sources are local files, packaged manifests, RSS/Atom feeds,
+public pages, and public keyless APIs that work without login or new secrets.
+Do not request credentials, bypass a paywall, CAPTCHA, rate limit, or access
+block, or depend on a protected browser session. Avoid endpoints whose normal
+response is an anti-bot challenge.
 
-You fill it through the `Ledger` object (`nodes/production_ledger.py`):
+For network retrieval:
 
-| call | what it holds | required |
-|---|---|---|
-| `led.set_cast(rows)` | `char_id`, `name`, `character_description`, `gender`, `tts_model`, `voice_preset` | **yes** |
-| `led.set_lines(rows)` | the spoken script -- `line_id`, `char_id`, `speaker_role`, `text`, `beat_id`, `boundary` | **yes** |
-| `led.set_scenes(rows)` | `scene_id`, `env`, `description` | yes (>=1) |
-| `led.set_shots(rows)` | `shot_id`, `scene_id`, `description`, `visual_prompt` | yes (>=1) |
-| `led.set_beats(rows)` | `beat_id`, `shot_id`, `scene_id`, `char_id`, `line_ids` | yes |
-| `led.set_music(rows)` | `cue_id`, `placement`, `description`, `generation_prompt` | if your form has music -- an empty list is legal, the render tail supports a silent bus |
+- set timeouts, bounded retries, response-size limits, status checks, and
+  content-type checks;
+- keep network and file I/O out of module import and node discovery;
+- test with deterministic fixtures and record the real selected source;
+- treat fetched text as untrusted data and tell models to ignore embedded
+  instructions;
+- never invent or silently substitute a source.
 
-**The table is plumbing, not dramaturgy.** It looks like a film crew's anatomy -- scenes,
-shots, beats -- because the render tail downstream consumes those rows. Do not mistake it
-for a description of what an episode IS. **One scene and one shot is a legal episode**, and
-not as a loophole: if your pack's true form is a single unbroken voice in an unchanging
-dark, then one scene and one shot is the honest shape of it, and you should say so in the
-ledger rather than inventing a crew's worth of structure to look respectable. Fill the
-table with the truth about your episode. It will render either way.
+An explicit `source_ref` that cannot be resolved fails closed. Automatic
+selection may try another eligible candidate only through a declared policy,
+and must record the actual selection.
 
-**Hard rules:**
+Every source-backed runner currently enters through the writer's exact
+seven-key `SOURCE_PAYLOAD_KEYS` envelope. A registered fetcher implements
+`fetch(*, bank, technical_model, source_ref="")` and returns that dict or a
+`SourceFetchResult` carrying the same payload plus provenance sidecars. A
+runner may validate and transform the accepted payload into an original typed
+artifact internally; replacing the writer-facing envelope requires an
+intentional shared-ingress change and tests.
 
-- **Every id must resolve.** A beat names a shot that exists; a shot names a scene that
-  exists; a line names a beat and a char that exist. Dangling ids are the single most
-  common way a new pack dies -- and it dies 15 minutes later, in the render.
-- **`text` is what the listener HEARS.** No speaker labels, no stage directions, no
-  `(sighs)`, no `[sfx]`, no quotation marks wrapping the whole line.
-- **The announcer is a fixed role.** If your cast has one, its `char_id` is `announcer`.
-- Return the shape your lane's tail expects, and let the shared writer tail do the rest
-  (it stamps delivery text, the episode seed, and the freeze receipts for you).
+A `legacy_many_pass` interpreter implements
+`(*, bank, payload, technical_fn, model_id)` and returns coherent
+`casting_brief`, `script_brief`, `news_close_brief`, `key_terms`,
+`attempts`, and `model_dump()` surfaces.
 
----
+Public access is not rights clearance. Preserve source identity, canonical
+URL, retrieval date, content digest, author or outlet, license status, license
+URL, and required attribution when applicable. Keep provenance and rights in
+the existing `meta.source_meta` and `meta.source_rights` sidecars rather
+than adding fields to a fixed payload or line row. Unknown or incompatible
+rights fail closed for an adaptation. Never fabricate citations, URLs,
+authors, or license claims.
 
-## 3. THE LAW -- Python judges, the LLM writes
+Every claim, quotation, number, and proper noun presented as real or
+source-derived fact must trace to validated evidence. Fictional assertions may
+be invented, but must remain distinguishable from fact.
 
-This is not negotiable, and it is where most new packs go wrong.
+## 6. Let models author; let Python prove
 
-- **Python may NEVER author story text.** No literal assigned to a `text=` field. No
-  f-string that builds a spoken line. No template, no canned fallback, no "safe default"
-  sentence. If a line must be spoken, a model must have written it.
-  *(There is an AST guard in the test suite that will fail your build for this.)*
-- **Python MAY repair mechanical metadata** -- ids, ordering, enums, a parent reference,
-  a fixed role label, keys the schema forbids. Anything already implied by an artifact
-  you have already accepted.
-- **If it is ambiguous, FAIL CLOSED.** Never guess. A dead episode is fine; a silently
-  wrong one is not.
-- **The word count is advisory.** `target_words` is a scale request and a post-hoc
-  statistic. It may never cause a trim, a pad, a cull, or a rewrite. Do not build a gate
-  on it. (We have been bitten by this four separate times.)
+Every spoken story line must originate in an accepted LLM artifact. A parser
+may remove declared serialization delimiters, but it may not rewrite the
+content field. Python may create IDs, order rows, attach enums, calculate
+counts and hashes, select validated voice metadata, and copy mechanically
+implied references. It may mechanically serialize or join already accepted
+verbatim rows. It may not create or alter a spoken content field by authoring,
+paraphrasing, joining fragments, trimming, padding, or improving prose.
 
----
+Apply the same ownership rule to titles, premises, character descriptions,
+visual prompts, and music prompts unless a live shared component explicitly
+owns that field.
 
-## 4. THE ANNOUNCER -- somewhere, someone must ground the story
+Invalid creative output goes back through a bounded model repair. Exhausted
+repair fails closed. Never ship canned story text or fall back to another
+bank or pipeline.
 
-The listener is in the dark. They cannot see a title card, a set, or a face. If nobody
-tells them where they are, they spend the first half of your episode working it out instead
-of feeling it.
+`target_words` is an advisory scale request and a receipt. It must not cause
+deterministic trimming, padding, line deletion, or a production gate.
 
-**The hard rule: at some point, some voice must GROUND the story.** Give the listener
-context for what they are hearing, and bring them back out at the end. An episode that
-simply *begins* -- mid-argument, unlocated, unexplained -- does not admit anyone into a
-story. It just starts one, and leaves the listener outside it. (We shipped exactly that
-episode. It was technically perfect and dramatically inert.)
+## 7. Fill the one production ledger
 
-The announcer is the classic instrument for this, and if your cast has one, grounding is
-its job. But the law is the *grounding*, not the role: a pack with no announcer is legal,
-provided some voice still does that work -- a diegetic frame, a narrator inside the story,
-a letter read aloud. Invent the instrument. Just do not skip the note.
+Use the provided `Ledger`; never create a parallel ledger. The table below
+lists the minimum authored inputs, not the full normalized row schemas:
 
-*Where* the grounding falls, and what shape it takes, is yours. Nothing requires it to come
-first: opening cold -- mid-scene, mid-sentence, the listener lost for a moment -- is a
-legitimate and often thrilling choice, provided the frame arrives. Early, late, threaded
-through, split across the ends, or a shape nobody has used. The only illegal shape is its
-absence.
+| table | minimum authored inputs |
+|---|---|
+| `cast` | `char_id`, `name`, `character_description`, `gender`; plus `tts_model` and `voice_preset` when the lane owns casting |
+| `scenes` | `scene_id`, `description`, `env` |
+| `shots` | `shot_id`, `scene_id`, `description`, `visual_prompt` |
+| `beats` | `beat_id`, `shot_id`, `scene_id`, `speaker`, `char_id`, `line_ids` |
+| `lines` | `line_id`, `shot_id`, `beat_id`, `char_id`, `speaker_role`, `text`; `boundary` for voiced rows |
+| `music` | `cue_id`, `description`, `generation_prompt`, `placement`; `anchor_line_id` when used |
 
-And one thing worth saying plainly, because it is the trap: **the announcer FRAMES, it does
-not ARGUE.** The moment the announcer starts taking turns in the scene -- answering a
-character, pressing a point, joining the debate -- it stops being the voice of the show and
-becomes a fourth person in the room, and the listener loses the only orientation they had.
-If your announcer is trading lines with your cast, you have lost the frame.
+`music=[]` is schema-valid but does not currently request silence; the
+canonical theme node interprets it as the legacy cue path. `clips` is
+downstream-owned, but the initialized top-level `clips` list must remain
+present. All required top-level collections must be lists, never null.
 
----
+Prove the complete graph in a bank-owned test:
 
-## 5. GATES -- what you are allowed to block on
+- IDs are non-empty and unique within each table.
+- Every scene-owned shot resolves to one scene.
+- Every scene-owned beat resolves to a shot and its `scene_id` agrees with
+  that shot.
+- Every member of a beat's `line_ids` resolves to exactly one line.
+- Every voiced scene line resolves back to exactly one beat and shot.
+- Every character line and its beat resolve to the same cast identity.
+- Any bookend, frame, or music sentinel outside the scene graph follows a
+  declared shared-tail contract and has a focused test.
+- Every optional music `anchor_line_id` resolves when present.
 
-You will want to validate the model's output. Good. But a gate that blocks production may
-**only** block on something that is:
+Allowed `speaker_role` values are `character`, `announcer`,
+`music_open`, `music_close`, and `music_inter`. Use
+`char_id="announcer"` as the new-lane convention unless the live shared cast
+contract assigns another non-empty ID. A non-skipped voiced row needs
+non-empty canonical `text`. A music sentinel may carry empty text without
+being skipped; any row explicitly marked `skip=True` needs empty text and a
+`tts_skip_reason`. A voiced line's `boundary` is `shot_start`,
+`beat_start`, or `continue`, consistent with its transition. Spoken text
+contains no speaker label, stage direction, or whole-line quotation wrapper.
 
-1. **objectively checkable** -- against a schema, a lexicon, an id graph. Not a vibe.
-2. **actually fixable** by the party you are asking to fix it, and
-3. **genuinely a defect** -- not a note, not a preference, and not your own contract
-   being honoured.
+Freeze policy is selected from the pack: a non-empty
+`line_composer_system` seam selects `legacy_full`; its absence selects
+`content_owned_readonly`. Choose and test that seam deliberately. A
+content-owned runner assigns real character voice metadata and proof receipts;
+the shared writer tail must then stamp fresh `text_for_tts` and its
+canonical-text source hash after final text mutations. A legacy lane uses the
+shared CastLock and readiness path.
 
-Failing that test, it is a **note**: record it, log it, stamp it on `meta`, and ship.
+Keep evidence maps, authorship hashes, and lane receipts in typed artifacts or
+namespaced `meta`, not in fixed line rows. Use the Ledger setters and shared
+count-stamping helpers.
 
-If your gate cannot name the offending item AND the reason AND a way to fix it, it is not
-a gate.
+## 8. Make validation repairable
 
-*(The graveyard of gates that broke this rule is in `SOURCE_BANK_PREFLIGHT.md`. Read it
-when you have finished designing -- not now.)*
+For structured passes, keep each prompt seam, worked example, typed schema,
+parser, and repair prompt in exact agreement. Use a bounded ladder such as
+base call, structural retry, then typed repair. Every rejection must name the
+offending item, evidence, reason, and permitted correction.
 
----
+Every collection the model fills must declare the concrete shape of one item.
+Do not use `list[dict[...]]`, `dict[str, Any]`, or `Any` for a
+model-authored collection of things. A true identifier-keyed mapping is valid
+because its keys define the organization. Pin the item structure; leave
+descriptive vocabulary open unless a closed enum is a real downstream
+contract.
 
-## 6. RETRIES -- ask twice before you kill
+Calculate prompt fit from the resolved per-slot context cap. Check the base,
+retry, and repair forms; the repair request is usually largest. Provenance
+passes must fail loudly rather than silently left-truncate.
 
-Every structured pass in this pipeline gets a bounded retry ladder: base call ->
-structural retry -> typed repair. When a model's output is rejected, **tell it the actual
-reason** and ask again ("your line was 337 characters; the limit is 300 -- cut it down").
+Never ask a model to calculate, report, or enforce exact counts. Python
+measures words, lines, items, and coverage deterministically. If a measured
+count needs correction, give the creative slot the measured defect and request
+a bounded rewrite. A model-produced count field cannot gate production, and
+an unused count field does not belong in the schema.
 
-"No fallback" means *never ship a canned line*. It does **not** mean "no second chance."
-An announcer intro once died on a single overlong sentence with no retry at all, and took
-four source banks down with it.
+A production gate may block only when the finding is:
 
----
+1. objectively checkable;
+2. repairable by the party being asked to repair it; and
+3. a real contract defect rather than taste, a warning, or a role doing its
+   licensed job.
 
-## 7. SEAMS -- your prompts live in the pack JSON
+Model audits propose findings; deterministic code corroborates them. A
+creative correction returns to the creative slot. Warnings and taste notes
+are recorded without becoming hidden fatal gates.
 
-Your prompts belong in `nodes/story_packs/<your_bank>/<your_bank>.json` under
-`prompt_stages`, not in Python.
+## 9. Integrate into the canonical workflow
 
-**The seam and the schema are ONE contract.** If your seam shows the model
-`{"fact_ids": [...]}` while your Pydantic model declares `fact_uses`, the model will obey
-the seam, strict mode will reject it, and your repair will quietly delete the model's work
-to force it to validate. **When they disagree, the model is not wrong -- you are.**
+A runnable custom lane needs a validated pack, bank registry row, pipeline
+registry row, execution runner, explicit `_RUNNER_BY_PIPELINE` dispatch,
+and tests in the same change. Register every required fetcher and interpreter.
+Set `runnable=true` only when the lane exists. A custom non-source-contract
+pipeline must also set `executable=true` when its runner lands.
 
-A test in the suite parses every seam's worked example and validates it against the schema
-it feeds. Keep them in step.
+There is one outer workflow: `workflows/otr_canonical.json`. Do not create a
+copy, generated substitute, or parallel ComfyUI graph. A registry-only bank
+normally appears through the existing `source_bank` selector and may require
+no workflow JSON edit; prove that path, and do not change the shipped
+`science_news` default merely to expose the new choice. If a node, widget,
+input, link, or default changes, update the canonical JSON in the same change
+and run the workflow, link, input-name, and positional-widget audits. Append
+new optional widgets at the end.
 
----
+## 10. Finish with evidence
 
-## 8. ROLES -- if your characters have different contracts, judge them differently
+After design, build, and wiring are complete, execute
+`docs/SOURCE_BANK_PREFLIGHT.md`. It includes the full Windows regression
+suite, Bug Bible regression, canonical validation, and a live 30-word run. The
+live run must save a valid ledger, pass the freeze path, publish to `otr/obs`,
+and leave a real asset that is verified on disk.
 
-If your pack gives two speakers opposite jobs, a validator that applies one rule to both is
-broken by construction: it will fail one of them for doing exactly what you licensed it to
-do. Make your validators role-aware, or do not give your roles different contracts.
-
----
-
-## 9. WHAT YOU MUST NOT DO (the short list)
-
-- Do not create or load an LLM. Use the two slots.
-- Do not write story text in Python.
-- Do not gate on word count.
-- Do not block on a warning, a note, or a preference.
-- Do not build a gate you cannot enumerate, corroborate, or repair.
-- Do not leave an id dangling.
-- Do not ship a canned line when the model fails -- retry, then fail closed.
-- Do not ship an episode nobody grounds -- and keep the announcer out of the argument.
-- Do not reach for guns, blood, violence, or swearing.
-
----
-
-## 10. HOW TO KNOW YOU ARE DONE
-
-Design freely first. Build the thing you actually want to hear. **Then**, once you have
-designed it (R1), coded it (R2) and wired it (R3), walk the pre-flight:
-
-> **`docs/SOURCE_BANK_PREFLIGHT.md`**
-
-That is where every bug this pipeline has ever died of is written down, as a checklist you
-run at the gates. It is deliberately NOT in this document: a list of failure modes read
-before you start will make you build something defensive and dull, and most of these bugs
-were in the *contract*, not the code -- they are invisible until you have a contract to
-check.
-
-Then, and only then:
-
-```
-1. pytest -q                      # the whole suite, including the cross-lane guards
-2. the Bug Bible regression       # comfyui-custom-node-survival-guide
-3. a live 30-word canonical run   # it must PUBLISH to otr\obs\ -- Test-Path the file
-```
-
-**A pack that passes the unit tests but has never published a 30-word episode is not
-done.** Nearly every real defect here was green in CI and only appeared in a live render.
-Run the 30-word smoke. It is the real gate.
-
----
-
-## 11. THE EXISTING BANKS, AS PROOF OF THE FREEDOM
-
-Ignore what these are *about*. Look at how differently they are BUILT. They are evidence,
-not a menu. Every one fills the same ledger through the same two slots, and no two work
-alike:
-
-- **one** runs a 10-pass ladder: extract facts -> pose a dramatic question -> cast ->
-  build a score graph -> write the whole script -> review -> retake -> audit.
-- **one** pitches three premises, critiques its own pitches, picks a winner, outlines, then
-  drafts and critiques **scene by scene**.
-- **one** stages a ceremony: it drafts **line by line**, alternating two speakers with
-  *opposite* contracts -- a literalist who may only say what the source supports, and a
-  speculator licensed to reach past it -- then runs an audit / challenge / rewrite loop.
-- **one** has **no source at all**: it draws atoms from a spark deck and invents the
-  episode outright.
-- **one** seals its canonical text against a proof map so nothing downstream can touch a
-  word of it.
-
-Different pass counts. Different artifacts. Different judges. Different sources -- or none.
-One of them is not even in the same *genre* as the others.
-
-Same two slots. Same ledger. Everything between those two facts is yours, and the gap is
-enormous. **Do not build a variant of one of these. Build the thing nobody has built.**
+A bank is complete only when its original design, source provenance, two-slot
+execution, ledger graph, runner/tail handoff, canonical integration, tests,
+and live asset all have evidence.

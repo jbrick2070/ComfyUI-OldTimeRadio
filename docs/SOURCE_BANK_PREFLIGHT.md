@@ -1,200 +1,295 @@
-# Source-bank pre-flight -- read this LAST, not first
+# Source Bank Preflight
 
-**Do not read this while you are designing.** It is a list of ways episodes have actually
-died, and if you carry it into a blank page you will build something defensive and dull.
-Design freely first. Write the thing you want to hear.
+Run this checklist after the bank's design is locked, its code exists, and its
+canonical integration is complete. Use `SOURCE_BANK_GUIDE.md` as the
+normative brief.
 
-Then, when you have:
+## Acceptance protocol
 
-- **R1 -- designed it** (you know your passes, your artifacts, your roles)
-- **R2 -- coded it** (it runs, it fills the ledger)
-- **R3 -- wired it** (it is in the workflow JSON and the bank registry)
+Every hard item receives `PASS`, `FAIL`, or an explicitly allowed `N/A`,
+plus evidence: a file and line, test name, validator output, ledger path, or
+published asset path.
 
-...come back here and walk the gauntlet. Every item below is a real corpse. Each one cost
-a 15-minute render, and most of them were invisible to the unit tests.
+When executing the checklist, number items top-to-bottom within each gate
+(`G1.1`, `G1.2`, and so on) and save an `ID | status | evidence` matrix.
+The final receipt must name that matrix and its SHA-256.
 
-Companion docs: `SOURCE_BANK_GUIDE.md` (the contract),
-`docs/PROD_BUG_LOG.md` (every live failure, dated), and the Bug Bible in the
-`comfyui-custom-node-survival-guide` repo (the cross-project classes).
+- Any hard `FAIL` stops the release.
+- `N/A` is legal only where this checklist says so.
+- Warnings are recorded but do not change the verdict.
+- "Probably", "looks right", and an unverified reviewer claim are not evidence.
+- Finish with the receipt template at the end of this file.
 
-> **A note on multi-model review (`/kibitz`, `/roundtable`):** do not point a panel at your
-> pack until R3. It will regress an original design to the mean. See GATE 3.5 -- bugs are a
-> committee problem; taste is not.
+## Gate 1 -- Independent design
 
----
+For this gate, a material choice changes one fingerprint dimension;
+normalization ignores only cosmetic names and IDs; and a near-copy preserves
+the same non-contract instructions or logic under surface rewording. Save the
+pre-comparison fingerprint and a six-dimension comparison matrix with paths
+and hashes.
 
-## GATE 1 -- after R1 (design). Ten minutes, on paper.
+- [ ] **Hard:** The architecture was written down before existing bank
+  implementations were studied. Its fingerprint records the source strategy,
+  pass DAG and slot assignments, role/authority graph, artifact handoffs,
+  retry/audit topology, and ledger-write strategy.
+- [ ] **Hard:** At least three material design choices are traced directly to
+  this bank's source constraints or intended listener experience.
+- [ ] **Hard:** After design lock, discretionary structure was compared with
+  registered banks after cosmetic names were normalized. Fail if the pass DAG
+  matches an existing lane, four or more of the six fingerprint dimensions
+  match one lane, or any non-contract prompt or implementation block was
+  copied or near-copied.
+- [ ] **Hard:** Similarity is limited to mandatory shared interfaces. There is
+  no existing-bank runner import, bank-to-bank fallback, renamed role system,
+  or "existing lane plus different prompts" architecture.
+- [ ] **Hard:** The design names its orientation and closure mechanism, and a
+  test or receipt identifies the resulting artifact or line IDs. Whether the
+  result works artistically remains taste, not a fatal gate.
+- [ ] **Hard:** The creative contract forbids guns, blood, violence, and
+  swearing without using deterministic prose censorship as a substitute for a
+  model repair.
 
-**1.1 Can every gate you invented actually be satisfied?**
-Take each rule you plan to enforce and ask: could a *good* episode fail it?
-- Killed us: a word-count quota demanding exact equality -- 5 words per beat.
-- Killed us: "every fact must be integrated", enforced *per scene*, when the facts belong
-  to the episode.
-- Killed us: an auditor failing a script because a line "adds no new information" -- in a
-  30-word episode with a two-fact source.
+Creative quality remains a taste decision, not a runtime validator.
 
-**1.2 Do your roles have different contracts?**
-If one speaker may only state what the source supports and another is licensed to
-speculate, then a single validator applied to both is broken before you write it. It will
-fail the speculator *for speculating*.
+## Gate 2 -- Source, access, evidence, and rights
 
-**1.3 Does any rule demand something you cannot enumerate?**
-If you cannot list the evidence, you cannot corroborate the finding, and you cannot repair
-it. That is not a gate -- it is a coin flip the episode can only lose. (We shipped one for
-months. It killed a whole bank.)
+- [ ] **Hard:** The source mode is explicit: no-source, local/package,
+  operator-pinned `source_ref`, or automatic public/keyless selection.
+- [ ] **Hard:** A no-source bank has an explicit bank-specific initialization
+  path. It does not use empty `fetcher` plus empty `interpreter` and
+  accidentally enter the reserved `original_radio` architecture. **N/A**
+  only for a source-backed bank.
+- [ ] **Hard:** The bank introduces no API key, login, paid service, protected
+  browser session, or endpoint that normally returns a paywall, CAPTCHA, or
+  anti-bot challenge. Existing model credentials remain behind the supplied
+  LLM slots.
+- [ ] **Hard:** Runtime source I/O occurs only inside the declared fetch path,
+  never at module import, pack discovery, or node `INPUT_TYPES` evaluation.
+- [ ] **Hard:** Network code enforces timeouts, bounded retries, status and
+  content-type checks, and response-size limits. Tests use deterministic
+  fixtures; the live run records the real selected source. **N/A** only when
+  the bank performs no network retrieval.
+- [ ] **Hard:** An explicit source failure stops loudly. Any automatic
+  next-candidate behavior is declared, bounded, and records the selected
+  candidate. No unrelated source, synthetic text, or other bank is silently
+  substituted.
+- [ ] **Hard:** Fetched text is delimited as untrusted data, embedded
+  instructions are ignored, and source claims are verified against data
+  rather than model confidence.
+- [ ] **Hard:** Every source-backed runner receives the writer's exact seven
+  live `SOURCE_PAYLOAD_KEYS`, all strings, with non-empty `seed_text`;
+  provenance and rights remain in sidecars. A lane-specific typed artifact is
+  derived only after ingress. **N/A** only for a no-source bank or an
+  intentional shared-ingress change with its own tests.
+- [ ] **Hard:** The registered fetcher matches
+  `fetch(*, bank, technical_model, source_ref="")` and returns `dict |
+  SourceFetchResult`. A `legacy_many_pass` interpreter matches its live call
+  signature and returns coherent brief attributes plus `model_dump()`.
+  **N/A** only where the selected architecture does not use that component.
+- [ ] **Hard:** The ledger preserves `meta.source_bank`,
+  `meta.source_ref`, `meta.source_meta`, and `meta.source_rights` as
+  applicable. Source identity, canonical URL, retrieval date, digest,
+  author/outlet, license status/URL, and attribution are present when the
+  source supplies them.
+- [ ] **Hard:** Public accessibility is not treated as public domain or
+  commercial clearance. Unknown or incompatible rights stop an adaptation.
+- [ ] **Hard:** Every on-air quotation, claim, number, and proper noun
+  presented as real or source-derived fact resolves to validated evidence.
+  Fictional invention is distinguishable from source fact.
+- [ ] **Hard:** A no-source bank stamps honest original/synthetic provenance
+  and contains no fabricated citation, URL, author, or license. **N/A** for a
+  source-backed bank.
 
-**1.4 Is anything in your design a "note" pretending to be a defect?**
-Pacing, repetition, thin drama, word choice, register, a warning. Record them. Never block
-on them.
+## Gate 3 -- LLM slots, prompts, and authorship
 
----
+- [ ] **Hard:** Every generation call uses only the supplied
+  `creative_fn` or `technical_fn`. There is no model loader, inference
+  backend import, direct model API, third slot, or new credential path.
+- [ ] **Hard:** Each pass has a justified slot assignment. Creative writing
+  and creative revision use the creative slot; extraction and structured
+  verification use the technical slot.
+- [ ] **Hard:** All model instructions live under the pack's
+  `prompt_stages`. Every referenced seam exists.
+- [ ] **Hard:** Each structured seam, worked example, typed schema, parser,
+  and repair prompt agree exactly. Worked examples validate in a test.
+- [ ] **Hard:** Every model-authored collection defines a concrete item model.
+  No collection of things is typed as `list[dict[...]]`,
+  `dict[str, Any]`, or `Any`. Identifier-keyed mappings are allowed.
+  Item structure is pinned; descriptive category vocabulary remains open
+  unless a closed enum is a real downstream contract.
+- [ ] **Hard:** Every canonical spoken line is traceable to an accepted model
+  artifact. Parser extraction may remove declared serialization delimiters
+  but does not rewrite the content field.
+- [ ] **Hard:** Python creates only mechanical data such as IDs, order,
+  references, enums, counts, hashes, and validated routing metadata. It does
+  not create or alter spoken prose; mechanical serialization of already
+  accepted verbatim rows is allowed.
+- [ ] **Hard:** Invalid creative content returns to a model through a bounded
+  repair. Exhaustion fails closed; there is no canned story fallback.
+- [ ] **Hard:** Every rejection names the item, evidence, defect, and allowed
+  correction. A model reviewer cannot create a fatal finding that
+  deterministic code cannot corroborate.
+- [ ] **Hard:** Base, structural-retry, and typed-repair prompts fit the
+  resolved context cap of their actual slot/model. Provenance-sensitive calls
+  fail loudly rather than truncate.
+- [ ] **Hard:** Output reservations scale from the artifact's real size driver
+  such as line count or evidence count, not only `target_words`.
+- [ ] **Hard:** Models are never asked to calculate, report, or enforce exact
+  word, line, item, or coverage counts. Python measures them
+  deterministically and supplies measured defects to any creative repair.
+  No model-produced or unused count field can gate production.
+- [ ] **Hard:** Creative randomness uses OS entropy. Reproducibility comes
+  only from the existing explicit seed overrides; the bank does not plant a
+  fixed seed.
+- [ ] **Hard:** `target_words` is advisory and recorded. It does not trigger
+  deterministic trim, padding, culling, rewriting, or a fatal quota gate.
 
-## GATE 2 -- after R2 (code). Run these before your first live roll.
+## Gate 4 -- Ledger closure and delivery
 
-**2.1 Is your seam's worked example a LEGAL instance of your schema?**
-Paste the example JSON out of your prompt and validate it against your Pydantic model.
-- Killed us: the seam said `{"fact_ids": ["F01"]}`; the model declared `fact_uses`. The
-  LLM obeyed the seam, strict mode rejected it, and the repair then **deleted the model's
-  work** to force it to validate. *When the seam and the schema disagree, the model is not
-  wrong -- you are.*
-- Killed us: a seam asking the cast for `tts_model` / `voice_preset` that the schema
-  forbids.
+- [ ] **Hard:** The provided `Ledger` is the only ledger. The root
+  `cast`, `lines`, `beats`, `scenes`, `shots`, `music`, and
+  `clips` values are present lists, never null.
+- [ ] **Hard:** The bank populates non-empty cast, scenes, shots, beats, and
+  lines. An empty music list is schema-legal but is not treated as a request
+  for silence by the current canonical theme node. A music-free design has
+  explicit supported behavior and tests. Announcer-only behavior uses only
+  the live explicit contract.
+- [ ] **Hard:** IDs are non-empty and unique within their tables.
+- [ ] **Hard:** A bank-owned graph test proves scene-owned shot -> scene,
+  scene-owned beat -> shot and matching scene, beat.line_ids -> lines, voiced
+  scene line -> exactly one beat and shot, and character line/beat -> cast.
+  Declared bookend, frame, or music sentinels outside that graph have focused
+  tests.
+- [ ] **Hard:** Every optional `music.anchor_line_id` resolves to a real
+  line when used.
+- [ ] **Hard:** Line and beat speaker identities agree. Every character
+  `char_id` resolves to cast; announcer identity follows the declared live
+  convention.
+- [ ] **Hard:** Every `speaker_role` is one of `character`,
+  `announcer`, `music_open`, `music_close`, or `music_inter`.
+- [ ] **Hard:** Every non-skipped voiced row has non-empty canonical text.
+  Music sentinels may have empty text without being skipped. Every row marked
+  `skip=True` has empty text and a non-empty `tts_skip_reason`. Spoken
+  text has no speaker label, stage direction, or whole-line quotation wrapper.
+- [ ] **Hard:** Every voiced line `boundary` is `shot_start`,
+  `beat_start`, or `continue`, and agrees with the actual shot/beat
+  transition.
+- [ ] **Hard:** Counts and hashes are stamped from final canonical content,
+  after all accepted model repairs.
+- [ ] **Hard:** Evidence maps and authorship receipts live in typed artifacts
+  or namespaced `meta`; the fixed line schema contains no ad hoc provenance
+  fields.
+- [ ] **Hard:** The pack deliberately selects its live freeze policy: non-empty
+  `line_composer_system` means `legacy_full`; absence means
+  `content_owned_readonly`. A test proves the expected policy.
+- [ ] **Hard:** A content-owned runner assigns valid character `tts_model`
+  and `voice_preset` values that satisfy the declared reuse policy
+  (unique when reuse is disabled). Its proof survives while the shared writer
+  tail stamps fresh `text_for_tts` and canonical-text source hashes. A
+  legacy lane proves the shared CastLock/readiness path owns delivery.
+- [ ] **Hard:** The lane-defined return object exposes `outline_view.title`
+  and `outline_view.premise`; an EpisodeCanon-compatible `canon` with
+  title, premise, setting, time of day, and sound palette;
+  `final_title_override`; and `run_story_spine`. An optional
+  `tail_finalizer` implements `before_save` and `after_save`.
+- [ ] **Hard:** The bank-owned closure test passes independently of the freeze
+  audit. Freeze warnings alone are not proof of full
+  scene/shot/beat/line/cast closure.
 
-**2.2 Can your schema express what JSON can express?**
-- Killed us: `tuple[X, X, X]` in a `strict=True` model fed from `json.loads`. JSON has no
-  tuple. That field could **never** validate, no matter what the model wrote. Use a
-  length-pinned `list`.
-- Killed us: `cites` with `min_length=1`, on a lane whose ceremonial lines cite nothing --
-  so the code invented a sentinel id that could not exist. **The schema forced the lane to
-  lie.** If a line can legitimately have none, allow none.
+## Gate 5 -- Registry, runner, and canonical wiring
 
-**2.3 Does Python author any story text?**
-Grep your pack for a literal or f-string assigned to `text=` / `premise=` / `title=`.
-- Killed us: `text="The record holds now."` -- Python speaking for a character, while the
-  model's own line for that moment sat unused in the artifact and was thrown away.
-- There is an AST guard in the suite. It will fail your build. Good.
+- [ ] **Hard:** The pack is duplicate-key-safe JSON at
+  `nodes/story_packs/<source_bank_id>/<story_model_id>.json`, uses the live
+  schema version, and its header coordinates match its path.
+- [ ] **Hard:** The exact bank row and pipeline row schemas validate. Defaults,
+  declared seams, required seams, pass slots, and cross-references resolve.
+- [ ] **Hard:** Custom seams live in pipeline `declared_seams` and pass rows
+  and are supplied by the pack. Bank `required_seams` contains only live
+  shared production seams.
+- [ ] **Hard:** Every required fetcher and interpreter ID is registered.
+  **N/A** only for a valid no-source or independent-runner contract that
+  deliberately declares neither.
+- [ ] **Hard:** The execution runner exists and is registered explicitly in
+  `_RUNNER_BY_PIPELINE`; no plugin-style discovery or fallback is assumed.
+- [ ] **Hard:** `runnable=true` lands only with the runnable lane. A custom
+  non-source-contract pipeline has `executable=true` in the same change.
+- [ ] **Hard:** `resolve_story_pack` and `require_runnable_bank` succeed
+  for the new coordinates, and an unknown or disabled coordinate fails loud.
+- [ ] **Hard:** The existing canonical `source_bank` selector reaches the
+  new bank. There is no copied, generated, or parallel workflow.
+- [ ] **Hard:** If no node, widget, input, link, or default changed, tests
+  prove registry-driven selection and the canonical workflow remains
+  unchanged, including the shipped `science_news` default. If any did
+  change, `workflows/otr_canonical.json` changed in the same commit.
+- [ ] **Hard:** Any canonical JSON change passes
+  `OTR_WorkflowValidator`, JSON round-trip, link referential integrity,
+  wired-input-name, and live `INPUT_TYPES`/widget-count audits. Optional
+  widgets were appended, not inserted.
+- [ ] **Hard:** Importing routing, pack, source, and runner modules performs no
+  network request, model load, GPU allocation, or unrelated file mutation.
 
-**2.4 Does every rejection tell you WHY?**
-Every gate must name the offending item, the reason, and the evidence.
-- Cost us three rolls of pure guessing: `"scene X failed its bounded rewrite"` -- which
-  scene? which line? what was wrong with it? Print the accused line next to the accusation.
+## Gate 6 -- Gates, tests, and live proof
 
-**2.5 Do you ask twice before you kill?**
-A rejected output gets the reason and a retry. "No fallback" means *never ship a canned
-line* -- it does **not** mean "no second chance."
-- Killed four banks: an announcer intro four characters over a 300-char cap, with no retry
-  at all.
+- [ ] **Hard:** Every fatal gate is objectively checkable, repairable by the
+  responsible component, and a real contract defect. Taste, pacing, register,
+  and warnings remain notes.
+- [ ] **Hard:** Validators are role-aware. They do not reject a role for
+  following its declared authority.
+- [ ] **Hard:** Tests cover registry loading, pack/seam schema parity, source
+  success and failure, rights/provenance, prompt fit, retry exhaustion,
+  authorship, ledger graph closure, tail handoff, import safety, and
+  no-fallback behavior.
+- [ ] **Hard:** After every code change, the full Windows regression suite and
+  Bug Bible regression pass as required by `AGENTS.md` and `CLAUDE.md`.
+- [ ] **Hard:** The final canonical workflow validation and link/widget audit
+  pass against the live node definitions.
+- [ ] **Hard:** Before the live run, the machine is reset using the selective
+  process and port procedure in `AGENTS.md`; no blanket Python kill is used.
+- [ ] **Hard:** A live 30-word run loads
+  `workflows/otr_canonical.json`, selects the new bank, exercises its real
+  source policy and real two-slot path, and reaches the shared writer tail.
+- [ ] **Hard:** The saved ledger passes the lane-owned closure proof and shared
+  freeze path with no hard errors. Its source, rights, slot-call, authorship,
+  and word-count receipts are present.
+- [ ] **Hard:** The final episode is published to `otr/obs`, and the exact
+  asset path exists on disk. A resident server or VRAM allocation is not proof
+  of completion.
+- [ ] **Hard:** No deliverable remains in a temporary directory, and no
+  temporary probe or generated workflow is included in the change.
 
-**2.6 Do your ids resolve?**
-Beat -> shot -> scene -> line -> char. Walk the graph in a unit test. A dangling id dies
-in the render, twenty minutes later.
+If an automated review panel is used, follow the current `AGENTS.md` and
+`CLAUDE.md` rules. Ground every finding in live code. Review may find
+implementation defects after the design lock; it may not redesign the bank's
+creative premise by consensus.
 
-**2.7 Do your creative rolls draw OS entropy?**
-Creative RNGs must not seed themselves. Reproducibility comes ONLY from the
-`OTR_CAST_SEED` / `OTR_STYLE_SEED` env overrides. A pack that plants its own fixed seed
-ships the same episode forever -- and looks perfectly healthy in every test.
+## Final receipt
 
----
+```text
+SOURCE BANK PREFLIGHT: PASS | FAIL
 
-## GATE 3 -- after R3 (wiring). The arithmetic nobody does.
-
-**3.0 Is your pack actually WIRED?**
-Code that is not reachable from `workflows/otr_canonical.json` (plus the bank registry) is
-dead, however good it is.
-- Killed us: a node and a new blend input shipped, tested green, and ran **dormant in
-  production** -- nobody had wired it (2026-06-13).
-- Run `OTR_WorkflowValidator`, then audit widget-count vs live `INPUT_TYPES` and link
-  referential integrity. `widgets_values` is POSITIONAL: only ever APPEND a new optional
-  widget at the END -- inserting mid-list silently shifts every saved value
-  (BUG-LOCAL-097).
-
-**3.1 Does your prompt FIT?**
-`context_cap` is 8192. `max_input_tokens = context_cap - max_new_tokens`. If your prompt
-is bigger, it is **silently left-truncated from the front** -- the system message and the
-schema go first.
-- Cost us four consecutive rolls: `PROMPT_GUARD: Truncated 5408 -> 4592`. A pass reserved
-  3600 output tokens, leaving 4592 for input, and its repair prompt was 5408. The model
-  never received the instructions we kept "improving". **It was not ignoring us. We were
-  cutting our own instructions off.**
-- Your typed-repair prompt is ALWAYS the fat one: it carries the failed artifact *and* the
-  validation error *and* the original request.
-- Set `prompt_must_fit=True` on any provenance-bearing pass so it fails LOUD instead of
-  lying to you.
-
-**3.2 Is your output reservation sized off the right dimension?**
-- Killed us: a budget scaled from the word count, when the artifact's size is driven by the
-  **line count** (per-line metadata). A 30-word script with 13 lines pays nearly all the
-  same cost as a 300-word one.
-
-**3.3 Is your gate reachable-and-passable?**
-- Killed us: a finalizer demanding `freeze_verdict == "frozen_clean"` on a lane where the
-  freeze runs *before* CastLock assigns voices -- so the cascade always has a note, and
-  `frozen_clean` was **unreachable by construction**. The gate could never pass.
-
-**3.4 Warnings are not errors.**
-Errors block. Structural verdicts block. Warnings get recorded and the record ships.
-
----
-
-## GATE 3.5 -- if you have `/kibitz` or `/roundtable`, use them HERE. Not earlier.
-
-If you have the multi-model review tools, they are very good at exactly one thing: finding
-bugs in something that already exists. They are dangerous at the one thing you must not
-let them do: **design your pack.**
-
-**Never run a panel at R1.** A panel optimises for *agreement*. Ask three models to
-critique a blank-page architecture and they will converge on the safe, average, familiar
-version of it -- and the strange, specific, original idea that made your pack worth writing
-is precisely what gets sanded off first. You will end up with a pack that four other people
-could have written. Do not hand your architecture to a committee before it can defend
-itself.
-
-**Run them at R3 and at pre-flight**, once the design is committed and the code is wired.
-Now the panel is doing what it is actually good at:
-
-- arithmetic you did not do (context caps, token reservations, VRAM)
-- contradictions between a seam and its schema
-- gates that cannot pass, or cannot fail
-- dead levers nobody calls any more
-- ids that do not resolve
-
-**Ask it bug questions, not taste questions.**
-- Good: *"Where does this silently truncate? Which gate is unsatisfiable? What does the
-  ledger expect that I never set?"*
-- Bad: *"Is this a good design? What would you do differently? How should the story work?"*
-
-**You are the judge, always.** Panels are confidently wrong. In this repo, on one day: they
-caught the seam/schema contradiction that was destroying the model's own fact attribution,
-they predicted the warning-as-fatal gate before it fired, and they correctly settled a
-one-based/zero-based indexing dispute. They *also* asserted a bug hit a lane it demonstrably
-did not, and produced an inflated truncation table that the actual logs refuted. **Ground
-every claim against the real code before you act on it.** A finding you have not verified is
-a hypothesis, not a bug.
-
-Bugs are a committee problem. Taste is not.
-
----
-
-## GATE 4 -- the real gate
-
+bank:
+story_model:
+story_pipeline:
+design_fingerprint:
+design_fingerprint_path_sha256:
+comparison_matrix_path_sha256:
+completed_check_matrix_path_sha256:
+target_derived_choices:
+source_mode:
+source_and_rights_evidence:
+llm_slot_evidence:
+authorship_evidence:
+ledger_graph_test:
+tail_handoff_test:
+registry_and_canonical_evidence:
+full_suite:
+bug_bible:
+workflow_validator:
+live_ledger:
+published_asset:
+hard_failures:
+warnings:
 ```
-1. pytest -q                     # whole suite, including the cross-lane guards
-2. the Bug Bible regression      # comfyui-custom-node-survival-guide
-3. a live 30-word canonical run  # must PUBLISH to otr\obs\ -- Test-Path the file
-```
 
-**A pack that passes the unit tests and has never published a 30-word episode is not
-done.** Nearly every defect on this page was green in CI and died live.
-
-When it fails -- and it will -- read the log before you theorise. Nine times out of ten the
-model was doing exactly what you told it, and the bug is in the contract, not the code.
-
----
-
-## The one-line version
-
-> **A gate may block production only if it is objectively checkable, actually fixable by
-> the party you're asking to fix it, and genuinely a defect -- not a note, not a
-> preference, and not your own contract being honoured.**
-
-Everything on this page is that sentence, learned the expensive way.
+`PASS` means `hard_failures: 0` and every hard item above has concrete
+evidence.
