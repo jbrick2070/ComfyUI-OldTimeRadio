@@ -254,6 +254,17 @@ roundtables/
 .memory/
 /AGENTS.md
 /MORNING_REPORT_*.md
+
+# --- 2026-07-11 repo-root sweep ---
+# Run heartbeats, PID files, smoke/soak status stamps and throwaway probe scripts
+# are runtime scratch: they regenerate on every leg and must never be committed.
+# (RUN_STATUS.txt is written live by scripts/otr_canonical_api_run -- deleting it
+# mid-leg is harmless but pointless; it comes straight back.)
+/RUN_STATUS.txt
+/tmp_*
+/*_status.txt
+/*_pid.txt
+/30w
 /otr/cache/
 /255
 /agy_*.txt
