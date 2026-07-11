@@ -221,7 +221,7 @@
     {
       "story_pipeline_id": "scifi_gemini_multipass",
       "label": "Sci-Fi Gemini Multi-Pass (Write-Critique-Rewrite Loop)",
-      "executable": false,
+      "executable": true,
       "requires_source_contract": false,
       "declared_seams": [
         "gemini_fact_extraction",

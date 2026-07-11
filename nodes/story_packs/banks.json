@@ -218,7 +218,7 @@
         "credits_source_line": "dramatized by machine from tonight's science wire"
       },
       "required_seams": [],
-      "runnable": false,
+      "runnable": true,
       "guide_ref": "Sci-Fi Gemini multi-pass loop spec bank."
     },
     {
