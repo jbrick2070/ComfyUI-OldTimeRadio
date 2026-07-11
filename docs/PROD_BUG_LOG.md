@@ -358,6 +358,16 @@ already promoted). Confidence tags preserved from the sweep.
 - confidence: HIGH
 - status: OPEN
 
+## PBUG-20260711-10 -- Codex P5 repair omitted ScriptLine boundary metadata
+- surfaced: scifi bake-off canonical 30w smoke roll 9, Codex P5, 2026-07-11
+- symptom: full script artifact was otherwise shaped, but all eight lines omitted required `boundary` values; strict validation halted before audio/media work
+- root cause: the repair contract named nested fields but did not define the boundary derivation from shot/beat order
+- fix: `94331eb2` adds the structural rule: first line in shot = `shot_start`, first line in beat = `beat_start`, otherwise `continue`
+- verify idea: force missing boundaries and assert the repair instruction contains the three-way derivation rule; live P5 must clear
+- bible-worthy: yes -- live script graph metadata failure
+- confidence: HIGH
+- status: OPEN
+
 ## FAN-OUT RECORD -- 2026-07-11 (operator-triggered)
 23 entries promoted to the Bible (156 -> 179) @ survival-guide commit d50d773;
 1 folded into BUG-11.26 law d (epilogue false-kill class); suite 17 passed /
