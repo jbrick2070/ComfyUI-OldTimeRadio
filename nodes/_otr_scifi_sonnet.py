@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import re
+import typing
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,6 +17,7 @@ log = logging.getLogger("OTR")
 
 try:
     from ._otr_canon import EpisodeCanon
+    from ._otr_json import parse_first_json_object
     from ._otr_source_payload import validate_source_payload
     from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import schema_shape_instruction, structured_call
@@ -23,6 +25,7 @@ try:
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
     from _otr_canon import EpisodeCanon  # type: ignore
+    from _otr_json import parse_first_json_object  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
@@ -220,6 +223,64 @@ class DraftLineV4(_Strict):
         if not self.non_fact and not self.cites:
             raise ValueError("a factual line must cite at least one dossier id")
         return self
+
+
+def _nested_model(annotation: Any) -> "type[BaseModel] | None":
+    """The BaseModel inside `X`, `list[X]`, `X | None`, ... or None."""
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return annotation
+    for arg in typing.get_args(annotation):
+        found = _nested_model(arg)
+        if found is not None:
+            return found
+    return None
+
+
+def _prune_to_schema(data: Any, model: "type[BaseModel]") -> None:
+    """Drop keys a strict model forbids, recursively, in place.
+
+    An unrequested key is not authored content: the contract never had a slot for
+    it, so nothing the writer meant to say lives there. Removing it discards no
+    story and invents nothing.
+    """
+    if not isinstance(data, dict):
+        return
+    fields = model.model_fields
+    for key in [k for k in data if k not in fields]:
+        del data[key]
+    for name, field in fields.items():
+        if name not in data:
+            continue
+        nested = _nested_model(field.annotation)
+        if nested is None:
+            continue
+        value = data[name]
+        if isinstance(value, list):
+            for item in value:
+                _prune_to_schema(item, nested)
+        else:
+            _prune_to_schema(value, nested)
+
+
+def repair_forbidden_extra_keys(
+    failed_output: str, result_type: "type[BaseModel]",
+) -> "BaseModel | None":
+    """Drop keys the strict artifact forbids. Fails closed if anything is MISSING.
+
+    A missing field is the model's work -- authored attribution, authored text --
+    and Python may not conjure it. This only removes what nobody asked for.
+    """
+    try:
+        data = parse_first_json_object(failed_output)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    _prune_to_schema(data, result_type)
+    try:
+        return result_type.model_validate(data)
+    except Exception:
+        return None
 
 
 def _audited_line_indices(events: "list[DraftLineV4]") -> list[int]:
@@ -474,11 +535,62 @@ def invoke_sonnet_structured(
             if deterministic is not None:
                 return deterministic
         else:
+            # An artifact can be thrown out purely for keys the model added that the
+            # contract never asked for. Pruning those loses no authored work, so try
+            # it before spending an LLM call. (Gemini's lane proved this out.)
+            deterministic = repair_forbidden_extra_keys(failed_output, result_type)
+            if deterministic is not None and post_validator(deterministic) is None:
+                log.info(
+                    "[scifi_sonnet:%s] deterministic repair dropped forbidden extra "
+                    "keys; no LLM repair call made", pass_id,
+                )
+                return deterministic
+            # The MISSING half is different: which facts a line cites is authored
+            # attribution, and Python must never invent it -- carrying the old line's
+            # cites forward onto new text would be exactly the false attribution we
+            # just spent the day removing. So ask, and ask NARROWLY: hand the model
+            # back its own corrected lines and request only the field it dropped,
+            # rather than making it re-derive a whole artifact from a wall of errors.
+            if getattr(result_type, "__name__", "") == "RewriteResultV4":
+                try:
+                    partial = parse_first_json_object(failed_output)
+                except Exception:
+                    partial = None
+                lines_missing = [
+                    item for item in (partial or {}).get("corrected_lines", [])
+                    if isinstance(item, dict) and not item.get("cites")
+                ]
+                if lines_missing:
+                    log.info(
+                        "[scifi_sonnet:%s] asking the model only for the %d missing "
+                        "cites array(s) it dropped", pass_id, len(lines_missing),
+                    )
+                    return [
+                        {"role": "system", "content": prompt[0]["content"] + "\n" + (
+                            "Your previous reply dropped the required `cites` array on "
+                            "one or more corrected lines. Return the SAME corrected "
+                            "lines with their text UNCHANGED, and add to each a cites "
+                            "array of 1-3 dossier ids (fact_N / num_N) that actually "
+                            "support what that line says. If the line names a fact in "
+                            "its wording, that fact's id belongs in cites. Change no "
+                            "text. Add no lines. Return the complete object."
+                        )},
+                        {"role": "user", "content": json.dumps({
+                            "lines_missing_cites": lines_missing,
+                            "dossier": json.loads(prompt[1]["content"])["typed_inputs"].get("dossier"),
+                        }, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
+                    ]
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the continuity archive, "
                 "session frame, cast locks, and authored lines; repair only fields named by "
                 "the validation error. Every required nested field must be present; preserve "
-                "the locked speaker/char_id mapping."
+                "the locked speaker/char_id mapping. "
+                "Return ONLY the keys the schema declares -- no extra fields. "
+                "EVERY corrected line MUST carry ALL FOUR of: line_ref, speaker, text, and "
+                "cites. cites is a NON-EMPTY array of 1-3 dossier ids (fact_N / num_N) that "
+                "actually support what the line says -- never omit it, never leave it empty, "
+                "and never cite an id that is not in the dossier. If your line mentions a "
+                "fact in its wording, that fact's id belongs in cites."
             )
         return [
             {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},
@@ -624,7 +736,13 @@ def run_scifi_sonnet_episode(
             events.append(DraftLineV4(text=challenge.vesh_objection, cites=[], non_fact=True, speaker="VESH", char_id="c04", source_pass="P4"))
             events.append(DraftLineV4(text=challenge.registrar_reopening, cites=[], non_fact=True, speaker="ANNOUNCER", char_id="announcer", source_pass="P4"))
             audited = _audited_line_indices(events)
-            rewrite = invoke_sonnet_structured(pass_id=f"P5:{round_no}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_rewrite_system", pack=pack, typed_inputs={"audit": audit.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in audited]}, result_type=RewriteResultV4, post_validator=lambda x: None, base_temperature=.45, structural_retry_temperature=.20, max_new_tokens=3000, journal=journal)
+            # The rewrite seam orders the doctor to fix a defect "by grounding the line
+            # in an actual key_numbers/verified_facts entry" and to return cites -- and
+            # the pass was never GIVEN the dossier. It was being told to cite a source
+            # it could not see, so it wrote fact ids into its prose and omitted the
+            # cites array entirely, twice, and the lane died. Hand it the dossier it is
+            # required to cite.
+            rewrite = invoke_sonnet_structured(pass_id=f"P5:{round_no}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_rewrite_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "audit": audit.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in audited]}, result_type=RewriteResultV4, post_validator=lambda x: None, base_temperature=.45, structural_retry_temperature=.20, max_new_tokens=3000, journal=journal)
             _apply_rewrite_corrections(events, audited, rewrite, audit, round_no)
             audit = invoke_sonnet_structured(pass_id=f"P3:recheck:{round_no}", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_audit_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in _audited_line_indices(events)], "coverage": {}}, result_type=AuditVerdictV4, post_validator=lambda x: None, base_temperature=.25, structural_retry_temperature=.12, max_new_tokens=2000, journal=journal)
             if audit.status == "clear":
@@ -634,15 +752,36 @@ def run_scifi_sonnet_episode(
             # reason to the grave: "remained defective after two rewrites" names no
             # line and no defect, so every diagnosis is a guess. Record what it
             # actually objected to, and which lines it flagged, before failing closed.
+            # Print the ACCUSED LINES next to the accusation. Without them we cannot
+            # tell whether the doctor kept inventing or the auditor is simply wrong,
+            # and we have burned two rolls guessing between those.
+            final = _audited_line_indices(events)
+            accused = []
+            for ref in audit.flagged_line_refs:
+                if 0 <= ref < len(final):
+                    line = events[final[ref]]
+                    accused.append(f"    [{ref}] {line.speaker}: {line.text!r} cites={line.cites}")
+                else:
+                    accused.append(f"    [{ref}] <no such line -- the auditor mis-numbered>")
             log.error(
                 "[scifi_sonnet] Warden audit exhausted after two rewrites\n"
                 "  defects       : %s\n"
                 "  flagged lines : %s\n"
-                "  invented facts: %s",
+                "  invented facts: %s\n"
+                "  the accused lines, as finally written:\n%s\n"
+                "  dossier facts : %s",
                 "; ".join(audit.defects) or "(none named)",
                 audit.flagged_line_refs, audit.invented_fact_flags,
+                "\n".join(accused) or "    (none)",
+                [f.fact_id for f in p0.verified_facts],
             )
-            journal["audit_exhausted"] = audit.model_dump(mode="json")
+            journal["audit_exhausted"] = {
+                "audit": audit.model_dump(mode="json"),
+                "accused_lines": [
+                    events[final[r]].model_dump(mode="json")
+                    for r in audit.flagged_line_refs if 0 <= r < len(final)
+                ],
+            }
             raise SonnetAuditExhaustedError(
                 "Sonnet Warden audit remained defective after two rewrites: "
                 + ("; ".join(audit.defects) or "(the auditor named no defect)")
