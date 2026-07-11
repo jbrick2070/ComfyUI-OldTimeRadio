@@ -49,7 +49,8 @@ class TestBankRow:
         # r3/M7: "+ Add Your Own" stays last; fable2 inserted BEFORE it.
         ids = ROUTING.list_bank_ids()
         assert ids[-1] == "custom_source_bank"
-        assert ids[-2] == "scifi_fable2"
+        assert ids[-5:] == ("scifi_fable2", "scifi_codex", "scifi_gemini",
+                            "scifi_sonnet", "custom_source_bank")
 
     def test_row_shape_runnable_s1b(self):
         bank = ROUTING.get_bank("scifi_fable2")
@@ -261,7 +262,8 @@ class TestScienceNewsUntouched:
         ids = ROUTING.list_bank_ids()
         assert ids == ("science_news", "media_archive",
                        "public_domain_story", "shakespeare",
-                       "original_radio", "scifi_fable2",
+                       "original_radio", "scifi_fable2", "scifi_codex",
+                       "scifi_gemini", "scifi_sonnet",
                        "custom_source_bank")
 
     def test_fable2_seams_never_shadow_production(self):

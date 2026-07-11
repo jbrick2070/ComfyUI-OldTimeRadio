@@ -211,7 +211,7 @@ def test_tail_signature_and_no_closure():
     'consumes ONLY ctx' law is structural, not stylistic."""
     fn = OTR_LedgerScriptWriter._run_writer_tail
     params = list(inspect.signature(fn).parameters)
-    assert params == ["self", "ctx"], f"signature drift: {params}"
+    assert params == ["self", "ctx", "tail_finalizer"], f"signature drift: {params}"
     assert fn.__code__.co_freevars == (), (
         f"tail grew a closure: {fn.__code__.co_freevars}"
     )

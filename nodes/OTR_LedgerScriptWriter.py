@@ -115,7 +115,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Protocol
 
 # S30 B2a: catalog drives the dropdown_choices() for the two model widgets
 # at INPUT_TYPES() registration time. Pure-Python module, no torch /
@@ -1580,6 +1580,33 @@ def _run_fable2_lane(**kwargs):
     return _F2.run_scifi_fable2_episode(**kwargs)
 
 
+def _run_scifi_codex_lane(**kwargs):
+    """Lazy dispatch for the additive Codex v4 bake-off lane."""
+    try:
+        from . import _otr_scifi_codex as _SC
+    except ImportError:  # pragma: no cover
+        import _otr_scifi_codex as _SC  # type: ignore
+    return _SC.run_scifi_codex_episode(**kwargs)
+
+
+def _run_scifi_gemini_lane(**kwargs):
+    """Lazy dispatch for the additive Gemini v4 bake-off lane."""
+    try:
+        from . import _otr_scifi_gemini as _SG
+    except ImportError:  # pragma: no cover
+        import _otr_scifi_gemini as _SG  # type: ignore
+    return _SG.run_scifi_gemini_episode(**kwargs)
+
+
+def _run_scifi_sonnet_lane(**kwargs):
+    """Lazy dispatch for the additive Sonnet v4 bake-off lane."""
+    try:
+        from . import _otr_scifi_sonnet as _SS
+    except ImportError:  # pragma: no cover
+        import _otr_scifi_sonnet as _SS  # type: ignore
+    return _SS.run_scifi_sonnet_episode(**kwargs)
+
+
 # scifi_fable2 S1b (doc s11): pipeline-id -> lane runner. Consulted
 # exactly ONCE per run, after the shared front (bank resolve -> runnable
 # gate -> fetch -> validate -> D.1 ledger + meta stamps) and BEFORE the
@@ -1588,6 +1615,9 @@ def _run_fable2_lane(**kwargs):
 # writer's own inline branches (byte-identical on a map miss).
 _RUNNER_BY_PIPELINE = {
     "fable2_multipass": _run_fable2_lane,
+    "scifi_codex_circuit": _run_scifi_codex_lane,
+    "scifi_gemini_multipass": _run_scifi_gemini_lane,
+    "sonnet_archive_multipass": _run_scifi_sonnet_lane,
 }
 
 # The two pipelines whose execution lane IS this writer's inline body.
@@ -2198,6 +2228,22 @@ class WriterTailContext:
                                # Tail precedence: user-typed episode_title >
                                # override > LLM regen. Legacy passes None ->
                                # byte-identical behavior.
+
+
+class TailFinalizer(Protocol):
+    """Optional lane-owned proof hook executed around the writer save.
+
+    Existing lanes pass ``None`` and retain their byte-for-byte tail path.
+    New source-bank lanes use this narrow protocol to prove their receipts,
+    run the freeze audits after all writer metadata mutations, and verify the
+    persisted JSON without changing any spoken text.
+    """
+
+    def before_save(self, *, ctx: WriterTailContext) -> None: ...
+
+    def after_save(
+        self, *, saved_path: str, ledger_data: Mapping[str, Any]
+    ) -> None: ...
 
 
 class OTR_LedgerScriptWriter:
@@ -3621,7 +3667,10 @@ class OTR_LedgerScriptWriter:
                 run_story_spine=_parts.run_story_spine,
                 final_title_override=_parts.final_title_override,
             )
-            return self._run_writer_tail(_tail_ctx)
+            return self._run_writer_tail(
+                _tail_ctx,
+                tail_finalizer=getattr(_parts, "tail_finalizer", None),
+            )
 
         # D.2 News interpretation. Read the full article (currently
         # discarded after RSS fetch -- see _fetch_rss_seed_or_die change
@@ -6208,7 +6257,8 @@ class OTR_LedgerScriptWriter:
         return self._run_writer_tail(_tail_ctx)
 
     def _run_writer_tail(
-        self, ctx: "WriterTailContext",
+        self, ctx: "WriterTailContext", *,
+        tail_finalizer: "TailFinalizer | None" = None,
     ) -> tuple[str, str, str, float, str]:
         """The writer's tail: J.5 title regen -> canon write -> K meta
         stamps -> K.5 visual_plan -> K.5.5/K.5.6 reflections -> Wave-2
@@ -6711,6 +6761,8 @@ class OTR_LedgerScriptWriter:
         # Sprint 3E (2026-05-25): the former J.6 post-hoc title
         # substitution -- another such ledger-only mutation -- is gone
         # (late title binding means no provisional title in dialogue).
+        if tail_finalizer is not None:
+            tail_finalizer.before_save(ctx=ctx)
         script_text = _PL.assemble_script_text_from_ledger(led.data)
         # story-ledger DRIFT chunk 2 (2026-06-25): PRE-FREEZE cross-stage
         # consistency guard. contract / outline / canon are the REAL objects
@@ -6767,6 +6819,14 @@ class OTR_LedgerScriptWriter:
 
         # --- M. Save ledger -------------------------------------------
         saved_path = led.save()
+        if tail_finalizer is not None:
+            if not saved_path:
+                raise RuntimeError(
+                    "lane TailFinalizer cannot verify a missing ledger save"
+                )
+            tail_finalizer.after_save(
+                saved_path=str(saved_path), ledger_data=led.data,
+            )
         log.info(
             "[OTR_LedgerScriptWriter] DONE: episode_id=%s, lines=%d, "
             "words=%d, est_minutes=%s, ledger=%s",

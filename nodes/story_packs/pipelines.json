@@ -86,6 +86,327 @@
       ]
     },
     {
+      "story_pipeline_id": "scifi_codex_circuit",
+      "label": "Sci-Fi Codex Circuit",
+      "executable": true,
+      "requires_source_contract": false,
+      "declared_seams": [
+        "codex_fact_index_system",
+        "codex_question_system",
+        "codex_pressure_cast_system",
+        "codex_radio_score_system",
+        "codex_coda_contract_system",
+        "codex_play_system",
+        "codex_listening_room_system",
+        "codex_retake_system",
+        "codex_final_audit_system",
+        "codex_structured_repair_system"
+      ],
+      "passes": [
+        {
+          "pass_id": "P0_fact_index",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_fact_index_system"
+          ],
+          "description": "Consumes A0, extracts source-spanned facts, entities, numbers, and tone, and fails if evidence cannot be indexed."
+        },
+        {
+          "pass_id": "P1_dramatic_question",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_question_system"
+          ],
+          "description": "Turns P0 constraints into a fiction-marked dramatic question without treating invention as reporting."
+        },
+        {
+          "pass_id": "P2_pressure_cast",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_pressure_cast_system"
+          ],
+          "description": "Builds the fixed-size cast and audible conflict graph from P1."
+        },
+        {
+          "pass_id": "P3_radio_score",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_radio_score_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Builds scenes, shots, beats, music cues, fact placements, and advisory beat-length centers."
+        },
+        {
+          "pass_id": "P4_structure_review",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_radio_score_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Reviews P3; a rewrite verdict loops once to P3 and a second rewrite verdict fails loud."
+        },
+        {
+          "pass_id": "P5_first_play",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_play_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Writes a complete first ScriptArtifact, including every announcer and music line."
+        },
+        {
+          "pass_id": "P6_listening_room",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_listening_room_system"
+          ],
+          "description": "Produces a listener-facing diagnosis of the whole first play and always sends it to full rewrite."
+        },
+        {
+          "pass_id": "P7_full_retake",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_retake_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Writes a complete replacement ScriptArtifact from P5 and P6, never a line-level patch."
+        },
+        {
+          "pass_id": "P8_final_audit",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_final_audit_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Audits current full script, source mappings, word counts, and ledger-ready role references; it feeds P9 and repeats after P9."
+        },
+        {
+          "pass_id": "P9_closing_rewrite",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_retake_system",
+            "codex_play_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Writes a complete final replacement. One additional full P9 rewrite is allowed only when the repeated P8 audit requests it."
+        },
+        {
+          "pass_id": "P10_structured_repair",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_structured_repair_system"
+          ],
+          "description": "Metadata-only repair seam: it supplies messages but makes no standalone call; shared repair reuses the originating pass slot and never changes model selection."
+        },
+        {
+          "pass_id": "P11_pre_tail_assembly",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "Validates and assembles the complete canonical ledger, then requires a warning-free Phase 0 report."
+        },
+        {
+          "pass_id": "P12_post_tail_freeze",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "Runs through the planned tail finalizer: warning-free Phase 10 before save, then a read-only persisted-ledger verification after save."
+        }
+      ],
+      "notes": [
+        "A0 is the first artifact and P0 is the first model call.",
+        "P3 to P4 to P3 is bounded to one structural rewrite.",
+        "P5 to P6 to P7 to P8 to P9 to P8 is non-linear full-rewrite topology; P9 may run once more after a rewrite audit.",
+        "Every model invocation uses only the pass slot. P11 and P12 are deterministic orchestration stages."
+      ]
+    },
+    {
+      "story_pipeline_id": "scifi_gemini_multipass",
+      "label": "Sci-Fi Gemini Multi-Pass (Write-Critique-Rewrite Loop)",
+      "executable": false,
+      "requires_source_contract": false,
+      "declared_seams": [
+        "gemini_fact_extraction",
+        "gemini_pitch_generation",
+        "gemini_pitch_critique",
+        "gemini_scene_outline",
+        "gemini_scene_draft",
+        "gemini_scene_critique",
+        "gemini_scene_rewrite"
+      ],
+      "passes": [
+        {
+          "pass_id": "gemini_extract_facts",
+          "slot": "technical",
+          "seam_refs": [
+            "gemini_fact_extraction"
+          ],
+          "description": "Extract raw scientific facts, numbers, and tone from the news payload."
+        },
+        {
+          "pass_id": "gemini_pitch",
+          "slot": "creative",
+          "seam_refs": [
+            "gemini_pitch_generation"
+          ],
+          "description": "Pitch 3 distinct sci-fi premises incorporating the facts."
+        },
+        {
+          "pass_id": "gemini_pitch_select",
+          "slot": "technical",
+          "seam_refs": [
+            "gemini_pitch_critique"
+          ],
+          "description": "Select the best premise for dramatic pacing and structural feasibility."
+        },
+        {
+          "pass_id": "gemini_outline",
+          "slot": "creative",
+          "seam_refs": [
+            "gemini_scene_outline"
+          ],
+          "description": "Generate a detailed scene, shot, beat outline with advisory word-band centers."
+        },
+        {
+          "pass_id": "gemini_draft",
+          "slot": "creative",
+          "seam_refs": [
+            "gemini_scene_draft"
+          ],
+          "description": "Draft verbatim dialogue and narration lines per scene beat."
+        },
+        {
+          "pass_id": "gemini_critique",
+          "slot": "technical",
+          "seam_refs": [
+            "gemini_scene_critique"
+          ],
+          "description": "Evaluate fact integration, locked roster fidelity, dialogue-only safety, and SFW compliance."
+        },
+        {
+          "pass_id": "gemini_rewrite",
+          "slot": "creative",
+          "seam_refs": [
+            "gemini_scene_rewrite"
+          ],
+          "description": "Rewrite the scene to correct any critique issues."
+        }
+      ],
+      "notes": [
+        "Scientific RSS payload-driven multi-pass pipeline utilizing Gemini.",
+        "Consumes the RSS news feed via resolved['news_article'] (Chunk 3 source contract)."
+      ]
+    },
+    {
+      "story_pipeline_id": "sonnet_archive_multipass",
+      "label": "Sonnet Archive Multipass (Continuity Archive frame narrative)",
+      "executable": false,
+      "requires_source_contract": false,
+      "declared_seams": [
+        "sonnet_intake_system",
+        "sonnet_frame_system",
+        "sonnet_literalist_system",
+        "sonnet_speculator_system",
+        "sonnet_audit_system",
+        "sonnet_warden_system",
+        "sonnet_rewrite_system",
+        "sonnet_attestation_system",
+        "sonnet_calibration_system"
+      ],
+      "passes": [
+        {
+          "pass_id": "provenance_intake",
+          "slot": "technical",
+          "seam_refs": [
+            "sonnet_intake_system"
+          ],
+          "description": "P0: raw science_rss payload -> FragmentDossier (verified_facts, key_numbers, named_entities, tone). Typed fail-loud on thin/malformed/empty. base_temp=0.20."
+        },
+        {
+          "pass_id": "session_frame",
+          "slot": "creative",
+          "seam_refs": [
+            "sonnet_frame_system"
+          ],
+          "description": "P1: dossier + the one advisory word steer -> SessionFrame (session title+premise, Registrar cold-open, the 3 Reliquarian registers). base_temp=.85."
+        },
+        {
+          "pass_id": "literalist_reading",
+          "slot": "creative",
+          "seam_refs": [
+            "sonnet_literalist_system"
+          ],
+          "description": "P2a (x2 calls): dossier + frame -> ORUM's citation-tagged lines (cites[] into the fact_N/num_N id space). base_temp=0.55."
+        },
+        {
+          "pass_id": "speculator_extrapolation",
+          "slot": "creative",
+          "seam_refs": [
+            "sonnet_speculator_system"
+          ],
+          "description": "P2b (x2 calls): dossier + frame + Orum's lines -> THESSALY's extrapolation lines. May not introduce a fact/number outside the dossier. base_temp=0.95."
+        },
+        {
+          "pass_id": "provenance_audit",
+          "slot": "technical",
+          "seam_refs": [
+            "sonnet_audit_system"
+          ],
+          "description": "P3: draft + dossier + precomputed citation coverage -> AuditVerdict. Runs after P2 and after P5 content rewrites; never for requested length. base_temp=.25."
+        },
+        {
+          "pass_id": "warden_challenge",
+          "slot": "creative",
+          "seam_refs": [
+            "sonnet_warden_system"
+          ],
+          "description": "P4: one mode-selected seam with distinct schemas. defect selects preserved WardenChallenge block; clear selects preserved WardenSatisfied block. Fires after every P3 result."
+        },
+        {
+          "pass_id": "rewrite",
+          "slot": "creative",
+          "seam_refs": [
+            "sonnet_rewrite_system"
+          ],
+          "description": "P5 (defect path only): draft + AuditVerdict + Warden objection -> corrected ORUM/THESSALY lines, restricted to flagged_line_refs. base_temp=0.45."
+        },
+        {
+          "pass_id": "attestation",
+          "slot": "creative",
+          "seam_refs": [
+            "sonnet_attestation_system"
+          ],
+          "description": "P6: dossier + final draft -> Registrar's closing citation-anchored Attestation + VESH's final seal + sign-off. base_temp=0.50."
+        },
+        {
+          "pass_id": "word_calibration",
+          "slot": "creative",
+          "seam_refs": [
+            "sonnet_calibration_system"
+          ],
+          "description": "P7: frozen declared seam; v4 gives it no target/count-triggered runtime edge."
+        },
+        {
+          "pass_id": "assemble",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "P8: pure Python, no LLM -- slot is registry metadata only. Final converged DraftScript -> ledger rows via set_cast/set_scenes/set_shots/set_beats/set_lines/set_music + EpisodeCanon. Runs exactly once, after the loop converges."
+        },
+        {
+          "pass_id": "seal_audit",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "P9: pure Python, no LLM. Deterministic trace, tokenization safety, no-orphan, authorship, and shared finalizer preparation."
+        }
+      ],
+      "notes": [
+        "Visible experiment; failure NEVER routes to legacy_many_pass.",
+        "requires_source_contract is false because the bank's interpreter is intentionally empty (P0 IS the interpretation) -- same registry technicality scifi_fable2 relies on (nodes/_otr_story_routing.py:427-435).",
+        "executable stays false until nodes/_otr_scifi_sonnet.py and the _RUNNER_BY_PIPELINE registration ship in the same change (registry law, nodes/OTR_LedgerScriptWriter.py:1610-1617).",
+        "kibitz r2 (Claude Code CLI, SHOULD-FIX #4): when bank.runnable flips to true, executable MUST flip to true in the SAME change -- nodes/_otr_story_routing.py:436-442 raises RegistryValidationError if requires_source_contract=false AND executable is still false. Not just a bank.json + runner change; pipelines.json's own executable flag is a separate, easy-to-miss flip.",
+        "The audit/rewrite loop is diegetic: VESH's objection and the Registrar's reopening beat ARE the P3-fail path, not a hidden gate (Section 1, Section 3).",
+        "Structured calls use the shared per-call three-attempt ladder; v4 has at most two P3 defect/P5 rewrite rounds and no count-calibration route."
+      ]
+    },
+    {
       "story_pipeline_id": "simple_4_prompt_experimental",
       "label": "Simple 4-Prompt Experimental",
       "executable": false,

@@ -1,5 +1,12 @@
 # OTR Go-Forward Plan
 
+**CODER SLOT CLAIM (2026-07-11, Codex):** Implement the three additive
+CODE-READY v4 Sci-Fi bake-off lanes in serial order (Codex -> Gemini ->
+Sonnet), including registry/pack/runner/tests and the shared optional
+TailFinalizer writer extension. Base SHA: `14dc8480e37342acfe5d9833726896e8ff9715ed`.
+`git status` is clean in all code/workflow/test files in scope; the only
+pre-existing work is the three incoming spec documents above.
+
 **CONTENDER LANE QUEUE (2026-07-10 night, operator-ratified).** Rival
 source-bank specs incoming: docs/2026-07-11-scifi-{codex,gemini,sonnet}-
 engine-spec.md. Lane law: (0) runway C1-C3 land FIRST (shared audio/merge
