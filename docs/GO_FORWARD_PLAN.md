@@ -19,24 +19,31 @@ All builds on v2.0-alpha, serial, never two windows in the shared JSON
 (mechanical); kibitz = local codex+antigravity; Fable only at the event.
 Then C6 qualification sweep (all six incl. B/C calibrations) -> C7 event.
 
-**ACTIVE STEP (2026-07-11): 720-bakeoff chunk C3 (cue manifest + canonical
-workflow wiring), CODE-READY.** C1 (durable-field identity) + C2 (text_for_tts
-delivery routing) SHIPPED + pushed @ `2f335c28` / v2.0-alpha (suite 7494/31/1
-+ Bug Bible 17/7/3 green). C3's wiring was kibitz'd (r3; Codex + Claude Code
-grounded, Antigravity timed out) -> HARDENED build spec =
-`docs/2026-07-11-c3-cue-manifest-wiring/FINAL_HARDENED_PLAN.md` (panel reviews
-+ anchor alongside). Load-bearing hardening vs the runway C3 text: (a) legacy
-lanes do NOT populate ledger.music[] (only fable2 calls set_music) -> node 83
-must SYNTHESIZE opening/closing via compose_music_prompt, mapping placement ->
-opening/closing/interstitial so inter_NN never KeyErrors; (b) fable2 sentinel
-lines carry NO cue_id -> stamp music[].anchor_line_id + placement in assembly
-(uses C1's fields) and resolve boundaries by anchor_line_id; (c) do NOT delete
-node-7 opening/closing inputs (widget-slot drift, BUG-LOCAL-097) -> keep
-declared/unlinked + branch on manifest presence; node-12 closing_audio same
-(drop link 243 only); (d) music = THIRD bus, never C2's two-bus check; (e)
-slice by manifest sample_count via direct tensor slice (no silence-trim) +
-resample to consumer rate; (f) shift ledger.music[] scene_audio->master_mix.
-STOP after C3 green+pushed; C4a/C4b run in an Opus window.
+**ACTIVE STEP (2026-07-11): 720-bakeoff C3 SHIPPED @ `6899d940` / v2.0-alpha;
+NEXT = C4a/C4b (S2 full loop) in an Opus window.** C1 (durable-field identity)
++ C2 (text_for_tts delivery routing) shipped @ `2f335c28`; C3 (cue manifest +
+canonical music-bus wiring) shipped this window per spec
+`docs/2026-07-11-c3-cue-manifest-wiring/FINAL_HARDENED_PLAN.md`. Suite 7510/31/1
++ Bug Bible 17/7/3 green; canonical validator OK (widget_vector_drift=0). LIVE:
+30w LTX smoke = SUCCESS (frozen_circuitry 62.9 MB, `audio_byte_identical OK`,
+7 beats covered, no gaps) + 720w all-visual LTX roll = SUCCESS (ticking_lockdown
+123.7 MB, `audio_byte_identical OK`, 18 beats incl. 2 music_inter covered, no
+gaps). What landed: NEW nodes/_otr_cue_manifest.py (manifest_version 1, shared
+parse/validate, keyed cue_id+batch_index); node 83 emits ONE padded cue batch +
+manifest (4-tuple cue_audio_clips/cue_manifest_json/render_log/done), rendering
+each ledger.music[] row (fable2) or SYNTHESIZING opening/closing/interstitial
+(legacy, byte-parity slot seeds), per-cue wav to the episode audio dir;
+SceneSequencer + EpisodeAssembler take music_cue_audio/manifest, music = THIRD
+bus (own index, never C2's two-bus check), opening/closing sliced from the batch
+by sample_count (no silence-trim) + resampled, interstitials inserted inline by
+anchor_line_id (fable2 only -- legacy interstitial stays unconsumed = pre-C3
+parity), scene_audio->master_mix shift extended to music rows (MF-H). JSON: links
+241/242/243 out, 280-283 in (node 83 -> nodes 3/7 fanout); node-7 opening/closing
++ node-12 closing_audio kept DECLARED/unlinked (BUG-LOCAL-097). last_link_id 279
+-> 283. STOP after C3 (done); C4a/C4b run in an Opus window.
+Post-C3 follow-up queued (operator 2026-07-11): richer music-still prompting
+(dedicated brief-driven visual prompt per cue vs reusing the cue description) --
+a SEPARATE chunk touching the image/video director prompt derivation, NOT C3.
 
 Plan of record: `docs/2026-07-10-fable2-720-bakeoff-runway.md` (kibitz'd before
 C4 coding). Chunks C1-C7: P1.1 ownership/revision merge contract -> P1.3
@@ -82,8 +89,7 @@ caption/credits sentinel alias, HuMo stale guard, per-scene band
 allocation): `docs/2026-07-10-fable2-s1b-QA-ANALYSIS.md` (file:line
 pins) + the brief `docs/2026-07-10-fable2-s1b-QA-PROBLEM-STATEMENT.md`.
 
-**Updated:** 2026-07-10 midday -- HEAD `ff4c226d` (+ this session's
-follow-up commit)
+**Updated:** 2026-07-11 -- HEAD `6899d940` (720-bakeoff C3 shipped + live-proofed)
 **Branch:** `v2.0-alpha`
 **Status:** original_radio LIVE SMOKE GREEN 2026-07-10 ("Page in the
 Tempest" published to obs). Remaining gate = OPERATOR EYEBALL only ->

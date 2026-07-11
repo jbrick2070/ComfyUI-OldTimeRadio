@@ -3,6 +3,46 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-11 -- HEAD 6899d940 (v2.0-alpha) [720-bakeoff C3 coder window]
+
+Did:
+- C3 SHIPPED @ 6899d940 (atomic code + canonical JSON + tests): music cue
+  manifest + third-bus wiring, per FINAL_HARDENED_PLAN.md. NEW
+  nodes/_otr_cue_manifest.py (manifest_version 1; shared parse/fail-loud
+  validate; keyed cue_id+batch_index; contiguous-batch + dup + placement gates).
+  Node 83 (StableAudioTheme) now emits ONE padded cue batch + manifest (4-tuple
+  cue_audio_clips/cue_manifest_json/render_log/done): renders each
+  ledger.music[] row (fable2) OR synthesizes opening/closing/interstitial
+  (legacy, byte-parity slot seeds); writes each cue wav to the episode audio
+  dir; placement mapping so inter_NN never KeyErrors compose_music_prompt.
+  SceneSequencer + EpisodeAssembler take music_cue_audio/manifest as a THIRD
+  bus (own index, never C2's two-bus check); opening/closing sliced from the
+  batch by sample_count (direct slice, no silence-trim) + resampled;
+  interstitials inserted inline by anchor_line_id (fable2 only; legacy stays
+  unconsumed = pre-C3 parity); MF-H scene_audio->master_mix shift extended to
+  music rows.
+- Canonical JSON same commit: links 241/242/243 out, 280-283 in (node 83 ->
+  nodes 3/7 fanout by name); node-7 opening/closing + node-12 closing_audio kept
+  DECLARED/unlinked (BUG-LOCAL-097 slot-drift guard); last_link_id 279 -> 283.
+  OTR_WorkflowValidator OK, widget_vector_drift=0, JSON round-trip + link-ref +
+  input-name + widgets_values-count audits clean.
+- Tests: NEW tests/test_cue_manifest.py (schema/dup/slice/byte-parity); rewrote
+  test_stable_audio_theme (4-tuple + fable2 lane) + test_full_workflow_v2_audio_
+  wiring (new fanout, 241/242/243 gone); fixed 2 constant-pin regressions caught
+  by the known-fail guard (test_audio_determinism_wrap 4-tuple,
+  test_google_video_sfx_workflow last_link_id 283).
+- Suite 7510/31/1 + Bug Bible 17/7/3 green. HEAD==origin, no BOM/0-byte, AST OK.
+- LIVE PROOF (LTX lane, headless :8000): 30w = SUCCESS (frozen_circuitry 62.9
+  MB, audio_byte_identical OK, 7 beats covered no gaps); 720w all-visual =
+  SUCCESS (ticking_lockdown 123.7 MB, audio_byte_identical OK, 18 beats incl. 2
+  music_inter covered, budget OK no gaps, 18:50 render). Byte-parity held on
+  both.
+Current step: C3 done + live-proofed. NEXT = C4a/C4b (S2 full loop) in an Opus
+window. Post-C3 follow-up queued: richer per-cue music-still prompting (separate
+chunk, image/video director prompt derivation).
+Next: C4a/C4b in an Opus window (do NOT start here).
+Commits: 6899d940 (code+JSON+tests). Docs refresh = this commit's follow-up.
+
 ## 2026-07-11 -- HEAD 2f335c28 (v2.0-alpha) [720-bakeoff C1/C2 coder window]
 
 Did:
