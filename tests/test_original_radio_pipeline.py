@@ -511,24 +511,6 @@ class TestQAGate:
         assert meta["original_qa"]["status"] == "clean_after_discard"
         assert meta["original_qa"]["discarded"] == ["weapons_smoking"]
 
-    def test_confirmed_hard_finding_still_kills(self, monkeypatch):
-        # The confirm pass produces a verbatim script quote -> the
-        # kill goes through with the evidence recorded (modern_ip is
-        # the one remaining confirm-class).
-        fn = _seq_fn(
-            json.dumps({"findings": [
-                {"class": "modern_ip",
-                 "detail": "a franchise name is spoken"},
-            ]}),
-            json.dumps({"confirmed": [
-                {"class": "modern_ip",
-                 "quote": "This has been SIGNAL LOST."},
-            ]}),
-        )
-        with pytest.raises(ORR.OriginalQAError, match="confirmed quote"):
-            self._run(_qa_ledger(), fn, monkeypatch)
-
-
 # ---------------------------------------------------------------------------
 # 6b. Hard-finding evidence triage (pure module, live-smoke hardening)
 # ---------------------------------------------------------------------------
@@ -602,35 +584,10 @@ class TestHardFindingTriage:
         assert len(kills) == 1 and not discarded
         assert "news" in kills[0][1]
 
-    def test_confirm_drop_discards(self):
-        fn = _seq_fn(json.dumps({"confirmed": []}))
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("modern_ip", "sounds like a franchise nod")],
-            script=self._SCRIPT, technical_fn=fn)
-        assert not kills and len(discarded) == 1
-
-    def test_confirm_grounded_quote_kills(self):
-        fn = _seq_fn(json.dumps({"confirmed": [
-            {"class": "modern_ip",
-             "quote": "This has been SIGNAL LOST."}]}))
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("modern_ip", "a branded catchphrase")],
-            script=self._SCRIPT, technical_fn=fn)
-        assert len(kills) == 1 and not discarded
-        assert "SIGNAL LOST" in kills[0][1]
-
-    def test_confirm_ungrounded_quote_exhausts_to_discard(self):
-        # The confirm judge invents a quote that is NOT in the script:
-        # the post-validator rejects it, the bounded ladder exhausts,
-        # and the finding is discarded (never a kill without evidence).
-        fn = _seq_fn(json.dumps({"confirmed": [
-            {"class": "modern_ip",
-             "quote": "brought to you by a famous cola"}]}))
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("modern_ip", "a brand is invoked")],
-            script=self._SCRIPT, technical_fn=fn)
-        assert not kills and len(discarded) == 1
-
+    def test_no_class_still_kills_on_an_unenumerable_hunch(self):
+        # Every surviving class corroborates against a LEXICON. Nothing may kill an
+        # episode on an open-vocabulary judgement no one can enumerate or check.
+        assert set(ORR.KILL_POLICY_BY_CLASS.values()) == {"lexicon_only"}
 
 # ---------------------------------------------------------------------------
 # 7. Provenance surfaces

@@ -135,8 +135,6 @@ HARD_CLASS_EVIDENCE: "dict[str, tuple[str, ...]]" = {
     "weapons_smoking": WEAPON_SMOKING_EVIDENCE,
     "news_source_framing": NEWS_FRAMING_EVIDENCE,
     "machine_attribution": MACHINE_ATTRIBUTION_EVIDENCE,
-    # Brand/franchise names are unbounded: confirm-quote only.
-    "modern_ip": (),
     "anachronism_dependency": ANACHRONISM_TERMS,
 }
 
@@ -147,18 +145,25 @@ HARD_CLASS_EVIDENCE: "dict[str, tuple[str, ...]]" = {
 # roll repeated the hole on news_source_framing by quoting the entire
 # -- perfectly clean -- intro line). Radio is pure dialogue: a weapon,
 # a tobacco act, NEWS FRAMING, or MACHINE ATTRIBUTION must be SAID in
-# words to exist on air, so every closed-vocabulary class takes the
-# lexicon as its only kill authority and an uncorroborated flag is
-# discarded LOUDLY (meta stamp + log keep it auditable; the operator
-# eyeball reviews discards). Only open-vocabulary modern_ip (brand /
-# franchise names are unenumerable) keeps the confirm-quote path.
+# words to exist on air, so every class takes the lexicon as its only
+# kill authority and an uncorroborated flag is discarded LOUDLY (meta
+# stamp + log keep it auditable; the operator eyeball reviews discards).
 # Data here, not Python branches.
+#
+# RIPPED 2026-07-11 (operator directive: "no more IP gates"). The pipeline
+# had ONE open-vocabulary class -- brand / franchise wording -- and it was
+# the only one whose kill authority was a confirm-quote rather than a
+# lexicon. Unenumerable by nature, it could never be corroborated: it killed
+# an episode on an unbounded hunch, with nothing to check it against and no
+# repair path. It took down the original_radio bank in the all-banks 30w
+# sweep. A gate with no enumerable evidence and no way to fix the finding is
+# not a gate; it is a coin flip the episode can only lose. Every surviving
+# class corroborates against a lexicon.
 KILL_POLICY_BY_CLASS: "dict[str, str]" = {
     "weapons_smoking": "lexicon_only",
     "anachronism_dependency": "lexicon_only",
     "news_source_framing": "lexicon_only",
     "machine_attribution": "lexicon_only",
-    "modern_ip": "confirm",
 }
 
 
@@ -369,8 +374,11 @@ class QAFindings(BaseModel):
     findings: list[QAFinding] = Field(default_factory=list)
 
 
+# The brand/franchise class is GONE (operator 2026-07-11: "no more IP gates").
+# A QA class the judge can flag but nobody can enumerate, corroborate, or repair
+# is not a safety net -- it is a lottery the episode can only lose.
 QA_CLASSES: frozenset = frozenset({
-    "weapons_smoking", "modern_ip", "news_source_framing",
+    "weapons_smoking", "news_source_framing",
     "machine_attribution", "epilogue_missing", "epilogue_moralizes",
     "epilogue_contradicts", "anachronism_dependency",
 })
@@ -380,7 +388,6 @@ QA_CLASSES: frozenset = frozenset({
 # everything else fails the episode outright.
 REPAIR_ACTION_BY_CLASS: "dict[str, str]" = {
     "weapons_smoking": "fail",
-    "modern_ip": "fail",
     "news_source_framing": "fail",
     "machine_attribution": "fail",
     "epilogue_missing": "recompose_outro",
@@ -716,11 +723,24 @@ def run_original_qa(
         raise OriginalQAError("original QA: empty script excerpt")
 
     def _qa_gate(m: QAFindings) -> "str | None":
+        # A finding whose class we do not recognise -- a retired class, or one the
+        # judge invented -- is DROPPED, not fatal.
+        # Rejecting the whole artifact over it sends the pass round the retry
+        # ladder and then kills the episode: the judge naming a class we no longer
+        # act on is not a defect in the SCRIPT, and it must never cost a broadcast.
+        kept = []
         for f in m.findings:
             if f.finding_class not in QA_CLASSES:
-                return f"unknown finding class {f.finding_class!r}"
+                log.warning(
+                    "[original_qa] discarding finding of unknown/retired class %r "
+                    "(detail=%r) -- it is not a class this pipeline acts on",
+                    f.finding_class, f.detail,
+                )
+                continue
             if not f.detail.strip():
                 return f"finding {f.finding_class!r}: empty detail"
+            kept.append(f)
+        m.findings = kept
         return None
 
     # LLM slot: technical -- structured audit, not narrative.
@@ -760,39 +780,6 @@ def run_original_qa(
 # not. Epilogue-class repair mechanics are untouched (r4 P3/P4).
 
 
-class ConfirmedFinding(BaseModel):
-    finding_class: str = Field(default="", alias="class")
-    quote: str = Field(default="")
-
-    model_config = {"populate_by_name": True}
-
-
-class ConfirmedFindings(BaseModel):
-    confirmed: list[ConfirmedFinding] = Field(default_factory=list)
-
-
-_QA_CONFIRM_SYSTEM = (
-    "You are re-auditing an old-time-radio script you previously "
-    "flagged. For each flagged class, either PROVE it -- copy the exact "
-    "on-air words that constitute the violation (the named weapon or "
-    "smoking act itself; the words calling the tale news, a report, or "
-    "a true story; the words attributing the story to a machine; the "
-    "brand or franchise name; the modern technology the plot depends "
-    "on) -- or DROP it.\n"
-    "A threat, alarm, siren, lever, or menace WITHOUT a named weapon "
-    "is NOT weapons_smoking; smoke or steam from machines, coils, or "
-    "overheating equipment is not either -- that class means a named "
-    "weapon or tobacco smoking. A time-of-day opener or dramatic "
-    "teaser is NOT news_source_framing unless the tale is explicitly "
-    "called news, a report, or a true story, or a source is cited.\n"
-    "Return one JSON object only -- no prose, no fences. Schema:\n"
-    '{ "confirmed": array (possibly EMPTY) of\n'
-    '    { "class": the flagged class,\n'
-    '      "quote": the offending words COPIED VERBATIM from the '
-    "script } }"
-)
-
-
 def corroborate_hard_finding(finding: QAFinding, script: str) -> "str | None":
     """Deterministic evidence check for an episode-killing finding.
 
@@ -808,79 +795,6 @@ def corroborate_hard_finding(finding: QAFinding, script: str) -> "str | None":
     return None
 
 
-def confirm_hard_findings(
-    findings: "Sequence[QAFinding]",
-    *,
-    script: str,
-    technical_fn: Callable[..., str],
-) -> "tuple[list[tuple[QAFinding, str]], list[QAFinding]]":
-    """ONE bounded confirm re-judge for uncorroborated hard findings.
-
-    Returns (confirmed, discarded): confirmed pairs each finding with
-    the verbatim script quote the judge produced for it (the post-
-    validator rejects quotes that are not literally in the script, so
-    a kill is always evidence-backed); discarded carries every finding
-    the confirm pass dropped or could not ground. A confirm ladder that
-    exhausts means the judge failed to produce grounded evidence twice
-    -- the evidence bar is not met, so everything is discarded (the
-    CALLER logs the discard loudly and stamps it on meta)."""
-    flagged = sorted({f.finding_class for f in findings})
-    script_norm = _norm_ws_lower(script)
-
-    def _confirm_gate(m: ConfirmedFindings) -> "str | None":
-        for c in m.confirmed:
-            if c.finding_class not in flagged:
-                return f"class {c.finding_class!r} was not flagged"
-            if not c.quote.strip():
-                return f"class {c.finding_class!r}: empty quote"
-            if _norm_ws_lower(c.quote) not in script_norm:
-                return (f"quote {c.quote!r} is not verbatim from the "
-                        f"script")
-        return None
-
-    try:
-        # LLM slot: technical -- evidence confirm re-judge, not narrative.
-        result = structured_call(
-            prompt=[
-                {"role": "system", "content": _QA_CONFIRM_SYSTEM},
-                {"role": "user", "content": (
-                    "FLAGGED CLASSES: " + ", ".join(flagged)
-                    + "\n\nORIGINAL FINDINGS:\n"
-                    + "\n".join(f"- {f.finding_class}: {f.detail}"
-                                for f in findings)
-                    + "\n\nTHE FULL SPOKEN SCRIPT:\n" + script
-                    + "\n\nProve or drop now."
-                )},
-            ],
-            schema=ConfirmedFindings,
-            slot_fn=technical_fn,
-            base_temperature=0.2,
-            structural_retry_temperature=0.1,
-            repair_prompt_factory=make_dispatching_repair_factory(),
-            post_validator=_confirm_gate,
-            max_new_tokens=600,
-            max_attempts=2,
-            helper_name="original_qa_confirm",
-        )
-    except StructuredCallFailedError:
-        log.warning(
-            "[OTR_OriginalRadio] original_qa confirm ladder exhausted "
-            "without grounded evidence; discarding %d unproven hard "
-            "finding(s)", len(list(findings)),
-        )
-        return [], list(findings)
-
-    quotes = {c.finding_class: c.quote for c in result.confirmed}
-    confirmed: "list[tuple[QAFinding, str]]" = []
-    discarded: "list[QAFinding]" = []
-    for f in findings:
-        if f.finding_class in quotes:
-            confirmed.append((f, quotes[f.finding_class]))
-        else:
-            discarded.append(f)
-    return confirmed, discarded
-
-
 def triage_hard_findings(
     findings: "Sequence[QAFinding]",
     *,
@@ -889,32 +803,28 @@ def triage_hard_findings(
 ) -> "tuple[list[tuple[QAFinding, str]], list[QAFinding]]":
     """Evidence triage for episode-killing findings.
 
-    Deterministic lexicon corroboration first (no LLM spend); anything
-    unproven takes the ONE confirm re-judge. Returns (kills, discarded)
-    where each kill pairs the finding with a human-readable evidence
-    string for the OriginalQAError / meta stamp."""
+    EVERY class corroborates against a LEXICON. A weapon, a tobacco act, news
+    framing, machine attribution, an anachronism -- radio is pure dialogue, so
+    each must be SAID in words to exist on air, and the words are enumerable.
+    A flag with no lexicon hit is judge noise: it is discarded (the caller logs
+    it loudly and stamps meta for the operator eyeball).
+
+    Nothing kills an episode on an open-vocabulary judgement. The confirm-quote
+    ladder was ripped with the brand/franchise class (operator 2026-07-11): a quote
+    proves the LINE EXISTS, never that it belongs to the class, and it was the
+    only path by which an unenumerable hunch could take a broadcast off the air.
+
+    Returns (kills, discarded); each kill pairs the finding with a human-readable
+    evidence string for the OriginalQAError / meta stamp.
+    """
     kills: "list[tuple[QAFinding, str]]" = []
-    unproven: "list[QAFinding]" = []
     discarded: "list[QAFinding]" = []
     for f in findings:
         term = corroborate_hard_finding(f, script)
         if term is not None:
             kills.append((f, f"lexicon evidence {term!r}"))
-        elif KILL_POLICY_BY_CLASS.get(f.finding_class) == "confirm":
-            unproven.append(f)
         else:
-            # lexicon_only class with no lexicon hit: nothing nameable
-            # is on air -> the flag is judge noise. Discard (the caller
-            # logs it loudly and stamps meta for the operator eyeball).
             discarded.append(f)
-    if unproven:
-        confirmed, dropped = confirm_hard_findings(
-            unproven, script=script, technical_fn=technical_fn,
-        )
-        kills.extend(
-            (f, f"confirmed quote {q!r}") for f, q in confirmed
-        )
-        discarded.extend(dropped)
     return kills, discarded
 
 
@@ -925,7 +835,6 @@ __all__ = [
     "REPAIR_ACTION_BY_CLASS", "build_original_briefs", "run_original_qa",
     "scan_forbidden", "DECK_AXES", "FORBIDDEN_TERMS", "ANACHRONISM_TERMS",
     "HARD_CLASS_EVIDENCE", "KILL_POLICY_BY_CLASS",
-    "ConfirmedFinding", "ConfirmedFindings",
-    "corroborate_hard_finding", "confirm_hard_findings",
+    "corroborate_hard_finding",
     "triage_hard_findings", "script_excerpt",
 ]
