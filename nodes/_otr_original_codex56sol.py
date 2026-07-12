@@ -51,87 +51,7 @@ CastRole = Annotated[
 ]
 
 
-def _manifest_speaker_role(value: Any) -> Any:
-    if not isinstance(value, str):
-        return value
-    lowered = value.strip().lower().replace("-", "_").replace(" ", "_")
-    if lowered in {"announcer", "narrator"}:
-        return "announcer"
-    if lowered in {"character", "caller", "desk_operator"}:
-        return "character"
-    return value
-
-
-def _manifest_boundary(value: Any) -> Any:
-    if not isinstance(value, str):
-        return value
-    lowered = value.strip().lower().replace("-", "_").replace(" ", "_")
-    aliases = {
-        "start": "shot_start",
-        "scene_start": "shot_start",
-        "shot_start": "shot_start",
-        "beat_start": "beat_start",
-        "continue": "continue",
-        "continuation": "continue",
-        "end": "continue",
-        "beat_end": "continue",
-        "shot_end": "continue",
-        "scene_end": "continue",
-    }
-    return aliases.get(lowered, value)
-
-
-def _manifest_arc_phase(value: Any) -> Any:
-    if not isinstance(value, str):
-        return value
-    lowered = value.strip().lower().replace("-", "_").replace(" ", "_")
-    aliases = {
-        "opening": "opening",
-        "setup": "opening",
-        "orientation": "opening",
-        "exposition": "opening",
-        "rising": "rising",
-        "confrontation": "rising",
-        "development": "rising",
-        "rising_action": "rising",
-        "reveal": "reveal",
-        "discovery": "reveal",
-        "climax": "reveal",
-        "closing": "closing",
-        "resolution": "closing",
-        "final": "closing",
-        "ending": "closing",
-    }
-    return aliases.get(lowered, value)
-
-
-def _manifest_marker(value: Any) -> Any:
-    if not isinstance(value, str):
-        return value
-    lowered = value.strip().lower().replace("-", "_").replace(" ", "_")
-    if lowered in {
-        "true", "yes", "1", "orientation", "clue", "reveal", "closure",
-        "closing", "final",
-    }:
-        return True
-    if lowered in {"false", "no", "0", "none", "null", ""}:
-        return False
-    return value
-
-
-ManifestSpeakerRole = Annotated[
-    Literal["announcer", "character"],
-    BeforeValidator(_manifest_speaker_role),
-]
-ManifestBoundary = Annotated[
-    Literal["shot_start", "beat_start", "continue"],
-    BeforeValidator(_manifest_boundary),
-]
-ManifestArcPhase = Annotated[
-    Literal["opening", "rising", "reveal", "closing"],
-    BeforeValidator(_manifest_arc_phase),
-]
-ManifestMarker = Annotated[bool | None, BeforeValidator(_manifest_marker)]
+ArcPhase = Literal["opening", "rising", "reveal", "closing"]
 
 
 class ConstraintDraw(StrictModel):
@@ -165,7 +85,7 @@ class PossibilityCard(StrictModel):
 
 
 class PossibilitySlate(StrictModel):
-    possibilities: list[PossibilityCard] = Field(min_length=3, max_length=3)
+    possibilities: list[PossibilityCard] = Field(min_length=4, max_length=6)
 
 
 class CandidateFinding(StrictModel):
@@ -200,6 +120,13 @@ class AudibleClue(StrictModel):
     implication: str
 
 
+class Interpretation(StrictModel):
+    interpretation_id: Identifier
+    clue_ids: list[Identifier] = Field(min_length=1)
+    explanation: str
+    is_true: bool
+
+
 class ResolutionLink(StrictModel):
     thread_id: Identifier
     action: str
@@ -214,6 +141,7 @@ class AudibleTruthMap(StrictModel):
     caller_threads: list[CallerThread] = Field(min_length=2)
     causal_steps: list[CausalStep] = Field(min_length=2)
     audible_clues: list[AudibleClue] = Field(min_length=3)
+    interpretations: list[Interpretation] = Field(min_length=2)
     reveal: str
     resolution_links: list[ResolutionLink] = Field(min_length=2)
 
@@ -252,13 +180,19 @@ class ShotConcept(StrictModel):
     env: str = ""
 
 
+class LineIntent(StrictModel):
+    intent: str
+    arc_phase: ArcPhase
+    clue_ids: list[Identifier] = Field(default_factory=list)
+
+
 class BeatConcept(StrictModel):
     beat_id: str
     shot_id: str
     scene_id: str
     char_id: str
     speaker: str
-    intent: str
+    line_intent: LineIntent
 
 
 class MusicBookend(StrictModel):
@@ -274,6 +208,9 @@ class BroadcastScore(StrictModel):
     scenes: list[SceneConcept] = Field(min_length=2, max_length=4)
     shots: list[ShotConcept] = Field(min_length=2)
     beats: list[BeatConcept] = Field(min_length=5)
+    orientation_beat_id: Identifier
+    reveal_beat_id: Identifier
+    closure_beat_id: Identifier
     opening_music: MusicBookend
     closing_music: MusicBookend
 
@@ -285,14 +222,15 @@ class ManifestLine(StrictModel):
     scene_id: str
     char_id: str
     speaker: str
-    speaker_role: ManifestSpeakerRole
-    boundary: ManifestBoundary
-    arc_phase: ManifestArcPhase
+    speaker_role: Literal["announcer", "character"]
+    boundary: Literal["shot_start", "beat_start", "continue"]
+    arc_phase: ArcPhase
     intent: str
-    orientation: ManifestMarker = None
-    clue: ManifestMarker = None
-    reveal: ManifestMarker = None
-    closure: ManifestMarker = None
+    clue_ids: list[Identifier] = Field(default_factory=list)
+    orientation: bool | None = None
+    clue: bool | None = None
+    reveal: bool | None = None
+    closure: bool | None = None
 
 
 class ClosedLineManifest(StrictModel):
@@ -346,6 +284,33 @@ class FinalContractAudit(StrictModel):
 GenerateFn = Callable[..., str]
 
 
+def _repair_rules(pass_id: str, error: Any) -> str:
+    rules = ""
+    if "forbidden" in str(error).lower():
+        rules += (
+            " Replace EVERY cited unsafe authored field/span. Unsafe prose "
+            "is not immutable. Preserve the artifact structure, immutable "
+            "constraint-draw fields, all IDs, and collection membership and "
+            "cardinality, but rewrite every cited unsafe prose value."
+        )
+    if pass_id == "P3":
+        rules += (
+            " Preserve the complete artifact and every existing collection "
+            "item. causal_steps MUST contain at least 2 items; audible_clues "
+            "MUST contain at least 3 items; caller_threads and resolution_links "
+            "MUST each contain at least 2 items. Never delete an item to repair "
+            "an identifier or type error."
+        )
+    if pass_id == "P5":
+        rules += (
+            " Cast MUST include one separate row with char_id exactly "
+            "`announcer` and role exactly `announcer`, exactly one different "
+            "row with role `desk_operator`, and every remaining row with "
+            "role `caller`. Never combine announcer and desk operator."
+        )
+    return rules
+
+
 def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
           seam: str, inputs: Mapping[str, Any], schema: type[BaseModel],
           scheduler: Any, journal: list[dict], tokens: int = 2400,
@@ -364,22 +329,7 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         attempts.append(hashlib.sha256(str(raw).encode()).hexdigest())
         return raw
     def repair(*, original_prompt, failed_output, error):
-        pass_rules = ""
-        if pass_id == "P3":
-            pass_rules = (
-                " Preserve the complete artifact and every existing collection "
-                "item. causal_steps MUST contain at least 2 items; audible_clues "
-                "MUST contain at least 3 items; caller_threads and resolution_links "
-                "MUST each contain at least 2 items. Never delete an item to repair "
-                "an identifier or type error."
-            )
-        if pass_id == "P5":
-            pass_rules += (
-                " Cast MUST include one separate row with char_id exactly "
-                "`announcer` and role exactly `announcer`, exactly one different "
-                "row with role `desk_operator`, and every remaining row with "
-                "role `caller`. Never combine announcer and desk operator."
-            )
+        pass_rules = _repair_rules(pass_id, error)
         return [
             {"role": "system", "content": system + "\nReturn the same complete artifact, repairing only the typed contract error." + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "error": str(error), "inputs": inputs}, ensure_ascii=False, sort_keys=True)},
@@ -426,7 +376,32 @@ def _validate_triage(triage: SlateTriage, slate: PossibilitySlate) -> str | None
     return None
 
 
-def _validate_score(score: BroadcastScore) -> str | None:
+def _validate_truth_map(truth: AudibleTruthMap) -> str | None:
+    collections = {
+        "caller_threads": [row.thread_id for row in truth.caller_threads],
+        "causal_steps": [row.step_id for row in truth.causal_steps],
+        "audible_clues": [row.clue_id for row in truth.audible_clues],
+        "interpretations": [row.interpretation_id for row in truth.interpretations],
+    }
+    if any(len(values) != len(set(values)) for values in collections.values()):
+        return "truth-map structural ids must be unique within each collection"
+    thread_ids = set(collections["caller_threads"])
+    clue_ids = set(collections["audible_clues"])
+    if any(clue.thread_id not in thread_ids for clue in truth.audible_clues):
+        return "every audible clue thread_id must resolve"
+    if any(link.thread_id not in thread_ids for link in truth.resolution_links):
+        return "every resolution link thread_id must resolve"
+    if not any(row.is_true for row in truth.interpretations):
+        return "interpretations need at least one true interpretation"
+    if not any(not row.is_true for row in truth.interpretations):
+        return "interpretations need at least one plausible false interpretation"
+    if any(set(row.clue_ids) - clue_ids for row in truth.interpretations):
+        return "every interpretation clue_id must resolve"
+    return None
+
+
+def _validate_score(score: BroadcastScore,
+                    truth: AudibleTruthMap) -> str | None:
     if sum(c.char_id == "announcer" and c.role == "announcer"
            for c in score.cast) != 1:
         return "cast needs one separate char_id='announcer', role='announcer' row"
@@ -434,6 +409,54 @@ def _validate_score(score: BroadcastScore) -> str | None:
         return "cast needs exactly one separate desk_operator row"
     if len({c.char_id for c in score.cast}) != len(score.cast):
         return "cast char_id values must be unique"
+    cast_ids = {c.char_id for c in score.cast}
+    scene_ids = {s.scene_id for s in score.scenes}
+    shot_by_id = {s.shot_id: s for s in score.shots}
+    beat_ids = [b.beat_id for b in score.beats]
+    if len(scene_ids) != len(score.scenes) or len(shot_by_id) != len(score.shots):
+        return "scene_id and shot_id values must be unique"
+    if len(beat_ids) != len(set(beat_ids)):
+        return "beat_id values must be unique"
+    if any(shot.scene_id not in scene_ids for shot in score.shots):
+        return "every shot scene_id must resolve"
+    for beat in score.beats:
+        shot = shot_by_id.get(beat.shot_id)
+        if (shot is None or beat.scene_id not in scene_ids
+                or shot.scene_id != beat.scene_id or beat.char_id not in cast_ids):
+            return "every beat graph reference must resolve"
+    closed_shots: set[str] = set()
+    previous_shot = None
+    for beat in score.beats:
+        if beat.shot_id != previous_shot:
+            if beat.shot_id in closed_shots:
+                return "beats for each shot must form one contiguous block"
+            if previous_shot is not None:
+                closed_shots.add(previous_shot)
+            previous_shot = beat.shot_id
+    landmark_ids = [score.orientation_beat_id, score.reveal_beat_id,
+                    score.closure_beat_id]
+    if len(set(landmark_ids)) != 3 or any(value not in beat_ids for value in landmark_ids):
+        return "orientation, reveal, and closure beat ids must be distinct and resolve"
+    positions = {beat_id: index for index, beat_id in enumerate(beat_ids)}
+    if not (positions[score.orientation_beat_id] < positions[score.reveal_beat_id]
+            < positions[score.closure_beat_id]):
+        return "landmark order must be orientation before reveal before closure"
+    by_beat = {beat.beat_id: beat for beat in score.beats}
+    expected_phases = {
+        score.orientation_beat_id: "opening",
+        score.reveal_beat_id: "reveal",
+        score.closure_beat_id: "closing",
+    }
+    if any(by_beat[beat_id].line_intent.arc_phase != phase
+           for beat_id, phase in expected_phases.items()):
+        return "landmark beat arc phases must be opening, reveal, and closing"
+    expected_clues = {clue.clue_id for clue in truth.audible_clues}
+    assigned_clues = [clue_id for beat in score.beats
+                      for clue_id in beat.line_intent.clue_ids]
+    if set(assigned_clues) != expected_clues:
+        return "line intents must cover every truth-map clue and no unknown clue"
+    if len(assigned_clues) != len(set(assigned_clues)):
+        return "each truth-map clue must be assigned to exactly one line intent"
     return None
 
 
@@ -453,22 +476,85 @@ def _iter_authored_strings(value: Any, path: str = ""):
 
 
 def _validate_authored_surface(value: Any, rules: Any) -> str | None:
+    violations = []
     for path, text in _iter_authored_strings(value):
         for term in getattr(rules, "banned_phrases", ()):
             if re.search(rf"\b{re.escape(term)}\b", text, re.I):
-                return (f"authored field {path!r} contains forbidden term "
-                        f"{term!r}; replace that authored detail")
+                violations.append(
+                    f"authored field {path!r} contains forbidden term {term!r}"
+                )
         for pattern in getattr(rules, "stage_business", ()):
             if pattern.search(text):
-                return (f"authored field {path!r} contains a forbidden "
-                        "authored surface; replace that detail")
+                violations.append(
+                    f"authored field {path!r} contains a forbidden authored surface"
+                )
+    if violations:
+        return "; ".join(violations) + "; replace every cited authored detail"
     return None
+
+
+def _truth_item_ids(truth: AudibleTruthMap) -> dict[str, set[str]]:
+    return {
+        "caller_threads": {row.thread_id for row in truth.caller_threads},
+        "causal_steps": {row.step_id for row in truth.causal_steps},
+        "audible_clues": {row.clue_id for row in truth.audible_clues},
+        "interpretations": {row.interpretation_id for row in truth.interpretations},
+        "resolution_links": {row.thread_id for row in truth.resolution_links},
+    }
+
+
+def _corroborated_fair_blocks(report: FairPlayReport,
+                              truth: AudibleTruthMap) -> list[FairPlayFinding]:
+    ids = _truth_item_ids(truth)
+    blocks = []
+    for finding in report.findings:
+        root = finding.field_path.strip().split(".", 1)[0]
+        if (finding.blocking and finding.category.strip()
+                and finding.detail.strip() and finding.item_id in ids.get(root, set())):
+            blocks.append(finding)
+    return blocks
+
+
+def _compile_manifest(score: BroadcastScore) -> ClosedLineManifest:
+    cast = {row.char_id: row for row in score.cast}
+    beat_to_line: dict[str, str] = {}
+    lines = []
+    previous_shot = None
+    for index, beat in enumerate(score.beats, 1):
+        line_id = f"line_{index:03d}"
+        beat_to_line[beat.beat_id] = line_id
+        intent = beat.line_intent
+        lines.append(ManifestLine(
+            line_id=line_id, beat_id=beat.beat_id, shot_id=beat.shot_id,
+            scene_id=beat.scene_id, char_id=beat.char_id, speaker=beat.speaker,
+            speaker_role="announcer" if cast[beat.char_id].role == "announcer"
+            else "character",
+            boundary="shot_start" if beat.shot_id != previous_shot else "beat_start",
+            arc_phase=intent.arc_phase, intent=intent.intent,
+            clue_ids=list(intent.clue_ids),
+            orientation=beat.beat_id == score.orientation_beat_id,
+            clue=bool(intent.clue_ids), reveal=beat.beat_id == score.reveal_beat_id,
+            closure=beat.beat_id == score.closure_beat_id,
+        ))
+        previous_shot = beat.shot_id
+    manifest = ClosedLineManifest(
+        lines=lines,
+        orientation_line_id=beat_to_line[score.orientation_beat_id],
+        reveal_line_id=beat_to_line[score.reveal_beat_id],
+        closure_line_id=beat_to_line[score.closure_beat_id],
+    )
+    error = _validate_manifest(score, manifest)
+    if error:
+        raise OriginalCodex56SolContractError(error)
+    return manifest
 
 
 def _validate_manifest(score: BroadcastScore,
                        manifest: ClosedLineManifest) -> str | None:
     beat_ids = {beat.beat_id for beat in score.beats}
-    if {line.beat_id for line in manifest.lines} != beat_ids:
+    manifest_beat_ids = [line.beat_id for line in manifest.lines]
+    if (set(manifest_beat_ids) != beat_ids
+            or len(manifest_beat_ids) != len(beat_ids)):
         return "manifest must cover every score beat exactly once"
     landmarks = {
         "orientation": manifest.orientation_line_id,
@@ -476,8 +562,35 @@ def _validate_manifest(score: BroadcastScore,
         "closure": manifest.closure_line_id,
     }
     line_ids = {line.line_id for line in manifest.lines}
+    if len(line_ids) != len(manifest.lines):
+        return "manifest line_id values must be unique"
     if any(line_id not in line_ids for line_id in landmarks.values()):
         return "every top-level landmark line id must resolve in manifest lines"
+    if len(set(landmarks.values())) != 3:
+        return "orientation, reveal, and closure line ids must be distinct"
+    positions = {line.line_id: index for index, line in enumerate(manifest.lines)}
+    if not (positions[manifest.orientation_line_id]
+            < positions[manifest.reveal_line_id]
+            < positions[manifest.closure_line_id]):
+        return "landmark line order must be orientation before reveal before closure"
+    expected_clues = {clue_id for beat in score.beats
+                      for clue_id in beat.line_intent.clue_ids}
+    manifest_clues = [clue_id for line in manifest.lines for clue_id in line.clue_ids]
+    if set(manifest_clues) != expected_clues or len(manifest_clues) != len(set(manifest_clues)):
+        return "manifest clue ids must exactly cover score line-intent clues"
+    score_by_beat = {beat.beat_id: beat for beat in score.beats}
+    cast_by_id = {row.char_id: row for row in score.cast}
+    for line in manifest.lines:
+        beat = score_by_beat[line.beat_id]
+        expected_role = ("announcer" if cast_by_id[beat.char_id].role == "announcer"
+                         else "character")
+        if (line.shot_id != beat.shot_id or line.scene_id != beat.scene_id
+                or line.char_id != beat.char_id or line.speaker != beat.speaker
+                or line.speaker_role != expected_role
+                or line.intent != beat.line_intent.intent
+                or line.arc_phase != beat.line_intent.arc_phase
+                or line.clue_ids != beat.line_intent.clue_ids):
+            return "manifest row differs from its accepted score beat"
     for line in manifest.lines:
         for marker, expected in landmarks.items():
             if getattr(line, marker) is True and line.line_id != expected:
@@ -504,7 +617,9 @@ def _validate_graph(score: BroadcastScore, manifest: ClosedLineManifest,
                 or shots[beat.shot_id].scene_id != beat.scene_id):
             return "beat graph reference is invalid"
     mids = [m.line_id for m in manifest.lines]
-    if len(mids) != len(set(mids)) or set(m.beat_id for m in manifest.lines) != set(beats):
+    manifest_beats = [m.beat_id for m in manifest.lines]
+    if (len(mids) != len(set(mids)) or set(manifest_beats) != set(beats)
+            or len(manifest_beats) != len(beats)):
         return "manifest must cover every beat exactly"
     sids = [line.line_id for line in script.lines]
     if sids != mids:
@@ -526,15 +641,45 @@ def _validate_text(script: PerformanceScript, rules: Any) -> str | None:
         text = line.text.strip()
         if not text:
             return "spoken text is empty"
-        for term in getattr(rules, "banned_phrases", ()):
-            if re.search(rf"\b{re.escape(term)}\b", text, re.I):
-                return f"forbidden term {term!r}"
-        for pattern in getattr(rules, "stage_business", ()):
-            if pattern.search(text):
-                return "forbidden authored surface"
         if re.search(r"^[A-Z][A-Z0-9 _-]{1,24}:\s*", text):
             return "speaker label in spoken text"
-    return None
+    return _validate_authored_surface(script, rules)
+
+
+def _preceding_lines(manifest: ClosedLineManifest,
+                     script: PerformanceScript) -> list[dict[str, str]]:
+    script_by_id = {line.line_id: line for line in script.lines}
+    packet = []
+    reveal_found = False
+    for row in manifest.lines:
+        if row.line_id == manifest.reveal_line_id:
+            reveal_found = True
+            break
+        spoken = script_by_id[row.line_id]
+        packet.append({"line_id": spoken.line_id, "char_id": spoken.char_id,
+                       "speaker": spoken.speaker, "text": spoken.text})
+    if not reveal_found:
+        raise OriginalCodex56SolContractError("blind-listener reveal line is missing")
+    if not packet:
+        raise OriginalCodex56SolContractError("blind-listener packet is empty")
+    return packet
+
+
+def _listener_blocks(report: BlindListenerReport,
+                     allowed_line_ids: set[str]) -> list[ListenerFinding]:
+    return [finding for finding in report.findings
+            if finding.blocking and finding.line_id in allowed_line_ids
+            and finding.category.strip() and finding.detail.strip()]
+
+
+def _audit_blocks(report: FinalContractAudit,
+                  script: PerformanceScript) -> list[ContractFinding]:
+    text_by_id = {line.line_id: line.text for line in script.lines}
+    return [finding for finding in report.findings
+            if finding.blocking and finding.item_id in text_by_id
+            and finding.field_path.strip() and finding.category.strip()
+            and finding.allowed_correction.strip() and finding.exact_span
+            and finding.exact_span in text_by_id[finding.item_id]]
 
 
 def _validate_script(score: BroadcastScore, manifest: ClosedLineManifest,
@@ -617,33 +762,43 @@ def run_original_codex56sol_episode(
     except Exception as exc:
         raise OriginalCodex56SolContractError(f"invalid immutable constraint draw: {exc}") from exc
     journal: list[dict] = []
-    ingress = _call(pass_id="P0", slot="technical", fn=technical_fn, pack=pack, seam="codex56_constraint_ingress", inputs={"draw": draw.model_dump(mode="json")}, schema=ConstraintIngress, scheduler=slot_scheduler, journal=journal, tokens=1200)
-    if ingress.draw != draw:
-        raise OriginalCodex56SolContractError("technical ingress changed the constraint draw")
+    ingress = ConstraintIngress(draw=draw)
     slate = _call(pass_id="P1", slot="creative", fn=creative_fn, pack=pack, seam="codex56_possibility_slate", inputs={"ingress": ingress.model_dump(mode="json"), "operator_hint": (meta.get("source_meta") or {}).get("operator_hint", "")}, schema=PossibilitySlate, scheduler=slot_scheduler, journal=journal, post_validator=lambda value: _validate_slate(value, draw) or _validate_authored_surface(value, story_rules))
     triage = _call(pass_id="P2", slot="technical", fn=technical_fn, pack=pack, seam="codex56_slate_triage", inputs={"slate": slate.model_dump(mode="json")}, schema=SlateTriage, scheduler=slot_scheduler, journal=journal, tokens=1600, post_validator=lambda value: _validate_triage(value, slate))
     selected = next((p for p in slate.possibilities if p.possibility_id == triage.selected_possibility_id), None)
     if selected is None or any(f.blocking and f.possibility_id == selected.possibility_id for f in triage.findings):
         raise OriginalCodex56SolContractError("triage did not select a valid possibility")
-    truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800, post_validator=lambda value: _validate_authored_surface(value, story_rules))
+    truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800, post_validator=lambda value: _validate_truth_map(value) or _validate_authored_surface(value, story_rules))
     fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600)
-    corroborated_fair_blocks = [
-        f for f in fair.findings
-        if f.blocking and f.field_path.strip() and f.item_id.strip()
-    ]
+    corroborated_fair_blocks = _corroborated_fair_blocks(fair, truth)
     if corroborated_fair_blocks:
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
-    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=lambda value: _validate_score(value) or _validate_authored_surface(value, story_rules))
-    manifest = _call(pass_id="P5_manifest", slot="technical", fn=technical_fn, pack=pack, seam="codex56_closed_line_manifest", inputs={"score": score.model_dump(mode="json")}, schema=ClosedLineManifest, scheduler=slot_scheduler, journal=journal, tokens=3000, post_validator=lambda value: _validate_manifest(score, value))
+    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=lambda value: _validate_score(value, truth) or _validate_authored_surface(value, story_rules))
+    manifest = _compile_manifest(score)
     script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
     _assert_script_valid(score, manifest, script, story_rules)
-    listener = _call(pass_id="P7", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"manifest": manifest.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)
-    if any(f.blocking for f in listener.findings):
-        script = _call(pass_id="P8", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": listener.model_dump(mode="json")}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
+    preceding_lines = _preceding_lines(manifest, script)
+    listener = _call(pass_id="P7", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"preceding_lines": preceding_lines}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)
+    listener_blocks = _listener_blocks(
+        listener, {line["line_id"] for line in preceding_lines})
+    if listener_blocks:
+        script = _call(pass_id="P8", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": [finding.model_dump(mode="json") for finding in listener_blocks]}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
         _assert_script_valid(score, manifest, script, story_rules)
+    elif listener.optional_notes or any(not finding.blocking for finding in listener.findings):
+        try:
+            optional_script = _call(pass_id="P8_optional", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": listener.model_dump(mode="json")}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
+            _assert_script_valid(score, manifest, optional_script, story_rules)
+            script = optional_script
+        except OriginalCodex56SolError:
+            pass
     audit = _call(pass_id="P9", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
-    if not audit.accepted or any(f.blocking for f in audit.findings):
-        raise OriginalCodex56SolContractError("final contract audit rejected the script")
+    audit_blocks = _audit_blocks(audit, script)
+    if audit_blocks:
+        script = _call(pass_id="P9_retake", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": [finding.model_dump(mode="json") for finding in audit_blocks]}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
+        _assert_script_valid(score, manifest, script, story_rules)
+        audit = _call(pass_id="P9_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
+        if _audit_blocks(audit, script):
+            raise OriginalCodex56SolContractError("final contract audit rejected the repaired script")
 
     led.set_cast(_cast_rows(score, episode_id))
     led.set_scenes([s.model_dump(mode="json") for s in score.scenes])

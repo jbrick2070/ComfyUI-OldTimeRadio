@@ -385,3 +385,12 @@ leaving them for live integration:
     manifest normalization. `exposition`, `rising_action`, and `climax` map to
     the canonical arc; a marker such as `closure: "final"` means true. Reject
     unknown labels after normalization.
+21. Re-audit every deterministic/model ownership label in the locked DAG before
+    live smoke. If a stage such as ingress or manifest compilation is declared
+    Python-owned, do not leave an LLM seam behind and then harden its vocabulary
+    with an expanding alias table. Put authored meaning in the preceding typed
+    artifact and compile structural IDs/enums locally.
+22. Treat information boundaries as wiring contracts. A blind-listener pass
+    must receive only accepted pre-reveal lines, never the full script or
+    landmark IDs; technical blocking findings must resolve to real artifact
+    coordinates and exact evidence before they gain repair or kill authority.

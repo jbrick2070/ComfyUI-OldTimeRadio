@@ -412,24 +412,23 @@
       "executable": true,
       "requires_source_contract": false,
       "declared_seams": [
-        "codex56_constraint_ingress", "codex56_possibility_slate",
+        "codex56_possibility_slate",
         "codex56_slate_triage", "codex56_audible_truth_map",
         "codex56_fair_play_audit", "codex56_broadcast_score",
-        "codex56_closed_line_manifest", "codex56_performance_script",
+        "codex56_performance_script",
         "codex56_blind_listener", "codex56_broadcast_retake",
         "codex56_final_contract_audit"
       ],
       "passes": [
-        {"pass_id":"P0_constraint_ingress","slot":"technical","seam_refs":["codex56_constraint_ingress"],"description":"Validate and restate the immutable non-spoken constraint draw."},
         {"pass_id":"P1_possibility_slate","slot":"creative","seam_refs":["codex56_possibility_slate"],"description":"Invent original benign acoustic puzzle possibilities."},
         {"pass_id":"P2_slate_triage","slot":"technical","seam_refs":["codex56_slate_triage"],"description":"Reject contract defects and select a buildable possibility."},
         {"pass_id":"P3_audible_truth_map","slot":"creative","seam_refs":["codex56_audible_truth_map"],"description":"Build the causal clue and resolution graph."},
         {"pass_id":"P4_fair_play_audit","slot":"technical","seam_refs":["codex56_fair_play_audit"],"description":"Audit audible clue sufficiency and graph closure."},
         {"pass_id":"P5_broadcast_score","slot":"creative","seam_refs":["codex56_broadcast_score"],"description":"Design cast, scenes, shots, beats, intents and music bookends."},
-        {"pass_id":"P5_manifest","slot":"technical","seam_refs":["codex56_closed_line_manifest"],"description":"Close the exact line graph before prose is written."},
         {"pass_id":"P6_performance_script","slot":"creative","seam_refs":["codex56_performance_script"],"description":"Write every canonical spoken line for the closed manifest."},
         {"pass_id":"P7_blind_listener","slot":"technical","seam_refs":["codex56_blind_listener"],"description":"Evaluate the complete script using spoiler-safe clue evidence."},
         {"pass_id":"P8_broadcast_retake","slot":"creative","seam_refs":["codex56_broadcast_retake"],"description":"Return a complete replacement script only when repair is required."},
+        {"pass_id":"P9_retake","slot":"creative","seam_refs":["codex56_broadcast_retake"],"description":"Return one complete replacement script for corroborated final-audit defects."},
         {"pass_id":"P9_final_contract_audit","slot":"technical","seam_refs":["codex56_final_contract_audit"],"description":"Final typed contract audit over the accepted complete script."}
       ],
       "notes": ["Only workflow creative and technical slots are used; bounded retries fail closed."]
