@@ -101,3 +101,11 @@ def test_freeform_non_owner_cast_role_normalizes_to_caller():
         "character_description":"A patient caller",
     })
     assert concept.role == "caller"
+
+
+def test_shot_environment_is_typed_optional_authored_metadata():
+    shot = lane.ShotConcept.model_validate({
+        "shot_id":"shot_1","scene_id":"scene_1","description":"Desk",
+        "visual_prompt":"Warm desk under amber light","env":"front office",
+    })
+    assert shot.env == "front office"

@@ -166,6 +166,7 @@ class ShotConcept(StrictModel):
     scene_id: str
     description: str
     visual_prompt: str
+    env: str = ""
 
 
 class BeatConcept(StrictModel):

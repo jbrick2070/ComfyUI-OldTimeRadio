@@ -358,3 +358,7 @@ leaving them for live integration:
     the semantic roster separately. Free-form labels such as `resident` may map
     to `caller`, but the artifact must still prove one distinct announcer and
     one distinct desk operator before it can advance.
+15. Include harmless authored metadata fields that models naturally place on
+    adjacent graph objects (for example an optional shot environment) when the
+    field is typed and provenance-safe. Otherwise a repair may fix a required
+    parent field only to fail because it preserved the same detail on a child.
