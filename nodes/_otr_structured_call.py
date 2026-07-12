@@ -14,10 +14,11 @@ structured passes onto `structured_call` is later, separate work
 
 The "2B principle" on temperature: raising entropy during a JSON-
 schema repair encourages MORE structural hallucination, not less. So
-the structural retry (Attempt 2) LOWERS temperature relative to the
-base attempt, and the typed repair (Attempt 3) runs at a static low
-temperature -- the ladder never raises temperature to "shake loose"
-a valid object.
+the structural retry LOWERS temperature relative to the base attempt,
+and the typed repair runs at a static low temperature. One bounded
+exception exists: if that typed repair itself ends in incomplete JSON
+syntax and call budget remains, its exact prompt may be retried once
+above the static repair temperature to avoid repeating an early stop.
 
 Slot-fn calling convention is read from `nodes/_otr_story_brief.py`
 (`run_story_brief_reflection`, `_repair_pass`): a slot fn has the
@@ -63,7 +64,8 @@ T = TypeVar("T", bound=BaseModel)
 # ---------------------------------------------------------------------------
 
 # Default cap on the retry ladder: base -> structural retry -> typed
-# repair. Three rungs; the ladder ends at the typed-repair attempt.
+# repair. When a schema/content failure skips the structural rung, the
+# remaining third call may recover JSON syntax from the typed repair.
 _DEFAULT_MAX_ATTEMPTS: int = 3
 
 # Token budget for a structured-JSON pass. A JSON object plus a short
@@ -79,6 +81,12 @@ _STRUCTURED_MAX_NEW_TOKENS: int = 512
 # temperature so the repair attempt is the calmest attempt in the
 # ladder.
 _REPAIR_TEMPERATURE: float = 0.10
+
+# A typed repair that starts but does not finish decodable JSON gets one
+# syntax-only retry when call budget remains. The retry temperature is
+# capped by the caller's base temperature, so callers at or below this
+# value keep their own lower ceiling.
+_REPAIR_SYNTAX_RETRY_FLOOR: float = 0.25
 
 
 # ---------------------------------------------------------------------------
@@ -583,7 +591,8 @@ def structured_call(
         failed output + the validation error. `None` selects
         `default_repair_prompt_factory`. A factory may instead return a
         finished `schema` instance, which is accepted directly with no
-        LLM repair call (see `RepairPromptFactory`).
+        LLM repair call (see `RepairPromptFactory`). The built repair
+        messages are cached for one syntax-only retry if budget remains.
       post_validator
         Optional content check run on every schema-valid instance,
         `post_validator(instance) -> str | None`. It returns an error
@@ -619,7 +628,11 @@ def structured_call(
       Typed repair: `repair_prompt_factory` either builds a repair prompt
                  (run at the static low temperature `_REPAIR_TEMPERATURE`)
                  or hands back a finished `schema` instance, returned
-                 directly with no LLM call. The ladder ends here.
+                 directly with no LLM call.
+      Repair syntax retry: if the typed repair returned non-decodable JSON
+                 and budget remains, retry its exact cached prompt once at
+                 a bounded temperature above the static repair floor. This
+                 does not run for schema or content rejection.
     """
     # --- Invariant: structural retry must LOWER temperature (2B). ---
     # Fail loud at entry. A structural retry at >= base temperature is
@@ -650,6 +663,7 @@ def structured_call(
     last_error: Optional[BaseException] = None
     last_raw: str = ""
     attempts_run = 0
+    repair_messages: Any = None
 
     # --- Attempt 1: base temperature. ---
     if attempts_run < max_attempts:
@@ -757,6 +771,42 @@ def structured_call(
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d (repair) failed: "
                 "%s | raw head: %s",
+                helper_name, attempts_run, exc, _raw_head(last_raw),
+            )
+
+    # A semantic/schema failure on the base call skips the structural rung,
+    # so typed repair can be attempt 2 of a three-call budget. If that repair
+    # starts but does not finish decodable JSON, spend the one remaining call
+    # on the exact same repair prompt. Do not rebuild it from the incomplete
+    # response (which would enlarge the prompt), and do not retry a repair that
+    # was itself schema-valid but content-invalid.
+    if (
+        attempts_run < max_attempts
+        and repair_messages is not None
+        and isinstance(last_error, json.JSONDecodeError)
+    ):
+        attempts_run += 1
+        retry_temperature = min(
+            base_temperature,
+            max(structural_retry_temperature, _REPAIR_SYNTAX_RETRY_FLOOR),
+        )
+        log.info(
+            "[OTR_StructuredCall] '%s' attempt %d/%d: typed repair syntax "
+            "retry at temperature=%.3f",
+            helper_name, attempts_run, max_attempts, retry_temperature,
+        )
+        try:
+            last_raw = _invoke_slot(
+                slot_fn, repair_messages,
+                temperature=retry_temperature,
+                max_new_tokens=max_new_tokens,
+            )
+            return _parse_and_validate(last_raw, schema, post_validator)
+        except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
+            last_error = exc
+            log.warning(
+                "[OTR_StructuredCall] '%s' attempt %d (repair syntax retry) "
+                "failed: %s | raw head: %s",
                 helper_name, attempts_run, exc, _raw_head(last_raw),
             )
 

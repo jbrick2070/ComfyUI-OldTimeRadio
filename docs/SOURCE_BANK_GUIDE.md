@@ -421,3 +421,6 @@ leaving them for live integration:
 29. Canonicalize purely structural integer IDs to strings consistently across
     a typed graph so a repair call is reserved for semantic/graph defects.
     State contiguity operationally: after leaving a shot ID, never return to it.
+30. Make configured retry budgets reachable. When a semantic base failure
+    skips the same-prompt structural rung, cache the typed-repair prompt and use
+    the remaining call only if that repair itself returns incomplete JSON.

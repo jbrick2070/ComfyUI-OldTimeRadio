@@ -209,6 +209,36 @@ def test_schema_violation_on_attempt_one_skips_structural_and_repairs():
     assert slot.calls[1]["temperature"] == pytest.approx(sc._REPAIR_TEMPERATURE)
 
 
+def test_incomplete_typed_repair_uses_remaining_syntax_retry_once():
+    slot = _make_counting_slot_fn(
+        responses=[_valid_json(), '{"title": "unfinished"', _valid_json()],
+    )
+    repair_factory = _make_recording_repair_factory()
+    post_validator = _make_counting_post_validator(
+        verdicts=["content reject", None],
+    )
+
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        repair_prompt_factory=repair_factory,
+        post_validator=post_validator,
+        max_attempts=3,
+        helper_name="sample_pass",
+    )
+
+    assert result.score == 42
+    assert len(slot.calls) == 3
+    assert len(repair_factory.invocations) == 1
+    assert slot.calls[1]["messages"] == slot.calls[2]["messages"]
+    assert slot.calls[1]["temperature"] == pytest.approx(sc._REPAIR_TEMPERATURE)
+    assert slot.calls[2]["temperature"] == pytest.approx(0.25)
+    assert sc._REPAIR_TEMPERATURE < slot.calls[2]["temperature"] <= 0.40
+
+
 # ---------------------------------------------------------------------------
 # 4. Attempts 1+2 fail, Attempt 3 (repair) succeeds; factory was invoked
 # ---------------------------------------------------------------------------
