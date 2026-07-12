@@ -574,7 +574,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - verify idea: remove `stamp` from an otherwise valid P5 clue intent, require one nine-call runner where the sixth call is a `ScoreIntentPatch`, persist only the LLM-provided replacement intent, and reject both a missing literal anchor and an unplanned beat ID. Run the full suite and Bug Bible, then repeat the same c03 120-word Gemma/Mistral canonical smoke.
 - bible-worthy: yes -- when a semantic defect is confined to an explicitly owned leaf, a whole-document repair is an avoidable reliability and context-window hazard. Create a small typed patch artifact, validate its exact scope, and retain full-artifact validation as the authority.
 - confidence: HIGH
-- status: FIXED IN CODE / PBUG-20260712-13 FOLLOW-UP FULL SUITE (7761 passed, 31 skipped, 1 xfailed) + BUG BIBLE (17 passed, 7 skipped, 3 xfailed) GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
+- status: LIVE-QUALIFIED end to end by same-seed c03 prompt `ed1a13ca-6cc5-4a79-830e-cc82c8a460ab`: P5 grounding patch cleared, frozen ledger and final OBS asset exist, ComfyUI `RESULT SUCCESS`
 
 ## PBUG-20260712-13 -- grounding-intent patch could erase an already-valid anchor
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `ec489787`, prompt `54c0a8bb-45f9-4cf2-bc56-49882fd16377`, E4B creative + Mistral technical, 2026-07-12
@@ -584,7 +584,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - verify idea: make a reveal beat carry the `stamp` clue and its already-valid `grille` device anchor while omitting `stamp`; require the plan to demand both literals, accept only a patch preserving both, and reject a patch that carries a banned phrase even when its anchors are complete. Run full suite, Bug Bible, and the same c03 120-word Gemma/Mistral canonical smoke.
 - bible-worthy: yes -- a narrow patch must preserve every currently valid invariant in the field it replaces, not merely add the invariant that triggered repair. Patch-local schema acceptance is insufficient; validate the merged canonical artifact at the same structured-call boundary.
 - confidence: HIGH
-- status: P5 PORTION LIVE-QUALIFIED by prompt `69a56fa7-afd3-4e72-b2b4-188a7afaac00` (P5 grounding patch cleared on its first attempt); complete episode then exposed PBUG-20260712-14 in P6. AWAITING PBUG-14 FULL GATES + SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
+- status: LIVE-QUALIFIED end to end by same-seed c03 prompt `ed1a13ca-6cc5-4a79-830e-cc82c8a460ab`: P5 grounding patch cleared, frozen ledger and final OBS asset exist, ComfyUI `RESULT SUCCESS`
 
 ## PBUG-20260712-14 -- full-script repair repeated one missing closure literal
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `a9cf3bbe`, prompt `69a56fa7-afd3-4e72-b2b4-188a7afaac00`, E4B creative + Mistral technical, 2026-07-12
@@ -594,7 +594,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - verify idea: remove the exact closure anchor from an otherwise valid P6 script, require a single extra `ScriptLinePatch` call that repairs only `line_005`, and preserve all other lines byte-for-byte. Also make a reveal line carry an object clue while already speaking the device anchor; require its patch plan and accepted replacement to retain both literals, then reject an otherwise anchored banned-phrase replacement. Run full suite, Bug Bible, and the identical c03 120-word Gemma/Mistral canonical smoke.
 - bible-worthy: yes -- the localized semantic-repair law applies separately to each artifact boundary. A complete script is no more suitable than a complete score for correcting one owned leaf.
 - confidence: HIGH
-- status: P6 PORTION LIVE-QUALIFIED by prompt `10438a88-66c6-400d-b7b9-d049b2f116f3` (P6 grounding patch cleared on its first attempt); later P8 retake exposed PBUG-20260712-15. AWAITING PBUG-15 FULL GATES + SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
+- status: LIVE-QUALIFIED end to end by same-seed c03 prompt `ed1a13ca-6cc5-4a79-830e-cc82c8a460ab`: P6 grounding patch cleared, frozen ledger and final OBS asset exist, ComfyUI `RESULT SUCCESS`
 
 ## PBUG-20260712-15 -- later full-script retakes bypassed the bounded P6 grounding repair
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `cb5166f8`, prompt `10438a88-66c6-400d-b7b9-d049b2f116f3`, E4B creative + Mistral technical, 2026-07-12
@@ -604,4 +604,14 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - verify idea: force P7 to request P8, make P8 omit the closure anchor, require a single P8 line patch and a clean blind-listener rerun before P9. Assert P8/P9 pipeline seam references include `codex56_script_anchor_patch`; run full suite, Bug Bible, and the identical c03 120-word Gemma/Mistral canonical smoke.
 - bible-worthy: yes -- a validation/repair guarantee must cover every reauthoring route for an artifact, not only its first construction. Factor the guarded boundary rather than duplicating a one-off call-site fix.
 - confidence: HIGH
-- status: FIXED IN CODE / FULL SUITE (7764 passed, 31 skipped, 1 xfailed) + BUG BIBLE (17 passed, 7 skipped, 3 xfailed) GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
+- status: LIVE-QUALIFIED end to end by same-seed c03 prompt `ed1a13ca-6cc5-4a79-830e-cc82c8a460ab`: P8 grounding patch cleared, listener rerun and P9 cleared, frozen ledger and final OBS asset exist, ComfyUI `RESULT SUCCESS`
+
+## PBUG-20260712-16 -- detached soak monitor reported a blank exit code after canonical success
+- surfaced: same-seed c03 120-word live qualification, monitor log `logs/codex56_c03_120_after_156cb2e4`, 2026-07-12
+- symptom: the detached PowerShell wrapper wrote `COMPLETE: SOAK_FAIL rc=` even though the canonical API reported `RESULT SUCCESS`, the final OBS MP4 was published, duration and byte-identical-audio checks passed, and the frozen ledger existed.
+- root cause: the monitor trusted a blank `Process.ExitCode` from the detached PowerShell child as a failure without reconciling the canonical API's explicit terminal result.
+- fix: the monitor now treats an empty child exit code plus a `RESULT SUCCESS` marker in the canonical runner log as success; a real nonzero code or missing success marker remains a fail.
+- verify idea: the next detached canonical smoke with a successful API result must write `COMPLETE: PASS rc=0`; an absent success marker must remain a failure.
+- bible-worthy: yes -- test orchestration must not turn an observed final asset plus explicit canonical success into a false-negative qualification verdict.
+- confidence: HIGH
+- status: FIXED IN HARNESS / AWAITING NEXT DETACHED-SMOKE CONFIRMATION
