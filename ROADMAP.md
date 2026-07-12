@@ -25,7 +25,7 @@ operator listening are separate elapsed time.
 | Order | Campaign | Exit condition | Coding estimate |
 |---:|---|---|---:|
 | 1 | Lean-mean/dead-code campaign | Re-grounded deletion/consolidation waves land green; no dormant interstitial audio or duplicate authorities | 12-16 days |
-| 2 | Timeline Cue Ledger / spotted SFX | `cue-1` survives its blind noun-detector gate; curated period library, timeline splicer, overlay path, canonical wiring, and byproduct-bed retirement are green | 8-15 days after R1-R4 |
+| 2 | Timeline Cue Ledger / generated spotted SFX | `cue-1` survives its blind noun-detector gate; generated-SFX selector, renderer, timeline mix, canonical wiring, receipts, and byproduct-bed retirement are green | provisionally 8-15 days after the R4.1 refit |
 | 3 | Other product expansion | Visual-pack roll, richer cue stills, provider additions, and system-agnostic upscale as separately gated campaigns | 5-10 days per selected set |
 | 4 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
 | 5 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
@@ -67,40 +67,56 @@ Required edges:
 - W2-W4 before W7;
 - generated ENGINE_MATRIX before registry deletion/consolidation;
 - cloud smoke before W8;
-- Randomizer and `dynamic_story` before the writer/widget structural split.
+- user extensibility, Randomizer, and `dynamic_story` before the writer/widget
+  structural split, preserving overlay quarantine, pack replay hashes, and the
+  final live widget layout.
 
 Do not re-delete the old context helper already removed at `1a6ae8f1`, and mark
 the earlier standalone interstitial-audio rip as satisfied when re-grounding.
 
-## 2. Timeline Cue Ledger / spotted SFX
+## 2. Timeline Cue Ledger / generated spotted SFX
 
-Plan of record: `docs/2026-07-11-timeline-cue-ledger.md`.
+Foundation plan: `docs/2026-07-11-timeline-cue-ledger.md`.
 
-**Status:** roadmap design; no code; not code-ready. The current plan explicitly
-parks implementation until the 720-word runway and lean-mean campaign land. It
-rebuilds SFX as a derived cue artifact after the spoken performance exists; it
-must never resurrect `speaker_role="sfx"`, pseudo-dialogue cues, or the retired
-pre-render SFX subsystem.
+Generated-SFX architecture evidence:
+`docs/2026-07-11-sfx-engine-architecture/roundtable/pass04_final.md`.
+
+**Status:** one roadmap campaign; no code; not yet code-ready. Implementation is
+parked until the 720-word runway and lean-mean campaign land. The immediate
+GO_FORWARD work is only a tracked current-HEAD R4.1 refit.
+
+The two dated designs are not separate implementation queues. Timeline Cue
+Ledger owns C0/C1 and the blind usefulness gate. If that gate passes, the
+generated-SFX design owns the renderer/mix/canonical continuation and
+**supersedes the older curated-CC0-library renderer; no library fallback
+survives**. SFX remains a derived cue artifact after spoken performance exists;
+never resurrect `speaker_role="sfx"`, pseudo-dialogue cues, or the retired
+pre-render subsystem.
 
 Planned sequence:
 
 1. **C0:** persist per-line WAV stems and ship the transcript drift report.
 2. **C1:** define `cue-1`, build the timestamp-blind intent/placement passes,
    and run the budget-matched blind noun-detector control. Indistinguishable
-   results stop the campaign before audio generation.
-3. **C2:** curate the CC0 period-effects library and render onset-exact cue
-   stems to canonical episode paths.
-4. **C3a-C3c:** splice nests at the raw scene-audio seam, preserve room tone,
-   rebase/persist final ledger timing before `audio_done`, render cue audio,
-   retire the accidental Google-video byproduct bed, add the overlay adapter,
-   and wire the canonical workflow in the same activation commit.
+   results stop the campaign before any audio engine work.
+3. **R4.1/C2:** after a passing gate, ratify the current generated-SFX plan:
+   ungated static selection between Stable Audio 3 Small-SFX and Medium;
+   selected-profile hard failures with no fallback; ledger-bound semantic cue
+   authoring; complete request/attempt/commit receipts; onset-exact generated
+   stems written directly to canonical episode paths.
+4. **C3a-C3c:** mix inside SceneSequencer at the raw scene-audio seam, preserve
+   room tone, rebase/persist final ledger timing before `audio_done`, retire the
+   accidental Google-video byproduct bed and any double-mix path, and wire the
+   canonical workflow in the same activation commit. There is no post-video or
+   Whisper/alignment lane.
 5. **C4 later:** add VFX rows only after the SFX lane is green; VFX genuinely
    needs a post-video picture-aware pass.
 
-Planning estimate for C0-C3c after the R1-R4 design arc: **8-15 coder-days**,
-plus roughly **2-4 elapsed live-evaluation days**. C0 is technically
-independently shippable, but remains parked with the campaign unless the operator
-explicitly promotes it earlier.
+The earlier C0-C3c estimate remains a provisional **8-15 coder-days + 2-4
+elapsed live-evaluation days** until R4.1 re-grounds the generated renderer's
+full ownership and receipt surface. R4.1 must replace this range if the grounded
+scope differs. C0 is technically independently shippable, but remains parked
+with the campaign unless the operator explicitly promotes it earlier.
 
 ## 3. Product expansion candidates
 
@@ -132,8 +148,9 @@ needed, what costs money, what stays local, and how to act on every loud failure
 
 ## 5. README and v2 release
 
-README is the final product pass, after the workflows, installers, and hardware
-claims are real. Ship v2 only when:
+Feature recipes update README when their features land. This section is the
+final README accuracy and product-release pass, after the workflows, installers,
+and hardware claims are real. Ship v2 only when:
 
 - canonical and generated workflows validate;
 - representative local, cloud, and RunPod paths complete tiny episodes;
@@ -153,5 +170,6 @@ remain operator-gated.
 - `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
 - `docs/2026-07-10-lean-mean-rip-final.md`
 - `docs/2026-07-11-timeline-cue-ledger.md`
+- `docs/2026-07-11-sfx-engine-architecture/roundtable/pass04_final.md`
 - `workflows/otr_canonical.json`
 - `workflows/variants/`
