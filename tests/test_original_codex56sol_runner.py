@@ -573,6 +573,98 @@ def test_duplicate_score_clues_repair_deterministically_at_first_placement():
     assert score.beats[2].line_intent.clue_ids == ["q1", "q2", "q3"]
 
 
+def _score_with_reopened_shot():
+    score_data = _fixtures()["score"]
+    score_data["shots"].insert(1, {
+        "shot_id": "shot_03",
+        "scene_id": "scene_01",
+        "description": "The return shelf across the room.",
+        "visual_prompt": "A return shelf opposite the radio desk.",
+    })
+    score_data["beats"][1]["shot_id"] = "shot_03"
+    return score_data
+
+
+def test_score_beat_topology_repair_splits_return_without_reordering_beats():
+    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
+    score_data = _score_with_reopened_shot()
+    score_data["shots"] = [
+        score_data["shots"][2], score_data["shots"][0],
+        score_data["shots"][1],
+    ]
+    score = lane.BroadcastScore.model_validate(score_data)
+    assert lane._validate_score(score, truth) == (
+        "beats for each shot must form one contiguous block"
+    )
+    authored_beats = [beat.model_dump(mode="json") for beat in score.beats]
+    authored_shots = [shot.model_dump(mode="json") for shot in score.shots]
+    authored_shot = next(
+        shot for shot in score.shots if shot.shot_id == "shot_01"
+    )
+
+    repaired = lane._repair_score_beat_topology(score, truth)
+
+    assert repaired is not None
+    assert [beat.beat_id for beat in repaired.beats] == [
+        beat["beat_id"] for beat in authored_beats
+    ]
+    assert [beat.shot_id for beat in repaired.beats] == [
+        "shot_01", "shot_03", "shot_01_return_2", "shot_02", "shot_02",
+    ]
+    for index, beat in enumerate(repaired.beats):
+        expected = dict(authored_beats[index])
+        if index == 2:
+            expected["shot_id"] = "shot_01_return_2"
+        assert beat.model_dump(mode="json") == expected
+    cloned_shot = next(
+        shot for shot in repaired.shots
+        if shot.shot_id == "shot_01_return_2"
+    )
+    assert cloned_shot.model_copy(
+        update={"shot_id": "shot_01"},
+    ).model_dump(mode="json") == authored_shot.model_dump(mode="json")
+    assert [
+        shot.model_dump(mode="json") for shot in repaired.shots[:-1]
+    ] == authored_shots
+    assert repaired.shots[-1].shot_id == "shot_01_return_2"
+    assert lane._validate_score(repaired, truth) is None
+    assert [beat.beat_id for beat in score.beats] == [
+        beat["beat_id"] for beat in authored_beats
+    ]
+    assert [beat.shot_id for beat in score.beats] == [
+        "shot_01", "shot_03", "shot_01", "shot_02", "shot_02",
+    ]
+
+
+def test_score_beat_topology_repair_uses_collision_safe_return_id():
+    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
+    score_data = _score_with_reopened_shot()
+    score_data["shots"].append({
+        "shot_id": "shot_01_return_2",
+        "scene_id": "scene_02",
+        "description": "An unused authored setup with a colliding name.",
+        "visual_prompt": "An unused quiet shelf setup.",
+    })
+    score = lane.BroadcastScore.model_validate(score_data)
+
+    repaired = lane._repair_score_beat_topology(score, truth)
+
+    assert repaired is not None
+    assert repaired.beats[2].shot_id == "shot_01_return_2_2"
+    assert {shot.shot_id for shot in repaired.shots} >= {
+        "shot_01_return_2", "shot_01_return_2_2",
+    }
+
+
+def test_score_beat_topology_repair_fails_closed_on_hidden_graph_error():
+    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
+    score_data = _score_with_reopened_shot()
+    score_data["beats"][2]["line_intent"]["clue_ids"] = ["unknown"]
+    score = lane.BroadcastScore.model_validate(score_data)
+
+    assert lane._repair_score_beat_topology(score, truth) is None
+
+
 def test_p3_repair_keeps_authoritative_top_level_and_removes_nested_extras():
     fixtures = _fixtures()
     selected = lane.PossibilityCard.model_validate(fixtures["card"])
@@ -776,6 +868,56 @@ def test_p5_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
     assert len(calls) == 8
 
 
+def test_p5_topology_and_bookend_repairs_compose_without_an_llm_call(tmp_path):
+    responses = _responses()
+    responses[4]["shots"].insert(1, {
+        "shot_id": "shot_03",
+        "scene_id": "scene_01",
+        "description": "The return shelf across the room.",
+        "visual_prompt": "A return shelf opposite the radio desk.",
+    })
+    responses[4]["beats"][1]["shot_id"] = "shot_03"
+    responses[4]["opening_music"]["music_file"] = "opening_music.mp3"
+    responses[4]["closing_music"]["music_file"] = "closing_music.mp3"
+    queued = iter(responses)
+    calls = []
+
+    def generate(_messages, **_kwargs):
+        calls.append(1)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p5_topology", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p5_topology",
+    )
+
+    assert len(calls) == 8
+    assert [row["beat_id"] for row in led.data["beats"]] == [
+        "b1", "b2", "b3", "b4", "b5",
+    ]
+    assert [row["shot_id"] for row in led.data["beats"]] == [
+        "shot_01", "shot_03", "shot_01_return_2", "shot_02", "shot_02",
+    ]
+    assert [row["boundary"] for row in led.data["lines"]] == [
+        "shot_start", "shot_start", "shot_start", "shot_start", "beat_start",
+    ]
+
+
 def test_p5_placement_repair_preserves_llm_fallback_for_safety(tmp_path):
     responses = _responses()
     corrected_score = json.loads(json.dumps(responses[4]))
@@ -942,6 +1084,8 @@ def test_p5_repair_spells_out_required_fields_and_exact_arc_phases():
     assert "at least 5 beats" in rules
     assert "never delete a beat" in rules
     assert "one adjacent contiguous block" in rules
+    assert "beats array is chronological and MUST never be reordered" in rules
+    assert "new shot row with a new unique shot_id" in rules
     assert "schema-path pseudo-fields" in rules
     assert "singular clue_id is forbidden" in rules
     assert "scene MUST retain a non-empty env" in rules

@@ -189,6 +189,21 @@ must preserve all required authored values byte-for-byte and rerun the complete
 strict schema plus semantic/graph validators. Never project an arbitrary model
 object onto a schema when an unknown key could carry story meaning.
 
+## 15. Make ordered graph topology executable
+
+An array can contain every required typed row and still violate the graph's
+meaning through order alone. State sequence rules with a concrete valid and
+invalid example (for example A, A, B versus A, B, A), identify which manifest
+owns the canonical group order, and enforce the invariant in Python.
+
+Never reorder authored chronological rows as a structural repair: sequence is
+story, even when every row object remains byte-identical. Repair only mechanical
+identifier topology when it is provably unambiguous -- for example, split a
+reopened A/B/A shot into A/B/A-return by cloning the shot metadata and retagging
+the later run -- while holding the authored row sequence fixed. Then rerun the
+complete graph, semantic, grounding, and landmark validators. Reject or fall
+through to typed repair whenever the identifier split is ambiguous.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

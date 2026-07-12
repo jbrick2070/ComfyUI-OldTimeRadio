@@ -351,7 +351,11 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "row and visual_prompt inside every shot row. "
             "Group every shot's beats into one adjacent contiguous block: "
             "once beats move to a different shot_id, never return to an "
-            "earlier shot_id. Preserve orientation-before-reveal-before-closure. "
+            "earlier shot_id. The beats array is chronological and MUST "
+            "never be reordered. If the camera returns to an earlier setup, "
+            "create a new shot row with a new unique shot_id and assign that "
+            "later contiguous beat run to it. Preserve "
+            "orientation-before-reveal-before-closure. "
             "Never emit schema-path pseudo-fields such as `scenes[*].env` or "
             "`shots[*].visual_prompt` at the top level. "
             "scenes, shots, and beats MUST be separate top-level arrays. "
@@ -431,6 +435,68 @@ def _repair_duplicate_score_clues(
                 seen.add(clue_id)
                 unique_ids.append(clue_id)
         beat.line_intent.clue_ids = unique_ids
+    return repaired
+
+
+def _repair_score_beat_topology(
+    score: BroadcastScore,
+    truth: AudibleTruthMap,
+) -> BroadcastScore | None:
+    """Split reopened shot runs without changing authored narrative order.
+
+    ``beats`` is chronological and compiles directly into spoken-line order,
+    so a structural repair must never sort it.  For a model topology such as
+    A, B, A, clone A's mechanical shot row under a collision-safe ID and retag
+    only the later A run.  Beat order, IDs, prose, speakers, clues, phases, and
+    landmark order remain unchanged.  The full score graph must validate after
+    the split or the normal typed LLM repair remains authoritative.
+    """
+    shot_by_id = {shot.shot_id: shot for shot in score.shots}
+    if len(shot_by_id) != len(score.shots):
+        return None
+    if any(beat.shot_id not in shot_by_id for beat in score.beats):
+        return None
+
+    repaired = score.model_copy(deep=True)
+    repaired_shot_by_id = {
+        shot.shot_id: shot for shot in repaired.shots
+    }
+    used_ids = set(repaired_shot_by_id)
+    run_counts: Counter[str] = Counter()
+    cloned_shots: list[ShotConcept] = []
+    previous_source_id: str | None = None
+    active_target_id: str | None = None
+    changed = False
+
+    for beat in repaired.beats:
+        source_id = beat.shot_id
+        if source_id != previous_source_id:
+            run_counts[source_id] += 1
+            if run_counts[source_id] == 1:
+                active_target_id = source_id
+            else:
+                base_id = f"{source_id}_return_{run_counts[source_id]}"
+                target_id = base_id
+                collision = 2
+                while target_id in used_ids:
+                    target_id = f"{base_id}_{collision}"
+                    collision += 1
+                used_ids.add(target_id)
+                clone = repaired_shot_by_id[source_id].model_copy(deep=True)
+                clone.shot_id = target_id
+                cloned_shots.append(clone)
+                active_target_id = target_id
+                changed = True
+            previous_source_id = source_id
+        if active_target_id is None:
+            return None
+        beat.shot_id = active_target_id
+
+    if not changed:
+        return None
+    repaired.shots.extend(cloned_shots)
+    if _validate_score(repaired, truth) is not None:
+        return None
     return repaired
 
 
@@ -560,11 +626,15 @@ def _repair_score_collection_placement(
         return None
     data["beats"] = top_beats if top_beats else nested_beats
 
-    if not changed:
-        return None
     try:
         repaired = BroadcastScore.model_validate(data)
     except ValidationError:
+        return None
+    topology_repair = _repair_score_beat_topology(repaired, truth)
+    if topology_repair is not None:
+        repaired = topology_repair
+        changed = True
+    if not changed:
         return None
     if _validate_score(repaired, truth) is not None:
         return None

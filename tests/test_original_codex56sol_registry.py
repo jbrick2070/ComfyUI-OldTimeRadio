@@ -72,6 +72,10 @@ def test_broadcast_score_prompt_closes_music_bookend_key_sets():
         "original_codex56sol").prompt_stages["codex56_broadcast_score"]
     assert "exactly the keys description and generation_prompt" in seam
     assert "never add music_file" in seam
+    assert "shot_01, shot_01, shot_02 is valid" in seam
+    assert "shot_01, shot_02, shot_01 is forbidden" in seam
+    assert "beats array is chronological and MUST never be reordered" in seam
+    assert "requires a new shot row with a new unique shot_id" in seam
 
 
 @pytest.mark.parametrize("hint", ["", "please emphasize patient teamwork"])
