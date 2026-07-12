@@ -3459,8 +3459,11 @@ class OTR_LedgerScriptWriter:
                 slot_a=google_api_slot_a_model,
                 slot_b=google_api_slot_b_model,
             )
-        except Exception:  # noqa: BLE001 -- non-Google runs must stay unaffected
-            pass
+        except Exception as exc:  # noqa: BLE001 -- non-Google runs stay unaffected
+            log.warning(
+                "[OTR_LedgerScriptWriter] Google API slot binding setup "
+                "failed; a selected Google lane will fail closed: %r", exc,
+            )
 
         # --- A. Resolve all widget inputs (RSS fetch happens here) -----
         resolved = _resolve_inputs(

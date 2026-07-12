@@ -80,6 +80,20 @@ def test_load_builds_native_cache_entry(monkeypatch, tmp_path):
     assert seen["n_gpu_layers"] == -1
 
 
+def test_production_vram_gate_uses_resolved_model_path(monkeypatch, tmp_path):
+    model_path = tmp_path / "custom.gguf"
+    model_path.write_bytes(b"gguf")
+    fake = FakeLlama()
+    monkeypatch.setenv("GEMMA4_12B_GGUF_PATH", str(model_path))
+    monkeypatch.setenv("GEMMA4_12B_N_CTX", "1024")
+    monkeypatch.setenv("OTR_TEST_MODE", "0")
+    monkeypatch.setattr(GGF, "_load_llama", lambda **_kwargs: fake)
+    monkeypatch.setattr("torch.cuda.is_available", lambda: True)
+    monkeypatch.setattr("torch.cuda.mem_get_info", lambda: (32 << 30, 32 << 30))
+    entry = GGF.GGUFNativeBackend().load(GGF.ROW_ID, _row())
+    assert entry["model_path"] == str(model_path)
+
+
 def test_generate_calls_llama_cpp_and_caps_tokens(monkeypatch, tmp_path):
     fake = FakeLlama()
     monkeypatch.setenv("GEMMA4_12B_MAX_NEW_TOKENS", "512")

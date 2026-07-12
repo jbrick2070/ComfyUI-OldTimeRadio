@@ -353,14 +353,15 @@ class GGUFNativeBackend:
             # would be rejected for needing VRAM it does not use. The quant is the
             # one lever we have when a model will not fit; a gate that cannot see
             # the quant cannot be reasoned with.
-            weights_gb = path.stat().st_size / (1024 ** 3)
+            weights_gb = model_path.stat().st_size / (1024 ** 3)
             kv_rate = _float_env("GEMMA4_12B_KV_GB_PER_1K", KV_GB_PER_1K_CTX)
             kv_gb = (n_ctx / 1024.0) * kv_rate
             estimated_needed_gb = weights_gb + kv_gb + 0.1
             log.info(
                 "[GGUFNative] VRAM Preflight: Free=%.2f GB | Needed=%.2f GB "
                 "(weights=%.2f from %s, kv=%.2f @ n_ctx=%d)",
-                free_gb, estimated_needed_gb, weights_gb, path.name, kv_gb, n_ctx,
+                free_gb, estimated_needed_gb, weights_gb, model_path.name,
+                kv_gb, n_ctx,
             )
             if free_gb < estimated_needed_gb:
                 raise GGUFNativeConfigError(

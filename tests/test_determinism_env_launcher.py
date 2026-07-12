@@ -85,6 +85,17 @@ def test_launcher_sets_all_env_before_python():
         )
 
 
+def test_launcher_hydrates_remote_llm_keys_before_python():
+    text = _LAUNCH_CMD.read_text(encoding="utf-8")
+    main_index = text.index("main.py")
+    for key in (
+        "OPENROUTER_API_KEY", "OTR_GOOGLE_API_KEY", "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+    ):
+        key_index = text.index(f"GetEnvironmentVariable('{key}','User')")
+        assert key_index < main_index
+
+
 # --- model-loader TF32 flip pinned ----------------------------------------
 
 def test_model_loader_tf32_disabled():

@@ -402,3 +402,7 @@ leaving them for live integration:
     typed repair prompt. If a small model writes semantic synonyms such as
     `orientation` or `closure` where the schema owns `opening` or `closing`,
     reject them; do not grow an alias table that hides contract drift.
+25. A repair prompt must pin every collection cardinality the model could
+    disturb and forbid schema-path prose from becoming a literal JSON key.
+    Correcting `scenes[*].env` is not permission to delete beats or emit a
+    top-level field named `scenes[*].env`.

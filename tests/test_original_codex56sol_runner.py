@@ -310,6 +310,9 @@ def test_p3_safety_repair_keeps_safety_and_collection_rules():
 
 def test_p5_repair_spells_out_required_fields_and_exact_arc_phases():
     rules = lane._repair_rules("P5", "invalid arc phase")
+    assert "at least 5 beats" in rules
+    assert "never delete a beat" in rules
+    assert "schema-path pseudo-fields" in rules
     assert "scene MUST retain a non-empty env" in rules
     assert "shot MUST retain a non-empty visual_prompt" in rules
     assert "orientation_beat_id beat is `opening`" in rules

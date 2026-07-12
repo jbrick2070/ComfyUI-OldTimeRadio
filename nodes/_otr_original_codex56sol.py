@@ -308,7 +308,13 @@ def _repair_rules(pass_id: str, error: Any) -> str:
         )
     if pass_id == "P5":
         rules += (
-            " Cast MUST include one separate row with char_id exactly "
+            " Preserve the complete artifact and every existing beat while "
+            "repairing it. Keep 2 to 4 scenes, at least 2 shots, and at least "
+            "5 beats; never delete a beat to repair another field. Put env "
+            "inside every scene row and visual_prompt inside every shot row. "
+            "Never emit schema-path pseudo-fields such as `scenes[*].env` or "
+            "`shots[*].visual_prompt` at the top level. Cast MUST include one "
+            "separate row with char_id exactly "
             "`announcer` and role exactly `announcer`, exactly one different "
             "row with role `desk_operator`, and every remaining row with "
             "role `caller`. Never combine announcer and desk operator. Every "

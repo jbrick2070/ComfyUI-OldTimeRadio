@@ -38,6 +38,9 @@ if defined OTR_C7 (
 rem Hydrate per-user secrets a detached shell may not have inherited (the DC
 rem service env snapshot predates setx -- known gotcha). Value is NEVER echoed.
 for /f "usebackq delims=" %%k in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OPENROUTER_API_KEY','User')"`) do set OPENROUTER_API_KEY=%%k
+for /f "usebackq delims=" %%k in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OTR_GOOGLE_API_KEY','User')"`) do set OTR_GOOGLE_API_KEY=%%k
+for /f "usebackq delims=" %%k in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('GEMINI_API_KEY','User')"`) do set GEMINI_API_KEY=%%k
+for /f "usebackq delims=" %%k in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('GOOGLE_API_KEY','User')"`) do set GOOGLE_API_KEY=%%k
 rem Hydrate OTR_BLENDER_EXE from the User env too (mesh_stage's pinned portable
 rem Blender; a detached cmd doesn't inherit setx User env -- the same gotcha).
 rem Without it mesh_stage fails closed missing_model -> falls back to
