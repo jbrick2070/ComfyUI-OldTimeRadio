@@ -494,7 +494,15 @@ def _repair_score_collection_placement(
     failed_output: str,
     truth: AudibleTruthMap,
 ) -> BroadcastScore | None:
-    """Normalize scene/shot/beat placement without rewriting authored values."""
+    """Normalize non-authoritative score structure without rewriting values.
+
+    The score owns music descriptions/prompts, never filenames or paths.  A
+    local model may still echo a plausible ``music_file`` bookkeeping field;
+    deleting any extra bookend key is the same structural projection as
+    lifting nested collections below. Required authored fields are untouched,
+    and the complete repaired score must still pass the strict model and graph
+    validator before it can be accepted without another LLM call.
+    """
     try:
         data = parse_first_json_object(failed_output)
     except (json.JSONDecodeError, ValueError, TypeError):
@@ -508,6 +516,14 @@ def _repair_score_collection_placement(
         return None
 
     changed = False
+    bookend_keys = set(MusicBookend.model_fields)
+    for field_name in ("opening_music", "closing_music"):
+        bookend = data.get(field_name)
+        if not isinstance(bookend, dict):
+            return None
+        for extra_key in sorted(set(bookend) - bookend_keys):
+            del bookend[extra_key]
+            changed = True
     nested_shots: list[Any] = []
     for scene in scenes:
         if "shots" not in scene:

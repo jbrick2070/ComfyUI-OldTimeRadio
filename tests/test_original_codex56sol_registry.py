@@ -66,6 +66,14 @@ def test_custom_title_override_receipts_name_the_real_bank():
     )) == "original_codex56sol_script_title"
 
 
+def test_broadcast_score_prompt_closes_music_bookend_key_sets():
+    routing._REGISTRY = None
+    seam = routing.resolve_story_pack(
+        "original_codex56sol").prompt_stages["codex56_broadcast_score"]
+    assert "exactly the keys description and generation_prompt" in seam
+    assert "never add music_file" in seam
+
+
 @pytest.mark.parametrize("hint", ["", "please emphasize patient teamwork"])
 def test_custom_premise_is_only_an_operator_hint_and_fetcher_still_runs(
         monkeypatch, hint):

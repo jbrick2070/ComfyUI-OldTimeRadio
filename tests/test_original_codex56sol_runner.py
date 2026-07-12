@@ -655,6 +655,22 @@ def test_p5_repair_keeps_authoritative_top_level_and_removes_nested_extras():
     assert all("shots" not in row.model_dump() for row in repaired.scenes)
 
 
+def test_p5_repair_drops_non_authoritative_music_bookkeeping_only():
+    fixtures = _fixtures()
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    data = fixtures["score"]
+    expected_opening = dict(data["opening_music"])
+    expected_closing = dict(data["closing_music"])
+    data["opening_music"]["music_file"] = "opening_music.mp3"
+    data["closing_music"]["music_file"] = "closing_music.mp3"
+    repaired = lane._repair_score_collection_placement(
+        json.dumps(data), truth,
+    )
+    assert repaired is not None
+    assert repaired.opening_music.model_dump() == expected_opening
+    assert repaired.closing_music.model_dump() == expected_closing
+
+
 def test_p5_repair_lifts_missing_top_level_shots_and_beats_verbatim():
     fixtures = _fixtures()
     truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
@@ -724,6 +740,8 @@ def test_p5_repair_fails_closed_on_unknown_or_graph_invalid_shapes():
 
 def test_p5_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
     responses = _responses()
+    responses[4]["opening_music"]["music_file"] = "opening_music.mp3"
+    responses[4]["closing_music"]["music_file"] = "closing_music.mp3"
     responses[4]["scenes"][0]["shots"] = [{
         "shot_id": "nested_extra", "scene_id": "scene_01",
         "description": "A redundant nested shot.",

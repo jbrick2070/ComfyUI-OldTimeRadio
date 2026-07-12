@@ -176,6 +176,19 @@ Do not retain raw prompts, rejected outputs, or unlimited retry prose by
 default. The goal is replayable accepted-state forensics, not an unbounded model
 transcript.
 
+## 14. Close every nested object, not only the artifact root
+
+Listing required schema paths tells a model what must exist; it does not tell
+the model which plausible bookkeeping fields must not exist. For every strict
+structured artifact, state the exact key set at each nested ownership boundary,
+especially music, media, provenance, delivery, and file/path-shaped objects.
+
+Pair that prompt contract with a narrow structural normalizer only where Python
+can prove the removed fields are non-authoritative metadata. Such a normalizer
+must preserve all required authored values byte-for-byte and rerun the complete
+strict schema plus semantic/graph validators. Never project an arbitrary model
+object onto a schema when an unknown key could carry story meaning.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:
