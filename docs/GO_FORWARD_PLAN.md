@@ -6,10 +6,12 @@ origin after the isolated Codex56 attempt-boundary fix. Scope: land the already-
 wire P2a/P4/P5 and qualify Fable2 at 120 -> 320 before the all-bank ladder.
 The deterministic Codex56 c03 live requalification is running from the pushed
 base; Fable2 edits are isolated and cannot alter that imported lane. Known
-untracked docs owned by other windows and excluded from this slot:
-`docs/2026-07-11-cue-ledger-r1-codex-prompt.md` and
-`docs/2026-07-12-dynamic-story-visual-scope.md`. Randomizer Rolls remains
-docs-only/queued and does not own `banks.json` or code during this slot.
+untracked doc owned by another window and excluded from this slot:
+`docs/2026-07-11-cue-ledger-r1-codex-prompt.md`.
+(`docs/2026-07-12-dynamic-story-visual-scope.md` is no longer untracked -- the
+docs-only window shipped it at rev 5 and it is now COMMITTED; see queue item 2.)
+Randomizer Rolls and dynamic_story both remain docs-only/queued and own no code
+during this slot.
 
 **C4a PURE-CONTRACT RECEIPT (2026-07-12): GREEN.** The 120+ production gate
 remains deliberately closed.
@@ -81,7 +83,74 @@ migration, no schema-doc churn); eligibility is exactly TWO filters -- runnable 
 request-compatible; `runnable` stays the only curation surface. The repo's existing
 disclosure surfaces (credits source line, HUD origin label) are unchanged.
 
-**2. QUEUED HARNESS DEFECT (found by the randomizer r3 panel, NOT a live failure -- so
+**2. DYNAMIC_STORY VISUAL DIRECTION (vd-1). DESIGN-READY, TBA SPRINT -- needs a coder
+slot AND the section-11 VERIFY-AT-BUILD pass before any code.** Plan of record:
+`docs/2026-07-12-dynamic-story-visual-scope.md` **rev 5** -- converged through the full
+/kibitz arc r1 (arc) -> r2 (coding) -> r3 (wiring) -> r4 (convergence); panel = codex
+`gpt-5.6-sol` @ ultra + antigravity `gemini-3.5-pro`, Claude anchor + sole judge; 8 panel
+calls, $0. Artifacts (now TRACKED, force-added):
+`kibitz-runs/2026-07-12-dynamic-story-visual/{r1,r2,r3,r4}/`
+(driver_anchor / codex / antigravity / judgment / final). Planned 2026-07-12 in a
+DOCS-ONLY window (Lesson 10) while Codex held the code slot: **no code, no tests, no
+registry, no canonical-JSON diff staged.**
+
+**What it is:** ONE new option `dynamic_story` on the EXISTING `visual_style` dropdown
+(code-side sentinel, NOT a pack file). When selected, a NEW post-freeze node
+`OTR_DynamicStoryDirection` runs an LLM over the FROZEN story and authors
+`meta.visual_direction` (schema `vd-1`): a synthesized v2 visual pack + evidence + a
+receipt. Every existing composer keeps consuming a `VisualStyle` -- no second
+prompt-composition path. An explicitly-named pack stays byte-identical and always wins;
+the sentinel VALUE is the only trigger.
+
+**Why it is NOT a small chunk (read before claiming the slot):** the arc found four
+things that make a naive build fail --
+1. `_otr_structured_call.validate_tolerant_data` SILENTLY CLAMPS over-long strings and
+   accepts them (`:422-434`). Routing authored visual text through it would coerce the
+   LLM's taste output with a log warning. -> vd schemas declare NO `max_length`; every
+   bound lives in `post_validator`, which routes to the typed-repair rung.
+2. `_otr_model_loader.make_generate_fn` has **NO context guard** (`:1108-1137`) -- the
+   must-fit / PROMPT_GUARD machinery exists ONLY inside the writer's own slot wrapper
+   (`OTR_LedgerScriptWriter.py:664-699`). Any new node copying the ShotLock idiom
+   inherits ZERO protection (the class behind PBUG-20260712-03). -> a provider-effective
+   count/cap interface + a must-fit slot_fn; preflight `max(base_call, repair_call)`;
+   no truncation, ever. Sizing forces a P-A (look) / P-B (batched shots) split.
+3. TWO consumers were missing from the first design: **MetaBrief**
+   (`derive_image_prompts` takes NO ledger and resolves meta-only, `:1570-1609`) and
+   **render_driver** (a THIRD independent `get_visual_style` call at `:1248` plus a
+   brief-first prompt core at `:2069`). Both raise on the sentinel today.
+4. `is_dynamic` must NOT be a persisted pack key (`VisualStyle` is a frozen dataclass
+   with an exact field list), and `derive_scene_still_targets` deliberately emits the
+   synthetic `b000_music_open`, so the `shots[]` universe is a PROJECTION of the target
+   set, not the target set.
+
+**Wiring (exact, r3-grounded):** node **96**, link **284**. Add
+`[284, 62, 1, 96, 0, "STRING"]`; REPOINT (never renumber) `252 -> [252, 96, 0, 90, 0]`
+and `255 -> [255, 96, 0, 89, 0]`; node 62 `outputs[1].links`
+`[16,231,232,233,252,255]` -> `[16,231,232,233,284]` (**the audio trio 231/232/233 and
+the signal-lost read 16 KEEP the raw freeze json -- the direction node is in the VISUAL
+lane only**); `last_node_id 96`, `last_link_id 284`, `order 4` + shift; 24 nodes /
+58 links. Breaks exactly two test pins, both fixed in the same commit:
+`tests/test_google_video_sfx_workflow.py:41` (`last_link_id == 283`) and
+`tests/test_visual_style_widget_3c.py:62-66` (choices == registry -> registry + sentinel).
+
+**Build sequence (section 9.4 -- order matters):** capture + COMMIT the pre-feature
+byte-identity baselines FIRST (once the code changes there is no immutable "before"),
+then land node + shared helpers + the three consumers + registration + tests + canonical
+JSON + regenerated variants as ONE activation chunk, then gates, then qualify 30w -> 120w
+on TWO local families (mistral-nemo + gemma-4-E4B) plus a declared cloud lane. Live legs
+must run a STILL-CONSUMING config or they prove nothing. Slot collision surface is large:
+`otr_meta_brief_image_prompt.py`, `otr_shot_lock.py`, `render_driver.py`,
+`otr_image_gen_dispatcher.py`, `_otr_visual_styles.py`, `_otr_structured_call.py`,
+`OTR_LedgerScriptWriter.py`, `__init__.py`, canonical JSON.
+
+**Open at build time (not design forks):** section 11's VERIFY-AT-BUILD checklist --
+the brief's REAL storage shape + `episode_id`'s real home (the DTO must not be built on a
+guessed path), per-model token facts, constrained-generation on/off for P-A, and the P-B
+batch size. Section 10 also names the smaller v0 (P-A only: an episode-specific pack, no
+per-line shots) if the operator wants a shorter first cut -- not recommended, since
+per-shot direction is the stated product intent.
+
+**3. QUEUED HARNESS DEFECT (found by the randomizer r3 panel, NOT a live failure -- so
 it belongs here, not in PROD_BUG_LOG):** `scripts/otr_render_watchdog.ps1` only recognizes
 `[soak] t=...` heartbeats and cannot read a canonical `RESULT` verdict, so it will
 declare a HEALTHY canonical render dead once it passes the 300s heartbeat stall
