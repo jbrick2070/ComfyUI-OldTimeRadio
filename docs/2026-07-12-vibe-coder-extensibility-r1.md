@@ -1,154 +1,215 @@
-# Vibe-Coder Extensibility -- R1 Scoper
+# Vibe-Coder Extensibility -- R1 Scoper (r1-HARDENED)
 
-- **Date:** 2026-07-12
-- **Status:** R1 scope only. NO code. Architecture deliberately left OPEN -- this doc frames the problem and the option space for an R1 panel pass (arc routing: cloud roundtable for ideas, or kibitz for economy).
-- **Operator ask:** make it easy for users -- "vibe coders" (README's target audience: ComfyUI newbies working with an LLM assistant) -- to add (A) new models to the dropdowns, (B) new source banks, (C) new visual styles. Keep the architecture open; scope first.
+- **Date:** 2026-07-12. **Revision:** r1 kibitz pass folded (panel: codex @ gpt-5.6-sol,
+  antigravity @ gemini-3.5-pro; Claude anchor + judge). Run artifacts + judgment log:
+  `kibitz-runs/2026-07-12-vibe-coder-extensibility/r1/final.md`.
+- **Status:** R1 scope only. NO code. Operator directed r1-only -- next round waits for go.
+  Architecture stays OPEN where marked; facts below are code-verified.
+- **Operator ask:** make it easy for vibe coders (README's target audience) to add (A) new
+  models to the dropdowns, (B) new source banks, (C) new visual styles.
 
 ---
 
 ## 1. Problem statement
 
-OTR's three main creative surfaces are extensible today, but only by an expert who reads the
-source. A vibe coder -- someone who can edit a JSON file with an LLM assistant's help but will
-not trace Python module contracts -- currently hits a wall on each surface at a different
-depth. The goal of this effort is a documented, validated, no-Python-edit path for the common
-case on all three surfaces, without weakening any of the fail-loud / no-fallback / preflight
-laws the pipeline depends on.
+OTR's three creative surfaces are extensible today, but only by an expert who reads the
+source. A vibe coder -- ComfyUI newbie working with an LLM assistant -- hits a wall on each
+surface at a different depth. Goal: a documented, validated, no-Python-edit path for the
+common case on all three surfaces, without weakening fail-loud / no-fallback / preflight law.
 
-Key reframe from grounding: **this is NOT a re-architecture.** All three surfaces already
-follow the converged "JSON owns content, Python owns behavior" law. The work is closing the
-last Python-edit seams, adding scaffolding + a friendly validation loop, and writing the
-5-minute recipes. The registries themselves are sound.
+Reframe #1: this is NOT a re-architecture -- all three surfaces already follow "JSON owns
+content, Python owns behavior."
 
-## 2. Current state (grounded 2026-07-12 against v2.0-alpha HEAD)
+Reframe #2 (r1 panel, adopted): "one pattern, three surfaces" holds only at the UX layer.
+The three surfaces have materially DIFFERENT admission contracts -- styles are self-contained
+content packs; models are discovered binaries with unknown compatibility; banks are
+multi-artifact EXECUTABLE lanes with rights/authorship/publication gates. One user-facing
+command + recipe shape, three explicitly distinct qualification paths. Do not promise
+equivalent drop-in extensibility.
+
+## 2. Current state (all claims code-verified 2026-07-12, v2.0-alpha)
 
 ### Surface A -- Model dropdowns (LLM writer slots)
-- `nodes/_otr_model_catalog.py`: `CURATED_LLM_MODELS` = frozen dataclass rows with honesty
-  fields (`repo_id`, `requires_auth`, `loader_backend` [7 backends incl. `gguf_native`,
-  `openrouter_http`], `vram_fit_tier` PASS/WARN/UNKNOWN/FAIL, `approx_safetensors_gb`,
-  `prompt_profile`, license audit fields, chat-template dispatch hints).
-- Dropdown = curated set + **local HF cache scan** + **local GGUF scan**, with label suffixes
-  (`[LOCAL HF]`, `[LOCAL GGUF]`, `[NOT DOWNLOADED]`); validator strips suffixes; three
-  admit-paths (curated / locally-scanned / valid org-name when auto-download enabled).
-- S30 two-model-selector: only `creative_writing_model` + `technical_model` widgets exist;
-  every consumer node receives its model id via a STRING socket broadcast (fail-loud
-  `MissingModelInputError` / `UnknownModelError` at the socket boundary).
-- **Vibe-coder reality:** dropping a GGUF/HF model into the local cache ALREADY surfaces it in
-  the dropdown. The wall: (1) nobody documents this; (2) a *curated* row (with VRAM honesty,
-  license fields, backend dispatch) requires a Python edit; (3) non-LLM model pins (video/
-  image/TTS engine checkpoints) live in engine code + the canonical workflow JSON, out of
-  scope of the catalog entirely.
+- `_otr_model_catalog.py`: `CURATED_LLM_MODELS` dataclass rows (honesty fields: backend,
+  vram_fit_tier, license audit, chat-template hints) + HF-hub-cache scan
+  (`scan_local_llm_cache` walks `HF_HOME/hub/models--*/snapshots/*` -- offline, HF-only).
+- Uncurated cache hits are admitted ONLY if their config.json declares a `*ForCausalLM`
+  architecture (BUG-LOCAL-257 guard) and get a BARE label. Suffixes are narrow:
+  `[LOCAL HF]` only on `google/gemma*` local rows, `[LOCAL GGUF]` only on the single curated
+  gguf row, `[NOT DOWNLOADED]` on absent curated rows.
+- **GGUF is NOT generically scanned.** `_otr_gguf_backend.py` is hardcoded to one family:
+  `ROW_ID = "unsloth/gemma-4-12b-it-GGUF"`, `DEFAULT_GGUF_FILENAME = "gemma-4-12b-it-Q8_0.gguf"`
+  (+ Q6_K/Q4_K_M artifact table, `GEMMA4_12B_GGUF_PATH` escape hatch). The draft's "local
+  GGUF drop already surfaces" was FALSE.
+- **Broadcast is technical-only.** The 2026-05-29 lean-down removed the zero-consumer
+  `creative_writing_model` output (contract audit at `OTR_LedgerScriptWriter.py:7076-7087`;
+  RETURN_NAMES ends `technical_model`). Creative model id rides the ledger meta. The
+  `_otr_model_inputs.py` S30 docstring predates this -- do not trust it on this point.
+- **Refresh differs by surface:** `dropdown_choices()` re-scans on every call, and
+  INPUT_TYPES consumes it -- model drops appear without restart. Banks and styles are lazy
+  in-memory singletons -- restart required (see B/C).
+- **Serialization hazard (new defect-class, design against it):** suffixed labels ARE the
+  serialized `widgets_values` strings; the writer defines no `VALIDATE_INPUTS`; stock
+  ComfyUI combo validation rejects a queued value not in the current choices list. A saved
+  workflow holding `X [NOT DOWNLOADED]` breaks after X is downloaded (label changes to bare
+  `X`). run() strips suffixes, so the fix direction exists -- but queue-time validation
+  precedes run(). Verify-at-build with a repro test.
 
 ### Surface B -- Source banks
-- `nodes/story_packs/banks.json` (schema v2.0): one row per bank -- `source_bank_id`, `label`,
-  `source_kind`, `interpreter`, `fetcher`, `default_story_model`, `default_story_pipeline`,
-  `defaults` (prompt-label dict), `required_seams` (the pack seam list), `runnable`,
-  `guide_ref`. Companion `pipelines.json`. Per-bank folders hold the story-model packs
-  (7 banks live today: science_news, media_archive, public_domain_story, shakespeare,
-  original_radio, custom_source_bank, original_codex56sol + the scifi_* bakeoff lanes).
-- `_otr_story_routing.list_bank_ids()` supplies the `source_bank` dropdown at INPUT_TYPES;
-  `get_bank()` gates at run.
-- **Vibe-coder reality:** a new bank that REUSES an existing `interpreter` + `fetcher` is
-  in principle a banks.json row + a pack folder -- no Python. The walls: (1) `interpreter` /
-  `fetcher` are bare Python identifiers with no documented contract or inventory; (2) the
-  seam-pack schema (`required_seams` content) is undocumented outside the code; (3) the
-  SOURCE_BANK_PREFLIGHT hard gate (docs/SOURCE_BANK_PREFLIGHT.md, hashed receipt -- operator
-  directive 2026-07-11) is a manual expert checklist; (4) `custom_source_bank` exists as an
-  experimental lane but is not a documented template.
+- Registry: `nodes/story_packs/banks.json` (v2.0 rows) + `pipelines.json`;
+  `_otr_story_routing.list_bank_ids()` feeds the dropdown; `get_bank()` gates at run.
+- **Contracts ARE documented** (draft was wrong): `docs/SOURCE_BANK_GUIDE.md` is normative --
+  three routing coordinates (§3), runner interface + two-slot law (§4), fetcher envelope
+  `fetch(*, bank, technical_model, source_ref="")` returning the writer's exact seven
+  `SOURCE_PAYLOAD_KEYS` (§5), `legacy_many_pass` interpreter contract, rights/provenance
+  sidecars. The real gap = newbie-safe inventory + templates + automated conformance
+  feedback, not absent documentation.
+- **Closed registries, no discovery:** 5 fetchers (`science_rss`, `media_archive_rss`,
+  `public_domain_source`, `shakespeare_folger`, `original_codex56sol_local_seed` --
+  bank-locked synthetic), 4 interpreters (`news_interpreter`, `media_archive_interpreter`,
+  `public_domain_interpreter`, `shakespeare_interpreter`) (`_otr_source_payload.py:512-532`);
+  runners registered explicitly in `_RUNNER_BY_PIPELINE` (preflight Gate 5 forbids
+  plugin-style discovery).
+- **The complete runnable-bank bundle** (draft understated it): bank row + story pack
+  (`story_packs/<bank>/<model>.json`) + **`nodes/story_rules/<source_bank_id>.json`** (the
+  loader HARD-FAILS any runnable bank missing its rules pack, `_otr_story_rules.py:274-280`;
+  stray files or unregistered stems in `story_rules/` fail the WHOLE load -- a vibe-coder
+  landmine) + registered pipeline/runner pair + qualification state.
+- `custom_source_bank` is `runnable: false` (banks.json:263-272) because its runner does not
+  exist -- it is NOT a blessed template lane as-is.
+- **Preflight has two natures.** Gate 1 is an independent-DESIGN gate: it hard-fails
+  "existing lane plus different prompts" architectures -- which is EXACTLY the Tier-1 vibe
+  bank. Gates 5-6 are production qualification: live 30w smokes across >=2 local LLM
+  families + a frontier lane, then 120w with ledger + published-asset receipts, full
+  regression + Bug Bible. No authoring script can truthfully emit that PASS.
 
 ### Surface C -- Visual styles
-- `nodes/visual_styles/<style_id>.json`, 9 packs shipped. `_otr_visual_styles.py` is pure
-  behavior: lazy directory sweep on first resolve, strict v2 schema validation, unknown id =
-  hard error, no fallbacks. JSON owns look/subject deltas; Python owns geometry contracts.
-- **Vibe-coder reality:** this is ALREADY drop-a-JSON. The walls: (1) the v2 schema is heavy
-  (~15 string fields + 4 dict fields, exact-placeholder template rules `{form}`/`{base}`,
-  mouth-prominence vocabulary requirement, 240-char motion-register budget, forbidden-terms
-  lint) -- fail-loud errors are correct but arrive one at a time against a schema the user has
-  never seen; (2) no annotated template or schema doc exists; (3) the sci_fi_radio pack is
-  pinned byte-identical to extraction fixtures -- an outsider copying it as a starter must not
-  "fix" it.
+- `nodes/visual_styles/<style_id>.json`, 9 packs, v2-only schema, lazy dir sweep on first
+  resolve then cached, unknown id = hard error, forbidden-terms lint sweeps all string
+  leaves, sci_fi_radio is byte-identity-pinned to extraction fixtures (copying it as a
+  starter must not "fix" it).
+- Fixed in-repo root (`_VISUAL_STYLES_ROOT = <pkg>/visual_styles`) -- user drops are
+  git-dirty and at risk across custom-node updates. Same for `story_packs/`. This is an
+  architectural boundary, not a UX preference.
 
-### Cross-cutting laws that any design MUST preserve
-- Fail-loud, no fallbacks, unknown id = hard error (Stage 2C/3C converged law).
-- Source-bank preflight hard gate + hashed receipt stays a gate (automate the mechanics, never
-  waive the gate).
-- LLM-first: banks/styles feed the LLM; Python judges, never rewrites story text.
-- `widgets_values` is positional: combo widgets store the selected STRING, so ADDING dropdown
-  entries is save-safe; REMOVING/renaming ids breaks saved workflows silently (BUG-LOCAL-097
-  family). Additions must never reorder or insert widgets.
-- New entries must not require touching `workflows/otr_canonical.json` -- dropdown CONTENTS
-  are data; wiring is structure. (Contracts never freeze -- adapters PARKED; do not smuggle a
-  versioning/adapter layer in through this effort.)
-- still_word lettering: per-episode locked font/lettering, backdrop varies.
+### Cross-cutting laws (any design MUST preserve)
+- Fail-loud, no fallbacks, unknown id = hard error. LLM-first (Python judges, never writes).
+- No runtime source I/O at module import, pack discovery, or INPUT_TYPES evaluation
+  (preflight Gate 2) -- constrains any refresh design.
+- Combo widgets serialize the selected STRING; additions are save-safe, removals/renames are
+  not; additions must never reorder `widgets_values`.
+- New entries must not require touching `workflows/otr_canonical.json` (registry-driven
+  selection; preflight Gate 5 pins the shipped science_news default).
+- SFW: preflight bans guns/blood/violence/swearing as a creative constraint, not a censor.
+- still_word lettering: per-episode locked font/lettering.
 
-## 3. Proposed shape (directions, all OPEN for the panel)
+## 3. Proposed shape (r1-hardened; OPEN where marked)
 
-**Thesis: one pattern, three surfaces.** Each surface gets the same four artifacts:
+**Per surface, four artifacts:** a drop-in data path for the common case; an annotated
+CHECKED template; one check command; a 5-minute README recipe. Plus, panel-adopted:
 
-1. **A drop-in data path with zero Python** for the common case
-   (already true for styles + local models; banks need the interpreter/fetcher seam closed
-   or documented around).
-2. **An annotated template / scaffold** the user copies
-   (`_TEMPLATE.json.example` per directory, or a scaffold script, or -- the vibe-coder-native
-   option -- a per-surface `SCHEMA.md` written to be PASTED INTO AN LLM ASSISTANT, i.e.
-   docs-as-prompts: "give this contract to Claude/ChatGPT with your idea; it emits a valid
-   pack").
-3. **A one-command validator with batch, friendly errors**
-   (`--check`-style CLI per surface or one `otr_check.py` covering all three; today's loaders
-   validate correctly but fail one error at a time at run time -- the vibe loop needs ALL
-   errors at once, at authoring time, with fix hints).
-4. **A 5-minute recipe in the README** (newbie audience refresh is already pending -- these
-   three recipes are its spine).
+1. **Two-state admission model for banks (adopted, ends the "5-minute bank vs preflight"
+   contradiction):**
+   - *authoring-validated* -- structural, script-checkable: schema, duplicate keys, seam
+     cross-refs, registry coordinates resolve, SFW/forbidden lint, story_rules pack present.
+     The check command can assert this state and emit a PARTIAL receipt that LISTS the
+     unresolved hard gates by ID.
+   - *production-qualified* -- only via the existing human-signed preflight with live
+     evidence (smokes, 120w receipts, published asset). The script NEVER emits a production
+     PASS. Qualitative gates stay human.
+2. **Tier-1 bank, redefined honestly:** the complete bundle (bank row + pack + story_rules
+   pack) reusing ONE blessed, proven fetcher/interpreter/pipeline triple from the closed
+   registries. OPEN: which triple gets blessed (R2 selects from the live 5x4 inventory;
+   `public_domain_source` lane is the natural candidate), or whether the missing
+   `custom_source_bank` runner gets built as the one code item (that is Tier-2 work).
+3. **Gate-1 vs Tier-1 ruling needed (operator decision, R1's biggest fork):**
+   (a) a distinct lightweight gate for declared-derivative Tier-1 content banks (honest
+   lane-reuse declaration replaces independence fingerprints; Gate 2 source/rights/safety
+   checks kept), or (b) Tier-1 "banks" are formally CONTENT PACKS within an existing lane
+   (naming change sidesteps Gate 1, which continues to govern new ENGINE lanes), or
+   (c) vibe banks stay Tier-2-only (kills most of Surface B's value). Anchor + both
+   panelists lean (a)/(b); (b) is cleanest against the directive's letter.
+4. **Validator: ONE implementation, two entry points.** A single public command with
+   subcommands (`check style | check bank | check model`) that CALLS the production
+   validators (`_otr_visual_styles` load path, `_otr_story_routing`/`_otr_story_rules`
+   sweeps, catalog validator) -- never a parallel schema authority. Batch output, ALL errors
+   at once, file+field+fix per error, plus machine-readable JSON diagnostics so an LLM
+   assistant can repair in one pass. Windows `.bat`/`.ps1` wrapper that locates the venv
+   python (portable installs have non-standard interpreters).
+5. **Authoring aid = annotated templates + a DERIVED LLM-ready schema doc.** Templates are
+   checked fixtures (validator-green by test). The paste-to-your-assistant SCHEMA doc is
+   generated/derived from the same validator+template source -- never hand-maintained
+   (drift law). NO interactive scaffold CLI (both panelists cut it).
+6. **Overlay decision is decide-FIRST (before any template/recipe work):** whether
+   user-owned packs live in `user_packs/<surface>/` merged at scan (update-survival,
+   git-clean) or stay in-repo (simpler, git-dirty). If overlay: define merge order,
+   duplicate-id rejection, built-in-id protection, and an update-survival acceptance test.
+   OPEN as to shape; NOT open as to timing -- the boundary is chosen in R1/R2, not after
+   templates exist. Note: user packs in an overlay are invisible to repo tests -- the check
+   command becomes the ONLY lint they ever see (its SFW/forbidden coverage is therefore
+   mandatory, not optional).
+7. **Suffix decoupling (Surface A design constraint, resolve in R2):** serialized combo
+   values should be canonical ids; status decoration must not change identity. Options:
+   UI-only decoration, or `VALIDATE_INPUTS` accepting suffix-mismatched-but-strippable
+   values. Either way: an ID-stability test (pin selected ids across additions +
+   download-state changes; reject duplicate/renamed/removed ids).
+8. **Refresh loop (OPEN, per-surface facts locked):** models already live-rescan; banks +
+   styles cache until restart. R1 default = keep the restart contract for banks/styles
+   (lean; cache-invalidation complexity avoided). Candidate upgrade if the operator wants
+   the hotter loop = stat/mtime-based invalidation in the two `_ensure_loaded` singletons.
+   Any design honors the no-I/O-at-INPUT_TYPES law (a directory stat at INPUT_TYPES is the
+   boundary case to rule on explicitly).
 
-Per-surface sketches (NOT decisions):
-- **A (models):** document the local-scan path as THE vibe path. Optionally add a
-  `models.d/*.json` overlay for user-curated rows, marked UNVERIFIED and machine-derivable
-  fields (size, maybe vram tier) auto-filled -- honesty fields must not be vibe-guessed.
-  Engine/video/TTS checkpoint pins stay OUT of scope for R1 (canonical-JSON coupling).
-- **B (banks):** define the Tier-1 bank = "new bank row + pack folder reusing a documented
-  existing interpreter/fetcher (rss / static-text / custom)" with zero Python; Tier-2 (new
-  interpreter/fetcher) stays expert. Ship a preflight SCRIPT that runs the mechanical checks
-  and emits the hashed receipt.
-- **C (styles):** template + validator + schema doc; possibly a "lint all packs" test that
-  already exists extended into the authoring CLI. Byte-identity pins and geometry-vs-look law
-  untouched.
+### CUT from R1 (panel-converged)
+- `models.d/*.json` curated-row overlay (both panelists; HF-cache discovery + curated-stays-
+  expert is the honest scope).
+- Interactive scaffold CLI (both).
+- Docs-as-prompts as an INDEPENDENT hand-written contract (drifts; the derived doc in #5
+  is the surviving form).
+- Live no-restart rescan for banks/styles as an R1 requirement (kept as the open upgrade
+  path in #8).
+- Generic GGUF walker (real backend work: parameterize `_otr_gguf_backend`, arbitrary
+  filenames/sizes/context; explicitly OUT unless the operator opts it in as its own item).
 
 ## 4. Non-goals (R1)
-- No marketplace / plugin system / pack manager; no in-ComfyUI GUI editor.
-- No schema freeze or adapter/versioning layer (contract adapters are PARKED with a
-  stable-defect revive trigger; respect it).
-- No relaxation of fail-loud, preflight, or SFW laws.
-- No new engine lanes, no new interpreters/fetchers as part of THIS effort.
-- No touching the 720w bake-off lanes (scifi_* banks are frozen race artifacts).
+- No marketplace / plugin system / GUI editor; no schema freeze or adapter layer (parked);
+  no relaxation of fail-loud / preflight / SFW; no new interpreters/fetchers/engine lanes
+  (unless the operator picks the custom-lane-runner option in §3.2); no touching the 720w
+  bake-off lanes; video/TTS/image engine pins stay out (canonical-JSON coupling) -- operator
+  ratifies this exclusion.
 
-## 5. Acceptance criteria (for the eventual build, testable)
-1. A user with no Python knowledge adds a **visual style** from a template, runs one check
-   command, gets EITHER a complete actionable error list OR a pass, and sees it in the
-   dropdown after restart -- without editing any .py or the canonical JSON.
-2. Same for a **Tier-1 source bank** (reusing a documented fetcher/interpreter), including a
-   script-emitted preflight receipt.
-3. A **local GGUF/HF model** drop is documented and surfaces in both writer dropdowns with
-   correct suffix labels (behavior exists; recipe + test coverage for the recipe).
-4. Saved workflows survive additions (no widget reorder; combo string semantics pinned by a
-   guardrail test).
-5. Every failure a vibe coder can trigger names the file, the field, and the fix in plain
-   language.
+## 5. Acceptance criteria (testable, r1-hardened)
+1. **Style:** template copy -> one check command (same code as the loader; ALL errors at
+   once with file+field+fix; SFW/forbidden lint included) -> restart -> appears in dropdown.
+   No .py or canonical-JSON edits.
+2. **Tier-1 bank:** complete bundle from template (bank row + pack + story_rules pack,
+   blessed triple) reaches *authoring-validated* + partial receipt via the check command.
+   *Production-qualified* remains the human/live-evidence preflight -- explicitly NOT
+   satisfiable by the script.
+3. **Model (discovery, not usability):** documented recipe; a dropped HF causal-LM snapshot
+   appears (bare label) in both writer dropdowns without restart; docs state UNKNOWN-tier
+   treatment honestly. Optional R2 add-on: a lightweight load/generate compatibility probe;
+   without it, acceptance = discovery only.
+4. **Saved-workflow safety:** additions never invalidate saved workflows; ID-stability test
+   pins selected ids before/after additions AND across download-state changes (the suffix
+   repro); duplicate/renamed/removed ids are rejected by the check command.
+5. **Failure quality:** every AUTHORING/ADMISSION failure on the three supported paths names
+   the file, the field, and the fix in plain language (network outages, model
+   incompatibility, and render failures are out of this promise).
+6. **Update survival:** the overlay decision is made and either implemented (drops survive a
+   custom-node update in an acceptance test) or explicitly deferred with operator sign-off.
 
-## 6. Open questions for the R1 panel
-1. Scaffold delivery: template files vs scaffold CLI vs docs-as-prompts (SCHEMA.md written for
-   LLM consumption)? Which does a vibe coder actually succeed with?
-2. One `otr_check.py` for all three surfaces vs per-surface validators? Relationship to the
-   existing variants `--check` and OTR_WorkflowValidator?
-3. User packs in-repo (git-dirty, clobbered by updates) vs a `user_packs/` overlay dir merged
-   at scan time (extra_model_paths-style)? Update-survival matters for non-git users.
-4. Dropdown refresh semantics: lazy first-resolve cache + restart (today) vs re-scan per
-   INPUT_TYPES call so drops appear on browser refresh -- cost/staleness trade.
-5. models.d overlay: worth it, or is local-scan + curated-stays-expert the honest scope?
-6. Which interpreter/fetcher pairs are safe to document as Tier-1 today, and does
-   `custom_source_bank` become the blessed template lane?
-7. How much of SOURCE_BANK_PREFLIGHT is mechanizable without diluting the gate (receipt
-   emission yes -- but which checks stay human)?
+## 6. Open questions (operator / R2)
+1. Gate-1 vs Tier-1 ruling: (a) lightweight derivative gate, (b) "content pack" reframing,
+   or (c) Tier-2-only. (Biggest fork; blocks Surface B.)
+2. Overlay: `user_packs/` merge-at-scan vs in-repo, and the merge/duplicate/protection rules.
+3. Which fetcher/interpreter/pipeline triple is blessed for Tier-1 -- or build the
+   custom-lane runner instead?
+4. Suffix decoupling: clean-id serialization vs VALIDATE_INPUTS tolerance.
+5. Refresh: accept restart contract for banks/styles (default) vs stat-based invalidation?
+6. Generic GGUF walker: stay out, or become its own scoped item?
+7. Model compatibility probe (load/generate smoke): R2 add-on or cut?
 
 ## 7. Next step
-Run R1 on this doc (panel per CLAUDE.md section 8: cloud roundtable for the ideas round, or
-kibitz r1 for economy), then R2 coding plan only after the option space above converges.
+Operator directed r1 only -- STOP here. When cleared: r2 coding plan via kibitz (local
+panel), folding the operator's rulings on §6.1-3 first, since they shape everything else.
