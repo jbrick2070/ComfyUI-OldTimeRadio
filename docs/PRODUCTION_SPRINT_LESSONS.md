@@ -1,5 +1,18 @@
 # Production Sprint Lessons
 
+## Mandatory use
+
+Before an implementation, live diagnosis, source-bank change, or workflow edit,
+read this document and the relevant entry in `PROD_BUG_LOG.md`. Then consult the
+portable counterpart in the shared Bug Bible at
+`C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\BUG_BIBLE.yaml`.
+This document retains the OTR-specific causal history; the Bible carries the
+generalized rule and its executable guard. Record a newly discovered production
+failure in the log first, and promote it to the Bible when it is repeatable and
+generalizable. Do not admit an invented fixture, code-review observation, or
+static-audit finding as a new production bug; those may only verify a failure
+already observed in a live run, smoke, soak, or published artifact.
+
 Use this guide when planning any OTR coding sprint, including story banks,
 dynamic visual direction, audio/SFX layers, model integrations, and workflow
 changes. The project rules in `AGENTS.md` and `CLAUDE.md` remain authoritative.

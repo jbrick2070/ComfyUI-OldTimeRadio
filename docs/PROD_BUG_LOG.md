@@ -6,8 +6,9 @@ soak, published episode). Dev/audit/review catches get fixed, never logged. NO e
 here touches the Bug Bible directly -- at ship time the operator triggers a BUG
 FAN-OUT over this log, which promotes approved entries into the survival-guide
 Bible in bulk under the Three-File Contract (YAML + README count + regression
-test, one commit). Promoted entries get marked `PROMOTED <bible-id>`; rejected
-ones get marked `REJECTED` and stay for the record. Append-only, newest last.
+test, one commit). Promoted entries get a `- promotion: BUG-...` mapping;
+rejected ones get marked `REJECTED` and stay for the record. Append-only,
+newest last.
 Running tests/bug_bible_regression.py after every code change stays automatic
 and is unrelated to this log.
 
@@ -21,6 +22,7 @@ Entry format:
 - fix: <commit sha + one line>
 - verify idea: <candidate machine check for the future bible test>
 - bible-worthy: <yes/no guess + why -- operator decides at fan-out>
+- promotion: <BUG-id after approved fan-out; omit while pending>
 - status: OPEN | PROMOTED <id> | REJECTED
 ```
 
@@ -299,6 +301,7 @@ already promoted). Confidence tags preserved from the sweep.
 - status: PROMOTED BUG-11.38
 
 ## PBUG-20260711-04 -- Codex P0 used a full quote with truncated or wrong source field metadata
+- promotion: BUG-11.46
 - surfaced: scifi bake-off canonical 30w smoke, Codex P0, 2026-07-11
 - symptom: a full headline quote was returned with `headline[0:55]`, so the validator saw only a truncated payload slice and halted the lane
 - root cause: the model supplied a stale end offset and, in some artifacts, source-field labels did not identify the field containing the exact quote
@@ -309,6 +312,7 @@ already promoted). Confidence tags preserved from the sweep.
 - status: OPEN
 
 ## PBUG-20260711-05 -- JSON parser salvaged a nested fact from a broken outer artifact
+- promotion: BUG-11.47
 - surfaced: scifi bake-off canonical 30w smoke, Codex P0, 2026-07-11
 - symptom: malformed outer fact JSON was scanned past its first brace; the parser returned the first nested fact object, producing misleading missing-top-level-key errors and preventing the intended repair path
 - root cause: shared fallback scanning treated a nested child as a valid top-level object when the response began with an invalid outer object
@@ -319,6 +323,7 @@ already promoted). Confidence tags preserved from the sweep.
 - status: OPEN
 
 ## PBUG-20260711-06 -- Codex P3 omitted required nested scene graph fields
+- promotion: BUG-11.48
 - surfaced: scifi bake-off canonical 30w smoke, Codex P3, 2026-07-11
 - symptom: score JSON had the correct top-level artifact but omitted required nested `scene_id`, `shot_id`, and `visual_prompt` fields; strict validation halted before script/dialogue/media work
 - root cause: the prompt named top-level keys but hand-described no complete nested required-field tree, so the local model repeated an incomplete graph
@@ -329,6 +334,7 @@ already promoted). Confidence tags preserved from the sweep.
 - status: OPEN
 
 ## PBUG-20260711-07 -- Codex P0 overclaimed beyond the supplied RSS payload
+- promotion: BUG-11.46
 - surfaced: scifi bake-off canonical 30w smoke roll 6, Codex P0, 2026-07-11
 - symptom: the model returned a quote longer than the literal `full_text` payload; typed repair repeated it and the evidence validator halted before downstream work
 - root cause: the model treated a claim-like sentence as source evidence even though the supplied payload did not contain that exact span
@@ -339,6 +345,7 @@ already promoted). Confidence tags preserved from the sweep.
 - status: OPEN
 
 ## PBUG-20260711-08 -- Codex P3 generic repair repeated an incomplete graph
+- promotion: BUG-11.48
 - surfaced: scifi bake-off canonical 30w smoke roll 7, Codex P3, 2026-07-11
 - symptom: base and generic typed repair both omitted required nested scene graph fields despite a valid top-level score object
 - root cause: non-P0 passes used the generic repair factory, which did not present the failed artifact and validation error with lane-specific graph-preservation instructions
@@ -349,6 +356,7 @@ already promoted). Confidence tags preserved from the sweep.
 - status: OPEN
 
 ## PBUG-20260711-09 -- Codex P3 repair omitted cast-locked speaker fields
+- promotion: BUG-11.48
 - surfaced: scifi bake-off canonical 30w smoke roll 8, Codex P3, 2026-07-11
 - symptom: schema-aware repair reduced the failure to two missing `speaker` fields on beats; the lane halted before script/media work
 - root cause: nested graph repair did not explicitly bind each beat's speaker to its cast row by `char_id`
@@ -359,6 +367,7 @@ already promoted). Confidence tags preserved from the sweep.
 - status: OPEN
 
 ## PBUG-20260711-10 -- Codex P5 repair omitted ScriptLine boundary metadata
+- promotion: BUG-11.48
 - surfaced: scifi bake-off canonical 30w smoke roll 9, Codex P5, 2026-07-11
 - symptom: full script artifact was otherwise shaped, but all eight lines omitted required `boundary` values; strict validation halted before audio/media work
 - root cause: the repair contract named nested fields but did not define the boundary derivation from shot/beat order
@@ -369,6 +378,7 @@ already promoted). Confidence tags preserved from the sweep.
 - status: OPEN
 
 ## PBUG-20260711-11 -- Canonical RSS selector delivered a thin science payload
+- promotion: BUG-11.49
 - surfaced: scifi bake-off canonical 30w smoke roll 10, 2026-07-12
 - symptom: run halted before P0 with `RSS payload is below the 80/12 thinness floor`; Gemini and Sonnet remained not-started because the serialized smoke gate stopped at Codex
 - root cause: common science RSS selection returned a thin article to a lane whose source contract requires a substantial RSS body
@@ -386,6 +396,7 @@ verifies), per the existing note pattern. Held OPEN: PBUG-20260702-01 (no
 root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 
 ## PBUG-20260711-12 -- Codex P5 output reservation truncated its own schema contract
+- promotion: BUG-11.50
 - surfaced: scifi bake-off canonical 30w smoke roll 11, Codex P5, 2026-07-11
 - symptom: both P5 attempts returned prose or a score-shaped object instead of `ScriptArtifactV4`; the prompt guard reported `Truncated ... -> 1692 tokens` before each call
 - root cause: P5 reserved a fixed 6500 output tokens inside an 8192-token context even for a 30-word script, leaving too little input budget for the failed artifact, graph, schema paths, and repair instructions
@@ -396,6 +407,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: OPEN
 
 ## PBUG-20260711-13 -- Codex P5 typed repair retained two forbidden legacy metadata values
+- promotion: BUG-11.48
 - surfaced: scifi bake-off canonical 30w Codex reroll after `fdc413ed`, 2026-07-11
 - symptom: full-contract P5 base output failed eight fields; typed repair corrected six but retained `schema_version=scifi_codex.script_artifact.v1` and one `boundary=beat_end`, so strict ScriptArtifactV4 validation halted before publish
 - root cause: the repair prompt exposed the exact literal and boundary enum contract but the local model copied two legacy values from its own failed artifact; there is no deterministic metadata-only normalization for ScriptArtifactV4 yet
@@ -407,6 +419,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED (awaiting fan-out)
 
 ## PBUG-20260711-14 -- content-owned lanes never stamped the TTS delivery text
+- promotion: BUG-12.51
 - surfaced: scifi bake-off canonical 30w smoke, Codex voice gate, 2026-07-11 (first roll to survive P5)
 - symptom: the lane cleared every structured pass, then halted at the voice handoff because its ledger lines carried no pronunciation-safe delivery string
 - root cause: content-owned lanes seal canonical `text` in their own runner and bypass the legacy producer that stamps `text_for_tts`; the shared writer tail never stamped it for them
@@ -427,6 +440,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: SUPERSEDED by PBUG-20260711-16 -- the receipt was right, the KEY was wrong (see below)
 
 ## PBUG-20260711-16 -- a "seed receipt" told CastLock to replay a cast nobody rolled
+- promotion: BUG-12.51
 - surfaced: scifi bake-off canonical 30w smoke roll 12, Codex CastLock, 2026-07-11 (first roll to survive P5 + the voice gate)
 - symptom: the lane cleared every structured pass, stamped 13 delivery lines, rendered, and then died ~14 minutes in with `ValueError: num_characters must be 1-6, got 0` (cast_lock.py:189 -> _assign_bark_voices -> _otr_casting.replay_voice_assignment -> assemble_pre_locked_rows:1211)
 - root cause: `meta.cast_contract.cast_seed` is not a generic episode seed -- it is a claim that the WRITER's seeded cast picker produced this cast and can be REPLAYED from it. Content-owned lanes build their own cast rows and stamp their own voice presets in the lane runner, so the picker never ran and the contract carries no `num_characters_request` -> `int(None or 0)` -> 0 -> ValueError. The PBUG-20260711-15 credits fix stamped `cast_seed` as a generic receipt and thereby CLOSED the `cast_seed is None` escape hatch these lanes had always relied on. A fix for one producer gap opened another.
@@ -437,6 +451,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED (awaiting fan-out)
 
 ## PBUG-20260711-17 -- P7 echoed the request envelope and truncated against its own output cap
+- promotion: BUG-11.50
 - surfaced: scifi bake-off canonical 30w smoke roll 12, Codex P7, 2026-07-11
 - symptom: `OUTPUT_CAP: prompt_tokens=4543 generated_tokens=2800 max_new_tokens=2800` then `no decodable top-level JSON object found`; the raw head shows the model emitting `{ "artifact_inputs": { "accepted_line_count": 13, ...` -- the INPUT envelope -- instead of the artifact root. The structural retry happened to recover, so the run survived on luck.
 - root cause: (1) the whole-script root contract forbade returning a score/scene/beat/patch but never forbade echoing the request envelope keys (`pass_id`, `artifact_inputs`, `result_json_schema`); (2) `_script_output_token_budget` scaled the reservation from the WORD STEER alone, but a ScriptArtifactV4 serializes strict per-line metadata for every accepted line -- the accepted LINE COUNT drives its size as much as the dialogue does, so a wide graph under-reserves and truncates
@@ -457,6 +472,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: OPEN -- gates the 720w bake-off
 
 ## PBUG-20260712-01 -- Gemma packed three owned items into suffixed fields
+- promotion: BUG-11.45
 - surfaced: canonical 30-word `original_codex56sol` smoke with `google/gemma-4-E4B-it [LOCAL HF]` creative + Mistral technical, prompt `0c1bb246-fae0-41c6-8f12-4cd8cccd27f3`, 2026-07-12
 - symptom: P3 emitted `lost_object_2`, `lost_object_3`, and `resolution_links_2`; typed repair renamed them to `lost_object_secondary` / `lost_object_tertiary` instead of removing the schema violations, so the run failed closed after 459 seconds
 - root cause: the P3 prompt named the collections but never stated that every selected lost object owns one separate `caller_threads` row with one singular `lost_object`, nor that every thread owns exactly one resolution row; Python also did not validate exact cross-artifact lost-object coverage
@@ -467,6 +483,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED (the next E4B run used one row per object with no suffixed fields; it exposed the distinct nesting bug below; awaiting fan-out)
 
 ## PBUG-20260712-02 -- Gemma nested top-level truth collections inside caller rows
+- promotion: BUG-11.45
 - surfaced: canonical 30-word `original_codex56sol` smoke with `google/gemma-4-E4B-it [LOCAL HF]` creative + Mistral technical, prompt `fc362a77-ec2f-4bf0-a4fc-ac9017eeec53`, 2026-07-12
 - symptom: P3 returned a schema-complete top-level truth map but also put a `causal_steps` array inside each of three `caller_threads` rows; typed repair repeated the forbidden nesting unchanged, and the run failed closed after 461.82 seconds
 - root cause: the P3 seam and typed-repair rules described collection contents but did not state the exact top-level collection placement or exact caller-row field set; the repair ladder had no safe deterministic relocation for declared collections placed at the wrong depth
@@ -477,6 +494,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED (next E4B run cleared P3/P4 and exposed the distinct P5 nesting bug below; awaiting fan-out)
 
 ## PBUG-20260712-03 -- Gemma nested score shots inside scenes
+- promotion: BUG-11.45
 - surfaced: canonical 30-word `original_codex56sol` smoke with `google/gemma-4-E4B-it [LOCAL HF]` creative + Mistral technical, prompt `649e1d99-c96d-485b-bce1-f68858f6d2d8`, 2026-07-12
 - symptom: the run cleared P1-P4, then P5 returned `shots` arrays inside all four `scenes` rows; typed repair repeated the forbidden nesting after `PROMPT_GUARD` truncated its input from 4751 to 4592 tokens, and the run failed closed after 13:31
 - root cause: the BroadcastScore seam and typed-repair rules specified scene and shot fields but did not explicitly require separate top-level scenes/shots/beats arrays; no deterministic structural repair handled declared score collections at the wrong depth
@@ -487,6 +505,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED -- canonical E4B/Mistral prompt `fafd6306-cf0a-4c41-9bcb-11d2a8974864` cleared P5, froze the ledger, and published the episode; that run exposed the separate semantic false green below
 
 ## PBUG-20260712-04 -- Raiders of the Lost Prompts: opaque clue IDs let the spoken story abandon its source bank
+- promotion: BUG-11.39
 - surfaced: published canonical 30-word `original_codex56sol` episode `signal_lost_the_muted_melody_20260712_020438`, E4B creative + Mistral technical, prompt `fafd6306-cf0a-4c41-9bcb-11d2a8974864`, 2026-07-12
 - symptom: history, freeze, audio identity, mux, and OBS publish all succeeded, but the immutable c03 draw (`parcel tag`, `brass button`, `choir note`, `clockwork display`, repair-and-return ending) became an ancient-artifact laboratory procedural speaking `protocol alpha`, `isotopic decay`, `resonance signature`, and `micro-vibrations`; none of the three lost possessions, the device, or the promised return survived into dialogue
 - root cause: routing was correct and visual style never entered P1-P9; semantic provenance stopped at opaque clue IDs. P5 proved clue-ID coverage but not clue meaning, P6 received score+manifest without the draw/truth map, script validation checked graph/safety only, P7/P9 could bless a self-consistent replacement cause, and only response hashes survived for intermediate artifacts. The independently selected `sci_fi_radio` visual pack then amplified the already accepted story drift downstream
@@ -497,6 +516,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED IN CODE / AWAITING LIVE 120-WORD C03 REQUALIFICATION; the published 30-word episode is retained as a false-green regression artifact and does not qualify the bank
 
 ## PBUG-20260712-05 -- Every custom runner title was stamped as a Fable2 title
+- promotion: BUG-12.49
 - surfaced: forensic audit of the same Codex56 false-green ledger, 2026-07-12
 - symptom: `meta.title_source` said `fable2_script_title` even though routing and authorship correctly identified `original_codex56sol`; the stale label could falsely implicate another story bank during incident diagnosis
 - root cause: the shared writer tail hardcoded the Fable2 receipt whenever any custom runner supplied `final_title_override`
@@ -507,6 +527,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED IN CODE / AWAITING FAN-OUT
 
 ## PBUG-20260712-06 -- Gemma repeated invented music filenames through P5 repair
+- promotion: BUG-11.40
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification, prompt `7384fbe8-d1c9-4485-ba8e-b7f100329a12`, E4B creative + Mistral technical, 2026-07-12
 - symptom: P5 reached the BroadcastScore on its first base call but added `opening_music.music_file=opening_music.mp3` and `closing_music.music_file=closing_music.mp3`; the typed repair repeated both forbidden fields, so strict validation failed closed after 12:32 and no ledger/media artifact was accepted
 - root cause: the score seam closed the top-level, scene, shot, beat, and line-intent key sets but described music bookends only semantically; the shared schema instruction listed their required paths without explicitly forbidding nested extras, allowing a model to treat plausible production filenames as authored score fields
@@ -517,6 +538,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED IN CODE / AWAITING LIVE 120-WORD C03 REQUALIFICATION
 
 ## PBUG-20260712-07 -- Gemma interleaved complete P5 beat blocks through repair
+- promotion: BUG-11.40
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification, prompt `d29b63d8-1890-40a4-a1ea-370bc9b02406`, E4B creative + Mistral technical, 2026-07-12
 - symptom: P5 produced a strict BroadcastScore with complete typed beats but returned to an earlier `shot_id` after starting another shot; the typed repair repeated the same A/B/A topology and the run failed closed after 11:51 with `beats for each shot must form one contiguous block`
 - root cause: the prompt named contiguous shot blocks and Python rejected interleaving, but the contract gave no concrete valid/invalid sequence example and the repair ladder had no safe deterministic ordering projection for otherwise valid authored beats
@@ -527,6 +549,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: PARTIAL IN `09222618` -- the clone/retag projection was correct, but its repair-factory-only placement missed the typed-repair response; see PBUG-20260712-08
 
 ## PBUG-20260712-08 -- P5 deterministic repair did not run on the typed-repair response
+- promotion: BUG-11.40
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `09222618`, prompt `76cb5ca2-0ac7-4b2b-9b64-705b30f0cf75`, E4B creative + Mistral technical, 2026-07-12
 - symptom: P5 base output again interleaved a closed shot; the repair-prompt factory could not accept the base after projection because another hidden validator defect remained, so it correctly requested typed repair. Gemma's typed-repair response repeated the same interleaving, then went directly to post-validation and failed after 12:33 without ever receiving the safe clone/retag projection
 - root cause: deterministic P3/P5 structural normalization lived only inside `repair_prompt_factory`, which runs before the typed-repair model call. `structured_call` validates the typed-repair response directly; it does not call the factory a second time for a schema-valid content failure
@@ -537,6 +560,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED IN CODE / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
 
 ## PBUG-20260712-09 -- raw P5 projection was not the schema-validated acceptance boundary
+- promotion: BUG-11.40
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `d024bc18`, prompt `51932200-9d57-499f-aae8-76f6fcf01631`, E4B creative + Mistral technical, 2026-07-12
 - symptom: both the P5 base output and its typed repair were schema-shaped BroadcastScores with the same reopened-shot A/B/A defect; the slot-output projection did not accept either response, and the shared ladder failed closed after 12:36 with `beats for each shot must form one contiguous block`
 - root cause: the clone/retag projection was still coupled to raw-string collection normalization before `structured_call` had created the strict `BroadcastScore`. That wrapper is useful for wrong-depth collections and nested extras, but it is not the guaranteed acceptance boundary for every schema-valid P5 response. A production response can therefore arrive at post-validation with the safe topology defect intact.
@@ -547,6 +571,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED IN CODE / FULL SUITE + BUG BIBLE GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
 
 ## PBUG-20260712-10 -- Gemma repeated duplicate clue ownership through P5 repair
+- promotion: BUG-11.40
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `73de861a`, prompt `00196fd7-943a-4427-90f0-91dce04d4a4b`, E4B creative + Mistral technical, 2026-07-12
 - symptom: the new P5 topology guard cleared the reopened-shot defect, exposing the next schema-valid error: a truth-map clue ID appeared in more than one `line_intent`. Gemma's typed repair repeated the duplicate and the run failed closed after 11:35 with `each truth-map clue must be assigned to exactly one line intent`.
 - root cause: the safe first-placement-wins duplicate-clue projection still lived in raw-output/repair-factory helpers. Like the prior topology repair, it was not enforced over the strict `BroadcastScore` object that the shared ladder accepts.
@@ -557,6 +582,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED IN CODE / FULL SUITE + BUG BIBLE GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
 
 ## PBUG-20260712-11 -- independent P5 repairs could not compose
+- promotion: BUG-11.41
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `145e955b`, prompt `de6f4c1e-b021-4106-871e-8e4a3673bfa4`, E4B creative + Mistral technical, 2026-07-12
 - symptom: P5 again returned a reopened-shot topology plus duplicate clue ownership. The topology guard was reached first but declined to apply because its helper demanded that the entire score, including the independent duplicate-clue invariant, already validate. Both the base and typed-repair responses therefore failed closed on the first reported topology error after 12:32.
 - root cause: each safe normalizer was implemented as an all-or-nothing full-score repair. A valid artifact containing two independent, non-authoritative mechanical defects could not reach either repair's success path; the post-validator handled only the first reported defect rather than a bounded composition of disjoint projections.
@@ -567,6 +593,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: FIXED IN CODE / FULL SUITE + BUG BIBLE GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
 
 ## PBUG-20260712-12 -- full-score repair overflowed for a one-intent grounding omission
+- promotion: BUG-11.42
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `ef6cd277`, prompt `cabf66f8-14d1-4de5-b043-d329b888df78`, E4B creative + Mistral technical, 2026-07-12
 - symptom: P5's typed structural guards cleared both reopened-shot topology and duplicate-clue ownership, but one non-announcer clue intent omitted the exact lost-object anchor `parcel tag`. The generic typed repair then attempted to regenerate the entire BroadcastScore, produced no decodable top-level JSON, repeated the same overflow on syntax retry, and failed closed after 14:39.
 - root cause: the acceptance boundary treated a localized LLM-owned semantic omission as a whole-artifact repair. A complete score is too large and too fragile an output shape for a one-line intent correction, especially after the failed score and contract inputs are fed back through the repair ladder.
@@ -577,6 +604,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: LIVE-QUALIFIED end to end by same-seed c03 prompt `ed1a13ca-6cc5-4a79-830e-cc82c8a460ab`: P5 grounding patch cleared, frozen ledger and final OBS asset exist, ComfyUI `RESULT SUCCESS`
 
 ## PBUG-20260712-13 -- grounding-intent patch could erase an already-valid anchor
+- promotion: BUG-11.43
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `ec489787`, prompt `54c0a8bb-45f9-4cf2-bc56-49882fd16377`, E4B creative + Mistral technical, 2026-07-12
 - symptom: P1-P5 cleared on their first attempts after P5 safely normalized reopened-shot topology and duplicate-clue ownership. The new `ScoreIntentPatch` first corrected four lost-object/device targets but omitted beat_09's required resolution anchor; its typed retry passed the patch-local anchor check yet the merged score still failed closed after 578.73 seconds.
 - root cause: the patch plan listed only newly missing anchors. A selected target beat can already hold a different immutable anchor required elsewhere (especially reveal/closure beats that also carry clues); overwriting its complete `line_intent.intent` could silently remove that existing anchor. The patch post-validator checked local target coverage but did not validate the merged BroadcastScore before accepting the typed patch.
@@ -587,6 +615,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: LIVE-QUALIFIED end to end by same-seed c03 prompt `ed1a13ca-6cc5-4a79-830e-cc82c8a460ab`: P5 grounding patch cleared, frozen ledger and final OBS asset exist, ComfyUI `RESULT SUCCESS`
 
 ## PBUG-20260712-14 -- full-script repair repeated one missing closure literal
+- promotion: BUG-11.42
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `a9cf3bbe`, prompt `69a56fa7-afd3-4e72-b2b4-188a7afaac00`, E4B creative + Mistral technical, 2026-07-12
 - symptom: P1-P5 cleared, including the bounded P5 grounding patch. P6 generated a structurally valid `PerformanceScript` but its closure line did not speak the exact immutable resolution anchor `returns everything`. The generic typed repair regenerated the whole script and repeated the identical omission, failing closed after 11:22.
 - root cause: P6 treated a localized LLM-owned spoken-line grounding omission as a full-script repair. The prompt already named the literal, but the full artifact request was large enough that Gemma reproduced the otherwise-valid script and its one missing phrase instead of isolating the closure line.
@@ -597,6 +626,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: LIVE-QUALIFIED end to end by same-seed c03 prompt `ed1a13ca-6cc5-4a79-830e-cc82c8a460ab`: P6 grounding patch cleared, frozen ledger and final OBS asset exist, ComfyUI `RESULT SUCCESS`
 
 ## PBUG-20260712-15 -- later full-script retakes bypassed the bounded P6 grounding repair
+- promotion: BUG-11.44
 - surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `cb5166f8`, prompt `10438a88-66c6-400d-b7b9-d049b2f116f3`, E4B creative + Mistral technical, 2026-07-12
 - symptom: P1-P6 cleared, including both bounded P5 and P6 grounding patches. The blind-listener loop requested P8; P8 returned a structurally valid replacement script but again omitted exact closure anchor `returns everything`. Its generic full-script typed repair repeated the omission and failed closed.
 - root cause: the P6 local-line guard was attached only to initial script creation. P8, optional P8, and P9 retake paths continued to validate full grounding inside their full-script `structured_call`, so a later reauthoring route could reintroduce the same local defect and bypass the guarded acceptance boundary.
@@ -607,6 +637,7 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - status: LIVE-QUALIFIED end to end by same-seed c03 prompt `ed1a13ca-6cc5-4a79-830e-cc82c8a460ab`: P8 grounding patch cleared, listener rerun and P9 cleared, frozen ledger and final OBS asset exist, ComfyUI `RESULT SUCCESS`
 
 ## PBUG-20260712-16 -- detached soak monitor reported a blank exit code after canonical success
+- promotion: BUG-12.50
 - surfaced: same-seed c03 120-word live qualification, monitor log `logs/codex56_c03_120_after_156cb2e4`, 2026-07-12
 - symptom: the detached PowerShell wrapper wrote `COMPLETE: SOAK_FAIL rc=` even though the canonical API reported `RESULT SUCCESS`, the final OBS MP4 was published, duration and byte-identical-audio checks passed, and the frozen ledger existed.
 - root cause: the monitor trusted a blank `Process.ExitCode` from the detached PowerShell child as a failure without reconciling the canonical API's explicit terminal result.
@@ -615,3 +646,90 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - bible-worthy: yes -- test orchestration must not turn an observed final asset plus explicit canonical success into a false-negative qualification verdict.
 - confidence: HIGH
 - status: FIXED IN HARNESS / AWAITING NEXT DETACHED-SMOKE CONFIRMATION
+
+## HISTORICAL BACKFILL -- 2026-07-12 production-only Bug Log sweep
+
+The archived `BUG_LOG.md` and `BUG_LOG_2026-06.md` contain many local labels,
+including design notes, test-only findings, unresolved investigations, and
+operator-pending visual observations. This backfill admits only historical
+records with explicit live/published/GPU evidence, a grounded root fix, and a
+current regression test. It does not promote an archived label merely because
+its name contains `BUG`.
+
+## PBUG-20260614-01 -- malformed post-blend filter silently dropped scopes and captions
+- promotion: BUG-08.08
+- surfaced: live look-QA of a published episode, 2026-06-14; server log recorded
+  ffmpeg `gbrpformat` rejection and source-copy fallback while `obs_publish OK`
+- symptom: a three-input procgen blend silently published without burned SDH
+  captions or audio-reactive scopes
+- root cause: an enabled green-overlay chain already ended in `,format=gbrp` and
+  the next chain appended `format=gbrp` without a separator, producing the
+  invalid token `gbrpformat`
+- fix: commit `99320ae` adds the pixel-format pin exactly once; current
+  `test_build_cmd_3input_scopes_no_double_format_gbrp_bug402` covers both
+  overlay states and the caption burn
+- verify idea: every enabled three-input filter combination has valid token
+  separators, expected pixel-format pins, and its required visual layers
+- bible-worthy: yes -- process success is not evidence that optional final
+  compositing effects survived
+- status: PROMOTED BUG-08.08
+
+## PBUG-20260614-02 -- post-composition shortest input clipped the rolling-credits tail
+- promotion: BUG-08.08
+- surfaced: operator-verified fresh render, 2026-06-14; credits were absent from
+  the published tail before the fix and visibly restored after it
+- symptom: the final video stopped at the shortest upstream track, cutting a
+  deliberately longer floor/HUD credits layer
+- root cause: post-composition treated a short scopes track as the completion
+  boundary despite the credits layer intentionally extending past master audio
+- fix: preserve the intended long-form timeline; current
+  `test_blend_cmd_does_NOT_use_shortest_for_c7_safety` guards the command
+- verify idea: a credits/scopes fixture with a deliberately longer tail retains
+  the complete post-roll in the final composition
+- bible-worthy: yes -- final-output success must include duration and layer
+  completeness, not merely an ffmpeg exit status
+- status: PROMOTED BUG-08.08
+
+## PBUG-20260626-01 -- LTX-AV activation spill caused a no-OOM multi-minute crawl
+- promotion: BUG-07.22
+- surfaced: GPU-validated live 30-word all-`ltx_audio_in` headless run,
+  2026-06-26; 223 s/iteration spill reduced to steady roughly 11 s/iteration
+- symptom: audio-conditioned video inference avoided OOM but fell into system
+  memory spill with near-zero free VRAM and an extreme per-beat slowdown
+- root cause: one VideoVAE stayed alive through both encode and decode, while
+  no activation reserve protected the sampler from desktop VRAM contention
+- fix: `ae8ec55e` splits encode/decode VAE lifetime; `bd5ffd23` scopes an
+  `EXTRA_RESERVED_VRAM` minimum and restores it after the run
+- verify idea: graph wiring has distinct VAE nodes; reserve scope raises,
+  restores on exception, and never lowers a stricter existing reserve; GPU soak
+  remains free of system-memory crawl
+- bible-worthy: yes -- a slow no-OOM render is a real VRAM failure class, not a
+  license to guess at quantization or offload changes
+- status: PROMOTED BUG-07.22
+
+## PBUG-20260702-02 -- orphaned one-shot environment hook poisoned later headless boots
+- promotion: BUG-12.52
+- surfaced: live all-`ltx_audio_in` probe, 2026-07-02; the report instead showed
+  every shot rendered by HuMo from a crashed leg's stale force-engine override
+- symptom: a canonically configured run silently inherited file-based engine
+  overrides that were not present in the explicit new-run configuration
+- root cause: normal post-leg cleanup did not run after a crash, leaving the
+  sourceable environment hook to affect later boots
+- fix: consume-once hook semantics plus canonical-wrapper stale-hook removal;
+  `test_headless_wrapper_clears_stale_extra_env_hook_before_boot` pins the
+  cleanup boundary
+- verify idea: seed an override hook, run the canonical headless wrapper, then
+  require hook removal and an engine receipt matching only explicit inputs
+- bible-worthy: yes -- temporary file-based overrides must not become hidden
+  persistent process defaults
+- status: PROMOTED BUG-12.52
+
+## BUG AUDIT RECEIPT -- 2026-07-12
+
+Searched every repository filename containing `bug`, both historical bug logs,
+all current PBUG entries, and bug-labelled commits. Promoted the July-11
+canonical-smoke set plus the four historical incidents above only after locating
+their real-run evidence and current regressions. Kept the unresolved July-2
+VRAM diagnosis, the environmental Ollama outage, and the predicted (not yet
+live) 720-word context risk out of the Bible; other archived local labels stay
+out until they independently meet the same production-only admission rule.

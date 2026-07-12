@@ -35,6 +35,16 @@ IS my workflow.
   Bug Bible lives in a SEPARATE repo: `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide`
   -- `cd` to its root and use the RELATIVE path `tests\bug_bible_regression.py` (an absolute forward-slash
   path fails to collect).
+- **Knowledge gate before implementation or diagnosis:** read `docs\PRODUCTION_SPRINT_LESSONS.md`, then the
+  relevant entries in `docs\PROD_BUG_LOG.md`, and the matching portable rules in
+  `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\BUG_BIBLE.yaml`. The lessons are
+  mandatory project context, the production log is the staging record, and the Bible is the reusable
+  cross-project contract. A newly fixed, repeatable production failure must be recorded in the log and
+  promoted with a Bible entry plus executable coverage whenever its verify condition is automatable.
+- **Admission rule:** only a bug verified by a live production artifact, headless run, smoke, soak, or
+  published episode may enter `PROD_BUG_LOG.md` or be promoted to the Bug Bible. A review observation,
+  static-audit finding, or invented test fixture may verify a known production bug, but never creates a
+  new PBUG or Bible rule on its own.
 - **PowerShell reality (DC runs powershell.exe):** use `;` to chain, NOT `&&`. Do NOT use
   `python -c "..."` with nested quotes -- PowerShell mangles them; instead WRITE A TEMP `.py` file, run
   it, then delete it. `2>&1` makes stderr render as scary red text -- that is NOT a failure; check the
