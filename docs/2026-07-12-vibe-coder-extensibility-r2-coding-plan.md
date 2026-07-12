@@ -1,10 +1,10 @@
-# Vibe-Coder Extensibility -- R2 Coding Plan (r2-HARDENED)
+# Vibe-Coder Extensibility -- R2 Coding Plan (r3-HARDENED, wiring-converged)
 
 - **Date:** 2026-07-12. **Parent:** `docs/2026-07-12-vibe-coder-extensibility-r1.md`
-  (@ 852209bf). **Revision:** kibitz r2 folded (codex @ gpt-5.6-sol, antigravity @
-  gemini-3.5-pro, Claude anchor+judge; judgment log:
-  `kibitz-runs/2026-07-12-vibe-coder-extensibility/r2/final.md`). r3 (wiring) next.
-  NO code until the arc converges.
+  (@ 852209bf). **Revision:** kibitz r2 AND r3 folded (codex @ gpt-5.6-sol,
+  antigravity @ gemini-3.5-pro, Claude anchor+judge; judgment logs:
+  `kibitz-runs/2026-07-12-vibe-coder-extensibility/r2/final.md` + `r3/final.md`).
+  Operator directed r2-r3 only; r4 convergence pass not yet run. NO code yet.
 - **Operator rulings (2026-07-12):** (1) NO TIERS -- two KINDS of addition: a **content
   pack** (story pack inside ANY registered RUNNABLE lane; the vibe path, equal across
   lanes) vs a **new lane** (fetcher/interpreter/runner + full independent-design
@@ -45,6 +45,24 @@
   4. `_clear_caches()` (exists, :547) additionally resets the PackRecord map.
 - `nodes/story_rules/`: NO overlay (lane infrastructure; stem = source_bank_id;
   runnable-bank coverage law `:274-280` unchanged). Content packs never ship rules.
+- **Overlay quarantine contract (r3, agy's boot-crash find judged in):** INPUT_TYPES
+  triggers the lazy sweep, so a malformed OVERLAY draft must not crash the node pack at
+  boot. Any overlay-side validation failure (schema, parity, user-content policy,
+  duplicate id, sidecar-name, symlink escape) QUARANTINES that overlay file: loud
+  console error naming file + reason, absent from the registry and every choices list,
+  run-time selection fails loud (not in the map), and `otr_check` reports the identical
+  issue. TRACKED-root failures keep today's hard fail (a broken shipped pack IS a build
+  error). Nothing silently succeeds; nothing substitutes -- fail-loud preserved, and a
+  vibe coder's draft can never brick the extension.
+- **Sidecar law (r3):** `_PACK_SIDECAR_FILENAMES_BY_BANK` exemptions (`:42`, applied
+  `:333`) do NOT apply under `user_packs/` -- overlay sidecar-named files are
+  quarantined loud (they would otherwise be unreachable, unvalidated content).
+- **Junction rule tightened (r3):** the RESOLVED `user_packs` root itself must live
+  under the resolved repo root (a junction root pointing elsewhere is rejected), and
+  every entry's resolved path must stay under the resolved root.
+- The published PackRecord map is wrapped in `MappingProxyType` (a frozen dataclass
+  holding a mutable dict is not immutable; `_Registry` `:120-127` has the same
+  weakness -- fix it for the new map, leave the old fields as-is).
 - Restart contract unchanged (overlay swept inside the same lazy singletons).
 - Tests: overlay style+pack visibility after `_clear_caches()`; duplicate-id rejection
   both directions; overlay top-level registry file rejected; non-runnable-bank overlay
@@ -67,26 +85,53 @@ a lane is unreachable. Fix:
   `resolve_story_pack(bank_id)` (byte-identical today); else guard `"/" in value` (a
   malformed value fails loud with `story_pack value must be <bank_id>/<story_model_id>`),
   split on the FIRST `/`, hard error if the pair's bank != selected `source_bank` (no
-  cross-bank fallback), then resolve via the PackRecord map. The ONE selected
-  `PackRecord` is passed EXPLICITLY to all three consumers (original interpreter, QA
-  gate, lane runner) -- no consumer re-resolves. Pipeline dispatch stays
+  cross-bank fallback), then resolve via the PackRecord map. Pipeline dispatch stays
   `bank.default_story_pipeline`, which W0's parity law makes provably equal to the
   selected pack's pipeline.
+- **CONSUMER INVENTORY -- the r3 headline (both agents independently; code-verified).**
+  The r2 "three consumers" list was incomplete: legacy-lane prompts resolve through
+  `_otr_creative_prompt_router.resolve_creative_system_prompt`, which re-resolves the
+  bank DEFAULT for every pack-routed seam (`:206`), with callers in `_otr_outline`
+  (`:1850-1884`) and `_otr_line_composer` (`:2109/:3291/:3602/:3736`); and
+  `_otr_freeze_cascade.resolve_freeze_policy` re-resolves the default and branches
+  freeze policy on ITS `line_composer_system` seam (`:316-331`). Two-channel threading
+  law:
+  1. **run()-scope:** the ONE selected `PackRecord` is passed EXPLICITLY to the original
+     interpreter factory (`:1799`), the QA gate (`:1837`), the lane runner (`:3741`),
+     AND down the prompt-router chain -- `resolve_creative_system_prompt`,
+     `generate_outline`, `compose_line`, and the announcer/coda helpers gain
+     `story_model_id: str | None = None` (None = bank default = byte-identical for
+     every pre-W1 caller). No production code re-resolves by bank alone.
+  2. **Ledger-scope** (freeze cascade, reroll paths): resolve via the W1
+     `meta.story_model_id` stamp -- `resolve_story_pack(bank, stamped_id)`; an absent
+     stamp (pre-W1 ledger) = today's behavior. Backwards-compatible by construction;
+     parity test: untagged AND unstamped ledgers behave byte-identically to today.
+  A thread-local "active pack" was considered and REJECTED (hidden global state).
+  Enforcement: grep-test pins `resolve_story_pack(` to exactly ONE writer call site;
+  integration fixture selects a secondary pack whose `line_composer_system` presence
+  differs from the default and proves composer prompts AND freeze policy follow the
+  SELECTED pack; refinement re-entry test (`:3232-3400` reconstructs run() args) proves
+  `story_pack` survives every re-entry.
 - **Stamps (verified absent today, `:3644-3665`):** `meta["story_model_id"]` +
-  `meta["story_pack_sha256"]` (overlay files can change under the same id -- the hash is
-  the replay receipt), stamped with the Stage-2C/3C block before the skeleton save.
-- **Canonical JSON:** append BOTH the `story_pack` widget value AND whatever the node's
-  existing optional-widget serialization requires (node 1 currently: 34 widgets_values,
-  35 inputs, `gate_in` last, link 279 = [279,63,0,1,34,STRING] -- verified by parse).
-  COUNTS AND SLOTS ARE RE-DERIVED AT BUILD TIME, never hardcoded: the ratified
-  lean-mean-rip (removes node-1 inputs[9], shifts link 279 dst_slot 34->33) may land
-  first; W1 rebases on the live JSON either way. Same-change: OTR_WorkflowValidator +
-  round-trip + link referential integrity + widget-count vs live INPUT_TYPES audits, and
-  the locked optional-set contract audit (`:6998+`) gains `story_pack`.
+  `meta["story_pack_sha256"]`, stamped with the Stage-2C/3C block before the skeleton
+  save. TOCTOU law: pack bytes are read ONCE at discovery -- decode/parse/validate THAT
+  payload, hash THOSE bytes, digest immutable in `PackRecord.sha256`; W1 stamps
+  `record.sha256` and never re-reads `record.path`.
+- **Canonical JSON (exact form, 3-way converged):** `gate_in` is a force-input with NO
+  widget slot (`:2996-3008`; node 1 today: 34 widget-inputs + gate_in = 35 inputs, link
+  279 -> slot 34, verified by parse). `story_pack` is declared AFTER `gate_in` in
+  INPUT_TYPES: it becomes input slot 35 with `{"widget":{"name":"story_pack"}}`,
+  `widgets_values[34]` = `"(bank default)"`, link 279 UNTOUCHED. If lean-mean-rip lands
+  first (node-1 input 9 removed, link 279 dst 34->33), the SAME append-at-live-END law
+  applies -- every count/slot is RE-DERIVED from the live JSON at build, never
+  hardcoded. Same-change: OTR_WorkflowValidator + round-trip + link referential
+  integrity + widget-count vs live INPUT_TYPES audits, and the locked optional-set
+  contract audit (`:6998+`) gains `story_pack`.
 - Tests: `test_story_pack_widget.py` (choices shape incl. runnable-only; sentinel
   default; no-slash fail; cross-bank fail; default-path byte-parity; explicit-pack
-  resolution; single-resolve law -- consumers receive the selected pack), canonical
-  guardrail update, stamp presence + hash correctness.
+  resolution), single-resolve grep test, consumer-threading integration fixture,
+  re-entry survival, ledger-channel parity, canonical guardrail update, stamp presence
+  + hash correctness.
 
 ## W2 -- `otr_check.py`: one validator, two entry points
 
@@ -100,20 +145,27 @@ a lane is unreachable. Fix:
   attached to the shared validation exceptions (today they are prose-only). Plain-text
   AND `--json` render the same issues; exit codes: 0 clean / 1 validation issues /
   2 internal error. String-parsing exceptions is forbidden.
-- **CLI grammar (decided now):** `otr_check.py style <path|id>... | pack <path|id>... |
-  model <id> | all [--json] [--receipt <out>]`. `all` scans both roots of both surfaces
-  + the model catalog. Registry caches are cleared at invocation start. Import
-  discipline = the test suite's pattern (OTR_TEST_MODE + direct module import; never
-  through ComfyUI-heavy `nodes/__init__`).
+- **CLI grammar (decided now):** `otr_check.py style <path|id>... |
+  pack <path|bank_id/story_model_id>... | model <id> | all [--json] [--receipt <out>]`.
+  Bare story-model ids are REJECTED (they are bank-scoped; no searching, no guessing).
+  `all` scans both roots of both surfaces + the model catalog. Registry caches are
+  cleared at invocation start. Import discipline = the test suite's pattern
+  (OTR_TEST_MODE + direct module import; never through ComfyUI-heavy `nodes/__init__`).
+  Model-catalog failures get a ValidationIssue ADAPTER at the failure site
+  (`UnknownModelError` is prose-only today, `:1129-1228`) -- never string parsing.
 - **SFW/user-content policy IN the production validator (parity law):** new
   `nodes/_otr_user_content_policy.py` -- stdlib, whole-word matching, authored-field
   coverage (prompt seams + defaults + labels). Called by the production pack validator,
-  so load-fail == check-fail with the same exception; styles keep their own
-  forbidden-terms lint. Seed vocabulary contract: `DEFAULT_PROFANITY_TERMS`
-  (`_otr_stage3_validators.py:140`) + a curated violence/weapons subset from
-  `FORBIDDEN_TERMS` (`_otr_original_radio.py:88`) EXCLUDING lane-specific
-  anachronism/source-framing terms. (Binding to `_ALL_FORBIDDEN` rejected -- it would
-  false-fail modern-setting lanes with 1940s anachronism terms.)
+  so load-fail == check-fail with the same exception (overlay-side violations
+  QUARANTINE per W0; tracked-side hard-fail); styles keep their own forbidden-terms
+  lint. **Dependency direction (r3):** `_otr_original_radio.py` imports pydantic at
+  module load (`:43`), so the policy module OWNS the curated literals and
+  original_radio/stage3 consume FROM it (leaf import) -- or pin a copied subset with a
+  drift test. Never policy -> original_radio. Seed vocabulary contract:
+  `DEFAULT_PROFANITY_TERMS` (`_otr_stage3_validators.py:140`) + a curated
+  violence/weapons subset from `FORBIDDEN_TERMS` (`_otr_original_radio.py:88`)
+  EXCLUDING lane-specific anachronism/source-framing terms. (Binding to
+  `_ALL_FORBIDDEN` rejected -- 1940s anachronism terms would false-fail modern lanes.)
 - **Authoring receipt for content packs = its own gate-ID contract** (NOT the bank
   preflight's positional G-numbers): stable IDs over {pack/schema/prompt validity,
   selected-lane compatibility (parity laws), user-content policy, regression suite,
@@ -122,10 +174,18 @@ a lane is unreachable. Fix:
   the CLI can NEVER emit them as passed (two-state law). Receipt carries SHA-256 of the
   pack, `banks.json`, `pipelines.json`, the lane's story_rules pack, plus schema +
   checker versions and verified-file/seam counts.
-- `scripts/otr_check.bat` resolution order: `OTR_PYTHON` env override -> ancestor
-  `.venv\Scripts\python.exe` (the real interpreter lives at `ComfyUI\.venv`, two
-  ancestors up) -> `..\..\python_embeded\python.exe` (portable) -> actionable failure.
-  Never an arbitrary system python.
+- **Receipt location (r3, convergent):** default and only sanctioned output dir =
+  `user_packs/receipts/` (invisible to both surface sweeps by construction). The CLI
+  REJECTS any `--receipt` path whose resolved location falls under
+  `user_packs/story_packs/` or `user_packs/visual_styles/` (same containment guard as
+  the overlay) -- a receipt beside a pack would be swept as a pack on restart. No sweep
+  exemptions for receipt-looking names: strays in swept dirs stay loud.
+- `scripts/otr_check.bat` resolution order: `OTR_PYTHON` env override ->
+  `%~dp0..\..\..\.venv\Scripts\python.exe` -> `%~dp0..\..\..\python_embeded\python.exe`
+  -> actionable failure. (THREE levels from `scripts\`: repo sits at
+  `ComfyUI\custom_nodes\<repo>` -- the r2 draft's two-level paths pointed at
+  `custom_nodes\` and were wrong.) Never an arbitrary system python. Optional
+  `otr_check.sh` mirrors the order for Linux/macOS dev boxes.
 - Tests: CLI==loader parity both directions; two-phase ordering; ValidationIssue JSON
   schema; receipt fields + hashes; policy module coverage (word-boundary, field sweep);
   wrapper resolution order (fixture dirs); cache-clear-at-start.
@@ -159,9 +219,11 @@ a lane is unreachable. Fix:
   `docs/EXTENDING_OTR.md`; a generated==committed test pins it. Recipe prose and laws
   live in ONE owned README section -- never generated, never duplicated. The tables are
   the LLM-paste contract; the README section is the human 5-minute path.
-- README: three 5-minute recipes (style; content pack -- any runnable lane, restart
-  note; local HF model -- causal-LM guard, bare label, UNKNOWN-tier honesty, no restart
-  needed) + one pointer: new LANES -> SOURCE_BANK_GUIDE.md + full preflight.
+- README: three 5-minute recipes (style; content pack -- any runnable lane, EXPLICIT
+  restart-to-see-choices note for the `story_pack` dropdown; local HF model --
+  causal-LM guard, bare label, UNKNOWN-tier honesty, no restart needed) + one pointer:
+  new LANES -> SOURCE_BANK_GUIDE.md + full preflight. Quarantine behavior documented:
+  a rejected draft shows a console error + `otr_check` explains the fix.
 
 ## W5 -- verification wave
 
@@ -182,19 +244,23 @@ live no-restart rescan; generic GGUF walker; model load/generate probe; within-f
 all-errors collection; end-user renamed-ID detection; generated recipe prose.
 
 ## Order + rough size
-W0 -> W1 -> W2 -> W4 -> W5; W3 slides in behind the ownership receipt. ~2-2.5k LOC
-(W0 ~450+tests, W1 ~250+tests, W2 ~700+tests incl. policy module + issue plumbing,
+Dependency graph (r3-fixed): `W0 -> W1 -> W2 -> W4`, plus `ownership receipt -> W3`,
+then `{W3, W4} -> W5`. W5 certifies nothing until BOTH branches are green. ~2.5-3k LOC
+(W0 ~550+tests incl. quarantine, W1 ~400+tests incl. consumer threading, W2 ~750+tests,
 W3 ~150+tests, W4 ~400). Each W = one green commit+push.
 
-## Questions for the r3 (wiring) panel
-1. The exact serialized form of the `story_pack` widget on canonical node 1 (widget-input
-   descriptor vs widgets_values-only) against the node's current serialization -- and the
-   rebase choreography if lean-mean-rip lands first.
-2. Consumer handoff: confirm the three consumer sites can accept an explicit pack
-   argument without signature ripples beyond the writer (`:1799/:1837/:3741`).
-3. `ValidationIssue` attachment point: one shared exception base across the three
-   modules, or per-module exceptions carrying the dataclass?
-4. Receipt/manifest file locations (receipts beside the pack? a receipts/ dir under
-   user_packs?) and their interaction with the overlay sweeps (must not be swept as
-   packs).
-5. Anything the wiring round finds unimplementable or under-specified.
+## r3 wiring resolutions (was: questions for the r3 panel)
+1. Serialization: LOCKED (see W1 -- story_pack after gate_in, input 35 / widget slot 34,
+   link 279 untouched; re-derive everything from live JSON at build).
+2. Consumer handoff: EXPANDED (see W1 -- prompt-router chain + freeze cascade via the
+   two-channel law; the original "three consumers" were not enough).
+3. `ValidationIssue`: dependency-leaf stdlib module (`nodes/_otr_validation_issue.py`) +
+   `.issue` attribute on each module's EXISTING exception families; no shared base, no
+   inheritance-tree coupling.
+4. Receipts: `user_packs/receipts/` with CLI containment rejection (see W2).
+
+## Verify-at-build (carried into W-execution)
+Installed ComfyUI's VALIDATE_INPUTS contract; SOURCE_PAYLOAD_KEYS exact names;
+story-pack loader error classes at ValidationIssue wiring; freeze-cascade meta-channel
+parity (untagged + unstamped ledgers byte-identical to today); emit-schema-doc
+generated==committed pin compares BYTES (UTF-8, LF, no BOM) to dodge CRLF flake.
