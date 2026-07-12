@@ -319,3 +319,12 @@ def test_p5_repair_spells_out_required_fields_and_exact_arc_phases():
     assert "shot MUST retain a non-empty visual_prompt" in rules
     assert "orientation_beat_id beat is `opening`" in rules
     assert "every other beat is `rising`" in rules
+
+
+def test_listener_and_final_audit_repair_envelopes_are_explicit():
+    listener = lane._repair_rules("P7", "optional_notes must be a list")
+    assert "optional_notes MUST be a list of strings" in listener
+    final = lane._repair_rules("P9", "accepted must be a boolean")
+    assert "accepted MUST be one boolean" in final
+    assert "Never copy the manifest or script" in final
+    assert "blocking MUST be a boolean" in final

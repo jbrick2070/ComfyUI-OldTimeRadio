@@ -410,3 +410,7 @@ leaving them for live integration:
     exact cardinality in the authored contract. Spell out nested object keys
     and plurality too: `clue_ids` is an array (possibly empty), never a
     singular `clue_id` scalar.
+27. For small technical audit passes, describe the output envelope before the
+    audit task. A field named `accepted` must be explicitly boolean or a model
+    may copy the accepted input artifact into it; always pin list fields and
+    every required finding member in both base and repair prompts.

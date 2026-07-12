@@ -332,6 +332,22 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "other beat is `rising`. Never use orientation, resolution, "
             "closure, climax, or other synonyms as arc_phase values."
         )
+    if pass_id == "P7":
+        rules += (
+            " understood_cause and understood_resolution MUST be strings; "
+            "findings MUST be a list; optional_notes MUST be a list of "
+            "strings, or [] when there are no optional notes."
+        )
+    if pass_id in {"P9", "P9_rerun"}:
+        rules += (
+            " Return only the compact audit envelope. accepted MUST be one "
+            "boolean, findings MUST be a list, and warnings MUST be a list of "
+            "strings. Never copy the manifest or script into accepted or any "
+            "other output field. Every finding MUST include field_path, "
+            "item_id, exact_span, category, allowed_correction, and blocking; "
+            "blocking MUST be a boolean. If there are no concrete defects, "
+            "return accepted=true, findings=[], and warnings=[]."
+        )
     return rules
 
 
