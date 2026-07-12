@@ -315,11 +315,14 @@ def _fetch_original_codex56sol_local_seed(
         deck = json.loads(raw.decode("utf-8"))
     except Exception as exc:
         raise SourcePayloadContractError(f"invalid constraint deck: {exc}") from exc
-    if (not isinstance(deck, dict) or deck.get("schema_version") != 1
+    if (not isinstance(deck, dict) or deck.get("schema_version") != 2
             or not isinstance(deck.get("deck_id"), str)
             or not isinstance(deck.get("draws"), list) or not deck["draws"]):
         raise SourcePayloadContractError("constraint deck shape is invalid")
-    required = {"constraint_id", "lost_objects", "acoustic_device", "helpful_ending"}
+    required = {
+        "constraint_id", "lost_objects", "acoustic_device", "helpful_ending",
+        "device_spoken_anchor", "resolution_spoken_anchor",
+    }
     for draw in deck["draws"]:
         if not isinstance(draw, dict) or set(draw) != required:
             raise SourcePayloadContractError("constraint draw has invalid keys")

@@ -40,6 +40,8 @@ def test_local_seed_fetch_is_exact_deterministic_and_rejects_source_ref(monkeypa
     draw = json.loads(a.payload["seed_text"])
     assert draw == a.source_meta["constraint_draw"]
     assert len(draw["deck_sha256"]) == 64
+    assert draw["device_spoken_anchor"]
+    assert draw["resolution_spoken_anchor"]
     assert a.source_rights["rights_label"] == "synthetic-original"
     assert not a.source_rights["license_url"]
     with pytest.raises(source.SourcePayloadContractError, match="rejects source_ref"):
@@ -53,6 +55,15 @@ def test_canonical_default_and_bytes_remain_pinned():
     writer_nodes = [n for n in workflow["nodes"] if n.get("type") == "OTR_LedgerScriptWriter"]
     assert len(writer_nodes) == 1
     assert writer_nodes[0]["widgets_values"][23] == "science_news"
+
+
+def test_custom_title_override_receipts_name_the_real_bank():
+    assert writer._title_source_for_custom_override(SimpleNamespace(
+        source_bank_id="scifi_fable2",
+    )) == "fable2_script_title"
+    assert writer._title_source_for_custom_override(SimpleNamespace(
+        source_bank_id="original_codex56sol",
+    )) == "original_codex56sol_script_title"
 
 
 @pytest.mark.parametrize("hint", ["", "please emphasize patient teamwork"])

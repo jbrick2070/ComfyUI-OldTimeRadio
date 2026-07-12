@@ -162,7 +162,7 @@ def _make_ctx(tmp_path: Path, monkeypatch, **over) -> WriterTailContext:
         episode_id=episode_id,
         contract=None,
         style_grammar_on=False,
-        source_bank_row=SimpleNamespace(defaults={
+        source_bank_row=SimpleNamespace(source_bank_id="scifi_fable2", defaults={
             "title_form_label": "science-fiction radio drama",
             "hud_origin_label": "",
         }),

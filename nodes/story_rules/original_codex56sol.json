@@ -8,5 +8,5 @@
   "banned_thesis_patterns": ["\\bthe moral is\\b", "\\bin summary\\b"],
   "personal_cost_patterns": [],
   "cliche_replacements": [],
-  "banned_phrases": ["gun", "weapon", "blood", "violence", "kill", "murder", "smoking", "cigarette", "Star Wars", "Star Trek", "Doctor Who", "Sherlock Holmes", "Batman", "Marvel", "Disney"]
+  "banned_phrases": ["gun", "weapon", "blood", "violence", "kill", "murder", "smoking", "cigarette", "Star Wars", "Star Trek", "Doctor Who", "Sherlock Holmes", "Batman", "Marvel", "Disney", "protocol alpha", "isotopic decay", "ancient artifact", "resonance signature", "micro-vibrations", "alien signal", "spaceship", "starship", "quantum device"]
 }

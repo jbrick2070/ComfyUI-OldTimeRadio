@@ -1,9 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "deck_id": "original_codex56sol_constraints_v1",
   "draws": [
-    {"constraint_id":"c01","lost_objects":["library stamp","blue mitten","recipe card"],"acoustic_device":"a loose ventilation grille repeats short phrases","helpful_ending":"the desk operator maps the echo and reunites each caller with the right item"},
-    {"constraint_id":"c02","lost_objects":["garden key","folded timetable","tin whistle"],"acoustic_device":"a speaking tube carries sounds between neighboring rooms","helpful_ending":"the callers coordinate a careful exchange at the station desk"},
-    {"constraint_id":"c03","lost_objects":["parcel tag","brass button","choir note"],"acoustic_device":"a clockwork display chimes in the same rhythm as each clue","helpful_ending":"the operator repairs the display and returns everything to its owner"}
+    {"constraint_id":"c01","lost_objects":["library stamp","blue mitten","recipe card"],"acoustic_device":"a loose ventilation grille repeats short phrases","helpful_ending":"the desk operator maps the echo and reunites each caller with the right item","device_spoken_anchor":"ventilation grille","resolution_spoken_anchor":"reunites each caller"},
+    {"constraint_id":"c02","lost_objects":["garden key","folded timetable","tin whistle"],"acoustic_device":"a speaking tube carries sounds between neighboring rooms","helpful_ending":"the callers coordinate a careful exchange at the station desk","device_spoken_anchor":"speaking tube","resolution_spoken_anchor":"careful exchange"},
+    {"constraint_id":"c03","lost_objects":["parcel tag","brass button","choir note"],"acoustic_device":"a clockwork display chimes in the same rhythm as each clue","helpful_ending":"the operator repairs the display and returns everything to its owner","device_spoken_anchor":"clockwork display","resolution_spoken_anchor":"returns everything"}
   ]
 }

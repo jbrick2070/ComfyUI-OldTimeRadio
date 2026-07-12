@@ -139,6 +139,43 @@ After every code change: focused tests, full Windows suite, Bug Bible, AST/JSON
 checks, commit, push to `v2.0-alpha`, and verify `HEAD == origin` before live
 qualification.
 
+## 11. Prove semantic provenance, not just structural references
+
+An ID can remain valid while its meaning disappears. If artifact A carries a
+typed clue and artifact B carries only that clue's ID, a later model can emit a
+self-consistent but unrelated story while every graph/reference validator
+passes.
+
+For content-owned pipelines, build a small immutable grounding contract from
+the accepted source/draw. Carry exact positive anchors through every authoring
+and retake seam, and verify their spoken evidence at the coordinates that own
+them. Structural coverage, an LLM audit, a frozen ledger, and a published video
+cannot override a deterministic semantic-fidelity failure.
+
+## 12. Test channel isolation by changing one channel
+
+Comments saying “visual style does not affect story” are not proof. Run the
+same mocked story pipeline twice while changing only the visual-style value and
+assert every captured story-model message is byte-identical. Apply the same
+method to SFX, voice, render, and other downstream channels.
+
+The story may feed visual direction; visual direction must not feed back into
+story authorship unless a separately named, explicitly designed mode owns that
+decision. Store selectors in separate ledger namespaces so a forensic audit can
+distinguish correlation from causation.
+
+## 13. Persist enough accepted artifacts to locate first drift
+
+Response hashes prove identity only when the response is still available. They
+cannot reveal where meaning first changed after a production run. Persist a
+bounded receipt of accepted typed artifacts and their grounding evidence:
+selected input, truth/plan, score/manifest, final authored output, audit, and
+line/span coordinates.
+
+Do not retain raw prompts, rejected outputs, or unlimited retry prose by
+default. The goal is replayable accepted-state forensics, not an unbounded model
+transcript.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

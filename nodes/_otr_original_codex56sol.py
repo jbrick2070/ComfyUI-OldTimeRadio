@@ -5,6 +5,7 @@ import hashlib
 import json
 import random
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -63,6 +64,8 @@ class ConstraintDraw(StrictModel):
     lost_objects: list[str] = Field(min_length=3, max_length=6)
     acoustic_device: str
     helpful_ending: str
+    device_spoken_anchor: str
+    resolution_spoken_anchor: str
 
 
 class ConstraintIngress(StrictModel):
@@ -146,6 +149,25 @@ class AudibleTruthMap(StrictModel):
     interpretations: list[Interpretation] = Field(min_length=2)
     reveal: str
     resolution_links: list[ResolutionLink] = Field(min_length=2)
+
+
+class GroundingClue(StrictModel):
+    clue_id: Identifier
+    thread_id: Identifier
+    lost_object: str
+    sound_or_phrase: str
+    implication: str
+
+
+class GroundingContract(StrictModel):
+    schema_version: Literal["original_codex56sol.grounding.v1"]
+    constraint_id: str
+    lost_object_anchors: list[str] = Field(min_length=3, max_length=6)
+    device_anchor: str
+    resolution_anchor: str
+    expected_cause: str
+    expected_resolution: str
+    clues: list[GroundingClue] = Field(min_length=3)
 
 
 class FairPlayFinding(StrictModel):
@@ -348,13 +370,27 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "orientation_beat_id beat is `opening`, the reveal_beat_id beat "
             "is `reveal`, the closure_beat_id beat is `closing`, and every "
             "other beat is `rising`. Never use orientation, resolution, "
-            "closure, climax, or other synonyms as arc_phase values."
+            "closure, climax, or other synonyms as arc_phase values. "
+            "Use grounding_contract: each lost-object anchor MUST appear "
+            "verbatim in at least one non-announcer clue-carrying intent for "
+            "its thread, device_anchor MUST appear in the reveal intent, and "
+            "resolution_anchor MUST appear in the closure intent."
         )
-    if pass_id == "P7":
+    if pass_id in {"P7", "P7_rerun"}:
         rules += (
             " understood_cause and understood_resolution MUST be strings; "
             "findings MUST be a list; optional_notes MUST be a list of "
             "strings, or [] when there are no optional notes."
+        )
+    if pass_id in {"P6", "P8", "P8_optional", "P9_retake"}:
+        rules += (
+            " Preserve every immutable spoken anchor in grounding_contract. "
+            "Each lost-object anchor must be spoken on a line carrying a clue "
+            "for that object's thread; the exact device_anchor must be spoken "
+            "on the manifest reveal line; the exact resolution_anchor must be "
+            "spoken on the manifest closure line. Never replace the mundane "
+            "lost-and-found mechanism with speculative technology, an ancient "
+            "artifact, a crime, or a supernatural cause."
         )
     if pass_id in {"P9", "P9_rerun"}:
         rules += (
@@ -676,8 +712,56 @@ def _validate_truth_map(
     return None
 
 
-def _validate_score(score: BroadcastScore,
-                    truth: AudibleTruthMap) -> str | None:
+def _build_grounding_contract(
+    draw: ConstraintDraw,
+    truth: AudibleTruthMap,
+) -> GroundingContract:
+    """Close the immutable draw over the truth map before dialogue exists."""
+    truth_error = _validate_truth_map(truth)
+    if truth_error is not None:
+        raise OriginalCodex56SolContractError(
+            f"cannot build grounding contract: {truth_error}"
+        )
+    thread_objects = {
+        row.thread_id: row.lost_object for row in truth.caller_threads
+    }
+    if Counter(thread_objects.values()) != Counter(draw.lost_objects):
+        raise OriginalCodex56SolContractError(
+            "cannot build grounding contract: truth-map lost objects differ "
+            "from the immutable draw"
+        )
+    clues = []
+    for clue in truth.audible_clues:
+        lost_object = thread_objects.get(clue.thread_id)
+        if lost_object is None:
+            raise OriginalCodex56SolContractError(
+                f"cannot build grounding contract: clue {clue.clue_id!r} "
+                f"references unknown thread {clue.thread_id!r}"
+            )
+        clues.append(GroundingClue(
+            clue_id=clue.clue_id,
+            thread_id=clue.thread_id,
+            lost_object=lost_object,
+            sound_or_phrase=clue.sound_or_phrase,
+            implication=clue.implication,
+        ))
+    return GroundingContract(
+        schema_version="original_codex56sol.grounding.v1",
+        constraint_id=draw.constraint_id,
+        lost_object_anchors=list(draw.lost_objects),
+        device_anchor=draw.device_spoken_anchor,
+        resolution_anchor=draw.resolution_spoken_anchor,
+        expected_cause=draw.acoustic_device,
+        expected_resolution=draw.helpful_ending,
+        clues=clues,
+    )
+
+
+def _validate_score(
+    score: BroadcastScore,
+    truth: AudibleTruthMap,
+    grounding_contract: GroundingContract | None = None,
+) -> str | None:
     if sum(c.char_id == "announcer" and c.role == "announcer"
            for c in score.cast) != 1:
         return "cast needs one separate char_id='announcer', role='announcer' row"
@@ -733,6 +817,42 @@ def _validate_score(score: BroadcastScore,
         return "line intents must cover every truth-map clue and no unknown clue"
     if len(assigned_clues) != len(set(assigned_clues)):
         return "each truth-map clue must be assigned to exactly one line intent"
+    if grounding_contract is not None:
+        clue_ids_by_object: dict[str, set[str]] = {}
+        for clue in grounding_contract.clues:
+            clue_ids_by_object.setdefault(
+                clue.lost_object, set()
+            ).add(clue.clue_id)
+        for anchor in grounding_contract.lost_object_anchors:
+            clue_ids = clue_ids_by_object.get(anchor, set())
+            if not any(
+                clue_ids.intersection(beat.line_intent.clue_ids)
+                and _contains_grounding_anchor(
+                    beat.line_intent.intent, anchor,
+                )
+                for beat in score.beats
+                if beat.char_id != "announcer"
+            ):
+                return (
+                    f"score needs a non-announcer clue intent naming exact "
+                    f"lost-object anchor {anchor!r}"
+                )
+        if not _contains_grounding_anchor(
+            by_beat[score.reveal_beat_id].line_intent.intent,
+            grounding_contract.device_anchor,
+        ):
+            return (
+                "reveal intent must name exact device anchor "
+                f"{grounding_contract.device_anchor!r}"
+            )
+        if not _contains_grounding_anchor(
+            by_beat[score.closure_beat_id].line_intent.intent,
+            grounding_contract.resolution_anchor,
+        ):
+            return (
+                "closure intent must name exact resolution anchor "
+                f"{grounding_contract.resolution_anchor!r}"
+            )
     return None
 
 
@@ -912,6 +1032,130 @@ def _validate_graph(score: BroadcastScore, manifest: ClosedLineManifest,
     return None
 
 
+def _normalize_grounding_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value)).casefold()
+    return " ".join(re.sub(r"[^\w]+", " ", normalized).split())
+
+
+def _contains_grounding_anchor(text: str, anchor: str) -> bool:
+    haystack = _normalize_grounding_text(text)
+    needle = _normalize_grounding_text(anchor)
+    return bool(needle) and f" {needle} " in f" {haystack} "
+
+
+def _raw_anchor_span(text: str, anchor: str) -> str | None:
+    tokens = _normalize_grounding_text(anchor).split()
+    if not tokens:
+        return None
+    pattern = re.compile(
+        r"(?<!\w)" + r"[\W_]+".join(re.escape(token) for token in tokens)
+        + r"(?!\w)",
+        re.IGNORECASE,
+    )
+    match = pattern.search(text)
+    return match.group(0) if match else None
+
+
+def _validate_script_grounding(
+    contract: GroundingContract,
+    manifest: ClosedLineManifest,
+    script: PerformanceScript,
+) -> str | None:
+    """Prove opaque clue IDs still have audible story content."""
+    script_by_id = {line.line_id: line for line in script.lines}
+    full_script = "\n".join(line.text for line in script.lines)
+    for anchor in contract.lost_object_anchors:
+        if not _contains_grounding_anchor(full_script, anchor):
+            return f"spoken script is missing lost-object anchor {anchor!r}"
+
+    clue_ids_by_object: dict[str, set[str]] = {
+        anchor: set() for anchor in contract.lost_object_anchors
+    }
+    for clue in contract.clues:
+        clue_ids_by_object.setdefault(clue.lost_object, set()).add(clue.clue_id)
+    for anchor in contract.lost_object_anchors:
+        clue_ids = clue_ids_by_object.get(anchor, set())
+        eligible_line_ids = [
+            row.line_id for row in manifest.lines
+            if clue_ids.intersection(row.clue_ids)
+        ]
+        if not eligible_line_ids:
+            return (
+                f"manifest has no clue-carrying line for lost-object anchor "
+                f"{anchor!r}"
+            )
+        if not any(
+            line_id in script_by_id
+            and _contains_grounding_anchor(script_by_id[line_id].text, anchor)
+            for line_id in eligible_line_ids
+        ):
+            return (
+                f"lost-object anchor {anchor!r} is not spoken on any line "
+                "carrying a clue for its thread"
+            )
+
+    reveal = script_by_id.get(manifest.reveal_line_id)
+    if reveal is None or not _contains_grounding_anchor(
+        reveal.text, contract.device_anchor,
+    ):
+        return (
+            f"reveal line must speak exact device anchor "
+            f"{contract.device_anchor!r}"
+        )
+    closure = script_by_id.get(manifest.closure_line_id)
+    if closure is None or not _contains_grounding_anchor(
+        closure.text, contract.resolution_anchor,
+    ):
+        return (
+            f"closure line must speak exact resolution anchor "
+            f"{contract.resolution_anchor!r}"
+        )
+    return None
+
+
+def _grounding_receipt(
+    contract: GroundingContract,
+    manifest: ClosedLineManifest,
+    script: PerformanceScript,
+) -> dict[str, Any]:
+    error = _validate_script_grounding(contract, manifest, script)
+    if error is not None:
+        raise OriginalCodex56SolContractError(error)
+    script_by_id = {line.line_id: line for line in script.lines}
+    clue_ids_by_object: dict[str, set[str]] = {}
+    for clue in contract.clues:
+        clue_ids_by_object.setdefault(clue.lost_object, set()).add(clue.clue_id)
+
+    evidence = []
+    for anchor in contract.lost_object_anchors:
+        clue_ids = clue_ids_by_object[anchor]
+        line_id = next(
+            row.line_id for row in manifest.lines
+            if clue_ids.intersection(row.clue_ids)
+            and _contains_grounding_anchor(script_by_id[row.line_id].text, anchor)
+        )
+        text = script_by_id[line_id].text
+        evidence.append({
+            "kind": "lost_object", "anchor": anchor, "line_id": line_id,
+            "exact_span": _raw_anchor_span(text, anchor) or text,
+        })
+    for kind, anchor, line_id in (
+        ("device", contract.device_anchor, manifest.reveal_line_id),
+        ("resolution", contract.resolution_anchor, manifest.closure_line_id),
+    ):
+        text = script_by_id[line_id].text
+        evidence.append({
+            "kind": kind, "anchor": anchor, "line_id": line_id,
+            "exact_span": _raw_anchor_span(text, anchor) or text,
+        })
+    return {
+        "schema_version": "original_codex56sol.grounding_receipt.v1",
+        "constraint_id": contract.constraint_id,
+        "complete": True,
+        "evidence": evidence,
+    }
+
+
 def _validate_text(script: PerformanceScript, rules: Any) -> str | None:
     for line in script.lines:
         text = line.text.strip()
@@ -941,11 +1185,42 @@ def _preceding_lines(manifest: ClosedLineManifest,
     return packet
 
 
-def _listener_blocks(report: BlindListenerReport,
-                     allowed_line_ids: set[str]) -> list[ListenerFinding]:
-    return [finding for finding in report.findings
-            if finding.blocking and finding.line_id in allowed_line_ids
-            and finding.category.strip() and finding.detail.strip()]
+def _listener_blocks(
+    report: BlindListenerReport,
+    allowed_line_ids: set[str],
+    contract: GroundingContract | None = None,
+    fallback_line_id: str = "",
+) -> list[ListenerFinding]:
+    blocks = [finding for finding in report.findings
+              if finding.blocking and finding.line_id in allowed_line_ids
+              and finding.category.strip() and finding.detail.strip()]
+    if contract is not None:
+        cause = _normalize_grounding_text(report.understood_cause)
+        device_tokens = [
+            token for token in _normalize_grounding_text(
+                contract.device_anchor
+            ).split()
+            if len(token) >= 4
+        ]
+        if device_tokens and not any(
+            f" {token} " in f" {cause} " for token in device_tokens
+        ):
+            line_id = fallback_line_id if fallback_line_id in allowed_line_ids else ""
+            if not line_id and allowed_line_ids:
+                line_id = sorted(allowed_line_ids)[-1]
+            if line_id and not any(row.line_id == line_id
+                                   and row.category == "Cause grounding"
+                                   for row in blocks):
+                blocks.append(ListenerFinding(
+                    line_id=line_id,
+                    category="Cause grounding",
+                    detail=(
+                        "Blind listener could not infer the declared mundane "
+                        f"device {contract.device_anchor!r} from pre-reveal clues"
+                    ),
+                    blocking=True,
+                ))
+    return blocks
 
 
 def _audit_blocks(report: FinalContractAudit,
@@ -959,14 +1234,23 @@ def _audit_blocks(report: FinalContractAudit,
 
 
 def _validate_script(score: BroadcastScore, manifest: ClosedLineManifest,
-                     script: PerformanceScript, rules: Any) -> str | None:
+                     script: PerformanceScript, rules: Any,
+                     grounding_contract: GroundingContract | None = None,
+                     ) -> str | None:
     return (_validate_graph(score, manifest, script)
-            or _validate_text(script, rules))
+            or _validate_text(script, rules)
+            or (_validate_script_grounding(
+                    grounding_contract, manifest, script)
+                if grounding_contract is not None else None))
 
 
 def _assert_script_valid(score: BroadcastScore, manifest: ClosedLineManifest,
-                         script: PerformanceScript, rules: Any) -> None:
-    error = _validate_script(score, manifest, script, rules)
+                         script: PerformanceScript, rules: Any,
+                         grounding_contract: GroundingContract | None = None,
+                         ) -> None:
+    error = _validate_script(
+        score, manifest, script, rules, grounding_contract,
+    )
     if error:
         raise OriginalCodex56SolContractError(error)
 
@@ -1045,36 +1329,57 @@ def run_original_codex56sol_episode(
     if selected is None or any(f.blocking and f.possibility_id == selected.possibility_id for f in triage.findings):
         raise OriginalCodex56SolContractError("triage did not select a valid possibility")
     truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800, post_validator=lambda value: _validate_truth_map(value, selected) or _validate_authored_surface(value, story_rules))
-    fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600)
+    grounding = _build_grounding_contract(draw, truth)
+    fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600)
     corroborated_fair_blocks = _corroborated_fair_blocks(fair, truth)
     if corroborated_fair_blocks:
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
-    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=lambda value: _validate_score(value, truth) or _validate_authored_surface(value, story_rules))
+    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=lambda value: _validate_score(value, truth, grounding) or _validate_authored_surface(value, story_rules))
     manifest = _compile_manifest(score)
-    script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
-    _assert_script_valid(score, manifest, script, story_rules)
+    script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
+    _assert_script_valid(score, manifest, script, story_rules, grounding)
     preceding_lines = _preceding_lines(manifest, script)
     listener = _call(pass_id="P7", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"preceding_lines": preceding_lines}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)
     listener_blocks = _listener_blocks(
-        listener, {line["line_id"] for line in preceding_lines})
+        listener, {line["line_id"] for line in preceding_lines}, grounding,
+        preceding_lines[-1]["line_id"],
+    )
     if listener_blocks:
-        script = _call(pass_id="P8", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": [finding.model_dump(mode="json") for finding in listener_blocks]}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
-        _assert_script_valid(score, manifest, script, story_rules)
+        script = _call(pass_id="P8", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": [finding.model_dump(mode="json") for finding in listener_blocks]}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
+        _assert_script_valid(score, manifest, script, story_rules, grounding)
+        preceding_lines = _preceding_lines(manifest, script)
+        listener = _call(pass_id="P7_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"preceding_lines": preceding_lines}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)
+        remaining_listener_blocks = _listener_blocks(
+            listener, {line["line_id"] for line in preceding_lines},
+            grounding, preceding_lines[-1]["line_id"],
+        )
+        if remaining_listener_blocks:
+            raise OriginalCodex56SolContractError(
+                "blind-listener rerun still could not infer the declared "
+                "mundane cause"
+            )
     elif listener.optional_notes or any(not finding.blocking for finding in listener.findings):
         try:
-            optional_script = _call(pass_id="P8_optional", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": listener.model_dump(mode="json")}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
-            _assert_script_valid(score, manifest, optional_script, story_rules)
+            optional_script = _call(pass_id="P8_optional", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": listener.model_dump(mode="json")}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
+            _assert_script_valid(score, manifest, optional_script, story_rules, grounding)
             script = optional_script
         except OriginalCodex56SolError:
             pass
-    audit = _call(pass_id="P9", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
+    audit = _call(pass_id="P9", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
     audit_blocks = _audit_blocks(audit, script)
+    if not audit.accepted and not audit_blocks:
+        raise OriginalCodex56SolContractError(
+            "final contract audit rejected the script without actionable "
+            "grounded findings"
+        )
     if audit_blocks:
-        script = _call(pass_id="P9_retake", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": [finding.model_dump(mode="json") for finding in audit_blocks]}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
-        _assert_script_valid(score, manifest, script, story_rules)
-        audit = _call(pass_id="P9_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
-        if _audit_blocks(audit, script):
+        script = _call(pass_id="P9_retake", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": [finding.model_dump(mode="json") for finding in audit_blocks]}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
+        _assert_script_valid(score, manifest, script, story_rules, grounding)
+        audit = _call(pass_id="P9_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
+        if not audit.accepted or _audit_blocks(audit, script):
             raise OriginalCodex56SolContractError("final contract audit rejected the repaired script")
+
+    _assert_script_valid(score, manifest, script, story_rules, grounding)
 
     led.set_cast(_cast_rows(score, episode_id))
     led.set_scenes([s.model_dump(mode="json") for s in score.scenes])
@@ -1089,7 +1394,31 @@ def run_original_codex56sol_episode(
     ])
     led.data["clips"] = []
     stamp_word_counts(led)
-    meta["original_codex56sol"] = {"call_journal": journal, "graph_proof": {"cast": len(score.cast), "scenes": len(score.scenes), "shots": len(score.shots), "beats": len(score.beats), "lines": len(manifest.lines)}, "phase_10_verdict": "accepted", "listener_report": listener.model_dump(mode="json"), "final_audit": audit.model_dump(mode="json")}
+    meta["original_codex56sol"] = {
+        "call_journal": journal,
+        "graph_proof": {
+            "cast": len(score.cast), "scenes": len(score.scenes),
+            "shots": len(score.shots), "beats": len(score.beats),
+            "lines": len(manifest.lines),
+        },
+        "phase_10_verdict": "accepted",
+        "listener_report": listener.model_dump(mode="json"),
+        "final_audit": audit.model_dump(mode="json"),
+        "grounding_receipt": _grounding_receipt(
+            grounding, manifest, script,
+        ),
+        "accepted_artifacts": {
+            "selected_possibility": selected.model_dump(mode="json"),
+            "triage": triage.model_dump(mode="json"),
+            "truth_map": truth.model_dump(mode="json"),
+            "fair_play_report": fair.model_dump(mode="json"),
+            "grounding_contract": grounding.model_dump(mode="json"),
+            "broadcast_score": score.model_dump(mode="json"),
+            "performance_script": script.model_dump(mode="json"),
+            "blind_listener_report": listener.model_dump(mode="json"),
+            "final_contract_audit": audit.model_dump(mode="json"),
+        },
+    }
     stamp_receipt(led.data, owner_bank="original_codex56sol", accepted_artifacts={"performance_script": script, "closed_manifest": manifest})
     canon = EpisodeCanon(title=script.title, premise=score.premise, setting=score.setting, time_of_day="", sound_palette=[])
     return OriginalCodex56SolTailParts(SimpleNamespace(title=script.title, premise=score.premise, setting=score.setting, time_of_day=""), canon, script.title, False, OriginalCodex56SolFinalizer())

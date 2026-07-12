@@ -1,13 +1,15 @@
 import json
 from contextlib import contextmanager
 
+import pytest
+
 from nodes import _otr_original_codex56sol as lane
 from nodes import _otr_story_routing as routing
 from nodes import _otr_story_rules as story_rules
 from nodes import production_ledger as ledger_mod
 
 
-DRAW = {"deck_id":"deck","deck_sha256":"a"*64,"constraint_id":"c01","lost_objects":["stamp","mitten","card"],"acoustic_device":"a grille repeats phrases","helpful_ending":"return every item"}
+DRAW = {"deck_id":"deck","deck_sha256":"a"*64,"constraint_id":"c01","lost_objects":["stamp","mitten","card"],"acoustic_device":"a grille repeats phrases","helpful_ending":"return every item","device_spoken_anchor":"grille","resolution_spoken_anchor":"every item is returned"}
 
 
 def _fixtures():
@@ -22,12 +24,12 @@ def _fixtures():
     ]
     beats = [
       {"beat_id":"b1","shot_id":"shot_01","scene_id":"scene_01","char_id":"announcer","speaker":"Announcer","line_intent":{"intent":"identify the station","arc_phase":"opening","clue_ids":[]}},
-      {"beat_id":"b2","shot_id":"shot_01","scene_id":"scene_01","char_id":"c01","speaker":"Mara Vale","line_intent":{"intent":"orient the practical problem","arc_phase":"rising","clue_ids":["q1"]}},
-      {"beat_id":"b3","shot_id":"shot_01","scene_id":"scene_01","char_id":"c02","speaker":"Ivo Reed","line_intent":{"intent":"state the shelf-number clues","arc_phase":"rising","clue_ids":["q2","q3"]}},
+      {"beat_id":"b2","shot_id":"shot_01","scene_id":"scene_01","char_id":"c01","speaker":"Mara Vale","line_intent":{"intent":"name the stamp and its repeated shelf number","arc_phase":"rising","clue_ids":["q1"]}},
+      {"beat_id":"b3","shot_id":"shot_01","scene_id":"scene_01","char_id":"c02","speaker":"Ivo Reed","line_intent":{"intent":"name the mitten scrape and card rustle","arc_phase":"rising","clue_ids":["q2","q3"]}},
       {"beat_id":"b4","shot_id":"shot_02","scene_id":"scene_02","char_id":"c01","speaker":"Mara Vale","line_intent":{"intent":"reveal the grille cause","arc_phase":"reveal","clue_ids":[]}},
-      {"beat_id":"b5","shot_id":"shot_02","scene_id":"scene_02","char_id":"c01","speaker":"Mara Vale","line_intent":{"intent":"return the item and close helpfully","arc_phase":"closing","clue_ids":[]}}]
+      {"beat_id":"b5","shot_id":"shot_02","scene_id":"scene_02","char_id":"c01","speaker":"Mara Vale","line_intent":{"intent":"confirm every item is returned","arc_phase":"closing","clue_ids":[]}}]
     score = {"title":truth["title"],"premise":truth["premise"],"setting":truth["setting"],"cast":cast,"scenes":scenes,"shots":shots,"beats":beats,"orientation_beat_id":"b1","reveal_beat_id":"b4","closure_beat_id":"b5","opening_music":{"description":"A curious warm station motif.","generation_prompt":"Warm plucked strings and soft dial tones, no vocals"},"closing_music":{"description":"The motif resolves gently.","generation_prompt":"Gentle resolved plucked strings, no vocals"}}
-    script_lines = [{"line_id":f"line_{i:03d}","char_id":b["char_id"],"speaker":b["speaker"],"text":t} for i,(b,t) in enumerate(zip(beats,["Lost and Found Frequency is listening.","One echo is joining today's calls.","I hear my shelf number after every answer.","The loose grille carries sounds from this shelf.","Your stamp is here, and the grille is secure." ]),1)]
+    script_lines = [{"line_id":f"line_{i:03d}","char_id":b["char_id"],"speaker":b["speaker"],"text":t} for i,(b,t) in enumerate(zip(beats,["Lost and Found Frequency is listening.","The stamp's shelf number repeats after every answer.","The mitten scrapes softly, and the card rustles beside it.","The loose grille carries sounds from this shelf.","The echo is mapped; every item is returned." ]),1)]
     slate = {"possibilities":[card,{**card,"possibility_id":"p2","title_seed":"Whisper Shelf"},{**card,"possibility_id":"p3","title_seed":"Three Notes Home"},{**card,"possibility_id":"p4","title_seed":"Kind Echo"}]}
     script = {"title":"The Helpful Echo","lines":script_lines}
     return {"card":card,"truth":truth,"score":score,"slate":slate,"script":script,
@@ -69,6 +71,240 @@ def test_mocked_complete_runner_fills_closed_ledger(tmp_path):
     assert len(led.data["lines"]) == 5
     assert [(m["cue_id"],m["placement"]) for m in led.data["music"]] == [("opening","opening"),("closing","closing")]
     assert led.data["meta"]["content_authorship"]["coverage"]["complete"] is True
+    lane_meta = led.data["meta"]["original_codex56sol"]
+    assert lane_meta["grounding_receipt"]["complete"] is True
+    assert set(lane_meta["accepted_artifacts"]) == {
+        "selected_possibility", "triage", "truth_map", "fair_play_report",
+        "grounding_contract", "broadcast_score", "performance_script",
+        "blind_listener_report", "final_contract_audit",
+    }
+
+
+def _grounding_fixture():
+    draw = lane.ConstraintDraw.model_validate(DRAW)
+    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
+    return lane._build_grounding_contract(draw, truth)
+
+
+def test_script_grounding_requires_objects_on_clue_lines_and_fixed_landmarks():
+    fixtures = _fixtures()
+    score = lane.BroadcastScore.model_validate(fixtures["score"])
+    manifest = lane._compile_manifest(score)
+    contract = _grounding_fixture()
+    script = lane.PerformanceScript.model_validate(fixtures["script"])
+    assert lane._validate_script_grounding(contract, manifest, script) is None
+
+    missing_object = script.model_copy(deep=True)
+    missing_object.lines[2].text = "I hear two soft sounds beside the shelf."
+    assert lane._validate_script_grounding(
+        contract, manifest, missing_object,
+    ) == (
+        "spoken script is missing lost-object anchor 'mitten'"
+    )
+
+    wrong_reveal = script.model_copy(deep=True)
+    wrong_reveal.lines[3].text = "A mysterious pattern carries the sounds."
+    assert lane._validate_script_grounding(
+        contract, manifest, wrong_reveal,
+    ) == "reveal line must speak exact device anchor 'grille'"
+
+    wrong_closure = script.model_copy(deep=True)
+    wrong_closure.lines[4].text = "The desk is quiet again."
+    assert lane._validate_script_grounding(
+        contract, manifest, wrong_closure,
+    ) == (
+        "closure line must speak exact resolution anchor "
+        "'every item is returned'"
+    )
+
+
+def test_production_muted_melody_detour_is_rejected_before_listener():
+    contract = _grounding_fixture()
+    manifest_rows = []
+    for index in range(1, 8):
+        line_id = f"line_{index:03d}"
+        if index == 1:
+            phase, clue_ids = "opening", []
+        elif index == 6:
+            phase, clue_ids = "reveal", []
+        elif index == 7:
+            phase, clue_ids = "closing", []
+        else:
+            phase = "rising"
+            clue_ids = [["q1"], ["q2"], ["q3"], []][index - 2]
+        manifest_rows.append({
+            "line_id": line_id, "beat_id": f"b{index}",
+            "shot_id": f"sh{index}", "scene_id": "s1",
+            "char_id": "announcer" if index == 1 else "op1",
+            "speaker": "System Voice" if index == 1 else "Elara Vance",
+            "speaker_role": "announcer" if index == 1 else "character",
+            "boundary": "shot_start", "arc_phase": phase,
+            "intent": "production regression", "clue_ids": clue_ids,
+        })
+    manifest = lane.ClosedLineManifest.model_validate({
+        "lines": manifest_rows,
+        "orientation_line_id": "line_001",
+        "reveal_line_id": "line_006",
+        "closure_line_id": "line_007",
+    })
+    texts = [
+        "Initiating artifact sequence analysis protocol alpha.",
+        "The primary resonance signature remains stubbornly erratic across all known frequencies.",
+        "The isotopic decay rate suggests a highly structured, ancient origin.",
+        "The tertiary harmonics indicate decay and instability.",
+        "If I stabilize the micro-vibrations, the pattern might lock into place.",
+        "It isn't a melody; it is a chromatic key demanding completion.",
+        "Stabilizing the micro-vibrations resolves the sequence.",
+    ]
+    script = lane.PerformanceScript.model_validate({
+        "title": "The Muted Melody",
+        "lines": [{
+            "line_id": row.line_id, "char_id": row.char_id,
+            "speaker": row.speaker, "text": text,
+        } for row, text in zip(manifest.lines, texts)],
+    })
+    assert lane._validate_script_grounding(
+        contract, manifest, script,
+    ) == "spoken script is missing lost-object anchor 'stamp'"
+
+
+def test_grounding_anchor_matching_is_nfkc_casefolded():
+    fixtures = _fixtures()
+    score = lane.BroadcastScore.model_validate(fixtures["score"])
+    manifest = lane._compile_manifest(score)
+    contract = _grounding_fixture()
+    script = lane.PerformanceScript.model_validate(fixtures["script"])
+    script.lines[1].text = script.lines[1].text.replace("stamp", "ＳＴＡＭＰ")
+    assert lane._validate_script_grounding(contract, manifest, script) is None
+
+
+def test_blind_listener_must_infer_a_device_anchor_token():
+    fixtures = _fixtures()
+    score = lane.BroadcastScore.model_validate(fixtures["score"])
+    manifest = lane._compile_manifest(score)
+    script = lane.PerformanceScript.model_validate(fixtures["script"])
+    packet = lane._preceding_lines(manifest, script)
+    report = lane.BlindListenerReport.model_validate({
+        "understood_cause": "An unstable resonance signature.",
+        "understood_resolution": "Unknown.",
+        "findings": [], "optional_notes": [],
+    })
+    blocks = lane._listener_blocks(
+        report, {row["line_id"] for row in packet}, _grounding_fixture(),
+        packet[-1]["line_id"],
+    )
+    assert [(row.line_id, row.category) for row in blocks] == [
+        (packet[-1]["line_id"], "Cause grounding"),
+    ]
+
+
+def test_blocking_listener_retake_is_rechecked_blind_without_contract(
+        tmp_path):
+    fixtures = _fixtures()
+    responses = _responses()
+    responses[6] = {
+        "understood_cause": "An unstable resonance signature.",
+        "understood_resolution": "Unknown.",
+        "findings": [], "optional_notes": [],
+    }
+    responses.insert(7, fixtures["script"])
+    responses.insert(8, fixtures["listener"])
+    queued = iter(responses)
+    prompts = []
+
+    def generate(messages, **_kwargs):
+        prompts.append(messages)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="listener_rerun", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({"source_bank": "original_codex56sol",
+                 "source_meta": {"constraint_draw": DRAW}})
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="listener_rerun",
+    )
+    assert len(prompts) == 10
+    rerun_input = json.loads(prompts[8][1]["content"])
+    assert set(rerun_input) == {"preceding_lines"}
+    assert "grounding_contract" not in prompts[8][1]["content"]
+
+
+def test_nonaccepted_final_audit_without_actionable_finding_fails_closed(
+        tmp_path):
+    responses = _responses()
+    responses[-1] = {"accepted": False, "findings": [], "warnings": []}
+    queued = iter(responses)
+
+    def generate(_messages, **_kwargs):
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(episode_id="audit_false", out_dir=str(tmp_path))
+    meta = led.data.setdefault("meta", {})
+    meta.update({"source_bank": "original_codex56sol",
+                 "source_meta": {"constraint_draw": DRAW}})
+    with pytest.raises(
+        lane.OriginalCodex56SolContractError,
+        match="without actionable grounded findings",
+    ):
+        lane.run_original_codex56sol_episode(
+            payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+            resolved={"target_words": 30, "num_characters": 3}, led=led,
+            meta=meta, creative_fn=generate, technical_fn=generate,
+            slot_scheduler=Scheduler(), source_bank_row=None,
+            story_rules=rules, episode_root=tmp_path,
+            episode_id="audit_false",
+        )
+
+
+def test_visual_style_cannot_change_any_codex56_story_message(tmp_path):
+    def capture(style_id, out_dir):
+        queued = iter(_responses())
+        messages = []
+
+        def generate(prompt, **_kwargs):
+            messages.append(json.loads(json.dumps(prompt)))
+            return json.dumps(next(queued))
+
+        led = ledger_mod.new_ledger(
+            episode_id="visual_isolation", out_dir=str(out_dir),
+        )
+        meta = led.data.setdefault("meta", {})
+        meta.update({"source_bank": "original_codex56sol",
+                     "source_meta": {"constraint_draw": DRAW}})
+        lane.run_original_codex56sol_episode(
+            payload={"seed_text": json.dumps(DRAW)},
+            pack=routing.resolve_story_pack("original_codex56sol"),
+            resolved={"target_words": 30, "num_characters": 3,
+                      "visual_style": style_id},
+            led=led, meta=meta, creative_fn=generate, technical_fn=generate,
+            slot_scheduler=Scheduler(), source_bank_row=None,
+            story_rules=story_rules.resolve_story_rules("original_codex56sol"),
+            episode_root=out_dir, episode_id="visual_isolation",
+        )
+        return messages
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    first = capture("sci_fi_radio", tmp_path / "a")
+    second = capture("video_art", tmp_path / "b")
+    assert first == second
+    serialized = json.dumps(first)
+    assert "sci_fi_radio" not in serialized
+    assert "video_art" not in serialized
 
 
 def test_p3_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
@@ -295,6 +531,27 @@ def test_score_requires_exact_clue_coverage_and_contiguous_shots():
     score = lane.BroadcastScore.model_validate(score_data)
     assert lane._validate_score(score, truth) == (
         "beats for each shot must form one contiguous block"
+    )
+
+
+def test_score_must_carry_spoken_anchor_intents_before_script_generation():
+    fixtures = _fixtures()
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    grounding = _grounding_fixture()
+    score = lane.BroadcastScore.model_validate(fixtures["score"])
+    assert lane._validate_score(score, truth, grounding) is None
+
+    drifted = score.model_copy(deep=True)
+    drifted.beats[1].line_intent.intent = "analyze the first component"
+    assert lane._validate_score(drifted, truth, grounding) == (
+        "score needs a non-announcer clue intent naming exact lost-object "
+        "anchor 'stamp'"
+    )
+
+    drifted = score.model_copy(deep=True)
+    drifted.beats[3].line_intent.intent = "reveal a resonance signature"
+    assert lane._validate_score(drifted, truth, grounding) == (
+        "reveal intent must name exact device anchor 'grille'"
     )
 
 

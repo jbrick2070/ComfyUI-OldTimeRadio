@@ -2265,6 +2265,16 @@ def _stamp_story_style_receipt(meta: dict, *, contract,
         meta.pop("story_style_status", None)
 
 
+def _title_source_for_custom_override(source_bank_row: Any) -> str:
+    """Return truthful custom-lane title provenance without changing ctx."""
+    bank_id = str(getattr(source_bank_row, "source_bank_id", "") or "").strip()
+    if bank_id == "scifi_fable2":
+        return "fable2_script_title"
+    if bank_id:
+        return f"{bank_id}_script_title"
+    return "custom_pipeline_script_title"
+
+
 # ---------------------------------------------------------------------------
 # Class
 # ---------------------------------------------------------------------------
@@ -6416,12 +6426,13 @@ class OTR_LedgerScriptWriter:
             final_title = resolved["episode_title"]
             title_source = "user"
         elif ctx.final_title_override is not None:
-            # r3/M3 (scifi_fable2): the lane's parsed play TITLE arrives
-            # via ctx; title regen NEVER runs for that lane (its assembly
-            # excludes title rows, so regen would discard the authored
-            # title). Legacy passes None -> this branch never fires there.
+            # Custom lanes supply an accepted authored TITLE via ctx; title
+            # regen never runs because it would discard that lane-owned title.
+            # Legacy passes None -> this branch never fires there.
             final_title = ctx.final_title_override
-            title_source = "fable2_script_title"
+            title_source = _title_source_for_custom_override(
+                ctx.source_bank_row
+            )
         else:
             # kibitz r3 D4 (2026-07-09) ROOT-CAUSE FIX: assemble from the
             # CANONICAL ledger, not the in-flight script_text_parts list.
