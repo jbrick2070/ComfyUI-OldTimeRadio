@@ -299,7 +299,12 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "item. causal_steps MUST contain at least 2 items; audible_clues "
             "MUST contain at least 3 items; caller_threads and resolution_links "
             "MUST each contain at least 2 items. Never delete an item to repair "
-            "an identifier or type error."
+            "an identifier or type error. interpretations MUST retain at least "
+            "2 items, including at least one true and one plausible false "
+            "interpretation. To repair truth balance, change is_true on one "
+            "existing interpretation; do not add or remove interpretations. "
+            "Every interpretation.clue_ids MUST retain at least one existing "
+            "audible_clues clue_id; an empty clue_ids list is invalid."
         )
     if pass_id == "P5":
         rules += (

@@ -394,3 +394,7 @@ leaving them for live integration:
     must receive only accepted pre-reveal lines, never the full script or
     landmark IDs; technical blocking findings must resolve to real artifact
     coordinates and exact evidence before they gain repair or kill authority.
+23. Make typed repairs preserve nested invariants, not only top-level counts.
+    When one scalar is wrong (for example, every interpretation is marked
+    true), tell the model to change that scalar on an existing row. Do not let
+    it invent a partial replacement row with an empty required ID collection.

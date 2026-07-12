@@ -304,3 +304,5 @@ def test_p3_safety_repair_keeps_safety_and_collection_rules():
     rules = lane._repair_rules("P3", "forbidden term 'kill'")
     assert "Replace EVERY" in rules
     assert "causal_steps MUST" in rules
+    assert "change is_true on one existing interpretation" in rules
+    assert "an empty clue_ids list is invalid" in rules
