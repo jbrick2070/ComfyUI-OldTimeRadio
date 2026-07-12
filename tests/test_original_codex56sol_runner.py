@@ -109,3 +109,19 @@ def test_shot_environment_is_typed_optional_authored_metadata():
         "visual_prompt":"Warm desk under amber light","env":"front office",
     })
     assert shot.env == "front office"
+
+
+def test_manifest_optional_landmark_markers_are_typed_and_checked():
+    score_data = _responses()[5]
+    score = lane.BroadcastScore.model_validate(score_data)
+    manifest_data = _responses()[6]
+    manifest_data["lines"][0].update({
+        "orientation": None, "clue": None, "reveal": None, "closure": None,
+    })
+    manifest = lane.ClosedLineManifest.model_validate(manifest_data)
+    assert lane._validate_manifest(score, manifest) is None
+    bad = manifest.model_copy(update={
+        "lines": [manifest.lines[0].model_copy(update={"reveal": True}),
+                  *manifest.lines[1:]],
+    })
+    assert "asserts reveal" in lane._validate_manifest(score, bad)

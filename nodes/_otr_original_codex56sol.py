@@ -206,6 +206,10 @@ class ManifestLine(StrictModel):
     boundary: Literal["shot_start", "beat_start", "continue"]
     arc_phase: Literal["opening", "rising", "reveal", "closing"]
     intent: str
+    orientation: bool | None = None
+    clue: bool | None = None
+    reveal: bool | None = None
+    closure: bool | None = None
 
 
 class ClosedLineManifest(StrictModel):
@@ -350,6 +354,26 @@ def _validate_score(score: BroadcastScore) -> str | None:
     return None
 
 
+def _validate_manifest(score: BroadcastScore,
+                       manifest: ClosedLineManifest) -> str | None:
+    beat_ids = {beat.beat_id for beat in score.beats}
+    if {line.beat_id for line in manifest.lines} != beat_ids:
+        return "manifest must cover every score beat exactly once"
+    landmarks = {
+        "orientation": manifest.orientation_line_id,
+        "reveal": manifest.reveal_line_id,
+        "closure": manifest.closure_line_id,
+    }
+    line_ids = {line.line_id for line in manifest.lines}
+    if any(line_id not in line_ids for line_id in landmarks.values()):
+        return "every top-level landmark line id must resolve in manifest lines"
+    for line in manifest.lines:
+        for marker, expected in landmarks.items():
+            if getattr(line, marker) is True and line.line_id != expected:
+                return f"line {line.line_id!r} asserts {marker} but landmark is {expected!r}"
+    return None
+
+
 def _validate_graph(score: BroadcastScore, manifest: ClosedLineManifest,
                     script: PerformanceScript) -> None:
     cast = {c.char_id: c for c in score.cast}
@@ -484,7 +508,7 @@ def run_original_codex56sol_episode(
     if corroborated_fair_blocks:
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
     score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=_validate_score)
-    manifest = _call(pass_id="P5_manifest", slot="technical", fn=technical_fn, pack=pack, seam="codex56_closed_line_manifest", inputs={"score": score.model_dump(mode="json")}, schema=ClosedLineManifest, scheduler=slot_scheduler, journal=journal, tokens=3000)
+    manifest = _call(pass_id="P5_manifest", slot="technical", fn=technical_fn, pack=pack, seam="codex56_closed_line_manifest", inputs={"score": score.model_dump(mode="json")}, schema=ClosedLineManifest, scheduler=slot_scheduler, journal=journal, tokens=3000, post_validator=lambda value: _validate_manifest(score, value))
     script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6))
     _validate_graph(score, manifest, script); _validate_text(script, story_rules)
     listener = _call(pass_id="P7", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"manifest": manifest.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)

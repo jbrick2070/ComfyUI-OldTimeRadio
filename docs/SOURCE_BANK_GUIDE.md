@@ -362,3 +362,7 @@ leaving them for live integration:
     adjacent graph objects (for example an optional shot environment) when the
     field is typed and provenance-safe. Otherwise a repair may fix a required
     parent field only to fail because it preserved the same detail on a child.
+16. When an artifact has authoritative top-level landmark IDs, models may also
+    emit optional per-row marker booleans. Type those markers and validate every
+    asserted marker against the top-level authority; do not let redundant
+    `null` markers cause a shape-only failure or become a second truth.
