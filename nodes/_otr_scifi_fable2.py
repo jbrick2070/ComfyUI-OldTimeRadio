@@ -29,12 +29,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 import random
 import re
 import warnings
 from contextlib import nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -46,6 +47,7 @@ try:
         structured_call,
     )
     from ._otr_repair_prompts import make_dispatching_repair_factory
+    from ._otr_story_rules import StoryRules, resolve_story_rules
     from ._otr_fable2_markup import (
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -72,6 +74,10 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         structured_call,
     )
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
+    from _otr_story_rules import (  # type: ignore
+        StoryRules,
+        resolve_story_rules,
+    )
     from _otr_fable2_markup import (  # type: ignore
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -189,6 +195,24 @@ _ONE_DRAFT_THRESHOLD = 120   # below this: one-pitch + one-draft mode
 _SUPPORTED_WORD_CEILING = 900  # act-chunk mode deferred post-S3
 _DIGEST_CHAR_CAP = 3600
 
+_COMPACT_MODE = "one_pitch_one_draft"
+_FULL_MODE = "three_pitch_two_draft"
+Fable2Mode = Literal["one_pitch_one_draft", "three_pitch_two_draft"]
+
+# S2 pins scene count as an explicit word-band table. Do not recover the old
+# `round(words / 110)` formula: its half-boundaries depend on Python banker's
+# rounding and were never an auditable production contract.
+_SCENE_COUNT_TABLE: "tuple[tuple[int, int], ...]" = (
+    (164, 1),
+    (274, 2),
+    (384, 3),
+    (494, 4),
+    (604, 5),
+    (714, 6),
+    (824, 7),
+    (_SUPPORTED_WORD_CEILING, 8),
+)
+
 # Fixed passes: plain ints (r2 anchor: no lambdas in a dict). P3/P5 use
 # _script_token_budget instead.
 _MAX_NEW_TOKENS = {
@@ -264,6 +288,29 @@ def assert_supported_target_words(target_words: int) -> None:
         )
 
 
+def _resolve_mode(target_words: int) -> Fable2Mode:
+    """Return the acceptance-shaped S2 mode for a requested word count.
+
+    This pure resolver lands in C4a before the executable gate flips in C4b.
+    Keeping the writer entry gate above closed during the intermediate green
+    commit prevents a 120+ request from silently reaching the old compact
+    runner. C4b removes only that temporary full-mode rejection after the
+    complete P2a/P4/P5 graph is wired.
+    """
+    tw = int(target_words)
+    if tw > _SUPPORTED_WORD_CEILING:
+        raise Fable2ScriptError(
+            "script",
+            f"target_words {tw} above supported ceiling "
+            f"{_SUPPORTED_WORD_CEILING}",
+        )
+    return (
+        _COMPACT_MODE
+        if tw < _ONE_DRAFT_THRESHOLD
+        else _FULL_MODE
+    )
+
+
 # ---------------------------------------------------------------------------
 # Artifact models (doc s5; pydantic v2)
 # ---------------------------------------------------------------------------
@@ -302,7 +349,7 @@ class DossierLLM(BaseModel):
 
 
 class Pitch(BaseModel):
-    pitch_id: int = Field(ge=1, le=3)
+    pitch_id: int = Field(ge=1, le=3, strict=True)
     frame_card: str
     logline: str = Field(min_length=15, max_length=240)
     hook: str = Field(min_length=10, max_length=200)
@@ -320,7 +367,7 @@ class PitchSlate(BaseModel):
 
 
 class PitchSelect(BaseModel):
-    chosen_pitch_id: int = Field(ge=1, le=3)
+    chosen_pitch_id: int = Field(ge=1, le=3, strict=True)
     selection_rationale: str = Field(min_length=20, max_length=300)
 
 
@@ -420,8 +467,9 @@ class Treatment(BaseModel):
 
 
 class CriticNote(BaseModel):
-    scene: int = Field(ge=0)
+    scene: int = Field(ge=0, strict=True)
     speaker: str
+    frame_scope: "Literal['intro', 'outro'] | None" = None
     problem: Literal[
         "register_bleed", "on_the_nose", "stakes_sag", "ending_unearned",
         "continuity_break", "cast_unused", "announcer_contract",
@@ -436,6 +484,15 @@ class CriticNote(BaseModel):
                 "a note is never replacement dialogue (NAME-colon shape)")
         return v
 
+    @model_validator(mode="after")
+    def _frame_scope_is_explicit(self) -> "CriticNote":
+        if self.scene == 0 and self.frame_scope is None:
+            raise ValueError(
+                "scene 0 requires frame_scope='intro' or 'outro'")
+        if self.scene > 0 and self.frame_scope is not None:
+            raise ValueError("frame_scope is only legal for scene 0 notes")
+        return self
+
 
 class CriticNotes(BaseModel):
     verdict: Literal["ship", "revise"]
@@ -445,6 +502,8 @@ class CriticNotes(BaseModel):
     def _revise_needs_notes(self) -> "CriticNotes":
         if self.verdict == "revise" and not self.notes:
             raise ValueError('"revise" requires >= 1 note')
+        if self.verdict == "ship" and self.notes:
+            raise ValueError('"ship" requires an empty notes array')
         return self
 
 
@@ -731,10 +790,15 @@ def _load_frame_deck(path: "Path | None" = None) -> dict:
     return deck
 
 
-def _deal(rng: random.Random, deck: dict, *, mode: str):
+def _deal(rng: random.Random, deck: dict, *, mode: Fable2Mode):
     """Deal (frame_cards, stance). one_pitch mode deals 1 card; full mode
     deals 3 distinct cards (pitch i uses card i)."""
-    count = 1 if mode == "one_pitch" else 3
+    if mode == _COMPACT_MODE:
+        count = 1
+    elif mode == _FULL_MODE:
+        count = 3
+    else:  # pragma: no cover - Literal plus runtime fail-loud boundary
+        raise Fable2PitchError("pitch_room", f"unknown fable2 mode {mode!r}")
     cards = tuple(rng.sample(list(deck["cards"]), count))
     stance = rng.choice(list(deck["stances"]))
     return cards, stance
@@ -747,21 +811,222 @@ def _deal(rng: random.Random, deck: dict, *, mode: str):
 @dataclass(frozen=True)
 class SceneEnvelope:
     scene_count: int
-    per_scene_words: int
+    scene_word_targets: "tuple[int, ...]"
     total_words: int
     band_frac: float = _TOTAL_WORD_BAND
 
+    def __post_init__(self) -> None:
+        if type(self.scene_count) is not int or type(self.total_words) is not int:
+            raise TypeError("scene_count and total_words must be strict ints")
+        if self.total_words < 1 or self.total_words > _SUPPORTED_WORD_CEILING:
+            raise ValueError(
+                f"total_words must be 1-{_SUPPORTED_WORD_CEILING}, got "
+                f"{self.total_words}")
+        if (not isinstance(self.scene_word_targets, tuple)
+                or any(type(value) is not int or value < 1
+                       for value in self.scene_word_targets)):
+            raise TypeError(
+                "scene_word_targets must be an immutable tuple of positive "
+                "strict ints")
+        if type(self.band_frac) is not float or self.band_frac != _TOTAL_WORD_BAND:
+            raise ValueError(
+                f"band_frac must equal the canonical {_TOTAL_WORD_BAND}")
+        expected_scenes = next(
+            scene_count for upper_bound, scene_count in _SCENE_COUNT_TABLE
+            if self.total_words <= upper_bound
+        )
+        quotient, remainder = divmod(self.total_words, expected_scenes)
+        expected_targets = tuple(
+            quotient + (1 if index < remainder else 0)
+            for index in range(expected_scenes)
+        )
+        if self.scene_count != expected_scenes:
+            raise ValueError(
+                f"scene_count {self.scene_count} does not match canonical "
+                f"table value {expected_scenes} for {self.total_words} words")
+        if self.scene_word_targets != expected_targets:
+            raise ValueError(
+                "scene_word_targets do not match the canonical "
+                "quotient/remainder vector")
+
+    @property
+    def per_scene_words(self) -> int:
+        """Compatibility view for compact callers; exact code uses vector."""
+        return max(1, round(self.total_words / self.scene_count))
+
+    @property
+    def scene_word_bands(self) -> "tuple[tuple[int, int], ...]":
+        return tuple(
+            (
+                math.ceil(target * (1.0 - _SCENE_WORD_BAND)),
+                math.floor(target * (1.0 + _SCENE_WORD_BAND)),
+            )
+            for target in self.scene_word_targets
+        )
+
+
+def _scene_count_for_words(target_words: int) -> int:
+    tw = int(target_words)
+    for upper_bound, scene_count in _SCENE_COUNT_TABLE:
+        if tw <= upper_bound:
+            return scene_count
+    return _SCENE_COUNT_TABLE[-1][1]
+
 
 def _build_envelope(target_words: int) -> SceneEnvelope:
-    """scenes = clamp(round(target_words/110), 1, 8) (30w -> 1, 350w -> 3;
-    tuned against the S1b/S2 smokes)."""
+    """Build the pinned scene table plus exact quotient/remainder vector."""
     tw = int(target_words)
-    scenes = max(1, min(8, round(tw / 110)))
+    if tw > _SUPPORTED_WORD_CEILING:
+        raise Fable2ScriptError(
+            "script",
+            f"target_words {tw} above supported ceiling "
+            f"{_SUPPORTED_WORD_CEILING}",
+        )
+    scenes = _scene_count_for_words(tw)
+    quotient, remainder = divmod(tw, scenes)
+    targets = tuple(
+        quotient + (1 if i < remainder else 0)
+        for i in range(scenes)
+    )
     return SceneEnvelope(
         scene_count=scenes,
-        per_scene_words=max(1, round(tw / scenes)),
+        scene_word_targets=targets,
         total_words=tw,
     )
+
+
+def _validate_scene_envelope(envelope: Any) -> None:
+    if type(envelope) is not SceneEnvelope:
+        raise Fable2ScriptError(
+            "revision_contract",
+            "envelope must be an exact canonical SceneEnvelope artifact",
+        )
+    canonical = _build_envelope(envelope.total_words)
+    if envelope != canonical:
+        raise Fable2ScriptError(
+            "revision_contract",
+            "envelope does not match the pinned scene-count/vector contract",
+        )
+
+
+@dataclass(frozen=True)
+class PassAttemptTrace:
+    """One observed P3/P5 markup call; never an inferred attempt count."""
+
+    attempt: int
+    temperature: float
+    requested_max_new_tokens: int
+    outcome: Literal[
+        "parse_rejected", "budget_rejected", "truncated", "accepted"
+    ]
+    truncation: bool = False
+    selected: bool = False
+    parse_defects: "tuple[str, ...]" = ()
+    character_words: "int | None" = None
+    scene_character_words: "tuple[int, ...]" = ()
+
+    def __post_init__(self) -> None:
+        valid_outcomes = {
+            "parse_rejected", "budget_rejected", "truncated", "accepted",
+        }
+        if type(self.attempt) is not int or type(
+                self.requested_max_new_tokens) is not int:
+            raise TypeError(
+                "attempt and requested_max_new_tokens must be strict ints")
+        if self.attempt < 1 or self.requested_max_new_tokens < 1:
+            raise ValueError("attempt and requested_max_new_tokens must be positive")
+        if (isinstance(self.temperature, bool)
+                or not isinstance(self.temperature, (int, float))
+                or not math.isfinite(float(self.temperature))):
+            raise TypeError("temperature must be one finite number")
+        if self.outcome not in valid_outcomes:
+            raise ValueError(
+                f"outcome must be one of {sorted(valid_outcomes)}, got "
+                f"{self.outcome!r}")
+        if type(self.truncation) is not bool or type(self.selected) is not bool:
+            raise TypeError("truncation and selected must be strict booleans")
+        if (not isinstance(self.parse_defects, tuple)
+                or any(not isinstance(value, str)
+                       for value in self.parse_defects)):
+            raise TypeError("parse_defects must be an immutable string tuple")
+        if (self.character_words is not None
+                and (type(self.character_words) is not int
+                     or self.character_words < 0)):
+            raise TypeError("character_words must be a non-negative strict int")
+        if (not isinstance(self.scene_character_words, tuple)
+                or any(type(value) is not int or value < 0
+                       for value in self.scene_character_words)):
+            raise TypeError(
+                "scene_character_words must be an immutable tuple of "
+                "non-negative strict ints")
+        if self.selected != (self.outcome == "accepted"):
+            raise ValueError("selected must be true exactly for an accepted attempt")
+        if self.truncation != (self.outcome == "truncated"):
+            raise ValueError("truncation must be true exactly for a truncated attempt")
+
+
+@dataclass(frozen=True)
+class ConstituentProof:
+    text: str
+    artifact: str
+    span: "tuple[int, int]"
+
+
+@dataclass(frozen=True)
+class ProofMapEntry:
+    line_id: str
+    constituents: "tuple[ConstituentProof, ...]"
+
+
+@dataclass(frozen=True)
+class FinalDraftHashes:
+    raw_sha256: str
+    normalized_sha256: str
+    parsed_sha256: str
+    proof_map_sha256: str
+    artifact_sha256: str
+
+
+DraftScore = tuple[int, int, int, int, int]
+
+
+@dataclass(frozen=True)
+class FinalDraft:
+    """One atomic script authority selected before any ledger mutation."""
+
+    raw_source: str
+    normalized_source: str
+    parsed: ParsedScript
+    proof_map: "tuple[ProofMapEntry, ...]"
+    p3_attempts: "tuple[PassAttemptTrace, ...]"
+    p5_attempts: "tuple[PassAttemptTrace, ...]"
+    score: DraftScore
+    scoring_context_sha256: str
+    hashes: FinalDraftHashes
+
+
+@dataclass(frozen=True)
+class RevisionContractResult:
+    eligible: bool
+    reasons: "tuple[str, ...]"
+    addressed_problem_classes: "tuple[str, ...]"
+    changed_scopes: "tuple[str, ...]"
+    protected_field_differences: "tuple[str, ...]"
+    total_word_count: int
+    total_word_band: "tuple[int, int]"
+    scene_word_counts: "tuple[int, ...]"
+    scene_word_bands: "tuple[tuple[int, int], ...]"
+    draft1_sha256: str
+    draft2_sha256: str
+    scoring_context_sha256: str
+    contract_sha256: str
+
+
+@dataclass(frozen=True)
+class DraftSelection:
+    winner: FinalDraft
+    reason: str
+    scoring_context_sha256: str
 
 
 # ---------------------------------------------------------------------------
@@ -903,15 +1168,27 @@ def _filter_dossier_entities(dossier: DossierLLM,
         "allowed_numbers": kept_numbers}), dropped
 
 
-def _make_pitch_validator(cards, mode: str, n_max: int):
+def _make_pitch_validator(cards, mode: Fable2Mode, n_max: int):
     """Dealt-card + divergence + SFW gates. `cards` is the dealt tuple;
     the count expectation is a parameter (r2/M3)."""
-    expected = 1 if mode == "one_pitch" else 3
+    if mode == _COMPACT_MODE:
+        expected = 1
+    elif mode == _FULL_MODE:
+        expected = 3
+    else:
+        raise Fable2PitchError("pitch_room", f"unknown fable2 mode {mode!r}")
     card_names = [c["name"] for c in cards]
 
     def _check(m: PitchSlate) -> "str | None":
         if len(m.pitches) != expected:
             return f"need exactly {expected} pitch(es), got {len(m.pitches)}"
+        expected_ids = list(range(1, expected + 1))
+        actual_ids = [p.pitch_id for p in m.pitches]
+        if actual_ids != expected_ids:
+            return (
+                f"pitch ids must be exactly {expected_ids} in dealt-card "
+                f"order, got {actual_ids}"
+            )
         for i, p in enumerate(m.pitches):
             if p.frame_card != card_names[i]:
                 return (f"pitch {i + 1} frame_card {p.frame_card!r} != dealt "
@@ -935,6 +1212,28 @@ def _make_pitch_validator(cards, mode: str, n_max: int):
                     if ov >= _LOGLINE_OVERLAP_MAX:
                         return (f"loglines {i + 1}/{j + 1} overlap "
                                 f"{ov:.2f} >= {_LOGLINE_OVERLAP_MAX}")
+        return None
+
+    return _check
+
+
+def _make_select_validator(slate: PitchSlate):
+    expected_ids = [1, 2, 3]
+    actual_ids = [pitch.pitch_id for pitch in slate.pitches]
+    if actual_ids != expected_ids:
+        raise Fable2SelectError(
+            "pitch_select",
+            f"selection requires exact pitch slate {expected_ids}, got "
+            f"{actual_ids}",
+        )
+    allowed = frozenset(actual_ids)
+
+    def _check(selection: PitchSelect) -> "str | None":
+        if selection.chosen_pitch_id not in allowed:
+            return (
+                f"chosen_pitch_id {selection.chosen_pitch_id} is not an "
+                f"existing slate member {sorted(allowed)}"
+            )
         return None
 
     return _check
@@ -1148,8 +1447,13 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
 
 
 def _pass_pitch(creative_fn, pack, dossier: DossierLLM, cards, stance,
-                *, n_max: int, mode: str) -> PitchSlate:
-    count = 1 if mode == "one_pitch" else 3
+                *, n_max: int, mode: Fable2Mode) -> PitchSlate:
+    if mode == _COMPACT_MODE:
+        count = 1
+    elif mode == _FULL_MODE:
+        count = 3
+    else:
+        raise Fable2PitchError("pitch_room", f"unknown fable2 mode {mode!r}")
     cards_text = "\n".join(
         f"CARD {i + 1}: {c['name']} -- {c['shape']}"
         for i, c in enumerate(cards))
@@ -1561,6 +1865,251 @@ def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
 # P7 -- pure-python assembly (doc s7)
 # ---------------------------------------------------------------------------
 
+def _scene_character_word_counts(parsed: ParsedScript) -> "tuple[int, ...]":
+    return tuple(
+        sum(len(line.text.split()) for line in scene.lines)
+        for scene in parsed.scenes
+    )
+
+
+def _parsed_payload(parsed: ParsedScript, *, normalizations: bool = True) -> dict:
+    payload = {
+        "title": parsed.title,
+        "music_open": parsed.music_open,
+        "music_inter": [list(row) for row in parsed.music_inter],
+        "music_close": parsed.music_close,
+        "announcer_intro": list(parsed.announcer_intro),
+        "scenes": [
+            {
+                "n": scene.n,
+                "setting": scene.setting,
+                "lines": [
+                    {"speaker": line.speaker, "text": line.text}
+                    for line in scene.lines
+                ],
+            }
+            for scene in parsed.scenes
+        ],
+        "announcer_outro": list(parsed.announcer_outro),
+        "coda": parsed.coda,
+        "character_word_count": parsed.character_word_count,
+        "announcer_word_count": parsed.announcer_word_count,
+    }
+    if normalizations:
+        payload["normalizations"] = list(parsed.normalizations)
+    return payload
+
+
+def _canonical_sha256(value: Any) -> str:
+    return _sha256(json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+
+
+def _story_rules_signature(story_rules: StoryRules) -> tuple:
+    """Immutable content fingerprint for an already shape-checked pack."""
+    pattern_fields = (
+        "cliche", "stage_business", "on_the_nose", "banned_thesis",
+        "personal_cost",
+    )
+    return (
+        story_rules.rules_id,
+        story_rules.label,
+        story_rules.schema_version,
+        tuple(
+            (name, tuple((rx.pattern, int(rx.flags))
+                         for rx in getattr(story_rules, name)))
+            for name in pattern_fields
+        ),
+        tuple(
+            (rx.pattern, int(rx.flags), replacement)
+            for rx, replacement in story_rules.cliche_replacements
+        ),
+        tuple(story_rules.banned_phrases),
+    )
+
+
+def _validate_fable2_story_rules(story_rules: Any) -> None:
+    """Fail loud if the caller did not resolve the exact Fable2 rules pack."""
+    if not isinstance(story_rules, StoryRules):
+        raise Fable2ScriptError(
+            "revision_contract",
+            "story_rules must be the resolved StoryRules artifact, got "
+            f"{type(story_rules).__name__}",
+        )
+    if getattr(story_rules, "rules_id", None) != "scifi_fable2":
+        raise Fable2ScriptError(
+            "revision_contract",
+            "story_rules.rules_id must be 'scifi_fable2', got "
+            f"{getattr(story_rules, 'rules_id', None)!r}",
+        )
+    if getattr(story_rules, "schema_version", None) != "v1":
+        raise Fable2ScriptError(
+            "revision_contract",
+            "story_rules.schema_version must be 'v1', got "
+            f"{getattr(story_rules, 'schema_version', None)!r}",
+        )
+    if not isinstance(story_rules.label, str) or not story_rules.label:
+        raise Fable2ScriptError(
+            "revision_contract", "story_rules.label must be non-empty")
+    for name in (
+        "cliche", "stage_business", "on_the_nose", "banned_thesis",
+        "personal_cost", "cliche_replacements",
+    ):
+        value = getattr(story_rules, name, None)
+        if not isinstance(value, tuple):
+            raise Fable2ScriptError(
+                "revision_contract",
+                f"story_rules.{name} must be a resolved tuple",
+            )
+    for name in (
+        "cliche", "stage_business", "on_the_nose", "banned_thesis",
+        "personal_cost",
+    ):
+        if any(not isinstance(rx, re.Pattern)
+               for rx in getattr(story_rules, name)):
+            raise Fable2ScriptError(
+                "revision_contract",
+                f"story_rules.{name} contains a non-re.Pattern entry",
+            )
+    replacements = story_rules.cliche_replacements
+    if any(
+        not isinstance(row, tuple)
+        or len(row) != 2
+        or not isinstance(row[0], re.Pattern)
+        or not isinstance(row[1], str)
+        for row in replacements
+    ):
+        raise Fable2ScriptError(
+            "revision_contract",
+            "story_rules.cliche_replacements must contain compiled-pattern "
+            "and string tuples",
+        )
+    phrases = getattr(story_rules, "banned_phrases", None)
+    if (not isinstance(phrases, tuple)
+            or any(not isinstance(p, str) or not p for p in phrases)):
+        raise Fable2ScriptError(
+            "revision_contract",
+            "story_rules.banned_phrases must be a resolved string tuple",
+        )
+    canonical = resolve_story_rules("scifi_fable2")
+    if _story_rules_signature(story_rules) != _story_rules_signature(canonical):
+        raise Fable2ScriptError(
+            "revision_contract",
+            "story_rules content does not match the canonical resolved "
+            "scifi_fable2 pack",
+        )
+
+
+def _story_rules_payload(story_rules: StoryRules) -> dict:
+    _validate_fable2_story_rules(story_rules)
+    pattern_fields = (
+        "cliche", "stage_business", "on_the_nose", "banned_thesis",
+        "personal_cost",
+    )
+    return {
+        "rules_id": story_rules.rules_id,
+        "label": story_rules.label,
+        "schema_version": story_rules.schema_version,
+        **{
+            name: [
+                {"pattern": rx.pattern, "flags": int(rx.flags)}
+                for rx in getattr(story_rules, name)
+            ]
+            for name in pattern_fields
+        },
+        "cliche_replacements": [
+            {"pattern": rx.pattern, "flags": int(rx.flags),
+             "replacement": replacement}
+            for rx, replacement in story_rules.cliche_replacements
+        ],
+        "banned_phrases": list(story_rules.banned_phrases),
+    }
+
+
+def _envelope_payload(envelope: SceneEnvelope) -> dict:
+    _validate_scene_envelope(envelope)
+    return {
+        "scene_count": envelope.scene_count,
+        "scene_word_targets": list(envelope.scene_word_targets),
+        "scene_word_bands": [list(band) for band in envelope.scene_word_bands],
+        "total_words": envelope.total_words,
+        "total_band_frac": envelope.band_frac,
+        "scene_band_frac": _SCENE_WORD_BAND,
+    }
+
+
+def _scoring_context_sha256(envelope: SceneEnvelope,
+                            story_rules: StoryRules) -> str:
+    return _canonical_sha256({
+        "envelope": _envelope_payload(envelope),
+        "story_rules": _story_rules_payload(story_rules),
+    })
+
+
+def _spoken_script_text(parsed: ParsedScript) -> str:
+    parts = list(parsed.announcer_intro)
+    parts.extend(
+        line.text for scene in parsed.scenes for line in scene.lines)
+    parts.extend(parsed.announcer_outro)
+    parts.append(parsed.coda)
+    return "\n".join(parts)
+
+
+def _rule_pattern_hits(parsed: ParsedScript, story_rules: Any) -> int:
+    _validate_fable2_story_rules(story_rules)
+    text = _spoken_script_text(parsed)
+    hits = sum(
+        len(tuple(rx.finditer(text)))
+        for name in ("cliche", "stage_business", "on_the_nose",
+                     "banned_thesis")
+        for rx in getattr(story_rules, name)
+    )
+    folded = text.casefold()
+    hits += sum(
+        folded.count(phrase.casefold())
+        for phrase in story_rules.banned_phrases
+    )
+    return hits
+
+
+def _draft_score(parsed: ParsedScript, envelope: SceneEnvelope,
+                 story_rules: Any) -> DraftScore:
+    _validate_scene_envelope(envelope)
+    counts = _scene_character_word_counts(parsed)
+    bands = envelope.scene_word_bands
+    paired = min(len(counts), len(bands))
+    violations = abs(len(counts) - len(bands)) + sum(
+        not (bands[i][0] <= counts[i] <= bands[i][1])
+        for i in range(paired)
+    )
+    distance = sum(
+        abs(counts[i] - envelope.scene_word_targets[i])
+        for i in range(paired)
+    )
+    distance += sum(counts[paired:])
+    distance += sum(envelope.scene_word_targets[paired:])
+    return (
+        _rule_pattern_hits(parsed, story_rules),
+        int(violations),
+        int(distance),
+        abs(parsed.character_word_count - envelope.total_words),
+        len(parsed.normalizations),
+    )
+
+
+def _proof_entry_payload(entry: ProofMapEntry) -> dict:
+    return {
+        "line_id": entry.line_id,
+        "constituents": [
+            {
+                "text": proof.text,
+                "artifact": proof.artifact,
+                "span": list(proof.span),
+            }
+            for proof in entry.constituents
+        ],
+    }
+
 def _prove_constituents(constituents, artifact_name: str, artifact_norm: str,
                         merged_text: str, line_id: str) -> "list[dict]":
     """Gate (a), per CONSTITUENT (r2/M4): every constituent line text
@@ -1591,6 +2140,686 @@ def _prove_constituents(constituents, artifact_name: str, artifact_norm: str,
     return proofs
 
 
+def _build_proof_map(parsed: ParsedScript, treatment: Treatment,
+                     normalized_source: str) -> "tuple[ProofMapEntry, ...]":
+    """Build every spoken-row proof without touching a ledger or meta."""
+    artifact_norm = _norm_ws(normalized_source)
+    if not artifact_norm:
+        raise Fable2AssembleError(
+            "assemble", "winning draft artifact is empty")
+    news_norm = _norm_ws(treatment.news_close_read)
+    entries: "list[ProofMapEntry]" = []
+
+    def _append(line_id: str, constituents, merged_text: str,
+                artifact_name: str, source_norm: str) -> None:
+        rows = _prove_constituents(
+            constituents, artifact_name, source_norm, merged_text, line_id)
+        entries.append(ProofMapEntry(
+            line_id=line_id,
+            constituents=tuple(
+                ConstituentProof(
+                    text=row["text"], artifact=row["artifact"],
+                    span=(int(row["span"][0]), int(row["span"][1])),
+                )
+                for row in rows
+            ),
+        ))
+
+    for index, text in enumerate(parsed.announcer_intro, start=1):
+        _append(
+            f"shot_000_b{index}", [text], text,
+            "winning_draft", artifact_norm,
+        )
+
+    for scene in parsed.scenes:
+        runs: "list[tuple[str, list[str]]]" = []
+        for line in scene.lines:
+            if runs and runs[-1][0] == line.speaker:
+                runs[-1][1].append(line.text)
+            else:
+                runs.append((line.speaker, [line.text]))
+        shot_id = f"shot_{scene.n:03d}"
+        for index, (_speaker, texts) in enumerate(runs, start=1):
+            merged = " ".join(_norm_ws(text) for text in texts)
+            _append(
+                f"{shot_id}_b{index}", texts, merged,
+                "winning_draft", artifact_norm,
+            )
+
+    if not parsed.scenes:
+        raise Fable2AssembleError("assemble", "script has no scenes")
+    post_shot = f"shot_{parsed.scenes[-1].n + 1:03d}"
+    post_index = 0
+    for text in parsed.announcer_outro:
+        post_index += 1
+        _append(
+            f"{post_shot}_b{post_index}", [text], text,
+            "winning_draft", artifact_norm,
+        )
+    post_index += 1
+    _append(
+        f"{post_shot}_b{post_index}", [parsed.coda], parsed.coda,
+        "winning_draft", artifact_norm,
+    )
+    post_index += 1
+    _append(
+        f"{post_shot}_b{post_index}", [treatment.news_close_read],
+        treatment.news_close_read, "treatment.news_close_read", news_norm,
+    )
+    ids = [entry.line_id for entry in entries]
+    if len(ids) != len(set(ids)):
+        raise Fable2AssembleError(
+            "assemble", f"proof map contains duplicate line ids: {ids}")
+    return tuple(entries)
+
+
+def _attempt_payload(trace: PassAttemptTrace) -> dict:
+    return {
+        "attempt": trace.attempt,
+        "temperature": trace.temperature,
+        "requested_max_new_tokens": trace.requested_max_new_tokens,
+        "outcome": trace.outcome,
+        "truncation": trace.truncation,
+        "selected": trace.selected,
+        "parse_defects": list(trace.parse_defects),
+        "character_words": trace.character_words,
+        "scene_character_words": list(trace.scene_character_words),
+    }
+
+
+def _final_draft_seal_payload(
+    *,
+    raw_sha256: str,
+    normalized_sha256: str,
+    parsed_sha256: str,
+    proof_map_sha256: str,
+    score: DraftScore,
+    scoring_context_sha256: str,
+    p3_attempts: "tuple[PassAttemptTrace, ...]",
+    p5_attempts: "tuple[PassAttemptTrace, ...]",
+) -> dict:
+    return {
+        "raw_sha256": raw_sha256,
+        "normalized_sha256": normalized_sha256,
+        "parsed_sha256": parsed_sha256,
+        "proof_map_sha256": proof_map_sha256,
+        "score": list(score),
+        "scoring_context_sha256": scoring_context_sha256,
+        "p3_attempts": [_attempt_payload(row) for row in p3_attempts],
+        "p5_attempts": [_attempt_payload(row) for row in p5_attempts],
+    }
+
+
+def _validate_attempt_sequence(label: str,
+                               rows: "tuple[PassAttemptTrace, ...]") -> None:
+    if not rows:
+        return
+    if any(type(row) is not PassAttemptTrace for row in rows):
+        raise Fable2ScriptError(
+            "final_draft",
+            f"{label} attempts must contain exact PassAttemptTrace artifacts",
+        )
+    if tuple(row.attempt for row in rows) != tuple(range(1, len(rows) + 1)):
+        raise Fable2ScriptError(
+            "final_draft", f"{label} attempts must be contiguous from 1")
+    selected = [row for row in rows if row.selected]
+    if len(selected) != 1 or selected[0] is not rows[-1]:
+        raise Fable2ScriptError(
+            "final_draft",
+            f"{label} must have exactly one selected final attempt",
+        )
+
+
+def build_final_draft(
+    raw_source: str,
+    parsed: ParsedScript,
+    treatment: Treatment,
+    envelope: SceneEnvelope,
+    story_rules: Any,
+    *,
+    p3_attempts: "tuple[PassAttemptTrace, ...]" = (),
+    p5_attempts: "tuple[PassAttemptTrace, ...]" = (),
+) -> FinalDraft:
+    """Pure parse/proof/score constructor for one candidate whole play."""
+    _validate_scene_envelope(envelope)
+    _validate_fable2_story_rules(story_rules)
+    p3_attempts = tuple(p3_attempts)
+    p5_attempts = tuple(p5_attempts)
+    _validate_attempt_sequence("P3", p3_attempts)
+    _validate_attempt_sequence("P5", p5_attempts)
+    normalized = normalize_fable2_markup_text(raw_source)
+    cast_names = [shape.name for shape in treatment.cast_shapes]
+    authoritative, defects = parse_fable2_markup(raw_source, cast_names)
+    if authoritative is None:
+        raise Fable2ParseError(
+            "final_draft",
+            "raw source does not parse: " + render_defects(defects),
+        )
+    if _parsed_payload(authoritative) != _parsed_payload(parsed):
+        raise Fable2ParseError(
+            "final_draft",
+            "provided ParsedScript does not match the authoritative raw parse",
+        )
+    proof_map = _build_proof_map(authoritative, treatment, normalized)
+    score = _draft_score(authoritative, envelope, story_rules)
+    parsed_payload = _parsed_payload(authoritative)
+    proof_payload = [_proof_entry_payload(entry) for entry in proof_map]
+    context_hash = _scoring_context_sha256(envelope, story_rules)
+    raw_hash = _sha256(raw_source)
+    normalized_hash = _sha256(normalized)
+    parsed_hash = _canonical_sha256(parsed_payload)
+    proof_hash = _canonical_sha256(proof_payload)
+    artifact_hash = _canonical_sha256(_final_draft_seal_payload(
+        raw_sha256=raw_hash,
+        normalized_sha256=normalized_hash,
+        parsed_sha256=parsed_hash,
+        proof_map_sha256=proof_hash,
+        score=score,
+        scoring_context_sha256=context_hash,
+        p3_attempts=p3_attempts,
+        p5_attempts=p5_attempts,
+    ))
+    return FinalDraft(
+        raw_source=raw_source,
+        normalized_source=normalized,
+        parsed=authoritative,
+        proof_map=proof_map,
+        p3_attempts=p3_attempts,
+        p5_attempts=p5_attempts,
+        score=score,
+        scoring_context_sha256=context_hash,
+        hashes=FinalDraftHashes(
+            raw_sha256=raw_hash,
+            normalized_sha256=normalized_hash,
+            parsed_sha256=parsed_hash,
+            proof_map_sha256=proof_hash,
+            artifact_sha256=artifact_hash,
+        ),
+    )
+
+
+def _assert_source_matches_parsed(
+    normalized_source: str,
+    parsed: ParsedScript,
+    cast_names: "list[str]",
+    label: str,
+) -> None:
+    reparsed, defects = parse_fable2_markup(normalized_source, cast_names)
+    if reparsed is None:
+        raise Fable2ScriptError(
+            "revision_contract",
+            f"{label} normalized source does not parse: "
+            + render_defects(defects),
+        )
+    if (_parsed_payload(reparsed, normalizations=False)
+            != _parsed_payload(parsed, normalizations=False)):
+        raise Fable2ScriptError(
+            "revision_contract",
+            f"{label} ParsedScript does not match its normalized source",
+        )
+
+
+def _validate_final_draft_integrity(label: str, draft: Any) -> None:
+    """Recompute every FinalDraft seal before it can influence selection."""
+    if type(draft) is not FinalDraft:
+        raise Fable2ScriptError(
+            "final_draft", f"{label} must be an exact FinalDraft artifact")
+    if type(draft.hashes) is not FinalDraftHashes:
+        raise Fable2ScriptError(
+            "final_draft", f"{label}.hashes must be FinalDraftHashes")
+    if type(draft.parsed) is not ParsedScript:
+        raise Fable2ScriptError(
+            "final_draft", f"{label}.parsed must be ParsedScript")
+    if (type(draft.score) is not tuple or len(draft.score) != 5
+            or any(type(value) is not int or value < 0
+                   for value in draft.score)):
+        raise Fable2ScriptError(
+            "final_draft", f"{label}.score must be five non-negative ints")
+    if not isinstance(draft.raw_source, str) or not isinstance(
+            draft.normalized_source, str):
+        raise Fable2ScriptError(
+            "final_draft", f"{label} source fields must be strings")
+    if not re.fullmatch(r"[0-9a-f]{64}", draft.scoring_context_sha256):
+        raise Fable2ScriptError(
+            "final_draft", f"{label} scoring context hash is malformed")
+    if type(draft.p3_attempts) is not tuple or type(
+            draft.p5_attempts) is not tuple:
+        raise Fable2ScriptError(
+            "final_draft", f"{label} attempt receipts must be tuples")
+    _validate_attempt_sequence(f"{label} P3", draft.p3_attempts)
+    _validate_attempt_sequence(f"{label} P5", draft.p5_attempts)
+
+    normalized = normalize_fable2_markup_text(draft.raw_source)
+    if normalized != draft.normalized_source:
+        raise Fable2ScriptError(
+            "final_draft", f"{label} normalized source seal is stale")
+    authoritative, defects = parse_fable2_markup(
+        draft.raw_source, _speakers_in_order(draft.parsed))
+    if authoritative is None:
+        raise Fable2ScriptError(
+            "final_draft",
+            f"{label} raw source no longer parses: {render_defects(defects)}",
+        )
+    if _parsed_payload(authoritative) != _parsed_payload(draft.parsed):
+        raise Fable2ScriptError(
+            "final_draft", f"{label} parsed artifact seal is stale")
+
+    if type(draft.proof_map) is not tuple:
+        raise Fable2ScriptError(
+            "final_draft", f"{label}.proof_map must be an immutable tuple")
+    line_ids = []
+    source_norm = _norm_ws(draft.normalized_source)
+    for entry in draft.proof_map:
+        if type(entry) is not ProofMapEntry or type(
+                entry.constituents) is not tuple:
+            raise Fable2ScriptError(
+                "final_draft", f"{label} proof map contains a forged row")
+        if not isinstance(entry.line_id, str) or not entry.line_id:
+            raise Fable2ScriptError(
+                "final_draft", f"{label} proof line id is invalid")
+        line_ids.append(entry.line_id)
+        for proof in entry.constituents:
+            if (type(proof) is not ConstituentProof
+                    or type(proof.span) is not tuple
+                    or len(proof.span) != 2
+                    or any(type(value) is not int for value in proof.span)
+                    or proof.span[0] < 0
+                    or proof.span[1] < proof.span[0]
+                    or not isinstance(proof.text, str)
+                    or not isinstance(proof.artifact, str)):
+                raise Fable2ScriptError(
+                    "final_draft", f"{label} contains a forged proof")
+            if proof.artifact == "winning_draft" and (
+                proof.span[1] > len(source_norm)
+                or source_norm[proof.span[0]:proof.span[1]] != proof.text
+            ):
+                raise Fable2ScriptError(
+                    "final_draft", f"{label} proof span no longer resolves")
+    if len(line_ids) != len(set(line_ids)):
+        raise Fable2ScriptError(
+            "final_draft", f"{label} proof line ids are not unique")
+
+    raw_hash = _sha256(draft.raw_source)
+    normalized_hash = _sha256(draft.normalized_source)
+    parsed_hash = _canonical_sha256(_parsed_payload(draft.parsed))
+    proof_hash = _canonical_sha256([
+        _proof_entry_payload(entry) for entry in draft.proof_map
+    ])
+    artifact_hash = _canonical_sha256(_final_draft_seal_payload(
+        raw_sha256=raw_hash,
+        normalized_sha256=normalized_hash,
+        parsed_sha256=parsed_hash,
+        proof_map_sha256=proof_hash,
+        score=draft.score,
+        scoring_context_sha256=draft.scoring_context_sha256,
+        p3_attempts=draft.p3_attempts,
+        p5_attempts=draft.p5_attempts,
+    ))
+    expected = FinalDraftHashes(
+        raw_sha256=raw_hash,
+        normalized_sha256=normalized_hash,
+        parsed_sha256=parsed_hash,
+        proof_map_sha256=proof_hash,
+        artifact_sha256=artifact_hash,
+    )
+    if draft.hashes != expected:
+        raise Fable2ScriptError(
+            "final_draft", f"{label} hash seal does not match its content")
+
+
+def _normalized_line_scopes(normalized_source: str):
+    """Return exact nonblank source bytes with explicit revision ownership."""
+    rows = []
+    blank_positions = []
+    current_scene = 0
+    seen_scene = False
+    for source_index, line in enumerate(normalized_source.splitlines()):
+        if not line.strip():
+            blank_positions.append(source_index)
+            continue
+        scene_match = re.match(r"^SCENE\s+(\d+):", line)
+        if scene_match:
+            current_scene = int(scene_match.group(1))
+            seen_scene = True
+            scope = ("protected", 0, "", "")
+        elif line.startswith(("TITLE:", "MUSIC:", "CODA:", "END.")):
+            scope = ("protected", 0, "", "")
+        elif ":" not in line:
+            scope = ("protected", 0, "", "")
+        else:
+            speaker = line.split(":", 1)[0]
+            if speaker == ANNOUNCER_NAME:
+                frame = "outro" if seen_scene else "intro"
+                scope = ("frame", 0, ANNOUNCER_NAME, frame)
+            else:
+                scope = ("scene", current_scene, speaker, "")
+        rows.append((source_index, line, scope))
+    return tuple(rows), tuple(blank_positions)
+
+
+def _note_scope_error(note: CriticNote, parsed: ParsedScript) -> "str | None":
+    scenes = {scene.n: scene for scene in parsed.scenes}
+    if note.scene == 0:
+        if note.speaker not in ("", ANNOUNCER_NAME):
+            return (
+                f"scene-zero note speaker must be empty or {ANNOUNCER_NAME}, "
+                f"got {note.speaker!r}"
+            )
+        if note.frame_scope not in ("intro", "outro"):
+            return "scene-zero note requires explicit intro/outro frame_scope"
+        return None
+    scene = scenes.get(note.scene)
+    if scene is None:
+        return f"critic note names missing scene {note.scene}"
+    speakers = {line.speaker for line in scene.lines}
+    if note.speaker and note.speaker not in speakers:
+        return (
+            f"critic note scene {note.scene} names speaker "
+            f"{note.speaker!r} outside that scene"
+        )
+    return None
+
+
+def _revision_contract_payload(contract: RevisionContractResult) -> dict:
+    return {
+        "eligible": contract.eligible,
+        "reasons": list(contract.reasons),
+        "addressed_problem_classes": list(
+            contract.addressed_problem_classes),
+        "changed_scopes": list(contract.changed_scopes),
+        "protected_field_differences": list(
+            contract.protected_field_differences),
+        "total_word_count": contract.total_word_count,
+        "total_word_band": list(contract.total_word_band),
+        "scene_word_counts": list(contract.scene_word_counts),
+        "scene_word_bands": [list(row) for row in contract.scene_word_bands],
+        "draft1_sha256": contract.draft1_sha256,
+        "draft2_sha256": contract.draft2_sha256,
+        "scoring_context_sha256": contract.scoring_context_sha256,
+    }
+
+
+def validate_revision_contract(
+    draft1_normalized: str,
+    parsed1: ParsedScript,
+    draft2_normalized: str,
+    parsed2: ParsedScript,
+    critic_notes: CriticNotes,
+    envelope: SceneEnvelope,
+    resolved_rules: Any,
+) -> RevisionContractResult:
+    """Pure S2 revision-law validator; it never repairs or rewrites text."""
+    _validate_scene_envelope(envelope)
+    _validate_fable2_story_rules(resolved_rules)
+    if not isinstance(critic_notes, CriticNotes):
+        raise Fable2ScriptError(
+            "revision_contract", "critic_notes must be a CriticNotes artifact")
+    if normalize_fable2_markup_text(draft1_normalized) != draft1_normalized:
+        raise Fable2ScriptError(
+            "revision_contract", "draft1 source is not normalized markup")
+    if normalize_fable2_markup_text(draft2_normalized) != draft2_normalized:
+        raise Fable2ScriptError(
+            "revision_contract", "draft2 source is not normalized markup")
+    cast_names = sorted(set(
+        _speakers_in_order(parsed1) + _speakers_in_order(parsed2)
+    ))
+    _assert_source_matches_parsed(
+        draft1_normalized, parsed1, cast_names, "draft1")
+    _assert_source_matches_parsed(
+        draft2_normalized, parsed2, cast_names, "draft2")
+
+    reasons: "list[str]" = []
+    protected: "list[str]" = []
+
+    def _protect(name: str, left: Any, right: Any) -> None:
+        if left != right:
+            protected.append(name)
+            reasons.append(f"protected field changed: {name}")
+
+    _protect("title", parsed1.title, parsed2.title)
+    _protect("cast_speaker_set", tuple(_speakers_in_order(parsed1)),
+             tuple(_speakers_in_order(parsed2)))
+    _protect("scene_count", len(parsed1.scenes), len(parsed2.scenes))
+    _protect("scene_order", tuple(s.n for s in parsed1.scenes),
+             tuple(s.n for s in parsed2.scenes))
+    _protect("scene_settings", tuple(s.setting for s in parsed1.scenes),
+             tuple(s.setting for s in parsed2.scenes))
+    _protect(
+        "speaker_topology",
+        tuple(tuple(line.speaker for line in scene.lines)
+              for scene in parsed1.scenes),
+        tuple(tuple(line.speaker for line in scene.lines)
+              for scene in parsed2.scenes),
+    )
+    _protect(
+        "music_queue",
+        (parsed1.music_open, parsed1.music_inter, parsed1.music_close),
+        (parsed2.music_open, parsed2.music_inter, parsed2.music_close),
+    )
+    _protect("coda_news_boundary", parsed1.coda, parsed2.coda)
+    _protect(
+        "announcer_skeleton",
+        (len(parsed1.announcer_intro), len(parsed1.announcer_outro)),
+        (len(parsed2.announcer_intro), len(parsed2.announcer_outro)),
+    )
+
+    scope_errors = []
+    for index, note in enumerate(critic_notes.notes):
+        error = _note_scope_error(note, parsed1)
+        if error:
+            scope_errors.append(f"critic note {index + 1}: {error}")
+    reasons.extend(scope_errors)
+
+    left_lines, left_blanks = _normalized_line_scopes(draft1_normalized)
+    right_lines, right_blanks = _normalized_line_scopes(draft2_normalized)
+    if left_blanks != right_blanks:
+        reasons.append(
+            "normalized-source blank-line layout changed outside authored "
+            "revision scopes"
+        )
+    if len(left_lines) != len(right_lines):
+        reasons.append(
+            "normalized-source nonblank line count changed outside the "
+            "protected skeleton"
+        )
+    changed: "list[tuple[str, int, str, str]]" = []
+    for left, right in zip(left_lines, right_lines):
+        left_index, left_bytes, left_scope = left
+        right_index, right_bytes, right_scope = right
+        if left_bytes == right_bytes:
+            continue
+        if left_scope != right_scope:
+            reasons.append(
+                f"normalized-source ownership changed at lines "
+                f"{left_index + 1}/{right_index + 1}"
+            )
+            continue
+        kind, scene_no, speaker, frame_scope = left_scope
+        if kind == "protected":
+            reasons.append(
+                f"protected normalized-source bytes changed at line "
+                f"{left_index + 1}"
+            )
+            continue
+        label = (
+            f"frame:{frame_scope}:line:{left_index}"
+            if kind == "frame"
+            else f"scene:{scene_no}:speaker:{speaker}:line:{left_index}"
+        )
+        changed.append((label, scene_no, speaker, frame_scope))
+
+    note_changed: "list[bool]" = [False] * len(critic_notes.notes)
+    for scope, scene_no, speaker, frame_scope in changed:
+        authorized = False
+        for index, note in enumerate(critic_notes.notes):
+            applies = (
+                (scene_no == 0 and note.scene == 0
+                 and note.frame_scope == frame_scope
+                 and note.speaker in ("", ANNOUNCER_NAME))
+                or
+                (scene_no > 0 and note.scene == scene_no
+                 and note.speaker in ("", speaker))
+            )
+            if applies:
+                authorized = True
+                note_changed[index] = True
+        if not authorized:
+            reasons.append(f"unnoted change outside critic scope: {scope}")
+
+    addressed: "list[str]" = []
+    for index, note in enumerate(critic_notes.notes):
+        if note_changed[index]:
+            if note.problem not in addressed:
+                addressed.append(note.problem)
+        else:
+            reasons.append(
+                f"critic note {index + 1} ({note.problem}) produced no "
+                "change in its authorized scope"
+            )
+
+    counts = _scene_character_word_counts(parsed2)
+    bands = envelope.scene_word_bands
+    lo_float, hi_float = _word_band(envelope.total_words)
+    total_band = (math.ceil(lo_float), math.floor(hi_float))
+    if not (total_band[0] <= parsed2.character_word_count <= total_band[1]):
+        reasons.append(
+            f"total character words {parsed2.character_word_count} outside "
+            f"{total_band[0]}-{total_band[1]}"
+        )
+    if len(counts) != len(bands):
+        reasons.append(
+            f"scene count {len(counts)} does not match envelope "
+            f"{len(bands)}"
+        )
+    for index, (count, band) in enumerate(zip(counts, bands), start=1):
+        if not (band[0] <= count <= band[1]):
+            reasons.append(
+                f"scene {index} character words {count} outside "
+                f"{band[0]}-{band[1]}"
+            )
+
+    # Keep the receipt concise and deterministic when one defect produces
+    # more than one comparison symptom.
+    reasons = list(dict.fromkeys(reasons))
+    result = RevisionContractResult(
+        eligible=not reasons,
+        reasons=tuple(reasons),
+        addressed_problem_classes=tuple(addressed),
+        changed_scopes=tuple(
+            scope for scope, _scene, _speaker, _frame in changed),
+        protected_field_differences=tuple(protected),
+        total_word_count=parsed2.character_word_count,
+        total_word_band=total_band,
+        scene_word_counts=counts,
+        scene_word_bands=bands,
+        draft1_sha256=_sha256(draft1_normalized),
+        draft2_sha256=_sha256(draft2_normalized),
+        scoring_context_sha256=_scoring_context_sha256(
+            envelope, resolved_rules),
+        contract_sha256="",
+    )
+    return replace(
+        result,
+        contract_sha256=_canonical_sha256(
+            _revision_contract_payload(result)),
+    )
+
+
+def _validate_revision_contract_integrity(contract: Any) -> None:
+    if type(contract) is not RevisionContractResult:
+        raise Fable2ScriptError(
+            "revision_contract",
+            "contract must be an exact RevisionContractResult artifact",
+        )
+    tuple_fields = (
+        "reasons", "addressed_problem_classes", "changed_scopes",
+        "protected_field_differences", "total_word_band",
+        "scene_word_counts", "scene_word_bands",
+    )
+    if any(type(getattr(contract, name)) is not tuple for name in tuple_fields):
+        raise Fable2ScriptError(
+            "revision_contract", "contract tuple fields are not immutable")
+    if type(contract.eligible) is not bool or contract.eligible != (
+            not contract.reasons):
+        raise Fable2ScriptError(
+            "revision_contract",
+            "contract eligibility does not match its reasons",
+        )
+    if (type(contract.total_word_count) is not int
+            or contract.total_word_count < 0
+            or len(contract.total_word_band) != 2
+            or any(type(value) is not int
+                   for value in contract.total_word_band)
+            or any(type(value) is not int or value < 0
+                   for value in contract.scene_word_counts)
+            or any(type(row) is not tuple or len(row) != 2
+                   or any(type(value) is not int for value in row)
+                   for row in contract.scene_word_bands)):
+        raise Fable2ScriptError(
+            "revision_contract", "contract word-budget receipt is malformed")
+    for name in (
+        "draft1_sha256", "draft2_sha256", "scoring_context_sha256",
+        "contract_sha256",
+    ):
+        if not re.fullmatch(r"[0-9a-f]{64}", getattr(contract, name)):
+            raise Fable2ScriptError(
+                "revision_contract", f"contract {name} is malformed")
+    expected_hash = _canonical_sha256(_revision_contract_payload(contract))
+    if contract.contract_sha256 != expected_hash:
+        raise Fable2ScriptError(
+            "revision_contract", "revision contract hash seal is stale")
+
+
+def choose_final_draft(draft1: FinalDraft, draft2: FinalDraft,
+                       contract: RevisionContractResult) -> DraftSelection:
+    """Keep draft 2 only when the revision is eligible and strictly better."""
+    _validate_final_draft_integrity("draft1", draft1)
+    _validate_final_draft_integrity("draft2", draft2)
+    _validate_revision_contract_integrity(contract)
+    if contract.draft1_sha256 != draft1.hashes.normalized_sha256:
+        raise Fable2ScriptError(
+            "revision_contract", "draft1 hash does not match contract")
+    if contract.draft2_sha256 != draft2.hashes.normalized_sha256:
+        raise Fable2ScriptError(
+            "revision_contract", "draft2 hash does not match contract")
+    if not (
+        contract.scoring_context_sha256
+        == draft1.scoring_context_sha256
+        == draft2.scoring_context_sha256
+    ):
+        raise Fable2ScriptError(
+            "revision_contract",
+            "revision contract and drafts use different envelope/rules "
+            "scoring contexts",
+        )
+    if not contract.eligible:
+        detail = "; ".join(contract.reasons[:4]) or "unspecified defect"
+        return DraftSelection(
+            winner=draft1,
+            reason=f"draft1 retained: revision ineligible ({detail})",
+            scoring_context_sha256=contract.scoring_context_sha256,
+        )
+    if draft2.score < draft1.score:
+        return DraftSelection(
+            winner=draft2,
+            reason=(f"draft2 selected: score {draft2.score} strictly lower "
+                    f"than {draft1.score}"),
+            scoring_context_sha256=contract.scoring_context_sha256,
+        )
+    if draft2.score == draft1.score:
+        return DraftSelection(
+            winner=draft1,
+            reason=f"draft1 retained: score tie {draft1.score}",
+            scoring_context_sha256=contract.scoring_context_sha256,
+        )
+    return DraftSelection(
+        winner=draft1,
+        reason=(f"draft1 retained: revision score {draft2.score} is worse "
+                f"than {draft1.score}"),
+        scoring_context_sha256=contract.scoring_context_sha256,
+    )
+
+
 def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
               cast_rows: "list[dict]", payload: "dict[str, Any]",
               meta: dict, *, target_words: int) -> None:
@@ -1608,6 +2837,10 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
         raise Fable2AssembleError(
             "assemble", "winning draft artifact missing from meta.fable2")
     news_read_norm = _norm_ws(treatment.news_close_read)
+    pure_proof_map = _build_proof_map(
+        parsed, treatment, winning_draft_text)
+    proof_by_id = {entry.line_id: entry for entry in pure_proof_map}
+    consumed_proof_ids: "set[str]" = set()
 
     # Gate (b): parsed speaker set == cast row names (minus ANNOUNCER).
     spoken = set(_speakers_in_order(parsed))
@@ -1663,9 +2896,35 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
                     text: str, boundary: "str | None",
                     constituents, artifact_name: str,
                     artifact_norm: str) -> dict:
-        proofs = _prove_constituents(
-            constituents, artifact_name, artifact_norm, text, line_id)
-        proof_map.append({"line_id": line_id, "constituents": proofs})
+        del artifact_norm  # pure proof construction already consumed it
+        entry = proof_by_id.get(line_id)
+        if entry is None or line_id in consumed_proof_ids:
+            raise Fable2AssembleError(
+                "assemble",
+                f"spoken row {line_id} has no unique prebuilt proof entry",
+            )
+        expected = tuple(_norm_ws(value) for value in constituents)
+        actual = tuple(proof.text for proof in entry.constituents)
+        if expected != actual:
+            raise Fable2AssembleError(
+                "assemble",
+                f"spoken row {line_id} constituents disagree with its "
+                "prebuilt proof entry",
+            )
+        if any(proof.artifact != artifact_name
+               for proof in entry.constituents):
+            raise Fable2AssembleError(
+                "assemble",
+                f"spoken row {line_id} proof artifact drifted from "
+                f"{artifact_name!r}",
+            )
+        if _norm_ws(text) != " ".join(expected):
+            raise Fable2AssembleError(
+                "assemble",
+                f"spoken row {line_id} text differs from proven constituents",
+            )
+        consumed_proof_ids.add(line_id)
+        proof_map.append(_proof_entry_payload(entry))
         return {
             "line_id": line_id, "beat_id": line_id, "shot_id": shot_id,
             "char_id": char_id, "speaker_role": role, "boundary": boundary,
@@ -1797,6 +3056,13 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
     led.set_beats(beat_rows)
     led.set_lines(line_rows)
     led.set_music(music_rows)
+
+    missing_proofs = sorted(set(proof_by_id) - consumed_proof_ids)
+    if missing_proofs:
+        raise Fable2AssembleError(
+            "assemble",
+            f"prebuilt proof entries were not consumed: {missing_proofs}",
+        )
 
     f2["proof_map"] = proof_map
     f2.pop("_winning_draft_text", None)
@@ -2021,7 +3287,7 @@ def run_scifi_fable2_episode(
     n_max = max(1, int(resolved["num_characters"]))
     creative_model = str(resolved["creative_writing_model"])
     technical_model = str(resolved["technical_model"])
-    mode = "one_pitch_one_draft"           # S1b low-budget spine
+    mode: Fable2Mode = _COMPACT_MODE       # C4b wires _FULL_MODE
 
     seed = _resolve_seed()
     rng = random.Random(seed)
@@ -2035,11 +3301,16 @@ def run_scifi_fable2_episode(
     receipts: "list[dict]" = []
 
     def _receipt(pass_id: str, model_id: str, attempts: int, temp: float,
-                 max_new_tokens: int) -> None:
-        receipts.append({
+                 max_new_tokens: int, *, status: str = "completed",
+                 reason: str = "") -> None:
+        row = {
             "pass_id": pass_id, "model_id": model_id, "attempts": attempts,
             "temp": temp, "max_new_tokens": max_new_tokens, "mode": mode,
-        })
+            "status": status,
+        }
+        if reason:
+            row["reason"] = reason
+        receipts.append(row)
 
     f2: dict = {
         "schema_version": _SCHEMA_VERSION,
@@ -2049,7 +3320,8 @@ def run_scifi_fable2_episode(
             "news_briefs_required is a documented NO-OP for this lane "
             "(interpreter empty by design; the treatment IS the "
             "interpretation).",
-            "S1b spine: P2a/P4/P5 land at S2; P8 is audit-only through S3.",
+            "Compact spine: P2a/P4/P5 carry explicit skipped receipts; "
+            "C4b wires them before the 120+ gate opens; P8 is audit-only.",
         ],
     }
     meta["fable2"] = f2
@@ -2083,14 +3355,14 @@ def run_scifi_fable2_episode(
 
     # --- deal + P1: pitch room (ONE-PITCH mode, r2/M3) --------------------
     deck = _load_frame_deck()
-    cards, stance = _deal(rng, deck, mode="one_pitch")
+    cards, stance = _deal(rng, deck, mode=mode)
     f2["cards_dealt"] = [dict(c) for c in cards]
     f2["stance"] = dict(stance)
     counting_cre, cre_box = _counting(creative_fn)
     with _helper_ctx(slot_scheduler, "fable2_pitch_room"):
         slate = _pass_pitch(
             counting_cre, pack, dossier, cards, stance,
-            n_max=n_max, mode="one_pitch")
+            n_max=n_max, mode=mode)
     _receipt("pitch_room", creative_model, cre_box["calls"],
              _TEMP["pitch_room"], _MAX_NEW_TOKENS["pitch_room"])
     pitch = slate.pitches[0]
@@ -2100,6 +3372,11 @@ def run_scifi_fable2_episode(
         "rationale": "one-pitch mode: the sole dealt pitch wins "
                      "(P2a skipped by design)",
     }
+    _receipt(
+        "pitch_select", "skipped", 0, _TEMP["pitch_select"],
+        _MAX_NEW_TOKENS["pitch_select"], status="skipped",
+        reason="compact mode: the sole dealt pitch wins",
+    )
 
     # --- P2b: treatment (cast names are BORN here, r2/M1) ----------------
     counting_cre2, cre2_box = _counting(creative_fn)
@@ -2135,7 +3412,17 @@ def run_scifi_fable2_episode(
     f2["draft1_sha256"] = _sha256(draft_text)
     f2["final_sha256"] = f2["draft1_sha256"]
     f2["better_draft_choice"] = "draft1_one_draft_mode"
-    f2["critic"] = None  # P4/P5 land at S2
+    f2["critic"] = None  # compact-mode skip; pass receipts are explicit
+    _receipt(
+        "critic", "skipped", 0, _TEMP["critic"],
+        _MAX_NEW_TOKENS["critic"], status="skipped",
+        reason="compact mode uses one accepted draft",
+    )
+    _receipt(
+        "revision", "skipped", 0, _TEMP["revision"],
+        _script_token_budget(target), status="skipped",
+        reason="compact mode uses one accepted draft",
+    )
     f2["parse"] = {
         "defects_by_attempt": parse_meta["defects_by_attempt"],
         "rerolls": parse_meta["rerolls"],

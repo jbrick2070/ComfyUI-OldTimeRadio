@@ -318,7 +318,7 @@ def _e2e_run(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_FABLE2_SEED", "42")
     deck = F2._load_frame_deck()
     dealt_cards, _stance = F2._deal(
-        random.Random(42), deck, mode="one_pitch")
+        random.Random(42), deck, mode=F2._COMPACT_MODE)
 
     def _pitch_json():
         return json.dumps({"pitches": [{
@@ -413,13 +413,21 @@ class TestEndToEndSpine:
         assert f2["audit"] == {
             "findings": [], "confirmed": [], "discarded": []}
         assert "_winning_draft_text" not in f2
-        # receipts: 7 passes, each stamped with the mode (r2 anchor)
+        # receipts: every logical pass is explicit, including compact skips.
         receipts = f2["pass_receipts"]
         assert [r["pass_id"] for r in receipts] == [
-            "dossier", "pitch_room", "treatment", "news_read", "script",
+            "dossier", "pitch_room", "pitch_select", "treatment",
+            "news_read", "script", "critic", "revision",
             "casting_voices", "assemble", "ledger_audit"]
         assert all(r["mode"] == "one_pitch_one_draft" for r in receipts)
-        llm_receipts = [r for r in receipts if r["pass_id"] != "assemble"]
+        skipped = [r for r in receipts if r["status"] == "skipped"]
+        assert [r["pass_id"] for r in skipped] == [
+            "pitch_select", "critic", "revision"]
+        assert all(r["attempts"] == 0 and r["reason"] for r in skipped)
+        llm_receipts = [
+            r for r in receipts if r["status"] == "completed"
+            and r["pass_id"] != "assemble"
+        ]
         assert all(r["attempts"] >= 1 for r in llm_receipts)
         # the read-split stamped the P2c read onto the treatment
         assert f2["treatment"]["news_close_read"] == (

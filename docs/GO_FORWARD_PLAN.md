@@ -1,5 +1,32 @@
 # OTR Go-Forward Plan
 
+**ACTIVE CODER SLOT (2026-07-12, Codex, Fable2 C4a/C4b).** Base SHA
+`d024bc180180fed776f031808c990aae09576423` on `v2.0-alpha`, equal to
+origin after the isolated Codex56 attempt-boundary fix. Scope: land the already-ratified S2 pure contracts, then
+wire P2a/P4/P5 and qualify Fable2 at 120 -> 320 before the all-bank ladder.
+The deterministic Codex56 c03 live requalification is running from the pushed
+base; Fable2 edits are isolated and cannot alter that imported lane. Known
+untracked docs owned by other windows and excluded from this slot:
+`docs/2026-07-11-cue-ledger-r1-codex-prompt.md` and
+`docs/2026-07-12-dynamic-story-visual-scope.md`. Randomizer Rolls remains
+docs-only/queued and does not own `banks.json` or code during this slot.
+
+**C4a PURE-CONTRACT RECEIPT (2026-07-12): GREEN.** The 120+ production gate
+remains deliberately closed.
+Landed in the dirty tree: explicit 120-900 mode/scene-vector contracts; strict
+pitch/critic identifiers; authoritative raw-parse and source-byte ownership;
+intro/outro-scoped revision notes; canonical StoryRules fingerprint; immutable
+typed P3/P5 attempt traces; context-bound keep-better selection; telemetry-sealed
+FinalDraft hashes; and explicit compact P2a/P4/P5 skipped receipts. Three
+read-only review passes closed the original nine findings, a duck-typed attempt
+boundary, and one later tamper pass covering canonical envelopes, real compiled
+regex entries, and recomputed FinalDraft/revision-contract seals. The final
+recheck found no remaining C4a must-fix. Seven-file Fable gate: 270 passed.
+Full repository gate: 7756 passed, 31 skipped, 1 expected failure, 5 dependency
+warnings. Bug Bible: 17 passed, 7 skipped, 3 expected failures. Next: push C4a
+as its own green commit, then C4b wires real nonempty P3/P5 traces and passes
+the selected FinalDraft atomically into assembly/audit.
+
 **RANDOMIZER ROLLS (Design A) -- CODE-READY, AWAITING SLOT + ONE OPERATOR CALL
 (2026-07-12, Claude window; NO code written, NO slot taken).** Plan of record:
 `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md` -- converged through the full

@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import random
 import sys
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -17,6 +19,7 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_scifi_fable2 as F2  # noqa: E402
+from nodes import _otr_story_rules as STORY_RULES  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +191,53 @@ class TestModels:
             F2.CriticNotes(verdict="revise", notes=[])
         F2.CriticNotes(verdict="ship", notes=[])  # legitimate verdict
 
+    def test_critic_ship_rejects_notes(self):
+        with pytest.raises(ValidationError, match="ship"):
+            F2.CriticNotes(verdict="ship", notes=[{
+                "scene": 1, "speaker": "SELA",
+                "problem": "subtext_flat",
+                "note": "Make the exchange less literal without new facts.",
+            }])
+
+    @pytest.mark.parametrize("value", ["1", True, 1.0])
+    def test_pitch_and_selection_ids_reject_int_coercion(self, value):
+        with pytest.raises(ValidationError):
+            F2.Pitch.model_validate(_pitch_dict(value, "Card A"))
+        with pytest.raises(ValidationError):
+            F2.PitchSelect(
+                chosen_pitch_id=value,
+                selection_rationale=(
+                    "This pitch has the clearest audible conflict and payoff."
+                ),
+            )
+
+    def test_scene_zero_critic_note_requires_explicit_frame_scope(self):
+        with pytest.raises(ValidationError, match="frame_scope"):
+            F2.CriticNote(
+                scene=0, speaker="", problem="announcer_contract",
+                note="Tighten the announcer frame without changing the coda.",
+            )
+        F2.CriticNote(
+            scene=0, frame_scope="intro", speaker="",
+            problem="announcer_contract",
+            note="Tighten the opening frame without changing the coda.",
+        )
+        with pytest.raises(ValidationError, match="only legal"):
+            F2.CriticNote(
+                scene=1, frame_scope="outro", speaker="SELA",
+                problem="subtext_flat",
+                note="Tighten the exchange without changing its facts.",
+            )
+
+    @pytest.mark.parametrize("value", ["0", True, 1.0])
+    def test_critic_scene_rejects_int_coercion(self, value):
+        with pytest.raises(ValidationError):
+            F2.CriticNote(
+                scene=value, frame_scope="intro" if value in ("0",) else None,
+                speaker="", problem="announcer_contract",
+                note="Tighten the announcer frame without changing the coda.",
+            )
+
     def test_audit_finding_class_enum_closed(self):
         with pytest.raises(ValidationError):
             F2.AuditFinding(finding_class="vibes_off", scene=1, speaker="",
@@ -298,19 +348,70 @@ _CARDS3 = (
 
 class TestPitchValidator:
     def test_one_pitch_mode_accepts_exactly_one(self):
-        check = F2._make_pitch_validator(_CARDS3[:1], "one_pitch", 4)
+        check = F2._make_pitch_validator(_CARDS3[:1], F2._COMPACT_MODE, 4)
         slate = F2.PitchSlate(pitches=[_pitch_dict(1, "Card A")])
         assert check(slate) is None
 
     def test_one_pitch_mode_rejects_three(self):
-        check = F2._make_pitch_validator(_CARDS3[:1], "one_pitch", 4)
+        check = F2._make_pitch_validator(_CARDS3[:1], F2._COMPACT_MODE, 4)
         slate = F2.PitchSlate(pitches=[
             _pitch_dict(1, "Card A"), _pitch_dict(2, "Card A"),
             _pitch_dict(3, "Card A")])
         assert "exactly 1" in (check(slate) or "")
 
+    @pytest.mark.parametrize("ids", ([1, 1, 3], [1, 3, 2], [2, 1, 3]))
+    def test_full_mode_pitch_ids_are_exact_and_ordered(self, ids):
+        check = F2._make_pitch_validator(_CARDS3, F2._FULL_MODE, 4)
+        slate = F2.PitchSlate(pitches=[
+            _pitch_dict(ids[0], "Card A",
+                        logline="One operator chooses whether to trust a "
+                                "quiet instrument before dawn arrives."),
+            _pitch_dict(ids[1], "Card B", cast_size=3,
+                        ending_shape="ironic_turn",
+                        logline="A committee discovers its careful minutes "
+                                "cannot schedule the mountain's answer."),
+            _pitch_dict(ids[2], "Card C", cast_size=4,
+                        ending_shape="open_question",
+                        logline="A village weighs old weather signs against "
+                                "a newly measured breath at dusk."),
+        ])
+        assert "pitch ids must be exactly" in (check(slate) or "")
+
+    def test_selection_validator_requires_exact_slate_and_member(self):
+        slate = F2.PitchSlate(pitches=[
+            _pitch_dict(1, "Card A"),
+            _pitch_dict(2, "Card B", cast_size=3,
+                        ending_shape="ironic_turn",
+                        logline="A committee hears a warning hidden inside "
+                                "the minutes it already approved."),
+            _pitch_dict(3, "Card C", cast_size=4,
+                        ending_shape="open_question",
+                        logline="A village chooses which measure of the "
+                                "mountain deserves its trust."),
+        ])
+        check = F2._make_select_validator(slate)
+        assert check(F2.PitchSelect(
+            chosen_pitch_id=2,
+            selection_rationale=(
+                "It has the clearest audible conflict and a payable ending."
+            ),
+        )) is None
+        bad = F2.PitchSlate(pitches=[
+            _pitch_dict(1, "Card A"),
+            _pitch_dict(1, "Card B", cast_size=3,
+                        ending_shape="ironic_turn",
+                        logline="A different committee story carries enough "
+                                "words to satisfy the schema."),
+            _pitch_dict(3, "Card C", cast_size=4,
+                        ending_shape="open_question",
+                        logline="A third village story uses a separate set "
+                                "of words for the test."),
+        ])
+        with pytest.raises(F2.Fable2SelectError, match="exact pitch slate"):
+            F2._make_select_validator(bad)
+
     def test_pitch_i_must_use_card_i(self):
-        check = F2._make_pitch_validator(_CARDS3, "full", 4)
+        check = F2._make_pitch_validator(_CARDS3, F2._FULL_MODE, 4)
         slate = F2.PitchSlate(pitches=[
             _pitch_dict(1, "Card A"),
             _pitch_dict(2, "Card C",
@@ -326,12 +427,12 @@ class TestPitchValidator:
         assert err and "card i" in err
 
     def test_cast_size_over_n_max_rejected(self):
-        check = F2._make_pitch_validator(_CARDS3[:1], "one_pitch", 2)
+        check = F2._make_pitch_validator(_CARDS3[:1], F2._COMPACT_MODE, 2)
         slate = F2.PitchSlate(pitches=[_pitch_dict(1, "Card A", cast_size=5)])
         assert "N_MAX" in (check(slate) or "")
 
     def test_full_mode_divergence_gate(self):
-        check = F2._make_pitch_validator(_CARDS3, "full", 4)
+        check = F2._make_pitch_validator(_CARDS3, F2._FULL_MODE, 4)
         slate = F2.PitchSlate(pitches=[
             _pitch_dict(1, "Card A",
                         logline="First distinct premise about a stubborn "
@@ -348,7 +449,7 @@ class TestPitchValidator:
         assert err and "diverge" in err
 
     def test_full_mode_logline_overlap_gate_both_directions(self):
-        check = F2._make_pitch_validator(_CARDS3, "full", 4)
+        check = F2._make_pitch_validator(_CARDS3, F2._FULL_MODE, 4)
         base = "A scientist must out-argue her own silence before the mountain speaks first tonight."
         near = "A scientist must out-argue her own silence before the mountain speaks last tonight."
         slate = F2.PitchSlate(pitches=[
@@ -379,7 +480,7 @@ class TestPitchValidator:
         assert check(ok) is None
 
     def test_sfw_lexicon_gate_word_boundary(self):
-        check = F2._make_pitch_validator(_CARDS3[:1], "one_pitch", 4)
+        check = F2._make_pitch_validator(_CARDS3[:1], F2._COMPACT_MODE, 4)
         bad = F2.PitchSlate(pitches=[_pitch_dict(
             1, "Card A",
             hook="She keeps a revolver in the instrument drawer.")])
@@ -664,6 +765,70 @@ class TestEnvelopeAndBudgets:
         assert F2._build_envelope(880).scene_count == 8
         assert F2._build_envelope(10).scene_count == 1  # clamp low
 
+    @pytest.mark.parametrize(("target", "mode"), [
+        (30, "one_pitch_one_draft"),
+        (119, "one_pitch_one_draft"),
+        (120, "three_pitch_two_draft"),
+        (320, "three_pitch_two_draft"),
+        (350, "three_pitch_two_draft"),
+        (720, "three_pitch_two_draft"),
+        (900, "three_pitch_two_draft"),
+    ])
+    def test_s2_mode_boundary_matrix(self, target, mode):
+        assert F2._resolve_mode(target) == mode
+
+    def test_s2_mode_rejects_901(self):
+        with pytest.raises(F2.Fable2ScriptError, match="ceiling"):
+            F2._resolve_mode(901)
+        with pytest.raises(F2.Fable2ScriptError, match="ceiling"):
+            F2._build_envelope(901)
+
+    def test_scene_envelope_rejects_noncanonical_direct_construction(self):
+        with pytest.raises(ValueError, match="scene_count"):
+            F2.SceneEnvelope(
+                scene_count=2,
+                scene_word_targets=(160, 160),
+                total_words=320,
+            )
+        with pytest.raises(ValueError, match="band_frac"):
+            F2.SceneEnvelope(
+                scene_count=3,
+                scene_word_targets=(107, 107, 106),
+                total_words=320,
+                band_frac=0.25,
+            )
+
+    @pytest.mark.parametrize(("target", "scenes"), [
+        (164, 1), (165, 2),
+        (274, 2), (275, 3),
+        (384, 3), (385, 4),
+        (494, 4), (495, 5),
+        (604, 5), (605, 6),
+        (714, 6), (715, 7),
+        (824, 7), (825, 8),
+        (900, 8),
+    ])
+    def test_scene_count_table_boundaries(self, target, scenes):
+        assert F2._build_envelope(target).scene_count == scenes
+
+    @pytest.mark.parametrize(("target", "vector"), [
+        (120, (120,)),
+        (320, (107, 107, 106)),
+        (350, (117, 117, 116)),
+        (720, (103, 103, 103, 103, 103, 103, 102)),
+        (900, (113, 113, 113, 113, 112, 112, 112, 112)),
+    ])
+    def test_exact_scene_vectors_and_bands(self, target, vector):
+        envelope = F2._build_envelope(target)
+        assert envelope.scene_word_targets == vector
+        assert sum(vector) == target
+        assert envelope.scene_count == len(vector)
+        assert envelope.scene_word_bands == tuple(
+            (int((value * 0.70).__ceil__()),
+             int((value * 1.30).__floor__()))
+            for value in vector
+        )
+
     def test_token_budget_floor_and_cap(self):
         assert F2._script_token_budget(30) == 1200      # floor
         assert F2._script_token_budget(500) == 1300
@@ -679,6 +844,487 @@ class TestEnvelopeAndBudgets:
         F2.assert_supported_target_words(F2._ONE_DRAFT_THRESHOLD - 1)
 
 
+def _revision_markup(
+    scene_counts=(107, 107, 106),
+    first_phrases=("clear answer", "steady answer", "patient answer"),
+    *,
+    title="The Exact Ledger",
+    settings=None,
+    opening_music="warm dial tones and strings",
+    closing_music="resolved dial tones and strings",
+    coda="The careful answer is",
+):
+    settings = settings or tuple(
+        f"instrument room {index}" for index in range(1, len(scene_counts) + 1)
+    )
+    assert len(settings) == len(scene_counts)
+    assert len(first_phrases) >= len(scene_counts)
+    rows = [
+        f"TITLE: {title}",
+        f"MUSIC: {opening_music}",
+        "ANNOUNCER: Tonight two careful listeners compare what they heard.",
+    ]
+    for scene_no, total in enumerate(scene_counts, start=1):
+        sela_words = total // 2 + total % 2
+        darrow_words = total - sela_words
+        phrase = first_phrases[scene_no - 1].split()
+        assert sela_words >= len(phrase) and darrow_words >= 1
+        sela = phrase + [
+            f"s{scene_no}a{index}"
+            for index in range(sela_words - len(phrase))
+        ]
+        darrow = [
+            f"s{scene_no}d{index}" for index in range(darrow_words)
+        ]
+        rows.extend([
+            f"SCENE {scene_no}: {settings[scene_no - 1]}",
+            "SELA: " + " ".join(sela),
+            "DARROW: " + " ".join(darrow),
+        ])
+        if scene_no < len(scene_counts):
+            rows.append(f"MUSIC: brief bridge after scene {scene_no}")
+    rows.extend([
+        "ANNOUNCER: The ledger closes without hiding its cost.",
+        f"CODA: {coda}:",
+        f"MUSIC: {closing_music}",
+        "END.",
+    ])
+    return "\n".join(rows)
+
+
+def _parse_revision(raw: str):
+    normalized = F2.normalize_fable2_markup_text(raw)
+    parsed, defects = F2.parse_fable2_markup(normalized, ["SELA", "DARROW"])
+    assert parsed is not None, F2.render_defects(defects)
+    return normalized, parsed
+
+
+def _fable2_rules():
+    STORY_RULES._clear_caches()
+    return STORY_RULES.resolve_story_rules("scifi_fable2")
+
+
+def _revision_notes(scene=1, speaker="SELA", *, frame_scope=None):
+    note = {
+        "scene": scene,
+        "speaker": speaker,
+        "problem": "subtext_flat",
+        "note": "Replace the literal exchange with a more playable response.",
+    }
+    if frame_scope is not None:
+        note["frame_scope"] = frame_scope
+    return F2.CriticNotes(verdict="revise", notes=[note])
+
+
+class TestRevisionContracts:
+    def test_authorized_strictly_better_revision_wins(self):
+        raw1, parsed1 = _parse_revision(_revision_markup(
+            first_phrases=("the void", "steady answer", "patient answer")))
+        raw2, parsed2 = _parse_revision(_revision_markup())
+        envelope = F2._build_envelope(320)
+        rules = _fable2_rules()
+        notes = _revision_notes()
+        contract = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, notes, envelope, rules)
+        assert contract.eligible is True
+        assert contract.addressed_problem_classes == ("subtext_flat",)
+        assert contract.changed_scopes == (
+            "scene:1:speaker:SELA:line:4",
+        )
+        assert contract.contract_sha256 == F2._canonical_sha256(
+            F2._revision_contract_payload(contract))
+        draft1 = F2.build_final_draft(
+            raw1, parsed1, _treatment(), envelope, rules)
+        draft2 = F2.build_final_draft(
+            raw2, parsed2, _treatment(), envelope, rules)
+        decision = F2.choose_final_draft(draft1, draft2, contract)
+        assert decision.winner is draft2
+        assert "strictly lower" in decision.reason
+        assert decision.scoring_context_sha256 == (
+            contract.scoring_context_sha256)
+
+    @pytest.mark.parametrize(("old_phrase", "new_phrase", "winner", "reason"), [
+        ("clear answer", "plain answer", "draft1", "score tie"),
+        ("clear answer", "the void", "draft1", "is worse"),
+    ])
+    def test_tie_and_worse_revision_keep_draft1(
+            self, old_phrase, new_phrase, winner, reason):
+        raw1, parsed1 = _parse_revision(_revision_markup(
+            first_phrases=(old_phrase, "steady answer", "patient answer")))
+        raw2, parsed2 = _parse_revision(_revision_markup(
+            first_phrases=(new_phrase, "steady answer", "patient answer")))
+        envelope = F2._build_envelope(320)
+        rules = _fable2_rules()
+        contract = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(), envelope, rules)
+        assert contract.eligible
+        draft1 = F2.build_final_draft(
+            raw1, parsed1, _treatment(), envelope, rules)
+        draft2 = F2.build_final_draft(
+            raw2, parsed2, _treatment(), envelope, rules)
+        decision = F2.choose_final_draft(draft1, draft2, contract)
+        assert decision.winner is draft1
+        assert reason in decision.reason
+
+    @pytest.mark.parametrize(("label", "mutate"), [
+        ("title", lambda raw: raw.replace(
+            "TITLE: The Exact Ledger", "TITLE: A Different Ledger", 1)),
+        ("scene_settings", lambda raw: raw.replace(
+            "SCENE 1: instrument room 1",
+            "SCENE 1: a different instrument room", 1)),
+        ("music_queue", lambda raw: raw.replace(
+            "MUSIC: warm dial tones and strings",
+            "MUSIC: brass fanfare and drums", 1)),
+        ("coda_news_boundary", lambda raw: raw.replace(
+            "CODA: The careful answer is:",
+            "CODA: An unrelated answer is:", 1)),
+        ("speaker_topology", lambda raw: raw.replace(
+            "SELA: clear answer", "DARROW: clear answer", 1)),
+    ])
+    def test_protected_field_drift_is_ineligible(self, label, mutate):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(mutate(_revision_markup()))
+        result = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(),
+            F2._build_envelope(320), _fable2_rules())
+        assert result.eligible is False
+        assert label in result.protected_field_differences
+
+    def test_scene_count_drift_is_ineligible(self):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(_revision_markup(
+            scene_counts=(160, 160),
+            first_phrases=("clear answer", "steady answer")))
+        result = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(),
+            F2._build_envelope(320), _fable2_rules())
+        assert result.eligible is False
+        assert "scene_count" in result.protected_field_differences
+
+    def test_unnoted_and_named_speaker_scope_escape_are_ineligible(self):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        changed = _revision_markup().replace("s1d0", "escapedword", 1)
+        raw2, parsed2 = _parse_revision(changed)
+        result = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(1, "SELA"),
+            F2._build_envelope(320), _fable2_rules())
+        assert result.eligible is False
+        assert any("speaker:DARROW" in reason for reason in result.reasons)
+
+    def test_intro_note_does_not_authorize_outro_change(self):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        changed = _revision_markup().replace(
+            "The ledger closes without hiding its cost.",
+            "The ledger rests without hiding its cost.",
+            1,
+        )
+        raw2, parsed2 = _parse_revision(changed)
+        notes = F2.CriticNotes(verdict="revise", notes=[{
+            "scene": 0,
+            "frame_scope": "intro",
+            "speaker": "",
+            "problem": "announcer_contract",
+            "note": "Tighten only the opening frame and preserve the close.",
+        }])
+
+        result = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, notes,
+            F2._build_envelope(320), _fable2_rules())
+
+        assert result.eligible is False
+        assert any(
+            "frame:outro" in reason and "unnoted change" in reason
+            for reason in result.reasons
+        )
+
+    def test_blank_line_layout_drift_is_ineligible(self):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(
+            _revision_markup().replace("SCENE 2:", "\nSCENE 2:", 1))
+
+        result = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(),
+            F2._build_envelope(320), _fable2_rules())
+
+        assert result.eligible is False
+        assert any("blank-line layout changed" in reason
+                   for reason in result.reasons)
+
+    @pytest.mark.parametrize(("notes", "needle"), [
+        (_revision_notes(4, ""), "missing scene 4"),
+        (_revision_notes(0, "SELA", frame_scope="intro"), "scene-zero"),
+    ])
+    def test_invalid_critic_scope_is_ineligible(self, notes, needle):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(_revision_markup(
+            first_phrases=("plain answer", "steady answer", "patient answer")))
+        result = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, notes,
+            F2._build_envelope(320), _fable2_rules())
+        assert result.eligible is False
+        assert any(needle in reason for reason in result.reasons)
+
+    def test_total_valid_but_per_scene_invalid_is_ineligible(self):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(_revision_markup(
+            scene_counts=(60, 200, 60)))
+        result = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(1, ""),
+            F2._build_envelope(320), _fable2_rules())
+        assert result.total_word_count == 320
+        assert result.eligible is False
+        assert any("scene 2 character words" in reason
+                   for reason in result.reasons)
+
+    def test_total_out_of_band_is_ineligible(self):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(_revision_markup(
+            scene_counts=(180, 180, 180)))
+        result = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(1, ""),
+            F2._build_envelope(320), _fable2_rules())
+        assert result.eligible is False
+        assert any("total character words" in reason
+                   for reason in result.reasons)
+
+    @pytest.mark.parametrize("bad_rules", [
+        None,
+        SimpleNamespace(rules_id="science_news", schema_version="v1"),
+    ])
+    def test_missing_or_mismatched_rules_fail_loud(self, bad_rules):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(_revision_markup(
+            first_phrases=("plain answer", "steady answer", "patient answer")))
+        with pytest.raises(F2.Fable2ScriptError, match="story_rules"):
+            F2.validate_revision_contract(
+                raw1, parsed1, raw2, parsed2, _revision_notes(),
+                F2._build_envelope(320), bad_rules)
+
+    def test_forged_same_type_rules_pack_fails_canonical_fingerprint(self):
+        rules = _fable2_rules()
+        forged = replace(rules, cliche=())
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(_revision_markup(
+            first_phrases=("plain answer", "steady answer", "patient answer")))
+
+        with pytest.raises(F2.Fable2ScriptError, match="canonical resolved"):
+            F2.validate_revision_contract(
+                raw1, parsed1, raw2, parsed2, _revision_notes(),
+                F2._build_envelope(320), forged)
+
+    def test_regex_like_story_rule_entries_are_not_accepted(self):
+        rules = _fable2_rules()
+
+        class BehavioralFakeRegex:
+            def __init__(self, source):
+                self.pattern = source.pattern
+                self.flags = source.flags
+
+            def finditer(self, _text):
+                return iter((object(), object(), object()))
+
+        assert rules.cliche
+        forged = replace(
+            rules,
+            cliche=tuple(BehavioralFakeRegex(rx) for rx in rules.cliche),
+        )
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(_revision_markup(
+            first_phrases=("plain answer", "steady answer", "patient answer")))
+
+        with pytest.raises(F2.Fable2ScriptError, match="non-re.Pattern"):
+            F2.validate_revision_contract(
+                raw1, parsed1, raw2, parsed2, _revision_notes(),
+                F2._build_envelope(320), forged)
+
+    def test_final_draft_rejects_fabricated_parse_normalizations(self):
+        raw, parsed = _parse_revision(_revision_markup())
+        fabricated = replace(parsed, normalizations=("fabricated",))
+
+        with pytest.raises(F2.Fable2ParseError, match="authoritative raw parse"):
+            F2.build_final_draft(
+                raw, fabricated, _treatment(), F2._build_envelope(320),
+                _fable2_rules())
+
+    def test_final_draft_rejects_duck_typed_scene_envelope(self):
+        raw, parsed = _parse_revision(_revision_markup())
+        forged = SimpleNamespace(
+            scene_count=3,
+            scene_word_targets=(107, 107, 106),
+            total_words=320,
+            band_frac=F2._TOTAL_WORD_BAND,
+            scene_word_bands=((74, 139), (74, 139), (75, 137)),
+        )
+
+        with pytest.raises(F2.Fable2ScriptError, match="exact canonical"):
+            F2.build_final_draft(
+                raw, parsed, _treatment(), forged, _fable2_rules())
+
+    def test_final_draft_is_frozen_and_hash_consistent(self):
+        raw, parsed = _parse_revision(_revision_markup())
+        trace = F2.PassAttemptTrace(
+            attempt=1, temperature=0.75, requested_max_new_tokens=1200,
+            outcome="accepted", selected=True, character_words=320,
+            scene_character_words=(107, 107, 106),
+        )
+        draft = F2.build_final_draft(
+            raw, parsed, _treatment(), F2._build_envelope(320),
+            _fable2_rules(), p3_attempts=(trace,))
+        assert draft.p3_attempts == (trace,)
+        assert draft.hashes.raw_sha256 == F2._sha256(raw)
+        assert draft.hashes.normalized_sha256 == F2._sha256(
+            draft.normalized_source)
+        assert draft.hashes.proof_map_sha256 == F2._canonical_sha256([
+            F2._proof_entry_payload(entry) for entry in draft.proof_map
+        ])
+        assert draft.hashes.artifact_sha256 == F2._canonical_sha256({
+            "raw_sha256": draft.hashes.raw_sha256,
+            "normalized_sha256": draft.hashes.normalized_sha256,
+            "parsed_sha256": draft.hashes.parsed_sha256,
+            "proof_map_sha256": draft.hashes.proof_map_sha256,
+            "score": list(draft.score),
+            "scoring_context_sha256": draft.scoring_context_sha256,
+            "p3_attempts": [F2._attempt_payload(trace)],
+            "p5_attempts": [],
+        })
+        assert len({entry.line_id for entry in draft.proof_map}) == len(
+            draft.proof_map)
+        with pytest.raises(FrozenInstanceError):
+            draft.score = (0, 0, 0, 0, 0)
+
+    def test_attempt_telemetry_changes_only_the_sealed_artifact_hash(self):
+        raw, parsed = _parse_revision(_revision_markup())
+        common = {
+            "attempt": 1,
+            "requested_max_new_tokens": 1200,
+            "outcome": "accepted",
+            "selected": True,
+            "character_words": 320,
+            "scene_character_words": (107, 107, 106),
+        }
+        first_trace = F2.PassAttemptTrace(temperature=0.75, **common)
+        second_trace = F2.PassAttemptTrace(temperature=0.30, **common)
+        first = F2.build_final_draft(
+            raw, parsed, _treatment(), F2._build_envelope(320),
+            _fable2_rules(), p3_attempts=(first_trace,))
+        second = F2.build_final_draft(
+            raw, parsed, _treatment(), F2._build_envelope(320),
+            _fable2_rules(), p3_attempts=(second_trace,))
+
+        assert first.hashes.raw_sha256 == second.hashes.raw_sha256
+        assert first.hashes.parsed_sha256 == second.hashes.parsed_sha256
+        assert first.hashes.proof_map_sha256 == second.hashes.proof_map_sha256
+        assert first.hashes.artifact_sha256 != second.hashes.artifact_sha256
+
+    @pytest.mark.parametrize(("overrides", "error"), [
+        ({"outcome": "bogus"}, ValueError),
+        ({"parse_defects": ["BAD_LINE_SHAPE"]}, TypeError),
+        ({"scene_character_words": [320]}, TypeError),
+        ({"outcome": "accepted", "selected": False}, ValueError),
+        ({"outcome": "truncated", "truncation": False}, ValueError),
+        ({"temperature": float("nan")}, TypeError),
+    ])
+    def test_attempt_trace_runtime_contract_is_typed_and_immutable(
+            self, overrides, error):
+        values = {
+            "attempt": 1,
+            "temperature": 0.30,
+            "requested_max_new_tokens": 1200,
+            "outcome": "parse_rejected",
+        }
+        values.update(overrides)
+        with pytest.raises(error):
+            F2.PassAttemptTrace(**values)
+
+    def test_attempt_sequences_must_be_contiguous_with_one_selected_final(self):
+        raw, parsed = _parse_revision(_revision_markup())
+        forged = SimpleNamespace(
+            attempt=1, temperature=-99, requested_max_new_tokens=1,
+            outcome="bogus", truncation=False, selected=True,
+            parse_defects=[], character_words=None,
+            scene_character_words=[],
+        )
+        with pytest.raises(F2.Fable2ScriptError, match="PassAttemptTrace"):
+            F2.build_final_draft(
+                raw, parsed, _treatment(), F2._build_envelope(320),
+                _fable2_rules(), p3_attempts=(forged,))
+
+        skipped_first = F2.PassAttemptTrace(
+            attempt=2, temperature=0.30, requested_max_new_tokens=1200,
+            outcome="accepted", selected=True,
+        )
+        with pytest.raises(F2.Fable2ScriptError, match="contiguous from 1"):
+            F2.build_final_draft(
+                raw, parsed, _treatment(), F2._build_envelope(320),
+                _fable2_rules(), p3_attempts=(skipped_first,))
+
+        accepted_early = F2.PassAttemptTrace(
+            attempt=1, temperature=0.30, requested_max_new_tokens=1200,
+            outcome="accepted", selected=True,
+        )
+        accepted_late = F2.PassAttemptTrace(
+            attempt=2, temperature=0.30, requested_max_new_tokens=1200,
+            outcome="accepted", selected=True,
+        )
+        with pytest.raises(F2.Fable2ScriptError, match="selected final"):
+            F2.build_final_draft(
+                raw, parsed, _treatment(), F2._build_envelope(320),
+                _fable2_rules(), p3_attempts=(accepted_early, accepted_late))
+
+    def test_selection_rejects_scoring_context_mismatch(self):
+        raw1, parsed1 = _parse_revision(_revision_markup(
+            first_phrases=("the void", "steady answer", "patient answer")))
+        raw2, parsed2 = _parse_revision(_revision_markup())
+        envelope = F2._build_envelope(320)
+        rules = _fable2_rules()
+        contract = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(), envelope, rules)
+        draft1 = F2.build_final_draft(
+            raw1, parsed1, _treatment(), envelope, rules)
+        draft2 = F2.build_final_draft(
+            raw2, parsed2, _treatment(), F2._build_envelope(350), rules)
+
+        with pytest.raises(F2.Fable2ScriptError, match="scoring contexts"):
+            F2.choose_final_draft(draft1, draft2, contract)
+
+    def test_selection_rejects_stale_final_draft_score_seal(self):
+        raw1, parsed1 = _parse_revision(_revision_markup(
+            first_phrases=("the void", "steady answer", "patient answer")))
+        raw2, parsed2 = _parse_revision(_revision_markup())
+        envelope = F2._build_envelope(320)
+        rules = _fable2_rules()
+        contract = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(), envelope, rules)
+        draft1 = F2.build_final_draft(
+            raw1, parsed1, _treatment(), envelope, rules)
+        draft2 = F2.build_final_draft(
+            raw2, parsed2, _treatment(), envelope, rules)
+        forged_score = (draft2.score[0] + 1, *draft2.score[1:])
+        forged = replace(draft2, score=forged_score)
+
+        with pytest.raises(F2.Fable2ScriptError, match="hash seal"):
+            F2.choose_final_draft(draft1, forged, contract)
+
+    def test_selection_rejects_forged_revision_eligibility(self):
+        raw1, parsed1 = _parse_revision(_revision_markup())
+        raw2, parsed2 = _parse_revision(
+            _revision_markup().replace("s1d0", "escapedword", 1))
+        envelope = F2._build_envelope(320)
+        rules = _fable2_rules()
+        contract = F2.validate_revision_contract(
+            raw1, parsed1, raw2, parsed2, _revision_notes(1, "SELA"),
+            envelope, rules)
+        assert contract.eligible is False
+        draft1 = F2.build_final_draft(
+            raw1, parsed1, _treatment(), envelope, rules)
+        draft2 = F2.build_final_draft(
+            raw2, parsed2, _treatment(), envelope, rules)
+        forged = replace(contract, eligible=True, reasons=())
+
+        with pytest.raises(F2.Fable2ScriptError, match="contract hash seal"):
+            F2.choose_final_draft(draft1, draft2, forged)
+
+
 # ---------------------------------------------------------------------------
 # 4. Deal + seed (doc s9; OTR_FABLE2_SEED repro)
 # ---------------------------------------------------------------------------
@@ -690,8 +1336,8 @@ class TestDeal:
         s1 = F2._resolve_seed()
         s2 = F2._resolve_seed()
         assert s1 == s2 == 42
-        d1 = F2._deal(random.Random(s1), deck, mode="one_pitch")
-        d2 = F2._deal(random.Random(s2), deck, mode="one_pitch")
+        d1 = F2._deal(random.Random(s1), deck, mode=F2._COMPACT_MODE)
+        d2 = F2._deal(random.Random(s2), deck, mode=F2._COMPACT_MODE)
         assert d1 == d2
 
     def test_bad_seed_env_fails_loud(self, monkeypatch):
@@ -701,7 +1347,7 @@ class TestDeal:
 
     def test_full_deal_is_three_distinct_cards(self):
         deck = F2._load_frame_deck()
-        cards, stance = F2._deal(random.Random(7), deck, mode="full")
+        cards, stance = F2._deal(random.Random(7), deck, mode=F2._FULL_MODE)
         assert len(cards) == 3
         assert len({c["name"] for c in cards}) == 3
         assert stance["name"].strip()
