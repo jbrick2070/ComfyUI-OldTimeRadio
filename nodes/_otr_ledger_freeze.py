@@ -476,7 +476,12 @@ def _check_per_cast_invariants(
         # in voice-path-cleanbreak Gate 2 and the shim is long gone;
         # the comment was carrying forensic history that's now in the
         # git log instead.
-        if (isinstance(name, str) and name.strip().upper() == "ANNOUNCER"):
+        is_announcer = (
+            isinstance(char_id, str) and char_id.strip().lower() == "announcer"
+        ) or (
+            isinstance(name, str) and name.strip().upper() == "ANNOUNCER"
+        )
+        if is_announcer:
             # Kokoro namespace -- voice_preset still must be non-empty
             # but the v2/ prefix does not apply.
             if not row.get("voice_preset"):

@@ -433,6 +433,11 @@ class GGUFNativeBackend:
         cap = _int_env("GEMMA4_12B_MAX_NEW_TOKENS", DEFAULT_OUTPUT_TOKENS_CAP)
         out_tokens = int(max_new_tokens or cap)
         if out_tokens > cap:
+            log.warning(
+                "[GGUFNative] output token request capped: requested=%d "
+                "effective=%d via GEMMA4_12B_MAX_NEW_TOKENS",
+                out_tokens, cap,
+            )
             out_tokens = cap
         kwargs: dict[str, Any] = {
             "messages": messages,

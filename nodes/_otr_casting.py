@@ -1878,7 +1878,8 @@ def _assert_voice_preset_invariant(cast: List[dict]) -> None:
     for row in cast or []:
         if not isinstance(row, dict):
             continue
-        if row.get("name") == "ANNOUNCER":
+        if (str(row.get("char_id") or "").strip().lower() == "announcer"
+                or row.get("name") == "ANNOUNCER"):
             continue
         char_id = row.get("char_id") or "<no char_id>"
         preset = row.get("voice_preset")

@@ -18,6 +18,14 @@ NODE_SRC = REPO_ROOT / "nodes" / "cast_lock.py"
 _WIDGET_TYPES = frozenset({"INT", "FLOAT", "STRING", "BOOLEAN"})
 
 
+def test_announcer_entry_prefers_canonical_char_id_over_display_name():
+    from nodes.cast_lock import _is_announcer_entry
+
+    assert _is_announcer_entry({
+        "char_id": "announcer", "name": "Anita", "voice_preset": "bf_lily",
+    })
+
+
 def _serialized_slots(it: dict) -> list:
     names = []
     for bucket in ("required", "optional"):

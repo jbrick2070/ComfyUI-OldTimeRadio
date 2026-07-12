@@ -1259,6 +1259,15 @@ def test_assert_unique_bark_voices_ignores_announcer():
     _OTRC._assert_unique_bark_voices(cast)
 
 
+def test_voice_preset_invariant_uses_announcer_char_id_with_display_name():
+    _OTRC._assert_voice_preset_invariant([
+        {"char_id": "announcer", "name": "Anita",
+         "voice_preset": "bf_lily"},
+        {"char_id": "c02", "name": "ALICE",
+         "voice_preset": "v2/en_speaker_4"},
+    ])
+
+
 def test_lock_cast_invariant_fires_at_end_if_voices_collide():
     """Fail-safe: the Bark voice-uniqueness invariant -- relocated to OTR_CastLock
     in Sprint 2 (a) (formerly the post-cast guard inside lock_cast) -- must raise

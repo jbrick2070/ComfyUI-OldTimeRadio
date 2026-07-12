@@ -414,3 +414,7 @@ leaving them for live integration:
     audit task. A field named `accepted` must be explicitly boolean or a model
     may copy the accepted input artifact into it; always pin list fields and
     every required finding member in both base and repair prompts.
+28. Downstream role gates must use canonical IDs before display names. An
+    announcer may have an authored on-air name while retaining
+    `char_id="announcer"`; Kokoro/Bark routing and freeze checks must recognize
+    the ID instead of requiring the visible name `ANNOUNCER`.

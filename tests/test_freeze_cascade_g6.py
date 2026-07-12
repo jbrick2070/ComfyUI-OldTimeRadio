@@ -110,6 +110,17 @@ def test_g6_excludes_announcer_with_kokoro_id():
     )
 
 
+def test_g6_uses_canonical_announcer_char_id_with_authored_display_name():
+    led = _make_ledger([
+        {"char_id": "announcer", "name": "Anita",
+         "voice_preset": "bf_lily", "traits": "warm host"},
+        {"char_id": "c01", "name": "LEMMY",
+         "voice_preset": "v2/en_speaker_8", "traits": "gruff"},
+    ])
+    report = _LFC.run_gap_audit(led, label="test")
+    assert not [e for e in report.errors if "voice_preset" in e.lower()]
+
+
 def test_g6_skipped_when_cast_empty_and_announcer_only_fallback():
     """announcer_only_fallback is the documented escape hatch -- G6 stays silent."""
     led = {

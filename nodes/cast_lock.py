@@ -50,9 +50,10 @@ _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 
 
 def _is_announcer_entry(entry: dict) -> bool:
+    char_id = str(entry.get("char_id") or "").strip().lower()
     name = str(entry.get("name") or "").strip().upper()
     role = str(entry.get("speaker_role") or entry.get("role") or "").strip().lower()
-    return name == "ANNOUNCER" or role == "announcer"
+    return char_id == "announcer" or name == "ANNOUNCER" or role == "announcer"
 
 
 class CastLock:
@@ -431,7 +432,7 @@ class CastLock:
                 continue
             cid = str(row.get("char_id") or "")
             rows_by_id[cid] = row
-            if str(row.get("name") or "").strip().upper() == "ANNOUNCER":
+            if _is_announcer_entry(row):
                 announcer_ids.add(cid)
             else:
                 char_rows.append(row)

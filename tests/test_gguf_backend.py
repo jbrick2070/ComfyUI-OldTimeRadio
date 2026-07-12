@@ -94,7 +94,7 @@ def test_production_vram_gate_uses_resolved_model_path(monkeypatch, tmp_path):
     assert entry["model_path"] == str(model_path)
 
 
-def test_generate_calls_llama_cpp_and_caps_tokens(monkeypatch, tmp_path):
+def test_generate_calls_llama_cpp_and_logs_token_cap(monkeypatch, caplog):
     fake = FakeLlama()
     monkeypatch.setenv("GEMMA4_12B_MAX_NEW_TOKENS", "512")
     ce = {"provider": "gguf_native", "model": fake}
@@ -109,6 +109,7 @@ def test_generate_calls_llama_cpp_and_caps_tokens(monkeypatch, tmp_path):
     assert call["messages"][0]["content"] == "hi"
     assert call["temperature"] == 0.2
     assert call["max_tokens"] == 512
+    assert "requested=999 effective=512" in caplog.text
 
 
 def test_generate_translates_openai_json_schema_response_format():
