@@ -235,7 +235,9 @@ GenerateFn = Callable[..., str]
 
 def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
           seam: str, inputs: Mapping[str, Any], schema: type[BaseModel],
-          scheduler: Any, journal: list[dict], tokens: int = 2400) -> BaseModel:
+          scheduler: Any, journal: list[dict], tokens: int = 2400,
+          post_validator: Callable[[BaseModel], Any] = lambda value: None,
+          ) -> BaseModel:
     system = str(pack.prompt_stages.get(seam) or "").strip()
     if not system:
         raise OriginalCodex56SolContractError(f"missing prompt seam {seam}")
@@ -261,7 +263,7 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
                 base_temperature=.72 if slot == "creative" else .18,
                 structural_retry_temperature=.25 if slot == "creative" else .08,
                 max_new_tokens=tokens, max_attempts=3,
-                post_validator=lambda value: None,
+                post_validator=post_validator,
                 repair_prompt_factory=repair,
                 helper_name=f"original_codex56sol:{pass_id}",
             )
@@ -269,6 +271,42 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         raise OriginalCodex56SolPassError(f"{pass_id} failed: {exc}") from exc
     journal.append({"pass_id": pass_id, "slot": slot, "attempts": attempts})
     return result
+
+
+def _validate_slate(slate: PossibilitySlate, draw: ConstraintDraw) -> None:
+    ids = [card.possibility_id for card in slate.possibilities]
+    if len(set(ids)) != len(ids):
+        raise OriginalCodex56SolContractError("possibility ids must be unique")
+    cause_tokens = {
+        token for token in re.findall(r"[a-z]+", draw.acoustic_device.lower())
+        if len(token) >= 5
+    }
+    for card in slate.possibilities:
+        surface = " ".join([
+            card.premise, card.shared_cause, *card.clue_plan,
+            card.helpful_resolution,
+        ]).lower()
+        missing = [obj for obj in draw.lost_objects if obj.lower() not in surface]
+        overlap = cause_tokens & set(re.findall(r"[a-z]+", surface))
+        if missing or len(overlap) < min(2, len(cause_tokens)):
+            raise OriginalCodex56SolContractError(
+                f"{card.possibility_id}: must retain every drawn object and "
+                "the drawn acoustic cause; "
+                f"missing_objects={missing} acoustic_overlap={sorted(overlap)}"
+            )
+
+
+def _validate_triage(triage: SlateTriage, slate: PossibilitySlate) -> None:
+    ids = {card.possibility_id for card in slate.possibilities}
+    if triage.selected_possibility_id not in ids:
+        raise OriginalCodex56SolContractError(
+            "selected_possibility_id must exactly match one slate id"
+        )
+    if any(f.blocking and f.possibility_id == triage.selected_possibility_id
+           for f in triage.findings):
+        raise OriginalCodex56SolContractError(
+            "triage selected a possibility it marked blocking"
+        )
 
 
 def _validate_graph(score: BroadcastScore, manifest: ClosedLineManifest,
@@ -391,8 +429,8 @@ def run_original_codex56sol_episode(
     ingress = _call(pass_id="P0", slot="technical", fn=technical_fn, pack=pack, seam="codex56_constraint_ingress", inputs={"draw": draw.model_dump(mode="json")}, schema=ConstraintIngress, scheduler=slot_scheduler, journal=journal, tokens=1200)
     if ingress.draw != draw:
         raise OriginalCodex56SolContractError("technical ingress changed the constraint draw")
-    slate = _call(pass_id="P1", slot="creative", fn=creative_fn, pack=pack, seam="codex56_possibility_slate", inputs={"ingress": ingress.model_dump(mode="json"), "operator_hint": (meta.get("source_meta") or {}).get("operator_hint", "")}, schema=PossibilitySlate, scheduler=slot_scheduler, journal=journal)
-    triage = _call(pass_id="P2", slot="technical", fn=technical_fn, pack=pack, seam="codex56_slate_triage", inputs={"slate": slate.model_dump(mode="json")}, schema=SlateTriage, scheduler=slot_scheduler, journal=journal, tokens=1600)
+    slate = _call(pass_id="P1", slot="creative", fn=creative_fn, pack=pack, seam="codex56_possibility_slate", inputs={"ingress": ingress.model_dump(mode="json"), "operator_hint": (meta.get("source_meta") or {}).get("operator_hint", "")}, schema=PossibilitySlate, scheduler=slot_scheduler, journal=journal, post_validator=lambda value: _validate_slate(value, draw))
+    triage = _call(pass_id="P2", slot="technical", fn=technical_fn, pack=pack, seam="codex56_slate_triage", inputs={"slate": slate.model_dump(mode="json")}, schema=SlateTriage, scheduler=slot_scheduler, journal=journal, tokens=1600, post_validator=lambda value: _validate_triage(value, slate))
     selected = next((p for p in slate.possibilities if p.possibility_id == triage.selected_possibility_id), None)
     if selected is None or any(f.blocking and f.possibility_id == selected.possibility_id for f in triage.findings):
         raise OriginalCodex56SolContractError("triage did not select a valid possibility")

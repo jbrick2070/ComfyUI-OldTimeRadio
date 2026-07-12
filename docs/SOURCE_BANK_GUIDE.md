@@ -306,3 +306,33 @@ and leave a real asset that is verified on disk.
 A bank is complete only when its original design, source provenance, two-slot
 execution, ledger graph, runner/tail handoff, canonical integration, tests,
 and live asset all have evidence.
+# Lessons to bake into the next source-bank coding plan
+
+The implementation plan should include these details explicitly, rather than
+leaving them for live integration:
+
+1. Provide the exact repository-valid JSON schema for the story pack, story
+   rules, bank row, pipeline row, and every sidecar.
+2. Define every Pydantic model field, enum, bound, and nested item type, plus one
+   known-valid JSON example for every model-authored artifact.
+3. Put every cross-artifact invariant inside the originating
+   `structured_call(..., post_validator=...)`. A check performed after the call
+   bypasses bounded typed repair and turns a repairable model mismatch into an
+   immediate episode failure.
+4. State deterministic retention checks for immutable ingress. Prompt prose
+   alone does not prove that a possibility preserved every drawn object,
+   acoustic cause, or required ending.
+5. Specify exact context/output reservations for base, syntax retry, and the
+   largest typed repair for every pass.
+6. Name the concrete live voice-selection function and returned row contract;
+   "use the voice registry" is not sufficiently implementable.
+7. Pin registry ordering tests and all repo-specific static annotations, such as
+   the literal `# LLM slot: per-sub-pass` audit tag.
+8. Define `custom_premise` precedence in the shared input resolver. For a local
+   synthetic fetcher it must remain an operator hint and must not bypass the
+   immutable draw.
+9. Identify the exact final writer mutation boundary and the point after the
+   last shared LLM call where telemetry is truthfully stamped.
+10. Say which lane-local provenance may remain after a shared generic receipt
+    migration, and make clear that it is evidence rather than a second source
+    of shared truth.
