@@ -1,10 +1,10 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-12 13:22 PDT
+**Updated:** 2026-07-12 13:36 PDT
 
 **Branch:** `v2.0-alpha`
 
-**Snapshot:** `48b5511abc9d`, equal to `origin/v2.0-alpha` when this plan was rebuilt
+**Snapshot base:** `b189a0e47eb4`, equal to `origin/v2.0-alpha` before this handoff update
 
 **Scope:** current qualification sprint plus the immediately following sprint only
 
@@ -38,6 +38,13 @@ narratives do not belong here.
 - Unrelated dirty work owned by another window must be preserved and excluded:
   `nodes/_otr_model_catalog.py`, `tests/test_openrouter_catalog_rows.py`,
   `docs/2026-07-11-cue-ledger-r1-codex-prompt.md`, and local bakeoff logs.
+- **dynamic_story is DESIGN-FINAL and code-ready, not an in-flight docs arc.**
+  `docs/2026-07-12-dynamic-story-visual-scope.md` is tracked at rev 5 FINAL;
+  R1-R4 have already converged and all 60 review artifacts are tracked under
+  `kibitz-runs/2026-07-12-dynamic-story-visual/{r1,r2,r3,r4}/`. Do not rerun
+  R2-R4. No implementation exists yet. Codex owns the build after the bakeoff,
+  Engine Matrix, and Randomizer release their collision surfaces (see Immediate
+  next sprint).
 - **README.md refreshed by a second (docs-only) window, 2026-07-12 13:14 PDT:**
   operator-directed refresh on `v2.0-alpha` — source-bank table (10 runnable banks),
   sfx/b-roll role-rip and VRAM-tier-rip corrections, portability-variant note,
@@ -149,24 +156,40 @@ and final OBS file.
    `_otr_lane_specs` as the one dispatch/compatibility authority, then add the
    source-bank roll, then three canonical 30-word proofs. Estimate: **1-2 days
    coding + 1 GPU day**.
-3. **Generated SFX engine lane -- triage only.** Re-ground the local R4
-   candidate at `kibitz-runs/2026-07-11-generated-sfx-engine-lane/r4/final.md`
-   (with the earlier local architecture evidence under
-   `docs/2026-07-11-sfx-engine-architecture/roundtable/`) and first materialize
-   a tracked, current-HEAD plan. Decide whether the required R4.1
-   production-readiness revision changes scope before any implementation.
-   Preserve the accepted intent: an ungated static selector for Stable Audio 3
-   Small-SFX and Medium; selected-profile hard failures with no fallback;
-   ledger-bound LLM semantic cue authoring; in-SceneSequencer mixing; and no
-   post-video SFX lane or Whisper/alignment dependency. Triage exit requires an
-   authoritative writer/consumer/lifecycle/receipt map, prompt-schema-fixture-
-   validator-repair parity, a failure-class repair ladder, measured base and
-   repair context caps, and a canonical 30/120/720 multi-family live
-   qualification recipe with episode and OBS receipt proof. Estimate:
-   **0.5-1 day plan refit only**.
+3. **dynamic_story visual direction -- Codex build.** Follow the already-final
+   rev-5 plan at `docs/2026-07-12-dynamic-story-visual-scope.md`; no more design
+   rounds are scheduled. Capture and commit named-pack byte baselines first,
+   then land the new `OTR_DynamicStoryDirection` node, shared context/receipt
+   helpers, all three consumers, registration, tests, canonical node 96/link
+   284 delta, and regenerated variants as the plan's single activation chunk.
+   Run the section-11 VERIFY-AT-BUILD checklist and the full 30/120 model-family
+   ladder. This starts only after Engine Matrix and Randomizer are green and the
+   coder slot is released. Estimate: **5-9 coder-days + 2-4 elapsed GPU days**.
+
+**Parallel docs-only track; not on the serial coder critical path:**
+
+- **Generated SFX engine lane -- triage only.** Re-ground the local R4
+  candidate at `kibitz-runs/2026-07-11-generated-sfx-engine-lane/r4/final.md`
+  (with the earlier local architecture evidence under
+  `docs/2026-07-11-sfx-engine-architecture/roundtable/`) and first materialize
+  a tracked, current-HEAD plan. Decide whether the required R4.1
+  production-readiness revision changes scope before any implementation.
+  Preserve the accepted intent: an ungated static selector for Stable Audio 3
+  Small-SFX and Medium; selected-profile hard failures with no fallback;
+  ledger-bound LLM semantic cue authoring; in-SceneSequencer mixing; and no
+  post-video SFX lane or Whisper/alignment dependency. Triage exit requires an
+  authoritative writer/consumer/lifecycle/receipt map, prompt-schema-fixture-
+  validator-repair parity, a failure-class repair ladder, measured base and
+  repair context caps, and a canonical 30/120/720 multi-family live
+  qualification recipe with episode and OBS receipt proof. Estimate:
+  **0.5-1 day plan refit only**.
 
 Randomizer waits until after the bakeoff so its dispatch refactor does not stale
 receipts in the one-variable bank experiment.
+
+**Immediate-next-sprint range:** about **7-12 coder-days + 3-5 elapsed GPU
+days**. Generated-SFX planning may run in parallel and does not claim the coder
+slot.
 
 ## Validation and incident rules
 
@@ -206,4 +229,5 @@ receipts in the one-variable bank experiment.
 - `docs/2026-07-11-720-bakeoff-kickoff.md`
 - `docs/2026-07-12-codex56sol-llm-telemetry-plan.md`
 - `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`
+- `docs/2026-07-12-dynamic-story-visual-scope.md`
 - `workflows/otr_canonical.json`
