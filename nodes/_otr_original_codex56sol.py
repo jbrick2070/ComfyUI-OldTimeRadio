@@ -14,6 +14,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from ._otr_canon import EpisodeCanon
 from ._otr_content_authorship import stamp_receipt
+from ._otr_json import parse_first_json_object
 from ._otr_structured_call import schema_shape_instruction, structured_call
 from . import _otr_ledger_freeze
 from .production_ledger import stamp_word_counts
@@ -354,6 +355,35 @@ def _repair_rules(pass_id: str, error: Any) -> str:
     return rules
 
 
+def _repair_duplicate_score_clues(
+    score: BroadcastScore,
+    truth: AudibleTruthMap,
+) -> BroadcastScore | None:
+    """Remove duplicate clue references without inventing placement.
+
+    This repair is safe only when the score already covers the exact truth-map
+    clue set. The first authored placement wins; later duplicate references are
+    removed in beat order. Missing or unknown clues remain semantic failures
+    for the LLM repair path.
+    """
+    expected = {clue.clue_id for clue in truth.audible_clues}
+    assigned = [clue_id for beat in score.beats
+                for clue_id in beat.line_intent.clue_ids]
+    if set(assigned) != expected or len(assigned) == len(set(assigned)):
+        return None
+
+    repaired = score.model_copy(deep=True)
+    seen: set[str] = set()
+    for beat in repaired.beats:
+        unique_ids = []
+        for clue_id in beat.line_intent.clue_ids:
+            if clue_id not in seen:
+                seen.add(clue_id)
+                unique_ids.append(clue_id)
+        beat.line_intent.clue_ids = unique_ids
+    return repaired
+
+
 def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
           seam: str, inputs: Mapping[str, Any], schema: type[BaseModel],
           scheduler: Any, journal: list[dict], tokens: int = 2400,
@@ -372,6 +402,24 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         attempts.append(hashlib.sha256(str(raw).encode()).hexdigest())
         return raw
     def repair(*, original_prompt, failed_output, error):
+        if (
+            pass_id == "P5"
+            and schema is BroadcastScore
+            and "each truth-map clue must be assigned to exactly one" in str(error)
+        ):
+            try:
+                failed_score = BroadcastScore.model_validate(
+                    parse_first_json_object(failed_output)
+                )
+                truth = AudibleTruthMap.model_validate(inputs["truth_map"])
+            except (json.JSONDecodeError, ValueError, KeyError, TypeError):
+                pass
+            else:
+                repaired_score = _repair_duplicate_score_clues(
+                    failed_score, truth,
+                )
+                if repaired_score is not None:
+                    return repaired_score
         pass_rules = _repair_rules(pass_id, error)
         return [
             {"role": "system", "content": system + "\nReturn the same complete artifact, repairing only the typed contract error." + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},

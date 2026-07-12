@@ -247,6 +247,54 @@ def test_score_requires_exact_clue_coverage_and_contiguous_shots():
     )
 
 
+def test_duplicate_score_clues_repair_deterministically_at_first_placement():
+    fixtures = _fixtures()
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    score_data = fixtures["score"]
+    score_data["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
+    score = lane.BroadcastScore.model_validate(score_data)
+    assert lane._validate_score(score, truth) == (
+        "each truth-map clue must be assigned to exactly one line intent"
+    )
+
+    repaired = lane._repair_duplicate_score_clues(score, truth)
+    assert repaired is not None
+    assert repaired.beats[1].line_intent.clue_ids == ["q1"]
+    assert repaired.beats[2].line_intent.clue_ids == ["q2", "q3"]
+    assert lane._validate_score(repaired, truth) is None
+    assert score.beats[2].line_intent.clue_ids == ["q1", "q2", "q3"]
+
+
+def test_duplicate_score_clue_repair_does_not_spend_an_llm_call(tmp_path):
+    responses = _responses()
+    responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
+    queued = iter(responses)
+    calls = []
+
+    def generate(_messages, **_kwargs):
+        calls.append(1)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_duplicate_clue", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({"source_bank": "original_codex56sol",
+                 "source_meta": {"constraint_draw": DRAW}})
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_duplicate_clue",
+    )
+    assert len(calls) == 8
+
+
 def test_python_manifest_is_repeatable_closed_and_spoiler_safe():
     score = lane.BroadcastScore.model_validate(_fixtures()["score"])
     first = lane._compile_manifest(score)

@@ -424,3 +424,7 @@ leaving them for live integration:
 30. Make configured retry budgets reachable. When a semantic base failure
     skips the same-prompt structural rung, cache the typed-repair prompt and use
     the remaining call only if that repair itself returns incomplete JSON.
+31. Repair duplicate graph references deterministically when the complete
+    expected set is already present: keep the first authored placement and
+    remove later duplicates. Missing or unknown references still require a
+    semantic repair; never invent their placement in Python.
