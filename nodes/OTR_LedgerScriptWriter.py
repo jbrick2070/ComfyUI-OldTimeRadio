@@ -1655,6 +1655,54 @@ _LEGACY_INLINE_PIPELINES = frozenset({
 })
 
 
+def _stamp_final_slot_telemetry(
+    *, meta, resolved, slot_scheduler, pipeline_id: str,
+    title_source: str,
+) -> None:
+    """Stamp the authoritative slot receipt after the final writer LLM call."""
+    meta["slot_transitions"] = int(slot_scheduler.transitions)
+    meta["slot_calls_by_slot"] = dict(slot_scheduler.calls_by_slot)
+    meta["slot_calls_by_helper"] = {
+        helper: dict(buckets)
+        for helper, buckets in slot_scheduler.slot_calls_by_helper.items()
+    }
+    meta["slot_transitions_by_phase"] = [
+        dict(record) for record in slot_scheduler.slot_transitions_by_phase
+    ]
+    if pipeline_id in _RUNNER_BY_PIPELINE:
+        # Custom runners name every structured pass through helper_context.
+        # Derive rows from that executed journal; never claim legacy phases.
+        params = {}
+        for helper, buckets in slot_scheduler.slot_calls_by_helper.items():
+            active = [slot for slot, count in buckets.items() if int(count) > 0]
+            if len(active) != 1:
+                continue
+            slot = active[0]
+            params[str(helper)] = {
+                "slot": slot,
+                "model": resolved[
+                    "creative_writing_model" if slot == "creative"
+                    else "technical_model"
+                ],
+            }
+        meta["gen_params_by_phase"] = params
+        return
+    params = {}
+    if meta.get("news") is not None:
+        params["news_interpreter"] = {
+            "slot": "technical", "model": resolved["technical_model"],
+        }
+    for phase in ("cast_lock", "outline", "dialogue_composer"):
+        params[phase] = {
+            "slot": "creative", "model": resolved["creative_writing_model"],
+        }
+    if title_source == "llm_post_composition":
+        params["title_regen"] = {
+            "slot": "creative", "model": resolved["creative_writing_model"],
+        }
+    meta["gen_params_by_phase"] = params
+
+
 def _resolve_lane_runner(pipeline_id: str):
     """Map hit -> the lane runner; known inline lane -> None (existing
     branches run byte-identically); anything else -> RAISE (r3/S1: a
@@ -3286,20 +3334,21 @@ class OTR_LedgerScriptWriter:
         # runner re-asserts defensively at its own entry. The refine loop
         # is unsupported on this lane S1-S3 (WriterTailContext law) -- a
         # non-Off refine widget fails loud here too.
-        if str(getattr(_source_bank_row, "default_story_pipeline", "")
-               or "") == "fable2_multipass":
+        _selected_pipeline_id = str(getattr(
+            _source_bank_row, "default_story_pipeline", "") or "")
+        if _selected_pipeline_id == "fable2_multipass":
             try:
                 from . import _otr_scifi_fable2 as _F2GATE
             except ImportError:  # pragma: no cover -- flat/standalone load
                 import _otr_scifi_fable2 as _F2GATE  # type: ignore
             _F2GATE.assert_supported_target_words(int(target_words))
-            if _refine_active or refine_target_grade != "Off":
-                raise RuntimeError(
-                    "[OTR_LedgerScriptWriter] the scifi_fable2 lane does "
-                    "not support the refine loop (S1-S3; "
-                    "ctx.refine_active MUST be False). Set "
-                    "refine_target_grade to 'Off' for this bank."
-                )
+        if (_selected_pipeline_id in _RUNNER_BY_PIPELINE
+                and (_refine_active or refine_target_grade != "Off")):
+            raise RuntimeError(
+                "[OTR_LedgerScriptWriter] dispatched custom pipeline "
+                f"{_selected_pipeline_id!r} does not support writer refine "
+                "re-entry. Set refine_target_grade to 'Off' for this bank."
+            )
         # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the
         # process env FIRST, before generate_outline + every style-grammar read,
         # so this single control governs the whole bundled scaffold: the style
@@ -3658,9 +3707,9 @@ class OTR_LedgerScriptWriter:
         if _lane_runner is not None:
             if _refine_active:
                 raise RuntimeError(
-                    "[OTR_LedgerScriptWriter] refine re-entry reached the "
-                    "fable2 dispatch -- the lane forbids the refine loop "
-                    "(S1-S3) and the entry gate should have raised."
+                    "[OTR_LedgerScriptWriter] refine re-entry reached custom "
+                    f"pipeline {_pipeline_id!r}; the early generic gate "
+                    "should have rejected it."
                 )
             _parts = _lane_runner(
                 payload=dict(resolved["news_article"]),
@@ -6503,55 +6552,9 @@ class OTR_LedgerScriptWriter:
         # they land.
         meta["creative_writing_model"] = resolved["creative_writing_model"]
         meta["technical_model"]        = resolved["technical_model"]
-        meta["slot_transitions"]       = slot_scheduler.transitions
-        meta["slot_calls_by_slot"]     = dict(slot_scheduler.calls_by_slot)
-        # S32 B6: per-helper / per-phase forensic stamping. Downstream
-        # consumers + final QA review can audit (a) which helpers
-        # used which slots, and (b) the ordered list of slot
-        # transitions captured during this run. Default-config
-        # (creative == technical) keeps transitions == 0 and the
-        # by-phase list empty; differing-slots populates both.
-        meta["slot_calls_by_helper"] = {
-            helper: dict(buckets)
-            for helper, buckets in slot_scheduler.slot_calls_by_helper.items()
-        }
-        meta["slot_transitions_by_phase"] = [
-            dict(record) for record in slot_scheduler.slot_transitions_by_phase
-        ]
-        # gen_params_by_phase rows track only the phases the writer
-        # invoked. Each row carries the slot + the resolved repo id
-        # consulted at call time + the per-slot sampling profile
-        # (top_p / min_p / repetition_penalty) for the creative
-        # phases. Technical phases use the same closure sampling.
-        gen_params_by_phase: dict[str, dict] = {}
-        # Style-engine consolidation (2026-07-05): the style engine
-        # (build_story_contract) is a deterministic sha256(cast_seed)
-        # hash draw, not an LLM phase -- no slot/model row to record
-        # here (the old "style_picker" LLM-phase entry is retired
-        # along with the picker itself).
-        if meta.get("news") is not None:
-            gen_params_by_phase["news_interpreter"] = {
-                "slot":  "technical",
-                "model": resolved["technical_model"],
-            }
-        gen_params_by_phase["cast_lock"] = {
-            "slot":  "creative",
-            "model": resolved["creative_writing_model"],
-        }
-        gen_params_by_phase["outline"] = {
-            "slot":  "creative",
-            "model": resolved["creative_writing_model"],
-        }
-        gen_params_by_phase["dialogue_composer"] = {
-            "slot":  "creative",
-            "model": resolved["creative_writing_model"],
-        }
-        if title_source == "llm_post_composition":
-            gen_params_by_phase["title_regen"] = {
-                "slot":  "creative",
-                "model": resolved["creative_writing_model"],
-            }
-        meta["gen_params_by_phase"] = gen_params_by_phase
+        # Slot/helper/phase receipts are stamped once, after all shared-tail
+        # reflection and story-spine calls. An earlier snapshot omitted those
+        # calls and falsely described custom runners with legacy phase names.
         # Always stamp the resolved final title (user / LLM regen / outline
         # fallback). title_source records which branch won so downstream
         # consumers and BUG_LOG forensics can tell user-typed from
@@ -6848,6 +6851,14 @@ class OTR_LedgerScriptWriter:
                 "[OTR_LedgerScriptWriter] consistency check skipped: %r",
                 _cons_exc,
             )
+        _stamp_final_slot_telemetry(
+            meta=meta,
+            resolved=resolved,
+            slot_scheduler=slot_scheduler,
+            pipeline_id=str(getattr(
+                _source_bank_row, "default_story_pipeline", "") or ""),
+            title_source=title_source,
+        )
         # The lane finalizer is the true last mutation boundary: every shared
         # writer metadata stamp (including consistency_status) is complete
         # before Phase 10 seals the ledger and authorship receipt.

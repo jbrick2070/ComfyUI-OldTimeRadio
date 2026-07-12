@@ -402,6 +402,26 @@ def _sweep_and_crossref(banks: "dict[str, SourceBank]",
                 f"{origin}: required_seams {missing} absent from default pack "
                 f"{default_path.name}"
             )
+        pipe = pipelines[bank.default_story_pipeline]
+        pass_refs = {
+            seam for pass_row in pipe.passes for seam in pass_row.seam_refs
+        }
+        absent_refs = sorted(pass_refs - set(pack.prompt_stages))
+        if absent_refs:
+            raise RegistryValidationError(
+                f"{origin}: pipeline pass seam_refs {absent_refs} absent from "
+                f"default pack {default_path.name}"
+            )
+        custom_pack_keys = set(pack.prompt_stages) - PRODUCTION_SEAM_ALLOWLIST
+        custom_pass_refs = pass_refs - PRODUCTION_SEAM_ALLOWLIST
+        if (custom_pack_keys != set(pipe.declared_seams)
+                or custom_pass_refs != set(pipe.declared_seams)):
+            raise RegistryValidationError(
+                f"{origin}: custom seam three-way parity failed: "
+                f"pack={sorted(custom_pack_keys)} "
+                f"declared={sorted(pipe.declared_seams)} "
+                f"pass_refs={sorted(custom_pass_refs)}"
+            )
         # Chunk 3 source-payload contract rules (after the precedence check so
         # bank.default_story_pipeline is already proven consistent). IDS ONLY
         # -- never executes wrapper bodies (lazy law).
@@ -425,7 +445,6 @@ def _sweep_and_crossref(banks: "dict[str, SourceBank]",
         # (executable=true -- a validation-time read; the "executable is never
         # a RUNTIME gate" law stands).
         if bank.runnable:
-            pipe = pipelines[bank.default_story_pipeline]
             if pipe.requires_source_contract:
                 if not bank.fetcher or not bank.interpreter:
                     raise RegistryValidationError(
