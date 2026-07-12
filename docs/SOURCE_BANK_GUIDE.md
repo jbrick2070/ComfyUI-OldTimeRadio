@@ -371,3 +371,8 @@ leaving them for live integration:
     `shot_end`, and `resolution` carry no conflicting authored meaning when the
     canonical downstream values are `character`, `continue`, and `closing`;
     unknown values must still fail loudly.
+18. Put the final script's graph, roster, and text-safety checks inside the P6
+    (and retake) `post_validator`, not only after generation. Forbidden terms,
+    speaker-label leakage, and line-coverage drift are authored defects that a
+    bounded typed repair can fix; keep a deterministic assertion after the call
+    as defense in depth.

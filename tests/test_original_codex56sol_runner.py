@@ -156,3 +156,26 @@ def test_manifest_unknown_enum_value_still_fails_loud():
         assert "arc_phase" in message
     else:
         raise AssertionError("unknown manifest enums must not be accepted")
+
+
+def test_p6_text_safety_failure_is_a_retryable_error_string():
+    script_data = _responses()[7]
+    script_data["lines"][2]["text"] = "We must kill the transmitter."
+    script = lane.PerformanceScript.model_validate(script_data)
+    rules = type("Rules", (), {
+        "banned_phrases": ("kill",),
+        "stage_business": (),
+    })()
+    error = lane._validate_text(script, rules)
+    assert error == "forbidden term 'kill'"
+
+
+def test_p6_cross_artifact_graph_failure_is_a_retryable_error_string():
+    score = lane.BroadcastScore.model_validate(_responses()[5])
+    manifest = lane.ClosedLineManifest.model_validate(_responses()[6])
+    script_data = _responses()[7]
+    script_data["lines"][0]["char_id"] = "wrong_character"
+    script = lane.PerformanceScript.model_validate(script_data)
+    assert lane._validate_graph(score, manifest, script) == (
+        "script roster differs from manifest"
+    )

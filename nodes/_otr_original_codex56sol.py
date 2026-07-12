@@ -440,53 +440,68 @@ def _validate_manifest(score: BroadcastScore,
 
 
 def _validate_graph(score: BroadcastScore, manifest: ClosedLineManifest,
-                    script: PerformanceScript) -> None:
+                    script: PerformanceScript) -> str | None:
     cast = {c.char_id: c for c in score.cast}
     scenes = {s.scene_id for s in score.scenes}
     shots = {s.shot_id: s for s in score.shots}
     beats = {b.beat_id: b for b in score.beats}
     if len(cast) != len(score.cast) or "announcer" not in cast:
-        raise OriginalCodex56SolContractError("cast ids are invalid")
+        return "cast ids are invalid"
     if sum(c.role == "desk_operator" for c in score.cast) != 1:
-        raise OriginalCodex56SolContractError("exactly one desk operator is required")
+        return "exactly one desk operator is required"
     for shot in score.shots:
         if shot.scene_id not in scenes:
-            raise OriginalCodex56SolContractError("shot scene reference is invalid")
+            return "shot scene reference is invalid"
     for beat in score.beats:
         if (beat.shot_id not in shots or beat.scene_id not in scenes
                 or beat.char_id not in cast
                 or shots[beat.shot_id].scene_id != beat.scene_id):
-            raise OriginalCodex56SolContractError("beat graph reference is invalid")
+            return "beat graph reference is invalid"
     mids = [m.line_id for m in manifest.lines]
     if len(mids) != len(set(mids)) or set(m.beat_id for m in manifest.lines) != set(beats):
-        raise OriginalCodex56SolContractError("manifest must cover every beat exactly")
+        return "manifest must cover every beat exactly"
     sids = [line.line_id for line in script.lines]
     if sids != mids:
-        raise OriginalCodex56SolContractError("script line order/coverage differs from manifest")
+        return "script line order/coverage differs from manifest"
     by_manifest = {m.line_id: m for m in manifest.lines}
     for line in script.lines:
         m = by_manifest[line.line_id]
         if line.char_id != m.char_id or line.speaker != m.speaker:
-            raise OriginalCodex56SolContractError("script roster differs from manifest")
+            return "script roster differs from manifest"
     for required in (manifest.orientation_line_id, manifest.reveal_line_id,
                      manifest.closure_line_id):
         if required not in set(mids):
-            raise OriginalCodex56SolContractError("manifest landmark is missing")
+            return "manifest landmark is missing"
+    return None
 
 
-def _validate_text(script: PerformanceScript, rules: Any) -> None:
+def _validate_text(script: PerformanceScript, rules: Any) -> str | None:
     for line in script.lines:
         text = line.text.strip()
         if not text:
-            raise OriginalCodex56SolContractError("spoken text is empty")
+            return "spoken text is empty"
         for term in getattr(rules, "banned_phrases", ()):
             if re.search(rf"\b{re.escape(term)}\b", text, re.I):
-                raise OriginalCodex56SolContractError(f"forbidden term {term!r}")
+                return f"forbidden term {term!r}"
         for pattern in getattr(rules, "stage_business", ()):
             if pattern.search(text):
-                raise OriginalCodex56SolContractError("forbidden authored surface")
+                return "forbidden authored surface"
         if re.search(r"^[A-Z][A-Z0-9 _-]{1,24}:\s*", text):
-            raise OriginalCodex56SolContractError("speaker label in spoken text")
+            return "speaker label in spoken text"
+    return None
+
+
+def _validate_script(score: BroadcastScore, manifest: ClosedLineManifest,
+                     script: PerformanceScript, rules: Any) -> str | None:
+    return (_validate_graph(score, manifest, script)
+            or _validate_text(script, rules))
+
+
+def _assert_script_valid(score: BroadcastScore, manifest: ClosedLineManifest,
+                         script: PerformanceScript, rules: Any) -> None:
+    error = _validate_script(score, manifest, script, rules)
+    if error:
+        raise OriginalCodex56SolContractError(error)
 
 
 def _cast_rows(score: BroadcastScore, episode_id: str) -> list[dict]:
@@ -574,12 +589,12 @@ def run_original_codex56sol_episode(
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
     score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=_validate_score)
     manifest = _call(pass_id="P5_manifest", slot="technical", fn=technical_fn, pack=pack, seam="codex56_closed_line_manifest", inputs={"score": score.model_dump(mode="json")}, schema=ClosedLineManifest, scheduler=slot_scheduler, journal=journal, tokens=3000, post_validator=lambda value: _validate_manifest(score, value))
-    script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6))
-    _validate_graph(score, manifest, script); _validate_text(script, story_rules)
+    script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
+    _assert_script_valid(score, manifest, script, story_rules)
     listener = _call(pass_id="P7", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"manifest": manifest.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)
     if any(f.blocking for f in listener.findings):
-        script = _call(pass_id="P8", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": listener.model_dump(mode="json")}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6))
-        _validate_graph(score, manifest, script); _validate_text(script, story_rules)
+        script = _call(pass_id="P8", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": listener.model_dump(mode="json")}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
+        _assert_script_valid(score, manifest, script, story_rules)
     audit = _call(pass_id="P9", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
     if not audit.accepted or any(f.blocking for f in audit.findings):
         raise OriginalCodex56SolContractError("final contract audit rejected the script")
