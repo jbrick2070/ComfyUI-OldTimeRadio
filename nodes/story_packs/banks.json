@@ -181,7 +181,7 @@
       },
       "required_seams": [],
       "runnable": true,
-      "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass. S1b: low-budget one-draft spine only (target_words < 120); the full loop lands at S2."
+      "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass. S2: compact one-draft mode below 120 words; real three-pitch/P2a/P4/P5/keep-better full mode from 120 through 900 words."
     },
     {
       "source_bank_id": "scifi_codex",

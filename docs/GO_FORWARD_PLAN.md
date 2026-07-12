@@ -1,10 +1,10 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-12 13:36 PDT
+**Updated:** 2026-07-12 13:45 PDT
 
 **Branch:** `v2.0-alpha`
 
-**Snapshot base:** `b189a0e47eb4`, equal to `origin/v2.0-alpha` before this handoff update
+**Snapshot base:** `e80c63f13675`, equal to `origin/v2.0-alpha` before the C4b ship commit
 
 **Scope:** current qualification sprint plus the immediately following sprint only
 
@@ -16,16 +16,18 @@ narratives do not belong here.
 
 ## Coordination snapshot
 
-- **C4b is in coding review now.** Do not restart it or take its collision
-  surfaces. C4a already shipped at `56806091`.
+- **C4b is GREEN and ships in the commit containing this receipt.** C4a
+  already shipped at `56806091`. The Fable2 collision surfaces release after
+  that commit is pushed and HEAD is verified equal to origin.
 - **Generated SFX engine lane is queued for later triage, not coding.** Do not
   take its code or canonical-workflow collision surfaces while C4b runs. The
   current R4 candidate is a local, ignored Kibitz artifact and must be
   re-grounded against then-current HEAD before it becomes an active sprint.
 - The 120-word queue completed its available sequence. `media_archive`,
   `public_domain_story`, `shakespeare`, and `original_radio` returned canonical
-  `RESULT SUCCESS`; `scifi_fable2` then stopped at its deliberate 120+ gate, which
-  C4b is meant to open. Receipt: `docs/_bakeoff_queue.log`.
+  `RESULT SUCCESS`; `scifi_fable2` then stopped at its deliberate 120+ gate.
+  C4b now opens that gate with the real full loop; the bakeoff owner may rerun
+  `scifi_fable2` after the C4b push. Receipt: `docs/_bakeoff_queue.log`.
 - The latest `original_codex56sol` 120-word rerun failed at
   `P6_grounding_patch` after two attempts. It is a real live incident and is
   staged as `PBUG-20260712-17`; its earlier successful same-seed qualification
@@ -59,7 +61,7 @@ wall time is listed separately and is not counted as coding time.
 
 | Order | Chunk | Hard completion gate | Coding estimate |
 |---:|---|---|---:|
-| 1 | Finish C4b review and land Fable2 full mode | P2a/P4/P5 wired; real P3/P5 traces; winner assembled once; 120+ gates flip atomically; suite + Bible green | 0.5-1.5 days remaining |
+| 1 | C4b Fable2 full mode -- GREEN / shipping | P2a/P4/P5 wired; real P3/P5 traces; winner assembled once; 120+ gates flipped atomically; suite + Bible green | complete |
 | 2 | Canonical watchdog support | Canonical runner emits heartbeats; watchdog recognizes canonical `RESULT`; healthy long runs never false-dead | 0.5 day |
 | 3 | Fable2 C5 consumers | Caption and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity | 0.5-1 day |
 | 4 | Rip interstitial **audio** only | Remove synth/insertion/timing path and tests; retain `music_inter` story/visual semantics | 0.5-1 day |
@@ -72,20 +74,31 @@ wall time is listed separately and is not counted as coding time.
 normal live-failure root-fix margin. The qualification/event runs add roughly
 **3-8 elapsed GPU days** but are not full-time coding.
 
-### 1. C4b activation -- active review
+### 1. C4b activation -- green ship receipt
 
 Plan of record: `docs/2026-07-10-fable2-720-bakeoff-runway.md`, C4b only.
 
-Expected surfaces:
+Landed surfaces:
 
 - `nodes/_otr_scifi_fable2.py`
 - `nodes/OTR_LedgerScriptWriter.py`
+- `nodes/story_packs/banks.json`
 - `nodes/story_packs/pipelines.json`
+- `nodes/story_packs/scifi_fable2/scifi_fable2_v1.json`
 - Fable2 artifact/runner tests
 
-No canonical workflow diff is expected. The review must recheck the real HEAD,
-then land one green commit and push it. Do not count C4a's pure mode objects as an
-open 120-word gate; current code still hard-selects compact mode.
+Receipt: 119 words executes compact mode; 120 and 420 execute the real full
+three-pitch/P2a/P4/P5 path; 900 executes full mode; 901 rejects before a model
+call. P3/P5 attempt traces come from observed calls and seal the selected
+immutable FinalDraft. Draft2-win and draft1-tie retention both pass the exact
+same winner object through P6/P7/P8; live and on-disk seals agree after
+incremental saves and the shared writer tail. Focused Fable2 gate: 276 passed.
+Full repository gate: 7774 passed, 31 skipped, 1 expected failure, 5 warnings.
+Bug Bible: 17 passed, 11 skipped, 3 expected failures. Canonical workflow SHA256
+`fb5c75801a5013e189c685dd9d1fbdf069ff22b3843d7ce9adf727efe3c5a830`;
+OTR_WorkflowValidator, JSON round-trip, strict link/input, widget-vector, and
+zod audits are green with **no canonical JSON diff**. No GPU render was started;
+the bakeoff window retains the sequential GPU queue.
 
 ### 2. Long-run truth before long runs
 

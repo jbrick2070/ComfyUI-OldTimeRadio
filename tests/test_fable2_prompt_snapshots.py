@@ -144,8 +144,9 @@ class TestSeamShapes:
         for needle in (
                 "Output the ENTIRE episode again, top to bottom -- not a "
                 "diff.",
-                "any scene with no note against it is copied VERBATIM",
-                "Keep the same TITLE, CAST, scene count and order",
+                "every unnoted scene/speaker scope",
+                "Keep the same TITLE, CAST, scene count/order/settings",
+                "opening/interstitial/closing MUSIC queue and placement",
                 "Apply EVERY note."):
             assert needle in flat
 
@@ -153,6 +154,10 @@ class TestSeamShapes:
         flat = _flat(stages["fable2_critic_system"])
         assert "NEVER write replacement dialogue" in flat
         assert '"ship" with an empty notes array is a legitimate verdict' \
+            in flat
+        assert '"frame_scope": "intro" | "outro" | null' in flat
+        assert "CODA and MUSIC are protected and never note targets" in flat
+        assert "scene=0 note MUST identify exactly one announcer frame" \
             in flat
         assert "word_budget is for SCENE-LEVEL pacing only" in flat
         for cls in _CRITIC_CLASSES:

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -140,18 +141,41 @@ _PAYLOAD = {
 }
 
 
+def _sealed_draft(markup: str, *, target_words: int = 50,
+                  treatment: "F2.Treatment | None" = None):
+    treatment = treatment or _treatment()
+    parsed, defects = parse_fable2_markup(markup, _CAST_NAMES)
+    assert parsed is not None, defects
+    envelope = F2._build_envelope(target_words)
+    trace = F2.PassAttemptTrace(
+        attempt=1,
+        temperature=F2._TEMP["script"],
+        requested_max_new_tokens=F2._script_token_budget(target_words),
+        outcome="accepted",
+        selected=True,
+        character_words=parsed.character_word_count,
+        scene_character_words=F2._scene_character_word_counts(parsed),
+    )
+    draft = F2.build_final_draft(
+        markup, parsed, treatment, envelope,
+        F2.resolve_story_rules("scifi_fable2"),
+        p3_attempts=(trace,),
+    )
+    return parsed, draft, envelope
+
+
 def _assembled(tmp_path: Path):
     """Run the pure-python golden chain into a REAL tmp ledger."""
-    parsed, defects = parse_fable2_markup(_MARKUP, _CAST_NAMES)
-    assert parsed is not None, defects
+    parsed, draft, envelope = _sealed_draft(_MARKUP)
     led = _PL.new_ledger(episode_id="fable2_golden_ep",
                          out_dir=str(tmp_path / "ep"))
-    meta = led.data.setdefault("meta", {})
-    meta["fable2"] = {"_winning_draft_text": _MARKUP}
+    led.data.setdefault("meta", {})["fable2"] = {}
     # the golden play carries 51 character words -> target 50 (band 40-60)
-    F2._assemble(led, parsed, _treatment(), _CAST_ROWS, _PAYLOAD, meta,
-                 target_words=50)
-    return led, parsed, meta
+    F2._assemble(
+        led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
+        envelope=envelope, story_rules=F2.resolve_story_rules("scifi_fable2"),
+        mode=F2._COMPACT_MODE)
+    return led, parsed, led.data["meta"]
 
 
 def _hierarchies(led) -> dict:
@@ -232,21 +256,26 @@ def test_every_spoken_row_proved_and_news_read_named(tmp_path):
     arts = {c["artifact"]
             for c in proof[news_rows[0]["line_id"]]["constituents"]}
     assert arts == {"treatment.news_close_read"}
-    # the draft artifact handle never survives into the ledger
+    on_disk = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    assert on_disk["meta"]["fable2"]["proof_map"] == \
+        led.data["meta"]["fable2"]["proof_map"]
+    # the retired draft-text side channel never enters the ledger
     assert "_winning_draft_text" not in meta["fable2"]
 
 
 def test_verbatim_proof_gate_fails_loud_on_foreign_text(tmp_path):
-    parsed, defects = parse_fable2_markup(_MARKUP, _CAST_NAMES)
-    assert parsed is not None, defects
+    _parsed, draft, envelope = _sealed_draft(_MARKUP)
     led = _PL.new_ledger(episode_id="fable2_proof_fail",
                          out_dir=str(tmp_path / "ep2"))
-    meta = led.data.setdefault("meta", {})
-    # a draft that does NOT contain the play's lines
-    meta["fable2"] = {"_winning_draft_text": "TITLE: Something Else\nEND."}
-    with pytest.raises(F2.Fable2AssembleError, match="verbatim proof"):
-        F2._assemble(led, parsed, _treatment(), _CAST_ROWS, _PAYLOAD, meta,
-                     target_words=50)
+    led.data.setdefault("meta", {})["fable2"] = {}
+    forged = replace(
+        draft, normalized_source="TITLE: Something Else\nEND.")
+    with pytest.raises(F2.Fable2ScriptError, match="seal"):
+        F2._assemble(
+            led, forged, _treatment(), _CAST_ROWS, _PAYLOAD,
+            envelope=envelope,
+            story_rules=F2.resolve_story_rules("scifi_fable2"),
+            mode=F2._COMPACT_MODE)
 
 
 def test_no_double_append_of_the_news_read(tmp_path):
@@ -265,14 +294,15 @@ def test_multiple_inter_cues_after_one_scene_all_survive(tmp_path):
         "MUSIC: single sustained violin note, rising",
         "MUSIC: single sustained violin note, rising\n"
         "MUSIC: distant kettle drums, answering")
-    parsed, defects = parse_fable2_markup(markup, _CAST_NAMES)
-    assert parsed is not None, defects
+    parsed, draft, envelope = _sealed_draft(markup)
     led = _PL.new_ledger(episode_id="fable2_intercues",
                          out_dir=str(tmp_path / "ep7"))
-    meta = led.data.setdefault("meta", {})
-    meta["fable2"] = {"_winning_draft_text": markup}
-    F2._assemble(led, parsed, _treatment(), _CAST_ROWS, _PAYLOAD, meta,
-                 target_words=50)
+    led.data.setdefault("meta", {})["fable2"] = {}
+    F2._assemble(
+        led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
+        envelope=envelope,
+        story_rules=F2.resolve_story_rules("scifi_fable2"),
+        mode=F2._COMPACT_MODE)
     assert [r["cue_id"] for r in led.data["music"]] == [
         "opening", "inter_01", "inter_02", "closing"]
     inter_rows = [r for r in led.data["lines"]
@@ -362,45 +392,49 @@ def test_compose_flags_absent_freeze_assertion(tmp_path):
 
 def test_incremental_saves_after_preamble_and_each_scene(tmp_path,
                                                          monkeypatch):
-    parsed, defects = parse_fable2_markup(_MARKUP, _CAST_NAMES)
-    assert parsed is not None, defects
+    _parsed, draft, envelope = _sealed_draft(_MARKUP)
     led = _PL.new_ledger(episode_id="fable2_saves",
                          out_dir=str(tmp_path / "ep3"))
-    meta = led.data.setdefault("meta", {})
-    meta["fable2"] = {"_winning_draft_text": _MARKUP}
+    led.data.setdefault("meta", {})["fable2"] = {}
     saves = []
     real_save = led.save
     monkeypatch.setattr(led, "save",
                         lambda: saves.append(1) or real_save())
-    F2._assemble(led, parsed, _treatment(), _CAST_ROWS, _PAYLOAD, meta,
-                 target_words=50)
+    F2._assemble(
+        led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
+        envelope=envelope,
+        story_rules=F2.resolve_story_rules("scifi_fable2"),
+        mode=F2._COMPACT_MODE)
     # preamble + 2 scenes + final = 4 saves minimum
     assert len(saves) >= 4
 
 
 def test_speaker_set_gate_fails_loud(tmp_path):
-    parsed, defects = parse_fable2_markup(_MARKUP, _CAST_NAMES)
-    assert parsed is not None, defects
+    _parsed, draft, envelope = _sealed_draft(_MARKUP)
     led = _PL.new_ledger(episode_id="fable2_castgate",
                          out_dir=str(tmp_path / "ep4"))
-    meta = led.data.setdefault("meta", {})
-    meta["fable2"] = {"_winning_draft_text": _MARKUP}
+    led.data.setdefault("meta", {})["fable2"] = {}
     missing_doku = [r for r in _CAST_ROWS if r["name"] != "DOKU"]
     with pytest.raises(F2.Fable2AssembleError, match="speaker set"):
-        F2._assemble(led, parsed, _treatment(), missing_doku, _PAYLOAD,
-                     meta, target_words=50)
+        F2._assemble(
+            led, draft, _treatment(), missing_doku, _PAYLOAD,
+            envelope=envelope,
+            story_rules=F2.resolve_story_rules("scifi_fable2"),
+            mode=F2._COMPACT_MODE)
 
 
 def test_word_band_gate_reasserts_at_assembly(tmp_path):
-    parsed, defects = parse_fable2_markup(_MARKUP, _CAST_NAMES)
-    assert parsed is not None, defects
+    _parsed, draft, envelope = _sealed_draft(
+        _MARKUP, target_words=100)
     led = _PL.new_ledger(episode_id="fable2_bandgate",
                          out_dir=str(tmp_path / "ep5"))
-    meta = led.data.setdefault("meta", {})
-    meta["fable2"] = {"_winning_draft_text": _MARKUP}
+    led.data.setdefault("meta", {})["fable2"] = {}
     with pytest.raises(F2.Fable2AssembleError, match="character_word_count"):
-        F2._assemble(led, parsed, _treatment(), _CAST_ROWS, _PAYLOAD, meta,
-                     target_words=100)  # play is 51 char words; band 80-120
+        F2._assemble(
+            led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
+            envelope=envelope,
+            story_rules=F2.resolve_story_rules("scifi_fable2"),
+            mode=F2._COMPACT_MODE)  # play is 51 words; band 80-120
 
 
 # ---------------------------------------------------------------------------

@@ -1598,7 +1598,7 @@ def _apply_intro_rewrite_result(led, first_announcer_id, new_text, flag):
 
 
 def _run_fable2_lane(**kwargs):
-    """Lane entry for `fable2_multipass` (scifi_fable2 S1b, doc s11).
+    """Lane entry for `fable2_multipass` (scifi_fable2 S2, doc s11).
 
     Late-imports the PURE runner module (r4/M3: the runner never imports
     this writer; the import points one way only) and returns its
@@ -1647,7 +1647,7 @@ def _run_original_codex56sol_lane(**kwargs):
     return _OC56.run_original_codex56sol_episode(**kwargs)
 
 
-# scifi_fable2 S1b (doc s11): pipeline-id -> lane runner. Consulted
+# scifi_fable2 S2 (doc s11): pipeline-id -> lane runner. Consulted
 # exactly ONCE per run, after the shared front (bank resolve -> runnable
 # gate -> fetch -> validate -> D.1 ledger + meta stamps) and BEFORE the
 # D.2 news-interpreter branch. legacy_many_pass and original_multi_pass
@@ -3347,7 +3347,7 @@ class OTR_LedgerScriptWriter:
         # Every REGISTERED style is valid to run (styles are prompt-tail
         # deltas; no execution lane to gate).
         _otr_visual_styles.resolve_visual_style(visual_style)
-        # scifi_fable2 S1b entry gates (r3/M4): the lane's word-budget gate
+        # scifi_fable2 S2 entry gates (r3/M4): the lane's word-budget gate
         # runs HERE -- before the story-scaffold env mutation, the refine
         # gate, the budget resets, and _resolve_inputs (the RSS fetch) --
         # so an unsupported target_words fails ONCE, loud and cheap, with
@@ -3714,7 +3714,7 @@ class OTR_LedgerScriptWriter:
                 type(_sweep_exc).__name__, str(_sweep_exc)[:200],
             )
 
-        # --- scifi_fable2 S1b: pipeline-runner dispatch (doc s11) -------
+        # --- scifi_fable2 S2: pipeline-runner dispatch (doc s11) --------
         # Consulted exactly ONCE, here: after the shared front (bank
         # resolve -> runnable gate -> science_rss fetch ->
         # validate_source_payload -> D.1 new_ledger + meta stamps +
@@ -3753,7 +3753,11 @@ class OTR_LedgerScriptWriter:
             )
             _tail_ctx = WriterTailContext(
                 led=led,
-                meta=meta,
+                # Custom runners may save incrementally; Ledger.save()
+                # replaces led.data with the merged on-disk payload, so the
+                # pre-dispatch alias can be stale here. Hand the shared tail
+                # the live mapping that owns the selected FinalDraft seals.
+                meta=led.data.setdefault("meta", {}),
                 resolved=resolved,
                 outline_view=_parts.outline_view,
                 canon=_parts.canon,

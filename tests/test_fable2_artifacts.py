@@ -771,6 +771,7 @@ class TestEnvelopeAndBudgets:
         (120, "three_pitch_two_draft"),
         (320, "three_pitch_two_draft"),
         (350, "three_pitch_two_draft"),
+        (420, "three_pitch_two_draft"),
         (720, "three_pitch_two_draft"),
         (900, "three_pitch_two_draft"),
     ])
@@ -838,10 +839,10 @@ class TestEnvelopeAndBudgets:
         with pytest.raises(F2.Fable2ScriptError, match="ceiling"):
             F2.assert_supported_target_words(901)
 
-    def test_entry_gate_s1b_one_draft_scope(self):
-        with pytest.raises(F2.Fable2ScriptError, match="S2"):
-            F2.assert_supported_target_words(F2._ONE_DRAFT_THRESHOLD)
+    def test_entry_gate_accepts_compact_and_full_s2_ranges(self):
         F2.assert_supported_target_words(F2._ONE_DRAFT_THRESHOLD - 1)
+        for target in (120, 420, 900):
+            F2.assert_supported_target_words(target)
 
 
 def _revision_markup(

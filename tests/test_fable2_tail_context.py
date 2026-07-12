@@ -226,6 +226,7 @@ def test_run_delegates_to_tail():
     assert "_run_writer_tail" in src
     assert "run_story_spine=True" in src
     assert "final_title_override=None" in src
+    assert 'meta=led.data.setdefault("meta", {})' in src
     assert "J.5. Post-composition title regen" not in src, (
         "the tail body is still inline in run()"
     )
@@ -259,6 +260,34 @@ def test_tail_byte_identity_same_inputs(tmp_path, monkeypatch):
         assert a == b, f"tail output slot {i} drifted between equal states"
     # slot 4 broadcasts the resolved technical model id
     assert out_a[4] == "stub/technical-model"
+
+
+def test_tail_preserves_selected_final_draft_seals_on_disk(
+        tmp_path, monkeypatch):
+    """The shared tail's final save cannot shed the C4b winner receipt."""
+    monkeypatch.setenv("OTR_ENABLE_STORY_SPINE", "0")
+    ctx = _make_ctx(
+        tmp_path / "sealed", monkeypatch, run_story_spine=False,
+        final_title_override="The Sealed Draft")
+    ctx.led.data["meta"]["source_bank"] = "scifi_fable2"
+    sealed = {
+        "raw_sha256": "1" * 64,
+        "normalized_sha256": "2" * 64,
+        "parsed_sha256": "3" * 64,
+        "proof_map_sha256": "4" * 64,
+        "artifact_sha256": "5" * 64,
+        "score": [0, 0, 0, 0, 0],
+        "scoring_context_sha256": "6" * 64,
+        "p3_attempts": [{"attempt": 1, "outcome": "accepted"}],
+        "p5_attempts": [{"attempt": 1, "outcome": "accepted"}],
+    }
+    ctx.led.data["meta"]["fable2"] = {"final_draft": sealed}
+
+    OTR_LedgerScriptWriter()._run_writer_tail(ctx)
+
+    assert ctx.led.data["meta"]["fable2"]["final_draft"] == sealed
+    saved = json.loads(Path(ctx.led.path).read_text(encoding="utf-8"))
+    assert saved["meta"]["fable2"]["final_draft"] == sealed
 
 
 @pytest.mark.parametrize(
