@@ -1166,11 +1166,40 @@ def invoke_codex_structured(
             else messages_in
         )
         raw = slot_fn(call_messages, **kwargs)
+        original_raw = str(raw)
+        resolved_artifact_unwrapped = False
+        # Live P3 proof 2026-07-12: the local creative model obeyed the typed
+        # repair semantically but wrapped the complete repaired object in the
+        # single-key envelope {"resolved_artifact": {...}}. That envelope is
+        # not RadioScoreV4 and must never reach Pydantic as if it were. Unwrap
+        # only this exact, unambiguous repair transport shape; mixed roots,
+        # non-object values, and every other extra key remain fail-loud.
+        try:
+            parsed_raw = parse_first_json_object(original_raw)
+        except Exception:
+            parsed_raw = None
+        if (
+            isinstance(parsed_raw, dict)
+            and set(parsed_raw) == {"resolved_artifact"}
+            and isinstance(parsed_raw["resolved_artifact"], dict)
+        ):
+            resolved_artifact_unwrapped = True
+            raw = json.dumps(
+                parsed_raw["resolved_artifact"],
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+            log.warning(
+                "[scifi_codex:%s] normalized exact resolved_artifact repair envelope",
+                pass_id,
+            )
         calls.append({
             "temperature": kwargs.get("temperature"),
             "max_new_tokens": kwargs.get("max_new_tokens"),
-            "raw_chars": len(str(raw)),
-            "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest(),
+            "raw_chars": len(original_raw),
+            "raw_sha256": hashlib.sha256(original_raw.encode("utf-8")).hexdigest(),
+            "resolved_artifact_unwrapped": resolved_artifact_unwrapped,
         })
         return raw
     def typed_repair_factory(*, original_prompt, failed_output, error):

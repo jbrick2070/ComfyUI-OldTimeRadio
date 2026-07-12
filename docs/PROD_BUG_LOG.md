@@ -748,3 +748,23 @@ out until they independently meet the same production-only admission rule.
 - verify idea: run the same 120-word model pairing with attempt telemetry; require the failing rung's exact raw/projected/error record, then add a focused regression for the isolated cause and a canonical rerun proving ledger, episode asset, `obs_publish OK`, and final OBS file
 - bible-worthy: pending -- live admission is proved, but no reusable rule exists until the root cause and fix are known
 - status: OPEN
+
+## PBUG-20260712-18 -- Sci-Fi Codex P3 repair envelope rejected as the artifact root
+- surfaced: canonical 120-word `scifi_codex` queue leg, prompt
+  `cc9e0f8a-2a20-40a1-b5dc-da2fc8a400d6`, Gemma E4B creative + Mistral-Nemo
+  technical, 2026-07-12
+- symptom: `RESULT FAIL` at P3 after two structured attempts; the repaired
+  `RadioScoreV4` was complete but nested under `resolved_artifact`, so strict
+  validation reported every required root field missing and the wrapper extra
+- root cause: the lane passed an exact single-key typed-repair transport
+  envelope directly into the requested strict artifact schema
+- fix: normalize only the exact `{"resolved_artifact": <object>}` transport
+  shape at the Sci-Fi Codex response boundary, preserve original-wire hash and
+  length, journal the normalization boolean, and keep mixed/non-object roots
+  fail-loud
+- verify idea: exact-wrapper, direct-root, mixed-root, non-object, original-wire
+  telemetry, and prompt-seam exclusion regressions; then rerun the same canonical
+  bank and require RESULT SUCCESS plus ledger and OBS final existence
+- bible-worthy: pending -- live admission and reusable exact-envelope rule are
+  proved; promote only through the standing Bug Bible fan-out
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

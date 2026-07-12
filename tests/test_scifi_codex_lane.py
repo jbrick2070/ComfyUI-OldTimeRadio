@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -627,6 +628,146 @@ def test_p3_typed_repair_receives_the_locked_score_graph_contract():
     repair_system = calls[1]["messages"][0]["content"]
     assert "score_graph_contract" in repair_system
     assert "every and only required_beat_ids" in repair_system
+
+
+def test_p3_exact_resolved_artifact_repair_envelope_is_unwrapped():
+    """Live 2026-07-12: typed repair returned one transport wrapper."""
+    score = _metadata_repair_score()
+    advisory = score.advisory_word_plan
+    invalid = score.model_dump(mode="json")
+    invalid["scenes"][0]["beats"].pop()
+    base_raw = json.dumps(invalid)
+    pack = SimpleNamespace(prompt_stages={
+        "codex_radio_score_system": "Score.",
+        "codex_coda_contract_system": "Coda.",
+    })
+
+    wrapped = json.dumps({
+        "resolved_artifact": score.model_dump(mode="json"),
+    })
+    responses = [base_raw, wrapped]
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    journal = {}
+    result = lane.invoke_codex_structured(
+        pass_id="P3", slot="creative",
+        slot_fn=slot_fn,
+        pack=pack,
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs={
+            "advisory_word_plan": advisory.model_dump(mode="json"),
+            "score_graph_contract": lane._score_graph_contract(advisory),
+        },
+        result_type=lane.RadioScoreV4,
+        post_validator=lambda candidate: lane._validate_radio_score_graph(
+            candidate, advisory
+        ),
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=3600, call_journal=journal, repair_advisory=advisory,
+    )
+
+    assert result == score
+    assert len(calls) == 2
+    repair_system = calls[1]["messages"][0]["content"]
+    assert "every and only required_beat_ids" in repair_system
+    attempts = journal["calls"][0]["attempts"]
+    assert [a["resolved_artifact_unwrapped"] for a in attempts] == [False, True]
+    assert attempts[0]["raw_chars"] == len(base_raw)
+    assert attempts[0]["raw_sha256"] == hashlib.sha256(base_raw.encode()).hexdigest()
+    assert attempts[1]["raw_chars"] == len(wrapped)
+    assert attempts[1]["raw_sha256"] == hashlib.sha256(wrapped.encode()).hexdigest()
+
+
+def test_p3_direct_root_preserves_wire_receipt_without_unwrap():
+    score = _metadata_repair_score()
+    advisory = score.advisory_word_plan
+    raw = json.dumps(score.model_dump(mode="json"))
+    journal = {}
+    pack = SimpleNamespace(prompt_stages={
+        "codex_radio_score_system": "Score.",
+        "codex_coda_contract_system": "Coda.",
+    })
+
+    result = lane.invoke_codex_structured(
+        pass_id="P3", slot="creative",
+        slot_fn=lambda messages, **kwargs: raw,
+        pack=pack,
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs={}, result_type=lane.RadioScoreV4,
+        post_validator=lambda candidate: lane._validate_radio_score_graph(
+            candidate, advisory
+        ),
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=3600, call_journal=journal,
+    )
+
+    assert result == score
+    attempt = journal["calls"][0]["attempts"][0]
+    assert attempt["resolved_artifact_unwrapped"] is False
+    assert attempt["raw_chars"] == len(raw)
+    assert attempt["raw_sha256"] == hashlib.sha256(raw.encode()).hexdigest()
+
+
+def test_resolved_artifact_envelope_with_sibling_key_stays_fail_loud():
+    score = _metadata_repair_score()
+    pack = SimpleNamespace(prompt_stages={
+        "codex_radio_score_system": "Score.",
+        "codex_coda_contract_system": "Coda.",
+    })
+    calls = []
+    def slot_fn(messages, **kwargs):
+        calls.append(1)
+        return json.dumps({
+            "resolved_artifact": score.model_dump(mode="json"),
+            "unexpected": "must not be discarded",
+        })
+
+    with pytest.raises(lane.CodexPassError):
+        lane.invoke_codex_structured(
+            pass_id="P3", slot="creative",
+            slot_fn=slot_fn,
+            pack=pack,
+            seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+            artifact_inputs={}, result_type=lane.RadioScoreV4,
+            post_validator=lambda candidate: None,
+            base_temperature=.72, structural_retry_temperature=.32,
+            max_new_tokens=3600, call_journal={},
+        )
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("wrapped_value", [[], "not-an-object", 7])
+def test_resolved_artifact_non_object_value_stays_fail_loud(wrapped_value):
+    pack = SimpleNamespace(prompt_stages={
+        "codex_radio_score_system": "Score.",
+        "codex_coda_contract_system": "Coda.",
+    })
+    with pytest.raises(lane.CodexPassError):
+        lane.invoke_codex_structured(
+            pass_id="P3", slot="creative",
+            slot_fn=lambda messages, **kwargs: json.dumps({
+                "resolved_artifact": wrapped_value,
+            }),
+            pack=pack,
+            seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+            artifact_inputs={}, result_type=lane.RadioScoreV4,
+            post_validator=lambda candidate: None,
+            base_temperature=.72, structural_retry_temperature=.32,
+            max_new_tokens=3600, call_journal={},
+        )
+
+
+def test_scifi_codex_prompt_seams_forbid_envelope_key():
+    pack = routing.resolve_story_pack("scifi_codex")
+    assert pack.prompt_stages
+    assert all(
+        "resolved_artifact" not in str(text)
+        for text in pack.prompt_stages.values()
+    )
 
 
 def test_script_output_token_budget_receipts_and_bounds():
