@@ -24,32 +24,31 @@ operator listening are separate elapsed time.
 
 | Order | Campaign | Exit condition | Coding estimate |
 |---:|---|---|---:|
-| 1 | Close remaining platform/profile gaps | Cloud variant emitted; representative CPU/NVIDIA/cloud smokes; AMD/Mac remain honestly marked until proved | 2-5 days |
-| 2 | `dynamic_story` visual direction | Current story becomes a typed post-freeze `vd-1` direction; canonical node/link activation; variants and 30/120 ladder green | 5-9 days |
-| 3 | Lean-mean/dead-code campaign | Re-grounded deletion/consolidation waves land green; no dormant interstitial audio or duplicate authorities | 12-16 days |
-| 4 | Product expansion | Visual-pack roll, richer cue stills, cue-ledger/SFX work, provider additions, system-agnostic upscale as separately gated campaigns | 5-10 days per selected set |
-| 5 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
-| 6 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
+| 1 | `dynamic_story` visual direction | Current story becomes a typed post-freeze `vd-1` direction; canonical node/link activation; variants and 30/120 ladder green | 5-9 days |
+| 2 | Lean-mean/dead-code campaign | Re-grounded deletion/consolidation waves land green; no dormant interstitial audio or duplicate authorities | 12-16 days |
+| 3 | Product expansion | Visual-pack roll, richer cue stills, cue-ledger/SFX work, provider additions, system-agnostic upscale as separately gated campaigns | 5-10 days per selected set |
+| 4 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
+| 5 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
 
-**Release-runway planning range after GO_FORWARD:** roughly **27-45 coder-days**
-before optional product-expansion campaigns, or about **6-10 one-coder weeks**
+**Release-runway planning range after GO_FORWARD:** roughly **25-40 coder-days**
+before optional product-expansion campaigns, or about **5-8 one-coder weeks**
 with normal integration margin. Hardware/provider qualification can extend
 calendar time without consuming equivalent coding time.
 
-## 1. Platform and profile closure
+## Portability status -- already implemented
 
-Finish verification, not another profile rewrite:
+The multi-platform workflow, profile, registry, and generated-variant features
+are already in place. They are not a future coding campaign.
 
-- ratify and emit the cloud-lanes variant from the canonical generator;
-- run representative CPU/no-GPU, NV50 identity, and cloud smokes;
-- keep AMD and Mac profiles explicitly unverified until their acceptance gates
-  run on matching hardware;
-- keep every generated workflow under `workflows/variants/` and generated from
-  `workflows/otr_canonical.json`;
-- use the generated `docs/ENGINE_MATRIX.md` from the immediate next sprint as
-  the user-visible engine/backend truth.
+Release QA still runs representative CPU/no-GPU, NVIDIA, cloud, AMD, and Mac
+acceptance smokes where matching hardware or credentials are available. That is
+validation time, not planned coding time. A platform smoke creates coding work
+only if it proves a real defect that must be root-fixed. Generated workflows
+remain under `workflows/variants/` and derive from
+`workflows/otr_canonical.json`; the planned `docs/ENGINE_MATRIX.md` makes the
+already-built engine/backend support visible to users.
 
-## 2. Story-derived visual direction
+## 1. Story-derived visual direction
 
 Plan of record: `docs/2026-07-12-dynamic-story-visual-scope.md`.
 
@@ -63,7 +62,7 @@ The current design name is `dynamic_story`; old `llm_creative` wording is
 retired. Dynamic direction remains downstream of the frozen story and may never
 feed visual taste back into story authorship.
 
-## 3. Lean-mean campaign
+## 2. Lean-mean campaign
 
 Plan of record: `docs/2026-07-10-lean-mean-rip-final.md`, but its line pins are
 stale and must be re-grounded once after feature surfaces stop moving.
@@ -84,7 +83,7 @@ Required edges:
 Do not re-delete the old context helper already removed at `1a6ae8f1`, and mark
 the earlier standalone interstitial-audio rip as satisfied when re-grounding.
 
-## 4. Product expansion candidates
+## 3. Product expansion candidates
 
 Choose these as separate campaigns after the core surface is stable:
 
@@ -100,7 +99,7 @@ Choose these as separate campaigns after the core surface is stable:
 Each candidate gets its own scoped design, exact ownership table, tests, and
 qualification ladder before entering GO_FORWARD.
 
-## 5. RunPod and installation
+## 4. RunPod and installation
 
 Build deployment and installation only from proven profiles:
 
@@ -113,7 +112,7 @@ Build deployment and installation only from proven profiles:
 The install path must answer which workflow to load, which models or keys are
 needed, what costs money, what stays local, and how to act on every loud failure.
 
-## 6. README and v2 release
+## 5. README and v2 release
 
 README is the final product pass, after the workflows, installers, and hardware
 claims are real. Ship v2 only when:
