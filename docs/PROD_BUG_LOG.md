@@ -9,6 +9,12 @@ Bible in bulk under the Three-File Contract (YAML + README count + regression
 test, one commit). Promoted entries get a `- promotion: BUG-...` mapping;
 rejected ones get marked `REJECTED` and stay for the record. Append-only,
 newest last.
+
+`promotion` and `status` are deliberately separate axes. `promotion` means a
+real production incident has supplied a reusable Bible rule; `status` continues
+to describe the implementation's own fix/requalification state. A fixed rule
+may therefore be promoted while its same-seed 120-word confirmation remains in
+progress. Conversely, an unproven review finding never receives either marker.
 Running tests/bug_bible_regression.py after every code change stays automatic
 and is unrelated to this log.
 
