@@ -1,0 +1,14 @@
+STDOUT:
+I have completed the Round 4 adversarial review of the plan and written my findings to the requested path:
+[antigravity.md](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/kibitz-runs/2026-07-12-dynamic-story-visual/r4/antigravity.md)
+
+### Summary of findings:
+- **Verdict**: `yes-with-fixes`.
+- **Must-Fix Defects**:
+  1. Identified an unresolved "State which" placeholder regarding the Google API creative lane's execution (constrained vs. unconstrained). Constraining it is not supported by the local codebase, so running it unconstrained with a fallback generate closure is the required fix.
+  2. Identified an ambiguity in what target text is verified during evidence quote checks for non-line ID types (`cast:`, `brief:`, `meta:`, `title`).
+  3. Identified a failure mode for story banks/episodes that lack clue-related elements, where the schema's required `clue_visual` field would fail validation if evidence is mandatory.
+- **Should-Fix / Nice-To-Have**:
+  1. Addressed the placeholder for Node 96 execution `order` by suggesting a concrete value and downstream shift.
+  2. Clarified `shots[]` order normalization during final artifact assembly.
+  3. Added explicit `slot_index` numbers to output fields for complete LiteGraph schema conformance.

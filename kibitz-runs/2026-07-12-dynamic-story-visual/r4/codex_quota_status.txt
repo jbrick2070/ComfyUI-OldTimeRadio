@@ -1,0 +1,10 @@
+agent=codex
+quota_check=enabled
+thresholds=50,70,90
+usage_percent=unknown
+
+[status commands]
+$ codex.exe login status
+rc=0
+STDERR:
+Logged in using ChatGPT

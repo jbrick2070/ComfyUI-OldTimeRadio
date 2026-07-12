@@ -1,0 +1,3 @@
+C:\Users\jeffr\AppData\Roaming\Claude\local-agent-mode-sessions\6503cb4a-a0ec-4e89-b422-c889f09084d6\cff774c2-bb97-4b73-b186-daa560353c46\local_c3e04439-19fe-4882-b9a7-855ceb95b189\outputs\otr_review_profile.md: C:\Users\jeffr\AppData\Roaming\Claude\local-agent-mode-sessions\6503cb4a-a0ec-4e89-b422-c889f09084d6\cff774c2-bb97-4b73-b186-daa560353c46\local_c3e04439-19fe-4882-b9a7-855ceb95b189\outputs\otr_review_profile.md
+comfyui: C:\Users\jeffr\Documents\kibitz\references\profiles\comfyui.md
+.kibitz\comfyui.local.md: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\.kibitz\comfyui.local.md

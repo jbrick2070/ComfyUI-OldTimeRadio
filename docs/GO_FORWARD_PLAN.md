@@ -27,15 +27,48 @@ warnings. Bug Bible: 17 passed, 7 skipped, 3 expected failures. Next: push C4a
 as its own green commit, then C4b wires real nonempty P3/P5 traces and passes
 the selected FinalDraft atomically into assembly/audit.
 
-**RANDOMIZER ROLLS (Design A) -- CODE-READY, AWAITING SLOT + ONE OPERATOR CALL
-(2026-07-12, Claude window; NO code written, NO slot taken).** Plan of record:
+## CODE-READY WORK QUEUE (planned, converged, NOT started -- needs only a coder slot)
+
+**1. RANDOMIZER ROLLS (Design A -- source-bank roll). CODE-READY. All design gates
+CLEARED; the ONLY thing it waits on is the coder slot.** Plan of record:
 `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md` -- converged through the full
 /kibitz arc r2 (coding) -> r3 (wiring) -> r4 (convergence); panel = codex
-`gpt-5.6-sol` @ ultra + antigravity `gemini-3.5-pro`, Claude anchor + judge; 8 panel
-calls, $0. Judgment logs (local, gitignored):
+`gpt-5.6-sol` @ ultra + antigravity `gemini-3.5-pro`, Claude anchor + sole judge;
+8 panel calls, $0. Judgment logs (local, gitignored):
 `kibitz-runs/2026-07-12-randomizer-rolls/{r2,r3,r4}/final.md`.
-This window was DOCS-ONLY (Lesson 10): the 56SOL window held the code and the GPU
-throughout. Nothing was staged but the plan doc.
+Planned 2026-07-12 in a DOCS-ONLY window (Lesson 10) while another window held the
+code and the GPU: **no code written, no slot taken, nothing staged but the plan.**
+
+**What it is:** a sentinel `roll (any eligible bank)` PREPENDED to the `source_bank`
+combo -- a UI command, not a registry row. `science_news` stays the default, so the
+roll is strictly opt-in and an unused workflow is byte-identical. **Zero canonical-JSON
+diff expected** (choices are not persisted; `widgets_values` is). The sentinel resolves
+to a concrete bank BEFORE `require_runnable_bank`, stamps `meta["bank_roll"]`
+(requested / selected / seed / seed_source / eligible_order), and the receipt is
+CARRIED through refine re-entry -- one submission = one roll. **The roll makes ZERO LLM
+calls.**
+
+**Build (2 pushed green sub-commits + a closeout), then qualify:**
+
+1. **Lane-spec rip** -- `_RUNNER_BY_PIPELINE`, `_LEGACY_INLINE_PIPELINES` and
+   `_resolve_lane_runner` are DELETED from the writer into a new `nodes/_otr_lane_specs.py`
+   (ONE lane authority: lazy runner NAMES + a declared per-lane compatibility policy +
+   the inline-pipeline set). Migrates the 3 existing tests that name the deleted
+   symbols. Valid-request/success-path neutral -- unsupported codex/gemini/sonnet
+   requests now fail EARLIER, with the identical native error type and message.
+2. **The roll** -- `nodes/_otr_bank_roll.py` + the writer seam + INPUT_TYPES + tests.
+3. **Closeout** -- evidence, receipt, handoff.
+
+Then 3 x 30-word live legs: seeded onto a legacy inline bank, seeded onto a dispatched
+custom lane, and one unseeded leg proved by REPLAY. Per leg: ledger + receipt, episode
+asset, `obs_publish OK`, and Test-Path on BOTH ledger-owned final paths. API SUCCESS is
+not proof.
+
+**On claiming the slot:** the base has moved repeatedly (`11f6214a` -> `9d8265c0` ->
+`efb6b6ad` -> ...), so re-read every line pin at the real HEAD before editing. The only
+collision surface is `OTR_LedgerScriptWriter.py` -- **`banks.json` is NOT touched.**
+
+**Design B (visual pack roll) stays parked until Design A lands.**
 
 **D-1 RESOLVED -- NO RIGHTS GATE (operator ruling, 2026-07-12).** The roll does NOT
 filter on rights and NO `rights_class` field ships. The LLM may write in whatever style
@@ -48,17 +81,8 @@ migration, no schema-doc churn); eligibility is exactly TWO filters -- runnable 
 request-compatible; `runnable` stays the only curation surface. The repo's existing
 disclosure surfaces (credits source line, HUD origin label) are unchanged.
 
-**ONE GATE BEFORE ANY CODE: the coder slot + a re-grounded base.** The base moved twice
-during planning alone (`11f6214a` -> `9d8265c0` -> `efb6b6ad`) and the writer's gates
-shifted with it: claim the slot, record the real HEAD, re-read every pin, THEN edit.
-The only collision surface left is `OTR_LedgerScriptWriter.py` (the lane-spec rip).
-
-Build = 2 pushed green sub-commits (lane-spec rip -> the roll itself) + a closeout, then
-3 x 30-word live legs (seeded inline, seeded dispatched, unseeded-with-replay-proof).
-Design B (visual pack roll) stays parked until A lands.
-
-**QUEUED HARNESS DEFECT (found by the r3 panel, NOT a live failure -- so it belongs
-here, not in PROD_BUG_LOG):** `scripts/otr_render_watchdog.ps1` only recognizes
+**2. QUEUED HARNESS DEFECT (found by the randomizer r3 panel, NOT a live failure -- so
+it belongs here, not in PROD_BUG_LOG):** `scripts/otr_render_watchdog.ps1` only recognizes
 `[soak] t=...` heartbeats and cannot read a canonical `RESULT` verdict, so it will
 declare a HEALTHY canonical render dead once it passes the 300s heartbeat stall
 window. Any long canonical (non-soak) render driven through the watchdog is at risk.

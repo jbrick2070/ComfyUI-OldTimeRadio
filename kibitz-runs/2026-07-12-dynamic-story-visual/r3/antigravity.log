@@ -1,0 +1,17 @@
+STDOUT:
+I have completed the Round 3 integration/wiring/sequencing review of the dynamic story visual direction plan (`r3/input.md`). 
+
+The review has been written to the target location:
+[antigravity.md](file:///C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/kibitz-runs/2026-07-12-dynamic-story-visual/r3/antigravity.md)
+
+### Summary of Key Findings
+
+- **Verdict:** `yes-with-fixes`.
+- **Must-Fixes:**
+  1. **[Section 2.3] Naming mismatch in semantic hash preimage:** The artifact model uses `"story_binding"` at its root, but the preimage specs `"binding"`. Fix: sync to `"story_binding"`.
+  2. **[Section 4.4] Under-sized preflight context budget assertion:** The current check only tests `input_tokens + max_new_tokens`. Fix: expand to include the worst-case repair envelope (`input_tokens + 2 * max_new_tokens + 500`).
+  3. **[Section 5.5 / 7.2] Resident LLM VRAM leaks in post-freeze nodes:** `OTR_ShotLock` and `OTR_MetaBriefImagePromptGen` load the writer LLM without unloading, risking VRAM OOM errors during downstream audio/video/image generation. Fix: add `finally: unload_llm_if_local_resident()`.
+  4. **[Section 7.4] Ignored `shots[]` notes on cinematic scene character/beat stills:** Authors' notes are only wired to `still_word` cards, bypassing cinematic targets entirely and violating mandatory consumption constraints. Fix: integrate notes into `_compose_char_scene_prompt` and `compose_still_prompt` when `is_dynamic` is active.
+  5. **[Section 9.1] Out-of-date test assertions:** Link addition 284 breaks `test_google_video_sfx_workflow.py:41` which hard-pins `wf["last_link_id"] == 283`. Fix: update test assertion to `284`.
+- **Should-Fixes:**
+  1. **[Section 5.2 / 5.3] `peek_ledger()` AttributeError risk:** Prevent `AttributeError` on `None` when checking if `peek_ledger().episode_id` matches the wire ledger.
