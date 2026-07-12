@@ -5,6 +5,7 @@ import hashlib
 import json
 import random
 import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -300,7 +301,14 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "item. causal_steps MUST contain at least 2 items; audible_clues "
             "MUST contain at least 3 items; caller_threads and resolution_links "
             "MUST each contain at least 2 items. Never delete an item to repair "
-            "an identifier or type error. interpretations MUST retain at least "
+            "an identifier or type error. Emit ONLY fields declared by the "
+            "schema: never invent numbered, secondary, tertiary, or suffixed "
+            "fields. Each caller_threads row has exactly one lost_object. If "
+            "the failed artifact packed multiple lost objects into extra fields "
+            "on one row, move each extra object into its own caller_threads row "
+            "and give every caller thread exactly one resolution_links row; do "
+            "not rename an unknown field and leave it in place. "
+            "interpretations MUST retain at least "
             "2 items, including at least one true and one plausible false "
             "interpretation. To repair truth balance, change is_true on one "
             "existing interpretation; do not add or remove interpretations. "
@@ -467,7 +475,10 @@ def _validate_triage(triage: SlateTriage, slate: PossibilitySlate) -> str | None
     return None
 
 
-def _validate_truth_map(truth: AudibleTruthMap) -> str | None:
+def _validate_truth_map(
+    truth: AudibleTruthMap,
+    selected: PossibilityCard | None = None,
+) -> str | None:
     collections = {
         "caller_threads": [row.thread_id for row in truth.caller_threads],
         "causal_steps": [row.step_id for row in truth.causal_steps],
@@ -478,10 +489,21 @@ def _validate_truth_map(truth: AudibleTruthMap) -> str | None:
         return "truth-map structural ids must be unique within each collection"
     thread_ids = set(collections["caller_threads"])
     clue_ids = set(collections["audible_clues"])
+    if selected is not None and Counter(
+        row.lost_object for row in truth.caller_threads
+    ) != Counter(selected.lost_objects):
+        return (
+            "caller_threads must contain exactly one row per selected lost "
+            "object, with one lost_object field per row"
+        )
     if any(clue.thread_id not in thread_ids for clue in truth.audible_clues):
         return "every audible clue thread_id must resolve"
-    if any(link.thread_id not in thread_ids for link in truth.resolution_links):
-        return "every resolution link thread_id must resolve"
+    clue_thread_ids = {clue.thread_id for clue in truth.audible_clues}
+    if clue_thread_ids != thread_ids:
+        return "every caller thread must have at least one audible clue"
+    resolution_thread_ids = [link.thread_id for link in truth.resolution_links]
+    if Counter(resolution_thread_ids) != Counter(thread_ids):
+        return "every caller thread must have exactly one resolution link"
     if not any(row.is_true for row in truth.interpretations):
         return "interpretations need at least one true interpretation"
     if not any(not row.is_true for row in truth.interpretations):
@@ -859,7 +881,7 @@ def run_original_codex56sol_episode(
     selected = next((p for p in slate.possibilities if p.possibility_id == triage.selected_possibility_id), None)
     if selected is None or any(f.blocking and f.possibility_id == selected.possibility_id for f in triage.findings):
         raise OriginalCodex56SolContractError("triage did not select a valid possibility")
-    truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800, post_validator=lambda value: _validate_truth_map(value) or _validate_authored_surface(value, story_rules))
+    truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800, post_validator=lambda value: _validate_truth_map(value, selected) or _validate_authored_surface(value, story_rules))
     fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600)
     corroborated_fair_blocks = _corroborated_fair_blocks(fair, truth)
     if corroborated_fair_blocks:

@@ -12,7 +12,7 @@ DRAW = {"deck_id":"deck","deck_sha256":"a"*64,"constraint_id":"c01","lost_object
 
 def _fixtures():
     card = {"possibility_id":"p1","title_seed":"Echo Desk","premise":"A stamp, mitten, and card are traced through one helpful echo.","desk_operator":{"name":"Mara Vale"},"callers":[{"name":"Ivo Reed"},{"name":"Nell Park"}],"lost_objects":DRAW["lost_objects"],"acoustic_device":DRAW["acoustic_device"],"shared_cause":"A grille repeats phrases and carries desk sounds.","clue_plan":["the stamp's shelf number repeats","the mitten makes a wool scrape","the card rustles beside the grille"],"helpful_resolution":"Mara maps the echo and returns every item."}
-    truth = {"title":"The Helpful Echo","premise":"A station desk solves three lost-item calls through one echo.","setting":"A small community radio station","desk_operator_name":"Mara Vale","caller_threads":[{"thread_id":"t1","caller_name":"Ivo Reed","lost_object":"stamp","practical_need":"finish a library return"},{"thread_id":"t2","caller_name":"Nell Park","lost_object":"mitten","practical_need":"complete a pair"}],"causal_steps":[{"step_id":"s1","cause":"The grille is loose.","effect":"Desk sounds travel to the call booth."},{"step_id":"s2","cause":"Objects rest beside the grille.","effect":"Their sounds repeat on calls."}],"audible_clues":[{"clue_id":"q1","thread_id":"t1","sound_or_phrase":"a repeated shelf number","implication":"the stamp is near the desk"},{"clue_id":"q2","thread_id":"t2","sound_or_phrase":"a soft wool scrape","implication":"the mitten is beside the grille"},{"clue_id":"q3","thread_id":"t2","sound_or_phrase":"three matching notes","implication":"one channel carries every clue"}],"reveal":"The loose grille carries sounds from the lost-and-found shelf.","resolution_links":[{"thread_id":"t1","action":"Mara checks the numbered shelf.","result":"Ivo receives the stamp."},{"thread_id":"t2","action":"Mara checks beside the grille.","result":"Nell receives the mitten."}]}
+    truth = {"title":"The Helpful Echo","premise":"A station desk solves three lost-item calls through one echo.","setting":"A small community radio station","desk_operator_name":"Mara Vale","caller_threads":[{"thread_id":"t1","caller_name":"Ivo Reed","lost_object":"stamp","practical_need":"finish a library return"},{"thread_id":"t2","caller_name":"Nell Park","lost_object":"mitten","practical_need":"complete a pair"},{"thread_id":"t3","caller_name":"Oren Bell","lost_object":"card","practical_need":"finish a recipe"}],"causal_steps":[{"step_id":"s1","cause":"The grille is loose.","effect":"Desk sounds travel to the call booth."},{"step_id":"s2","cause":"Objects rest beside the grille.","effect":"Their sounds repeat on calls."}],"audible_clues":[{"clue_id":"q1","thread_id":"t1","sound_or_phrase":"a repeated shelf number","implication":"the stamp is near the desk"},{"clue_id":"q2","thread_id":"t2","sound_or_phrase":"a soft wool scrape","implication":"the mitten is beside the grille"},{"clue_id":"q3","thread_id":"t3","sound_or_phrase":"a crisp card rustle","implication":"the card is beside the grille"}],"reveal":"The loose grille carries sounds from the lost-and-found shelf.","resolution_links":[{"thread_id":"t1","action":"Mara checks the numbered shelf.","result":"Ivo receives the stamp."},{"thread_id":"t2","action":"Mara checks beside the grille.","result":"Nell receives the mitten."},{"thread_id":"t3","action":"Mara checks the card tray.","result":"Oren receives the card."}]}
     cast = [{"char_id":"announcer","name":"Announcer","role":"announcer","character_description":"Brief station host"},{"char_id":"c01","name":"Mara Vale","role":"desk_operator","character_description":"Warm precise desk operator"},{"char_id":"c02","name":"Ivo Reed","role":"caller","character_description":"Patient library volunteer"}]
     scenes = [{"scene_id":"scene_01","description":"Calls reach the desk.","env":"radio station desk"},{"scene_id":"scene_02","description":"Mara resolves the echo.","env":"lost-and-found shelf"}]
     shots = [{"shot_id":"shot_01","scene_id":"scene_01","description":"Mara at the desk.","visual_prompt":"Warm radio desk, Mara listening, amber practical light"},{"shot_id":"shot_02","scene_id":"scene_02","description":"The shelf and grille.","visual_prompt":"Orderly shelf beside a loose grille, soft morning light"}]
@@ -230,6 +230,22 @@ def test_truth_map_interpretations_and_references_are_retryable():
     )
 
 
+def test_truth_map_requires_one_thread_and_resolution_per_selected_object():
+    fixtures = _fixtures()
+    selected = lane.PossibilityCard.model_validate(fixtures["slate"]["possibilities"][0])
+    complete = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    assert lane._validate_truth_map(complete, selected) is None
+
+    incomplete_data = fixtures["truth"]
+    incomplete_data["caller_threads"] = incomplete_data["caller_threads"][:2]
+    incomplete_data["resolution_links"] = incomplete_data["resolution_links"][:2]
+    incomplete = lane.AudibleTruthMap.model_validate(incomplete_data)
+    assert lane._validate_truth_map(incomplete, selected) == (
+        "caller_threads must contain exactly one row per selected lost object, "
+        "with one lost_object field per row"
+    )
+
+
 def test_score_requires_exact_clue_coverage_and_contiguous_shots():
     fixtures = _fixtures()
     truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
@@ -376,6 +392,8 @@ def test_p3_safety_repair_keeps_safety_and_collection_rules():
     assert "causal_steps MUST" in rules
     assert "change is_true on one existing interpretation" in rules
     assert "an empty clue_ids list is invalid" in rules
+    assert "never invent numbered, secondary, tertiary, or suffixed fields" in rules
+    assert "move each extra object into its own caller_threads row" in rules
 
 
 def test_p5_repair_spells_out_required_fields_and_exact_arc_phases():

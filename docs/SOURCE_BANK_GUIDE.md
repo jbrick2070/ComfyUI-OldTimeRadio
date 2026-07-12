@@ -428,3 +428,8 @@ leaving them for live integration:
     expected set is already present: keep the first authored placement and
     remove later duplicates. Missing or unknown references still require a
     semantic repair; never invent their placement in Python.
+32. Spell out singular-row ownership at the generation seam. If an input list
+    becomes one typed row per item, say so explicitly, require exact coverage,
+    and forbid numbered or suffixed pseudo-fields. Validate the cross-artifact
+    mapping in Python; different model families otherwise pack extra items into
+    fields such as `lost_object_2` and may merely rename them during repair.
