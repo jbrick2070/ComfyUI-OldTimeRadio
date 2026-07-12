@@ -232,6 +232,19 @@ accept only after the typed projection preserves authored values and clears all
 validators. This prevents a duplicated pre-parse helper from becoming a
 false-green proxy for the production acceptance path.
 
+## 18. Group safe graph ownership repairs at one typed boundary
+
+For a schema-valid score, related exact invariants such as contiguous shot
+ownership and one-to-one clue ownership should share the same typed
+post-validation boundary. The model owns the first authored placement and all
+meaningful prose; Python may only derive a later mechanical identity or remove
+an exact repeated reference when the complete typed graph proves that no story
+meaning is lost.
+
+Keep raw cleanup limited to defects that prevent parsing at all. Test each
+typed repair with that raw path disabled, including a typed-repair response,
+so a pre-parse helper cannot falsely appear to qualify the production guard.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

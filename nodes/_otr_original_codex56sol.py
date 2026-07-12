@@ -27,6 +27,9 @@ log = logging.getLogger(__name__)
 
 
 _SCORE_TOPOLOGY_ERROR = "beats for each shot must form one contiguous block"
+_SCORE_DUPLICATE_CLUE_ERROR = (
+    "each truth-map clue must be assigned to exactly one line intent"
+)
 
 
 class OriginalCodex56SolError(RuntimeError): pass
@@ -367,10 +370,13 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "`shots[*].visual_prompt` at the top level. "
             "scenes, shots, and beats MUST be separate top-level arrays. "
             "Never place shots inside scenes or beats inside shots. "
-            "Every line_intent MUST "
-            "have exactly the keys intent, arc_phase, and clue_ids. clue_ids "
-            "MUST always be an array of existing clue IDs, or [] when there "
-            "is no clue; singular clue_id is forbidden. Cast MUST include one "
+             "Every line_intent MUST "
+             "have exactly the keys intent, arc_phase, and clue_ids. clue_ids "
+             "MUST always be an array of existing clue IDs, or [] when there "
+             "is no clue; singular clue_id is forbidden. Assign every truth-map "
+             "clue ID exactly once across all line_intents; if a clue appears "
+             "twice, retain its first authored placement and remove only its "
+             "later duplicate reference. Cast MUST include one "
             "separate row with char_id exactly "
             "`announcer` and role exactly `announcer`, exactly one different "
             "row with role `desk_operator`, and every remaining row with "
@@ -419,6 +425,7 @@ def _repair_rules(pass_id: str, error: Any) -> str:
 def _repair_duplicate_score_clues(
     score: BroadcastScore,
     truth: AudibleTruthMap,
+    grounding_contract: GroundingContract | None = None,
 ) -> BroadcastScore | None:
     """Remove duplicate clue references without inventing placement.
 
@@ -442,6 +449,8 @@ def _repair_duplicate_score_clues(
                 seen.add(clue_id)
                 unique_ids.append(clue_id)
         beat.line_intent.clue_ids = unique_ids
+    if _validate_score(repaired, truth, grounding_contract) is not None:
+        return None
     return repaired
 
 
@@ -690,17 +699,6 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
                 truth = None
             if truth is not None:
                 repaired = _repair_score_collection_placement(raw, truth)
-                if repaired is None:
-                    try:
-                        failed_score = BroadcastScore.model_validate(
-                            parse_first_json_object(raw)
-                        )
-                    except (json.JSONDecodeError, ValueError, TypeError):
-                        failed_score = None
-                    if failed_score is not None:
-                        repaired = _repair_duplicate_score_clues(
-                            failed_score, truth,
-                        )
         if repaired is None or post_validator(repaired) is not None:
             return raw
         log.info(
@@ -750,25 +748,6 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
                         f"{error}; after structural normalization: "
                         f"{content_error}"
                     )
-                if "each truth-map clue must be assigned to exactly one" in str(error):
-                    try:
-                        failed_score = BroadcastScore.model_validate(
-                            parse_first_json_object(failed_output)
-                        )
-                    except (json.JSONDecodeError, ValueError, TypeError):
-                        pass
-                    else:
-                        repaired_score = _repair_duplicate_score_clues(
-                            failed_score, truth,
-                        )
-                        if repaired_score is not None:
-                            content_error = post_validator(repaired_score)
-                            if content_error is None:
-                                return repaired_score
-                            effective_error = RuntimeError(
-                                f"{error}; after structural normalization: "
-                                f"{content_error}"
-                            )
         pass_rules = _repair_rules(pass_id, effective_error)
         return [
             {"role": "system", "content": system + "\nReturn the same complete artifact, repairing only the typed contract error." + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
@@ -958,7 +937,7 @@ def _validate_score(
     if set(assigned_clues) != expected_clues:
         return "line intents must cover every truth-map clue and no unknown clue"
     if len(assigned_clues) != len(set(assigned_clues)):
-        return "each truth-map clue must be assigned to exactly one line intent"
+        return _SCORE_DUPLICATE_CLUE_ERROR
     if grounding_contract is not None:
         clue_ids_by_object: dict[str, set[str]] = {}
         for clue in grounding_contract.clues:
@@ -1047,20 +1026,29 @@ def _validate_score_attempt(
     grounded score validates again.
     """
     structural_error = _validate_score(score, truth, grounding_contract)
+    repaired: BroadcastScore | None = None
+    repaired_kind = ""
     if structural_error == _SCORE_TOPOLOGY_ERROR:
         repaired = _repair_score_beat_topology(
             score, truth, grounding_contract,
         )
-        if repaired is not None:
-            score.shots = repaired.shots
-            score.beats = repaired.beats
-            log.info(
-                "[original_codex56sol] P5 normalized one safe structural "
-                "defect at the schema-validated attempt boundary"
-            )
-            structural_error = _validate_score(
-                score, truth, grounding_contract,
-            )
+        repaired_kind = "shot topology"
+    elif structural_error == _SCORE_DUPLICATE_CLUE_ERROR:
+        repaired = _repair_duplicate_score_clues(
+            score, truth, grounding_contract,
+        )
+        repaired_kind = "duplicate clue ownership"
+    if repaired is not None:
+        score.shots = repaired.shots
+        score.beats = repaired.beats
+        log.info(
+            "[original_codex56sol] P5 normalized safe %s at the "
+            "schema-validated attempt boundary",
+            repaired_kind,
+        )
+        structural_error = _validate_score(
+            score, truth, grounding_contract,
+        )
     if structural_error is not None:
         return structural_error
     return _validate_authored_surface(score, story_rules)

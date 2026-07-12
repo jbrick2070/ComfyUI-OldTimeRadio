@@ -545,3 +545,13 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - bible-worthy: yes -- a raw-output middleware hook is not a substitute for the strict typed object boundary where an artifact is actually accepted
 - confidence: HIGH
 - status: FIXED IN CODE / FULL SUITE + BUG BIBLE GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
+
+## PBUG-20260712-10 -- Gemma repeated duplicate clue ownership through P5 repair
+- surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `73de861a`, prompt `00196fd7-943a-4427-90f0-91dce04d4a4b`, E4B creative + Mistral technical, 2026-07-12
+- symptom: the new P5 topology guard cleared the reopened-shot defect, exposing the next schema-valid error: a truth-map clue ID appeared in more than one `line_intent`. Gemma's typed repair repeated the duplicate and the run failed closed after 11:35 with `each truth-map clue must be assigned to exactly one line intent`.
+- root cause: the safe first-placement-wins duplicate-clue projection still lived in raw-output/repair-factory helpers. Like the prior topology repair, it was not enforced over the strict `BroadcastScore` object that the shared ladder accepts.
+- fix: move duplicate clue ownership into the same schema-validated P5 post-validator as reopened-shot topology. It keeps the first authored clue placement in beat order, removes only later duplicate references, reruns the complete grounded score validator, and leaves missing or unknown clues for the LLM repair path. The raw duplicate projection path is removed so tests cannot mistake it for the acceptance guard. Base and repair prompts now require a final exact-once `clue_ids` scan.
+- verify idea: disable raw collection cleanup, inject a duplicate clue into a valid base score, and require a no-extra-call accepted ledger. Then add an unrelated forbidden authored phrase so typed repair is required and return a duplicate-clue repair response; require exact-once clues in the persisted accepted BroadcastScore with one repair model call.
+- bible-worthy: yes -- ordered first-owner reconciliation is safe only after the full typed graph is available, not as speculative raw JSON cleanup
+- confidence: HIGH
+- status: FIXED IN CODE / FULL SUITE + BUG BIBLE GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION

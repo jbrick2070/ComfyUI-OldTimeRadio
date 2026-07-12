@@ -1028,9 +1028,15 @@ def test_p5_typed_repair_response_gets_schema_boundary_topology_projection(
     ]
 
 
-def test_duplicate_score_clue_repair_does_not_spend_an_llm_call(tmp_path):
+def test_p5_schema_boundary_projects_duplicate_clue_ownership(
+    tmp_path, monkeypatch,
+):
     responses = _responses()
     responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
+    monkeypatch.setattr(
+        lane, "_repair_score_collection_placement",
+        lambda _raw, _truth: None,
+    )
     queued = iter(responses)
     calls = []
 
@@ -1056,6 +1062,61 @@ def test_duplicate_score_clue_repair_does_not_spend_an_llm_call(tmp_path):
         episode_root=tmp_path, episode_id="codex56_duplicate_clue",
     )
     assert len(calls) == 8
+
+
+def test_p5_typed_repair_response_gets_schema_boundary_clue_projection(
+    tmp_path, monkeypatch,
+):
+    responses = _responses()
+    responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
+    safe_repair_response = json.loads(json.dumps(responses[4]))
+    responses[4]["premise"] = "Kill the clue."
+    responses.insert(5, safe_repair_response)
+    monkeypatch.setattr(
+        lane, "_repair_score_collection_placement",
+        lambda _raw, _truth: None,
+    )
+    queued = iter(responses)
+    calls = []
+    repair_prompts = []
+
+    def generate(messages, **_kwargs):
+        calls.append(1)
+        if any("forbidden term 'kill'" in row["content"]
+               for row in messages):
+            repair_prompts.append(messages)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p5_repair_duplicate", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p5_repair_duplicate",
+    )
+
+    assert len(calls) == 9
+    assert len(repair_prompts) == 1
+    accepted_score = (
+        led.data["meta"]["original_codex56sol"]
+        ["accepted_artifacts"]["broadcast_score"]
+    )
+    assert [beat["line_intent"]["clue_ids"]
+            for beat in accepted_score["beats"]] == [
+        [], ["q1"], ["q2", "q3"], [], [],
+    ]
 
 
 def test_python_manifest_is_repeatable_closed_and_spoiler_safe():
