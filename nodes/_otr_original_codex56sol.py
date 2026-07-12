@@ -273,10 +273,10 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
     return result
 
 
-def _validate_slate(slate: PossibilitySlate, draw: ConstraintDraw) -> None:
+def _validate_slate(slate: PossibilitySlate, draw: ConstraintDraw) -> str | None:
     ids = [card.possibility_id for card in slate.possibilities]
     if len(set(ids)) != len(ids):
-        raise OriginalCodex56SolContractError("possibility ids must be unique")
+        return "possibility ids must be unique"
     cause_tokens = {
         token for token in re.findall(r"[a-z]+", draw.acoustic_device.lower())
         if len(token) >= 5
@@ -289,24 +289,22 @@ def _validate_slate(slate: PossibilitySlate, draw: ConstraintDraw) -> None:
         missing = [obj for obj in draw.lost_objects if obj.lower() not in surface]
         overlap = cause_tokens & set(re.findall(r"[a-z]+", surface))
         if missing or len(overlap) < min(2, len(cause_tokens)):
-            raise OriginalCodex56SolContractError(
+            return (
                 f"{card.possibility_id}: must retain every drawn object and "
                 "the drawn acoustic cause; "
                 f"missing_objects={missing} acoustic_overlap={sorted(overlap)}"
             )
+    return None
 
 
-def _validate_triage(triage: SlateTriage, slate: PossibilitySlate) -> None:
+def _validate_triage(triage: SlateTriage, slate: PossibilitySlate) -> str | None:
     ids = {card.possibility_id for card in slate.possibilities}
     if triage.selected_possibility_id not in ids:
-        raise OriginalCodex56SolContractError(
-            "selected_possibility_id must exactly match one slate id"
-        )
+        return "selected_possibility_id must exactly match one slate id"
     if any(f.blocking and f.possibility_id == triage.selected_possibility_id
            for f in triage.findings):
-        raise OriginalCodex56SolContractError(
-            "triage selected a possibility it marked blocking"
-        )
+        return "triage selected a possibility it marked blocking"
+    return None
 
 
 def _validate_graph(score: BroadcastScore, manifest: ClosedLineManifest,

@@ -316,9 +316,11 @@ leaving them for live integration:
 2. Define every Pydantic model field, enum, bound, and nested item type, plus one
    known-valid JSON example for every model-authored artifact.
 3. Put every cross-artifact invariant inside the originating
-   `structured_call(..., post_validator=...)`. A check performed after the call
-   bypasses bounded typed repair and turns a repairable model mismatch into an
-   immediate episode failure.
+   `structured_call(..., post_validator=...)`. In this repository the validator
+   must return an error string (or `None`), not raise; raising bypasses the
+   structured retry catcher. A check performed after the call likewise bypasses
+   bounded typed repair and turns a repairable mismatch into an immediate
+   episode failure.
 4. State deterministic retention checks for immutable ingress. Prompt prose
    alone does not prove that a possibility preserved every drawn object,
    acoustic cause, or required ending.

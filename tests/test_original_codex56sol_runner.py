@@ -63,3 +63,13 @@ def test_mocked_complete_runner_fills_closed_ledger(tmp_path):
     assert len(led.data["lines"]) == 5
     assert [(m["cue_id"],m["placement"]) for m in led.data["music"]] == [("opening","opening"),("closing","closing")]
     assert led.data["meta"]["content_authorship"]["coverage"]["complete"] is True
+
+
+def test_cross_artifact_validators_return_retryable_error_strings():
+    draw = lane.ConstraintDraw.model_validate(DRAW)
+    bad = lane.PossibilitySlate.model_validate({"possibilities": [
+        {"possibility_id":f"p{i}","title_seed":"Other","premise":"Other objects.","desk_operator":{"name":"Mara Vale"},"callers":[{"name":"Ivo Reed"},{"name":"Nell Park"}],"shared_cause":"A storm.","clue_plan":["one","two","three"],"helpful_resolution":"They meet."}
+        for i in range(1,4)
+    ]})
+    error = lane._validate_slate(bad, draw)
+    assert isinstance(error, str) and "retain every drawn object" in error
