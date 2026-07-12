@@ -275,6 +275,20 @@ merge, rerun the complete artifact, grounding, and authored-surface validators;
 an unknown or broader defect must remain fail-closed rather than being squeezed
 through the narrow tool.
 
+## 21. Preserve accepted invariants in every replaced patch field
+
+A patch that replaces an entire leaf value can remove a different invariant that
+was already correct in that same value. Include both the newly required facts
+and every immutable fact currently present in a selected target. This matters
+when one beat carries multiple contracts, such as a reveal or closure beat that
+also owns a clue.
+
+Validate the *merged canonical artifact* in the structured-call post-validator,
+not only the patch's local key set. A local patch can be schema-valid and carry
+all newly requested literals while still breaking a graph, grounding, safety, or
+authorship invariant elsewhere in the target field. Return the precise merged
+error to the typed repair ladder and remain fail-closed if it cannot be cleared.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

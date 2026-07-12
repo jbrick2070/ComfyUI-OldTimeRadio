@@ -80,6 +80,7 @@ def test_broadcast_score_prompt_closes_music_bookend_key_sets():
     patch_seam = pack.prompt_stages["codex56_score_anchor_patch"]
     assert "ScoreIntentPatch JSON only" in patch_seam
     assert "every required_anchors string verbatim" in patch_seam
+    assert "Do not write visual direction" in patch_seam
     p5 = next(
         row for row in registry.pipelines["acoustic_puzzle_v1"].passes
         if row.pass_id == "P5_broadcast_score"

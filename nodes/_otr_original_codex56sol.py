@@ -1283,6 +1283,21 @@ def _score_grounding_repair_plan(
             grounding.resolution_anchor,
         )
 
+    # A target can be a reveal or closure beat (or otherwise already carry a
+    # different valid immutable anchor).  Replacing its intent must never
+    # erase an anchor that the accepted score already relies on.
+    protected_anchors = (
+        *grounding.lost_object_anchors,
+        grounding.device_anchor,
+        grounding.resolution_anchor,
+    )
+    for beat in score.beats:
+        if beat.beat_id not in targets:
+            continue
+        for anchor in protected_anchors:
+            if _contains_grounding_anchor(beat.line_intent.intent, anchor):
+                targets[beat.beat_id].add(anchor)
+
     return [
         {
             "beat_id": beat.beat_id,
@@ -1315,6 +1330,42 @@ def _validate_score_intent_patch(
     return None
 
 
+def _merge_score_intent_patch(
+    score: BroadcastScore,
+    patch: ScoreIntentPatch,
+) -> BroadcastScore:
+    intents = {row.beat_id: row.intent for row in patch.replacements}
+    repaired = score.model_copy(deep=True)
+    for beat in repaired.beats:
+        if beat.beat_id in intents:
+            beat.line_intent.intent = intents[beat.beat_id]
+    return repaired
+
+
+def _validate_score_intent_patch_application(
+    patch: ScoreIntentPatch,
+    score: BroadcastScore,
+    plan: list[dict[str, Any]],
+    truth: AudibleTruthMap,
+    grounding: GroundingContract,
+    story_rules: Any,
+) -> str | None:
+    patch_error = _validate_score_intent_patch(patch, plan)
+    if patch_error is not None:
+        return patch_error
+    repaired = _merge_score_intent_patch(score, patch)
+    score_error = _validate_score(repaired, truth, grounding)
+    if score_error is not None:
+        return f"score intent patch leaves the full score invalid: {score_error}"
+    authored_error = _validate_authored_surface(repaired, story_rules)
+    if authored_error is not None:
+        return (
+            "score intent patch leaves a forbidden authored surface: "
+            f"{authored_error}"
+        )
+    return None
+
+
 def _apply_score_intent_patch(
     score: BroadcastScore,
     patch: ScoreIntentPatch,
@@ -1323,18 +1374,10 @@ def _apply_score_intent_patch(
     grounding: GroundingContract,
     story_rules: Any,
 ) -> BroadcastScore | None:
-    if _validate_score_intent_patch(patch, plan) is not None:
+    if _validate_score_intent_patch_application(
+            patch, score, plan, truth, grounding, story_rules) is not None:
         return None
-    intents = {row.beat_id: row.intent for row in patch.replacements}
-    repaired = score.model_copy(deep=True)
-    for beat in repaired.beats:
-        if beat.beat_id in intents:
-            beat.line_intent.intent = intents[beat.beat_id]
-    if _validate_score(repaired, truth, grounding) is not None:
-        return None
-    if _validate_authored_surface(repaired, story_rules) is not None:
-        return None
-    return repaired
+    return _merge_score_intent_patch(score, patch)
 
 
 def _repair_score_grounding_intents(
@@ -1353,7 +1396,9 @@ def _repair_score_grounding_intents(
         pack=pack, seam="codex56_score_anchor_patch",
         inputs={"targets": plan}, schema=ScoreIntentPatch,
         scheduler=scheduler, journal=journal, tokens=900,
-        post_validator=lambda value: _validate_score_intent_patch(value, plan),
+        post_validator=lambda value: _validate_score_intent_patch_application(
+            value, score, plan, truth, grounding, story_rules,
+        ),
     )
     repaired = _apply_score_intent_patch(
         score, patch, plan, truth, grounding, story_rules,

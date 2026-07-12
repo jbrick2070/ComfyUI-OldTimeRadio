@@ -155,6 +155,46 @@ def test_p5_intent_patch_rejects_missing_or_unplanned_anchors():
     )
 
 
+def test_p5_intent_patch_preserves_anchor_already_valid_on_target():
+    score = lane.BroadcastScore.model_validate(_fixtures()["score"])
+    score.beats[1].line_intent.clue_ids = []
+    score.beats[3].line_intent.clue_ids = ["q1"]
+    contract = _grounding_fixture()
+    plan = lane._score_grounding_repair_plan(score, contract)
+    assert plan == [{
+        "beat_id": "b4",
+        "current_intent": "reveal the grille cause",
+        "required_anchors": ["grille", "stamp"],
+    }]
+
+    patch = lane.ScoreIntentPatch.model_validate({
+        "replacements": [{
+            "beat_id": "b4",
+            "intent": "reveal the grille cause through the stamp clue",
+        }],
+    })
+    assert lane._validate_score_intent_patch_application(
+        patch, score, plan, lane.AudibleTruthMap.model_validate(
+            _fixtures()["truth"],
+        ), contract, story_rules.resolve_story_rules("original_codex56sol"),
+    ) is None
+
+    unsafe_patch = lane.ScoreIntentPatch.model_validate({
+        "replacements": [{
+            "beat_id": "b4",
+            "intent": "reveal the grille, stamp, and kill the mystery",
+        }],
+    })
+    assert "forbidden authored surface" in (
+        lane._validate_score_intent_patch_application(
+            unsafe_patch, score, plan, lane.AudibleTruthMap.model_validate(
+                _fixtures()["truth"],
+            ), contract,
+            story_rules.resolve_story_rules("original_codex56sol"),
+        ) or ""
+    )
+
+
 def _grounding_fixture():
     draw = lane.ConstraintDraw.model_validate(DRAW)
     truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
