@@ -89,17 +89,34 @@ def _manifest_arc_phase(value: Any) -> Any:
         "opening": "opening",
         "setup": "opening",
         "orientation": "opening",
+        "exposition": "opening",
         "rising": "rising",
         "confrontation": "rising",
         "development": "rising",
+        "rising_action": "rising",
         "reveal": "reveal",
         "discovery": "reveal",
+        "climax": "reveal",
         "closing": "closing",
         "resolution": "closing",
         "final": "closing",
         "ending": "closing",
     }
     return aliases.get(lowered, value)
+
+
+def _manifest_marker(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    lowered = value.strip().lower().replace("-", "_").replace(" ", "_")
+    if lowered in {
+        "true", "yes", "1", "orientation", "clue", "reveal", "closure",
+        "closing", "final",
+    }:
+        return True
+    if lowered in {"false", "no", "0", "none", "null", ""}:
+        return False
+    return value
 
 
 ManifestSpeakerRole = Annotated[
@@ -114,6 +131,7 @@ ManifestArcPhase = Annotated[
     Literal["opening", "rising", "reveal", "closing"],
     BeforeValidator(_manifest_arc_phase),
 ]
+ManifestMarker = Annotated[bool | None, BeforeValidator(_manifest_marker)]
 
 
 class ConstraintDraw(StrictModel):
@@ -271,10 +289,10 @@ class ManifestLine(StrictModel):
     boundary: ManifestBoundary
     arc_phase: ManifestArcPhase
     intent: str
-    orientation: bool | None = None
-    clue: bool | None = None
-    reveal: bool | None = None
-    closure: bool | None = None
+    orientation: ManifestMarker = None
+    clue: ManifestMarker = None
+    reveal: ManifestMarker = None
+    closure: ManifestMarker = None
 
 
 class ClosedLineManifest(StrictModel):

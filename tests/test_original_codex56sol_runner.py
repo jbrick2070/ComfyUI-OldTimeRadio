@@ -140,6 +140,14 @@ def test_manifest_python_owned_enums_normalize_common_model_aliases():
     assert line.arc_phase == "closing"
 
 
+def test_manifest_dramatic_arc_and_marker_aliases_normalize():
+    data = _responses()[6]["lines"][0]
+    data.update({"arc_phase":"climax", "closure":"final"})
+    line = lane.ManifestLine.model_validate(data)
+    assert line.arc_phase == "reveal"
+    assert line.closure is True
+
+
 def test_manifest_unknown_enum_value_still_fails_loud():
     data = {
         "line_id":"l1", "beat_id":"b1", "shot_id":"s1",

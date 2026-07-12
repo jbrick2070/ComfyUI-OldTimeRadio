@@ -381,3 +381,7 @@ leaving them for live integration:
     invented in a slate must repair in the slate/truth/score ladder; waiting
     until P6 can create an impossible repair where the script is required to
     preserve the same now-locked detail.
+20. Include standard dramatic-taxonomy aliases and semantic marker values in
+    manifest normalization. `exposition`, `rising_action`, and `climax` map to
+    the canonical arc; a marker such as `closure: "final"` means true. Reject
+    unknown labels after normalization.
