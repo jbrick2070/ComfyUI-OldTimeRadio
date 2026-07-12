@@ -319,15 +319,12 @@ def _humo_hosts_enabled() -> bool:
     return os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
 
 
-#: ADDENDUM (ltx talking radio-face, SEPARATE from the HuMo-hosts feature): the
-#: bookend role that gets a WIDE radio-FACE still for ltx_audio_in I2V init.
-#: ANNOUNCER-ONLY (operator 2026-07-03): the MUSIC bookend stays faceless
-#: (ltx would lip-sync a mouth to music), so render_driver only ever consumes
-#: the announcer face (render_driver.py:1145-1155) -- minting a music radio-face
-#: still was a dead FLUX render every talking episode, pruned 2026-07-04
-#: (radio-face logic C2). Object_id pattern MUST match render_driver's
-#: _ltx_radio_face_object_id (still_<role>_radio_face_169).
-_LTX_RADIO_FACE_ROLES = ("announcer_visual",)
+#: LTX audio-in bookends use a WIDE radio-face still for their I2V init. Music
+#: remains a radio in every visual mode; when it is explicitly audio-driven it
+#: receives the same radio-with-lips treatment as the announcer (operator
+#: 2026-07-12). Other music engines retain their faceless radio scene still.
+#: Object ids MUST match render_driver._ltx_radio_face_object_id.
+_LTX_RADIO_FACE_ROLES = ("announcer_visual", "music_visual")
 
 
 def _ltx_radio_face_object_id(role: str) -> str:
@@ -475,20 +472,34 @@ def _video_models_from_policy(policy_json):
     return {}
 
 
-def _effective_announcer_family(video_models) -> str:
-    """The RESOLVED ``announcer_visual`` engine FAMILY, AFTER OTR_FORCE_ENGINE_MAP.
+def _still_consumer_capabilities(video_models):
+    """Ask the dispatcher-owned authority for every role's tri-state capability.
 
-    The radio-face rule keys the announcer portrait on this, NOT the bare
-    OTR_ENABLE_HUMO_HOSTS flag: HUMO on but the announcer FORCED to a static
-    engine (OTR_FORCE_ENGINE_MAP=announcer_visual=still_flat) still means a
-    faceless radio. Resolves the role's engine via the shared role_slots join,
-    applies the SAME force-map the dispatcher/render-time override uses
-    (:func:`otr_image_gen_dispatcher._effective_engine_after_force_map`), then
-    reads the family via :func:`render_driver.engine_family`. Tolerant: any
-    resolution/import failure -> "" (the caller then defaults to the FACELESS
-    radio_object -- fail SAFE toward faceless). Pure except the env read inside
-    the force-map resolver."""
-    eng_id = _effective_prompt_engine_for_role(video_models, "announcer_visual")
+    ``False`` proves that a role is procedural and its prompt may be omitted;
+    ``True`` requires authoring; ``None`` remains uncertain and preserves the
+    legacy authoring path.  Only an all-False complete map permits the early
+    no-image return.
+    """
+    if not isinstance(video_models, dict):
+        return None
+    try:
+        try:
+            from .otr_image_gen_dispatcher import still_consumer_capabilities  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from otr_image_gen_dispatcher import still_consumer_capabilities  # type: ignore
+        return still_consumer_capabilities({"video_models": video_models})
+    except Exception:  # noqa: BLE001 -- uncertainty retains legacy authoring
+        return None
+
+
+def _effective_video_family_for_role(video_models, role: str) -> str:
+    """The RESOLVED video-engine family for one role after effective rewrites.
+
+    Tolerant: a resolution/import failure returns ``""`` so callers cannot infer
+    a lip-host consumer from an incomplete policy. Pure except the effective
+    engine's environment reads.
+    """
+    eng_id = _effective_prompt_engine_for_role(video_models, role)
     if not eng_id:
         return ""
     try:
@@ -499,6 +510,11 @@ def _effective_announcer_family(video_models) -> str:
         return str(engine_family(eng_id, "") or "")
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _effective_announcer_family(video_models) -> str:
+    """Compatibility wrapper for the announcer radio-style decision."""
+    return _effective_video_family_for_role(video_models, "announcer_visual")
 
 
 def _effective_prompt_engine_for_role(video_models, role: str) -> str:
@@ -1597,6 +1613,18 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     (open/announcer/outro via :func:`derive_scene_still_targets`).
     """
     warnings: list = []
+    still_capabilities = _still_consumer_capabilities(video_models)
+    if (still_capabilities is not None
+            and all(value is False for value in still_capabilities.values())):
+        # All effective video engines are procedural.  This return is before
+        # style resolution and every prompt/LLM path: no image payload means no
+        # downstream image render and no upstream visual authoring to fail.
+        return {"version": 1, "objects": []}, warnings
+
+    def _still_required(role: str) -> bool:
+        return (still_capabilities is None
+                or still_capabilities.get(role) is not False)
+
     setting = _read_setting(meta)
     # Chunk A1 (r3 threading): resolve the visual style ONCE at the image-
     # prompt ENTRY and thread it down (helpers never re-resolve). Fail-loud:
@@ -1611,13 +1639,14 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     out: dict = {}
     roster = list(cast or [])
     cast_ids = {str(c.get("char_id") or "") for c in roster if isinstance(c, dict)}
-    for cid in announcer_line_char_ids(lines):
-        if cid in cast_ids:
-            continue                      # a real cast row already covers it
-        roster.append({
-            "char_id": cid,
-            "_synthetic_announcer": True,
-        })
+    if _still_required("announcer_visual"):
+        for cid in announcer_line_char_ids(lines):
+            if cid in cast_ids:
+                continue                  # a real cast row already covers it
+            roster.append({
+                "char_id": cid,
+                "_synthetic_announcer": True,
+            })
     for char in roster:
         if not isinstance(char, dict):
             continue
@@ -1627,6 +1656,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _is_announcer_row = bool(
             char.get("_synthetic_announcer")
             or str(char.get("name") or "").strip().upper() == "ANNOUNCER")
+        _role = "announcer_visual" if _is_announcer_row else "character_video"
+        if not _still_required(_role):
+            continue
         appearance = _appearance_for_char([char], cid)
         # Framing aspect: synthetic announcers follow announcer_visual, cast
         # characters follow character_video -- so a WIDE video engine gets a
@@ -1838,19 +1870,22 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             _pobj["radio_host_style"] = pinfo["radio_host_style"]
         objects.append(_pobj)
 
-    # RADIO-HOST FACE object (2026-07-01, chunk 3) -- the ONE animatable human
-    # face this feature grants. GATED on OTR_ENABLE_HUMO_HOSTS so OFF is
-    # byte-identical (no extra object minted). Minted ONCE per episode with its
-    # own object_id (kind=portrait -> render_driver._portrait_index resolves it
-    # as the HuMo init_image for the LINELESS announcer/music bookends). Aspect
-    # FOLLOWS the HuMo bookend slot (music_visual, else announcer_visual) so a
-    # wide HuMo engine is not fed a pillarboxed portrait; seed is pinned to
-    # OTR_RADIO_BOOKEND_SEED in the dispatcher (open/inter/close share ONE face).
-    # The no-baby negative is populated on the row.
-    if _humo_hosts_enabled():
-        _rh_aspect = (_role_aspects.get("music_visual")
-                      or _role_aspects.get("announcer_visual") or "portrait")
-        # MUSIC bookends -> the ANTHROPOMORPHIC RADIO CONSOLE face (operator 2026-07-01).
+    # RADIO-HOST FACE object (2026-07-01, chunk 3) -- the ONE animatable radio
+    # face for a *proven* HuMo bookend consumer. Music is always a radio; it gets
+    # lips only when the effective music engine is audio-driven, just as an
+    # audio-driven announcer does. A regular still/visualizer music lane gets its
+    # normal faceless radio scene still instead. When both bookends are HuMo, use
+    # the music slot as the longstanding shared host owner; when only one is HuMo,
+    # stamp that role so the dispatcher resolves its valid image slot.
+    _radio_host_roles = tuple(
+        role for role in ("music_visual", "announcer_visual")
+        if (_still_required(role)
+            and _effective_video_family_for_role(video_models, role)
+            == "audio_driven_face")
+    )
+    if _humo_hosts_enabled() and _radio_host_roles:
+        _rh_role = _radio_host_roles[0]
+        _rh_aspect = _role_aspects.get(_rh_role) or "portrait"
         _rh_prompt = build_radio_host_prompt(meta, _rh_aspect,
                                              radio_host_style="console_face",
                                              vstyle=_vstyle)
@@ -1858,7 +1893,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         objects.append({
             "object_id": RADIO_HOST_PORTRAIT_ID,
             "kind": "portrait",
-            "role": "music_visual",
+            "role": _rh_role,
             "w": _rhw, "h": _rhh,
             "prompt": _rh_prompt,
             "prompt_hash": _content_hash(_rh_prompt),
@@ -1873,18 +1908,21 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     # render_driver._ltx_radio_face_object_id; seed-pinned in the dispatcher
     # (shares the bookend seed). No-baby negative populated.
     # When a bookend role's engine lip-syncs (talking_roles via the director
-    # policy), the radio-face still mints; a non-talking single-pass announcer
-    # is faceless.
+    # policy), the radio-face still mints. A non-audio-driven music engine stays
+    # a faceless radio scene; an explicitly LTX-audio music engine gets lips.
     _talk = talking_roles or {}
-    if any(_talk.get(r) for r in _LTX_RADIO_FACE_ROLES):
+    if any(_talk.get(r) and _still_required(r) for r in _LTX_RADIO_FACE_ROLES):
         _fw, _fh = still_dims_for_aspect("wide", PORTRAIT_W, PORTRAIT_H)
         for _abrole in _LTX_RADIO_FACE_ROLES:
+            if not (_talk.get(_abrole) and _still_required(_abrole)):
+                continue
             # Talking-radio kibitz r1 (2026-07-01): the ltx bookend still uses the
             # LTX-ONLY mouth-forward style. The radio IS the host, and ltx_audio_in
             # (no face detector) needs the biggest, clearest mouth region to drive
-            # -- the Sub-plan-C probe lever. ANNOUNCER-ONLY since 2026-07-03 (music
-            # stays faceless; the dead music mint was pruned 2026-07-04). The HuMo
-            # console_face look is byte-unchanged (the split); no new model / path.
+            # -- the Sub-plan-C probe lever. The same literal radio-with-lips
+            # contract applies to announcer and explicitly audio-driven music;
+            # ordinary music remains the faceless radio scene. The HuMo
+            # console_face look stays a separate family-specific path.
             _fprompt = build_radio_host_prompt(
                 meta, "wide", radio_host_style="ltx_radio_mouth",
                 vstyle=_vstyle)
@@ -1937,6 +1975,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _fodder_roles = set(mesh_fodder_roles or ())
         _still_word_roles = set(still_word_roles or ())
         for tgt in scene_targets:
+            if not _still_required(str(tgt.get("role") or "")):
+                continue
             _cid = str(tgt.get("char_id") or "")
             _src = tgt["source"]
             _bid = tgt["beat_id"]
@@ -2142,6 +2182,16 @@ class OTRMetaBriefImagePromptGen:
         meta = led.get("meta") if isinstance(led.get("meta"), dict) else {}
         cast = led.get("cast") if isinstance(led.get("cast"), list) else []
         lines = led.get("lines") if isinstance(led.get("lines"), list) else []
+        video_models = _video_models_from_policy(image_policy_json)
+        _still_capabilities = _still_consumer_capabilities(video_models)
+        if (_still_capabilities is not None
+                and all(value is False for value in _still_capabilities.values())):
+            payload = {"version": 1, "objects": []}
+            return (
+                json.dumps(payload, ensure_ascii=True, separators=(",", ":")),
+                "image_prompts v1: 0 objects\n"
+                "SKIP: no effective video role consumes init_image",
+            )
 
         warnings: list = []
         # Brief disposition, ONCE per run (gap-audit G4 restore).
@@ -2164,7 +2214,7 @@ class OTRMetaBriefImagePromptGen:
             mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),
             talking_roles=_talking_roles_from_policy(image_policy_json),
             still_word_roles=_still_word_roles_from_policy(image_policy_json),
-            video_models=_video_models_from_policy(image_policy_json),
+            video_models=video_models,
         )  # aspects + mesh-fodder + talking + still_word roles + video_models ride in image_policy_json
         warnings.extend(warn2)
 

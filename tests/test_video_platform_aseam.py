@@ -413,6 +413,38 @@ def test_shotlock_derives_orphans_from_beat():
     assert "grim resolve" in c["text_prompt"] and "spacer" in c["text_prompt"]
 
 
+def test_shotlock_all_visualizers_skip_writer_visual_directives(monkeypatch):
+    calls = {"n": 0}
+
+    def must_not_resolve(*_args, **_kwargs):
+        calls["n"] += 1
+        raise AssertionError("all-visualizer run must not resolve writer LLM")
+
+    monkeypatch.setattr(sl, "_resolve_writer_llm", must_not_resolve)
+    ledger = {
+        "cast": [{"char_id": "c1", "name": "BABA",
+                  "portrait_prompt": "a tall weathered spacer with a scar"}],
+        "lines": [{"line_id": "b1", "char_id": "c1",
+                   "speaker_role": "character", "text": "The station is failing.",
+                   "samples": 24000, "sample_rate": 24000}],
+        "meta": {"story_brief_terms": {"setting": ["a derelict orbital station"]}},
+    }
+    policy = json.dumps({
+        "policy_version": 2,
+        "video_models": {
+            "announcer_video_model": {"engine_id": "viz_mxc_cpu"},
+            "music_video_model": {"engine_id": "viz_mxc_mandala"},
+            "character_video_model": {"engine_id": "viz_camera"},
+        },
+        "canvas": {"w": 832, "h": 480, "fps": 25},
+    })
+    patched, _rev, _report, _done, _episode_id = OTRShotLock().lock(
+        json.dumps(ledger), audio_done="audio:done", video_policy_json=policy)
+    shots = json.loads(patched)["video"]["shots"]
+    assert calls["n"] == 0
+    assert shots and shots[0]["creative"] == {}
+
+
 def test_passpm_empty_json_reseed_then_templates():
     """An ATTEMPTED derivation LLM that collapses to empty after every reseed
     still spends the reseed budget, then the deterministic collapse guard

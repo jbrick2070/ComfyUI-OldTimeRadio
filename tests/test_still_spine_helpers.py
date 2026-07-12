@@ -663,6 +663,10 @@ class TestDispatcherStillSpine:
                 "image_models": {
                 "music_image_model": {"engine_id": "flux_gen1"},
                 "character_image_model": {"engine_id": "flux_gen1"}},
+                "video_models": {
+                "announcer_video_model": {"engine_id": "viz_mxc_cpu"},
+                "music_video_model": {"engine_id": "still_motion"},
+                "character_video_model": {"engine_id": "viz_camera"}},
                 "seed": {"mode": "request_hash", "request_seed": 3}}
             payload = {"version": 1, "objects": [{
                 "object_id": "still_b000_music_open", "kind": "scene_open",
@@ -921,6 +925,10 @@ class TestDispatcherStillSpine:
             policy = {"policy_version": 2,
                 "image_models": {
                 "character_image_model": {"engine_id": "flux_gen1"}},
+                "video_models": {
+                "announcer_video_model": {"engine_id": "viz_mxc_cpu"},
+                "music_video_model": {"engine_id": "viz_mxc_mandala"},
+                "character_video_model": {"engine_id": "still_motion"}},
                 "seed": {"request_seed": 0}}
             payload = {"version": 1, "objects": [{
                 "object_id": "c1", "kind": "portrait",

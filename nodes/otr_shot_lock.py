@@ -505,6 +505,7 @@ def derive_creative_directives(
     batch_size: int = 15,
     max_reseed: int = 2,
     consistency_gate_warn_only: bool = False,
+    video_policy=None,
 ):
     """Derive per-beat creative directives for character-bearing beats.
 
@@ -521,7 +522,24 @@ def derive_creative_directives(
     frozen audio.
     """
     warnings: list = []
-    char_beats = [b for b in beats if b["role"] in CHARACTER_BEARING_ROLES]
+    # The image dispatcher owns effective init-image capability (including
+    # force-map and radio-host redirects).  Ask it lazily so every direct legacy
+    # caller still behaves as before when it has no complete policy.  A proven
+    # ``False`` for character_video lets an all-visualizer run return before
+    # resolving the writer LLM; unknown remains author-all.
+    still_capabilities = None
+    if video_policy is not None:
+        try:
+            from .otr_image_gen_dispatcher import still_consumer_capabilities
+            still_capabilities = still_consumer_capabilities(video_policy)
+        except Exception:  # noqa: BLE001 -- uncertainty retains authoring
+            still_capabilities = None
+    char_beats = [
+        b for b in beats
+        if (b["role"] in CHARACTER_BEARING_ROLES
+            and (still_capabilities is None
+                 or still_capabilities.get(b["role"]) is not False))
+    ]
     if not char_beats:
         return {}, warnings
 
@@ -1098,6 +1116,7 @@ class OTRShotLock:
         creative, cre_warn = derive_creative_directives(
             beats, meta, led,
             consistency_gate_warn_only=bool(consistency_gate_warn_only),
+            video_policy=policy,
         )
         warnings.extend(cre_warn)
 

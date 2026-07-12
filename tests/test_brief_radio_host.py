@@ -308,6 +308,38 @@ def test_mint_ltx_audio_in_gets_mouth_still(monkeypatch):
         _SPACE_META, "portrait", "radio_object")
 
 
+def test_mint_ltx_audio_in_music_gets_radio_with_lips(monkeypatch):
+    # Music is always a radio. When its selected engine is audio-driven LTX, it
+    # receives the same wide radio-with-lips init as an audio-driven announcer.
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        talking_roles={"music_visual": True},
+        video_models={
+            "announcer_video_model": {"engine_id": "viz_mxc_cpu"},
+            "music_video_model": {"engine_id": "ltx_audio_in"},
+            "character_video_model": {"engine_id": "viz_camera"},
+        })
+    objs = {o["object_id"]: o for o in out["objects"]}
+    face = objs["still_music_visual_radio_face_169"]
+    assert face["role"] == "music_visual"
+    assert "rubbery mouth" in face["prompt"]
+
+
+def test_humo_radio_host_uses_announcer_slot_when_music_is_procedural(monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        video_models={
+            "announcer_video_model": {"engine_id": "humo"},
+            "music_video_model": {"engine_id": "viz_mxc_mandala"},
+            "character_video_model": {"engine_id": "viz_camera"},
+        })
+    objs = {o["object_id"]: o for o in out["objects"]}
+    host = objs[mbp.RADIO_HOST_PORTRAIT_ID]
+    assert host["role"] == "announcer_visual"
+    assert "dial" in host["prompt"] and "face" in host["prompt"]
+
+
 def test_redirected_humo_announcer_mints_ltx_mouth_still(monkeypatch):
     # Render redirects announcer_visual HuMo picks to ltx_audio_in when HuMo hosts
     # are off. MetaBrief must plan against that effective engine, or the render
@@ -406,7 +438,12 @@ def test_radio_host_portrait_minted_when_toggle_on(monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
-        still_aspects={"music_visual": "wide"})
+        still_aspects={"music_visual": "wide"},
+        video_models={
+            "announcer_video_model": {"engine_id": "viz_mxc_cpu"},
+            "music_video_model": {"engine_id": "humo"},
+            "character_video_model": {"engine_id": "viz_camera"},
+        })
     objs = {o["object_id"]: o for o in out["objects"]}
     rh = objs[mbp.RADIO_HOST_PORTRAIT_ID]
     assert rh["kind"] == "portrait" and rh["role"] == "music_visual"

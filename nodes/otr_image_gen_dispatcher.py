@@ -395,44 +395,76 @@ def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
     return eff
 
 
-def _still_needed_for_role(image_policy: dict, role: str) -> bool:
-    """True if the SELECTED video engine for ``role`` consumes the role's still.
-    When the role's video engine IGNORES the still (the visualizer / abstract /
-    audio-only procedural floor -> ``accepts_still=False``), the still is never used
-    -> skip generating it, so an all-procedural episode invokes NO image model
-    (accessible for users with no image/video models). Fail SAFE: unknown engine /
-    missing video_models / unknown role -> True (keep the still, legacy behaviour).
-    Pure registry read; delegates the capability check to ``engine_consumes_still``."""
-    vmodels = (image_policy or {}).get("video_models") or {}
-    if not vmodels:
-        return True                       # legacy policy: dispatch every still
-    # Unknown role -> keep the still (fail-safe), matching the legacy
-    # _ROLE_TO_VIDEO_SLOT.get(role) -> None -> True behaviour. engine_id_for_role
-    # raises ValueError on an unknown role, so guard explicitly.
-    if str(role) not in _role_slots.ROLE_TO_VIDEO_SLOT:
-        return True
-    # Route-A: resolve the role's video engine via the ONE shared map (per-role
-    # slot only) so character_video correctly
-    # reads character_video_model (humo_14B_169 consumes the still it requires).
-    eng_id = _role_slots.engine_id_for_role(vmodels, str(role))
-    if not eng_id:
-        return True
-    # Honor render-time engine rewrites (force-map + radio-is-host redirect): the
-    # image phase must mint/skip against the same engine build_request_from_shot
-    # will see, or a redirected talking ltx_audio_in announcer can reach render
-    # without its mandatory wide radio-face still.
-    eng_id = _effective_video_engine_for_role(str(role), eng_id)
+def still_consumer_capability(image_policy: dict, role: str):
+    """``True`` / ``False`` / ``None`` for one role's init-image consumer.
+
+    ``True`` and ``False`` are proven only after resolving the selected engine
+    through the same force-map and radio-host redirect the render path uses.
+    ``None`` means no proof: a missing/partial policy, unknown role, empty slot,
+    or unresolvable effective engine.  Keeping that third state prevents an
+    unrelated custom slot from erasing a proven character consumer while still
+    forbidding generation for an unproven object role.
+    """
+    if not isinstance(image_policy, dict):
+        return None
+    vmodels = image_policy.get("video_models")
+    role_s = str(role or "")
+    if not isinstance(vmodels, dict) or role_s not in _role_slots.ROLE_TO_VIDEO_SLOT:
+        return None
     try:
+        eng_id = _role_slots.engine_id_for_role(vmodels, role_s)
+        if not eng_id:
+            return None
+        eng_id = _effective_video_engine_for_role(role_s, eng_id)
+        # Register built-in lightweight adapters before the query; this remains
+        # lazy so importing the dispatcher stays cold-import clean.
+        from . import _otr_video_engines  # noqa: F401
         from ._otr_video_engines import registry as _vreg
-        eng = _vreg.get_engine(eng_id)
-    except Exception as exc:              # noqa: BLE001
-        # No silent fallback (LOUD): an unknown/unresolvable engine keeps the still
-        # (fail SAFE) but says so -- never a quiet force-True.
-        log.warning("[OTR_ImageGenDispatcher] _still_needed_for_role: cannot resolve "
-                    "video engine %r for role=%s (%s); keeping the still (fail-safe)",
-                    eng_id, role, exc)
+        if not _vreg.is_registered(eng_id):
+            return None
+        return engine_consumes_still(_vreg.get_engine(eng_id))
+    except Exception:  # noqa: BLE001 -- absence of proof is a real third state
+        return None
+
+
+def _still_needed_for_role(image_policy: dict, role: str) -> bool:
+    """Legacy boolean view of :func:`still_consumer_capability`.
+
+    Direct legacy callers historically fail-safe toward keeping a still when
+    configuration is unknown.  The terminal dispatcher now consumes the
+    tri-state helper directly and refuses to render without proof instead.
+    """
+    capability = still_consumer_capability(image_policy, role)
+    if capability is None:
+        log.warning("[OTR_ImageGenDispatcher] _still_needed_for_role: cannot prove "
+                    "an effective init-image consumer for role=%s; retaining the "
+                    "legacy boolean fail-safe", role)
         return True
-    return engine_consumes_still(eng)
+    return capability
+
+
+def still_consumer_capabilities(image_policy: dict):
+    """Return ``{role: True|False|None}`` or ``None`` for malformed policy."""
+    if not isinstance(image_policy, dict) or not isinstance(
+            image_policy.get("video_models"), dict):
+        return None
+    return {
+        role: still_consumer_capability(image_policy, role)
+        for role in _role_slots.ROLE_TO_VIDEO_SLOT
+    }
+
+
+def roles_requiring_stills(image_policy: dict):
+    """Return conclusively still-consuming roles, or ``None`` if any role is unknown.
+
+    The compact set is ideal for an all-procedural upstream bypass.  Callers
+    that need per-object mixed-policy behavior should use
+    :func:`still_consumer_capabilities` and preserve ``None`` as uncertainty.
+    """
+    capabilities = still_consumer_capabilities(image_policy)
+    if capabilities is None or any(value is None for value in capabilities.values()):
+        return None
+    return frozenset(role for role, value in capabilities.items() if value)
 
 
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
@@ -492,6 +524,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "on this) instead of hand-editing image_policy_json." % viol)
     warnings: list = []
     report: list = []
+    objects = (image_prompts or {}).get("objects") or []
+    still_capabilities = still_consumer_capabilities(image_policy)
+    if objects and still_capabilities is None:
+        raise ImageRenderError(
+            "OTR_ImageGenDispatcher cannot prove an image consumer: image_policy "
+            "must carry a video_models map before any still is rendered. "
+            "Refusing image generation rather than assuming a consumer."
+        )
     cast = ledger.get("cast") if isinstance(ledger.get("cast"), list) else []
     images_section = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
     cache_index = dict(images_section.get("cache_index") or {})
@@ -530,7 +570,6 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     # stamp, so stamp_portrait must not fail-closed on them (cast stays
     # CastLock's frozen authority; never added to here).
     cast_ids = {str(c.get("char_id") or "") for c in cast if isinstance(c, dict)}
-    objects = (image_prompts or {}).get("objects") or []
     for obj in objects:
         if not isinstance(obj, dict):
             continue
@@ -553,16 +592,25 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         obj_h = int(obj.get("h") or 0)
         if not oid:
             continue
-        # SKIP an unused still: when this role's SELECTED video engine ignores
-        # init_image (the visualizer / abstract procedural floor), the still is
-        # never consumed -> do not generate it. An all-procedural episode then
-        # invokes NO image model at all (accessible: works for users with no
-        # image/video models). Safe for byte-identical (the skipped still was
-        # unused; audio + video output unchanged). LOUD trace.
-        if not _still_needed_for_role(image_policy, role):
-            log.info("[OTR_ImageGenDispatcher] skip %s (role=%s): the selected "
-                     "video engine ignores init_image (procedural floor) -- no "
-                     "still generated", oid, role)
+        if role not in _role_slots.ROLE_TO_VIDEO_SLOT:
+            raise ImageRenderError(
+                f"{oid}: image object declares unknown role {role!r}; cannot "
+                "prove an init-image consumer. Refusing image generation."
+            )
+        capability = still_capabilities.get(role)
+        if capability is None:
+            raise ImageRenderError(
+                f"{oid}: cannot prove an effective init-image consumer for role "
+                f"{role!r}; resolve that role's video engine before image "
+                "generation."
+            )
+        # A still is generated ONLY for a proven effective consumer.  The shared
+        # tri-state decision accounts for force-map + radio-host redirects, so
+        # this cannot drift from the render engine's actual init-image capability.
+        if not capability:
+            log.info("[OTR_ImageGenDispatcher] skip %s (role=%s): no proven "
+                    "effective video consumer for init_image -- no still "
+                    "generated", oid, role)
             continue
         # Slot resolution per OBJECT role (ST-3: the ImageDirector slots
         # finally honored); empty named slot -> character fallback, LOUD.

@@ -199,9 +199,8 @@ def test_keep_set_keeps_lora(ia2v_env):
 
 
 # --------------------------------------------------------------------------- #
-# TALKING prompt register (lips-dont-talk kibitz fix, 2026-07-02): probe P4
-# proved the scene/console register collapses articulation (4.15 -> 1.18);
-# P2 proved music cannot drive lips (register deliberately unchanged there).
+# TALKING prompt register: an explicitly audio-driven announcer or music radio
+# gets lips; a non-audio-driven music engine keeps its faceless console scene.
 # --------------------------------------------------------------------------- #
 _PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 80
 
@@ -279,14 +278,15 @@ def test_announcer_bookend_gets_talking_register(ia2v_env, tmp_path,
     assert "Tuning dial needle" not in p          # console register replaced
 
 
-def test_music_bookend_keeps_console_register(ia2v_env, tmp_path, monkeypatch):
-    # P2: LTX cannot lip-sync to music -- the music bookends deliberately
-    # KEEP the console-motion register even under the talking recipe.
+def test_music_bookend_gets_talking_radio_register(ia2v_env, tmp_path, monkeypatch):
+    # Operator 2026-07-12: an explicitly LTX-audio music radio gets the
+    # lip-sync register and its matching wide radio-with-lips still.
     from nodes._otr_video_engines import render_driver as rd
 
     req = rd.build_request_from_shot(_music_open_shot(), _ltx_ledger(tmp_path))
-    assert "Dial whip-pans" in req["text_prompt"]
-    assert "lips" not in req["text_prompt"]
+    assert "lips opening and closing" in req["text_prompt"]
+    assert req["observability"]["init_source"] == "ltx_radio_face"
+    assert req["observability"]["init_image"] == "face.png"
 
 
 def test_announcer_bookend_unchanged_on_single_pass_recipe(tmp_path,
@@ -448,6 +448,17 @@ def test_announcer_bookend_takes_radio_face_by_default_under_ia2v(
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     req = rd.build_request_from_shot(_announcer_open_shot(),
                                      _ltx_ledger(tmp_path))
+    obs = req["observability"]
+    assert obs["init_source"] == "ltx_radio_face"
+    assert obs["init_image"] == "face.png"
+
+
+def test_music_bookend_takes_radio_face_by_default_under_ia2v(
+        ia2v_env, tmp_path, monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    req = rd.build_request_from_shot(_music_open_shot(), _ltx_ledger(tmp_path))
     obs = req["observability"]
     assert obs["init_source"] == "ltx_radio_face"
     assert obs["init_image"] == "face.png"

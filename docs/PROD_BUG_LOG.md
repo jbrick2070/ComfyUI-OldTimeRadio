@@ -768,3 +768,37 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: pending -- live admission and reusable exact-envelope rule are
   proved; promote only through the standing Bug Bible fan-out
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260712-19 -- all-visualizer policy still invoked upstream image authoring
+- surfaced: canonical 120-word `scifi_codex` queue leg, prompt
+  `e5ded258-1f3d-4a6e-874a-ba89ce1e6a83`, Gemma E4B creative + Mistral-Nemo
+  technical, 2026-07-12
+- symptom: `RESULT FAIL` at node 89 `OTR_MetaBriefImagePromptGen`; the canonical
+  all-visualizer policy (`viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera`) still
+  resolved and used the writer visual-prompt path, and c03 failed the
+  story-consistency gate even though no downstream video role consumed an init
+  image. No OBS final was produced.
+- root cause: effective-engine / `accepts_still` capability was checked only at
+  downstream image dispatch. MetaBrief and ShotLock entered visual-authoring
+  paths before that guard, so a proven no-consumer policy could still spend or
+  fail in an upstream writer call.
+- fix: make dispatcher-owned effective per-role still capability (including
+  force-map and radio redirects) the shared authority. A complete all-false
+  map returns an explicit empty v1 payload and bypasses MetaBrief/ShotLock
+  writer resolution; mixed policy omits only roles proven procedural and keeps
+  unknown roles conservative upstream. The dispatcher renders only roles
+  proven to consume an init image and fails loudly for an unproven object role.
+- verify idea: `test_roles_requiring_stills_needs_a_complete_resolvable_policy`,
+  `test_meta_brief_all_visualizers_bypass_prompt_authoring`,
+  `test_meta_brief_node_bypasses_before_writer_resolution`,
+  `test_meta_brief_mixed_policy_authors_only_proven_consumer_roles`,
+  `test_dispatcher_refuses_image_render_without_proven_consumer`,
+  `test_dispatcher_preserves_proven_role_when_another_slot_is_unresolved`,
+  `test_dispatcher_rejects_explicit_unknown_object_role`,
+  `test_dispatch_skips_stills_for_all_visualizer_episode`, and
+  `test_shotlock_all_visualizers_skip_writer_visual_directives`; then rerun the
+  canonical bank and require RESULT SUCCESS, no image objects or visual-writer
+  call, ledger, episode asset, `obs_publish OK`, and OBS final.
+- bible-worthy: yes -- live failure plus reusable effective-consumer-capability
+  contract and executable coverage
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

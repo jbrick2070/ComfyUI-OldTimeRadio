@@ -13,9 +13,9 @@ Pins:
      silent `or ...["announcer"]` fallback is RETIRED (a stub style with a
      missing console key raises KeyError, never remaps); the
      OTR_LTX_OPEN_MOTION_KEY retarget works off the STATIC key set.
-  2. NO-LEAK (r3): the probe-locked _IA2V_TALKING_PROMPT_ANNOUNCER is a
-     VERBATIM Python constant -- pack motion_registers["announcer"] never
-     reaches a talking announcer bookend, even from a hostile pack.
+   2. NO-LEAK (r3): the probe-locked _IA2V_TALKING_PROMPT_ANNOUNCER is a
+      VERBATIM Python constant -- pack motion registers never reach an
+      explicitly audio-driven radio bookend, even from a hostile pack.
   3. LOOK SPLITS: object anchors / plate scaffold compose geometry + pack
      look byte-identically; the emblem template formats {base} at the real
      fallback; music_visual keeps radio_form_from_meta.
@@ -174,7 +174,7 @@ class TestMotionRegisters:
 # 2. NO-LEAK: the probe-locked talking prompt outranks every pack
 # ---------------------------------------------------------------------------
 class TestTalkingNoLeak:
-    def test_pack_announcer_motion_never_leaks_into_talking(
+    def test_pack_radio_motion_never_leaks_into_talking(
             self, _single_pass_recipe, tmp_path, monkeypatch):
         raw = json.loads((_STYLES_DIR / "sci_fi_radio.json")
                          .read_text(encoding="utf-8"))
@@ -204,9 +204,15 @@ class TestTalkingNoLeak:
         assert "HOSTILE" not in req["text_prompt"]
         assert (req["observability"]["prompt_field_source"]
                 == "python:ia2v_talking")
-        # music bookends KEEP the (hostile-pack) console register -- P2
-        req2 = rd.build_request_from_shot(_shot(), _led(dict(_META_BRIEF)))
-        assert req2["text_prompt"] != rd._IA2V_TALKING_PROMPT_ANNOUNCER
+        # Explicitly audio-driven music uses the same radio-with-lips contract;
+        # its hostile pack motion must not leak either.
+        led2 = _led(dict(_META_BRIEF))
+        led2["images"]["images"].append(
+            {"object_id": "still_music_visual_radio_face_169",
+             "kind": "portrait", "path": str(face)})
+        req2 = rd.build_request_from_shot(_shot(), led2)
+        assert req2["text_prompt"] == rd._IA2V_TALKING_PROMPT_ANNOUNCER
+        assert "HOSTILE" not in req2["text_prompt"]
 
     def test_talking_constants_stay_python(self):
         # P8: verbatim constants; packs have no field for them.

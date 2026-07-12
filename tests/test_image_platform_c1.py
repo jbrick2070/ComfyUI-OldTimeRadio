@@ -76,6 +76,20 @@ def _payload(*objs):
     return {"version": 1, "objects": list(objs)}
 
 
+def _complete_video_models(*, announcer="viz_mxc_cpu", music="viz_mxc_mandala",
+                           character="still_motion"):
+    """A complete, resolvable policy for dispatch tests.
+
+    Tests that expect a still to render must state its consumer explicitly;
+    merely choosing an image engine is not proof that any video engine uses it.
+    """
+    return {
+        "announcer_video_model": {"engine_id": announcer},
+        "music_video_model": {"engine_id": music},
+        "character_video_model": {"engine_id": character},
+    }
+
+
 def _by_id(payload_and_warns_or_payload):
     p = payload_and_warns_or_payload
     if isinstance(p, tuple):
@@ -466,6 +480,88 @@ def test_meta_brief_consistency_gate_fallback():
     assert any("missing appearance/setting" in w for w in warns)
 
 
+def test_roles_requiring_stills_needs_a_complete_resolvable_policy(monkeypatch):
+    import nodes._otr_video_engines  # noqa: F401 -- self-register built-ins
+    all_visualizers = _complete_video_models(character="viz_camera")
+    assert disp.roles_requiring_stills({"video_models": all_visualizers}) == frozenset()
+    assert disp.roles_requiring_stills({}) is None
+    assert disp.roles_requiring_stills({"video_models": "bad"}) is None
+    assert disp.roles_requiring_stills({"video_models": {
+        "character_video_model": {"engine_id": "viz_camera"}}}) is None
+    assert disp.roles_requiring_stills({"video_models": _complete_video_models(
+        character="not_a_real_engine")}) is None
+
+    all_still = {"video_models": _complete_video_models(
+        announcer="still_motion", music="still_motion", character="still_motion")}
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_cpu")
+    assert disp.roles_requiring_stills(all_still) == frozenset()
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=wan_ti2v")
+    assert disp.roles_requiring_stills({"video_models": all_visualizers}) == frozenset({
+        "character_video"})
+
+
+def test_meta_brief_all_visualizers_bypass_prompt_authoring():
+    calls = {"n": 0}
+
+    def must_not_run(_prompt):
+        calls["n"] += 1
+        raise AssertionError("all-visualizer run must not author image prompts")
+
+    payload, warnings = mbp.derive_image_prompts(
+        [{"char_id": "c1", "name": "BABA", "portrait_prompt": "weathered spacer"}],
+        {"story_brief_terms": {"setting": ["orbital station"]}},
+        llm_fn=must_not_run,
+        video_models=_complete_video_models(character="viz_camera"),
+    )
+    assert payload == {"version": 1, "objects": []}
+    assert warnings == []
+    assert calls["n"] == 0
+
+
+def test_meta_brief_node_bypasses_before_writer_resolution(monkeypatch):
+    monkeypatch.setattr(
+        mbp, "_resolve_writer_llm",
+        lambda *_a, **_kw: (_ for _ in ()).throw(
+            AssertionError("all-visualizer run must not resolve writer LLM")),
+    )
+    script = json.dumps({
+        "meta": {"story_brief_terms": {"setting": ["orbital station"]}},
+        "cast": [{"char_id": "c1", "name": "BABA", "portrait_prompt": "weathered spacer"}],
+        "lines": [],
+    })
+    payload_json, report = mbp.OTRMetaBriefImagePromptGen().generate(
+        script, image_policy_json=json.dumps({"video_models": _complete_video_models(
+            character="viz_camera")}))
+    assert json.loads(payload_json) == {"version": 1, "objects": []}
+    assert "SKIP: no effective video role consumes init_image" in report
+
+
+def test_meta_brief_mixed_policy_authors_only_proven_consumer_roles():
+    calls = {"n": 0}
+
+    def writer(_prompt):
+        calls["n"] += 1
+        return "weathered spacer in the orbital station, face visible"
+
+    payload, _warnings = mbp.derive_image_prompts(
+        [{"char_id": "c1", "name": "BABA", "portrait_prompt": "weathered spacer"}],
+        {"story_brief_terms": {"setting": ["orbital station"]}},
+        llm_fn=writer,
+        lines=[
+            {"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer",
+             "text": "Welcome back."},
+            {"line_id": "b002", "speaker_role": "character", "char_id": "c1",
+             "text": "The station is failing."},
+            {"line_id": "b003", "speaker_role": "music_close", "char_id": "music_close"},
+        ],
+        video_models=_complete_video_models(character="still_motion"),
+    )
+    objects = payload["objects"]
+    assert objects and {obj["role"] for obj in objects} == {"character_video"}
+    assert {obj["object_id"] for obj in objects} >= {"c1", "still_b002"}
+    assert calls["n"] >= 2  # portrait + character scene; no announcer/music authoring
+
+
 # --------------------------------------------------------------------------- #
 def test_dispatcher_prompt_not_path_guard():
     with pytest.raises(ValueError):
@@ -473,6 +569,73 @@ def test_dispatcher_prompt_not_path_guard():
     with pytest.raises(ValueError):
         disp._assert_not_path(r"C:\stills\x.png")
     disp._assert_not_path("a normal portrait prompt, cinematic")  # ok
+
+
+def test_dispatcher_refuses_image_render_without_proven_consumer(tmp_path):
+    calls = {"n": 0}
+
+    def must_not_render(_req):
+        calls["n"] += 1
+        return _np_pixels(1)
+
+    policy = {
+        "policy_version": 2,
+        "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+        "seed": {"request_seed": 0},
+    }
+    with pytest.raises(disp.ImageRenderError, match="cannot prove an image consumer"):
+        disp.dispatch_images(
+            {"episode_id": "ep_no_consumer", "cast": [{"char_id": "c1"}]},
+            policy, _payload(_pobj("c1", "weathered spacer", "ph1")),
+            gen_fn=must_not_render, output_dir=str(tmp_path),
+            lockdir=tmp_path / "lease.lockdir")
+    assert calls["n"] == 0
+
+
+def test_dispatcher_preserves_proven_role_when_another_slot_is_unresolved(
+        clean_image_registry, tmp_path):
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    policy = {
+        "policy_version": 2,
+        "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+        "video_models": _complete_video_models(
+            announcer="operator_custom_unknown", character="still_motion"),
+        "seed": {"request_seed": 0},
+    }
+    capabilities = disp.still_consumer_capabilities(policy)
+    assert capabilities["announcer_visual"] is None
+    assert capabilities["music_visual"] is False
+    assert capabilities["character_video"] is True
+    calls = {"n": 0}
+
+    def render(_req):
+        calls["n"] += 1
+        return _np_pixels(8)
+
+    ledger, _done, _report, _warnings = disp.dispatch_images(
+        {"episode_id": "ep_mixed_proof", "cast": [{"char_id": "c1"}]},
+        policy, _payload(_pobj("c1", "weathered spacer", "ph1")),
+        gen_fn=render, output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
+    assert calls["n"] == 1
+    assert ledger["images"]["images"][0]["role"] == "character_video"
+
+
+def test_dispatcher_rejects_explicit_unknown_object_role(tmp_path):
+    policy = {
+        "policy_version": 2,
+        "video_models": _complete_video_models(),
+        "seed": {"request_seed": 0},
+    }
+    payload = _payload({
+        "object_id": "bad", "kind": "portrait", "role": "retired_role_b",
+        "char_id": "", "w": 832, "h": 1216, "prompt": "unused", "prompt_hash": "x",
+    })
+    with pytest.raises(disp.ImageRenderError, match="unknown role"):
+        disp.dispatch_images(
+            {"episode_id": "ep_bad_role", "cast": []}, policy, payload,
+            gen_fn=lambda _req: _np_pixels(3), output_dir=str(tmp_path),
+            lockdir=tmp_path / "lease.lockdir")
 
 
 def test_apply_fresh_cap():
@@ -616,6 +779,7 @@ def test_cloud_image_adapter_bypasses_local_gpu_residency(
     policy = {
         "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "ideo_alias"}},
+        "video_models": _complete_video_models(),
         "seed": {"request_seed": 0},
         "granularity": {},
     }
@@ -647,7 +811,7 @@ def test_gen_fn_none_for_pending_target_raises(clean_image_registry, tmp_path):
     policy = {
         "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
-        "video_models": {"character_video_model": {"engine_id": "still_motion"}},
+        "video_models": _complete_video_models(),
         "seed": {"request_seed": 0},
         "granularity": {},
     }
@@ -665,7 +829,7 @@ def test_dispatch_appends_visual_safety_to_image_requests(
     policy = {
         "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
-        "video_models": {"character_video_model": {"engine_id": "still_motion"}},
+        "video_models": _complete_video_models(),
         "seed": {"request_seed": 0},
         "granularity": {},
     }
@@ -705,7 +869,9 @@ def test_dispatch_renders_forced_ltx_announcer_radio_face(
             "announcer_image_model": {"engine_id": "flux_gen1"},
             "character_image_model": {"engine_id": "flux_gen1"}},
         "video_models": {
-            "announcer_video_model": {"engine_id": "viz_green"}},
+            "announcer_video_model": {"engine_id": "viz_green"},
+            "music_video_model": {"engine_id": "viz_green"},
+            "character_video_model": {"engine_id": "viz_green"}},
         "seed": {"request_seed": 0},
         "granularity": {},
     }
@@ -792,7 +958,7 @@ def test_dispatch_still_made_when_video_engine_needs_init_image(clean_image_regi
     policy = {
         "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
-        "video_models": {"character_video_model": {"engine_id": "wan_ti2v"}},
+        "video_models": _complete_video_models(character="wan_ti2v"),
         "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     lockdir = tmp_path / "lease.lockdir"
@@ -812,6 +978,7 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
               "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"policy_version": 2,
               "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(),
               "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     lockdir = tmp_path / "lease.lockdir"
@@ -876,6 +1043,7 @@ def test_dispatcher_hard_fails_on_unusable_engine(clean_image_registry, tmp_path
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"policy_version": 2,
               "image_models": {"character_image_model": {"engine_id": "ghost"}},
+              "video_models": _complete_video_models(),
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "x, y", "ph"))
     with pytest.raises(disp.ImageRenderError):
@@ -982,6 +1150,7 @@ def test_dispatcher_accepts_sidecar_path_handoff(clean_image_registry, tmp_path)
               "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"policy_version": 2,
               "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(),
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     side = _write_png(tmp_path / "from_sidecar.png", val=77)
@@ -1009,6 +1178,7 @@ def test_dispatcher_hard_fails_on_truncated_handoff(clean_image_registry, tmp_pa
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"policy_version": 2,
               "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(),
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     empty = tmp_path / "truncated.png"
@@ -1088,6 +1258,7 @@ def test_dispatcher_hard_fails_on_render_failure(clean_image_registry, tmp_path)
     ledger = {"cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {"policy_version": 2,
               "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(),
               "seed": {"request_seed": 0}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
 
@@ -1269,6 +1440,8 @@ def test_dispatcher_mints_non_cast_announcer_portrait(clean_image_registry, tmp_
               "image_models": {
                   "character_image_model": {"engine_id": "flux_gen1"},
                   "announcer_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(
+                  announcer="still_motion", character="still_motion"),
               "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(
         _pobj("c1", "a keeper, harbor", "ph1"),
@@ -1306,6 +1479,7 @@ def test_dispatch_persists_radio_host_style_fresh_and_cache_hit(
               "image_models": {
                   "character_image_model": {"engine_id": "flux_gen1"},
                   "announcer_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(announcer="still_motion"),
               "seed": {"request_seed": 0}, "granularity": {}}
     ann_obj = {"object_id": "announcer", "kind": "portrait",
                "role": "announcer_visual", "char_id": "announcer",
@@ -1340,6 +1514,7 @@ def test_dispatch_persists_still_word_provenance(clean_image_registry, tmp_path)
     policy = {"policy_version": 2,
               "image_models": {
                   "character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(),
               "seed": {"request_seed": 0}, "granularity": {}}
     obj = {"object_id": "still_b001", "kind": "scene_open",
            "role": "character_video", "beat_id": "b001", "char_id": "c01",

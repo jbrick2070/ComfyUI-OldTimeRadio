@@ -146,6 +146,10 @@ def test_image_dispatcher_stamps_singleton(fresh_singleton, tmp_path):
         policy = {"policy_version": 2,
                   "image_models":
                   {"character_image_model": {"engine_id": "flux_gen1"}},
+                  "video_models": {
+                      "announcer_video_model": {"engine_id": "viz_mxc_cpu"},
+                      "music_video_model": {"engine_id": "viz_mxc_mandala"},
+                      "character_video_model": {"engine_id": "still_motion"}},
                   "seed": {"request_seed": 0}, "granularity": {}}
         prompts = {"version": 1, "objects": [{
             "object_id": "c1", "kind": "portrait", "role": "character_video",

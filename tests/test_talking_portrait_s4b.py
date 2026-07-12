@@ -57,8 +57,10 @@ def test_video_director_role_talking_map():
     }
     talk = OTRVideoDirector._role_talking(resolved)
     assert set(talk) == {"announcer_visual", "music_visual",
-                         "character_video"}
+                          "character_video"}
     # default env (dev unet) -> ia2v register -> talking engine
+    assert talk["announcer_visual"] is True
+    assert talk["music_visual"] is True
     assert talk["character_video"] is True
 
 
@@ -142,10 +144,11 @@ def test_radio_face_mints_for_talking_bookends_without_env():
         _CAST, _META, llm_fn=None,
         talking_roles={"announcer_visual": True, "music_visual": True})
     ids = _radio_face_ids(payload)
-    # radio-face logic 2026-07-04 (C2): the MUSIC radio-face mint is pruned
-    # (announcer-only since 2026-07-03; the music bookend stays faceless).
+    # Music stays radio-shaped in every mode. An explicitly audio-driven music
+    # engine gets the matching radio-with-lips still; non-audio-driven music
+    # still uses its faceless radio scene.
     assert "still_announcer_visual_radio_face_169" in ids
-    assert "still_music_visual_radio_face_169" not in ids
+    assert "still_music_visual_radio_face_169" in ids
 
 
 def test_radio_face_absent_without_talking_or_env():

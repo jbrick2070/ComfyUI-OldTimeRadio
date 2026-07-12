@@ -1465,33 +1465,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "synthesizes its dark floor; a still-REQUIRED engine (still_word/"
                 "ltx_audio_in) fails LOUD in render_clip (no fallbacks). Investigate "
                 "the image phase for beat %s.", _eng, _bid, _bid)
-    # ADDENDUM (ltx talking radio-face, 2026-07-01, SEPARATE from the main
-    # OTR_ENABLE_HUMO_HOSTS feature): on an ltx_audio_in ANNOUNCER bookend,
-    # swap the FACELESS brief-driven scene still for the WIDE radio-FACE
-    # still. Applies ONLY when the FINAL routed bookend engine is ltx_audio_in.
-    # PRECEDENCE: if the main feature's OTR_ENABLE_HUMO_HOSTS is
-    # ON, HuMo owns the bookends -> rejected LOUD (never a silent double-route).
-    # S4c (operator eyeball 2026-07-02, "should be talking lips?"): under the
-    # ia2v TALKING register the mouth face IS the host and the recipe lip-syncs
-    # it, so a bookend must never ship faceless again (the pinprick b005/b001
-    # miss: faceless scene still -> nothing to articulate).
-    # OPERATOR DIRECTIVE 2026-07-03: the MUSIC bookend stays FACELESS. This swap
-    # is now ANNOUNCER-ONLY. ltx_audio_in is audio-conditioned, so feeding a
-    # radio-FACE still on a MUSIC beat makes the ia2v lip-sync graph articulate a
-    # mouth to the MUSIC (wrong -- music has no speech; "ltx makes the lips move
-    # so we don't need them"). Music keeps the faceless scene still resolved just
-    # above -> no mouth to animate. Only the ANNOUNCER bookend gets the talking
-    # radio-face.
+    # LTX audio-in bookends use a WIDE radio-FACE init under the ia2v talking
+    # register. Music remains a radio in every visual mode; when its effective
+    # engine is explicitly audio-driven, it gets the same radio-with-lips asset
+    # as the announcer (operator 2026-07-12). Other music engines retain the
+    # faceless radio scene still resolved above. HuMo is a per-role engine choice,
+    # so its global opt-in must not suppress an explicitly selected LTX role.
     if (_ia2v_talking_register_active("ltx_audio_in")
             and str(shot.get("engine_id") or "") == "ltx_audio_in"
-            and _role_of_shot(shot) == "announcer_visual"):
+            and _role_of_shot(shot) in ("announcer_visual", "music_visual")):
         _abrole = _role_of_shot(shot)
-        if os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
-            raise RenderError(
-                "talking ltx_audio_in announcer AND OTR_ENABLE_HUMO_HOSTS=1 on %s bookend "
-                "shot %s: HuMo owns the bookends, so the LTX radio-face is "
-                "rejected (never a silent double-route). Turn ONE toggle off."
-                % (_abrole, shot.get("shot_id")))
         _fid = _ltx_radio_face_object_id(_abrole)
         _frow = next(
             (im for im in (((ledger or {}).get("images") or {}).get("images") or [])
@@ -1500,20 +1483,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _fpath = str((_frow or {}).get("path") or "")
         if not _fpath:
             raise RenderError(
-                "a talking ltx_audio_in announcer REQUIRES the minted wide radio-face still "
+                "a talking ltx_audio_in %s bookend REQUIRES the minted wide radio-face still "
                 "(MetaBrief mints it when the engine lip-syncs). Missing still %r in the ledger "
                 "for %s bookend shot %s -- NO FALLBACK (never black, never a portrait "
-                "pillarbox). Confirm MetaBrief minted it + the dispatcher rendered it." % (_fid, _abrole,
-                                                          shot.get("shot_id")))
+                "pillarbox). Confirm MetaBrief minted it + the dispatcher rendered it." % (_abrole, _fid,
+                                                          _abrole, shot.get("shot_id")))
         _fw = int((_frow or {}).get("w") or 0)
         _fh = int((_frow or {}).get("h") or 0)
         if _fw and _fh and _fw <= _fh:
             raise RenderError(
-                "a talking ltx_audio_in announcer REQUIRES the minted wide radio-face still. "
+                "a talking ltx_audio_in %s bookend REQUIRES the minted wide radio-face still. "
                 "radio-face still %r is %dx%d (NOT wide) for "
                 "the wide ltx_audio_in %s bookend -- feeding it would pillarbox. NO "
                 "FALLBACK: mint a WIDE radio-face still (aspect-follows the bookend "
-                "slot)." % (_fid, _fw, _fh, _abrole))
+                "slot)." % (_abrole, _fid, _fw, _fh, _abrole))
         init_image = _fpath
         init_source = "ltx_radio_face"
         _LOG.warning(
@@ -1788,20 +1771,18 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # three call sites x every shot invites a regression if the ctor ever
     # grows weight; memoize the bool here and reuse it below).
     _talking_register = _ia2v_talking_register_active(shot.get("engine_id"))
-    # ia2v TALKING register, ANNOUNCER precedence (kibitz r2 must-fix): an
-    # announcer bookend that happens to carry an M4 creative prompt would
+    # ia2v TALKING register, radio-bookend precedence: an explicitly audio-driven
+    # announcer or music bookend that happens to carry an M4 creative prompt would
     # otherwise take the M4 branch below and the talking swap in the motion
     # branch would never fire. Under the two-stage lip-sync recipe the
-    # talking register OUTRANKS M4 on announcer bookends -- clearing the
-    # text here routes the shot into the motion branch, whose announcer key
-    # swaps to _IA2V_TALKING_PROMPT_ANNOUNCER. Music bookends and every
-    # other engine keep M4 precedence untouched.
-    if (text_prompt and _shot_role == "announcer_visual"
+    # talking register OUTRANKS M4 on radio bookends -- clearing the text here
+    # routes the shot into the matching radio-with-lips motion branch.
+    if (text_prompt and _shot_role in ("announcer_visual", "music_visual")
             and _talking_register):
         _LOG.warning(
-            "[OTR.render_driver] IA2V TALKING register: announcer bookend %s "
+            "[OTR.render_driver] IA2V TALKING register: %s bookend %s "
             "M4 prompt OUTRANKED by the lip-sync register (M4 kept for "
-            "non-ia2v engines)", shot.get("shot_id"))
+            "non-ia2v engines)", _shot_role, shot.get("shot_id"))
         text_prompt = ""
     # ROLE-driven (2026-06-26): the shared classifier also catches ltx_audio_in
     # CHARACTER beats (audio_conditioned_video family), so the gear scrub + the
@@ -1972,19 +1953,19 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # is a VERBATIM Python constant (P8) and always outranks the pack.
             scene_prompt = _vstyle.motion_registers[_motion_key]
             _field_source = "motion_registers:%s" % _motion_key
-            # ia2v TALKING register (lips-dont-talk fix, 2026-07-02): under
-            # the canonical two-stage recipe the ANNOUNCER bookend narrates
-            # TALKING so the audio conditioning has something to drive; the
-            # music bookends keep the console-motion register (P2: music
-            # cannot drive lips). Single-pass recipes byte-unchanged.
-            _talking_swap = (_motion_key == "announcer" and _talking_register)
+            # ia2v TALKING register: both explicitly audio-driven radio bookends
+            # use the lip-sync prompt and the matching radio-with-lips still.
+            # Single-pass or non-audio-driven music stays on its faceless
+            # console-motion register.
+            _talking_swap = (_shot_role in ("announcer_visual", "music_visual")
+                             and _talking_register)
             if _talking_swap:
                 scene_prompt = _IA2V_TALKING_PROMPT_ANNOUNCER
                 _field_source = "python:ia2v_talking"
                 _LOG.warning(
-                    "[OTR.render_driver] IA2V TALKING register: announcer "
+                    "[OTR.render_driver] IA2V TALKING register: %s "
                     "bookend %s prompt swapped to the lip-sync register",
-                    shot.get("shot_id"))
+                    _shot_role, shot.get("shot_id"))
             _meta = (ledger or {}).get("meta") or {}
             _terms = (_meta.get("story_brief_terms")
                       if isinstance(_meta, dict) else None) or {}
@@ -2009,8 +1990,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             elif _mc_override and _talking_swap:
                 _LOG.warning(
                     "[OTR.render_driver] IA2V TALKING register: motion-clause "
-                    "override on announcer bookend %s IGNORED (lip-sync "
-                    "register outranks it)", shot.get("shot_id"))
+                    "override on %s bookend %s IGNORED (lip-sync register "
+                    "outranks it)", _shot_role, shot.get("shot_id"))
             if (_google_text_provider
                     and _field_source.startswith("motion_registers:")):
                 try:
