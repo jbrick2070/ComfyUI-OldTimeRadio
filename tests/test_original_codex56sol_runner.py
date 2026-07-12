@@ -82,3 +82,14 @@ def test_ungrounded_fair_play_opinion_is_not_a_fatal_coordinate():
     })
     grounded = [f for f in report.findings if f.blocking and f.field_path and f.item_id]
     assert grounded == []
+
+
+def test_structural_numeric_ids_canonicalize_without_authored_prose_change():
+    card = lane.PossibilityCard.model_validate({
+        "possibility_id":1,"title_seed":"Echo","premise":"A premise.",
+        "desk_operator":{"name":"Mara Vale"},"callers":[],
+        "lost_objects":DRAW["lost_objects"],
+        "acoustic_device":DRAW["acoustic_device"],"shared_cause":"Echo",
+        "clue_plan":["one","two","three"],"helpful_resolution":"Returned.",
+    })
+    assert card.possibility_id == "1"

@@ -8,9 +8,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable, Literal, Mapping
+from typing import Annotated, Any, Callable, Literal, Mapping
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from ._otr_canon import EpisodeCanon
 from ._otr_content_authorship import stamp_receipt
@@ -26,6 +26,12 @@ class OriginalCodex56SolContractError(OriginalCodex56SolError): pass
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+
+
+Identifier = Annotated[
+    str, BeforeValidator(lambda value: str(value) if isinstance(value, int)
+                         and not isinstance(value, bool) else value),
+]
 
 
 class ConstraintDraw(StrictModel):
@@ -46,7 +52,7 @@ class FictionalName(StrictModel):
 
 
 class PossibilityCard(StrictModel):
-    possibility_id: str
+    possibility_id: Identifier
     title_seed: str
     premise: str
     desk_operator: FictionalName
@@ -63,39 +69,39 @@ class PossibilitySlate(StrictModel):
 
 
 class CandidateFinding(StrictModel):
-    possibility_id: str
+    possibility_id: Identifier
     category: str
     detail: str
     blocking: bool
 
 
 class SlateTriage(StrictModel):
-    selected_possibility_id: str
+    selected_possibility_id: Identifier
     findings: list[CandidateFinding]
 
 
 class CallerThread(StrictModel):
-    thread_id: str
+    thread_id: Identifier
     caller_name: str
     lost_object: str
     practical_need: str
 
 
 class CausalStep(StrictModel):
-    step_id: str
+    step_id: Identifier
     cause: str
     effect: str
 
 
 class AudibleClue(StrictModel):
-    clue_id: str
-    thread_id: str
+    clue_id: Identifier
+    thread_id: Identifier
     sound_or_phrase: str
     implication: str
 
 
 class ResolutionLink(StrictModel):
-    thread_id: str
+    thread_id: Identifier
     action: str
     result: str
 
@@ -253,8 +259,17 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         attempts.append(hashlib.sha256(str(raw).encode()).hexdigest())
         return raw
     def repair(*, original_prompt, failed_output, error):
+        pass_rules = ""
+        if pass_id == "P3":
+            pass_rules = (
+                " Preserve the complete artifact and every existing collection "
+                "item. causal_steps MUST contain at least 2 items; audible_clues "
+                "MUST contain at least 3 items; caller_threads and resolution_links "
+                "MUST each contain at least 2 items. Never delete an item to repair "
+                "an identifier or type error."
+            )
         return [
-            {"role": "system", "content": system + "\nReturn the same complete artifact, repairing only the typed contract error. JSON only.\n" + schema_shape_instruction(schema)},
+            {"role": "system", "content": system + "\nReturn the same complete artifact, repairing only the typed contract error." + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "error": str(error), "inputs": inputs}, ensure_ascii=False, sort_keys=True)},
         ]
     try:

@@ -349,3 +349,8 @@ leaving them for live integration:
     fatal findings need the concrete coordinates the deterministic validator can
     verify. Missing coordinates make the observation a warning, not a hidden
     taste gate.
+13. Decide identifier ownership explicitly. When Python owns structural IDs,
+    normalize harmless integer/string representations at the typed boundary;
+    do not spend a creative retry on formatting that carries no authored
+    meaning. Repair prompts for collection artifacts must also say never to
+    delete items while repairing an ID or field type.
