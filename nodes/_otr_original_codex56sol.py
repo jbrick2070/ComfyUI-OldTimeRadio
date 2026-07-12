@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import random
 import re
 import unicodedata
@@ -20,6 +21,9 @@ from ._otr_json import parse_first_json_object
 from ._otr_structured_call import schema_shape_instruction, structured_call
 from . import _otr_ledger_freeze
 from .production_ledger import stamp_word_counts
+
+
+log = logging.getLogger(__name__)
 
 
 class OriginalCodex56SolError(RuntimeError): pass
@@ -654,10 +658,58 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         {"role": "user", "content": json.dumps(inputs, ensure_ascii=False, sort_keys=True)},
     ]
     attempts = []
+
+    def normalize_attempt_output(raw: str) -> str:
+        """Apply narrow deterministic repairs to every ladder response.
+
+        A repair-prompt factory sees only the response that *triggered* the
+        typed-repair rung.  The typed-repair response itself normally goes
+        straight to schema/content validation, so a local model can repeat a
+        safe mechanical defect there and bypass the projection.  Normalize at
+        the slot boundary instead, while retaining the hash of the actual raw
+        model output.  Full post-validation remains the acceptance authority.
+        """
+        repaired: BaseModel | None = None
+        if pass_id == "P3" and schema is AudibleTruthMap:
+            try:
+                selected = PossibilityCard.model_validate(inputs["selected"])
+            except (KeyError, TypeError, ValidationError):
+                selected = None
+            if selected is not None:
+                repaired = _repair_truth_map_collection_placement(
+                    raw, selected,
+                )
+        elif pass_id == "P5" and schema is BroadcastScore:
+            try:
+                truth = AudibleTruthMap.model_validate(inputs["truth_map"])
+            except (KeyError, TypeError, ValidationError):
+                truth = None
+            if truth is not None:
+                repaired = _repair_score_collection_placement(raw, truth)
+                if repaired is None:
+                    try:
+                        failed_score = BroadcastScore.model_validate(
+                            parse_first_json_object(raw)
+                        )
+                    except (json.JSONDecodeError, ValueError, TypeError):
+                        failed_score = None
+                    if failed_score is not None:
+                        repaired = _repair_duplicate_score_clues(
+                            failed_score, truth,
+                        )
+        if repaired is None or post_validator(repaired) is not None:
+            return raw
+        log.info(
+            "[original_codex56sol] %s normalized one safe structural "
+            "defect at the per-attempt boundary",
+            pass_id,
+        )
+        return repaired.model_dump_json()
+
     def capture(messages, **kwargs):
         raw = fn(messages, **kwargs)
         attempts.append(hashlib.sha256(str(raw).encode()).hexdigest())
-        return raw
+        return normalize_attempt_output(raw)
     def repair(*, original_prompt, failed_output, error):
         effective_error: Any = error
         if pass_id == "P3" and schema is AudibleTruthMap:

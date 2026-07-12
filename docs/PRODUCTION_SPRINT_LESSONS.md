@@ -204,6 +204,19 @@ the later run -- while holding the authored row sequence fixed. Then rerun the
 complete graph, semantic, grounding, and landmark validators. Reject or fall
 through to typed repair whenever the identifier split is ambiguous.
 
+## 16. Run deterministic projections at every attempt boundary
+
+A typed-repair prompt factory sees the failed base response, but it does not
+necessarily see or normalize the model's typed-repair response. If a safe
+projection exists only inside that factory, a model can repeat the identical
+mechanical defect on the final repair attempt and bypass the projection.
+
+Hash the actual raw model response first, then apply the same narrow projection
+at the slot-output boundary for every base, syntax-retry, and typed-repair
+response. Return the projected artifact only when its strict schema and complete
+semantic/grounding validators pass; otherwise retain the raw response and let
+the ordinary ladder report or repair the real remaining defect.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

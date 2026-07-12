@@ -963,6 +963,61 @@ def test_p5_placement_repair_preserves_llm_fallback_for_safety(tmp_path):
     assert "forbidden term 'kill'" in repair_prompts[0][1]["content"]
 
 
+def test_p5_typed_repair_response_gets_same_safe_topology_projection(tmp_path):
+    responses = _responses()
+    responses[4]["shots"].insert(1, {
+        "shot_id": "shot_03",
+        "scene_id": "scene_01",
+        "description": "The return shelf across the room.",
+        "visual_prompt": "A return shelf opposite the radio desk.",
+    })
+    responses[4]["beats"][1]["shot_id"] = "shot_03"
+    safe_repair_response = json.loads(json.dumps(responses[4]))
+    responses[4]["premise"] = "Kill the clue."
+    responses.insert(5, safe_repair_response)
+    queued = iter(responses)
+    calls = []
+    repair_prompts = []
+
+    def generate(messages, **_kwargs):
+        calls.append(1)
+        if any("after structural normalization" in row["content"]
+               for row in messages):
+            repair_prompts.append(messages)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p5_repair_topology", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p5_repair_topology",
+    )
+
+    assert len(calls) == 9
+    assert len(repair_prompts) == 1
+    assert "forbidden term 'kill'" in repair_prompts[0][1]["content"]
+    assert [row["beat_id"] for row in led.data["beats"]] == [
+        "b1", "b2", "b3", "b4", "b5",
+    ]
+    assert [row["shot_id"] for row in led.data["beats"]] == [
+        "shot_01", "shot_03", "shot_01_return_2", "shot_02", "shot_02",
+    ]
+
+
 def test_duplicate_score_clue_repair_does_not_spend_an_llm_call(tmp_path):
     responses = _responses()
     responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
