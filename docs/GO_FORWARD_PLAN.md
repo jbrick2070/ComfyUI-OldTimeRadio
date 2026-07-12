@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-12 13:00 PDT
+**Updated:** 2026-07-12 13:22 PDT
 
 **Branch:** `v2.0-alpha`
 
@@ -18,6 +18,10 @@ narratives do not belong here.
 
 - **C4b is in coding review now.** Do not restart it or take its collision
   surfaces. C4a already shipped at `56806091`.
+- **Generated SFX engine lane is queued for later triage, not coding.** Do not
+  take its code or canonical-workflow collision surfaces while C4b runs. The
+  current R4 candidate is a local, ignored Kibitz artifact and must be
+  re-grounded against then-current HEAD before it becomes an active sprint.
 - The 120-word queue completed its available sequence. `media_archive`,
   `public_domain_story`, `shakespeare`, and `original_radio` returned canonical
   `RESULT SUCCESS`; `scifi_fable2` then stopped at its deliberate 120+ gate, which
@@ -145,6 +149,21 @@ and final OBS file.
    `_otr_lane_specs` as the one dispatch/compatibility authority, then add the
    source-bank roll, then three canonical 30-word proofs. Estimate: **1-2 days
    coding + 1 GPU day**.
+3. **Generated SFX engine lane -- triage only.** Re-ground the local R4
+   candidate at `kibitz-runs/2026-07-11-generated-sfx-engine-lane/r4/final.md`
+   (with the earlier local architecture evidence under
+   `docs/2026-07-11-sfx-engine-architecture/roundtable/`) and first materialize
+   a tracked, current-HEAD plan. Decide whether the required R4.1
+   production-readiness revision changes scope before any implementation.
+   Preserve the accepted intent: an ungated static selector for Stable Audio 3
+   Small-SFX and Medium; selected-profile hard failures with no fallback;
+   ledger-bound LLM semantic cue authoring; in-SceneSequencer mixing; and no
+   post-video SFX lane or Whisper/alignment dependency. Triage exit requires an
+   authoritative writer/consumer/lifecycle/receipt map, prompt-schema-fixture-
+   validator-repair parity, a failure-class repair ladder, measured base and
+   repair context caps, and a canonical 30/120/720 multi-family live
+   qualification recipe with episode and OBS receipt proof. Estimate:
+   **0.5-1 day plan refit only**.
 
 Randomizer waits until after the bakeoff so its dispatch refactor does not stale
 receipts in the one-variable bank experiment.
@@ -173,6 +192,9 @@ receipts in the one-variable bank experiment.
 - The current model-catalog/test edits have no owner/test receipt in this file.
   Preserve them and claim the coder slot only after their owner lands or releases
   them.
+- The generated-SFX R4 candidate and its Roundtable evidence are ignored local
+  artifacts. Triage must preserve the accepted decisions in a tracked plan
+  before implementation can begin.
 
 ## Pointers
 
