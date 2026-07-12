@@ -71,6 +71,41 @@ def test_mocked_complete_runner_fills_closed_ledger(tmp_path):
     assert led.data["meta"]["content_authorship"]["coverage"]["complete"] is True
 
 
+def test_p3_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
+    responses = _responses()
+    responses[2]["caller_threads"][0]["causal_steps"] = [{
+        "step_id": "nested_extra", "cause": "A redundant detail.",
+        "effect": "The top-level graph remains authoritative.",
+    }]
+    queued = iter(responses)
+    calls = []
+
+    def generate(_messages, **_kwargs):
+        calls.append(1)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p3_placement", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p3_placement",
+    )
+    assert len(calls) == 8
+
+
 def test_cross_artifact_validators_return_retryable_error_strings():
     draw = lane.ConstraintDraw.model_validate(DRAW)
     bad = lane.PossibilitySlate.model_validate({"possibilities": [
@@ -279,6 +314,70 @@ def test_duplicate_score_clues_repair_deterministically_at_first_placement():
     assert repaired.beats[2].line_intent.clue_ids == ["q2", "q3"]
     assert lane._validate_score(repaired, truth) is None
     assert score.beats[2].line_intent.clue_ids == ["q1", "q2", "q3"]
+
+
+def test_p3_repair_keeps_authoritative_top_level_and_removes_nested_extras():
+    fixtures = _fixtures()
+    selected = lane.PossibilityCard.model_validate(fixtures["card"])
+    data = fixtures["truth"]
+    expected_steps = list(data["causal_steps"])
+    data["caller_threads"][0]["causal_steps"] = [{
+        "step_id": "extra_step", "cause": "An extra detail.",
+        "effect": "It is not part of the typed top-level graph.",
+    }]
+    repaired = lane._repair_truth_map_collection_placement(
+        json.dumps(data), selected,
+    )
+    assert repaired is not None
+    assert [row.model_dump() for row in repaired.causal_steps] == expected_steps
+    assert all(
+        set(row.model_dump()) == {
+            "thread_id", "caller_name", "lost_object", "practical_need",
+        }
+        for row in repaired.caller_threads
+    )
+
+
+def test_p3_repair_lifts_missing_top_level_collection_verbatim():
+    fixtures = _fixtures()
+    selected = lane.PossibilityCard.model_validate(fixtures["card"])
+    data = fixtures["truth"]
+    expected_steps = data.pop("causal_steps")
+    data["caller_threads"][0]["causal_steps"] = [expected_steps[0]]
+    data["caller_threads"][1]["causal_steps"] = [expected_steps[1]]
+    repaired = lane._repair_truth_map_collection_placement(
+        json.dumps(data), selected,
+    )
+    assert repaired is not None
+    assert [row.model_dump() for row in repaired.causal_steps] == expected_steps
+
+
+def test_p3_repair_fails_closed_on_unknown_or_graph_invalid_shapes():
+    fixtures = _fixtures()
+    selected = lane.PossibilityCard.model_validate(fixtures["card"])
+    non_list = fixtures["truth"]
+    non_list["caller_threads"][0]["causal_steps"] = "not a list"
+    assert lane._repair_truth_map_collection_placement(
+        json.dumps(non_list), selected,
+    ) is None
+
+    duplicate = _fixtures()["truth"]
+    duplicate.pop("causal_steps")
+    repeated = {
+        "step_id": "same", "cause": "Repeated.", "effect": "Ambiguous.",
+    }
+    duplicate["caller_threads"][0]["causal_steps"] = [repeated]
+    duplicate["caller_threads"][1]["causal_steps"] = [dict(repeated)]
+    assert lane._repair_truth_map_collection_placement(
+        json.dumps(duplicate), selected,
+    ) is None
+
+    unknown = _fixtures()["truth"]
+    unknown["caller_threads"][0]["unknown_collection"] = []
+    unknown["caller_threads"][0]["causal_steps"] = []
+    assert lane._repair_truth_map_collection_placement(
+        json.dumps(unknown), selected,
+    ) is None
 
 
 def test_duplicate_score_clue_repair_does_not_spend_an_llm_call(tmp_path):

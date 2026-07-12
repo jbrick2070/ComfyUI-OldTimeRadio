@@ -117,6 +117,11 @@ Creative quality remains a taste decision, not a runtime validator.
   `dict[str, Any]`, or `Any`. Identifier-keyed mappings are allowed.
   Item structure is pinned; descriptive category vocabulary remains open
   unless a closed enum is a real downstream contract.
+- [ ] **Hard:** Every input-list-to-output-row transformation declares and
+  tests exact ownership: one row per input item, one singular owned value per
+  row, and complete downstream reference coverage. Base and repair prompts
+  forbid numbered, secondary/tertiary, and suffixed pseudo-fields; Python
+  validates the cross-artifact multiset and closure.
 - [ ] **Hard:** Every canonical spoken line is traceable to an accepted model
   artifact. Parser extraction may remove declared serialization delimiters
   but does not rewrite the content field.
@@ -248,6 +253,13 @@ Creative quality remains a taste decision, not a runtime validator.
 - [ ] **Hard:** A live 30-word run loads
   `workflows/otr_canonical.json`, selects the new bank, exercises its real
   source policy and real two-slot path, and reaches the shared writer tail.
+- [ ] **Hard:** Before long-form qualification, 30-word canonical smokes pass
+  with at least two materially different local LLM families and one configured
+  frontier/cloud creative lane, while the technical slot remains independently
+  exercised. Record each concrete model label and prompt ID.
+- [ ] **Hard:** After those 30-word smokes pass, repeat the same model pairings
+  at 120 words and save the ledger and published-asset receipt for each. Do not
+  begin a 720-word qualification or bakeoff until every 120-word leg is green.
 - [ ] **Hard:** The saved ledger passes the lane-owned closure proof and shared
   freeze path with no hard errors. Its source, rights, slot-call, authorship,
   and word-count receipts are present.

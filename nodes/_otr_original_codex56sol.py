@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any, Callable, Literal, Mapping
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
 from ._otr_canon import EpisodeCanon
 from ._otr_content_authorship import stamp_receipt
@@ -308,6 +308,9 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "on one row, move each extra object into its own caller_threads row "
             "and give every caller thread exactly one resolution_links row; do "
             "not rename an unknown field and leave it in place. "
+            "causal_steps, audible_clues, interpretations, and "
+            "resolution_links MUST appear only as top-level arrays; never "
+            "place them inside caller_threads rows. "
             "interpretations MUST retain at least "
             "2 items, including at least one true and one plausible false "
             "interpretation. To repair truth balance, change is_true on one "
@@ -392,6 +395,62 @@ def _repair_duplicate_score_clues(
     return repaired
 
 
+def _repair_truth_map_collection_placement(
+    failed_output: str,
+    selected: PossibilityCard,
+) -> AudibleTruthMap | None:
+    """Normalize declared collection placement without rewriting values.
+
+    Existing top-level collections are authoritative; nested copies are
+    forbidden extras. Lift nested rows only when the top-level collection is
+    missing or empty, and return only a fully valid truth graph.
+    """
+    try:
+        data = parse_first_json_object(failed_output)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    threads = data.get("caller_threads")
+    if not isinstance(threads, list) or not all(
+        isinstance(row, dict) for row in threads
+    ):
+        return None
+
+    changed = False
+    for collection in (
+        "causal_steps", "audible_clues", "interpretations", "resolution_links",
+    ):
+        lifted: list[Any] = []
+        for row in threads:
+            if collection not in row:
+                continue
+            nested = row[collection]
+            if not isinstance(nested, list):
+                return None
+            del row[collection]
+            lifted.extend(nested)
+            changed = True
+        if not lifted:
+            continue
+        existing = data.get(collection)
+        if existing is None:
+            existing = []
+        if not isinstance(existing, list):
+            return None
+        data[collection] = existing if existing else lifted
+
+    if not changed:
+        return None
+    try:
+        repaired = AudibleTruthMap.model_validate(data)
+    except ValidationError:
+        return None
+    if _validate_truth_map(repaired, selected) is not None:
+        return None
+    return repaired
+
+
 def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
           seam: str, inputs: Mapping[str, Any], schema: type[BaseModel],
           scheduler: Any, journal: list[dict], tokens: int = 2400,
@@ -410,6 +469,17 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         attempts.append(hashlib.sha256(str(raw).encode()).hexdigest())
         return raw
     def repair(*, original_prompt, failed_output, error):
+        if pass_id == "P3" and schema is AudibleTruthMap:
+            try:
+                selected = PossibilityCard.model_validate(inputs["selected"])
+            except (KeyError, TypeError, ValidationError):
+                pass
+            else:
+                repaired_truth = _repair_truth_map_collection_placement(
+                    failed_output, selected,
+                )
+                if repaired_truth is not None:
+                    return repaired_truth
         if (
             pass_id == "P5"
             and schema is BroadcastScore

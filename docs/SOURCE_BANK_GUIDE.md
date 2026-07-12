@@ -257,6 +257,14 @@ because its keys define the organization. Pin the item structure; leave
 descriptive vocabulary open unless a closed enum is a real downstream
 contract.
 
+When an accepted input list is transformed into typed output rows, the base
+prompt and repair prompt must state the ownership mapping explicitly: one row
+per input item, exactly one singular owned value per row, and exact reference
+coverage downstream. Forbid numbered, `secondary`/`tertiary`, and suffixed
+pseudo-fields. Python must validate the input-to-output multiset and reference
+closure. Test this seam with at least two materially different model families;
+a repair that merely renames an unknown field is still invalid.
+
 Calculate prompt fit from the resolved per-slot context cap. Check the base,
 retry, and repair forms; the repair request is usually largest. Provenance
 passes must fail loudly rather than silently left-truncate.
@@ -433,3 +441,9 @@ leaving them for live integration:
     and forbid numbered or suffixed pseudo-fields. Validate the cross-artifact
     mapping in Python; different model families otherwise pack extra items into
     fields such as `lost_object_2` and may merely rename them during repair.
+33. State collection placement, not only item shape. Name which arrays are
+    top-level and list the exact fields allowed inside nested rows. A narrow
+    deterministic repair may remove forbidden nested copies when a valid
+    top-level collection is already authoritative, or lift nested rows when
+    the top-level collection is absent; it must preserve values, validate the
+    complete graph, and otherwise fall through to typed repair.
