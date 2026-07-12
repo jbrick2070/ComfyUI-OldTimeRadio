@@ -80,6 +80,81 @@ def test_mocked_complete_runner_fills_closed_ledger(tmp_path):
     }
 
 
+def test_p5_missing_grounding_anchor_uses_small_intent_patch(tmp_path):
+    responses = _responses()
+    responses[4]["beats"][1]["line_intent"]["intent"] = (
+        "name the repeated shelf number"
+    )
+    responses.insert(5, {
+        "replacements": [{
+            "beat_id": "b2",
+            "intent": "name the stamp and its repeated shelf number",
+        }],
+    })
+    calls = []
+
+    def generate(messages, **_kwargs):
+        calls.append(messages)
+        return json.dumps(responses.pop(0))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p5_grounding_patch", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p5_grounding_patch",
+    )
+
+    assert len(calls) == 9
+    assert "ScoreIntentPatch" in calls[5][0]["content"]
+    assert led.data["meta"]["original_codex56sol"]["call_journal"][5][
+        "pass_id"
+    ] == "P5_grounding_patch"
+    accepted_score = led.data["meta"]["original_codex56sol"][
+        "accepted_artifacts"
+    ]["broadcast_score"]
+    assert accepted_score["beats"][1]["line_intent"]["intent"] == (
+        "name the stamp and its repeated shelf number"
+    )
+
+
+def test_p5_intent_patch_rejects_missing_or_unplanned_anchors():
+    plan = [{
+        "beat_id": "b2",
+        "current_intent": "name the repeated shelf number",
+        "required_anchors": ["stamp"],
+    }]
+    missing_anchor = lane.ScoreIntentPatch.model_validate({
+        "replacements": [{
+            "beat_id": "b2", "intent": "name the repeated shelf number",
+        }],
+    })
+    unexpected_beat = lane.ScoreIntentPatch.model_validate({
+        "replacements": [{
+            "beat_id": "b3", "intent": "name the stamp",
+        }],
+    })
+    assert lane._validate_score_intent_patch(missing_anchor, plan) == (
+        "score intent patch must name every required immutable anchor for "
+        "beat b2"
+    )
+    assert lane._validate_score_intent_patch(unexpected_beat, plan) == (
+        "score intent patch must replace every and only planned beat ids once"
+    )
+
+
 def _grounding_fixture():
     draw = lane.ConstraintDraw.model_validate(DRAW)
     truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])

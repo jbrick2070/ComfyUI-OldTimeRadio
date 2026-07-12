@@ -415,6 +415,7 @@
         "codex56_possibility_slate",
         "codex56_slate_triage", "codex56_audible_truth_map",
         "codex56_fair_play_audit", "codex56_broadcast_score",
+        "codex56_score_anchor_patch",
         "codex56_performance_script",
         "codex56_blind_listener", "codex56_broadcast_retake",
         "codex56_final_contract_audit"
@@ -424,7 +425,7 @@
         {"pass_id":"P2_slate_triage","slot":"technical","seam_refs":["codex56_slate_triage"],"description":"Reject contract defects and select a buildable possibility."},
         {"pass_id":"P3_audible_truth_map","slot":"creative","seam_refs":["codex56_audible_truth_map"],"description":"Build the causal clue and resolution graph."},
         {"pass_id":"P4_fair_play_audit","slot":"technical","seam_refs":["codex56_fair_play_audit"],"description":"Audit audible clue sufficiency and graph closure."},
-        {"pass_id":"P5_broadcast_score","slot":"creative","seam_refs":["codex56_broadcast_score"],"description":"Design cast, scenes, shots, beats, intents and music bookends."},
+        {"pass_id":"P5_broadcast_score","slot":"creative","seam_refs":["codex56_broadcast_score","codex56_score_anchor_patch"],"description":"Design cast, scenes, shots, beats, intents and music bookends; when a structurally valid score misses an immutable grounding anchor, repair only the affected line intent through a bounded typed patch."},
         {"pass_id":"P6_performance_script","slot":"creative","seam_refs":["codex56_performance_script"],"description":"Write every canonical spoken line for the closed manifest."},
         {"pass_id":"P7_blind_listener","slot":"technical","seam_refs":["codex56_blind_listener"],"description":"Evaluate the complete script using spoiler-safe clue evidence."},
         {"pass_id":"P8_broadcast_retake","slot":"creative","seam_refs":["codex56_broadcast_retake"],"description":"Return a complete replacement script only when repair is required."},

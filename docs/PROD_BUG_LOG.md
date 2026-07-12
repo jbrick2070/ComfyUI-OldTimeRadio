@@ -565,3 +565,13 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - bible-worthy: yes -- independently safe deterministic transformations must compose before a global validator can judge their shared result
 - confidence: HIGH
 - status: FIXED IN CODE / FULL SUITE + BUG BIBLE GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
+
+## PBUG-20260712-12 -- full-score repair overflowed for a one-intent grounding omission
+- surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `ef6cd277`, prompt `cabf66f8-14d1-4de5-b043-d329b888df78`, E4B creative + Mistral technical, 2026-07-12
+- symptom: P5's typed structural guards cleared both reopened-shot topology and duplicate-clue ownership, but one non-announcer clue intent omitted the exact lost-object anchor `parcel tag`. The generic typed repair then attempted to regenerate the entire BroadcastScore, produced no decodable top-level JSON, repeated the same overflow on syntax retry, and failed closed after 14:39.
+- root cause: the acceptance boundary treated a localized LLM-owned semantic omission as a whole-artifact repair. A complete score is too large and too fragile an output shape for a one-line intent correction, especially after the failed score and contract inputs are fed back through the repair ladder.
+- fix: accept the P5 score after structural and safety validation, then immediately derive a bounded eligible-beat plan from the immutable grounding contract. Call a separate `ScoreIntentPatch` seam with only `{beat_id, current_intent, required_anchors}` targets. The LLM authors each replacement intent; Python accepts only one replacement for every and only planned beat, verifies literal anchors, merges no other field, and reruns the full grounded-score and authored-surface contracts. Prompt-pack and pipeline declarations make the tool auditable.
+- verify idea: remove `stamp` from an otherwise valid P5 clue intent, require one nine-call runner where the sixth call is a `ScoreIntentPatch`, persist only the LLM-provided replacement intent, and reject both a missing literal anchor and an unplanned beat ID. Run the full suite and Bug Bible, then repeat the same c03 120-word Gemma/Mistral canonical smoke.
+- bible-worthy: yes -- when a semantic defect is confined to an explicitly owned leaf, a whole-document repair is an avoidable reliability and context-window hazard. Create a small typed patch artifact, validate its exact scope, and retain full-artifact validation as the authority.
+- confidence: HIGH
+- status: FIXED IN CODE / FULL SUITE (7760 passed, 31 skipped, 1 xfailed) + BUG BIBLE (17 passed, 7 skipped, 3 xfailed) GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION

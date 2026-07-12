@@ -249,6 +249,15 @@ class BroadcastScore(StrictModel):
     closing_music: MusicBookend
 
 
+class ScoreIntentReplacement(StrictModel):
+    beat_id: Identifier
+    intent: str
+
+
+class ScoreIntentPatch(StrictModel):
+    replacements: list[ScoreIntentReplacement] = Field(min_length=1, max_length=6)
+
+
 class ManifestLine(StrictModel):
     line_id: str
     beat_id: str
@@ -769,8 +778,17 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
                         f"{content_error}"
                     )
         pass_rules = _repair_rules(pass_id, effective_error)
+        artifact_instruction = (
+            "Return the same complete artifact, repairing only the typed "
+            "contract error."
+        )
+        if pass_id == "P5_grounding_patch":
+            artifact_instruction = (
+                "Return only the complete ScoreIntentPatch for the supplied "
+                "targets; do not emit a BroadcastScore or any other artifact."
+            )
         return [
-            {"role": "system", "content": system + "\nReturn the same complete artifact, repairing only the typed contract error." + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
+            {"role": "system", "content": system + "\n" + artifact_instruction + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "error": str(effective_error), "inputs": inputs}, ensure_ascii=False, sort_keys=True)},
         ]
     try:
@@ -1033,7 +1051,7 @@ def _validate_authored_surface(value: Any, rules: Any) -> str | None:
 def _validate_score_attempt(
     score: BroadcastScore,
     truth: AudibleTruthMap,
-    grounding_contract: GroundingContract,
+    grounding_contract: GroundingContract | None,
     story_rules: Any,
 ) -> str | None:
     """Validate every P5 response at the exact structured-call boundary.
@@ -1043,7 +1061,9 @@ def _validate_score_attempt(
     not only in the raw-string normalization path: this is the one boundary
     every schema-valid ladder response must cross.  The projection changes
     only mechanical shot ownership and is accepted only when the complete
-    grounded score validates again.
+    requested score contract validates again.  P5 first accepts the structural
+    score here; localized immutable-anchor omissions are handled immediately
+    afterward by the bounded ``ScoreIntentPatch`` tool.
     """
     repaired_kinds: list[str] = []
     for _ in range(2):
@@ -1225,6 +1245,124 @@ def _contains_grounding_anchor(text: str, anchor: str) -> bool:
     haystack = _normalize_grounding_text(text)
     needle = _normalize_grounding_text(anchor)
     return bool(needle) and f" {needle} " in f" {haystack} "
+
+
+def _score_grounding_repair_plan(
+    score: BroadcastScore,
+    grounding: GroundingContract,
+) -> list[dict[str, Any]] | None:
+    """Select only LLM-owned intents that lack immutable grounding anchors."""
+    targets: dict[str, set[str]] = {}
+    clue_ids_by_object: dict[str, set[str]] = {}
+    for clue in grounding.clues:
+        clue_ids_by_object.setdefault(clue.lost_object, set()).add(clue.clue_id)
+    for anchor in grounding.lost_object_anchors:
+        relevant_clues = clue_ids_by_object.get(anchor, set())
+        eligible = [
+            beat for beat in score.beats
+            if beat.char_id != "announcer"
+            and relevant_clues.intersection(beat.line_intent.clue_ids)
+        ]
+        if not eligible:
+            return None
+        if not any(_contains_grounding_anchor(
+                beat.line_intent.intent, anchor) for beat in eligible):
+            targets.setdefault(eligible[0].beat_id, set()).add(anchor)
+
+    by_id = {beat.beat_id: beat for beat in score.beats}
+    reveal = by_id.get(score.reveal_beat_id)
+    closure = by_id.get(score.closure_beat_id)
+    if reveal is None or closure is None:
+        return None
+    if not _contains_grounding_anchor(
+            reveal.line_intent.intent, grounding.device_anchor):
+        targets.setdefault(reveal.beat_id, set()).add(grounding.device_anchor)
+    if not _contains_grounding_anchor(
+            closure.line_intent.intent, grounding.resolution_anchor):
+        targets.setdefault(closure.beat_id, set()).add(
+            grounding.resolution_anchor,
+        )
+
+    return [
+        {
+            "beat_id": beat.beat_id,
+            "current_intent": beat.line_intent.intent,
+            "required_anchors": sorted(targets[beat.beat_id]),
+        }
+        for beat in score.beats if beat.beat_id in targets
+    ]
+
+
+def _validate_score_intent_patch(
+    patch: ScoreIntentPatch,
+    plan: list[dict[str, Any]],
+) -> str | None:
+    expected = {str(row["beat_id"]): row for row in plan}
+    seen: set[str] = set()
+    for replacement in patch.replacements:
+        beat_id = replacement.beat_id
+        if beat_id not in expected or beat_id in seen:
+            return "score intent patch must replace every and only planned beat ids once"
+        seen.add(beat_id)
+        for anchor in expected[beat_id]["required_anchors"]:
+            if not _contains_grounding_anchor(replacement.intent, anchor):
+                return (
+                    "score intent patch must name every required immutable "
+                    f"anchor for beat {beat_id}"
+                )
+    if seen != set(expected):
+        return "score intent patch must replace every planned beat id"
+    return None
+
+
+def _apply_score_intent_patch(
+    score: BroadcastScore,
+    patch: ScoreIntentPatch,
+    plan: list[dict[str, Any]],
+    truth: AudibleTruthMap,
+    grounding: GroundingContract,
+    story_rules: Any,
+) -> BroadcastScore | None:
+    if _validate_score_intent_patch(patch, plan) is not None:
+        return None
+    intents = {row.beat_id: row.intent for row in patch.replacements}
+    repaired = score.model_copy(deep=True)
+    for beat in repaired.beats:
+        if beat.beat_id in intents:
+            beat.line_intent.intent = intents[beat.beat_id]
+    if _validate_score(repaired, truth, grounding) is not None:
+        return None
+    if _validate_authored_surface(repaired, story_rules) is not None:
+        return None
+    return repaired
+
+
+def _repair_score_grounding_intents(
+    *, score: BroadcastScore, truth: AudibleTruthMap,
+    grounding: GroundingContract, pack: Any, creative_fn: GenerateFn,
+    scheduler: Any, journal: list[dict], story_rules: Any,
+) -> BroadcastScore:
+    """Use a small LLM tool call for missing immutable P5 intent anchors."""
+    plan = _score_grounding_repair_plan(score, grounding)
+    if not plan:
+        raise OriginalCodex56SolContractError(
+            "P5 grounding repair has no eligible immutable-anchor plan"
+        )
+    patch = _call(
+        pass_id="P5_grounding_patch", slot="creative", fn=creative_fn,
+        pack=pack, seam="codex56_score_anchor_patch",
+        inputs={"targets": plan}, schema=ScoreIntentPatch,
+        scheduler=scheduler, journal=journal, tokens=900,
+        post_validator=lambda value: _validate_score_intent_patch(value, plan),
+    )
+    repaired = _apply_score_intent_patch(
+        score, patch, plan, truth, grounding, story_rules,
+    )
+    if repaired is None:
+        raise OriginalCodex56SolContractError(
+            "P5 grounding patch did not clear the full score contract"
+        )
+    return repaired
 
 
 def _raw_anchor_span(text: str, anchor: str) -> str | None:
@@ -1518,7 +1656,27 @@ def run_original_codex56sol_episode(
     corroborated_fair_blocks = _corroborated_fair_blocks(fair, truth)
     if corroborated_fair_blocks:
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
-    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=lambda value: _validate_score_attempt(value, truth, grounding, story_rules))
+    score = _call(
+        pass_id="P5", slot="creative", fn=creative_fn, pack=pack,
+        seam="codex56_broadcast_score",
+        inputs={
+            "truth_map": truth.model_dump(mode="json"),
+            "grounding_contract": grounding.model_dump(mode="json"),
+            "target_words_advisory": int(resolved["target_words"]),
+            "num_characters_advisory": int(resolved["num_characters"]),
+        },
+        schema=BroadcastScore, scheduler=slot_scheduler, journal=journal,
+        tokens=3600,
+        post_validator=lambda value: _validate_score_attempt(
+            value, truth, None, story_rules,
+        ),
+    )
+    if _validate_score(score, truth, grounding) is not None:
+        score = _repair_score_grounding_intents(
+            score=score, truth=truth, grounding=grounding, pack=pack,
+            creative_fn=creative_fn, scheduler=slot_scheduler, journal=journal,
+            story_rules=story_rules,
+        )
     manifest = _compile_manifest(score)
     script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
     _assert_script_valid(score, manifest, script, story_rules, grounding)

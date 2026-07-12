@@ -260,6 +260,21 @@ condition. Add a regression where the base and typed-repair responses contain
 the complete defect combination; testing each repair in isolation is not
 evidence that the production boundary can combine them.
 
+## 20. Repair localized semantic omissions with bounded typed patches
+
+Do not resend an entire accepted artifact merely because one LLM-owned leaf
+misses an immutable semantic anchor. Whole-document regeneration increases
+context pressure, expands the failure surface, and can force the model to
+recreate already-valid structure instead of correcting the actual omission.
+
+Define a minimal patch schema that names the allowed targets and fields. Python
+may derive those targets from the immutable contract and must verify exact
+one-for-one coverage, literal anchor inclusion, and no changes outside the
+declared patch scope. The model still authors the replacement prose. After the
+merge, rerun the complete artifact, grounding, and authored-surface validators;
+an unknown or broader defect must remain fail-closed rather than being squeezed
+through the narrow tool.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

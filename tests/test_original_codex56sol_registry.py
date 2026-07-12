@@ -68,14 +68,25 @@ def test_custom_title_override_receipts_name_the_real_bank():
 
 def test_broadcast_score_prompt_closes_music_bookend_key_sets():
     routing._REGISTRY = None
-    seam = routing.resolve_story_pack(
-        "original_codex56sol").prompt_stages["codex56_broadcast_score"]
+    registry = routing._ensure_loaded()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    seam = pack.prompt_stages["codex56_broadcast_score"]
     assert "exactly the keys description and generation_prompt" in seam
     assert "never add music_file" in seam
     assert "shot_01, shot_01, shot_02 is valid" in seam
     assert "shot_01, shot_02, shot_01 is forbidden" in seam
     assert "beats array is chronological and MUST never be reordered" in seam
     assert "requires a new shot row with a new unique shot_id" in seam
+    patch_seam = pack.prompt_stages["codex56_score_anchor_patch"]
+    assert "ScoreIntentPatch JSON only" in patch_seam
+    assert "every required_anchors string verbatim" in patch_seam
+    p5 = next(
+        row for row in registry.pipelines["acoustic_puzzle_v1"].passes
+        if row.pass_id == "P5_broadcast_score"
+    )
+    assert p5.seam_refs == (
+        "codex56_broadcast_score", "codex56_score_anchor_patch",
+    )
 
 
 @pytest.mark.parametrize("hint", ["", "please emphasize patient teamwork"])
