@@ -739,3 +739,12 @@ their real-run evidence and current regressions. Kept the unresolved July-2
 VRAM diagnosis, the environmental Ollama outage, and the predicted (not yet
 live) 720-word context risk out of the Bible; other archived local labels stay
 out until they independently meet the same production-only admission rule.
+
+## PBUG-20260712-17 -- Codex56 P6 grounding patch exhausted both live attempts
+- surfaced: canonical 120-word `original_codex56sol` queue leg, prompt `e256be3f-69a0-495f-8a99-3bf9c06e01a8`, Gemma E4B creative + Mistral-Nemo technical, 2026-07-12
+- symptom: the canonical API returned `RESULT FAIL`; node 1 stopped at `P6_grounding_patch` after two structured-call attempts, before ledger/media/OBS completion
+- root cause: OPEN -- the queue wrapper preserved only the truncated terminal exception, not the exact messages, raw response, projection, and validator error needed to distinguish model omission from repair-contract or context failure
+- fix: none yet; first reproduce or inspect the retained attempt artifacts after the code-ready Codex56 telemetry seam lands, then fix the owning representation/validator boundary rather than increasing retries
+- verify idea: run the same 120-word model pairing with attempt telemetry; require the failing rung's exact raw/projected/error record, then add a focused regression for the isolated cause and a canonical rerun proving ledger, episode asset, `obs_publish OK`, and final OBS file
+- bible-worthy: pending -- live admission is proved, but no reusable rule exists until the root cause and fix are known
+- status: OPEN

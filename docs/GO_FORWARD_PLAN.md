@@ -1,712 +1,181 @@
 # OTR Go-Forward Plan
 
-**ACTIVE CODER SLOT (2026-07-12, Codex, Fable2 C4a/C4b).** Base SHA
-`d024bc180180fed776f031808c990aae09576423` on `v2.0-alpha`, equal to
-origin after the isolated Codex56 attempt-boundary fix. Scope: land the already-ratified S2 pure contracts, then
-wire P2a/P4/P5 and qualify Fable2 at 120 -> 320 before the all-bank ladder.
-The deterministic Codex56 c03 live requalification is running from the pushed
-base; Fable2 edits are isolated and cannot alter that imported lane. Known
-untracked doc owned by another window and excluded from this slot:
-`docs/2026-07-11-cue-ledger-r1-codex-prompt.md`.
-(`docs/2026-07-12-dynamic-story-visual-scope.md` is no longer untracked -- the
-docs-only window shipped it at rev 5 and it is now COMMITTED; see queue item 2.)
-Randomizer Rolls and dynamic_story both remain docs-only/queued and own no code
-during this slot.
+**Updated:** 2026-07-12 13:00 PDT
 
-**C4a PURE-CONTRACT RECEIPT (2026-07-12): GREEN.** The 120+ production gate
-remains deliberately closed.
-Landed in the dirty tree: explicit 120-900 mode/scene-vector contracts; strict
-pitch/critic identifiers; authoritative raw-parse and source-byte ownership;
-intro/outro-scoped revision notes; canonical StoryRules fingerprint; immutable
-typed P3/P5 attempt traces; context-bound keep-better selection; telemetry-sealed
-FinalDraft hashes; and explicit compact P2a/P4/P5 skipped receipts. Three
-read-only review passes closed the original nine findings, a duck-typed attempt
-boundary, and one later tamper pass covering canonical envelopes, real compiled
-regex entries, and recomputed FinalDraft/revision-contract seals. The final
-recheck found no remaining C4a must-fix. Seven-file Fable gate: 270 passed.
-Full repository gate: 7756 passed, 31 skipped, 1 expected failure, 5 dependency
-warnings. Bug Bible: 17 passed, 7 skipped, 3 expected failures. Next: push C4a
-as its own green commit, then C4b wires real nonempty P3/P5 traces and passes
-the selected FinalDraft atomically into assembly/audit.
-
-## CODE-READY WORK QUEUE (planned, converged, NOT started -- needs only a coder slot)
-
-**1. RANDOMIZER ROLLS (Design A -- source-bank roll). CODE-READY. All design gates
-CLEARED; the ONLY thing it waits on is the coder slot.** Plan of record:
-`docs/2026-07-12-randomizer-rolls-r2-coding-plan.md` -- converged through the full
-/kibitz arc r2 (coding) -> r3 (wiring) -> r4 (convergence); panel = codex
-`gpt-5.6-sol` @ ultra + antigravity `gemini-3.5-pro`, Claude anchor + sole judge;
-8 panel calls, $0. Judgment logs (local, gitignored):
-`kibitz-runs/2026-07-12-randomizer-rolls/{r2,r3,r4}/final.md`.
-Planned 2026-07-12 in a DOCS-ONLY window (Lesson 10) while another window held the
-code and the GPU: **no code written, no slot taken, nothing staged but the plan.**
-
-**What it is:** a sentinel `roll (any eligible bank)` PREPENDED to the `source_bank`
-combo -- a UI command, not a registry row. `science_news` stays the default, so the
-roll is strictly opt-in and an unused workflow is byte-identical. **Zero canonical-JSON
-diff expected** (choices are not persisted; `widgets_values` is). The sentinel resolves
-to a concrete bank BEFORE `require_runnable_bank`, stamps `meta["bank_roll"]`
-(requested / selected / seed / seed_source / eligible_order), and the receipt is
-CARRIED through refine re-entry -- one submission = one roll. **The roll makes ZERO LLM
-calls.**
-
-**Build (2 pushed green sub-commits + a closeout), then qualify:**
-
-1. **Lane-spec rip** -- `_RUNNER_BY_PIPELINE`, `_LEGACY_INLINE_PIPELINES` and
-   `_resolve_lane_runner` are DELETED from the writer into a new `nodes/_otr_lane_specs.py`
-   (ONE lane authority: lazy runner NAMES + a declared per-lane compatibility policy +
-   the inline-pipeline set). Migrates the 3 existing tests that name the deleted
-   symbols. Valid-request/success-path neutral -- unsupported codex/gemini/sonnet
-   requests now fail EARLIER, with the identical native error type and message.
-2. **The roll** -- `nodes/_otr_bank_roll.py` + the writer seam + INPUT_TYPES + tests.
-3. **Closeout** -- evidence, receipt, handoff.
-
-Then 3 x 30-word live legs: seeded onto a legacy inline bank, seeded onto a dispatched
-custom lane, and one unseeded leg proved by REPLAY. Per leg: ledger + receipt, episode
-asset, `obs_publish OK`, and Test-Path on BOTH ledger-owned final paths. API SUCCESS is
-not proof.
-
-**On claiming the slot:** the base has moved repeatedly (`11f6214a` -> `9d8265c0` ->
-`efb6b6ad` -> ...), so re-read every line pin at the real HEAD before editing. The only
-collision surface is `OTR_LedgerScriptWriter.py` -- **`banks.json` is NOT touched.**
-
-**Design B (visual pack roll) stays parked until Design A lands.**
-
-**D-1 RESOLVED -- NO RIGHTS GATE (operator ruling, 2026-07-12).** The roll does NOT
-filter on rights and NO `rights_class` field ships. The LLM may write in whatever style
-it wants; understanding the terms under which AI output is used is the END USER's
-responsibility. We cannot have the code -- or a model -- hold the legal IP status of
-every source everywhere. This OVERRIDES R1 s2's rights exclusion and the r2 panel's
-allowlist argument. Consequences: `shakespeare` is roll-eligible like any runnable
-bank; **`banks.json` is NOT touched** (no field, no parser change, no synthetic-builder
-migration, no schema-doc churn); eligibility is exactly TWO filters -- runnable +
-request-compatible; `runnable` stays the only curation surface. The repo's existing
-disclosure surfaces (credits source line, HUD origin label) are unchanged.
-
-**2. DYNAMIC_STORY VISUAL DIRECTION (vd-1). DESIGN-READY, TBA SPRINT -- needs a coder
-slot AND the section-11 VERIFY-AT-BUILD pass before any code.** Plan of record:
-`docs/2026-07-12-dynamic-story-visual-scope.md` **rev 5** -- converged through the full
-/kibitz arc r1 (arc) -> r2 (coding) -> r3 (wiring) -> r4 (convergence); panel = codex
-`gpt-5.6-sol` @ ultra + antigravity `gemini-3.5-pro`, Claude anchor + sole judge; 8 panel
-calls, $0. Artifacts (now TRACKED, force-added):
-`kibitz-runs/2026-07-12-dynamic-story-visual/{r1,r2,r3,r4}/`
-(driver_anchor / codex / antigravity / judgment / final). Planned 2026-07-12 in a
-DOCS-ONLY window (Lesson 10) while Codex held the code slot: **no code, no tests, no
-registry, no canonical-JSON diff staged.**
-
-**What it is:** ONE new option `dynamic_story` on the EXISTING `visual_style` dropdown
-(code-side sentinel, NOT a pack file). When selected, a NEW post-freeze node
-`OTR_DynamicStoryDirection` runs an LLM over the FROZEN story and authors
-`meta.visual_direction` (schema `vd-1`): a synthesized v2 visual pack + evidence + a
-receipt. Every existing composer keeps consuming a `VisualStyle` -- no second
-prompt-composition path. An explicitly-named pack stays byte-identical and always wins;
-the sentinel VALUE is the only trigger.
-
-**Why it is NOT a small chunk (read before claiming the slot):** the arc found four
-things that make a naive build fail --
-1. `_otr_structured_call.validate_tolerant_data` SILENTLY CLAMPS over-long strings and
-   accepts them (`:422-434`). Routing authored visual text through it would coerce the
-   LLM's taste output with a log warning. -> vd schemas declare NO `max_length`; every
-   bound lives in `post_validator`, which routes to the typed-repair rung.
-2. `_otr_model_loader.make_generate_fn` has **NO context guard** (`:1108-1137`) -- the
-   must-fit / PROMPT_GUARD machinery exists ONLY inside the writer's own slot wrapper
-   (`OTR_LedgerScriptWriter.py:664-699`). Any new node copying the ShotLock idiom
-   inherits ZERO protection (the class behind PBUG-20260712-03). -> a provider-effective
-   count/cap interface + a must-fit slot_fn; preflight `max(base_call, repair_call)`;
-   no truncation, ever. Sizing forces a P-A (look) / P-B (batched shots) split.
-3. TWO consumers were missing from the first design: **MetaBrief**
-   (`derive_image_prompts` takes NO ledger and resolves meta-only, `:1570-1609`) and
-   **render_driver** (a THIRD independent `get_visual_style` call at `:1248` plus a
-   brief-first prompt core at `:2069`). Both raise on the sentinel today.
-4. `is_dynamic` must NOT be a persisted pack key (`VisualStyle` is a frozen dataclass
-   with an exact field list), and `derive_scene_still_targets` deliberately emits the
-   synthetic `b000_music_open`, so the `shots[]` universe is a PROJECTION of the target
-   set, not the target set.
-
-**Wiring (exact, r3-grounded):** node **96**, link **284**. Add
-`[284, 62, 1, 96, 0, "STRING"]`; REPOINT (never renumber) `252 -> [252, 96, 0, 90, 0]`
-and `255 -> [255, 96, 0, 89, 0]`; node 62 `outputs[1].links`
-`[16,231,232,233,252,255]` -> `[16,231,232,233,284]` (**the audio trio 231/232/233 and
-the signal-lost read 16 KEEP the raw freeze json -- the direction node is in the VISUAL
-lane only**); `last_node_id 96`, `last_link_id 284`, `order 4` + shift; 24 nodes /
-58 links. Breaks exactly two test pins, both fixed in the same commit:
-`tests/test_google_video_sfx_workflow.py:41` (`last_link_id == 283`) and
-`tests/test_visual_style_widget_3c.py:62-66` (choices == registry -> registry + sentinel).
-
-**Build sequence (section 9.4 -- order matters):** capture + COMMIT the pre-feature
-byte-identity baselines FIRST (once the code changes there is no immutable "before"),
-then land node + shared helpers + the three consumers + registration + tests + canonical
-JSON + regenerated variants as ONE activation chunk, then gates, then qualify 30w -> 120w
-on TWO local families (mistral-nemo + gemma-4-E4B) plus a declared cloud lane. Live legs
-must run a STILL-CONSUMING config or they prove nothing. Slot collision surface is large:
-`otr_meta_brief_image_prompt.py`, `otr_shot_lock.py`, `render_driver.py`,
-`otr_image_gen_dispatcher.py`, `_otr_visual_styles.py`, `_otr_structured_call.py`,
-`OTR_LedgerScriptWriter.py`, `__init__.py`, canonical JSON.
-
-**Open at build time (not design forks):** section 11's VERIFY-AT-BUILD checklist --
-the brief's REAL storage shape + `episode_id`'s real home (the DTO must not be built on a
-guessed path), per-model token facts, constrained-generation on/off for P-A, and the P-B
-batch size. Section 10 also names the smaller v0 (P-A only: an episode-specific pack, no
-per-line shots) if the operator wants a shorter first cut -- not recommended, since
-per-shot direction is the stated product intent.
-
-**3. QUEUED HARNESS DEFECT (found by the randomizer r3 panel, NOT a live failure -- so
-it belongs here, not in PROD_BUG_LOG):** `scripts/otr_render_watchdog.ps1` only recognizes
-`[soak] t=...` heartbeats and cannot read a canonical `RESULT` verdict, so it will
-declare a HEALTHY canonical render dead once it passes the 300s heartbeat stall
-window. Any long canonical (non-soak) render driven through the watchdog is at risk.
-Fix in its own chunk: emit compatible heartbeats from
-`scripts/otr_canonical_api_run.py`'s history poll, and teach the watchdog the
-canonical verdict.
-
-**CONSTRAINED CODER SLOT CLAIM (2026-07-11, Codex, `original_codex56sol`):**
-Operator authorized non-GPU implementation while the existing Sci-Fi Codex live
-run remains active. Base SHA: `26952a7ea64d61a2178485ac2708e350b52f9b48` on
-`v2.0-alpha`; origin matched at claim time. Scope: source-bank Chunks A-E, with
-GPU/live Chunk D deferred until the operator releases the active run. Known
-pre-existing dirty files, owned by the prior window and excluded from this claim:
-`nodes/_otr_scifi_codex.py`, `scripts/otr_run_watcher.ps1`,
-`tests/test_scifi_lane_schema_parity.py`, and
-`docs/2026-07-11-cue-ledger-r1-codex-prompt.md`. Do not edit, stage, revert,
-delete, commit, reset, or kill those files/processes. Any campaign change that
-would overlap one of those files waits for release; all other work proceeds
-serially. Next action: publish corrected locked planning artifacts, then Chunk A
-on non-overlapping surfaces.
-
-**CODER SLOT CLAIM (2026-07-11, Codex):** Implement the three additive
-CODE-READY v4 Sci-Fi bake-off lanes in serial order (Codex -> Gemini ->
-Sonnet), including registry/pack/runner/tests and the shared optional
-TailFinalizer writer extension. Base SHA: `14dc8480e37342acfe5d9833726896e8ff9715ed`.
-`git status` is clean in all code/workflow/test files in scope; the only
-pre-existing work is the three incoming spec documents above.
-
-**CONTENDER LANE QUEUE (2026-07-10 night, operator-ratified).** Rival
-source-bank specs incoming: docs/2026-07-11-scifi-{codex,gemini,sonnet}-
-engine-spec.md. Lane law: (0) runway C1-C3 land FIRST (shared audio/merge
-contracts), then C4a/C4b + C5/C5.5 (fable2 720-proof); (1) ONE grounding
-window verifies all landed specs' contract claims -> buildable verdict each
-(repairs = JSON-shape only, logged, zero wording changes); (2) each
-contender then gets an UNINTERRUPTED serial lane -- kibitz r2->r3->r4 on its
-spec (r1 skipped: creative authorship is the contender's, panel may harden
-implementability/wiring ONLY; any creative "improvement" = rejected on
-authorship grounds) -> build in one coder window holding this file's slot
-(bank row + pipeline + pack + runner + tests; runnable/executable flipped
-same change; suite + Bug Bible; commit AND push per green chunk) -> 30w lane
-smoke root-fixed -> 720w qualification roll w/ run-sheet -> release slot ->
-next contender. Build order = most-buildable-first per grounding verdict.
-All builds on v2.0-alpha, serial, never two windows in the shared JSON
-(banks/pipelines/dispatch are collision surfaces). Builder windows = Sonnet
-(mechanical); kibitz = local codex+antigravity; Fable only at the event.
-Then C6 qualification sweep (all six incl. B/C calibrations) -> C7 event.
-
-**ACTIVE STEP (2026-07-11): 720-bakeoff C3 SHIPPED @ `6899d940` / v2.0-alpha;
-NEXT = C4a/C4b (S2 full loop) in an Opus window.** C1 (durable-field identity)
-+ C2 (text_for_tts delivery routing) shipped @ `2f335c28`; C3 (cue manifest +
-canonical music-bus wiring) shipped this window per spec
-`docs/2026-07-11-c3-cue-manifest-wiring/FINAL_HARDENED_PLAN.md`. Suite 7510/31/1
-+ Bug Bible 17/7/3 green; canonical validator OK (widget_vector_drift=0). LIVE:
-30w LTX smoke = SUCCESS (frozen_circuitry 62.9 MB, `audio_byte_identical OK`,
-7 beats covered, no gaps) + 720w all-visual LTX roll = SUCCESS (ticking_lockdown
-123.7 MB, `audio_byte_identical OK`, 18 beats incl. 2 music_inter covered, no
-gaps). What landed: NEW nodes/_otr_cue_manifest.py (manifest_version 1, shared
-parse/validate, keyed cue_id+batch_index); node 83 emits ONE padded cue batch +
-manifest (4-tuple cue_audio_clips/cue_manifest_json/render_log/done), rendering
-each ledger.music[] row (fable2) or SYNTHESIZING opening/closing/interstitial
-(legacy, byte-parity slot seeds), per-cue wav to the episode audio dir;
-SceneSequencer + EpisodeAssembler take music_cue_audio/manifest, music = THIRD
-bus (own index, never C2's two-bus check), opening/closing sliced from the batch
-by sample_count (no silence-trim) + resampled, interstitials inserted inline by
-anchor_line_id (fable2 only -- legacy interstitial stays unconsumed = pre-C3
-parity), scene_audio->master_mix shift extended to music rows (MF-H). JSON: links
-241/242/243 out, 280-283 in (node 83 -> nodes 3/7 fanout); node-7 opening/closing
-+ node-12 closing_audio kept DECLARED/unlinked (BUG-LOCAL-097). last_link_id 279
--> 283. STOP after C3 (done); C4a/C4b run in an Opus window.
-Post-C3 follow-up queued (operator 2026-07-11): richer music-still prompting
-(dedicated brief-driven visual prompt per cue vs reusing the cue description) --
-a SEPARATE chunk touching the image/video director prompt derivation, NOT C3.
-
-**DEAD-CODE RIP TARGET (operator ruling 2026-07-11): INTERSTITIAL AUDIO WAS
-DELIBERATELY RIPPED OUT and must NOT come back.** The C3 kibitz-r3 spec
-(MF-C/MF-F) reintroduced it, and C3 shipped it: SceneSequencer inserts an
-interstitial cue inline at a music_inter sentinel resolved by anchor_line_id,
-and node 83 synthesizes/renders an `interstitial` cue. It is INERT on every
-shipped lane (legacy music[] carries no anchor_line_id -> never resolves;
-live 720w confirmed music_inter_positioned=0), so the operator ruled LEAVE AS
-IS for now -- but it is dormant production code, exactly the class CLAUDE.md
-forbids. RIP in a follow-up (fold into the lean-mean rip): remove the
-interstitial branch in SceneSequencer's music dispatch, the `interstitial`
-cue from node 83's legacy synth set (_CUE_SLOTS) + CUE_DURATIONS/_CUE_CHARACTER
-if unused elsewhere, and the anchor_line_id insertion path + its tests. Do NOT
-re-add interstitial audio in any future chunk.
-
-Plan of record: `docs/2026-07-10-fable2-720-bakeoff-runway.md` (kibitz'd before
-C4 coding). Chunks C1-C7: P1.1 ownership/revision merge contract -> P1.3
-text_for_tts (science_news byte-parity fixture FIRST) -> P1.4 cue manifest +
-canonical workflow delta (links 241-243 out, 280-283 in, code+JSON same commit)
--> P1.5 S2 full loop (3-pitch/P4/P5/keep-better judge, 120-900w) -> 350w + 720w
-live rolls -> P2.2 caption/credits alias + HuMo guard -> bake-off: fable2 vs
-original_radio vs science_news vs a GPT-authored from-scratch fable2-pipeline
-pack (operator-ratified contender D), one pinned news story, 720w each, blinded
-operator judging. 720w needs NO act-chunking (inside S2's 120-900 band).
-Precondition SHIPPED @ `47bf50f2`: r2-QA P0 fold -- FreezePolicy
-content_owned_readonly freeze boundary (fable2 skips reviewer/doctor/5B/A3/5C/
-escalation/A2/D3-mutation/Phase-7-normalization; read-only proof verification;
-tagged-unresolvable bank TERMINAL; freeze_capability_receipt w/ sha256 +
-content_mutations=0), live-root veto after reviewer save-rebind (P0.3), 19-field
-absent-key merge ownership (P0.2). Suite 7463/31/1 + Bug Bible green. Governing
-spec: `docs/2026-07-10-fable2-s2-QA-ANALYSIS-r2.md`. Deferred: P2.1
-retire-doctor-skip, P2.3 soak cohorts, >900w act-chunk, cloud pins.
-
-**scifi_fable2 S1b SHIPPED + FIRST GREEN EPISODE (2026-07-10 midday, this
-coder window; slot released).** Spine live per doc s13 + the s13.5
-deviation record: runner @ `a24b75c4`, 25-roll live-smoke hardening +
-kibitz r2/r3/r4 folded @ `ff4c226d` (+ follow-up chunk this session) --
-**"Einstein's Echo" published to obs (RESULT SUCCESS 570s, 56.9 MB,
-Test-Path'd), canonical JSON NO-DIFF + OTR_WorkflowValidator OK
-recorded.** Key S1b deltas (details: doc s13.5 +
-`docs/2026-07-10-fable2-s1b-smoke-hardening.md`): P2c read-split
-(10th seam `fable2_news_read_system`), parser delete-only decoration
-normalization, 4-rung P3 ladder + few-shot + micro-episode line cap,
-one-word cast labels, sentinel announcer char_id (freeze-cascade
-mutator dodge -- ROOT MUTATOR STILL UNIDENTIFIED, open question in the
-hardening doc), source-as-legality-authority subset gates, delete-only
-dossier entity filtering, nested-path clamp in _otr_structured_call.
-Next fable2 step = **S2: full loop** (P1 three-pitch + P2a select + P4
-critic + P5 revision + keep-better-draft; 350w live smoke; doc s13 S2
-test set). **BLOCKER RESOLVED (external QA fold @ af378aad):** real
-chain was doctor-skip + stale-disk merge resurrection, NOT the 5C
-reroll -- ownership-aware merge + skip contract + 5B/5C lane capability
-gate shipped; **LTX media path GREEN: "The Butterfly's Gambit" in obs
-(1787s, character lane ltx_audio_in + stills)**. S2 must fold the QA
-runway items (proof-provenance/text_for_tts, inter-scene music wiring,
-caption/credits sentinel alias, HuMo stale guard, per-scene band
-allocation): `docs/2026-07-10-fable2-s1b-QA-ANALYSIS.md` (file:line
-pins) + the brief `docs/2026-07-10-fable2-s1b-QA-PROBLEM-STATEMENT.md`.
-
-**Updated:** 2026-07-11 -- HEAD `6899d940` (720-bakeoff C3 shipped + live-proofed)
 **Branch:** `v2.0-alpha`
-**Status:** original_radio LIVE SMOKE GREEN 2026-07-10 ("Page in the
-Tempest" published to obs). Remaining gate = OPERATOR EYEBALL only ->
-then source-bank sweep -> portability.
-
-**PLATFORM-PORTABILITY BUILD: S0-S6 SHIPPED overnight 2026-07-10 (this
-coder window; claim RELEASED -- ratify decisions + tier smokes remain).**
-Spec docs/2026-07-09-platform-portability-final.md executed end to end:
-
-- S0 `c32d7cbe`+`390e5015`: 7 committed-state defects (loader guard,
-  vram-node accel helpers, _detect_host mps/vendor + lying-CUDA fix,
-  dispatcher gen_fn raise, bark honest row + cpu_floor kokoro, HuMo
-  script/label alignment, indextts2 installer pair now SHIPPED).
-- S1 `af60c09e`: LLMRuntimePolicy end to end (FA2 probe + tag auto-quant
-  DELETED; lane backstop; policy-keyed LLM cache; GGUF artifact table;
-  n_ctx downgrade + preflight-tolerance now raises).
-- S2 `dd79f5b2`: profile schema v2 (+linux/+mps/+gpu_vendor/llm/video/
-  image/audio/render/preflight) + ALL 8 profiles migrated + widget_mapping
-  v2 (writer out of exempt_node_types; 20 creative names exempt).
-- S3 `e1f692e7`: registry CAPABILITIES v2 ATOMIC (device_backends
-  supersedes cpu_ok; vendor pins table-visible; humo fp8 flags). FABLE
-  GATE ran pre-commit: NO MUST-FIX.
-- S4 `2e31efb9`: policy v2 consumers -- REAL host_caps at every adapter
-  boundary (was {} everywhere), adapter-level image assert_usable (was
-  never called), CastLock meta.voice_device stamp, kokoro/musicgen/
-  chatterbox waterfalls DELETED, frame budget static + MotionBudgetError
-  (never resizes).
-- S5 `6fb5cc29`/`b60e9df3`/`b8bbadd3`/`6f0131da`: widgets (writer 28->34
-  slots 28-33; director 14/8; castlock 6) ATOMIC with canonical + mapping;
-  gate_in link 279 gates the WRITER; scripts/build_variants.py (+--check,
-  ratify_before_emit refusal); semantic master_hash ASSERTED by the
-  validator; otr_api soft-skip RETIRED (hard fail).
-- S6 `2bd212ec`: profiles otr_nv40_12gb / otr_amd16_rocm / otr_amd8_rocm
-  / otr_mac_mps (draft) added; EMITTED 5 variants + launch recipes
-  (8gb_lite, cpu_floor, nv40, amd16, amd8; --check green). REFUSED
-  pending ratification: 16gb_full, cloud_all, otr_mac_mps.
-- SMOKE GATE: 30w canonical live smoke on the FULL rebuilt stack =
-  RESULT SUCCESS in 543s (baseline 548s) -- published
-  `otr\obs\signal_lost_whispers_of_deception_20260710_043218_..._final.mp4`
-  (57.2 MB). Suite 7251/31/1 + Bug Bible 17/7/3 green at ship.
-
-RATIFIED (operator, 2026-07-10 morning, all four): (1) 16gb_full
-REGENERATED from canonical (viz lanes + z_image_turbo) -- nv50 identity
-variant EMITTED; (2) cloud tier RENAMED cloud_all -> otr_cloud_lanes;
-OpenRouter slot pins = NEXT SESSION (the one remaining ratify gate --
-cloud variant still refused); (3) mac ceiling 10.0 ratified -- otr_mac_mps
-draft variant EMITTED; (4) AMD/Mac ship draft-UNVERIFIED behind the
-acceptance gates in their launch recipes. Post-ratification emission:
-7 variants + recipes committed (--check green).
-NEXT SMOKES: cpu tier on this box (--cpu; NOTE cpu_floor inherits
-canonical z_image_turbo images -- cuda-only, so the cpu smoke needs the
-google image lane + OTR_GOOGLE_API_KEY or pre-staged stills; surfaced by
-the new adapter-level gate, decide before running), then the nv50
-identity re-soak after ratify (1). Bug Bible candidates queued:
-lying-CUDA is_available pattern; registry-row-vs-generation-path honesty;
-waterfall-deletion class. Longer wan-beat lanes now FAIL LOUD instead of
-shrinking (dial: frame_count widget / OTR_VIDEO_BUDGET_MARGIN).
-
-**Shipped 2026-07-09 evening (both pushed):**
-
-- Closing-seam routing fix (QA F1): coda + announcer seams now
-  pack-route per bank; PD/Shakespeare coda seams re-authored to the bridge
-  contract; title pass reads banks.json `title_form_label`. 30 new tests.
-  CODE COMMIT = `40535ddc` (the operator's Codex loop committed the
-  in-flight tree, bundled with its dia hardening); `321bcc9c` carries
-  only docs. SHA corrected per the codex fan-out catch.
-- Produced-story meta split (`5a09984c`): K.5.6 `run_produced_story_summary`
-  stamps `meta["produced_story"]` (logline/subject of the ACTUAL episode);
-  credits/HUD/treatment premise + music last-ditch mood repointed. Operator
-  ruling: pre-gen source digest and post-gen story brief NEVER share a name.
-- QA synthesis (local, gitignored dir): docs/2026-07-09-source-route-qa/.
-- original_radio ARCHITECTURE_V1 + R1 roundtable artifacts (local):
-  docs/2026-07-09-original-radio/.
-
-This file is for short-term coordination only. Longer runway lives in
-`ROADMAP.md`; old sprint logs belong in `docs/GO_FORWARD_ARCHIVE.md`,
-`docs/HANDOFF_LOG.md`, or dated docs.
-
-## Current Status
-
-Recent green code chunks on `v2.0-alpha`:
-
-- Media archive seed deck is green and pushed.
-- Visual-style bleed guard is green and pushed.
-- `recur_frac` is now the concise `recursive fractal light field` pack; LTX
-  audio-in talking prompts keep a face/mouth/lip-sync cue without cartoon
-  wording. Commit: `ac919d99`.
-- Model-slot audit + pre-smoke contract inspection is green locally:
-  `docs/2026-07-09-model-slot-audit.md` now records the canonical kept local
-  matrix, retired/non-invocable ids, and the requested Chatterbox/Dia/Qwen/Wan
-  plus Comfy Cloud still/video readiness queue. `tests/test_model_slot_audit.py`
-  pins the canonical contracts and the newly inspected candidate surfaces.
-- All-Chatterbox 30-word OBS live smoke completed from a real `science_news`
-  MIT News source. Output landed in
-  `C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\signal_lost_the_allocation_key_20260709_162019_silent_procgen_blended_captioned_with_credits_final.mp4`.
-  The smoke exposed a real no-reuse gap: distinct logical Chatterbox ids could
-  share the same underlying WAV. The fix blocks same-asset/provider collisions
-  when `allow_voice_reuse=False`.
-- Dia is now in the announcer on-deck lane: `dia` serves `announcer_voice`,
-  `announcer_dia_v1` is in the profile resolver, the announcer dropdown exposes
-  it explicitly, and the default voice bank has a British-leaning male/female
-  preferred announcer pair with seeded 50/50 selection and no-reuse separation
-  from character refs.
-
-Current runnable source banks in `nodes/story_packs/banks.json`:
-
-- `science_news`
-- `media_archive`
-- `public_domain_story`
-- `shakespeare`
-
-Known non-runnable bank:
-
-- `custom_source_bank` stays listed but intentionally fails loud.
-
-Unrelated local file present before this plan update and left untouched:
-
-- `docs/2026-07-08-source-banks-v2-plan.md`
-
-## Next Action
-
-### 0. ACTIVE: `original_radio` campaign (operator 2026-07-09)
-
-Build spine: **ARCHITECTURE_V4.md** (R1 converged x2, ~$0.26). Operator
-locks: Hitchcock epilogue AS the announcer outro; printed-layer provenance;
-no era frame; RUNNABLE ON BUILD (no flips/switches/fallbacks, hard fails
-accepted); north star = max story complexity / max code elegance.
-R2 DONE (2026-07-09 late): /kibitz r2 -- Codex gpt-5.5 (auto) + Antigravity
-gemini-3.5-pro (operator-pasted manual after one auto timeout) + Claude
-anchor; 3-way convergence, no architecture change. Coding plan =
-**docs/2026-07-09-original-radio/R2_CODING_PLAN.md** (mirror:
-kibitz-runs/2026-07-09-original-radio/r2/final.md). Key r2 locks:
-intro-rewrite SHAPE A (derive ProducedOpenBrief -> existing safe-open
-composer; derive helper lives in _otr_story_brief.py); runtime dispatch on
-BANK SHAPE (empty fetcher+interpreter), NEVER pipe.requires_source_contract
-(routing law 88-91); original_multi_pass ships executable:true (sweep 4b
-elif demands it -- no sweep patch); build_original_briefs returns the
-validate_interpreter_result contract with news_close_brief="";
-story_rules/original_radio.json is load-bearing (outro rules resolve);
-provenance data-driven (bank defaults hud_origin_label + credits_source_line;
-news_used gets final title + origin_label via builder signature); KEEP
-news_coda_no_brief flag; keep-intro failure posture upheld (agy hard-fail
-logged as operator dial); no workflow JSON diff expected (registry-derived
-dropdown; source_bank already headless-whitelisted).
-R3 (wiring) + R4 (convergence) DONE same night (Codex + anchor; agy auto
-lane timed out 3x -- its r2 manual review is on the record). Artifacts:
-R3_WIRING_DELTAS.md + kibitz-runs/.../r4/final.md (r4 pins P1-P8).
-BUILD SHIPPED (operator away, autonomy directive):
-- CHUNK A `181506e8`: intro rewrite ALL banks (derive_produced_open_brief
-  in _otr_story_brief + writer I.4.9 block, keep-intro posture, flags
-  read-extend) + J.5 title-regen root-cause fix (ledger-assembled).
-- CHUNK B `604ccdd3`: the original_radio SAME-COMMIT set, runnable:true
-  -- registry rows (pipeline executable:true; spark deck registered as a
-  pack SIDECAR in routing), 13-stage pack w/ Hitchcock outro seam,
-  story_rules, _otr_original_radio.py (concept->select->brief +
-  whole-script QA w/ coalesced outro repair), writer bank-shape dispatch
-  (runnable+empty-empty), interpreter-shaped adapter + dual source_meta
-  restamp, provenance surfaces (news_used labels/final title, HUD origin
-  label x2, credits_source_line stamp+render).
-Both pushed; suite 7136 passed/31 skipped/1 xfailed + Bug Bible 16/7/3
-green; AST/BOM/0-byte verify clean. NO workflow JSON diff (source_bank
-menu derives from the registry).
-SMOKE GATE GREEN (2026-07-10 early): live 30w original_radio OBS smoke
-PUBLISHED -- `otr\obs\signal_lost_page_in_the_tempest_20260710_010652_
-silent_procgen_blended_captioned_with_credits_final.mp4` (48 MB, RESULT
-SUCCESS, 548s; disclosure line explicit machine-generated; QA meta
-clean_after_discard w/ discards stamped). Validator record:
-OTR_WorkflowValidator OK in the green run -- 23 nodes / 55 links /
-widget_vector_drift=0; the LANE produced NO workflow diff (registry-
-derived dropdown confirmed); the only canonical diff since 604ccdd3 is
-the deliberate creative-slot fix (d526c8b7). It took SIX live-smoke
-hardening commits to get here -- 5 judge/ladder root fixes + 1 workflow
-config fix (7f459e21, 75173fc4, a61ab2ed, 6fdf3f6e, d526c8b7, 1c735c2d;
-details in HANDOFF_LOG 2026-07-10). Suite 7151/31/1 + Bug Bible 17/7/3
-green; bible +BUG-11.26.
-REMAINING GATE: OPERATOR EYEBALL of the published episode (consider the
-3-episode batch from V2 s7). Content items FOR the eyeball, not gates:
-(a) outro/dialogue name drift (outro names 'Harold', cast-external;
-run-2 had 'Eliza'), (b) stage directions leaked into a spoken line one
-run ('(smashes a nearby console)'), (c) script lines arrive quote-
-wrapped, (d) nemo premise drifted sci-fi in 2 of 4 rolls (period-legit
-Dimension-X flavor; timeless-rule tension). Then the source-bank
-end-to-end sweep (section 3 below).
-Queued design item for the arc: demote `meta["news"]` to provenance-only
-+ distinct-name migration (operator: "we can't just throw around meta").
-
-QUEUED CAMPAIGN (2026-07-10, analysis DONE + VERIFIED, code NOT started):
-**lean-mean rip** (de-slop / ship-shape). Plan =
-`docs/2026-07-10-lean-mean-rip-final.md` @ `b9219478` (committed; the dated
-folder holds local round artifacts). r1-r4 converged same night (3 mechanical
-audits -> 3-Fable architect fan-out -> grounding -> Fable gate: CONVERGED after
-7 must-fixes, folded), THEN a 2-agent code-readiness sweep re-verified every
-claim against the REAL post-portability HEAD `20185542` (48 confirmed; 9
-amendments folded, incl. the quantified W5 obligation: remove node-1 inputs[9]
-+ renumber link 279 dst_slot 34->33). ~32-33k LOC deletion in waves W0-W8 +
-consolidations C1-C7 + giants split SW1-SW4. Portability precondition is now
-MET (S0-S6 shipped + ratified). D-1..D-6 OPERATOR RATIFIED 2026-07-10 (plan @
-`e569880d`), D-2 codicil: rip RTXUpscale now; a FUTURE system-agnostic
-multi-GPU upscale campaign rebuilds against the `upscale_stage` profile
-reservation, honest-switch law (widgets land WITH a working engine). CLEARED
-TO EXECUTE post-portability-settle; execution-time gates = R-4 seam re-survey
-+ R-7 re-grep only.
-
-NEXT-CODER-SESSION ITEM (operator 2026-07-10): **ENGINE_MATRIX.md** --
-device_backends must be END-USER VISIBLE, not hidden in registry rows.
-Spec: extend scripts/build_variants.py with an emit step rendering
-docs/ENGINE_MATRIX.md from the THREE registries' CAPABILITIES v2 rows
-(engine id, role, device_backends, requires_vendor, needs_fp8_te/fp4,
-practical_without_gpu, sidecar_conditional) + a reason-code legend
-(vendor pin / fp8 / NVML gate / cu128 / no-install-path). GENERATED,
-never hand-edited; `--check` regenerates + diffs it like the variants;
-README links it. Tests: pin emitted file == live registries (rides
---check). NO workflow JSON / widget changes -- zero positional risk.
-Operator chose matrix-doc ONLY (recipes/validator/tooltip surfaces
-declined for now). Small chunk, lands BEFORE the lean-mean campaign.
-
-### 1. Model-Slot Audit And End-To-End Smokes (live smokes PARKED 2026-07-09)
-
-Inventory every local model/engine exposed through the production slots:
-
-- music
-- audio/TTS
-- still image
-- video
-
-For each candidate, document and test:
-
-- required inputs and produced outputs
-- supported slot/family/role
-- required model files and expected VRAM class
-- canonical workflow compatibility
-- whether it can complete a tiny end-to-end smoke from `workflows/otr_canonical.json`
-
-Decision rule:
-
-- If a model fits the slot contract and finishes an end-to-end smoke, keep it
-  in the tested path.
-- If it cannot fit, cannot run, silently downgrades, OOMs outside its claimed
-  tier, or produces the wrong artifact shape, remove it from the tested path or
-  mark it non-invocable. No silent fallback.
-
-Deliverables:
-
-- Done: compact tested/retired model matrix.
-- Done: focused tests that prove unsupported engines fail loud.
-- Done: pre-live-smoke input/output contract inspection for `chatterbox`, `dia`,
-  `qwen_image`, `wan_ti2v`, `wan_i2v`, `cloud_nano_banana_2`,
-  `cloud_seedream_2`, `cloud_krea_2_turbo`, `cloud_luma_photon_flash`,
-  `cloud_vidu_q2_pro_fast_720p`, and its SFX sibling.
-- Done: canonical offline API dry-run from `workflows/otr_canonical.json`.
-- Remaining: live sidecar/GPU/provider smokes after the selective headless reset
-  and any required auth/asset preflight.
-
-Recommended live-smoke order:
-
-1. Done: full all-Chatterbox 30-word OBS smoke.
-2. Done: Dia cast/announcer contract is green in tests. Remaining: Dia one
-   character line plus Dia announcer line live sidecar smoke, then a full
-   all-Dia smoke if the sidecar path is healthy.
-3. Comfy Cloud stills: Luma Photon Flash, Krea 2 Turbo, Seedream 2, Nano Banana
-   2.
-4. Cheap Comfy Cloud video: Vidu Q2 Pro Fast 720p.
-5. Local heavy visuals: Wan TI2V first; Qwen Image after CLIP/VAE preflight is
-   strengthened; Wan I2V after the 5B Wan path unless the 14B target is needed.
-
-### 2. `original_radio` Source Bank
-
-Design and implement a no-source original-drama lane where the LLM creates a
-random original old-time-radio premise, cast, outline, and filled ledger.
-
-Hard requirements:
-
-- No news/source attribution.
-- No franchise or modern IP wording.
-- No guns, knives, smoking, or source-seed leakage.
-- Small cast, clear radio conflict, coherent ending.
-- Fail loud after bounded repair attempts if the LLM cannot produce a valid
-  brief/ledger.
-
-Architecture direction:
-
-- Add `original_radio` as its own source bank, not as a fake RSS/source lane.
-- Add an original multi-pass runner only when its tests exist.
-- Let the original branch generate compatibility `meta["news"]` fields for
-  current downstream code, while stamping honest provenance under sidecars.
-- Deep-think the creative route before coding; if the shape is still ambiguous,
-  use the repo roundtable/Fable rules for a grounded design pass.
-
-Dynamic visual-style direction:
-
-- Explore an improvising visual pack for original episodes.
-- It must validate through the same visual-style schema, never write ad-hoc
-  disk packs during a render, and must not leak the style name into story
-  premise, title, narration, or dialogue.
-
-### 3. Source-Bank End-To-End Sweep
-
-After the model-slot audit and `original_radio` work, prove every runnable bank
-works end to end or fix it before moving on:
-
-- `science_news`
-- `media_archive`
-- `public_domain_story`
-- `shakespeare`
-- `original_radio` once runnable
-
-Use 30-word/random smokes first. Look specifically for:
-
-- source-bank drift
-- story/source leakage
-- title or premise pollution from visual style
-- weak cast separation
-- stale sci-fi wording in non-sci-fi banks
-- bad coda/source-note behavior
-- forbidden content
-- broken still/video/audio routing
-
-Stop when each lane is good enough to proceed; do not polish forever.
-
-### 4. Portability
-
-Only after the above is green, continue portability work:
-
-- no-GPU / procedural
-- all-cloud
-- RTX 8 GB, 12-16 GB, and 24 GB+
-- Mac
-- AMD where practical
-- RunPod/cloud GPU
-
-Canonical workflow remains `workflows/otr_canonical.json`; exported workflows
-must be generated from canonical, not hand-maintained.
-
-### 5. Legacy dead-code rip (operator directive 2026-07-11)
-
-Rip out legacy code paths that nothing calls any more. This is not cosmetic --
-dead paths actively cost us live rolls, because a reviewer (human or agent)
-cannot tell which lever is real and patches the dead one.
-
-Live example that triggered this directive (2026-07-11): `_otr_model_catalog`
-carries BOTH `CURATED_CONTEXT_OVERRIDES` + `resolve_context_cap` AND a per-row
-`CuratedModel.context_window` field, with `tests/test_effective_context_limit.py`
-describing itself as a "Mirror of the legacy CURATED_CONTEXT_OVERRIDES /
-resolve_context_cap path". Two levers, one truth, no marker for which is live --
-so the first proposed fix for the 720w context ceiling aimed at a table that may
-not be on the runtime path at all.
-
-Rules for the rip:
-- Prove a path is dead before removing it (no caller, no test that exercises the
-  RUNTIME behavior, not just the constant).
-- Remove it outright; do not leave it behind a flag or a comment saying "legacy".
-  A cleanbreak, per the standing cleanbreak framing.
-- Same-change test update. If a test only pins a dead constant, the test goes too.
-- Run the full suite + Bug Bible; commit and push per green chunk.
-
-Candidates to audit (unproven -- audit first, do not assume):
-- `_otr_model_catalog.CURATED_CONTEXT_OVERRIDES` / `resolve_context_cap` vs the
-  per-row `context_window` effective-limit path.
-- Anything else the source-bank v2 / VRAM-rip / portability waves superseded but
-  left standing.
-
-## Last Validation
-
-Post live-smoke hardening (2026-07-10):
-
-```text
-pytest -q -p no:cacheprovider
-
-7151 passed, 31 skipped, 1 xfailed, 5 warnings
-```
-
-Bug Bible (bible now 156 entries, +BUG-11.26):
-
-```text
-cd C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide
-pytest -q -p no:cacheprovider tests\bug_bible_regression.py
-
-17 passed, 7 skipped, 3 xfailed
-```
-
-Focused voice/cast subset:
-
-```text
-pytest -q -p no:cacheprovider tests\test_model_slot_audit.py tests\test_voice_bank.py tests\test_audio_engine_adapters.py tests\test_engine_profiles.py tests\test_tts_engine_sidecars.py tests\test_announcer_voice.py
-
-114 passed
-```
-
-Focused contract subset:
-
-```text
-pytest -q -p no:cacheprovider tests\test_model_slot_audit.py tests\test_cloud_image_adapters.py tests\test_cloud_video_adapters.py
-
-83 passed
-```
-
-No workflow JSON edit was needed for the Dia announcer on-deck chunk: the
-canonical workflow already carries the `announcer_voice_engine` widget and the
-announcer node engine dropdown derives from the profile/registry menu. No live
-Dia sidecar smoke was run in this chunk.
-
-## Standing Rules
-
-- `workflows/otr_canonical.json` is the canonical workflow.
-- Any node/widget/wiring change must update that workflow in the same change.
-- Every headless/API smoke must load the canonical workflow.
-- Reset selectively before headless runs; never blanket-kill Python.
-- Render assets go straight to `otr\episodes\<ep>\`, final to `otr\obs\`.
-- Do not revert unrelated/user changes.
-- Fix root causes, not shims.
-- No silent fallback.
-- JSON owns content/config.
-- Python owns validation/routing/execution.
-- Commit and push every green chunk to `origin/v2.0-alpha`.
+
+**Snapshot:** `48b5511abc9d`, equal to `origin/v2.0-alpha` when this plan was rebuilt
+
+**Scope:** current qualification sprint plus the immediately following sprint only
+
+**Longer runway:** `ROADMAP.md`
+
+This is the only active go-forward file. Dated specifications remain supporting
+evidence, not competing queues. Git history is the archive; completed sprint
+narratives do not belong here.
+
+## Coordination snapshot
+
+- **C4b is in coding review now.** Do not restart it or take its collision
+  surfaces. C4a already shipped at `56806091`.
+- The 120-word queue completed its available sequence. `media_archive`,
+  `public_domain_story`, `shakespeare`, and `original_radio` returned canonical
+  `RESULT SUCCESS`; `scifi_fable2` then stopped at its deliberate 120+ gate, which
+  C4b is meant to open. Receipt: `docs/_bakeoff_queue.log`.
+- The latest `original_codex56sol` 120-word rerun failed at
+  `P6_grounding_patch` after two attempts. It is a real live incident and is
+  staged as `PBUG-20260712-17`; its earlier successful same-seed qualification
+  remains evidence, not a waiver for this new failure.
+- Ten banks are currently runnable; always re-derive the roster from
+  `nodes/story_packs/banks.json`. `custom_source_bank` remains non-runnable.
+- Port 8000 is still held by the resident server from the finished queue. The next
+  live owner must perform the selective reset in `AGENTS.md`; never blanket-kill
+  Python.
+- Unrelated dirty work owned by another window must be preserved and excluded:
+  `nodes/_otr_model_catalog.py`, `tests/test_openrouter_catalog_rows.py`,
+  `docs/2026-07-11-cue-ledger-r1-codex-prompt.md`, and local bakeoff logs.
+
+## Ordered current sprint
+
+A coder-day below means roughly one focused engineering day. GPU qualification
+wall time is listed separately and is not counted as coding time.
+
+| Order | Chunk | Hard completion gate | Coding estimate |
+|---:|---|---|---:|
+| 1 | Finish C4b review and land Fable2 full mode | P2a/P4/P5 wired; real P3/P5 traces; winner assembled once; 120+ gates flip atomically; suite + Bible green | 0.5-1.5 days remaining |
+| 2 | Canonical watchdog support | Canonical runner emits heartbeats; watchdog recognizes canonical `RESULT`; healthy long runs never false-dead | 0.5 day |
+| 3 | Fable2 C5 consumers | Caption and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity | 0.5-1 day |
+| 4 | Rip interstitial **audio** only | Remove synth/insertion/timing path and tests; retain `music_inter` story/visual semantics | 0.5-1 day |
+| 5 | Context/cap foundation | One provider-effective cap/count/must-fit authority; measured repair envelopes; no silent truncation and no blind 8192->16384 raise | 1-3 days |
+| 6 | Fable2 qualification | 30 words on two local families + one declared cloud lane, same pairings at 120, then one 720 leg with complete ledger/episode/OBS proof | 0.5-1 coding day + 1-3 GPU days |
+| 7 | Codex56 attempt telemetry | Land the code-ready five-file plan; prove raw vs projected records, fail-open behavior, directory rename safety, abort retention, and a 30-word live smoke | 2-4 days |
+| 8 | One bakeoff, not two | Resolve/build the already-ratified contender D if still applicable, revalidate only stale receipts, freeze code, run one all-bank 720 batch, blind verdict, operator listen | 1-3 coding days + 2-5 GPU days |
+
+**Current-sprint planning range:** about **7-14 coder-days**, or **8-15** with
+normal live-failure root-fix margin. The qualification/event runs add roughly
+**3-8 elapsed GPU days** but are not full-time coding.
+
+### 1. C4b activation -- active review
+
+Plan of record: `docs/2026-07-10-fable2-720-bakeoff-runway.md`, C4b only.
+
+Expected surfaces:
+
+- `nodes/_otr_scifi_fable2.py`
+- `nodes/OTR_LedgerScriptWriter.py`
+- `nodes/story_packs/pipelines.json`
+- Fable2 artifact/runner tests
+
+No canonical workflow diff is expected. The review must recheck the real HEAD,
+then land one green commit and push it. Do not count C4a's pure mode objects as an
+open 120-word gate; current code still hard-selects compact mode.
+
+### 2. Long-run truth before long runs
+
+Fix `scripts/otr_canonical_api_run.py` and
+`scripts/otr_render_watchdog.ps1` before another long qualification. This is a
+review-proven harness defect, not a production-admitted PBUG. Add focused tests
+for canonical heartbeat progress, `RESULT SUCCESS`, explicit failure, and a
+stalled/down-server verdict.
+
+### 3. Fable correctness closeout
+
+Land C5, then remove operator-banned interstitial audio as a separate green
+chunk. Likely surfaces:
+
+- `nodes/_otr_captions.py`
+- `nodes/otr_credits_roll.py`
+- `nodes/_otr_video_engines/render_driver.py`
+- `nodes/stable_audio_theme.py`
+- `nodes/scene_sequencer.py`
+- `nodes/_otr_music_prompt.py`
+- focused caption/credits/HuMo/cue tests
+
+The interstitial rip must preserve story/visual cue rows. Only synthesis,
+manifest audio placement, master-timeline insertion, and their dead tests go.
+
+### 4. Context fit and qualification law
+
+Before 720, measure the real base and repair envelopes for every whole-artifact
+pass. Keep the 8192 local guard until evidence proves a larger per-profile cap is
+safe; current VRAM evidence says a blind 16K change can cost 2-3 GiB. Prefer
+must-fit failure and localized typed patches when a whole artifact cannot fit.
+
+`docs/PRODUCTION_SPRINT_LESSONS.md` owns the ladder. Older references to
+`120 -> 320`, `350 -> 720`, or a single-model 120 run are retired as qualification
+laws. The only production ladder is:
+
+1. tests and full gates;
+2. 30 words on two local model families plus one configured cloud/frontier lane;
+3. the same pairings at 120 words;
+4. then 720 words.
+
+### 5. Telemetry before the final event
+
+Plan of record:
+`docs/2026-07-12-codex56sol-llm-telemetry-plan.md`.
+
+Follow its internal green chunks exactly: pending-retention guard, pure recorder,
+shared structured-call callbacks alone, scheduler metadata, Codex56 lane wiring,
+then live proofs. It intentionally changes no node, widget, ledger byte, or
+canonical workflow JSON.
+
+### 6. One authoritative bakeoff
+
+Use `docs/2026-07-11-720-bakeoff-kickoff.md` as the self-regrounding event
+driver. Do not also run the older four-bank C6/C7 event as a second campaign.
+Re-derive the bank roster and reuse a receipt only when no relevant structured
+prompt/schema/validator changed after it. Every leg loads
+`workflows/otr_canonical.json` and proves ledger, episode asset, `obs_publish OK`,
+and final OBS file.
+
+## Immediate next sprint
+
+1. **Generate `docs/ENGINE_MATRIX.md`.** Extend `scripts/build_variants.py` so
+   `--check` emits and diffs the matrix from all three live CAPABILITIES
+   registries; link it from README. Estimate: **0.5-1 day**.
+2. **Randomizer Rolls Design A.** Follow
+   `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`: first establish
+   `_otr_lane_specs` as the one dispatch/compatibility authority, then add the
+   source-bank roll, then three canonical 30-word proofs. Estimate: **1-2 days
+   coding + 1 GPU day**.
+
+Randomizer waits until after the bakeoff so its dispatch refactor does not stale
+receipts in the one-variable bank experiment.
+
+## Validation and incident rules
+
+- Latest completed clean-code receipt available to this audit: 7,764 passed,
+  31 skipped, 1 expected failure; Bug Bible 17 passed, 7 skipped, 3 expected
+  failures. The unrelated dirty model-catalog pair is not covered by that receipt.
+- Every code chunk: focused tests, full Windows suite, Bug Bible, AST/JSON/BOM/
+  zero-byte checks, commit, push, and verify HEAD equals origin.
+- Every workflow/node/widget/link change updates
+  `workflows/otr_canonical.json` in the same commit and runs the full workflow
+  validation ritual.
+- A live failure enters `docs/PROD_BUG_LOG.md`. Only a production-proven,
+  root-caused, generalizable, operator-approved rule enters
+  `docs/BUG_BIBLE_PROMOTION_QUEUE.md`; static findings never do.
+
+## Open risks
+
+- `PBUG-20260712-17`: latest Codex56 P6 grounding-patch exhaustion; root cause
+  still open.
+- The old `PBUG-20260711-18` record describes a predicted context risk, not a
+  live-admitted bug. Treat it as an engineering gate and never promote it unless
+  production evidence later satisfies the admission rule.
+- The current model-catalog/test edits have no owner/test receipt in this file.
+  Preserve them and claim the coder slot only after their owner lands or releases
+  them.
 
 ## Pointers
 
 - `ROADMAP.md`
-- `AGENTS.md`
-- `CLAUDE.md`
-- `docs/BUG_LOG.md`
-- `docs/GO_FORWARD_ARCHIVE.md`
-- `docs/2026-07-08-source-banks-v2-plan.md`
-- `docs/google_tts_ideas.md`
-- `docs/multimodal-story-schema/MEDIA_ARCHIVE_QA_HANDOFF.md`
+- `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
+- `docs/PRODUCTION_SPRINT_LESSONS.md`
+- `docs/PROD_BUG_LOG.md`
+- `docs/2026-07-10-fable2-720-bakeoff-runway.md`
+- `docs/2026-07-11-720-bakeoff-kickoff.md`
+- `docs/2026-07-12-codex56sol-llm-telemetry-plan.md`
+- `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`
 - `workflows/otr_canonical.json`

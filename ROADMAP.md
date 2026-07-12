@@ -1,362 +1,140 @@
 # OTR Roadmap
 
+**Updated:** 2026-07-12
+
 **Branch:** `v2.0-alpha`
-**Owner:** Jeffrey A. Brick
-**Updated:** 2026-07-12 (added 1b: sci-fi bake-off 720w final verdict, with file links)
-**Purpose:** release runway after the current and next sprint.
 
-This file starts after the active handoff in `docs/GO_FORWARD_PLAN.md`. Keep
-current sprint and next sprint there; keep later sprints here. Old sprint logs
-and archaeology belong in `docs/ROADMAP_HISTORY.md` or dated docs.
+**Purpose:** ordered release runway after `docs/GO_FORWARD_PLAN.md`
 
-## North Star
+This is the only roadmap. It contains future work only. Completed source-pack,
+Google TTS, portability-build, and prior sprint narratives live in git history
+and dated evidence documents, not in the forward queue.
 
-Ship OTR v2 as a user-friendly ComfyUI pack that can generate short old-time
-radio episodes with story, voices, visuals, captions, credits, and final video.
+## North star
 
-The release should not only work on Jeffrey's machine. It should offer clear
-paths for:
+Ship OTR v2 as a friendly, fail-loud ComfyUI pack that generates complete
+old-time-radio episodes with coherent stories, distinct voices, story-native
+visuals, captions, credits, and a final publishable video across practical local
+and cloud hardware paths.
 
-- no-GPU / procedural users
-- all-cloud users
-- RTX 8 GB, 12-16 GB, and 24 GB+ users
-- Mac users
-- AMD users where practical
-- RunPod/cloud GPU users
+## Ordered release runway
 
-Everything must fail loud. No silent local fallback, no surprise model loads, no
-wrong-shaped Partner-node or API calls, and no hidden downgrade that changes the
-user's chosen route.
+A coder-day is one focused engineering day. Live renders, provider waits, and
+operator listening are separate elapsed time.
 
-## Before This Roadmap Starts
+| Order | Campaign | Exit condition | Coding estimate |
+|---:|---|---|---:|
+| 1 | Close remaining platform/profile gaps | Cloud variant emitted; representative CPU/NVIDIA/cloud smokes; AMD/Mac remain honestly marked until proved | 2-5 days |
+| 2 | `dynamic_story` visual direction | Current story becomes a typed post-freeze `vd-1` direction; canonical node/link activation; variants and 30/120 ladder green | 5-9 days |
+| 3 | Lean-mean/dead-code campaign | Re-grounded deletion/consolidation waves land green; no dormant interstitial audio or duplicate authorities | 12-16 days |
+| 4 | Product expansion | Visual-pack roll, richer cue stills, cue-ledger/SFX work, provider additions, system-agnostic upscale as separately gated campaigns | 5-10 days per selected set |
+| 5 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
+| 6 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
 
-`docs/GO_FORWARD_PLAN.md` currently owns:
+**Release-runway planning range after GO_FORWARD:** roughly **27-45 coder-days**
+before optional product-expansion campaigns, or about **6-10 one-coder weeks**
+with normal integration margin. Hardware/provider qualification can extend
+calendar time without consuming equivalent coding time.
 
-- current sprint: Google BYO API build, starting with `google_tts`
-- next sprint: media archive drama seed deck
+## 1. Platform and profile closure
 
-When those two are done, continue here.
+Finish verification, not another profile rewrite:
 
-## Release Arc After GO_FORWARD
+- ratify and emit the cloud-lanes variant from the canonical generator;
+- run representative CPU/no-GPU, NV50 identity, and cloud smokes;
+- keep AMD and Mac profiles explicitly unverified until their acceptance gates
+  run on matching hardware;
+- keep every generated workflow under `workflows/variants/` and generated from
+  `workflows/otr_canonical.json`;
+- use the generated `docs/ENGINE_MATRIX.md` from the immediate next sprint as
+  the user-visible engine/backend truth.
 
-### 1. Finish Remaining Source Packs
+## 2. Story-derived visual direction
 
-Build the remaining source-bank lanes before broad portability work.
+Plan of record: `docs/2026-07-12-dynamic-story-visual-scope.md`.
 
-Source packs:
+Build only after the GO_FORWARD context and telemetry foundations plus
+Randomizer Design A have landed. Re-run its VERIFY-AT-BUILD checklist against the
+then-current code. Preserve named-style byte identity, capture pre-feature
+baselines first, and activate node 96/link 284 atomically with code, tests,
+canonical JSON, and generated variants.
 
-- `public_domain_story`: public-domain text -> faithful condensed radio
-  adaptation.
-- `shakespeare`: Shakespeare scene/act -> faithful theatrical radio adaptation.
-- `original_radio`: fully original LLM-generated radio drama with no external
-  source.
+The current design name is `dynamic_story`; old `llm_creative` wording is
+retired. Dynamic direction remains downstream of the frozen story and may never
+feed visual taste back into story authorship.
 
-#### Public Domain
+## 3. Lean-mean campaign
 
-Public domain is a condensation/adaptation problem, not a seed-invention lane.
+Plan of record: `docs/2026-07-10-lean-mean-rip-final.md`, but its line pins are
+stale and must be re-grounded once after feature surfaces stop moving.
 
-Target flow:
+Execute the ratified dependency order, one pushed green chunk at a time:
 
-```text
-public-domain source
--> faithful digest around the configured word target
--> small radio cast
--> ledger
--> dynamic story-native visual style
-```
+`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 -> W5+SW4 -> C1-C5 -> SW1/SW2/SW3 -> C6 -> C7 -> W8`
 
-Rules:
+Required edges:
 
-- Preserve the original plot path, central conflict, tone, and ending where
-  practical.
-- Prune cast to a small number of speaking roles.
-- Compress exposition and side characters.
-- Fail loud if no coherent plot/scene/ending can be identified.
-- Default mode should be faithful, not loose "inspired by."
+- W1 before SW3;
+- W2 before C2;
+- W2-W4 before W7;
+- generated ENGINE_MATRIX before registry deletion/consolidation;
+- cloud smoke before W8;
+- Randomizer and `dynamic_story` before the writer/widget structural split.
 
-Visual style:
+Do not re-delete the old context helper already removed at `1a6ae8f1`, and mark
+the earlier standalone interstitial-audio rip as satisfied when re-grounding.
 
-- If the user chooses a specific style, adhere to it.
-- If the user chooses `llm_creative`, generate a unique episode style with a
-  strict schema and safety cleanup.
-- The style should fit the native story rather than impose sci-fi or archive
-  grammar.
+## 4. Product expansion candidates
 
-#### Shakespeare
+Choose these as separate campaigns after the core surface is stable:
 
-Shakespeare should be its own parallel source pack, not only generic public
-domain.
+- Randomizer Design B: visual-pack roll, only after `dynamic_story` establishes
+  one visual-style authority;
+- richer brief-driven music-cue still prompts;
+- ASR-anchored cue ledger and later SFX spotting;
+- direct BYO Google music/image/video paths, followed by other providers only
+  when they keep provider identity explicit and fail loud;
+- a new system-agnostic multi-GPU upscale stage built against profile and
+  registry contracts, never resurrection of the retired NVIDIA-only node.
 
-First scope:
+Each candidate gets its own scoped design, exact ownership table, tests, and
+qualification ladder before entering GO_FORWARD.
 
-- scene adaptation
-- act adaptation
+## 5. RunPod and installation
 
-Later:
+Build deployment and installation only from proven profiles:
 
-- whole-play condensation
-
-Rules:
-
-- Preserve iconic characters and relationships more aggressively than generic
-  public domain.
-- Compress acts/scenes rather than arbitrary chunks.
-- Keep the central turn of the scene.
-- Modernize only enough for radio clarity.
-- Allow elevated diction without flattening the language.
-- Prune cast hard, but do not casually merge iconic roles.
-
-#### Original Radio
-
-Fully original LLM-generated radio drama.
-
-No RSS, no source text, no seed words by default. Let the LLM create title,
-premise, cast, plot, ending, and optionally a unique visual style.
-
-Target passes:
-
-1. Generate candidate concepts.
-2. Score for radio clarity, originality, small-cast feasibility, visual
-   potential, and safety.
-3. Pick one.
-4. Build cast.
-5. Build outline.
-6. Fill ledger.
-7. Repair continuity and voice separation.
-8. Pick or generate visual style depending on user setting.
-9. Final safety, leak, and cliche cleanup.
-
-Visual style:
-
-- If user selects a registered style, the story must honor it.
-- If user selects `llm_creative`, generate a custom visual style for that
-  episode with a strict schema.
-
-### 1b. Sci-Fi Bake-off -- 720-Word Final Verdict (QUEUED, self-regrounding)
-
-Three blind-specced sci-fi story engines (Codex / Gemini / Sonnet lanes) compete
-against every runnable source bank in one pinned-model 720-word batch, judged
-blind, crowned by operator ear. Runs when all three lanes are 30-word green.
-
-Files (the kickoff re-derives all volatile facts at run time -- GATE -1):
-
-- Kickoff prompt (execute as written): `docs/2026-07-11-720-bakeoff-kickoff.md`
-- Contender specs: `docs/2026-07-11-scifi-codex-engine-spec.md`,
-  `docs/2026-07-11-scifi-gemini-engine-spec.md`,
-  `docs/2026-07-11-scifi-sonnet-engine-spec.md`
-- Governing laws + qualification ladder (30 -> 120 -> 720):
-  `docs/PRODUCTION_SPRINT_LESSONS.md`
-- Prod-bug staging log every live failure feeds: `docs/PROD_BUG_LOG.md`
-  (promotion to the Bug Bible happens only at operator-triggered fan-out)
-- Verdict lands at `docs/<date>-720-bakeoff/VERDICT.md`; closes with the full
-  SPRINT RECEIPT block
-- Live scoreboard: Cowork artifact `scifi-bakeoff-verdict-board` (reads
-  `scifi_smoke_status.txt` + `docs/PROD_BUG_LOG.md` on every open; operator
-  scoring sliders persist locally)
-
-Shape: bank is the ONLY variable (identical pinned model slots across legs);
-blind two-Fable judging + anchor reconciliation; the doc ranking is advisory --
-the crown waits for Jeffrey's blind listen.
-
-## 2. Thirty-Word Smoke Sweep
-
-After the source packs are coherent, run short 30-word/random smokes across
-each lane.
-
-Goal is not endless testing. Goal is to find and fix the obvious leaks:
-
-- source-bank drift
-- story leaks
-- gender/cast mistakes
-- weak cast separation
-- stale sci-fi phrasing in non-sci-fi lanes
-- bad coda/source note behavior
-- style mismatch
-- forbidden content
-- overused smoke/fog language
-- dull or incoherent episode structure
-
-Stop when the lane is good enough to proceed to portability. Do not polish
-forever.
-
-## 3. Cloud And BYO API Paths
-
-Keep "cloud" meanings clear:
-
-- Comfy Cloud / Partner nodes: Comfy Credits path.
-- Google BYO API: direct Google/Gemini API path.
-- Future BYO providers: separate direct API paths.
-
-Near-term Google ids:
-
-- `google_llm`
-- `google_music`
-- `google_img`
-- `google_vid`
-
-`google_tts` is the current sprint in `docs/GO_FORWARD_PLAN.md`. Later Google
-work should follow the same direct-BYO, fail-loud, no-cross-provider-fallback
-contract.
-
-## 4. Workflow Portability Profiles
-
-Once source packs are usable, turn portability into explicit profiles/toggles.
-
-Target profiles:
-
-- `no_gpu_procgen`
-- `all_cloud`
-- `amd_8_16gb`
-- `mac_8_16gb`
-- `mac_32_64gb`
-- `rtx_8gb`
-- `rtx_12_16gb`
-- `rtx_24gb_plus`
-
-Each profile should document:
-
-- expected hardware
-- required models
-- optional models
-- local vs cloud dependencies
-- approximate disk use
-- expected render mode
-- what fails loud if missing
-- known unsupported paths
-
-The canonical workflow remains:
-
-- `workflows/otr_canonical.json`
-
-Exported tier workflows should be generated from the canonical workflow by a
-script, not hand-maintained:
-
-- `workflows/exported/otr_no_gpu_procgen.json`
-- `workflows/exported/otr_all_cloud.json`
-- `workflows/exported/otr_rtx_8gb.json`
-- `workflows/exported/otr_rtx_12_16gb.json`
-- `workflows/exported/otr_rtx_24gb_plus.json`
-- `workflows/exported/otr_mac_8_16gb.json`
-- `workflows/exported/otr_mac_32_64gb.json`
-- `workflows/exported/otr_amd_8_16gb.json`
-
-Any real node/widget/wiring change must still update the canonical workflow in
-the same change.
-
-## 5. RunPod And Cloud GPU Harness
-
-After local profiles exist, build a RunPod-friendly deployment harness.
-
-Target scripts:
-
-- `scripts/runpod/bootstrap.sh`
-- `scripts/runpod/start_comfy.sh`
-- `scripts/runpod/check_env.py`
-- `scripts/runpod/smoke_profile.py`
-- `scripts/runpod/collect_logs.py`
-
-Target docs:
-
-- `docs/RUNPOD.md`
-- `docs/MACHINE_PROFILES.md`
-
-RunPod matrix:
-
-- cheap 8 GB NVIDIA
-- 12-16 GB NVIDIA
-- 24 GB+ NVIDIA
-- all-cloud/no-local-model path on a small pod
-
-Goal:
-
-- install cleanly
-- run at least one tiny profile-specific episode
-- fail loudly with useful diagnostics
-- collect logs and environment facts for optimization
-
-## 6. Installation Path
-
-Make the project approachable for people using ComfyUI and vibe-coding tools.
-
-Target scripts:
-
-- `scripts/install/windows.ps1`
-- `scripts/install/linux_runpod.sh`
-- `scripts/install/check_system.py`
-- `scripts/install/download_models.py`
-- `scripts/install/verify_install.py`
-
-Target docs:
-
-- `docs/INSTALL.md`
-- `docs/FIRST_RENDER.md`
-- `docs/TROUBLESHOOTING.md`
-- `docs/MACHINE_PROFILES.md`
-
-The install docs should answer:
-
-- Which workflow do I load?
-- Which models do I need for my machine?
-- What API keys or credits are optional?
-- What stays local?
-- What costs money?
-- What should I do when a loud error appears?
-
-## 7. README Polish
-
-The README is the final product pass, after profiles and install scripts are
-real.
-
-It should be accurate, friendly, and user-first:
-
-- what OTR is
-- screenshots/video examples
-- pick-your-machine path
-- first render in practical steps
-- story source choices
-- model/API cost clarity
-- troubleshooting
-- developer details at the bottom
-
-The README should feel like a usable product guide, not an internal engineering
-notebook.
-
-## 8. Ship v2
-
-Ship when:
-
-- source packs are usable
-- short smokes catch no obvious leaks
-- cloud/direct API paths fail loud and route correctly
-- canonical workflow validates
-- exported workflows are generated and tested
-- install scripts work on at least the main paths
-- RunPod harness works on representative pods
-- README and first-render docs match reality
-- full repo suite and Bug Bible are green
-
-Tagging/promotions remain operator-gated. Pushes to `v2.0-alpha` remain normal
-green-chunk workflow.
-
-## Active Principles
-
-- Fix root causes, not shims.
-- Fail loud; no silent fallback.
-- Keep workflow JSON wired when node/widget surfaces change.
-- JSON owns content/config. Python owns validation/routing/execution.
-- Prefer small, testable chunks.
-- Keep user-facing docs accurate and kind.
+- RunPod bootstrap/start/environment-check/smoke/log collection;
+- Windows and Linux installers;
+- deterministic model/download and install verification;
+- `INSTALL.md`, `FIRST_RENDER.md`, `TROUBLESHOOTING.md`, and machine-profile
+  guidance that match the generated workflows and engine matrix.
+
+The install path must answer which workflow to load, which models or keys are
+needed, what costs money, what stays local, and how to act on every loud failure.
+
+## 6. README and v2 release
+
+README is the final product pass, after the workflows, installers, and hardware
+claims are real. Ship v2 only when:
+
+- canonical and generated workflows validate;
+- representative local, cloud, and RunPod paths complete tiny episodes;
+- source/story/visual lanes have current qualification receipts;
+- full repo suite and Bug Bible are green;
+- install and first-render docs match observed behavior;
+- pending production-proven Bible candidates are resolved or explicitly held;
+- the operator has completed the final listen/eyeball and authorizes the tag or
+  promotion.
+
+Pushes to `v2.0-alpha` remain normal green-chunk workflow. Tags and promotions
+remain operator-gated.
 
 ## References
 
-- `AGENTS.md`
-- `CLAUDE.md`
-- `docs/BUG_LOG.md`
-- `docs/PROD_BUG_LOG.md` (prod-failure staging log; Bible fan-out is operator-gated)
-- `docs/2026-07-10-lean-mean-rip-final.md` (queued de-slop campaign, post-portability,
-  D-1..D-6 ratified)
-- `docs/2026-07-11-720-bakeoff-kickoff.md` (section 1b kickoff)
-- `docs/ROADMAP_HISTORY.md`
-- `docs/multimodal-story-schema/MEDIA_ARCHIVE_QA_HANDOFF.md`
-- `docs/google_tts_ideas.md`
+- `docs/GO_FORWARD_PLAN.md`
+- `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
+- `docs/2026-07-12-dynamic-story-visual-scope.md`
+- `docs/2026-07-10-lean-mean-rip-final.md`
 - `workflows/otr_canonical.json`
+- `workflows/variants/`
