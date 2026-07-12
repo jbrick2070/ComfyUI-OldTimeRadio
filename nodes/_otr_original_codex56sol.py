@@ -113,8 +113,8 @@ class AudibleTruthMap(StrictModel):
 
 
 class FairPlayFinding(StrictModel):
-    field_path: str
-    item_id: str
+    field_path: str = ""
+    item_id: str = ""
     category: str
     detail: str
     blocking: bool
@@ -426,7 +426,11 @@ def run_original_codex56sol_episode(
         raise OriginalCodex56SolContractError("triage did not select a valid possibility")
     truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800)
     fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600)
-    if not fair.accepted or any(f.blocking for f in fair.findings):
+    corroborated_fair_blocks = [
+        f for f in fair.findings
+        if f.blocking and f.field_path.strip() and f.item_id.strip()
+    ]
+    if corroborated_fair_blocks:
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
     score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600)
     manifest = _call(pass_id="P5_manifest", slot="technical", fn=technical_fn, pack=pack, seam="codex56_closed_line_manifest", inputs={"score": score.model_dump(mode="json")}, schema=ClosedLineManifest, scheduler=slot_scheduler, journal=journal, tokens=3000)

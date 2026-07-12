@@ -344,3 +344,8 @@ leaving them for live integration:
     exploratory slate card to satisfy downstream cast/thread completeness when
     a later truth-map or manifest artifact is the actual owner; premature
     minima consume repairs without improving the final contract.
+12. Separate reviewer opinion from corroborated defects in the schema and
+    blocking logic. A model marking a global note `blocking=true` is not enough;
+    fatal findings need the concrete coordinates the deterministic validator can
+    verify. Missing coordinates make the observation a warning, not a hidden
+    taste gate.

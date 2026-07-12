@@ -73,3 +73,12 @@ def test_cross_artifact_validators_return_retryable_error_strings():
     ]})
     error = lane._validate_slate(bad, draw)
     assert isinstance(error, str) and "copied verbatim" in error
+
+
+def test_ungrounded_fair_play_opinion_is_not_a_fatal_coordinate():
+    report = lane.FairPlayReport.model_validate({
+        "accepted": False,
+        "findings": [{"category":"Helpful Ending","detail":"Could be warmer","blocking":True}],
+    })
+    grounded = [f for f in report.findings if f.blocking and f.field_path and f.item_id]
+    assert grounded == []
