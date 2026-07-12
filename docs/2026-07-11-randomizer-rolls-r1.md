@@ -116,7 +116,53 @@ shared but the idiom:
 - No auto-roll-eligibility capability flag (parked operator option; the
   `runnable` flag stays the curation surface).
 
-## 5. Sequencing
+## 5. Production-sprint lessons applied (operator directive 2026-07-12)
+
+Per `docs/PRODUCTION_SPRINT_LESSONS.md`, binding on the R2 plan:
+
+**Ownership (Lessons 1).** The roll receipt gets a declared ownership row
+before any code:
+
+- `meta["bank_roll"]` -- authoritative writer: the sentinel resolver in the
+  writer's `run()` entry (one site, before `require_runnable_bank`).
+  Consumers: refine re-entry (reuse), HUD/credits (selected bank defaults),
+  replay tooling. Classification: DERIVED (from registry + request + seed) --
+  never authored, never measured. Lifecycle: fixed at submission, frozen with
+  the ledger, replayable via `seed` + `eligible_order`. Durable storage: the
+  episode ledger meta.
+- Same table for `meta["style_roll"]` in Design B.
+
+**No LLM surface (Lessons 2-5 mostly N/A by construction).** The roll makes
+ZERO model calls: no prompt, no schema, no repair ladder, no context budget.
+Keep it that way -- if an R2 draft adds a model call to the roll, it is wrong.
+Lesson 3 taxonomy: bank selection under a declared uniform policy over an
+enumerated eligible pool is MECHANICAL, like id repair -- Python may do it.
+
+**Qualification ladder (Lesson 6, adapted).** The roll is deterministic, but
+the LANE it selects is model-sensitive end to end. Qualification for Design A:
+
+1. unit fixtures (deterministic seed, injected-RNG unbiased-choice, receipt,
+   re-entry reuse, empty-pool raise) + full suite + Bug Bible;
+2. canonical 30-word smoke WITH the sentinel selected, seeded to land on at
+   least TWO different banks across legs (one legacy inline, one dispatched
+   custom lane) -- proving the pre-gate resolution works for both dispatch
+   shapes;
+3. one unseeded roll leg (OS entropy, receipt records what it drew).
+
+**Publish proof (Lesson 7).** Every qualification leg verifies the saved
+ledger + receipts, the episode asset under `otr/episodes/<ep>/`,
+`obs_publish OK`, and `Test-Path` of the final under `otr/obs/` -- an API
+SUCCESS is not proof. Canonical JSON updated + validated in the same commit
+as the widget change.
+
+**Concurrency (Lesson 10).** R2 does not start while another window owns the
+code. This doc is docs-only scoping, staged alone.
+
+**Sprint receipt.** The R2 sprint ends with the PRODUCTION_SPRINT_LESSONS
+receipt block filled in (model pairings recorded even though the roll itself
+is model-free -- the rolled lanes are not).
+
+## 6. Sequencing
 
 1. Design A -> R2 coding plan via /kibitz when the coding window frees.
 2. Design B -> R2 as its own change, same panel, after Design A lands.
