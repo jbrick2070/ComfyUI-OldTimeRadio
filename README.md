@@ -1,10 +1,11 @@
 # ComfyUI-OldTimeRadio (SIGNAL LOST)
 
-Turn **real science news** into a finished **sci-fi radio-drama video** — script, voices,
-music, and CRT-style video — fully automated inside ComfyUI. Drop it in, queue one workflow,
-walk away, and a complete episode lands in your output folder.
+Turn **real news, public-domain stories, Shakespeare, or fully original LLM fiction** into a
+finished **radio-drama video** — script, voices, music, and CRT-style video — fully automated
+inside ComfyUI. Drop it in, queue one workflow, walk away, and a complete episode lands in
+your output folder.
 
-**Pipeline:** real news → LLM script → character voices (IndexTTS2) + announcer (Kokoro) +
+**Pipeline:** story source → LLM script → character voices (IndexTTS2) + announcer (Kokoro) +
 themes (Stable Audio) → 48 kHz master mix → model-agnostic video (HuMo / LTX / Wan / CRT
 visualizer) → final MP4.
 
@@ -60,6 +61,9 @@ it names any missing weight and where it expects it.
   canonical workflow is the quick 30-word smoke canvas; heavier/local/cloud
   routing is handled by explicit profile overrides.
 - **OS:** Windows or Linux. Tested heavily on Windows + RTX (Blackwell/sm_120).
+- **Other setups:** per-platform workflow variants + recipes ship in-repo (16 GB NVIDIA
+  canonical, cloud-lane variant, Mac ~10 GB ceiling, AMD). The Mac/AMD variants are
+  drafts — not yet verified on real hardware.
 - **Disk:** the model set is large (tens of GB). Episodes are a few dozen MB each.
 
 ---
@@ -82,6 +86,28 @@ News → LedgerScriptWriter (LLM) → FreezeCascade → CastLock
 
 ---
 
+## Story sources (source banks)
+
+The writer's `source_bank` dropdown selects where each episode's story comes from.
+Default: `science_news`.
+
+| Bank | What it does |
+|------|--------------|
+| `science_news` | real science RSS → sci-fi radio drama (the shipped default) |
+| `media_archive` | media RSS / archive items → restoration-adventure episodes |
+| `public_domain_story` | faithful radio adaptation of a public-domain source |
+| `shakespeare` | Folger scene adaptation |
+| `original_radio` | no-source original fiction seeded from an entropy spark draw |
+| `scifi_fable2`, `scifi_codex`, `scifi_gemini`, `scifi_sonnet` | independent multipass sci-fi writer lanes — four genuinely different story architectures |
+| `original_codex56sol` | "Lost and Found Frequency" — an original fair-play audio mystery lane |
+
+A typed `custom_premise` rides along as an operator hint on the original lanes and as a
+source override on the article lanes. Every lane is fail-closed: a bad source, context
+overflow, or contract violation stops loudly instead of shipping a degraded story, and
+the LLM writes all story text — Python validates, it never rewrites prose.
+
+---
+
 ## v2.0-alpha — the Open Video Model Platform
 
 The video layer is **model-agnostic**: a registry of pluggable engine adapters, chosen
@@ -96,13 +122,16 @@ beat; every chain ends at a guaranteed CRT "radio-floor" clip, so a missing or O
 | `announcer_visual` | the announcer bookends | procedural visualizer |
 | `music_visual` | opening/closing theme bookends | procedural visualizer |
 | `character_video` | character dialogue beats | procedural visualizer / still floor |
-| `scene_broll` | scene b-roll | canonical policy driven |
-| `background_abstract` | text-only background | canonical policy driven |
+
+(The former `sfx` speaker role and `scene_broll` / `background_abstract` video roles were
+removed in the 2026-07-01 cleanbreak — old ledgers using them fail loud by design.)
 
 **Engines available:** HuMo (audio-driven face, 14B + 1.7B tiers), LTX (text/image→video and
 audio-in), Wan (TI2V / I2V), and the cheap CPU floors (CRT **visualizer**, Ken-Burns, flat
-still, station card). Audio-driven engines are offered only where audio exists; everything is
-single-resident under a 14.5 GB ceiling and request-hash deterministic.
+still, station card). Audio-driven engines are offered only where audio exists; engines load
+one at a time with explicit VRAM reclaim between stages, and renders are request-hash
+deterministic. The old VRAM tier system is gone — per-platform workflow variants are the
+sizing mechanism now.
 
 ### Headless canonical path
 
@@ -159,6 +188,8 @@ appear there as they render.
 
 - **"SERVER DID NOT COME UP" on headless boot** — set `PYTHONUTF8=1` and
   `PYTHONIOENCODING=utf-8`; a non-UTF-8 console crashes on the first emoji log line.
+  (The shipped launcher `scripts/_otr_soak_server_launch.cmd` already sets both, and a
+  regression guard in the sibling survival-guide repo keeps it that way.)
 - **An engine "fails loudly" mid-render** — that's by design; check the log for the missing
   model/dependency. The beat falls back to a CRT floor so the episode still completes.
 - **Out of VRAM on a local video tier** — use the canonical procedural path or an
@@ -167,6 +198,18 @@ appear there as they render.
   master mix's closing theme. Tracked for a fix.
 - **Nodes don't appear after install** — restart ComfyUI; confirm you're on the `v2.0-alpha`
   branch.
+
+---
+
+## Quality discipline
+
+Development runs under a sibling QA harness — the
+[ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide):
+a 197-entry machine-readable Bug Bible distilled from this project's live production
+incidents, plus a static regression suite that runs against this pack after every change.
+Production bugs are staged in [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) and promoted
+to the Bible in verified batches. Only bugs that actually failed in a live run qualify —
+review findings never create entries on their own.
 
 ---
 
@@ -179,9 +222,10 @@ project's generations. Born of the machine, still raising hell on the airwaves. 
 
 ## Changelog
 
-The current line is **v2.0-alpha** (Open Video Model Platform; per-role engines; HuMo-14B
-character/announcer/music promotion; frozen byte-identical audio master). Full per-version
-history is in the git log and the GitHub Releases page.
+The current line is **v2.0-alpha** (Open Video Model Platform; per-role engines; ten story
+source banks including four independent multipass sci-fi writer lanes and an original
+fair-play mystery lane; per-platform workflow variants; frozen byte-identical audio master).
+Full per-version history is in the git log and the GitHub Releases page.
 
 ## License & Credits
 

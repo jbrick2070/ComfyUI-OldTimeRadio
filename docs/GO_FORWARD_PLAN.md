@@ -34,6 +34,12 @@ narratives do not belong here.
 - Unrelated dirty work owned by another window must be preserved and excluded:
   `nodes/_otr_model_catalog.py`, `tests/test_openrouter_catalog_rows.py`,
   `docs/2026-07-11-cue-ledger-r1-codex-prompt.md`, and local bakeoff logs.
+- **README.md refreshed by a second (docs-only) window, 2026-07-12 13:14 PDT:**
+  operator-directed refresh on `v2.0-alpha` — source-bank table (10 runnable banks),
+  sfx/b-roll role-rip and VRAM-tier-rip corrections, portability-variant note,
+  survival-guide cross-link. Committed with a pathspec limited to `README.md` +
+  this file; no code, tests, or workflow JSON touched. Informational only — if a
+  README commit appears in your rebase, this is it.
 
 ## Ordered current sprint
 
