@@ -38,16 +38,15 @@ the second bakeoff this plan forbids.
   history; it is no longer a queue item.
 - The filtered OpenRouter catalog work is pushed at `961e095a`; the old dirty
   model-catalog warning is retired.
-- The exact Sci-Fi Codex repair-envelope fix is pushed at `7aa3140e`; its live
-  reverify remains open.
-- **The sole coder slot is currently held by the Sci-Fi Codex visual-policy
-  production fix (`PBUG-20260712-19`).** Its dirty ownership is:
-  `docs/PROD_BUG_LOG.md`, `nodes/otr_image_gen_dispatcher.py`,
-  `nodes/otr_meta_brief_image_prompt.py`, `nodes/otr_shot_lock.py`,
-  `nodes/_otr_video_engines/render_driver.py`, and the corresponding
-  image-platform, still-spine, video-platform, and credits tests.
-  No next chunk starts until that owner lands or releases the files. The task ID
-  is not recorded in the repository.
+- The exact Sci-Fi Codex repair-envelope fix is pushed at `7aa3140e`; the
+  compact P3 repair-context follow-up is pushed at `915c8314`. Both await live
+  reverify with the same canonical `scifi_codex` leg.
+- The all-visualizer effective-consumer root fix (`PBUG-20260712-19`) is pushed
+  at `496689da`. **The sole coder slot is currently held by the Sci-Fi P0
+  bounded-evidence repair (`PBUG-20260712-21`).** Its ownership is the three
+  compatible Sci-Fi source lanes (Codex, Gemini, Sonnet), their P0 seams/tests,
+  `docs/PROD_BUG_LOG.md`, and the Bug Bible `11.50` promotion update. No next
+  production chunk starts until it lands and the canonical Codex rerun clears.
 - Preserve the untracked cue-ledger prompt, Sci-Fi Codex repair plan, and local
   bakeoff logs. They are not owned by this planning rewrite.
 - One coder edits code or `workflows/otr_canonical.json` at a time. Read-only
@@ -60,7 +59,7 @@ time and is listed separately.
 
 | Order | Chunk | Hard completion gate | Estimate |
 |---:|---|---|---:|
-| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-19` root fix; focused tests, full suite, Bible; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no unused visual-authoring LLM call or image objects, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies the pending live reverify for the shipped `PBUG-20260712-18` repair. | 0.5-1 day + <=1 GPU day |
+| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-21` bounded P0 root fix; focused tests, full suite, Bible; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no unused visual-authoring LLM call or image objects, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies pending live reverifies for shipped PBUGs 18-20. | 0.5-1 day + <=1 GPU day |
 | 2 | Canonical watchdog support | Canonical runner emits heartbeats; watchdog recognizes canonical `RESULT`; healthy long runs never false-dead; explicit failure and stalled/down-server paths are pinned. This is a harness defect, not a production-admitted PBUG. | 0.5 day |
 | 3 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. | 0.5-1 day |
 | 4 | Rip interstitial **audio** only | Remove synthesis, insertion, timing, and dead tests; retain `music_inter` story/visual semantics. | 0.5-1 day |
@@ -149,7 +148,8 @@ different facts. Do not encode promotion state inside a bug's fix status.
 |---|---|---|
 | `PBUG-20260712-17` | Live failure; root cause open until telemetry captures it | **Not eligible** -- no proved reusable law yet |
 | `PBUG-20260712-18` | Live-proven exact repair-envelope failure; fix pushed at `7aa3140e`; live reverify pending | After reverify: overlap check + operator approval, then add to the promotion queue |
-| `PBUG-20260712-19` | Live-proven all-visualizer authoring failure; fix is currently another owner's dirty work | After land + live reverify: overlap check + operator approval, then add to the promotion queue |
+| `PBUG-20260712-19` | Live-proven all-visualizer authoring failure; fix pushed at `496689da`, live reverify pending | After live reverify: overlap check + operator approval, then add to the promotion queue |
+| `PBUG-20260712-20` / `21` | Live-proven P3/P0 structured-capacity failures; fixes use compact repair context and bounded artifact surfaces | Already generalized into BUG-11.50; live reverify remains required |
 | historical `PBUG-20260711-18` | Analysis-only 720-word context risk, historically mislabelled as a PBUG | **Never eligible from static evidence**; keep only as the item-7 engineering risk unless a future live artifact independently admits it |
 
 The active production-fix owner updates `docs/PROD_BUG_LOG.md`. The thin approval
@@ -158,11 +158,10 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Latest fully documented clean baseline: C4b at `95582643` -- full repo
-  **7,774 passed, 31 skipped, 1 expected failure**; Bug Bible **17 passed,
-  11 skipped, 3 expected failures**. Later pushed commits do not carry a newer
-  full-suite receipt in this handoff, so the active Sci-Fi Codex closeout must
-  establish the next whole-tree baseline.
+- Latest whole-tree receipt during the active P0 closeout: **7,802 passed, 31
+  skipped, 1 xfailed**; Bug Bible **17 passed, 11 skipped, 3 xfailed**. The
+  canonical validator, JSON round-trip, live widget-vector, link, and input
+  audits report **23 nodes / 57 links** with no canonical workflow delta.
 - Every code chunk: focused tests, full Windows suite, Bug Bible, AST/JSON/BOM/
   zero-byte checks, commit, push, and verify `HEAD == origin/v2.0-alpha`.
 - Every node/widget/link/schema change edits `workflows/otr_canonical.json` in
@@ -177,8 +176,8 @@ fixture creates a row.
 
 ## Open risks
 
-- The active dirty Sci-Fi Codex owner must land/release before any new coder
-  claims the slot.
+- The active dirty Sci-Fi P0 owner must land/release before any new coder claims
+  the slot.
 - `PBUG-20260712-17` can expand item 6 only after telemetry identifies the real
   boundary; retries and cap inflation are forbidden substitutes.
 - User extensibility and `dynamic_story` both touch the writer, visual-style

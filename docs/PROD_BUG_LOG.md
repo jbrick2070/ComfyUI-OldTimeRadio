@@ -836,3 +836,41 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: already promoted as BUG-11.50; added OTR executable coverage
   for the repair-prompt dimension.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260712-21 -- Sci-Fi source P0 could exhaust its bounded output before producing JSON
+
+- promotion: BUG-11.50
+- surfaced: canonical 120-word `scifi_codex` reverify queue leg, prompt
+  `b5341847-4635-4eeb-a5b8-4660136b0d78`, Gemma E4B creative + Mistral-Nemo
+  technical, 2026-07-12
+- symptom: P0 selected a valid long RSS source, then both base/structural
+  attempts ended at `generated_tokens=2000` with incomplete JSON
+  (`prompt_tokens=2455`, `max_new_tokens=2000`). Its typed repair returned an
+  otherwise literal index with `tone: []`, which strict validation correctly
+  rejected because `tone` is model-owned scalar prose. No P1/P3 artifact,
+  ledger, media asset, or OBS final was produced.
+- root cause: FactIndexV4/FragmentDossierV4 allowed up to twelve facts,
+  entities, and numbers while claims, quote spans, numeric-token lists, and
+  several strings had no finite serialized surface. A fixed P0 output ceiling
+  could therefore be too small by construction. The generic typed repair also
+  replayed a copyable original-request envelope and did not explicitly require
+  scalar `tone`, recreating the context/shape failure class from PBUG-20.
+- fix: introduce one shared Sci-Fi P0 evidence contract for Codex, Gemini, and
+  Sonnet: 1-6 facts, 0-4 entities/numbers, one literal span per fact/entity,
+  bounded claim/name/quote/token/tone fields, and compact story-usable prompt
+  seams. Reserve 2,800 output tokens for FactIndexV4 and 3,000 for Sonnet's two
+  extra root strings, journal the bounds/source-size receipt, and retain
+  `prompt_must_fit=True`. P0 repairs now receive tagged failed-artifact,
+  rejection, source evidence, digest, and allowed-field references only; they
+  explicitly require the exact artifact root and one nonempty scalar `tone`.
+  Python never substitutes a tone value.
+- verify idea: reject seven facts, a second evidence span, an overlong quote,
+  and `tone: []`; assert all three source lanes use the shared bounded
+  reservation and compact repair context without `original_request` or
+  `artifact_inputs`; then rerun the same canonical Codex bank through P3 and
+  require zero all-visualizer image objects, saved ledger, episode asset,
+  `obs_publish OK`, and OBS final.
+- bible-worthy: yes -- a live bounded-output failure with reusable
+  model-facing artifact-surface and compact-repair requirements; promoted as
+  BUG-11.50 with cross-lane executable coverage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

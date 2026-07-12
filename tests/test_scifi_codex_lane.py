@@ -345,6 +345,119 @@ def test_p0_structured_prompt_receives_only_the_evidence_projection():
     assert '"source"' not in prompt_text
     assert '"date"' not in prompt_text
     assert '"link"' not in prompt_text
+    assert "P0 COMPACT EXTRACTION CONTRACT" in calls[0]["messages"][0]["content"]
+
+
+def test_fact_index_contract_bounds_output_surface():
+    """P0's accepted JSON has a finite envelope before a token cap is chosen."""
+    span = lane.SourceSpanV4(
+        field="headline", start=0, end=6, quote="Signal",
+    )
+    fact = lane.FactV4(
+        fact_id="F01", claim="A signal is recorded.", source_spans=[span],
+    )
+    valid = {
+        "facts": [fact.model_dump(mode="json")],
+        "entities": [],
+        "numbers": [],
+        "tone": "cautious",
+        "payload_sha256": "0" * 64,
+    }
+    assert lane.FactIndexV4.model_validate(valid).facts[0].fact_id == "F01"
+
+    too_many = dict(valid)
+    too_many["facts"] = [fact.model_dump(mode="json")] * 7
+    with pytest.raises(Exception):
+        lane.FactIndexV4.model_validate(too_many)
+    with pytest.raises(Exception):
+        lane.FactV4(
+            fact_id="F01",
+            claim="A signal is recorded.",
+            source_spans=[span, span],
+        )
+    with pytest.raises(Exception):
+        lane.SourceSpanV4(
+            field="headline", start=0, end=241, quote="x" * 241,
+        )
+    with pytest.raises(Exception):
+        lane.FactIndexV4.model_validate({**valid, "tone": []})
+
+
+def test_fact_index_token_budget_keeps_the_live_120_word_window():
+    """The live 2,455-token P0 prompt gets a named bounded-output reservation."""
+    context_cap = 8192
+    observed_base_prompt_tokens = 2455
+
+    assert lane.p0_output_token_budget() == 2800
+    assert lane.p0_output_token_budget(extra_root_fields=2) == 3000
+    assert context_cap - lane.p0_output_token_budget() >= observed_base_prompt_tokens
+    receipt = lane.p0_contract_receipt()
+    assert receipt["max_new_tokens"] == 2800
+    assert receipt["max_fact_rows"] == 6
+    assert receipt["max_spans_per_evidence_row"] == 1
+
+
+def test_p0_typed_repair_is_compact_and_requires_scalar_tone():
+    """A model must repair tone; Python must not turn a list into authored prose."""
+    payload = _payload()
+    envelope, _ = lane.validate_payload_envelope(
+        payload, {"seed_source": "rss_fetch", "target_words": 120},
+    )
+    inputs = lane._p0_artifact_inputs(envelope)
+    field, evidence = next(iter(inputs["payload"]["payload"].items()))
+    quote = evidence[: min(32, len(evidence))]
+    artifact = {
+        "facts": [{
+            "fact_id": "F01",
+            "claim": "The observatory records a signal.",
+            "source_spans": [{
+                "field": field, "start": 0, "end": len(quote), "quote": quote,
+            }],
+            "numeric_tokens": [],
+        }],
+        "entities": [],
+        "numbers": [],
+        "tone": [],
+        "payload_sha256": envelope.source_digest,
+    }
+    repaired = {**artifact, "tone": "cautious"}
+    replies = iter((json.dumps(artifact), json.dumps(repaired)))
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return next(replies)
+
+    result = lane.invoke_codex_structured(
+        pass_id="P0", slot="technical", slot_fn=slot_fn,
+        pack=SimpleNamespace(prompt_stages={"codex_fact_index_system": "Read A0."}),
+        seam_refs=("codex_fact_index_system",), artifact_inputs=inputs,
+        result_type=lane.FactIndexV4,
+        post_validator=lambda value: lane._validate_fact_index(
+            value, payload,
+            allowed_source_fields=frozenset(inputs["allowed_source_fields"]),
+            expected_payload_sha256=envelope.source_digest,
+        ),
+        base_temperature=.20, structural_retry_temperature=.10,
+        max_new_tokens=lane.p0_output_token_budget(), call_journal={},
+        prompt_must_fit=True,
+    )
+
+    assert result.tone == "cautious"
+    # A schema-shaped response skips the redundant structural retry and goes
+    # straight to typed repair, so the model-owned scalar tone is call two.
+    assert len(calls) == 2
+    assert all(
+        getattr(call["messages"], "_otr_prompt_must_fit", False)
+        for call in calls
+    )
+    repair_system = calls[-1]["messages"][0]["content"]
+    repair_user = calls[-1]["messages"][1]["content"]
+    assert "tone is one nonempty scalar" in repair_system
+    assert "<failed_fact_index>" in repair_user
+    assert "<source_evidence>" in repair_user
+    assert "original_request" not in repair_user
+    assert "artifact_inputs" not in repair_user
 
 
 def test_p0_deterministic_repair_cannot_reintroduce_an_omitted_alias():
@@ -949,6 +1062,9 @@ def test_only_whole_script_passes_use_dynamic_token_budget():
         )
     )
     p0_keywords = {keyword.arg: keyword.value for keyword in p0_call.keywords if keyword.arg}
+    p0_budget = p0_keywords["max_new_tokens"]
+    assert isinstance(p0_budget, ast.Name)
+    assert p0_budget.id == "p0_token_budget"
     assert isinstance(p0_keywords["prompt_must_fit"], ast.Constant)
     assert p0_keywords["prompt_must_fit"].value is True
     assert isinstance(p0_keywords["post_validator"], ast.Lambda)
@@ -962,6 +1078,8 @@ def test_only_whole_script_passes_use_dynamic_token_budget():
     assert isinstance(expected_digest.value, ast.Name)
     assert expected_digest.value.id == "env"
     assert expected_digest.attr == "source_digest"
+    assert "fact_index_token_budget" in source_path.read_text(encoding="utf-8")
+    assert "p0_contract_receipt" in source_path.read_text(encoding="utf-8")
     for pass_id, budget_node in seen.items():
         if pass_id not in {"P3", "P3_rewrite", "P5", "P7", "P9"}:
             assert not (

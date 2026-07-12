@@ -19,6 +19,23 @@ try:
     from ._otr_canon import EpisodeCanon
     from ._otr_json import parse_first_json_object
     from ._otr_source_payload import validate_source_payload
+    from ._otr_scifi_p0_contract import (
+        MAX_CLAIM_CHARS,
+        MAX_ENTITY_NAME_CHARS,
+        MAX_ENTITY_ROWS,
+        MAX_FACT_ROWS,
+        MAX_HEADLINE_CLEAN_CHARS,
+        MAX_NUMERIC_TOKEN_CHARS,
+        MAX_NUMBER_ROWS,
+        MAX_PROVENANCE_NOTE_CHARS,
+        MAX_QUOTE_CHARS,
+        MAX_SPANS_PER_EVIDENCE_ROW,
+        MAX_TONE_CHARS,
+        compact_p0_repair_context,
+        p0_contract_instruction,
+        p0_contract_receipt,
+        p0_output_token_budget,
+    )
     from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import schema_shape_instruction, structured_call
     from . import _otr_ledger_freeze
@@ -27,6 +44,23 @@ except ImportError:  # pragma: no cover
     from _otr_canon import EpisodeCanon  # type: ignore
     from _otr_json import parse_first_json_object  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
+    from _otr_scifi_p0_contract import (  # type: ignore
+        MAX_CLAIM_CHARS,
+        MAX_ENTITY_NAME_CHARS,
+        MAX_ENTITY_ROWS,
+        MAX_FACT_ROWS,
+        MAX_HEADLINE_CLEAN_CHARS,
+        MAX_NUMERIC_TOKEN_CHARS,
+        MAX_NUMBER_ROWS,
+        MAX_PROVENANCE_NOTE_CHARS,
+        MAX_QUOTE_CHARS,
+        MAX_SPANS_PER_EVIDENCE_ROW,
+        MAX_TONE_CHARS,
+        compact_p0_repair_context,
+        p0_contract_instruction,
+        p0_contract_receipt,
+        p0_output_token_budget,
+    )
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
     import _otr_ledger_freeze  # type: ignore
@@ -60,7 +94,7 @@ class SourceSpanV4(_Strict):
     field: Literal["headline", "summary", "full_text", "seed_text"]
     start: int = Field(ge=0)
     end: int = Field(gt=0)
-    quote: str
+    quote: str = Field(min_length=1, max_length=MAX_QUOTE_CHARS)
 
     @model_validator(mode="after")
     def ordered(self):
@@ -76,31 +110,37 @@ class PayloadV4(_Strict):
 
 
 class EvidenceFactV4(_Strict):
-    fact_id: str = Field(pattern=r"fact_[0-9]+")
-    claim: str
-    source_spans: list[SourceSpanV4]
+    fact_id: str = Field(pattern=r"^fact_[1-6]$")
+    claim: str = Field(min_length=1, max_length=MAX_CLAIM_CHARS)
+    source_spans: list[SourceSpanV4] = Field(
+        min_length=1, max_length=MAX_SPANS_PER_EVIDENCE_ROW,
+    )
 
 
 class EvidenceNumberV4(_Strict):
-    number_id: str = Field(pattern=r"num_[0-9]+")
-    verbatim: str
+    number_id: str = Field(pattern=r"^num_[1-4]$")
+    verbatim: str = Field(min_length=1, max_length=MAX_NUMERIC_TOKEN_CHARS)
     fact_id: str
     source_span: SourceSpanV4
 
 
 class EvidenceEntityV4(_Strict):
-    entity_id: str = Field(pattern=r"entity_[0-9]+")
-    name: str
-    source_spans: list[SourceSpanV4]
+    entity_id: str = Field(pattern=r"^entity_[1-4]$")
+    name: str = Field(min_length=1, max_length=MAX_ENTITY_NAME_CHARS)
+    source_spans: list[SourceSpanV4] = Field(
+        min_length=1, max_length=MAX_SPANS_PER_EVIDENCE_ROW,
+    )
 
 
 class FragmentDossierV4(_Strict):
-    verified_facts: list[EvidenceFactV4] = Field(min_length=1, max_length=12)
-    key_numbers: list[EvidenceNumberV4] = Field(max_length=12)
-    named_entities: list[EvidenceEntityV4] = Field(max_length=12)
-    tone: str
-    headline_clean: str
-    provenance_note: str
+    verified_facts: list[EvidenceFactV4] = Field(
+        min_length=1, max_length=MAX_FACT_ROWS,
+    )
+    key_numbers: list[EvidenceNumberV4] = Field(max_length=MAX_NUMBER_ROWS)
+    named_entities: list[EvidenceEntityV4] = Field(max_length=MAX_ENTITY_ROWS)
+    tone: str = Field(min_length=1, max_length=MAX_TONE_CHARS)
+    headline_clean: str = Field(max_length=MAX_HEADLINE_CLEAN_CHARS)
+    provenance_note: str = Field(max_length=MAX_PROVENANCE_NOTE_CHARS)
     payload_sha256: str
 
 
@@ -514,6 +554,8 @@ def invoke_sonnet_structured(
     prompt_must_fit: bool = False,
 ) -> BaseModel:
     prompt = _prompt(pack, seam_ref, pass_id, typed_inputs, result_type)
+    if pass_id == "P0":
+        prompt[0]["content"] += p0_contract_instruction(has_numeric_tokens=False)
     attempts: list[dict[str, Any]] = []
     def capture(messages, **kwargs):
         call_messages = (
@@ -522,23 +564,34 @@ def invoke_sonnet_structured(
             else messages
         )
         raw = slot_fn(call_messages, **kwargs)
-        attempts.append({"temperature": kwargs.get("temperature"), "raw_sha256": hashlib.sha256(str(raw).encode("utf-8")).hexdigest()})
+        original_raw = str(raw)
+        attempts.append({
+            "temperature": kwargs.get("temperature"),
+            "max_new_tokens": kwargs.get("max_new_tokens"),
+            "raw_chars": len(original_raw),
+            "raw_sha256": hashlib.sha256(original_raw.encode("utf-8")).hexdigest(),
+        })
         return raw
     def typed_repair_factory(*, original_prompt, failed_output, error):
         if pass_id == "P0":
             repair_rules = (
-                "This is a typed repair of the same artifact, not a new creative response. "
-                "Return one JSON object only. Use fact_1, fact_2, ... for facts; entity_1, "
-                "entity_2, ... for entities; and num_1, num_2, ... for numbers. Keep every "
-                "fact_id reference consistent. For every source span, calculate quote from "
-                "the original request exactly as payload[field][start:end]; do not paraphrase, "
-                "infer, or retain a mismatched span. Preserve valid claims and remove only "
-                "unsupported facts."
+                "This is a typed repair of the same FragmentDossierV4, not a new creative "
+                "response. Return one complete JSON object only, rooted exactly at "
+                "verified_facts, key_numbers, named_entities, tone, headline_clean, "
+                "provenance_note, and payload_sha256. Use fact_1 through fact_6, entity_1 "
+                "through entity_4, and num_1 through num_4; keep every fact_id reference "
+                "consistent. Every fact and entity has exactly one literal source span; "
+                "calculate quote exactly as payload[field][start:end] from the supplied source "
+                "evidence. Do not paraphrase, infer, or retain a mismatched span. tone is one "
+                "nonempty scalar source-derived string, never an array or object. Preserve "
+                "valid claims and remove only unsupported facts. The tagged input references "
+                "are not an output template: never return a wrapper, request field, or tag name."
             )
+            p0_envelope = json.loads(prompt[1]["content"])["typed_inputs"]["payload"]
             deterministic = repair_literal_source_metadata(
                 failed_output,
                 FragmentDossierV4,
-                json.loads(prompt[1]["content"])["typed_inputs"]["payload"]["payload"],
+                p0_envelope["payload"],
                 zero_padded_ids=False,
             )
             if deterministic is not None:
@@ -601,6 +654,20 @@ def invoke_sonnet_structured(
                 "and never cite an id that is not in the dossier. If your line mentions a "
                 "fact in its wording, that fact's id belongs in cites."
             )
+        if pass_id == "P0":
+            return [
+                {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},
+                {
+                    "role": "user",
+                    "content": compact_p0_repair_context(
+                        failed_artifact=failed_output,
+                        rejection=str(error),
+                        source_evidence=p0_envelope["payload"],
+                        source_digest=p0_envelope["payload_sha256"],
+                        allowed_source_fields=sorted(p0_envelope["payload"]),
+                    ),
+                },
+            ]
         return [
             {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": str(error), "original_request": json.loads(prompt[1]["content"])}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
@@ -766,7 +833,15 @@ def run_scifi_sonnet_episode(
     envelope, steer = validate_sonnet_payload(payload, resolved)
     meta["scifi_sonnet"] = {"source_digest": envelope.payload_sha256, "source_mode": envelope.source_mode, "call_journal": {}}
     journal = meta["scifi_sonnet"]["call_journal"]
-    p0 = invoke_sonnet_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_intake_system", pack=pack, typed_inputs={"payload": envelope.model_dump(mode="json")}, result_type=FragmentDossierV4, post_validator=lambda x: _dossier_validator(x, payload), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2000, journal=journal, prompt_must_fit=True)
+    p0_token_budget = p0_output_token_budget(extra_root_fields=2)
+    journal["fact_index_token_budget"] = {
+        **p0_contract_receipt(extra_root_fields=2),
+        "source_evidence_field_count": len(envelope.payload),
+        "source_evidence_characters": sum(
+            len(value) for value in envelope.payload.values()
+        ),
+    }
+    p0 = invoke_sonnet_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_intake_system", pack=pack, typed_inputs={"payload": envelope.model_dump(mode="json")}, result_type=FragmentDossierV4, post_validator=lambda x: _dossier_validator(x, payload), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=p0_token_budget, journal=journal, prompt_must_fit=True)
     p1 = invoke_sonnet_structured(pass_id="P1", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_frame_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "initial_session_word_steer": steer}, result_type=SessionFrameV4, post_validator=lambda x: None, base_temperature=.85, structural_retry_temperature=.40, max_new_tokens=2300, journal=journal)
     cast = lock_archive_cast(p1)
     orum = []

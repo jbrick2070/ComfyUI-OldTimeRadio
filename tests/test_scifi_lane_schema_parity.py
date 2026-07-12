@@ -19,8 +19,10 @@ length-pinned list.
 from __future__ import annotations
 
 import importlib
+import json
 import pathlib
 import typing
+from types import SimpleNamespace
 
 import pytest
 from pydantic import BaseModel
@@ -357,6 +359,117 @@ def test_source_grounded_p0_refuses_to_be_left_truncated(module_name, invoke_nam
         )
         return
     pytest.fail(f"no P0 call found in {module_name}")
+
+
+@pytest.mark.parametrize(
+    "module_name,root_name,facts_key,entities_key,numbers_key,fact_def",
+    (
+        ("nodes._otr_scifi_codex", "FactIndexV4", "facts", "entities", "numbers", "FactV4"),
+        ("nodes._otr_scifi_gemini", "FactIndexV4", "facts", "entities", "numbers", "FactV4"),
+        ("nodes._otr_scifi_sonnet", "FragmentDossierV4", "verified_facts", "named_entities", "key_numbers", "EvidenceFactV4"),
+    ),
+)
+def test_source_grounded_p0_has_a_finite_shared_output_envelope(
+    module_name, root_name, facts_key, entities_key, numbers_key, fact_def,
+):
+    """BUG-11.50: a capped P0 needs a schema-bounded artifact surface."""
+    module = importlib.import_module(module_name)
+    root_schema = getattr(module, root_name).model_json_schema()
+    properties = root_schema["properties"]
+    assert properties[facts_key]["maxItems"] == 6
+    assert properties[entities_key]["maxItems"] == 4
+    assert properties[numbers_key]["maxItems"] == 4
+    assert properties["tone"]["minLength"] == 1
+    assert properties["tone"]["maxLength"] == 80
+    assert module.SourceSpanV4.model_json_schema()["properties"]["quote"]["maxLength"] == 240
+    fact_schema = root_schema["$defs"][fact_def]
+    assert fact_schema["properties"]["source_spans"]["maxItems"] == 1
+    assert fact_schema["properties"]["claim"]["maxLength"] == 240
+    assert module.p0_output_token_budget() == 2800
+
+
+@pytest.mark.parametrize(
+    "module_name,invoke_name,envelope_name,seam,root_name,kind",
+    (
+        ("nodes._otr_scifi_gemini", "invoke_gemini_structured", "GeminiPayloadV4", "gemini_fact_extraction", "FactIndexV4", "fact_index"),
+        ("nodes._otr_scifi_sonnet", "invoke_sonnet_structured", "PayloadV4", "sonnet_intake_system", "FragmentDossierV4", "dossier"),
+    ),
+)
+def test_sibling_p0_typed_repairs_are_compact_and_require_scalar_tone(
+    module_name, invoke_name, envelope_name, seam, root_name, kind,
+):
+    """Gemini and Sonnet must not revive the generic copyable repair envelope."""
+    module = importlib.import_module(module_name)
+    source_payload = {
+        "headline": "Signal report",
+        "summary": "A careful observatory report.",
+        "full_text": "A careful observatory report records a signal.",
+        "source": "Test Wire",
+        "date": "2026-07-12",
+        "link": "https://example.invalid/report",
+        "seed_text": "A careful observatory report records a signal.",
+    }
+    envelope = getattr(module, envelope_name)(
+        payload=source_payload, source_mode="rss", payload_sha256="0" * 64,
+    )
+    span = {"field": "headline", "start": 0, "end": 6, "quote": "Signal"}
+    if kind == "fact_index":
+        artifact = {
+            "facts": [{
+                "fact_id": "F01", "claim": "A signal is reported.",
+                "source_spans": [span], "numeric_tokens": [],
+            }],
+            "entities": [], "numbers": [], "tone": [], "payload_sha256": "0" * 64,
+        }
+    else:
+        artifact = {
+            "verified_facts": [{
+                "fact_id": "fact_1", "claim": "A signal is reported.",
+                "source_spans": [span],
+            }],
+            "key_numbers": [], "named_entities": [], "tone": [],
+            "headline_clean": "Signal report", "provenance_note": "Test Wire, 2026-07-12.",
+            "payload_sha256": "0" * 64,
+        }
+    repaired = {**artifact, "tone": "cautious"}
+    replies = iter((json.dumps(artifact), json.dumps(repaired)))
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return next(replies)
+
+    result = getattr(module, invoke_name)(
+        pass_id="P0", slot="technical", slot_fn=slot_fn,
+        seam_ref=seam, pack=SimpleNamespace(prompt_stages={seam: "Read source."}),
+        typed_inputs={"payload": envelope.model_dump(mode="json")},
+        result_type=getattr(module, root_name), post_validator=lambda _: None,
+        base_temperature=.20, structural_retry_temperature=.10,
+        max_new_tokens=module.p0_output_token_budget(), journal=journal,
+        prompt_must_fit=True,
+    )
+
+    assert result.tone == "cautious"
+    assert len(calls) == 2
+    assert all(
+        getattr(call["messages"], "_otr_prompt_must_fit", False)
+        for call in calls
+    )
+    assert "P0 COMPACT EXTRACTION CONTRACT" in calls[0]["messages"][0]["content"]
+    repair_system = calls[-1]["messages"][0]["content"]
+    repair_user = calls[-1]["messages"][1]["content"]
+    assert "tone is one nonempty scalar" in repair_system
+    assert "<failed_fact_index>" in repair_user
+    assert "<source_evidence>" in repair_user
+    assert "original_request" not in repair_user
+    assert "artifact_inputs" not in repair_user
+    attempts = journal["calls"][0]["attempts"]
+    assert all(
+        {"temperature", "max_new_tokens", "raw_chars", "raw_sha256"}
+        <= set(attempt)
+        for attempt in attempts
+    )
 
 
 def _outline_payload(*, drop_visual_prompt=False):
