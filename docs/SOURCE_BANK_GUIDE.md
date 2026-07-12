@@ -406,3 +406,7 @@ leaving them for live integration:
     disturb and forbid schema-path prose from becoming a literal JSON key.
     Correcting `scenes[*].env` is not permission to delete beats or emit a
     top-level field named `scenes[*].env`.
+26. When a small model repeatedly ignores a bounded range, choose one valid
+    exact cardinality in the authored contract. Spell out nested object keys
+    and plurality too: `clue_ids` is an array (possibly empty), never a
+    singular `clue_id` scalar.
