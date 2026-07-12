@@ -93,3 +93,11 @@ def test_structural_numeric_ids_canonicalize_without_authored_prose_change():
         "clue_plan":["one","two","three"],"helpful_resolution":"Returned.",
     })
     assert card.possibility_id == "1"
+
+
+def test_freeform_non_owner_cast_role_normalizes_to_caller():
+    concept = lane.CastConcept.model_validate({
+        "char_id":"c02","name":"Ivo Reed","role":"resident",
+        "character_description":"A patient caller",
+    })
+    assert concept.role == "caller"

@@ -34,6 +34,23 @@ Identifier = Annotated[
 ]
 
 
+def _role_value(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    lowered = value.strip().lower()
+    if lowered == "announcer":
+        return "announcer"
+    if lowered in {"desk_operator", "desk operator"}:
+        return "desk_operator"
+    return "caller"
+
+
+CastRole = Annotated[
+    Literal["announcer", "desk_operator", "caller"],
+    BeforeValidator(_role_value),
+]
+
+
 class ConstraintDraw(StrictModel):
     deck_id: str
     deck_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -134,7 +151,7 @@ class FairPlayReport(StrictModel):
 class CastConcept(StrictModel):
     char_id: str
     name: str
-    role: Literal["announcer", "desk_operator", "caller"]
+    role: CastRole
     character_description: str
 
 
@@ -268,6 +285,13 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
                 "MUST each contain at least 2 items. Never delete an item to repair "
                 "an identifier or type error."
             )
+        if pass_id == "P5":
+            pass_rules += (
+                " Cast MUST include one separate row with char_id exactly "
+                "`announcer` and role exactly `announcer`, exactly one different "
+                "row with role `desk_operator`, and every remaining row with "
+                "role `caller`. Never combine announcer and desk operator."
+            )
         return [
             {"role": "system", "content": system + "\nReturn the same complete artifact, repairing only the typed contract error." + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "error": str(error), "inputs": inputs}, ensure_ascii=False, sort_keys=True)},
@@ -311,6 +335,17 @@ def _validate_triage(triage: SlateTriage, slate: PossibilitySlate) -> str | None
     if any(f.blocking and f.possibility_id == triage.selected_possibility_id
            for f in triage.findings):
         return "triage selected a possibility it marked blocking"
+    return None
+
+
+def _validate_score(score: BroadcastScore) -> str | None:
+    if sum(c.char_id == "announcer" and c.role == "announcer"
+           for c in score.cast) != 1:
+        return "cast needs one separate char_id='announcer', role='announcer' row"
+    if sum(c.role == "desk_operator" for c in score.cast) != 1:
+        return "cast needs exactly one separate desk_operator row"
+    if len({c.char_id for c in score.cast}) != len(score.cast):
+        return "cast char_id values must be unique"
     return None
 
 
@@ -447,7 +482,7 @@ def run_original_codex56sol_episode(
     ]
     if corroborated_fair_blocks:
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
-    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600)
+    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=_validate_score)
     manifest = _call(pass_id="P5_manifest", slot="technical", fn=technical_fn, pack=pack, seam="codex56_closed_line_manifest", inputs={"score": score.model_dump(mode="json")}, schema=ClosedLineManifest, scheduler=slot_scheduler, journal=journal, tokens=3000)
     script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6))
     _validate_graph(score, manifest, script); _validate_text(script, story_rules)

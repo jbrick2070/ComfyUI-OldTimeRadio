@@ -354,3 +354,7 @@ leaving them for live integration:
     do not spend a creative retry on formatting that carries no authored
     meaning. Repair prompts for collection artifacts must also say never to
     delete items while repairing an ID or field type.
+14. For Python-owned enums, define the normalization boundary and then validate
+    the semantic roster separately. Free-form labels such as `resident` may map
+    to `caller`, but the artifact must still prove one distinct announcer and
+    one distinct desk operator before it can advance.
