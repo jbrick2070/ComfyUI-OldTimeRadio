@@ -311,7 +311,14 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             " Cast MUST include one separate row with char_id exactly "
             "`announcer` and role exactly `announcer`, exactly one different "
             "row with role `desk_operator`, and every remaining row with "
-            "role `caller`. Never combine announcer and desk operator."
+            "role `caller`. Never combine announcer and desk operator. Every "
+            "scene MUST retain a non-empty env and every shot MUST retain a "
+            "non-empty visual_prompt. line_intent.arc_phase MUST be exactly "
+            "one of `opening`, `rising`, `reveal`, or `closing`: the "
+            "orientation_beat_id beat is `opening`, the reveal_beat_id beat "
+            "is `reveal`, the closure_beat_id beat is `closing`, and every "
+            "other beat is `rising`. Never use orientation, resolution, "
+            "closure, climax, or other synonyms as arc_phase values."
         )
     return rules
 

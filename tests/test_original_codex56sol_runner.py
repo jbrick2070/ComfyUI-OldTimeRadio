@@ -306,3 +306,11 @@ def test_p3_safety_repair_keeps_safety_and_collection_rules():
     assert "causal_steps MUST" in rules
     assert "change is_true on one existing interpretation" in rules
     assert "an empty clue_ids list is invalid" in rules
+
+
+def test_p5_repair_spells_out_required_fields_and_exact_arc_phases():
+    rules = lane._repair_rules("P5", "invalid arc phase")
+    assert "scene MUST retain a non-empty env" in rules
+    assert "shot MUST retain a non-empty visual_prompt" in rules
+    assert "orientation_beat_id beat is `opening`" in rules
+    assert "every other beat is `rising`" in rules

@@ -398,3 +398,7 @@ leaving them for live integration:
     When one scalar is wrong (for example, every interpretation is marked
     true), tell the model to change that scalar on an existing row. Do not let
     it invent a partial replacement row with an empty required ID collection.
+24. Put exact literal enums and their landmark mapping in the base prompt and
+    typed repair prompt. If a small model writes semantic synonyms such as
+    `orientation` or `closure` where the schema owns `opening` or `closing`,
+    reject them; do not grow an alias table that hides contract drift.
