@@ -26,12 +26,13 @@ operator listening are separate elapsed time.
 |---:|---|---|---:|
 | 1 | `dynamic_story` visual direction | Current story becomes a typed post-freeze `vd-1` direction; canonical node/link activation; variants and 30/120 ladder green | 5-9 days |
 | 2 | Lean-mean/dead-code campaign | Re-grounded deletion/consolidation waves land green; no dormant interstitial audio or duplicate authorities | 12-16 days |
-| 3 | Product expansion | Visual-pack roll, richer cue stills, cue-ledger/SFX work, provider additions, system-agnostic upscale as separately gated campaigns | 5-10 days per selected set |
-| 4 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
-| 5 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
+| 3 | Timeline Cue Ledger / spotted SFX | `cue-1` survives its blind noun-detector gate; curated period library, timeline splicer, overlay path, canonical wiring, and byproduct-bed retirement are green | 8-15 days after R1-R4 |
+| 4 | Other product expansion | Visual-pack roll, richer cue stills, provider additions, and system-agnostic upscale as separately gated campaigns | 5-10 days per selected set |
+| 5 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
+| 6 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
 
-**Release-runway planning range after GO_FORWARD:** roughly **25-40 coder-days**
-before optional product-expansion campaigns, or about **5-8 one-coder weeks**
+**Release-runway planning range after GO_FORWARD:** roughly **33-55 coder-days**
+before optional product-expansion campaigns, or about **7-11 one-coder weeks**
 with normal integration margin. Hardware/provider qualification can extend
 calendar time without consuming equivalent coding time.
 
@@ -83,14 +84,43 @@ Required edges:
 Do not re-delete the old context helper already removed at `1a6ae8f1`, and mark
 the earlier standalone interstitial-audio rip as satisfied when re-grounding.
 
-## 3. Product expansion candidates
+## 3. Timeline Cue Ledger / spotted SFX
+
+Plan of record: `docs/2026-07-11-timeline-cue-ledger.md`.
+
+**Status:** roadmap design; no code; not code-ready. The current plan explicitly
+parks implementation until the 720-word runway and lean-mean campaign land. It
+rebuilds SFX as a derived cue artifact after the spoken performance exists; it
+must never resurrect `speaker_role="sfx"`, pseudo-dialogue cues, or the retired
+pre-render SFX subsystem.
+
+Planned sequence:
+
+1. **C0:** persist per-line WAV stems and ship the transcript drift report.
+2. **C1:** define `cue-1`, build the timestamp-blind intent/placement passes,
+   and run the budget-matched blind noun-detector control. Indistinguishable
+   results stop the campaign before audio generation.
+3. **C2:** curate the CC0 period-effects library and render onset-exact cue
+   stems to canonical episode paths.
+4. **C3a-C3c:** splice nests at the raw scene-audio seam, preserve room tone,
+   rebase/persist final ledger timing before `audio_done`, render cue audio,
+   retire the accidental Google-video byproduct bed, add the overlay adapter,
+   and wire the canonical workflow in the same activation commit.
+5. **C4 later:** add VFX rows only after the SFX lane is green; VFX genuinely
+   needs a post-video picture-aware pass.
+
+Planning estimate for C0-C3c after the R1-R4 design arc: **8-15 coder-days**,
+plus roughly **2-4 elapsed live-evaluation days**. C0 is technically
+independently shippable, but remains parked with the campaign unless the operator
+explicitly promotes it earlier.
+
+## 4. Product expansion candidates
 
 Choose these as separate campaigns after the core surface is stable:
 
 - Randomizer Design B: visual-pack roll, only after `dynamic_story` establishes
   one visual-style authority;
 - richer brief-driven music-cue still prompts;
-- ASR-anchored cue ledger and later SFX spotting;
 - direct BYO Google music/image/video paths, followed by other providers only
   when they keep provider identity explicit and fail loud;
 - a new system-agnostic multi-GPU upscale stage built against profile and
@@ -99,7 +129,7 @@ Choose these as separate campaigns after the core surface is stable:
 Each candidate gets its own scoped design, exact ownership table, tests, and
 qualification ladder before entering GO_FORWARD.
 
-## 4. RunPod and installation
+## 5. RunPod and installation
 
 Build deployment and installation only from proven profiles:
 
@@ -112,7 +142,7 @@ Build deployment and installation only from proven profiles:
 The install path must answer which workflow to load, which models or keys are
 needed, what costs money, what stays local, and how to act on every loud failure.
 
-## 5. README and v2 release
+## 6. README and v2 release
 
 README is the final product pass, after the workflows, installers, and hardware
 claims are real. Ship v2 only when:
@@ -135,5 +165,6 @@ remain operator-gated.
 - `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
 - `docs/2026-07-12-dynamic-story-visual-scope.md`
 - `docs/2026-07-10-lean-mean-rip-final.md`
+- `docs/2026-07-11-timeline-cue-ledger.md`
 - `workflows/otr_canonical.json`
 - `workflows/variants/`
