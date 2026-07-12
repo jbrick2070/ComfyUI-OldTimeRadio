@@ -419,6 +419,34 @@ def _validate_score(score: BroadcastScore) -> str | None:
     return None
 
 
+def _iter_authored_strings(value: Any, path: str = ""):
+    if isinstance(value, BaseModel):
+        value = value.model_dump(mode="python")
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            child = f"{path}.{key}" if path else str(key)
+            yield from _iter_authored_strings(item, child)
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            child = f"{path}.{index}" if path else str(index)
+            yield from _iter_authored_strings(item, child)
+    elif isinstance(value, str):
+        yield path, value
+
+
+def _validate_authored_surface(value: Any, rules: Any) -> str | None:
+    for path, text in _iter_authored_strings(value):
+        for term in getattr(rules, "banned_phrases", ()):
+            if re.search(rf"\b{re.escape(term)}\b", text, re.I):
+                return (f"authored field {path!r} contains forbidden term "
+                        f"{term!r}; replace that authored detail")
+        for pattern in getattr(rules, "stage_business", ()):
+            if pattern.search(text):
+                return (f"authored field {path!r} contains a forbidden "
+                        "authored surface; replace that detail")
+    return None
+
+
 def _validate_manifest(score: BroadcastScore,
                        manifest: ClosedLineManifest) -> str | None:
     beat_ids = {beat.beat_id for beat in score.beats}
@@ -574,12 +602,12 @@ def run_original_codex56sol_episode(
     ingress = _call(pass_id="P0", slot="technical", fn=technical_fn, pack=pack, seam="codex56_constraint_ingress", inputs={"draw": draw.model_dump(mode="json")}, schema=ConstraintIngress, scheduler=slot_scheduler, journal=journal, tokens=1200)
     if ingress.draw != draw:
         raise OriginalCodex56SolContractError("technical ingress changed the constraint draw")
-    slate = _call(pass_id="P1", slot="creative", fn=creative_fn, pack=pack, seam="codex56_possibility_slate", inputs={"ingress": ingress.model_dump(mode="json"), "operator_hint": (meta.get("source_meta") or {}).get("operator_hint", "")}, schema=PossibilitySlate, scheduler=slot_scheduler, journal=journal, post_validator=lambda value: _validate_slate(value, draw))
+    slate = _call(pass_id="P1", slot="creative", fn=creative_fn, pack=pack, seam="codex56_possibility_slate", inputs={"ingress": ingress.model_dump(mode="json"), "operator_hint": (meta.get("source_meta") or {}).get("operator_hint", "")}, schema=PossibilitySlate, scheduler=slot_scheduler, journal=journal, post_validator=lambda value: _validate_slate(value, draw) or _validate_authored_surface(value, story_rules))
     triage = _call(pass_id="P2", slot="technical", fn=technical_fn, pack=pack, seam="codex56_slate_triage", inputs={"slate": slate.model_dump(mode="json")}, schema=SlateTriage, scheduler=slot_scheduler, journal=journal, tokens=1600, post_validator=lambda value: _validate_triage(value, slate))
     selected = next((p for p in slate.possibilities if p.possibility_id == triage.selected_possibility_id), None)
     if selected is None or any(f.blocking and f.possibility_id == selected.possibility_id for f in triage.findings):
         raise OriginalCodex56SolContractError("triage did not select a valid possibility")
-    truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800)
+    truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800, post_validator=lambda value: _validate_authored_surface(value, story_rules))
     fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600)
     corroborated_fair_blocks = [
         f for f in fair.findings
@@ -587,7 +615,7 @@ def run_original_codex56sol_episode(
     ]
     if corroborated_fair_blocks:
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
-    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=_validate_score)
+    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=lambda value: _validate_score(value) or _validate_authored_surface(value, story_rules))
     manifest = _call(pass_id="P5_manifest", slot="technical", fn=technical_fn, pack=pack, seam="codex56_closed_line_manifest", inputs={"score": score.model_dump(mode="json")}, schema=ClosedLineManifest, scheduler=slot_scheduler, journal=journal, tokens=3000, post_validator=lambda value: _validate_manifest(score, value))
     script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules))
     _assert_script_valid(score, manifest, script, story_rules)

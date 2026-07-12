@@ -376,3 +376,8 @@ leaving them for live integration:
     speaker-label leakage, and line-coverage drift are authored defects that a
     bounded typed repair can fix; keep a deterministic assertion after the call
     as defense in depth.
+19. Apply safety rules at the earliest creative artifact that authors a detail,
+    before later passes treat it as immutable. A forbidden title or clue first
+    invented in a slate must repair in the slate/truth/score ladder; waiting
+    until P6 can create an impossible repair where the script is required to
+    preserve the same now-locked detail.

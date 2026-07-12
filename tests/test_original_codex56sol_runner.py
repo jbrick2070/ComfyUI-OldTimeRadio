@@ -179,3 +179,27 @@ def test_p6_cross_artifact_graph_failure_is_a_retryable_error_string():
     assert lane._validate_graph(score, manifest, script) == (
         "script roster differs from manifest"
     )
+
+
+def test_safety_is_caught_before_a_detail_becomes_manifest_immutable():
+    score_data = _responses()[5]
+    score_data["beats"][2]["intent"] = "Name To Kill a Mockingbird"
+    score = lane.BroadcastScore.model_validate(score_data)
+    rules = type("Rules", (), {
+        "banned_phrases": ("kill",),
+        "stage_business": (),
+    })()
+    error = lane._validate_authored_surface(score, rules)
+    assert error == (
+        "authored field 'beats.2.intent' contains forbidden term 'kill'; "
+        "replace that authored detail"
+    )
+
+
+def test_safe_score_surface_passes_before_manifest_lock():
+    score = lane.BroadcastScore.model_validate(_responses()[5])
+    rules = type("Rules", (), {
+        "banned_phrases": ("kill",),
+        "stage_business": (),
+    })()
+    assert lane._validate_authored_surface(score, rules) is None
