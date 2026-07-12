@@ -204,6 +204,55 @@ receipts in the one-variable bank experiment.
 days**. Generated-SFX planning may run in parallel and does not claim the coder
 slot.
 
+## Appended 2026-07-12 (evening): vibe-coder extensibility -- NEW QUEUE CANDIDATE, coder must re-prioritize
+
+Added by the planning window after this file's 13:45 snapshot; it deliberately does NOT
+renumber or reorder the queues above -- the next coder window folds it in.
+
+- **What it is:** operator-directed extensibility build -- user content packs on ANY
+  runnable lane (NO tiers), `user_packs/` overlay with quarantine (external junction
+  root sanctioned for update survival), `story_pack` selection widget with two-channel
+  consumer threading + replay sha stamps, `otr_check` CLI (one validator, two entry
+  points, CP-1..CP-7 receipt contract), templates + generated `docs/EXTENDING_OTR.md`,
+  three README recipes, and the writer `VALIDATE_INPUTS` suffix-flip fix.
+- **Plan of record (code-ready):**
+  `docs/2026-07-12-vibe-coder-extensibility-r2-coding-plan.md` @ `97d4f9eb` --
+  full kibitz r1-r4 arc converged same day (artifacts under
+  `kibitz-runs/2026-07-12-vibe-coder-extensibility/`, gitignored; judgment logs in each
+  round's `final.md`). Scoper: `docs/2026-07-12-vibe-coder-extensibility-r1.md`.
+- **ACTIVATION GATE (in-plan, hard):** claim the sole coder slot here first; obtain
+  clean-or-released ownership receipts for `nodes/OTR_LedgerScriptWriter.py`,
+  `nodes/_otr_story_routing.py`, `nodes/_otr_story_pack.py`,
+  `nodes/_otr_visual_styles.py`, `nodes/_otr_model_catalog.py` (W3 only), `README.md`,
+  and `workflows/otr_canonical.json`.
+- **Shape:** ACTIVATION GATE -> W0 overlay/quarantine -> W1 story_pack widget +
+  threading (the ONE canonical-JSON change) -> W2 otr_check -> W4 templates/docs;
+  ownership receipt -> W3 (VALIDATE_INPUTS + shipped-ID manifest); {W3, W4} -> W5
+  (suite + Bible + one canonical 30-word overlay-selection smoke with full
+  episode/obs receipt chain). Estimate: **4-7 coder-days + <=1 GPU day** (W5 smoke).
+- **Collision facts for re-prioritization (the coder's call, not this window's):**
+  1. W1 touches the writer + `workflows/otr_canonical.json` -- it must land either
+     BEFORE the bakeoff code-freeze (current-sprint item 8) or wait until after the
+     event; landing mid-freeze is forbidden by the freeze itself.
+  2. W0 reshapes `_otr_story_routing` internals (PackRecord map) -- Randomizer Design A
+     establishes `_otr_lane_specs` as the dispatch/compatibility authority in the same
+     neighborhood; whichever lands second rebases (cheaper: extensibility after
+     Randomizer, or before Randomizer starts).
+  3. dynamic_story's build also appends canonical surfaces (node 96 / link 284) -- no
+     shared node with W1 (node 1), but both re-derive slots from live JSON; land
+     serially, re-derive each time.
+  4. W3 shares `nodes/_otr_model_catalog.py` with the unowned dirty-edit risk already
+     listed in Open risks; the plan gates W3 on that receipt independently, so W0-W2/W4
+     never wait on it.
+  5. README.md was refreshed today by a docs window -- W4's recipes rebase on that text.
+- **Suggested slots (pick one, or re-derive):** (a) immediately after current-sprint
+  item 5 (context/cap) and before Fable2 qualification if the operator wants the
+  extensibility surface demoable early -- accepts a rebase risk against item 8's
+  freeze; (b) between the bakeoff (item 8) and Engine Matrix -- zero freeze risk,
+  recommended default; (c) after Randomizer Design A -- cheapest `_otr_story_routing`
+  rebase, longest wait. dynamic_story keeps its stated position (after Engine Matrix +
+  Randomizer) in every option.
+
 ## Validation and incident rules
 
 - Latest completed clean-code receipt available to this audit: 7,764 passed,
