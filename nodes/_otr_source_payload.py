@@ -289,6 +289,74 @@ def _fetch_science_rss(*, bank, technical_model: str,
     return _writer._fetch_rss_seed_or_die(technical_model)
 
 
+def _fetch_original_codex56sol_local_seed(
+    *, bank, technical_model: str, source_ref: str = "",
+) -> SourceFetchResult:
+    """Draw exactly one immutable synthetic constraint card; no network."""
+    del technical_model
+    import hashlib
+    import json
+    import os
+    import random
+    from pathlib import Path
+
+    if getattr(bank, "source_bank_id", "") != "original_codex56sol":
+        raise SourcePayloadContractError("local seed fetcher received wrong bank")
+    if str(source_ref or "").strip():
+        raise SourcePayloadContractError(
+            "original_codex56sol rejects source_ref; it has no external source"
+        )
+    path = (Path(__file__).resolve().parent / "story_packs" /
+            "original_codex56sol" / "constraint_deck.json")
+    raw = path.read_bytes()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raise SourcePayloadContractError("constraint deck must be UTF-8 without BOM")
+    try:
+        deck = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        raise SourcePayloadContractError(f"invalid constraint deck: {exc}") from exc
+    if (not isinstance(deck, dict) or deck.get("schema_version") != 1
+            or not isinstance(deck.get("deck_id"), str)
+            or not isinstance(deck.get("draws"), list) or not deck["draws"]):
+        raise SourcePayloadContractError("constraint deck shape is invalid")
+    required = {"constraint_id", "lost_objects", "acoustic_device", "helpful_ending"}
+    for draw in deck["draws"]:
+        if not isinstance(draw, dict) or set(draw) != required:
+            raise SourcePayloadContractError("constraint draw has invalid keys")
+        if (not isinstance(draw["lost_objects"], list)
+                or len(draw["lost_objects"]) < 3
+                or any(not isinstance(x, str) or not x.strip()
+                       for x in draw["lost_objects"])
+                or any(not isinstance(draw[k], str) or not draw[k].strip()
+                       for k in required - {"lost_objects"})):
+            raise SourcePayloadContractError("constraint draw values are invalid")
+    seed = os.environ.get("OTR_ORIGINAL_SEED", "").strip()
+    rng = random.Random(seed) if seed else random.SystemRandom()
+    selected = dict(rng.choice(deck["draws"]))
+    deck_hash = hashlib.sha256(raw).hexdigest()
+    draw = {
+        "deck_id": deck["deck_id"], "deck_sha256": deck_hash,
+        **selected,
+    }
+    seed_text = json.dumps(draw, sort_keys=True, separators=(",", ":"))
+    return SourceFetchResult(
+        payload={
+            "headline": "Original Lost and Found Frequency constraint draw",
+            "summary": seed_text, "full_text": seed_text,
+            "source": "Original synthetic constraint draw", "date": "",
+            "link": "", "seed_text": seed_text,
+        },
+        source_meta={
+            "synthetic_original": True, "constraint_draw": draw,
+            "operator_hint": "",
+        },
+        source_rights={
+            "rights_label": "synthetic-original", "license_url": "",
+            "external_author": "", "external_citation": "",
+        },
+    )
+
+
 def _interpret_news(*, bank, payload: dict, technical_fn,
                     model_id: str):
     """news_interpreter: verbatim wrapper around build_news_briefs.
@@ -446,7 +514,11 @@ _FETCHERS: "dict[str, FetcherEntry]" = {
     "public_domain_source": FetcherEntry(fetch=_fetch_public_domain_source,
                                          seed_source="public_domain_source"),
     "shakespeare_folger": FetcherEntry(fetch=_fetch_shakespeare_folger,
-                                       seed_source="shakespeare_folger"),
+                                        seed_source="shakespeare_folger"),
+    "original_codex56sol_local_seed": FetcherEntry(
+        fetch=_fetch_original_codex56sol_local_seed,
+        seed_source="original_llm",
+    ),
 }
 
 _INTERPRETERS: "dict[str, object]" = {

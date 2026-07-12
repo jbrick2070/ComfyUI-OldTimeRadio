@@ -29,6 +29,7 @@ LANE_MODULES = (
     "nodes._otr_scifi_codex",
     "nodes._otr_scifi_gemini",
     "nodes._otr_scifi_sonnet",
+    "nodes._otr_original_codex56sol",
 )
 
 # Types JSON cannot represent. A JSON document has exactly one sequence type

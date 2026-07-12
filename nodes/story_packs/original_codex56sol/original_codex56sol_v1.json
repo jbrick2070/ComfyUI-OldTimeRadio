@@ -1,0 +1,20 @@
+{
+  "source_bank_id": "original_codex56sol",
+  "schema_version": "v2.0",
+  "story_model_id": "original_codex56sol_v1",
+  "story_pipeline_id": "acoustic_puzzle_v1",
+  "label": "Lost and Found Frequency v1",
+  "prompt_stages": {
+    "codex56_constraint_ingress": "You are the technical ingress clerk. Return the supplied constraint draw exactly, without adding story prose. Preserve its constraint id, objects, acoustic device, helpful ending, deck version and hash. JSON only, matching the supplied schema.",
+    "codex56_possibility_slate": "Invent three distinctly original, warm Lost and Found Frequency audio-mystery possibilities from the immutable constraint ingress. Each uses ordinary lost objects, one benign shared acoustic cause, audible clues in fair order, and a helpful ending. No violence, weapons, blood, threats, cruelty, profanity, smoking, intoxicants, brands, public figures, franchises, adaptations, lyrics, or copied characters. Names must be fictional. JSON only.",
+    "codex56_slate_triage": "Act as a technical contract checker. Select one possibility that is causally solvable through sound and complies with every safety and originality constraint. Findings must identify concrete fields; do not assign an originality score and do not rewrite prose. JSON only.",
+    "codex56_audible_truth_map": "Build the selected possibility into a complete causal truth map: caller threads, ordered causal steps, audible clues, interpretations, reveal, and helpful resolution links. The listener must be able to solve it before the reveal. Keep the announcer brief and never let the announcer solve the puzzle. JSON only.",
+    "codex56_fair_play_audit": "Audit the supplied truth map for exact causal closure, clue-before-reveal order, audible sufficiency, benign safety, declared-name closure, and a helpful ending. Report only concrete corroborable findings; taste notes are warnings. JSON only.",
+    "codex56_broadcast_score": "Design a compact broadcast score from the accepted truth map. Use 2-5 fictional cast members including announcer and desk operator, 2-4 scenes, filmable shots, ordered beats, exact line intents, and exactly two non-evidentiary music bookends. Every clue and resolution must be assigned to a line intent. Do not write spoken dialogue yet. JSON only.",
+    "codex56_closed_line_manifest": "Close the broadcast score into an exact ordered line manifest. Preserve declared cast, scene, shot and beat ids. Each manifest line has one speaker, role, boundary, arc phase and intent. Include orientation, clue, reveal and closure line ids. Do not author spoken prose. JSON only.",
+    "codex56_performance_script": "Write one complete PerformanceScript for the closed manifest. Supply exactly one spoken line for every manifest line id and no extras; preserve speaker and character ids. Text must sound natural aloud, contain no labels, wrappers or stage directions, and obey all safety rules. Make clues understandable, voices distinct, the resolution coherent, and the ending helpful. The target word request is advisory; never report counts. JSON only.",
+    "codex56_blind_listener": "Evaluate the complete script as a blind listener using only lines before the declared reveal. Report concrete contract defects separately from optional craft notes. Do not rewrite the story and do not invent an originality score. JSON only.",
+    "codex56_broadcast_retake": "Return a complete replacement PerformanceScript only when the supplied findings establish a concrete contract defect. Preserve every manifest line id and speaker exactly, fix only evidenced defects, and rerun all safety constraints. No patch prose. JSON only.",
+    "codex56_final_contract_audit": "Perform the final technical audit over the accepted complete script and manifest. Check exact line coverage, roster, graph references, clue order, safety, labels, wrappers, and helpful closure. Findings require field path, item id, exact span, category and allowed correction. Do not score originality or word count. JSON only."
+  }
+}

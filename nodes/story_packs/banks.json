@@ -241,6 +241,25 @@
       "guide_ref": "Archive frame-narrative multipass lane: the intake pass IS the interpretation (empty interpreter, mirrors scifi_fable2's own contract at nodes/story_packs/banks.json:171). The retry loop is diegetic -- the Warden's objection and the Registrar's on-air reopening ARE the technical audit/rewrite cycle, not a hidden gate. Dossier is stamped at meta.sonnet_dossier, never meta.news (avoids a false gen_params_by_phase.news_interpreter stamp, nodes/OTR_LedgerScriptWriter.py:6390-6394). No fallback to legacy_many_pass, ever."
     },
     {
+      "source_bank_id": "original_codex56sol",
+      "label": "Original Codex 56SOL - Lost and Found Frequency",
+      "source_kind": "original_llm",
+      "interpreter": "",
+      "fetcher": "original_codex56sol_local_seed",
+      "default_story_model": "original_codex56sol_v1",
+      "default_story_pipeline": "acoustic_puzzle_v1",
+      "defaults": {
+        "story_form_label": "original fair-play audio mystery",
+        "source_material_label": "Original synthetic constraint draw",
+        "title_form_label": "Lost and Found Frequency mystery",
+        "hud_origin_label": "STORY ORIGIN",
+        "credits_source_line": "an original synthetic story generated for this broadcast"
+      },
+      "required_seams": [],
+      "runnable": true,
+      "guide_ref": "Synthetic-original Lost and Found Frequency lane; no external source or adaptation."
+    },
+    {
       "source_bank_id": "custom_source_bank",
       "label": "+ Add Your Own",
       "source_kind": "custom",
