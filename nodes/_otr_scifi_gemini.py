@@ -898,6 +898,14 @@ def run_scifi_gemini_episode(
         validate_spoken_text_and_lock(draft, p3, casts)
         drafts[scene.scene_id] = draft
     expected = _assemble(led, p3, drafts, meta)
+    from ._otr_content_authorship import stamp_receipt
+    stamp_receipt(
+        led.data, owner_bank="scifi_gemini",
+        accepted_artifacts={
+            f"final_scene:{scene_id}": draft
+            for scene_id, draft in drafts.items()
+        },
+    )
     actual = sum(len(_WORD_RE.findall(x)) for x in expected.values())
     meta["scifi_gemini"]["word_receipt"] = {"requested_words": int(resolved["target_words"]), "actual_split_words": actual, "actual_ledger_word_count": int(led.data.get("total_word_count") or 0)}
     meta["scifi_gemini"]["fact_index"] = p0.model_dump(mode="json")

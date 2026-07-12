@@ -1602,7 +1602,8 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
     # the runner just before assembly) -- ParsedScript is frozen and
     # deliberately does not carry the raw markup.
     f2 = meta.setdefault("fable2", {})
-    draft_norm = _norm_ws(f2.get("_winning_draft_text") or "")
+    winning_draft_text = str(f2.get("_winning_draft_text") or "")
+    draft_norm = _norm_ws(winning_draft_text)
     if not draft_norm:
         raise Fable2AssembleError(
             "assemble", "winning draft artifact missing from meta.fable2")
@@ -1799,6 +1800,19 @@ def _assemble(led: Any, parsed: ParsedScript, treatment: Treatment,
 
     f2["proof_map"] = proof_map
     f2.pop("_winning_draft_text", None)
+
+    from ._otr_content_authorship import stamp_receipt
+    meta.setdefault("source_bank", "scifi_fable2")
+    stamp_receipt(
+        led.data, owner_bank="scifi_fable2",
+        accepted_artifacts={
+            "winning_script": winning_draft_text,
+            "final_treatment": (
+                treatment.model_dump(mode="json")
+                if hasattr(treatment, "model_dump") else treatment.__dict__
+            ),
+        },
+    )
 
     # Content-owned Phase 7 (720-bakeoff C2 / S2 P1.3): stamp the TTS
     # DELIVERY text (Dr. -> Doctor, digits -> words) onto a separate

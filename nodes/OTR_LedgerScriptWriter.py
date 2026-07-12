@@ -6822,9 +6822,6 @@ class OTR_LedgerScriptWriter:
                 )
             stamp_text_for_tts_delivery(led)
 
-        if tail_finalizer is not None:
-            tail_finalizer.before_save(ctx=ctx)
-        script_text = _PL.assemble_script_text_from_ledger(led.data)
         # story-ledger DRIFT chunk 2 (2026-06-25): PRE-FREEZE cross-stage
         # consistency guard. contract / outline / canon are the REAL objects
         # here; OTR_CastLock is a DOWNSTREAM node (it re-locks the FROZEN
@@ -6851,6 +6848,12 @@ class OTR_LedgerScriptWriter:
                 "[OTR_LedgerScriptWriter] consistency check skipped: %r",
                 _cons_exc,
             )
+        # The lane finalizer is the true last mutation boundary: every shared
+        # writer metadata stamp (including consistency_status) is complete
+        # before Phase 10 seals the ledger and authorship receipt.
+        if tail_finalizer is not None:
+            tail_finalizer.before_save(ctx=ctx)
+        script_text = _PL.assemble_script_text_from_ledger(led.data)
         script_json = json.dumps(led.data, indent=2, ensure_ascii=False)
         # kibitz r2-r4 provenance: bank-defaults-driven labels; the
         # original lane stamps source "Original (LLM)" (via seed_source

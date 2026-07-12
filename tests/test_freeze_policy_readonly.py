@@ -4,7 +4,7 @@ fold, 2026-07-10, fable2 S1b -> S2 runway).
 The r2 P0 chain this file locks down:
 
   P0.1  the cascade invoked the text-mutating reviewer BEFORE its lane
-        capability gate, so a sealed fable2 proof map could diverge from
+        capability gate, so a sealed content-authorship receipt could diverge from
         the live canonical text (Butterfly b2/b5, Einstein b3). Fix: ONE
         typed FreezePolicy resolved before any content pass; for
         content-owned lanes every legacy mutator is skipped and only
@@ -120,24 +120,25 @@ def test_readonly_cascade_freezes_without_any_content_mutation(
     _forbid_legacy_passes(monkeypatch)
     led = _golden_fable2_ledger(tmp_path)
     before_lines = copy.deepcopy(led.data["lines"])
-    before_proof = copy.deepcopy(led.data["meta"]["fable2"]["proof_map"])
+    before_authorship = copy.deepcopy(
+        led.data["meta"]["content_authorship"])
 
     disp = LFC.run_freeze_cascade(_fail_generate, led)
 
     assert disp.verdict in ("frozen_clean", "frozen_with_warns"), (
         disp.verdict)
     meta = led.data["meta"]
-    # canonical text + proof map byte-identical through the cascade
+    # canonical text + generic authorship receipt byte-identical through cascade
     assert [r["text"] for r in led.data["lines"]] == [
         r["text"] for r in before_lines]
-    assert meta["fable2"]["proof_map"] == before_proof
+    assert meta["content_authorship"] == before_authorship
     # truthful capability receipt (r2 P0.1)
     receipt = meta["freeze_capability_receipt"]
     assert receipt["policy"] == "content_owned_readonly"
     assert receipt["content_mutations"] == 0
     assert receipt["text_sha256_entry"] == receipt["text_sha256_exit"]
-    assert receipt["proof_map_sha256_entry"] == (
-        receipt["proof_map_sha256_exit"])
+    assert receipt["content_authorship_sha256_entry"] == (
+        receipt["content_authorship_sha256_exit"])
     for phase in LFC._LEGACY_CONTENT_PHASES:
         assert phase in receipt["skipped_phases"], phase
     # the reviewer result is a capability disposition, NOT a fake clean
@@ -164,7 +165,7 @@ def test_readonly_cascade_proof_divergence_is_terminal(
     assert meta["freeze_block_class"] == "structural"
     receipt = meta["freeze_capability_receipt"]
     assert receipt["structural_errors"], "proof divergence must be recorded"
-    assert any("proof" in e for e in receipt["structural_errors"])
+    assert any("content_authorship" in e for e in receipt["structural_errors"])
 
 
 def test_unresolvable_tagged_bank_cascade_halts_before_any_pass(

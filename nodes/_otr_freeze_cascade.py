@@ -355,22 +355,18 @@ def _sha256_lines_text(ledger_data: dict) -> str:
     return h.hexdigest()
 
 
-def _sha256_proof_map(ledger_data: dict) -> str:
-    """Stable proof-map fingerprint for the capability receipt."""
+def _sha256_content_authorship(ledger_data: dict) -> str:
+    """Validate and fingerprint the generic accepted-artifact receipt."""
     import hashlib
-    import json as _json
-    meta = ledger_data.get("meta") or {}
-    proof = ((meta.get("fable2") or {}).get("proof_map")) or []
-    try:
-        blob = _json.dumps(proof, sort_keys=True, ensure_ascii=False)
-    except Exception:  # noqa: BLE001 -- receipt observability only
-        blob = repr(proof)
-    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+    if not isinstance((ledger_data.get("meta") or {}).get("content_authorship"), dict):
+        return hashlib.sha256(b"").hexdigest()
+    from ._otr_content_authorship import receipt_sha256
+    return receipt_sha256(ledger_data)
 
 
 def _readonly_structural_validation(ledger_data: dict) -> "list[str]":
     """Read-only structural validation for content_owned_readonly lanes
-    (r2 P0.1): proof-map verification + speaker-to-cast validation,
+    (r2 P0.1): generic authorship verification + speaker-to-cast validation,
     WITHOUT any of the legacy repair mutations. Returns error strings;
     any error is terminal for the freeze."""
     errors: "list[str]" = []
@@ -378,28 +374,13 @@ def _readonly_structural_validation(ledger_data: dict) -> "list[str]":
     lines = [ln for ln in (ledger_data.get("lines") or [])
              if isinstance(ln, dict)]
     lines_by_id = {str(ln.get("line_id") or ""): ln for ln in lines}
-    # 1. Proof-map verification: every sealed row's live canonical text
-    #    must still equal the space-join of its proven constituents.
-    proof_map = ((meta.get("fable2") or {}).get("proof_map")) or []
-    for row in proof_map:
-        if not isinstance(row, dict):
-            continue
-        lid = str(row.get("line_id") or "")
-        live = lines_by_id.get(lid)
-        if live is None:
-            errors.append(
-                f"proof row {lid!r}: line missing from the ledger")
-            continue
-        sealed = " ".join(
-            str((c or {}).get("text") or "")
-            for c in (row.get("constituents") or [])
-        ).strip()
-        live_norm = " ".join(str(live.get("text") or "").split())
-        if sealed and live_norm != sealed:
-            errors.append(
-                f"proof row {lid!r}: live canonical text diverged from "
-                f"the sealed proof (live={live_norm[:60]!r} "
-                f"sealed={sealed[:60]!r})")
+    # 1. Generic authorship verification: exact voiced-line coverage and
+    #    raw UTF-8 hashes from the accepted final artifact.
+    try:
+        from ._otr_content_authorship import validate_receipt
+        validate_receipt(ledger_data)
+    except Exception as exc:  # fail closed; caller promotes errors to terminal
+        errors.append(f"content_authorship: {exc}")
     # 2. Read-only speaker-to-cast validation (the D3 sweep's CHECK
     #    without its mutation): a cast char_id must carry role
     #    "character". A violation means an unaccounted mutator ran.
@@ -423,19 +404,19 @@ def _stamp_capability_receipt(
     policy: "FreezePolicy",
     *,
     entry_text_sha: str,
-    entry_proof_sha: str,
+    entry_authorship_sha: str,
     skipped_phases,
     executed_phases,
     structural_errors=(),
 ) -> dict:
     """meta.freeze_capability_receipt (r2 P0.1): policy provenance,
-    skipped/executed phases, canonical-text + proof-map hashes before
+    skipped/executed phases, canonical-text + authorship hashes before
     and after the cascade, and the content-mutation count that makes
     proof invariance testable. Stamped at EVERY cascade exit."""
     data = led.data
     meta = data.setdefault("meta", {})
     exit_text_sha = _sha256_lines_text(data)
-    exit_proof_sha = _sha256_proof_map(data)
+    exit_authorship_sha = _sha256_content_authorship(data)
     receipt = {
         "policy": policy.name,
         "policy_source": policy.source,
@@ -443,11 +424,11 @@ def _stamp_capability_receipt(
         "executed_phases": list(executed_phases),
         "text_sha256_entry": entry_text_sha,
         "text_sha256_exit": exit_text_sha,
-        "proof_map_sha256_entry": entry_proof_sha,
-        "proof_map_sha256_exit": exit_proof_sha,
+        "content_authorship_sha256_entry": entry_authorship_sha,
+        "content_authorship_sha256_exit": exit_authorship_sha,
         "content_mutations": 0 if (
             exit_text_sha == entry_text_sha
-            and exit_proof_sha == entry_proof_sha
+            and exit_authorship_sha == entry_authorship_sha
         ) else 1,
         "structural_errors": [str(e) for e in structural_errors],
         "terminal_error": policy.terminal_error,
@@ -1197,7 +1178,7 @@ def run_freeze_cascade(
     policy = resolve_freeze_policy(meta)
     meta["freeze_policy"] = {"name": policy.name, "source": policy.source}
     _cap_entry_text_sha = _sha256_lines_text(ledger_data)
-    _cap_entry_proof_sha = _sha256_proof_map(ledger_data)
+    _cap_entry_authorship_sha = _sha256_content_authorship(ledger_data)
     if policy.terminal_error:
         log.error("[LFC] %s", policy.terminal_error)
         disp = _build_terminal_skip_disposition(
@@ -1210,7 +1191,7 @@ def run_freeze_cascade(
         _stamp_capability_receipt(
             led, policy,
             entry_text_sha=_cap_entry_text_sha,
-            entry_proof_sha=_cap_entry_proof_sha,
+            entry_authorship_sha=_cap_entry_authorship_sha,
             skipped_phases=_LEGACY_CONTENT_PHASES,
             executed_phases=("phase_0_gap_audit_pre",),
             structural_errors=(policy.terminal_error,),
@@ -1228,7 +1209,7 @@ def run_freeze_cascade(
             _stamp_capability_receipt(
                 led, policy,
                 entry_text_sha=_cap_entry_text_sha,
-                entry_proof_sha=_cap_entry_proof_sha,
+                entry_authorship_sha=_cap_entry_authorship_sha,
                 skipped_phases=(),
                 executed_phases=(
                     "phase_0_gap_audit_pre",
@@ -1287,7 +1268,7 @@ def run_freeze_cascade(
             _stamp_capability_receipt(
                 led, policy,
                 entry_text_sha=_cap_entry_text_sha,
-                entry_proof_sha=_cap_entry_proof_sha,
+                entry_authorship_sha=_cap_entry_authorship_sha,
                 skipped_phases=_LEGACY_CONTENT_PHASES,
                 executed_phases=(
                     "phase_0_gap_audit_pre",
@@ -1499,17 +1480,17 @@ def run_freeze_cascade(
     )
 
     # r2 P0.1 invariant: under a readonly policy NOTHING may have
-    # mutated canonical text or the proof map between cascade entry and
+    # mutated canonical text or the authorship receipt between cascade entry and
     # the freeze gate. A divergence means an unaccounted writer ran --
     # terminal structural error, fail loud, never freeze.
     if not policy.run_legacy_content_passes:
         _ro_exit_text = _sha256_lines_text(led.data)
-        _ro_exit_proof = _sha256_proof_map(led.data)
+        _ro_exit_authorship = _sha256_content_authorship(led.data)
         if (_ro_exit_text != _cap_entry_text_sha
-                or _ro_exit_proof != _cap_entry_proof_sha):
+                or _ro_exit_authorship != _cap_entry_authorship_sha):
             _mut_err = (
                 "content mutated under content_owned_readonly policy "
-                "(canonical text or proof map hash diverged between "
+                "(canonical text or authorship hash diverged between "
                 "cascade entry and the freeze gate)"
             )
             log.error("[LFC] %s", _mut_err)
@@ -1523,7 +1504,7 @@ def run_freeze_cascade(
             _stamp_capability_receipt(
                 led, policy,
                 entry_text_sha=_cap_entry_text_sha,
-                entry_proof_sha=_cap_entry_proof_sha,
+                entry_authorship_sha=_cap_entry_authorship_sha,
                 skipped_phases=_cap_skipped,
                 executed_phases=_cap_executed_tail,
                 structural_errors=(_mut_err,),
@@ -1576,7 +1557,7 @@ def run_freeze_cascade(
         _stamp_capability_receipt(
             led, policy,
             entry_text_sha=_cap_entry_text_sha,
-            entry_proof_sha=_cap_entry_proof_sha,
+            entry_authorship_sha=_cap_entry_authorship_sha,
             skipped_phases=_cap_skipped,
             executed_phases=_cap_executed_tail,
             structural_errors=list(exc.errors),
@@ -1651,7 +1632,7 @@ def run_freeze_cascade(
     _stamp_capability_receipt(
         led, policy,
         entry_text_sha=_cap_entry_text_sha,
-        entry_proof_sha=_cap_entry_proof_sha,
+        entry_authorship_sha=_cap_entry_authorship_sha,
         skipped_phases=_cap_skipped,
         executed_phases=_cap_executed_tail,
     )

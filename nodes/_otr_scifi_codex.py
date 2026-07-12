@@ -1552,6 +1552,11 @@ def run_scifi_codex_episode(
         script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
     validate_spoken_text_and_roster(script, p2, score)
     expected = _assemble_ledger(led, score, p2, script, meta)
+    from ._otr_content_authorship import stamp_receipt
+    stamp_receipt(
+        led.data, owner_bank="scifi_codex",
+        accepted_artifacts={"final_script": script},
+    )
     actual = sum(_words(v) for v in expected.values())
     meta["scifi_codex"]["word_receipt"] = {"requested_words": steer.requested_words, "actual_split_words": actual, "actual_ledger_word_count": int(led.data.get("total_word_count") or 0)}
     meta["scifi_codex"]["fact_index"] = p0.model_dump(mode="json")

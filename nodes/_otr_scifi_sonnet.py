@@ -891,6 +891,14 @@ def run_scifi_sonnet_episode(
     ])
     validate_spoken_text_and_lock(events, cast)
     expected = _assemble(led, p1, cast, events, att, meta)
+    from ._otr_content_authorship import stamp_receipt
+    stamp_receipt(
+        led.data, owner_bank="scifi_sonnet",
+        accepted_artifacts={
+            "final_events": [event.model_dump(mode="json") for event in events],
+            "final_attestation": att,
+        },
+    )
     actual = sum(len(_WORD_RE.findall(x)) for x in expected.values())
     meta["scifi_sonnet"]["word_receipt"] = {"requested_words": steer["requested_words"], "actual_split_words": actual, "actual_ledger_word_count": int(led.data.get("total_word_count") or 0)}
     meta["scifi_sonnet"]["dossier"] = p0.model_dump(mode="json")
