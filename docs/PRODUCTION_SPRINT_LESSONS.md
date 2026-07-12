@@ -303,6 +303,19 @@ complete script graph, safety, and grounding checks after merge. The tool must
 not become a broad retake in disguise: no title, roster, ordering, or unplanned
 line edits are permitted.
 
+## 23. Put the guarded artifact boundary behind every reauthoring route
+
+An initial authoring pass is not the only place an artifact can regress. Blind
+listener retakes, optional polish retakes, and final-audit retakes all create a
+fresh complete artifact and can reintroduce the same localized defect. Do not
+wire a bounded repair at only the first call site.
+
+Factor one guarded authoring helper that first accepts structural/safety-valid
+output, invokes the narrow patch only for a localized full-contract failure,
+then validates the merged canonical artifact. Declare the repair seam on every
+pipeline pass that can traverse this helper and use pass-specific journal IDs so
+production receipts show where the correction occurred.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

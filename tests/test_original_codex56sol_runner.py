@@ -243,6 +243,57 @@ def test_p6_missing_grounding_anchor_uses_small_line_patch(tmp_path):
     )
 
 
+def test_p8_retake_missing_anchor_uses_the_same_small_line_patch(tmp_path):
+    fixtures = _fixtures()
+    responses = _responses()
+    responses[6] = {
+        "understood_cause": "An unstable resonance signature.",
+        "understood_resolution": "Unknown.",
+        "findings": [], "optional_notes": [],
+    }
+    retake = json.loads(json.dumps(fixtures["script"]))
+    retake["lines"][4]["text"] = "The echo is mapped; the desk is quiet."
+    responses.insert(7, retake)
+    responses.insert(8, {
+        "replacements": [{
+            "line_id": "line_005",
+            "text": "The echo is mapped; every item is returned.",
+        }],
+    })
+    responses.insert(9, fixtures["listener"])
+    calls = []
+
+    def generate(messages, **_kwargs):
+        calls.append(messages)
+        return json.dumps(responses.pop(0))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p8_grounding_patch", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p8_grounding_patch",
+    )
+
+    assert len(calls) == 11
+    assert "ScriptLinePatch" in calls[8][0]["content"]
+    assert led.data["meta"]["original_codex56sol"]["call_journal"][8][
+        "pass_id"
+    ] == "P8_grounding_patch"
+
+
 def test_p6_line_patch_preserves_anchor_already_valid_on_target():
     score = lane.BroadcastScore.model_validate(_fixtures()["score"])
     score.beats[1].line_intent.clue_ids = []

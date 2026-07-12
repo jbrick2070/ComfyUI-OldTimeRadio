@@ -428,8 +428,8 @@
         {"pass_id":"P5_broadcast_score","slot":"creative","seam_refs":["codex56_broadcast_score","codex56_score_anchor_patch"],"description":"Design cast, scenes, shots, beats, intents and music bookends; when a structurally valid score misses an immutable grounding anchor, repair only the affected line intent through a bounded typed patch."},
         {"pass_id":"P6_performance_script","slot":"creative","seam_refs":["codex56_performance_script","codex56_script_anchor_patch"],"description":"Write every canonical spoken line for the closed manifest; when a structurally valid script misses immutable grounding, repair only the affected spoken line through a bounded typed patch."},
         {"pass_id":"P7_blind_listener","slot":"technical","seam_refs":["codex56_blind_listener"],"description":"Evaluate the complete script using spoiler-safe clue evidence."},
-        {"pass_id":"P8_broadcast_retake","slot":"creative","seam_refs":["codex56_broadcast_retake"],"description":"Return a complete replacement script only when repair is required."},
-        {"pass_id":"P9_retake","slot":"creative","seam_refs":["codex56_broadcast_retake"],"description":"Return one complete replacement script for corroborated final-audit defects."},
+        {"pass_id":"P8_broadcast_retake","slot":"creative","seam_refs":["codex56_broadcast_retake","codex56_script_anchor_patch"],"description":"Return a complete replacement script only when repair is required; localized grounding omissions use a bounded spoken-line patch."},
+        {"pass_id":"P9_retake","slot":"creative","seam_refs":["codex56_broadcast_retake","codex56_script_anchor_patch"],"description":"Return one complete replacement script for corroborated final-audit defects; localized grounding omissions use a bounded spoken-line patch."},
         {"pass_id":"P9_final_contract_audit","slot":"technical","seam_refs":["codex56_final_contract_audit"],"description":"Final typed contract audit over the accepted complete script."}
       ],
       "notes": ["Only workflow creative and technical slots are used; bounded retries fail closed."]

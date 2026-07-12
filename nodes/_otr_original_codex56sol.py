@@ -791,7 +791,7 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
             "Return the same complete artifact, repairing only the typed "
             "contract error."
         )
-        if pass_id in {"P5_grounding_patch", "P6_grounding_patch"}:
+        if pass_id.endswith("_grounding_patch"):
             artifact_instruction = (
                 f"Return only the complete {schema.__name__} for the supplied "
                 "targets; do not emit a full artifact or any other object."
@@ -1613,16 +1613,17 @@ def _repair_script_grounding_lines(
     *, script: PerformanceScript, score: BroadcastScore,
     manifest: ClosedLineManifest, grounding: GroundingContract, pack: Any,
     creative_fn: GenerateFn, scheduler: Any, journal: list[dict],
-    story_rules: Any,
+    story_rules: Any, origin_pass_id: str,
 ) -> PerformanceScript:
-    """Use a small LLM tool call for localized P6 grounding omissions."""
+    """Use a small LLM tool call for a localized script grounding omission."""
     plan = _script_grounding_repair_plan(script, manifest, grounding)
     if not plan:
         raise OriginalCodex56SolContractError(
-            "P6 grounding repair has no eligible immutable-anchor plan"
+            f"{origin_pass_id} grounding repair has no eligible immutable-anchor plan"
         )
     patch = _call(
-        pass_id="P6_grounding_patch", slot="creative", fn=creative_fn,
+        pass_id=f"{origin_pass_id}_grounding_patch", slot="creative",
+        fn=creative_fn,
         pack=pack, seam="codex56_script_anchor_patch",
         inputs={"targets": plan}, schema=ScriptLinePatch,
         scheduler=scheduler, journal=journal, tokens=900,
@@ -1631,6 +1632,31 @@ def _repair_script_grounding_lines(
         ),
     )
     return _merge_script_line_patch(script, patch)
+
+
+def _call_grounded_script(
+    *, pass_id: str, fn: GenerateFn, pack: Any, seam: str,
+    inputs: Mapping[str, Any], score: BroadcastScore,
+    manifest: ClosedLineManifest, grounding: GroundingContract,
+    scheduler: Any, journal: list[dict], story_rules: Any, tokens: int,
+) -> PerformanceScript:
+    """Accept structural scripts first, then patch localized grounding gaps."""
+    script = _call(
+        pass_id=pass_id, slot="creative", fn=fn, pack=pack, seam=seam,
+        inputs=inputs, schema=PerformanceScript, scheduler=scheduler,
+        journal=journal, tokens=tokens,
+        post_validator=lambda value: _validate_script(
+            score, manifest, value, story_rules,
+        ),
+    )
+    if _validate_script(score, manifest, script, story_rules, grounding) is not None:
+        script = _repair_script_grounding_lines(
+            script=script, score=score, manifest=manifest, grounding=grounding,
+            pack=pack, creative_fn=fn, scheduler=scheduler, journal=journal,
+            story_rules=story_rules, origin_pass_id=pass_id,
+        )
+    _assert_script_valid(score, manifest, script, story_rules, grounding)
+    return script
 
 
 def _grounding_receipt(
@@ -1876,8 +1902,8 @@ def run_original_codex56sol_episode(
             story_rules=story_rules,
         )
     manifest = _compile_manifest(score)
-    script = _call(
-        pass_id="P6", slot="creative", fn=creative_fn, pack=pack,
+    script = _call_grounded_script(
+        pass_id="P6", fn=creative_fn, pack=pack,
         seam="codex56_performance_script",
         inputs={
             "score": score.model_dump(mode="json"),
@@ -1886,19 +1912,10 @@ def run_original_codex56sol_episode(
             "grounding_contract": grounding.model_dump(mode="json"),
             "target_words_advisory": int(resolved["target_words"]),
         },
-        schema=PerformanceScript, scheduler=slot_scheduler, journal=journal,
+        score=score, manifest=manifest, grounding=grounding,
+        scheduler=slot_scheduler, journal=journal, story_rules=story_rules,
         tokens=max(2600, int(resolved["target_words"]) * 6),
-        post_validator=lambda value: _validate_script(
-            score, manifest, value, story_rules,
-        ),
     )
-    if _validate_script(score, manifest, script, story_rules, grounding) is not None:
-        script = _repair_script_grounding_lines(
-            script=script, score=score, manifest=manifest, grounding=grounding,
-            pack=pack, creative_fn=creative_fn, scheduler=slot_scheduler,
-            journal=journal, story_rules=story_rules,
-        )
-    _assert_script_valid(score, manifest, script, story_rules, grounding)
     preceding_lines = _preceding_lines(manifest, script)
     listener = _call(pass_id="P7", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"preceding_lines": preceding_lines}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)
     listener_blocks = _listener_blocks(
@@ -1906,8 +1923,23 @@ def run_original_codex56sol_episode(
         preceding_lines[-1]["line_id"],
     )
     if listener_blocks:
-        script = _call(pass_id="P8", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": [finding.model_dump(mode="json") for finding in listener_blocks]}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
-        _assert_script_valid(score, manifest, script, story_rules, grounding)
+        script = _call_grounded_script(
+            pass_id="P8", fn=creative_fn, pack=pack,
+            seam="codex56_broadcast_retake",
+            inputs={
+                "manifest": manifest.model_dump(mode="json"),
+                "truth_map": truth.model_dump(mode="json"),
+                "grounding_contract": grounding.model_dump(mode="json"),
+                "previous_script": script.model_dump(mode="json"),
+                "findings": [
+                    finding.model_dump(mode="json")
+                    for finding in listener_blocks
+                ],
+            },
+            score=score, manifest=manifest, grounding=grounding,
+            scheduler=slot_scheduler, journal=journal, story_rules=story_rules,
+            tokens=max(2600, int(resolved["target_words"]) * 6),
+        )
         preceding_lines = _preceding_lines(manifest, script)
         listener = _call(pass_id="P7_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"preceding_lines": preceding_lines}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)
         remaining_listener_blocks = _listener_blocks(
@@ -1921,8 +1953,21 @@ def run_original_codex56sol_episode(
             )
     elif listener.optional_notes or any(not finding.blocking for finding in listener.findings):
         try:
-            optional_script = _call(pass_id="P8_optional", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": listener.model_dump(mode="json")}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
-            _assert_script_valid(score, manifest, optional_script, story_rules, grounding)
+            optional_script = _call_grounded_script(
+                pass_id="P8_optional", fn=creative_fn, pack=pack,
+                seam="codex56_broadcast_retake",
+                inputs={
+                    "manifest": manifest.model_dump(mode="json"),
+                    "truth_map": truth.model_dump(mode="json"),
+                    "grounding_contract": grounding.model_dump(mode="json"),
+                    "previous_script": script.model_dump(mode="json"),
+                    "findings": listener.model_dump(mode="json"),
+                },
+                score=score, manifest=manifest, grounding=grounding,
+                scheduler=slot_scheduler, journal=journal,
+                story_rules=story_rules,
+                tokens=max(2600, int(resolved["target_words"]) * 6),
+            )
             script = optional_script
         except OriginalCodex56SolError:
             pass
@@ -1934,8 +1979,23 @@ def run_original_codex56sol_episode(
             "grounded findings"
         )
     if audit_blocks:
-        script = _call(pass_id="P9_retake", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_retake", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "previous_script": script.model_dump(mode="json"), "findings": [finding.model_dump(mode="json") for finding in audit_blocks]}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
-        _assert_script_valid(score, manifest, script, story_rules, grounding)
+        script = _call_grounded_script(
+            pass_id="P9_retake", fn=creative_fn, pack=pack,
+            seam="codex56_broadcast_retake",
+            inputs={
+                "manifest": manifest.model_dump(mode="json"),
+                "truth_map": truth.model_dump(mode="json"),
+                "grounding_contract": grounding.model_dump(mode="json"),
+                "previous_script": script.model_dump(mode="json"),
+                "findings": [
+                    finding.model_dump(mode="json")
+                    for finding in audit_blocks
+                ],
+            },
+            score=score, manifest=manifest, grounding=grounding,
+            scheduler=slot_scheduler, journal=journal, story_rules=story_rules,
+            tokens=max(2600, int(resolved["target_words"]) * 6),
+        )
         audit = _call(pass_id="P9_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
         if not audit.accepted or _audit_blocks(audit, script):
             raise OriginalCodex56SolContractError("final contract audit rejected the repaired script")

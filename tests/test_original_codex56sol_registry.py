@@ -98,6 +98,20 @@ def test_broadcast_score_prompt_closes_music_bookend_key_sets():
     assert p6.seam_refs == (
         "codex56_performance_script", "codex56_script_anchor_patch",
     )
+    p8 = next(
+        row for row in registry.pipelines["acoustic_puzzle_v1"].passes
+        if row.pass_id == "P8_broadcast_retake"
+    )
+    p9_retake = next(
+        row for row in registry.pipelines["acoustic_puzzle_v1"].passes
+        if row.pass_id == "P9_retake"
+    )
+    assert p8.seam_refs == (
+        "codex56_broadcast_retake", "codex56_script_anchor_patch",
+    )
+    assert p9_retake.seam_refs == (
+        "codex56_broadcast_retake", "codex56_script_anchor_patch",
+    )
 
 
 @pytest.mark.parametrize("hint", ["", "please emphasize patient teamwork"])
