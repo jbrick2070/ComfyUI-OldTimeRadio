@@ -289,6 +289,20 @@ all newly requested literals while still breaking a graph, grounding, safety, or
 authorship invariant elsewhere in the target field. Return the precise merged
 error to the typed repair ladder and remain fail-closed if it cannot be cleared.
 
+## 22. Apply localized semantic repair at every artifact boundary
+
+Do not stop the bounded-patch pattern at a planning artifact. A complete
+performance script can be just as expensive and unreliable to regenerate for a
+single missing immutable phrase as a complete score. Keep the authoring model
+responsible for replacement prose, but create a separate typed patch seam for
+each artifact whose individual leaves have clear ownership and a full validator.
+
+For spoken-script patches, target line IDs only; retain every valid literal
+already spoken by that line, require every newly required literal, and rerun the
+complete script graph, safety, and grounding checks after merge. The tool must
+not become a broad retake in disguise: no title, roster, ordering, or unplanned
+line edits are permitted.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

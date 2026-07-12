@@ -195,6 +195,92 @@ def test_p5_intent_patch_preserves_anchor_already_valid_on_target():
     )
 
 
+def test_p6_missing_grounding_anchor_uses_small_line_patch(tmp_path):
+    responses = _responses()
+    responses[5]["lines"][4]["text"] = "The echo is mapped; the desk is quiet."
+    responses.insert(6, {
+        "replacements": [{
+            "line_id": "line_005",
+            "text": "The echo is mapped; every item is returned.",
+        }],
+    })
+    calls = []
+
+    def generate(messages, **_kwargs):
+        calls.append(messages)
+        return json.dumps(responses.pop(0))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p6_grounding_patch", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p6_grounding_patch",
+    )
+
+    assert len(calls) == 9
+    assert "ScriptLinePatch" in calls[6][0]["content"]
+    assert led.data["meta"]["original_codex56sol"]["call_journal"][6][
+        "pass_id"
+    ] == "P6_grounding_patch"
+    accepted_script = led.data["meta"]["original_codex56sol"][
+        "accepted_artifacts"
+    ]["performance_script"]
+    assert accepted_script["lines"][4]["text"] == (
+        "The echo is mapped; every item is returned."
+    )
+
+
+def test_p6_line_patch_preserves_anchor_already_valid_on_target():
+    score = lane.BroadcastScore.model_validate(_fixtures()["score"])
+    score.beats[1].line_intent.clue_ids = []
+    score.beats[3].line_intent.clue_ids = ["q1"]
+    manifest = lane._compile_manifest(score)
+    script = lane.PerformanceScript.model_validate(_fixtures()["script"])
+    contract = _grounding_fixture()
+    plan = lane._script_grounding_repair_plan(script, manifest, contract)
+    assert plan == [{
+        "line_id": "line_004",
+        "current_text": "The loose grille carries sounds from this shelf.",
+        "required_anchors": ["grille", "stamp"],
+    }]
+
+    patch = lane.ScriptLinePatch.model_validate({
+        "replacements": [{
+            "line_id": "line_004",
+            "text": "The stamp proves the loose grille carries shelf sounds.",
+        }],
+    })
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    assert lane._validate_script_line_patch_application(
+        patch, script, plan, score, manifest, contract, rules,
+    ) is None
+
+    unsafe_patch = lane.ScriptLinePatch.model_validate({
+        "replacements": [{
+            "line_id": "line_004",
+            "text": "The stamp proves the loose grille can kill the mystery.",
+        }],
+    })
+    assert "forbidden term 'kill'" in (
+        lane._validate_script_line_patch_application(
+            unsafe_patch, script, plan, score, manifest, contract, rules,
+        ) or ""
+    )
+
+
 def _grounding_fixture():
     draw = lane.ConstraintDraw.model_validate(DRAW)
     truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])

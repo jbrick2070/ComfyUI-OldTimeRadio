@@ -81,12 +81,22 @@ def test_broadcast_score_prompt_closes_music_bookend_key_sets():
     assert "ScoreIntentPatch JSON only" in patch_seam
     assert "every required_anchors string verbatim" in patch_seam
     assert "Do not write visual direction" in patch_seam
+    script_patch_seam = pack.prompt_stages["codex56_script_anchor_patch"]
+    assert "ScriptLinePatch JSON only" in script_patch_seam
+    assert "natural spoken dialogue" in script_patch_seam
     p5 = next(
         row for row in registry.pipelines["acoustic_puzzle_v1"].passes
         if row.pass_id == "P5_broadcast_score"
     )
     assert p5.seam_refs == (
         "codex56_broadcast_score", "codex56_score_anchor_patch",
+    )
+    p6 = next(
+        row for row in registry.pipelines["acoustic_puzzle_v1"].passes
+        if row.pass_id == "P6_performance_script"
+    )
+    assert p6.seam_refs == (
+        "codex56_performance_script", "codex56_script_anchor_patch",
     )
 
 

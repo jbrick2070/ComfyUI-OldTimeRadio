@@ -295,6 +295,15 @@ class PerformanceScript(StrictModel):
     lines: list[SpokenLine] = Field(min_length=5)
 
 
+class ScriptLineReplacement(StrictModel):
+    line_id: str
+    text: str
+
+
+class ScriptLinePatch(StrictModel):
+    replacements: list[ScriptLineReplacement] = Field(min_length=1, max_length=8)
+
+
 class ListenerFinding(StrictModel):
     line_id: str
     category: str
@@ -782,10 +791,10 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
             "Return the same complete artifact, repairing only the typed "
             "contract error."
         )
-        if pass_id == "P5_grounding_patch":
+        if pass_id in {"P5_grounding_patch", "P6_grounding_patch"}:
             artifact_instruction = (
-                "Return only the complete ScoreIntentPatch for the supplied "
-                "targets; do not emit a BroadcastScore or any other artifact."
+                f"Return only the complete {schema.__name__} for the supplied "
+                "targets; do not emit a full artifact or any other object."
             )
         return [
             {"role": "system", "content": system + "\n" + artifact_instruction + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
@@ -1480,6 +1489,150 @@ def _validate_script_grounding(
     return None
 
 
+def _script_grounding_repair_plan(
+    script: PerformanceScript,
+    manifest: ClosedLineManifest,
+    grounding: GroundingContract,
+) -> list[dict[str, Any]] | None:
+    """Select only spoken lines that need immutable grounding literals."""
+    script_by_id = {line.line_id: line for line in script.lines}
+    targets: dict[str, set[str]] = {}
+    clue_ids_by_object: dict[str, set[str]] = {}
+    for clue in grounding.clues:
+        clue_ids_by_object.setdefault(clue.lost_object, set()).add(clue.clue_id)
+    for anchor in grounding.lost_object_anchors:
+        clue_ids = clue_ids_by_object.get(anchor, set())
+        eligible = [
+            row for row in manifest.lines
+            if clue_ids.intersection(row.clue_ids)
+        ]
+        if not eligible:
+            return None
+        if not any(
+            row.line_id in script_by_id
+            and _contains_grounding_anchor(
+                script_by_id[row.line_id].text, anchor,
+            )
+            for row in eligible
+        ):
+            targets.setdefault(eligible[0].line_id, set()).add(anchor)
+
+    reveal = script_by_id.get(manifest.reveal_line_id)
+    closure = script_by_id.get(manifest.closure_line_id)
+    if reveal is None or closure is None:
+        return None
+    if not _contains_grounding_anchor(reveal.text, grounding.device_anchor):
+        targets.setdefault(reveal.line_id, set()).add(grounding.device_anchor)
+    if not _contains_grounding_anchor(
+            closure.text, grounding.resolution_anchor):
+        targets.setdefault(closure.line_id, set()).add(
+            grounding.resolution_anchor,
+        )
+
+    # A line can carry several valid story facts.  A replacement must retain
+    # every immutable fact it already speaks, not merely the missing one.
+    protected_anchors = (
+        *grounding.lost_object_anchors,
+        grounding.device_anchor,
+        grounding.resolution_anchor,
+    )
+    for line_id in targets:
+        line = script_by_id.get(line_id)
+        if line is None:
+            return None
+        for anchor in protected_anchors:
+            if _contains_grounding_anchor(line.text, anchor):
+                targets[line_id].add(anchor)
+
+    return [
+        {
+            "line_id": row.line_id,
+            "current_text": script_by_id[row.line_id].text,
+            "required_anchors": sorted(targets[row.line_id]),
+        }
+        for row in manifest.lines if row.line_id in targets
+    ]
+
+
+def _validate_script_line_patch(
+    patch: ScriptLinePatch,
+    plan: list[dict[str, Any]],
+) -> str | None:
+    expected = {str(row["line_id"]): row for row in plan}
+    seen: set[str] = set()
+    for replacement in patch.replacements:
+        line_id = replacement.line_id
+        if line_id not in expected or line_id in seen:
+            return "script line patch must replace every and only planned line ids once"
+        seen.add(line_id)
+        for anchor in expected[line_id]["required_anchors"]:
+            if not _contains_grounding_anchor(replacement.text, anchor):
+                return (
+                    "script line patch must speak every required immutable "
+                    f"anchor for line {line_id}"
+                )
+    if seen != set(expected):
+        return "script line patch must replace every planned line id"
+    return None
+
+
+def _merge_script_line_patch(
+    script: PerformanceScript,
+    patch: ScriptLinePatch,
+) -> PerformanceScript:
+    texts = {row.line_id: row.text for row in patch.replacements}
+    repaired = script.model_copy(deep=True)
+    for line in repaired.lines:
+        if line.line_id in texts:
+            line.text = texts[line.line_id]
+    return repaired
+
+
+def _validate_script_line_patch_application(
+    patch: ScriptLinePatch,
+    script: PerformanceScript,
+    plan: list[dict[str, Any]],
+    score: BroadcastScore,
+    manifest: ClosedLineManifest,
+    grounding: GroundingContract,
+    story_rules: Any,
+) -> str | None:
+    patch_error = _validate_script_line_patch(patch, plan)
+    if patch_error is not None:
+        return patch_error
+    repaired = _merge_script_line_patch(script, patch)
+    script_error = _validate_script(
+        score, manifest, repaired, story_rules, grounding,
+    )
+    if script_error is not None:
+        return f"script line patch leaves the full script invalid: {script_error}"
+    return None
+
+
+def _repair_script_grounding_lines(
+    *, script: PerformanceScript, score: BroadcastScore,
+    manifest: ClosedLineManifest, grounding: GroundingContract, pack: Any,
+    creative_fn: GenerateFn, scheduler: Any, journal: list[dict],
+    story_rules: Any,
+) -> PerformanceScript:
+    """Use a small LLM tool call for localized P6 grounding omissions."""
+    plan = _script_grounding_repair_plan(script, manifest, grounding)
+    if not plan:
+        raise OriginalCodex56SolContractError(
+            "P6 grounding repair has no eligible immutable-anchor plan"
+        )
+    patch = _call(
+        pass_id="P6_grounding_patch", slot="creative", fn=creative_fn,
+        pack=pack, seam="codex56_script_anchor_patch",
+        inputs={"targets": plan}, schema=ScriptLinePatch,
+        scheduler=scheduler, journal=journal, tokens=900,
+        post_validator=lambda value: _validate_script_line_patch_application(
+            value, script, plan, score, manifest, grounding, story_rules,
+        ),
+    )
+    return _merge_script_line_patch(script, patch)
+
+
 def _grounding_receipt(
     contract: GroundingContract,
     manifest: ClosedLineManifest,
@@ -1723,7 +1876,28 @@ def run_original_codex56sol_episode(
             story_rules=story_rules,
         )
     manifest = _compile_manifest(score)
-    script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
+    script = _call(
+        pass_id="P6", slot="creative", fn=creative_fn, pack=pack,
+        seam="codex56_performance_script",
+        inputs={
+            "score": score.model_dump(mode="json"),
+            "manifest": manifest.model_dump(mode="json"),
+            "truth_map": truth.model_dump(mode="json"),
+            "grounding_contract": grounding.model_dump(mode="json"),
+            "target_words_advisory": int(resolved["target_words"]),
+        },
+        schema=PerformanceScript, scheduler=slot_scheduler, journal=journal,
+        tokens=max(2600, int(resolved["target_words"]) * 6),
+        post_validator=lambda value: _validate_script(
+            score, manifest, value, story_rules,
+        ),
+    )
+    if _validate_script(score, manifest, script, story_rules, grounding) is not None:
+        script = _repair_script_grounding_lines(
+            script=script, score=score, manifest=manifest, grounding=grounding,
+            pack=pack, creative_fn=creative_fn, scheduler=slot_scheduler,
+            journal=journal, story_rules=story_rules,
+        )
     _assert_script_valid(score, manifest, script, story_rules, grounding)
     preceding_lines = _preceding_lines(manifest, script)
     listener = _call(pass_id="P7", slot="technical", fn=technical_fn, pack=pack, seam="codex56_blind_listener", inputs={"preceding_lines": preceding_lines}, schema=BlindListenerReport, scheduler=slot_scheduler, journal=journal, tokens=1800)
