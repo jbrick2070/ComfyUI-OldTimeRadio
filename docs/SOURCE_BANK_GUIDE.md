@@ -418,3 +418,6 @@ leaving them for live integration:
     announcer may have an authored on-air name while retaining
     `char_id="announcer"`; Kokoro/Bark routing and freeze checks must recognize
     the ID instead of requiring the visible name `ANNOUNCER`.
+29. Canonicalize purely structural integer IDs to strings consistently across
+    a typed graph so a repair call is reserved for semantic/graph defects.
+    State contiguity operationally: after leaving a shot ID, never return to it.

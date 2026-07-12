@@ -160,21 +160,21 @@ class FairPlayReport(StrictModel):
 
 
 class CastConcept(StrictModel):
-    char_id: str
+    char_id: Identifier
     name: str
     role: CastRole
     character_description: str
 
 
 class SceneConcept(StrictModel):
-    scene_id: str
+    scene_id: Identifier
     description: str
     env: str
 
 
 class ShotConcept(StrictModel):
-    shot_id: str
-    scene_id: str
+    shot_id: Identifier
+    scene_id: Identifier
     description: str
     visual_prompt: str
     env: str = ""
@@ -187,10 +187,10 @@ class LineIntent(StrictModel):
 
 
 class BeatConcept(StrictModel):
-    beat_id: str
-    shot_id: str
-    scene_id: str
-    char_id: str
+    beat_id: Identifier
+    shot_id: Identifier
+    scene_id: Identifier
+    char_id: Identifier
     speaker: str
     line_intent: LineIntent
 
@@ -313,8 +313,11 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "least 5 beats; never delete a beat to repair another field. If "
             "the failed artifact has more than 4 scenes, consolidate it into "
             "exactly 4 and reassign every shot and beat to retained scene IDs; "
-            "do not echo the oversized artifact. Put env "
-            "inside every scene row and visual_prompt inside every shot row. "
+            "do not echo the oversized artifact. Put env inside every scene "
+            "row and visual_prompt inside every shot row. "
+            "Group every shot's beats into one adjacent contiguous block: "
+            "once beats move to a different shot_id, never return to an "
+            "earlier shot_id. Preserve orientation-before-reveal-before-closure. "
             "Never emit schema-path pseudo-fields such as `scenes[*].env` or "
             "`shots[*].visual_prompt` at the top level. Every line_intent MUST "
             "have exactly the keys intent, arc_phase, and clue_ids. clue_ids "

@@ -100,6 +100,28 @@ def test_structural_numeric_ids_canonicalize_without_authored_prose_change():
     })
     assert card.possibility_id == "1"
 
+    cast = lane.CastConcept.model_validate({
+        "char_id": 2, "name": "Caller", "role": "caller",
+        "character_description": "Patient",
+    })
+    scene = lane.SceneConcept.model_validate({
+        "scene_id": 3, "description": "Office", "env": "indoors",
+    })
+    shot = lane.ShotConcept.model_validate({
+        "shot_id": 4, "scene_id": 3, "description": "Desk",
+        "visual_prompt": "A warm desk",
+    })
+    beat = lane.BeatConcept.model_validate({
+        "beat_id": 5, "shot_id": 4, "scene_id": 3, "char_id": 2,
+        "speaker": "Caller",
+        "line_intent": {"intent": "Ask", "arc_phase": "rising",
+                        "clue_ids": []},
+    })
+    assert (cast.char_id, scene.scene_id, shot.shot_id, shot.scene_id,
+            beat.beat_id, beat.shot_id, beat.scene_id, beat.char_id) == (
+        "2", "3", "4", "3", "5", "4", "3", "2",
+    )
+
 
 def test_freeform_non_owner_cast_role_normalizes_to_caller():
     concept = lane.CastConcept.model_validate({
@@ -313,6 +335,7 @@ def test_p5_repair_spells_out_required_fields_and_exact_arc_phases():
     assert "exactly 4 scenes" in rules
     assert "at least 5 beats" in rules
     assert "never delete a beat" in rules
+    assert "one adjacent contiguous block" in rules
     assert "schema-path pseudo-fields" in rules
     assert "singular clue_id is forbidden" in rules
     assert "scene MUST retain a non-empty env" in rules
