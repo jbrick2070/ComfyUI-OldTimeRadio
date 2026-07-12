@@ -26,6 +26,9 @@ from .production_ledger import stamp_word_counts
 log = logging.getLogger(__name__)
 
 
+_SCORE_TOPOLOGY_ERROR = "beats for each shot must form one contiguous block"
+
+
 class OriginalCodex56SolError(RuntimeError): pass
 class OriginalCodex56SolPassError(OriginalCodex56SolError): pass
 class OriginalCodex56SolContractError(OriginalCodex56SolError): pass
@@ -445,6 +448,7 @@ def _repair_duplicate_score_clues(
 def _repair_score_beat_topology(
     score: BroadcastScore,
     truth: AudibleTruthMap,
+    grounding_contract: GroundingContract | None = None,
 ) -> BroadcastScore | None:
     """Split reopened shot runs without changing authored narrative order.
 
@@ -499,7 +503,7 @@ def _repair_score_beat_topology(
     if not changed:
         return None
     repaired.shots.extend(cloned_shots)
-    if _validate_score(repaired, truth) is not None:
+    if _validate_score(repaired, truth, grounding_contract) is not None:
         return None
     return repaired
 
@@ -927,7 +931,7 @@ def _validate_score(
     for beat in score.beats:
         if beat.shot_id != previous_shot:
             if beat.shot_id in closed_shots:
-                return "beats for each shot must form one contiguous block"
+                return _SCORE_TOPOLOGY_ERROR
             if previous_shot is not None:
                 closed_shots.add(previous_shot)
             previous_shot = beat.shot_id
@@ -1025,6 +1029,41 @@ def _validate_authored_surface(value: Any, rules: Any) -> str | None:
     if violations:
         return "; ".join(violations) + "; replace every cited authored detail"
     return None
+
+
+def _validate_score_attempt(
+    score: BroadcastScore,
+    truth: AudibleTruthMap,
+    grounding_contract: GroundingContract,
+    story_rules: Any,
+) -> str | None:
+    """Validate every P5 response at the exact structured-call boundary.
+
+    P5 base and typed-repair outputs first become a strict ``BroadcastScore``
+    inside ``structured_call``.  The contiguous-shot projection belongs here,
+    not only in the raw-string normalization path: this is the one boundary
+    every schema-valid ladder response must cross.  The projection changes
+    only mechanical shot ownership and is accepted only when the complete
+    grounded score validates again.
+    """
+    structural_error = _validate_score(score, truth, grounding_contract)
+    if structural_error == _SCORE_TOPOLOGY_ERROR:
+        repaired = _repair_score_beat_topology(
+            score, truth, grounding_contract,
+        )
+        if repaired is not None:
+            score.shots = repaired.shots
+            score.beats = repaired.beats
+            log.info(
+                "[original_codex56sol] P5 normalized one safe structural "
+                "defect at the schema-validated attempt boundary"
+            )
+            structural_error = _validate_score(
+                score, truth, grounding_contract,
+            )
+    if structural_error is not None:
+        return structural_error
+    return _validate_authored_surface(score, story_rules)
 
 
 def _truth_item_ids(truth: AudibleTruthMap) -> dict[str, set[str]]:
@@ -1472,7 +1511,7 @@ def run_original_codex56sol_episode(
     corroborated_fair_blocks = _corroborated_fair_blocks(fair, truth)
     if corroborated_fair_blocks:
         raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
-    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=lambda value: _validate_score(value, truth, grounding) or _validate_authored_surface(value, story_rules))
+    score = _call(pass_id="P5", slot="creative", fn=creative_fn, pack=pack, seam="codex56_broadcast_score", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"]), "num_characters_advisory": int(resolved["num_characters"])}, schema=BroadcastScore, scheduler=slot_scheduler, journal=journal, tokens=3600, post_validator=lambda value: _validate_score_attempt(value, truth, grounding, story_rules))
     manifest = _compile_manifest(score)
     script = _call(pass_id="P6", slot="creative", fn=creative_fn, pack=pack, seam="codex56_performance_script", inputs={"score": score.model_dump(mode="json"), "manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "target_words_advisory": int(resolved["target_words"])}, schema=PerformanceScript, scheduler=slot_scheduler, journal=journal, tokens=max(2600, int(resolved["target_words"]) * 6), post_validator=lambda value: _validate_script(score, manifest, value, story_rules, grounding))
     _assert_script_valid(score, manifest, script, story_rules, grounding)

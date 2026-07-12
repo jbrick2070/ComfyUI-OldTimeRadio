@@ -868,7 +868,9 @@ def test_p5_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
     assert len(calls) == 8
 
 
-def test_p5_topology_and_bookend_repairs_compose_without_an_llm_call(tmp_path):
+def test_p5_schema_boundary_projects_topology_when_raw_projection_misses(
+    tmp_path, monkeypatch,
+):
     responses = _responses()
     responses[4]["shots"].insert(1, {
         "shot_id": "shot_03",
@@ -877,8 +879,10 @@ def test_p5_topology_and_bookend_repairs_compose_without_an_llm_call(tmp_path):
         "visual_prompt": "A return shelf opposite the radio desk.",
     })
     responses[4]["beats"][1]["shot_id"] = "shot_03"
-    responses[4]["opening_music"]["music_file"] = "opening_music.mp3"
-    responses[4]["closing_music"]["music_file"] = "closing_music.mp3"
+    monkeypatch.setattr(
+        lane, "_repair_score_collection_placement",
+        lambda _raw, _truth: None,
+    )
     queued = iter(responses)
     calls = []
 
@@ -934,7 +938,7 @@ def test_p5_placement_repair_preserves_llm_fallback_for_safety(tmp_path):
 
     def generate(messages, **_kwargs):
         calls.append(1)
-        if any("after structural normalization" in row["content"]
+        if any("forbidden term 'kill'" in row["content"]
                for row in messages):
             repair_prompts.append(messages)
         return json.dumps(next(queued))
@@ -963,7 +967,9 @@ def test_p5_placement_repair_preserves_llm_fallback_for_safety(tmp_path):
     assert "forbidden term 'kill'" in repair_prompts[0][1]["content"]
 
 
-def test_p5_typed_repair_response_gets_same_safe_topology_projection(tmp_path):
+def test_p5_typed_repair_response_gets_schema_boundary_topology_projection(
+    tmp_path, monkeypatch,
+):
     responses = _responses()
     responses[4]["shots"].insert(1, {
         "shot_id": "shot_03",
@@ -975,13 +981,17 @@ def test_p5_typed_repair_response_gets_same_safe_topology_projection(tmp_path):
     safe_repair_response = json.loads(json.dumps(responses[4]))
     responses[4]["premise"] = "Kill the clue."
     responses.insert(5, safe_repair_response)
+    monkeypatch.setattr(
+        lane, "_repair_score_collection_placement",
+        lambda _raw, _truth: None,
+    )
     queued = iter(responses)
     calls = []
     repair_prompts = []
 
     def generate(messages, **_kwargs):
         calls.append(1)
-        if any("after structural normalization" in row["content"]
+        if any("forbidden term 'kill'" in row["content"]
                for row in messages):
             repair_prompts.append(messages)
         return json.dumps(next(queued))

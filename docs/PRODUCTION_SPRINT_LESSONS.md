@@ -217,6 +217,21 @@ response. Return the projected artifact only when its strict schema and complete
 semantic/grounding validators pass; otherwise retain the raw response and let
 the ordinary ladder report or repair the real remaining defect.
 
+## 17. Put typed structural repair at the accepted-object boundary
+
+Raw-string cleanup is appropriate for unambiguous JSON-shape defects, such as
+lifting a declared collection from the wrong nesting level. It is not enough
+for a projection whose safety depends on the fully parsed artifact and its
+complete graph/grounding validator. Apply that kind of repair in the
+schema-validated post-check over the same typed object that will be returned to
+the caller.
+
+Test the boundary itself: deliberately disable or bypass the earlier raw
+normalizer, then prove both a base response and a typed-repair response still
+accept only after the typed projection preserves authored values and clears all
+validators. This prevents a duplicated pre-parse helper from becoming a
+false-green proxy for the production acceptance path.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:
