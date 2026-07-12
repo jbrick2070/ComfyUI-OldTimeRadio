@@ -51,6 +51,8 @@ class PossibilityCard(StrictModel):
     premise: str
     desk_operator: FictionalName
     callers: list[FictionalName] = Field(min_length=2, max_length=4)
+    lost_objects: list[str] = Field(min_length=3, max_length=6)
+    acoustic_device: str
     shared_cause: str
     clue_plan: list[str] = Field(min_length=3)
     helpful_resolution: str
@@ -277,22 +279,12 @@ def _validate_slate(slate: PossibilitySlate, draw: ConstraintDraw) -> str | None
     ids = [card.possibility_id for card in slate.possibilities]
     if len(set(ids)) != len(ids):
         return "possibility ids must be unique"
-    cause_tokens = {
-        token for token in re.findall(r"[a-z]+", draw.acoustic_device.lower())
-        if len(token) >= 5
-    }
     for card in slate.possibilities:
-        surface = " ".join([
-            card.premise, card.shared_cause, *card.clue_plan,
-            card.helpful_resolution,
-        ]).lower()
-        missing = [obj for obj in draw.lost_objects if obj.lower() not in surface]
-        overlap = cause_tokens & set(re.findall(r"[a-z]+", surface))
-        if missing or len(overlap) < min(2, len(cause_tokens)):
+        if (card.lost_objects != draw.lost_objects
+                or card.acoustic_device != draw.acoustic_device):
             return (
-                f"{card.possibility_id}: must retain every drawn object and "
-                "the drawn acoustic cause; "
-                f"missing_objects={missing} acoustic_overlap={sorted(overlap)}"
+                f"{card.possibility_id}: lost_objects and acoustic_device "
+                "must be copied verbatim from the immutable constraint draw"
             )
     return None
 

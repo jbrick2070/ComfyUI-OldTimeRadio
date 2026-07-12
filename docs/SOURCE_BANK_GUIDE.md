@@ -323,7 +323,9 @@ leaving them for live integration:
    episode failure.
 4. State deterministic retention checks for immutable ingress. Prompt prose
    alone does not prove that a possibility preserved every drawn object,
-   acoustic cause, or required ending.
+   acoustic cause, or required ending. Put retained constraints in explicit
+   typed fields and validate those fields exactly; do not infer retention by
+   searching free prose for phrases or synonyms.
 5. Specify exact context/output reservations for base, syntax retry, and the
    largest typed repair for every pass.
 6. Name the concrete live voice-selection function and returned row contract;
