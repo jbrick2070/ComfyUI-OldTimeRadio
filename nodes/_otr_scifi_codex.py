@@ -1035,6 +1035,48 @@ def _score_graph_contract(advisory: AdvisoryWordPlanV4) -> dict[str, Any]:
     }
 
 
+def _radio_score_output_token_budget(
+    requested_words: int, beat_count: int,
+) -> int:
+    """Reserve P3 output without starving its schema-bearing repair prompt.
+
+    The live 120-word Sci-Fi Codex repair receipt needed 5,273 input tokens.
+    A flat 3,600-token P3 reservation against the local 8,192-token cap left
+    only 4,592 input tokens, so the generate wrapper silently discarded the
+    leading system/schema/repair contract.  The model then echoed the trailing
+    request envelope instead of receiving the repair instructions at all.
+
+    RadioScoreV4 size grows with both the spoken-word steer and the locked beat
+    graph.  Keep enough output room for the complete score, but bound the
+    120-word/12-beat reservation below the observed repair-fit ceiling.  The
+    call site also uses ``prompt_must_fit=True``: if a larger future graph still
+    cannot fit, it fails before generation rather than corrupting the contract
+    through left truncation.
+    """
+    if (
+        not isinstance(requested_words, int)
+        or isinstance(requested_words, bool)
+        or not 30 <= requested_words <= 900
+    ):
+        raise CodexTargetRangeError("requested_words must be 30..900")
+    if (
+        not isinstance(beat_count, int)
+        or isinstance(beat_count, bool)
+        or beat_count < 1
+    ):
+        raise CodexTargetRangeError("beat_count must be a positive int")
+    # RadioScoreV4 carries authored descriptions plus strict per-beat graph
+    # metadata.  The 2,800 floor comfortably fits a complete 120-word score
+    # while preserving 5,392 input tokens under the current 8,192-token cap.
+    return min(
+        3600,
+        max(
+            2800,
+            int(requested_words * 3.0) + 115 * int(beat_count) + 550,
+        ),
+    )
+
+
 def _script_output_token_budget(
     requested_words: int, accepted_line_count: int,
 ) -> int:
@@ -1276,7 +1318,11 @@ def invoke_codex_structured(
                 "story's cause-and-response progression rather than inventing another "
                 "ID. Flatten all line_ids in assembly order into l001, l002, and so on "
                 "with no gaps, and make every music cue anchor an existing line and its "
-                "owning beat. Return one complete JSON object only."
+                "owning beat. Return one complete JSON object only. Begin at the "
+                "RadioScoreV4 root with exactly title, premise, setting, "
+                "advisory_word_plan, scenes, and music_cues. The tagged input "
+                "references below are not an output template: never return a wrapper, "
+                "a request field, or any tag name."
             )
         elif pass_id == "P2":
             deterministic = repair_cast_plan_metadata(failed_output)
@@ -1362,6 +1408,59 @@ def invoke_codex_structured(
                 "script line, set boundary to shot_start for the first line in a shot, "
                 "beat_start for the first line in a beat, or continue otherwise."
             )
+        if pass_id in {"P3", "P3_rewrite"}:
+            # P3's live repair prompt exceeded the available input window when
+            # it blindly echoed the complete original request.  The failed score
+            # already carries its authored story surface.  Keep only the locked
+            # mechanical graph/advisory context it cannot safely infer, plus the
+            # accepted score and review when this is a P3 rewrite.  Plain tagged
+            # sections deliberately avoid presenting a JSON request envelope for
+            # the local model to copy as its answer.
+            p3_inputs = body["artifact_inputs"]
+            repair_sections = [
+                "INPUT REFERENCES ONLY -- they are not an output shape.",
+                "<failed_radio_score>",
+                failed_output,
+                "</failed_radio_score>",
+                "<rejection>",
+                detail,
+                "</rejection>",
+                "<locked_score_graph>",
+                json.dumps(
+                    p3_inputs.get("score_graph_contract") or {},
+                    sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                ),
+                "</locked_score_graph>",
+                "<locked_advisory_word_plan>",
+                json.dumps(
+                    p3_inputs.get("advisory_word_plan")
+                    or (
+                        repair_advisory.model_dump(mode="json")
+                        if repair_advisory is not None else {}
+                    ),
+                    sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                ),
+                "</locked_advisory_word_plan>",
+            ]
+            if pass_id == "P3_rewrite":
+                repair_sections.extend((
+                    "<accepted_score_before_rewrite>",
+                    json.dumps(
+                        p3_inputs.get("score") or {},
+                        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                    ),
+                    "</accepted_score_before_rewrite>",
+                    "<rewrite_review>",
+                    json.dumps(
+                        p3_inputs.get("review") or {},
+                        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                    ),
+                    "</rewrite_review>",
+                ))
+            return [
+                {"role": "system", "content": "\n".join(seams) + schema_instruction + "\n" + repair_rules},
+                {"role": "user", "content": "\n".join(repair_sections)},
+            ]
         compact_request = {
             key: value for key, value in body.items()
             if key != "result_json_schema"
@@ -1559,11 +1658,19 @@ def run_scifi_codex_episode(
     beat_ids = [f"b{i:03d}" for i in range(max(3, min(12, len(p2.cast) * 3)))]
     advisory = make_advisory_word_blueprint(steer.requested_words, beat_ids)
     score_graph_contract = _score_graph_contract(advisory)
-    p3 = invoke_codex_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"question": p1.model_dump(mode="json"), "cast": p2.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=3600, call_journal=journal, repair_advisory=advisory)
+    score_token_budget = _radio_score_output_token_budget(
+        steer.requested_words, len(beat_ids),
+    )
+    journal["radio_score_token_budget"] = {
+        "requested_words": steer.requested_words,
+        "beat_count": len(beat_ids),
+        "max_new_tokens": score_token_budget,
+    }
+    p3 = invoke_codex_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"question": p1.model_dump(mode="json"), "cast": p2.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=score_token_budget, call_journal=journal, repair_advisory=advisory, prompt_must_fit=True)
     review = invoke_codex_structured(pass_id="P4", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json")}, result_type=StructureReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1800, call_journal=journal)
     score = p3
     if review.verdict == "rewrite":
-        score = invoke_codex_structured(pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json"), "review": review.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.55, structural_retry_temperature=.20, max_new_tokens=3600, call_journal=journal, repair_advisory=advisory)
+        score = invoke_codex_structured(pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json"), "review": review.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.55, structural_retry_temperature=.20, max_new_tokens=score_token_budget, call_journal=journal, repair_advisory=advisory, prompt_must_fit=True)
     # The whole-script reservation is only knowable once the score's accepted
     # line graph is final (P3, or P3_rewrite): the artifact serializes strict
     # metadata for every accepted line, so the line count -- not the word steer

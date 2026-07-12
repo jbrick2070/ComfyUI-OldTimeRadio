@@ -628,6 +628,64 @@ def test_p3_typed_repair_receives_the_locked_score_graph_contract():
     repair_system = calls[1]["messages"][0]["content"]
     assert "score_graph_contract" in repair_system
     assert "every and only required_beat_ids" in repair_system
+    repair_user = calls[1]["messages"][1]["content"]
+    assert "<failed_radio_score>" in repair_user
+    assert "<locked_score_graph>" in repair_user
+    assert "original_request" not in repair_user
+    assert '"artifact_inputs"' not in repair_user
+
+
+def test_p3_repair_context_is_not_a_copyable_json_request_envelope():
+    """Live 2026-07-12: preserve the repair prefix and root boundary."""
+    score = _metadata_repair_score()
+    advisory = score.advisory_word_plan
+    invalid = score.model_dump(mode="json")
+    invalid["music_cues"].append(copy.deepcopy(invalid["music_cues"][0]))
+    responses = [json.dumps(invalid), json.dumps(score.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+    pack = SimpleNamespace(prompt_stages={
+        "codex_radio_score_system": "Score.",
+        "codex_coda_contract_system": "Coda.",
+    })
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane.invoke_codex_structured(
+        pass_id="P3", slot="creative", slot_fn=slot_fn, pack=pack,
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs={
+            "question": {"question": "What is the cost?"},
+            "cast": {"cast": []},
+            "advisory_word_plan": advisory.model_dump(mode="json"),
+            "score_graph_contract": lane._score_graph_contract(advisory),
+        },
+        result_type=lane.RadioScoreV4,
+        post_validator=lambda candidate: lane._validate_radio_score_graph(
+            candidate, advisory
+        ),
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=2800, call_journal={}, repair_advisory=advisory,
+        prompt_must_fit=True,
+    )
+
+    assert result == score
+    assert len(calls) == 2
+    assert all(
+        getattr(call["messages"], "_otr_prompt_must_fit", False)
+        for call in calls
+    )
+    repair_system = calls[1]["messages"][0]["content"]
+    repair_user = calls[1]["messages"][1]["content"]
+    assert "never return a wrapper" in repair_system
+    assert "<failed_radio_score>" in repair_user
+    assert "<rejection>" in repair_user
+    assert "<locked_score_graph>" in repair_user
+    assert "<locked_advisory_word_plan>" in repair_user
+    assert "original_request" not in repair_user
+    assert '"artifact_inputs"' not in repair_user
+    assert '"validation_error"' not in repair_user
 
 
 def test_p3_exact_resolved_artifact_repair_envelope_is_unwrapped():
@@ -792,6 +850,27 @@ def test_script_output_token_budget_receipts_and_bounds():
             lane._script_output_token_budget(30, bad_count)
 
 
+def test_radio_score_output_budget_preserves_the_live_p3_repair_window():
+    """A P3 repair must never spend its own schema/instruction prefix."""
+    context_cap = 8192
+    observed_repair_prompt_tokens = 5273
+
+    budget = lane._radio_score_output_token_budget(120, 12)
+    assert budget == 2800
+    assert context_cap - budget >= observed_repair_prompt_tokens
+    assert lane._radio_score_output_token_budget(720, 12) == 3600
+    assert (
+        lane._radio_score_output_token_budget(720, 12)
+        > lane._radio_score_output_token_budget(30, 3)
+    )
+    for invalid_words in (True, 29, 901, 120.0):
+        with pytest.raises(lane.CodexTargetRangeError):
+            lane._radio_score_output_token_budget(invalid_words, 12)
+    for invalid_beats in (True, 0, -1, 12.0):
+        with pytest.raises(lane.CodexTargetRangeError):
+            lane._radio_score_output_token_budget(120, invalid_beats)
+
+
 def test_only_whole_script_passes_use_dynamic_token_budget():
     source_path = Path(__file__).parents[1] / "nodes" / "_otr_scifi_codex.py"
     tree = ast.parse(source_path.read_text(encoding="utf-8"))
@@ -800,6 +879,7 @@ def test_only_whole_script_passes_use_dynamic_token_budget():
     repair_advisories: dict[str, ast.AST | None] = {}
     artifact_inputs: dict[str, ast.AST | None] = {}
     post_validators: dict[str, ast.AST | None] = {}
+    prompt_must_fit: dict[str, ast.AST | None] = {}
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -813,6 +893,7 @@ def test_only_whole_script_passes_use_dynamic_token_budget():
             repair_advisories[pass_node.value] = keywords.get("repair_advisory")
             artifact_inputs[pass_node.value] = keywords.get("artifact_inputs")
             post_validators[pass_node.value] = keywords.get("post_validator")
+            prompt_must_fit[pass_node.value] = keywords.get("prompt_must_fit")
     for pass_id in ("P5", "P7", "P9"):
         budget_node = seen[pass_id]
         assert isinstance(budget_node, ast.Name)
@@ -821,6 +902,12 @@ def test_only_whole_script_passes_use_dynamic_token_budget():
         assert isinstance(repair_score, ast.Name)
         assert repair_score.id == "score"
     for pass_id in ("P3", "P3_rewrite"):
+        budget_node = seen[pass_id]
+        assert isinstance(budget_node, ast.Name)
+        assert budget_node.id == "score_token_budget"
+        must_fit = prompt_must_fit[pass_id]
+        assert isinstance(must_fit, ast.Constant)
+        assert must_fit.value is True
         validator = post_validators[pass_id]
         assert isinstance(validator, ast.Lambda)
         assert isinstance(validator.body, ast.Call)
@@ -876,10 +963,10 @@ def test_only_whole_script_passes_use_dynamic_token_budget():
     assert expected_digest.value.id == "env"
     assert expected_digest.attr == "source_digest"
     for pass_id, budget_node in seen.items():
-        if pass_id not in {"P5", "P7", "P9"}:
+        if pass_id not in {"P3", "P3_rewrite", "P5", "P7", "P9"}:
             assert not (
                 isinstance(budget_node, ast.Name)
-                and budget_node.id == "script_token_budget"
+                and budget_node.id in {"score_token_budget", "script_token_budget"}
             )
 
 

@@ -802,3 +802,37 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- live failure plus reusable effective-consumer-capability
   contract and executable coverage
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260712-20 -- Sci-Fi Codex P3 typed repair silently lost its contract
+
+- promotion: BUG-11.50
+- surfaced: canonical 120-word `scifi_codex` reverify queue leg, prompt
+  `ffc354cc-febf-4ada-9ebd-2e3d27a057e8`, Gemma E4B creative + Mistral-Nemo
+  technical, 2026-07-12
+- symptom: the base P3 `RadioScoreV4` had five music cues (maximum three),
+  then its typed repair logged `PROMPT_GUARD: Truncated 5273 -> 4592`
+  (`context_cap=8192`, `max_new_tokens=3600`) and returned the request-shaped
+  root `{artifact_inputs, validation_error}`. Strict validation correctly
+  rejected the envelope; no ledger, media asset, or OBS final was produced.
+- root cause: P3/P3_rewrite reserved a flat 3,600 output tokens without
+  accounting for the fixed 8,192-token local context or the full failed-score
+  repair prompt. The generic repair payload duplicated the original request,
+  so the token wrapper left-truncated its leading system/schema/rules before
+  calling Gemma. The model did not receive the contract it was expected to
+  repair and echoed trailing input material instead.
+- fix: calculate the RadioScoreV4 reservation from requested words and locked
+  beat count; at the observed 120-word/12-beat case it reserves 2,800 tokens,
+  leaving 5,392 input tokens. Mark P3 and P3_rewrite as `prompt_must_fit` so
+  a future oversize graph fails before generation, and send P3 repair context
+  as compact tagged references (failed score, rejection, locked graph,
+  advisory; plus accepted score/review only for P3_rewrite) rather than a
+  copyable JSON request envelope.
+- verify idea: assert `8192 - radio_score_output_token_budget(120, 12) >=
+  5273`, assert P3/P3_rewrite both use that dynamic budget and
+  `prompt_must_fit=True`, assert the P3 repair prompt carries no
+  `original_request`/`artifact_inputs` JSON envelope, then rerun the same
+  canonical bank and require P3 clearance, zero all-visualizer image objects,
+  saved ledger, episode asset, `obs_publish OK`, and final OBS file.
+- bible-worthy: already promoted as BUG-11.50; added OTR executable coverage
+  for the repair-prompt dimension.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING
