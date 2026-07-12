@@ -2,7 +2,7 @@
 
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
-**Updated:** 2026-07-08
+**Updated:** 2026-07-12 (added 1b: sci-fi bake-off 720w final verdict, with file links)
 **Purpose:** release runway after the current and next sprint.
 
 This file starts after the active handoff in `docs/GO_FORWARD_PLAN.md`. Keep
@@ -131,6 +131,32 @@ Visual style:
 - If user selects a registered style, the story must honor it.
 - If user selects `llm_creative`, generate a custom visual style for that
   episode with a strict schema.
+
+### 1b. Sci-Fi Bake-off -- 720-Word Final Verdict (QUEUED, self-regrounding)
+
+Three blind-specced sci-fi story engines (Codex / Gemini / Sonnet lanes) compete
+against every runnable source bank in one pinned-model 720-word batch, judged
+blind, crowned by operator ear. Runs when all three lanes are 30-word green.
+
+Files (the kickoff re-derives all volatile facts at run time -- GATE -1):
+
+- Kickoff prompt (execute as written): `docs/2026-07-11-720-bakeoff-kickoff.md`
+- Contender specs: `docs/2026-07-11-scifi-codex-engine-spec.md`,
+  `docs/2026-07-11-scifi-gemini-engine-spec.md`,
+  `docs/2026-07-11-scifi-sonnet-engine-spec.md`
+- Governing laws + qualification ladder (30 -> 120 -> 720):
+  `docs/PRODUCTION_SPRINT_LESSONS.md`
+- Prod-bug staging log every live failure feeds: `docs/PROD_BUG_LOG.md`
+  (promotion to the Bug Bible happens only at operator-triggered fan-out)
+- Verdict lands at `docs/<date>-720-bakeoff/VERDICT.md`; closes with the full
+  SPRINT RECEIPT block
+- Live scoreboard: Cowork artifact `scifi-bakeoff-verdict-board` (reads
+  `scifi_smoke_status.txt` + `docs/PROD_BUG_LOG.md` on every open; operator
+  scoring sliders persist locally)
+
+Shape: bank is the ONLY variable (identical pinned model slots across legs);
+blind two-Fable judging + anchor reconciliation; the doc ranking is advisory --
+the crown waits for Jeffrey's blind listen.
 
 ## 2. Thirty-Word Smoke Sweep
 
@@ -326,6 +352,10 @@ green-chunk workflow.
 - `AGENTS.md`
 - `CLAUDE.md`
 - `docs/BUG_LOG.md`
+- `docs/PROD_BUG_LOG.md` (prod-failure staging log; Bible fan-out is operator-gated)
+- `docs/2026-07-10-lean-mean-rip-final.md` (queued de-slop campaign, post-portability,
+  D-1..D-6 ratified)
+- `docs/2026-07-11-720-bakeoff-kickoff.md` (section 1b kickoff)
 - `docs/ROADMAP_HISTORY.md`
 - `docs/multimodal-story-schema/MEDIA_ARCHIVE_QA_HANDOFF.md`
 - `docs/google_tts_ideas.md`
