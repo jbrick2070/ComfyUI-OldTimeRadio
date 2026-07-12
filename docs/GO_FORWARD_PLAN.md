@@ -1,5 +1,43 @@
 # OTR Go-Forward Plan
 
+**RANDOMIZER ROLLS (Design A) -- CODE-READY, AWAITING SLOT + ONE OPERATOR CALL
+(2026-07-12, Claude window; NO code written, NO slot taken).** Plan of record:
+`docs/2026-07-12-randomizer-rolls-r2-coding-plan.md` -- converged through the full
+/kibitz arc r2 (coding) -> r3 (wiring) -> r4 (convergence); panel = codex
+`gpt-5.6-sol` @ ultra + antigravity `gemini-3.5-pro`, Claude anchor + judge; 8 panel
+calls, $0. Judgment logs (local, gitignored):
+`kibitz-runs/2026-07-12-randomizer-rolls/{r2,r3,r4}/final.md`.
+This window was DOCS-ONLY (Lesson 10): the 56SOL window held the code and the GPU
+throughout. Nothing was staged but the plan doc.
+
+**TWO GATES BEFORE ANY CODE:**
+
+1. **D-1 -- OPERATOR RATIFICATION (the one thing only Jeffrey can decide).** The roll
+   needs a rights FACT per bank, because `guide_ref` is free prose and a roll must not
+   decide rights by grepping English. Proposed: new REQUIRED `rights_class` field on
+   every bank row, enum `{unrestricted, noncommercial, unknown}`, with
+   `shakespeare = "noncommercial"` (its guide_ref already says CC BY-NC 3.0) and the
+   other ten rows `"unrestricted"`. The unattended roll draws ONLY from
+   `"unrestricted"`; a manual pick of any bank is unaffected. **Ratify or amend.**
+2. **Coder slot + a re-grounded base.** `banks.json` is the hottest collision surface
+   in the repo and this chunk adds a required field to every row -- it lands only in a
+   window that OWNS banks.json, and the contender windows must be told the field
+   exists. The base moved twice during planning alone (`11f6214a` -> `9d8265c0` ->
+   `efb6b6ad`): claim the slot, record the real HEAD, re-read every pin, THEN edit.
+
+Build = 3 pushed green sub-commits (lane-spec rip -> rights_class registry -> the roll
+itself) + a closeout, then 3 x 30-word live legs (seeded inline, seeded dispatched,
+unseeded-with-replay-proof). Design B (visual pack roll) stays parked until A lands.
+
+**QUEUED HARNESS DEFECT (found by the r3 panel, NOT a live failure -- so it belongs
+here, not in PROD_BUG_LOG):** `scripts/otr_render_watchdog.ps1` only recognizes
+`[soak] t=...` heartbeats and cannot read a canonical `RESULT` verdict, so it will
+declare a HEALTHY canonical render dead once it passes the 300s heartbeat stall
+window. Any long canonical (non-soak) render driven through the watchdog is at risk.
+Fix in its own chunk: emit compatible heartbeats from
+`scripts/otr_canonical_api_run.py`'s history poll, and teach the watchdog the
+canonical verdict.
+
 **CONSTRAINED CODER SLOT CLAIM (2026-07-11, Codex, `original_codex56sol`):**
 Operator authorized non-GPU implementation while the existing Sci-Fi Codex live
 run remains active. Base SHA: `26952a7ea64d61a2178485ac2708e350b52f9b48` on
