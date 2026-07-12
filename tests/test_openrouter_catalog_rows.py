@@ -237,6 +237,37 @@ def test_slot_a_lead_is_recommended_creative(enabled_cached):
     assert a[1] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
 
 
+def test_slot_a_temporarily_offers_hy3_free_even_with_stale_cache(enabled_cached):
+    """The through-2026-07-21 creative contender must not depend on cache age."""
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert "tencent/hy3:free" in a
+    assert a.index("tencent/hy3:free") > a.index(
+        orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
+    )
+    assert "tencent/hy3:free" not in cat.openrouter_catalog_dropdown_choices("b")
+
+
+def test_slot_a_offers_low_cost_aion_fiction_model(enabled_cached):
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert "aion-labs/aion-3.0-mini" in a
+    assert a.index("aion-labs/aion-3.0-mini") > a.index("tencent/hy3:free")
+    assert "aion-labs/aion-3.0-mini" not in cat.openrouter_catalog_dropdown_choices("b")
+
+
+def test_pinned_creative_contenders_honor_denylist(enabled_cached, monkeypatch):
+    monkeypatch.setenv("OTR_OPENROUTER_MODEL_DENYLIST", "tencent/hy3:free")
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert "tencent/hy3:free" not in a
+    assert "aion-labs/aion-3.0-mini" in a
+
+
+def test_pinned_creative_contenders_require_capability_evidence(enabled_cached, monkeypatch):
+    monkeypatch.setenv("OTR_OPENROUTER_SLOT_A_REQUIRE_JSON", "1")
+    a = cat.openrouter_catalog_dropdown_choices("a")
+    assert "tencent/hy3:free" not in a
+    assert "aion-labs/aion-3.0-mini" not in a
+
+
 def test_slot_b_lead_is_recommended_technical(enabled_cached):
     # BUG-LOCAL-400: enable-sentinel leads; recommended technical is first real.
     b = cat.openrouter_catalog_dropdown_choices("b")
@@ -358,7 +389,7 @@ def test_pruned_default_hides_full_catalog_optin_restores(enabled_cached, monkey
 # --- enabled but cold/empty cache ------------------------------------------
 
 
-def test_empty_cache_when_enabled_shows_recommended_plus_sentinel(monkeypatch, tmp_path):
+def test_empty_cache_when_enabled_keeps_pinned_creative_contenders(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
     monkeypatch.setenv("OTR_OPENROUTER_CACHE_DIR", str(tmp_path))  # no cache file
@@ -367,6 +398,7 @@ def test_empty_cache_when_enabled_shows_recommended_plus_sentinel(monkeypatch, t
     a = cat.openrouter_catalog_dropdown_choices("a")
     assert a == [cat.OPENROUTER_ENABLE_SENTINEL,
                  orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
+                 "tencent/hy3:free", "aion-labs/aion-3.0-mini",
                  cat.OPENROUTER_EMPTY_CACHE_SENTINEL]
 
 

@@ -817,6 +817,16 @@ OPENROUTER_FRONTIER_LATEST = (
 OPENROUTER_NO_LATEST_AUTHORS = ("x-ai",)
 
 
+# Pinned creative contenders that must remain selectable while an on-disk
+# catalog predates their listing.  These deliberately omit ``supports_json``:
+# a slot that explicitly requires structured output must fail closed until a
+# refreshed catalog supplies that capability evidence.
+_PINNED_CREATIVE_CONTENDER_ROWS = (
+    {"id": "tencent/hy3:free", "provider": "tencent"},
+    {"id": "aion-labs/aion-3.0-mini", "provider": "aion-labs"},
+)
+
+
 # Suffixes that mark a NON-frontier variant (dev builds, small/fast tiers, free
 # previews). Excluded when auto-picking an author's frontier model so the
 # dropdown keeps e.g. x-ai/grok-4.3, not x-ai/grok-build-0.1 / grok-mini.
@@ -886,6 +896,17 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
     models = _filter_catalog_models(_orb.cached_models(), slot=s)
     by_id = {m["id"]: m for m in models}
+    # Apply the same operator filters to cache-independent contenders.  A
+    # stale cache must not hide an explicitly requested creative comparison,
+    # but a denylist, provider/allowlist restriction, or REQUIRE_JSON contract
+    # must still win.
+    supplemental_creative_by_id = {
+        m["id"]: m
+        for m in (
+            _filter_catalog_models(list(_PINNED_CREATIVE_CONTENDER_ROWS), slot=s)
+            if s == "a" else []
+        )
+    }
 
     # Tier 1 lead: the per-slot env override iff present in the filtered cache,
     # else the recommended constant ("if set + present, else recommended").
@@ -918,6 +939,15 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     allowlist = (os.environ.get("OTR_OPENROUTER_MODEL_ALLOWLIST") or "").strip()
     provider_filter = (os.environ.get("OTR_OPENROUTER_PROVIDER_FILTER") or "").strip()
     explicit_narrowing = bool(allowlist or provider_filter)
+
+    # Operator-requested creative contenders.  HY3 is temporary through
+    # 2026-07-21.  Keep both selectable when a cache predates their listing,
+    # without bypassing the filters above; these are options, never defaults.
+    if s == "a" and not explicit_narrowing:
+        for row in _PINNED_CREATIVE_CONTENDER_ROWS:
+            mid = row["id"]
+            if mid in by_id or mid in supplemental_creative_by_id:
+                _add(mid)
     if not explicit_narrowing:
         for mid in OPENROUTER_FRONTIER_LATEST:
             _add(mid)
@@ -943,9 +973,18 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
     if not models:
         # Cold / fully-filtered cache: keep the recommended default selectable
-        # and flag that discovery is empty so the operator runs a refresh.
+        # and flag that discovery is empty so the operator runs a refresh.  An
+        # eligible pinned contender remains visible so a stale cache cannot
+        # erase an operator-requested comparison lane.
+        cold_choices = [lead]
+        if s == "a" and not explicit_narrowing:
+            for row in _PINNED_CREATIVE_CONTENDER_ROWS:
+                mid = row["id"]
+                if mid in supplemental_creative_by_id and mid not in cold_choices:
+                    cold_choices.append(mid)
+        cold_choices.append(OPENROUTER_EMPTY_CACHE_SENTINEL)
         return _lead_with_sentinel(
-            OPENROUTER_ENABLE_SENTINEL, [lead, OPENROUTER_EMPTY_CACHE_SENTINEL]
+            OPENROUTER_ENABLE_SENTINEL, cold_choices
         )
     return _lead_with_sentinel(OPENROUTER_ENABLE_SENTINEL, ordered)
 
