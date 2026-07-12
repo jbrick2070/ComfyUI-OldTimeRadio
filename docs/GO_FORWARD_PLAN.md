@@ -37,24 +37,25 @@ calls, $0. Judgment logs (local, gitignored):
 This window was DOCS-ONLY (Lesson 10): the 56SOL window held the code and the GPU
 throughout. Nothing was staged but the plan doc.
 
-**TWO GATES BEFORE ANY CODE:**
+**D-1 RESOLVED -- NO RIGHTS GATE (operator ruling, 2026-07-12).** The roll does NOT
+filter on rights and NO `rights_class` field ships. The LLM may write in whatever style
+it wants; understanding the terms under which AI output is used is the END USER's
+responsibility. We cannot have the code -- or a model -- hold the legal IP status of
+every source everywhere. This OVERRIDES R1 s2's rights exclusion and the r2 panel's
+allowlist argument. Consequences: `shakespeare` is roll-eligible like any runnable
+bank; **`banks.json` is NOT touched** (no field, no parser change, no synthetic-builder
+migration, no schema-doc churn); eligibility is exactly TWO filters -- runnable +
+request-compatible; `runnable` stays the only curation surface. The repo's existing
+disclosure surfaces (credits source line, HUD origin label) are unchanged.
 
-1. **D-1 -- OPERATOR RATIFICATION (the one thing only Jeffrey can decide).** The roll
-   needs a rights FACT per bank, because `guide_ref` is free prose and a roll must not
-   decide rights by grepping English. Proposed: new REQUIRED `rights_class` field on
-   every bank row, enum `{unrestricted, noncommercial, unknown}`, with
-   `shakespeare = "noncommercial"` (its guide_ref already says CC BY-NC 3.0) and the
-   other ten rows `"unrestricted"`. The unattended roll draws ONLY from
-   `"unrestricted"`; a manual pick of any bank is unaffected. **Ratify or amend.**
-2. **Coder slot + a re-grounded base.** `banks.json` is the hottest collision surface
-   in the repo and this chunk adds a required field to every row -- it lands only in a
-   window that OWNS banks.json, and the contender windows must be told the field
-   exists. The base moved twice during planning alone (`11f6214a` -> `9d8265c0` ->
-   `efb6b6ad`): claim the slot, record the real HEAD, re-read every pin, THEN edit.
+**ONE GATE BEFORE ANY CODE: the coder slot + a re-grounded base.** The base moved twice
+during planning alone (`11f6214a` -> `9d8265c0` -> `efb6b6ad`) and the writer's gates
+shifted with it: claim the slot, record the real HEAD, re-read every pin, THEN edit.
+The only collision surface left is `OTR_LedgerScriptWriter.py` (the lane-spec rip).
 
-Build = 3 pushed green sub-commits (lane-spec rip -> rights_class registry -> the roll
-itself) + a closeout, then 3 x 30-word live legs (seeded inline, seeded dispatched,
-unseeded-with-replay-proof). Design B (visual pack roll) stays parked until A lands.
+Build = 2 pushed green sub-commits (lane-spec rip -> the roll itself) + a closeout, then
+3 x 30-word live legs (seeded inline, seeded dispatched, unseeded-with-replay-proof).
+Design B (visual pack roll) stays parked until A lands.
 
 **QUEUED HARNESS DEFECT (found by the r3 panel, NOT a live failure -- so it belongs
 here, not in PROD_BUG_LOG):** `scripts/otr_render_watchdog.ps1` only recognizes

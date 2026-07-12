@@ -11,17 +11,33 @@ re-litigated.
 widget, value, env var, or code ships in this change.
 **Binding:** `CLAUDE.md`, `docs/PRODUCTION_SPRINT_LESSONS.md`.
 
-## PRECONDITIONS (both must be true before the first edit)
+## D-1 RESOLVED -- NO RIGHTS GATE (operator ruling, 2026-07-12)
 
-1. **D-1 operator ratification of the `rights_class` values** (s5). They are a
-   legal declaration the operator owns; the build does not invent them.
-2. **Coder slot + a re-grounded base.** All line pins below were taken at
-   `11f6214a`. The base has moved TWICE during this planning window alone
-   (`11f6214a` -> `9d8265c0` -> `efb6b6ad`), and the writer's gates have shifted
-   with it. This is a standing instruction, not a one-off: **claim the slot in
-   `docs/GO_FORWARD_PLAN.md`, record the actual HEAD, re-read EVERY pin below at
-   that HEAD, and only then edit or compute qualification seeds.** `banks.json` is
-   the hottest collision surface in the repo; this chunk owns it or does not run.
+**The roll does NOT filter on rights, and no `rights_class` field ships.** Operator:
+the LLM may write in whatever style it wants; understanding the terms under which AI
+output is used is the END USER's responsibility, not a filter inside the writer. This
+OVERRIDES R1 s2's rights-class exclusion and the r2 panel's affirmative-allowlist
+argument (operator directives win over any doc, panel, or memory that disagrees).
+
+Consequences -- the plan gets SMALLER:
+
+- `shakespeare` is roll-eligible like every other runnable bank.
+- **`banks.json` is NOT touched.** No new registry field, no parser change, no
+  synthetic-row-builder migration, no schema-doc churn. The registry-collision hazard
+  that dominated r2/r3 is GONE, and the old sub-commit 2 is deleted.
+- Eligibility is now exactly TWO filters: **runnable** + **request-compatible**.
+- The disclosure surfaces the repo already ships (credits source line, HUD origin
+  label, machine-generated disclosure) are unchanged and remain the honest signal.
+
+## PRECONDITION (one, before the first edit)
+
+**Coder slot + a re-grounded base.** All line pins below were taken at `11f6214a`.
+The base has moved TWICE during this planning window alone (`11f6214a` -> `9d8265c0`
+-> `efb6b6ad`), and the writer's gates have shifted with it. Standing instruction:
+**claim the slot in `docs/GO_FORWARD_PLAN.md`, record the actual HEAD, re-read EVERY
+pin below at that HEAD, and only then edit or compute qualification seeds.** The
+collision surface is now just `OTR_LedgerScriptWriter.py` (the lane-spec rip), not
+the registry.
 
 ---
 
@@ -46,9 +62,8 @@ widget, value, env var, or code ships in this change.
   `scifi_sonnet` (:386-404) each reject `target_words` outside **30-900** -- but
   from INSIDE the runner, after source work. `original_codex56sol` treats
   target_words as ADVISORY. **So "no hook = compatible" is FALSE today.**
-- **No rights field exists.** `SourceBank` carries `runnable` + free-prose
-  `guide_ref`; shakespeare's CC BY-NC status is an English sentence
-  (`banks.json:133`). New keys require `_parse_bank` + the known-keys frozenset.
+- **No rights field exists, and none is added** (D-1). `runnable` remains the ONLY
+  curation surface, exactly as R1 s4 wanted.
 - **The validator is a LENGTH check** (`widget_vector_drift`,
   `_otr_workflow_validator.py:158-172`); the guardrail pins `wv[23] ==
   "science_news"` and `wv[23] in list_bank_ids()`
@@ -79,10 +94,6 @@ defaults, exactly as on a manual pick. (Replay tooling is FUTURE work, not a wir
 consumer.) DERIVED (registry x request x seed); zero LLM calls. Fixed at submission,
 carried through every refine pass, frozen with the ledger. **Absent -- not null, not
 a stub -- on a manual pick.**
-
-**`SourceBank.rights_class`** -- writer: `nodes/story_packs/banks.json` (JSON owns
-config). Consumer: `_otr_bank_roll` only. AUTHORED (a legal declaration the operator
-owns). Static, validated at load.
 
 **`_otr_lane_specs.LANE_SPECS`** -- the ONE lane authority: dispatched-lane runners
 (lazy), their compatibility policy, and the inline-pipeline set. Consumers: the
@@ -219,10 +230,10 @@ def resolve_bank_selection(requested, request_factory, carried=None,
    specific bank: pin the bank), filter, draw. Empty pool -> `BankRollError` naming
    every filter that removed candidates and how many each removed.
 
-**Eligibility (three filters, each counted for the error message):**
-runnable -> `rights_class == "unrestricted"` (an AFFIRMATIVE allowlist) ->
-`is_roll_compatible(bank, req)`. Filtering BEFORE the draw is legal; a bank that
-fails AFTER the draw fails LOUD -- never a silent re-roll.
+**Eligibility (TWO filters, each counted for the error message):**
+`bank.runnable is True` -> `is_roll_compatible(bank, req)`. That is the whole pool
+(D-1: no rights filter). Filtering BEFORE the draw is legal; a bank that fails AFTER
+the draw fails LOUD -- never a silent re-roll.
 
 **Seed:**
 
@@ -291,39 +302,18 @@ _LANES.assert_supported(_source_bank_row, ...)   # REPLACES the hardcoded :3351-
 - Receipt stamped beside `meta["source_bank"]` (:3634) FROM `_bank_roll_receipt`.
 - INPUT_TYPES (:2847-2862): choices become `[SENTINEL] + list(list_bank_ids())`;
   default stays `"science_news"`; the tooltip is REWRITTEN (the current one claims
-  other banks "are not yet runnable" -- ten of them are) and documents the roll,
-  `OTR_BANK_SEED`, and the rights exclusion. **No new widget, no positional shift**
-  -- `widgets_values` law (BUG-LOCAL-097) is not engaged, and the commit message says
-  so explicitly.
+  other banks "are not yet runnable" -- ten of them are) and documents the roll and
+  `OTR_BANK_SEED`. **No new widget, no positional shift** -- `widgets_values` law
+  (BUG-LOCAL-097) is not engaged, and the commit message says so explicitly.
 
-### A4 -- registry: `rights_class`
+### A4 -- registry: NOTHING (D-1)
 
-REQUIRED string on every bank row, enum `{"unrestricted", "noncommercial", "unknown"}`:
+`banks.json`, `_otr_story_routing`, and the synthetic row builders are **not touched**.
+No `rights_class`, no parser change, no schema-doc churn. `runnable` remains the only
+curation surface. This is the operator ruling, and it also removes the registry
+collision hazard that made the slot requirement so heavy.
 
-- `nodes/story_packs/banks.json` -- **all eleven rows, audited from the file**, never
-  from a remembered list.
-- `_otr_story_routing`: `SourceBank.rights_class` -- **declared BEFORE the first
-  defaulted field** (`runnable: bool = False`, :115-116), or the dataclass will not
-  compile -- plus `_parse_bank` validation (MISSING or unknown -> `RegistryValidationError`;
-  both cases tested) and the known-keys frozenset (:196).
-- **Synthetic row builders update in the SAME change or the suite reddens on load:**
-  `tests/test_story_routing_stage2.py:36-45` and `tests/test_source_payload_chunk3.py:212-221`.
-- Doc surfaces that would otherwise teach invalid rows:
-  `docs/multimodal-story-schema/schema-examples/banks.json`, `STAGE2_SUBPLAN.md:57-66`,
-  `docs/SOURCE_BANK_GUIDE.md:289-295`.
-- Roll policy: **only `"unrestricted"` is eligible.** `"unknown"` fails closed -- the
-  honest state for a bank whose rights nobody has ruled on.
-
-Required, not optional-with-default: a bank that forgets to declare rights would
-silently join the *unattended* roll pool, and that failure is legal, not technical.
-This is a rights FACT, not the auto-roll capability flag R1 s4 rules out -- there is
-no per-bank "may be rolled" toggle, and `runnable` remains the curation surface.
-
-**D-1 (operator ratifies before the chunk lands):** proposed
-`shakespeare = "noncommercial"` (its guide_ref already says CC BY-NC), all other ten
-rows `"unrestricted"`. Ratify or amend.
-
-### A5 -- build order (three green, PUSHED sub-commits + a closeout; do not interleave)
+### A5 -- build order (two green, PUSHED sub-commits + a closeout; do not interleave)
 
 Each sub-commit: focused tests -> full Windows suite -> Bug Bible -> commit -> push ->
 verify `HEAD == origin`. If a sub-commit is not green, STOP; do not stack on it.
@@ -335,16 +325,13 @@ verify `HEAD == origin`. If a sub-commit is not green, STOP; do not stack on it.
    `tests/test_custom_runner_truthfulness.py:35-45`,
    `tests/test_fable2_runner_ladders.py:471-484`,
    `tests/test_original_codex56sol_registry.py:12-26` -- or the suite is red before
-   step 3 exists. Also update `docs/SOURCE_BANK_PREFLIGHT.md:217-220`, whose normative
-   checklist still tells a builder to register runners in the table being deleted, and
-   mark the now-invalid bank-row examples in the four engine-spec docs HISTORICAL.
+   step 2 exists. Also update `docs/SOURCE_BANK_PREFLIGHT.md:217-220`, whose normative
+   checklist still tells a builder to register runners in the table being deleted.
    **This step is valid-request/success-path neutral** -- NOT "behavior-neutral":
    unsupported codex/gemini/sonnet requests now fail EARLIER (at the gate rather than
    inside the runner), with the identical native type and message.
-2. **`rights_class`**: registry + parser + BOTH synthetic builders + the schema doc
-   surfaces (suite green).
-3. **`_otr_bank_roll`** + the writer seam + INPUT_TYPES + the new tests.
-4. **Closeout commit** (after qualification): evidence, `docs/PROD_BUG_LOG.md` entries
+2. **`_otr_bank_roll`** + the writer seam + INPUT_TYPES + the new tests.
+3. **Closeout commit** (after qualification): evidence, `docs/PROD_BUG_LOG.md` entries
    for anything that actually failed a LIVE leg, the sprint receipt, GO_FORWARD_PLAN,
    handoff. Pushed. (PRODUCTION_SPRINT_LESSONS:138-139.)
 
@@ -388,20 +375,17 @@ New `tests/test_bank_roll_design_a.py`:
 - **h. refine truth** -- with the widget at `Off` but `OTR_STORY_REFINE_BAR` forcing
   `effective_passes >= 2`, dispatched lanes are excluded from the pool (the widget
   string alone would have admitted them).
-- **i. eligibility** -- shakespeare excluded (rights); `custom_source_bank` excluded
-  (runnable); `rights_class="unknown"` excluded; with refine effective the pool is
-  **"rights-eligible runnable banks on INLINE pipelines"** derived from
-  `INLINE_PIPELINES` (NOT the phrase "the legacy inline banks" -- shakespeare is
-  inline and rights-excluded); at 1000 words codex/gemini/sonnet are excluded while a
-  DIRECT pick still fails loud.
+- **i. eligibility** -- `custom_source_bank` excluded (runnable); **`shakespeare` IS
+  eligible** (D-1: no rights filter); with refine effective the pool is exactly the
+  **runnable banks on INLINE pipelines**, derived from `INLINE_PIPELINES` (never a
+  hard-coded list); at 1000 words codex/gemini/sonnet are excluded while a DIRECT pick
+  still fails loud.
 - **j. sentinel + nonblank `source_ref` raises** before any RNG call or fetch.
 - **k. empty pool raises**, naming every filter that emptied it and its count.
 - **l. seed hygiene** -- malformed / negative / >= 2**32 `OTR_BANK_SEED` raises
   `BankRollError` (one loud type); `resolve_seed` reads the SUPPLIED mapping.
-- **l2. the direct-pick exemption** -- a MANUAL `shakespeare` pick is still ALLOWED and
-  stamps NO receipt. The rights rule promises this; nothing currently proves it.
-- **m. registry** -- every row declares a valid `rights_class` (audited from the file,
-  no hard-coded count); missing AND unknown values raise `RegistryValidationError`.
+- **m. no registry change** -- `banks.json` and `_otr_story_routing` are byte-identical
+  after this chunk (guarded by the same no-diff discipline as the workflow JSON).
 - **n. lane authority** -- every `LANE_SPECS` row resolves to a callable;
   `runner_for()` returns None for a known inline pipeline and RAISES for an unknown
   one; the telemetry membership branch (:1684) still classifies custom vs legacy
@@ -483,7 +467,7 @@ legs are polled directly.
 SPRINT RECEIPT: PASS | FAIL
 scope: randomizer rolls Design A (source-bank roll)
 authoritative_writers: _otr_bank_roll.resolve_bank_selection (meta.bank_roll);
-                       banks.json (rights_class); _otr_lane_specs.LANE_SPECS (dispatch + compat)
+                       _otr_lane_specs.LANE_SPECS (dispatch + compat)
 durable_artifacts: meta.bank_roll in the episode ledger
 canonical_workflow_hash:
 focused_tests:
