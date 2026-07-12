@@ -45,11 +45,17 @@ trained.
 1. FAIL-OPEN. Every telemetry write wrapped so an exception logs one
    warning and continues the render. Telemetry can be lossy; renders
    cannot. A telemetry-caused lane abort is a P0 self-inflicted bug.
-2. SIDECAR PATH, never the episode ledger. Default root
-   `otr/telemetry/<bank>/<YYYY-MM-DD>/` (JSONL append + blobs/ subdir).
-   No reads or writes to episode ledger files from the telemetry path
-   (WinError 5 per-beat-save contention class). Append-only, buffered,
-   no fsync-per-record.
+2. PER-EPISODE, SEPARATE FILES (operator directive 2026-07-12: telemetry
+   writes to the episodes folder). Root = `otr/episodes/<ep>/telemetry/`
+   (`llm_calls.jsonl` append + `blobs/` subdir), self-contained per
+   episode so records travel/delete with their episode and lineage
+   grouping is automatic. The telemetry path NEVER opens the episode
+   ledger files themselves -- its own file handles only (the WinError 5
+   per-beat-save contention class applies to ledger files; the standing
+   no-DC-reads-mid-run discipline covers the whole episode dir).
+   Append-only, buffered, no fsync-per-record. Blob dedupe is
+   within-episode only (cross-episode dedupe forfeited by design; volume
+   is ~1 MB/episode, trivial).
 3. PERF BUDGET: < 0.5% of call wall time. Given 100-200 s NF4 decodes and
    millisecond-scale hash+append, expected real cost is < 0.1%. Assert
    order-of-magnitude in a test with a stub generate fn (telemetry
@@ -70,15 +76,16 @@ trained.
 
 ## Acceptance
 
-- 30-word live smoke: episode renders normally, telemetry dir contains
-  one record per LLM attempt with resolvable blob hashes, and a forced
-  telemetry-write failure (e.g. read-only dir) still yields a green
-  render with one warning line.
+- 30-word live smoke: episode renders normally,
+  `otr/episodes/<ep>/telemetry/` contains one record per LLM attempt with
+  resolvable blob hashes (Test-Path the jsonl before declaring success),
+  and a forced telemetry-write failure (e.g. read-only dir) still yields
+  a green render with one warning line.
 - Regression suite + Bug Bible green. New tests: fail-open behavior,
   OTR_TEST_MODE default-off, record schema round-trip, dedupe store
   hit path, perf budget stub test.
-- Retention note in the README of the telemetry dir (safe to delete any
-  day-folder; blobs are re-derivable only from future runs).
+- Retention: telemetry travels with its episode -- deleting an episode
+  folder deletes its telemetry; no separate cleanup surface.
 
 ## Non-goals
 
