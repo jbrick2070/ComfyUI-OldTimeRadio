@@ -366,3 +366,8 @@ leaving them for live integration:
     emit optional per-row marker booleans. Type those markers and validate every
     asserted marker against the top-level authority; do not let redundant
     `null` markers cause a shape-only failure or become a second truth.
+17. Enumerate common semantic aliases for every Python-owned manifest enum and
+    normalize them at the typed boundary. Values such as `desk_operator`,
+    `shot_end`, and `resolution` carry no conflicting authored meaning when the
+    canonical downstream values are `character`, `continue`, and `closing`;
+    unknown values must still fail loudly.

@@ -51,6 +51,71 @@ CastRole = Annotated[
 ]
 
 
+def _manifest_speaker_role(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    lowered = value.strip().lower().replace("-", "_").replace(" ", "_")
+    if lowered in {"announcer", "narrator"}:
+        return "announcer"
+    if lowered in {"character", "caller", "desk_operator"}:
+        return "character"
+    return value
+
+
+def _manifest_boundary(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    lowered = value.strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "start": "shot_start",
+        "scene_start": "shot_start",
+        "shot_start": "shot_start",
+        "beat_start": "beat_start",
+        "continue": "continue",
+        "continuation": "continue",
+        "end": "continue",
+        "beat_end": "continue",
+        "shot_end": "continue",
+        "scene_end": "continue",
+    }
+    return aliases.get(lowered, value)
+
+
+def _manifest_arc_phase(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    lowered = value.strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "opening": "opening",
+        "setup": "opening",
+        "orientation": "opening",
+        "rising": "rising",
+        "confrontation": "rising",
+        "development": "rising",
+        "reveal": "reveal",
+        "discovery": "reveal",
+        "closing": "closing",
+        "resolution": "closing",
+        "final": "closing",
+        "ending": "closing",
+    }
+    return aliases.get(lowered, value)
+
+
+ManifestSpeakerRole = Annotated[
+    Literal["announcer", "character"],
+    BeforeValidator(_manifest_speaker_role),
+]
+ManifestBoundary = Annotated[
+    Literal["shot_start", "beat_start", "continue"],
+    BeforeValidator(_manifest_boundary),
+]
+ManifestArcPhase = Annotated[
+    Literal["opening", "rising", "reveal", "closing"],
+    BeforeValidator(_manifest_arc_phase),
+]
+
+
 class ConstraintDraw(StrictModel):
     deck_id: str
     deck_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -202,9 +267,9 @@ class ManifestLine(StrictModel):
     scene_id: str
     char_id: str
     speaker: str
-    speaker_role: Literal["announcer", "character"]
-    boundary: Literal["shot_start", "beat_start", "continue"]
-    arc_phase: Literal["opening", "rising", "reveal", "closing"]
+    speaker_role: ManifestSpeakerRole
+    boundary: ManifestBoundary
+    arc_phase: ManifestArcPhase
     intent: str
     orientation: bool | None = None
     clue: bool | None = None

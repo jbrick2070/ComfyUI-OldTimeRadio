@@ -125,3 +125,34 @@ def test_manifest_optional_landmark_markers_are_typed_and_checked():
                   *manifest.lines[1:]],
     })
     assert "asserts reveal" in lane._validate_manifest(score, bad)
+
+
+def test_manifest_python_owned_enums_normalize_common_model_aliases():
+    line = lane.ManifestLine.model_validate({
+        "line_id":"l1", "beat_id":"b1", "shot_id":"s1",
+        "scene_id":"scene1", "char_id":"desk_operator",
+        "speaker":"Evelyn", "speaker_role":"desk_operator",
+        "boundary":"shot_end", "arc_phase":"resolution",
+        "intent":"Close the recovered-item call",
+    })
+    assert line.speaker_role == "character"
+    assert line.boundary == "continue"
+    assert line.arc_phase == "closing"
+
+
+def test_manifest_unknown_enum_value_still_fails_loud():
+    data = {
+        "line_id":"l1", "beat_id":"b1", "shot_id":"s1",
+        "scene_id":"scene1", "char_id":"c1", "speaker":"Caller",
+        "speaker_role":"sound_effect", "boundary":"somewhere",
+        "arc_phase":"epilogue", "intent":"Speak",
+    }
+    try:
+        lane.ManifestLine.model_validate(data)
+    except ValueError as exc:
+        message = str(exc)
+        assert "speaker_role" in message
+        assert "boundary" in message
+        assert "arc_phase" in message
+    else:
+        raise AssertionError("unknown manifest enums must not be accepted")
