@@ -50,7 +50,7 @@ class PossibilityCard(StrictModel):
     title_seed: str
     premise: str
     desk_operator: FictionalName
-    callers: list[FictionalName] = Field(min_length=2, max_length=4)
+    callers: list[FictionalName] = Field(max_length=4)
     lost_objects: list[str] = Field(min_length=3, max_length=6)
     acoustic_device: str
     shared_cause: str

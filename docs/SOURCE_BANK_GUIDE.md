@@ -340,3 +340,7 @@ leaving them for live integration:
 10. Say which lane-local provenance may remain after a shared generic receipt
     migration, and make clear that it is evidence rather than a second source
     of shared truth.
+11. Assign each invariant to the artifact that owns it. Do not require an
+    exploratory slate card to satisfy downstream cast/thread completeness when
+    a later truth-map or manifest artifact is the actual owner; premature
+    minima consume repairs without improving the final contract.
