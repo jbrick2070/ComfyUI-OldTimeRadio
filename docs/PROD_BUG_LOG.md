@@ -555,3 +555,13 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - bible-worthy: yes -- ordered first-owner reconciliation is safe only after the full typed graph is available, not as speculative raw JSON cleanup
 - confidence: HIGH
 - status: FIXED IN CODE / FULL SUITE + BUG BIBLE GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION
+
+## PBUG-20260712-11 -- independent P5 repairs could not compose
+- surfaced: deterministic canonical 120-word `original_codex56sol` c03 requalification after `145e955b`, prompt `de6f4c1e-b021-4106-871e-8e4a3673bfa4`, E4B creative + Mistral technical, 2026-07-12
+- symptom: P5 again returned a reopened-shot topology plus duplicate clue ownership. The topology guard was reached first but declined to apply because its helper demanded that the entire score, including the independent duplicate-clue invariant, already validate. Both the base and typed-repair responses therefore failed closed on the first reported topology error after 12:32.
+- root cause: each safe normalizer was implemented as an all-or-nothing full-score repair. A valid artifact containing two independent, non-authoritative mechanical defects could not reach either repair's success path; the post-validator handled only the first reported defect rather than a bounded composition of disjoint projections.
+- fix: split each P5 helper into a narrow projector and a full-validation wrapper. At the typed `BroadcastScore` acceptance boundary, apply at most the two proven-safe projections in deterministic order (reopened shot ownership, then duplicate clue ownership), preserve all authored prose/beat order/first clue placements, and run the complete grounded score validator only after the bounded composition. Any remaining or ambiguous defect remains a normal LLM failure.
+- verify idea: create one base score and one typed-repair score with both A/B/A topology and a later duplicate clue, plus an unrelated forbidden phrase on the base so the typed call is mandatory. Disable raw cleanup and require the accepted score to retain beat order, mint the collision-safe return shot, keep first clue ownership, remove only the later duplicate, and use exactly one repair model call.
+- bible-worthy: yes -- independently safe deterministic transformations must compose before a global validator can judge their shared result
+- confidence: HIGH
+- status: FIXED IN CODE / FULL SUITE + BUG BIBLE GREEN / AWAITING SAME-SEED LIVE 120-WORD C03 REQUALIFICATION

@@ -422,17 +422,17 @@ def _repair_rules(pass_id: str, error: Any) -> str:
     return rules
 
 
-def _repair_duplicate_score_clues(
+def _project_duplicate_score_clues(
     score: BroadcastScore,
     truth: AudibleTruthMap,
-    grounding_contract: GroundingContract | None = None,
 ) -> BroadcastScore | None:
-    """Remove duplicate clue references without inventing placement.
+    """Project duplicate clue references without judging the full graph.
 
     This repair is safe only when the score already covers the exact truth-map
     clue set. The first authored placement wins; later duplicate references are
-    removed in beat order. Missing or unknown clues remain semantic failures
-    for the LLM repair path.
+    removed in beat order. A caller must run the complete score validator after
+    applying this narrow projection; missing or unknown clues remain LLM
+    failures.
     """
     expected = {clue.clue_id for clue in truth.audible_clues}
     assigned = [clue_id for beat in score.beats
@@ -449,24 +449,32 @@ def _repair_duplicate_score_clues(
                 seen.add(clue_id)
                 unique_ids.append(clue_id)
         beat.line_intent.clue_ids = unique_ids
+    return repaired
+
+
+def _repair_duplicate_score_clues(
+    score: BroadcastScore,
+    truth: AudibleTruthMap,
+    grounding_contract: GroundingContract | None = None,
+) -> BroadcastScore | None:
+    """Return only a fully valid duplicate-clue projection."""
+    repaired = _project_duplicate_score_clues(score, truth)
+    if repaired is None:
+        return None
     if _validate_score(repaired, truth, grounding_contract) is not None:
         return None
     return repaired
 
 
-def _repair_score_beat_topology(
-    score: BroadcastScore,
-    truth: AudibleTruthMap,
-    grounding_contract: GroundingContract | None = None,
-) -> BroadcastScore | None:
-    """Split reopened shot runs without changing authored narrative order.
+def _project_score_beat_topology(score: BroadcastScore) -> BroadcastScore | None:
+    """Project reopened shot runs without judging the full graph.
 
     ``beats`` is chronological and compiles directly into spoken-line order,
     so a structural repair must never sort it.  For a model topology such as
     A, B, A, clone A's mechanical shot row under a collision-safe ID and retag
     only the later A run.  Beat order, IDs, prose, speakers, clues, phases, and
-    landmark order remain unchanged.  The full score graph must validate after
-    the split or the normal typed LLM repair remains authoritative.
+    landmark order remain unchanged. A caller must run full graph validation
+    after this narrow projection.
     """
     shot_by_id = {shot.shot_id: shot for shot in score.shots}
     if len(shot_by_id) != len(score.shots):
@@ -512,6 +520,18 @@ def _repair_score_beat_topology(
     if not changed:
         return None
     repaired.shots.extend(cloned_shots)
+    return repaired
+
+
+def _repair_score_beat_topology(
+    score: BroadcastScore,
+    truth: AudibleTruthMap,
+    grounding_contract: GroundingContract | None = None,
+) -> BroadcastScore | None:
+    """Return only a fully valid reopened-shot projection."""
+    repaired = _project_score_beat_topology(score)
+    if repaired is None:
+        return None
     if _validate_score(repaired, truth, grounding_contract) is not None:
         return None
     return repaired
@@ -1025,29 +1045,28 @@ def _validate_score_attempt(
     only mechanical shot ownership and is accepted only when the complete
     grounded score validates again.
     """
-    structural_error = _validate_score(score, truth, grounding_contract)
-    repaired: BroadcastScore | None = None
-    repaired_kind = ""
-    if structural_error == _SCORE_TOPOLOGY_ERROR:
-        repaired = _repair_score_beat_topology(
-            score, truth, grounding_contract,
-        )
-        repaired_kind = "shot topology"
-    elif structural_error == _SCORE_DUPLICATE_CLUE_ERROR:
-        repaired = _repair_duplicate_score_clues(
-            score, truth, grounding_contract,
-        )
-        repaired_kind = "duplicate clue ownership"
-    if repaired is not None:
+    repaired_kinds: list[str] = []
+    for _ in range(2):
+        structural_error = _validate_score(score, truth, grounding_contract)
+        repaired: BroadcastScore | None = None
+        repaired_kind = ""
+        if structural_error == _SCORE_TOPOLOGY_ERROR:
+            repaired = _project_score_beat_topology(score)
+            repaired_kind = "shot topology"
+        elif structural_error == _SCORE_DUPLICATE_CLUE_ERROR:
+            repaired = _project_duplicate_score_clues(score, truth)
+            repaired_kind = "duplicate clue ownership"
+        if repaired is None:
+            break
         score.shots = repaired.shots
         score.beats = repaired.beats
+        repaired_kinds.append(repaired_kind)
+    structural_error = _validate_score(score, truth, grounding_contract)
+    if repaired_kinds and structural_error is None:
         log.info(
             "[original_codex56sol] P5 normalized safe %s at the "
             "schema-validated attempt boundary",
-            repaired_kind,
-        )
-        structural_error = _validate_score(
-            score, truth, grounding_contract,
+            " + ".join(repaired_kinds),
         )
     if structural_error is not None:
         return structural_error

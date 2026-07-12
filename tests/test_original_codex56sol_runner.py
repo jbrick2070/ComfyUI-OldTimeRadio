@@ -1119,6 +1119,65 @@ def test_p5_typed_repair_response_gets_schema_boundary_clue_projection(
     ]
 
 
+def test_p5_schema_boundary_composes_topology_and_clue_projections(
+    tmp_path, monkeypatch,
+):
+    responses = _responses()
+    responses[4]["shots"].insert(1, {
+        "shot_id": "shot_03", "scene_id": "scene_01",
+        "description": "The return shelf across the room.",
+        "visual_prompt": "A return shelf opposite the radio desk.",
+    })
+    responses[4]["beats"][1]["shot_id"] = "shot_03"
+    responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
+    safe_repair_response = json.loads(json.dumps(responses[4]))
+    responses[4]["premise"] = "Kill the clue."
+    responses.insert(5, safe_repair_response)
+    monkeypatch.setattr(
+        lane, "_repair_score_collection_placement",
+        lambda _raw, _truth: None,
+    )
+    queued = iter(responses)
+    calls = []
+
+    def generate(_messages, **_kwargs):
+        calls.append(1)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p5_composed_projections", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p5_composed_projections",
+    )
+
+    accepted_score = (
+        led.data["meta"]["original_codex56sol"]
+        ["accepted_artifacts"]["broadcast_score"]
+    )
+    assert len(calls) == 9
+    assert [beat["shot_id"] for beat in accepted_score["beats"]] == [
+        "shot_01", "shot_03", "shot_01_return_2", "shot_02", "shot_02",
+    ]
+    assert [beat["line_intent"]["clue_ids"]
+            for beat in accepted_score["beats"]] == [
+        [], ["q1"], ["q2", "q3"], [], [],
+    ]
+
+
 def test_python_manifest_is_repeatable_closed_and_spoiler_safe():
     score = lane.BroadcastScore.model_validate(_fixtures()["score"])
     first = lane._compile_manifest(score)

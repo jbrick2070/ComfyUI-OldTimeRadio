@@ -245,6 +245,21 @@ Keep raw cleanup limited to defects that prevent parsing at all. Test each
 typed repair with that raw path disabled, including a typed-repair response,
 so a pre-parse helper cannot falsely appear to qualify the production guard.
 
+## 19. Compose independent safe projections before global validation
+
+Do not make each narrow mechanical repair demand that every other invariant is
+already clean. A score can contain two independently provable defects, such as
+a reopened shot run and a duplicate clue reference. Factor a projector from its
+full-validation wrapper, apply only a small declared set of disjoint projectors
+in deterministic order, and then run the complete graph, grounding, and safety
+checks once over their shared result.
+
+The composition must be bounded, must preserve authored content and chronology,
+and must remain fail-closed for an unknown, missing, ambiguous, or still-invalid
+condition. Add a regression where the base and typed-repair responses contain
+the complete defect combination; testing each repair in isolation is not
+evidence that the production boundary can combine them.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:
