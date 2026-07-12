@@ -331,7 +331,10 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "once beats move to a different shot_id, never return to an "
             "earlier shot_id. Preserve orientation-before-reveal-before-closure. "
             "Never emit schema-path pseudo-fields such as `scenes[*].env` or "
-            "`shots[*].visual_prompt` at the top level. Every line_intent MUST "
+            "`shots[*].visual_prompt` at the top level. "
+            "scenes, shots, and beats MUST be separate top-level arrays. "
+            "Never place shots inside scenes or beats inside shots. "
+            "Every line_intent MUST "
             "have exactly the keys intent, arc_phase, and clue_ids. clue_ids "
             "MUST always be an array of existing clue IDs, or [] when there "
             "is no clue; singular clue_id is forbidden. Cast MUST include one "
@@ -451,6 +454,71 @@ def _repair_truth_map_collection_placement(
     return repaired
 
 
+def _repair_score_collection_placement(
+    failed_output: str,
+    truth: AudibleTruthMap,
+) -> BroadcastScore | None:
+    """Normalize scene/shot/beat placement without rewriting authored values."""
+    try:
+        data = parse_first_json_object(failed_output)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    scenes = data.get("scenes")
+    if not isinstance(scenes, list) or not all(
+        isinstance(row, dict) for row in scenes
+    ):
+        return None
+
+    changed = False
+    nested_shots: list[Any] = []
+    for scene in scenes:
+        if "shots" not in scene:
+            continue
+        value = scene["shots"]
+        if not isinstance(value, list):
+            return None
+        del scene["shots"]
+        nested_shots.extend(value)
+        changed = True
+    top_shots = data.get("shots")
+    if top_shots is None:
+        top_shots = []
+    if not isinstance(top_shots, list):
+        return None
+    data["shots"] = top_shots if top_shots else nested_shots
+    if not all(isinstance(row, dict) for row in data["shots"]):
+        return None
+
+    nested_beats: list[Any] = []
+    for shot in data["shots"]:
+        if "beats" not in shot:
+            continue
+        value = shot["beats"]
+        if not isinstance(value, list):
+            return None
+        del shot["beats"]
+        nested_beats.extend(value)
+        changed = True
+    top_beats = data.get("beats")
+    if top_beats is None:
+        top_beats = []
+    if not isinstance(top_beats, list):
+        return None
+    data["beats"] = top_beats if top_beats else nested_beats
+
+    if not changed:
+        return None
+    try:
+        repaired = BroadcastScore.model_validate(data)
+    except ValidationError:
+        return None
+    if _validate_score(repaired, truth) is not None:
+        return None
+    return repaired
+
+
 def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
           seam: str, inputs: Mapping[str, Any], schema: type[BaseModel],
           scheduler: Any, journal: list[dict], tokens: int = 2400,
@@ -469,6 +537,7 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         attempts.append(hashlib.sha256(str(raw).encode()).hexdigest())
         return raw
     def repair(*, original_prompt, failed_output, error):
+        effective_error: Any = error
         if pass_id == "P3" and schema is AudibleTruthMap:
             try:
                 selected = PossibilityCard.model_validate(inputs["selected"])
@@ -479,29 +548,53 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
                     failed_output, selected,
                 )
                 if repaired_truth is not None:
-                    return repaired_truth
-        if (
-            pass_id == "P5"
-            and schema is BroadcastScore
-            and "each truth-map clue must be assigned to exactly one" in str(error)
-        ):
+                    content_error = post_validator(repaired_truth)
+                    if content_error is None:
+                        return repaired_truth
+                    effective_error = RuntimeError(
+                        f"{error}; after structural normalization: "
+                        f"{content_error}"
+                    )
+        if pass_id == "P5" and schema is BroadcastScore:
             try:
-                failed_score = BroadcastScore.model_validate(
-                    parse_first_json_object(failed_output)
-                )
                 truth = AudibleTruthMap.model_validate(inputs["truth_map"])
             except (json.JSONDecodeError, ValueError, KeyError, TypeError):
                 pass
             else:
-                repaired_score = _repair_duplicate_score_clues(
-                    failed_score, truth,
+                placement_repair = _repair_score_collection_placement(
+                    failed_output, truth,
                 )
-                if repaired_score is not None:
-                    return repaired_score
-        pass_rules = _repair_rules(pass_id, error)
+                if placement_repair is not None:
+                    content_error = post_validator(placement_repair)
+                    if content_error is None:
+                        return placement_repair
+                    effective_error = RuntimeError(
+                        f"{error}; after structural normalization: "
+                        f"{content_error}"
+                    )
+                if "each truth-map clue must be assigned to exactly one" in str(error):
+                    try:
+                        failed_score = BroadcastScore.model_validate(
+                            parse_first_json_object(failed_output)
+                        )
+                    except (json.JSONDecodeError, ValueError, TypeError):
+                        pass
+                    else:
+                        repaired_score = _repair_duplicate_score_clues(
+                            failed_score, truth,
+                        )
+                        if repaired_score is not None:
+                            content_error = post_validator(repaired_score)
+                            if content_error is None:
+                                return repaired_score
+                            effective_error = RuntimeError(
+                                f"{error}; after structural normalization: "
+                                f"{content_error}"
+                            )
+        pass_rules = _repair_rules(pass_id, effective_error)
         return [
             {"role": "system", "content": system + "\nReturn the same complete artifact, repairing only the typed contract error." + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
-            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "error": str(error), "inputs": inputs}, ensure_ascii=False, sort_keys=True)},
+            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "error": str(effective_error), "inputs": inputs}, ensure_ascii=False, sort_keys=True)},
         ]
     try:
         with scheduler.helper_context(f"original_codex56sol:{pass_id}"):

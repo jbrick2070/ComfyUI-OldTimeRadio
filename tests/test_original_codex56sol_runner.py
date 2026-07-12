@@ -380,6 +380,172 @@ def test_p3_repair_fails_closed_on_unknown_or_graph_invalid_shapes():
     ) is None
 
 
+def test_p5_repair_keeps_authoritative_top_level_and_removes_nested_extras():
+    fixtures = _fixtures()
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    data = fixtures["score"]
+    expected_shots = list(data["shots"])
+    data["scenes"][0]["shots"] = [{
+        "shot_id": "extra_shot", "scene_id": "scene_01",
+        "description": "A redundant nested shot.",
+        "visual_prompt": "A redundant nested composition.",
+    }]
+    repaired = lane._repair_score_collection_placement(
+        json.dumps(data), truth,
+    )
+    assert repaired is not None
+    assert [row.model_dump(exclude_defaults=True) for row in repaired.shots] == expected_shots
+    assert all("shots" not in row.model_dump() for row in repaired.scenes)
+
+
+def test_p5_repair_lifts_missing_top_level_shots_and_beats_verbatim():
+    fixtures = _fixtures()
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    data = fixtures["score"]
+    expected_shots = data.pop("shots")
+    expected_beats = data.pop("beats")
+    beats_by_shot = {
+        shot["shot_id"]: [
+            beat for beat in expected_beats if beat["shot_id"] == shot["shot_id"]
+        ]
+        for shot in expected_shots
+    }
+    for scene in data["scenes"]:
+        scene["shots"] = []
+    for shot in expected_shots:
+        nested_shot = dict(shot)
+        nested_shot["beats"] = beats_by_shot[shot["shot_id"]]
+        target = next(
+            scene for scene in data["scenes"]
+            if scene["scene_id"] == shot["scene_id"]
+        )
+        target["shots"].append(nested_shot)
+    repaired = lane._repair_score_collection_placement(
+        json.dumps(data), truth,
+    )
+    assert repaired is not None
+    assert [row.model_dump(exclude_defaults=True) for row in repaired.shots] == expected_shots
+    assert [row.model_dump() for row in repaired.beats] == expected_beats
+
+
+def test_p5_repair_fails_closed_on_unknown_or_graph_invalid_shapes():
+    fixtures = _fixtures()
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    non_list = fixtures["score"]
+    non_list["scenes"][0]["shots"] = "not a list"
+    assert lane._repair_score_collection_placement(
+        json.dumps(non_list), truth,
+    ) is None
+
+    duplicate = _fixtures()["score"]
+    duplicate["shots"] = []
+    duplicate["scenes"][0]["shots"] = [
+        dict(duplicate["scenes"][0], shot_id="same", scene_id="scene_01",
+             visual_prompt="One"),
+        dict(duplicate["scenes"][0], shot_id="same", scene_id="scene_01",
+             visual_prompt="Two"),
+    ]
+    assert lane._repair_score_collection_placement(
+        json.dumps(duplicate), truth,
+    ) is None
+
+    unknown = _fixtures()["score"]
+    unknown["scenes"][0]["unknown_collection"] = []
+    unknown["scenes"][0]["shots"] = []
+    assert lane._repair_score_collection_placement(
+        json.dumps(unknown), truth,
+    ) is None
+
+    partial = _fixtures()["score"]
+    missing_shot = partial["shots"][1]
+    partial["shots"] = partial["shots"][:1]
+    partial["scenes"][1]["shots"] = [missing_shot]
+    assert lane._repair_score_collection_placement(
+        json.dumps(partial), truth,
+    ) is None
+
+
+def test_p5_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
+    responses = _responses()
+    responses[4]["scenes"][0]["shots"] = [{
+        "shot_id": "nested_extra", "scene_id": "scene_01",
+        "description": "A redundant nested shot.",
+        "visual_prompt": "A redundant nested composition.",
+    }]
+    queued = iter(responses)
+    calls = []
+
+    def generate(_messages, **_kwargs):
+        calls.append(1)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p5_placement", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p5_placement",
+    )
+    assert len(calls) == 8
+
+
+def test_p5_placement_repair_preserves_llm_fallback_for_safety(tmp_path):
+    responses = _responses()
+    corrected_score = json.loads(json.dumps(responses[4]))
+    responses[4]["premise"] = "Kill the clue."
+    responses[4]["scenes"][0]["shots"] = [{
+        "shot_id": "nested_extra", "scene_id": "scene_01",
+        "description": "A redundant nested shot.",
+        "visual_prompt": "A redundant nested composition.",
+    }]
+    responses.insert(5, corrected_score)
+    queued = iter(responses)
+    calls = []
+    repair_prompts = []
+
+    def generate(messages, **_kwargs):
+        calls.append(1)
+        if any("after structural normalization" in row["content"]
+               for row in messages):
+            repair_prompts.append(messages)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(
+        episode_id="codex56_p5_safety_fallback", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="codex56_p5_safety_fallback",
+    )
+    assert len(calls) == 9
+    assert len(repair_prompts) == 1
+    assert "forbidden term 'kill'" in repair_prompts[0][1]["content"]
+
+
 def test_duplicate_score_clue_repair_does_not_spend_an_llm_call(tmp_path):
     responses = _responses()
     responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")

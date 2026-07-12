@@ -447,3 +447,8 @@ leaving them for live integration:
     top-level collection is already authoritative, or lift nested rows when
     the top-level collection is absent; it must preserve values, validate the
     complete graph, and otherwise fall through to typed repair.
+34. Apply the placement audit at every artifact layer. A model that nests
+    truth-map collections inside caller rows may later nest shots inside scenes
+    or beats inside shots. For each schema, declare its top-level arrays and
+    the exact fields of every nested row in both base and repair prompts; test
+    each boundary with a materially different model family.
