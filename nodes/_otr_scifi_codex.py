@@ -473,20 +473,21 @@ def _radio_score_draft_surface_receipt() -> dict[str, int | str | bool]:
 
 _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION = (
     "\nRadioScoreDraftV4 compact contract: return one JSON object only, rooted "
-    "at exactly title, premise, setting, scenes, music_cues. title <=64; premise "
-    "<=144; setting <=80. scenes has 1..3 items. Each scene has exactly env, "
-    "description, shots, beats: env <=56; description <=72; shots has 1..2 items "
-    "each with exactly description <=72 and visual_prompt <=120; beats has 1..4 "
+    "at exactly title, premise, setting, scenes, music_cues. Author prose below "
+    "the private rejection edges using these safe ceilings: title <=48; premise "
+    "<=108; setting <=60. scenes has 1..3 items. Each scene has exactly env, "
+    "description, shots, beats: env <=42; description <=54; shots has 1..2 items "
+    "each with exactly description <=54 and visual_prompt <=90; beats has 1..4 "
     "items each with exactly shot_index, char_id, line_count, intent, arc_phase, "
     "fact_ids. shot_index is zero-based within this scene; char_id must be one "
-    "accepted spoken cast ID; line_count is 1 or 2; intent <=64; arc_phase <=28; "
+    "accepted spoken cast ID; line_count is 1 or 2; intent <=48; arc_phase <=21; "
     "arc_phase is a narrative JSON string such as arrival, pressure, turn, or "
     "decision, never a number, word count, advisory center, or percentage. fact_ids "
     "is an ordered unique list of at most two allowed fact IDs. music_cues has 1..3 "
     "unique items, each exactly cue_id, description, generation_prompt, "
     "anchor_beat_index, anchor_line_index: cue_id MUST be exactly one of "
     "music_open, music_inter, music_close, never a descriptive music name; put any "
-    "creative cue name in description. description <=80; generation_prompt <=120; "
+    "creative cue name in description. description <=60; generation_prompt <=90; "
     "anchor_beat_index is zero-based in flattened scene/beat order; "
     "anchor_line_index is zero-based within that beat. cue_id determines broad "
     "placement; the indices choose its exact anchor. Do not emit advisory_word_plan, "
@@ -2218,7 +2219,9 @@ def invoke_codex_structured(
                 " Preserve the previous_draft structural decisions exactly: "
                 "scene count, shots per scene, each beat's shot_index/char_id/"
                 "line_count, and every cue_id/local anchor. Improve only "
-                "creative prose or allowed fact placement in response to review."
+                "creative prose or allowed fact placement in response to review. "
+                "Change only prose directly necessary to resolve the review; "
+                "preserve every other previous_draft prose leaf byte for byte."
             )
     if script_artifact_pass:
         schema_instruction += _SCRIPT_ARTIFACT_ROOT_INSTRUCTION

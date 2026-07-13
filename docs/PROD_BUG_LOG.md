@@ -1295,3 +1295,35 @@ out until they independently meet the same production-only admission rule.
   acronyms from ungrounded shouting at the validator boundary; promoted as
   executable BUG-11.51 coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-08 -- P3 rewrite overflowed more prose leaves than its patch envelope
+
+- promotion: BUG-11.42 extension
+- surfaced: canonical 42-word `scifi_codex` reverify, prompt
+  `3c4f6e67-8dda-47e8-802e-a37c6359e1b1`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: P0 through P4 cleared and the repaired P3 topology held. The
+  P3_rewrite response preserved structure but reauthored broadly, producing 13
+  prose leaves just over their strict caps. That exceeded the proven 12-target
+  local patch envelope, so the normal full-draft repair repeated all 13
+  overflows and exhausted the ladder before script, ledger, media, or OBS.
+- root cause: the base/rewrite authoring contract exposed every private schema
+  rejection edge as the model's writing target. The rewrite instruction also
+  allowed every creative prose leaf to change even when the review required a
+  narrower correction. The bounded patch already used conservative targets,
+  but it was only a downstream backstop after the broad overflow was created.
+- fix: make conservative 75% prose ceilings the only model-visible limits at
+  every P3 base, restart, full-repair, and rewrite boundary while retaining the
+  larger immutable Pydantic caps privately. Require P3_rewrite to change only
+  prose directly necessary for the review and preserve every other prior prose
+  leaf byte for byte. Keep the proven 12-row patch envelope and fail-closed
+  validation; do not expand an arbitrary capacity or Python-clip authored text.
+- verify idea: capture base, full-repair, and rewrite system messages and assert
+  they expose only the safe 48/108/60, 42/54/90, 48/21, and 60/90 ceilings.
+  Require rewrite to preserve non-target prose byte for byte while retaining
+  existing structure locks. Re-run the same canonical 42-word combination
+  through ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes -- safety margin belongs at every authoring boundary, not
+  only the local patch after overflow; promoted as executable BUG-11.42
+  extension coverage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

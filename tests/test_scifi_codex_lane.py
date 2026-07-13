@@ -1793,6 +1793,11 @@ def test_p3_compact_contract_names_nested_literal_values_on_base_and_repair():
     assert len(calls) == 2
     for call in calls:
         system = call["messages"][0]["content"]
+        assert "safe ceilings: title <=48; premise <=108; setting <=60" in system
+        assert "env <=42; description <=54" in system
+        assert "description <=54 and visual_prompt <=90" in system
+        assert "intent <=48; arc_phase <=21" in system
+        assert "description <=60; generation_prompt <=90" in system
         assert "arc_phase is a narrative JSON string" in system
         assert "never a number, word count, advisory center, or percentage" in system
         assert "cue_id MUST be exactly one of music_open, music_inter, music_close" in system
@@ -1894,6 +1899,8 @@ def test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft():
     assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
     assert "Preserve the previous_draft structural decisions" in calls[0]["messages"][0]["content"]
+    assert "preserve every other previous_draft prose leaf byte for byte" in calls[0]["messages"][0]["content"]
+    assert "safe ceilings: title <=48; premise <=108; setting <=60" in calls[0]["messages"][0]["content"]
     assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
 
 
