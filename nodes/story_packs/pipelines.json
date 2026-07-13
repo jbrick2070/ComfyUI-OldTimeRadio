@@ -643,7 +643,7 @@
           "seam_refs": [
             "codex56_fair_play_audit"
           ],
-          "description": "Audit audible clue sufficiency and graph closure."
+          "description": "Audit finite, text-evidenced P3-owned fair-play claims."
         },
         {
           "pass_id": "P5_broadcast_score",

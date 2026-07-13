@@ -58,6 +58,8 @@ from __future__ import annotations
 import json
 
 import pytest
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from nodes import _otr_structured_call as sc
@@ -73,6 +75,18 @@ class SampleSchema(BaseModel):
 
     title: str = Field(min_length=1, max_length=120)
     score: int = Field(ge=0, le=100)
+
+
+class ContractLeaf(BaseModel):
+    label: str = Field(min_length=2, max_length=9, pattern=r"^[A-Z]+$")
+    mode: Literal["warm", "dry"]
+
+
+class ContractSchema(BaseModel):
+    fixed: Literal["locked"]
+    entries: list[ContractLeaf] = Field(min_length=1, max_length=2)
+    rating: float = Field(gt=0, le=7, multiple_of=0.5)
+    optional_leaf: ContractLeaf | None = None
 
 
 def _valid_json() -> str:
@@ -135,6 +149,103 @@ def _make_recording_repair_factory():
 
     factory.invocations = invocations  # type: ignore[attr-defined]
     return factory
+
+
+def test_schema_contract_renders_nested_bounds_literals_and_paths():
+    instruction = sc.schema_shape_instruction(ContractSchema)
+
+    assert instruction.count("[OTR_SCHEMA_CONTRACT_V1]") == 1
+    assert "const=\"locked\"" in instruction
+    assert 'enum=["warm", "dry"]' in instruction
+    assert "entries: required; type=array; minItems=1; maxItems=2" in instruction
+    assert "entries[*].label: required; type=string; minLength=2; maxLength=9" in instruction
+    assert "pattern=\"^[A-Z]+$\"" in instruction
+    assert "rating: required; type=number; minimum" not in instruction
+    assert "exclusiveMinimum=0" in instruction
+    assert "maximum=7" in instruction
+    assert "multipleOf=0.5" in instruction
+    assert "optional_leaf.label" in instruction
+    assert sc.schema_path_exists(ContractSchema, "entries[*].label")
+    assert sc.schema_path_exists(ContractSchema, "entries[0].label")
+    assert not sc.schema_path_exists(ContractSchema, "entries[*].missing")
+
+
+def test_structured_call_injects_one_contract_without_mutating_messages():
+    prompt = [
+        {"role": "system", "content": "Author a compact response."},
+        {"role": "user", "content": "Use the supplied facts."},
+    ]
+    original = json.loads(json.dumps(prompt))
+    slot = _make_counting_slot_fn(
+        responses=[_bad_json(), _bad_json(), _valid_json()],
+    )
+    repair_factory = _make_recording_repair_factory()
+
+    result = sc.structured_call(
+        prompt=prompt,
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        repair_prompt_factory=repair_factory,
+        helper_name="schema_contract_injection",
+    )
+
+    assert result.score == 42
+    assert prompt == original
+    assert len(slot.calls) == 3
+    for call in slot.calls:
+        rendered = "\n".join(
+            str(row.get("content", ""))
+            for row in call["messages"]
+            if isinstance(row, dict)
+        )
+        assert rendered.count("[OTR_SCHEMA_CONTRACT_V1]") == 1
+    factory_prompt = repair_factory.invocations[0]["original_prompt"]
+    assert isinstance(factory_prompt, list)
+    assert "[OTR_SCHEMA_CONTRACT_V1]" in factory_prompt[0]["content"]
+
+
+def test_structured_call_keeps_string_prompt_shape_for_custom_repair():
+    slot = _make_counting_slot_fn(
+        responses=[_schema_violating_json(), _valid_json()],
+    )
+    repair_factory = _make_recording_repair_factory()
+
+    sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        repair_prompt_factory=repair_factory,
+        helper_name="string_schema_contract_injection",
+    )
+
+    factory_prompt = repair_factory.invocations[0]["original_prompt"]
+    assert isinstance(factory_prompt, str)
+    assert factory_prompt.count("[OTR_SCHEMA_CONTRACT_V1]") == 1
+
+
+def test_structured_call_preserves_one_message_prompt_position():
+    prompt = [{"role": "user", "content": "sanitized story facts"}]
+    slot = _make_counting_slot_fn(responses=[_valid_json()])
+
+    sc.structured_call(
+        prompt=prompt,
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        helper_name="single_message_contract_injection",
+    )
+
+    sent = slot.calls[0]["messages"]
+    assert len(sent) == 1
+    assert sent[0]["role"] == "user"
+    assert sent[0]["content"].startswith("sanitized story facts")
+    assert sent[0]["content"].count("[OTR_SCHEMA_CONTRACT_V1]") == 1
+    assert prompt[0]["content"] == "sanitized story facts"
 
 
 # ---------------------------------------------------------------------------

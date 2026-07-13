@@ -37,7 +37,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Callable, Optional, Protocol, TypeVar
+import re
+from typing import Any, Callable, Mapping, Optional, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -91,6 +92,25 @@ _REPAIR_TEMPERATURE: float = REPAIR_TEMPERATURE
 # capped by the caller's base temperature, so callers at or below this
 # value keep their own lower ceiling.
 _REPAIR_SYNTAX_RETRY_FLOOR: float = 0.25
+
+# A compact, model-visible rendering of the complete output contract.  The
+# marker makes injection idempotent: a number of established lane wrappers
+# already append ``schema_shape_instruction`` themselves, while the shared
+# ladder now guarantees coverage for every other caller and every repair turn.
+_SCHEMA_CONTRACT_MARKER = "[OTR_SCHEMA_CONTRACT_V1]"
+_SCHEMA_CONTRACT_END_MARKER = "[/OTR_SCHEMA_CONTRACT_V1]"
+_SCHEMA_CONSTRAINT_KEYS = (
+    "minLength",
+    "maxLength",
+    "pattern",
+    "minItems",
+    "maxItems",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -196,19 +216,205 @@ def schema_required_paths(schema: type[BaseModel]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(paths))
 
 
-def schema_shape_instruction(schema: type[BaseModel]) -> str:
-    """Describe required nested schema paths for weak local JSON writers.
+def schema_property_paths(schema: type[BaseModel]) -> tuple[str, ...]:
+    """Return every declared property path, resolving refs and array items.
 
-    The full JSON schema is already supplied as typed input, but compact path
-    inventory is more reliably followed by small local models. This describes
-    structure only; it never supplies or rewrites story content.
+    ``schema_required_paths`` intentionally answers the narrower question that
+    legacy seams used to need.  Audit contracts need a stronger, schema-grounded
+    inventory: a blocking claim may only point at a property the repair owner can
+    actually author.  This walker is shared by the prompt renderer and those
+    static checks, so the two cannot drift.
+    """
+    raw = schema.model_json_schema()
+    definitions = raw.get("$defs", {})
+    legacy_definitions = raw.get("definitions", {})
+    paths: list[str] = []
+    seen: set[tuple[str, str]] = set()
+
+    def resolve_ref(node: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        ref = node.get("$ref")
+        if not isinstance(ref, str):
+            return None
+        prefix, _, name = ref.rpartition("/")
+        if prefix not in {"#/$defs", "#/definitions"}:
+            return None
+        target = definitions.get(name, legacy_definitions.get(name))
+        if not isinstance(target, dict):
+            return None
+        merged = dict(target)
+        merged.update({key: value for key, value in node.items() if key != "$ref"})
+        return merged
+
+    def walk(node: object, path: str) -> None:
+        if not isinstance(node, dict):
+            return
+        ref = node.get("$ref")
+        if isinstance(ref, str):
+            marker = (ref, path)
+            if marker in seen:
+                return
+            seen.add(marker)
+            resolved = resolve_ref(node)
+            if resolved is not None:
+                walk(resolved, path)
+            return
+
+        for branch_key in ("anyOf", "oneOf", "allOf"):
+            branches = node.get(branch_key)
+            if isinstance(branches, list):
+                for branch in branches:
+                    walk(branch, path)
+
+        if node.get("type") == "array":
+            walk(node.get("items", {}), f"{path}[*]")
+            return
+
+        properties = node.get("properties", {})
+        if not isinstance(properties, dict):
+            return
+        for name, child in properties.items():
+            if not isinstance(name, str):
+                continue
+            child_path = f"{path}.{name}" if path else name
+            paths.append(child_path)
+            walk(child, child_path)
+
+    walk(raw, "")
+    return tuple(dict.fromkeys(paths))
+
+
+def schema_path_exists(schema: type[BaseModel], path: str) -> bool:
+    """Whether ``path`` names a declared schema property.
+
+    Audit code normally uses ``[*]`` for array items, but accept a concrete
+    numeric index too so a test cannot accidentally turn a representation detail
+    into a false negative.
+    """
+    normalised = re.sub(r"\[\d+\]", "[*]", path.strip())
+    return normalised in set(schema_property_paths(schema))
+
+
+def _schema_constraint_description(node: Mapping[str, Any]) -> str:
+    """Render the finite, enforceable facts carried by one JSON-schema node."""
+    parts: list[str] = []
+    kind = node.get("type")
+    if isinstance(kind, list):
+        parts.append("type=" + "|".join(str(value) for value in kind))
+    elif isinstance(kind, str):
+        parts.append(f"type={kind}")
+    for branch_key in ("anyOf", "oneOf", "allOf"):
+        branches = node.get(branch_key)
+        if isinstance(branches, list):
+            parts.append(f"{branch_key}={len(branches)}")
+    if "const" in node:
+        parts.append("const=" + json.dumps(node["const"], ensure_ascii=False))
+    enum = node.get("enum")
+    if isinstance(enum, list):
+        parts.append("enum=" + json.dumps(enum, ensure_ascii=False))
+    for key in _SCHEMA_CONSTRAINT_KEYS:
+        if key in node:
+            parts.append(f"{key}=" + json.dumps(node[key], ensure_ascii=False))
+    if "format" in node:
+        parts.append(f"format={node['format']}")
+    return "; ".join(parts) or "schema-defined value"
+
+
+def _schema_contract_lines(schema: type[BaseModel]) -> tuple[str, ...]:
+    """Return a compact recursive contract for every output schema field."""
+    raw = schema.model_json_schema()
+    definitions = raw.get("$defs", {})
+    legacy_definitions = raw.get("definitions", {})
+    lines: list[str] = []
+    seen_lines: set[str] = set()
+    seen_refs: set[tuple[str, str]] = set()
+
+    def add(line: str) -> None:
+        if line not in seen_lines:
+            seen_lines.add(line)
+            lines.append(line)
+
+    def resolve_ref(node: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        ref = node.get("$ref")
+        if not isinstance(ref, str):
+            return None
+        prefix, _, name = ref.rpartition("/")
+        if prefix not in {"#/$defs", "#/definitions"}:
+            return None
+        target = definitions.get(name, legacy_definitions.get(name))
+        if not isinstance(target, dict):
+            return None
+        merged = dict(target)
+        merged.update({key: value for key, value in node.items() if key != "$ref"})
+        return merged
+
+    def walk(node: object, path: str, required: bool) -> None:
+        if not isinstance(node, dict):
+            return
+        ref = node.get("$ref")
+        if isinstance(ref, str):
+            marker = (ref, path)
+            if marker in seen_refs:
+                return
+            seen_refs.add(marker)
+            resolved = resolve_ref(node)
+            if resolved is not None:
+                walk(resolved, path, required)
+            return
+
+        label = path or "<root>"
+        if path:
+            requirement = "required" if required else "optional"
+            add(f"- {label}: {requirement}; {_schema_constraint_description(node)}")
+
+        properties = node.get("properties", {})
+        if isinstance(properties, dict):
+            names = [name for name in properties if isinstance(name, str)]
+            closed = node.get("additionalProperties") is False
+            closure = "closed; " if closed else ""
+            add(
+                f"- object {label}: {closure}exact keys="
+                + ", ".join(names)
+            )
+            required_names = node.get("required", [])
+            required_set = {
+                name for name in required_names if isinstance(name, str)
+            } if isinstance(required_names, list) else set()
+            for name in names:
+                child_path = f"{path}.{name}" if path else name
+                walk(properties[name], child_path, name in required_set)
+
+        if node.get("type") == "array":
+            walk(node.get("items", {}), f"{path}[*]", True)
+
+        for branch_key in ("anyOf", "oneOf", "allOf"):
+            branches = node.get(branch_key)
+            if isinstance(branches, list):
+                for branch in branches:
+                    walk(branch, path, required)
+
+    walk(raw, "", True)
+    return tuple(lines)
+
+
+def schema_shape_instruction(schema: type[BaseModel]) -> str:
+    """Render the complete model-visible JSON contract for ``schema``.
+
+    Required paths alone were not enough: local writers could still miss a
+    literal, a bound, or a closed nested object that Python enforced later.
+    This text is deliberately compact enough for prompt-fit callers while
+    carrying every JSON-schema constraint that can be stated mechanically.
     """
     compact = ", ".join(schema_required_paths(schema))
+    details = "\n".join(_schema_contract_lines(schema))
     return (
-        "\nReturn exactly one JSON object, with no Markdown, headings, or prose. "
+        f"\n{_SCHEMA_CONTRACT_MARKER}\n"
+        "Return exactly one JSON object, with no Markdown, headings, or prose. "
         f"Its exact top-level keys are: {', '.join(schema.model_fields)}. "
-        "Every required nested path must be present, including repeated graph "
-        f"references. Required paths: {compact}"
+        "Do not add undeclared fields. Every required nested path must be present, "
+        "including repeated graph references. "
+        f"Required paths: {compact}\n"
+        "Complete output schema contract:\n"
+        f"{details}\n{_SCHEMA_CONTRACT_END_MARKER}"
     )
 
 
@@ -304,11 +510,67 @@ def _prompt_to_messages(prompt: Any) -> Any:
 
     A plain string is wrapped into a single `user` message; an existing
     messages list (or any other already-structured payload) is passed
-    through untouched.
+    through unchanged.
     """
     if isinstance(prompt, str):
         return [{"role": "user", "content": prompt}]
     return prompt
+
+
+def _prompt_has_schema_contract(prompt: Any) -> bool:
+    """Return whether a prompt already carries the idempotency marker."""
+    if isinstance(prompt, str):
+        return _SCHEMA_CONTRACT_MARKER in prompt
+    if isinstance(prompt, (list, tuple)):
+        return any(
+            isinstance(row, Mapping)
+            and _SCHEMA_CONTRACT_MARKER in str(row.get("content", ""))
+            for row in prompt
+        )
+    return False
+
+
+def _copy_message_prompt(prompt: list[Any] | tuple[Any, ...]) -> list[Any]:
+    """Shallow-copy message rows before adding a system instruction."""
+    return [dict(row) if isinstance(row, Mapping) else row for row in prompt]
+
+
+def _prompt_with_schema_contract(prompt: Any, schema: type[BaseModel]) -> Any:
+    """Attach ``schema``'s contract without mutating a caller-owned prompt.
+
+    Structured callers pass either a plain string or OpenAI-style messages.  A
+    messages prompt receives the contract in its first system row. If it has no
+    system row, the first textual message carries the contract instead so
+    established one-message callers keep their message order and testable
+    user-payload position. A string remains a string so custom repair factories
+    that deliberately rely on that shape keep their contract.
+    The marker prevents a wrapper and the shared ladder from adding duplicate
+    schema text, including on syntax retries and custom typed repairs.
+    """
+    if isinstance(prompt, str):
+        if _SCHEMA_CONTRACT_MARKER in prompt:
+            return prompt
+        return prompt + schema_shape_instruction(schema)
+    if not isinstance(prompt, (list, tuple)):
+        return prompt
+
+    messages = _copy_message_prompt(prompt)
+    if _prompt_has_schema_contract(messages):
+        return messages
+    contract = schema_shape_instruction(schema)
+    for row in messages:
+        if (
+            isinstance(row, dict)
+            and row.get("role") == "system"
+            and isinstance(row.get("content"), str)
+        ):
+            row["content"] = str(row["content"]) + contract
+            return messages
+    for row in messages:
+        if isinstance(row, dict) and isinstance(row.get("content"), str):
+            row["content"] = str(row["content"]) + contract
+            return messages
+    return [{"role": "system", "content": contract}, *messages]
 
 
 def invoke_structured_slot(
@@ -705,7 +967,8 @@ def structured_call(
         else default_repair_prompt_factory
     )
 
-    base_messages = _prompt_to_messages(prompt)
+    contract_prompt = _prompt_with_schema_contract(prompt, schema)
+    base_messages = _prompt_to_messages(contract_prompt)
     last_error: Optional[BaseException] = None
     last_raw: str = ""
     attempts_run = 0
@@ -816,7 +1079,7 @@ def structured_call(
                 else ValueError("no prior error captured")
             )
             repair_prompt = factory(
-                original_prompt=prompt,
+                original_prompt=contract_prompt,
                 failed_output=last_raw,
                 error=repair_error,
             )
@@ -840,7 +1103,9 @@ def structured_call(
                     helper_name, attempts_run,
                 )
                 return repair_prompt
-            repair_messages = _prompt_to_messages(repair_prompt)
+            repair_messages = _prompt_to_messages(
+                _prompt_with_schema_contract(repair_prompt, schema)
+            )
             last_raw = ""
             last_raw = _invoke_slot(
                 slot_fn, repair_messages,

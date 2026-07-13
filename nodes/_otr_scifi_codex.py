@@ -1649,7 +1649,11 @@ def _p3_text_patch_messages(
     return [
         {
             "role": "system",
-            "content": seam,
+            # This direct, bounded repair transport deliberately bypasses the
+            # shared retry ladder.  It must still expose the exact typed patch
+            # contract, including bounds and literals, just like every ladder
+            # call does.
+            "content": seam + schema_shape_instruction(_RadioScoreDraftTextPatchV4),
         },
         {
             "role": "user",

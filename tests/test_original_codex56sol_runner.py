@@ -248,9 +248,13 @@ def test_p8_retake_missing_anchor_uses_the_same_small_line_patch(tmp_path):
     fixtures = _fixtures()
     responses = _responses()
     responses[6] = {
-        "understood_cause": "An unstable resonance signature.",
+        "understood_cause": "The repeated sounds do not yet have a clear source.",
         "understood_resolution": "Unknown.",
-        "findings": [], "optional_notes": [],
+        "findings": [{
+            "line_id": "line_003", "category": "Causal clarity",
+            "detail": "The repeated sounds still need a concrete source.",
+            "blocking": True,
+        }], "optional_notes": [],
     }
     retake = json.loads(json.dumps(fixtures["script"]))
     retake["lines"][4]["text"] = "The echo is mapped; the desk is quiet."
@@ -431,7 +435,7 @@ def test_grounding_anchor_matching_is_nfkc_casefolded():
     assert lane._validate_script_grounding(contract, manifest, script) is None
 
 
-def test_blind_listener_must_infer_a_device_anchor_token():
+def test_blind_listener_does_not_require_a_reveal_only_anchor_token():
     fixtures = _fixtures()
     score = lane.BroadcastScore.model_validate(fixtures["score"])
     manifest = lane._compile_manifest(score)
@@ -442,13 +446,8 @@ def test_blind_listener_must_infer_a_device_anchor_token():
         "understood_resolution": "Unknown.",
         "findings": [], "optional_notes": [],
     })
-    blocks = lane._listener_blocks(
-        report, {row["line_id"] for row in packet}, _grounding_fixture(),
-        packet[-1]["line_id"],
-    )
-    assert [(row.line_id, row.category) for row in blocks] == [
-        (packet[-1]["line_id"], "Cause grounding"),
-    ]
+    blocks = lane._listener_blocks(report, {row["line_id"] for row in packet})
+    assert blocks == []
 
 
 def test_blocking_listener_retake_is_rechecked_blind_without_contract(
@@ -456,9 +455,13 @@ def test_blocking_listener_retake_is_rechecked_blind_without_contract(
     fixtures = _fixtures()
     responses = _responses()
     responses[6] = {
-        "understood_cause": "An unstable resonance signature.",
+        "understood_cause": "The earlier lines do not connect the repeated sounds.",
         "understood_resolution": "Unknown.",
-        "findings": [], "optional_notes": [],
+        "findings": [{
+            "line_id": "line_003", "category": "Causal clarity",
+            "detail": "The repeated sounds still have no concrete source.",
+            "blocking": True,
+        }], "optional_notes": [],
     }
     responses.insert(7, fixtures["script"])
     responses.insert(8, fixtures["listener"])
@@ -852,7 +855,8 @@ def test_cross_artifact_validators_return_retryable_error_strings():
 def test_ungrounded_fair_play_opinion_is_not_a_fatal_coordinate():
     report = lane.FairPlayReport.model_validate({
         "accepted": False,
-        "findings": [{"category":"Helpful Ending","detail":"Could be warmer","blocking":True}],
+        "findings": [{"category":"Helpful Ending","detail":"Could be warmer",
+                      "evidence_span":"","blocking":True}],
     })
     truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
     assert lane._corroborated_fair_blocks(report, truth) == []
@@ -1871,7 +1875,8 @@ def test_p4_uncorroborated_block_is_advisory_not_fatal(tmp_path):
     responses[3] = {
         "accepted": False,
         "findings": [{"category": "Helpful Ending",
-                      "detail": "Could be warmer", "blocking": True}],
+                      "detail": "Could be warmer", "evidence_span": "",
+                      "blocking": True}],
         "warnings": ["the closing could land more gently"],
     }
     queued = iter(responses)
@@ -1914,8 +1919,9 @@ def test_p4_corroborated_block_retakes_the_truth_map(tmp_path):
     responses[3] = {
         "accepted": False,
         "findings": [{"field_path": "audible_clues.0.implication",
-                      "item_id": "q1", "category": "Fair play",
-                      "detail": "the stamp clue is not audible before the reveal",
+                      "item_id": "q1", "category": "sole_declared_mundane_cause",
+                      "evidence_span": "the stamp is near the desk",
+                      "detail": "the shared cause is not linked to this clue",
                       "blocking": True}],
         "warnings": [],
     }
@@ -1973,8 +1979,9 @@ def test_p4_rerun_still_blocked_fails_closed(tmp_path):
     block = {
         "accepted": False,
         "findings": [{"field_path": "audible_clues.0.implication",
-                      "item_id": "q1", "category": "Fair play",
-                      "detail": "still not audible", "blocking": True}],
+                      "item_id": "q1", "category": "sole_declared_mundane_cause",
+                      "evidence_span": "the stamp is near the desk",
+                      "detail": "the shared cause remains unlinked", "blocking": True}],
         "warnings": [],
     }
     responses[3] = json.loads(json.dumps(block))
@@ -1996,7 +2003,9 @@ def test_p4_rerun_still_blocked_fails_closed(tmp_path):
     with pytest.raises(
         lane.OriginalCodex56SolContractError,
         # The error must carry the finding, not just the fact of failure.
-        match=r"rejected the retaken truth map: \[Fair play\] q1: still not audible",
+        match=(r"rejected the retaken truth map: "
+               r"\[sole_declared_mundane_cause\] q1: "
+               r"the shared cause remains unlinked"),
     ):
         lane.run_original_codex56sol_episode(
             payload={"seed_text": json.dumps(DRAW)}, pack=pack,
@@ -2016,43 +2025,61 @@ def test_fair_play_envelope_classifies_every_finding_class():
     # Uncoordinated blocking opinion -> advisory, never an envelope error.
     advisory = report(accepted=False, findings=[
         {"category": "Helpful Ending", "detail": "Could be warmer",
-         "blocking": True}])
+         "evidence_span": "", "blocking": True}])
     assert lane._validate_fair_play_envelope(advisory, truth) is None
     assert lane._corroborated_fair_blocks(advisory, truth) == []
     assert [f.detail for f in lane._fair_play_advisories(advisory, truth)] == [
         "Could be warmer",
     ]
 
-    # A sloppy path over a REAL item is still a real defect: corroborate it
-    # rather than fail the episode over a coordinate the retake never reads.
+    # A sloppy path over a REAL, mapped item is still a real defect: the
+    # evidence/category route, not a locator spelling, grants authority.
     sloppy = report(accepted=False, findings=[
         {"field_path": "causal_steps.0.cause", "item_id": "q1",
-         "category": "Fair play", "detail": "sloppy path, real item",
+         "category": "sole_declared_mundane_cause",
+         "evidence_span": "the stamp is near the desk",
+         "detail": "sloppy path, real item",
          "blocking": True}])
     assert lane._validate_fair_play_envelope(sloppy, truth) is None
     assert [f.item_id for f in lane._corroborated_fair_blocks(sloppy, truth)] == [
         "q1",
     ]
 
-    # A blocking finding on a real item with no category/detail is unusable.
+    # A named in-scope blocker without fields needed to route evidence returns to
+    # P4's typed repair rather than becoming a fatal external error.
     bare = report(accepted=False, findings=[
         {"field_path": "audible_clues.0.implication", "item_id": "q1",
-         "category": "  ", "detail": "", "blocking": True}])
-    assert "must include a category and a detail" in (
+         "category": "sole_declared_mundane_cause", "detail": "",
+         "evidence_span": "", "blocking": True}])
+    assert "must include a category, detail, and verbatim evidence_span" in (
         lane._validate_fair_play_envelope(bare, truth)
     )
 
     # Corroborated -> actionable.
     real = report(accepted=False, findings=[
         {"field_path": "audible_clues.0.implication", "item_id": "q1",
-         "category": "Fair play", "detail": "not audible", "blocking": True}])
+         "category": "sole_declared_mundane_cause",
+         "evidence_span": "the stamp is near the desk",
+         "detail": "shared cause missing", "blocking": True}])
     assert lane._validate_fair_play_envelope(real, truth) is None
     assert [f.item_id for f in lane._corroborated_fair_blocks(real, truth)] == ["q1"]
+
+    # P7-owned timing and listener claims stay advisory even if a model labels
+    # them blocking; P3 has no ordering field it could re-author to satisfy them.
+    timing = report(accepted=False, findings=[
+        {"field_path": "audible_clues.0.implication", "item_id": "q1",
+         "category": "clue_timing", "evidence_span": "the stamp is near the desk",
+         "detail": "not audible before reveal", "blocking": True}])
+    assert lane._validate_fair_play_envelope(timing, truth) is None
+    assert lane._corroborated_fair_blocks(timing, truth) == []
+    assert lane._fair_play_advisories(timing, truth) == timing.findings
 
     # Self-contradiction and empty rejection both return to the model.
     contradiction = report(accepted=True, findings=[
         {"field_path": "audible_clues.0.implication", "item_id": "q1",
-         "category": "Fair play", "detail": "not audible", "blocking": True}])
+         "category": "sole_declared_mundane_cause",
+         "evidence_span": "the stamp is near the desk",
+         "detail": "shared cause missing", "blocking": True}])
     assert "must not carry a blocking finding" in (
         lane._validate_fair_play_envelope(contradiction, truth)
     )
@@ -2105,11 +2132,13 @@ def test_p4_blocking_authority_is_stated_in_seam_and_repair_rules():
         "original_codex56sol",
     ).prompt_stages["codex56_fair_play_audit"]
     rules = lane._repair_rules("P4_rerun", "blocking must be a boolean")
-    assert "caller_threads, causal_steps, audible_clues" in rules
-    assert "thread_id, step_id, clue_id, or interpretation_id" in seam
+    for category in lane._FAIR_PLAY_BLOCKING_CAPABILITIES:
+        assert category in seam
+        assert category in rules
     for text in (seam, rules):
-        assert "never blocking" in text or "NOT blocking" in text
-    assert "orders a full retake" in seam
+        assert "evidence_span" in text
+        assert "field_path is an advisory locator" in text
+    assert "truth-map retake" in seam
 
 
 def test_p4_may_not_grade_what_a_truth_map_cannot_express():
@@ -2136,8 +2165,8 @@ def test_p4_may_not_grade_what_a_truth_map_cannot_express():
     assert "clue-before-reveal placement" in fair
     assert "audited downstream" in fair
     # ...while still owning what a truth map CAN express.
-    assert "exact causal closure" in fair
-    assert "helpful ending" in fair
+    assert "causal closure" in fair
+    assert "helpful resolution" in fair
 
     # The ordering property is owned downstream, where order actually exists:
     # the manifest carries arc_phase and a reveal line id, and the blind listener
@@ -2147,20 +2176,8 @@ def test_p4_may_not_grade_what_a_truth_map_cannot_express():
     assert "before the declared reveal" in stages["codex56_blind_listener"]
 
 
-def test_every_schema_bound_is_stated_where_the_model_can_see_it():
-    """The class guard: a BOUND the model is never shown.
-
-    `schema_shape_instruction` does emit the required nested paths, so the model
-    is told which fields must exist. What it never emits is a `min_length`,
-    `max_length`, or `pattern`. A bound that appears in neither the seam nor the
-    pass's repair rules is therefore a rule the ladder cannot state -- which is
-    exactly how PBUG-20260713-11 killed a live run (clue_plan's min_length=3 was
-    enforced in Python and written nowhere a model could read it).
-
-    Guard every constrained field across every structured pass in the lane.
-    """
-    routing._REGISTRY = None
-    stages = routing.resolve_story_pack("original_codex56sol").prompt_stages
+def test_every_schema_bound_is_in_the_shared_model_visible_contract():
+    """Every structured pass gets its bounds through the shared ladder contract."""
 
     passes = [
         ("P1", "codex56_possibility_slate", lane.PossibilitySlate),
@@ -2195,8 +2212,9 @@ def test_every_schema_bound_is_stated_where_the_model_can_see_it():
         return out
 
     unstated = []
-    for pass_id, seam_key, schema in passes:
-        visible = stages[seam_key] + " " + lane._repair_rules(pass_id, "bound")
+    for pass_id, _seam_key, schema in passes:
+        visible = lane.schema_shape_instruction(schema)
+        assert "[OTR_SCHEMA_CONTRACT_V1]" in visible
         for path in bounded(schema):
             leaf = path.split(".")[-1]
             if leaf not in visible:
@@ -2253,27 +2271,29 @@ def test_fair_play_coordinates_survive_however_the_model_writes_them():
     """
     truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
 
-    def report(field_path, item_id):
+    def report(field_path, item_id, evidence_span):
         return lane.FairPlayReport.model_validate({
             "accepted": False,
             "findings": [{"field_path": field_path, "item_id": item_id,
-                          "category": "Fair play", "detail": "not audible",
+                          "category": "benign_safety",
+                          "evidence_span": evidence_span,
+                          "detail": "unsafe claim",
                           "blocking": True}],
         })
 
     # Every one of these names the same real defect, however it was written --
     # including the exact two coordinates that killed a live run.
-    for field_path, item_id in (
-        ("audible_clues[0].implication", "q1"),
-        ("audible_clues.0.implication", "q1"),
-        ("truth_map.audible_clues[0].implication", "q1"),
-        ("truth_map.causal_steps[1].effect", "s1"),   # killed prompt d5f66b1a
-        ("caller_threads[0].lost_object", "t1"),      # killed prompt 07725d30
-        ("truth_map", "t1"),
-        ("", "q1"),
-        ("a sloppy path", "q1"),
+    for field_path, item_id, evidence_span in (
+        ("audible_clues[0].implication", "q1", "the stamp is near the desk"),
+        ("audible_clues.0.implication", "q1", "the stamp is near the desk"),
+        ("truth_map.audible_clues[0].implication", "q1", "the stamp is near the desk"),
+        ("truth_map.causal_steps[1].effect", "s1", "The grille is loose."),  # killed prompt d5f66b1a
+        ("caller_threads[0].lost_object", "t1", "finish a library return"),  # killed prompt 07725d30
+        ("truth_map", "t1", "finish a library return"),
+        ("", "q1", "the stamp is near the desk"),
+        ("a sloppy path", "q1", "the stamp is near the desk"),
     ):
-        row = report(field_path, item_id)
+        row = report(field_path, item_id, evidence_span)
         assert lane._validate_fair_play_envelope(row, truth) is None, field_path
         assert [f.item_id
                 for f in lane._corroborated_fair_blocks(row, truth)] == [item_id]
@@ -2287,7 +2307,7 @@ def test_fair_play_coordinates_survive_however_the_model_writes_them():
     }
 
     # An id that names nothing is still advisory, never fatal.
-    unknown = report("audible_clues.0.implication", "nope")
+    unknown = report("audible_clues.0.implication", "nope", "not present")
     assert lane._validate_fair_play_envelope(unknown, truth) is None
     assert lane._corroborated_fair_blocks(unknown, truth) == []
     assert [f.item_id for f in lane._fair_play_advisories(unknown, truth)] == [
