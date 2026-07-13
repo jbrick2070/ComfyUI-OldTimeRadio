@@ -1060,3 +1060,33 @@ out until they independently meet the same production-only admission rule.
   eligibility before its truncating candidate slice and share the exact
   predicate with the accepting envelope. Promotion remains a separate review.
 - status: FIXED AND LIVE VERIFIED
+
+## PBUG-20260713-01 -- OpenRouter global reasoning-off rejected by mandatory endpoint
+
+- promotion: BUG-12.53
+- surfaced: canonical 120-word `scifi_codex` reverify, prompt
+  `14af0787-f45c-4caa-8737-92d057855653`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-12/13
+- symptom: strict RSS admission and P0 cleared, then P1 stopped before creative
+  generation with HTTP 400: `Reasoning is mandatory for this endpoint and
+  cannot be disabled.` The process-wide `OPENROUTER_REASONING_EFFORT=none`
+  had been sent unchanged to `aion-labs/aion-3.0-mini`.
+- root cause: the OpenRouter cache discarded the live `/models` reasoning
+  contract, and request construction applied one global effort to every model.
+  A saved slug absent from the stale June cache also had no bounded way to learn
+  the provider's precise mandatory-capability response.
+- fix: retain sanitized per-model reasoning metadata in catalog schema v2 and
+  resolve the global setting against the selected model. A mandatory model uses
+  its lowest declared enabled effort (or `low` when the catalog omits effort
+  levels), while ordinary models retain explicit `none`. For stale/cold cache
+  only, the exact mandatory-reasoning 400 triggers one same-model corrected
+  call, remembers the capability for the process, and does not consume the
+  transient retry budget; every other 400 remains fail-fast.
+- verify idea: prove proactive metadata resolution, exact-400 learning with
+  zero transient retries, subsequent-call reuse, unchanged ordinary-model
+  `none`, generic-400 fail-fast, and live catalog retention of Aion's
+  `mandatory: true`; then rerun the same canonical 120-word combination through
+  ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: promoted as BUG-12.53 with executable OTR coverage and shared
+  Bug Bible regression pins.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

@@ -168,6 +168,27 @@ _CATALOG_MODELS = [
      "supported_parameters": ["tools"], "supports_json": False},
 ]
 
+
+def test_slim_model_preserves_reasoning_capability_contract():
+    slim = orb._slim_model({
+        "id": "aion-labs/aion-3.0-mini",
+        "reasoning": {
+            "supported_efforts": ["high", "medium", "low"],
+            "default_effort": "medium",
+            "default_enabled": True,
+            "mandatory": True,
+            "supports_max_tokens": False,
+        },
+    })
+
+    assert slim["reasoning"] == {
+        "supported_efforts": ["high", "medium", "low"],
+        "default_effort": "medium",
+        "default_enabled": True,
+        "mandatory": True,
+        "supports_max_tokens": False,
+    }
+
 _FILTER_ENV = (
     "OTR_OPENROUTER_MODEL_ALLOWLIST", "OTR_OPENROUTER_MODEL_DENYLIST",
     "OTR_OPENROUTER_PROVIDER_FILTER", "OTR_OPENROUTER_SLOT_A_REQUIRE_JSON",

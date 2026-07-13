@@ -28,10 +28,14 @@ def _reset_and_silence(monkeypatch):
     resolution is the default), and make backoff instant for every test."""
     orb.reset_run_budget()
     orb.clear_slot_bindings()
+    orb._MANDATORY_REASONING_SLUGS.clear()
+    orb._MANDATORY_REASONING_OVERRIDE_LOGGED.clear()
     monkeypatch.setattr(orb.time, "sleep", lambda *_a, **_k: None)
     yield
     orb.reset_run_budget()
     orb.clear_slot_bindings()
+    orb._MANDATORY_REASONING_SLUGS.clear()
+    orb._MANDATORY_REASONING_OVERRIDE_LOGGED.clear()
 
 
 @pytest.fixture
@@ -373,6 +377,35 @@ def test_generate_uses_low_reasoning_effort_when_env_unset(enabled_env, monkeypa
     assert seen["payload"]["reasoning_effort"] == "low"
 
 
+def test_generate_uses_lowest_catalog_effort_when_reasoning_is_mandatory(
+    enabled_env, monkeypatch,
+):
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
+    monkeypatch.setattr(
+        orb,
+        "_cached_model",
+        lambda _slug: {
+            "reasoning": {
+                "mandatory": True,
+                "supported_efforts": ["high", "medium", "low", "minimal"],
+            }
+        },
+    )
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion", lambda **kw: seen.update(kw) or _ok_result()
+    )
+
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    backend.generate(
+        entry, [{"role": "user", "content": "x"}],
+        temperature=0.5, max_new_tokens=64,
+    )
+
+    assert seen["payload"]["reasoning_effort"] == "minimal"
+
+
 # ---------------------------------------------------------------------------
 # C6 cost-ceiling abort -- proven with a mocked token counter
 # ---------------------------------------------------------------------------
@@ -475,6 +508,49 @@ def test_non_retryable_status_aborts_immediately(enabled_env, monkeypatch):
         backend.generate(entry, [{"role": "user", "content": "x"}],
                          temperature=0.5, max_new_tokens=16)
     assert attempts["n"] == 1  # no retries on a 401
+
+
+def test_stale_cache_learns_mandatory_reasoning_from_exact_400(
+    enabled_env, monkeypatch,
+):
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
+    monkeypatch.setenv("OPENROUTER_MAX_RETRIES", "0")
+    sent_efforts = []
+
+    def mandatory_then_ok(**kw):
+        effort = kw["payload"].get("reasoning_effort")
+        sent_efforts.append(effort)
+        if effort == "none":
+            return {
+                "status_code": 400,
+                "json": {
+                    "error": {
+                        "message": (
+                            "Reasoning is mandatory for this endpoint and "
+                            "cannot be disabled."
+                        )
+                    }
+                },
+                "text": "",
+            }
+        return _ok_result("recovered")
+
+    monkeypatch.setattr(orb, "_post_chat_completion", mandatory_then_ok)
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+
+    assert backend.generate(
+        entry, [{"role": "user", "content": "x"}],
+        temperature=0.5, max_new_tokens=16,
+    ) == "recovered"
+    assert sent_efforts == ["none", "low"]
+
+    sent_efforts.clear()
+    assert backend.generate(
+        entry, [{"role": "user", "content": "x"}],
+        temperature=0.5, max_new_tokens=16,
+    ) == "recovered"
+    assert sent_efforts == ["low"]
 
 
 def test_transport_exception_is_retried_then_aborts(enabled_env, monkeypatch):

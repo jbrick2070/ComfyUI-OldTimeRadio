@@ -40,6 +40,8 @@ log = logging.getLogger(__name__)
 
 #: One-shot guard so the "reasoning_effort ACTIVE" evidence line logs once/process.
 _REASONING_EFFORT_LOGGED = False
+_MANDATORY_REASONING_SLUGS: set[str] = set()
+_MANDATORY_REASONING_OVERRIDE_LOGGED: set[str] = set()
 
 # ---------------------------------------------------------------------------
 # Reasoning-wrapper strip (BUG-306 / BUG-LOCAL-308 family)
@@ -263,6 +265,40 @@ def _reasoning_effort_from_env() -> str | None:
     return raw.strip().lower() or DEFAULT_REASONING_EFFORT
 
 
+def _mandatory_reasoning_effort(
+    slug: str, reasoning_meta: Any = None,
+) -> str | None:
+    """Return the effective effort for a model whose reasoning is mandatory.
+
+    OpenRouter's model catalog declares ``reasoning.mandatory`` and lists
+    supported efforts in descending order. An operator-wide ``none`` remains
+    valid for ordinary models, but a mandatory model rejects that value. In
+    that case use its lowest declared non-``none`` effort, or the project low
+    default when a stale/cold catalog has no capability detail.
+    """
+    requested = _reasoning_effort_from_env()
+    meta = reasoning_meta if isinstance(reasoning_meta, dict) else {}
+    mandatory = bool(meta.get("mandatory")) or slug in _MANDATORY_REASONING_SLUGS
+    if not mandatory or requested != "none":
+        return requested
+
+    supported = [
+        str(value).strip().lower()
+        for value in (meta.get("supported_efforts") or [])
+        if str(value).strip().lower() != "none"
+    ]
+    effective = supported[-1] if supported else DEFAULT_REASONING_EFFORT
+    if slug not in _MANDATORY_REASONING_OVERRIDE_LOGGED:
+        _MANDATORY_REASONING_OVERRIDE_LOGGED.add(slug)
+        log.warning(
+            "[OpenRouter] %s requires reasoning; overriding the incompatible "
+            "global effort 'none' with %r for this model only.",
+            slug,
+            effective,
+        )
+    return effective
+
+
 def openrouter_enabled() -> bool:
     """Remote is reachable when the API KEY is present -- a creds-present check,
     NOT a promotion gate. C6 (2026-06-29 -- "registry IS the menu"): the separate
@@ -362,6 +398,24 @@ def is_model_gone_error(status: int, snippet: str) -> bool:
         return False
     low = (snippet or "").lower()
     return any(m in low for m in _MODEL_GONE_MARKERS)
+
+
+def is_mandatory_reasoning_error(status: int, snippet: str) -> bool:
+    """Recognize OpenRouter's exact capability rejection for reasoning-off.
+
+    This is deliberately narrower than a generic HTTP 400 retry: only a
+    reasoning-specific message that says the feature is mandatory or cannot be
+    disabled qualifies for one same-model capability renegotiation.
+    """
+    if int(status or 0) != 400:
+        return False
+    low = (snippet or "").lower()
+    return "reasoning" in low and (
+        "mandatory" in low
+        or "cannot be disabled" in low
+        or "can't be disabled" in low
+        or "must be enabled" in low
+    )
 
 
 def _strip_route_suffix(slug: str) -> str:
@@ -618,7 +672,7 @@ def _slug_in_cache(slug: str) -> bool:
 # saved slug is still preserved + attempted (S3). The cache governs
 # DISCOVERY only; it must never mutate a saved slot slug value.
 
-CATALOG_SCHEMA_VERSION = 1
+CATALOG_SCHEMA_VERSION = 2
 _CATALOG_FILENAME = "openrouter_models.json"
 _CATALOG_STALE_AFTER_S = 7 * 24 * 3600  # older than a week -> "stale" (still usable)
 
@@ -673,6 +727,18 @@ def cached_models() -> list[dict]:
     from the stored fields."""
     models = load_catalog_cache().get("models") or []
     return [m for m in models if isinstance(m, dict) and m.get("id")]
+
+
+def _cached_model(slug: str) -> dict:
+    """Return cached capability metadata for *slug*, or an empty mapping."""
+    clean = _strip_route_suffix(slug)
+    try:
+        for model in cached_models():
+            if model.get("id") == clean:
+                return model
+    except Exception:  # noqa: BLE001 -- cache metadata is advisory
+        pass
+    return {}
 
 
 def _parse_iso(ts: Any) -> datetime.datetime | None:
@@ -731,6 +797,24 @@ def _slim_model(raw: dict) -> dict | None:
     arch = raw.get("architecture") if isinstance(raw.get("architecture"), dict) else {}
     out_mods = arch.get("output_modalities")
     out_mods = [str(x).lower() for x in out_mods] if isinstance(out_mods, list) else []
+    raw_reasoning = raw.get("reasoning") if isinstance(raw.get("reasoning"), dict) else {}
+    supported_efforts = raw_reasoning.get("supported_efforts")
+    supported_efforts = (
+        [str(value).strip().lower() for value in supported_efforts]
+        if isinstance(supported_efforts, list)
+        else []
+    )
+    reasoning = {
+        "supported_efforts": supported_efforts,
+        "default_effort": (
+            str(raw_reasoning.get("default_effort")).strip().lower()
+            if raw_reasoning.get("default_effort") is not None
+            else None
+        ),
+        "default_enabled": bool(raw_reasoning.get("default_enabled")),
+        "mandatory": bool(raw_reasoning.get("mandatory")),
+        "supports_max_tokens": bool(raw_reasoning.get("supports_max_tokens")),
+    }
     return {
         "id": mid,
         "name": str(raw.get("name") or mid),
@@ -742,6 +826,7 @@ def _slim_model(raw: dict) -> dict | None:
         "supported_parameters": sp,
         "supports_json": ("structured_outputs" in sp) or ("response_format" in sp),
         "output_modalities": out_mods,
+        "reasoning": reasoning,
     }
 
 
@@ -898,6 +983,7 @@ class OpenRouterBackend:
         # ':floor' suffix on the bound slug is stripped here and carried as an
         # explicit sort, so the wire payload + run meta hold the clean slug.
         slug, provider_sort = resolve_route(letter, resolve_slug(repo_id))
+        cached_model = _cached_model(slug)
         context_window = int(
             getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW)
             or DEFAULT_CONTEXT_WINDOW
@@ -908,6 +994,7 @@ class OpenRouterBackend:
             "slot_letter": letter,        # "A" / "B"
             "slug": slug,                 # the resolved real model id
             "provider_sort": provider_sort,  # throughput|price|latency|None
+            "reasoning": cached_model.get("reasoning"),
             "context_cap": context_window,
             "context_window": context_window,
             # optional per-slot overrides (FC3) -- None ⇒ caller controls
@@ -994,7 +1081,9 @@ class OpenRouterBackend:
         # field is omitted, so non-thinking models / OpenRouter-proper are
         # byte-identical. Not require_parameters-gated: a backend that ignores it
         # simply reasons as before -- the output-token floor is the safety net.
-        reasoning_effort = _reasoning_effort_from_env()
+        reasoning_effort = _mandatory_reasoning_effort(
+            slug, cache_entry.get("reasoning")
+        )
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort
             # EVIDENT (operator 2026-06-22): log ONCE per process so any server
@@ -1114,7 +1203,12 @@ class OpenRouterBackend:
         last_err: str = ""
         last_status: int = 0
         last_snippet: str = ""
-        for attempt in range(max_retries + 1):
+        transient_retries_left = max_retries
+        capability_retry_used = False
+        total_attempts = 0
+        payload = dict(payload)
+        while True:
+            total_attempts += 1
             try:
                 result = _post_chat_completion(
                     base_url=base_url, api_key=api_key,
@@ -1125,10 +1219,13 @@ class OpenRouterBackend:
                 last_status, last_snippet = 0, ""
                 log.warning(
                     "[OpenRouter] attempt %d/%d failed (%s)",
-                    attempt + 1, max_retries + 1, last_err,
+                    total_attempts, max_retries + 1, last_err,
                 )
-                self._sleep_backoff(attempt)
-                continue
+                if transient_retries_left > 0:
+                    transient_retries_left -= 1
+                    self._sleep_backoff(max_retries - transient_retries_left - 1)
+                    continue
+                break
 
             status = int(result.get("status_code") or 0)
             if status == 200:
@@ -1137,12 +1234,30 @@ class OpenRouterBackend:
             last_snippet = self._error_snippet(result)
             last_status = status
             last_err = f"HTTP {status}: {last_snippet}"
-            if status in _RETRYABLE_STATUS and attempt < max_retries:
+            if (
+                not capability_retry_used
+                and payload.get("reasoning_effort") == "none"
+                and is_mandatory_reasoning_error(status, last_snippet)
+            ):
+                capability_retry_used = True
+                _MANDATORY_REASONING_SLUGS.add(slug)
+                effective = _mandatory_reasoning_effort(slug)
+                payload["reasoning_effort"] = effective
+                log.warning(
+                    "[OpenRouter] %s rejected reasoning_effort='none' as "
+                    "mandatory; retrying the same model once with %r and "
+                    "remembering the capability for this process.",
+                    slug,
+                    effective,
+                )
+                continue
+            if status in _RETRYABLE_STATUS and transient_retries_left > 0:
+                transient_retries_left -= 1
                 log.warning(
                     "[OpenRouter] attempt %d/%d retryable (%s)",
-                    attempt + 1, max_retries + 1, last_err,
+                    total_attempts, max_retries + 1, last_err,
                 )
-                self._sleep_backoff(attempt)
+                self._sleep_backoff(max_retries - transient_retries_left - 1)
                 continue
             # Non-retryable (e.g. 400/401/403/404) -> abort now.
             break
@@ -1158,7 +1273,7 @@ class OpenRouterBackend:
                 slug=slug,
             )
         raise OpenRouterCallFailedError(
-            f"OpenRouter call to {slug} failed after {max_retries + 1} "
+            f"OpenRouter call to {slug} failed after {total_attempts} "
             f"attempt(s): {last_err}. Aborting the run (no mid-episode "
             f"fall-back to local, per C5)."
         )
