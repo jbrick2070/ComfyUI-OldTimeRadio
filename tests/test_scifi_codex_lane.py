@@ -1069,6 +1069,41 @@ def test_p3_semantic_repair_uses_minified_draft_and_bounded_receipts():
     assert journal["calls"][0]["accepted_transport"]["schema"] == "RadioScoreDraftV4"
 
 
+def test_p3_compact_contract_names_nested_literal_values_on_base_and_repair():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    invalid = draft.model_dump(mode="json")
+    invalid["scenes"][0]["beats"][0]["arc_phase"] = 10
+    invalid["music_cues"][0]["cue_id"] = "TensionBuild"
+    responses = [json.dumps(invalid), json.dumps(draft.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn, pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal={},
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    for call in calls:
+        system = call["messages"][0]["content"]
+        assert "arc_phase is a narrative JSON string" in system
+        assert "never a number, word count, advisory center, or percentage" in system
+        assert "cue_id MUST be exactly one of music_open, music_inter, music_close" in system
+        assert "never a descriptive music name" in system
+
+
 def test_p3_two_decode_failures_restart_only_from_trusted_draft_context():
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
     cast = _metadata_repair_cast()

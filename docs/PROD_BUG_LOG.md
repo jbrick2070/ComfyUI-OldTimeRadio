@@ -951,3 +951,36 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- repeatable bounded-source-metadata repair class at the
   shared Sci-Fi P0 fan-out; promoted as an executable BUG-11.50 extension.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260712-24 -- Sci-Fi Codex P3 compact draft omitted nested literal semantics
+
+- promotion: BUG-11.38 extension
+- surfaced: canonical 120-word `scifi_codex` reverify queue leg, prompt
+  `fab1bbbe-cfc1-484b-8f5b-61dfc296de6e`, Gemma E4B creative + Mistral-Nemo
+  technical, 2026-07-12
+- symptom: P0 repaired and P1/P2 cleared, but P3's base compact draft emitted
+  numeric `arc_phase` values copied from advisory word centers and invented
+  descriptive cue IDs (`TensionBuild`, `EquityStrain`, `DecisionPoint`). Its
+  typed repair reduced unrelated overlength errors but repeated those seven
+  invalid nested values, so the canonical queue ended `RESULT FAIL` before
+  P4/P5, ledger finalization, media, or OBS work.
+- root cause: P3 correctly omitted the large full Pydantic schema to preserve
+  its measured 8,192-token repair window, but the compact model-facing contract
+  named `arc_phase` and `cue_id` only by field and length. It did not preserve
+  their nested literal/type semantics. The local model therefore treated
+  `arc_phase` as a word-band number and treated `cue_id` as a creative title;
+  the same incomplete surface was reused for typed repair.
+- fix: make the shared compact P3/P3-rewrite base and repair contract state that
+  `arc_phase` is a short narrative JSON string, never a number/word count/center
+  or percentage, and enumerate `music_open`, `music_inter`, and `music_close`
+  as the only cue IDs. Creative cue naming stays in `description`. No Python
+  normalization is permitted: arc labels and cue choice remain model-authored.
+- verify idea: drive the live failure shape (numeric arc plus descriptive cue
+  ID) through base then typed repair and assert the accepted score returns only
+  after the repair sees both literal rules; retain actual-tokenizer fit tests
+  for base/restart/semantic-repair/rewrite envelopes. Then rerun the same
+  canonical Codex leg through P3/ledger/OBS proof.
+- bible-worthy: yes -- model-visible compact schemas must retain nested type and
+  literal semantics, not merely field names and maximum lengths; promoted as an
+  executable BUG-11.38 extension.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING
