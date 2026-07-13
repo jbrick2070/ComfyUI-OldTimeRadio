@@ -170,6 +170,27 @@ def test_schema_contract_renders_nested_bounds_literals_and_paths():
     assert not sc.schema_path_exists(ContractSchema, "entries[*].missing")
 
 
+def test_schema_contract_never_emits_an_empty_key_list_for_a_scalar():
+    """A scalar declares no properties, so it has no "exact keys" to state.
+
+    Emitting the object line for every string/int/bool leaf bloated the contract
+    injected into every LLM call in every lane with meaningless empty key lists.
+    Object lines must survive; scalar lines must not exist at all.
+    """
+    instruction = sc.schema_shape_instruction(ContractSchema)
+
+    assert "exact keys=\n" not in instruction
+    assert not any(
+        line.startswith("- object ") and line.rstrip().endswith("exact keys=")
+        for line in instruction.splitlines()
+    )
+    # The real object contracts are still stated.
+    assert any(
+        line.startswith("- object entries[*]:") and "exact keys=" in line
+        for line in instruction.splitlines()
+    )
+
+
 def test_structured_call_injects_one_contract_without_mutating_messages():
     prompt = [
         {"role": "system", "content": "Author a compact response."},

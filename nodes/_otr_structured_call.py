@@ -367,8 +367,15 @@ def _schema_contract_lines(schema: type[BaseModel]) -> tuple[str, ...]:
             add(f"- {label}: {requirement}; {_schema_constraint_description(node)}")
 
         properties = node.get("properties", {})
-        if isinstance(properties, dict):
-            names = [name for name in properties if isinstance(name, str)]
+        # An "exact keys=" line is only meaningful for a node that actually
+        # declares properties. Scalars carry none, so emitting the line for them
+        # produced an empty, meaningless key list on every string/int/bool field
+        # -- pure token cost and a confusion risk for the small technical model.
+        names = (
+            [name for name in properties if isinstance(name, str)]
+            if isinstance(properties, dict) else []
+        )
+        if names:
             closed = node.get("additionalProperties") is False
             closure = "closed; " if closed else ""
             add(
