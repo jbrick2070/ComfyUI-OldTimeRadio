@@ -1417,7 +1417,21 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- an audit's blocking authority must not exceed what its
   repair route can re-author, and a validator that cannot be overruled must not
   be re-litigated by a model. Candidate for fan-out.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED at `3a98a6f1`; LIVE REVERIFIED 2026-07-13, prompt
+  `28fe3cdf-e652-4db6-ab59-b7ddda6786ae` (same canonical 42-word
+  `original_codex56sol` leg, Aion 3.0 Mini creative + Mistral-Nemo technical).
+  `RESULT SUCCESS`, `obs_publish OK`, asset confirmed on disk (84,092,039 bytes,
+  `output\otr\obs\signal_lost_waiting_room_whispers_20260713_122501_silent_procgen_blended_captioned_with_credits_final.mp4`).
+  The live receipt proves the seam, not just the gate: P9 ran ONCE with no
+  retake and no repair (`call_journal` `P9x1`), and the audit model met the very
+  situation that killed the prior run -- a concern it could not act on -- and
+  self-classified it into `warnings` verbatim: "The 'resolution_anchor' in the
+  grounding_contract is missing. This is a compile-time issue and cannot be
+  corrected during this pass." `accepted=true`, `findings=[]`,
+  `blocking_script_findings=0`. That warning is itself a model misread -- the
+  deterministic grounding validator proved the anchor IS spoken on the closure
+  line -- which is exactly why a model's opinion about a Python-owned artifact
+  must never hold a blocking vote.
 
 ## PBUG-20260713-11 -- P1 slate lost a clue per object with no rule to repair it
 
@@ -1452,4 +1466,12 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- a cardinality invariant that lives only in a schema
   minimum, with no matching prompt rule and no repair branch, is an unrepairable
   contract. Same class as PBUG-20260713-10. Candidate for fan-out.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED at `58983363`; LIVE REVERIFIED 2026-07-13, prompt
+  `28fe3cdf-e652-4db6-ab59-b7ddda6786ae` (same leg and models). P1 passed on its
+  FIRST attempt with no repair rung (`call_journal` `P1x1`) and the run carried
+  through to `RESULT SUCCESS`, `obs_publish OK`, and the final OBS asset.
+- coverage limit (stated, not hidden): `constraint_deck.json` ships 3 draws and
+  every one has exactly 3 lost objects, so live production has only ever
+  exercised the 3-object case, where the coverage rule and the bare
+  `min_length=3` happen to coincide. The wider-draw behaviour this fix adds
+  (4+ objects) is proven by unit test only. `ConstraintDraw` permits up to 6.
