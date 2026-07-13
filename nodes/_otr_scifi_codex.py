@@ -197,12 +197,27 @@ class CastPlanV4(_Strict):
     cast: list[CastPlanRowV4] = Field(min_length=2, max_length=4)
 
 
-_CAST_NAME_RE = re.compile(r"(?:(?:Dr|Prof)\. )?[A-Z][a-z]+(?: [A-Z][a-z]+)*")
+_CAST_NAME_PREFIX_RE = re.compile(r"^(?:(?:Dr|Prof)\. )")
+_CAST_NAME_WORD_RE = re.compile(r"[A-Z][a-z]+")
+_CAST_NAME_ACRONYM_RE = re.compile(r"[A-Z]{2,3}")
 
 
 def _is_canonical_character_name(name: str) -> bool:
-    """Accept ordinary title-cased full names without rewriting cast work."""
-    return bool(_CAST_NAME_RE.fullmatch(name))
+    """Accept title-cased names with at most one short role acronym token."""
+    body = _CAST_NAME_PREFIX_RE.sub("", name, count=1)
+    tokens = body.split(" ")
+    if not tokens or any(not token for token in tokens):
+        return False
+    acronym_count = sum(bool(_CAST_NAME_ACRONYM_RE.fullmatch(token)) for token in tokens)
+    return (
+        acronym_count <= 1
+        and any(_CAST_NAME_WORD_RE.fullmatch(token) for token in tokens)
+        and all(
+            _CAST_NAME_WORD_RE.fullmatch(token)
+            or _CAST_NAME_ACRONYM_RE.fullmatch(token)
+            for token in tokens
+        )
+    )
 
 
 def _validate_cast_plan(cast: CastPlanV4) -> str | None:
@@ -2579,7 +2594,10 @@ def invoke_codex_structured(
                 "object only. Preserve every character description, gender, role, "
                 "and voice slot. The row whose char_id is announcer MUST have the "
                 "exact fixed name ANNOUNCER. Every non-announcer name must be one "
-                "canonical Title-Case name, and every char_id must occur exactly once."
+                "canonical Title-Case name. One short 2-3 letter acronym token is "
+                "allowed inside an otherwise Title-Case name (for example AI Unit "
+                "Seven), but digits and all-uppercase full labels are forbidden. "
+                "Every char_id must occur exactly once."
             )
         elif pass_id == "P0":
             repair_rules = (

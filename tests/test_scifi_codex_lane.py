@@ -291,6 +291,18 @@ def test_cast_plan_locks_and_repairs_the_fixed_announcer_identity():
     assert lane._validate_cast_plan(
         repaired.model_copy(update={"cast": [repaired.cast[0], full_name]}),
     ) is None
+    acronym_name = repaired.cast[1].model_copy(update={"name": "AI Unit Seven"})
+    assert lane._validate_cast_plan(
+        repaired.model_copy(update={"cast": [repaired.cast[0], acronym_name]}),
+    ) is None
+    digit_name = repaired.cast[1].model_copy(update={"name": "AI Unit 7"})
+    assert "canonical Title-Case name" in lane._validate_cast_plan(
+        repaired.model_copy(update={"cast": [repaired.cast[0], digit_name]}),
+    )
+    label_name = repaired.cast[1].model_copy(update={"name": "AI UNIT"})
+    assert "canonical Title-Case name" in lane._validate_cast_plan(
+        repaired.model_copy(update={"cast": [repaired.cast[0], label_name]}),
+    )
     invalid_name = repaired.cast[1].model_copy(update={"name": "dr. amelia hart"})
     assert "canonical Title-Case name" in lane._validate_cast_plan(
         repaired.model_copy(update={"cast": [repaired.cast[0], invalid_name]}),
@@ -313,6 +325,38 @@ def test_cast_plan_locks_and_repairs_the_fixed_announcer_identity():
     assert isinstance(result, lane.CastPlanV4)
     assert result.cast[0].name == "ANNOUNCER"
     assert len(calls) == 1
+
+
+def test_p2_repair_accepts_short_acronym_inside_title_case_character_name():
+    cast = _metadata_repair_cast()
+    invalid_row = cast.cast[1].model_copy(update={"name": "AI Unit 7"})
+    repaired_row = invalid_row.model_copy(update={"name": "AI Unit Seven"})
+    invalid = cast.model_copy(update={"cast": [cast.cast[0], invalid_row]})
+    repaired = cast.model_copy(update={"cast": [cast.cast[0], repaired_row]})
+    responses = [
+        json.dumps(invalid.model_dump(mode="json")),
+        json.dumps(repaired.model_dump(mode="json")),
+    ]
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane.invoke_codex_structured(
+        pass_id="P2", slot="creative", slot_fn=slot_fn,
+        pack=SimpleNamespace(prompt_stages={"codex_pressure_cast_system": "Cast."}),
+        seam_refs=("codex_pressure_cast_system",), artifact_inputs={},
+        result_type=lane.CastPlanV4, post_validator=lane._validate_cast_plan,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=1600, call_journal={},
+    )
+
+    assert result.cast[1].name == "AI Unit Seven"
+    assert len(calls) == 2
+    repair_system = calls[1]["messages"][0]["content"]
+    assert "One short 2-3 letter acronym token is allowed" in repair_system
+    assert "digits and all-uppercase full labels are forbidden" in repair_system
 
 
 def test_codex_pack_and_registry_contract():

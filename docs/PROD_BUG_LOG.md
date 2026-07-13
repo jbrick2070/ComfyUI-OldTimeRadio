@@ -1327,3 +1327,30 @@ out until they independently meet the same production-only admission rule.
   only the local patch after overflow; promoted as executable BUG-11.42
   extension coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-09 -- P2 rejected an acronym-bearing canonical character name
+
+- promotion: BUG-11.52
+- surfaced: canonical 42-word `scifi_codex` reverify, prompt
+  `7997800e-b0f5-4201-ae2d-193a899ac6f4`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: P0 and the compact P1 repair cleared. P2 returned `AI Unit 7`; its
+  repair correctly removed the digit as `AI Unit Seven`, but the same validator
+  rejected the legitimate `AI` acronym and exhausted the ladder before P3,
+  script, ledger, media, or OBS.
+- root cause: the cast-name grammar accepted only `[A-Z][a-z]+` tokens. The
+  repair instruction said only "Title-Case," so the model fixed the visible
+  numeric defect while the validator's hidden blanket acronym ban remained.
+- fix: accept at most one short 2-3-letter acronym token inside a name that also
+  contains at least one normal Title-Case word. Continue rejecting digits,
+  lowercase labels, empty tokens, multiple acronyms, and all-uppercase full
+  labels. State the exact grammar and `AI Unit Seven` example at the P2 repair
+  boundary; do not rewrite character names in Python.
+- verify idea: accept `AI Unit Seven` and `Dr. Amelia Hart`; reject `AI Unit 7`,
+  `AI UNIT`, and lowercase names. Reproduce base `AI Unit 7` followed by the
+  one-call authored repair and assert its exact model-facing grammar. Re-run
+  the canonical 42-word combination through ledger, episode, `obs_publish OK`,
+  and final OBS existence.
+- bible-worthy: yes -- lexical validators must state and implement the same
+  bounded acronym-aware name grammar; promoted as executable BUG-11.52.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING
