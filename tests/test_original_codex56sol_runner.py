@@ -1995,7 +1995,8 @@ def test_p4_rerun_still_blocked_fails_closed(tmp_path):
                  "source_meta": {"constraint_draw": DRAW}})
     with pytest.raises(
         lane.OriginalCodex56SolContractError,
-        match="rejected the retaken truth map",
+        # The error must carry the finding, not just the fact of failure.
+        match=r"rejected the retaken truth map: \[Fair play\] q1: still not audible",
     ):
         lane.run_original_codex56sol_episode(
             payload={"seed_text": json.dumps(DRAW)}, pack=pack,

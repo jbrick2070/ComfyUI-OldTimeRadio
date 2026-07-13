@@ -2164,9 +2164,18 @@ def run_original_codex56sol_episode(
         # before anything audits or consumes it.
         grounding = _build_grounding_contract(draw, truth)
         fair = _call(pass_id="P4_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600, post_validator=lambda value, t=truth: _validate_fair_play_envelope(value, t))
-        if _corroborated_fair_blocks(fair, truth):
+        rerun_blocks = _corroborated_fair_blocks(fair, truth)
+        if rerun_blocks:
+            # Carry the findings into the error. A fail-closed message that
+            # reports only THAT it failed forces the next engineer to guess at
+            # what the model objected to -- which is how this gate got
+            # misdiagnosed twice.
+            detail = "; ".join(
+                f"[{row.category.strip()}] {row.item_id}: {row.detail.strip()}"
+                for row in rerun_blocks
+            )
             raise OriginalCodex56SolContractError(
-                "fair-play audit rejected the retaken truth map"
+                f"fair-play audit rejected the retaken truth map: {detail}"
             )
         fair_advisories = fair_advisories + _fair_play_advisories(fair, truth)
 
