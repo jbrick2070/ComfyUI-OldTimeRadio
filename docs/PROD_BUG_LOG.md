@@ -1127,3 +1127,39 @@ out until they independently meet the same production-only admission rule.
   transport behavior, not locality alone; promoted as executable BUG-11.42
   extension coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-03 -- P4 repair replaced a valid pass review with diagnostic-shaped JSON
+
+- promotion: BUG-11.38 extension
+- surfaced: canonical 120-word `scifi_codex` reverify, prompt
+  `a43a3e77-2ba4-4420-a4e1-1982bf0448cc`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: P0 through P3 cleared. P4 returned the correct three-field review
+  with `verdict: "pass"` and an empty string issue list, but its rationale was
+  one character over the 240-character cap. The generic typed repair changed
+  the verdict to the invalid literal `fail` and changed issues into objects
+  shaped like validation diagnostics, then exhausted the ladder before
+  ledger/media/OBS work.
+- root cause: the compact P4 seam named field lengths but did not state the
+  exact verdict literals or that issues are strings. Its generic repair turn
+  also supplied the entire score-shaped original request beside Pydantic error
+  diagnostics, allowing input and diagnostic shapes to compete with the small
+  output contract.
+- fix: repeat an exact StructureReviewV4 contract at the base and repair
+  boundaries: exactly `verdict`, `issues`, and `rationale`; only `pass` or
+  `rewrite`; a flat list of at most six bounded strings; and one bounded
+  rationale. Give the repair only the failed review and bounded rejection,
+  require valid fields to remain unchanged, and explicitly forbid copying
+  error codes/messages/shapes. The model still authors any shortening; Python
+  does not clip review prose.
+- verify idea: inject a correct `pass` review whose rationale is 241
+  characters, capture both calls, and require the repair to preserve `pass`
+  and empty string issues while shortening only the rationale. Assert both
+  system prompts carry the literal/type contract and the repair input omits
+  the accepted score/original request. Then rerun the same canonical 120-word
+  combination through ledger, episode, `obs_publish OK`, and final OBS
+  existence.
+- bible-worthy: yes -- compact typed contracts must preserve literal and item
+  type semantics at every repair boundary; promoted as executable BUG-11.38
+  extension coverage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

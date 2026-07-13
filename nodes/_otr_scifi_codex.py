@@ -1185,6 +1185,15 @@ class StructureReviewV4(_Strict):
     rationale: str = Field(default="", max_length=240)
 
 
+_STRUCTURE_REVIEW_CONTRACT_INSTRUCTION = (
+    " STRUCTURE REVIEW ROOT CONTRACT: return exactly verdict, issues, and "
+    "rationale. verdict is the exact JSON string literal pass or rewrite; "
+    "never return fail. issues is a flat JSON array of zero to six strings, "
+    "each 1-120 characters; never return issue objects. rationale is one JSON "
+    "string of at most 240 characters."
+)
+
+
 class ListenerIssueV4(_Strict):
     """One diagnosis from the listening room.
 
@@ -2138,6 +2147,8 @@ def invoke_codex_structured(
             )
     if script_artifact_pass:
         schema_instruction += _SCRIPT_ARTIFACT_ROOT_INSTRUCTION
+    if result_type is StructureReviewV4:
+        schema_instruction += _STRUCTURE_REVIEW_CONTRACT_INSTRUCTION
     messages = [{"role": "system", "content": "\n".join(seams) + schema_instruction}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
     calls: list[dict[str, Any]] = []
 
@@ -2512,6 +2523,39 @@ def invoke_codex_structured(
                 "issue is about the whole play), and direction (what a writer should do). "
                 "Return one JSON object only."
             )
+        elif pass_id == "P4" and result_type is StructureReviewV4:
+            # Keep the compact review itself as the only output-shaped input.
+            # The accepted score and Pydantic diagnostic are evidence, not
+            # templates; including the full original request here caused the
+            # live repair to invent `fail` and object-shaped issues.
+            repair_rules = (
+                "This is a typed repair of the same StructureReviewV4, not a "
+                "new score review. Preserve every already-valid field and "
+                "change only rejected fields. Return exactly three root keys: "
+                "verdict, issues, rationale. verdict MUST be the exact string "
+                "pass or rewrite, never fail. issues MUST be a flat JSON array "
+                "of zero to six strings of 1-120 characters each, never objects. "
+                "rationale MUST be one string of at most 240 characters. The "
+                "rejection describes invalid paths only; never copy its error "
+                "codes, messages, or diagnostic shape into the artifact."
+            )
+            return [
+                {
+                    "role": "system",
+                    "content": "\n".join(seams) + schema_instruction
+                    + "\n" + repair_rules,
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "failed_structure_review": failed_output,
+                            "rejection": detail,
+                        },
+                        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                    ),
+                },
+            ]
         else:
             repair_rules = (
                 "This is a typed repair of the same artifact. Preserve the existing premise, "

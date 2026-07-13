@@ -1869,6 +1869,53 @@ def test_default_schema_injection_preserves_wire_receipt_without_unwrap():
     )
 
 
+def test_p4_typed_repair_keeps_exact_review_shape_and_only_compact_failed_review():
+    overlong_rationale = "A" * 241
+    base = json.dumps({
+        "verdict": "pass",
+        "issues": [],
+        "rationale": overlong_rationale,
+    })
+    repaired = json.dumps({
+        "verdict": "pass",
+        "issues": [],
+        "rationale": "The score is coherent, causal, and ready for scripting.",
+    })
+    calls: list[dict[str, object]] = []
+    responses = [base, repaired]
+    pack = SimpleNamespace(prompt_stages={
+        "codex_radio_score_system": "Review the score.",
+        "codex_coda_contract_system": "Keep the coda source-bound.",
+    })
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane.invoke_codex_structured(
+        pass_id="P4", slot="technical", slot_fn=slot_fn, pack=pack,
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs={"score": {"large": "accepted score must not be repeated"}},
+        result_type=lane.StructureReviewV4, post_validator=lambda _: None,
+        base_temperature=.20, structural_retry_temperature=.10,
+        max_new_tokens=1800, call_journal={}, clamp_overlong_strings=False,
+    )
+
+    assert result.verdict == "pass"
+    assert result.issues == []
+    assert len(calls) == 2
+    for call in calls:
+        system = call["messages"][0]["content"]
+        assert "verdict is the exact JSON string literal pass or rewrite" in system
+        assert "issues is a flat JSON array of zero to six strings" in system
+        assert "never return fail" in system
+    repair_user = json.loads(calls[1]["messages"][1]["content"])
+    assert set(repair_user) == {"failed_structure_review", "rejection"}
+    assert "original_request" not in calls[1]["messages"][1]["content"]
+    assert "accepted score must not be repeated" not in calls[1]["messages"][1]["content"]
+    assert "string_too_long" in repair_user["rejection"]
+
+
 def test_resolved_artifact_envelope_with_sibling_key_stays_fail_loud():
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
     cast = _metadata_repair_cast()
