@@ -1954,6 +1954,12 @@ def test_p4_corroborated_block_retakes_the_truth_map(tmp_path):
     disposition = led.data["meta"]["original_codex56sol"]["fair_play_disposition"]
     assert disposition["truth_map_retake_ran"] is True
     assert disposition["effective_verdict"] == "accepted_after_truth_map_retake"
+    # The retake's CAUSE is persisted, not just the fact of it -- otherwise the
+    # retake rate cannot be calibrated from the receipt.
+    assert disposition["corroborated_blocking_findings"] == 1
+    assert [row["item_id"] for row in disposition["initial_blocking_findings"]] == [
+        "q1",
+    ]
     journal = led.data["meta"]["original_codex56sol"]["call_journal"]
     assert [row["pass_id"] for row in journal][:6] == [
         "P1", "P2", "P3", "P4", "P3_rerun", "P4_rerun",
@@ -2098,10 +2104,46 @@ def test_p4_blocking_authority_is_stated_in_seam_and_repair_rules():
         "original_codex56sol",
     ).prompt_stages["codex56_fair_play_audit"]
     rules = lane._repair_rules("P4_rerun", "blocking must be a boolean")
+    assert "caller_threads, causal_steps, audible_clues" in rules
+    assert "thread_id, step_id, clue_id, or interpretation_id" in seam
     for text in (seam, rules):
-        assert "caller_threads, causal_steps, audible_clues" in text
         assert "never blocking" in text or "NOT blocking" in text
     assert "orders a full retake" in seam
+
+
+def test_p4_may_not_grade_what_a_truth_map_cannot_express():
+    """PBUG-20260713-14: the audit blocked 3/3 live runs on an impossible question.
+
+    `AudibleTruthMap` carries no line order and no reveal position -- nothing in
+    it is "before" the reveal. Grading clue-before-reveal order there asked the
+    model to judge a property the artifact cannot state, so it invented a defect
+    on every run and the retake could never satisfy it. That property IS tested,
+    where it is representable: the P7 blind listener reads only pre-reveal lines
+    and must infer the cause.
+    """
+    routing._REGISTRY = None
+    stages = routing.resolve_story_pack("original_codex56sol").prompt_stages
+    fair = stages["codex56_fair_play_audit"]
+
+    # The truth map has no ordering to grade.
+    assert not any(
+        field in lane.AudibleTruthMap.model_fields
+        for field in ("reveal_index", "clue_order", "line_order", "arc_phase")
+    )
+    # So P4 must not grade it -- and must say so.
+    assert "Do NOT judge clue ordering" in fair
+    assert "clue-before-reveal placement" in fair
+    assert "audited downstream" in fair
+    # ...while still owning what a truth map CAN express.
+    assert "exact causal closure" in fair
+    assert "helpful ending" in fair
+
+    # The ordering property is owned downstream, where order actually exists:
+    # the manifest carries arc_phase and a reveal line id, and the blind listener
+    # is the pass that tests it.
+    assert "arc_phase" in lane.ManifestLine.model_fields
+    assert "reveal_line_id" in lane.ClosedLineManifest.model_fields
+    assert "before the declared reveal" in stages["codex56_blind_listener"]
 
 
 def test_every_schema_bound_is_stated_where_the_model_can_see_it():

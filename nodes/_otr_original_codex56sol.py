@@ -2131,6 +2131,7 @@ def run_original_codex56sol_episode(
     fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600, post_validator=lambda value, t=truth: _validate_fair_play_envelope(value, t))
     fair_advisories = _fair_play_advisories(fair, truth)
     corroborated_fair_blocks = _corroborated_fair_blocks(fair, truth)
+    initial_fair_blocks = list(corroborated_fair_blocks)
     truth_map_retake_ran = False
     if corroborated_fair_blocks:
         # The truth map is authored by P3, so a corroborated fair-play block is
@@ -2169,13 +2170,20 @@ def run_original_codex56sol_episode(
             )
         fair_advisories = fair_advisories + _fair_play_advisories(fair, truth)
 
+    # Persist WHY a retake fired, not just that one did. Without the initial
+    # blocking findings the retake rate cannot be calibrated from the receipt,
+    # and calibration is the only way to tell a load-bearing repair route from a
+    # second authoring pass in disguise.
     fair_play_disposition = {
-        "schema_version": "original_codex56sol.fair_play_disposition.v1",
+        "schema_version": "original_codex56sol.fair_play_disposition.v2",
         "model_verdict": fair.accepted,
         "effective_verdict": ("accepted_after_truth_map_retake"
                               if truth_map_retake_ran else "accepted"),
         "truth_map_retake_ran": truth_map_retake_ran,
-        "corroborated_blocking_findings": 0,
+        "initial_blocking_findings": [
+            row.model_dump(mode="json") for row in initial_fair_blocks
+        ],
+        "corroborated_blocking_findings": len(initial_fair_blocks),
         "advisory_findings": [row.model_dump(mode="json")
                               for row in fair_advisories],
         "warnings": list(fair.warnings),

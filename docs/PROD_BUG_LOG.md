@@ -1578,4 +1578,49 @@ out until they independently meet the same production-only admission rule.
   answer; if nothing, it is not a guard, it is a liability. The corollary: an ID
   is the identity, a path is a hint, and Python must never fail closed on a
   coordinate it can resolve -- or on one it does not need.
+- status: FIXED at `fdb5c433`; LIVE REVERIFIED at prompt
+  `ee452c84-7bd7-4dba-9e45-ad15a255f8ab` -- the coordinate gate no longer fires;
+  P4 corroborated, `P3_rerun` ran, and `P4_rerun` reached a real verdict for the
+  first time. That verdict exposed PBUG-20260713-14 below.
+
+## PBUG-20260713-14 -- the fair-play audit graded a property its artifact cannot express
+
+- surfaced: canonical 42-word `original_codex56sol` runs, prompts `d5f66b1a`,
+  `07725d30`, and `ee452c84` (Aion 3.0 Mini creative + Mistral-Nemo technical,
+  2026-07-13). The last one reached the retake verdict and failed closed with
+  `fair-play audit rejected the retaken truth map`.
+- symptom: P4 raised a corroborated blocking finding on **3 of 3** live runs, and
+  blocked the RETAKEN truth map as well. A repair route that fires every time,
+  and that a retake cannot satisfy, is not a repair route.
+- root cause: the P4 seam ordered the model to check "clue-before-reveal order"
+  and "audible sufficiency" -- but `AudibleTruthMap` carries **no line order and
+  no reveal position**. Nothing in it is "before" anything. The audit asked the
+  model to judge a property the artifact cannot state, so it manufactured a
+  defect every run, and `P3_rerun` could never fix what it could not represent.
+  The property is not even unowned: it is already tested where it IS
+  representable, by the P7 blind listener, which reads only the pre-reveal lines
+  and must infer the mundane cause. P4 was duplicating a downstream gate on an
+  artifact that cannot answer it.
+- fix: narrow P4's charter to what a truth map can express -- causal closure,
+  separate mundane possessions, the declared device as sole cause, benign safety,
+  declared-name closure, and the helpful ending. The seam now explicitly forbids
+  judging clue ordering, clue timing, clue-before-reveal placement, pacing, or
+  listener experience, and says those are decided later and audited downstream.
+  The retake machinery is unchanged and correct; it was aimed at an impossible
+  question. Also persist the retake's CAUSE: `fair_play_disposition` was writing
+  a hardcoded `"corroborated_blocking_findings": 0` and dropping the initial
+  blocking findings, so the retake rate could not be calibrated from the receipt
+  (v2 now records `initial_blocking_findings` and a real count).
+- verify idea: assert `AudibleTruthMap` declares no ordering/timing field and the
+  P4 seam forbids grading one; assert the blind-listener seam still owns
+  "before the declared reveal"; assert the disposition records the initial
+  blocking findings and a true count. Re-run the canonical 42-word combination
+  and confirm P4 accepts without a retake, through ledger, episode,
+  `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes. **An audit may only grade properties its artifact can
+  express.** If the check needs an ordering, a timing, or a coordinate the
+  artifact does not carry, the model will invent a verdict and the repair cannot
+  converge. Audit each artifact for what it can say, and put ordering checks
+  where ordering exists. Found by asking why a repair route fired 100% of the
+  time -- a repair path that always fires is a design smell, not a safety net.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
