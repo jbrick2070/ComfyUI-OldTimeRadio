@@ -2,7 +2,7 @@ import json
 from contextlib import contextmanager
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from nodes import _otr_original_codex56sol as lane
 from nodes import _otr_story_routing as routing
@@ -2090,6 +2090,121 @@ def test_p4_blocking_authority_is_stated_in_seam_and_repair_rules():
         assert "caller_threads, causal_steps, audible_clues" in text
         assert "never blocking" in text or "NOT blocking" in text
     assert "orders a full retake" in seam
+
+
+def test_every_schema_bound_is_stated_where_the_model_can_see_it():
+    """The class guard: a BOUND the model is never shown.
+
+    `schema_shape_instruction` does emit the required nested paths, so the model
+    is told which fields must exist. What it never emits is a `min_length`,
+    `max_length`, or `pattern`. A bound that appears in neither the seam nor the
+    pass's repair rules is therefore a rule the ladder cannot state -- which is
+    exactly how PBUG-20260713-11 killed a live run (clue_plan's min_length=3 was
+    enforced in Python and written nowhere a model could read it).
+
+    Guard every constrained field across every structured pass in the lane.
+    """
+    routing._REGISTRY = None
+    stages = routing.resolve_story_pack("original_codex56sol").prompt_stages
+
+    passes = [
+        ("P1", "codex56_possibility_slate", lane.PossibilitySlate),
+        ("P2", "codex56_slate_triage", lane.SlateTriage),
+        ("P3", "codex56_audible_truth_map", lane.AudibleTruthMap),
+        ("P3_rerun", "codex56_truth_map_retake", lane.AudibleTruthMap),
+        ("P4", "codex56_fair_play_audit", lane.FairPlayReport),
+        ("P5", "codex56_broadcast_score", lane.BroadcastScore),
+        ("P5_grounding_patch", "codex56_score_anchor_patch",
+         lane.ScoreIntentPatch),
+        ("P6", "codex56_performance_script", lane.PerformanceScript),
+        ("P6_grounding_patch", "codex56_script_anchor_patch",
+         lane.ScriptLinePatch),
+        ("P7", "codex56_blind_listener", lane.BlindListenerReport),
+        ("P9", "codex56_final_contract_audit", lane.FinalContractAudit),
+    ]
+
+    def bounded(model, prefix="", seen=None, out=None):
+        seen = seen if seen is not None else set()
+        out = out if out is not None else []
+        if model in seen:
+            return out
+        seen.add(model)
+        for name, field in model.model_fields.items():
+            if any(hasattr(meta, attr) for meta in field.metadata
+                   for attr in ("min_length", "max_length", "pattern")):
+                out.append(f"{prefix}{name}")
+            annotation = field.annotation
+            for sub in (getattr(annotation, "__args__", ()) or (annotation,)):
+                if isinstance(sub, type) and issubclass(sub, BaseModel):
+                    bounded(sub, f"{prefix}{name}.", seen, out)
+        return out
+
+    unstated = []
+    for pass_id, seam_key, schema in passes:
+        visible = stages[seam_key] + " " + lane._repair_rules(pass_id, "bound")
+        for path in bounded(schema):
+            leaf = path.split(".")[-1]
+            if leaf not in visible:
+                unstated.append(f"{pass_id}:{schema.__name__}.{path}")
+    assert not unstated, (
+        "these fields carry a schema bound the model is never shown, and the "
+        f"repair ladder cannot state: {unstated}"
+    )
+
+
+def test_blocking_is_demanded_as_a_field_not_invited_as_prose():
+    """PBUG-20260713-12: 'set blocking=false' read as text to write.
+
+    The model wrote the literal string into `detail` and omitted the real
+    boolean. The required path WAS in the model-visible contract -- the defect
+    was a seam that phrased a field as prose.
+    """
+    routing._REGISTRY = None
+    stages = routing.resolve_story_pack("original_codex56sol").prompt_stages
+    for seam_key in ("codex56_fair_play_audit", "codex56_blind_listener"):
+        seam = stages[seam_key]
+        assert "real JSON boolean field" in seam
+        assert "never written as prose inside detail" in seam
+
+
+def test_wide_draw_contracts_are_satisfiable():
+    """A schema cap must never forbid the only artifact its validator accepts."""
+    def max_length(model, field):
+        return next(
+            getattr(meta, "max_length")
+            for meta in model.model_fields[field].metadata
+            if getattr(meta, "max_length", None) is not None
+        )
+
+    # One caller per lost object, and a draw may carry up to 6 lost objects.
+    assert max_length(lane.PossibilityCard, "callers") >= 6
+    # The intent patch can target one beat per anchor (<=6) plus reveal and
+    # closure = 8, and `_validate_score_intent_patch` demands EVERY planned
+    # target -- so a cap below 8 forbids the only patch it would accept.
+    assert max_length(lane.ScoreIntentPatch, "replacements") >= 8
+    assert max_length(lane.ScriptLinePatch, "replacements") >= 8
+
+
+def test_fair_play_field_path_root_survives_bracket_indexing():
+    """`audible_clues[0].implication` names the same collection as `.0.`."""
+    assert lane._field_path_root("audible_clues.0.implication") == "audible_clues"
+    assert lane._field_path_root("audible_clues[0].implication") == "audible_clues"
+    assert lane._field_path_root(" caller_threads[2].lost_object ") == "caller_threads"
+    assert lane._field_path_root("audible_clues") == "audible_clues"
+
+    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
+    bracketed = lane.FairPlayReport.model_validate({
+        "accepted": False,
+        "findings": [{"field_path": "audible_clues[0].implication",
+                      "item_id": "q1", "category": "Fair play",
+                      "detail": "not audible before the reveal",
+                      "blocking": True}],
+    })
+    assert lane._validate_fair_play_envelope(bracketed, truth) is None
+    assert [f.item_id for f in lane._corroborated_fair_blocks(bracketed, truth)] == [
+        "q1",
+    ]
+    assert lane._fair_play_advisories(bracketed, truth) == []
 
 
 def test_p3_safety_repair_keeps_safety_and_collection_rules():

@@ -1475,3 +1475,58 @@ out until they independently meet the same production-only admission rule.
   exercised the 3-object case, where the coverage rule and the bare
   `min_length=3` happen to coincide. The wider-draw behaviour this fix adds
   (4+ objects) is proven by unit test only. `ConstraintDraw` permits up to 6.
+
+## PBUG-20260713-12 -- P4 wrote `blocking` as prose because no seam ever demanded the field
+
+- surfaced: canonical 42-word `original_codex56sol` run, prompt
+  `6c73745f-e639-4d4e-b46a-1cfeb7df3716`, Aion 3.0 Mini creative + Mistral-Nemo
+  technical, 2026-07-13. Log `tmp\p245_verify_42_server.log`.
+- symptom: `P4 failed after 2 attempt(s) -> ValidationError: findings.1.blocking
+  Field required`. The model emitted the flag as PROSE inside the detail string --
+  `"detail": "All lost objects are mundane items, blocking=false"` -- and omitted
+  the actual boolean field. It also wrote `field_path` with bracket indexing
+  (`caller_threads[0].lost_object`).
+- root cause: a seam that PHRASED A FIELD AS PROSE, in a seam shipped hours
+  earlier at `81336eca`. The fair-play seam said "report them with
+  blocking=false" -- which reads as text to WRITE -- so the model wrote the
+  literal string into `detail` and dropped the real boolean field.
+  **Correction to an earlier hypothesis in this log:** the required path WAS in
+  the model-visible contract. `schema_shape_instruction` DOES emit required
+  nested paths (verified: `Required paths: accepted, findings,
+  findings[*].category, findings[*].detail, findings[*].blocking`). What it does
+  NOT emit is any BOUND -- no `min_length`, `max_length`, or `pattern`. So the
+  invisible-contract class is real but narrower than first written: it covers
+  bounds (PBUG-20260713-11's `clue_plan` `min_length=3`), not required-ness.
+  This entry is a phrasing defect, not an unstated-field defect.
+  Separately, `_corroborated_fair_blocks` derived the collection root with
+  `split(".", 1)[0]`, so the model's bracket-indexed `field_path`
+  (`caller_threads[0].lost_object`) resolved to `caller_threads[0]`, matched no
+  collection, and would have silently failed to corroborate a real defect.
+- fix: demand `blocking` as a real JSON boolean FIELD in the P4 seam and repair
+  rules, and forbid writing it as prose inside `detail`/`category`. Apply the
+  same wording to P7, whose `ListenerFinding` seam had the identical prose-invite
+  exposure. Add `_field_path_root`, which strips an index suffix so
+  `audible_clues[0].x` and `audible_clues.0.x` name the same collection (a
+  mechanical read of a coordinate, not a reinterpretation of the finding).
+  Add the CLASS GUARD that is actually true: every field carrying a schema BOUND
+  must have that field named in the seam or the repair rules, across all 11
+  structured passes. Running it surfaced two schema caps that forbade the only
+  artifact their own validator would accept, both fixed here:
+  `PossibilityCard.callers` capped at 4 while a draw may carry 6 lost objects
+  (one caller each), and `ScoreIntentPatch.replacements` capped at 6 while the
+  plan can target 6 anchors + reveal + closure = 8 and
+  `_validate_score_intent_patch` demands every planned target. Its script-side
+  twin was already correctly sized at 8.
+- verify idea: the bounds guard itself (every bounded field named in the
+  model-visible contract, all 11 passes); assert the seam demands a boolean field
+  and forbids prose in detail; assert bracket and dot coordinates corroborate
+  identically; assert no cap is below what its validator demands. Re-run the
+  canonical 42-word combination through ledger, episode, `obs_publish OK`, and
+  final OBS existence.
+- bible-worthy: yes, as two separate rules. (1) A prompt must demand a structured
+  field AS a field; phrasing a key's value in prose ("set x=false") invites the
+  model to emit it as prose and drop the field. (2) A schema bound is invisible
+  to the model -- the shape instruction emits required paths but never
+  min/max/pattern -- so every bound must be restated in the model-visible
+  contract, and no bound may be lower than what its own validator demands.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

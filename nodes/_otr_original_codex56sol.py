@@ -91,7 +91,10 @@ class PossibilityCard(StrictModel):
     title_seed: str
     premise: str
     desk_operator: FictionalName
-    callers: list[FictionalName] = Field(max_length=4)
+    # One caller per lost object (P3 enforces exactly that), and a draw may
+    # carry up to 6 lost objects -- so a cap of 4 made a 5- or 6-object draw
+    # impossible to satisfy. The cap tracks the draw's own ceiling.
+    callers: list[FictionalName] = Field(max_length=6)
     lost_objects: list[str] = Field(min_length=3, max_length=6)
     acoustic_device: str
     shared_cause: str
@@ -260,7 +263,12 @@ class ScoreIntentReplacement(StrictModel):
 
 
 class ScoreIntentPatch(StrictModel):
-    replacements: list[ScoreIntentReplacement] = Field(min_length=1, max_length=6)
+    # The plan can target one beat per lost-object anchor (up to 6) plus the
+    # reveal and closure beats = 8. `_validate_score_intent_patch` demands EVERY
+    # planned target, so a cap of 6 made a wide draw unsatisfiable: the schema
+    # forbade the only patch the validator would accept. Sized like its
+    # script-side twin, ScriptLinePatch.
+    replacements: list[ScoreIntentReplacement] = Field(min_length=1, max_length=8)
 
 
 class ManifestLine(StrictModel):
@@ -375,8 +383,13 @@ def _repair_rules(pass_id: str, error: Any) -> str:
         rules += (
             " Return only the compact audit envelope. accepted MUST be one "
             "boolean, findings MUST be a list, and warnings MUST be a list of "
-            "strings. A finding may set blocking=true ONLY when it names a "
-            "concrete truth-map item: field_path MUST start with the collection "
+            "strings. EVERY finding MUST carry all five keys as separate JSON "
+            "fields: field_path, item_id, category, detail, and blocking. "
+            "blocking MUST be a real JSON boolean field on the finding object "
+            "-- true or false, never omitted, and NEVER written as prose inside "
+            "detail or category. detail is plain description only. "
+            "A finding may set blocking=true ONLY when it names a "
+            "concrete truth-map item: field_path MUST begin with the collection "
             "that owns the item (caller_threads, causal_steps, audible_clues, "
             "interpretations, or resolution_links) and item_id MUST be that "
             "item's exact id from the supplied truth_map. Taste, tone, warmth, "
@@ -454,7 +467,12 @@ def _repair_rules(pass_id: str, error: Any) -> str:
         rules += (
             " understood_cause and understood_resolution MUST be strings; "
             "findings MUST be a list; optional_notes MUST be a list of "
-            "strings, or [] when there are no optional notes."
+            "strings, or [] when there are no optional notes. EVERY finding "
+            "MUST carry all four keys as separate JSON fields: line_id, "
+            "category, detail, and blocking. line_id MUST be an exact line_id "
+            "copied from the supplied lines. blocking MUST be a real JSON "
+            "boolean field -- true or false, never omitted, and NEVER written "
+            "as prose inside detail or category."
         )
     if pass_id in {"P6", "P8", "P8_optional", "P9_retake"}:
         rules += (
@@ -1175,12 +1193,23 @@ def _truth_item_ids(truth: AudibleTruthMap) -> dict[str, set[str]]:
     }
 
 
+def _field_path_root(field_path: str) -> str:
+    """The collection a field_path names, however the model indexed it.
+
+    Models write `audible_clues.0.implication` and `audible_clues[0].implication`
+    interchangeably.  The index is not part of the collection's identity, so
+    stripping it is a mechanical read of the coordinate, not a reinterpretation
+    of the finding.
+    """
+    return field_path.strip().split(".", 1)[0].split("[", 1)[0].strip()
+
+
 def _corroborated_fair_blocks(report: FairPlayReport,
                               truth: AudibleTruthMap) -> list[FairPlayFinding]:
     ids = _truth_item_ids(truth)
     blocks = []
     for finding in report.findings:
-        root = finding.field_path.strip().split(".", 1)[0]
+        root = _field_path_root(finding.field_path)
         if (finding.blocking and finding.category.strip()
                 and finding.detail.strip() and finding.item_id in ids.get(root, set())):
             blocks.append(finding)
@@ -1234,7 +1263,7 @@ def _validate_fair_play_envelope(report: FairPlayReport,
         item_id = finding.item_id.strip()
         if item_id not in resolvable:
             continue  # uncoordinated taste note -> demoted, never fatal
-        root = finding.field_path.strip().split(".", 1)[0]
+        root = _field_path_root(finding.field_path)
         if item_id not in ids.get(root, set()):
             return (
                 f"blocking finding for item {item_id!r} sets field_path root "
