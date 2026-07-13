@@ -767,6 +767,20 @@ def test_allowed_spoken_acronyms_include_only_bounded_short_cast_role_tokens():
     assert lane._spoken_error("The RUN ends.", allowed_all_caps=allowed) == "spoken text contains an all-caps lexical word"
 
 
+def test_dramatic_question_repair_trims_overlong_fields_at_word_boundary():
+    raw = json.dumps({
+        "question": "Should park manager Lena approve drone flights over the river, knowing the science makes tracking possible but the drones may disturb nesting birds? " * 2,
+        "consequence": "Approval yields precise data while denial avoids disturbance but misses a chance to understand the phenomenon. " * 2,
+        "ending_direction": "The choice remains unresolved as the signal fades into the night. " * 3,
+    })
+    repaired = lane.repair_dramatic_question_metadata(raw)
+    assert repaired is not None
+    assert len(repaired.question) <= 160
+    assert len(repaired.consequence) <= 160
+    assert len(repaired.ending_direction) <= 120
+    assert not repaired.question.endswith(" ")
+
+
 def test_fact_index_provenance_rejects_out_of_range_spans_and_wrong_a0_digest():
     payload = {"headline": "literal evidence"}
     digest = lane._digest(payload)

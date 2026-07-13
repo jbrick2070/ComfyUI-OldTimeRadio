@@ -255,6 +255,37 @@ def repair_cast_plan_metadata(failed_output: str) -> CastPlanV4 | None:
     return cast.model_copy(update={"cast": rows}) if changed else None
 
 
+def repair_dramatic_question_metadata(failed_output: str) -> DramaticQuestionV4 | None:
+    """Apply a minimal word-boundary trim when P1 exceeds schema caps."""
+    try:
+        raw = parse_first_json_object(failed_output)
+        if not isinstance(raw, dict):
+            return None
+        values = {key: raw[key] for key in ("question", "consequence", "ending_direction")}
+        if any(not isinstance(value, str) or not value.strip() for value in values.values()):
+            return None
+        caps = {"question": 160, "consequence": 160, "ending_direction": 120}
+        # Keep the established semantic repair turn for an ending-only
+        # overflow; deterministic trimming is reserved for the live failure
+        # mode where Aion repeats an overlong question/consequence.
+        if len(values["question"].strip()) <= 160 and len(values["consequence"].strip()) <= 160:
+            return None
+        changed = False
+        for key, cap in caps.items():
+            value = values[key].strip()
+            if len(value) > cap:
+                shortened = value[:cap].rsplit(" ", 1)[0].rstrip(" ,;:-(")
+                if not shortened:
+                    return None
+                values[key] = shortened
+                changed = True
+            else:
+                values[key] = value
+        return DramaticQuestionV4.model_validate(values) if changed else None
+    except Exception:
+        return None
+
+
 _RADIO_SCORE_CONTEXT_CAP_TOKENS = 8192
 # Measured 2026-07-12 with the actual local Gemma E4B chat template: the
 # max-width compact draft serializes to 1,418 tokens. Reserve that surface plus
@@ -2561,6 +2592,10 @@ def invoke_codex_structured(
                 },
             ]
         elif pass_id == "P1" and result_type is DramaticQuestionV4:
+            deterministic = repair_dramatic_question_metadata(failed_output)
+            if deterministic is not None:
+                log.info("[scifi_codex:P1] deterministic bounded question repair accepted")
+                return deterministic
             # P1 is a three-string authoring contract.  Keep its repair turn
             # equally small and explicit: the generic graph-repair prompt
             # obscures these caps and a live Aion repair copied the rejected
