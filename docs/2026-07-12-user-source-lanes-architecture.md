@@ -36,9 +36,13 @@ module, no canonical workflow is hand-edited. Two authoring paths share that flo
   contracts (SourcePayload, two LLM slots, production Ledger, writer tail, asset
   paths, fail-loud). Full qualification ladder.
 
-Broken or half-finished bundles NEVER appear in any dropdown and NEVER break ComfyUI
-boot: they are quarantined with the same structured reason in the console and in
-`otr_check`.
+Bundles with ACTIVATION-DETECTABLE defects (schema, contract, collision, staleness,
+path escape, import/signature failure) NEVER appear in any dropdown and NEVER break
+ComfyUI boot: they are quarantined with the same structured reason in the console and
+in `otr_check`. RUNTIME failures (a dead feed, a lane bug mid-render) abort THAT run
+loudly with no fallback; they do not retroactively quarantine the lane -- the
+activation state machine only transitions on check/byte evidence (r1: the promise is
+scoped to what the state machine can actually guarantee).
 
 ### Exact end-user steps
 
@@ -71,11 +75,16 @@ Path B (original lane):
   `tests/test_workflow_json_guardrails.py:702-714`; the headless path validates combo
   membership against the LIVE `/object_info` schema, `scripts/otr_api.py:198-216`, so
   activated lanes are automatically accepted there too).
-- **Story Pack dropdown (planned, carried from the superseded plan):** appended at the
-  live END of the writer widget vector; default `"(bank default)"`; activated lane
-  packs appear as `<lane_id>/<story_model_id>`; an explicit pack whose lane != the
-  selected Source Bank fails loud. This is the ONLY canonical-workflow delta in the
-  whole feature (§7).
+- **Story Pack dropdown (operator-required; carried design):** appended at the live
+  END of the writer widget vector; default `"(bank default)"`; activated lane packs
+  appear as `<lane_id>/<story_model_id>`; a VARIANT with no bundled packs shows its
+  base's packs under the BASE's coordinates (honest -- the pack IS the base's; §4
+  aliasing law). An explicit pack must belong to the selected lane OR its declared
+  base -- anything else fails loud. This is the ONLY canonical-workflow delta in the
+  whole feature (§7). (r1 panel note: both panelists proposed cutting/deferring this
+  widget; REJECTED -- the operator's requirement specifies it. It stays its own late
+  wave and every lane runs via manifest defaults without it, so it never blocks the
+  lanes themselves.)
 - **Source Reference (exists, run param `:1236`, threaded `:1401/:1473`, stamped
   `:3645`):** a feed variant with blank `source_ref` uses its manifest's feeds; a lane
   accepts URL/file/ID overrides only when its declared `source_ref_mode` permits.
@@ -130,6 +139,18 @@ Laws:
 - The four writer consumer sites move onto the authority in the same change that
   creates it (the "lane-spec rip" the randomizer plan already scoped -- ownership
   transfers to this build; §9).
+- **Every id-membership surface consults the authority (r1, agy's three boot-crash
+  classes):** `resolve_story_pack`/`_pack_path` resolve user-lane packs via the
+  LaneSpec's bundle paths (never the shipped root alone); `_otr_story_rules._load_all`
+  validates runnable-lane rules coverage THROUGH the authority (shipped runnable
+  banks -> shipped rules dir, user lanes -> bundle `story_rules.json` or base-inherit
+  ref) instead of asserting every runnable id has a file under `nodes/story_rules/`;
+  `registered_fetcher_ids()`/`registered_interpreter_ids()` cross-refs admit
+  user-lane entry-point refs. Without these three, the first activated lane crashes
+  boot.
+- **Reset seam (r1, codex):** `_otr_lane_specs._clear_caches()` mirrors the existing
+  hooks (styles :393, routing :547, rules :317) -- one internal reset for tests and
+  restart admission; no live rescanning.
 
 ## 4. Path A -- safe feed variant (manifest-only)
 
@@ -154,21 +175,45 @@ Laws:
 }
 ```
 
-(Exact field names final at build against the base row's `defaults` dict; the
-WHITELIST is the contract: feed URLs, source-identity/label strings, an optional
-compatible `default_story_pack`, `random_eligible`. Nothing else.)
+(Field-name note: the pack field is `default_story_model` -- the canonical pack id
+IS the `story_model_id` filename stem everywhere: manifest, LaneSpec, dropdown,
+receipts, replay stamps (r1: one identity, no `default_story_pack` synonym). The
+WHITELIST is the contract: feed URLs, source-identity strings, an optional compatible
+`default_story_model`, `random_eligible`, an optional NARROWED `word_range`. Nothing
+else.)
 
-- `base_lane_id` must be in the APPROVED feed-capable base set -- v1 proposal:
-  `science_news` + `media_archive` (both are RSS lanes with shipped fetchers;
-  operator ratifies the set, §16.1). The base must be shipped AND runnable.
-- **Enabling change (the ONE parameterization):** the science RSS implementation
-  iterates the module constant `SCIENCE_NEWS_FEEDS`
-  (`story_orchestrator.py:1228-1263`) inside `_fetch_science_news(...)` (:1677+),
-  reached via the registered wrapper `_fetch_science_rss(*, bank, technical_model,
-  source_ref="")` (`_otr_source_payload.py:265`). The fetch chain gains a
-  `feed_urls: tuple[str, ...] | None = None` parameter threaded from the LaneSpec
-  (None = the shipped constant, byte-identical for shipped lanes). Same for the
-  media_archive fetcher if ratified. All Gate-2 network laws (timeouts, bounded
+- **Compatibility inheritance (r1):** a variant inherits the base lane's word_range
+  and `check_compatibility` surface verbatim; the manifest may NARROW word_range,
+  never widen it. Anything beyond that is original-lane territory.
+- **Pack namespace aliasing (r1, anchor):** pack validation enforces
+  `pack.source_bank_id == bank_id` by path coordinates (`_otr_story_routing.py:
+  373-378`), so base packs can never be re-stamped under a variant id. A variant's
+  effective pack namespace = its bundled packs (validated under `<lane_id>`) UNION
+  the base lane's packs (under the base's own coordinates). Blank
+  `default_story_model` = the base's default pack.
+- **Source-identity projection (r1, exact keys):** the manifest's `source_identity`
+  entries overlay the base row's `defaults` dict keys consumed downstream --
+  `source_material_label`, `credits_source_line` (stamped at
+  `OTR_LedgerScriptWriter.py:3648-3659` and rendered by credits/HUD), plus the other
+  `defaults` label keys enumerated in the whitelist at build. Precedence: variant
+  manifest > base defaults. Nothing outside the enumerated keys projects.
+
+- `base_lane_id` must be in the APPROVED feed-capable base set -- v1:
+  `science_news` + `media_archive`, BOTH now grounded (normative default, ratify at
+  approval; agy's science-only minority recorded). The base must be shipped AND
+  runnable.
+- **Enabling change (one parameterization, TWO enumerated files -- r1):**
+  - science: `SCIENCE_NEWS_FEEDS` constant (`story_orchestrator.py:1228-1263`)
+    iterated by `_fetch_science_news(...)` (:1677+), reached via the wrapper
+    `_fetch_science_rss` (`_otr_source_payload.py:265`);
+  - media_archive: `DEFAULT_MEDIA_ARCHIVE_FEEDS` + the EXISTING
+    `OTR_MEDIA_ARCHIVE_FEEDS` env resolver (`_otr_media_archive_sources.py:16-19,
+    156-164`), fetcher `fetch_media_archive_rss` (:175+), reached via
+    `_otr_source_payload.py:398-406`.
+  Both fetch chains gain `feed_urls: tuple[str, ...] | None = None` threaded from the
+  LaneSpec. Precedence: LaneSpec feeds (variants) > `OTR_MEDIA_ARCHIVE_FEEDS` env
+  (legacy operator override, media only, shipped lane unchanged) > shipped constants.
+  None = byte-identical shipped behavior. All Gate-2 network laws (timeouts, bounded
   retries, size/status/content-type checks, untrusted-data delimiting) are INHERITED
   CODE -- the variant cannot alter them.
 - The variant's effective lane = base LaneSpec + whitelisted overrides. It can NEVER
@@ -231,10 +276,32 @@ re-derived at build)
   optional before_save/after_save finalizer). Behind it the lane may implement any
   internal pass graph.
 
-Stable boundaries a lane gets for free and cannot cross: the two slot callables +
-runtime policy (no third slot, no direct model loads, no new providers/credentials);
-the production Ledger contract; the canonical writer tail; asset paths
-(`otr\episodes\<ep>\`, `otr\obs\`); fail-loud everywhere.
+**Boundary honesty (r1, codex):** `lane.py` runs IN-PROCESS with the user's
+permissions and receives mutable `led`/`meta`/callables -- exactly like shipped
+dispatched runners (`OTR_LedgerScriptWriter.py:3739-3779`). The §5.4 restrictions are
+therefore COOPERATIVE SDK RULES, not enforced walls (consistent with the no-sandbox
+non-goal). What OTR actually ENFORCES: post-runner artifact validation -- the returned
+tail parts and ledger state are validated against the production contracts BEFORE
+shared-tail entry (schema, required fields, authoritative-producer receipts), and any
+violation aborts loud. The lane gets for free: the two slot callables + runtime
+policy, the production Ledger contract, the canonical writer tail, asset paths
+(`otr\episodes\<ep>\`, `otr\obs\`), fail-loud everywhere.
+
+**LaneTailParts contract law (r1, codex -- production history makes this
+non-optional):** content-owned runners have already failed at provenance boundaries
+(`docs/PROD_BUG_LOG.md:427-455`; producer-receipt rules in the Bug Bible). Before
+`run_lane` is exposed, the exact `LaneTailParts` schema, the required ledger state at
+handoff, the authoritative PRODUCER for every provenance field (delivery text,
+episode seed, cast provenance, title, source identity, freeze state), forbidden
+replay claims, and the before_save/after_save lifecycle are specified and validated
+-- r2 carries the field-level detail; the LAW lands now.
+
+**run_lane staging (r1, judged):** the operator requires original lanes to optionally
+ship their own runner, so run_lane STAYS in v1 scope -- but it is the LAST wave
+(L5b), an EXPERIMENTAL tier shipping only after the fetch/interpret+common-writer
+path (L5a) is proven by the reference lane, and only with the LaneTailParts law
+satisfied. (codex proposed deferring run_lane entirely; partially rejected --
+operator requirement wins, staging adopted.)
 
 ### 5.4 v1 prohibitions (separate core/expert campaigns, enforced by the checker)
 No ComfyUI nodes/links from bundles; no third LLM slot; no new model provider or
@@ -265,24 +332,42 @@ States: `UNCHECKED -> ACTIVATED -> (bytes changed) STALE -> re-activate` and
 2. Path containment: per-entry resolution against the resolved
    `user_packs/source_lanes/` root (root itself MAY be an external junction -- the
    sanctioned Manager-update survival mechanism; entries may not escape it).
-3. Original lanes: bounded CHILD PROCESS (the venv python, timeout, no GPU) imports
+3. Original lanes: bounded CHILD PROCESS (`sys.executable`, timeout, no GPU --
+   `sys.executable` guarantees portable-install compatibility, r1 agy) imports
    `lane.py`, verifies declared entry points exist with the exact keyword-only
-   signatures (inspect), runs deterministic fixture preflights (fixtures/ samples ->
-   payload validation -> interpreter surfaces shape check; recorded fixtures, no live
-   network at activation). Import-time I/O in `lane.py` = failure.
+   signatures (`inspect.signature`), runs deterministic fixture preflights.
+   **Execution scope (r1):** `fetch_source` is SIGNATURE-INSPECTED ONLY (it is a
+   network function; activation stays network-free); `interpret_source` and
+   `check_compatibility` EXECUTE against `fixtures/` samples (pre-recorded payloads
+   -> surfaces shape check). Import-time discipline is enforced as: the import must
+   complete inside the timeout and the fixture preflights must pass deterministically
+   (best-effort I/O instrumentation is optional hardening, not the contract -- r1
+   codex wording fix).
 4. Variants: base-lane approval + whitelist + feed URL shape checks (scheme, no
-   credentials embedded); the real-feed parse test is a QUALIFICATION smoke, not an
+   embedded credentials); the real-feed parse test is a QUALIFICATION smoke, not an
    activation step (activation stays deterministic).
-5. `--activate` writes `user_packs/receipts/lanes/<lane_id>.json`: per-file SHA-256
-   map, manifest sha, schema+checker versions, base-lane version hash (variants),
-   entry-point fingerprint (originals), timestamp.
+5. `--activate` writes `user_packs/receipts/lanes/<lane_id>.json`: the COMPLETE
+   per-file SHA-256 map INCLUDING file count + relative paths (an added stray file
+   flips the bundle STALE rather than riding along -- r1 anchor), manifest sha,
+   schema+checker versions, base-lane version hash (variants), entry-point
+   fingerprint (originals), **host-contract hash (r1, codex): a digest over the
+   surfaces the bundle executes against -- SOURCE_PAYLOAD_KEYS schema version, the
+   runner-adapter/LaneTailParts schema version, ledger/tail validator version,
+   checker policy version. A core update that changes any of these flips every
+   original-lane receipt STALE instead of silently reinterpreting old activations**,
+   timestamp.
 6. **Boot admit (restart):** the authority sweeps bundles WITHOUT importing any user
    Python; a bundle enters the registry IFF its current bytes match a successful
-   receipt exactly. Mismatch = STALE quarantine ("re-run otr_check lane --activate").
-7. **Runtime:** selecting an activated original lane lazily imports `lane.py`
-   in-process at that moment; any import/contract/fetch/runner failure aborts the
-   run loud. NEVER a fallback to a shipped lane, another user lane, another model, or
-   another feed.
+   receipt exactly (including the host-contract hash). Mismatch = STALE quarantine
+   ("re-run otr_check lane --activate").
+7. **Runtime (TOCTOU-closed, r1 codex):** selecting an activated original lane
+   RE-HASHES the bundle files against the admitted receipt IMMEDIATELY BEFORE the
+   lazy import -- a file changed after boot fails STALE before any user code runs.
+   Then `lane.py` imports in-process; any import/contract/fetch/runner failure aborts
+   the run loud. NEVER a fallback to a shipped lane, another user lane, another
+   model, or another feed. Runtime failures do NOT change activation state (§1).
+8. `otr_check lane <id> --status` reports ACTIVATED / STALE / QUARANTINED with the
+   receipt + host-contract hashes (r1, codex optional -- adopted).
 
 Quarantine laws (carried + extended -- console, resolve, and `otr_check` all emit the
 IDENTICAL stored `ValidationIssue`):
@@ -310,10 +395,10 @@ headless name-based patching audits all green (the harness's loud length guards,
 - `dynamic_story` stays LANE-AGNOSTIC: it consumes the valid common frozen ledger;
   any activated lane that produces one works automatically. No lane-conditional code
   in dynamic_story; no coupling in either direction.
-- The Engine Matrix remains audio/image/video capabilities ONLY. If a readiness table
-  is wanted, `otr_check` gains an optional `emit-lane-table` generating a SEPARATE
-  Source Lane table from the ONE authority (shipped + activated, kind, runnable,
-  random-eligible, receipt state). Not mixed into ENGINE_MATRIX.md.
+- The Engine Matrix remains audio/image/video capabilities ONLY. `emit-lane-table`
+  is CUT from v1 (r1, codex) -- `otr_check lane --status` covers readiness; a
+  generated Source Lane table can follow once the authority lifecycle stabilizes,
+  and it would still be a SEPARATE table, never mixed into ENGINE_MATRIX.md.
 
 ## 9. Randomizer interaction (resolved NOW, not at implementation time)
 
@@ -369,6 +454,14 @@ families + one configured cloud/frontier lane, same pairings at 120, then one fr
 720 leg -- with ledger, episode, OBS, full suite, and Bug Bible gates. (Ladder law per
 GO_FORWARD_PLAN §4 / PRODUCTION_SPRINT_LESSONS.)
 
+**Ladder prerequisites named (r1, codex):** the model-family set is the standing
+qualification law's -- two local families (the shipped `DEFAULT_LLM`
+mistral-nemo + the compact technical family already used by routing tests) plus ONE
+operator-configured cloud/frontier lane (operator supplies credentials, as for every
+existing qualification); qualification is GRANTED by the artifact set (ledger +
+episode asset + `obs_publish OK` + final OBS file + suite/Bible receipts), nothing
+softer. Missing prerequisites = the ladder does not start; there is no skip policy.
+
 Static findings never create PBUG/Bible entries; only live production evidence does.
 
 ## 12. File ownership / change table + waves
@@ -378,19 +471,27 @@ Static findings never create PBUG/Bible entries; only live production evidence d
 | L0 | `.gitignore`, new `nodes/_otr_user_packs.py`, `nodes/_otr_validation_issue.py`, `nodes/_otr_visual_styles.py` | user_packs foundation: junction stance, containment, quarantine store, ValidationIssue, styles overlay (carried) |
 | L1 | new `nodes/_otr_lane_specs.py`, `nodes/OTR_LedgerScriptWriter.py` (4 consumer sites), `nodes/_otr_source_payload.py`, `nodes/_otr_story_routing.py`, `nodes/_otr_story_rules.py` | THE AUTHORITY: LaneSpec, shipped seed absorption (lane-spec rip per randomizer design), PackRecord map (carried), resolution APIs consult authority |
 | L2 | new `scripts/otr_check.py` + `otr_check.bat`, `user_packs/receipts/` contract | checker + `lane --activate` + child-process harness + receipts + boot admit + quarantine wiring |
-| L3 | `story_orchestrator.py` (feed parameterization), fetch chain threading | Path A: rss_variant end-to-end + 30/120 variant smokes |
-| L4 | `nodes/OTR_LedgerScriptWriter.py` + `workflows/otr_canonical.json` + contract audit | story_pack widget + two-channel consumer threading + stamps (carried W1, unchanged design) |
-| L5 | lane.py adapter seams in `_otr_lane_specs`, example bundle in `docs/templates/example_lane/` | Path B SDK: lazy entry-point adapters, run_lane dispatch, trust doc, reference lane |
-| L6 | `docs/templates/`, `docs/EXTENDING_OTR.md` generator, `README.md` | templates + generated tables + recipes (carried W4, + lane recipes) |
-| L7 | `nodes/_otr_model_catalog.py` (gated), `tests/fixtures/shipped_model_ids.json` | VALIDATE_INPUTS + shipped-ID manifest (carried W3, ownership-receipt-gated) |
-| L8 | tests + live proofs | full suite + Bible + BOTH ladders' live legs (§11) |
+| L3 | `story_orchestrator.py` + `_otr_media_archive_sources.py` + `_otr_source_payload.py` threading | Path A: rss_variant end-to-end (BOTH approved bases, r1) + 30/120 variant smokes |
+| L4 | `nodes/OTR_LedgerScriptWriter.py` + `workflows/otr_canonical.json` + contract audit | story_pack widget + two-channel consumer threading + stamps (carried, operator-required) |
+| L5a | lane.py adapter seams in `_otr_lane_specs`, example bundle in `docs/templates/example_lane/` | Path B SDK core: fetch/interpret/compat entry-point adapters + common-writer reuse, trust doc, reference lane |
+| L5b | run_lane dispatch + LaneTailParts validation | Path B EXPERIMENTAL tier: own-runner lanes, only after L5a's reference lane is proven (r1 staging) |
+| L6 | `docs/templates/`, `docs/EXTENDING_OTR.md` generator, `README.md` | templates + generated tables + recipes (incl. carried local-LLM discovery recipe, docs-only) |
+| L7 | tests + live proofs | full suite + Bible + BOTH ladders' live legs (§11) |
+
+**Moved OUT of this campaign (r1, codex):** the carried VALIDATE_INPUTS suffix fix +
+shipped-model-ID manifest (old W3) -- unrelated to source lanes; it becomes its own
+micro-plan executing against the superseded doc's converged design, scheduled
+independently in GO_FORWARD_PLAN. The user visual-styles overlay STAYS in L0
+(partially rejected cut: the user_packs foundation + quarantine store are genuinely
+shared, the marginal cost is near zero, and styles are part of the operator's
+original product ask).
 
 Dependency graph: ACTIVATION-GATE(coder slot + ownership receipts) -> L0 -> L1 ->
-L2 -> {L3, L4} -> L5 -> L6 -> L8; ownership receipt -> L7 -> L8. Each wave = one
-green pushed commit. Collision note for the queue: L1 touches the SAME writer
-surfaces the randomizer plan reserved (the rip moves here); L4 must land outside the
-bakeoff code-freeze; sequencing stays "this feature before Randomizer, final
-qualification, and the one bakeoff" (operator).
+L2 -> {L3, L4} -> L5a -> L5b -> L6 -> L7. Each wave = one green pushed commit.
+Collision note for the queue: L1 touches the SAME writer surfaces the randomizer
+plan reserved (the rip moves here); L4 must land outside the bakeoff code-freeze;
+sequencing stays "this feature before Randomizer, final qualification, and the one
+bakeoff" (operator).
 
 ## 13. Carried forward from the superseded plan (verbatim design, re-homed)
 
@@ -400,11 +501,12 @@ inside lanes + per-pack parity laws + PackRecord map + TOCTOU sha; structured
 quarantine/collision taxonomy incl. tombstones + protected ids; external junction
 support; replay hashes; append-only widget discipline + story_pack widget design
 (serialization form, two-channel threading, run() signature, falsy coercion);
-VALIDATE_INPUTS blanket-True + shipped-ID baseline; `.bat` 4-probe resolution;
-receipts location/containment; CP-gate receipt style (re-numbered per §11's two
-ladders). CUTS carried: models.d, scaffold CLI, hand-written schema docs, live
-rescan, generic GGUF walker, model probe, within-file all-errors, otr_check.sh,
-LOC-table estimates.
+`.bat` 4-probe resolution; receipts location/containment; CP-gate receipt style
+(re-numbered per §11's two ladders). VALIDATE_INPUTS + shipped-ID baseline: moved to
+its own micro-plan (r1; design stands in the superseded doc, execution decoupled).
+CUTS carried: models.d, scaffold CLI, hand-written schema docs, live rescan, generic
+GGUF walker, model probe, within-file all-errors, otr_check.sh, LOC-table estimates;
+NEW r1 cut: emit-lane-table.
 
 ## 14. Precondition -- fast-moving base
 
@@ -418,27 +520,29 @@ pin at that HEAD, THEN edit.
 | Track | Estimate |
 |---|---|
 | Shared registry/checker/UI (L0-L2 + L4) | 6-8 coder-days |
-| Safe feed-variant path (L3) | 2-3 coder-days |
-| Original-lane SDK (L5) + templates/docs (L6) | 6-9 coder-days |
-| Carried W3 (L7) | 0.5 coder-day |
-| Verification wave (L8) coding share | 1-2 coder-days |
-| **Total coding** | **~15-22 coder-days** |
+| Safe feed-variant path (L3, both bases) | 2-3 coder-days |
+| Original-lane SDK (L5a + L5b) + templates/docs (L6) | 6-9 coder-days |
+| Verification wave (L7) coding share | 1-2 coder-days |
+| **Total coding** | **~15-22 coder-days** (old W3 moved out, LaneTailParts law added -- net wash) |
 | GPU qualification: variant smokes 30/120 | 0.5-1 elapsed GPU day |
 | GPU qualification: reference original lane full ladder + 720 | 2-4 elapsed GPU days |
 
-## 16. Remaining operator decisions
+## 16. Normative defaults (folded r1; operator ratifies at approval, may override)
 
-1. **Approved feed-capable base set (v1):** `science_news` only, or
-   `science_news + media_archive` (recommended)?
-2. **Activation consent:** is running `--activate` itself sufficient consent to
-   execute bundle Python in the child process (recommended; a banner states the
-   trust boundary), or do you want an additional explicit prompt per NEW lane?
-3. **Variant story_rules default = inherit base** (recommended) -- ratify.
-4. **Reference example lane** ships as an inert template under
-   `docs/templates/example_lane/` (recommended) vs a live activated sample.
-5. **Ratify the `_otr_lane_specs` ownership transfer** from the Randomizer plan to
-   this build (randomizer re-grounds on top; its plan gets a delta note after this
-   converges).
+The r1 panel required these to be normative rather than open (§16 items alter
+security/scope/ownership). The recommendations are now the PLAN; each carries a
+ratification flag:
+
+1. **Approved feed-capable base set (v1) = `science_news` + `media_archive`** --
+   both parameterization seams grounded (§4). [RATIFY]
+2. **Running `--activate` IS the consent act** for executing bundle Python in the
+   bounded child; the command prints the §5.5 trust-boundary banner first. [RATIFY]
+3. **Variant story_rules default = inherit base**; bundles may override with their
+   own `story_rules.json`. [RATIFY]
+4. **Reference example lane ships INERT** under `docs/templates/example_lane/`
+   (a test pins that nothing under docs/ can enter the authority). [RATIFY]
+5. **`_otr_lane_specs` ownership transfers to this build** (randomizer re-grounds on
+   top; its plan gets a delta note after this doc converges). [RATIFY]
 
 ## 17. Non-goals (v1)
 
