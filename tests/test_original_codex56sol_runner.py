@@ -2016,12 +2016,24 @@ def test_fair_play_envelope_classifies_every_finding_class():
         "Could be warmer",
     ]
 
-    # Real item under a DIFFERENT known collection -> contradiction -> repair.
-    mismatched = report(accepted=False, findings=[
+    # A sloppy path over a REAL item is still a real defect: corroborate it
+    # rather than fail the episode over a coordinate the retake never reads.
+    sloppy = report(accepted=False, findings=[
         {"field_path": "causal_steps.0.cause", "item_id": "q1",
-         "category": "Fair play", "detail": "wrong root", "blocking": True}])
-    error = lane._validate_fair_play_envelope(mismatched, truth)
-    assert "name the collection that owns it" in error
+         "category": "Fair play", "detail": "sloppy path, real item",
+         "blocking": True}])
+    assert lane._validate_fair_play_envelope(sloppy, truth) is None
+    assert [f.item_id for f in lane._corroborated_fair_blocks(sloppy, truth)] == [
+        "q1",
+    ]
+
+    # A blocking finding on a real item with no category/detail is unusable.
+    bare = report(accepted=False, findings=[
+        {"field_path": "audible_clues.0.implication", "item_id": "q1",
+         "category": "  ", "detail": "", "blocking": True}])
+    assert "must include a category and a detail" in (
+        lane._validate_fair_play_envelope(bare, truth)
+    )
 
     # Corroborated -> actionable.
     real = report(accepted=False, findings=[
@@ -2186,24 +2198,17 @@ def test_wide_draw_contracts_are_satisfiable():
 
 
 def test_fair_play_coordinates_survive_however_the_model_writes_them():
-    """PBUG-20260713-13: a benign path prefix must not cost a defect its repair.
+    """PBUG-20260713-13: the item_id is the identity; field_path is a hint.
 
-    The item_id is the identity. A model that writes
-    `truth_map.causal_steps[1].effect` -- prefixing with the payload key its
-    input arrived under -- has named the same collection as `causal_steps.1`.
-    Fail-closed is reserved for the ONE genuine ambiguity: an id owned by two
-    collections.
+    Two live episodes died inside a coordinate gate that could not change the
+    outcome of the repair -- once on a benign `truth_map.` prefix (the payload
+    key the artifact arrives under), once on a `thread_id`, which keys BOTH
+    caller_threads and resolution_links by design. The retake receives the
+    finding verbatim, so the owning collection is not a question Python needs to
+    ask. A guard that cannot improve the repair must not be able to cause an
+    outage.
     """
     truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
-    known = lane._truth_item_ids(truth)
-
-    assert lane._field_path_collections(
-        "audible_clues.0.implication", known) == {"audible_clues"}
-    assert lane._field_path_collections(
-        "audible_clues[0].implication", known) == {"audible_clues"}
-    assert lane._field_path_collections(
-        "truth_map.causal_steps[1].effect", known) == {"causal_steps"}
-    assert lane._field_path_collections("truth_map", known) == set()
 
     def report(field_path, item_id):
         return lane.FairPlayReport.model_validate({
@@ -2213,23 +2218,38 @@ def test_fair_play_coordinates_survive_however_the_model_writes_them():
                           "blocking": True}],
         })
 
-    # Every one of these coordinates names the same real defect.
-    for field_path in ("audible_clues[0].implication",
-                       "audible_clues.0.implication",
-                       "truth_map.audible_clues[0].implication",
-                       "truth_map"):
-        row = report(field_path, "q1")
+    # Every one of these names the same real defect, however it was written --
+    # including the exact two coordinates that killed a live run.
+    for field_path, item_id in (
+        ("audible_clues[0].implication", "q1"),
+        ("audible_clues.0.implication", "q1"),
+        ("truth_map.audible_clues[0].implication", "q1"),
+        ("truth_map.causal_steps[1].effect", "s1"),   # killed prompt d5f66b1a
+        ("caller_threads[0].lost_object", "t1"),      # killed prompt 07725d30
+        ("truth_map", "t1"),
+        ("", "q1"),
+        ("a sloppy path", "q1"),
+    ):
+        row = report(field_path, item_id)
         assert lane._validate_fair_play_envelope(row, truth) is None, field_path
         assert [f.item_id
-                for f in lane._corroborated_fair_blocks(row, truth)] == ["q1"]
+                for f in lane._corroborated_fair_blocks(row, truth)] == [item_id]
         assert lane._fair_play_advisories(row, truth) == []
 
-    # A path that names a DIFFERENT known collection than the item's owner is a
-    # contradiction, and still returns to the model.
-    contradiction = report("causal_steps.0.cause", "q1")
-    error = lane._validate_fair_play_envelope(contradiction, truth)
-    assert "lives in audible_clues" in error
-    assert lane._corroborated_fair_blocks(contradiction, truth) == []
+    # `thread_id` genuinely belongs to two collections -- that is the schema, not
+    # a defect, and it must never fail closed.
+    ids = lane._truth_item_ids(truth)
+    assert {name for name, members in ids.items() if "t1" in members} == {
+        "caller_threads", "resolution_links",
+    }
+
+    # An id that names nothing is still advisory, never fatal.
+    unknown = report("audible_clues.0.implication", "nope")
+    assert lane._validate_fair_play_envelope(unknown, truth) is None
+    assert lane._corroborated_fair_blocks(unknown, truth) == []
+    assert [f.item_id for f in lane._fair_play_advisories(unknown, truth)] == [
+        "nope",
+    ]
 
 
 def test_p3_safety_repair_keeps_safety_and_collection_rules():

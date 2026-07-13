@@ -1549,21 +1549,33 @@ out until they independently meet the same production-only admission rule.
   It was never ambiguous: `item_id='s4'` resolves in exactly ONE collection. I
   had made `field_path` the identity when the `item_id` is the identity, and then
   fail-closed on a cosmetic disagreement -- turning a working retake into a kill.
-- fix: classify by identity. `_field_path_collections` reads EVERY dotted segment
-  (stripping bracket indices) and returns the known collections named anywhere in
-  the path, so a payload-key prefix, a bracket index, and a bare collection name
-  all resolve identically. `_fair_play_owners` resolves the item_id to the
-  collections that actually contain it. A blocking finding corroborates when its
-  id has exactly one owner and the path does not name a DIFFERENT known
-  collection. Fail-closed is now reserved for the one genuine ambiguity -- an
-  id owned by two collections -- plus a self-contradictory path.
-- verify idea: assert `audible_clues[0].x`, `audible_clues.0.x`,
-  `truth_map.audible_clues[0].x`, and a bare `truth_map` all corroborate the same
-  defect; assert a path naming a different known collection than the id's owner
-  still returns to the model. Re-run the canonical 42-word combination through
-  ledger, episode, `obs_publish OK`, and final OBS existence.
-- bible-worthy: yes -- when a finding carries both an ID and a path, the ID is
-  the identity and the path is a hint. A validator must not fail closed on a
-  coordinate it can resolve deterministically; reserve fail-closed for real
-  ambiguity, or a guard becomes the outage.
+- second failure, same gate (prompt `07725d30-0014-4da8-a9df-137663c3ad37`): the
+  first fix classified by identity but still fail-closed when an item_id resolved
+  in more than one collection. It then died on `item_id 't1' exists in more than
+  one collection (caller_threads, resolution_links)` -- because `_truth_item_ids`
+  keys BOTH of those collections by `thread_id`. Every thread-level finding is
+  "ambiguous" BY DESIGN. The premise was wrong, not the branch.
+- fix: DELETE the coordinate gate. `_truth_item_exists` asks the only question
+  Python needs -- does this id name a real item anywhere in the accepted truth
+  map? -- and that is all corroboration requires. The retake receives the finding
+  verbatim and re-authors the whole truth map, so the owning collection cannot
+  change the repair, and for a thread id it is not even a well-posed question.
+  `field_path` is now a hint for the model, never a gate. The envelope keeps only
+  the checks that catch the model contradicting ITSELF: accepted=true carrying a
+  blocking finding, accepted=false carrying none, and a blocking finding on a
+  real item with no category/detail.
+- verify idea: assert every coordinate spelling corroborates the same defect --
+  `audible_clues[0].x`, `audible_clues.0.x`, `truth_map.audible_clues[0].x`, a
+  bare `truth_map`, an empty path, and a prose path -- including the two exact
+  coordinates that killed prompts `d5f66b1a` and `07725d30`; assert `thread_id`
+  resolving in two collections is not an error. Re-run the canonical 42-word
+  combination through ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes, and this is the sharpest lesson of the day. **A guard that
+  cannot change the outcome must not be able to cause an outage.** I added a
+  coordinate gate whose verdict the repair path never reads, and it killed two
+  production episodes on cosmetic disagreements while improving nothing. Before
+  adding a fail-closed check, name what a caller would DO differently with its
+  answer; if nothing, it is not a guard, it is a liability. The corollary: an ID
+  is the identity, a path is a hint, and Python must never fail closed on a
+  coordinate it can resolve -- or on one it does not need.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
