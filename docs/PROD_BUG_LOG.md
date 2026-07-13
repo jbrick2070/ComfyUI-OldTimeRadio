@@ -956,6 +956,27 @@ out until they independently meet the same production-only admission rule.
   shared Sci-Fi P0 fan-out; promoted as an executable BUG-11.50 extension.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
 
+## PBUG-20260713-10 -- P1 repeated an overlong Aion dramatic question
+
+- promotion: BUG-11.54
+- surfaced: canonical 120-word `scifi_codex` smoke, prompt
+  `2147f181-8821-461f-a5dc-8cb9bfefd48c`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: P1 returned a question above the 160-character schema cap; the
+  typed repair repeated the invalid field and exhausted the ladder before P2.
+- root cause: the repair prompt described the cap but relied on a second model
+  call to shorten authored text, so a reasoning model could copy the rejected
+  question unchanged.
+- fix: add a deterministic, word-boundary P1 repair only for overlong question
+  or consequence fields, preserving the established semantic repair turn for
+  ending-only overflow and rejecting malformed roots.
+- verify idea: unit-test bounded shortening and run the canonical 120-word
+  combination through P5, ledger, episode, `obs_publish OK`, and final OBS
+  existence.
+- bible-worthy: yes -- bounded typed repair must not depend on a model obeying
+  a repeated length instruction; promoted as executable BUG-11.54.
+- status: FIXED IN TREE; 120-WORD LIVE PASS
+
 ## PBUG-20260712-24 -- Sci-Fi Codex P3 compact draft omitted nested literal semantics
 
 - promotion: BUG-11.38 extension
