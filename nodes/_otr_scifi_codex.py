@@ -199,7 +199,9 @@ class CastPlanV4(_Strict):
 
 _CAST_NAME_PREFIX_RE = re.compile(r"^(?:(?:Dr|Prof)\. )")
 _CAST_NAME_WORD_RE = re.compile(r"[A-Z][a-z]+")
-_CAST_NAME_ACRONYM_RE = re.compile(r"[A-Z]{2,3}")
+# Acronyms are tokens, not arbitrary uppercase substrings (e.g. ``STOP``
+# must not be accepted as ``STO`` when scanning role prose).
+_CAST_NAME_ACRONYM_RE = re.compile(r"(?<![A-Za-z0-9])[A-Z]{2,3}(?![A-Za-z0-9])")
 
 
 def _is_canonical_character_name(name: str) -> bool:
@@ -1808,7 +1810,7 @@ def _run_p3_text_patch(
     return merged_draft
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9'’-]*")
 _DECORATION_RE = re.compile(r"[\r\n\t\[\]()\x60*]|^\s*\x60\x60\x60|^\s*[-*]\s+")
-_ALL_CAPS_RE = re.compile(r"\b[A-Z]{2,}\b")
+_ALL_CAPS_RE = re.compile(r"(?<![A-Za-z0-9])[A-Z]{2,}(?![A-Za-z0-9])")
 _LABEL_RE = re.compile(r"^\s*(?:ANNOUNCER|[A-Z][A-Za-z]+)\s*:")
 _QUOTED_RE = re.compile(r"^\s*[\"'].*[\"']\s*$")
 
@@ -1987,6 +1989,25 @@ def _source_grounded_all_caps(index: FactIndexV4) -> frozenset[str]:
         for surface in surfaces
         for match in _ALL_CAPS_RE.finditer(surface or "")
     )
+
+
+def _allowed_spoken_all_caps(
+    index: FactIndexV4 | None,
+    cast: CastPlanV4,
+) -> frozenset[str]:
+    """Return source acronyms plus short acronyms explicitly in cast roles.
+
+    Role text is accepted metadata, not free-form script prose.  This keeps
+    the spoken validator strict while allowing a cast-locked term such as
+    ``CEO`` to survive the P5/P7/P9 and final validation paths.
+    """
+    allowed = set(_source_grounded_all_caps(index)) if index is not None else set()
+    for row in cast.cast:
+        allowed.update(
+            match.group(0)
+            for match in _CAST_NAME_ACRONYM_RE.finditer(row.role_in_conflict or "")
+        )
+    return frozenset(allowed)
 
 
 def _spoken_error(
@@ -2966,11 +2987,7 @@ def _validate_script_post(
             script,
             cast,
             score,
-            (
-                _source_grounded_all_caps(fact_index)
-                if fact_index is not None
-                else frozenset()
-            ),
+            _allowed_spoken_all_caps(fact_index, cast),
         )
     except ScifiCodexError as exc:
         return str(exc)
@@ -3139,7 +3156,7 @@ def run_scifi_codex_episode(
     if audit.verdict == "rewrite":
         script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
     validate_spoken_text_and_roster(
-        script, p2, score, _source_grounded_all_caps(p0),
+        script, p2, score, _allowed_spoken_all_caps(p0, p2),
     )
     expected = _assemble_ledger(led, score, p2, script, meta)
     from ._otr_content_authorship import stamp_receipt

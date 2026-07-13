@@ -750,6 +750,23 @@ def test_spoken_validator_allows_only_acronyms_grounded_in_accepted_fact_index()
     ) == "spoken text contains an all-caps lexical word"
 
 
+def test_allowed_spoken_acronyms_include_only_bounded_short_cast_role_tokens():
+    cast = lane.CastPlanV4(cast=[
+        lane.CastPlanRowV4(
+            char_id="announcer", name="ANNOUNCER", character_description="Witness.",
+            gender="neutral", role_in_conflict="Reports the CEO decision.", voice_slot="announcer",
+        ),
+        lane.CastPlanRowV4(
+            char_id="c01", name="Iona", character_description="Observer.",
+            gender="female", role_in_conflict="Challenges STOP signs.", voice_slot="c01",
+        ),
+    ])
+    allowed = lane._allowed_spoken_all_caps(None, cast)
+    assert allowed == frozenset({"CEO"})
+    assert lane._spoken_error("The CEO decides.", allowed_all_caps=allowed) is None
+    assert lane._spoken_error("The RUN ends.", allowed_all_caps=allowed) == "spoken text contains an all-caps lexical word"
+
+
 def test_fact_index_provenance_rejects_out_of_range_spans_and_wrong_a0_digest():
     payload = {"headline": "literal evidence"}
     digest = lane._digest(payload)
