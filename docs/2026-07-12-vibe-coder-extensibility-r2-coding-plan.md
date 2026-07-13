@@ -1,4 +1,13 @@
-# Vibe-Coder Extensibility -- Coding Plan (r4-CONVERGED, code-ready)
+# Vibe-Coder Extensibility -- Coding Plan (r4-CONVERGED)
+
+> **SUPERSEDED FOR SCOPE (operator correction, 2026-07-12 late).** This plan's
+> "content packs only -- NO user-created lanes" ruling is RETIRED: the operator
+> requires real user source lanes (safe feed variants + original lane plug-ins).
+> The replacement architecture is `docs/2026-07-12-user-source-lanes-architecture.md`
+> (DRAFT, awaiting architecture approval + its own kibitz arc). Do NOT execute this
+> plan's waves as scoped; its carried-forward pieces are enumerated in the
+> replacement's §13. The GO_FORWARD_PLAN queue entry pointing here is stale until the
+> replacement converges.
 
 - **Date:** 2026-07-12. **Parent:** `docs/2026-07-12-vibe-coder-extensibility-r1.md`
   (@ 852209bf). **Revision:** full kibitz arc r2+r3+r4 folded (codex @ gpt-5.6-sol,
