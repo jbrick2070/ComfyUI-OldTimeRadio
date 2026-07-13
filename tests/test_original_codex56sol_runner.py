@@ -1,4 +1,5 @@
 import json
+import pathlib
 from contextlib import contextmanager
 
 import pytest
@@ -1419,8 +1420,11 @@ def test_device_anchor_must_be_planted_before_the_reveal(tmp_path):
         grounding, manifest, late,
     )
     plan = lane._script_grounding_repair_plan(late, manifest, grounding)
+    # The plant goes on the EARLIEST pre-reveal clue line: a clue the listener
+    # meets in the last breath before the reveal is fair only on paper. The line
+    # keeps the anchor it already speaks.
     assert [(row["line_id"], row["required_anchors"]) for row in plan] == [
-        ("line_003", ["card", "grille", "mitten"]),
+        ("line_002", ["grille", "stamp"]),
     ]
 
     # The score half of the same rule: a clue intent must name it pre-reveal.
@@ -1440,6 +1444,156 @@ def test_device_anchor_must_be_planted_before_the_reveal(tmp_path):
     assert "BEFORE the reveal beat" in lane._validate_score_clue_ownership(
         unfair, grounding,
     )
+
+
+def _deck_draws():
+    path = (
+        pathlib.Path(lane.__file__).parent
+        / "story_packs" / "original_codex56sol" / "constraint_deck.json"
+    )
+    deck = json.loads(path.read_text(encoding="utf-8"))
+    # The fetcher stamps deck provenance onto every draw it hands the lane.
+    return [
+        {**row, "deck_id": deck["deck_id"], "deck_sha256": "a" * 64}
+        for row in deck["draws"]
+    ]
+
+
+@pytest.mark.parametrize("draw", _deck_draws(), ids=lambda d: d["constraint_id"])
+def test_every_shipped_draw_is_satisfiable_at_the_five_line_minimum(draw):
+    """The contract must be WINNABLE on every draw the deck actually ships.
+
+    A 30-word episode compiles to the 5-beat minimum: announcer, two clue lines,
+    reveal, closure. With the real multiword anchors, one witness script has to
+    exist that speaks every lost-object anchor on a clue line for its thread, the
+    device anchor on a pre-reveal clue line AND on the reveal, and the resolution
+    anchor on the closure. If no witness exists for some draw, the rule is not a
+    contract -- it is an unwinnable gate, and this test is what says so.
+    """
+    objects = draw["lost_objects"]
+    device = draw["device_spoken_anchor"]
+    resolution = draw["resolution_spoken_anchor"]
+    clue_ids = [f"q{i}" for i in range(1, len(objects) + 1)]
+
+    truth = lane.AudibleTruthMap.model_validate({
+        "title": "Deck Witness", "premise": "Three calls, one echo.",
+        "setting": "A small station", "desk_operator_name": "Mara Vale",
+        "caller_threads": [
+            {"thread_id": f"t{i}", "caller_name": f"Caller {i}",
+             "lost_object": obj, "practical_need": "finish an errand"}
+            for i, obj in enumerate(objects, 1)
+        ],
+        "causal_steps": [
+            {"step_id": "s1", "cause": "The device is loose.",
+             "effect": "Desk sounds travel."},
+            {"step_id": "s2", "cause": "Objects rest beside it.",
+             "effect": "Their sounds repeat."},
+        ],
+        "audible_clues": [
+            {"clue_id": clue_ids[i], "thread_id": f"t{i + 1}",
+             "sound_or_phrase": f"a sound from the {obj}",
+             "implication": f"the {obj} is near the desk"}
+            for i, obj in enumerate(objects)
+        ],
+        "interpretations": [
+            {"interpretation_id": "i1", "clue_ids": [clue_ids[0]],
+             "explanation": "The sounds come from the desk.", "is_true": True},
+            {"interpretation_id": "i2", "clue_ids": [clue_ids[0]],
+             "explanation": "A caller is imagining it.", "is_true": False},
+        ],
+        "reveal": "The device carries sounds from the shelf.",
+        "resolution_links": [
+            {"thread_id": f"t{i}", "action": "Mara checks the shelf.",
+             "result": f"{obj} goes home."}
+            for i, obj in enumerate(objects, 1)
+        ],
+    })
+    grounding = lane._build_grounding_contract(
+        lane.ConstraintDraw.model_validate(draw), truth,
+    )
+
+    # The witness: the first clue line carries object one AND plants the device;
+    # the second carries the remaining objects.
+    first_clue, rest = clue_ids[:1], clue_ids[1:]
+    beats = [
+        {"beat_id": "b1", "shot_id": "shot_01", "scene_id": "scene_01",
+         "char_id": "announcer", "speaker": "Announcer",
+         "line_intent": {"intent": "open the show", "arc_phase": "opening",
+                         "clue_ids": []}},
+        {"beat_id": "b2", "shot_id": "shot_01", "scene_id": "scene_01",
+         "char_id": "c01", "speaker": "Mara Vale",
+         "line_intent": {
+             "intent": f"name the {objects[0]} heard through the {device}",
+             "arc_phase": "rising", "clue_ids": first_clue}},
+        {"beat_id": "b3", "shot_id": "shot_01", "scene_id": "scene_01",
+         "char_id": "c02", "speaker": "Ivo Reed",
+         "line_intent": {
+             "intent": "name " + " and ".join(objects[1:]),
+             "arc_phase": "rising", "clue_ids": rest}},
+        {"beat_id": "b4", "shot_id": "shot_02", "scene_id": "scene_02",
+         "char_id": "c01", "speaker": "Mara Vale",
+         "line_intent": {"intent": f"reveal the {device}",
+                         "arc_phase": "reveal", "clue_ids": []}},
+        {"beat_id": "b5", "shot_id": "shot_02", "scene_id": "scene_02",
+         "char_id": "c01", "speaker": "Mara Vale",
+         "line_intent": {"intent": f"confirm the desk {resolution}",
+                         "arc_phase": "closing", "clue_ids": []}},
+    ]
+    score = lane.BroadcastScore.model_validate({
+        "title": "Deck Witness", "premise": "Three calls, one echo.",
+        "setting": "A small station",
+        "cast": [
+            {"char_id": "announcer", "name": "Announcer", "role": "announcer",
+             "character_description": "Brief station host"},
+            {"char_id": "c01", "name": "Mara Vale", "role": "desk_operator",
+             "character_description": "Warm precise desk operator"},
+            {"char_id": "c02", "name": "Ivo Reed", "role": "caller",
+             "character_description": "Patient volunteer"},
+        ],
+        "scenes": [
+            {"scene_id": "scene_01", "description": "Calls reach the desk.",
+             "env": "radio station desk"},
+            {"scene_id": "scene_02", "description": "The echo is mapped.",
+             "env": "lost-and-found shelf"},
+        ],
+        "shots": [
+            {"shot_id": "shot_01", "scene_id": "scene_01",
+             "description": "Mara at the desk.", "visual_prompt": "Warm desk"},
+            {"shot_id": "shot_02", "scene_id": "scene_02",
+             "description": "The shelf.", "visual_prompt": "Orderly shelf"},
+        ],
+        "beats": beats,
+        "orientation_beat_id": "b1", "reveal_beat_id": "b4",
+        "closure_beat_id": "b5",
+        "opening_music": {"description": "Warm motif.",
+                          "generation_prompt": "Warm strings, no vocals"},
+        "closing_music": {"description": "It resolves.",
+                          "generation_prompt": "Gentle strings, no vocals"},
+    })
+    assert lane._validate_score(score, truth, grounding) is None
+    assert lane._validate_score_clue_ownership(score, grounding) is None
+
+    manifest = lane._compile_manifest(score)
+    texts = [
+        "Lost and Found Frequency is listening.",
+        f"The {objects[0]} keeps answering back through the {device}.",
+        "You can hear " + " and ".join(objects[1:]) + " beside it.",
+        f"The {device} has been carrying every sound from that shelf.",
+        f"The desk {resolution} before the hour is out.",
+    ]
+    script = lane.PerformanceScript.model_validate({
+        "title": "Deck Witness",
+        "lines": [
+            {"line_id": row.line_id, "char_id": row.char_id,
+             "speaker": row.speaker, "text": text}
+            for row, text in zip(manifest.lines, texts)
+        ],
+    })
+    assert lane._validate_script_grounding(grounding, manifest, script) is None
+    receipt = lane._grounding_receipt(grounding, manifest, script)
+    assert receipt["complete"] is True
+    plant = next(r for r in receipt["evidence"] if r["kind"] == "device_plant")
+    assert plant["line_id"] == "line_002"
 
 
 def test_p5_announcer_owned_clue_reaches_the_p5_ladder():

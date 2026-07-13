@@ -45,6 +45,7 @@ Status: Phase 0 + Phase 10 of the Multi-Turn Polish sprint (2026-05-11).
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, List, Literal, Optional
@@ -626,7 +627,85 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g8_line_id_uniqueness(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g9_sfw_spoken_text(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
+
+
+# G9 SFW ship-stop on spoken text. Phase 0 collect / Phase 10 raise.
+#
+# PD4 is a hard rule ("Safe for work. No profanity.") and until now nothing
+# enforced it on the episode that actually ships. `_otr_ledger_scrub` runs only
+# on the lanes with `run_story_spine=True` -- never on the content-owned lanes --
+# and even where it runs, its verdict is stamped and read by nobody. The lanes
+# that had any profanity check at all had it as an LLM opinion.
+#
+# This is the deterministic version: one word-boundary scan over the spoken text
+# that reaches the microphone, on the one path EVERY lane crosses. It runs inside
+# the gap audit, so Phase 10 raises FreezeAssertionError on it exactly like any
+# other critical gap -- a verdict an existing caller already acts on.
+#
+# Announcer lines are in scope: the bookends ship too.
+
+
+def _profanity_terms() -> List[str]:
+    """The live SFW vocabulary. Global policy -- never pack-tunable."""
+    try:
+        from ._otr_stage3_validators import DEFAULT_PROFANITY_TERMS
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        from _otr_stage3_validators import DEFAULT_PROFANITY_TERMS  # type: ignore
+    return list(DEFAULT_PROFANITY_TERMS)
+
+
+def _sfw_pattern() -> "re.Pattern[str]":
+    """Whole-word, case-insensitive alternation over the live term list.
+
+    Word-boundary, so "hell" fires on "go to hell" and never on "hello",
+    "shellfish", or "Michelle". Multi-word entries ("screw you") keep their
+    internal spacing and stay bounded at both ends.
+    """
+    terms = sorted(
+        (t.strip() for t in _profanity_terms() if t and t.strip()),
+        key=len, reverse=True,
+    )
+    if not terms:
+        return re.compile(r"(?!x)x")  # matches nothing
+    body = "|".join(re.escape(term) for term in terms)
+    return re.compile(rf"(?<!\w)(?:{body})(?!\w)", re.IGNORECASE)
+
+
+def _check_g9_sfw_spoken_text(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G9: no profanity in the spoken text of any ledger line."""
+    lines = ledger_data.get("lines")
+    if not isinstance(lines, list):
+        return
+    pattern = _sfw_pattern()
+    hits: list[str] = []
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        text = line.get("text")
+        if not isinstance(text, str) or not text:
+            continue
+        found = sorted({match.group(0).lower() for match in pattern.finditer(text)})
+        if found:
+            lid = line.get("line_id") or "<no line_id>"
+            hits.append(f"{lid}: {', '.join(found)}")
+    if hits:
+        sample = hits[:5]
+        more = "" if len(hits) <= 5 else f" (+{len(hits) - 5} more)"
+        errors.append(
+            f"G9: profanity in the spoken text of {len(hits)} line(s): "
+            f"{'; '.join(sample)}{more}. PD4 is a hard ship rule -- the "
+            f"episode does not freeze with these words on the microphone. "
+            f"The vocabulary is DEFAULT_PROFANITY_TERMS in "
+            f"_otr_stage3_validators."
+        )
 
 
 # G7 (SFX per-cue dur_s bounds) DELETED 2026-07-01 (rip-sfx-broll):

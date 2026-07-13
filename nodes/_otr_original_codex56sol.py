@@ -930,6 +930,16 @@ def _validate_score(
     if sum(c.char_id == "announcer" and c.role == "announcer"
            for c in score.cast) != 1:
         return "cast needs one separate char_id='announcer', role='announcer' row"
+    # ROLE is the announcer authority everywhere downstream: `_compile_manifest`
+    # stamps `speaker_role` from it, and the fair-play rule is defined over
+    # non-announcer voices. A second row carrying role='announcer' under another
+    # char_id would make the cast and the manifest disagree about who is the
+    # announcer, so there is exactly one, and every other row is a real voice.
+    if sum(c.role == "announcer" for c in score.cast) != 1:
+        return (
+            "exactly one cast row may have role='announcer'; give every other "
+            "row role='desk_operator' or role='caller'"
+        )
     if sum(c.role == "desk_operator" for c in score.cast) != 1:
         return "cast needs exactly one separate desk_operator row"
     if len({c.char_id for c in score.cast}) != len(score.cast):
@@ -983,6 +993,7 @@ def _validate_score(
     if len(assigned_clues) != len(set(assigned_clues)):
         return _SCORE_DUPLICATE_CLUE_ERROR
     if grounding_contract is not None:
+        role_by_char = {row.char_id: row.role for row in score.cast}
         clue_ids_by_object: dict[str, set[str]] = {}
         for clue in grounding_contract.clues:
             clue_ids_by_object.setdefault(
@@ -996,7 +1007,7 @@ def _validate_score(
                     beat.line_intent.intent, anchor,
                 )
                 for beat in score.beats
-                if beat.char_id != "announcer"
+                if role_by_char.get(beat.char_id) != "announcer"
             ):
                 return (
                     f"score needs a non-announcer clue intent naming exact "
@@ -1126,7 +1137,14 @@ def _pre_reveal_clue_beats(score: BroadcastScore) -> list[BeatConcept]:
 
     This is the population the fair-play contract is defined over. It is a pure
     read of accepted beat order and clue ownership -- no judgement.
+
+    "Non-announcer" means the beat's CAST ROLE is not announcer, which is the
+    same authority `_compile_manifest` uses to stamp `speaker_role`. Keying off
+    `char_id` instead would let a cast row with role='announcer' under some other
+    id count here but not in the manifest, and the two halves of this rule would
+    then disagree about which lines exist.
     """
+    role_by_char = {row.char_id: row.role for row in score.cast}
     positions = {beat.beat_id: index for index, beat in enumerate(score.beats)}
     reveal_position = positions.get(score.reveal_beat_id)
     if reveal_position is None:
@@ -1134,7 +1152,7 @@ def _pre_reveal_clue_beats(score: BroadcastScore) -> list[BeatConcept]:
     return [
         beat for index, beat in enumerate(score.beats)
         if index < reveal_position
-        and beat.char_id != "announcer"
+        and role_by_char.get(beat.char_id) != "announcer"
         and beat.line_intent.clue_ids
     ]
 
@@ -1166,6 +1184,7 @@ def _validate_score_clue_ownership(
     so a defect in either is unrepairable below this rung and the score itself
     must be re-authored.  That is what this check returns to the P5 ladder.
     """
+    role_by_char = {row.char_id: row.role for row in score.cast}
     clue_ids_by_object: dict[str, set[str]] = {}
     for clue in grounding.clues:
         clue_ids_by_object.setdefault(clue.lost_object, set()).add(clue.clue_id)
@@ -1174,7 +1193,7 @@ def _validate_score_clue_ownership(
         if not any(
             clue_ids.intersection(beat.line_intent.clue_ids)
             for beat in score.beats
-            if beat.char_id != "announcer"
+            if role_by_char.get(beat.char_id) != "announcer"
         ):
             return (
                 f"a non-announcer beat must carry an audible clue for lost "
@@ -1326,6 +1345,7 @@ def _score_grounding_repair_plan(
     grounding: GroundingContract,
 ) -> list[dict[str, Any]] | None:
     """Select only LLM-owned intents that lack immutable grounding anchors."""
+    role_by_char = {row.char_id: row.role for row in score.cast}
     targets: dict[str, set[str]] = {}
     clue_ids_by_object: dict[str, set[str]] = {}
     for clue in grounding.clues:
@@ -1334,7 +1354,7 @@ def _score_grounding_repair_plan(
         relevant_clues = clue_ids_by_object.get(anchor, set())
         eligible = [
             beat for beat in score.beats
-            if beat.char_id != "announcer"
+            if role_by_char.get(beat.char_id) != "announcer"
             and relevant_clues.intersection(beat.line_intent.clue_ids)
         ]
         if not eligible:
@@ -1352,16 +1372,17 @@ def _score_grounding_repair_plan(
             reveal.line_intent.intent, grounding.device_anchor):
         targets.setdefault(reveal.beat_id, set()).add(grounding.device_anchor)
     # The device must also be PLANTED: named in a clue intent the listener hears
-    # before the reveal explains it.  The last such beat is the plant closest to
-    # the payoff, and the choice is deterministic so the validator, the plan, and
-    # the receipt all name the same beat.
+    # before the reveal explains it.  Plant on the EARLIEST eligible clue beat --
+    # a clue the listener meets in the last breath before the reveal is fair only
+    # on paper.  Deterministic, so the validator, the plan, and the receipt all
+    # agree on which beat carries it.
     pre_reveal_clue_beats = _pre_reveal_clue_beats(score)
     if not pre_reveal_clue_beats:
         return None
     if not any(_contains_grounding_anchor(
             beat.line_intent.intent, grounding.device_anchor)
             for beat in pre_reveal_clue_beats):
-        targets.setdefault(pre_reveal_clue_beats[-1].beat_id, set()).add(
+        targets.setdefault(pre_reveal_clue_beats[0].beat_id, set()).add(
             grounding.device_anchor,
         )
     if not _contains_grounding_anchor(
@@ -1620,8 +1641,8 @@ def _script_grounding_repair_plan(
     if not _contains_grounding_anchor(reveal.text, grounding.device_anchor):
         targets.setdefault(reveal.line_id, set()).add(grounding.device_anchor)
     # The pre-reveal plant of the device anchor (see `_validate_script_grounding`).
-    # Deterministic target: the last pre-reveal clue line -- the plant closest to
-    # the payoff, and the same line the validator and the receipt name.
+    # Earliest eligible clue line, for the same reason the score plan uses the
+    # earliest clue beat: the listener needs to have heard it in time to solve it.
     pre_reveal_clue_lines = _pre_reveal_clue_lines(manifest)
     if not pre_reveal_clue_lines:
         return None
@@ -1632,7 +1653,7 @@ def _script_grounding_repair_plan(
         )
         for row in pre_reveal_clue_lines
     ):
-        targets.setdefault(pre_reveal_clue_lines[-1].line_id, set()).add(
+        targets.setdefault(pre_reveal_clue_lines[0].line_id, set()).add(
             grounding.device_anchor,
         )
     if not _contains_grounding_anchor(
@@ -1995,7 +2016,6 @@ def run_original_codex56sol_episode(
             "shots": len(score.shots), "beats": len(score.beats),
             "lines": len(manifest.lines),
         },
-        "phase_10_verdict": "accepted",
         "grounding_receipt": _grounding_receipt(
             grounding, manifest, script,
         ),
