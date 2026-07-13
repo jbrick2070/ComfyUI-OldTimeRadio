@@ -1282,7 +1282,8 @@ def test_p3_rewrite_local_text_patch_preserves_locked_structure():
     assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
 
 
-def test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect():
+def test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect(caplog):
+    caplog.set_level("INFO")
     advisory = lane.make_advisory_word_blueprint(
         60, [f"b{index:03d}" for index in range(6)],
     )
@@ -1318,6 +1319,8 @@ def test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect():
     assert calls[1]["max_new_tokens"] == lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
     assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
     assert "repair_kind" not in journal["calls"][0]["attempts"][1]
+    assert "text-patch preflight retained full repair:" in caplog.text
+    assert "cue_id" in caplog.text
 
 
 def test_p3_malformed_text_patch_fails_without_a_third_reroll():

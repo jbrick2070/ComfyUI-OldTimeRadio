@@ -1514,10 +1514,21 @@ def _p3_text_patch_preflight(
         for target in targets:
             _p3_text_patch_set_at(probe, target.loc, "x")
         candidate = RadioScoreDraftV4.model_validate(probe)
-        return post_validator(candidate) is None
-    except Exception:
+        validation_error = post_validator(candidate)
+        if validation_error is not None:
+            log.info(
+                "[scifi_codex:P3] text-patch preflight retained full repair: %s",
+                " ".join(str(validation_error).split())[:300],
+            )
+            return False
+        return True
+    except Exception as exc:
         # A hidden schema/compiler/signature/graph defect is broader than this
         # patch. Preserve the existing full typed repair rather than guessing.
+        log.info(
+            "[scifi_codex:P3] text-patch preflight retained full repair: %s: %s",
+            type(exc).__name__, " ".join(str(exc).split())[:260],
+        )
         return False
 
 
