@@ -1961,6 +1961,7 @@ def invoke_codex_structured(
                 FactIndexV4,
                 body["artifact_inputs"]["payload"]["payload"],
                 zero_padded_ids=True,
+                max_quote_chars=MAX_QUOTE_CHARS,
             )
             if deterministic is not None:
                 # A0's digest is deterministic request metadata.  It is safe
@@ -2339,7 +2340,7 @@ def run_scifi_codex_episode(
             len(value) for value in p0_inputs["payload"]["payload"].values()
         ),
     }
-    p0 = invoke_codex_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_fact_index_system",), artifact_inputs=p0_inputs, result_type=FactIndexV4, post_validator=lambda x: _validate_fact_index(x, payload, allowed_source_fields=p0_allowed_fields, expected_payload_sha256=env.source_digest), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=p0_token_budget, call_journal=journal, prompt_must_fit=True)
+    p0 = invoke_codex_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_fact_index_system",), artifact_inputs=p0_inputs, result_type=FactIndexV4, post_validator=lambda x: _validate_fact_index(x, payload, allowed_source_fields=p0_allowed_fields, expected_payload_sha256=env.source_digest), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=p0_token_budget, call_journal=journal, prompt_must_fit=True, clamp_overlong_strings=False)
     p1 = invoke_codex_structured(
         pass_id="P1", slot="creative", slot_fn=creative_fn, pack=pack,
         seam_refs=("codex_question_system",),

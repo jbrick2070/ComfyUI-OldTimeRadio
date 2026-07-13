@@ -1,3 +1,5 @@
+import json
+
 from nodes._otr_scifi_codex import FactIndexV4
 from nodes._otr_scifi_codex import RadioScoreV4, ScriptArtifactV4, _schema_instruction as codex_schema_instruction
 from nodes._otr_scifi_gemini import _schema_instruction as gemini_schema_instruction
@@ -60,6 +62,55 @@ def test_repair_rehomes_exact_quote_only_when_field_label_is_wrong():
     span = repaired.facts[0].source_spans[0]
     assert span.field == "full_text"
     assert payload[span.field][span.start:span.end] == span.quote
+
+
+def test_repair_bounds_an_exact_oversized_quote_without_changing_the_claim():
+    payload = {"full_text": "literal evidence " + ("x" * 300)}
+    raw = json.dumps({
+        "facts": [{
+            "fact_id": "F0",
+            "claim": "keep this claim",
+            "source_spans": [{
+                "field": "full_text", "start": 0, "end": 12,
+                "quote": payload["full_text"],
+            }],
+        }],
+        "entities": [],
+        "numbers": [],
+        "tone": "measured",
+        "payload_sha256": "digest",
+    })
+    repaired = repair_literal_source_metadata(
+        raw, FactIndexV4, payload, zero_padded_ids=True, max_quote_chars=32,
+    )
+    assert repaired is not None
+    assert repaired.facts[0].claim == "keep this claim"
+    span = repaired.facts[0].source_spans[0]
+    assert span.start == 0
+    assert span.end == 32
+    assert span.quote == payload["full_text"][:32]
+    assert payload[span.field][span.start:span.end] == span.quote
+
+
+def test_repair_refuses_an_oversized_quote_that_is_not_literal_source_text():
+    payload = {"full_text": "literal evidence " + ("x" * 300)}
+    raw = json.dumps({
+        "facts": [{
+            "fact_id": "F0",
+            "claim": "claim",
+            "source_spans": [{
+                "field": "full_text", "start": 0, "end": 12,
+                "quote": payload["full_text"] + " invented",
+            }],
+        }],
+        "entities": [],
+        "numbers": [],
+        "tone": "measured",
+        "payload_sha256": "digest",
+    })
+    assert repair_literal_source_metadata(
+        raw, FactIndexV4, payload, zero_padded_ids=True, max_quote_chars=32,
+    ) is None
 
 
 def test_all_lane_schema_seams_name_exact_top_level_keys():

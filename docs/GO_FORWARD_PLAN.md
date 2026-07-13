@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-12 20:23 PDT
+**Updated:** 2026-07-12 20:54 PDT
 
 **Branch:** `v2.0-alpha`
 
@@ -45,15 +45,19 @@ the second bakeoff this plan forbids.
 - The all-visualizer effective-consumer root fix (`PBUG-20260712-19`) is pushed
   at `496689da`; the shared P0 bounded-evidence repair (`PBUG-20260712-21`) is
   pushed at `e1d3a035`. **The sole coder slot is currently held by the live
-  Sci-Fi Codex P3 transport replacement (`PBUG-20260712-22`).** The bounded
+  Sci-Fi Codex qualification follow-on (`PBUG-20260712-23`).** The bounded
   direct-score correction failed again at live prompt
   `edbbac48-9aa8-4907-8086-f63134604604`; root commit `c942b2ae` replaces only
   P3 and P3-rewrite model transport with `RadioScoreDraftV4` plus a fail-closed
   compiler returning the same final `RadioScoreV4`. It is pushed and equals
-  origin after focused/full/Bible/workflow gates; canonical live reverify is
-  the next active action before the coder slot releases. It preserves the
-  canonical workflow and shared all-visualizer no-image gate. BUG-11.50's
-  portable rule and regression catalog are pushed separately at `63dd571`.
+  origin after focused/full/Bible/workflow gates. Its reverify reached a new
+  shared P0 failure at prompt `81e0b0c9-2f20-4085-9fd0-e7f8034f75da`: an exact
+  literal quote exceeded the finite cap, the generic clamp retained stale
+  coordinates, and the raw metadata repair could not accept it. The active
+  root fix moves only that proven literal metadata case into the shared Sci-Fi
+  P0 repair and disables generic clamp at all three P0 boundaries; canonical
+  live reverify remains the next action before the coder slot releases. It
+  preserves the canonical workflow and shared all-visualizer no-image gate.
   The full four-round Kibitz campaign (8 local reviews) and four-round frontier
   panel ($0.8618 actual) are recorded under the dated transport-recovery artifacts.
   The RSS parity audit found no safe schema copy/paste: Gemini, Sonnet,
@@ -70,7 +74,7 @@ time and is listed separately.
 
 | Order | Chunk | Hard completion gate | Estimate |
 |---:|---|---|---:|
-| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-22` compact P3 draft/compiler root fix; focused tests, full suite, Bible, canonical validator/audits, commit/push; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no visual-authoring LLM call or image objects under all-visualizer policy, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies pending live reverifies for shipped PBUGs 18-22. | 0.5-1 day + <=1 GPU day |
+| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-22` compact P3 draft/compiler root fix and `PBUG-20260712-23` exact-oversized-source-span root fix; focused tests, full suite, Bible, canonical validator/audits, commit/push; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no visual-authoring LLM call or image objects under all-visualizer policy, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies pending live reverifies for shipped PBUGs 18-23. | 0.5-1 day + <=1 GPU day |
 | 2 | Canonical watchdog support | Canonical runner emits heartbeats; watchdog recognizes canonical `RESULT`; healthy long runs never false-dead; explicit failure and stalled/down-server paths are pinned. This is a harness defect, not a production-admitted PBUG. | 0.5 day |
 | 3 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. | 0.5-1 day |
 | 4 | Rip interstitial **audio** only | Remove synthesis, insertion, timing, and dead tests; retain `music_inter` story/visual semantics. | 0.5-1 day |

@@ -593,6 +593,7 @@ def invoke_sonnet_structured(
                 FragmentDossierV4,
                 p0_envelope["payload"],
                 zero_padded_ids=False,
+                max_quote_chars=MAX_QUOTE_CHARS,
             )
             if deterministic is not None:
                 return deterministic
@@ -674,7 +675,7 @@ def invoke_sonnet_structured(
         ]
     try:
         # LLM slot: per-sub-pass injected creative/technical closure.
-        result = structured_call(prompt=prompt, schema=result_type, slot_fn=capture, base_temperature=base_temperature, structural_retry_temperature=structural_retry_temperature, max_new_tokens=max_new_tokens, max_attempts=3, post_validator=post_validator, repair_prompt_factory=typed_repair_factory, helper_name=f"scifi_sonnet:{pass_id}")
+        result = structured_call(prompt=prompt, schema=result_type, slot_fn=capture, base_temperature=base_temperature, structural_retry_temperature=structural_retry_temperature, max_new_tokens=max_new_tokens, max_attempts=3, post_validator=post_validator, repair_prompt_factory=typed_repair_factory, clamp_overlong_strings=pass_id != "P0", helper_name=f"scifi_sonnet:{pass_id}")
     except Exception as exc:
         raise SonnetPassError(f"{pass_id} failed: {exc}") from exc
     journal.setdefault("calls", []).append({"pass_id": pass_id, "slot": slot, "attempts": attempts, "accepted": result.model_dump(mode="json")})

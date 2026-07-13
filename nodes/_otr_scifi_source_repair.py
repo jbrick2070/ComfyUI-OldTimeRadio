@@ -54,14 +54,27 @@ def repair_literal_source_metadata(
     payload: Mapping[str, str],
     *,
     zero_padded_ids: bool,
+    max_quote_chars: int | None = None,
 ) -> BaseModel | None:
     """Return a validated metadata-only repair, or ``None`` to keep retry loud.
 
     A source span is repaired only when its existing quote is an exact
     substring of one unambiguous declared payload field. If it is paraphrased
     or absent, its evidence row is dropped; if no supported fact remains, the
-    schema validation still fails loudly.
+    schema validation still fails loudly. An exact literal quote that is wider
+    than a finite schema cap may be narrowed only to the corresponding source
+    prefix at its repaired coordinate. Claims and every other model-authored
+    field remain byte-identical.
     """
+    if (
+        max_quote_chars is not None
+        and (
+            isinstance(max_quote_chars, bool)
+            or not isinstance(max_quote_chars, int)
+            or max_quote_chars < 1
+        )
+    ):
+        raise ValueError("max_quote_chars must be a positive integer or None")
     try:
         import json
 
@@ -112,10 +125,35 @@ def repair_literal_source_metadata(
                         return
                     corrected_field, positions = candidate_fields[0]
                     new_start = min(positions, key=lambda position: abs(position - start))
-                    if node.get("field") != corrected_field or node.get("start") != new_start or node.get("end") != new_start + len(quote):
+                    corrected_quote = quote
+                    if (
+                        max_quote_chars is not None
+                        and len(corrected_quote) > max_quote_chars
+                    ):
+                        # The full model quote has already been proven literal by
+                        # ``_occurrences`` above. Source-span text is deterministic
+                        # metadata, so preserve its repaired coordinate and retain
+                        # only the finite literal prefix the schema permits.
+                        corrected_quote = payload[corrected_field][
+                            new_start:new_start + max_quote_chars
+                        ]
+                    if not corrected_quote:
+                        invalid_span_ids.add(id(node))
+                        changed = True
+                        for value in node.values():
+                            visit(value)
+                        return
+                    new_end = new_start + len(corrected_quote)
+                    if (
+                        node.get("field") != corrected_field
+                        or node.get("start") != new_start
+                        or node.get("end") != new_end
+                        or node.get("quote") != corrected_quote
+                    ):
                         node["field"] = corrected_field
                         node["start"] = new_start
-                        node["end"] = new_start + len(quote)
+                        node["end"] = new_end
+                        node["quote"] = corrected_quote
                         changed = True
             for value in node.values():
                 visit(value)

@@ -357,6 +357,56 @@ def test_source_grounded_p0_refuses_to_be_left_truncated(module_name, invoke_nam
     pytest.fail(f"no P0 call found in {module_name}")
 
 
+def test_source_grounded_p0_disables_generic_string_clamping():
+    """P0 may repair literal metadata, never silently truncate authored fields."""
+    import ast
+    import pathlib
+
+    codex_source = pathlib.Path("nodes/_otr_scifi_codex.py")
+    codex_tree = ast.parse(codex_source.read_text(encoding="utf-8"))
+    for node in ast.walk(codex_tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name) or node.func.id != "invoke_codex_structured":
+            continue
+        keywords = {kw.arg: kw.value for kw in node.keywords if kw.arg}
+        pass_node = keywords.get("pass_id")
+        if not (isinstance(pass_node, ast.Constant) and pass_node.value == "P0"):
+            continue
+        clamp = keywords.get("clamp_overlong_strings")
+        assert isinstance(clamp, ast.Constant) and clamp.value is False
+        break
+    else:
+        pytest.fail("no Codex P0 call found")
+
+    for module_path, invoke_name in (
+        ("nodes/_otr_scifi_gemini.py", "invoke_gemini_structured"),
+        ("nodes/_otr_scifi_sonnet.py", "invoke_sonnet_structured"),
+    ):
+        tree = ast.parse(pathlib.Path(module_path).read_text(encoding="utf-8"))
+        for function in ast.walk(tree):
+            if not isinstance(function, ast.FunctionDef) or function.name != invoke_name:
+                continue
+            calls = [
+                call for call in ast.walk(function)
+                if isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Name)
+                and call.func.id == "structured_call"
+            ]
+            assert len(calls) == 1
+            keywords = {kw.arg: kw.value for kw in calls[0].keywords if kw.arg}
+            clamp = keywords.get("clamp_overlong_strings")
+            assert isinstance(clamp, ast.Compare)
+            assert isinstance(clamp.left, ast.Name) and clamp.left.id == "pass_id"
+            assert len(clamp.ops) == 1 and isinstance(clamp.ops[0], ast.NotEq)
+            assert len(clamp.comparators) == 1
+            assert isinstance(clamp.comparators[0], ast.Constant)
+            assert clamp.comparators[0].value == "P0"
+            break
+        else:
+            pytest.fail(f"no {invoke_name} function found in {module_path}")
+
+
 @pytest.mark.parametrize(
     "module_name,root_name,facts_key,entities_key,numbers_key,fact_def",
     (

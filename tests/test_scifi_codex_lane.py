@@ -613,6 +613,57 @@ def test_p0_deterministic_repair_cannot_reintroduce_an_omitted_alias():
     assert payload[span.field][span.start:span.end] == quote
 
 
+def test_p0_deterministic_repair_bounds_an_exact_overwide_literal_quote():
+    payload = _payload()
+    envelope, _ = lane.validate_payload_envelope(
+        payload, {"seed_source": "rss_fetch", "target_words": 30},
+    )
+    inputs = lane._p0_artifact_inputs(envelope)
+    allowed = frozenset(inputs["allowed_source_fields"])
+    pack = SimpleNamespace(prompt_stages={"codex_fact_index_system": "Read A0."})
+    quote = payload["seed_text"][: lane.MAX_QUOTE_CHARS + 60]
+    raw = json.dumps({
+        "facts": [{
+            "fact_id": "F0",
+            "claim": "The observatory measured a quiet signal.",
+            "source_spans": [{
+                "field": "seed_text", "start": 0, "end": 80, "quote": quote,
+            }],
+            "numeric_tokens": [],
+        }],
+        "entities": [],
+        "numbers": [],
+        "tone": "cautious",
+        "payload_sha256": "0" * 64,
+    })
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return raw
+
+    repaired = lane.invoke_codex_structured(
+        pass_id="P0", slot="technical", slot_fn=slot_fn, pack=pack,
+        seam_refs=("codex_fact_index_system",), artifact_inputs=inputs,
+        result_type=lane.FactIndexV4,
+        post_validator=lambda value: lane._validate_fact_index(
+            value, payload, allowed_source_fields=allowed,
+            expected_payload_sha256=envelope.source_digest,
+        ),
+        base_temperature=.20, structural_retry_temperature=.10,
+        max_new_tokens=2000, call_journal={}, clamp_overlong_strings=False,
+    )
+
+    assert len(calls) == 1
+    assert repaired.facts[0].claim == "The observatory measured a quiet signal."
+    span = repaired.facts[0].source_spans[0]
+    assert span.field == "seed_text"
+    assert span.start == 0
+    assert span.end == lane.MAX_QUOTE_CHARS
+    assert span.quote == payload["seed_text"][: lane.MAX_QUOTE_CHARS]
+    assert payload[span.field][span.start:span.end] == span.quote
+
+
 def test_literal_fact_spans_and_reject_only_spoken_hygiene():
     payload = _payload()
     quote = payload["headline"][0:10]

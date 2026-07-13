@@ -915,3 +915,39 @@ out until they independently meet the same production-only admission rule.
   authoring-draft/compiler boundary when it removes deterministic graph
   serialization rather than merely papering over absent bounds.
 - status: ROOT REPLACEMENT IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260712-23 -- Sci-Fi P0 generic string clamp stranded an exact oversized source span
+
+- promotion: BUG-11.50 extension
+- surfaced: canonical 120-word `scifi_codex` reverify queue leg, prompt
+  `81e0b0c9-2f20-4085-9fd0-e7f8034f75da`, Gemma E4B creative + Mistral-Nemo
+  technical, 2026-07-12
+- symptom: P0 selected an eligible RSS source, but its first fact returned an
+  exact literal `full_text` quote wider than the 240-character P0 source-span
+  cap. The generic tolerant validator word-clamped the quote while retaining
+  the model's old end coordinate; the literal-span validator correctly rejected
+  the synthetic mismatch. The typed repair repeated the same oversized literal,
+  so the canonical queue ended `RESULT FAIL` before P1/P3, ledger finalization,
+  media, or OBS work.
+- root cause: `repair_literal_source_metadata` safely reindexed exact quoted
+  source text, but it first required the raw artifact to satisfy Pydantic's
+  quote cap. It therefore could not repair an exact source quote that exceeded
+  that cap. Meanwhile P0 still used the generic string clamp intended for
+  compatibility fields, which may shorten source metadata at a word boundary
+  without recomputing `end`. The shared P0 helper shape made the defect possible
+  in Codex, Gemini, and Sonnet.
+- fix: disable generic overlong-string clamping at all three Sci-Fi P0
+  boundaries. Extend the shared metadata-only repair so it accepts an oversized
+  quote only after proving the *entire raw quote* occurs literally in one legal
+  source field, rehomes/reindexes it under the existing ambiguity rules, then
+  replaces only the quote with that coordinate's exact finite source prefix and
+  recomputes `end`. Claims, tone, and all nonliteral/ambiguous text remain
+  model-owned and fail through the bounded typed-repair ladder.
+- verify idea: exact oversized source quote repairs in one P0 call to the
+  schema cap with byte-identical claim; an oversized quote with invented text is
+  rejected; all three Sci-Fi P0 call sites disable generic clamping. Run focused,
+  full, and Bug Bible gates, then rerun the same canonical Codex leg through
+  P3/ledger/OBS proof.
+- bible-worthy: yes -- repeatable bounded-source-metadata repair class at the
+  shared Sci-Fi P0 fan-out; promoted as an executable BUG-11.50 extension.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING
