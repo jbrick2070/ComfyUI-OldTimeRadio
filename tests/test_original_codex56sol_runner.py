@@ -582,7 +582,8 @@ def test_grounded_script_finding_triggers_one_retake(tmp_path):
     )
     assert disposition["script_retake_ran"] is True
     assert disposition["blocking_script_findings"] == 0
-    assert disposition["accepted"] is True
+    assert disposition["model_verdict"] is True
+    assert disposition["effective_verdict"] == "accepted_after_script_retake"
 
 
 def test_ungrounded_script_finding_returns_to_typed_repair(tmp_path):
@@ -612,7 +613,8 @@ def test_ungrounded_script_finding_returns_to_typed_repair(tmp_path):
         led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
     )
     assert disposition["script_retake_ran"] is False
-    assert disposition["accepted"] is True
+    assert disposition["model_verdict"] is True
+    assert disposition["effective_verdict"] == "accepted"
 
 
 def test_exact_span_array_reaches_typed_repair_without_normalization(tmp_path):
@@ -1820,6 +1822,274 @@ def test_p1_clue_short_slate_is_repaired_by_the_authoring_model(tmp_path):
     assert "one distinct audible clue for EVERY lost object" in repair_prompt
     assert "at least 3 items" in repair_prompt
     assert len(led.data["lines"]) == 5
+
+
+def test_p5_announcer_owned_clue_reaches_the_p5_ladder():
+    """The one half of the grounding contract the bounded patch cannot repair.
+
+    A missing anchor WORD is a leaf defect the intent patch fixes. But the patch
+    is forbidden from touching clue_ids, so an announcer-owned clue must be
+    returned to the pass that authored it -- not hard-aborted with zero calls.
+    """
+    fixtures = _fixtures()
+    score = lane.BroadcastScore.model_validate(fixtures["score"])
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    draw = lane.ConstraintDraw.model_validate(DRAW)
+    grounding = lane._build_grounding_contract(draw, truth)
+
+    assert lane._validate_score_clue_ownership(score, grounding) is None
+
+    # Move every clue for the stamp onto the announcer beat.
+    hijacked = score.model_copy(deep=True)
+    for beat in hijacked.beats:
+        if "q1" in beat.line_intent.clue_ids:
+            beat.line_intent.clue_ids = [
+                c for c in beat.line_intent.clue_ids if c != "q1"
+            ]
+    hijacked.beats[0].line_intent.clue_ids = ["q1"]
+    error = lane._validate_score_clue_ownership(hijacked, grounding)
+    assert "non-announcer beat must carry an audible clue" in error
+    assert "stamp" in error
+
+    # The ownership rule belongs in the ladder; the naming rule does not.
+    named_only = score.model_copy(deep=True)
+    for beat in named_only.beats:
+        if "q1" in beat.line_intent.clue_ids:
+            beat.line_intent.intent = "mention the shelf number"
+    assert lane._validate_score_clue_ownership(named_only, grounding) is None
+    assert lane._validate_score(named_only, truth, grounding) is not None
+
+
+def test_p4_uncorroborated_block_is_advisory_not_fatal(tmp_path):
+    """A taste note mislabelled blocking must never end an episode.
+
+    Guards `test_ungrounded_fair_play_opinion_is_not_a_fatal_coordinate`
+    end-to-end: the episode completes, no retake runs, and the opinion is kept
+    verbatim as advice.
+    """
+    responses = _responses()
+    responses[3] = {
+        "accepted": False,
+        "findings": [{"category": "Helpful Ending",
+                      "detail": "Could be warmer", "blocking": True}],
+        "warnings": ["the closing could land more gently"],
+    }
+    queued = iter(responses)
+    calls = []
+
+    def generate(_messages, **_kwargs):
+        calls.append(1)
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(episode_id="fair_advisory", out_dir=str(tmp_path))
+    meta = led.data.setdefault("meta", {})
+    meta.update({"source_bank": "original_codex56sol",
+                 "source_meta": {"constraint_draw": DRAW}})
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="fair_advisory",
+    )
+    assert len(calls) == 8  # no retake, no repair
+    disposition = led.data["meta"]["original_codex56sol"]["fair_play_disposition"]
+    assert disposition["truth_map_retake_ran"] is False
+    assert disposition["model_verdict"] is False
+    assert disposition["effective_verdict"] == "accepted"
+    assert [row["detail"] for row in disposition["advisory_findings"]] == [
+        "Could be warmer",
+    ]
+    assert disposition["warnings"] == ["the closing could land more gently"]
+
+
+def test_p4_corroborated_block_retakes_the_truth_map(tmp_path):
+    """A real truth-map defect is returned to the model that authored it."""
+    responses = _responses()
+    truth = responses[2]
+    responses[3] = {
+        "accepted": False,
+        "findings": [{"field_path": "audible_clues.0.implication",
+                      "item_id": "q1", "category": "Fair play",
+                      "detail": "the stamp clue is not audible before the reveal",
+                      "blocking": True}],
+        "warnings": [],
+    }
+    # P3_rerun returns a repaired truth map; P4_rerun then accepts.
+    responses.insert(4, json.loads(json.dumps(truth)))
+    responses.insert(5, {"accepted": True, "findings": [], "warnings": []})
+    prompts = []
+
+    def generate(messages, **_kwargs):
+        prompts.append(json.loads(json.dumps(messages)))
+        return json.dumps(responses.pop(0))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(episode_id="fair_retake", out_dir=str(tmp_path))
+    meta = led.data.setdefault("meta", {})
+    meta.update({"source_bank": "original_codex56sol",
+                 "source_meta": {"constraint_draw": DRAW}})
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="fair_retake",
+    )
+    assert len(prompts) == 10  # 8 + P3_rerun + P4_rerun
+    retake_system = prompts[4][0]["content"]
+    retake_input = json.loads(prompts[4][1]["content"])
+    assert "Re-author the audible truth map" in retake_system
+    assert set(retake_input) == {
+        "selected", "draw", "previous_truth_map", "fair_play_findings",
+    }
+    assert [row["item_id"] for row in retake_input["fair_play_findings"]] == ["q1"]
+    disposition = led.data["meta"]["original_codex56sol"]["fair_play_disposition"]
+    assert disposition["truth_map_retake_ran"] is True
+    assert disposition["effective_verdict"] == "accepted_after_truth_map_retake"
+    journal = led.data["meta"]["original_codex56sol"]["call_journal"]
+    assert [row["pass_id"] for row in journal][:6] == [
+        "P1", "P2", "P3", "P4", "P3_rerun", "P4_rerun",
+    ]
+    assert len(led.data["lines"]) == 5
+
+
+def test_p4_rerun_still_blocked_fails_closed(tmp_path):
+    """One retake, then stop. No loop."""
+    responses = _responses()
+    block = {
+        "accepted": False,
+        "findings": [{"field_path": "audible_clues.0.implication",
+                      "item_id": "q1", "category": "Fair play",
+                      "detail": "still not audible", "blocking": True}],
+        "warnings": [],
+    }
+    responses[3] = json.loads(json.dumps(block))
+    responses.insert(4, json.loads(json.dumps(responses[2])))
+    responses.insert(5, json.loads(json.dumps(block)))
+    queued = iter(responses)
+
+    def generate(_messages, **_kwargs):
+        return json.dumps(next(queued))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(episode_id="fair_fail", out_dir=str(tmp_path))
+    meta = led.data.setdefault("meta", {})
+    meta.update({"source_bank": "original_codex56sol",
+                 "source_meta": {"constraint_draw": DRAW}})
+    with pytest.raises(
+        lane.OriginalCodex56SolContractError,
+        match="rejected the retaken truth map",
+    ):
+        lane.run_original_codex56sol_episode(
+            payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+            resolved={"target_words": 30, "num_characters": 3}, led=led,
+            meta=meta, creative_fn=generate, technical_fn=generate,
+            slot_scheduler=Scheduler(), source_bank_row=None,
+            story_rules=rules, episode_root=tmp_path, episode_id="fair_fail",
+        )
+
+
+def test_fair_play_envelope_classifies_every_finding_class():
+    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
+
+    def report(**kwargs):
+        return lane.FairPlayReport.model_validate(kwargs)
+
+    # Uncoordinated blocking opinion -> advisory, never an envelope error.
+    advisory = report(accepted=False, findings=[
+        {"category": "Helpful Ending", "detail": "Could be warmer",
+         "blocking": True}])
+    assert lane._validate_fair_play_envelope(advisory, truth) is None
+    assert lane._corroborated_fair_blocks(advisory, truth) == []
+    assert [f.detail for f in lane._fair_play_advisories(advisory, truth)] == [
+        "Could be warmer",
+    ]
+
+    # Real item under the wrong collection root -> ambiguous -> typed repair.
+    mismatched = report(accepted=False, findings=[
+        {"field_path": "causal_steps.0.cause", "item_id": "q1",
+         "category": "Fair play", "detail": "wrong root", "blocking": True}])
+    error = lane._validate_fair_play_envelope(mismatched, truth)
+    assert "does not own that item" in error
+
+    # Corroborated -> actionable.
+    real = report(accepted=False, findings=[
+        {"field_path": "audible_clues.0.implication", "item_id": "q1",
+         "category": "Fair play", "detail": "not audible", "blocking": True}])
+    assert lane._validate_fair_play_envelope(real, truth) is None
+    assert [f.item_id for f in lane._corroborated_fair_blocks(real, truth)] == ["q1"]
+
+    # Self-contradiction and empty rejection both return to the model.
+    contradiction = report(accepted=True, findings=[
+        {"field_path": "audible_clues.0.implication", "item_id": "q1",
+         "category": "Fair play", "detail": "not audible", "blocking": True}])
+    assert "must not carry a blocking finding" in (
+        lane._validate_fair_play_envelope(contradiction, truth)
+    )
+    empty = report(accepted=False, findings=[], warnings=["unsure"])
+    assert "at least one blocking finding" in (
+        lane._validate_fair_play_envelope(empty, truth)
+    )
+
+    # Warnings are legal now, and a warning-less report still validates.
+    assert lane._validate_fair_play_envelope(
+        report(accepted=True, findings=[], warnings=["tone note"]), truth,
+    ) is None
+    assert report(accepted=True, findings=[]).warnings == []
+
+
+def test_p3_rerun_shares_every_p3_repair_surface():
+    """A renamed pass must not silently escape its own repair machinery."""
+    base = lane._repair_rules("P3", "clue_ids must not be empty")
+    rerun = lane._repair_rules("P3_rerun", "clue_ids must not be empty")
+    assert "causal_steps MUST" in base
+    assert rerun == base
+
+    # The per-attempt collection normalizer must fire on the rerun too.
+    selected = lane.PossibilityCard.model_validate(_fixtures()["card"])
+    truth = _fixtures()["truth"]
+    nested = json.loads(json.dumps(truth))
+    nested["caller_threads"][0]["causal_steps"] = nested.pop("causal_steps")
+    raw = json.dumps(nested)
+    repaired = lane._repair_truth_map_collection_placement(raw, selected)
+    assert repaired is not None
+    assert len(repaired.causal_steps) == 2
+
+
+def test_p2_triage_contract_is_stated_in_seam_and_repair_rules():
+    routing._REGISTRY = None
+    seam = routing.resolve_story_pack(
+        "original_codex56sol",
+    ).prompt_stages["codex56_slate_triage"]
+    rules = lane._repair_rules("P2", "triage selected a possibility it marked blocking")
+    for text in (seam, rules):
+        assert "copied verbatim" in text
+        assert "least compromised" in text
+    assert "Never mark the possibility you select as blocking" in seam
+    assert "NEVER mark the possibility you select as blocking" in rules
+
+
+def test_p4_blocking_authority_is_stated_in_seam_and_repair_rules():
+    routing._REGISTRY = None
+    seam = routing.resolve_story_pack(
+        "original_codex56sol",
+    ).prompt_stages["codex56_fair_play_audit"]
+    rules = lane._repair_rules("P4_rerun", "blocking must be a boolean")
+    for text in (seam, rules):
+        assert "caller_threads, causal_steps, audible_clues" in text
+        assert "never blocking" in text or "NOT blocking" in text
+    assert "orders a full retake" in seam
 
 
 def test_p3_safety_repair_keeps_safety_and_collection_rules():

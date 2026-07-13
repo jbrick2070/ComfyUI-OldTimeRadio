@@ -191,6 +191,11 @@ class FairPlayFinding(StrictModel):
 class FairPlayReport(StrictModel):
     accepted: bool
     findings: list[FairPlayFinding]
+    # The seam has always promised "taste notes are warnings", but StrictModel
+    # forbids extra keys -- so a model that obeyed the prompt literally was
+    # rejected for it.  Defaulted, never required: every existing report that
+    # omits warnings stays valid.
+    warnings: list[str] = Field(default_factory=list)
 
 
 class CastConcept(StrictModel):
@@ -357,7 +362,29 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "missing clue for the uncovered object and keep every existing "
             "clue as written."
         )
-    if pass_id == "P3":
+    if pass_id == "P2":
+        rules += (
+            " selected_possibility_id MUST be one possibility_id copied "
+            "verbatim from the supplied slate: never a title, an index, or an "
+            "invented id. NEVER mark the possibility you select as blocking. If "
+            "every candidate carries a concern, select the least compromised one "
+            "and record its concern with blocking=false. blocking MUST be a "
+            "boolean, and every finding must name a concrete field."
+        )
+    if pass_id in {"P4", "P4_rerun"}:
+        rules += (
+            " Return only the compact audit envelope. accepted MUST be one "
+            "boolean, findings MUST be a list, and warnings MUST be a list of "
+            "strings. A finding may set blocking=true ONLY when it names a "
+            "concrete truth-map item: field_path MUST start with the collection "
+            "that owns the item (caller_threads, causal_steps, audible_clues, "
+            "interpretations, or resolution_links) and item_id MUST be that "
+            "item's exact id from the supplied truth_map. Taste, tone, warmth, "
+            "and style remarks are NOT blocking: put them in warnings or set "
+            "blocking=false. accepted MUST be false when a blocking finding "
+            "exists and true otherwise."
+        )
+    if pass_id in {"P3", "P3_rerun"}:
         rules += (
             " Preserve the complete artifact and every existing collection "
             "item. causal_steps MUST contain at least 2 items; audible_clues "
@@ -746,7 +773,7 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         model output.  Full post-validation remains the acceptance authority.
         """
         repaired: BaseModel | None = None
-        if pass_id == "P3" and schema is AudibleTruthMap:
+        if pass_id in {"P3", "P3_rerun"} and schema is AudibleTruthMap:
             try:
                 selected = PossibilityCard.model_validate(inputs["selected"])
             except (KeyError, TypeError, ValidationError):
@@ -777,7 +804,7 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
         return normalize_attempt_output(raw)
     def repair(*, original_prompt, failed_output, error):
         effective_error: Any = error
-        if pass_id == "P3" and schema is AudibleTruthMap:
+        if pass_id in {"P3", "P3_rerun"} and schema is AudibleTruthMap:
             try:
                 selected = PossibilityCard.model_validate(inputs["selected"])
             except (KeyError, TypeError, ValidationError):
@@ -1158,6 +1185,99 @@ def _corroborated_fair_blocks(report: FairPlayReport,
                 and finding.detail.strip() and finding.item_id in ids.get(root, set())):
             blocks.append(finding)
     return blocks
+
+
+def _fair_play_advisories(report: FairPlayReport,
+                          truth: AudibleTruthMap) -> list[FairPlayFinding]:
+    """Blocking findings that name no truth-map item, kept as advice.
+
+    A fair-play opinion with no coordinates ("the ending could be warmer") is a
+    taste note the model mislabelled as blocking.  It cannot be acted on and it
+    must not be fatal -- Python demotes it and records it verbatim.  The
+    classification is mechanical: the item_id either resolves in a truth-map
+    collection or it does not.
+    """
+    ids = _truth_item_ids(truth)
+    resolvable = {item for collection in ids.values() for item in collection}
+    return [finding for finding in report.findings
+            if finding.blocking and finding.item_id.strip() not in resolvable]
+
+
+def _validate_fair_play_envelope(report: FairPlayReport,
+                                 truth: AudibleTruthMap) -> str | None:
+    """Hold the fair-play verdict to coordinates Python can act on.
+
+    Unlike the P9 audit -- whose target, the manifest, is Python-compiled and
+    unfixable by any retake -- the truth map is authored by P3.  A fair-play
+    rejection is therefore legitimate and gets a repair route, not a demotion.
+    Python only insists that a blocking verdict either names a real truth-map
+    item or is honest about naming none.
+
+    Ambiguity fails closed: an item_id that resolves under a DIFFERENT
+    field_path root leaves Python unable to tell which item is meant, so the
+    defect returns to the owning model rather than being guessed at.
+    """
+    ids = _truth_item_ids(truth)
+    resolvable = {item for collection in ids.values() for item in collection}
+    blocking = [finding for finding in report.findings if finding.blocking]
+    if report.accepted and blocking:
+        return (
+            "an accepted fair-play report must not carry a blocking finding; "
+            "set accepted=false or make the finding non-blocking"
+        )
+    if not report.accepted and not blocking:
+        return (
+            "a rejected fair-play report must carry at least one blocking "
+            "finding; return accepted=true and use warnings when nothing blocks"
+        )
+    for finding in blocking:
+        item_id = finding.item_id.strip()
+        if item_id not in resolvable:
+            continue  # uncoordinated taste note -> demoted, never fatal
+        root = finding.field_path.strip().split(".", 1)[0]
+        if item_id not in ids.get(root, set()):
+            return (
+                f"blocking finding for item {item_id!r} sets field_path root "
+                f"{root!r}, which does not own that item; name the collection "
+                "that actually contains it"
+            )
+        if not (finding.category.strip() and finding.detail.strip()):
+            return (
+                f"blocking finding for item {item_id!r} must include a "
+                "category and a detail"
+            )
+    return None
+
+
+def _validate_score_clue_ownership(
+    score: BroadcastScore,
+    grounding: GroundingContract,
+) -> str | None:
+    """Every lost object must reach a listener through a non-announcer voice.
+
+    OWNERSHIP ONLY -- never anchor text.  The bounded intent patch can rewrite a
+    beat's intent prose, so a missing anchor WORD stays outside the ladder and
+    is repaired there (see `_repair_score_grounding_intents`).  But the patch is
+    forbidden from touching `clue_ids`, so if the announcer is the only voice
+    carrying an object's clue, no patch can fix it and the score itself must be
+    re-authored.  That is what this check returns to the P5 ladder.
+    """
+    clue_ids_by_object: dict[str, set[str]] = {}
+    for clue in grounding.clues:
+        clue_ids_by_object.setdefault(clue.lost_object, set()).add(clue.clue_id)
+    for anchor in grounding.lost_object_anchors:
+        clue_ids = clue_ids_by_object.get(anchor, set())
+        if not any(
+            clue_ids.intersection(beat.line_intent.clue_ids)
+            for beat in score.beats
+            if beat.char_id != "announcer"
+        ):
+            return (
+                f"a non-announcer beat must carry an audible clue for lost "
+                f"object {anchor!r}; the announcer may not be the only voice "
+                "that holds it"
+            )
+    return None
 
 
 def _compile_manifest(score: BroadcastScore) -> ClosedLineManifest:
@@ -1982,10 +2102,58 @@ def run_original_codex56sol_episode(
         raise OriginalCodex56SolContractError("triage did not select a valid possibility")
     truth = _call(pass_id="P3", slot="creative", fn=creative_fn, pack=pack, seam="codex56_audible_truth_map", inputs={"selected": selected.model_dump(mode="json"), "draw": draw.model_dump(mode="json")}, schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal, tokens=2800, post_validator=lambda value: _validate_truth_map(value, selected) or _validate_authored_surface(value, story_rules))
     grounding = _build_grounding_contract(draw, truth)
-    fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600)
+    fair = _call(pass_id="P4", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600, post_validator=lambda value, t=truth: _validate_fair_play_envelope(value, t))
+    fair_advisories = _fair_play_advisories(fair, truth)
     corroborated_fair_blocks = _corroborated_fair_blocks(fair, truth)
+    truth_map_retake_ran = False
     if corroborated_fair_blocks:
-        raise OriginalCodex56SolContractError("fair-play audit rejected the truth map")
+        # The truth map is authored by P3, so a corroborated fair-play block is
+        # actionable: return it to its owner instead of ending the episode.
+        # `selected`, `draw`, and `story_rules` are held fixed -- the retake may
+        # re-author the truth map, never re-select the possibility -- and the P3
+        # post_validator is reused verbatim so the retaken map still proves the
+        # invariants `_build_grounding_contract` depends on.
+        truth_map_retake_ran = True
+        truth = _call(
+            pass_id="P3_rerun", slot="creative", fn=creative_fn, pack=pack,
+            seam="codex56_truth_map_retake",
+            inputs={
+                "selected": selected.model_dump(mode="json"),
+                "draw": draw.model_dump(mode="json"),
+                "previous_truth_map": truth.model_dump(mode="json"),
+                "fair_play_findings": [
+                    finding.model_dump(mode="json")
+                    for finding in corroborated_fair_blocks
+                ],
+            },
+            schema=AudibleTruthMap, scheduler=slot_scheduler, journal=journal,
+            tokens=2800,
+            post_validator=lambda value, s=selected: (
+                _validate_truth_map(value, s)
+                or _validate_authored_surface(value, story_rules)
+            ),
+        )
+        # The old contract was derived from the rejected truth map: rebuild it
+        # before anything audits or consumes it.
+        grounding = _build_grounding_contract(draw, truth)
+        fair = _call(pass_id="P4_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_fair_play_audit", inputs={"truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json")}, schema=FairPlayReport, scheduler=slot_scheduler, journal=journal, tokens=1600, post_validator=lambda value, t=truth: _validate_fair_play_envelope(value, t))
+        if _corroborated_fair_blocks(fair, truth):
+            raise OriginalCodex56SolContractError(
+                "fair-play audit rejected the retaken truth map"
+            )
+        fair_advisories = fair_advisories + _fair_play_advisories(fair, truth)
+
+    fair_play_disposition = {
+        "schema_version": "original_codex56sol.fair_play_disposition.v1",
+        "model_verdict": fair.accepted,
+        "effective_verdict": ("accepted_after_truth_map_retake"
+                              if truth_map_retake_ran else "accepted"),
+        "truth_map_retake_ran": truth_map_retake_ran,
+        "corroborated_blocking_findings": 0,
+        "advisory_findings": [row.model_dump(mode="json")
+                              for row in fair_advisories],
+        "warnings": list(fair.warnings),
+    }
     score = _call(
         pass_id="P5", slot="creative", fn=creative_fn, pack=pack,
         seam="codex56_broadcast_score",
@@ -1997,8 +2165,15 @@ def run_original_codex56sol_episode(
         },
         schema=BroadcastScore, scheduler=slot_scheduler, journal=journal,
         tokens=3600,
-        post_validator=lambda value: _validate_score_attempt(
-            value, truth, None, story_rules,
+        # The grounding contract stays out of `_validate_score_attempt` on
+        # purpose: a missing anchor WORD is a localized leaf defect owned by the
+        # bounded intent patch, not a reason to regenerate a whole score.  Clue
+        # OWNERSHIP is different -- the patch may not touch clue_ids -- so it is
+        # the one half of the contract the ladder must see while it can still
+        # re-author the score.
+        post_validator=lambda value, t=truth, g=grounding: (
+            _validate_score_attempt(value, t, None, story_rules)
+            or _validate_score_clue_ownership(value, g)
         ),
     )
     if _validate_score(score, truth, grounding) is not None:
@@ -2107,9 +2282,14 @@ def run_original_codex56sol_episode(
             raise OriginalCodex56SolContractError("final contract audit rejected the repaired script")
         advisories = advisories + _audit_advisories(audit, script)
 
+    # Two verdicts, never conflated: `model_verdict` is what the audit model
+    # said, verbatim; `effective_verdict` is what the pipeline did about it.
+    # A single ambiguous `accepted` key would leave two competing authorities.
     audit_disposition = {
         "schema_version": "original_codex56sol.final_audit_disposition.v1",
-        "accepted": audit.accepted,
+        "model_verdict": audit.accepted,
+        "effective_verdict": ("accepted_after_script_retake" if retake_ran
+                              else "accepted"),
         "script_retake_ran": retake_ran,
         "blocking_script_findings": len(_audit_blocks(audit, script)),
         "advisory_findings": [row.model_dump(mode="json") for row in advisories],
@@ -2142,6 +2322,7 @@ def run_original_codex56sol_episode(
         "listener_report": listener.model_dump(mode="json"),
         "final_audit": audit.model_dump(mode="json"),
         "final_audit_disposition": audit_disposition,
+        "fair_play_disposition": fair_play_disposition,
         "grounding_receipt": _grounding_receipt(
             grounding, manifest, script,
         ),

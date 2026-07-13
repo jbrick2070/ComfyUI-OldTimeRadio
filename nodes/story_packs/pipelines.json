@@ -8,18 +8,92 @@
       "requires_source_contract": true,
       "declared_seams": [],
       "passes": [
-        {"pass_id": "source_interpret", "slot": "technical", "seam_refs": [], "description": "Source brain -> briefs (science: news_interpreter.build_news_briefs; generated content fields, not templates)."},
-        {"pass_id": "outline", "slot": "creative", "seam_refs": ["outline_macro_system", "outline_phase_system", "outline_beat_system"], "description": "Macro/phase/beat outline passes."},
-        {"pass_id": "pitch_room", "slot": "creative", "seam_refs": [], "description": "Divergent pitch generation (prompt not pack-sourced yet)."},
-        {"pass_id": "story_select", "slot": "technical", "seam_refs": [], "description": "Candidate grading/selection (prompt not pack-sourced yet)."},
-        {"pass_id": "dramatic_state", "slot": "creative", "seam_refs": [], "description": "Central-conflict derivation (prompt not pack-sourced yet)."},
-        {"pass_id": "casting", "slot": "creative", "seam_refs": [], "description": "Cast craft (shared radio craft; casting_brief is interpreter output)."},
-        {"pass_id": "line_compose", "slot": "creative", "seam_refs": ["line_composer_system"], "description": "Per-beat line composition."},
-        {"pass_id": "exchange_compose", "slot": "creative", "seam_refs": ["exchange_system"], "description": "Build-4 grouped-exchange prepass (use_exchange); static system prompt pack-routed, dynamic craft bullets Python-owned."},
-        {"pass_id": "announcer_intro_outro", "slot": "creative", "seam_refs": ["announcer_intro_system", "announcer_intro_safe_system", "announcer_outro_system"], "description": "Announcer intro/outro."},
-        {"pass_id": "announcer_coda", "slot": "creative", "seam_refs": ["coda_system"], "description": "Coda per bank coda_mode; science implementation is compose_news_coda."},
-        {"pass_id": "title_regen", "slot": "creative", "seam_refs": [], "description": "Late-binding title regeneration (prompt not pack-sourced yet)."},
-        {"pass_id": "story_brief_reflection", "slot": "technical", "seam_refs": [], "description": "meta.story_brief reflection pass. NOT pack-overridable."}
+        {
+          "pass_id": "source_interpret",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "Source brain -> briefs (science: news_interpreter.build_news_briefs; generated content fields, not templates)."
+        },
+        {
+          "pass_id": "outline",
+          "slot": "creative",
+          "seam_refs": [
+            "outline_macro_system",
+            "outline_phase_system",
+            "outline_beat_system"
+          ],
+          "description": "Macro/phase/beat outline passes."
+        },
+        {
+          "pass_id": "pitch_room",
+          "slot": "creative",
+          "seam_refs": [],
+          "description": "Divergent pitch generation (prompt not pack-sourced yet)."
+        },
+        {
+          "pass_id": "story_select",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "Candidate grading/selection (prompt not pack-sourced yet)."
+        },
+        {
+          "pass_id": "dramatic_state",
+          "slot": "creative",
+          "seam_refs": [],
+          "description": "Central-conflict derivation (prompt not pack-sourced yet)."
+        },
+        {
+          "pass_id": "casting",
+          "slot": "creative",
+          "seam_refs": [],
+          "description": "Cast craft (shared radio craft; casting_brief is interpreter output)."
+        },
+        {
+          "pass_id": "line_compose",
+          "slot": "creative",
+          "seam_refs": [
+            "line_composer_system"
+          ],
+          "description": "Per-beat line composition."
+        },
+        {
+          "pass_id": "exchange_compose",
+          "slot": "creative",
+          "seam_refs": [
+            "exchange_system"
+          ],
+          "description": "Build-4 grouped-exchange prepass (use_exchange); static system prompt pack-routed, dynamic craft bullets Python-owned."
+        },
+        {
+          "pass_id": "announcer_intro_outro",
+          "slot": "creative",
+          "seam_refs": [
+            "announcer_intro_system",
+            "announcer_intro_safe_system",
+            "announcer_outro_system"
+          ],
+          "description": "Announcer intro/outro."
+        },
+        {
+          "pass_id": "announcer_coda",
+          "slot": "creative",
+          "seam_refs": [
+            "coda_system"
+          ],
+          "description": "Coda per bank coda_mode; science implementation is compose_news_coda."
+        },
+        {
+          "pass_id": "title_regen",
+          "slot": "creative",
+          "seam_refs": [],
+          "description": "Late-binding title regeneration (prompt not pack-sourced yet)."
+        },
+        {
+          "pass_id": "story_brief_reflection",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "meta.story_brief reflection pass. NOT pack-overridable."
+        }
       ],
       "notes": [
         "DESCRIPTIVE ONLY: the production writer owns the real sequence; this row is stamping/audit metadata.",
@@ -38,10 +112,38 @@
         "original_qa_system"
       ],
       "passes": [
-        {"pass_id": "original_concept", "slot": "creative", "seam_refs": ["original_concept_system"], "description": "Spark atoms (+ optional operator hint) -> THREE pitched concepts, exactly N dramatic roles each."},
-        {"pass_id": "original_select", "slot": "creative", "seam_refs": ["original_select_system"], "description": "Story-editor pick: winning concept + cast wants/pressures + selection_rationale (audit trail)."},
-        {"pass_id": "original_brief", "slot": "technical", "seam_refs": ["original_brief_system"], "description": "Concept -> interpreter-result compat briefs; news_close_brief hardwired empty (the close is the announcer outro epilogue)."},
-        {"pass_id": "original_qa", "slot": "technical", "seam_refs": ["original_qa_system"], "description": "Post-composition whole-script hard-rule audit; writer owns one coalesced outro repair, then fail loud."}
+        {
+          "pass_id": "original_concept",
+          "slot": "creative",
+          "seam_refs": [
+            "original_concept_system"
+          ],
+          "description": "Spark atoms (+ optional operator hint) -> THREE pitched concepts, exactly N dramatic roles each."
+        },
+        {
+          "pass_id": "original_select",
+          "slot": "creative",
+          "seam_refs": [
+            "original_select_system"
+          ],
+          "description": "Story-editor pick: winning concept + cast wants/pressures + selection_rationale (audit trail)."
+        },
+        {
+          "pass_id": "original_brief",
+          "slot": "technical",
+          "seam_refs": [
+            "original_brief_system"
+          ],
+          "description": "Concept -> interpreter-result compat briefs; news_close_brief hardwired empty (the close is the announcer outro epilogue)."
+        },
+        {
+          "pass_id": "original_qa",
+          "slot": "technical",
+          "seam_refs": [
+            "original_qa_system"
+          ],
+          "description": "Post-composition whole-script hard-rule audit; writer owns one coalesced outro repair, then fail loud."
+        }
       ],
       "notes": [
         "executable:true = the runner exists: the production writer's bank-shape branch (empty fetcher+interpreter) IS this pipeline's execution lane (sweep 4b; kibitz r2-r4).",
@@ -66,17 +168,92 @@
         "fable2_audit_system"
       ],
       "passes": [
-        {"pass_id": "dossier", "slot": "technical", "seam_refs": ["fable2_dossier_system"], "description": "P0: python-capped source digest -> DossierArtifact (facts, allowed numbers, entities, dramatizable vectors)."},
-        {"pass_id": "pitch_room", "slot": "creative", "seam_refs": ["fable2_pitch_system"], "description": "P1 CREATIVE 1: dossier + dealt frame cards + stance -> PitchSlate (3 pitches full mode, 1 in low-budget one-pitch mode)."},
-        {"pass_id": "pitch_select", "slot": "technical", "seam_refs": ["fable2_select_system"], "description": "P2a technical-judge: dossier + slate + stance -> PitchSelect (winner + rationale; skipped in one-pitch mode)."},
-        {"pass_id": "treatment", "slot": "creative", "seam_refs": ["fable2_treatment_system"], "description": "P2b creative: dossier + winning pitch + stance + N_MAX -> Treatment (cast shapes w/ registers, priced ending, news thread). Cast names are born here; the factual close moved to news_read (S1b read-split)."},
-        {"pass_id": "news_read", "slot": "technical", "seam_refs": ["fable2_news_read_system"], "description": "P2c technical (S1b read-split, kibitz r2 Q1): dossier + provenance -> the 1-2 sentence factual close under the anti-invention subset laws; stamped onto treatment.news_close_read by the runner."},
-        {"pass_id": "script", "slot": "creative", "seam_refs": ["fable2_script_system"], "description": "P3 CREATIVE 2: treatment + digest + envelope -> COMPLETE play in strict markup; markup ladder + budget gate + truncation retry."},
-        {"pass_id": "critic", "slot": "technical", "seam_refs": ["fable2_critic_system"], "description": "P4 technical-judge: draft + treatment -> CriticNotes (never replacement dialogue; skipped in low-budget mode)."},
-        {"pass_id": "revision", "slot": "creative", "seam_refs": ["fable2_revision_system"], "description": "P5 CREATIVE 3: draft + notes + treatment -> COMPLETE play rewritten with verbatim-preserve law; keep-better-draft defect judge (skipped in low-budget mode)."},
-        {"pass_id": "casting_voices", "slot": "technical", "seam_refs": ["fable2_casting_system"], "description": "P6 technical-creative: winning parsed script + cast shapes + dealt voice menu -> CastingVoices (voices/portraits only; register authority stays with the treatment)."},
-        {"pass_id": "assemble", "slot": "technical", "seam_refs": [], "description": "P7: pure Python assembly, no LLM -- slot is registry metadata. The selected sealed FinalDraft + Treatment -> ledger rows with per-constituent verbatim proof gates; incremental led.save() per scene."},
-        {"pass_id": "ledger_audit", "slot": "technical", "seam_refs": ["fable2_audit_system"], "description": "P8 technical: the selected sealed FinalDraft's complete music-bearing assembled view + treatment -> AuditFindings; evidence triage discards uncorroborated findings LOUDLY; confirmed findings = fail loud naming the defect (audit-only through S3)."}
+        {
+          "pass_id": "dossier",
+          "slot": "technical",
+          "seam_refs": [
+            "fable2_dossier_system"
+          ],
+          "description": "P0: python-capped source digest -> DossierArtifact (facts, allowed numbers, entities, dramatizable vectors)."
+        },
+        {
+          "pass_id": "pitch_room",
+          "slot": "creative",
+          "seam_refs": [
+            "fable2_pitch_system"
+          ],
+          "description": "P1 CREATIVE 1: dossier + dealt frame cards + stance -> PitchSlate (3 pitches full mode, 1 in low-budget one-pitch mode)."
+        },
+        {
+          "pass_id": "pitch_select",
+          "slot": "technical",
+          "seam_refs": [
+            "fable2_select_system"
+          ],
+          "description": "P2a technical-judge: dossier + slate + stance -> PitchSelect (winner + rationale; skipped in one-pitch mode)."
+        },
+        {
+          "pass_id": "treatment",
+          "slot": "creative",
+          "seam_refs": [
+            "fable2_treatment_system"
+          ],
+          "description": "P2b creative: dossier + winning pitch + stance + N_MAX -> Treatment (cast shapes w/ registers, priced ending, news thread). Cast names are born here; the factual close moved to news_read (S1b read-split)."
+        },
+        {
+          "pass_id": "news_read",
+          "slot": "technical",
+          "seam_refs": [
+            "fable2_news_read_system"
+          ],
+          "description": "P2c technical (S1b read-split, kibitz r2 Q1): dossier + provenance -> the 1-2 sentence factual close under the anti-invention subset laws; stamped onto treatment.news_close_read by the runner."
+        },
+        {
+          "pass_id": "script",
+          "slot": "creative",
+          "seam_refs": [
+            "fable2_script_system"
+          ],
+          "description": "P3 CREATIVE 2: treatment + digest + envelope -> COMPLETE play in strict markup; markup ladder + budget gate + truncation retry."
+        },
+        {
+          "pass_id": "critic",
+          "slot": "technical",
+          "seam_refs": [
+            "fable2_critic_system"
+          ],
+          "description": "P4 technical-judge: draft + treatment -> CriticNotes (never replacement dialogue; skipped in low-budget mode)."
+        },
+        {
+          "pass_id": "revision",
+          "slot": "creative",
+          "seam_refs": [
+            "fable2_revision_system"
+          ],
+          "description": "P5 CREATIVE 3: draft + notes + treatment -> COMPLETE play rewritten with verbatim-preserve law; keep-better-draft defect judge (skipped in low-budget mode)."
+        },
+        {
+          "pass_id": "casting_voices",
+          "slot": "technical",
+          "seam_refs": [
+            "fable2_casting_system"
+          ],
+          "description": "P6 technical-creative: winning parsed script + cast shapes + dealt voice menu -> CastingVoices (voices/portraits only; register authority stays with the treatment)."
+        },
+        {
+          "pass_id": "assemble",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "P7: pure Python assembly, no LLM -- slot is registry metadata. The selected sealed FinalDraft + Treatment -> ledger rows with per-constituent verbatim proof gates; incremental led.save() per scene."
+        },
+        {
+          "pass_id": "ledger_audit",
+          "slot": "technical",
+          "seam_refs": [
+            "fable2_audit_system"
+          ],
+          "description": "P8 technical: the selected sealed FinalDraft's complete music-bearing assembled view + treatment -> AuditFindings; evidence triage discards uncorroborated findings LOUDLY; confirmed findings = fail loud naming the defect (audit-only through S3)."
+        }
       ],
       "notes": [
         "Visible experiment; failure NEVER routes to legacy_many_pass.",
@@ -422,26 +599,108 @@
       "requires_source_contract": false,
       "declared_seams": [
         "codex56_possibility_slate",
-        "codex56_slate_triage", "codex56_audible_truth_map",
-        "codex56_fair_play_audit", "codex56_broadcast_score",
+        "codex56_slate_triage",
+        "codex56_audible_truth_map",
+        "codex56_truth_map_retake",
+        "codex56_fair_play_audit",
+        "codex56_broadcast_score",
         "codex56_score_anchor_patch",
-        "codex56_performance_script", "codex56_script_anchor_patch",
-        "codex56_blind_listener", "codex56_broadcast_retake",
+        "codex56_performance_script",
+        "codex56_script_anchor_patch",
+        "codex56_blind_listener",
+        "codex56_broadcast_retake",
         "codex56_final_contract_audit"
       ],
       "passes": [
-        {"pass_id":"P1_possibility_slate","slot":"creative","seam_refs":["codex56_possibility_slate"],"description":"Invent original benign acoustic puzzle possibilities."},
-        {"pass_id":"P2_slate_triage","slot":"technical","seam_refs":["codex56_slate_triage"],"description":"Reject contract defects and select a buildable possibility."},
-        {"pass_id":"P3_audible_truth_map","slot":"creative","seam_refs":["codex56_audible_truth_map"],"description":"Build the causal clue and resolution graph."},
-        {"pass_id":"P4_fair_play_audit","slot":"technical","seam_refs":["codex56_fair_play_audit"],"description":"Audit audible clue sufficiency and graph closure."},
-        {"pass_id":"P5_broadcast_score","slot":"creative","seam_refs":["codex56_broadcast_score","codex56_score_anchor_patch"],"description":"Design cast, scenes, shots, beats, intents and music bookends; when a structurally valid score misses an immutable grounding anchor, repair only the affected line intent through a bounded typed patch."},
-        {"pass_id":"P6_performance_script","slot":"creative","seam_refs":["codex56_performance_script","codex56_script_anchor_patch"],"description":"Write every canonical spoken line for the closed manifest; when a structurally valid script misses immutable grounding, repair only the affected spoken line through a bounded typed patch."},
-        {"pass_id":"P7_blind_listener","slot":"technical","seam_refs":["codex56_blind_listener"],"description":"Evaluate the complete script using spoiler-safe clue evidence."},
-        {"pass_id":"P8_broadcast_retake","slot":"creative","seam_refs":["codex56_broadcast_retake","codex56_script_anchor_patch"],"description":"Return a complete replacement script only when repair is required; localized grounding omissions use a bounded spoken-line patch."},
-        {"pass_id":"P9_retake","slot":"creative","seam_refs":["codex56_broadcast_retake","codex56_script_anchor_patch"],"description":"Return one complete replacement script for corroborated final-audit defects; localized grounding omissions use a bounded spoken-line patch."},
-        {"pass_id":"P9_final_contract_audit","slot":"technical","seam_refs":["codex56_final_contract_audit"],"description":"Final typed contract audit over the accepted complete script."}
+        {
+          "pass_id": "P1_possibility_slate",
+          "slot": "creative",
+          "seam_refs": [
+            "codex56_possibility_slate"
+          ],
+          "description": "Invent original benign acoustic puzzle possibilities."
+        },
+        {
+          "pass_id": "P2_slate_triage",
+          "slot": "technical",
+          "seam_refs": [
+            "codex56_slate_triage"
+          ],
+          "description": "Reject contract defects and select a buildable possibility."
+        },
+        {
+          "pass_id": "P3_audible_truth_map",
+          "slot": "creative",
+          "seam_refs": [
+            "codex56_audible_truth_map",
+            "codex56_truth_map_retake"
+          ],
+          "description": "Build the causal clue and resolution graph."
+        },
+        {
+          "pass_id": "P4_fair_play_audit",
+          "slot": "technical",
+          "seam_refs": [
+            "codex56_fair_play_audit"
+          ],
+          "description": "Audit audible clue sufficiency and graph closure."
+        },
+        {
+          "pass_id": "P5_broadcast_score",
+          "slot": "creative",
+          "seam_refs": [
+            "codex56_broadcast_score",
+            "codex56_score_anchor_patch"
+          ],
+          "description": "Design cast, scenes, shots, beats, intents and music bookends; when a structurally valid score misses an immutable grounding anchor, repair only the affected line intent through a bounded typed patch."
+        },
+        {
+          "pass_id": "P6_performance_script",
+          "slot": "creative",
+          "seam_refs": [
+            "codex56_performance_script",
+            "codex56_script_anchor_patch"
+          ],
+          "description": "Write every canonical spoken line for the closed manifest; when a structurally valid script misses immutable grounding, repair only the affected spoken line through a bounded typed patch."
+        },
+        {
+          "pass_id": "P7_blind_listener",
+          "slot": "technical",
+          "seam_refs": [
+            "codex56_blind_listener"
+          ],
+          "description": "Evaluate the complete script using spoiler-safe clue evidence."
+        },
+        {
+          "pass_id": "P8_broadcast_retake",
+          "slot": "creative",
+          "seam_refs": [
+            "codex56_broadcast_retake",
+            "codex56_script_anchor_patch"
+          ],
+          "description": "Return a complete replacement script only when repair is required; localized grounding omissions use a bounded spoken-line patch."
+        },
+        {
+          "pass_id": "P9_retake",
+          "slot": "creative",
+          "seam_refs": [
+            "codex56_broadcast_retake",
+            "codex56_script_anchor_patch"
+          ],
+          "description": "Return one complete replacement script for corroborated final-audit defects; localized grounding omissions use a bounded spoken-line patch."
+        },
+        {
+          "pass_id": "P9_final_contract_audit",
+          "slot": "technical",
+          "seam_refs": [
+            "codex56_final_contract_audit"
+          ],
+          "description": "Final typed contract audit over the accepted complete script."
+        }
       ],
-      "notes": ["Only workflow creative and technical slots are used; bounded retries fail closed."]
+      "notes": [
+        "Only workflow creative and technical slots are used; bounded retries fail closed."
+      ]
     },
     {
       "story_pipeline_id": "simple_4_prompt_experimental",
@@ -455,10 +714,38 @@
         "pass_4_technical_ledger_audit"
       ],
       "passes": [
-        {"pass_id": "pass_1_creative_story", "slot": "creative", "seam_refs": ["pass_1_creative_story"], "description": "Complete source-grounded story; no JSON output."},
-        {"pass_id": "pass_2_creative_ledger_fill", "slot": "creative", "seam_refs": ["pass_2_creative_ledger_fill"], "description": "Fill the production ledger shape from the story."},
-        {"pass_id": "pass_3_technical_schema_cleanup", "slot": "technical", "seam_refs": ["pass_3_technical_schema_cleanup"], "description": "Repair schema: required fields, enums, ids."},
-        {"pass_id": "pass_4_technical_ledger_audit", "slot": "technical", "seam_refs": ["pass_4_technical_ledger_audit"], "description": "Consistency audit; if the ledger cannot be made valid, fail loudly naming this pass."}
+        {
+          "pass_id": "pass_1_creative_story",
+          "slot": "creative",
+          "seam_refs": [
+            "pass_1_creative_story"
+          ],
+          "description": "Complete source-grounded story; no JSON output."
+        },
+        {
+          "pass_id": "pass_2_creative_ledger_fill",
+          "slot": "creative",
+          "seam_refs": [
+            "pass_2_creative_ledger_fill"
+          ],
+          "description": "Fill the production ledger shape from the story."
+        },
+        {
+          "pass_id": "pass_3_technical_schema_cleanup",
+          "slot": "technical",
+          "seam_refs": [
+            "pass_3_technical_schema_cleanup"
+          ],
+          "description": "Repair schema: required fields, enums, ids."
+        },
+        {
+          "pass_id": "pass_4_technical_ledger_audit",
+          "slot": "technical",
+          "seam_refs": [
+            "pass_4_technical_ledger_audit"
+          ],
+          "description": "Consistency audit; if the ledger cannot be made valid, fail loudly naming this pass."
+        }
       ],
       "notes": [
         "Visible experiment, never a fallback: failure NEVER routes to legacy_many_pass.",

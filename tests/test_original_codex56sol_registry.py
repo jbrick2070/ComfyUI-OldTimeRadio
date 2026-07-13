@@ -114,6 +114,36 @@ def test_broadcast_score_prompt_closes_music_bookend_key_sets():
     )
 
 
+def test_truth_map_retake_seam_holds_three_way_registry_parity():
+    """The retake seam must exist on all three surfaces or the lane won't load.
+
+    `_otr_story_routing` enforces, at IMPORT time,
+    pack.prompt_stages == pipeline.declared_seams == union(pass.seam_refs)
+    for every custom seam. A partial wiring change raises
+    RegistryValidationError and kills the whole lane on load, so pin all three.
+    """
+    routing._REGISTRY = None
+    registry = routing._ensure_loaded()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    pipeline = registry.pipelines["acoustic_puzzle_v1"]
+
+    assert "codex56_truth_map_retake" in pack.prompt_stages
+    assert "codex56_truth_map_retake" in pipeline.declared_seams
+    pass_refs = {seam for row in pipeline.passes for seam in row.seam_refs}
+    assert "codex56_truth_map_retake" in pass_refs
+    assert set(pack.prompt_stages) == set(pipeline.declared_seams)
+
+    truth_row = next(row for row in pipeline.passes
+                     if row.pass_id == "P3_audible_truth_map")
+    assert truth_row.slot == "creative"
+    assert truth_row.seam_refs == (
+        "codex56_audible_truth_map", "codex56_truth_map_retake",
+    )
+    seam = pack.prompt_stages["codex56_truth_map_retake"]
+    assert "Re-author the audible truth map" in seam
+    assert "never select a different possibility" in seam
+
+
 @pytest.mark.parametrize("hint", ["", "please emphasize patient teamwork"])
 def test_custom_premise_is_only_an_operator_hint_and_fetcher_still_runs(
         monkeypatch, hint):
