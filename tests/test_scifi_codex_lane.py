@@ -1118,6 +1118,47 @@ def test_p3_semantic_repair_uses_minified_draft_and_bounded_receipts():
     assert journal["calls"][0]["accepted_transport"]["schema"] == "RadioScoreDraftV4"
 
 
+def test_p3_base_and_repair_bind_locked_total_to_per_scene_cap():
+    advisory = lane.make_advisory_word_blueprint(
+        42, [f"b{index:03d}" for index in range(6)],
+    )
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    valid = _draft_for_advisory(advisory)
+    wrong_total = valid.model_dump(mode="json")
+    wrong_total["scenes"] = wrong_total["scenes"][:1]
+    responses = [
+        json.dumps(wrong_total),
+        json.dumps(valid.model_dump(mode="json")),
+    ]
+    calls: list[dict[str, object]] = []
+    pack = routing.resolve_story_pack("scifi_codex")
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn, pack=pack,
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal={},
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    for call in calls:
+        system = call["messages"][0]["content"]
+        assert "contains exactly 6 beat rows" in system
+        assert "flattened total" in system
+        assert "exactly 6" in system
+        assert "Each individual scene may contain at most 4 beats" in system
+        assert "across at least 2 scene(s)" in system
+
+
 @pytest.mark.parametrize(
     ("loc", "cap"),
     [

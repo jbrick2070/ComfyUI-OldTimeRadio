@@ -496,6 +496,37 @@ _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION = (
 )
 
 
+def _radio_score_draft_topology_instruction(
+    artifact_inputs: Mapping[str, Any],
+) -> str:
+    """Bind the compact draft's local scene cap to the locked global plan."""
+    advisory_raw = artifact_inputs.get("advisory_word_plan")
+    per_beat = (
+        advisory_raw.get("per_beat")
+        if isinstance(advisory_raw, Mapping)
+        else None
+    )
+    if (
+        not isinstance(per_beat, list)
+        or not 1 <= len(per_beat) <= _RADIO_SCORE_MAX_BEATS
+    ):
+        raise CodexPackContractError(
+            "P3 compact draft requires a bounded advisory_word_plan.per_beat"
+        )
+    beat_count = len(per_beat)
+    minimum_scene_count = (
+        beat_count + _RADIO_SCORE_MAX_BEATS_PER_SCENE - 1
+    ) // _RADIO_SCORE_MAX_BEATS_PER_SCENE
+    return (
+        f" The accepted advisory_word_plan contains exactly {beat_count} beat "
+        "rows. The flattened total across every scenes[*].beats array MUST be "
+        f"exactly {beat_count}. Each individual scene may contain at most "
+        f"{_RADIO_SCORE_MAX_BEATS_PER_SCENE} beats, so distribute the locked "
+        f"beats across at least {minimum_scene_count} scene(s); never place all "
+        "locked beats into one scene when that crosses the per-scene cap."
+    )
+
+
 class ScriptLineV4(_Strict):
     line_id: str
     beat_id: str
@@ -2151,6 +2182,9 @@ def invoke_codex_structured(
         schema_instruction += p0_contract_instruction(has_numeric_tokens=True)
     if draft_score_pass:
         schema_instruction += _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION
+        schema_instruction += _radio_score_draft_topology_instruction(
+            artifact_inputs,
+        )
         if pass_id == "P3_rewrite":
             schema_instruction += (
                 " Preserve the previous_draft structural decisions exactly: "

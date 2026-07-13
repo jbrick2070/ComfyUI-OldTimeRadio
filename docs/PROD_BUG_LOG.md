@@ -1236,3 +1236,34 @@ out until they independently meet the same production-only admission rule.
   isolate the failed artifact, and target below the rejection edge; promoted
   as executable BUG-11.38 extension coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-06 -- P3 repair fixed total beats by overflowing one scene
+
+- promotion: BUG-11.38 extension
+- surfaced: canonical 42-word `scifi_codex` reverify, prompt
+  `a2b76223-c4be-49e3-945f-9fd1895a33a3`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: P0 through P2 cleared. P3's base draft had fewer flattened beats
+  than the locked six-row advisory. Its semantic repair restored all six beats
+  but placed them in one scene, violating RadioScoreDraftV4's maximum of four
+  beats per scene, and exhausted the ladder before ledger/media/OBS work.
+- root cause: the compact schema said each scene had one to four beats, while
+  the accepted advisory lived only in the input context. Neither the base nor
+  repair instruction explicitly bound the locked global beat count to the sum
+  of the scene-local arrays or derived the minimum scene count. The model fixed
+  the named total-count rejection without preserving the independent local cap.
+- fix: derive a bounded topology instruction from the accepted advisory before
+  every P3/P3_rewrite call. State the exact locked flattened beat total, repeat
+  the four-beat per-scene maximum, derive the minimum scene count, and require
+  distribution across scenes. The same instruction is carried by base,
+  restart, semantic repair, and rewrite boundaries; Python still derives only
+  canonical mechanics after a complete valid authored draft.
+- verify idea: use a six-row advisory and a schema-valid one-scene/four-beat
+  draft, then require the repair to return a valid two-scene/six-beat draft.
+  Assert both captured system prompts name exact total six, local maximum four,
+  and minimum two scenes. Re-run the same canonical 42-word combination through
+  ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes -- compact nested contracts must explicitly relate locked
+  global cardinality to local collection caps at every repair boundary;
+  promoted as executable BUG-11.38 extension coverage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING
