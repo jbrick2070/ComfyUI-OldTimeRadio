@@ -4,6 +4,7 @@ import ast
 import copy
 import hashlib
 import json
+import math
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -103,72 +104,6 @@ def _bounded_prose(characters: int, seed: str) -> str:
     return text.rstrip()
 
 
-def _max_width_radio_score(advisory: lane.AdvisoryWordPlanV4) -> lane.RadioScoreV4:
-    """Build a complete, natural-prose score at every P3 local maximum."""
-    scenes = []
-    beat_number = 1
-    line_number = 1
-    shot_number = 1
-    for scene_number in range(1, 4):
-        scene_id = f"scene_{scene_number:03d}"
-        shots = []
-        for _ in range(2):
-            shots.append(lane.ShotPlanV4(
-                shot_id=f"shot_{shot_number:03d}",
-                scene_id=scene_id,
-                description=_bounded_prose(72, f"shot{shot_number}"),
-                visual_prompt=_bounded_prose(120, f"visual{shot_number}"),
-            ))
-            shot_number += 1
-        beats = []
-        for local_beat in range(4):
-            beats.append(lane.BeatPlanV4(
-                beat_id=f"b{beat_number:03d}",
-                scene_id=scene_id,
-                shot_id=shots[local_beat % 2].shot_id,
-                speaker=_bounded_prose(40, f"speaker{beat_number}"),
-                char_id="announcer",
-                speaker_role="announcer",
-                line_ids=[f"l{line_number:03d}", f"l{line_number + 1:03d}"],
-                order=beat_number,
-                intent=_bounded_prose(64, f"intent{beat_number}"),
-                arc_phase=_bounded_prose(28, f"arc{beat_number}"),
-                fact_ids=["F01", "F02"],
-                advisory_voiced_word_center=10,
-            ))
-            beat_number += 1
-            line_number += 2
-        scenes.append(lane.ScenePlanV4(
-            scene_id=scene_id,
-            env=_bounded_prose(56, f"environment{scene_number}"),
-            description=_bounded_prose(72, f"scene{scene_number}"),
-            shots=shots,
-            beats=beats,
-        ))
-    return lane.RadioScoreV4(
-        title=_bounded_prose(64, "title"),
-        premise=_bounded_prose(144, "premise"),
-        setting=_bounded_prose(80, "setting"),
-        advisory_word_plan=advisory,
-        scenes=scenes,
-        music_cues=[
-            lane.MusicCueV4(
-                cue_id=cue_id,
-                placement=placement,
-                description=_bounded_prose(80, cue_id),
-                generation_prompt=_bounded_prose(120, f"prompt{cue_id}"),
-                anchor_line_id=anchor_line_id,
-                anchor_beat_id=anchor_beat_id,
-            )
-            for cue_id, placement, anchor_line_id, anchor_beat_id in (
-                ("music_open", "open", "l001", "b001"),
-                ("music_inter", "inter", "l013", "b007"),
-                ("music_close", "close", "l023", "b012"),
-            )
-        ],
-    )
-
-
 def _legacy_metadata_artifact() -> dict[str, object]:
     lines = [
         {
@@ -254,6 +189,89 @@ def _metadata_repair_fact_index() -> lane.FactIndexV4:
         )],
         entities=[], numbers=[], tone="cautious", payload_sha256="0" * 64,
     )
+
+
+def _draft_for_advisory(
+    advisory: lane.AdvisoryWordPlanV4,
+    *,
+    max_width: bool = False,
+    cast_ids: tuple[str, ...] = ("announcer", "c01"),
+) -> lane.RadioScoreDraftV4:
+    """Build a valid compact draft for the passed, possibly b000-based plan."""
+    beat_total = len(advisory.per_beat)
+    scenes: list[dict[str, object]] = []
+    cursor = 0
+    while cursor < beat_total:
+        local_count = min(4, beat_total - cursor)
+        scene_number = len(scenes) + 1
+        shot_count = 1 if local_count == 1 else 2
+        beats = []
+        for local_index in range(local_count):
+            flat_index = cursor + local_index
+            beats.append({
+                "shot_index": local_index % shot_count,
+                "char_id": cast_ids[flat_index % len(cast_ids)],
+                "line_count": 2 if max_width else 1,
+                "intent": _bounded_prose(64 if max_width else 24, f"intent{flat_index}"),
+                "arc_phase": _bounded_prose(28 if max_width else 12, f"arc{flat_index}"),
+                "fact_ids": ["F01"],
+            })
+        scenes.append({
+            "env": _bounded_prose(56 if max_width else 20, f"env{scene_number}"),
+            "description": _bounded_prose(72 if max_width else 28, f"scene{scene_number}"),
+            "shots": [
+                {
+                    "description": _bounded_prose(72 if max_width else 24, f"shot{scene_number}a"),
+                    "visual_prompt": _bounded_prose(120 if max_width else 32, f"visual{scene_number}a"),
+                },
+            ] + ([
+                {
+                    "description": _bounded_prose(72 if max_width else 24, f"shot{scene_number}b"),
+                    "visual_prompt": _bounded_prose(120 if max_width else 32, f"visual{scene_number}b"),
+                },
+            ] if shot_count == 2 else []),
+            "beats": beats,
+        })
+        cursor += local_count
+    cue_specs = [("music_open", 0, 0)]
+    if beat_total >= 6:
+        cue_specs.append(("music_inter", beat_total // 2, 0))
+    if beat_total >= 9:
+        cue_specs.append(("music_close", beat_total - 1, 1 if max_width else 0))
+    return lane.RadioScoreDraftV4(
+        title=_bounded_prose(64 if max_width else 32, "title"),
+        premise=_bounded_prose(144 if max_width else 56, "premise"),
+        setting=_bounded_prose(80 if max_width else 32, "setting"),
+        scenes=scenes,
+        music_cues=[
+            {
+                "cue_id": cue_id,
+                "description": _bounded_prose(80 if max_width else 28, cue_id),
+                "generation_prompt": _bounded_prose(120 if max_width else 36, f"prompt{cue_id}"),
+                "anchor_beat_index": beat_index,
+                "anchor_line_index": line_index,
+            }
+            for cue_id, beat_index, line_index in cue_specs
+        ],
+    )
+
+
+def _draft_context(
+    advisory: lane.AdvisoryWordPlanV4,
+    cast: lane.CastPlanV4,
+    fact_index: lane.FactIndexV4,
+) -> dict[str, object]:
+    question = lane.DramaticQuestionV4(
+        question="What does the cautious signal demand?",
+        consequence="A reckless reply could turn a warning into a disaster.",
+        ending_direction="Choose restraint before the report reaches dawn.",
+    )
+    return {
+        "question": question.model_dump(mode="json"),
+        "cast": cast.model_dump(mode="json"),
+        "fact_index": lane._compact_p0_fact_context(fact_index),
+        "advisory_word_plan": advisory.model_dump(mode="json"),
+    }
 
 
 def test_cast_plan_locks_and_repairs_the_fixed_announcer_identity():
@@ -689,22 +707,7 @@ def test_advisory_centers_do_not_require_requested_count():
     plan = lane.make_advisory_word_blueprint(719, ["b001", "b002", "b003"])
     assert plan.advisory_total_center == 719
     assert sum(x.advisory_word_center for x in plan.per_beat) == 719
-    assert lane._score_graph_contract(plan) == {
-        "required_beat_ids": ["b001", "b002", "b003"],
-        "required_beat_orders": [
-            {"beat_id": "b001", "order": 1},
-            {"beat_id": "b002", "order": 2},
-            {"beat_id": "b003", "order": 3},
-        ],
-        "line_id_policy": (
-            "Flattened scene/beat line_ids must be unique contiguous canonical "
-            "IDs l001, l002, and so on, with no gaps."
-        ),
-        "music_anchor_policy": (
-            "Every music cue anchor_line_id must be one of those line_ids and "
-            "anchor_beat_id must be that line's owning beat_id."
-        ),
-    }
+    assert [row.beat_id for row in plan.per_beat] == ["b001", "b002", "b003"]
 
 
 def test_score_contract_closes_advisory_beats_lines_and_cue_anchors_before_p5():
@@ -731,57 +734,53 @@ def test_score_contract_closes_advisory_beats_lines_and_cue_anchors_before_p5():
     ) == "music cue 'music_open' anchors an unknown score line"
 
 
-def test_radio_score_surface_is_finite_before_p3_reserves_output_capacity():
-    score = _metadata_repair_score()
-    receipt = lane._radio_score_surface_receipt()
+def test_radio_score_draft_surface_is_finite_before_p3_reserves_output_capacity():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    draft = _draft_for_advisory(advisory)
+    receipt = lane._radio_score_draft_surface_receipt()
 
+    assert receipt["schema"] == "RadioScoreDraftV4"
+    assert receipt["full_result_json_schema_in_prompt"] is False
     assert receipt["max_scenes"] == 3
     assert receipt["max_shots_per_scene"] == 2
     assert receipt["max_beats_per_scene"] == 4
-    assert receipt["max_total_shots"] == 6
     assert receipt["max_total_beats"] == 12
-    assert receipt["max_lines_per_beat"] == 2
-    assert receipt["max_total_line_ids"] == 24
-    assert receipt["max_new_tokens"] == 2900
-    assert receipt["input_token_reservation"] == 5292
+    assert receipt["max_line_count_per_beat"] == 2
+    assert receipt["max_new_tokens"] == lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
+    assert receipt["input_token_reservation"] + receipt["max_new_tokens"] == 8192
 
-    overlong_title = score.model_dump(mode="json")
+    overlong_title = draft.model_dump(mode="json")
     overlong_title["title"] = "x" * 65
     with pytest.raises(ValidationError):
-        lane.RadioScoreV4.model_validate(overlong_title)
+        lane.RadioScoreDraftV4.model_validate(overlong_title)
 
-    overlong_visual_prompt = score.model_dump(mode="json")
+    overlong_visual_prompt = draft.model_dump(mode="json")
     overlong_visual_prompt["scenes"][0]["shots"][0]["visual_prompt"] = "x" * 121
     with pytest.raises(ValidationError):
-        lane.RadioScoreV4.model_validate(overlong_visual_prompt)
+        lane.RadioScoreDraftV4.model_validate(overlong_visual_prompt)
 
-    overlong_beat_intent = score.model_dump(mode="json")
-    overlong_beat_intent["scenes"][0]["beats"][0]["intent"] = "x" * 65
+    invalid_local_anchor = draft.model_dump(mode="json")
+    invalid_local_anchor["music_cues"][0]["anchor_line_index"] = 2
     with pytest.raises(ValidationError):
-        lane.RadioScoreV4.model_validate(overlong_beat_intent)
+        lane.RadioScoreDraftV4.model_validate(invalid_local_anchor)
 
-    too_many_scenes = score.model_dump(mode="json")
+    too_many_scenes = draft.model_dump(mode="json")
     too_many_scenes["scenes"] *= 4
     with pytest.raises(ValidationError):
-        lane.RadioScoreV4.model_validate(too_many_scenes)
-
-    too_many_beats = score.model_dump(mode="json")
-    too_many_beats["scenes"][0]["beats"] *= 5
-    with pytest.raises(ValidationError):
-        lane.RadioScoreV4.model_validate(too_many_beats)
+        lane.RadioScoreDraftV4.model_validate(too_many_scenes)
 
     with pytest.raises(ValidationError):
         lane.AdvisoryWordPlanV4.model_validate({
             "advisory_total_center": 120,
             "per_beat": [
                 {"beat_id": f"b{index:03d}", "advisory_word_center": 10}
-                for index in range(1, 14)
+                for index in range(13)
             ],
         })
 
 
-def test_max_width_p3_and_rewrite_envelopes_fit_the_local_gemma_context():
-    """Pin output and BOTH compact repair envelopes to the live tokenizer."""
+def test_max_width_p3_draft_envelopes_fit_the_local_gemma_context():
+    """Measure the real draft/base/restart/repair/rewrite chat envelopes."""
     if not _GEMMA_E4B_TOKENIZER_SNAPSHOT.is_dir():
         pytest.skip("local Gemma E4B tokenizer snapshot is unavailable")
     transformers = pytest.importorskip("transformers")
@@ -789,99 +788,91 @@ def test_max_width_p3_and_rewrite_envelopes_fit_the_local_gemma_context():
         _GEMMA_E4B_TOKENIZER_SNAPSHOT, local_files_only=True,
     )
     advisory = lane.make_advisory_word_blueprint(
-        120, [f"b{index:03d}" for index in range(1, 13)],
+        120, [f"b{index:03d}" for index in range(12)],
     )
-    score = _max_width_radio_score(advisory)
-    score_json = json.dumps(
-        score.model_dump(mode="json"),
+    cast = _metadata_repair_cast()
+    fact_index = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory, max_width=True)
+    draft_json = json.dumps(
+        draft.model_dump(mode="json"),
         sort_keys=True, separators=(",", ":"), ensure_ascii=False,
     )
-    invalid = score.model_dump(mode="json")
+    invalid = draft.model_dump(mode="json")
     invalid["music_cues"][1]["cue_id"] = "music_open"
     invalid_json = json.dumps(
         invalid, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
     )
     pack = routing.resolve_story_pack("scifi_codex")
-    graph = lane._score_graph_contract(advisory)
-    question = lane.DramaticQuestionV4(
-        question=_bounded_prose(160, "question"),
-        consequence=_bounded_prose(160, "consequence"),
-        ending_direction=_bounded_prose(120, "ending"),
-    )
-    cast = lane.CastPlanV4(cast=[
-        lane.CastPlanRowV4(
-            char_id=char_id,
-            name="ANNOUNCER" if char_id == "announcer" else _bounded_prose(40, char_id),
-            character_description=_bounded_prose(160, f"description{char_id}"),
-            gender=_bounded_prose(24, f"gender{char_id}"),
-            role_in_conflict=_bounded_prose(120, f"role{char_id}"),
-            voice_slot=char_id,
-        )
-        for char_id in ("announcer", "c01", "c02", "c03")
-    ])
-    review = lane.StructureReviewV4(
-        verdict="rewrite",
-        issues=[_bounded_prose(120, f"issue{index}") for index in range(1, 7)],
-        rationale=_bounded_prose(240, "rationale"),
-    )
-    reservation = lane._radio_score_surface_receipt()
+    context = _draft_context(advisory, cast, fact_index)
+    reservation = lane._radio_score_draft_surface_receipt()
 
-    def capture(pass_id, artifact_inputs, *, base_temperature, structural_retry_temperature):
-        calls = []
-        responses = [invalid_json, score_json]
+    def run_draft_call(
+        pass_id: str,
+        responses: list[str],
+        *,
+        expected_signature: tuple[object, ...] | None = None,
+    ) -> list[object]:
+        calls: list[object] = []
 
         def slot(messages, **_kwargs):
             calls.append(messages)
             return responses.pop(0)
 
-        result = lane.invoke_codex_structured(
+        artifact_inputs = dict(context)
+        if pass_id == "P3_rewrite":
+            artifact_inputs["previous_draft"] = draft.model_dump(mode="json")
+            artifact_inputs["review"] = {
+                "verdict": "rewrite",
+                "issues": [_bounded_prose(120, "issue")],
+                "rationale": _bounded_prose(240, "rationale"),
+            }
+        result = lane._call_radio_score_draft(
             pass_id=pass_id,
-            slot="creative",
             slot_fn=slot,
             pack=pack,
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
             artifact_inputs=artifact_inputs,
-            result_type=lane.RadioScoreV4,
-            post_validator=lambda candidate: lane._validate_radio_score_graph(
-                candidate, advisory,
-            ),
-            base_temperature=base_temperature,
-            structural_retry_temperature=structural_retry_temperature,
+            advisory=advisory,
+            cast=cast,
+            fact_index=fact_index,
+            base_temperature=.72 if pass_id == "P3" else .55,
+            structural_retry_temperature=.32 if pass_id == "P3" else .20,
             max_new_tokens=reservation["max_new_tokens"],
             call_journal={},
-            repair_advisory=advisory,
-            prompt_must_fit=True,
-            clamp_overlong_strings=False,
+            expected_signature=expected_signature,
         )
-        assert result == score
-        assert len(calls) == 2
-        repair_user = calls[1][1]["content"]
-        assert "<failed_radio_score>" in repair_user
-        assert "<locked_score_graph>" in repair_user
-        if pass_id == "P3_rewrite":
-            assert "<rewrite_review>" in repair_user
+        assert isinstance(result, lane.RadioScoreV4)
         return calls
 
-    p3_calls = capture(
-        "P3",
-        {
-            "question": question.model_dump(mode="json"),
-            "cast": cast.model_dump(mode="json"),
-            "advisory_word_plan": advisory.model_dump(mode="json"),
-            "score_graph_contract": graph,
-        },
-        base_temperature=.72,
-        structural_retry_temperature=.32,
+    incomplete = '{"title":"unfinished"'
+    base_and_restart = run_draft_call("P3", [incomplete, incomplete, draft_json])
+    semantic_repair = run_draft_call("P3", [invalid_json, draft_json])
+    rewrite_signature = lane._radio_score_draft_structure_signature(draft)
+    rewrite_base = run_draft_call("P3_rewrite", [draft_json], expected_signature=rewrite_signature)
+    rewrite_repair = run_draft_call(
+        "P3_rewrite", [invalid_json, draft_json], expected_signature=rewrite_signature,
     )
-    rewrite_calls = capture(
-        "P3_rewrite",
-        {
-            "score": score.model_dump(mode="json"),
-            "review": review.model_dump(mode="json"),
-        },
-        base_temperature=.55,
-        structural_retry_temperature=.20,
+
+    assert len(base_and_restart) == 3
+    assert incomplete not in base_and_restart[2][1]["content"]
+    assert "<draft_context>" in base_and_restart[2][1]["content"]
+    assert len(semantic_repair) == 2
+    assert "<failed_radio_score_draft>" in semantic_repair[1][1]["content"]
+    assert invalid_json in semantic_repair[1][1]["content"]
+    assert len(rewrite_base) == 1
+    assert len(rewrite_repair) == 2
+    assert "<failed_radio_score_draft>" in rewrite_repair[1][1]["content"]
+    all_calls = [
+        *base_and_restart,
+        *semantic_repair,
+        *rewrite_base,
+        *rewrite_repair,
+    ]
+    assert all(
+        "result_json_schema" not in messages[1]["content"]
+        for messages in all_calls
     )
+    assert all("RadioScoreDraftV4" in messages[0]["content"] for messages in all_calls)
 
     def token_count(messages) -> int:
         prompt = tokenizer.apply_chat_template(
@@ -889,225 +880,252 @@ def test_max_width_p3_and_rewrite_envelopes_fit_the_local_gemma_context():
         )
         return len(tokenizer(prompt, add_special_tokens=False)["input_ids"])
 
-    score_tokens = len(tokenizer(
-        score_json, add_special_tokens=False,
-    )["input_ids"])
-    assert 2500 <= score_tokens <= reservation["max_new_tokens"]
-    prompt_tokens = [
-        token_count(messages) for messages in (*p3_calls, *rewrite_calls)
-    ]
-    assert all(token_count <= reservation["input_token_reservation"] for token_count in prompt_tokens), (
-        f"max-width P3 prompt tokens {prompt_tokens} exceed "
-        f"{reservation['input_token_reservation']}"
-    )
-
-
-def test_score_metadata_repair_derives_only_a_known_cue_anchor_beat():
-    score = _metadata_repair_score()
-    advisory = score.advisory_word_plan
-    bad = score.model_dump(mode="json")
-    bad["music_cues"][0]["anchor_beat_id"] = "b003"
-    preserved = copy.deepcopy(bad)
-
-    repaired = lane.repair_radio_score_metadata(_fenced_json(bad), advisory)
-
-    assert repaired is not None
-    dumped = repaired.model_dump(mode="json")
-    assert dumped["music_cues"][0]["anchor_beat_id"] == "b001"
-    assert dumped["music_cues"][0]["anchor_line_id"] == "l001"
-    assert {
-        key: value for key, value in dumped.items() if key != "music_cues"
-    } == {
-        key: value for key, value in preserved.items() if key != "music_cues"
-    }
-    assert bad == preserved
-
-    unknown_anchor = copy.deepcopy(bad)
-    unknown_anchor["music_cues"][0]["anchor_line_id"] = "l006"
-    assert lane.repair_radio_score_metadata(_fenced_json(unknown_anchor), advisory) is None
-
-
-def test_p3_cue_anchor_metadata_repair_short_circuits_the_model_call():
-    score = _metadata_repair_score()
-    advisory = score.advisory_word_plan
-    bad = score.model_dump(mode="json")
-    bad["music_cues"][0]["anchor_beat_id"] = "b003"
-    calls: list[dict[str, object]] = []
-    pack = SimpleNamespace(prompt_stages={
-        "codex_radio_score_system": "Score.",
-        "codex_coda_contract_system": "Coda.",
-    })
-
-    def slot_fn(messages, **kwargs):
-        calls.append({"messages": messages, **kwargs})
-        return _fenced_json(bad)
-
-    result = lane.invoke_codex_structured(
-        pass_id="P3", slot="creative", slot_fn=slot_fn, pack=pack,
-        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-        artifact_inputs={"score_graph_contract": lane._score_graph_contract(advisory)},
-        result_type=lane.RadioScoreV4,
-        post_validator=lambda candidate: lane._validate_radio_score_graph(candidate, advisory),
-        base_temperature=.72, structural_retry_temperature=.32,
-        max_new_tokens=3600, call_journal={}, repair_advisory=advisory,
-    )
-
-    assert result.music_cues[0].anchor_beat_id == "b001"
-    assert len(calls) == 1
-
-
-def test_p3_typed_repair_receives_the_locked_score_graph_contract():
-    score = _metadata_repair_score()
-    advisory = score.advisory_word_plan
-    invalid = score.model_dump(mode="json")
-    invalid["scenes"][0]["beats"].pop()
-    responses = [json.dumps(invalid), json.dumps(score.model_dump(mode="json"))]
-    calls: list[dict[str, object]] = []
-    pack = SimpleNamespace(prompt_stages={
-        "codex_radio_score_system": "Score.",
-        "codex_coda_contract_system": "Coda.",
-    })
-
-    def slot_fn(messages, **kwargs):
-        calls.append({"messages": messages, **kwargs})
-        return responses.pop(0)
-
-    result = lane.invoke_codex_structured(
-        pass_id="P3", slot="creative", slot_fn=slot_fn, pack=pack,
-        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-        artifact_inputs={
-            "advisory_word_plan": advisory.model_dump(mode="json"),
-            "score_graph_contract": lane._score_graph_contract(advisory),
-        },
-        result_type=lane.RadioScoreV4,
-        post_validator=lambda candidate: lane._validate_radio_score_graph(candidate, advisory),
-        base_temperature=.72, structural_retry_temperature=.32,
-        max_new_tokens=3600, call_journal={},
-    )
-
-    assert result == score
-    assert len(calls) == 2
-    repair_system = calls[1]["messages"][0]["content"]
-    assert "score_graph_contract" in repair_system
-    assert "every and only required_beat_ids" in repair_system
-    assert "title <=64" in repair_system
-    assert "intent <=64" in repair_system
-    repair_user = calls[1]["messages"][1]["content"]
-    assert "<failed_radio_score>" in repair_user
-    assert "<locked_score_graph>" in repair_user
-    assert "original_request" not in repair_user
-    assert '"artifact_inputs"' not in repair_user
-
-
-def test_p3_repair_context_is_not_a_copyable_json_request_envelope():
-    """Live 2026-07-12: preserve the repair prefix and root boundary."""
-    score = _metadata_repair_score()
-    advisory = score.advisory_word_plan
-    invalid = score.model_dump(mode="json")
-    invalid["music_cues"].append(copy.deepcopy(invalid["music_cues"][0]))
-    responses = [json.dumps(invalid), json.dumps(score.model_dump(mode="json"))]
-    calls: list[dict[str, object]] = []
-    pack = SimpleNamespace(prompt_stages={
-        "codex_radio_score_system": "Score.",
-        "codex_coda_contract_system": "Coda.",
-    })
-
-    def slot_fn(messages, **kwargs):
-        calls.append({"messages": messages, **kwargs})
-        return responses.pop(0)
-
-    result = lane.invoke_codex_structured(
-        pass_id="P3", slot="creative", slot_fn=slot_fn, pack=pack,
-        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-        artifact_inputs={
-            "question": {"question": "What is the cost?"},
-            "cast": {"cast": []},
-            "advisory_word_plan": advisory.model_dump(mode="json"),
-            "score_graph_contract": lane._score_graph_contract(advisory),
-        },
-        result_type=lane.RadioScoreV4,
-        post_validator=lambda candidate: lane._validate_radio_score_graph(
-            candidate, advisory
-        ),
-        base_temperature=.72, structural_retry_temperature=.32,
-        max_new_tokens=2800, call_journal={}, repair_advisory=advisory,
-        prompt_must_fit=True,
-    )
-
-    assert result == score
-    assert len(calls) == 2
+    draft_tokens = len(tokenizer(draft_json, add_special_tokens=False)["input_ids"])
+    prompt_tokens = [token_count(messages) for messages in all_calls]
+    assert draft_tokens == 1418
+    assert reservation["max_new_tokens"] == (
+        draft_tokens + max(128, math.ceil(draft_tokens * .15)) + 16
+    ) == 1647
     assert all(
-        getattr(call["messages"], "_otr_prompt_must_fit", False)
-        for call in calls
+        prompt_tokens_for_call + reservation["max_new_tokens"] <= 8192
+        for prompt_tokens_for_call in prompt_tokens
+    ), f"draft P3 prompt tokens {prompt_tokens} exceed the 8192 context cap"
+
+
+def test_draft_compiler_derives_only_mechanical_score_metadata():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    fact_index = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    before = draft.model_dump(mode="json")
+
+    score = lane.compile_radio_score_draft(draft, advisory, cast, fact_index)
+
+    assert score.advisory_word_plan.model_dump(mode="json") == advisory.model_dump(mode="json")
+    assert [beat.beat_id for scene in score.scenes for beat in scene.beats] == [
+        "b000", "b001", "b002",
+    ]
+    assert [beat.order for scene in score.scenes for beat in scene.beats] == [1, 2, 3]
+    assert [beat.line_ids for scene in score.scenes for beat in scene.beats] == [
+        ["l001"], ["l002"], ["l003"],
+    ]
+    assert [beat.speaker for scene in score.scenes for beat in scene.beats] == [
+        "ANNOUNCER", "Iona", "ANNOUNCER",
+    ]
+    cue = score.music_cues[0]
+    assert (cue.placement, cue.anchor_beat_id, cue.anchor_line_id) == (
+        "open", "b000", "l001",
     )
-    repair_system = calls[1]["messages"][0]["content"]
-    repair_user = calls[1]["messages"][1]["content"]
-    assert "never return a wrapper" in repair_system
-    assert "<failed_radio_score>" in repair_user
-    assert "<rejection>" in repair_user
-    assert "<locked_score_graph>" in repair_user
-    assert "<locked_advisory_word_plan>" in repair_user
-    assert "original_request" not in repair_user
-    assert '"artifact_inputs"' not in repair_user
-    assert '"validation_error"' not in repair_user
+    assert lane._validate_radio_score_graph(score, advisory) is None
+    assert draft.model_dump(mode="json") == before
 
 
-def test_p3_rewrite_repair_does_not_duplicate_the_accepted_score_context():
-    score = _metadata_repair_score()
-    advisory = score.advisory_word_plan
-    invalid = score.model_dump(mode="json")
-    invalid["music_cues"].append(copy.deepcopy(invalid["music_cues"][0]))
-    responses = [json.dumps(invalid), json.dumps(score.model_dump(mode="json"))]
-    calls: list[dict[str, object]] = []
-    pack = SimpleNamespace(prompt_stages={
-        "codex_radio_score_system": "Score.",
-        "codex_coda_contract_system": "Coda.",
+def test_draft_compiler_rejects_unowned_or_invalid_runtime_decisions():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    baseline = _draft_for_advisory(advisory).model_dump(mode="json")
+
+    cases = []
+    missing_beat = copy.deepcopy(baseline)
+    missing_beat["scenes"][0]["beats"].pop()
+    cases.append(("beat_count", missing_beat))
+    one_shot = copy.deepcopy(baseline)
+    one_shot["scenes"][0]["shots"].pop()
+    one_shot["scenes"][0]["beats"][1]["shot_index"] = 1
+    cases.append(("shot_index", one_shot))
+    unused_shot = copy.deepcopy(baseline)
+    for beat in unused_shot["scenes"][0]["beats"]:
+        beat["shot_index"] = 0
+    cases.append(("unused_shot", unused_shot))
+    unknown_cast = copy.deepcopy(baseline)
+    unknown_cast["scenes"][0]["beats"][0]["char_id"] = "c02"
+    cases.append(("cast_id", unknown_cast))
+    uncovered_cast = copy.deepcopy(baseline)
+    for beat in uncovered_cast["scenes"][0]["beats"]:
+        beat["char_id"] = "announcer"
+    cases.append(("cast_coverage", uncovered_cast))
+    unknown_fact = copy.deepcopy(baseline)
+    unknown_fact["scenes"][0]["beats"][0]["fact_ids"] = ["F02"]
+    cases.append(("fact_id", unknown_fact))
+    duplicate_fact = copy.deepcopy(baseline)
+    duplicate_fact["scenes"][0]["beats"][0]["fact_ids"] = ["F01", "F01"]
+    cases.append(("fact_id", duplicate_fact))
+    duplicate_cue = copy.deepcopy(baseline)
+    duplicate_cue["music_cues"].append(copy.deepcopy(duplicate_cue["music_cues"][0]))
+    cases.append(("cue_id", duplicate_cue))
+    bad_anchor = copy.deepcopy(baseline)
+    bad_anchor["music_cues"][0]["anchor_beat_index"] = 5
+    cases.append(("cue_anchor", bad_anchor))
+
+    for expected_code, raw_draft in cases:
+        draft = lane.RadioScoreDraftV4.model_validate(raw_draft)
+        with pytest.raises(lane.RadioScoreDraftCompileError) as exc_info:
+            lane.compile_radio_score_draft(draft, advisory, cast, facts)
+        assert exc_info.value.code == expected_code
+
+    duplicate_advisory = advisory.model_copy(update={
+        "per_beat": [advisory.per_beat[0], advisory.per_beat[0], advisory.per_beat[2]],
     })
+    with pytest.raises(lane.RadioScoreDraftCompileError) as exc_info:
+        lane.compile_radio_score_draft(
+            lane.RadioScoreDraftV4.model_validate(baseline),
+            duplicate_advisory,
+            cast,
+            facts,
+        )
+    assert exc_info.value.code == "invalid_advisory"
+
+def test_p3_semantic_repair_uses_minified_draft_and_bounded_receipts():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    bad = draft.model_dump(mode="json")
+    bad["music_cues"].append(copy.deepcopy(bad["music_cues"][0]))
+    responses = [json.dumps(bad), json.dumps(draft.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+    pack = routing.resolve_story_pack("scifi_codex")
+    journal: dict[str, object] = {}
 
     def slot_fn(messages, **kwargs):
         calls.append({"messages": messages, **kwargs})
         return responses.pop(0)
 
-    result = lane.invoke_codex_structured(
-        pass_id="P3_rewrite", slot="creative", slot_fn=slot_fn, pack=pack,
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn, pack=pack,
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-        artifact_inputs={
-            "score": score.model_dump(mode="json"),
-            "review": {"verdict": "rewrite", "issues": ["Tighten the turn."]},
-        },
-        result_type=lane.RadioScoreV4,
-        post_validator=lambda candidate: lane._validate_radio_score_graph(
-            candidate, advisory,
-        ),
-        base_temperature=.55, structural_retry_temperature=.20,
-        max_new_tokens=3000, call_journal={}, repair_advisory=advisory,
-        prompt_must_fit=True, clamp_overlong_strings=False,
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal=journal,
     )
 
-    assert result == score
+    assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
+    repair_system = calls[1]["messages"][0]["content"]
     repair_user = calls[1]["messages"][1]["content"]
-    assert "<failed_radio_score>" in repair_user
-    assert '"required_beat_ids":["b001","b002","b003"]' in repair_user
-    assert "<rewrite_review>" in repair_user
-    assert "accepted_score_before_rewrite" not in repair_user
+    assert "RadioScoreDraftV4" in repair_system
+    assert "<failed_radio_score_draft>" in repair_user
+    assert "<trusted_draft_context>" in repair_user
+    assert "original_request" not in repair_user
+    assert '"result_json_schema"' not in repair_user
+    attempts = journal["calls"][0]["attempts"]
+    assert attempts[0]["compiler_status"] == "cue_id"
+    assert attempts[0]["draft_status"] == "compiler_rejected"
+    assert attempts[1]["compiler_status"] == "accepted"
+    assert journal["calls"][0]["accepted_transport"]["schema"] == "RadioScoreDraftV4"
+
+
+def test_p3_two_decode_failures_restart_only_from_trusted_draft_context():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    incomplete = '{"title":"partial-model-output"'
+    responses = [incomplete, incomplete, json.dumps(draft.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn, pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal=journal,
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 3
+    assert calls[1]["temperature"] == pytest.approx(.32)
+    restart_user = calls[2]["messages"][1]["content"]
+    assert "<draft_context>" in restart_user
+    assert incomplete not in restart_user
+    assert "<failed_radio_score_draft>" not in restart_user
+    attempts = journal["calls"][0]["attempts"]
+    assert [attempt["parse_status"] for attempt in attempts] == [
+        "not_decoded", "not_decoded", "decoded",
+    ]
+
+
+def test_project_compile_round_trip_preserves_the_rewrite_structure():
+    advisory = lane.make_advisory_word_blueprint(
+        120, [f"b{index:03d}" for index in range(12)],
+    )
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory, max_width=True)
+    score = lane.compile_radio_score_draft(draft, advisory, cast, facts)
+
+    projected = lane.project_radio_score_to_draft(score)
+    rebuilt = lane.compile_radio_score_draft(projected, advisory, cast, facts)
+
+    assert lane._radio_score_draft_structure_signature(projected) == (
+        lane._radio_score_draft_structure_signature(
+            lane.project_radio_score_to_draft(rebuilt)
+        )
+    )
+    assert [cue.anchor_line_id for cue in rebuilt.music_cues] == [
+        "l001", "l013", "l024",
+    ]
+
+
+def test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    score = lane.compile_radio_score_draft(draft, advisory, cast, facts)
+    projected = lane.project_radio_score_to_draft(score)
+    signature = lane._radio_score_draft_structure_signature(projected)
+    changed = projected.model_dump(mode="json")
+    changed["scenes"][0]["beats"][0]["char_id"] = "c01"
+    responses = [json.dumps(changed), json.dumps(projected.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+    artifact_inputs = {
+        **_draft_context(advisory, cast, facts),
+        "previous_draft": projected.model_dump(mode="json"),
+        "review": {"verdict": "rewrite", "issues": ["Tighten the turn."]},
+    }
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3_rewrite", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=artifact_inputs,
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.55, structural_retry_temperature=.20,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal={}, expected_signature=signature,
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    assert "Preserve the previous_draft structural decisions" in calls[0]["messages"][0]["content"]
+    assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
 
 
 def test_p3_exact_resolved_artifact_repair_envelope_is_unwrapped():
     """Live 2026-07-12: typed repair returned one transport wrapper."""
-    score = _metadata_repair_score()
-    advisory = score.advisory_word_plan
-    invalid = score.model_dump(mode="json")
-    invalid["scenes"][0]["beats"].pop()
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    invalid = draft.model_dump(mode="json")
+    invalid["music_cues"].append(copy.deepcopy(invalid["music_cues"][0]))
     base_raw = json.dumps(invalid)
-    pack = SimpleNamespace(prompt_stages={
-        "codex_radio_score_system": "Score.",
-        "codex_coda_contract_system": "Coda.",
-    })
-
-    wrapped = json.dumps({
-        "resolved_artifact": score.model_dump(mode="json"),
-    })
+    wrapped = json.dumps({"resolved_artifact": draft.model_dump(mode="json")})
     responses = [base_raw, wrapped]
     calls: list[dict[str, object]] = []
 
@@ -1115,28 +1133,20 @@ def test_p3_exact_resolved_artifact_repair_envelope_is_unwrapped():
         calls.append({"messages": messages, **kwargs})
         return responses.pop(0)
 
-    journal = {}
-    result = lane.invoke_codex_structured(
-        pass_id="P3", slot="creative",
-        slot_fn=slot_fn,
-        pack=pack,
+    journal: dict[str, object] = {}
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-        artifact_inputs={
-            "advisory_word_plan": advisory.model_dump(mode="json"),
-            "score_graph_contract": lane._score_graph_contract(advisory),
-        },
-        result_type=lane.RadioScoreV4,
-        post_validator=lambda candidate: lane._validate_radio_score_graph(
-            candidate, advisory
-        ),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
         base_temperature=.72, structural_retry_temperature=.32,
-        max_new_tokens=3600, call_journal=journal, repair_advisory=advisory,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal=journal,
     )
 
-    assert result == score
+    assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
-    repair_system = calls[1]["messages"][0]["content"]
-    assert "every and only required_beat_ids" in repair_system
     attempts = journal["calls"][0]["attempts"]
     assert [a["resolved_artifact_unwrapped"] for a in attempts] == [False, True]
     assert attempts[0]["raw_chars"] == len(base_raw)
@@ -1145,82 +1155,92 @@ def test_p3_exact_resolved_artifact_repair_envelope_is_unwrapped():
     assert attempts[1]["raw_sha256"] == hashlib.sha256(wrapped.encode()).hexdigest()
 
 
-def test_p3_direct_root_preserves_wire_receipt_without_unwrap():
-    score = _metadata_repair_score()
-    advisory = score.advisory_word_plan
-    raw = json.dumps(score.model_dump(mode="json"))
+def test_default_schema_injection_preserves_wire_receipt_without_unwrap():
+    question = lane.DramaticQuestionV4(
+        question="What must the observer choose?",
+        consequence="The report may change a dangerous decision.",
+        ending_direction="Choose caution before dawn.",
+    )
+    raw = json.dumps(question.model_dump(mode="json"))
     journal = {}
+    messages_seen: list[object] = []
     pack = SimpleNamespace(prompt_stages={
-        "codex_radio_score_system": "Score.",
-        "codex_coda_contract_system": "Coda.",
+        "codex_question_system": "Question.",
     })
 
+    def slot_fn(messages, **kwargs):
+        messages_seen.append(messages)
+        return raw
+
     result = lane.invoke_codex_structured(
-        pass_id="P3", slot="creative",
-        slot_fn=lambda messages, **kwargs: raw,
+        pass_id="P1", slot="creative",
+        slot_fn=slot_fn,
         pack=pack,
-        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-        artifact_inputs={}, result_type=lane.RadioScoreV4,
-        post_validator=lambda candidate: lane._validate_radio_score_graph(
-            candidate, advisory
-        ),
+        seam_refs=("codex_question_system",),
+        artifact_inputs={}, result_type=lane.DramaticQuestionV4,
+        post_validator=lambda candidate: None,
         base_temperature=.72, structural_retry_temperature=.32,
         max_new_tokens=3600, call_journal=journal,
     )
 
-    assert result == score
+    assert result == question
     attempt = journal["calls"][0]["attempts"][0]
     assert attempt["resolved_artifact_unwrapped"] is False
     assert attempt["raw_chars"] == len(raw)
     assert attempt["raw_sha256"] == hashlib.sha256(raw.encode()).hexdigest()
+    assert attempt["schema_status"] == "accepted"
+    assert '"result_json_schema"' in messages_seen[0][1]["content"]
+    assert "Its exact top-level keys are: question, consequence, ending_direction" in (
+        messages_seen[0][0]["content"]
+    )
 
 
 def test_resolved_artifact_envelope_with_sibling_key_stays_fail_loud():
-    score = _metadata_repair_score()
-    pack = SimpleNamespace(prompt_stages={
-        "codex_radio_score_system": "Score.",
-        "codex_coda_contract_system": "Coda.",
-    })
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
     calls = []
+
     def slot_fn(messages, **kwargs):
         calls.append(1)
         return json.dumps({
-            "resolved_artifact": score.model_dump(mode="json"),
+            "resolved_artifact": draft.model_dump(mode="json"),
             "unexpected": "must not be discarded",
         })
 
     with pytest.raises(lane.CodexPassError):
-        lane.invoke_codex_structured(
-            pass_id="P3", slot="creative",
-            slot_fn=slot_fn,
-            pack=pack,
+        lane._call_radio_score_draft(
+            pass_id="P3", slot_fn=slot_fn,
+            pack=routing.resolve_story_pack("scifi_codex"),
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-            artifact_inputs={}, result_type=lane.RadioScoreV4,
-            post_validator=lambda candidate: None,
+            artifact_inputs=_draft_context(advisory, cast, facts),
+            advisory=advisory, cast=cast, fact_index=facts,
             base_temperature=.72, structural_retry_temperature=.32,
-            max_new_tokens=3600, call_journal={},
+            max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+            call_journal={},
         )
     assert len(calls) == 2
 
 
 @pytest.mark.parametrize("wrapped_value", [[], "not-an-object", 7])
 def test_resolved_artifact_non_object_value_stays_fail_loud(wrapped_value):
-    pack = SimpleNamespace(prompt_stages={
-        "codex_radio_score_system": "Score.",
-        "codex_coda_contract_system": "Coda.",
-    })
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
     with pytest.raises(lane.CodexPassError):
-        lane.invoke_codex_structured(
-            pass_id="P3", slot="creative",
+        lane._call_radio_score_draft(
+            pass_id="P3",
             slot_fn=lambda messages, **kwargs: json.dumps({
                 "resolved_artifact": wrapped_value,
             }),
-            pack=pack,
+            pack=routing.resolve_story_pack("scifi_codex"),
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-            artifact_inputs={}, result_type=lane.RadioScoreV4,
-            post_validator=lambda candidate: None,
+            artifact_inputs=_draft_context(advisory, cast, facts),
+            advisory=advisory, cast=cast, fact_index=facts,
             base_temperature=.72, structural_retry_temperature=.32,
-            max_new_tokens=3600, call_journal={},
+            max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+            call_journal={},
         )
 
 
@@ -1232,11 +1252,10 @@ def test_scifi_codex_prompt_seams_forbid_envelope_key():
         for text in pack.prompt_stages.values()
     )
     radio_score_seam = pack.prompt_stages["codex_radio_score_system"]
-    assert "at most 3 scenes" in radio_score_seam
-    assert "at most 2 shots and 4 beats per scene" in radio_score_seam
-    assert "title <=64" in radio_score_seam
-    assert "intent <=64" in radio_score_seam
-    assert "cue descriptions <=80" in radio_score_seam
+    assert "RadioScoreDraftV4" in radio_score_seam
+    assert "never manufacture canonical IDs" in radio_score_seam
+    assert "previous_draft locks its structural choices" in radio_score_seam
+    assert "RadioScoreV4" not in radio_score_seam
 
 
 def test_script_output_token_budget_receipts_and_bounds():
@@ -1261,139 +1280,57 @@ def test_script_output_token_budget_receipts_and_bounds():
             lane._script_output_token_budget(30, bad_count)
 
 
-def test_radio_score_output_budget_preserves_the_live_p3_repair_window():
-    """A finite P3 surface reserves both whole output and repair input room."""
+def test_radio_score_draft_output_budget_preserves_the_live_p3_repair_window():
+    """The compact draft reserves output while retaining an explicit input cap."""
     context_cap = 8192
 
-    budget = lane._radio_score_output_token_budget(120, 12)
-    assert budget == 2900
-    assert context_cap - budget == 5292
-    assert lane._radio_score_output_token_budget(720, 12) == 2900
-    assert lane._radio_score_output_token_budget(30, 3) == 2900
+    budget = lane._radio_score_draft_output_token_budget(120, 12)
+    assert budget == lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
+    assert context_cap - budget == lane._radio_score_draft_surface_receipt()["input_token_reservation"]
+    assert lane._radio_score_draft_output_token_budget(720, 12) == budget
+    assert lane._radio_score_draft_output_token_budget(30, 3) == budget
     for invalid_words in (True, 29, 901, 120.0):
         with pytest.raises(lane.CodexTargetRangeError):
-            lane._radio_score_output_token_budget(invalid_words, 12)
+            lane._radio_score_draft_output_token_budget(invalid_words, 12)
     for invalid_beats in (True, 0, -1, 12.0, 13):
         with pytest.raises(lane.CodexTargetRangeError):
-            lane._radio_score_output_token_budget(120, invalid_beats)
+            lane._radio_score_draft_output_token_budget(120, invalid_beats)
 
 
-def test_only_whole_script_passes_use_dynamic_token_budget():
+def test_p3_uses_draft_helper_while_script_passes_keep_dynamic_budget():
     source_path = Path(__file__).parents[1] / "nodes" / "_otr_scifi_codex.py"
-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
-    seen: dict[str, ast.AST | None] = {}
-    repair_scores: dict[str, ast.AST | None] = {}
-    repair_advisories: dict[str, ast.AST | None] = {}
-    artifact_inputs: dict[str, ast.AST | None] = {}
-    post_validators: dict[str, ast.AST | None] = {}
-    prompt_must_fit: dict[str, ast.AST | None] = {}
-    clamp_overlong_strings: dict[str, ast.AST | None] = {}
+    source = source_path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    p3_helpers = []
+    script_passes: dict[str, ast.AST | None] = {}
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
             continue
-        if not isinstance(node.func, ast.Name) or node.func.id != "invoke_codex_structured":
-            continue
-        keywords = {kw.arg: kw.value for kw in node.keywords if kw.arg}
+        keywords = {keyword.arg: keyword.value for keyword in node.keywords if keyword.arg}
         pass_node = keywords.get("pass_id")
-        if isinstance(pass_node, ast.Constant) and isinstance(pass_node.value, str):
-            seen[pass_node.value] = keywords.get("max_new_tokens")
-            repair_scores[pass_node.value] = keywords.get("repair_score")
-            repair_advisories[pass_node.value] = keywords.get("repair_advisory")
-            artifact_inputs[pass_node.value] = keywords.get("artifact_inputs")
-            post_validators[pass_node.value] = keywords.get("post_validator")
-            prompt_must_fit[pass_node.value] = keywords.get("prompt_must_fit")
-            clamp_overlong_strings[pass_node.value] = keywords.get(
-                "clamp_overlong_strings"
-            )
+        if not isinstance(pass_node, ast.Constant) or not isinstance(pass_node.value, str):
+            continue
+        if node.func.id == "_call_radio_score_draft":
+            p3_helpers.append((pass_node.value, keywords))
+        elif node.func.id == "invoke_codex_structured":
+            script_passes[pass_node.value] = keywords.get("max_new_tokens")
+
+    assert {pass_id for pass_id, _keywords in p3_helpers} == {"P3", "P3_rewrite"}
+    for pass_id, keywords in p3_helpers:
+        budget = keywords["max_new_tokens"]
+        assert isinstance(budget, ast.Name)
+        assert budget.id == "score_token_budget"
+        assert isinstance(keywords["advisory"], ast.Name)
+        assert isinstance(keywords["cast"], ast.Name)
+        assert isinstance(keywords["fact_index"], ast.Name)
     for pass_id in ("P5", "P7", "P9"):
-        budget_node = seen[pass_id]
-        assert isinstance(budget_node, ast.Name)
-        assert budget_node.id == "script_token_budget"
-        repair_score = repair_scores[pass_id]
-        assert isinstance(repair_score, ast.Name)
-        assert repair_score.id == "score"
-    for pass_id in ("P3", "P3_rewrite"):
-        budget_node = seen[pass_id]
-        assert isinstance(budget_node, ast.Name)
-        assert budget_node.id == "score_token_budget"
-        must_fit = prompt_must_fit[pass_id]
-        assert isinstance(must_fit, ast.Constant)
-        assert must_fit.value is True
-        validator = post_validators[pass_id]
-        assert isinstance(validator, ast.Lambda)
-        assert isinstance(validator.body, ast.Call)
-        assert isinstance(validator.body.func, ast.Name)
-        assert validator.body.func.id == "_validate_radio_score_graph"
-        assert len(validator.body.args) == 2
-        assert isinstance(validator.body.args[1], ast.Name)
-        assert validator.body.args[1].id == "advisory"
-        repair_advisory = repair_advisories[pass_id]
-        assert isinstance(repair_advisory, ast.Name)
-        assert repair_advisory.id == "advisory"
-    for pass_id in ("P1", "P2", "P3", "P3_rewrite", "P4"):
-        clamp_flag = clamp_overlong_strings[pass_id]
-        assert isinstance(clamp_flag, ast.Constant)
-        assert clamp_flag.value is False
-    rewrite_inputs = artifact_inputs["P3_rewrite"]
-    assert isinstance(rewrite_inputs, ast.Dict)
-    assert {
-        key.value for key in rewrite_inputs.keys
-        if isinstance(key, ast.Constant) and isinstance(key.value, str)
-    } == {"score", "review"}
-    p5_inputs = artifact_inputs["P5"]
-    assert isinstance(p5_inputs, ast.Call)
-    assert isinstance(p5_inputs.func, ast.Name)
-    assert p5_inputs.func.id == "_script_artifact_inputs"
-    for pass_id in ("P7", "P9"):
-        inputs = artifact_inputs[pass_id]
-        assert isinstance(inputs, ast.Dict)
-        assert any(
-            key is None
-            and isinstance(value, ast.Call)
-            and isinstance(value.func, ast.Name)
-            and value.func.id == "_script_artifact_context"
-            for key, value in zip(inputs.keys, inputs.values)
-        )
-    p0_inputs = artifact_inputs["P0"]
-    assert isinstance(p0_inputs, ast.Name)
-    assert p0_inputs.id == "p0_inputs"
-    p0_call = next(
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "invoke_codex_structured"
-        and any(
-            keyword.arg == "pass_id"
-            and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value == "P0"
-            for keyword in node.keywords
-        )
-    )
-    p0_keywords = {keyword.arg: keyword.value for keyword in p0_call.keywords if keyword.arg}
-    p0_budget = p0_keywords["max_new_tokens"]
-    assert isinstance(p0_budget, ast.Name)
-    assert p0_budget.id == "p0_token_budget"
-    assert isinstance(p0_keywords["prompt_must_fit"], ast.Constant)
-    assert p0_keywords["prompt_must_fit"].value is True
-    assert isinstance(p0_keywords["post_validator"], ast.Lambda)
-    validator_call = p0_keywords["post_validator"].body
-    assert isinstance(validator_call, ast.Call)
-    validator_keywords = {keyword.arg: keyword.value for keyword in validator_call.keywords if keyword.arg}
-    assert isinstance(validator_keywords["allowed_source_fields"], ast.Name)
-    assert validator_keywords["allowed_source_fields"].id == "p0_allowed_fields"
-    expected_digest = validator_keywords["expected_payload_sha256"]
-    assert isinstance(expected_digest, ast.Attribute)
-    assert isinstance(expected_digest.value, ast.Name)
-    assert expected_digest.value.id == "env"
-    assert expected_digest.attr == "source_digest"
-    assert "fact_index_token_budget" in source_path.read_text(encoding="utf-8")
-    assert "p0_contract_receipt" in source_path.read_text(encoding="utf-8")
-    for pass_id, budget_node in seen.items():
-        if pass_id not in {"P3", "P3_rewrite", "P5", "P7", "P9"}:
-            assert not (
-                isinstance(budget_node, ast.Name)
-                and budget_node.id in {"score_token_budget", "script_token_budget"}
-            )
+        budget = script_passes[pass_id]
+        assert isinstance(budget, ast.Name)
+        assert budget.id == "script_token_budget"
+    assert "_score_graph_contract" not in source
+    assert "repair_radio_score_metadata" not in source
+    assert "include_result_json_schema=False" in source
+    assert "radio_score_draft_token_budget" in source
 
 
 def test_script_artifact_metadata_repair_normalizes_only_graph_metadata():

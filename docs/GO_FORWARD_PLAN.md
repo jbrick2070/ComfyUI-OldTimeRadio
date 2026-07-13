@@ -1,10 +1,11 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-12 15:14 PDT
+**Updated:** 2026-07-12 20:23 PDT
 
 **Branch:** `v2.0-alpha`
 
-**Grounded base:** `42f1af82`, equal to `origin/v2.0-alpha` when this re-plan began
+**Grounded base:** `7c806eec`, equal to `origin/v2.0-alpha` when the active
+P3 transport replacement began
 
 **Scope:** the active qualification/release-prep sprint and the immediately
 following feature sprint only
@@ -44,13 +45,18 @@ the second bakeoff this plan forbids.
 - The all-visualizer effective-consumer root fix (`PBUG-20260712-19`) is pushed
   at `496689da`; the shared P0 bounded-evidence repair (`PBUG-20260712-21`) is
   pushed at `e1d3a035`. **The sole coder slot is currently held by the live
-  Sci-Fi Codex P3 bounded-full-score repair (`PBUG-20260712-22`).** Its
-  ownership is the Codex score/P1/P2/P4 schemas and seams, compact P3 repair,
-  shared authored-artifact clamp boundary, P3 tests, this log, and the
-  BUG-11.50 extension. The RSS parity audit found no safe schema copy/paste:
-  Gemini, Sonnet, Fable2, Media Archive, and original lanes remain
-  artifact-specific follow-ups. No next production chunk starts until this
-  lands and the canonical Codex rerun clears.
+  Sci-Fi Codex P3 transport replacement (`PBUG-20260712-22`).** The bounded
+  direct-score correction failed again at live prompt
+  `edbbac48-9aa8-4907-8086-f63134604604`; the active root fix replaces only P3
+  and P3-rewrite model transport with `RadioScoreDraftV4` plus a fail-closed
+  compiler returning the same final `RadioScoreV4`. It preserves the canonical
+  workflow and the shared all-visualizer no-image gate. Focused tests are
+  green; first full-suite pass is green; final full rerun, Bible, commit/push,
+  and canonical live reverify remain before the coder slot releases. The full
+  four-round Kibitz campaign (8 local reviews) and four-round frontier panel
+  ($0.8618 actual) are recorded under the dated transport-recovery artifacts.
+  The RSS parity audit found no safe schema copy/paste: Gemini, Sonnet,
+  Fable2, Media Archive, and original lanes remain artifact-specific follow-ups.
 - Preserve the untracked cue-ledger prompt, Sci-Fi Codex repair plan, and local
   bakeoff logs. They are not owned by this planning rewrite.
 - One coder edits code or `workflows/otr_canonical.json` at a time. Read-only
@@ -63,7 +69,7 @@ time and is listed separately.
 
 | Order | Chunk | Hard completion gate | Estimate |
 |---:|---|---|---:|
-| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-22` bounded P3 full-score root fix after PBUG-21; focused tests, full suite, Bible; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no unused visual-authoring LLM call or image objects, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies pending live reverifies for shipped PBUGs 18-22. | 0.5-1 day + <=1 GPU day |
+| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-22` compact P3 draft/compiler root fix; focused tests, full suite, Bible, canonical validator/audits, commit/push; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no visual-authoring LLM call or image objects under all-visualizer policy, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies pending live reverifies for shipped PBUGs 18-22. | 0.5-1 day + <=1 GPU day |
 | 2 | Canonical watchdog support | Canonical runner emits heartbeats; watchdog recognizes canonical `RESULT`; healthy long runs never false-dead; explicit failure and stalled/down-server paths are pinned. This is a harness defect, not a production-admitted PBUG. | 0.5 day |
 | 3 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. | 0.5-1 day |
 | 4 | Rip interstitial **audio** only | Remove synthesis, insertion, timing, and dead tests; retain `music_inter` story/visual semantics. | 0.5-1 day |
@@ -72,7 +78,7 @@ time and is listed separately.
 | 7 | Context/cap foundation | One provider-effective cap/count/reservation/must-fit authority feeds preflight, invocation, and receipts; measure base and repair envelopes; no silent truncation and no blind 8192->16384 raise. | 1-3 days |
 | 8 | User extensibility -- local LLMs and content packs | Execute the converged W0-W5 plan: `user_packs/` overlay/quarantine, selectable content/story packs inside any existing runnable source lane, replay SHA integrity, `otr_check`, templates/generated schema docs/README recipes, and local causal-LM selection safety. New source lanes remain the expert preflight path. | 4-7 days + <=1 GPU day |
 | 9 | Fable2 qualification | 30 words on two local families and one declared cloud lane; same pairings at 120; then one frozen 720 leg with ledger/episode/OBS proof. | 0.5-1 day + 1-3 GPU days |
-| 10 | One bakeoff, not two | Resolve/build ratified contender D if still applicable; freeze code; revalidate only receipts that remain current; run one all-bank 720 event and blind verdict. The frozen Fable2 720 leg may serve both item 9 and its bakeoff leg only when SHA, settings, and event evidence are identical. | 1-3 days + 2-5 GPU days |
+| 10 | Fresh two-matrix bakeoff | After item 1 commits/pushes and all ten 120-word canonical legs are individually green with receipt/ledger/OBS proof, update the durable report and World Cup scoreboard. Then run all ten 420-word legs sequentially with OpenRouter creative `tencent/hy3:free` and local technical Mistral-Nemo; fail loud if HY3 is unavailable. No 320- or 720-word legs. | 2-5 GPU days |
 
 **Current-sprint planning range:** about **11-25 coder-days + 4-11 elapsed
 GPU days**. The top of the range covers the still-unknown `PBUG-20260712-17`
@@ -162,10 +168,11 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Latest whole-tree receipt during the active P0 closeout: **7,802 passed, 31
-  skipped, 1 xfailed**; Bug Bible **17 passed, 11 skipped, 3 xfailed**. The
-  canonical validator, JSON round-trip, live widget-vector, link, and input
-  audits report **23 nodes / 57 links** with no canonical workflow delta.
+- Active P3 transport receipt: focused suite **139 passed, 1 skipped**;
+  final whole-tree rerun **7,807 passed, 31 skipped, 1 xfailed**. Bug Bible
+  **17 passed, 11 skipped, 3 xfailed**. The canonical validator, JSON round-
+  trip, live widget-vector, link, and input audits report **23 nodes / 57
+  links** with no canonical workflow delta.
 - Every code chunk: focused tests, full Windows suite, Bug Bible, AST/JSON/BOM/
   zero-byte checks, commit, push, and verify `HEAD == origin/v2.0-alpha`.
 - Every node/widget/link/schema change edits `workflows/otr_canonical.json` in

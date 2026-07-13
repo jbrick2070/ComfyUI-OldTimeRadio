@@ -14,7 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any, Callable, Literal, Mapping, MutableMapping, Sequence
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 
 log = logging.getLogger("OTR")
@@ -39,7 +39,11 @@ try:
         p0_output_token_budget,
     )
     from ._otr_scifi_source_repair import repair_literal_source_metadata
-    from ._otr_structured_call import schema_shape_instruction, structured_call
+    from ._otr_structured_call import (
+        PostValidationError,
+        schema_shape_instruction,
+        structured_call,
+    )
     from . import _otr_ledger_freeze
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
@@ -62,7 +66,11 @@ except ImportError:  # pragma: no cover
         p0_output_token_budget,
     )
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
-    from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
+    from _otr_structured_call import (  # type: ignore
+        PostValidationError,
+        schema_shape_instruction,
+        structured_call,
+    )
     import _otr_ledger_freeze  # type: ignore
     from production_ledger import stamp_word_counts  # type: ignore
 
@@ -224,7 +232,10 @@ def repair_cast_plan_metadata(failed_output: str) -> CastPlanV4 | None:
 
 
 _RADIO_SCORE_CONTEXT_CAP_TOKENS = 8192
-_RADIO_SCORE_MAX_OUTPUT_TOKENS = 2900
+# Measured 2026-07-12 with the actual local Gemma E4B chat template: the
+# max-width compact draft serializes to 1,418 tokens. Reserve that surface plus
+# max(128, ceil(15%)) and a 16-token framing margin: 1,647 tokens.
+_RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS = 1647
 _RADIO_SCORE_MAX_SCENES = 3
 _RADIO_SCORE_MAX_SHOTS_PER_SCENE = 2
 _RADIO_SCORE_MAX_BEATS_PER_SCENE = 4
@@ -313,20 +324,88 @@ class RadioScoreV4(_Strict):
     )
 
 
-def _radio_score_surface_receipt() -> dict[str, int | str]:
-    """Return the bounded P3 surface used to reserve its output window.
+class RadioScoreDraftBeatV4(_Strict):
+    """The P3 author's scene-local decisions, without derived score metadata."""
 
-    Local nested maxima make the whole score finite without introducing a
-    second score representation: at most three scenes, six shots, twelve
-    beats, and twenty-four line IDs can be serialized.
-    """
+    shot_index: int = Field(ge=0, le=_RADIO_SCORE_MAX_SHOTS_PER_SCENE - 1)
+    char_id: Literal["announcer", "c01", "c02", "c03"]
+    line_count: int = Field(ge=1, le=_RADIO_SCORE_MAX_LINES_PER_BEAT)
+    intent: str = Field(min_length=1, max_length=64)
+    arc_phase: str = Field(min_length=1, max_length=28)
+    fact_ids: list[Annotated[str, Field(pattern=r"^F0[1-6]$")]] = Field(
+        default_factory=list,
+        max_length=_RADIO_SCORE_MAX_FACT_IDS_PER_BEAT,
+    )
+
+
+class RadioScoreDraftShotV4(_Strict):
+    description: str = Field(min_length=1, max_length=72)
+    visual_prompt: str = Field(min_length=1, max_length=120)
+
+
+class RadioScoreDraftSceneV4(_Strict):
+    env: str = Field(min_length=1, max_length=56)
+    description: str = Field(min_length=1, max_length=72)
+    shots: list[RadioScoreDraftShotV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_SHOTS_PER_SCENE,
+    )
+    beats: list[RadioScoreDraftBeatV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_BEATS_PER_SCENE,
+    )
+
+
+class RadioScoreDraftMusicCueV4(_Strict):
+    cue_id: Literal["music_open", "music_inter", "music_close"]
+    description: str = Field(min_length=1, max_length=80)
+    generation_prompt: str = Field(min_length=1, max_length=120)
+    anchor_beat_index: int = Field(ge=0, le=_RADIO_SCORE_MAX_BEATS - 1)
+    anchor_line_index: int = Field(ge=0, le=_RADIO_SCORE_MAX_LINES_PER_BEAT - 1)
+
+
+class RadioScoreDraftV4(_Strict):
+    """Compact P3 transport. Python derives the final score mechanics."""
+
+    title: str = Field(min_length=1, max_length=64)
+    premise: str = Field(min_length=1, max_length=144)
+    setting: str = Field(min_length=1, max_length=80)
+    scenes: list[RadioScoreDraftSceneV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_SCENES,
+    )
+    music_cues: list[RadioScoreDraftMusicCueV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_MUSIC_CUES,
+    )
+
+
+_DRAFT_ERROR_CODES = frozenset({
+    "invalid_advisory", "beat_count", "shot_index", "unused_shot",
+    "cast_id", "cast_coverage", "fact_id", "cue_id", "cue_anchor",
+    "score_schema", "graph",
+})
+
+
+class RadioScoreDraftCompileError(ScifiCodexError):
+    """Bounded, retry-safe reason why a complete draft cannot compile."""
+
+    def __init__(self, *, code: str, path: str, detail: str) -> None:
+        if code not in _DRAFT_ERROR_CODES:
+            raise ValueError(f"unknown RadioScoreDraftCompileError code {code!r}")
+        self.code = code
+        self.path = " ".join(str(path).split())[:120] or "root"
+        self.detail = " ".join(str(detail).split())[:240] or "invalid draft"
+        super().__init__(f"draft.{self.code} at {self.path}: {self.detail}")
+
+
+def _radio_score_draft_surface_receipt() -> dict[str, int | str | bool]:
+    """Return the finite model-visible P3 draft surface and reservation."""
     return {
-        "schema": "RadioScoreV4",
+        "schema": "RadioScoreDraftV4",
         "context_cap_tokens": _RADIO_SCORE_CONTEXT_CAP_TOKENS,
-        "max_new_tokens": _RADIO_SCORE_MAX_OUTPUT_TOKENS,
+        "max_new_tokens": _RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
         "input_token_reservation": (
-            _RADIO_SCORE_CONTEXT_CAP_TOKENS - _RADIO_SCORE_MAX_OUTPUT_TOKENS
+            _RADIO_SCORE_CONTEXT_CAP_TOKENS
+            - _RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
         ),
+        "full_result_json_schema_in_prompt": False,
         "max_scenes": _RADIO_SCORE_MAX_SCENES,
         "max_shots_per_scene": _RADIO_SCORE_MAX_SHOTS_PER_SCENE,
         "max_beats_per_scene": _RADIO_SCORE_MAX_BEATS_PER_SCENE,
@@ -335,9 +414,7 @@ def _radio_score_surface_receipt() -> dict[str, int | str]:
         ),
         "max_total_beats": _RADIO_SCORE_MAX_BEATS,
         "max_lines_per_beat": _RADIO_SCORE_MAX_LINES_PER_BEAT,
-        "max_total_line_ids": (
-            _RADIO_SCORE_MAX_BEATS * _RADIO_SCORE_MAX_LINES_PER_BEAT
-        ),
+        "max_line_count_per_beat": _RADIO_SCORE_MAX_LINES_PER_BEAT,
         "max_music_cues": _RADIO_SCORE_MAX_MUSIC_CUES,
         "max_fact_ids_per_beat": _RADIO_SCORE_MAX_FACT_IDS_PER_BEAT,
         "max_title_chars": 64,
@@ -347,7 +424,6 @@ def _radio_score_surface_receipt() -> dict[str, int | str]:
         "max_scene_description_chars": 72,
         "max_shot_description_chars": 72,
         "max_visual_prompt_chars": 120,
-        "max_beat_speaker_chars": 40,
         "max_beat_intent_chars": 64,
         "max_arc_phase_chars": 28,
         "max_cue_description_chars": 80,
@@ -355,14 +431,24 @@ def _radio_score_surface_receipt() -> dict[str, int | str]:
     }
 
 
-_RADIO_SCORE_SURFACE_INSTRUCTION = (
-    "\nRadioScoreV4 bounded-output contract: emit at most 3 scenes; each scene "
-    "has at most 2 shots and 4 beats; each beat has 1 or 2 canonical line IDs; "
-    "there are at most 12 beats, 24 line IDs, and 3 music cues. Keep title <=64 "
-    "characters; premise <=144; setting <=80; scene env <=56; scene and shot "
-    "descriptions <=72; visual prompts and cue generation prompts <=120; beat "
-    "speaker <=40, intent <=64, arc phase <=28; cue descriptions <=80. IDs must "
-    "be scene_###, shot_###, b###, l###, and F01 through F06 as applicable."
+_RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION = (
+    "\nRadioScoreDraftV4 compact contract: return one JSON object only, rooted "
+    "at exactly title, premise, setting, scenes, music_cues. title <=64; premise "
+    "<=144; setting <=80. scenes has 1..3 items. Each scene has exactly env, "
+    "description, shots, beats: env <=56; description <=72; shots has 1..2 items "
+    "each with exactly description <=72 and visual_prompt <=120; beats has 1..4 "
+    "items each with exactly shot_index, char_id, line_count, intent, arc_phase, "
+    "fact_ids. shot_index is zero-based within this scene; char_id must be one "
+    "accepted spoken cast ID; line_count is 1 or 2; intent <=64; arc_phase <=28; "
+    "fact_ids is an ordered unique list of at most two allowed fact IDs. music_cues "
+    "has 1..3 unique items, each exactly cue_id, description, generation_prompt, "
+    "anchor_beat_index, anchor_line_index: description <=80; generation_prompt "
+    "<=120; anchor_beat_index is zero-based in flattened scene/beat order; "
+    "anchor_line_index is zero-based within that beat. cue_id determines broad "
+    "placement; the indices choose its exact anchor. Do not emit advisory_word_plan, "
+    "any scene/shot/beat/line ID, order, parent, speaker, speaker_role, canonical "
+    "cue anchor, spoken line text, wrapper, pass_id, artifact_inputs, or "
+    "result_json_schema."
 )
 
 
@@ -559,53 +645,348 @@ def _validate_radio_score_graph(
     return None
 
 
-def repair_radio_score_metadata(
-    failed_output: str, advisory: AdvisoryWordPlanV4,
-) -> RadioScoreV4 | None:
-    """Derive cue anchor beats from an otherwise closed accepted score graph.
+_DRAFT_SPOKEN_CHAR_IDS = frozenset({"announcer", "c01", "c02", "c03"})
+_DRAFT_CUE_PLACEMENTS = {
+    "music_open": "open",
+    "music_inter": "inter",
+    "music_close": "close",
+}
 
-    A cue's ``anchor_beat_id`` is executable metadata: once its anchor line is
-    known, the owning beat is not a creative choice.  Do not repair an unknown
-    anchor, missing beat, altered advisory plan, or noncanonical line manifest;
-    those require a complete score repair and must fail closed here.
+
+def compile_radio_score_draft(
+    draft: RadioScoreDraftV4,
+    advisory: AdvisoryWordPlanV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+) -> RadioScoreV4:
+    """Compile model-owned score decisions into the strict executable score.
+
+    The model owns story surface, scene-local shot choice, cast choice, line
+    count, fact placement, and cue choice. The compiler owns only values that
+    have one authoritative derivation from the accepted advisory/cast/facts:
+    canonical IDs, parents, order, speaker metadata, word centers, cue
+    placement, and canonical cue anchors.
     """
-    try:
-        score = RadioScoreV4.model_validate(parse_first_json_object(failed_output))
-    except Exception:
-        return None
-    if score.advisory_word_plan.model_dump(mode="json") != advisory.model_dump(mode="json"):
-        return None
-    expected_beats = [row.beat_id for row in advisory.per_beat]
-    observed_beats = [beat for scene in score.scenes for beat in scene.beats]
-    if [beat.beat_id for beat in observed_beats] != expected_beats:
-        return None
-    if [beat.order for beat in observed_beats] != list(range(1, len(observed_beats) + 1)):
-        return None
-    line_metadata = _accepted_script_line_metadata(score)
-    if line_metadata is None:
-        return None
-    line_ids = list(line_metadata)
-    if line_ids != [f"l{i:03d}" for i in range(1, len(line_ids) + 1)]:
-        return None
+    advisory_rows = list(advisory.per_beat)
+    advisory_ids = [row.beat_id for row in advisory_rows]
+    if not advisory_rows or len(set(advisory_ids)) != len(advisory_ids):
+        raise RadioScoreDraftCompileError(
+            code="invalid_advisory", path="advisory.per_beat",
+            detail="accepted advisory must contain unique beat IDs",
+        )
 
+    flat_draft_beat_count = sum(len(scene.beats) for scene in draft.scenes)
+    if flat_draft_beat_count != len(advisory_rows):
+        raise RadioScoreDraftCompileError(
+            code="beat_count", path="scenes[*].beats",
+            detail="flattened draft beat count must equal accepted advisory count",
+        )
+
+    cast_by_id = {row.char_id: row for row in cast.cast}
+    if len(cast_by_id) != len(cast.cast) or "announcer" not in cast_by_id:
+        raise RadioScoreDraftCompileError(
+            code="cast_id", path="cast.cast",
+            detail="accepted cast must contain unique IDs including announcer",
+        )
+    if any(char_id not in _DRAFT_SPOKEN_CHAR_IDS for char_id in cast_by_id):
+        raise RadioScoreDraftCompileError(
+            code="cast_id", path="cast.cast",
+            detail="accepted cast contains an unsupported spoken ID",
+        )
+
+    accepted_fact_ids = [fact.fact_id for fact in fact_index.facts]
+    if len(set(accepted_fact_ids)) != len(accepted_fact_ids):
+        raise RadioScoreDraftCompileError(
+            code="fact_id", path="fact_index.facts",
+            detail="accepted fact index must contain unique fact IDs",
+        )
+    accepted_fact_id_set = set(accepted_fact_ids)
+
+    compiled_scenes: list[ScenePlanV4] = []
+    line_manifest: list[tuple[str, tuple[str, ...]]] = []
+    used_cast_ids: set[str] = set()
+    global_shot_number = 1
+    global_beat_number = 0
+    global_line_number = 1
+
+    for scene_index, draft_scene in enumerate(draft.scenes):
+        scene_path = f"scenes[{scene_index}]"
+        scene_id = f"scene_{scene_index + 1:03d}"
+        compiled_shots: list[ShotPlanV4] = []
+        compiled_shot_ids: list[str] = []
+        for draft_shot in draft_scene.shots:
+            shot_id = f"shot_{global_shot_number:03d}"
+            global_shot_number += 1
+            compiled_shot_ids.append(shot_id)
+            compiled_shots.append(ShotPlanV4(
+                shot_id=shot_id,
+                scene_id=scene_id,
+                description=draft_shot.description,
+                visual_prompt=draft_shot.visual_prompt,
+            ))
+
+        used_shot_indices: set[int] = set()
+        compiled_beats: list[BeatPlanV4] = []
+        for beat_index, draft_beat in enumerate(draft_scene.beats):
+            beat_path = f"{scene_path}.beats[{beat_index}]"
+            if not 0 <= draft_beat.shot_index < len(compiled_shot_ids):
+                raise RadioScoreDraftCompileError(
+                    code="shot_index", path=f"{beat_path}.shot_index",
+                    detail="scene-local shot_index does not name a declared shot",
+                )
+            if draft_beat.char_id not in cast_by_id:
+                raise RadioScoreDraftCompileError(
+                    code="cast_id", path=f"{beat_path}.char_id",
+                    detail="draft beat chooses a cast ID absent from accepted cast",
+                )
+            if len(set(draft_beat.fact_ids)) != len(draft_beat.fact_ids):
+                raise RadioScoreDraftCompileError(
+                    code="fact_id", path=f"{beat_path}.fact_ids",
+                    detail="draft beat fact IDs must be unique",
+                )
+            for fact_id in draft_beat.fact_ids:
+                if fact_id not in accepted_fact_id_set:
+                    raise RadioScoreDraftCompileError(
+                        code="fact_id", path=f"{beat_path}.fact_ids",
+                        detail="draft beat references a fact absent from accepted P0",
+                    )
+
+            advisory_row = advisory_rows[global_beat_number]
+            line_ids = tuple(
+                f"l{line_number:03d}"
+                for line_number in range(
+                    global_line_number,
+                    global_line_number + draft_beat.line_count,
+                )
+            )
+            global_line_number += draft_beat.line_count
+            cast_row = cast_by_id[draft_beat.char_id]
+            speaker_role: Literal["character", "announcer"] = (
+                "announcer" if draft_beat.char_id == "announcer" else "character"
+            )
+            compiled_beats.append(BeatPlanV4(
+                beat_id=advisory_row.beat_id,
+                scene_id=scene_id,
+                shot_id=compiled_shot_ids[draft_beat.shot_index],
+                speaker=cast_row.name,
+                char_id=draft_beat.char_id,
+                speaker_role=speaker_role,
+                line_ids=list(line_ids),
+                order=global_beat_number + 1,
+                intent=draft_beat.intent,
+                arc_phase=draft_beat.arc_phase,
+                fact_ids=list(draft_beat.fact_ids),
+                advisory_voiced_word_center=advisory_row.advisory_word_center,
+            ))
+            used_shot_indices.add(draft_beat.shot_index)
+            used_cast_ids.add(draft_beat.char_id)
+            line_manifest.append((advisory_row.beat_id, line_ids))
+            global_beat_number += 1
+
+        expected_shot_indices = set(range(len(compiled_shot_ids)))
+        if used_shot_indices != expected_shot_indices:
+            raise RadioScoreDraftCompileError(
+                code="unused_shot", path=f"{scene_path}.shots",
+                detail="every declared shot must own at least one beat",
+            )
+        compiled_scenes.append(ScenePlanV4(
+            scene_id=scene_id,
+            env=draft_scene.env,
+            description=draft_scene.description,
+            shots=compiled_shots,
+            beats=compiled_beats,
+        ))
+
+    if used_cast_ids != set(cast_by_id):
+        raise RadioScoreDraftCompileError(
+            code="cast_coverage", path="scenes[*].beats[*].char_id",
+            detail="every accepted cast ID must own at least one spoken beat",
+        )
+
+    compiled_cues: list[MusicCueV4] = []
     seen_cue_ids: set[str] = set()
-    cues: list[MusicCueV4] = []
-    changed = False
-    for cue in score.music_cues:
+    for cue_index, draft_cue in enumerate(draft.music_cues):
+        cue_path = f"music_cues[{cue_index}]"
+        if draft_cue.cue_id in seen_cue_ids:
+            raise RadioScoreDraftCompileError(
+                code="cue_id", path=f"{cue_path}.cue_id",
+                detail="draft music cue IDs must be unique",
+            )
+        seen_cue_ids.add(draft_cue.cue_id)
+        if not 0 <= draft_cue.anchor_beat_index < len(line_manifest):
+            raise RadioScoreDraftCompileError(
+                code="cue_anchor", path=f"{cue_path}.anchor_beat_index",
+                detail="cue anchor beat index is outside the flattened draft beats",
+            )
+        anchor_beat_id, anchor_line_ids = line_manifest[draft_cue.anchor_beat_index]
+        if not 0 <= draft_cue.anchor_line_index < len(anchor_line_ids):
+            raise RadioScoreDraftCompileError(
+                code="cue_anchor", path=f"{cue_path}.anchor_line_index",
+                detail="cue anchor line index is outside its selected beat",
+            )
+        compiled_cues.append(MusicCueV4(
+            cue_id=draft_cue.cue_id,
+            placement=_DRAFT_CUE_PLACEMENTS[draft_cue.cue_id],
+            description=draft_cue.description,
+            generation_prompt=draft_cue.generation_prompt,
+            anchor_line_id=anchor_line_ids[draft_cue.anchor_line_index],
+            anchor_beat_id=anchor_beat_id,
+        ))
+
+    try:
+        score = RadioScoreV4(
+            title=draft.title,
+            premise=draft.premise,
+            setting=draft.setting,
+            advisory_word_plan=advisory.model_copy(deep=True),
+            scenes=compiled_scenes,
+            music_cues=compiled_cues,
+        )
+    except ValidationError as exc:
+        raise RadioScoreDraftCompileError(
+            code="score_schema", path="compiled_score",
+            detail=str(exc),
+        ) from exc
+    graph_error = _validate_radio_score_graph(score, advisory)
+    if graph_error is not None:
+        raise RadioScoreDraftCompileError(
+            code="graph", path="compiled_score", detail=graph_error,
+        )
+    return score
+
+
+def _radio_score_draft_structure_signature(
+    draft: RadioScoreDraftV4,
+) -> tuple[Any, ...]:
+    """Return only rewrite-locked mechanical draft decisions."""
+    return (
+        tuple(
+            (
+                len(scene.shots),
+                tuple(
+                    (beat.shot_index, beat.char_id, beat.line_count)
+                    for beat in scene.beats
+                ),
+            )
+            for scene in draft.scenes
+        ),
+        tuple(
+            (cue.cue_id, cue.anchor_beat_index, cue.anchor_line_index)
+            for cue in draft.music_cues
+        ),
+    )
+
+
+def project_radio_score_to_draft(score: RadioScoreV4) -> RadioScoreDraftV4:
+    """Represent a compiled score in the exact compact P3-rewrite transport."""
+    draft_scenes: list[dict[str, Any]] = []
+    line_positions: dict[str, tuple[int, int, str]] = {}
+    flat_beat_index = 0
+    for scene_index, scene in enumerate(score.scenes):
+        shot_index_by_id = {shot.shot_id: index for index, shot in enumerate(scene.shots)}
+        if len(shot_index_by_id) != len(scene.shots):
+            raise RadioScoreDraftCompileError(
+                code="score_schema", path=f"scenes[{scene_index}].shots",
+                detail="compiled score has duplicate shot IDs",
+            )
+        draft_beats: list[dict[str, Any]] = []
+        for beat_index, beat in enumerate(scene.beats):
+            beat_path = f"scenes[{scene_index}].beats[{beat_index}]"
+            if beat.shot_id not in shot_index_by_id:
+                raise RadioScoreDraftCompileError(
+                    code="score_schema", path=f"{beat_path}.shot_id",
+                    detail="compiled beat does not belong to a scene shot",
+                )
+            if beat.char_id not in _DRAFT_SPOKEN_CHAR_IDS:
+                raise RadioScoreDraftCompileError(
+                    code="score_schema", path=f"{beat_path}.char_id",
+                    detail="compiled score uses a non-spoken beat that draft cannot represent",
+                )
+            if not 1 <= len(beat.line_ids) <= _RADIO_SCORE_MAX_LINES_PER_BEAT:
+                raise RadioScoreDraftCompileError(
+                    code="score_schema", path=f"{beat_path}.line_ids",
+                    detail="compiled score has an unsupported line count",
+                )
+            for line_index, line_id in enumerate(beat.line_ids):
+                if line_id in line_positions:
+                    raise RadioScoreDraftCompileError(
+                        code="score_schema", path=f"{beat_path}.line_ids",
+                        detail="compiled score repeats a line ID",
+                )
+                line_positions[line_id] = (flat_beat_index, line_index, beat.beat_id)
+            draft_beats.append({
+                "shot_index": shot_index_by_id[beat.shot_id],
+                "char_id": beat.char_id,
+                "line_count": len(beat.line_ids),
+                "intent": beat.intent,
+                "arc_phase": beat.arc_phase,
+                "fact_ids": list(beat.fact_ids),
+            })
+            flat_beat_index += 1
+        draft_scenes.append({
+            "env": scene.env,
+            "description": scene.description,
+            "shots": [
+                {
+                    "description": shot.description,
+                    "visual_prompt": shot.visual_prompt,
+                }
+                for shot in scene.shots
+            ],
+            "beats": draft_beats,
+        })
+
+    draft_cues: list[dict[str, Any]] = []
+    seen_cue_ids: set[str] = set()
+    for cue_index, cue in enumerate(score.music_cues):
+        cue_path = f"music_cues[{cue_index}]"
         if cue.cue_id in seen_cue_ids:
-            return None
+            raise RadioScoreDraftCompileError(
+                code="cue_id", path=f"{cue_path}.cue_id",
+                detail="compiled score has duplicate music cue IDs",
+            )
         seen_cue_ids.add(cue.cue_id)
-        anchor = line_metadata.get(cue.anchor_line_id)
-        if anchor is None:
-            return None
-        if cue.anchor_beat_id != anchor[0]:
-            cue = cue.model_copy(update={"anchor_beat_id": anchor[0]})
-            changed = True
-        cues.append(cue)
-    if not changed:
-        return None
-    repaired = score.model_copy(update={"music_cues": cues})
-    return repaired if _validate_radio_score_graph(repaired, advisory) is None else None
+        anchor = line_positions.get(cue.anchor_line_id)
+        if anchor is None or cue.anchor_beat_id != anchor[2]:
+            raise RadioScoreDraftCompileError(
+                code="cue_anchor", path=f"{cue_path}.anchor_line_id",
+                detail="compiled cue does not point to its owning score line",
+            )
+        if cue.placement != _DRAFT_CUE_PLACEMENTS[cue.cue_id]:
+            raise RadioScoreDraftCompileError(
+                code="cue_id", path=f"{cue_path}.placement",
+                detail="compiled cue placement does not match its cue ID",
+            )
+        draft_cues.append({
+            "cue_id": cue.cue_id,
+            "description": cue.description,
+            "generation_prompt": cue.generation_prompt,
+            "anchor_beat_index": anchor[0],
+            "anchor_line_index": anchor[1],
+        })
+    try:
+        return RadioScoreDraftV4(
+            title=score.title,
+            premise=score.premise,
+            setting=score.setting,
+            scenes=draft_scenes,
+            music_cues=draft_cues,
+        )
+    except ValidationError as exc:
+        raise RadioScoreDraftCompileError(
+            code="score_schema", path="projected_draft", detail=str(exc),
+        ) from exc
+
+
+def _compact_p0_fact_context(fact_index: FactIndexV4) -> dict[str, Any]:
+    """Keep P3's fact grounding without P0 span/provenance bulk."""
+    return {
+        "facts": [
+            {"fact_id": fact.fact_id, "claim": fact.claim}
+            for fact in fact_index.facts
+        ],
+        "tone": fact_index.tone,
+    }
 
 
 def repair_script_artifact_metadata(
@@ -1138,37 +1519,15 @@ def make_advisory_word_blueprint(requested_words: int, locked_beats: Sequence[st
     )
 
 
-def _score_graph_contract(advisory: AdvisoryWordPlanV4) -> dict[str, Any]:
-    """Render the non-creative P3 graph constraints as model-visible data."""
-    beat_ids = [row.beat_id for row in advisory.per_beat]
-    return {
-        "required_beat_ids": beat_ids,
-        "required_beat_orders": [
-            {"beat_id": beat_id, "order": index}
-            for index, beat_id in enumerate(beat_ids, start=1)
-        ],
-        "line_id_policy": (
-            "Flattened scene/beat line_ids must be unique contiguous canonical "
-            "IDs l001, l002, and so on, with no gaps."
-        ),
-        "music_anchor_policy": (
-            "Every music cue anchor_line_id must be one of those line_ids and "
-            "anchor_beat_id must be that line's owning beat_id."
-        ),
-    }
-
-
-def _radio_score_output_token_budget(
+def _radio_score_draft_output_token_budget(
     requested_words: int, beat_count: int,
 ) -> int:
-    """Reserve P3 output from its finite, model-visible score surface.
+    """Reserve P3 output from the measured finite draft surface.
 
-    The live 120-word Codex P3 failure exhausted an unbounded score at the old
-    2,800-token cap. The score now has static local maxima (3 scenes, 6 shots,
-    12 beats, 24 line IDs, bounded prose), so one 2,900-token reservation is
-    sufficient for every supported word steer while leaving 5,292 input tokens
-    in the 8,192-token context. ``prompt_must_fit=True`` still proves each
-    concrete base or repair prompt fits before generation.
+    The compiler owns all canonical score mechanics. This reservation therefore
+    covers only the compact draft's bounded authored decisions; each concrete
+    base/restart/repair envelope still proves its own input fit before calling
+    the local model.
     """
     if (
         not isinstance(requested_words, int)
@@ -1184,7 +1543,7 @@ def _radio_score_output_token_budget(
         raise CodexTargetRangeError(
             f"beat_count must be an int in 1..{_RADIO_SCORE_MAX_BEATS}"
         )
-    return _RADIO_SCORE_MAX_OUTPUT_TOKENS
+    return _RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
 
 
 def _script_output_token_budget(
@@ -1293,9 +1652,9 @@ def invoke_codex_structured(
     base_temperature: float, structural_retry_temperature: float,
     max_new_tokens: int, call_journal: MutableMapping[str, Any],
     repair_score: RadioScoreV4 | None = None,
-    repair_advisory: AdvisoryWordPlanV4 | None = None,
     prompt_must_fit: bool = False,
     clamp_overlong_strings: bool = True,
+    include_result_json_schema: bool = True,
 ) -> BaseModel:
     if not seam_refs:
         raise CodexPackContractError(f"{pass_id} has no prompt seam")
@@ -1306,16 +1665,95 @@ def invoke_codex_structured(
             raise CodexPackContractError(f"missing Codex seam {seam!r}")
         seams.append(text)
     script_artifact_pass = pass_id in {"P5", "P7", "P9"}
-    body = {"pass_id": pass_id, "artifact_inputs": artifact_inputs, "result_json_schema": result_type.model_json_schema()}
-    schema_instruction = _schema_instruction(result_type)
+    draft_score_pass = (
+        pass_id in {"P3", "P3_rewrite"}
+        and result_type is RadioScoreDraftV4
+    )
+    if pass_id in {"P3", "P3_rewrite"} and not draft_score_pass:
+        raise CodexPackContractError(
+            f"{pass_id} must use RadioScoreDraftV4 transport"
+        )
+    body = {"pass_id": pass_id, "artifact_inputs": artifact_inputs}
+    schema_instruction = ""
+    if include_result_json_schema:
+        body["result_json_schema"] = result_type.model_json_schema()
+        schema_instruction = _schema_instruction(result_type)
     if pass_id == "P0":
         schema_instruction += p0_contract_instruction(has_numeric_tokens=True)
-    if pass_id in {"P3", "P3_rewrite"}:
-        schema_instruction += _RADIO_SCORE_SURFACE_INSTRUCTION
+    if draft_score_pass:
+        schema_instruction += _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION
+        if pass_id == "P3_rewrite":
+            schema_instruction += (
+                " Preserve the previous_draft structural decisions exactly: "
+                "scene count, shots per scene, each beat's shot_index/char_id/"
+                "line_count, and every cue_id/local anchor. Improve only "
+                "creative prose or allowed fact placement in response to review."
+            )
     if script_artifact_pass:
         schema_instruction += _SCRIPT_ARTIFACT_ROOT_INSTRUCTION
     messages = [{"role": "system", "content": "\n".join(seams) + schema_instruction}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
     calls: list[dict[str, Any]] = []
+
+    def mark_attempt_complete(
+        attempt_index: int,
+        _validated_raw: str,
+        error: BaseException | None,
+    ) -> None:
+        """Store bounded status beside the original-wire response receipt."""
+        if not 1 <= attempt_index <= len(calls):
+            return
+        receipt = calls[attempt_index - 1]
+        if error is None:
+            receipt.update({
+                "parse_status": "decoded",
+                "schema_status": "accepted",
+                "draft_status": "accepted" if draft_score_pass else "not_applicable",
+                "compiler_status": "accepted" if draft_score_pass else "not_applicable",
+                "graph_status": "accepted" if draft_score_pass else "not_applicable",
+            })
+            return
+        if isinstance(error, json.JSONDecodeError):
+            receipt.update({
+                "parse_status": "not_decoded",
+                "schema_status": "not_run",
+                "draft_status": "not_decoded" if draft_score_pass else "not_applicable",
+                "compiler_status": "not_run" if draft_score_pass else "not_applicable",
+                "graph_status": "not_run" if draft_score_pass else "not_applicable",
+            })
+            return
+        if isinstance(error, ValidationError):
+            receipt.update({
+                "parse_status": "decoded",
+                "schema_status": "rejected",
+                "draft_status": "schema_rejected" if draft_score_pass else "not_applicable",
+                "compiler_status": "not_run" if draft_score_pass else "not_applicable",
+                "graph_status": "not_run" if draft_score_pass else "not_applicable",
+            })
+            return
+        if isinstance(error, PostValidationError):
+            text = str(error)
+            draft_code = ""
+            if text.startswith("draft."):
+                draft_code = text.split(" ", 1)[0].removeprefix("draft.")
+            receipt.update({
+                "parse_status": "decoded",
+                "schema_status": "accepted",
+                "draft_status": "compiler_rejected" if draft_score_pass else "not_applicable",
+                "compiler_status": draft_code or "post_validation_rejected",
+                "graph_status": (
+                    "rejected" if draft_code == "graph"
+                    else ("not_run" if draft_score_pass else "not_applicable")
+                ),
+            })
+            return
+        receipt.update({
+            "parse_status": "terminal_error",
+            "schema_status": "not_run",
+            "draft_status": "terminal_error" if draft_score_pass else "not_applicable",
+            "compiler_status": "not_run" if draft_score_pass else "not_applicable",
+            "graph_status": "not_run" if draft_score_pass else "not_applicable",
+        })
+
     def capture(messages_in, **kwargs):
         call_messages = (
             _PromptMustFitMessages(messages_in)
@@ -1357,10 +1795,15 @@ def invoke_codex_structured(
             "raw_chars": len(original_raw),
             "raw_sha256": hashlib.sha256(original_raw.encode("utf-8")).hexdigest(),
             "resolved_artifact_unwrapped": resolved_artifact_unwrapped,
+            "parse_status": "decoded" if isinstance(parsed_raw, dict) else "pending",
+            "schema_status": "pending",
+            "draft_status": "pending" if draft_score_pass else "not_applicable",
+            "compiler_status": "pending" if draft_score_pass else "not_applicable",
+            "graph_status": "pending" if draft_score_pass else "not_applicable",
         })
         return raw
     def typed_repair_factory(*, original_prompt, failed_output, error):
-        detail = str(error)
+        detail = " ".join(str(error).split())[:500] or "structured output rejected"
         if script_artifact_pass:
             log.info(
                 "[scifi_codex:%s] attempting deterministic ScriptArtifactV4 metadata repair",
@@ -1409,36 +1852,85 @@ def invoke_codex_structured(
                 "The accepted_line_graph is closed: return every and only its line IDs; "
                 "music_cues never create a line row."
             )
-        elif pass_id in {"P3", "P3_rewrite"}:
-            deterministic = (
-                repair_radio_score_metadata(failed_output, repair_advisory)
-                if repair_advisory is not None
-                else None
+        elif draft_score_pass:
+            trusted_context = json.dumps(
+                body["artifact_inputs"],
+                sort_keys=True, separators=(",", ":"), ensure_ascii=False,
             )
-            if deterministic is not None and post_validator(deterministic) is None:
-                log.info(
-                    "[scifi_codex:%s] deterministic RadioScoreV4 cue-anchor repair accepted",
-                    pass_id,
+            if isinstance(error, json.JSONDecodeError):
+                # A base syntax failure already consumed attempt one and the
+                # shared ladder's lower-temperature structural retry consumed
+                # attempt two. Its raw response is incomplete by definition;
+                # never carry that partial story surface into call three.
+                if len(calls) < 2:
+                    raise CodexPackContractError(
+                        "draft clean restart requires two completed decode attempts"
+                    )
+                restart_rules = (
+                    "Start a fresh RadioScoreDraftV4 from the trusted references. "
+                    "The prior responses were incomplete JSON and are intentionally "
+                    "unavailable. Return one complete draft root only; do not return "
+                    "a wrapper, a request field, or an explanation."
                 )
-                return deterministic
-            repair_rules = (
-                "This is a typed repair of the same RadioScoreV4, not a new "
-                "unconstrained outline. The original request's score_graph_contract "
-                "and advisory_word_plan are locked executable metadata. Copy the "
-                "advisory_word_plan exactly. The flattened scenes[].beats array MUST "
-                "contain every and only required_beat_ids, in that exact order, with "
-                "the listed consecutive order values. Preserve existing title, premise, "
-                "scene/shot descriptions, and beat intent wherever present; if a locked "
-                "beat was omitted, add its complete score record using the existing "
-                "story's cause-and-response progression rather than inventing another "
-                "ID. Flatten all line_ids in assembly order into l001, l002, and so on "
-                "with no gaps, and make every music cue anchor an existing line and its "
-                "owning beat. Return one complete JSON object only. Begin at the "
-                "RadioScoreV4 root with exactly title, premise, setting, "
-                "advisory_word_plan, scenes, and music_cues. The tagged input "
-                "references below are not an output template: never return a wrapper, "
-                "a request field, or any tag name."
+                return [
+                    {
+                        "role": "system",
+                        "content": "\n".join(seams) + schema_instruction
+                        + "\n" + restart_rules,
+                    },
+                    {
+                        "role": "user",
+                        "content": "\n".join((
+                            "TRUSTED REFERENCES ONLY -- not an output shape.",
+                            "<draft_context>",
+                            trusted_context,
+                            "</draft_context>",
+                        )),
+                    },
+                ]
+            try:
+                parsed_failed_draft = parse_first_json_object(failed_output)
+            except Exception as exc:
+                raise CodexPackContractError(
+                    "draft semantic repair requires one complete parsed object"
+                ) from exc
+            if not isinstance(parsed_failed_draft, dict):
+                raise CodexPackContractError(
+                    "draft semantic repair requires an object root"
+                )
+            minified_failed_draft = json.dumps(
+                parsed_failed_draft,
+                sort_keys=True, separators=(",", ":"), ensure_ascii=False,
             )
+            repair_rules = (
+                "This is a typed repair of the same RadioScoreDraftV4, not a new "
+                "unconstrained outline. Preserve valid creative decisions wherever "
+                "possible; repair only the bounded rejection. Return one complete draft "
+                "root only. Do not return a wrapper, request field, canonical IDs, "
+                "advisory metadata, speaker metadata, or spoken text."
+            )
+            return [
+                {
+                    "role": "system",
+                    "content": "\n".join(seams) + schema_instruction
+                    + "\n" + repair_rules,
+                },
+                {
+                    "role": "user",
+                    "content": "\n".join((
+                        "INPUT REFERENCES ONLY -- they are not an output shape.",
+                        "<failed_radio_score_draft>",
+                        minified_failed_draft,
+                        "</failed_radio_score_draft>",
+                        "<rejection>",
+                        detail,
+                        "</rejection>",
+                        "<trusted_draft_context>",
+                        trusted_context,
+                        "</trusted_draft_context>",
+                    )),
+                },
+            ]
         elif pass_id == "P2":
             deterministic = repair_cast_plan_metadata(failed_output)
             if deterministic is not None and post_validator(deterministic) is None:
@@ -1544,58 +2036,6 @@ def invoke_codex_structured(
                     ),
                 },
             ]
-        if pass_id in {"P3", "P3_rewrite"}:
-            # P3's live repair prompt exceeded the available input window when
-            # it blindly echoed the complete original request.  The failed score
-            # already carries its authored story surface.  Keep only the locked
-            # mechanical graph/advisory context it cannot safely infer, plus the
-            # rewrite review when this is a P3 rewrite. The failed rewrite is
-            # already the complete bounded score surface, so repeating the
-            # accepted pre-rewrite score only recreates input-window pressure.
-            # Plain tagged sections deliberately avoid presenting a JSON request
-            # envelope for the local model to copy as its answer.
-            p3_inputs = body["artifact_inputs"]
-            locked_graph = p3_inputs.get("score_graph_contract")
-            if not locked_graph and repair_advisory is not None:
-                locked_graph = _score_graph_contract(repair_advisory)
-            repair_sections = [
-                "INPUT REFERENCES ONLY -- they are not an output shape.",
-                "<failed_radio_score>",
-                failed_output,
-                "</failed_radio_score>",
-                "<rejection>",
-                detail,
-                "</rejection>",
-                "<locked_score_graph>",
-                json.dumps(
-                    locked_graph or {},
-                    sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                ),
-                "</locked_score_graph>",
-                "<locked_advisory_word_plan>",
-                json.dumps(
-                    p3_inputs.get("advisory_word_plan")
-                    or (
-                        repair_advisory.model_dump(mode="json")
-                        if repair_advisory is not None else {}
-                    ),
-                    sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                ),
-                "</locked_advisory_word_plan>",
-            ]
-            if pass_id == "P3_rewrite":
-                repair_sections.extend((
-                    "<rewrite_review>",
-                    json.dumps(
-                        p3_inputs.get("review") or {},
-                        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                    ),
-                    "</rewrite_review>",
-                ))
-            return [
-                {"role": "system", "content": "\n".join(seams) + schema_instruction + "\n" + repair_rules},
-                {"role": "user", "content": "\n".join(repair_sections)},
-            ]
         compact_request = {
             key: value for key, value in body.items()
             if key != "result_json_schema"
@@ -1604,6 +2044,12 @@ def invoke_codex_structured(
             {"role": "system", "content": "\n".join(seams) + schema_instruction + "\n" + repair_rules},
             {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": detail, "original_request": compact_request}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
         ]
+    journal_entry: dict[str, Any] = {
+        "pass_id": pass_id,
+        "slot": slot,
+        "attempts": calls,
+    }
+    call_journal.setdefault("calls", []).append(journal_entry)
     try:
         # LLM slot: per-sub-pass injected creative/technical closure.
         result = structured_call(
@@ -1615,11 +2061,107 @@ def invoke_codex_structured(
             post_validator=post_validator,
             clamp_overlong_strings=clamp_overlong_strings,
             helper_name=f"scifi_codex:{pass_id}",
+            on_attempt_complete=mark_attempt_complete,
         )
     except Exception as exc:
+        journal_entry["terminal_error"] = (
+            f"{type(exc).__name__}: {' '.join(str(exc).split())[:500]}"
+        )
         raise CodexPassError(f"{pass_id} failed: {exc}") from exc
-    call_journal.setdefault("calls", []).append({"pass_id": pass_id, "slot": slot, "attempts": calls, "accepted": result.model_dump(mode="json")})
+    journal_entry["accepted"] = result.model_dump(mode="json")
     return result
+
+
+def _call_radio_score_draft(
+    *,
+    pass_id: Literal["P3", "P3_rewrite"],
+    slot_fn: GenerateFn,
+    pack: Any,
+    seam_refs: tuple[str, ...],
+    artifact_inputs: Mapping[str, Any],
+    advisory: AdvisoryWordPlanV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    base_temperature: float,
+    structural_retry_temperature: float,
+    max_new_tokens: int,
+    call_journal: MutableMapping[str, Any],
+    expected_signature: tuple[Any, ...] | None = None,
+) -> RadioScoreV4:
+    """Accept only a compiled final score from the compact P3 transport."""
+    compiled_by_draft_identity: dict[int, RadioScoreV4] = {}
+
+    def validate_draft(candidate: BaseModel) -> str | None:
+        if not isinstance(candidate, RadioScoreDraftV4):
+            return "draft.score_schema at root: selected result is not a draft"
+        try:
+            compiled = compile_radio_score_draft(
+                candidate, advisory, cast, fact_index,
+            )
+            if (
+                expected_signature is not None
+                and _radio_score_draft_structure_signature(candidate)
+                != expected_signature
+            ):
+                raise RadioScoreDraftCompileError(
+                    code="graph", path="rewrite.structure",
+                    detail="rewrite changed a locked draft structural decision",
+                )
+        except RadioScoreDraftCompileError as exc:
+            return str(exc)
+        compiled_by_draft_identity[id(candidate)] = compiled
+        return None
+
+    result = invoke_codex_structured(
+        pass_id=pass_id,
+        slot="creative",
+        slot_fn=slot_fn,
+        pack=pack,
+        seam_refs=seam_refs,
+        artifact_inputs=artifact_inputs,
+        result_type=RadioScoreDraftV4,
+        post_validator=validate_draft,
+        base_temperature=base_temperature,
+        structural_retry_temperature=structural_retry_temperature,
+        max_new_tokens=max_new_tokens,
+        call_journal=call_journal,
+        prompt_must_fit=True,
+        clamp_overlong_strings=False,
+        include_result_json_schema=False,
+    )
+    if not isinstance(result, RadioScoreDraftV4):
+        raise CodexPassError(f"{pass_id} returned a non-draft structured result")
+    compiled = compiled_by_draft_identity.get(id(result))
+    if compiled is None:
+        # The post-validator normally compiles this exact immutable instance.
+        # Recompile defensively if a future structured-call implementation
+        # materializes a value-equal replacement before returning it.
+        compiled = compile_radio_score_draft(result, advisory, cast, fact_index)
+        if (
+            expected_signature is not None
+            and _radio_score_draft_structure_signature(result) != expected_signature
+        ):
+            raise CodexPassError(
+                f"{pass_id} accepted a draft that changed locked rewrite structure"
+            )
+
+    calls = call_journal.get("calls")
+    if isinstance(calls, list) and calls and isinstance(calls[-1], dict):
+        journal_entry = calls[-1]
+        if journal_entry.get("pass_id") == pass_id:
+            draft_wire = journal_entry.get("accepted")
+            draft_serialized = json.dumps(
+                draft_wire, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            )
+            journal_entry["accepted_transport"] = {
+                "schema": "RadioScoreDraftV4",
+                "chars": len(draft_serialized),
+                "sha256": hashlib.sha256(
+                    draft_serialized.encode("utf-8")
+                ).hexdigest(),
+            }
+            journal_entry["accepted"] = compiled.model_dump(mode="json")
+    return compiled
 
 
 def _script_digest(script: ScriptArtifactV4) -> str:
@@ -1818,30 +2360,27 @@ def run_scifi_codex_episode(
     )
     beat_ids = [f"b{i:03d}" for i in range(max(3, min(12, len(p2.cast) * 3)))]
     advisory = make_advisory_word_blueprint(steer.requested_words, beat_ids)
-    score_graph_contract = _score_graph_contract(advisory)
-    score_token_budget = _radio_score_output_token_budget(
+    score_token_budget = _radio_score_draft_output_token_budget(
         steer.requested_words, len(beat_ids),
     )
-    journal["radio_score_token_budget"] = {
-        **_radio_score_surface_receipt(),
+    journal["radio_score_draft_token_budget"] = {
+        **_radio_score_draft_surface_receipt(),
         "requested_words": steer.requested_words,
         "beat_count": len(beat_ids),
     }
-    p3 = invoke_codex_structured(
-        pass_id="P3", slot="creative", slot_fn=creative_fn, pack=pack,
+    p3_draft_inputs = {
+        "question": p1.model_dump(mode="json"),
+        "cast": p2.model_dump(mode="json"),
+        "fact_index": _compact_p0_fact_context(p0),
+        "advisory_word_plan": advisory.model_dump(mode="json"),
+    }
+    p3 = _call_radio_score_draft(
+        pass_id="P3", slot_fn=creative_fn, pack=pack,
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-        artifact_inputs={
-            "question": p1.model_dump(mode="json"),
-            "cast": p2.model_dump(mode="json"),
-            "advisory_word_plan": advisory.model_dump(mode="json"),
-            "score_graph_contract": score_graph_contract,
-        },
-        result_type=RadioScoreV4,
-        post_validator=lambda x: _validate_radio_score_graph(x, advisory),
+        artifact_inputs=p3_draft_inputs,
+        advisory=advisory, cast=p2, fact_index=p0,
         base_temperature=.72, structural_retry_temperature=.32,
         max_new_tokens=score_token_budget, call_journal=journal,
-        repair_advisory=advisory, prompt_must_fit=True,
-        clamp_overlong_strings=False,
     )
     review = invoke_codex_structured(
         pass_id="P4", slot="technical", slot_fn=technical_fn, pack=pack,
@@ -1854,19 +2393,30 @@ def run_scifi_codex_episode(
     )
     score = p3
     if review.verdict == "rewrite":
-        score = invoke_codex_structured(
-            pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack,
+        projected_p3 = project_radio_score_to_draft(p3)
+        rewrite_signature = _radio_score_draft_structure_signature(projected_p3)
+        roundtrip_score = compile_radio_score_draft(projected_p3, advisory, p2, p0)
+        if (
+            _radio_score_draft_structure_signature(
+                project_radio_score_to_draft(roundtrip_score)
+            )
+            != rewrite_signature
+        ):
+            raise CodexPassError(
+                "P3_rewrite draft projection failed its structural round-trip"
+            )
+        score = _call_radio_score_draft(
+            pass_id="P3_rewrite", slot_fn=creative_fn, pack=pack,
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
             artifact_inputs={
-                "score": p3.model_dump(mode="json"),
+                **p3_draft_inputs,
+                "previous_draft": projected_p3.model_dump(mode="json"),
                 "review": review.model_dump(mode="json"),
             },
-            result_type=RadioScoreV4,
-            post_validator=lambda x: _validate_radio_score_graph(x, advisory),
+            advisory=advisory, cast=p2, fact_index=p0,
             base_temperature=.55, structural_retry_temperature=.20,
             max_new_tokens=score_token_budget, call_journal=journal,
-            repair_advisory=advisory, prompt_must_fit=True,
-            clamp_overlong_strings=False,
+            expected_signature=rewrite_signature,
         )
     # The whole-script reservation is only knowable once the score's accepted
     # line graph is final (P3, or P3_rewrite): the artifact serializes strict

@@ -875,40 +875,43 @@ out until they independently meet the same production-only admission rule.
   BUG-11.50 with cross-lane executable coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
 
-## PBUG-20260712-22 -- Sci-Fi Codex P3 could exhaust an unbounded full score
+## PBUG-20260712-22 -- Sci-Fi Codex P3 whole-score transport exhausted its model window
 
 - promotion: BUG-11.50 extension
 - surfaced: canonical 120-word `scifi_codex` reverify queue leg, prompt
   `f26b727b-42c8-40d6-b3ee-001d7a869cf9`, Gemma E4B creative + Mistral-Nemo
   technical, 2026-07-12
-- symptom: P0 cleared through its existing literal-span metadata repair, but P3
-  returned incomplete JSON at `generated_tokens=max_new_tokens=2800` on both
-  base and structural attempts. Its compact typed-repair input fit at 4,317
-  tokens, yet that repair also exhausted the 2,800-token output cap. The queue
-  ended `RESULT FAIL` before ledger, episode, image/still, or OBS work.
-- root cause: PBUG-20's compact repair path fixed input truncation, but
-  `RadioScoreV4` still had unbounded authored strings and nested scene, shot,
-  beat, line-ID, and advisory-row surface. A 2,800-token reservation therefore
-  had no defensible whole-artifact ceiling and could truncate a valid score.
-- fix: make the existing canonical score finite rather than adding a second
-  draft/compiler artifact: at most 3 scenes, 6 shots, 12 beats, 24 line IDs,
-  and 3 cues; bound every P3 prose/ID field and type the advisory rows. Use a
-  2,900-token score reservation with a 5,292-token input reserve, retain
-  `prompt_must_fit=True`, and disable shared string clamping for P1/P2/P3/
-  P3-rewrite/P4 authored artifacts so an over-limit value reaches typed repair
-  rather than silently losing prose. P3-rewrite repair no longer repeats the
-  accepted score beside its failed rewrite; its base rewrite request carries
-  the accepted score plus review only, while typed repair derives the locked
-  graph from the trusted advisory plan. A local Gemma tokenizer regression
-  exercises max-width P3 and P3-rewrite base/repair envelopes; the P3 score
-  measured 2,621 output tokens, its max-width base prompt measured 3,465, and
-  every measured base/repair envelope fits the 5,292-token input reservation.
-- verify idea: reject over-limit score/advisory shapes; verify clamp-off still
-  fails loud while the shared default remains compatible; verify the rewrite
-  repair omits the duplicate accepted score; verify the P3 receipt records its
-  finite surface and 2,900/5,292 reservation; then rerun the same canonical
-  bank through P3 and require all-visualizer zero image objects, saved ledger,
-  canonical episode asset, `obs_publish OK`, and final OBS file.
-- bible-worthy: yes -- same admitted bounded-whole-artifact and compact-repair
-  law as BUG-11.50, with P3 full-score executable coverage added.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- symptom: the initial bounded direct-score correction was rerun live at
+  prompt `edbbac48-9aa8-4907-8086-f63134604604` (same Gemma E4B creative +
+  Mistral-Nemo technical pairing). P0-P2 cleared, but P3 again produced no
+  decodable top-level JSON on its 2,900-token base, lower-temperature, and
+  typed-repair calls. The canonical queue ended `RESULT FAIL` before ledger,
+  episode, image/still, or OBS work.
+- root cause: finite `RadioScoreV4` bounds removed the original unbounded
+  schema defect, but the model still had to serialize duplicate mechanical
+  graph state it did not author: advisory rows, scene/shot/beat/line IDs,
+  parents, order, speakers, roles, and canonical cue anchors. The direct
+  whole-score transport remained too wide for the live model even with a
+  2,900-token cap; increasing the cap alone would recreate repair-window risk.
+- fix: replace direct P3/P3-rewrite score emission with bounded
+  `RadioScoreDraftV4` plus a fail-closed compiler. The model authors only
+  creative surface, local shot/cast/line-count/fact/cue choices; Python derives
+  only uniquely determined mechanics from accepted P0/P2/advisory state and
+  revalidates fresh `RadioScoreV4`. The three-call ladder restarts from trusted
+  context after two decode failures and uses minified parsed semantic repair
+  only for complete invalid drafts. Exact wrapped-root handling remains. The
+  real Gemma tokenizer measured a max-width draft at 1,418 output tokens;
+  reservation is 1,647 (`+ max(128, 15%) + 16`). Measured base, clean restart,
+  semantic repair, rewrite base, and rewrite repair prompts were respectively
+  1,110, 1,167, 2,664, 2,614, and 4,165 tokens, all within 8,192 with the new
+  reservation.
+- verify idea: compiler tests reject dynamic advisory/count/shot/cast/fact/cue
+  defects and preserve `compile(project(score))` rewrite structure; actual
+  tokenizer tests cover all six envelopes and require prompt plus reservation
+  <=8,192; default schema injection remains unchanged for other passes; then
+  rerun the canonical 120-word bank and require all-visualizer zero image
+  objects, saved ledger, episode asset, `obs_publish OK`, and final OBS file.
+- bible-worthy: yes -- BUG-11.50 now explicitly permits a compact
+  authoring-draft/compiler boundary when it removes deterministic graph
+  serialization rather than merely papering over absent bounds.
+- status: ROOT REPLACEMENT IN TREE; LIVE REVERIFY PENDING

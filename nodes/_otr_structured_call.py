@@ -581,6 +581,9 @@ def structured_call(
     max_new_tokens: int = _STRUCTURED_MAX_NEW_TOKENS,
     max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     helper_name: str = "structured_call",
+    on_attempt_complete: Optional[
+        Callable[[int, str, Optional[BaseException]], None]
+    ] = None,
 ) -> T:
     """Run a structured-JSON LLM call through the shared retry ladder.
 
@@ -639,6 +642,13 @@ def structured_call(
         Caps the ladder (default 3).
       helper_name
         Short string for logging / slot attribution.
+      on_attempt_complete
+        Optional observability hook invoked once for each actual slot attempt
+        after validation succeeds or fails. It receives the one-based attempt
+        number, the slot output passed to validation, and ``None`` on success
+        or the raised validation/parse/provider exception on failure. The hook
+        is diagnostic only: a hook exception is logged and never changes the
+        structured-call result or retry ladder.
 
     The ladder (stops at the first schema-valid result that also
     clears `post_validator`; only `json.JSONDecodeError`,
@@ -691,6 +701,17 @@ def structured_call(
     attempts_run = 0
     repair_messages: Any = None
 
+    def notify_attempt(error: Optional[BaseException]) -> None:
+        if on_attempt_complete is None:
+            return
+        try:
+            on_attempt_complete(attempts_run, last_raw, error)
+        except Exception:
+            log.exception(
+                "[OTR_StructuredCall] '%s' attempt completion hook failed",
+                helper_name,
+            )
+
     # --- Attempt 1: base temperature. ---
     if attempts_run < max_attempts:
         attempts_run += 1
@@ -700,24 +721,31 @@ def structured_call(
             helper_name, attempts_run, max_attempts, base_temperature,
         )
         try:
+            last_raw = ""
             last_raw = _invoke_slot(
                 slot_fn, base_messages,
                 temperature=base_temperature,
                 max_new_tokens=max_new_tokens,
             )
-            return _parse_and_validate(
+            result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
                 clamp_overlong_strings=clamp_overlong_strings,
             )
+            notify_attempt(None)
+            return result
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
+            notify_attempt(exc)
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d failed: %s | raw "
                 "head: %s", helper_name, attempts_run, exc,
                 _raw_head(last_raw),
             )
+        except Exception as exc:
+            notify_attempt(exc)
+            raise
 
     # --- Structural retry: SAME prompt, lower temperature -- ONLY for a JSON
     # SYNTAX failure. A re-prompt at lower temperature can shake loose a
@@ -737,24 +765,31 @@ def structured_call(
             structural_retry_temperature, base_temperature,
         )
         try:
+            last_raw = ""
             last_raw = _invoke_slot(
                 slot_fn, base_messages,
                 temperature=structural_retry_temperature,
                 max_new_tokens=max_new_tokens,
             )
-            return _parse_and_validate(
+            result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
                 clamp_overlong_strings=clamp_overlong_strings,
             )
+            notify_attempt(None)
+            return result
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
+            notify_attempt(exc)
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d failed: %s | raw "
                 "head: %s", helper_name, attempts_run, exc,
                 _raw_head(last_raw),
             )
+        except Exception as exc:
+            notify_attempt(exc)
+            raise
 
     # --- Typed repair at a static low temperature (the final rung). ---
     if attempts_run < max_attempts:
@@ -796,24 +831,31 @@ def structured_call(
                 )
                 return repair_prompt
             repair_messages = _prompt_to_messages(repair_prompt)
+            last_raw = ""
             last_raw = _invoke_slot(
                 slot_fn, repair_messages,
                 temperature=_REPAIR_TEMPERATURE,
                 max_new_tokens=max_new_tokens,
             )
-            return _parse_and_validate(
+            result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
                 clamp_overlong_strings=clamp_overlong_strings,
             )
+            notify_attempt(None)
+            return result
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
+            notify_attempt(exc)
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d (repair) failed: "
                 "%s | raw head: %s",
                 helper_name, attempts_run, exc, _raw_head(last_raw),
             )
+        except Exception as exc:
+            notify_attempt(exc)
+            raise
 
     # A semantic/schema failure on the base call skips the structural rung,
     # so typed repair can be attempt 2 of a three-call budget. If that repair
@@ -837,24 +879,31 @@ def structured_call(
             helper_name, attempts_run, max_attempts, retry_temperature,
         )
         try:
+            last_raw = ""
             last_raw = _invoke_slot(
                 slot_fn, repair_messages,
                 temperature=retry_temperature,
                 max_new_tokens=max_new_tokens,
             )
-            return _parse_and_validate(
+            result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
                 clamp_overlong_strings=clamp_overlong_strings,
             )
+            notify_attempt(None)
+            return result
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
+            notify_attempt(exc)
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d (repair syntax retry) "
                 "failed: %s | raw head: %s",
                 helper_name, attempts_run, exc, _raw_head(last_raw),
             )
+        except Exception as exc:
+            notify_attempt(exc)
+            raise
 
     # --- Ladder exhausted: fail loud. ---
     log.error(
