@@ -1207,7 +1207,12 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
     assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
     assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
     assert "replacements" in calls[1]["messages"][0]["content"]
-    assert "original_text" in calls[1]["messages"][1]["content"]
+    assert "source_to_shorten" in calls[1]["messages"][1]["content"]
+    patch_request = json.loads(calls[1]["messages"][1]["content"])
+    assert set(patch_request) == {"rewrite_tasks"}
+    assert patch_request["rewrite_tasks"][0]["max_chars"] == 54
+    assert "original_text" not in patch_request["rewrite_tasks"][0]
+    assert "Never copy source_to_shorten unchanged" in calls[1]["messages"][0]["content"]
 
     attempts = journal["calls"][0]["attempts"]
     assert len(attempts) == 2
@@ -1405,6 +1410,41 @@ def test_p3_text_patch_contract_rejects_missing_duplicate_unknown_blank_and_over
 
     with pytest.raises(ValidationError):
         patch([])
+
+
+def test_p3_text_patch_receipt_distinguishes_model_prose_over_schema_cap():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    invalid = _draft_for_advisory(advisory).model_dump(mode="json")
+    invalid["premise"] = "x" * 145
+    journal: dict[str, object] = {}
+    responses = [
+        json.dumps(invalid),
+        json.dumps({"replacements": [{
+            "path": "premise", "replacement_text": "y" * 145,
+        }]}),
+    ]
+
+    def slot_fn(messages, **kwargs):
+        return responses.pop(0)
+
+    slot_fn._otr_p3_text_patch_transport = "full_message_remote"  # type: ignore[attr-defined]
+    with pytest.raises(lane.CodexPassError, match="replacement_over_schema_cap"):
+        lane._call_radio_score_draft(
+            pass_id="P3", slot_fn=slot_fn,
+            pack=routing.resolve_story_pack("scifi_codex"),
+            seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+            artifact_inputs=_draft_context(advisory, cast, facts),
+            advisory=advisory, cast=cast, fact_index=facts,
+            base_temperature=.72, structural_retry_temperature=.32,
+            max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+            call_journal=journal,
+        )
+
+    attempt = journal["calls"][0]["attempts"][1]
+    assert attempt["patch_error_code"] == "replacement_over_schema_cap"
+    assert "y" * 20 not in json.dumps(attempt)
 
 
 def test_p3_text_patch_rejects_a_resolved_artifact_wrapper_without_reroll():

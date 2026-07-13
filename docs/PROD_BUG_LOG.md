@@ -1163,3 +1163,35 @@ out until they independently meet the same production-only admission rule.
   type semantics at every repair boundary; promoted as executable BUG-11.38
   extension coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-04 -- P3 patch aimed at the hard cap and crossed it
+
+- promotion: BUG-11.42 extension
+- surfaced: canonical 120-word `scifi_codex` reverify, prompt
+  `94a11e73-c7f8-47a1-b929-37c1cf7d63d6`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: P0 through P2 cleared. P3 selected the bounded three-leaf text
+  patch, but its patch schema failed. The outer ladder logged the stale base
+  draft head, obscuring the direct patch error. Three exact live Aion probes
+  then reproduced a premise replacement just over its 144-character cap.
+- root cause: the request exposed the strict schema cap as the model's writing
+  target, and its `original_text` field looked like an output value to copy.
+  Approximate character counting crossed the edge; Aion also copied the
+  over-cap source unchanged. The receipt collapsed every patch-schema error
+  into `patch_root`.
+- fix: expose only a conservative 75% model-facing `max_chars` for each leaf;
+  keep the larger immutable schema cap private to validation so the model
+  cannot anchor on the rejection edge. Root the input at `rewrite_tasks`, name
+  the source `source_to_shorten`, and use one concise contract that forbids an
+  unchanged copy. Never Python-clip authored prose. Classify replacement-
+  string overflow separately without recording rejected prose.
+- verify idea: require a model-facing 54-character ceiling for a scene whose
+  private schema cap is 72, with no hard-cap field in the request. Require the
+  action-shaped input and prove three exact live Aion probes pass. Inject a
+  145-character replacement for a
+  144-character target and assert a `replacement_over_schema_cap` receipt with
+  no prose retention. Reprobe live Aion, then rerun canonical 120 through
+  ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes -- bounded authoring needs safety margin below its strict
+  rejection cap; promoted as executable BUG-11.42 extension coverage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

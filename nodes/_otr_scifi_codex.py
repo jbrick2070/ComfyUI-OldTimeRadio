@@ -1554,23 +1554,27 @@ def _p3_text_patch_messages(
     target_rows = [
         {
             "path": target.path,
-            "max_chars": target.max_chars,
-            "original_text": target.current_text,
+            # Models approximate character counts. Give them writing room
+            # below the immutable schema edge; merged validation still uses
+            # the true hard cap and Python never clips authored prose.
+            # Do not expose the larger hard cap: models anchor on the largest
+            # visible number. This conservative model-facing ceiling leaves
+            # room for approximate counting; validation retains the true cap.
+            "max_chars": max(1, (target.max_chars * 3) // 4),
+            # An action-named source field avoids inviting an unchanged copy.
+            "source_to_shorten": target.current_text,
         }
         for target in targets
     ]
     return [
         {
             "role": "system",
-            "content": seam + "\nReturn one JSON object only, rooted at "
-            "replacements. The target list is input evidence, never an output "
-            "template. Do not return a RadioScoreDraftV4, a wrapper, a request "
-            "field, or an explanation.",
+            "content": seam,
         },
         {
             "role": "user",
             "content": json.dumps(
-                {"targets": target_rows},
+                {"rewrite_tasks": target_rows},
                 sort_keys=True, separators=(",", ":"), ensure_ascii=False,
             ),
         },
@@ -1691,6 +1695,15 @@ def _run_p3_text_patch(
     try:
         patch = _RadioScoreDraftTextPatchV4.model_validate(patch_data)
     except ValidationError as exc:
+        error_rows = exc.errors()
+        over_cap_only = bool(error_rows) and all(
+            row.get("type") == "string_too_long"
+            and tuple(row.get("loc") or ())[-1:] == ("replacement_text",)
+            for row in error_rows
+        )
+        error_code = (
+            "replacement_over_schema_cap" if over_cap_only else "patch_root"
+        )
         receipt.update({
             "parse_status": "decoded",
             "schema_status": "rejected",
@@ -1698,9 +1711,9 @@ def _run_p3_text_patch(
             "compiler_status": "not_run",
             "graph_status": "not_run",
             "patch_status": "schema_rejected",
-            "patch_error_code": "patch_root",
+            "patch_error_code": error_code,
         })
-        raise _p3_text_patch_contract_error("patch_root") from exc
+        raise _p3_text_patch_contract_error(error_code) from exc
     try:
         merged_raw = _merge_p3_text_patch(raw_draft, targets, patch)
         merged_draft = RadioScoreDraftV4.model_validate(merged_raw)
