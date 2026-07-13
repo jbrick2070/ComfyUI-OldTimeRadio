@@ -51,6 +51,12 @@ from datetime import datetime, timedelta
 # Project State (v1.4 Theme C) - series bible for cross-episode consistency.
 # Read-only during generation. See nodes/project_state.py for the write path.
 from .project_state import ProjectState
+from ._otr_rss_source_contract import (
+    MIN_CHARS as _V4_RSS_MIN_CHARS,
+    MIN_UNIQUE_TOKENS as _V4_RSS_MIN_UNIQUE_TOKENS,
+    MIN_WORDS as _V4_RSS_MIN_WORDS,
+    meets_v4_rss_source_floor,
+)
 
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
 from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
@@ -1662,16 +1668,34 @@ def _llm_rerank_with_bodies(
 
 
 def _science_body_meets_v4_floor(
-    text: str, *, min_chars: int = 400, min_words: int = 80,
-    min_unique_tokens: int = 12,
+    text: object, *, min_chars: int = _V4_RSS_MIN_CHARS,
+    min_words: int = _V4_RSS_MIN_WORDS,
+    min_unique_tokens: int = _V4_RSS_MIN_UNIQUE_TOKENS,
 ) -> bool:
-    """Return whether an RSS body can satisfy the sci-fi v4 payload gate."""
-    tokens = re.findall(r"[A-Za-z0-9]+", text.lower())
-    return (
-        len(text) >= min_chars
-        and len(tokens) >= min_words
-        and len(set(tokens)) >= min_unique_tokens
+    """Compatibility forwarding surface for the shared Sci-Fi v4 floor."""
+    return meets_v4_rss_source_floor(
+        text,
+        min_chars=min_chars,
+        min_words=min_words,
+        min_unique_tokens=min_unique_tokens,
     )
+
+
+def _prioritize_strict_rss_candidates(pool: list[dict]) -> list[dict]:
+    """Stable-partition already-qualified inline RSS bodies to the front.
+
+    This is a bounded pre-fetch preference for strict v4 lanes only. It never
+    drops candidates or changes their source strings: URL-scrape candidates
+    remain in their prior order after the inline-qualified bucket.
+    """
+    qualified: list[dict] = []
+    remaining: list[dict] = []
+    for candidate in pool:
+        if meets_v4_rss_source_floor(candidate.get("rss_full") or ""):
+            qualified.append(candidate)
+        else:
+            remaining.append(candidate)
+    return qualified + remaining
 
 
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
@@ -1881,19 +1905,39 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
     # extrapolate from -- the story ends up generic rather than
     # grounded in real science. Anything below the floor is excluded
     # from the re-rank pool.
-    CONTENT_FLOOR = 400
-    MIN_WORDS = 80
-    MIN_UNIQUE_TOKENS = 12
+    CONTENT_FLOOR = _V4_RSS_MIN_CHARS
+    MIN_WORDS = _V4_RSS_MIN_WORDS
+    MIN_UNIQUE_TOKENS = _V4_RSS_MIN_UNIQUE_TOKENS
     # The sci-fi v4 payload contract has a stricter semantic floor than the
     # legacy writer. Inspect more candidates before failing so a thin RSS
     # entry cannot starve an otherwise healthy fetch batch.
     MAX_ATTEMPTS = 10 if require_science_floor else 5
 
+    if require_science_floor:
+        prequalified_count = sum(
+            meets_v4_rss_source_floor(candidate.get("rss_full") or "")
+            for candidate in pool
+        )
+        pool = _prioritize_strict_rss_candidates(pool)
+        log.info(
+            "[NewsFetcher] Strict v4 admission prioritized %d/%d "
+            "inline RSS candidate(s) before the %d-attempt cap",
+            prequalified_count,
+            len(pool),
+            MAX_ATTEMPTS,
+        )
+
     def _resolve_body(candidate: dict) -> dict:
         """Body resolver for one candidate. Pure; thread-safe."""
         out = dict(candidate)
-        if out.get("rss_full") and len(out["rss_full"]) > 300:
-            out["full_text"] = out["rss_full"]
+        rss_full = out.get("rss_full")
+        has_acceptable_inline_rss = (
+            meets_v4_rss_source_floor(rss_full)
+            if require_science_floor
+            else bool(rss_full) and len(rss_full) > 300
+        )
+        if has_acceptable_inline_rss:
+            out["full_text"] = rss_full
             out["_body_source"] = "rss_full"
             log.info(
                 "[NewsFetcher] [%s] RSS full body: %d chars",

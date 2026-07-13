@@ -18,6 +18,7 @@ log = logging.getLogger("OTR")
 try:
     from ._otr_canon import EpisodeCanon
     from ._otr_json import parse_first_json_object
+    from ._otr_rss_source_contract import meets_v4_rss_source_floor
     from ._otr_source_payload import validate_source_payload
     from ._otr_scifi_p0_contract import (
         MAX_CLAIM_CHARS,
@@ -43,6 +44,7 @@ try:
 except ImportError:  # pragma: no cover
     from _otr_canon import EpisodeCanon  # type: ignore
     from _otr_json import parse_first_json_object  # type: ignore
+    from _otr_rss_source_contract import meets_v4_rss_source_floor  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_scifi_p0_contract import (  # type: ignore
         MAX_CLAIM_CHARS,
@@ -435,8 +437,10 @@ def validate_sonnet_payload(payload: Mapping[str, Any], resolved: Mapping[str, A
             raise SonnetThinPayloadError("pinned source is below the 8/4 thinness floor")
     elif source == "rss_fetch":
         mode, text = "rss", clean["full_text"]
-        if len(text.split()) < 80 or len(set(re.findall(r"[A-Za-z0-9]+", text.lower()))) < 12:
-            raise SonnetThinPayloadError("RSS source is below the 80/12 thinness floor")
+        if not meets_v4_rss_source_floor(text):
+            raise SonnetThinPayloadError(
+                "RSS source is below the 400/80/12 v4 source floor"
+            )
     else:
         raise SonnetPayloadRouteError("scifi_sonnet accepts only rss_fetch or custom_premise")
     target = resolved.get("target_words")

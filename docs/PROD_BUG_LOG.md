@@ -1030,3 +1030,33 @@ out until they independently meet the same production-only admission rule.
   never Python clipping or a broad retake. Promoted as executable BUG-11.42
   extension coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260712-26 -- Strict Sci-Fi RSS admission starved eligible inline bodies
+
+- surfaced: canonical 120-word `scifi_codex` GUI/API run, prompt
+  `59b9baa5-046f-4e4c-b313-8d18223ea716`, 2026-07-12
+- symptom: the live feed pool contained qualifying literal inline RSS bodies,
+  but the strict selector body-resolved only the first ten headline-ranked
+  candidates. All ten fell back to thin summaries, so the writer failed before
+  P0 with `No science RSS candidate met the v4 source floor`.
+- root cause: the selector enforced the 400-character/80-word/12-unique-token
+  floor only after its bounded body-fetch slice. It had no eligibility-aware
+  ordering, and its legacy `rss_full > 300` shortcut did not match the stricter
+  Codex/Gemini/Sonnet envelope contract.
+- fix: define one stdlib-only v4 RSS predicate and route strict selection plus
+  all three lane envelopes through it. In strict mode, stable-partition already
+  qualified inline RSS bodies ahead of unresolved candidates while preserving
+  prior rank inside each partition; admit inline text only through the shared
+  predicate, retain the ten-candidate cap and URL-scrape path, and leave legacy
+  non-strict behavior unchanged.
+- verification: focused admission coverage passed; full Windows suite
+  `7843 passed, 31 skipped, 1 xfailed`; Bug Bible `17 passed, 12 skipped,
+  3 xfailed`. Canonical prompt `14af0787-f45c-4caa-8737-92d057855653`
+  logged `Strict v4 admission prioritized 13/40`, resolved ten bodies with
+  `10/10 candidate(s) passed content floor`, selected a 4,825-character MIT
+  article, and crossed P0 into P1. A separate OpenRouter reasoning-capability
+  error then stopped the episode; it does not reopen source admission.
+- bible-worthy: yes -- a bounded selector must apply hard downstream
+  eligibility before its truncating candidate slice and share the exact
+  predicate with the accepting envelope. Promotion remains a separate review.
+- status: FIXED AND LIVE VERIFIED
