@@ -11,7 +11,9 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import pathlib
+import subprocess
 import sys
 
 import pytest
@@ -329,10 +331,100 @@ def test_headless_wrapper_clears_stale_extra_env_hook_before_boot():
 def test_headless_wrapper_does_not_assign_reserved_pid_variable():
     src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
     assert "foreach ($pid " not in src
-    assert "$listenerPid" in src
+    assert "$proc.ProcessId" in src
 
 
-def test_headless_wrapper_waits_after_port_listener_kill():
+def test_headless_wrapper_uses_positive_ownership_and_free_port_selection():
     src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
     assert "for ($i = 0; $i -lt 10; $i++)" in src
     assert "if (-not $remaining) { return }" in src
+    assert "Test-OtrHeadlessServerCommand" in src
+    assert "Test-OtrCanonicalRunnerCommand" in src
+    assert "Resolve-OtrHeadlessPort" in src
+    assert "[int]$Port = 0" in src
+    assert "Get-NetTCPConnection -LocalPort 8000" not in src
+
+
+def test_canonical_runner_emits_poll_heartbeats(tmp_path, monkeypatch):
+    dump = tmp_path / "prompt.json"
+    monkeypatch.setattr(canonical, "build_api_prompt", lambda _args: ({}, []))
+    monkeypatch.setattr(canonical, "submit_prompt", lambda _prompt: "prompt-live")
+
+    def _poll(prompt_id, timeout_s, poll_s, on_tick=None):
+        assert prompt_id == "prompt-live"
+        assert timeout_s == 5400
+        assert poll_s == 5
+        assert on_tick is not None
+        on_tick(0.0, {})
+        on_tick(5.9, {"status_str": "running"})
+        return "SUCCESS", ""
+
+    monkeypatch.setattr(canonical, "poll_history", _poll)
+    rc, out = _run_main(["--dump-prompt", str(dump)])
+    assert rc == 0
+    assert "t=0s prompt_id=prompt-live status=queued" in out
+    assert "t=0s prompt_id=prompt-live status=pending" in out
+    assert "t=5s prompt_id=prompt-live status=running" in out
+    assert "RESULT SUCCESS prompt_id=prompt-live" in out
+
+
+@pytest.mark.skipif(os.name != "nt", reason="PowerShell selector module is Windows-only")
+def test_headless_process_selectors_never_claim_the_interactive_gui():
+    module = SCRIPTS / "otr_headless_process.psm1"
+
+    def selected(function_name: str, command_line: str) -> bool:
+        env = os.environ.copy()
+        env["OTR_TEST_COMMAND_LINE"] = command_line
+        module_text = str(module).replace("'", "''")
+        script = (
+            "$ErrorActionPreference='Stop'; "
+            f"Import-Module -Name '{module_text}' -Force; "
+            f"if ({function_name} -CommandLine $env:OTR_TEST_COMMAND_LINE) "
+            "{ 'true' } else { 'false' }"
+        )
+        completed = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            check=False, capture_output=True, text=True, env=env, timeout=15,
+        )
+        assert completed.returncode == 0, completed.stderr
+        return completed.stdout.strip().splitlines()[-1] == "true"
+
+    headless = (
+        r"C:\Python\python.exe C:\ComfyUI\main.py --port 8123 "
+        r"--extra-model-paths-config C:\OTR\_otr_headless_model_paths.yaml"
+    )
+    gui = (
+        r"C:\Python\python.exe C:\ComfyUI\main.py --port 8001 "
+        r"--extra-model-paths-config C:\ComfyUI\shared_model_paths.yaml"
+    )
+    assert selected("Test-OtrHeadlessServerCommand", headless)
+    assert not selected("Test-OtrHeadlessServerCommand", gui)
+    assert not selected(
+        "Test-OtrHeadlessServerCommand",
+        r"C:\Python\python.exe C:\ComfyUI\main.py --port 8123",
+    )
+    assert selected(
+        "Test-OtrCanonicalRunnerCommand",
+        r"C:\Python\python.exe C:\OTR\scripts\otr_canonical_api_run.py --words 30",
+    )
+    assert not selected("Test-OtrCanonicalRunnerCommand", gui)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="watchdog is a PowerShell harness")
+def test_watchdog_recognizes_canonical_terminal_result(tmp_path):
+    leg_log = tmp_path / "leg.log"
+    leg_log.write_text(
+        "[canonical-api] RESULT SUCCESS prompt_id=prompt-live\n",
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+            "-File", str(SCRIPTS / "otr_render_watchdog.ps1"),
+            "-LegLog", str(leg_log), "-PollSeconds", "0",
+        ],
+        check=False, capture_output=True, text=True, timeout=20,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "DONE" in completed.stdout
+    assert "DONE" in (tmp_path / "leg.log.watchdog").read_text(encoding="ascii")

@@ -13,8 +13,8 @@
         -LegLog scripts\_otr_render_b_a.log
 
   Exit codes: 0 = leg finished (verdict printed); 2 = DEAD (stall or queue down).
-  It does NOT kill anything -- it REPORTS. The caller resets per the CLAUDE.md
-  directive (kill all python, confirm idle GPU, reboot canonical launcher).
+  It does NOT kill anything -- it REPORTS. The caller uses the canonical
+  harness's selective OTR-headless reset, confirms idle GPU, then reboots.
 #>
 param(
     [Parameter(Mandatory = $true)][string]$LegLog,
@@ -33,13 +33,13 @@ function Write-Verdict($state, $msg) {
 Write-Verdict 'RUNNING' 'watchdog armed'
 
 function Get-Heartbeat($path) {
-    $m = Select-String -Path $path -Pattern '\[soak\] t=\s*(\d+)s' |
+    $m = Select-String -Path $path -Pattern '\[(?:soak|canonical-api)\]\s+t=\s*(\d+)s' |
         Select-Object -Last 1
     if ($m) { return [int]$m.Matches[0].Groups[1].Value }
     return -1
 }
 function Get-Verdict($path) {
-    $m = Select-String -Path $path -Pattern 'sweep_.* -> (PASS|SOAK_FAIL|RC_\d+|ERROR)|COMPLETE:' |
+    $m = Select-String -Path $path -Pattern 'sweep_.* -> (PASS|SOAK_FAIL|RC_\d+|ERROR)|COMPLETE:|\[canonical-api\].*RESULT\s+(SUCCESS|FAIL|TIMEOUT)|\[canonical-headless\].*RESULT\s+FAIL' |
         Select-Object -Last 1
     if ($m) { return $m.Line.Trim() }
     return $null
@@ -48,6 +48,7 @@ function Get-Verdict($path) {
 $lastBeat = -1
 $lastProgress = Get-Date
 $qFail = 0
+$armed = $false
 Write-Host ("[watchdog] start {0} :: leg={1} stall={2}s poll={3}s" -f `
     (Get-Date -Format HH:mm:ss), $LegLog, $StallSeconds, $PollSeconds)
 
@@ -66,6 +67,11 @@ while ($true) {
     if ($beat -ge 0 -and $beat -ne $lastBeat) {
         $lastBeat = $beat
         $lastProgress = Get-Date
+        $armed = $true
+    }
+    if (-not $armed) {
+        Write-Host ("[watchdog] {0} waiting for first heartbeat" -f (Get-Date -Format HH:mm:ss))
+        continue
     }
     $stalledFor = [int]((Get-Date) - $lastProgress).TotalSeconds
 

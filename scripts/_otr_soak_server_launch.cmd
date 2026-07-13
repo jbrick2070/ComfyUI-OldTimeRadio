@@ -62,6 +62,10 @@ if not exist "%OTR_TMP%" mkdir "%OTR_TMP%"
 set TEMP=%OTR_TMP%
 set TMP=%OTR_TMP%
 set OTR_GPU_LEASE_DIR=%OTR_TMP%
+rem The canonical wrapper chooses a free local port per leg. Direct/manual
+rem launches keep the historical port as a harmless default.
+if not defined OTR_HEADLESS_PORT set OTR_HEADLESS_PORT=8000
+echo [launch] OTR headless port %OTR_HEADLESS_PORT%
 if /i "%2"=="FLOOR" (
   set OTR_ENABLE_HUMO=
   echo [launch] heavy engines OFF ^(floor leg^)
@@ -115,7 +119,7 @@ rem desktop_extensions entry points at the dead v1 install path and crashes
 rem main.py's prestartup scan (FileNotFoundError).
 C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
   C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\main.py ^
-  --port 8000 --cuda-malloc --user-directory C:\Users\jeffr\Documents\ComfyUI ^
+  --port %OTR_HEADLESS_PORT% --cuda-malloc --user-directory C:\Users\jeffr\Documents\ComfyUI ^
   --output-directory %OTR_REAL_OUTPUT% ^
   --extra-model-paths-config "%~dp0_otr_headless_model_paths.yaml" ^
   --disable-metadata ^

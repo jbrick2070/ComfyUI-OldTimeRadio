@@ -23,7 +23,8 @@ param(
     [switch]$NoReset,
     [int]$Timeout = 5400,
     [int]$PollSeconds = 5,
-    [string]$ServerLog = "C:\Users\jeffr\Documents\ComfyUI\comfyui_8000.log"
+    [int]$Port = 0,
+    [string]$ServerLog = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,61 +33,73 @@ $Python = "C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
 $Launch = Join-Path $Repo "scripts\_otr_soak_server_launch.cmd"
 $Canonical = Join-Path $Repo "workflows\otr_canonical.json"
 $StaleExtraEnv = Join-Path $Repo "scripts\_otr_soak_capstone_results\_marathon_extra_env.cmd"
+$ProcessSelectors = Join-Path $Repo "scripts\otr_headless_process.psm1"
+
+Import-Module -Name $ProcessSelectors -Force -ErrorAction Stop
 
 function Say($Message) {
     Write-Host ("[canonical-headless] {0} {1}" -f (Get-Date -Format HH:mm:ss), $Message)
 }
 
 function Stop-OtrPython {
-    $patterns = @(
-        "ComfyUI\\main.py",
-        "ComfyUI/main.py",
-        "otr_canonical_api_run.py",
-        "otr_headless_canonical.ps1"
-    )
     $procs = Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'" -ErrorAction SilentlyContinue
     foreach ($proc in $procs) {
         $cmd = [string]$proc.CommandLine
         if (-not $cmd) { continue }
-        $hit = $false
-        foreach ($pattern in $patterns) {
-            if ($cmd.IndexOf($pattern, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                $hit = $true
-                break
-            }
-        }
-        if ($hit) {
+        if (
+            (Test-OtrHeadlessServerCommand -CommandLine $cmd) -or
+            (Test-OtrCanonicalRunnerCommand -CommandLine $cmd)
+        ) {
             Say ("stopping pid={0} cmd={1}" -f $proc.ProcessId, $cmd)
             Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
         }
     }
     Start-Sleep -Seconds 2
-    $listeners = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
-    foreach ($listenerPid in ($listeners.OwningProcess | Select-Object -Unique)) {
-        Say ("stopping :8000 listener pid={0}" -f $listenerPid)
-        Stop-Process -Id $listenerPid -Force -ErrorAction SilentlyContinue
-    }
     for ($i = 0; $i -lt 10; $i++) {
-        $remaining = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+        $remaining = @(
+            Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'" -ErrorAction SilentlyContinue |
+                Where-Object { Test-OtrHeadlessServerCommand -CommandLine ([string]$_.CommandLine) }
+        )
         if (-not $remaining) { return }
         Start-Sleep -Seconds 1
     }
+    $pids = $remaining | ForEach-Object { $_.ProcessId }
+    throw "OTR headless process(es) still running after selective reset: $($pids -join ', ')"
 }
 
-function Wait-Comfy {
+function Resolve-OtrHeadlessPort([int]$RequestedPort) {
+    if ($RequestedPort -gt 0) {
+        $listeners = Get-NetTCPConnection -LocalPort $RequestedPort -State Listen -ErrorAction SilentlyContinue
+        if ($listeners) {
+            $owner = ($listeners.OwningProcess | Select-Object -Unique) -join ', '
+            throw "requested port :$RequestedPort is already listening (pid $owner)"
+        }
+        return $RequestedPort
+    }
+
+    $reservation = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    try {
+        $reservation.Start()
+        return ([System.Net.IPEndPoint]$reservation.LocalEndpoint).Port
+    } finally {
+        $reservation.Stop()
+    }
+}
+
+function Wait-Comfy([int]$ApiPort) {
     for ($i = 0; $i -lt 90; $i++) {
         Start-Sleep -Seconds 2
         try {
-            $stats = Invoke-WebRequest -Uri "http://127.0.0.1:8000/system_stats" -UseBasicParsing -TimeoutSec 5
-            $validator = Invoke-WebRequest -Uri "http://127.0.0.1:8000/object_info/OTR_WorkflowValidator" -UseBasicParsing -TimeoutSec 5
+            $stats = Invoke-WebRequest -Uri "http://127.0.0.1:$ApiPort/system_stats" -UseBasicParsing -TimeoutSec 5
+            $validator = Invoke-WebRequest -Uri "http://127.0.0.1:$ApiPort/object_info/OTR_WorkflowValidator" -UseBasicParsing -TimeoutSec 5
             if ($stats.StatusCode -eq 200 -and $validator.StatusCode -eq 200) {
-                Say "server healthy"
+                Say "server healthy on :$ApiPort"
                 return
             }
         } catch {
         }
     }
-    throw "ComfyUI API did not become healthy on :8000; see $ServerLog"
+    throw "ComfyUI API did not become healthy on :$ApiPort; see $ServerLog"
 }
 
 Set-Location -LiteralPath $Repo
@@ -97,22 +110,29 @@ if (-not (Test-Path -LiteralPath $Canonical)) {
 
 Say "canonical workflow: $Canonical"
 
-if (-not $NoBoot) {
-    if (-not $NoReset) {
-        Say "selective reset"
-        Stop-OtrPython
-        $remaining = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
-        if ($remaining) {
-            throw ":8000 is still listening after selective reset"
-        }
-        try {
-            $vram = (& nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits) | Select-Object -First 1
-            Say ("vram after reset: {0} MiB" -f $vram)
-        } catch {
-            Say "nvidia-smi unavailable; continuing"
-        }
-    }
+if ($NoBoot -and $Port -le 0) {
+    throw "-NoBoot requires an explicit -Port for the existing ComfyUI API server"
+}
 
+if (-not $NoBoot -and -not $NoReset) {
+    Say "selective OTR headless reset"
+    Stop-OtrPython
+    try {
+        $vram = (& nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits) | Select-Object -First 1
+        Say ("vram after reset: {0} MiB" -f $vram)
+    } catch {
+        Say "nvidia-smi unavailable; continuing"
+    }
+}
+
+$EffectivePort = if ($NoBoot) { $Port } else { Resolve-OtrHeadlessPort $Port }
+if (-not $ServerLog) {
+    $ServerLog = Join-Path $Repo ("tmp\otr_headless_{0}.log" -f $EffectivePort)
+}
+$env:COMFYUI_URL = "http://127.0.0.1:$EffectivePort"
+$env:OTR_HEADLESS_PORT = "$EffectivePort"
+
+if (-not $NoBoot) {
     if (Test-Path -LiteralPath $StaleExtraEnv) {
         Say "removing stale extra-env hook before canonical boot"
         Remove-Item -LiteralPath $StaleExtraEnv -Force
@@ -120,11 +140,11 @@ if (-not $NoBoot) {
 
     Say "booting ComfyUI API"
     $server = Start-Process -FilePath $Launch -ArgumentList "`"$ServerLog`"" -WindowStyle Hidden -PassThru
-    Say ("server pid={0} log={1}" -f $server.Id, $ServerLog)
-    Wait-Comfy
+    Say ("server pid={0} port={1} log={2}" -f $server.Id, $EffectivePort, $ServerLog)
+    Wait-Comfy $EffectivePort
 } else {
-    Say "NoBoot set; using existing ComfyUI API server"
-    Wait-Comfy
+    Say "NoBoot set; using existing ComfyUI API server on :$EffectivePort"
+    Wait-Comfy $EffectivePort
 }
 
 $argsList = @(
@@ -144,4 +164,8 @@ if ($DryRun) {
 
 Say ("running: {0} {1}" -f $Python, ($argsList -join " "))
 & $Python @argsList
-exit $LASTEXITCODE
+$runnerExit = $LASTEXITCODE
+if ($runnerExit -ne 0) {
+    Say ("RESULT FAIL canonical_runner_exit={0}" -f $runnerExit)
+}
+exit $runnerExit

@@ -208,8 +208,22 @@ def main(argv: list[str] | None = None) -> int:
 
     prompt_id = submit_prompt(prompt)
     print(f"[canonical-api] QUEUED prompt_id={prompt_id}", flush=True)
+    print(
+        f"[canonical-api] t=0s prompt_id={prompt_id} status=queued",
+        flush=True,
+    )
+
+    def heartbeat(elapsed_s: float, status: dict) -> None:
+        phase = str(status.get("status_str") or "pending")
+        print(
+            f"[canonical-api] t={int(elapsed_s)}s prompt_id={prompt_id} "
+            f"status={phase}",
+            flush=True,
+        )
+
     status, err = poll_history(
-        prompt_id, timeout_s=args.timeout, poll_s=args.poll_s
+        prompt_id, timeout_s=args.timeout, poll_s=args.poll_s,
+        on_tick=heartbeat,
     )
     print(f"[canonical-api] RESULT {status} prompt_id={prompt_id}", flush=True)
     if status != "SUCCESS":
