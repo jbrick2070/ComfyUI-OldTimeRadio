@@ -1050,7 +1050,11 @@ class OpenRouterBackend:
         # actual tokens, so a generous floor costs nothing on short replies.
         cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_OUTPUT_TOKENS_CAP)
         floor = _int_env("OPENROUTER_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
-        out_tokens = max(int(max_new_tokens or 0), floor)
+        requested_tokens = max(1, int(max_new_tokens or 0))
+        if bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
+            out_tokens = requested_tokens
+        else:
+            out_tokens = max(requested_tokens, floor)
         if out_tokens > cap:
             out_tokens = cap
         temp = (

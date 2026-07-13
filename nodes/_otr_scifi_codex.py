@@ -383,9 +383,9 @@ class RadioScoreDraftV4(_Strict):
     )
 
 
-_P3_TEXT_PATCH_MAX_TARGETS = 6
+_P3_TEXT_PATCH_MAX_TARGETS = 12
 _P3_TEXT_PATCH_MAX_SOURCE_CHARS = 256
-_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 512
+_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 1024
 _P3_TEXT_PATCH_PATH_MAX_CHARS = 80
 _P3_TEXT_PATCH_SEAM = "codex_radio_score_text_patch"
 _P3_TEXT_PATCH_KIND = "p3_authored_text_patch"
@@ -560,6 +560,13 @@ class _PromptMustFitMessages(list[dict[str, str]]):
     """Tell the local slot wrapper to fail before it slices this prompt."""
 
     _otr_prompt_must_fit = True
+
+
+class _P3TextPatchMessages(list[dict[str, str]]):
+    """Keep the authored-text repair complete and output-bounded."""
+
+    _otr_prompt_must_fit = True
+    _otr_strict_remote_output_budget = True
 
 
 def _has_forbidden_script_scene_keys(scenes: object) -> bool:
@@ -1338,27 +1345,12 @@ class FinalAuditV4(_Strict):
 GenerateFn = Callable[..., str]
 
 
-def _is_local_p3_text_patch_slot(slot_fn: GenerateFn) -> bool:
-    """Return whether an exact local tokenizer guard can enforce this patch.
-
-    Production calls use ``_SlotScheduler``.  It declares this capability
-    from the resolved catalog row before the first lazy invocation, so a
-    provider wrapper cannot be mistaken for a local model simply because its
-    callable hides the backend's markers.  Bare local test/integration callables
-    retain the historical no-remote-marker path.
-    """
-    declared = getattr(slot_fn, "_otr_p3_text_patch_local", None)
-    if declared is not None:
-        return declared is True
-    return not any(
-        bool(getattr(slot_fn, marker, False))
-        for marker in (
-            "_otr_openrouter",
-            "_otr_comfy_credits",
-            "_otr_google_api",
-            "_otr_gguf_native",
-        )
-    )
+def _p3_text_patch_transport(slot_fn: GenerateFn) -> str | None:
+    """Return one explicitly proven authored-text patch transport."""
+    declared = getattr(slot_fn, "_otr_p3_text_patch_transport", None)
+    if declared in ("exact_local", "full_message_remote"):
+        return str(declared)
+    return None
 
 
 def _is_p3_patch_index(value: object) -> bool:
@@ -1604,7 +1596,7 @@ def _merge_p3_text_patch(
     return merged
 
 
-def _run_local_p3_text_patch(
+def _run_p3_text_patch(
     *,
     slot_fn: GenerateFn,
     pack: Any,
@@ -1613,6 +1605,7 @@ def _run_local_p3_text_patch(
     post_validator: Callable[[BaseModel], str | None],
     calls: list[dict[str, Any]],
     mark_attempt_complete: Callable[[int, str, BaseException | None], None],
+    patch_transport: str,
 ) -> RadioScoreDraftV4:
     """Make P3's sole author-owned text patch call with a complete receipt."""
     patch_attempt_index = len(calls) + 1
@@ -1628,6 +1621,7 @@ def _run_local_p3_text_patch(
         "compiler_status": "pending",
         "graph_status": "pending",
         "repair_kind": _P3_TEXT_PATCH_KIND,
+        "patch_transport": patch_transport,
         "patch_status": "pending",
         "patch_targets": [
             {"path": target.path, "max_chars": target.max_chars}
@@ -1641,7 +1635,7 @@ def _run_local_p3_text_patch(
     try:
         raw_patch = str(invoke_structured_slot(
             slot_fn,
-            _PromptMustFitMessages(_p3_text_patch_messages(pack, targets)),
+            _P3TextPatchMessages(_p3_text_patch_messages(pack, targets)),
             temperature=REPAIR_TEMPERATURE,
             max_new_tokens=_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS,
         ))
@@ -2151,7 +2145,7 @@ def invoke_codex_structured(
             # raises, so letting its generic callback classify that empty
             # string would falsely rewrite a JSON/patch-schema failure as a
             # decoded accepted draft.  On direct success this callback is
-            # invoked explicitly by `_run_local_p3_text_patch` after the
+            # invoked explicitly by `_run_p3_text_patch` after the
             # merged artifact has cleared the complete validator.
             if error is None:
                 receipt.update({
@@ -2321,11 +2315,11 @@ def invoke_codex_structured(
         elif draft_score_pass:
             # A live P3 compact draft can be structurally complete with only a
             # few authored strings over their strict caps. Let the author make
-            # one bounded local shortening decision, but only after a probe
-            # proves that no hidden compiler/signature/graph defect exists.
-            # Remote slots retain their normal same-slot full repair: their
-            # virtual context metadata is not an exact tokenizer preflight.
-            if _is_local_p3_text_patch_slot(slot_fn) and isinstance(error, ValidationError):
+            # one bounded shortening decision over an explicitly proven
+            # transport, but only after a probe proves that no hidden
+            # compiler/signature/graph defect exists.
+            patch_transport = _p3_text_patch_transport(slot_fn)
+            if patch_transport is not None and isinstance(error, ValidationError):
                 try:
                     failed_draft_for_patch = parse_first_json_object(failed_output)
                 except Exception:
@@ -2342,7 +2336,7 @@ def invoke_codex_structured(
                             post_validator,
                         )
                     ):
-                        return _run_local_p3_text_patch(
+                        return _run_p3_text_patch(
                             slot_fn=slot_fn,
                             pack=pack,
                             raw_draft=failed_draft_for_patch,
@@ -2350,6 +2344,7 @@ def invoke_codex_structured(
                             post_validator=post_validator,
                             calls=calls,
                             mark_attempt_complete=mark_attempt_complete,
+                            patch_transport=patch_transport,
                         )
             trusted_context = json.dumps(
                 body["artifact_inputs"],

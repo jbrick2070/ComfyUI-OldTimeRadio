@@ -946,19 +946,27 @@ def test_max_width_p3_draft_envelopes_fit_the_local_gemma_context():
     patch_loc_caps = [
         (("title",), 64),
         (("premise",), 144),
+        (("setting",), 80),
+        (("scenes", 0, "env"), 56),
+        (("scenes", 0, "description"), 72),
+        (("scenes", 0, "shots", 0, "description"), 72),
         (("scenes", 0, "shots", 0, "visual_prompt"), 120),
+        (("scenes", 0, "shots", 1, "description"), 72),
+        (("scenes", 0, "shots", 1, "visual_prompt"), 120),
         (("scenes", 0, "beats", 0, "intent"), 64),
-        (("music_cues", 0, "description"), 80),
-        (("music_cues", 2, "generation_prompt"), 120),
+        (("scenes", 0, "beats", 0, "arc_phase"), 28),
+        (("scenes", 0, "beats", 1, "intent"), 64),
     ]
     for loc, cap in patch_loc_caps:
-        lane._p3_text_patch_set_at(patch_raw, loc, "x" * (cap + 1))
+        lane._p3_text_patch_set_at(
+            patch_raw, loc, "x" * lane._P3_TEXT_PATCH_MAX_SOURCE_CHARS,
+        )
     with pytest.raises(ValidationError) as patch_error:
         lane.RadioScoreDraftV4.model_validate(patch_raw)
     patch_targets = lane._derive_p3_text_patch_targets(
         patch_raw, patch_error.value,
     )
-    assert patch_targets is not None and len(patch_targets) == 6
+    assert patch_targets is not None and len(patch_targets) == 12
     patch_messages = lane._p3_text_patch_messages(pack, patch_targets)
     patch_response = json.dumps(
         {
@@ -1180,6 +1188,8 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
         calls.append({"messages": messages, **kwargs})
         return responses.pop(0)
 
+    slot_fn._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
+
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
         pack=routing.resolve_story_pack("scifi_codex"),
@@ -1202,6 +1212,7 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
     attempts = journal["calls"][0]["attempts"]
     assert len(attempts) == 2
     assert attempts[1]["repair_kind"] == "p3_authored_text_patch"
+    assert attempts[1]["patch_transport"] == "exact_local"
     assert attempts[1]["patch_status"] == "accepted"
     assert attempts[1]["parse_status"] == "decoded"
     assert attempts[1]["schema_status"] == "accepted"
@@ -1247,6 +1258,8 @@ def test_p3_rewrite_local_text_patch_preserves_locked_structure():
         calls.append({"messages": messages, **kwargs})
         return responses.pop(0)
 
+    slot_fn._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
+
     result = lane._call_radio_score_draft(
         pass_id="P3_rewrite", slot_fn=slot_fn,
         pack=routing.resolve_story_pack("scifi_codex"),
@@ -1287,6 +1300,8 @@ def test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect():
         calls.append({"messages": messages, **kwargs})
         return responses.pop(0)
 
+    slot_fn._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
+
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
         pack=routing.resolve_story_pack("scifi_codex"),
@@ -1318,6 +1333,8 @@ def test_p3_malformed_text_patch_fails_without_a_third_reroll():
     def slot_fn(messages, **kwargs):
         calls.append({"messages": messages, **kwargs})
         return responses.pop(0)
+
+    slot_fn._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
 
     with pytest.raises(lane.CodexPassError):
         lane._call_radio_score_draft(
@@ -1409,6 +1426,8 @@ def test_p3_text_patch_rejects_a_resolved_artifact_wrapper_without_reroll():
         calls.append({"messages": messages, **kwargs})
         return responses.pop(0)
 
+    slot_fn._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
+
     with pytest.raises(lane.CodexPassError):
         lane._call_radio_score_draft(
             pass_id="P3", slot_fn=slot_fn,
@@ -1431,7 +1450,7 @@ def test_p3_text_patch_rejects_a_resolved_artifact_wrapper_without_reroll():
     assert attempt["compiler_status"] == "not_run"
 
 
-def test_p3_scheduler_openrouter_stays_on_full_repair_and_forwards_json_mode(monkeypatch):
+def test_p3_scheduler_openrouter_uses_bounded_patch_and_forwards_json_mode(monkeypatch):
     """The production scheduler must preserve remote P3 transport identity.
 
     A scheduler closure is the actual writer path, unlike an unwrapped test
@@ -1448,7 +1467,11 @@ def test_p3_scheduler_openrouter_stays_on_full_repair_and_forwards_json_mode(mon
     draft = _draft_for_advisory(advisory)
     invalid = draft.model_dump(mode="json")
     invalid["scenes"][0]["description"] = "x" * 73
-    responses = [json.dumps(invalid), json.dumps(draft.model_dump(mode="json"))]
+    replacement = "A compact receiver hums."
+    responses = [json.dumps(invalid), json.dumps({"replacements": [{
+        "path": "scenes.0.description",
+        "replacement_text": replacement,
+    }]})]
     calls: list[dict[str, object]] = []
     journal: dict[str, object] = {}
 
@@ -1487,6 +1510,7 @@ def test_p3_scheduler_openrouter_stays_on_full_repair_and_forwards_json_mode(mon
     slot_fn = scheduler.for_slot("creative")
     assert slot_fn._otr_openrouter is True  # type: ignore[attr-defined]
     assert slot_fn._otr_p3_text_patch_local is False  # type: ignore[attr-defined]
+    assert slot_fn._otr_p3_text_patch_transport == "full_message_remote"  # type: ignore[attr-defined]
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
@@ -1502,18 +1526,105 @@ def test_p3_scheduler_openrouter_stays_on_full_repair_and_forwards_json_mode(mon
     assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
     assert all(call["response_format"] == {"type": "json_object"} for call in calls)
-    assert calls[1]["max_new_tokens"] == lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
-    assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
-    assert "repair_kind" not in journal["calls"][0]["attempts"][1]
+    assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
+    assert getattr(
+        calls[1]["messages"], "_otr_strict_remote_output_budget", False,
+    ) is True
+    attempt = journal["calls"][0]["attempts"][1]
+    assert attempt["repair_kind"] == "p3_authored_text_patch"
+    assert attempt["patch_transport"] == "full_message_remote"
+    assert attempt["patch_status"] == "accepted"
+    assert result.scenes[0].description == replacement
 
 
-def test_p3_openrouter_overlength_uses_same_slot_full_repair_with_json_mode():
+def test_p3_openrouter_repairs_captured_ten_target_shape_with_json_mode():
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
     cast = _metadata_repair_cast()
     facts = _metadata_repair_fact_index()
     draft = _draft_for_advisory(advisory)
     invalid = draft.model_dump(mode="json")
-    invalid["scenes"][0]["description"] = "x" * 73
+    target_loc_caps = [
+        (("title",), 64),
+        (("premise",), 144),
+        (("setting",), 80),
+        (("scenes", 0, "env"), 56),
+        (("scenes", 0, "description"), 72),
+        (("scenes", 0, "shots", 0, "description"), 72),
+        (("scenes", 0, "shots", 0, "visual_prompt"), 120),
+        (("scenes", 0, "shots", 1, "description"), 72),
+        (("scenes", 0, "shots", 1, "visual_prompt"), 120),
+        (("scenes", 0, "beats", 0, "intent"), 64),
+    ]
+    for loc, cap in target_loc_caps:
+        lane._p3_text_patch_set_at(invalid, loc, "x" * (cap + 1))
+    patch_rows = [
+        {
+            "path": ".".join(str(item) for item in loc),
+            "replacement_text": f"Short replacement {index}.",
+        }
+        for index, (loc, _cap) in enumerate(target_loc_caps)
+    ]
+    responses = [
+        json.dumps(invalid),
+        json.dumps({"replacements": patch_rows}),
+    ]
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    slot_fn._otr_openrouter = True  # type: ignore[attr-defined]
+    slot_fn._otr_response_format = None  # type: ignore[attr-defined]
+    slot_fn._otr_p3_text_patch_transport = "full_message_remote"  # type: ignore[attr-defined]
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal=journal,
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    assert all(call["response_format"] == {"type": "json_object"} for call in calls)
+    assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    attempt = journal["calls"][0]["attempts"][1]
+    assert attempt["patch_transport"] == "full_message_remote"
+    assert attempt["patch_status"] == "accepted"
+    assert len(attempt["patch_targets"]) == 10
+    assert {row["path"] for row in attempt["patch_targets"]} == {
+        row["path"] for row in patch_rows
+    }
+
+
+def test_p3_openrouter_thirteen_targets_retain_full_repair():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    invalid = draft.model_dump(mode="json")
+    target_loc_caps = [
+        (("title",), 64), (("premise",), 144), (("setting",), 80),
+        (("scenes", 0, "env"), 56),
+        (("scenes", 0, "description"), 72),
+        (("scenes", 0, "shots", 0, "description"), 72),
+        (("scenes", 0, "shots", 0, "visual_prompt"), 120),
+        (("scenes", 0, "shots", 1, "description"), 72),
+        (("scenes", 0, "shots", 1, "visual_prompt"), 120),
+        (("scenes", 0, "beats", 0, "intent"), 64),
+        (("scenes", 0, "beats", 0, "arc_phase"), 28),
+        (("scenes", 0, "beats", 1, "intent"), 64),
+        (("scenes", 0, "beats", 1, "arc_phase"), 28),
+    ]
+    for loc, cap in target_loc_caps:
+        lane._p3_text_patch_set_at(invalid, loc, "x" * (cap + 1))
     responses = [json.dumps(invalid), json.dumps(draft.model_dump(mode="json"))]
     calls: list[dict[str, object]] = []
     journal: dict[str, object] = {}
@@ -1524,6 +1635,7 @@ def test_p3_openrouter_overlength_uses_same_slot_full_repair_with_json_mode():
 
     slot_fn._otr_openrouter = True  # type: ignore[attr-defined]
     slot_fn._otr_response_format = None  # type: ignore[attr-defined]
+    slot_fn._otr_p3_text_patch_transport = "full_message_remote"  # type: ignore[attr-defined]
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
@@ -1537,8 +1649,6 @@ def test_p3_openrouter_overlength_uses_same_slot_full_repair_with_json_mode():
     )
 
     assert isinstance(result, lane.RadioScoreV4)
-    assert len(calls) == 2
-    assert all(call["response_format"] == {"type": "json_object"} for call in calls)
     assert calls[1]["max_new_tokens"] == lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
     assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
     assert "repair_kind" not in journal["calls"][0]["attempts"][1]

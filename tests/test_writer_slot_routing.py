@@ -301,6 +301,7 @@ def test_scheduler_declares_catalog_local_p3_patch_capability(monkeypatch):
 
     slot_fn = scheduler.for_slot("creative")
     assert slot_fn._otr_p3_text_patch_local is True  # type: ignore[attr-defined]
+    assert slot_fn._otr_p3_text_patch_transport == "exact_local"  # type: ignore[attr-defined]
     assert slot_fn._otr_openrouter is False  # type: ignore[attr-defined]
     assert slot_fn._otr_response_format is None  # type: ignore[attr-defined]
 

@@ -326,6 +326,26 @@ def test_floor_overridable_via_env(enabled_env, monkeypatch):
     assert seen["payload"]["max_tokens"] == 1500
 
 
+def test_strict_message_budget_bypasses_overridden_floor(enabled_env, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_MIN_OUTPUT_TOKENS", "1500")
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result(),
+    )
+
+    class StrictMessages(list):
+        _otr_strict_remote_output_budget = True
+
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    backend.generate(
+        entry, StrictMessages([{"role": "user", "content": "x"}]),
+        temperature=0.5, max_new_tokens=1024,
+    )
+    assert seen["payload"]["max_tokens"] == 1024
+
+
 def test_max_tokens_clamped_to_cap(enabled_env, monkeypatch):
     monkeypatch.setenv("OPENROUTER_A_MAXTOK", "256")
     seen = {}

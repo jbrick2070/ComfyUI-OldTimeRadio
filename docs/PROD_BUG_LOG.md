@@ -1090,3 +1090,40 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: promoted as BUG-12.53 with executable OTR coverage and shared
   Bug Bible regression pins.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-02 -- Remote P3 whole-draft repair repeated ten local prose overflows
+
+- promotion: BUG-11.42 extension
+- surfaced: canonical 120-word `scifi_codex` reverify, prompt
+  `b98bef70-d5ae-4c60-9402-ce3adeccf26e`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: RSS admission, P0, P1, and P2 cleared. P3 returned an otherwise
+  complete compact draft with ten `string_too_long` authored fields. The normal
+  remote whole-draft typed repair fixed only two, repeated eight, and exhausted
+  the ladder before ledger/media/OBS work.
+- root cause: PBUG-20260712-25's one-for-one authored-text repair was restricted
+  to exact-tokenizer local slots and six targets. OpenRouter already sent full
+  messages or failed loudly, but its explicitly known transport was still forced
+  through the broad retake. The live ten-target shape also exceeded the local
+  patch schema, so merely enabling the remote marker would have remained dead.
+- fix: declare behavioral patch transport explicitly on the lazy scheduler:
+  exact-tokenizer local, full-message/fail-loud OpenRouter, or ineligible.
+  Expand the one-call patch envelope to 12 targets/1024 output tokens, prove its
+  actual tokenizer envelope, preserve complete preflight and merged validation,
+  and record the chosen transport. OpenRouter honors the patch's strict output
+  cap even when its global minimum-output floor is raised; JSON mode, mandatory
+  reasoning, cost guard, routing, retries, and terminal provider errors remain
+  in the shared backend. Thirteen-plus or any mixed/hidden/unproven shape keeps
+  whole-draft repair.
+- verify idea: reproduce the ten-target artifact with an explicit OpenRouter
+  callable and require exactly base plus one patch, all ten exact paths,
+  json_object mode, 1024 tokens, full-message transport receipt, and complete
+  draft acceptance. Prove 12-row prompt/response fit, 13 targets retain broad
+  repair, excluded/unmarked transports remain ineligible, and a raised global
+  remote floor cannot inflate the strict patch budget. Then rerun the same
+  canonical combination through ledger, episode asset, `obs_publish OK`, and
+  final OBS existence.
+- bible-worthy: yes -- bounded semantic repair eligibility depends on a proven
+  transport behavior, not locality alone; promoted as executable BUG-11.42
+  extension coverage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

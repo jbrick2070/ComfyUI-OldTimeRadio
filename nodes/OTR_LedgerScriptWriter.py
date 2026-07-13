@@ -537,16 +537,18 @@ class _SlotScheduler:
 
         return _HelperCtx()
 
-    def _slot_transport_markers(self, slot: str) -> dict[str, bool | None]:
+    def _slot_transport_markers(
+        self, slot: str,
+    ) -> dict[str, bool | str | None]:
         """Return the declared transport capability for one configured slot.
 
         ``for_slot`` deliberately defers model acquisition until an actual
         generation call.  Its wrapper must nevertheless retain the catalog's
-        provider identity: structured callers decide whether a bounded local
-        repair is safe *before* invoking the wrapper, and OpenRouter needs its
+        transport behavior: structured callers decide whether a bounded repair
+        is safe *before* invoking the wrapper, and OpenRouter needs its
         JSON-object request mode forwarded through it.  An unknown/non-curated
-        id is conservative (not eligible for the tokenizer-proven local P3
-        text patch), while normal local catalog rows are explicitly eligible.
+        id is conservative (not eligible for the P3 text patch), while proven
+        local and full-message remote catalog rows are explicitly eligible.
         """
         try:
             row = _otr_model_catalog._by_repo_id().get(self.ids[slot])
@@ -555,6 +557,11 @@ class _SlotScheduler:
             provider = ""
         return {
             "_otr_p3_text_patch_local": provider == "local",
+            "_otr_p3_text_patch_transport": (
+                "exact_local" if provider == "local"
+                else "full_message_remote" if provider == "openrouter"
+                else None
+            ),
             "_otr_openrouter": provider == "openrouter",
             "_otr_comfy_credits": provider == "comfy_credits",
             "_otr_google_api": provider == "google_api",
