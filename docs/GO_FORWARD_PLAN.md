@@ -47,14 +47,15 @@ the second bakeoff this plan forbids.
   pushed at `e1d3a035`. **The sole coder slot is currently held by the live
   Sci-Fi Codex P3 transport replacement (`PBUG-20260712-22`).** The bounded
   direct-score correction failed again at live prompt
-  `edbbac48-9aa8-4907-8086-f63134604604`; the active root fix replaces only P3
-  and P3-rewrite model transport with `RadioScoreDraftV4` plus a fail-closed
-  compiler returning the same final `RadioScoreV4`. It preserves the canonical
-  workflow and the shared all-visualizer no-image gate. Focused tests are
-  green; first full-suite pass is green; final full rerun, Bible, commit/push,
-  and canonical live reverify remain before the coder slot releases. The full
-  four-round Kibitz campaign (8 local reviews) and four-round frontier panel
-  ($0.8618 actual) are recorded under the dated transport-recovery artifacts.
+  `edbbac48-9aa8-4907-8086-f63134604604`; root commit `c942b2ae` replaces only
+  P3 and P3-rewrite model transport with `RadioScoreDraftV4` plus a fail-closed
+  compiler returning the same final `RadioScoreV4`. It is pushed and equals
+  origin after focused/full/Bible/workflow gates; canonical live reverify is
+  the next active action before the coder slot releases. It preserves the
+  canonical workflow and shared all-visualizer no-image gate. BUG-11.50's
+  portable rule and regression catalog are pushed separately at `63dd571`.
+  The full four-round Kibitz campaign (8 local reviews) and four-round frontier
+  panel ($0.8618 actual) are recorded under the dated transport-recovery artifacts.
   The RSS parity audit found no safe schema copy/paste: Gemini, Sonnet,
   Fable2, Media Archive, and original lanes remain artifact-specific follow-ups.
 - Preserve the untracked cue-ledger prompt, Sci-Fi Codex repair plan, and local
