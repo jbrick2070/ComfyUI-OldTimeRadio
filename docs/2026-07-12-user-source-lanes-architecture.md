@@ -1,13 +1,22 @@
 # User Source Lanes -- Replacement Architecture & Coding Plan (v1 DRAFT)
 
 - **Date:** 2026-07-12 (late). **Status:** DRAFT FOR ARCHITECTURE APPROVAL -- no code,
-  no GO_FORWARD_PLAN change until this converges (operator directive). Kibitz arc:
-  **r1 folded @ `d724e08a`, r2 folded @ `f7c6902c`, r3 (wiring) folded in this
-  change** -- panel = codex (gpt-5.6-sol) + antigravity, Claude anchor + judge;
-  artifacts under `kibitz-runs/2026-07-12-user-source-lanes/`. r4 (convergence)
-  remains. Re-grounded against live HEAD this session; the fast-moving-base
-  precondition in §14 governs every line pin below (r3 re-pinned the §3 runner-map
-  block, which had drifted ~+37 lines).
+  no GO_FORWARD_PLAN change until this converges (operator directive).
+- **Kibitz arc COMPLETE (r1-r4), but NOT CONVERGED.** r1 @ `d724e08a`, r2 @ `f7c6902c`,
+  r3 (wiring) @ `1af3d2bc`, r4 (convergence) folded in this change. Panel = codex
+  (`gpt-5.6-sol`, pinned) + antigravity; Claude anchor + judge. Artifacts + per-round
+  judgment logs: `kibitz-runs/2026-07-12-user-source-lanes/{r1..r4}/`.
+  **r4 surfaced TWELVE grounded must-fixes rather than confirming convergence** -- three of
+  them (PackRef owner loss, the staging boundary, the SDK import contradiction) were defects
+  introduced by the CONFIDENT r3 fold itself. All twelve are folded here. The architecture
+  SHAPE was never challenged: no round overturned an earlier decision, and no panelist
+  proposed a different design.
+  **Therefore: ONE r5 confirmation pass is required before the coder slot.** Releasing now
+  would trust a fold that has not been adversarially read even once -- which is exactly the
+  failure r4 just caught twice.
+- Re-grounded against live HEAD this session; the fast-moving-base precondition in §14
+  governs every line pin below (r3 re-pinned the §3 runner-map block, which had drifted
+  ~+37 lines).
 - **SUPERSEDES FOR SCOPE:** `docs/2026-07-12-vibe-coder-extensibility-r2-coding-plan.md`
   (@ 97d4f9eb). That plan's "content packs only, NO new lanes" ruling is RETIRED by
   operator correction. Its useful work is carried forward explicitly in §13 -- nothing
@@ -71,11 +80,17 @@ Path B (original lane):
    `story_rules.json`, `story_packs/default.json`, `fixtures/`.
 2. Implement the typed entry points in `lane.py` (§5.3). Point your LLM assistant at
    `docs/EXTENDING_OTR.md` -- the generated contract tables are written for that.
-3. Run `otr_check lane <path> --activate`. The checker validates every JSON, then
-   imports and contract-tests your Python in a bounded child process against your
+3. Run `scripts\otr_check.bat lane <path> --activate`. The checker validates every JSON,
+   then imports and contract-tests your Python in a bounded child process against your
    fixtures. Fix and re-run until the receipt lands.
-4. Restart. Select the lane. Render. (Editing ANY bundle file de-activates the lane
-   until you `--activate` again -- byte hashes are the truth.)
+4. Restart. Select the lane. Render.
+   **Restart semantics, stated honestly (r4, codex -- the old parenthetical overclaimed):**
+   editing a bundle file does NOT de-activate a lane in an ALREADY-RUNNING ComfyUI -- the
+   registries do not live-rescan, and the running process keeps executing from the immutable
+   snapshot it admitted at boot. What is true: `otr_check lane <id> --status` sees your edit
+   immediately and reports STALE, and the NEXT restart drops the stale lane from every
+   dropdown until you `--activate` again. Byte hashes are the truth; the restart is when the
+   truth is re-read.
 
 ## 2. Widget / default / restart behavior (exact)
 
@@ -106,24 +121,44 @@ Path B (original lane):
   (line-composer, outline macro/phase/beat, exchange, coda, the three announcer seams).
   (antigravity r3 flagged the symptom but named `_otr_line_composer.py` /
   `_otr_outline.py` as the offenders -- both have ZERO `resolve_story_pack` calls; the
-  choke point is one hop deeper.) The fix threads `story_model_id` through FOUR surfaces
-  and nothing else:
-  1. `resolve_creative_system_prompt` gains an optional `story_model_id` -- the SINGLE
+  choke point is one hop deeper.) The fix threads a **full `PackRef`** through FOUR
+  surfaces and nothing else:
+  **(r4 CORRECTION -- r3 threaded only `story_model_id`, which is a build-breaker.)**
+  `resolve_story_pack(bank, model)` resolves via `_pack_path(bank.source_bank_id,
+  model_id)` = `story_packs/<bank>/<model>.json`. So a VARIANT selecting a BASE-owned pack
+  would resolve to `story_packs/<variant_id>/<model>.json` -- **a path that cannot exist**
+  (§4's own aliasing law keeps base packs under the BASE's coordinates) -> hard
+  `UnknownStoryModelError` on the first variant that uses its base's pack, which is the
+  DEFAULT case. The threaded unit is therefore
+  `PackRef{owner_lane_id, story_model_id, pipeline_id, sha256}`, resolved by
+  **`owner_lane_id`, NEVER the selected bank**:
+  1. `resolve_creative_system_prompt` gains an optional `PackRef` -- the SINGLE
      choke point for every creative seam (composer + outline + announcer need no new
      `resolve_story_pack` call, only signature pass-through);
   2. the three writer pack-resolution sites (`OTR_LedgerScriptWriter.py:1836`, `:1874`,
      `:3778`);
   3. the replay path `_otr_freeze_cascade.py:316`, which re-resolves from
-     `meta["source_bank"]` -- it must read the STAMPED `story_model_id` back out of meta
-     or a replay silently reverts to the default pack (§10 already requires this;
-     grounding confirms it is load-bearing, not belt-and-braces);
+     `meta["source_bank"]` -- it must read the STAMPED PackRef (owner + id + sha) back out
+     of meta, or a replay silently reverts to the default pack, or fails outright for a
+     base-owned pack (§10; grounding confirms this is load-bearing, not belt-and-braces);
   4. `run()` / `_resolve_inputs` gain the `story_pack` parameter (refine re-entry then
      carries it for free -- it rebuilds args from
      `inspect.signature(type(self).run).parameters`, `:3446-3457`, so a new kwarg rides
      through automatically as long as it avoids the exclusion tuple).
+  Every episode -- shipped lanes INCLUDED -- stamps all four PackRef fields, and replay
+  resolves by stamped OWNER + digest, never by selected `source_bank`.
   REJECTED (antigravity): a thread-local `set_active_story_model_override`. Hidden
   ambient state is invisible to the freeze cascade and would replay wrong. Thread the
   PackRef; never hide it.
+- **Story-pack vs MODEL PROMPT-PROFILE precedence (r4, codex -- undefined, and the live
+  router silently wins).** Grounded `resolve_creative_system_prompt` (`:190-207`): if the
+  selected model's curated row has `prompt_profile == "otr_1940s_v1"`, the router returns
+  `OTR_PERIOD_SYSTEM_PROMPT` at `:197-198` and **never consults the pack seam or
+  `source_bank_id` at all**. So on a period model, an explicit story_pack selection would
+  be silently discarded. LAW (smallest compatibility-preserving rule): the
+  `"(bank default)"` sentinel PRESERVES today's model-profile precedence exactly; an
+  EXPLICIT story_pack selection OVERRIDES the model profile for pack-routed seams. Both
+  directions pinned by tests.
 - **Falsy-coercion law (r3, executable -- the trap nobody on the panel caught):**
   `resolve_story_pack` (`_otr_story_routing.py:522`) tests `story_model_id is not None`.
   A blank `""` is therefore NOT a default -- it is a lookup for a pack literally named
@@ -191,7 +226,10 @@ L4 CREATES it.
 |---|---|
 | `lane_id`, `label`, `kind` | identity; kind = `shipped` / `rss_variant` / `original` |
 | `runnable` | the ONLY run gate (registry law preserved) |
-| `pipeline_id` | shipped row id, or synthetic `user:<lane_id>` (§5) |
+| `execution_kind` | `common_writer` \| `own_runner` -- the DISPATCH authority (§5.6). **(r4: was described in prose but missing from this table.)** With `kind`, it also gates the L5b staging path: staging requires `kind == original` AND `execution_kind == own_runner`, never `execution_kind` alone |
+| `pipeline_id` | **(r4 -- this row contradicted §5.6 and would have broken every user pack.)** `legacy_many_pass` (the REAL registered row) for ALL common-writer lanes, variants included -- their packs declare it and the parity law holds natively. A synthetic `user:<lane_id>` row is composed ONLY for `own_runner` lanes. It is NOT "synthetic for every user lane" |
+| `feed_urls` | variants only: the per-feed provenance RECORDS (§4), threaded explicitly to the fetch chain. **(r4: missing from this table.)** |
+| `pack_owner` / default `PackRef` | the lane's default pack as a full `PackRef` (owner + id + pipeline + sha) -- resolution NEVER derives the path from the selected bank (§2, r4) |
 | `runner` | lazy ref: shipped wrapper, common-writer marker, or `lane.py:run_lane` |
 | `fetcher` / `interpreter` | lazy refs: shipped ids, base-lane inherit, or `lane.py` entry points |
 | `source_ref_mode` | `none` / `url` / `file` / `id` (declared, enforced at fetch) |
@@ -256,6 +294,17 @@ Laws:
   private raw seed accessor that parses banks + pipelines WITHOUT the cross-ref sweep; the
   authority composes from it, and the sweep then validates the completed map. This is a
   build deliverable, not an assumption.
+- **Construction must be PURE and the publish ATOMIC -- two callbacks still re-enter (r4,
+  codex + agy convergent; the r3 raw-seed accessor closed the banks/pipelines edge but not
+  these).** Grounded, two paths still call back into routing during load: the routing sweep
+  calls `_osp.registered_fetcher_ids()` / `registered_interpreter_ids()`, and
+  `_otr_story_rules._load_all` calls `_runnable_bank_ids()` (`:233-236`), which
+  deferred-imports routing's `list_bank_ids` / `get_bank`. Once those APIs delegate to the
+  authority, a load re-enters itself. LAW: parsing and validation are PURE FUNCTIONS taking
+  banks, pipelines, PackRecords, handler ids and rules rows as EXPLICIT PARAMETERS; all
+  locals are validated; the singleton is then published ATOMICALLY; consumer APIs may consult
+  the authority only AFTER publication. `_otr_story_rules._load_all` / `_validate_row` accept
+  the runnable-id set as a parameter instead of importing routing.
 - **HOST_CONTRACT hash (r2, hybrid judged):** derived PROGRAMMATICALLY from the live
   surface objects -- `repr(sorted(SOURCE_PAYLOAD_KEYS))` + the contracts-module
   dataclass field signatures + the checker policy version -- not hand-bumped strings
@@ -300,14 +349,26 @@ else.)
   effective pack namespace = its bundled packs (validated under `<lane_id>`) UNION
   the base lane's packs (under the base's own coordinates). Blank
   `default_story_model` = the base's default pack.
-- **Source-identity projection (r2-FINAL enumeration; grounded banks.json:12-20,
-  43-51):** overridable IDENTITY keys = `source_material_label`,
+- **Source-identity projection (r2 enumeration; r4-CORRECTED -- one key was on the wrong
+  side of the line):** overridable IDENTITY keys = `source_material_label`,
   `credits_source_line` (stamp path `OTR_LedgerScriptWriter.py:3648-3659`),
-  `key_terms_label`, `close_brief_label`, `title_form_label`. FORBIDDEN
-  (behavior-bearing, inherit-only): `coda_mode`, `source_develop_verb`,
-  `source_grounding_label`, `story_form_label`. No generic defaults overlay exists --
-  the whitelist IS the projection. [RATIFY the split] Precedence: variant manifest >
-  base defaults.
+  `key_terms_label`, `close_brief_label`. FORBIDDEN (behavior-bearing, inherit-only):
+  `coda_mode`, `source_develop_verb`, `source_grounding_label`, `story_form_label`, **and
+  `title_form_label` (r4, codex -- it was classed as "identity", but it STEERS TITLE
+  GENERATION rather than describing the source; identity overrides are attribution/display
+  ONLY)**. No generic defaults overlay exists -- the whitelist IS the projection.
+  [RATIFY the split] Precedence: variant manifest > base defaults.
+- **Per-feed provenance + rights (r4, codex -- required by BINDING project docs, and a
+  single lane-level string cannot satisfy them).** `docs/SOURCE_BANK_GUIDE.md` §5 and
+  `docs/SOURCE_BANK_PREFLIGHT.md` Gate 2 are binding on this plan and demand canonical URL,
+  digest, outlet/author, rights status, license URL and attribution, failing CLOSED on
+  unknown or incompatible adaptation rights. One `credits_source_line` cannot truthfully
+  describe a multi-publisher feed set. So `feed_urls` becomes a list of per-feed RECORDS
+  (url + outlet + rights status + license URL + attribution), and the SELECTED feed's and
+  article's provenance is stamped into `meta.source_meta` / `meta.source_rights`. The
+  plumbing already exists: `SourceFetchResult` carries `source_meta` and `source_rights`
+  sidecars precisely for this (`_otr_source_payload.py:85-95`). [RATIFY -- this expands the
+  manifest beyond a bare URL list.]
 - **PackRef data model (r2, codex):** the widget string parses ONCE into
   `PackRef{owner_lane_id, story_model_id}`; resolution threads the PackRef, never
   re-parses. A variant bundle pack whose filename stem collides with a base-lane stem
@@ -369,6 +430,26 @@ else.)
     STREAMED body-size cap, a small bounded retry budget. Both call sites then hand
     `feedparser.parse()` pre-fetched, size-capped BYTES instead of a URL -- which also
     retires the racy global-socket-timeout hack.
+  - **IT MUST COVER THE SECOND HOP -- and that hop is the actual hole (r4, codex + agy
+    convergent; the r3 seam hardened only the feed DOCUMENT and would have left the
+    dangerous request wide open).** Grounded: after parsing the feed, the science lane
+    makes a SECOND, entirely unhardened request to a URL taken from INSIDE the feed entry
+    -- `_fetch_full_article` (`nodes/story_orchestrator.py:1267`,
+    `requests.get(url, timeout=timeout, headers=...)` + `raise_for_status`), called from
+    `_resolve_body` (`:1904`) on `entry.get("link", "")` (`:1768`), executed in PARALLEL
+    across up to 10 candidates. It has NO host allowlist, NO redirect restriction
+    (`requests` follows redirects by default), NO content-type check, and NO streamed size
+    cap (the 12000-char truncation runs AFTER `resp.text` has already materialized the
+    whole body).
+    Today this is incidentally safe: `SCIENCE_NEWS_FEEDS` is a hardcoded allowlist of
+    institutional domains, so the links inside are trustworthy. **A user-supplied feed
+    removes that guarantee entirely** -- a Path A variant can point `link` at ANY host, and
+    OTR will fetch it, follow its redirects, and read an unbounded body. So `_fetch_full_article`
+    routes through `_otr_feed_fetch` too, with a purpose-specific content-type policy
+    (article = `text/html`; feed = the feed types), and the same redirect/size/retry bounds.
+  - **Numeric bounds (r4 -- both panels converged on these independently; RATIFY, do not
+    assume):** connect 5s, read 10s, max 3 redirects, 2 MiB decoded body cap, 2 retries on
+    the 408/429/5xx set, max 32 feed_urls, max 2048-char URLs, max 8 concurrent workers.
   - **concurrency cap:** `story_orchestrator.py:1783` builds
     `ThreadPoolExecutor(max_workers=len(shuffled_feeds))` -- one worker per feed. Harmless
     today (the list is a hardcoded 29-entry constant with no user path), a real
@@ -382,9 +463,21 @@ else.)
   override runner, pipeline, interpreter, provider, ledger behavior, or safety
   checks -- the whitelist makes that unrepresentable, not merely forbidden.
 - `story_rules: "inherit"` (default) uses the base's rules pack; a bundle MAY ship
-  `story_rules.json` instead (validated with the same code as shipped rules). Packs:
-  optional `story_packs/` (validated per the carried content-pack laws); blank
-  `default_story_pack` = base's default pack.
+  `story_rules.json` instead (validated with the same code as shipped rules). **`story_rules`
+  IS part of the whitelist (r4 -- the manifest example used it while the whitelist prose
+  omitted it).** Packs: optional `story_packs/` (validated per the carried content-pack
+  laws); blank `default_story_model` = base's default pack. **(r4: this line previously said
+  `default_story_pack` -- the exact synonym the doc itself outlaws twelve lines earlier.
+  There is ONE identity: `default_story_model`.)**
+- **Feed failover -- the honest law (r4, codex; the absolute "never a fallback to another
+  feed" was contradicted by BOTH shipped base lanes).** Grounded: science swallows a failed
+  feed and continues (`except Exception: return []` per feed); media_archive accumulates
+  entries ACROSS its configured feeds and raises only when NONE yield payloads (`:187-196`).
+  So bounded failover is inherited behavior, not a violation. LAW: bounded selection and
+  failover are permitted ONLY WITHIN the receipt-bound declared feed set; the SELECTED feed
+  and the SELECTED article are stamped into the ledger; exhaustion of the declared set fails
+  the run LOUD. Cross-lane, cross-bank, undeclared-feed, and different-model fallback remain
+  absolutely forbidden -- that is what the no-fallback law actually protects.
 - **Escalation rule:** anything needing Python, a new payload shape, or different
   interpretation is NOT a variant -- the checker rejects manifest fields outside the
   whitelist with "use an original lane" in the fix text.
@@ -440,10 +533,33 @@ validation requires attribute/`model_dump()` agreement
 (`_otr_source_payload.py:204-257`) -- the types are pinned to those consumers, not
 invented.
 
-- `fetch_source(*, lane, technical_model, source_ref="") -> SourceFetchResult | dict`
+**SDK import contradiction -- RESOLVED (r4, codex + agy convergent; the r3 fold created it:
+§1 promised lanes the bounded-fetch seam while §6.3 forbade importing anything but stdlib +
+the contracts leaf, and `SourceFetchResult` lives in neither).** Grounding overturned BOTH
+panelists' premise and made the fix cheaper than either proposed: `_otr_source_payload.py` is
+**already stdlib-only at import time** -- its entire top-level import block is
+`from __future__ import annotations` + `from dataclasses import dataclass` (`:33-35`); every
+heavy import is lazy, inside function bodies, by documented design ("Zero file I/O at
+import"), and `nodes/__init__.py` is a single comment line. Importing it from a bare child
+process drags in NOTHING. It is a de-facto leaf that simply is not named like one. So:
+- `SourceFetchResult` (frozen dataclass: `payload: dict`, `source_meta: dict | None`,
+  `source_rights: dict | None`, `:85-95`) and `SOURCE_PAYLOAD_KEYS` (`:80-82`) are DEFINED in
+  `_otr_lane_contracts.py` and **RE-EXPORTED** from `_otr_source_payload` -- one definition,
+  zero duplication, no import-graph change, no consumer edits.
+- the bounded fetch (§4) is handed to `fetch_source` as an **INJECTED TYPED CAPABILITY** on
+  the run context, NOT as an import. The SDK's stdlib+leaf rule stays intact instead of being
+  punctured, and the lane physically cannot reach around it to a raw socket without leaving
+  the contract.
+Same principle for `run_lane`: it receives a typed `LaneRunContext` + `SlotPort` capabilities,
+never the writer's raw internal `resolved` dict or `slot_scheduler` (codex r4 -- exposing
+those would freeze writer internals as public SDK surface). All injected capabilities are
+part of HOST_CONTRACT and therefore stale a receipt when they change.
+
+- `fetch_source(*, lane, technical_model, source_ref="", fetch) -> SourceFetchResult`
   -- MUST return the writer's exact seven-key `SOURCE_PAYLOAD_KEYS` envelope
   (`_otr_source_payload.py:80-82`; unknown key = hard error), mirroring the
-  registered-fetcher contract (`SOURCE_BANK_GUIDE.md` §5).
+  registered-fetcher contract (`SOURCE_BANK_GUIDE.md` §5). `fetch` is the injected bounded
+  fetcher; network access outside it is an SDK violation.
 - `interpret_source(*, lane, payload, technical_fn, model_id)` -- returns the
   interpreter surfaces (`casting_brief`, `script_brief`, `news_close_brief`,
   `key_terms`, `attempts`, `model_dump()`), mirroring the `legacy_many_pass`
@@ -504,18 +620,40 @@ the dispatched-runner call (`:3766-3790`). By the time a runner is reached, cano
 state is already on disk and globally published. A staging facade bolted on at the
 dispatch point protects nothing.
 
-L5b therefore does this instead:
-1. `execution_kind` is known from the LaneSpec BEFORE any ledger exists, so **own-runner
-   selection moves ahead of `new_ledger()`**;
-2. own-runner lanes get a **sibling STAGING episode directory + a NON-GLOBAL staging
-   ledger** (never installed as `_CURRENT`, so no downstream reader can see it);
-3. the complete result is validated (LaneTailParts + provenance receipts) BEFORE anything
-   canonical exists;
-4. on acceptance, the staging directory is **atomically renamed** into its canonical
-   destination and the accepted ledger is bound as `_CURRENT` for the shared tail;
-5. on rejection: abort loud, staging dir removed, NO canonical episode was ever created.
+**And the r3 fix was STILL not far enough (r4, codex -- grounded, and worse than the panel
+claimed).** r3 promoted the staging dir after validating the runner result but BEFORE the
+shared tail. That still leaks: the tail's `tail_finalizer` runs USER code on both sides of
+persistence -- `before_save(ctx)` (`:6933`) -> `led.save()` (`:6963`) -> `after_save(...)`
+(`:6969`) -- and shipped finalizers RAISE on both sides in production today
+(`_CodexTailFinalizer.before_save` -> `CodexPreTailAuditError`, `_otr_scifi_codex.py:2679`;
+`after_save` -> `CodexSavedLedgerAuditError`, `:2714`). Worse still, `led.save()` is called
+~10 times BEFORE the tail is even entered (skeleton `:3721`, then `:4662, :4797, :5920,
+:6003, :6133, :6237, :6277, :6348, :6374`), and the tail writes the CANON file before the
+finalizer. So a failure anywhere in the tail would expose canonical partial state.
+
+L5b therefore does this -- **promotion is the LAST act, after the tail, not before it**:
+1. `execution_kind` + `kind` are known from the LaneSpec BEFORE any ledger exists, so
+   **user-own-runner selection moves ahead of `new_ledger()`**;
+2. the lane gets a **STAGING episode directory + a NON-GLOBAL staging ledger** (never
+   installed as `_CURRENT`, so no downstream reader can see it);
+3. the ENTIRE chain runs INSIDE staging: runner -> shared tail -> `before_save` -> final
+   contract validation (LaneTailParts + provenance receipts) -> `save()` -> `after_save`;
+4. only THEN: **atomic rename** into the canonical destination, rebase `Ledger.out_dir` /
+   `meta.paths` / every returned path, and bind `_CURRENT` through a NEW `production_ledger`
+   API. Assert no staging path survives in memory, in the ledger JSON, or in returned
+   outputs;
+5. on any failure: abort loud, staging dir removed, **NO canonical episode ever existed**.
 User code never gets `led.save()` against the canonical episode path. L5b consequently
 OWNS `nodes/OTR_LedgerScriptWriter.py` + `nodes/production_ledger.py` (§12).
+
+**The staging gate is `kind == "original"` AND `execution_kind == "own_runner"` -- BOTH,
+never `execution_kind` alone (r4, agy + anchor, convergent).** FIVE SHIPPED lanes are
+dispatched own-runners today (`_RUNNER_BY_PIPELINE:1693-1699`: fable2, scifi_codex,
+scifi_gemini, scifi_sonnet, original_codex56sol) and they save incrementally against the
+canonical ledger. Gating on `execution_kind` alone would drag all five onto the staging path
+and re-baseline proven production. Shipped dispatched lanes keep today's exact sequence,
+byte-for-byte. This is stated as LAW so that a plausible-sounding "unify the two paths"
+refactor cannot quietly land it.
 (Common-writer lanes are unaffected -- fetch/interpret never touch the ledger.)
 
 **Validate BEFORE the dereference (r3):** the dispatch site reads `_parts.outline_view`,
@@ -589,7 +727,16 @@ States: `UNCHECKED -> ACTIVATED -> (bytes changed) STALE -> re-activate` and
    import and fixture execution, so a JSON-verdict-on-stdout protocol is corruptible by
    any `print()` in a user lane. The verdict goes to a DEDICATED RESULT FILE; the child's
    stdout/stderr are captured separately, capped, and surfaced in the `ValidationIssue`
-   on failure.
+   on failure. **Result-file path (r4):** the PARENT mints a unique path via `tempfile` in
+   the system temp dir, truncates it, passes it to the child by env var, and reads it after
+   the child exits -- so parallel activations and aborted runs cannot collide or read a
+   stale verdict. (agy proposed hardcoding the operator's repo `tmp\` dir; rejected -- an
+   SDK contract must not bake in one machine's layout.)
+   **"Network-free" is a HARNESS promise, not an enforced wall (r4, codex -- wording fix):**
+   the child runs user-trusted Python, which can open a socket if it wants. What OTR
+   guarantees is that the HARNESS initiates no network call and that activation's own
+   verdict never depends on one. Enforcing a socket ban is not attempted (it would
+   contradict §5.5) -- so the honest claim is the one stated here.
    **`technical_fn` for the fixture preflight (r3, antigravity -- a real hole: the r2
    draft said `interpret_source` EXECUTES but never said what it calls):**
    `interpret_source` needs the technical LLM slot, and activation is network-free and
@@ -616,6 +763,29 @@ into a TEMP SIBLING dir -> verify the snapshot's own complete hash -> ATOMIC REN
 place -> **publish the receipt LAST**. Boot admits a lane IFF **both** the receipt AND its
 snapshot exist and agree. Steps 5 and 7 below describe the two objects; the order of
 publication is snapshot-then-receipt, always.
+
+**Activation is a COMPLETE crash-safe transaction (r4, codex -- "publish the receipt last"
+was necessary but not sufficient):**
+- `activation_id` is derived from CONTENT, independent of timestamp (two activations of
+  identical bytes are the same activation).
+- fsync + atomic rename the snapshot; fsync + `os.replace` a TEMP receipt file. Every
+  crash point resolves to either the OLD valid activation or the NEW one -- never a
+  valid-looking receipt with missing content. Crash-injection tests sit at all four points
+  (after temp-snapshot write, after snapshot rename, during receipt write, after receipt
+  replace).
+- **NEVER delete an older content-addressed snapshot during activation.** A resident ComfyUI
+  process is still importing from it (registries do not live-rescan). Re-activating while the
+  server is up must leave the running process able to finish on its admitted snapshot; GC is
+  DEFERRED until no process can reference it. ("Exactly one live snapshot per lane" from r2 is
+  hereby corrected: exactly one CURRENT snapshot; older ones are retained, not unlinked.)
+- **`__pycache__` must not mutate the snapshot.** Importing `lane.py` FROM the snapshot would
+  otherwise write bytecode INTO the hashed tree and break its own byte-identity on the next
+  admit. Bytecode writing is suppressed for snapshot imports; a test asserts the snapshot tree
+  is byte-identical after a full render.
+- **`lane_id` grammar (r4, codex -- unstated, and Windows makes it bite):** `lane_id` MUST equal
+  the directory basename and match `[a-z][a-z0-9_]{0,63}`; Windows reserved names rejected;
+  duplicate and protected-id checks performed with casefold/normcase. Without this, `Foo` and
+  `foo` are one directory but two receipt/snapshot coordinates.
 
 5. `--activate` writes `user_packs/receipts/lanes/<lane_id>.json`: the COMPLETE
    per-file SHA-256 map INCLUDING file count + relative paths (an added stray file
@@ -658,10 +828,14 @@ publication is snapshot-then-receipt, always.
    replaces it. Any import/contract/fetch/runner failure aborts the run loud. NEVER
    a fallback to a shipped lane, another user lane, another model, or another feed.
    Runtime failures do NOT change activation state (§1).
-8. `otr_check lane <id> --status` reports ACTIVATED / STALE / QUARANTINED with the
-   receipt + host-contract hashes, WHY-stale (the first mismatching relative path or
-   the moved host-contract surface), and receipt/preflight timestamps. Receipts
-   store RELATIVE paths only (portable; r2).
+8. `scripts\otr_check.bat lane <id> --status` reports **UNCHECKED / ACTIVATED / STALE /
+   QUARANTINED** (r4: UNCHECKED is a declared state of the machine and had been dropped from
+   this list) with the receipt + host-contract hashes, WHY-stale (the first mismatching
+   relative path or the moved host-contract surface), the admitted SNAPSHOT hash vs the
+   mutable authoring bytes (so an operator can tell what the resident server is actually
+   running), and receipt/preflight timestamps. Receipts store RELATIVE paths only
+   (portable; r2). `--explain-hash` (r4, both panels) itemizes each component of
+   `activation_id`, `base_hash` and HOST_CONTRACT so a stale receipt is self-diagnosing.
 
 Quarantine laws (carried + extended -- console, resolve, and `otr_check` all emit the
 IDENTICAL stored `ValidationIssue`):
@@ -710,6 +884,13 @@ headless name-based patching audits all green (the harness's loud length guards,
   `story_pack == "(bank default)"`; an explicit pack combined with roll fails early
   and clearly (a pack pins a lane, a roll denies one -- contradiction by
   construction).
+- **Roll RUNTIME tests belong to the randomizer build, not this one (r4, codex).** This
+  build lands FIRST and `_otr_bank_roll` does not exist yet, so scheduling pool-draw,
+  roll x pack and refine-roll BEHAVIOR tests here schedules tests against absent code. This
+  build exposes and tests only the DETERMINISTIC contract the randomizer will consume:
+  LaneSpec `random_eligible`, `runnable`, and `check_compatibility`. The roll x pack RULE
+  stays stated above (it is a contract the randomizer must honor and this doc is where it is
+  decided); its runtime tests move to that build.
 
 ## 10. Replay / receipt contract
 
@@ -774,12 +955,12 @@ Static findings never create PBUG/Bible entries; only live production evidence d
 | L0b | `nodes/_otr_visual_styles.py` | styles overlay (operator-preserved; OFF the lane critical path -- parallel any time after L0a) |
 | L1 | new `nodes/_otr_lane_specs.py`, `nodes/OTR_LedgerScriptWriter.py` (consumer sites), `nodes/_otr_source_payload.py`, `nodes/_otr_story_routing.py` (+ **NEW private raw seed accessor, r3**), `nodes/_otr_story_rules.py` | THE AUTHORITY: LaneSpec + execution_kind, effective row IS a `SourceBank` (r3), shipped seed absorption (lane-spec rip per randomizer design), authority pipeline view, PackRecord map (carried), resolution APIs consult authority, load-order invariant, 3-way `_clear_caches` fan-out (r3) |
 | L2 | new `scripts/otr_check.py` + `otr_check.bat`, **`nodes/_otr_lane_specs.py` (r3 -- boot admit lives in the AUTHORITY; it cannot be wired from the checker files alone)**, `user_packs/receipts/` contract | checker + `lane --activate` + child-process harness (result-file verdict, recorded-response `technical_fn` mock, `taskkill /F /T`) + receipts + snapshot-then-receipt publication + boot admit + quarantine wiring |
-| L3 | **new `nodes/_otr_feed_fetch.py` (r3, REQUIRED)** + `story_orchestrator.py` + **`nodes/OTR_LedgerScriptWriter.py` (r3 -- `_fetch_rss_seed_or_die` is the science chain's MIDDLE HOP; without this file `feed_urls` cannot reach the fetcher)** + `_otr_media_archive_sources.py` + `_otr_source_payload.py` threading | Path A: bounded-fetch seam (timeouts / status / content-type / byte cap / retry budget / concurrency clamp) THEN rss_variant end-to-end (BOTH approved bases, r1). **Implementation + focused tests only (r3): the canonical 30/120 variant smokes move AFTER L4**, since they cannot prove the replay contract before the stamps exist |
+| L3 | **new `nodes/_otr_feed_fetch.py` (r3, REQUIRED)** + `nodes/story_orchestrator.py` (r4: path corrected -- there is no root-level copy) + **`nodes/OTR_LedgerScriptWriter.py` (r3 -- `_fetch_rss_seed_or_die` is the science chain's MIDDLE HOP; without this file `feed_urls` cannot reach the fetcher)** + `nodes/_otr_media_archive_sources.py` + `nodes/_otr_source_payload.py` threading | Path A: bounded-fetch seam covering **BOTH network hops -- feed documents AND `_fetch_full_article` article bodies (r4)** -- timeouts / redirect cap / status / content-type / streamed byte cap / retry budget / concurrency clamp; THEN rss_variant end-to-end (BOTH approved bases) + per-feed provenance records. **Implementation + focused tests only (r3): the canonical 30/120 variant smokes move AFTER L4.** **Includes the shipped-lane RE-BASELINE (r4): routing science + media through the seam is not byte-identical, so their 30/120 receipts refresh here** |
 | L4 | `nodes/OTR_LedgerScriptWriter.py` + `workflows/otr_canonical.json` + **`nodes/_otr_creative_prompt_router.py` (the single creative-seam choke point)** + **`nodes/_otr_line_composer.py` / `nodes/_otr_outline.py` (signature pass-through only -- neither calls `resolve_story_pack`)** + **`nodes/_otr_freeze_cascade.py` (stamped-pack replay)** + `nodes/_otr_story_routing.py` (`list_story_pack_choices`, NEW) + contract audit | story_pack widget + the FOUR-surface threading (§2, r3) + falsy-coercion law + stamps (carried, operator-required). **Then the canonical 30/120 variant smokes from L3 run here.** |
 | L5a | lane.py adapter seams in `_otr_lane_specs`, example bundle in `docs/templates/example_lane/` | Path B SDK core: fetch/interpret/compat entry-point adapters (enumerated matrix, §5.2) + common-writer reuse, trust doc, reference lane |
 | L5b | run_lane dispatch + LaneTailParts validation + **`nodes/OTR_LedgerScriptWriter.py` + `nodes/production_ledger.py` (r3 -- own-runner selection moves BEFORE `new_ledger()`; the staging ledger cannot be bolted on at the dispatch point)** | Path B EXPERIMENTAL tier: own-runner lanes with staging dir + non-global staging ledger + validate-before-dereference + atomic promotion; only after L5a's reference lane is proven (r1 staging) |
 | L6 | `docs/templates/`, `docs/EXTENDING_OTR.md` generator, `README.md` | templates + generated tables + recipes (incl. carried local-LLM discovery recipe, docs-only) |
-| L7 | tests + live proofs | full suite + Bible + BOTH ladders' live legs (§11) |
+| L7 | tests + live proofs | full suite + Bible + BOTH ladders' live legs (§11). **(r4) Adds an INERT own-runner example + failure-injection + canonical 30/120 legs THROUGH staging -> promotion -> freeze -> episode -> OBS before `execution_kind=own_runner` is exposed: L5a's reference lane is common-writer, so it proves nothing about L5b's materially different ledger/promotion path** |
 
 **Moved OUT of this campaign (r1, codex):** the carried VALIDATE_INPUTS suffix fix +
 shipped-model-ID manifest (old W3) -- unrelated to source lanes; it becomes its own
@@ -837,9 +1018,20 @@ pin at that HEAD, THEN edit.
 | Safe feed-variant path (L3, both bases, 3-hop science threading) | 2-3 coder-days |
 | Original-lane SDK (L5a) + own-runner staging/promotion (L5b, r3-reseated) + templates/docs (L6) | 7-10 coder-days (r3: +1 for moving own-runner selection ahead of `new_ledger()` and the atomic promotion) |
 | Verification wave (L7) coding share | 1-2 coder-days |
-| **Total coding** | **~18-26 coder-days** (r3: +3-4 over the r2 figure -- the bounded-fetch seam and the pack-threading surfaces were latent work the r2 draft had priced at zero) |
+| Article-body hop + per-feed provenance/rights records (L3, r4) | 1.5-2.5 coder-days |
+| Own-runner staging: full tail-inside-staging + atomic promotion + path rebase (L5b, r4 -- promotion moved after the tail) | +1-2 coder-days |
+| **Total coding** | **~21-31 coder-days** (r3: +3-4 for the bounded-fetch seam and pack threading; r4: +3-5 for the second network hop, per-feed rights, and the corrected staging boundary -- all latent work the earlier drafts had priced at zero) |
 | GPU qualification: variant smokes 30/120 | 0.5-1 elapsed GPU day |
+| GPU qualification: **shipped-lane RE-BASELINE** (science + media 30/120 refresh after the fetch seam, r4) | 0.5-1 elapsed GPU day |
 | GPU qualification: reference original lane full ladder + 720 | 2-4 elapsed GPU days |
+| GPU qualification: own-runner tier 30/120 through staging + promotion (r4) | 0.5-1 elapsed GPU day |
+
+**Honest note on the trend:** the estimate has grown from ~15-22 to ~21-31 coder-days across
+the arc. None of that growth is scope creep -- every increment is work the earlier drafts had
+priced at ZERO because they asserted an inheritance that did not exist (network bounds), or
+threaded an identity that could not resolve (PackRef), or promoted state at a boundary that
+could not hold it (staging). A plan that got cheaper each round would have been the warning
+sign.
 
 ## 16. Normative defaults (folded r1; operator ratifies at approval, may override)
 
@@ -864,16 +1056,120 @@ ratification flag:
    content-type check and no byte cap (the grounded state today, §4) -- is not a variant
    OTR can honestly offer. Ratifying this ratifies the estimate change. [RATIFY]
 
+**Added by r4 (these three change SCOPE or COST -- they are operator calls, not panel
+calls):**
+
+7. **The seam ALSO covers `_fetch_full_article`, and the SHIPPED lanes route through it
+   -- accepting a re-baseline.** The article-body hop (§4) is the real hole: with a
+   user-supplied feed, `link` can point anywhere, and OTR currently follows it with no host
+   allowlist, no redirect cap, and no size cap. Hardening it means the shipped science +
+   media lanes change behavior (a content-type/size policy can drop an entry
+   `feedparser.parse()` accepts today), so their 30/120 receipts must refresh in L3. The
+   alternative -- a user-only fetch path -- leaves the PRODUCTION lane on the racy
+   global-socket-timeout path we just exposed, i.e. exactly the "dead lever" the operator
+   ruled against. [RATIFY the re-baseline]
+8. **Numeric network bounds:** connect 5s / read 10s / 3 redirects / 2 MiB decoded body /
+   2 retries (408, 429, 5xx) / max 32 feeds / max 2048-char URLs / max 8 workers. Both
+   panels proposed these independently; they are DEFAULTS, not measurements. [RATIFY]
+9. **Per-feed provenance + rights records** (§4) rather than a single lane-level credits
+   string. Required by the binding `SOURCE_BANK_GUIDE.md` §5 + `SOURCE_BANK_PREFLIGHT.md`
+   Gate 2 (fail CLOSED on unknown/incompatible adaptation rights), and it expands the
+   manifest beyond a bare URL list. [RATIFY]
+
 ## 17. Non-goals (v1)
 
 Marketplace/sharing; sandboxing user Python; new providers/credential systems; third
-LLM slot; ledger schema changes; ComfyUI nodes/links from bundles; per-lane UI panels;
-`lane_options_json`; Engine Matrix mixing; Design B style roll; relaxing fail-loud,
+LLM slot; **top-level / versioned ledger-SCHEMA changes (r4 narrowing: namespaced `meta`
+receipts ARE allowed -- §10 deliberately adds metadata fields, so a blanket "no ledger
+schema changes" contradicted the plan)**; ComfyUI nodes/links from bundles; per-lane UI
+panels; `lane_options_json`; Engine Matrix mixing; Design B style roll; relaxing fail-loud,
 freeze, SFW, or publishing gates.
+
+## 18. Normative contracts appendix (r4 -- BINDING; the coder builds from THIS, not from
+## a promise that "r2 carries the field-level detail")
+
+These are repository-owned types in `nodes/_otr_lane_contracts.py` (dependency-free leaf,
+stdlib only). Each ships a constructor, a validator, exact null rules, ONE known-valid
+fixture, and specified rejection behavior. Field-level provenance ownership per
+`execution_kind` (§5.3) is enforced by the L5b validator against these types.
+
+```python
+SOURCE_PAYLOAD_KEYS = frozenset({          # defined HERE, re-exported by _otr_source_payload
+    "headline", "summary", "full_text", "source", "date", "link", "seed_text"})
+
+@dataclass(frozen=True)
+class SourceFetchResult:                   # moved from _otr_source_payload.py:85-95
+    payload: dict                          # EXACTLY the seven keys above; unknown key = hard error
+    source_meta: dict | None = None        # provenance sidecar (selected feed + article)
+    source_rights: dict | None = None      # rights sidecar; fail CLOSED on unknown/incompatible
+
+@dataclass(frozen=True)
+class PackRef:                             # the threaded unit -- parsed ONCE, never re-parsed
+    owner_lane_id: str                     # resolves the PATH. NEVER the selected bank (r4).
+    story_model_id: str                    # pack filename stem == the one canonical identity
+    pipeline_id: str
+    sha256: str
+
+@dataclass(frozen=True)
+class CompatRequest:
+    target_words: int
+    refine_active: bool
+    source_ref: str = ""
+    custom_premise: str | None = None
+
+@dataclass(frozen=True)
+class CompatDecision:
+    accepted: bool
+    reason: str = ""                       # REQUIRED and non-empty when accepted is False
+
+@dataclass(frozen=True)
+class InterpreterResult:
+    casting_brief: str
+    script_brief: str
+    news_close_brief: str
+    key_terms: tuple[str, ...]
+    attempts: int
+    def model_dump(self) -> dict: ...      # attribute/model_dump agreement is VALIDATED
+                                           # (_otr_source_payload.py:204-257)
+
+@dataclass(frozen=True)
+class LaneTailParts:
+    outline_view: dict                     # the four below are HARD dereferences at
+    canon: object                          # OTR_LedgerScriptWriter.py:3799-3813 --
+    run_story_spine: object                # a missing one raises bare AttributeError, so
+    final_title_override: str | None       # the validator MUST reject before that point
+    tail_finalizer: object | None = None   # the ONLY soft (getattr) field
+```
+
+`LaneRunContext` / `SlotPort` (the injected capabilities handed to `run_lane` and
+`fetch_source`) are typed here too -- user code never receives the writer's raw internal
+`resolved` dict or `slot_scheduler`, so writer internals never become public SDK surface.
+Every type in this appendix is part of the HOST_CONTRACT hash: changing any field stales
+every original-lane receipt (§6.5), and a mutation test proves it.
 
 ---
 
-**Next step:** r4 convergence pass -> operator architecture approval (§16, now SIX
-ratification flags) -> only then update GO_FORWARD_PLAN (replacing the superseded queue
-entry) and release to the coder. Kibitz artifacts + the per-round judgment logs live in
-`kibitz-runs/2026-07-12-user-source-lanes/{r1,r2,r3,r4}/`.
+**Next step (r4-revised):**
+1. **Operator ratifies §16 -- now NINE flags.** Flags 7-9 (article-body hop + shipped-lane
+   re-baseline, numeric network bounds, per-feed rights records) change SCOPE and COST, so
+   they are operator calls, not panel calls. Everything else in the r4 fold is mechanical and
+   already decided.
+2. **One r5 confirmation pass** on this folded doc. NOT a fifth opinion for its own sake:
+   r4 proved that a confident fold introduces defects (it caught three of mine), and the r4
+   fold has not yet been read adversarially by anyone.
+3. If r5 comes back clean -> update GO_FORWARD_PLAN (replacing the superseded queue entry)
+   -> claim the coder slot -> re-derive EVERY line pin at the recorded HEAD (§14) -> code.
+
+**Do not skip step 2.** The doc is now internally consistent and grounded, which is exactly
+what it looked like at the end of r3 -- one round before r4 found twelve things wrong with it.
+
+Kibitz artifacts + the per-round judgment logs: `kibitz-runs/2026-07-12-user-source-lanes/{r1..r4}/`.
+
+**Standing panel note (so r5 does not spend a round re-litigating):** the user visual-styles
+overlay (L0b) has now been proposed for CUT by a panelist in r1, r3, and r4 -- and rejected
+all three times for the same grounded reasons (operator product ask; shared `user_packs` +
+quarantine foundation; already off the critical path at `L0a -> L1`, blocking nothing). It is
+not scope creep. Likewise, stripping the `(rN ... REJECTED because ...)` annotations from this
+doc was proposed and rejected: those annotations are the only thing preventing a future
+reviewer from re-introducing a fix that was already grounded and killed -- the dead-lever
+failure mode. They stay.
