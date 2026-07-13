@@ -345,6 +345,18 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "constraint-draw fields, all IDs, and collection membership and "
             "cardinality, but rewrite every cited unsafe prose value."
         )
+    if pass_id == "P1":
+        rules += (
+            " Return 4 to 6 possibilities and never delete one to repair "
+            "another. Every possibility MUST copy the ingress lost_objects "
+            "array and acoustic_device string verbatim. clue_plan MUST carry "
+            "one distinct audible clue for EVERY lost object in that array, in "
+            "the same order, so three lost objects require at least three "
+            "clue_plan entries. Never merge two objects into one clue and "
+            "never drop a lost object's clue: if a clue is missing, author the "
+            "missing clue for the uncovered object and keep every existing "
+            "clue as written."
+        )
     if pass_id == "P3":
         rules += (
             " Preserve the complete artifact and every existing collection "
@@ -841,6 +853,17 @@ def _validate_slate(slate: PossibilitySlate, draw: ConstraintDraw) -> str | None
             return (
                 f"{card.possibility_id}: lost_objects and acoustic_device "
                 "must be copied verbatim from the immutable constraint draw"
+            )
+        # Every lost object must reach the listener as its own audible clue.
+        # The count is derived from the accepted draw, so Python can prove the
+        # shortfall -- but a clue is authored story, so a missing one returns to
+        # the model rather than being invented here.
+        if len(card.clue_plan) < len(draw.lost_objects):
+            return (
+                f"{card.possibility_id}: clue_plan must carry one distinct "
+                f"audible clue for each of the {len(draw.lost_objects)} lost "
+                f"objects, but it has {len(card.clue_plan)}; author the missing "
+                "clue instead of merging two objects into one"
             )
     return None
 

@@ -1748,6 +1748,80 @@ def test_safety_reports_all_authored_coordinates_in_one_repair():
     assert "possibilities.1.clue_plan.0" in error
 
 
+def test_p1_clue_plan_must_cover_every_lost_object():
+    """PBUG-20260713-11: a clue-short slate is a model defect, not a Python fix.
+
+    The lost-object count comes from the accepted draw, so Python can prove the
+    shortfall -- but a clue is authored story, so the defect returns to the
+    model with the exact rule instead of being invented in Python.
+    """
+    draw = lane.ConstraintDraw.model_validate(DRAW)
+    data = _fixtures()["slate"]
+    assert lane._validate_slate(
+        lane.PossibilitySlate.model_validate(data), draw,
+    ) is None
+
+    # A wider draw proves the coverage rule outranks the bare schema minimum:
+    # four lost objects still leave a three-clue card one object short.
+    wide_draw = lane.ConstraintDraw.model_validate({
+        **DRAW, "lost_objects": ["stamp", "mitten", "card", "ledger"],
+    })
+    wide = json.loads(json.dumps(data))
+    for card in wide["possibilities"]:
+        card["lost_objects"] = list(wide_draw.lost_objects)
+    error = lane._validate_slate(
+        lane.PossibilitySlate.model_validate(wide), wide_draw,
+    )
+    assert "one distinct audible clue for each of the 4 lost objects" in error
+    assert "but it has 3" in error
+
+    rules = lane._repair_rules("P1", "list should have at least 3 items")
+    assert "one distinct audible clue for EVERY lost object" in rules
+    assert "Never merge two objects into one clue" in rules
+    assert "never delete one to repair another" in rules
+
+    routing._REGISTRY = None
+    seam = routing.resolve_story_pack(
+        "original_codex56sol",
+    ).prompt_stages["codex56_possibility_slate"]
+    assert "one distinct audible clue for EACH lost object" in seam
+    assert "Never merge two objects into a single clue" in seam
+
+
+def test_p1_clue_short_slate_is_repaired_by_the_authoring_model(tmp_path):
+    responses = _responses()
+    short = json.loads(json.dumps(responses[0]))
+    for card in short["possibilities"]:
+        card["clue_plan"] = card["clue_plan"][:2]
+    responses.insert(0, short)
+    prompts = []
+
+    def generate(messages, **_kwargs):
+        prompts.append(json.loads(json.dumps(messages)))
+        return json.dumps(responses.pop(0))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(episode_id="p1_short", out_dir=str(tmp_path))
+    meta = led.data.setdefault("meta", {})
+    meta.update({"source_bank": "original_codex56sol",
+                 "source_meta": {"constraint_draw": DRAW}})
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
+        episode_root=tmp_path, episode_id="p1_short",
+    )
+    assert len(prompts) == 9
+    repair_prompt = json.dumps(prompts[1])
+    assert "one distinct audible clue for EVERY lost object" in repair_prompt
+    assert "at least 3 items" in repair_prompt
+    assert len(led.data["lines"]) == 5
+
+
 def test_p3_safety_repair_keeps_safety_and_collection_rules():
     rules = lane._repair_rules("P3", "forbidden term 'kill'")
     assert "Replace EVERY" in rules

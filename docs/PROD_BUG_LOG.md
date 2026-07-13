@@ -1418,3 +1418,38 @@ out until they independently meet the same production-only admission rule.
   repair route can re-author, and a validator that cannot be overruled must not
   be re-litigated by a model. Candidate for fan-out.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-11 -- P1 slate lost a clue per object with no rule to repair it
+
+- surfaced: canonical 42-word `original_codex56sol` reverify of PBUG-20260713-10,
+  prompt `0bca5788-9da4-4d23-b7da-c49984956bec`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13. Log `tmp\p9_verify_42_server.log`.
+- symptom: the run died 121s in, before P9 was ever reached:
+  `P1 failed ... after 2 attempt(s)`. Three of four possibility cards returned a
+  two-entry `clue_plan` against `Field(min_length=3)`. The typed repair returned
+  the same defect (4 errors, then 3), so the ladder exhausted.
+- root cause: the clue-per-lost-object contract existed only as a bare pydantic
+  `min_length=3`. The P1 seam never stated it, `_validate_slate` never checked
+  coverage, and `_repair_rules` had no `P1` branch at all -- so the repair prompt
+  carried the raw pydantic text plus a generic "repair only the typed contract
+  error" and no rule telling the model to author the missing clue. The model
+  read its own merged two-object clue as correct and kept it. The schema minimum
+  is also not the real invariant: one clue per lost object means a four-object
+  draw needs four clues, which `min_length=3` would silently pass.
+- fix: state the same contract at all three surfaces. The seam and the new
+  `_repair_rules("P1")` branch require 4-6 possibilities, verbatim immutable
+  fields, and one distinct clue for EVERY lost object, in order, never merging
+  two objects and never dropping a card to repair another. `_validate_slate` now
+  derives the required count from the accepted draw
+  (`len(clue_plan) >= len(draw.lost_objects)`) and reports the exact shortfall.
+  Python never authors a clue: a clue is story, so the defect returns to the
+  model and fails closed if the ladder exhausts.
+- verify idea: assert a four-object draw rejects a three-clue card with the exact
+  shortfall message; assert the P1 repair rules and seam both state the
+  per-object rule; drive a runner where the base slate is clue-short and the
+  authored repair restores it. Re-run the canonical 42-word combination through
+  ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes -- a cardinality invariant that lives only in a schema
+  minimum, with no matching prompt rule and no repair branch, is an unrepairable
+  contract. Same class as PBUG-20260713-10. Candidate for fan-out.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING
