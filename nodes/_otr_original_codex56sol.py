@@ -434,8 +434,21 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "strings. Never copy the manifest or script into accepted or any "
             "other output field. Every finding MUST include field_path, "
             "item_id, exact_span, category, allowed_correction, and blocking; "
-            "blocking MUST be a boolean. If there are no concrete defects, "
-            "return accepted=true, findings=[], and warnings=[]."
+            "blocking MUST be a boolean. "
+            "You audit the spoken script only. The manifest, truth_map, and "
+            "grounding_contract are already-accepted read-only evidence: the "
+            "only correction this pass can order is a retake of a spoken line, "
+            "so a defect you cannot locate in spoken text cannot block. Set "
+            "blocking=true ONLY on a finding whose item_id is exactly one "
+            "line_id from script.lines and whose exact_span is one string "
+            "copied verbatim from that same line's text. exact_span MUST be a "
+            "single quoted substring, never an array, an offset pair, a "
+            "character range, or a paraphrase. Report any concern about the "
+            "manifest, truth_map, grounding_contract, or clue bookkeeping in "
+            "warnings, or as a finding with blocking=false. accepted MUST be "
+            "false when at least one blocking finding exists and true "
+            "otherwise. If no spoken line is defective, return accepted=true "
+            "with findings=[] and put any remark in warnings."
         )
     return rules
 
@@ -1771,12 +1784,82 @@ def _listener_blocks(
 
 def _audit_blocks(report: FinalContractAudit,
                   script: PerformanceScript) -> list[ContractFinding]:
+    """Blocking findings the P9 retake can actually act on.
+
+    The retake re-authors spoken lines, so an actionable block names one real
+    script line and quotes the offending span verbatim from that line's text.
+    """
     text_by_id = {line.line_id: line.text for line in script.lines}
     return [finding for finding in report.findings
             if finding.blocking and finding.item_id in text_by_id
             and finding.field_path.strip() and finding.category.strip()
-            and finding.allowed_correction.strip() and finding.exact_span
-            and finding.exact_span in text_by_id[finding.item_id]]
+            and finding.allowed_correction.strip()
+            and finding.exact_span.strip()
+            and finding.exact_span.strip() in text_by_id[finding.item_id]]
+
+
+def _audit_advisories(report: FinalContractAudit,
+                      script: PerformanceScript) -> list[ContractFinding]:
+    """Findings outside the audit's blocking authority, preserved verbatim.
+
+    P9 owns the spoken script. Its other inputs are not model-owned at this
+    point: the manifest is compiled by Python from the accepted score and
+    proven row-for-row by `_validate_manifest` (exact clue coverage, no
+    duplicates, landmark order), while the truth map and grounding contract are
+    already-accepted artifacts. A finding that names one of those instead of a
+    spoken line therefore cannot be repaired by a script retake and cannot
+    overrule a deterministic validator that has already proven the invariant.
+
+    Classifying such a finding is a mechanical fact -- its item_id either is a
+    script line_id or it is not -- so Python may demote it without judging any
+    authored meaning. It is recorded verbatim in the run receipt as advice and
+    never blocks the episode.
+    """
+    line_ids = {line.line_id for line in script.lines}
+    return [finding for finding in report.findings
+            if finding.item_id not in line_ids]
+
+
+def _validate_audit_envelope(report: FinalContractAudit,
+                             script: PerformanceScript) -> str | None:
+    """Hold the audit to the blocking authority its repair route can serve.
+
+    Fail closed and return the defect to the owning model when a blocking
+    finding names a real script line but does not quote it -- Python cannot
+    infer which spoken text the model meant, so the coordinates are ambiguous
+    and must not be guessed or normalized. A rejection with no blocking finding
+    at all is the same class of defect: it orders a retake it refuses to
+    locate.
+    """
+    text_by_id = {line.line_id: line.text for line in script.lines}
+    blocking = [finding for finding in report.findings if finding.blocking]
+    for finding in blocking:
+        if finding.item_id not in text_by_id:
+            continue
+        missing = [name for name in
+                   ("field_path", "category", "allowed_correction")
+                   if not getattr(finding, name).strip()]
+        if missing:
+            return (
+                f"blocking finding for script line {finding.item_id!r} is "
+                f"missing {', '.join(missing)}"
+            )
+        span = finding.exact_span.strip()
+        if not span or span not in text_by_id[finding.item_id]:
+            return (
+                f"blocking finding for script line {finding.item_id!r} must "
+                "set exact_span to one exact substring copied verbatim from "
+                "that line's spoken text"
+            )
+    if not report.accepted and not blocking:
+        return (
+            "a rejected audit must carry at least one blocking finding; "
+            "return accepted=true and use warnings when no spoken line is "
+            "defective"
+        )
+    if report.accepted and blocking:
+        return "an accepted audit must not carry a blocking finding"
+    return None
 
 
 def _validate_script(score: BroadcastScore, manifest: ClosedLineManifest,
@@ -1971,14 +2054,13 @@ def run_original_codex56sol_episode(
             script = optional_script
         except OriginalCodex56SolError:
             pass
-    audit = _call(pass_id="P9", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
+    audited_script = script
+    audit = _call(pass_id="P9", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800, post_validator=lambda value: _validate_audit_envelope(value, audited_script))
     audit_blocks = _audit_blocks(audit, script)
-    if not audit.accepted and not audit_blocks:
-        raise OriginalCodex56SolContractError(
-            "final contract audit rejected the script without actionable "
-            "grounded findings"
-        )
+    advisories = _audit_advisories(audit, script)
+    retake_ran = False
     if audit_blocks:
+        retake_ran = True
         script = _call_grounded_script(
             pass_id="P9_retake", fn=creative_fn, pack=pack,
             seam="codex56_broadcast_retake",
@@ -1996,9 +2078,20 @@ def run_original_codex56sol_episode(
             scheduler=slot_scheduler, journal=journal, story_rules=story_rules,
             tokens=max(2600, int(resolved["target_words"]) * 6),
         )
-        audit = _call(pass_id="P9_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800)
-        if not audit.accepted or _audit_blocks(audit, script):
+        audited_script = script
+        audit = _call(pass_id="P9_rerun", slot="technical", fn=technical_fn, pack=pack, seam="codex56_final_contract_audit", inputs={"manifest": manifest.model_dump(mode="json"), "truth_map": truth.model_dump(mode="json"), "grounding_contract": grounding.model_dump(mode="json"), "script": script.model_dump(mode="json")}, schema=FinalContractAudit, scheduler=slot_scheduler, journal=journal, tokens=1800, post_validator=lambda value: _validate_audit_envelope(value, audited_script))
+        if _audit_blocks(audit, script):
             raise OriginalCodex56SolContractError("final contract audit rejected the repaired script")
+        advisories = advisories + _audit_advisories(audit, script)
+
+    audit_disposition = {
+        "schema_version": "original_codex56sol.final_audit_disposition.v1",
+        "accepted": audit.accepted,
+        "script_retake_ran": retake_ran,
+        "blocking_script_findings": len(_audit_blocks(audit, script)),
+        "advisory_findings": [row.model_dump(mode="json") for row in advisories],
+        "warnings": list(audit.warnings),
+    }
 
     _assert_script_valid(score, manifest, script, story_rules, grounding)
 
@@ -2025,6 +2118,7 @@ def run_original_codex56sol_episode(
         "phase_10_verdict": "accepted",
         "listener_report": listener.model_dump(mode="json"),
         "final_audit": audit.model_dump(mode="json"),
+        "final_audit_disposition": audit_disposition,
         "grounding_receipt": _grounding_receipt(
             grounding, manifest, script,
         ),

@@ -1375,3 +1375,46 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- lexical validators must state and implement the same
   bounded acronym-aware name grammar; promoted as executable BUG-11.52.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-10 -- P9 audit blocked on a defect its only repair route could not touch
+
+- surfaced: canonical 42-word `original_codex56sol` run, prompt
+  `e0a03830-aa18-42c4-8c47-89c6cff51a46`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13. Logs
+  `tmp\scifi_42_aion_original_pair_harness.out.log` and
+  `tmp\scifi_42_aion_final_server.log`.
+- symptom: the whole pipeline authored, validated, and grounded a complete
+  script, then died at the last gate with `final contract audit rejected the
+  script without actionable grounded findings` after 570s. The audit had
+  returned `accepted=false` whose only findings named the manifest and a clue
+  id (`manifest.lines[4].clue_ids`, `item_id=c4`) -- never a spoken line.
+- root cause: the P9 seam asked the model to audit the script AND the manifest,
+  truth map, and grounding contract, but the only correction the pass owns is a
+  spoken-line retake, and `_audit_blocks` accepts a finding only when it names a
+  script line and quotes an exact span. A finding about a derived artifact was
+  therefore simultaneously authoritative enough to reject the episode and too
+  unlocatable to repair -- a guaranteed dead end. The manifest is not even
+  model-owned: Python compiles it from the accepted score and `_validate_manifest`
+  already proves exact clue coverage, no duplicates, and landmark order.
+- fix: state and enforce the audit's blocking authority. The seam prompt and the
+  P9/P9_rerun repair rules now say only a finding whose `item_id` is a
+  `script.lines` line_id and whose `exact_span` is copied verbatim from that
+  line may block, and that manifest/truth/grounding concerns belong in
+  `warnings`. `_validate_audit_envelope` runs as the P9 and P9_rerun
+  post-validator: a blocking finding that names a real script line without a
+  verbatim span, a rejection carrying no blocking finding, and an acceptance
+  carrying one all return to the typed-repair ladder and fail closed if it
+  exhausts. `_audit_advisories` demotes findings aimed at derived artifacts --
+  a mechanical classification, never a judgment of authored meaning -- and
+  records them verbatim in the new `final_audit_disposition` receipt. The dead-
+  end raise is gone because the state is now unreachable.
+- verify idea: assert a manifest-only `accepted=false` completes the episode
+  with zero retakes and an advisory receipt row; a quoted script-line block
+  still triggers exactly one retake; an unquotable script-line block reaches
+  typed repair; an `exact_span` array stays a typed failure and is never
+  normalized into index semantics. Re-run the canonical 42-word combination
+  through ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes -- an audit's blocking authority must not exceed what its
+  repair route can re-author, and a validator that cannot be overruled must not
+  be re-litigated by a model. Candidate for fan-out.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

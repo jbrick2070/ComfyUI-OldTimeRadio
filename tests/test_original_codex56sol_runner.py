@@ -2,6 +2,7 @@ import json
 from contextlib import contextmanager
 
 import pytest
+from pydantic import ValidationError
 
 from nodes import _otr_original_codex56sol as lane
 from nodes import _otr_story_routing as routing
@@ -491,14 +492,192 @@ def test_blocking_listener_retake_is_rechecked_blind_without_contract(
     assert "grounding_contract" not in prompts[8][1]["content"]
 
 
-def test_nonaccepted_final_audit_without_actionable_finding_fails_closed(
-        tmp_path):
-    responses = _responses()
-    responses[-1] = {"accepted": False, "findings": [], "warnings": []}
-    queued = iter(responses)
+def _run_with_audit(tmp_path, episode_id, audit_responses, extra=()):
+    """Drive the mocked runner with a scripted P9 audit ladder."""
+    responses = _responses()[:-1] + list(audit_responses) + list(extra)
+    prompts = []
+
+    def generate(messages, **_kwargs):
+        prompts.append(json.loads(json.dumps(messages)))
+        if responses:
+            return json.dumps(responses.pop(0))
+        return json.dumps(audit_responses[-1])
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(episode_id=episode_id, out_dir=str(tmp_path))
+    meta = led.data.setdefault("meta", {})
+    meta.update({"source_bank": "original_codex56sol",
+                 "source_meta": {"constraint_draw": DRAW}})
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led,
+        meta=meta, creative_fn=generate, technical_fn=generate,
+        slot_scheduler=Scheduler(), source_bank_row=None,
+        story_rules=rules, episode_root=tmp_path, episode_id=episode_id,
+    )
+    return led, prompts
+
+
+def test_manifest_only_audit_rejection_never_blocks_the_script(tmp_path):
+    """PBUG-20260713-01: a derived-artifact finding is advice, not a retake.
+
+    The manifest is compiled by Python from the accepted score and proven by
+    `_validate_manifest`, so an audit finding that names a manifest row or a
+    clue id cannot be repaired by a spoken-line retake and cannot overrule the
+    deterministic validator. It must never dead-end the episode.
+    """
+    led, prompts = _run_with_audit(tmp_path, "audit_manifest_only", [{
+        "accepted": False,
+        "findings": [{
+            "field_path": "manifest.lines[4].clue_ids",
+            "item_id": "c4",
+            "exact_span": "c4",
+            "category": "Clue bookkeeping",
+            "allowed_correction": "reassign the clue",
+            "blocking": True,
+        }],
+        "warnings": ["clue order looks unusual"],
+    }])
+    assert len(prompts) == 8
+    disposition = (
+        led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
+    )
+    assert disposition["script_retake_ran"] is False
+    assert disposition["blocking_script_findings"] == 0
+    assert [row["item_id"] for row in disposition["advisory_findings"]] == ["c4"]
+    assert disposition["warnings"] == ["clue order looks unusual"]
+    assert led.data["meta"]["original_codex56sol"]["phase_10_verdict"] == "accepted"
+    assert len(led.data["lines"]) == 5
+
+
+def test_grounded_script_finding_triggers_one_retake(tmp_path):
+    """A blocking finding that quotes a real spoken span still retakes."""
+    script = _fixtures()["script"]
+    led, prompts = _run_with_audit(
+        tmp_path, "audit_retake",
+        [{
+            "accepted": False,
+            "findings": [{
+                "field_path": "lines.0.text",
+                "item_id": "line_001",
+                "exact_span": "Lost and Found Frequency",
+                "category": "Safety",
+                "allowed_correction": "rephrase the station identification",
+                "blocking": True,
+            }],
+            "warnings": [],
+        }],
+        extra=[script, {"accepted": True, "findings": [], "warnings": []}],
+    )
+    assert len(prompts) == 10
+    retake_input = json.loads(prompts[8][1]["content"])
+    assert [row["exact_span"] for row in retake_input["findings"]] == [
+        "Lost and Found Frequency",
+    ]
+    disposition = (
+        led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
+    )
+    assert disposition["script_retake_ran"] is True
+    assert disposition["blocking_script_findings"] == 0
+    assert disposition["accepted"] is True
+
+
+def test_ungrounded_script_finding_returns_to_typed_repair(tmp_path):
+    """A script-line block with an unquotable span is ambiguous, not ignored."""
+    led, prompts = _run_with_audit(
+        tmp_path, "audit_ungrounded",
+        [
+            {
+                "accepted": False,
+                "findings": [{
+                    "field_path": "lines.0.text",
+                    "item_id": "line_001",
+                    "exact_span": "a phrase this line never speaks",
+                    "category": "Safety",
+                    "allowed_correction": "rephrase",
+                    "blocking": True,
+                }],
+                "warnings": [],
+            },
+            {"accepted": True, "findings": [], "warnings": []},
+        ],
+    )
+    assert len(prompts) == 9
+    repair_prompt = json.dumps(prompts[8])
+    assert "exact substring copied verbatim" in repair_prompt
+    disposition = (
+        led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
+    )
+    assert disposition["script_retake_ran"] is False
+    assert disposition["accepted"] is True
+
+
+def test_exact_span_array_reaches_typed_repair_without_normalization(tmp_path):
+    """P9 arrays are a typed failure; Python never invents index semantics."""
+    with pytest.raises(ValidationError):
+        lane.FinalContractAudit.model_validate({
+            "accepted": False,
+            "findings": [{
+                "field_path": "lines.0.text", "item_id": "line_001",
+                "exact_span": ["Lost and Found", "Frequency"],
+                "category": "Safety", "allowed_correction": "rephrase",
+                "blocking": True,
+            }],
+            "warnings": [],
+        })
+
+    script = _fixtures()["script"]
+    led, prompts = _run_with_audit(
+        tmp_path, "audit_span_array",
+        [
+            {
+                "accepted": False,
+                "findings": [{
+                    "field_path": "lines.0.text", "item_id": "line_001",
+                    "exact_span": ["Lost and Found", "Frequency"],
+                    "category": "Safety",
+                    "allowed_correction": "rephrase",
+                    "blocking": True,
+                }],
+                "warnings": [],
+            },
+            {
+                "accepted": False,
+                "findings": [{
+                    "field_path": "lines.0.text", "item_id": "line_001",
+                    "exact_span": "Lost and Found Frequency",
+                    "category": "Safety",
+                    "allowed_correction": "rephrase",
+                    "blocking": True,
+                }],
+                "warnings": [],
+            },
+        ],
+        extra=[script, {"accepted": True, "findings": [], "warnings": []}],
+    )
+    assert len(prompts) == 11
+    audit = led.data["meta"]["original_codex56sol"]["accepted_artifacts"][
+        "final_contract_audit"
+    ]
+    assert audit["accepted"] is True
+    disposition = (
+        led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
+    )
+    assert disposition["script_retake_ran"] is True
+
+
+def test_audit_rejection_with_no_finding_at_all_fails_closed(tmp_path):
+    """A rejection that locates nothing exhausts the ladder and fails closed."""
+    responses = _responses()[:-1]
+    stubborn = {"accepted": False, "findings": [], "warnings": []}
 
     def generate(_messages, **_kwargs):
-        return json.dumps(next(queued))
+        if responses:
+            return json.dumps(responses.pop(0))
+        return json.dumps(stubborn)
 
     routing._REGISTRY = None
     story_rules._clear_caches()
@@ -509,8 +688,8 @@ def test_nonaccepted_final_audit_without_actionable_finding_fails_closed(
     meta.update({"source_bank": "original_codex56sol",
                  "source_meta": {"constraint_draw": DRAW}})
     with pytest.raises(
-        lane.OriginalCodex56SolContractError,
-        match="without actionable grounded findings",
+        lane.OriginalCodex56SolPassError,
+        match="at least one blocking finding",
     ):
         lane.run_original_codex56sol_episode(
             payload={"seed_text": json.dumps(DRAW)}, pack=pack,
@@ -520,6 +699,70 @@ def test_nonaccepted_final_audit_without_actionable_finding_fails_closed(
             story_rules=rules, episode_root=tmp_path,
             episode_id="audit_false",
         )
+
+
+def test_audit_envelope_gate_classifies_every_finding_class():
+    script = lane.PerformanceScript.model_validate(_fixtures()["script"])
+    line_id = script.lines[0].line_id
+    spoken = script.lines[0].text
+
+    grounded = lane.FinalContractAudit.model_validate({
+        "accepted": False,
+        "findings": [{
+            "field_path": "lines.0.text", "item_id": line_id,
+            "exact_span": spoken.split(" is ")[0], "category": "Safety",
+            "allowed_correction": "rephrase", "blocking": True,
+        }],
+        "warnings": [],
+    })
+    assert lane._validate_audit_envelope(grounded, script) is None
+    assert len(lane._audit_blocks(grounded, script)) == 1
+    assert lane._audit_advisories(grounded, script) == []
+
+    ungrounded = lane.FinalContractAudit.model_validate({
+        "accepted": False,
+        "findings": [{
+            "field_path": "lines.0.text", "item_id": line_id,
+            "exact_span": "never spoken here", "category": "Safety",
+            "allowed_correction": "rephrase", "blocking": True,
+        }],
+        "warnings": [],
+    })
+    assert "verbatim" in lane._validate_audit_envelope(ungrounded, script)
+
+    manifest_only = lane.FinalContractAudit.model_validate({
+        "accepted": False,
+        "findings": [{
+            "field_path": "manifest.lines[4].clue_ids", "item_id": "c4",
+            "exact_span": "c4", "category": "Clue bookkeeping",
+            "allowed_correction": "reassign", "blocking": True,
+        }],
+        "warnings": [],
+    })
+    assert lane._validate_audit_envelope(manifest_only, script) is None
+    assert lane._audit_blocks(manifest_only, script) == []
+    assert [row.item_id
+            for row in lane._audit_advisories(manifest_only, script)] == ["c4"]
+
+    empty_rejection = lane.FinalContractAudit.model_validate({
+        "accepted": False, "findings": [], "warnings": ["unsure"],
+    })
+    assert "at least one blocking finding" in lane._validate_audit_envelope(
+        empty_rejection, script,
+    )
+
+    contradictory = lane.FinalContractAudit.model_validate({
+        "accepted": True,
+        "findings": [{
+            "field_path": "lines.0.text", "item_id": line_id,
+            "exact_span": spoken, "category": "Safety",
+            "allowed_correction": "rephrase", "blocking": True,
+        }],
+        "warnings": [],
+    })
+    assert "must not carry a blocking finding" in lane._validate_audit_envelope(
+        contradictory, script,
+    )
 
 
 def test_visual_style_cannot_change_any_codex56_story_message(tmp_path):
@@ -1538,3 +1781,16 @@ def test_listener_and_final_audit_repair_envelopes_are_explicit():
     assert "accepted MUST be one boolean" in final
     assert "Never copy the manifest or script" in final
     assert "blocking MUST be a boolean" in final
+
+
+def test_final_audit_blocking_authority_is_stated_in_prompt_and_repair():
+    routing._REGISTRY = None
+    pack = routing.resolve_story_pack("original_codex56sol")
+    seam = pack.prompt_stages["codex56_final_contract_audit"]
+    rerun = lane._repair_rules("P9_rerun", "blocking must be a boolean")
+    for text in (seam, rerun):
+        assert "one line_id from script.lines" in text
+        assert "copied verbatim" in text
+        assert "never an array" in text
+    assert "cannot be retaken" in seam
+    assert "read-only evidence" in rerun
