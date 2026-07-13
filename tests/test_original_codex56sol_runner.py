@@ -2016,12 +2016,12 @@ def test_fair_play_envelope_classifies_every_finding_class():
         "Could be warmer",
     ]
 
-    # Real item under the wrong collection root -> ambiguous -> typed repair.
+    # Real item under a DIFFERENT known collection -> contradiction -> repair.
     mismatched = report(accepted=False, findings=[
         {"field_path": "causal_steps.0.cause", "item_id": "q1",
          "category": "Fair play", "detail": "wrong root", "blocking": True}])
     error = lane._validate_fair_play_envelope(mismatched, truth)
-    assert "does not own that item" in error
+    assert "name the collection that owns it" in error
 
     # Corroborated -> actionable.
     real = report(accepted=False, findings=[
@@ -2185,26 +2185,51 @@ def test_wide_draw_contracts_are_satisfiable():
     assert max_length(lane.ScriptLinePatch, "replacements") >= 8
 
 
-def test_fair_play_field_path_root_survives_bracket_indexing():
-    """`audible_clues[0].implication` names the same collection as `.0.`."""
-    assert lane._field_path_root("audible_clues.0.implication") == "audible_clues"
-    assert lane._field_path_root("audible_clues[0].implication") == "audible_clues"
-    assert lane._field_path_root(" caller_threads[2].lost_object ") == "caller_threads"
-    assert lane._field_path_root("audible_clues") == "audible_clues"
+def test_fair_play_coordinates_survive_however_the_model_writes_them():
+    """PBUG-20260713-13: a benign path prefix must not cost a defect its repair.
 
+    The item_id is the identity. A model that writes
+    `truth_map.causal_steps[1].effect` -- prefixing with the payload key its
+    input arrived under -- has named the same collection as `causal_steps.1`.
+    Fail-closed is reserved for the ONE genuine ambiguity: an id owned by two
+    collections.
+    """
     truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
-    bracketed = lane.FairPlayReport.model_validate({
-        "accepted": False,
-        "findings": [{"field_path": "audible_clues[0].implication",
-                      "item_id": "q1", "category": "Fair play",
-                      "detail": "not audible before the reveal",
-                      "blocking": True}],
-    })
-    assert lane._validate_fair_play_envelope(bracketed, truth) is None
-    assert [f.item_id for f in lane._corroborated_fair_blocks(bracketed, truth)] == [
-        "q1",
-    ]
-    assert lane._fair_play_advisories(bracketed, truth) == []
+    known = lane._truth_item_ids(truth)
+
+    assert lane._field_path_collections(
+        "audible_clues.0.implication", known) == {"audible_clues"}
+    assert lane._field_path_collections(
+        "audible_clues[0].implication", known) == {"audible_clues"}
+    assert lane._field_path_collections(
+        "truth_map.causal_steps[1].effect", known) == {"causal_steps"}
+    assert lane._field_path_collections("truth_map", known) == set()
+
+    def report(field_path, item_id):
+        return lane.FairPlayReport.model_validate({
+            "accepted": False,
+            "findings": [{"field_path": field_path, "item_id": item_id,
+                          "category": "Fair play", "detail": "not audible",
+                          "blocking": True}],
+        })
+
+    # Every one of these coordinates names the same real defect.
+    for field_path in ("audible_clues[0].implication",
+                       "audible_clues.0.implication",
+                       "truth_map.audible_clues[0].implication",
+                       "truth_map"):
+        row = report(field_path, "q1")
+        assert lane._validate_fair_play_envelope(row, truth) is None, field_path
+        assert [f.item_id
+                for f in lane._corroborated_fair_blocks(row, truth)] == ["q1"]
+        assert lane._fair_play_advisories(row, truth) == []
+
+    # A path that names a DIFFERENT known collection than the item's owner is a
+    # contradiction, and still returns to the model.
+    contradiction = report("causal_steps.0.cause", "q1")
+    error = lane._validate_fair_play_envelope(contradiction, truth)
+    assert "lives in audible_clues" in error
+    assert lane._corroborated_fair_blocks(contradiction, truth) == []
 
 
 def test_p3_safety_repair_keeps_safety_and_collection_rules():

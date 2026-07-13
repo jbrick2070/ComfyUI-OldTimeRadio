@@ -11,7 +11,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Annotated, Any, Callable, Literal, Mapping
+from typing import Annotated, Any, Callable, Iterable, Literal, Mapping
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
@@ -1193,25 +1193,51 @@ def _truth_item_ids(truth: AudibleTruthMap) -> dict[str, set[str]]:
     }
 
 
-def _field_path_root(field_path: str) -> str:
-    """The collection a field_path names, however the model indexed it.
+def _field_path_collections(field_path: str, known: Iterable[str]) -> set[str]:
+    """Which known collections a field_path names, however the model wrote it.
 
-    Models write `audible_clues.0.implication` and `audible_clues[0].implication`
-    interchangeably.  The index is not part of the collection's identity, so
-    stripping it is a mechanical read of the coordinate, not a reinterpretation
-    of the finding.
+    Models index with dots or brackets (`audible_clues.0.x`,
+    `audible_clues[0].x`) and often prefix the path with the payload key the
+    artifact arrived under (`truth_map.causal_steps[1].effect`), because that is
+    literally what the input object is called.  None of that changes which
+    collection is named, so reading past it is a mechanical parse of the
+    coordinate -- not a reinterpretation of the finding.
     """
-    return field_path.strip().split(".", 1)[0].split("[", 1)[0].strip()
+    segments = {
+        segment.split("[", 1)[0].strip()
+        for segment in field_path.strip().split(".")
+    }
+    return {name for name in known if name in segments}
+
+
+def _fair_play_owners(item_id: str,
+                      ids: Mapping[str, set[str]]) -> set[str]:
+    """The collections that actually contain this item id."""
+    return {name for name, members in ids.items() if item_id in members}
 
 
 def _corroborated_fair_blocks(report: FairPlayReport,
                               truth: AudibleTruthMap) -> list[FairPlayFinding]:
+    """Blocking findings that name a real truth-map item.
+
+    The item_id is the identity; field_path is a hint.  An id that belongs to
+    exactly one collection is unambiguous no matter how the path was written, so
+    a benign prefix or an unrecognized path never costs a real defect its
+    repair.  Only a path that names a DIFFERENT known collection than the one
+    owning the id is a contradiction, and that is left to the envelope validator.
+    """
     ids = _truth_item_ids(truth)
     blocks = []
     for finding in report.findings:
-        root = _field_path_root(finding.field_path)
+        item_id = finding.item_id.strip()
+        owners = _fair_play_owners(item_id, ids)
+        if len(owners) != 1:
+            continue
+        named = _field_path_collections(finding.field_path, ids)
+        if named and not (owners & named):
+            continue  # contradictory coordinate -> the envelope repairs it
         if (finding.blocking and finding.category.strip()
-                and finding.detail.strip() and finding.item_id in ids.get(root, set())):
+                and finding.detail.strip()):
             blocks.append(finding)
     return blocks
 
@@ -1227,9 +1253,9 @@ def _fair_play_advisories(report: FairPlayReport,
     collection or it does not.
     """
     ids = _truth_item_ids(truth)
-    resolvable = {item for collection in ids.values() for item in collection}
     return [finding for finding in report.findings
-            if finding.blocking and finding.item_id.strip() not in resolvable]
+            if finding.blocking
+            and not _fair_play_owners(finding.item_id.strip(), ids)]
 
 
 def _validate_fair_play_envelope(report: FairPlayReport,
@@ -1247,7 +1273,6 @@ def _validate_fair_play_envelope(report: FairPlayReport,
     defect returns to the owning model rather than being guessed at.
     """
     ids = _truth_item_ids(truth)
-    resolvable = {item for collection in ids.values() for item in collection}
     blocking = [finding for finding in report.findings if finding.blocking]
     if report.accepted and blocking:
         return (
@@ -1261,14 +1286,23 @@ def _validate_fair_play_envelope(report: FairPlayReport,
         )
     for finding in blocking:
         item_id = finding.item_id.strip()
-        if item_id not in resolvable:
+        owners = _fair_play_owners(item_id, ids)
+        if not owners:
             continue  # uncoordinated taste note -> demoted, never fatal
-        root = _field_path_root(finding.field_path)
-        if item_id not in ids.get(root, set()):
+        if len(owners) > 1:
+            # The only genuine ambiguity: one id, two collections. Python must
+            # not pick for the model.
             return (
-                f"blocking finding for item {item_id!r} sets field_path root "
-                f"{root!r}, which does not own that item; name the collection "
-                "that actually contains it"
+                f"blocking finding item_id {item_id!r} exists in more than one "
+                f"collection ({', '.join(sorted(owners))}); give a field_path "
+                "that names the one you mean"
+            )
+        named = _field_path_collections(finding.field_path, ids)
+        if named and not (owners & named):
+            return (
+                f"blocking finding for item {item_id!r} sets a field_path in "
+                f"{', '.join(sorted(named))}, but that item lives in "
+                f"{next(iter(owners))}; name the collection that owns it"
             )
         if not (finding.category.strip() and finding.detail.strip()):
             return (

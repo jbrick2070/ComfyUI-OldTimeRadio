@@ -1530,3 +1530,40 @@ out until they independently meet the same production-only admission rule.
   min/max/pattern -- so every bound must be restated in the model-visible
   contract, and no bound may be lower than what its own validator demands.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-13 -- my own fair-play validator fail-closed on a benign path prefix
+
+- surfaced: canonical 42-word `original_codex56sol` run, prompt
+  `d5f66b1a-e85a-46b3-a447-7bf4f22d6e4e`, Aion 3.0 Mini creative + Mistral-Nemo
+  technical, 2026-07-13. Log `tmp\final_42_server.log`. Self-inflicted by the
+  validator shipped at `810369ff`.
+- symptom: the new P4 retake route worked -- P4 corroborated a block, `P3_rerun`
+  re-authored the truth map -- and then `P4_rerun` exhausted its ladder on my own
+  error: `blocking finding for item 's4' sets field_path root 'truth_map', which
+  does not own that item`. Episode dead at 408s.
+- root cause: the model wrote `field_path` as `truth_map.causal_steps[...]`,
+  prefixing the path with the key its input arrived under -- which is exactly
+  what the payload calls it (`inputs={"truth_map": ..., "grounding_contract":
+  ...}`). My root extraction took the FIRST dotted segment, got `truth_map`,
+  found it owned no item, and classified a perfectly clear finding as ambiguous.
+  It was never ambiguous: `item_id='s4'` resolves in exactly ONE collection. I
+  had made `field_path` the identity when the `item_id` is the identity, and then
+  fail-closed on a cosmetic disagreement -- turning a working retake into a kill.
+- fix: classify by identity. `_field_path_collections` reads EVERY dotted segment
+  (stripping bracket indices) and returns the known collections named anywhere in
+  the path, so a payload-key prefix, a bracket index, and a bare collection name
+  all resolve identically. `_fair_play_owners` resolves the item_id to the
+  collections that actually contain it. A blocking finding corroborates when its
+  id has exactly one owner and the path does not name a DIFFERENT known
+  collection. Fail-closed is now reserved for the one genuine ambiguity -- an
+  id owned by two collections -- plus a self-contradictory path.
+- verify idea: assert `audible_clues[0].x`, `audible_clues.0.x`,
+  `truth_map.audible_clues[0].x`, and a bare `truth_map` all corroborate the same
+  defect; assert a path naming a different known collection than the id's owner
+  still returns to the model. Re-run the canonical 42-word combination through
+  ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes -- when a finding carries both an ID and a path, the ID is
+  the identity and the path is a hint. A validator must not fail closed on a
+  coordinate it can resolve deterministically; reserve fail-closed for real
+  ambiguity, or a guard becomes the outage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING
