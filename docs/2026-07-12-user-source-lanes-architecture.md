@@ -151,6 +151,21 @@ Laws:
 - **Reset seam (r1, codex):** `_otr_lane_specs._clear_caches()` mirrors the existing
   hooks (styles :393, routing :547, rules :317) -- one internal reset for tests and
   restart admission; no live rescanning.
+- **Import DAG + load order (r2, 3-way convergent):** a new DEPENDENCY-FREE leaf
+  module `nodes/_otr_lane_contracts.py` owns the shared records/enums (LaneSpec,
+  PackRef, CompatRequest/CompatDecision, InterpreterResult, LaneTailParts, the
+  HOST_CONTRACT surface) -- stdlib only, imports nothing from OTR. `_otr_lane_specs`
+  is import-leaf-safe (every cross-module reach is a LAZY inner import, the writer's
+  own :1632-1647 pattern) and NEVER calls routing APIs during authority
+  CONSTRUCTION; strict load-order invariant: routing loads its raw
+  banks/pipelines `_REGISTRY` FIRST, then the authority composes, then consuming
+  modules' validation paths call authority FUNCTIONS (function-local deferred
+  imports). This kills the circular-init loop all three reviews flagged.
+- **HOST_CONTRACT hash (r2, hybrid judged):** derived PROGRAMMATICALLY from the live
+  surface objects -- `repr(sorted(SOURCE_PAYLOAD_KEYS))` + the contracts-module
+  dataclass field signatures + the checker policy version -- not hand-bumped strings
+  (forgettable) and not raw file bytes (comment edits would stale every receipt). A
+  guardrail test pins the derivation so a silent surface change fails the suite.
 
 ## 4. Path A -- safe feed variant (manifest-only)
 
@@ -168,10 +183,9 @@ Laws:
     "source_material_label": "Space story",
     "credits_source_line": "Source: My Space Feed"
   },
-  "default_story_pack": "",
+  "default_story_model": "",
   "story_rules": "inherit",
-  "random_eligible": true,
-  "notes": ""
+  "random_eligible": true
 }
 ```
 
@@ -191,12 +205,18 @@ else.)
   effective pack namespace = its bundled packs (validated under `<lane_id>`) UNION
   the base lane's packs (under the base's own coordinates). Blank
   `default_story_model` = the base's default pack.
-- **Source-identity projection (r1, exact keys):** the manifest's `source_identity`
-  entries overlay the base row's `defaults` dict keys consumed downstream --
-  `source_material_label`, `credits_source_line` (stamped at
-  `OTR_LedgerScriptWriter.py:3648-3659` and rendered by credits/HUD), plus the other
-  `defaults` label keys enumerated in the whitelist at build. Precedence: variant
-  manifest > base defaults. Nothing outside the enumerated keys projects.
+- **Source-identity projection (r2-FINAL enumeration; grounded banks.json:12-20,
+  43-51):** overridable IDENTITY keys = `source_material_label`,
+  `credits_source_line` (stamp path `OTR_LedgerScriptWriter.py:3648-3659`),
+  `key_terms_label`, `close_brief_label`, `title_form_label`. FORBIDDEN
+  (behavior-bearing, inherit-only): `coda_mode`, `source_develop_verb`,
+  `source_grounding_label`, `story_form_label`. No generic defaults overlay exists --
+  the whitelist IS the projection. [RATIFY the split] Precedence: variant manifest >
+  base defaults.
+- **PackRef data model (r2, codex):** the widget string parses ONCE into
+  `PackRef{owner_lane_id, story_model_id}`; resolution threads the PackRef, never
+  re-parses. A variant bundle pack whose filename stem collides with a base-lane stem
+  is an ACTIVATION ERROR (no precedence guessing between local and base namespaces).
 
 - `base_lane_id` must be in the APPROVED feed-capable base set -- v1:
   `science_news` + `media_archive`, BOTH now grounded (normative default, ratify at
@@ -255,6 +275,16 @@ Adds to the common fields: `source_kind`; `entry_points` (which of
 ### 5.3 Typed runtime interfaces (grounded against live contracts; exact signatures
 re-derived at build)
 
+**Typed contracts law (r2, codex):** every surface below is a repository-owned
+dataclass/TypedDict in `_otr_lane_contracts.py` -- `CompatRequest`, `CompatDecision`,
+`InterpreterResult`, `LaneTailParts` -- each with a constructor, a validator, exact
+null rules, ONE known-valid fixture, and specified rejection behavior. The live
+dispatch dereferences `outline_view`/`canon`/`run_story_spine`/`final_title_override`
+/`tail_finalizer` immediately (`OTR_LedgerScriptWriter.py:3739-3779`) and interpreter
+validation requires attribute/`model_dump()` agreement
+(`_otr_source_payload.py:204-257`) -- the types are pinned to those consumers, not
+invented.
+
 - `fetch_source(*, lane, technical_model, source_ref="") -> SourceFetchResult | dict`
   -- MUST return the writer's exact seven-key `SOURCE_PAYLOAD_KEYS` envelope
   (`_otr_source_payload.py:80-82`; unknown key = hard error), mirroring the
@@ -303,6 +333,25 @@ path (L5a) is proven by the reference lane, and only with the LaneTailParts law
 satisfied. (codex proposed deferring run_lane entirely; partially rejected --
 operator requirement wins, staging adopted.)
 
+**run_lane durable-state isolation (r2, codex -- validation alone cannot protect
+disk):** shipped runners save incrementally and `Ledger.save()` can replace live
+state (writer warning at `:3755-3759`) -- a failing user runner would otherwise leave
+invalid durable state behind before post-run validation. L5b therefore hands
+`run_lane` a STAGING ledger facade + a STAGING artifact root; the complete result is
+validated (LaneTailParts + provenance receipts) and then ATOMICALLY merged into the
+production ledger + episode directory on acceptance. User code never gets
+`led.save()` against the canonical episode path. (Common-writer lanes are unaffected
+-- fetch/interpret never touch the ledger.)
+
+**Provenance ownership, executable (r2):** the contract enumerates, per
+execution_kind, the pre-tail ledger fields user code MUST produce, MAY produce, and
+MUST NEVER claim -- the forbidden list starts from production history (delivery +
+generic `episode_seed` receipts required before finalization; fabricated
+`cast_contract.cast_seed` replay claims forbidden -- `docs/PROD_BUG_LOG.md:427-455`
++ the Bible's producer-receipt rules). The fable2 row-level merge-ownership model is
+the implementation precedent; field-level lists are pinned in
+`_otr_lane_contracts.py` and enforced by the L5b validator.
+
 ### 5.4 v1 prohibitions (separate core/expert campaigns, enforced by the checker)
 No ComfyUI nodes/links from bundles; no third LLM slot; no new model provider or
 credential system; no production-ledger schema changes; no bypass of freeze,
@@ -314,12 +363,23 @@ exactly like any custom node they install. OTR does not sandbox it; OTR controls
 it runs (never at boot; at activation in a bounded child process, and lazily at
 render when the lane is selected). Running `--activate` is the consent act.
 
-### 5.6 Pipeline identity
-Activation synthesizes `pipeline_id = "user:<lane_id>"` mapped onto the two EXISTING
-pipeline classes (grounded `pipelines.json`: `requires_source_contract` metadata for
-common-writer lanes; `executable: true` for run_lane lanes -- runtime dispatch stays
-on lane shape, never on those flags, preserving the registry law). `pipelines.json`
-and `banks.json` are NEVER edited by activation.
+### 5.6 Pipeline + execution identity (r2-corrected -- the naive synthetic id was a
+build-breaker)
+Every pack's `story_pipeline_id` must resolve in the loaded pipeline registry and
+match its lane's default pipeline (`_otr_story_routing.py:336-347, 382-425` -- a bare
+synthetic id would raise `UnknownPipelineError` at the first user pack). Fix, two
+parts (codex r2, both halves adopted):
+1. **`execution_kind` on LaneSpec** (`common_writer` | `own_runner`) is the DISPATCH
+   authority -- runtime never dispatches on pipeline metadata flags (registry law
+   preserved).
+2. **Pipeline identity:** common-writer lanes (all variants + reuse_common_writer
+   originals) reference the REAL registered `legacy_many_pass` row -- their packs
+   declare it and the parity law holds natively. Own-runner lanes get an
+   authority-COMPOSED complete synthetic `StoryPipeline` row (`user:<lane_id>`,
+   executable=true, requires_source_contract=false, declared_seams + passes from the
+   manifest) published in the authority's pipeline VIEW, which is what pack
+   validation consults post-L1 -- so their packs validate against a real, complete
+   row. `pipelines.json` and `banks.json` are NEVER edited by activation.
 
 ## 6. Activation + quarantine state machine
 
@@ -332,10 +392,17 @@ States: `UNCHECKED -> ACTIVATED -> (bytes changed) STALE -> re-activate` and
 2. Path containment: per-entry resolution against the resolved
    `user_packs/source_lanes/` root (root itself MAY be an external junction -- the
    sanctioned Manager-update survival mechanism; entries may not escape it).
-3. Original lanes: bounded CHILD PROCESS (`sys.executable`, timeout, no GPU --
-   `sys.executable` guarantees portable-install compatibility, r1 agy) imports
-   `lane.py`, verifies declared entry points exist with the exact keyword-only
-   signatures (`inspect.signature`), runs deterministic fixture preflights.
+3. Original lanes: bounded CHILD PROCESS imports `lane.py`, verifies declared entry
+   points exist with the exact keyword-only signatures (`inspect.signature`), runs
+   deterministic fixture preflights. **Child environment spec (r2):**
+   `sys.executable` (portable-safe), `PYTHONPATH` = repo root + `OTR_TEST_MODE=1`
+   (the test suite's import discipline -- `nodes._otr_lane_contracts` resolves,
+   heavy `nodes/__init__` never runs), `CUDA_VISIBLE_DEVICES=""`, fixed timeout with
+   process-TREE termination, capped stdout/stderr, JSON verdict on stdout, exit-code
+   protocol (0 pass / 1 contract issues / 2 harness error). SDK law: `lane.py` is a
+   SINGLE FILE in v1 (no package, no relative imports) and may import stdlib + the
+   contracts leaf; importing `comfy.*` or ComfyUI runtime modules fails activation
+   BY DESIGN.
    **Execution scope (r1):** `fetch_source` is SIGNATURE-INSPECTED ONLY (it is a
    network function; activation stays network-free); `interpret_source` and
    `check_compatibility` EXECUTE against `fixtures/` samples (pre-recorded payloads
@@ -357,17 +424,28 @@ States: `UNCHECKED -> ACTIVATED -> (bytes changed) STALE -> re-activate` and
    original-lane receipt STALE instead of silently reinterpreting old activations**,
    timestamp.
 6. **Boot admit (restart):** the authority sweeps bundles WITHOUT importing any user
-   Python; a bundle enters the registry IFF its current bytes match a successful
-   receipt exactly (including the host-contract hash). Mismatch = STALE quarantine
-   ("re-run otr_check lane --activate").
-7. **Runtime (TOCTOU-closed, r1 codex):** selecting an activated original lane
-   RE-HASHES the bundle files against the admitted receipt IMMEDIATELY BEFORE the
-   lazy import -- a file changed after boot fails STALE before any user code runs.
-   Then `lane.py` imports in-process; any import/contract/fetch/runner failure aborts
-   the run loud. NEVER a fallback to a shipped lane, another user lane, another
-   model, or another feed. Runtime failures do NOT change activation state (§1).
+   Python -- manifest parsing is fully guarded (a malformed/corrupt `lane.json`
+   quarantines with a ValidationIssue; boot never dies, r2 agy). A bundle enters the
+   registry IFF its current bytes match a successful receipt exactly (including the
+   host-contract hash). Mismatch = STALE quarantine ("re-run otr_check lane
+   --activate"). Hashing discipline (r2, codex): an allowlist of extensions/paths,
+   maximum file count and aggregate size, streamed hashing, reparse-point/device
+   entries rejected -- `fixtures/` cannot smuggle unbounded assets into the hash set.
+7. **Runtime (TOCTOU actually closed -- r2 supersedes r1's re-hash-then-import,
+   which left a race and fought Python's module cache):** `--activate` copies the
+   verified bundle into a CONTENT-ADDRESSED IMMUTABLE SNAPSHOT
+   (`user_packs/.activated/<lane_id>/<receipt_hash>/`); boot admits against it;
+   runtime imports `lane.py` FROM THE SNAPSHOT under a receipt-specific module name
+   (importlib, unique per receipt -- stale sys.modules entries can never shadow a
+   re-activation). The mutable bundle dir is authoring surface only. Cache
+   invalidation: exactly one live snapshot per lane; a successful re-activate
+   replaces it. Any import/contract/fetch/runner failure aborts the run loud. NEVER
+   a fallback to a shipped lane, another user lane, another model, or another feed.
+   Runtime failures do NOT change activation state (§1).
 8. `otr_check lane <id> --status` reports ACTIVATED / STALE / QUARANTINED with the
-   receipt + host-contract hashes (r1, codex optional -- adopted).
+   receipt + host-contract hashes, WHY-stale (the first mismatching relative path or
+   the moved host-contract surface), and receipt/preflight timestamps. Receipts
+   store RELATIVE paths only (portable; r2).
 
 Quarantine laws (carried + extended -- console, resolve, and `otr_check` all emit the
 IDENTICAL stored `ValidationIssue`):
@@ -425,10 +503,16 @@ Every user-lane episode stamps (extending the carried `story_model_id` +
 `base_lane_id` + base version hash; originals: fetcher/interpreter/runner code
 hashes (from the receipt's file map); `story_rules_sha256`; selected pack id + sha;
 source payload sha; the `CompatDecision`; selected models/providers (existing
-stamps); the ledger + publishing receipts (existing). Re-entry law (carried, r4):
-stamped hashes MUST match the current activation receipt or the re-entry fails loud
-(freeze cascade via its non-raising `terminal_error` path, `:302-305`). A changed
-bundle can never replay silently under an old receipt.
+stamps); the ledger + publishing receipts (existing). Re-entry law (r2-corrected mechanics): an explicit ACTIVATION-RECEIPT VALIDATOR runs
+at every stamped-ledger re-entry gate -- it resolves the stamped lane, compares the
+stamped receipt id + bundle hashes against the CURRENT activation receipt, and on
+stale/missing/mismatch routes to `resolve_freeze_policy`'s existing non-raising
+`terminal_error` branch (the real path is `_otr_freeze_cascade.py:302-341`; today it
+only catches bank/pack resolution failure -- the receipt comparison is NEW code with
+stale/missing/mismatched receipts each pinned by a test). Pack-seam re-resolution at
+the cascade uses the stamped `story_model_id` (`resolve_story_pack(bank,
+stamped_id)`), never the bare bank default. A changed bundle can never replay
+silently under an old receipt.
 
 ## 11. Qualification ladders (two, distinct)
 
@@ -436,9 +520,11 @@ bundle can never replay silently under an old receipt.
 manifest/schema validation; protected-id + duplicate collision tests; inheritance
 whitelist tests (rejected override attempts); real feed parse -> seven-key payload
 test (first live step, qualification not activation); canonical 30-word and 120-word
-runs on the variant lane (one local family + the configured lane, since the
-architecture under test is the FEED, not the writer); ledger + episode asset +
-`obs_publish OK` + final OBS proof. **720 receipts REUSE the base lane's** while (a)
+runs on the variant lane -- named set (r2): the shipped `DEFAULT_LLM`
+(mistral-nemo) local family + ONE operator-configured cloud/frontier creative lane,
+technical slot exercised as in every existing qualification (the architecture under
+test is the FEED, not the writer); ledger + episode asset + `obs_publish OK` + final
+OBS proof per PRODUCTION_SPRINT_LESSONS §§6-8. **720 receipts REUSE the base lane's** while (a)
 the variant's activation receipt's base hash still matches the live base lane and
 (b) no structured prompt/schema/validator change post-dates those receipts (the
 GO_FORWARD_PLAN receipt-reuse law, applied verbatim). A grounded contract change in
@@ -468,8 +554,9 @@ Static findings never create PBUG/Bible entries; only live production evidence d
 
 | Wave | Surfaces (owned changes) | Content |
 |---|---|---|
-| L0 | `.gitignore`, new `nodes/_otr_user_packs.py`, `nodes/_otr_validation_issue.py`, `nodes/_otr_visual_styles.py` | user_packs foundation: junction stance, containment, quarantine store, ValidationIssue, styles overlay (carried) |
-| L1 | new `nodes/_otr_lane_specs.py`, `nodes/OTR_LedgerScriptWriter.py` (4 consumer sites), `nodes/_otr_source_payload.py`, `nodes/_otr_story_routing.py`, `nodes/_otr_story_rules.py` | THE AUTHORITY: LaneSpec, shipped seed absorption (lane-spec rip per randomizer design), PackRecord map (carried), resolution APIs consult authority |
+| L0a | `.gitignore`, new `nodes/_otr_user_packs.py`, new `nodes/_otr_validation_issue.py`, new `nodes/_otr_lane_contracts.py` | user_packs core: junction stance, containment, quarantine store, ValidationIssue, typed lane contracts leaf |
+| L0b | `nodes/_otr_visual_styles.py` | styles overlay (operator-preserved; OFF the lane critical path -- parallel any time after L0a) |
+| L1 | new `nodes/_otr_lane_specs.py`, `nodes/OTR_LedgerScriptWriter.py` (4 consumer sites), `nodes/_otr_source_payload.py`, `nodes/_otr_story_routing.py`, `nodes/_otr_story_rules.py` | THE AUTHORITY: LaneSpec + execution_kind, shipped seed absorption (lane-spec rip per randomizer design), authority pipeline view, PackRecord map (carried), resolution APIs consult authority, load-order invariant |
 | L2 | new `scripts/otr_check.py` + `otr_check.bat`, `user_packs/receipts/` contract | checker + `lane --activate` + child-process harness + receipts + boot admit + quarantine wiring |
 | L3 | `story_orchestrator.py` + `_otr_media_archive_sources.py` + `_otr_source_payload.py` threading | Path A: rss_variant end-to-end (BOTH approved bases, r1) + 30/120 variant smokes |
 | L4 | `nodes/OTR_LedgerScriptWriter.py` + `workflows/otr_canonical.json` + contract audit | story_pack widget + two-channel consumer threading + stamps (carried, operator-required) |
