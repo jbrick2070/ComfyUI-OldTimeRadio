@@ -2459,6 +2459,52 @@ def invoke_codex_structured(
                     )),
                 },
             ]
+        elif pass_id == "P1" and result_type is DramaticQuestionV4:
+            # P1 is a three-string authoring contract.  Keep its repair turn
+            # equally small and explicit: the generic graph-repair prompt
+            # obscures these caps and a live Aion repair copied the rejected
+            # 120+ character ending_direction unchanged.
+            try:
+                failed_question = parse_first_json_object(failed_output)
+            except Exception as exc:
+                raise CodexPackContractError(
+                    "P1 typed repair requires one complete parsed object"
+                ) from exc
+            if not isinstance(failed_question, dict):
+                raise CodexPackContractError(
+                    "P1 typed repair requires an object root"
+                )
+            repair_rules = (
+                "This is a typed repair of the same DramaticQuestionV4, not a "
+                "new story proposal. Return exactly three root keys: question, "
+                "consequence, ending_direction. Each value MUST be one nonempty "
+                "JSON string. question and consequence are each at most 160 "
+                "characters; ending_direction is at most 120 characters. Preserve "
+                "every already-valid field byte for byte. Rewrite each rejected "
+                "overlong field in your own shorter words; never copy it unchanged "
+                "and never cut a word in half. For safety, keep a rewritten question "
+                "or consequence at or below 120 characters and a rewritten "
+                "ending_direction at or below 90 characters. The rejection is "
+                "diagnostic evidence only; never copy its shape or messages into "
+                "the artifact."
+            )
+            return [
+                {
+                    "role": "system",
+                    "content": "\n".join(seams) + schema_instruction
+                    + "\n" + repair_rules,
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "failed_dramatic_question": failed_question,
+                            "rejection": detail,
+                        },
+                        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                    ),
+                },
+            ]
         elif pass_id == "P2":
             deterministic = repair_cast_plan_metadata(failed_output)
             if deterministic is not None and post_validator(deterministic) is None:

@@ -1909,6 +1909,57 @@ def test_default_schema_injection_preserves_wire_receipt_without_unwrap():
     )
 
 
+def test_p1_typed_repair_uses_compact_exact_contract_and_safe_rewrite_margin():
+    valid_question = "Must Lina trust the evaluator before the gallery opens?"
+    valid_consequence = "Trust may expose bias; refusal may discard a useful pattern."
+    overlong_ending = (
+        "Before the exhibition closes, Lina must choose whether computational "
+        "judgment deserves authority over her own creative decision and its consequences."
+    )
+    base = json.dumps({
+        "question": valid_question,
+        "consequence": valid_consequence,
+        "ending_direction": overlong_ending,
+    })
+    repaired_ending = "Lina must choose whether the evaluator deserves authority over her design."
+    repaired = json.dumps({
+        "question": valid_question,
+        "consequence": valid_consequence,
+        "ending_direction": repaired_ending,
+    })
+    responses = [base, repaired]
+    calls: list[dict[str, object]] = []
+    pack = SimpleNamespace(prompt_stages={
+        "codex_question_system": "Write the dramatic question.",
+    })
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane.invoke_codex_structured(
+        pass_id="P1", slot="creative", slot_fn=slot_fn, pack=pack,
+        seam_refs=("codex_question_system",), artifact_inputs={
+            "fact_index": {"facts": ["large trusted context must stay out of repair"]},
+        }, result_type=lane.DramaticQuestionV4,
+        post_validator=lambda candidate: None,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=1800, call_journal={}, clamp_overlong_strings=False,
+    )
+
+    assert result.ending_direction == repaired_ending
+    assert len(calls) == 2
+    repair_system = calls[1]["messages"][0]["content"]
+    repair_user = json.loads(calls[1]["messages"][1]["content"])
+    assert "Return exactly three root keys" in repair_system
+    assert "ending_direction is at most 120 characters" in repair_system
+    assert "ending_direction at or below 90 characters" in repair_system
+    assert "never copy it unchanged" in repair_system
+    assert repair_user["failed_dramatic_question"]["ending_direction"] == overlong_ending
+    assert "original_request" not in repair_user
+    assert "fact_index" not in repair_user
+
+
 def test_p4_typed_repair_keeps_exact_review_shape_and_only_compact_failed_review():
     overlong_rationale = "A" * 241
     base = json.dumps({

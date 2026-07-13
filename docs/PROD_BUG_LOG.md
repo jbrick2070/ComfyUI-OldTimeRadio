@@ -767,7 +767,8 @@ out until they independently meet the same production-only admission rule.
   bank and require RESULT SUCCESS plus ledger and OBS final existence
 - bible-worthy: pending -- live admission and reusable exact-envelope rule are
   proved; promote only through the standing Bug Bible fan-out
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED AND LIVE VERIFIED by canonical prompt
+  `7a84b6c3-221e-4959-8636-e0d4e5e23838` (`obs_publish OK`)
 
 ## PBUG-20260712-19 -- all-visualizer policy still invoked upstream image authoring
 - surfaced: canonical 120-word `scifi_codex` queue leg, prompt
@@ -801,7 +802,8 @@ out until they independently meet the same production-only admission rule.
   call, ledger, episode asset, `obs_publish OK`, and OBS final.
 - bible-worthy: yes -- live failure plus reusable effective-consumer-capability
   contract and executable coverage
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED AND LIVE VERIFIED by canonical prompt
+  `7a84b6c3-221e-4959-8636-e0d4e5e23838` (`obs_publish OK`)
 
 ## PBUG-20260712-20 -- Sci-Fi Codex P3 typed repair silently lost its contract
 
@@ -835,7 +837,8 @@ out until they independently meet the same production-only admission rule.
   saved ledger, episode asset, `obs_publish OK`, and final OBS file.
 - bible-worthy: already promoted as BUG-11.50; added OTR executable coverage
   for the repair-prompt dimension.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED AND LIVE VERIFIED by canonical prompt
+  `7a84b6c3-221e-4959-8636-e0d4e5e23838` (`obs_publish OK`)
 
 ## PBUG-20260712-21 -- Sci-Fi source P0 could exhaust its bounded output before producing JSON
 
@@ -873,7 +876,8 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- a live bounded-output failure with reusable
   model-facing artifact-surface and compact-repair requirements; promoted as
   BUG-11.50 with cross-lane executable coverage.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED AND LIVE VERIFIED by canonical prompt
+  `7a84b6c3-221e-4959-8636-e0d4e5e23838` (`obs_publish OK`)
 
 ## PBUG-20260712-22 -- Sci-Fi Codex P3 whole-score transport exhausted its model window
 
@@ -1089,7 +1093,8 @@ out until they independently meet the same production-only admission rule.
   ledger, episode, `obs_publish OK`, and final OBS existence.
 - bible-worthy: promoted as BUG-12.53 with executable OTR coverage and shared
   Bug Bible regression pins.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED AND LIVE VERIFIED by canonical prompt
+  `7a84b6c3-221e-4959-8636-e0d4e5e23838` (`obs_publish OK`)
 
 ## PBUG-20260713-02 -- Remote P3 whole-draft repair repeated ten local prose overflows
 
@@ -1126,7 +1131,8 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- bounded semantic repair eligibility depends on a proven
   transport behavior, not locality alone; promoted as executable BUG-11.42
   extension coverage.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED AND LIVE VERIFIED by canonical prompt
+  `7a84b6c3-221e-4959-8636-e0d4e5e23838` (`obs_publish OK`)
 
 ## PBUG-20260713-03 -- P4 repair replaced a valid pass review with diagnostic-shaped JSON
 
@@ -1162,7 +1168,8 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- compact typed contracts must preserve literal and item
   type semantics at every repair boundary; promoted as executable BUG-11.38
   extension coverage.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: FIXED AND LIVE VERIFIED by canonical prompt
+  `7a84b6c3-221e-4959-8636-e0d4e5e23838` (`obs_publish OK`)
 
 ## PBUG-20260713-04 -- P3 patch aimed at the hard cap and crossed it
 
@@ -1194,4 +1201,38 @@ out until they independently meet the same production-only admission rule.
   ledger, episode, `obs_publish OK`, and final OBS existence.
 - bible-worthy: yes -- bounded authoring needs safety margin below its strict
   rejection cap; promoted as executable BUG-11.42 extension coverage.
+- status: FIXED AND LIVE VERIFIED by canonical prompt
+  `7a84b6c3-221e-4959-8636-e0d4e5e23838` (`obs_publish OK`)
+
+## PBUG-20260713-05 -- P1 repair copied an overlong ending direction unchanged
+
+- promotion: BUG-11.38 extension
+- surfaced: canonical 42-word `scifi_codex` smoke, prompt
+  `d1313994-753c-4748-bf8c-a4e09e15d8fe`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: RSS admission and deterministic P0 repair cleared. P1 returned the
+  correct three-field DramaticQuestionV4 shape, but `ending_direction` exceeded
+  its 120-character cap. The typed repair copied the same overlong value
+  unchanged and exhausted the ladder before ledger/media/OBS work.
+- root cause: P1 fell through to the generic graph-artifact repair contract.
+  Although its generated JSON schema carried the numeric constraint, the
+  authoring instruction did not repeat the three exact keys, per-field caps,
+  or a safe rewrite target. Its repair input also repeated the full original
+  request and fact index beside the tiny failed artifact, obscuring the only
+  required edit.
+- fix: give DramaticQuestionV4 its own compact repair boundary. Supply only the
+  parsed failed question and bounded rejection; repeat the exact three root
+  keys and hard caps; preserve valid fields byte for byte; require each
+  rejected overlong field to be rewritten rather than copied or mid-word
+  clipped; and give rewritten fields a conservative 75% authoring ceiling.
+  Python never clips or authors the prose.
+- verify idea: inject a valid question/consequence plus an overlong ending,
+  require exactly one model-authored repair, and assert the repair prompt names
+  the 160/160/120 hard caps plus 120/120/90 rewrite margins. Assert the repair
+  payload omits the original request and fact index and preserves valid fields.
+  Then rerun the same canonical 42-word combination through ledger, episode,
+  `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes -- a tiny authored repair must repeat its exact contract,
+  isolate the failed artifact, and target below the rejection edge; promoted
+  as executable BUG-11.38 extension coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
