@@ -79,8 +79,12 @@ _STRUCTURED_MAX_NEW_TOKENS: int = 512
 # is a "follow the schema exactly" instruction, and low entropy is what
 # makes a local model comply. Deliberately below any sane base
 # temperature so the repair attempt is the calmest attempt in the
-# ladder.
-_REPAIR_TEMPERATURE: float = 0.10
+# ladder.  P3's bounded authored-text patch uses this same public value rather
+# than inventing a second repair temperature.
+REPAIR_TEMPERATURE: float = 0.10
+# Compatibility name retained for existing callers/tests that predate the
+# shared public export.
+_REPAIR_TEMPERATURE: float = REPAIR_TEMPERATURE
 
 # A typed repair that starts but does not finish decodable JSON gets one
 # syntax-only retry when call budget remains. The retry temperature is
@@ -307,7 +311,7 @@ def _prompt_to_messages(prompt: Any) -> Any:
     return prompt
 
 
-def _invoke_slot(
+def invoke_structured_slot(
     slot_fn: Callable[..., str],
     messages: Any,
     *,
@@ -342,6 +346,12 @@ def _invoke_slot(
         temperature=temperature,
         max_new_tokens=max_new_tokens,
     )
+
+
+# Compatibility alias retained while callers migrate to the explicit shared
+# invocation name.  It preserves OpenRouter json_object behavior at every
+# structured boundary.
+_invoke_slot = invoke_structured_slot
 
 
 def apply_field_aliases(

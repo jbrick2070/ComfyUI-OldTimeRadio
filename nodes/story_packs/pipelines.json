@@ -95,6 +95,7 @@
         "codex_question_system",
         "codex_pressure_cast_system",
         "codex_radio_score_system",
+        "codex_radio_score_text_patch",
         "codex_coda_contract_system",
         "codex_play_system",
         "codex_listening_room_system",
@@ -135,6 +136,14 @@
             "codex_coda_contract_system"
           ],
           "description": "Builds scenes, shots, beats, music cues, fact placements, and advisory beat-length centers."
+        },
+        {
+          "pass_id": "P3_authored_text_patch",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_radio_score_text_patch"
+          ],
+          "description": "Conditional local-only P3/P3-rewrite text shortening repair. It returns a bounded replacement patch, never a complete score, and reuses the originating creative slot."
         },
         {
           "pass_id": "P4_structure_review",

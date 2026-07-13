@@ -984,3 +984,49 @@ out until they independently meet the same production-only admission rule.
   literal semantics, not merely field names and maximum lengths; promoted as an
   executable BUG-11.38 extension.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260712-25 -- Sci-Fi Codex P3 full typed repair repeated local prose overflow
+
+- promotion: BUG-11.42 extension
+- surfaced: canonical 120-word `scifi_codex` reverify queue leg, prompt
+  `4b19f3ed-bd28-4f84-9b81-5fcddfb89dc0`, Gemma E4B creative + Mistral-Nemo
+  technical, 2026-07-12
+- symptom: P0 repaired and P1/P2 cleared. P3 then returned a complete compact
+  draft whose only surfaced defects were four model-authored strings over their
+  finite caps. Its normal full typed repair shortened one field but repeated
+  three over-cap fields, exhausting the bounded ladder before P4, ledger,
+  media, or OBS work.
+- root cause: generic clamping was correctly disabled at the author-owned P3
+  boundary, but the only remaining repair transport resent the complete draft.
+  That invited the local creative model to reauthor already-valid graph and
+  prose surface instead of making the one bounded shortening decision. Pydantic
+  length errors could also conceal a compiler-only defect, so a naive text patch
+  would have incorrectly treated every string-only error report as local. A
+  lazy scheduler wrapper also hid remote-provider markers, which would have
+  let a remote slot take the local-only route; generic completion reporting
+  could then mislabel a rejected direct patch as a decoded accepted draft.
+- fix: on local P3/P3-rewrite only, derive a maximum-six exact whitelist of
+  over-cap authored leaves from the real Pydantic locations; preflight a clone
+  through the strict draft/compiler/signature/graph boundary; then request one
+  strict one-for-one author-owned shortening patch at the common typed-repair
+  temperature. Merge only through trusted locations, revalidate the complete
+  draft, and record the real patch call in the existing P3 receipt. Unknown,
+  broad, hidden-graph, malformed, or still-over-cap repairs fail closed. Remote
+  OpenRouter slots retain the existing same-slot full repair because their
+  virtual context metadata is not an exact tokenizer preflight; no model/router
+  fallback or substitution is introduced. The scheduler carries exact catalog
+  transport capability into its lazy closure and relays OpenRouter JSON-object
+  mode; direct-patch receipts own their parse/schema/contract truth so the
+  generic ladder cannot overwrite it with an empty factory result.
+- verify idea: cover every eligible P3 leaf, mixed/broad errors, hidden compiler
+  defects, malformed patch roots, unselected-field preservation, local base and
+  rewrite receipt success at `.10`/512, a scheduler-wrapped remote same-slot
+  JSON-mode full repair, truthful malformed-patch receipts, and actual Gemma
+  E4B six-target prompt plus reservation fit. Run focused,
+  full, Bug Bible, pack/registry, and canonical workflow gates, then rerun the
+  fresh canonical Codex leg through ledger/OBS proof.
+- bible-worthy: yes -- a live bounded-patch admission: localized authored prose
+  needs one-for-one model replacement plus complete preflight/merged validation,
+  never Python clipping or a broad retake. Promoted as executable BUG-11.42
+  extension coverage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

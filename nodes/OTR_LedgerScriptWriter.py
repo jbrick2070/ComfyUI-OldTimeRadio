@@ -537,6 +537,33 @@ class _SlotScheduler:
 
         return _HelperCtx()
 
+    def _slot_transport_markers(self, slot: str) -> dict[str, bool | None]:
+        """Return the declared transport capability for one configured slot.
+
+        ``for_slot`` deliberately defers model acquisition until an actual
+        generation call.  Its wrapper must nevertheless retain the catalog's
+        provider identity: structured callers decide whether a bounded local
+        repair is safe *before* invoking the wrapper, and OpenRouter needs its
+        JSON-object request mode forwarded through it.  An unknown/non-curated
+        id is conservative (not eligible for the tokenizer-proven local P3
+        text patch), while normal local catalog rows are explicitly eligible.
+        """
+        try:
+            row = _otr_model_catalog._by_repo_id().get(self.ids[slot])
+            provider = str(getattr(row, "provider", "") or "")
+        except Exception:  # noqa: BLE001 -- capability is a safe false default
+            provider = ""
+        return {
+            "_otr_p3_text_patch_local": provider == "local",
+            "_otr_openrouter": provider == "openrouter",
+            "_otr_comfy_credits": provider == "comfy_credits",
+            "_otr_google_api": provider == "google_api",
+            "_otr_gguf_native": provider == "gguf_native",
+            # The scheduler does not bind a schema itself.  The common
+            # structured-call invoker may pass json_object for OpenRouter.
+            "_otr_response_format": None,
+        }
+
     def for_slot(self, slot: str):
         """Return a generate_fn closure that targets `slot`. Each call
         ensures the right model is resident before generation fires."""
@@ -547,17 +574,27 @@ class _SlotScheduler:
             )
         scheduler = self
 
-        def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
+        transport_markers = scheduler._slot_transport_markers(slot)
+
+        def generate_fn(
+            messages, *, temperature, max_new_tokens, stop=None,
+            response_format=None,
+        ):
             cache_entry = scheduler._account_and_get_entry(slot)
             base = _build_truncating_generate_fn(
                 cache_entry, **scheduler.sampling,
             )
-            return base(
-                messages,
-                temperature=temperature,
-                max_new_tokens=max_new_tokens,
-                stop=stop,
-            )
+            kwargs = {
+                "temperature": temperature,
+                "max_new_tokens": max_new_tokens,
+                "stop": stop,
+            }
+            if response_format is not None:
+                kwargs["response_format"] = response_format
+            return base(messages, **kwargs)
+
+        for marker, value in transport_markers.items():
+            setattr(generate_fn, marker, value)
 
         return generate_fn
 

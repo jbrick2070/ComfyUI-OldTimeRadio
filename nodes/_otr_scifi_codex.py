@@ -5,6 +5,7 @@ It never fetches a source, loads a model, or edits LLM-authored dialogue.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -41,6 +42,8 @@ try:
     from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import (
         PostValidationError,
+        REPAIR_TEMPERATURE,
+        invoke_structured_slot,
         schema_shape_instruction,
         structured_call,
     )
@@ -68,6 +71,8 @@ except ImportError:  # pragma: no cover
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import (  # type: ignore
         PostValidationError,
+        REPAIR_TEMPERATURE,
+        invoke_structured_slot,
         schema_shape_instruction,
         structured_call,
     )
@@ -374,6 +379,39 @@ class RadioScoreDraftV4(_Strict):
     music_cues: list[RadioScoreDraftMusicCueV4] = Field(
         min_length=1, max_length=_RADIO_SCORE_MAX_MUSIC_CUES,
     )
+
+
+_P3_TEXT_PATCH_MAX_TARGETS = 6
+_P3_TEXT_PATCH_MAX_SOURCE_CHARS = 256
+_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 512
+_P3_TEXT_PATCH_PATH_MAX_CHARS = 80
+_P3_TEXT_PATCH_SEAM = "codex_radio_score_text_patch"
+_P3_TEXT_PATCH_KIND = "p3_authored_text_patch"
+
+
+class _RadioScoreDraftTextPatchRowV4(_Strict):
+    """One author-owned text replacement addressed by an opaque path token."""
+
+    path: str = Field(min_length=1, max_length=_P3_TEXT_PATCH_PATH_MAX_CHARS)
+    replacement_text: str = Field(min_length=1, max_length=144)
+
+
+class _RadioScoreDraftTextPatchV4(_Strict):
+    """Small P3-only patch root; never a replacement draft transport."""
+
+    replacements: list[_RadioScoreDraftTextPatchRowV4] = Field(
+        min_length=1, max_length=_P3_TEXT_PATCH_MAX_TARGETS,
+    )
+
+
+@dataclass(frozen=True)
+class _P3TextPatchTarget:
+    """One loc derived from the strict failed draft, never from model output."""
+
+    loc: tuple[str | int, ...]
+    path: str
+    max_chars: int
+    current_text: str
 
 
 _DRAFT_ERROR_CODES = frozenset({
@@ -1296,6 +1334,402 @@ class FinalAuditV4(_Strict):
 
 
 GenerateFn = Callable[..., str]
+
+
+def _is_local_p3_text_patch_slot(slot_fn: GenerateFn) -> bool:
+    """Return whether an exact local tokenizer guard can enforce this patch.
+
+    Production calls use ``_SlotScheduler``.  It declares this capability
+    from the resolved catalog row before the first lazy invocation, so a
+    provider wrapper cannot be mistaken for a local model simply because its
+    callable hides the backend's markers.  Bare local test/integration callables
+    retain the historical no-remote-marker path.
+    """
+    declared = getattr(slot_fn, "_otr_p3_text_patch_local", None)
+    if declared is not None:
+        return declared is True
+    return not any(
+        bool(getattr(slot_fn, marker, False))
+        for marker in (
+            "_otr_openrouter",
+            "_otr_comfy_credits",
+            "_otr_google_api",
+            "_otr_gguf_native",
+        )
+    )
+
+
+def _is_p3_patch_index(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _p3_text_patch_cap(loc: tuple[str | int, ...]) -> int | None:
+    """Return the exact author-owned cap for one trusted Pydantic loc tuple."""
+    if not all(isinstance(item, str) or _is_p3_patch_index(item) for item in loc):
+        return None
+    if len(loc) == 1 and isinstance(loc[0], str):
+        return {"title": 64, "premise": 144, "setting": 80}.get(loc[0])
+    if (
+        len(loc) == 3
+        and loc[0] == "scenes"
+        and _is_p3_patch_index(loc[1])
+        and isinstance(loc[2], str)
+    ):
+        return {"env": 56, "description": 72}.get(loc[2])
+    if (
+        len(loc) == 5
+        and loc[0] == "scenes"
+        and _is_p3_patch_index(loc[1])
+        and loc[2] == "shots"
+        and _is_p3_patch_index(loc[3])
+        and isinstance(loc[4], str)
+    ):
+        return {"description": 72, "visual_prompt": 120}.get(loc[4])
+    if (
+        len(loc) == 5
+        and loc[0] == "scenes"
+        and _is_p3_patch_index(loc[1])
+        and loc[2] == "beats"
+        and _is_p3_patch_index(loc[3])
+        and isinstance(loc[4], str)
+    ):
+        return {"intent": 64, "arc_phase": 28}.get(loc[4])
+    if (
+        len(loc) == 3
+        and loc[0] == "music_cues"
+        and _is_p3_patch_index(loc[1])
+        and isinstance(loc[2], str)
+    ):
+        return {"description": 80, "generation_prompt": 120}.get(loc[2])
+    return None
+
+
+def _p3_text_patch_value_at(raw: object, loc: tuple[str | int, ...]) -> object | None:
+    """Read only a trusted loc from a decoded root; never infer a path."""
+    node: object = raw
+    for item in loc:
+        if isinstance(item, str):
+            if not isinstance(node, Mapping) or item not in node:
+                return None
+            node = node[item]
+        elif _is_p3_patch_index(item):
+            if not isinstance(node, list) or item >= len(node):
+                return None
+            node = node[item]
+        else:
+            return None
+    return node
+
+
+def _p3_text_patch_set_at(
+    raw: dict[str, Any], loc: tuple[str | int, ...], replacement: str,
+) -> None:
+    """Set a leaf through a previously derived trusted loc tuple only."""
+    if not loc:
+        raise ValueError("empty P3 text-patch location")
+    node: object = raw
+    for item in loc[:-1]:
+        if isinstance(item, str):
+            if not isinstance(node, dict) or item not in node:
+                raise ValueError("unreachable P3 text-patch object path")
+            node = node[item]
+        elif _is_p3_patch_index(item):
+            if not isinstance(node, list) or item >= len(node):
+                raise ValueError("unreachable P3 text-patch list path")
+            node = node[item]
+        else:
+            raise ValueError("invalid P3 text-patch path segment")
+    leaf = loc[-1]
+    if isinstance(leaf, str):
+        if not isinstance(node, dict) or leaf not in node:
+            raise ValueError("unreachable P3 text-patch leaf")
+        node[leaf] = replacement
+        return
+    if _is_p3_patch_index(leaf):
+        if not isinstance(node, list) or leaf >= len(node):
+            raise ValueError("unreachable P3 text-patch list leaf")
+        node[leaf] = replacement
+        return
+    raise ValueError("invalid P3 text-patch leaf segment")
+
+
+def _derive_p3_text_patch_targets(
+    raw: object, error: ValidationError,
+) -> tuple[_P3TextPatchTarget, ...] | None:
+    """Accept only a small, fully proven set of authored over-cap leaves."""
+    if not isinstance(raw, dict):
+        return None
+    errors = error.errors()
+    if not errors:
+        return None
+    seen_locs: set[tuple[str | int, ...]] = set()
+    targets: list[_P3TextPatchTarget] = []
+    for row in errors:
+        if row.get("type") != "string_too_long":
+            return None
+        raw_loc = row.get("loc")
+        if not isinstance(raw_loc, tuple):
+            return None
+        loc = tuple(raw_loc)
+        if not all(
+            isinstance(item, str) or _is_p3_patch_index(item)
+            for item in loc
+        ):
+            return None
+        if loc in seen_locs:
+            return None
+        expected_cap = _p3_text_patch_cap(loc)
+        observed_cap = (row.get("ctx") or {}).get("max_length")
+        if (
+            expected_cap is None
+            or not isinstance(observed_cap, int)
+            or isinstance(observed_cap, bool)
+            or observed_cap != expected_cap
+        ):
+            return None
+        current_text = _p3_text_patch_value_at(raw, loc)
+        if (
+            not isinstance(current_text, str)
+            or len(current_text) <= expected_cap
+            or len(current_text) > _P3_TEXT_PATCH_MAX_SOURCE_CHARS
+        ):
+            return None
+        path = ".".join(str(item) for item in loc)
+        if not path or len(path) > _P3_TEXT_PATCH_PATH_MAX_CHARS:
+            return None
+        seen_locs.add(loc)
+        targets.append(_P3TextPatchTarget(
+            loc=loc,
+            path=path,
+            max_chars=expected_cap,
+            current_text=current_text,
+        ))
+    if not 1 <= len(targets) <= _P3_TEXT_PATCH_MAX_TARGETS:
+        return None
+    return tuple(targets)
+
+
+def _p3_text_patch_preflight(
+    raw: dict[str, Any],
+    targets: tuple[_P3TextPatchTarget, ...],
+    post_validator: Callable[[BaseModel], str | None],
+) -> bool:
+    """Prove that only the selected prose leaves block the complete contract."""
+    probe = copy.deepcopy(raw)
+    try:
+        for target in targets:
+            _p3_text_patch_set_at(probe, target.loc, "x")
+        candidate = RadioScoreDraftV4.model_validate(probe)
+        return post_validator(candidate) is None
+    except Exception:
+        # A hidden schema/compiler/signature/graph defect is broader than this
+        # patch. Preserve the existing full typed repair rather than guessing.
+        return False
+
+
+def _p3_text_patch_messages(
+    pack: Any, targets: tuple[_P3TextPatchTarget, ...],
+) -> list[dict[str, str]]:
+    """Build the small, non-copyable local authoring request."""
+    stages = getattr(pack, "prompt_stages", {}) or {}
+    seam = str(stages.get(_P3_TEXT_PATCH_SEAM) or "").strip()
+    if not seam:
+        raise CodexPackContractError(
+            f"missing Codex seam {_P3_TEXT_PATCH_SEAM!r}"
+        )
+    target_rows = [
+        {
+            "path": target.path,
+            "max_chars": target.max_chars,
+            "original_text": target.current_text,
+        }
+        for target in targets
+    ]
+    return [
+        {
+            "role": "system",
+            "content": seam + "\nReturn one JSON object only, rooted at "
+            "replacements. The target list is input evidence, never an output "
+            "template. Do not return a RadioScoreDraftV4, a wrapper, a request "
+            "field, or an explanation.",
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {"targets": target_rows},
+                sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            ),
+        },
+    ]
+
+
+def _p3_text_patch_contract_error(code: str) -> PostValidationError:
+    """Return a bounded failure that cannot serialize rejected patch prose."""
+    return PostValidationError(f"draft.text_patch at root: {code}")
+
+
+def _merge_p3_text_patch(
+    raw: dict[str, Any],
+    targets: tuple[_P3TextPatchTarget, ...],
+    patch: _RadioScoreDraftTextPatchV4,
+) -> dict[str, Any]:
+    """Apply exact one-for-one model prose only through trusted target locs."""
+    by_path = {target.path: target for target in targets}
+    if len(patch.replacements) != len(by_path):
+        raise _p3_text_patch_contract_error("replacement_count")
+    replacements: dict[str, str] = {}
+    for row in patch.replacements:
+        target = by_path.get(row.path)
+        if target is None:
+            raise _p3_text_patch_contract_error("unknown_path")
+        if row.path in replacements:
+            raise _p3_text_patch_contract_error("duplicate_path")
+        if not row.replacement_text.strip():
+            raise _p3_text_patch_contract_error("blank_replacement")
+        if len(row.replacement_text) > target.max_chars:
+            raise _p3_text_patch_contract_error("replacement_over_cap")
+        replacements[row.path] = row.replacement_text
+    if set(replacements) != set(by_path):
+        raise _p3_text_patch_contract_error("missing_path")
+    merged = copy.deepcopy(raw)
+    try:
+        for target in targets:
+            _p3_text_patch_set_at(
+                merged, target.loc, replacements[target.path],
+            )
+    except Exception as exc:
+        raise _p3_text_patch_contract_error("trusted_path_unreachable") from exc
+    return merged
+
+
+def _run_local_p3_text_patch(
+    *,
+    slot_fn: GenerateFn,
+    pack: Any,
+    raw_draft: dict[str, Any],
+    targets: tuple[_P3TextPatchTarget, ...],
+    post_validator: Callable[[BaseModel], str | None],
+    calls: list[dict[str, Any]],
+    mark_attempt_complete: Callable[[int, str, BaseException | None], None],
+) -> RadioScoreDraftV4:
+    """Make P3's sole author-owned text patch call with a complete receipt."""
+    patch_attempt_index = len(calls) + 1
+    receipt: dict[str, Any] = {
+        "temperature": REPAIR_TEMPERATURE,
+        "max_new_tokens": _P3_TEXT_PATCH_MAX_OUTPUT_TOKENS,
+        "raw_chars": None,
+        "raw_sha256": None,
+        "resolved_artifact_unwrapped": False,
+        "parse_status": "pending",
+        "schema_status": "pending",
+        "draft_status": "pending",
+        "compiler_status": "pending",
+        "graph_status": "pending",
+        "repair_kind": _P3_TEXT_PATCH_KIND,
+        "patch_status": "pending",
+        "patch_targets": [
+            {"path": target.path, "max_chars": target.max_chars}
+            for target in targets
+        ],
+    }
+    calls.append(receipt)
+    if len(calls) != patch_attempt_index:
+        raise CodexPackContractError("P3 text-patch receipt index drift")
+
+    try:
+        raw_patch = str(invoke_structured_slot(
+            slot_fn,
+            _PromptMustFitMessages(_p3_text_patch_messages(pack, targets)),
+            temperature=REPAIR_TEMPERATURE,
+            max_new_tokens=_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS,
+        ))
+    except Exception:
+        receipt.update({
+            "parse_status": "terminal_error",
+            "schema_status": "not_run",
+            "draft_status": "terminal_error",
+            "compiler_status": "not_run",
+            "graph_status": "not_run",
+            "patch_status": "terminal_error",
+            "patch_error_code": "provider",
+        })
+        raise
+    receipt.update({
+        "raw_chars": len(raw_patch),
+        "raw_sha256": hashlib.sha256(raw_patch.encode("utf-8")).hexdigest(),
+    })
+
+    try:
+        patch_data = parse_first_json_object(raw_patch)
+    except Exception as exc:
+        receipt.update({
+            "parse_status": "not_decoded",
+            "schema_status": "not_run",
+            "draft_status": "not_decoded",
+            "compiler_status": "not_run",
+            "graph_status": "not_run",
+            "patch_status": "not_decoded",
+            "patch_error_code": "json",
+        })
+        raise _p3_text_patch_contract_error("patch_json") from exc
+    try:
+        patch = _RadioScoreDraftTextPatchV4.model_validate(patch_data)
+    except ValidationError as exc:
+        receipt.update({
+            "parse_status": "decoded",
+            "schema_status": "rejected",
+            "draft_status": "schema_rejected",
+            "compiler_status": "not_run",
+            "graph_status": "not_run",
+            "patch_status": "schema_rejected",
+            "patch_error_code": "patch_root",
+        })
+        raise _p3_text_patch_contract_error("patch_root") from exc
+    try:
+        merged_raw = _merge_p3_text_patch(raw_draft, targets, patch)
+        merged_draft = RadioScoreDraftV4.model_validate(merged_raw)
+    except PostValidationError:
+        receipt.update({
+            "parse_status": "decoded",
+            "schema_status": "accepted",
+            "draft_status": "patch_contract_rejected",
+            "compiler_status": "not_run",
+            "graph_status": "not_run",
+            "patch_status": "contract_rejected",
+            "patch_error_code": "coverage",
+        })
+        raise
+    except ValidationError as exc:
+        receipt.update({
+            "parse_status": "decoded",
+            "schema_status": "rejected",
+            "draft_status": "schema_rejected",
+            "compiler_status": "not_run",
+            "graph_status": "not_run",
+            "patch_status": "schema_rejected",
+            "patch_error_code": "merged_draft",
+        })
+        raise _p3_text_patch_contract_error("merged_draft") from exc
+    validation_error = post_validator(merged_draft)
+    if validation_error is not None:
+        detail = str(validation_error)
+        draft_code = ""
+        if detail.startswith("draft."):
+            draft_code = detail.split(" ", 1)[0].removeprefix("draft.")
+        receipt.update({
+            "parse_status": "decoded",
+            "schema_status": "accepted",
+            "draft_status": "compiler_rejected",
+            "compiler_status": draft_code or "post_validation_rejected",
+            "graph_status": "rejected" if draft_code == "graph" else "not_run",
+            "patch_status": "post_validation_rejected",
+            "patch_error_code": "merged_contract",
+        })
+        raise PostValidationError(validation_error)
+
+    mark_attempt_complete(patch_attempt_index, raw_patch, None)
+    receipt["patch_status"] = "accepted"
+    return merged_draft
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9'’-]*")
 _DECORATION_RE = re.compile(r"[\r\n\t\[\]()\x60*]|^\s*\x60\x60\x60|^\s*[-*]\s+")
 _ALL_CAPS_RE = re.compile(r"\b[A-Z]{2,}\b")
@@ -1707,6 +2141,23 @@ def invoke_codex_structured(
         if not 1 <= attempt_index <= len(calls):
             return
         receipt = calls[attempt_index - 1]
+        if receipt.get("repair_kind") == _P3_TEXT_PATCH_KIND:
+            # The direct P3 patch owns its real wire receipt.  The shared
+            # structured ladder has no patch raw output when the factory
+            # raises, so letting its generic callback classify that empty
+            # string would falsely rewrite a JSON/patch-schema failure as a
+            # decoded accepted draft.  On direct success this callback is
+            # invoked explicitly by `_run_local_p3_text_patch` after the
+            # merged artifact has cleared the complete validator.
+            if error is None:
+                receipt.update({
+                    "parse_status": "decoded",
+                    "schema_status": "accepted",
+                    "draft_status": "accepted",
+                    "compiler_status": "accepted",
+                    "graph_status": "accepted",
+                })
+            return
         if error is None:
             receipt.update({
                 "parse_status": "decoded",
@@ -1806,6 +2257,13 @@ def invoke_codex_structured(
             "graph_status": "pending" if draft_score_pass else "not_applicable",
         })
         return raw
+
+    # `structured_call` sees this wrapper rather than the original slot. Keep
+    # OpenRouter's structured-output markers visible so base/full-repair P3
+    # calls retain the same json_object transport as an unwrapped slot.
+    capture._otr_openrouter = getattr(slot_fn, "_otr_openrouter", False)  # type: ignore[attr-defined]
+    capture._otr_response_format = getattr(slot_fn, "_otr_response_format", None)  # type: ignore[attr-defined]
+
     def typed_repair_factory(*, original_prompt, failed_output, error):
         detail = " ".join(str(error).split())[:500] or "structured output rejected"
         if script_artifact_pass:
@@ -1857,6 +2315,38 @@ def invoke_codex_structured(
                 "music_cues never create a line row."
             )
         elif draft_score_pass:
+            # A live P3 compact draft can be structurally complete with only a
+            # few authored strings over their strict caps. Let the author make
+            # one bounded local shortening decision, but only after a probe
+            # proves that no hidden compiler/signature/graph defect exists.
+            # Remote slots retain their normal same-slot full repair: their
+            # virtual context metadata is not an exact tokenizer preflight.
+            if _is_local_p3_text_patch_slot(slot_fn) and isinstance(error, ValidationError):
+                try:
+                    failed_draft_for_patch = parse_first_json_object(failed_output)
+                except Exception:
+                    failed_draft_for_patch = None
+                if isinstance(failed_draft_for_patch, dict):
+                    patch_targets = _derive_p3_text_patch_targets(
+                        failed_draft_for_patch, error,
+                    )
+                    if (
+                        patch_targets is not None
+                        and _p3_text_patch_preflight(
+                            failed_draft_for_patch,
+                            patch_targets,
+                            post_validator,
+                        )
+                    ):
+                        return _run_local_p3_text_patch(
+                            slot_fn=slot_fn,
+                            pack=pack,
+                            raw_draft=failed_draft_for_patch,
+                            targets=patch_targets,
+                            post_validator=post_validator,
+                            calls=calls,
+                            mark_attempt_complete=mark_attempt_complete,
+                        )
             trusted_context = json.dumps(
                 body["artifact_inputs"],
                 sort_keys=True, separators=(",", ":"), ensure_ascii=False,

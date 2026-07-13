@@ -942,6 +942,47 @@ def test_max_width_p3_draft_envelopes_fit_the_local_gemma_context():
         for prompt_tokens_for_call in prompt_tokens
     ), f"draft P3 prompt tokens {prompt_tokens} exceed the 8192 context cap"
 
+    patch_raw = copy.deepcopy(draft.model_dump(mode="json"))
+    patch_loc_caps = [
+        (("title",), 64),
+        (("premise",), 144),
+        (("scenes", 0, "shots", 0, "visual_prompt"), 120),
+        (("scenes", 0, "beats", 0, "intent"), 64),
+        (("music_cues", 0, "description"), 80),
+        (("music_cues", 2, "generation_prompt"), 120),
+    ]
+    for loc, cap in patch_loc_caps:
+        lane._p3_text_patch_set_at(patch_raw, loc, "x" * (cap + 1))
+    with pytest.raises(ValidationError) as patch_error:
+        lane.RadioScoreDraftV4.model_validate(patch_raw)
+    patch_targets = lane._derive_p3_text_patch_targets(
+        patch_raw, patch_error.value,
+    )
+    assert patch_targets is not None and len(patch_targets) == 6
+    patch_messages = lane._p3_text_patch_messages(pack, patch_targets)
+    patch_response = json.dumps(
+        {
+            "replacements": [
+                {
+                    "path": target.path,
+                    "replacement_text": _bounded_prose(
+                        target.max_chars, f"patch{index}",
+                    ),
+                }
+                for index, target in enumerate(patch_targets)
+            ],
+        },
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    )
+    patch_prompt_tokens = token_count(patch_messages)
+    patch_response_tokens = len(
+        tokenizer(patch_response, add_special_tokens=False)["input_ids"]
+    )
+    assert patch_response_tokens <= lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    assert (
+        patch_prompt_tokens + lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS <= 8192
+    ), f"P3 text patch prompt tokens {patch_prompt_tokens} exceed the 8192 context cap"
+
 
 def test_draft_compiler_derives_only_mechanical_score_metadata():
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
@@ -1067,6 +1108,440 @@ def test_p3_semantic_repair_uses_minified_draft_and_bounded_receipts():
     assert attempts[0]["draft_status"] == "compiler_rejected"
     assert attempts[1]["compiler_status"] == "accepted"
     assert journal["calls"][0]["accepted_transport"]["schema"] == "RadioScoreDraftV4"
+
+
+@pytest.mark.parametrize(
+    ("loc", "cap"),
+    [
+        (("title",), 64),
+        (("premise",), 144),
+        (("setting",), 80),
+        (("scenes", 0, "env"), 56),
+        (("scenes", 0, "description"), 72),
+        (("scenes", 0, "shots", 0, "description"), 72),
+        (("scenes", 0, "shots", 1, "visual_prompt"), 120),
+        (("scenes", 0, "beats", 0, "intent"), 64),
+        (("scenes", 0, "beats", 1, "arc_phase"), 28),
+        (("music_cues", 0, "description"), 80),
+        (("music_cues", 0, "generation_prompt"), 120),
+    ],
+)
+def test_p3_text_patch_gate_covers_each_author_owned_leaf(loc, cap):
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    raw = _draft_for_advisory(advisory).model_dump(mode="json")
+    lane._p3_text_patch_set_at(raw, loc, "x" * (cap + 1))
+
+    with pytest.raises(ValidationError) as exc_info:
+        lane.RadioScoreDraftV4.model_validate(raw)
+
+    targets = lane._derive_p3_text_patch_targets(raw, exc_info.value)
+    assert targets is not None
+    assert len(targets) == 1
+    assert targets[0].loc == loc
+    assert targets[0].max_chars == cap
+    assert targets[0].current_text == "x" * (cap + 1)
+
+
+def test_p3_text_patch_refuses_mixed_or_unbounded_source_errors():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    raw = _draft_for_advisory(advisory).model_dump(mode="json")
+    raw["title"] = "x" * 257
+    with pytest.raises(ValidationError) as source_exc:
+        lane.RadioScoreDraftV4.model_validate(raw)
+    assert lane._derive_p3_text_patch_targets(raw, source_exc.value) is None
+
+    mixed = _draft_for_advisory(advisory).model_dump(mode="json")
+    mixed["title"] = "x" * 65
+    mixed["music_cues"][0]["cue_id"] = "not_a_cue"
+    with pytest.raises(ValidationError) as mixed_exc:
+        lane.RadioScoreDraftV4.model_validate(mixed)
+    assert lane._derive_p3_text_patch_targets(mixed, mixed_exc.value) is None
+
+
+def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    invalid = draft.model_dump(mode="json")
+    invalid["scenes"][0]["description"] = "x" * 73
+    replacement = "A receiver hums under a cold sky."
+    responses = [
+        json.dumps(invalid),
+        json.dumps({"replacements": [{
+            "path": "scenes.0.description",
+            "replacement_text": replacement,
+        }]}),
+    ]
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal=journal,
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    assert calls[1]["temperature"] == pytest.approx(lane.REPAIR_TEMPERATURE)
+    assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
+    assert "replacements" in calls[1]["messages"][0]["content"]
+    assert "original_text" in calls[1]["messages"][1]["content"]
+
+    attempts = journal["calls"][0]["attempts"]
+    assert len(attempts) == 2
+    assert attempts[1]["repair_kind"] == "p3_authored_text_patch"
+    assert attempts[1]["patch_status"] == "accepted"
+    assert attempts[1]["parse_status"] == "decoded"
+    assert attempts[1]["schema_status"] == "accepted"
+    assert attempts[1]["draft_status"] == "accepted"
+    assert attempts[1]["patch_targets"] == [
+        {"path": "scenes.0.description", "max_chars": 72},
+    ]
+    assert "x" * 73 not in json.dumps(attempts, ensure_ascii=False)
+    expected = draft.model_dump(mode="json")
+    expected["scenes"][0]["description"] = replacement
+    expected_wire = json.dumps(
+        expected, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    )
+    transport = journal["calls"][0]["accepted_transport"]
+    assert transport["schema"] == "RadioScoreDraftV4"
+    assert transport["sha256"] == hashlib.sha256(expected_wire.encode()).hexdigest()
+    assert result.title == expected["title"]
+    assert result.scenes[0].description == replacement
+    assert result.scenes[0].shots[0].visual_prompt == (
+        expected["scenes"][0]["shots"][0]["visual_prompt"]
+    )
+
+
+def test_p3_rewrite_local_text_patch_preserves_locked_structure():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    score = lane.compile_radio_score_draft(draft, advisory, cast, facts)
+    projected = lane.project_radio_score_to_draft(score)
+    invalid = projected.model_dump(mode="json")
+    invalid["scenes"][0]["beats"][0]["intent"] = "x" * 65
+    responses = [
+        json.dumps(invalid),
+        json.dumps({"replacements": [{
+            "path": "scenes.0.beats.0.intent",
+            "replacement_text": "A cautious choice sharpens.",
+        }]}),
+    ]
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3_rewrite", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs={
+            **_draft_context(advisory, cast, facts),
+            "previous_draft": projected.model_dump(mode="json"),
+            "review": {"verdict": "rewrite", "issues": ["Tighten the turn."]},
+        },
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.55, structural_retry_temperature=.20,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal={},
+        expected_signature=lane._radio_score_draft_structure_signature(projected),
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
+
+
+def test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect():
+    advisory = lane.make_advisory_word_blueprint(
+        60, [f"b{index:03d}" for index in range(6)],
+    )
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    invalid = draft.model_dump(mode="json")
+    invalid["scenes"][0]["description"] = "x" * 73
+    invalid["music_cues"][1]["cue_id"] = "music_open"
+    responses = [json.dumps(invalid), json.dumps(draft.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal=journal,
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    assert calls[1]["max_new_tokens"] == lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
+    assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
+    assert "repair_kind" not in journal["calls"][0]["attempts"][1]
+
+
+def test_p3_malformed_text_patch_fails_without_a_third_reroll():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    invalid = _draft_for_advisory(advisory).model_dump(mode="json")
+    invalid["scenes"][0]["description"] = "x" * 73
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+    responses = [json.dumps(invalid), "not JSON"]
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    with pytest.raises(lane.CodexPassError):
+        lane._call_radio_score_draft(
+            pass_id="P3", slot_fn=slot_fn,
+            pack=routing.resolve_story_pack("scifi_codex"),
+            seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+            artifact_inputs=_draft_context(advisory, cast, facts),
+            advisory=advisory, cast=cast, fact_index=facts,
+            base_temperature=.72, structural_retry_temperature=.32,
+            max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+            call_journal=journal,
+        )
+
+    assert len(calls) == 2
+    attempt = journal["calls"][0]["attempts"][1]
+    assert attempt["repair_kind"] == "p3_authored_text_patch"
+    assert attempt["patch_status"] == "not_decoded"
+    assert attempt["parse_status"] == "not_decoded"
+    assert attempt["schema_status"] == "not_run"
+    assert attempt["draft_status"] == "not_decoded"
+    assert attempt["compiler_status"] == "not_run"
+    assert attempt["graph_status"] == "not_run"
+    assert "not JSON" not in json.dumps(attempt, ensure_ascii=False)
+
+
+def test_p3_text_patch_contract_rejects_missing_duplicate_unknown_blank_and_overcap_rows():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    raw = _draft_for_advisory(advisory).model_dump(mode="json")
+    raw["scenes"][0]["description"] = "x" * 73
+    raw["scenes"][0]["beats"][0]["intent"] = "y" * 65
+    with pytest.raises(ValidationError) as exc_info:
+        lane.RadioScoreDraftV4.model_validate(raw)
+    targets = lane._derive_p3_text_patch_targets(raw, exc_info.value)
+    assert targets is not None and len(targets) == 2
+    first, second = targets
+
+    def patch(rows):
+        return lane._RadioScoreDraftTextPatchV4.model_validate({"replacements": rows})
+
+    rows_by_case = {
+        "missing": [{
+            "path": first.path,
+            "replacement_text": "Short enough.",
+        }],
+        "duplicate": [
+            {"path": first.path, "replacement_text": "Short enough."},
+            {"path": first.path, "replacement_text": "Still short."},
+        ],
+        "unknown": [
+            {"path": "scenes.9.description", "replacement_text": "Short enough."},
+            {"path": second.path, "replacement_text": "Still short."},
+        ],
+        "blank": [
+            {"path": first.path, "replacement_text": " "},
+            {"path": second.path, "replacement_text": "Still short."},
+        ],
+        "overcap": [
+            {"path": first.path, "replacement_text": "z" * (first.max_chars + 1)},
+            {"path": second.path, "replacement_text": "Still short."},
+        ],
+    }
+    for rows in rows_by_case.values():
+        with pytest.raises(lane.PostValidationError):
+            lane._merge_p3_text_patch(raw, targets, patch(rows))
+
+    with pytest.raises(ValidationError):
+        patch([])
+
+
+def test_p3_text_patch_rejects_a_resolved_artifact_wrapper_without_reroll():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    invalid = _draft_for_advisory(advisory).model_dump(mode="json")
+    invalid["scenes"][0]["description"] = "x" * 73
+    wrapped_patch = {
+        "resolved_artifact": {
+            "replacements": [{
+                "path": "scenes.0.description",
+                "replacement_text": "A compact receiver hums.",
+            }],
+        },
+    }
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+    responses = [json.dumps(invalid), json.dumps(wrapped_patch)]
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    with pytest.raises(lane.CodexPassError):
+        lane._call_radio_score_draft(
+            pass_id="P3", slot_fn=slot_fn,
+            pack=routing.resolve_story_pack("scifi_codex"),
+            seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+            artifact_inputs=_draft_context(advisory, cast, facts),
+            advisory=advisory, cast=cast, fact_index=facts,
+            base_temperature=.72, structural_retry_temperature=.32,
+            max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+            call_journal=journal,
+        )
+
+    assert len(calls) == 2
+    attempt = journal["calls"][0]["attempts"][1]
+    assert attempt["repair_kind"] == "p3_authored_text_patch"
+    assert attempt["patch_status"] == "schema_rejected"
+    assert attempt["parse_status"] == "decoded"
+    assert attempt["schema_status"] == "rejected"
+    assert attempt["draft_status"] == "schema_rejected"
+    assert attempt["compiler_status"] == "not_run"
+
+
+def test_p3_scheduler_openrouter_stays_on_full_repair_and_forwards_json_mode(monkeypatch):
+    """The production scheduler must preserve remote P3 transport identity.
+
+    A scheduler closure is the actual writer path, unlike an unwrapped test
+    slot.  It must advertise OpenRouter before P3 chooses its repair ladder and
+    relay the common json_object request mode to the lazily built backend.
+    """
+    from nodes import OTR_LedgerScriptWriter as writer
+    from nodes import _otr_model_catalog as catalog
+    from nodes import _otr_model_loader as model_loader
+
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    invalid = draft.model_dump(mode="json")
+    invalid["scenes"][0]["description"] = "x" * 73
+    responses = [json.dumps(invalid), json.dumps(draft.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        catalog, "_by_repo_id",
+        lambda: {"openrouter:slot-a": SimpleNamespace(provider="openrouter")},
+    )
+    monkeypatch.setattr(
+        model_loader,
+        "request_slot",
+        lambda slot, model_id, policy=None: {"provider": "openrouter"},
+    )
+
+    def fake_build(cache_entry, **_sampling):
+        assert cache_entry["provider"] == "openrouter"
+
+        def base(messages, *, temperature, max_new_tokens, stop=None,
+                 response_format=None):
+            calls.append({
+                "messages": messages,
+                "temperature": temperature,
+                "max_new_tokens": max_new_tokens,
+                "stop": stop,
+                "response_format": response_format,
+            })
+            return responses.pop(0)
+
+        return base
+
+    monkeypatch.setattr(writer, "_build_truncating_generate_fn", fake_build)
+    scheduler = writer._SlotScheduler(
+        creative_id="openrouter:slot-a",
+        technical_id="mistralai/Mistral-Nemo-Instruct-2407",
+        top_p=.92, min_p=0.0, repetition_penalty=1.0,
+    )
+    slot_fn = scheduler.for_slot("creative")
+    assert slot_fn._otr_openrouter is True  # type: ignore[attr-defined]
+    assert slot_fn._otr_p3_text_patch_local is False  # type: ignore[attr-defined]
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal=journal,
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    assert all(call["response_format"] == {"type": "json_object"} for call in calls)
+    assert calls[1]["max_new_tokens"] == lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
+    assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
+    assert "repair_kind" not in journal["calls"][0]["attempts"][1]
+
+
+def test_p3_openrouter_overlength_uses_same_slot_full_repair_with_json_mode():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    invalid = draft.model_dump(mode="json")
+    invalid["scenes"][0]["description"] = "x" * 73
+    responses = [json.dumps(invalid), json.dumps(draft.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+    journal: dict[str, object] = {}
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    slot_fn._otr_openrouter = True  # type: ignore[attr-defined]
+    slot_fn._otr_response_format = None  # type: ignore[attr-defined]
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal=journal,
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    assert len(calls) == 2
+    assert all(call["response_format"] == {"type": "json_object"} for call in calls)
+    assert calls[1]["max_new_tokens"] == lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
+    assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
+    assert "repair_kind" not in journal["calls"][0]["attempts"][1]
 
 
 def test_p3_compact_contract_names_nested_literal_values_on_base_and_repair():

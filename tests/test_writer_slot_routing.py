@@ -276,6 +276,35 @@ def test_same_slot_id_means_zero_transitions(monkeypatch):
     assert all(model_id == SAME for _slot, model_id in trace)
 
 
+def test_scheduler_declares_catalog_local_p3_patch_capability(monkeypatch):
+    """A local catalog row must explicitly authorize P3's tokenizer guard.
+
+    This is the counterpart to the scheduler-wrapped OpenRouter P3 test: the
+    wrapper must be conservative for unknown/remote rows without accidentally
+    disabling the exact local catalog route it is meant to protect.
+    """
+    import nodes.OTR_LedgerScriptWriter as W
+    import nodes._otr_model_catalog as catalog
+
+    local_id = "mistralai/Mistral-Nemo-Instruct-2407"
+    monkeypatch.setattr(
+        catalog, "_by_repo_id",
+        lambda: {local_id: type("LocalRow", (), {"provider": "local"})()},
+    )
+    scheduler = W._SlotScheduler(
+        creative_id=local_id,
+        technical_id=local_id,
+        top_p=.92,
+        min_p=0.0,
+        repetition_penalty=1.0,
+    )
+
+    slot_fn = scheduler.for_slot("creative")
+    assert slot_fn._otr_p3_text_patch_local is True  # type: ignore[attr-defined]
+    assert slot_fn._otr_openrouter is False  # type: ignore[attr-defined]
+    assert slot_fn._otr_response_format is None  # type: ignore[attr-defined]
+
+
 # ---------------------------------------------------------------------------
 # 4. test_polish_routes_to_creative
 # ---------------------------------------------------------------------------
