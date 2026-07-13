@@ -1267,3 +1267,31 @@ out until they independently meet the same production-only admission rule.
   global cardinality to local collection caps at every repair boundary;
   promoted as executable BUG-11.38 extension coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260713-07 -- Source-grounded acronym was rejected as shouting
+
+- promotion: BUG-11.51
+- surfaced: canonical 42-word `scifi_codex` reverify, prompt
+  `3627b61a-8174-43e5-95f1-1a0c8f0269ec`, Aion 3.0 Mini creative +
+  Mistral-Nemo technical, 2026-07-13
+- symptom: P0 through P4 and P3_rewrite cleared, including the repaired compact
+  topology. P5 used the acronym `RIO` from accepted source evidence. The spoken
+  hygiene validator rejected it as an all-caps lexical word; the model repair
+  merely moved the same grounded acronym to another line and exhausted the
+  ladder before ledger/media/OBS work.
+- root cause: spoken hygiene used a blanket uppercase-token regex. It had no
+  connection to the accepted FactIndexV4 evidence, so a legitimate acronym and
+  ungrounded shouting were indistinguishable at every script boundary.
+- fix: derive the exact set of uppercase lexical tokens only from the literal
+  source spans already accepted for facts, entities, and numeric evidence.
+  Thread that immutable allowlist through P5, P7, P9, and final spoken
+  validation. Continue rejecting every all-caps lexical token absent from the
+  accepted evidence; do not lowercase or rewrite authored dialogue in Python.
+- verify idea: accept `RIO` when it is present in a literal accepted fact span,
+  reject `STOP` in the same line, and prove the source-grounded set reaches all
+  script validators. Re-run the same canonical 42-word combination through
+  ledger, episode, `obs_publish OK`, and final OBS existence.
+- bible-worthy: yes -- lexical hygiene must distinguish source-grounded
+  acronyms from ungrounded shouting at the validator boundary; promoted as
+  executable BUG-11.51 coverage.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

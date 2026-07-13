@@ -1957,13 +1957,36 @@ def _validate_fact_index(
     return None
 
 
-def _spoken_error(text: str, name: str = "") -> str | None:
+def _source_grounded_all_caps(index: FactIndexV4) -> frozenset[str]:
+    """Return exact acronym tokens already present in accepted source evidence."""
+    surfaces: list[str] = []
+    for fact in index.facts:
+        surfaces.extend(span.quote for span in fact.source_spans)
+    for entity in index.entities:
+        surfaces.extend(span.quote for span in entity.source_spans)
+    for number in index.numbers:
+        surfaces.append(number.source_span.quote)
+    return frozenset(
+        match.group(0)
+        for surface in surfaces
+        for match in _ALL_CAPS_RE.finditer(surface or "")
+    )
+
+
+def _spoken_error(
+    text: str,
+    name: str = "",
+    allowed_all_caps: frozenset[str] = frozenset(),
+) -> str | None:
     value = text or ""
     if not value.strip():
         return "spoken text is empty"
     if _DECORATION_RE.search(value) or _LABEL_RE.match(value) or _QUOTED_RE.match(value):
         return "spoken text contains stage direction, markup, or a role label"
-    if _ALL_CAPS_RE.search(value):
+    if any(
+        match.group(0) not in allowed_all_caps
+        for match in _ALL_CAPS_RE.finditer(value)
+    ):
         return "spoken text contains an all-caps lexical word"
     if name and re.match(r"^\s*" + re.escape(name.split()[0]) + r"\s*[,!:]", value, re.I):
         return "spoken text begins with a self-vocative"
@@ -1973,7 +1996,10 @@ def _spoken_error(text: str, name: str = "") -> str | None:
 
 
 def validate_spoken_text_and_roster(
-    script: ScriptArtifactV4, cast: CastPlanV4, score: RadioScoreV4
+    script: ScriptArtifactV4,
+    cast: CastPlanV4,
+    score: RadioScoreV4,
+    allowed_all_caps: frozenset[str] = frozenset(),
 ) -> None:
     locked = {row.char_id: row.name for row in cast.cast}
     if locked.get("announcer") != "ANNOUNCER":
@@ -1990,7 +2016,9 @@ def validate_spoken_text_and_roster(
             raise CodexSpokenTextError(f"line {line.line_id} uses an unlocked cast id")
         if line.speaker_role not in ("character", "announcer"):
             raise CodexSpokenTextError(f"line {line.line_id} has an illegal spoken role")
-        err = _spoken_error(line.text, locked[line.char_id])
+        err = _spoken_error(
+            line.text, locked[line.char_id], allowed_all_caps,
+        )
         if err:
             raise CodexSpokenTextError(f"{line.line_id}: {err}")
     voiced = {line.char_id for line in script.lines if not line.skip}
@@ -2905,10 +2933,24 @@ def _build_codex_episode_canon(
     )
 
 
-def _validate_script_post(script: ScriptArtifactV4, cast: CastPlanV4, score: RadioScoreV4) -> str | None:
+def _validate_script_post(
+    script: ScriptArtifactV4,
+    cast: CastPlanV4,
+    score: RadioScoreV4,
+    fact_index: FactIndexV4 | None = None,
+) -> str | None:
     try:
         _validate_script_graph(script, score)
-        validate_spoken_text_and_roster(script, cast, score)
+        validate_spoken_text_and_roster(
+            script,
+            cast,
+            score,
+            (
+                _source_grounded_all_caps(fact_index)
+                if fact_index is not None
+                else frozenset()
+            ),
+        )
     except ScifiCodexError as exc:
         return str(exc)
     return None
@@ -3069,13 +3111,15 @@ def run_scifi_codex_episode(
         raise CodexGraphError("accepted score has no line graph to budget for")
     script_token_budget = _script_output_token_budget(steer.requested_words, accepted_line_count)
     journal["script_token_budget"] = {"requested_words": steer.requested_words, "accepted_line_count": accepted_line_count, "max_new_tokens": script_token_budget}
-    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
     listener = invoke_codex_structured(pass_id="P6", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_listening_room_system",), artifact_inputs={"script": script.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ListenerReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2200, call_journal=journal)
-    script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+    script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
     audit = invoke_codex_structured(pass_id="P8", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_final_audit_system", "codex_coda_contract_system"), artifact_inputs={"script": script.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json")}, result_type=FinalAuditV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2400, call_journal=journal)
     if audit.verdict == "rewrite":
-        script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
-    validate_spoken_text_and_roster(script, p2, score)
+        script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+    validate_spoken_text_and_roster(
+        script, p2, score, _source_grounded_all_caps(p0),
+    )
     expected = _assemble_ledger(led, score, p2, script, meta)
     from ._otr_content_authorship import stamp_receipt
     stamp_receipt(

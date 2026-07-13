@@ -676,8 +676,34 @@ def test_literal_fact_spans_and_reject_only_spoken_hygiene():
     assert lane._validate_fact_index(broken, payload)
     assert lane._spoken_error("(pause) the signal arrives", "Iona")
     assert lane._spoken_error("NASA confirms it", "Iona")
+    assert lane._spoken_error(
+        "NASA confirms it", "Iona", frozenset({"NASA"}),
+    ) is None
+    assert lane._spoken_error(
+        "NASA says STOP", "Iona", frozenset({"NASA"}),
+    ) == "spoken text contains an all-caps lexical word"
     assert lane._spoken_error("Iona, listen", "Iona")
     assert lane._spoken_error("The signal arrives", "Iona") is None
+
+
+def test_spoken_validator_allows_only_acronyms_grounded_in_accepted_fact_index():
+    facts = lane.FactIndexV4(
+        facts=[lane.FactV4(
+            fact_id="F01",
+            claim="RIO lets NASA researchers share robot software.",
+            source_spans=[lane.SourceSpanV4(
+                field="full_text", start=0, end=3, quote="RIO",
+            )],
+        )],
+        entities=[], numbers=[], tone="technical", payload_sha256="0" * 64,
+    )
+    allowed = lane._source_grounded_all_caps(facts)
+
+    assert allowed == frozenset({"RIO"})
+    assert lane._spoken_error("RIO can move between robots.", allowed_all_caps=allowed) is None
+    assert lane._spoken_error(
+        "RIO must STOP now.", allowed_all_caps=allowed,
+    ) == "spoken text contains an all-caps lexical word"
 
 
 def test_fact_index_provenance_rejects_out_of_range_spans_and_wrong_a0_digest():
