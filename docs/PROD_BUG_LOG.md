@@ -874,3 +874,41 @@ out until they independently meet the same production-only admission rule.
   model-facing artifact-surface and compact-repair requirements; promoted as
   BUG-11.50 with cross-lane executable coverage.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
+
+## PBUG-20260712-22 -- Sci-Fi Codex P3 could exhaust an unbounded full score
+
+- promotion: BUG-11.50 extension
+- surfaced: canonical 120-word `scifi_codex` reverify queue leg, prompt
+  `f26b727b-42c8-40d6-b3ee-001d7a869cf9`, Gemma E4B creative + Mistral-Nemo
+  technical, 2026-07-12
+- symptom: P0 cleared through its existing literal-span metadata repair, but P3
+  returned incomplete JSON at `generated_tokens=max_new_tokens=2800` on both
+  base and structural attempts. Its compact typed-repair input fit at 4,317
+  tokens, yet that repair also exhausted the 2,800-token output cap. The queue
+  ended `RESULT FAIL` before ledger, episode, image/still, or OBS work.
+- root cause: PBUG-20's compact repair path fixed input truncation, but
+  `RadioScoreV4` still had unbounded authored strings and nested scene, shot,
+  beat, line-ID, and advisory-row surface. A 2,800-token reservation therefore
+  had no defensible whole-artifact ceiling and could truncate a valid score.
+- fix: make the existing canonical score finite rather than adding a second
+  draft/compiler artifact: at most 3 scenes, 6 shots, 12 beats, 24 line IDs,
+  and 3 cues; bound every P3 prose/ID field and type the advisory rows. Use a
+  2,900-token score reservation with a 5,292-token input reserve, retain
+  `prompt_must_fit=True`, and disable shared string clamping for P1/P2/P3/
+  P3-rewrite/P4 authored artifacts so an over-limit value reaches typed repair
+  rather than silently losing prose. P3-rewrite repair no longer repeats the
+  accepted score beside its failed rewrite; its base rewrite request carries
+  the accepted score plus review only, while typed repair derives the locked
+  graph from the trusted advisory plan. A local Gemma tokenizer regression
+  exercises max-width P3 and P3-rewrite base/repair envelopes; the P3 score
+  measured 2,621 output tokens, its max-width base prompt measured 3,465, and
+  every measured base/repair envelope fits the 5,292-token input reservation.
+- verify idea: reject over-limit score/advisory shapes; verify clamp-off still
+  fails loud while the shared default remains compatible; verify the rewrite
+  repair omits the duplicate accepted score; verify the P3 receipt records its
+  finite surface and 2,900/5,292 reservation; then rerun the same canonical
+  bank through P3 and require all-visualizer zero image objects, saved ledger,
+  canonical episode asset, `obs_publish OK`, and final OBS file.
+- bible-worthy: yes -- same admitted bounded-whole-artifact and compact-repair
+  law as BUG-11.50, with P3 full-score executable coverage added.
+- status: FIXED IN TREE; LIVE REVERIFY PENDING

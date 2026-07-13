@@ -393,6 +393,7 @@ def validate_tolerant_data(
     schema: type[T],
     *,
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
+    clamp_overlong_strings: bool = True,
 ) -> T:
     """Strict-first validate, then bounded tolerance, then the content check.
 
@@ -402,8 +403,9 @@ def validate_tolerant_data(
 
       1. ``schema.model_validate(data)`` -- the EXACT current strict parse. A
          schema with no tolerance hooks is byte-identical to today.
-      2. On ``ValidationError`` ONLY: clamp over-long top-level string fields to
-         their declared ``max_length`` and re-validate. A verbose/weak model can
+      2. When ``clamp_overlong_strings`` is true, on ``ValidationError`` ONLY:
+         clamp over-long top-level string fields to their declared ``max_length``
+         and re-validate. A verbose/weak model can
          overflow a short capped tag field (e.g. the outline's ``time_of_day``,
          max 40 chars: an 8B model wrote a whole sentence -> the whole episode
          aborted, 2026-06-18). This fires solely on a would-fail output -- a good
@@ -422,6 +424,11 @@ def validate_tolerant_data(
     try:
         instance = schema.model_validate(data)
     except ValidationError as ve:
+        if not clamp_overlong_strings:
+            # Authored prose is not safe to silently shorten.  A caller that
+            # owns a finite creative artifact can choose this fail-closed path
+            # so the structured ladder reaches its typed repair instead.
+            raise
         repaired = _clamp_overlong_strings(data, ve)
         if repaired is None:
             raise
@@ -444,6 +451,7 @@ def parse_validate_tolerant(
     schema: type[T],
     *,
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
+    clamp_overlong_strings: bool = True,
 ) -> T:
     """Extract the first JSON object from ``raw`` then ``validate_tolerant_data``.
 
@@ -453,7 +461,12 @@ def parse_validate_tolerant(
     ``validate_tolerant_data`` directly (e.g. the binary decision lane).
     """
     data = _otr_json.parse_first_json_object(raw or "")
-    return validate_tolerant_data(data, schema, post_validator=post_validator)
+    return validate_tolerant_data(
+        data,
+        schema,
+        post_validator=post_validator,
+        clamp_overlong_strings=clamp_overlong_strings,
+    )
 
 
 def _raw_head(raw: "str | None", cap: int = 400) -> str:
@@ -474,6 +487,8 @@ def _parse_and_validate(
     raw: str,
     schema: type[T],
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
+    *,
+    clamp_overlong_strings: bool = True,
 ) -> T:
     """Back-compat thin wrapper over ``parse_validate_tolerant``.
 
@@ -483,7 +498,12 @@ def _parse_and_validate(
     content check (raised as ``PostValidationError``). All three recoverable
     exception types are caught by the ladder, which advances to the next attempt.
     """
-    return parse_validate_tolerant(raw, schema, post_validator=post_validator)
+    return parse_validate_tolerant(
+        raw,
+        schema,
+        post_validator=post_validator,
+        clamp_overlong_strings=clamp_overlong_strings,
+    )
 
 
 def _clamp_overlong_strings(
@@ -557,6 +577,7 @@ def structured_call(
     structural_retry_temperature: float,
     repair_prompt_factory: Optional[RepairPromptFactory] = None,
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
+    clamp_overlong_strings: bool = True,
     max_new_tokens: int = _STRUCTURED_MAX_NEW_TOKENS,
     max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     helper_name: str = "structured_call",
@@ -603,6 +624,11 @@ def structured_call(
         `PostValidationError` and advances the ladder exactly like a
         schema failure. Mirrors the `extra_check` idiom already used by
         `_otr_outline._run_call_with_retry`. `None` disables the check.
+      clamp_overlong_strings
+        Defaults to `True` to preserve the bounded compatibility repair for
+        existing callers. An authored-artifact boundary can set it to `False`
+        so an over-limit prose field remains a `ValidationError`, advances to
+        typed repair, and is never silently shortened.
       max_new_tokens
         Token budget passed to `slot_fn` on every attempt. Structured
         passes vary widely -- a story-brief reflection needs ~160, a
@@ -679,7 +705,12 @@ def structured_call(
                 temperature=base_temperature,
                 max_new_tokens=max_new_tokens,
             )
-            return _parse_and_validate(last_raw, schema, post_validator)
+            return _parse_and_validate(
+                last_raw,
+                schema,
+                post_validator,
+                clamp_overlong_strings=clamp_overlong_strings,
+            )
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
@@ -711,7 +742,12 @@ def structured_call(
                 temperature=structural_retry_temperature,
                 max_new_tokens=max_new_tokens,
             )
-            return _parse_and_validate(last_raw, schema, post_validator)
+            return _parse_and_validate(
+                last_raw,
+                schema,
+                post_validator,
+                clamp_overlong_strings=clamp_overlong_strings,
+            )
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
@@ -765,7 +801,12 @@ def structured_call(
                 temperature=_REPAIR_TEMPERATURE,
                 max_new_tokens=max_new_tokens,
             )
-            return _parse_and_validate(last_raw, schema, post_validator)
+            return _parse_and_validate(
+                last_raw,
+                schema,
+                post_validator,
+                clamp_overlong_strings=clamp_overlong_strings,
+            )
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(
@@ -801,7 +842,12 @@ def structured_call(
                 temperature=retry_temperature,
                 max_new_tokens=max_new_tokens,
             )
-            return _parse_and_validate(last_raw, schema, post_validator)
+            return _parse_and_validate(
+                last_raw,
+                schema,
+                post_validator,
+                clamp_overlong_strings=clamp_overlong_strings,
+            )
         except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
             last_error = exc
             log.warning(

@@ -29,6 +29,24 @@ def test_overlong_string_is_clamped_not_aborted():
     assert inst.beats == 3
 
 
+def test_authored_artifact_can_disable_the_overlong_string_clamp():
+    raw = ('{"time_of_day": "Midnight to 8 AM - the deadly hours when heat '
+           'illnesses spike across the city", "beats": 3}')
+    with pytest.raises(ValidationError):
+        sc._parse_and_validate(raw, _Shape, clamp_overlong_strings=False)
+
+    with pytest.raises(sc.StructuredCallFailedError):
+        sc.structured_call(
+            prompt="return the compact shape",
+            schema=_Shape,
+            slot_fn=lambda _messages, **_kwargs: raw,
+            base_temperature=.2,
+            structural_retry_temperature=.1,
+            clamp_overlong_strings=False,
+            max_attempts=1,
+        )
+
+
 def test_clamp_trims_at_word_boundary():
     # 43 chars of words -> clamp to <=40 at a word boundary (no mid-word chop).
     raw = '{"time_of_day": "alpha bravo charlie delta echo foxtrot", "beats": 1}'

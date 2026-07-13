@@ -164,17 +164,17 @@ class FactIndexV4(_Strict):
 
 
 class DramaticQuestionV4(_Strict):
-    question: str
-    consequence: str
-    ending_direction: str
+    question: str = Field(min_length=1, max_length=160)
+    consequence: str = Field(min_length=1, max_length=160)
+    ending_direction: str = Field(min_length=1, max_length=120)
 
 
 class CastPlanRowV4(_Strict):
     char_id: Literal["announcer", "c01", "c02", "c03"]
-    name: str
-    character_description: str
-    gender: str
-    role_in_conflict: str
+    name: str = Field(min_length=1, max_length=40)
+    character_description: str = Field(min_length=1, max_length=160)
+    gender: str = Field(min_length=1, max_length=24)
+    role_in_conflict: str = Field(min_length=1, max_length=120)
     voice_slot: Literal["announcer", "c01", "c02", "c03"]
 
 
@@ -223,16 +223,36 @@ def repair_cast_plan_metadata(failed_output: str) -> CastPlanV4 | None:
     return cast.model_copy(update={"cast": rows}) if changed else None
 
 
+_RADIO_SCORE_CONTEXT_CAP_TOKENS = 8192
+_RADIO_SCORE_MAX_OUTPUT_TOKENS = 2900
+_RADIO_SCORE_MAX_SCENES = 3
+_RADIO_SCORE_MAX_SHOTS_PER_SCENE = 2
+_RADIO_SCORE_MAX_BEATS_PER_SCENE = 4
+_RADIO_SCORE_MAX_BEATS = (
+    _RADIO_SCORE_MAX_SCENES * _RADIO_SCORE_MAX_BEATS_PER_SCENE
+)
+_RADIO_SCORE_MAX_LINES_PER_BEAT = 2
+_RADIO_SCORE_MAX_MUSIC_CUES = 3
+_RADIO_SCORE_MAX_FACT_IDS_PER_BEAT = 2
+
+
+class AdvisoryBeatV4(_Strict):
+    beat_id: str = Field(pattern=r"^b\d{3}$")
+    advisory_word_center: int = Field(ge=0, le=900)
+
+
 class AdvisoryWordPlanV4(_Strict):
-    advisory_total_center: int = Field(ge=1)
-    per_beat: list[dict[str, Any]]
+    advisory_total_center: int = Field(ge=1, le=900)
+    per_beat: list[AdvisoryBeatV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_BEATS,
+    )
 
 
 class BeatPlanV4(_Strict):
-    beat_id: str
-    scene_id: str
-    shot_id: str
-    speaker: str
+    beat_id: str = Field(pattern=r"^b\d{3}$")
+    scene_id: str = Field(pattern=r"^scene_\d{3}$")
+    shot_id: str = Field(pattern=r"^shot_\d{3}$")
+    speaker: str = Field(min_length=1, max_length=40)
     char_id: Literal[
         "announcer", "c01", "c02", "c03",
         "music_open", "music_inter", "music_close",
@@ -240,45 +260,110 @@ class BeatPlanV4(_Strict):
     speaker_role: Literal[
         "character", "announcer", "music_open", "music_close", "music_inter",
     ]
-    line_ids: list[str] = Field(min_length=1)
-    order: int
-    intent: str
-    arc_phase: str
-    fact_ids: list[str] = []
-    advisory_voiced_word_center: int = Field(ge=0)
+    line_ids: list[Annotated[str, Field(pattern=r"^l\d{3}$")]] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_LINES_PER_BEAT,
+    )
+    order: int = Field(ge=1, le=_RADIO_SCORE_MAX_BEATS)
+    intent: str = Field(min_length=1, max_length=64)
+    arc_phase: str = Field(min_length=1, max_length=28)
+    fact_ids: list[Annotated[str, Field(pattern=r"^F0[1-6]$")]] = Field(
+        default_factory=list, max_length=_RADIO_SCORE_MAX_FACT_IDS_PER_BEAT,
+    )
+    advisory_voiced_word_center: int = Field(ge=0, le=900)
 
 
 class ShotPlanV4(_Strict):
-    shot_id: str
-    scene_id: str
-    description: str
-    visual_prompt: str
+    shot_id: str = Field(pattern=r"^shot_\d{3}$")
+    scene_id: str = Field(pattern=r"^scene_\d{3}$")
+    description: str = Field(min_length=1, max_length=72)
+    visual_prompt: str = Field(min_length=1, max_length=120)
 
 
 class ScenePlanV4(_Strict):
-    scene_id: str
-    env: str
-    description: str
-    shots: list[ShotPlanV4] = Field(min_length=1)
-    beats: list[BeatPlanV4] = Field(min_length=1)
+    scene_id: str = Field(pattern=r"^scene_\d{3}$")
+    env: str = Field(min_length=1, max_length=56)
+    description: str = Field(min_length=1, max_length=72)
+    shots: list[ShotPlanV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_SHOTS_PER_SCENE,
+    )
+    beats: list[BeatPlanV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_BEATS_PER_SCENE,
+    )
 
 
 class MusicCueV4(_Strict):
     cue_id: Literal["music_open", "music_inter", "music_close"]
     placement: Literal["open", "inter", "close"]
-    description: str
-    generation_prompt: str
-    anchor_line_id: str
-    anchor_beat_id: str
+    description: str = Field(min_length=1, max_length=80)
+    generation_prompt: str = Field(min_length=1, max_length=120)
+    anchor_line_id: str = Field(pattern=r"^l\d{3}$")
+    anchor_beat_id: str = Field(pattern=r"^b\d{3}$")
 
 
 class RadioScoreV4(_Strict):
-    title: str
-    premise: str
-    setting: str
+    title: str = Field(min_length=1, max_length=64)
+    premise: str = Field(min_length=1, max_length=144)
+    setting: str = Field(min_length=1, max_length=80)
     advisory_word_plan: AdvisoryWordPlanV4
-    scenes: list[ScenePlanV4] = Field(min_length=1)
-    music_cues: list[MusicCueV4] = Field(min_length=1, max_length=3)
+    scenes: list[ScenePlanV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_SCENES,
+    )
+    music_cues: list[MusicCueV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_MUSIC_CUES,
+    )
+
+
+def _radio_score_surface_receipt() -> dict[str, int | str]:
+    """Return the bounded P3 surface used to reserve its output window.
+
+    Local nested maxima make the whole score finite without introducing a
+    second score representation: at most three scenes, six shots, twelve
+    beats, and twenty-four line IDs can be serialized.
+    """
+    return {
+        "schema": "RadioScoreV4",
+        "context_cap_tokens": _RADIO_SCORE_CONTEXT_CAP_TOKENS,
+        "max_new_tokens": _RADIO_SCORE_MAX_OUTPUT_TOKENS,
+        "input_token_reservation": (
+            _RADIO_SCORE_CONTEXT_CAP_TOKENS - _RADIO_SCORE_MAX_OUTPUT_TOKENS
+        ),
+        "max_scenes": _RADIO_SCORE_MAX_SCENES,
+        "max_shots_per_scene": _RADIO_SCORE_MAX_SHOTS_PER_SCENE,
+        "max_beats_per_scene": _RADIO_SCORE_MAX_BEATS_PER_SCENE,
+        "max_total_shots": (
+            _RADIO_SCORE_MAX_SCENES * _RADIO_SCORE_MAX_SHOTS_PER_SCENE
+        ),
+        "max_total_beats": _RADIO_SCORE_MAX_BEATS,
+        "max_lines_per_beat": _RADIO_SCORE_MAX_LINES_PER_BEAT,
+        "max_total_line_ids": (
+            _RADIO_SCORE_MAX_BEATS * _RADIO_SCORE_MAX_LINES_PER_BEAT
+        ),
+        "max_music_cues": _RADIO_SCORE_MAX_MUSIC_CUES,
+        "max_fact_ids_per_beat": _RADIO_SCORE_MAX_FACT_IDS_PER_BEAT,
+        "max_title_chars": 64,
+        "max_premise_chars": 144,
+        "max_setting_chars": 80,
+        "max_scene_env_chars": 56,
+        "max_scene_description_chars": 72,
+        "max_shot_description_chars": 72,
+        "max_visual_prompt_chars": 120,
+        "max_beat_speaker_chars": 40,
+        "max_beat_intent_chars": 64,
+        "max_arc_phase_chars": 28,
+        "max_cue_description_chars": 80,
+        "max_cue_generation_prompt_chars": 120,
+    }
+
+
+_RADIO_SCORE_SURFACE_INSTRUCTION = (
+    "\nRadioScoreV4 bounded-output contract: emit at most 3 scenes; each scene "
+    "has at most 2 shots and 4 beats; each beat has 1 or 2 canonical line IDs; "
+    "there are at most 12 beats, 24 line IDs, and 3 music cues. Keep title <=64 "
+    "characters; premise <=144; setting <=80; scene env <=56; scene and shot "
+    "descriptions <=72; visual prompts and cue generation prompts <=120; beat "
+    "speaker <=40, intent <=64, arc phase <=28; cue descriptions <=80. IDs must "
+    "be scene_###, shot_###, b###, l###, and F01 through F06 as applicable."
+)
 
 
 class ScriptLineV4(_Strict):
@@ -439,10 +524,7 @@ def _validate_radio_score_graph(
 
     expected_beat_ids: list[str] = []
     for row in advisory.per_beat:
-        beat_id = row.get("beat_id") if isinstance(row, dict) else None
-        if not isinstance(beat_id, str) or not beat_id:
-            return "locked advisory plan has an invalid beat ID"
-        expected_beat_ids.append(beat_id)
+        expected_beat_ids.append(row.beat_id)
     if len(set(expected_beat_ids)) != len(expected_beat_ids):
         return "locked advisory plan has duplicate beat IDs"
 
@@ -493,7 +575,7 @@ def repair_radio_score_metadata(
         return None
     if score.advisory_word_plan.model_dump(mode="json") != advisory.model_dump(mode="json"):
         return None
-    expected_beats = [str(row["beat_id"]) for row in advisory.per_beat]
+    expected_beats = [row.beat_id for row in advisory.per_beat]
     observed_beats = [beat for scene in score.scenes for beat in scene.beats]
     if [beat.beat_id for beat in observed_beats] != expected_beats:
         return None
@@ -665,8 +747,10 @@ def _validate_script_graph(script: ScriptArtifactV4, score: RadioScoreV4) -> Non
 
 class StructureReviewV4(_Strict):
     verdict: Literal["pass", "rewrite"]
-    issues: list[str] = []
-    rationale: str = ""
+    issues: list[Annotated[str, Field(min_length=1, max_length=120)]] = Field(
+        default_factory=list, max_length=6,
+    )
+    rationale: str = Field(default="", max_length=240)
 
 
 class ListenerIssueV4(_Strict):
@@ -1047,13 +1131,16 @@ def make_advisory_word_blueprint(requested_words: int, locked_beats: Sequence[st
         centers[i] += 1
     return AdvisoryWordPlanV4(
         advisory_total_center=requested_words,
-        per_beat=[{"beat_id": beat_id, "advisory_word_center": n} for beat_id, n in zip(ids, centers)],
+        per_beat=[
+            AdvisoryBeatV4(beat_id=beat_id, advisory_word_center=n)
+            for beat_id, n in zip(ids, centers)
+        ],
     )
 
 
 def _score_graph_contract(advisory: AdvisoryWordPlanV4) -> dict[str, Any]:
     """Render the non-creative P3 graph constraints as model-visible data."""
-    beat_ids = [str(row["beat_id"]) for row in advisory.per_beat]
+    beat_ids = [row.beat_id for row in advisory.per_beat]
     return {
         "required_beat_ids": beat_ids,
         "required_beat_orders": [
@@ -1074,20 +1161,14 @@ def _score_graph_contract(advisory: AdvisoryWordPlanV4) -> dict[str, Any]:
 def _radio_score_output_token_budget(
     requested_words: int, beat_count: int,
 ) -> int:
-    """Reserve P3 output without starving its schema-bearing repair prompt.
+    """Reserve P3 output from its finite, model-visible score surface.
 
-    The live 120-word Sci-Fi Codex repair receipt needed 5,273 input tokens.
-    A flat 3,600-token P3 reservation against the local 8,192-token cap left
-    only 4,592 input tokens, so the generate wrapper silently discarded the
-    leading system/schema/repair contract.  The model then echoed the trailing
-    request envelope instead of receiving the repair instructions at all.
-
-    RadioScoreV4 size grows with both the spoken-word steer and the locked beat
-    graph.  Keep enough output room for the complete score, but bound the
-    120-word/12-beat reservation below the observed repair-fit ceiling.  The
-    call site also uses ``prompt_must_fit=True``: if a larger future graph still
-    cannot fit, it fails before generation rather than corrupting the contract
-    through left truncation.
+    The live 120-word Codex P3 failure exhausted an unbounded score at the old
+    2,800-token cap. The score now has static local maxima (3 scenes, 6 shots,
+    12 beats, 24 line IDs, bounded prose), so one 2,900-token reservation is
+    sufficient for every supported word steer while leaving 5,292 input tokens
+    in the 8,192-token context. ``prompt_must_fit=True`` still proves each
+    concrete base or repair prompt fits before generation.
     """
     if (
         not isinstance(requested_words, int)
@@ -1098,19 +1179,12 @@ def _radio_score_output_token_budget(
     if (
         not isinstance(beat_count, int)
         or isinstance(beat_count, bool)
-        or beat_count < 1
+        or not 1 <= beat_count <= _RADIO_SCORE_MAX_BEATS
     ):
-        raise CodexTargetRangeError("beat_count must be a positive int")
-    # RadioScoreV4 carries authored descriptions plus strict per-beat graph
-    # metadata.  The 2,800 floor comfortably fits a complete 120-word score
-    # while preserving 5,392 input tokens under the current 8,192-token cap.
-    return min(
-        3600,
-        max(
-            2800,
-            int(requested_words * 3.0) + 115 * int(beat_count) + 550,
-        ),
-    )
+        raise CodexTargetRangeError(
+            f"beat_count must be an int in 1..{_RADIO_SCORE_MAX_BEATS}"
+        )
+    return _RADIO_SCORE_MAX_OUTPUT_TOKENS
 
 
 def _script_output_token_budget(
@@ -1221,6 +1295,7 @@ def invoke_codex_structured(
     repair_score: RadioScoreV4 | None = None,
     repair_advisory: AdvisoryWordPlanV4 | None = None,
     prompt_must_fit: bool = False,
+    clamp_overlong_strings: bool = True,
 ) -> BaseModel:
     if not seam_refs:
         raise CodexPackContractError(f"{pass_id} has no prompt seam")
@@ -1235,6 +1310,8 @@ def invoke_codex_structured(
     schema_instruction = _schema_instruction(result_type)
     if pass_id == "P0":
         schema_instruction += p0_contract_instruction(has_numeric_tokens=True)
+    if pass_id in {"P3", "P3_rewrite"}:
+        schema_instruction += _RADIO_SCORE_SURFACE_INSTRUCTION
     if script_artifact_pass:
         schema_instruction += _SCRIPT_ARTIFACT_ROOT_INSTRUCTION
     messages = [{"role": "system", "content": "\n".join(seams) + schema_instruction}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
@@ -1472,10 +1549,15 @@ def invoke_codex_structured(
             # it blindly echoed the complete original request.  The failed score
             # already carries its authored story surface.  Keep only the locked
             # mechanical graph/advisory context it cannot safely infer, plus the
-            # accepted score and review when this is a P3 rewrite.  Plain tagged
-            # sections deliberately avoid presenting a JSON request envelope for
-            # the local model to copy as its answer.
+            # rewrite review when this is a P3 rewrite. The failed rewrite is
+            # already the complete bounded score surface, so repeating the
+            # accepted pre-rewrite score only recreates input-window pressure.
+            # Plain tagged sections deliberately avoid presenting a JSON request
+            # envelope for the local model to copy as its answer.
             p3_inputs = body["artifact_inputs"]
+            locked_graph = p3_inputs.get("score_graph_contract")
+            if not locked_graph and repair_advisory is not None:
+                locked_graph = _score_graph_contract(repair_advisory)
             repair_sections = [
                 "INPUT REFERENCES ONLY -- they are not an output shape.",
                 "<failed_radio_score>",
@@ -1486,7 +1568,7 @@ def invoke_codex_structured(
                 "</rejection>",
                 "<locked_score_graph>",
                 json.dumps(
-                    p3_inputs.get("score_graph_contract") or {},
+                    locked_graph or {},
                     sort_keys=True, separators=(",", ":"), ensure_ascii=False,
                 ),
                 "</locked_score_graph>",
@@ -1503,12 +1585,6 @@ def invoke_codex_structured(
             ]
             if pass_id == "P3_rewrite":
                 repair_sections.extend((
-                    "<accepted_score_before_rewrite>",
-                    json.dumps(
-                        p3_inputs.get("score") or {},
-                        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                    ),
-                    "</accepted_score_before_rewrite>",
                     "<rewrite_review>",
                     json.dumps(
                         p3_inputs.get("review") or {},
@@ -1536,7 +1612,9 @@ def invoke_codex_structured(
             structural_retry_temperature=structural_retry_temperature,
             max_new_tokens=max_new_tokens, max_attempts=3,
             repair_prompt_factory=typed_repair_factory,
-            post_validator=post_validator, helper_name=f"scifi_codex:{pass_id}",
+            post_validator=post_validator,
+            clamp_overlong_strings=clamp_overlong_strings,
+            helper_name=f"scifi_codex:{pass_id}",
         )
     except Exception as exc:
         raise CodexPassError(f"{pass_id} failed: {exc}") from exc
@@ -1720,8 +1798,24 @@ def run_scifi_codex_episode(
         ),
     }
     p0 = invoke_codex_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_fact_index_system",), artifact_inputs=p0_inputs, result_type=FactIndexV4, post_validator=lambda x: _validate_fact_index(x, payload, allowed_source_fields=p0_allowed_fields, expected_payload_sha256=env.source_digest), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=p0_token_budget, call_journal=journal, prompt_must_fit=True)
-    p1 = invoke_codex_structured(pass_id="P1", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_question_system",), artifact_inputs={"fact_index": p0.model_dump(mode="json")}, result_type=DramaticQuestionV4, post_validator=lambda x: None, base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=1800, call_journal=journal)
-    p2 = invoke_codex_structured(pass_id="P2", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_pressure_cast_system",), artifact_inputs={"question": p1.model_dump(mode="json")}, result_type=CastPlanV4, post_validator=_validate_cast_plan, base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=1600, call_journal=journal)
+    p1 = invoke_codex_structured(
+        pass_id="P1", slot="creative", slot_fn=creative_fn, pack=pack,
+        seam_refs=("codex_question_system",),
+        artifact_inputs={"fact_index": p0.model_dump(mode="json")},
+        result_type=DramaticQuestionV4, post_validator=lambda x: None,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=1800, call_journal=journal,
+        clamp_overlong_strings=False,
+    )
+    p2 = invoke_codex_structured(
+        pass_id="P2", slot="creative", slot_fn=creative_fn, pack=pack,
+        seam_refs=("codex_pressure_cast_system",),
+        artifact_inputs={"question": p1.model_dump(mode="json")},
+        result_type=CastPlanV4, post_validator=_validate_cast_plan,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=1600, call_journal=journal,
+        clamp_overlong_strings=False,
+    )
     beat_ids = [f"b{i:03d}" for i in range(max(3, min(12, len(p2.cast) * 3)))]
     advisory = make_advisory_word_blueprint(steer.requested_words, beat_ids)
     score_graph_contract = _score_graph_contract(advisory)
@@ -1729,15 +1823,51 @@ def run_scifi_codex_episode(
         steer.requested_words, len(beat_ids),
     )
     journal["radio_score_token_budget"] = {
+        **_radio_score_surface_receipt(),
         "requested_words": steer.requested_words,
         "beat_count": len(beat_ids),
-        "max_new_tokens": score_token_budget,
     }
-    p3 = invoke_codex_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"question": p1.model_dump(mode="json"), "cast": p2.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.72, structural_retry_temperature=.32, max_new_tokens=score_token_budget, call_journal=journal, repair_advisory=advisory, prompt_must_fit=True)
-    review = invoke_codex_structured(pass_id="P4", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json")}, result_type=StructureReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1800, call_journal=journal)
+    p3 = invoke_codex_structured(
+        pass_id="P3", slot="creative", slot_fn=creative_fn, pack=pack,
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs={
+            "question": p1.model_dump(mode="json"),
+            "cast": p2.model_dump(mode="json"),
+            "advisory_word_plan": advisory.model_dump(mode="json"),
+            "score_graph_contract": score_graph_contract,
+        },
+        result_type=RadioScoreV4,
+        post_validator=lambda x: _validate_radio_score_graph(x, advisory),
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=score_token_budget, call_journal=journal,
+        repair_advisory=advisory, prompt_must_fit=True,
+        clamp_overlong_strings=False,
+    )
+    review = invoke_codex_structured(
+        pass_id="P4", slot="technical", slot_fn=technical_fn, pack=pack,
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs={"score": p3.model_dump(mode="json")},
+        result_type=StructureReviewV4, post_validator=lambda x: None,
+        base_temperature=.20, structural_retry_temperature=.10,
+        max_new_tokens=1800, call_journal=journal,
+        clamp_overlong_strings=False,
+    )
     score = p3
     if review.verdict == "rewrite":
-        score = invoke_codex_structured(pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_radio_score_system", "codex_coda_contract_system"), artifact_inputs={"score": p3.model_dump(mode="json"), "review": review.model_dump(mode="json"), "advisory_word_plan": advisory.model_dump(mode="json"), "score_graph_contract": score_graph_contract}, result_type=RadioScoreV4, post_validator=lambda x: _validate_radio_score_graph(x, advisory), base_temperature=.55, structural_retry_temperature=.20, max_new_tokens=score_token_budget, call_journal=journal, repair_advisory=advisory, prompt_must_fit=True)
+        score = invoke_codex_structured(
+            pass_id="P3_rewrite", slot="creative", slot_fn=creative_fn, pack=pack,
+            seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+            artifact_inputs={
+                "score": p3.model_dump(mode="json"),
+                "review": review.model_dump(mode="json"),
+            },
+            result_type=RadioScoreV4,
+            post_validator=lambda x: _validate_radio_score_graph(x, advisory),
+            base_temperature=.55, structural_retry_temperature=.20,
+            max_new_tokens=score_token_budget, call_journal=journal,
+            repair_advisory=advisory, prompt_must_fit=True,
+            clamp_overlong_strings=False,
+        )
     # The whole-script reservation is only knowable once the score's accepted
     # line graph is final (P3, or P3_rewrite): the artifact serializes strict
     # metadata for every accepted line, so the line count -- not the word steer

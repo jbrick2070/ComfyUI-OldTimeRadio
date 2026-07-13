@@ -107,10 +107,6 @@ def test_no_strict_lane_field_is_unrepresentable_in_json(module_name):
 # coin flip. Anything else must nest a real model. Add to this list only with a reason
 # that a NEW model, reading only the schema, could not misread.
 ALLOWED_SHAPELESS = {
-    # justification: Python BUILDS this plan and the model copies back the literal it
-    # was handed. The shape is demonstrated by value, not described in prose, so there
-    # is nothing for the model to guess.
-    "nodes._otr_scifi_codex.AdvisoryWordPlanV4.per_beat",
     # justification: guarded. _has_forbidden_script_scene_keys pins the container to a
     # list of dicts and rejects score-shaped echoes, and a deterministic repair covers
     # the rest. The free keys inside are deliberate room for the script's scene prose.

@@ -42,11 +42,15 @@ the second bakeoff this plan forbids.
   compact P3 repair-context follow-up is pushed at `915c8314`. Both await live
   reverify with the same canonical `scifi_codex` leg.
 - The all-visualizer effective-consumer root fix (`PBUG-20260712-19`) is pushed
-  at `496689da`. **The sole coder slot is currently held by the Sci-Fi P0
-  bounded-evidence repair (`PBUG-20260712-21`).** Its ownership is the three
-  compatible Sci-Fi source lanes (Codex, Gemini, Sonnet), their P0 seams/tests,
-  `docs/PROD_BUG_LOG.md`, and the Bug Bible `11.50` promotion update. No next
-  production chunk starts until it lands and the canonical Codex rerun clears.
+  at `496689da`; the shared P0 bounded-evidence repair (`PBUG-20260712-21`) is
+  pushed at `e1d3a035`. **The sole coder slot is currently held by the live
+  Sci-Fi Codex P3 bounded-full-score repair (`PBUG-20260712-22`).** Its
+  ownership is the Codex score/P1/P2/P4 schemas and seams, compact P3 repair,
+  shared authored-artifact clamp boundary, P3 tests, this log, and the
+  BUG-11.50 extension. The RSS parity audit found no safe schema copy/paste:
+  Gemini, Sonnet, Fable2, Media Archive, and original lanes remain
+  artifact-specific follow-ups. No next production chunk starts until this
+  lands and the canonical Codex rerun clears.
 - Preserve the untracked cue-ledger prompt, Sci-Fi Codex repair plan, and local
   bakeoff logs. They are not owned by this planning rewrite.
 - One coder edits code or `workflows/otr_canonical.json` at a time. Read-only
@@ -59,7 +63,7 @@ time and is listed separately.
 
 | Order | Chunk | Hard completion gate | Estimate |
 |---:|---|---|---:|
-| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-21` bounded P0 root fix; focused tests, full suite, Bible; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no unused visual-authoring LLM call or image objects, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies pending live reverifies for shipped PBUGs 18-20. | 0.5-1 day + <=1 GPU day |
+| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-22` bounded P3 full-score root fix after PBUG-21; focused tests, full suite, Bible; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no unused visual-authoring LLM call or image objects, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies pending live reverifies for shipped PBUGs 18-22. | 0.5-1 day + <=1 GPU day |
 | 2 | Canonical watchdog support | Canonical runner emits heartbeats; watchdog recognizes canonical `RESULT`; healthy long runs never false-dead; explicit failure and stalled/down-server paths are pinned. This is a harness defect, not a production-admitted PBUG. | 0.5 day |
 | 3 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. | 0.5-1 day |
 | 4 | Rip interstitial **audio** only | Remove synthesis, insertion, timing, and dead tests; retain `music_inter` story/visual semantics. | 0.5-1 day |
@@ -149,7 +153,7 @@ different facts. Do not encode promotion state inside a bug's fix status.
 | `PBUG-20260712-17` | Live failure; root cause open until telemetry captures it | **Not eligible** -- no proved reusable law yet |
 | `PBUG-20260712-18` | Live-proven exact repair-envelope failure; fix pushed at `7aa3140e`; live reverify pending | After reverify: overlap check + operator approval, then add to the promotion queue |
 | `PBUG-20260712-19` | Live-proven all-visualizer authoring failure; fix pushed at `496689da`, live reverify pending | After live reverify: overlap check + operator approval, then add to the promotion queue |
-| `PBUG-20260712-20` / `21` | Live-proven P3/P0 structured-capacity failures; fixes use compact repair context and bounded artifact surfaces | Already generalized into BUG-11.50; live reverify remains required |
+| `PBUG-20260712-20` / `21` / `22` | Live-proven P3/P0 structured-capacity failures; fixes use compact repair context and bounded artifact surfaces | Already generalized into BUG-11.50; live reverify remains required |
 | historical `PBUG-20260711-18` | Analysis-only 720-word context risk, historically mislabelled as a PBUG | **Never eligible from static evidence**; keep only as the item-7 engineering risk unless a future live artifact independently admits it |
 
 The active production-fix owner updates `docs/PROD_BUG_LOG.md`. The thin approval
@@ -176,8 +180,8 @@ fixture creates a row.
 
 ## Open risks
 
-- The active dirty Sci-Fi P0 owner must land/release before any new coder claims
-  the slot.
+- The active dirty Sci-Fi Codex P3 owner must land/release before any new coder
+  claims the slot.
 - `PBUG-20260712-17` can expand item 6 only after telemetry identifies the real
   boundary; retries and cap inflation are forbidden substitutes.
 - User extensibility and `dynamic_story` both touch the writer, visual-style
