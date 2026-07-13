@@ -26,24 +26,20 @@ def _fixtures():
     beats = [
       {"beat_id":"b1","shot_id":"shot_01","scene_id":"scene_01","char_id":"announcer","speaker":"Announcer","line_intent":{"intent":"identify the station","arc_phase":"opening","clue_ids":[]}},
       {"beat_id":"b2","shot_id":"shot_01","scene_id":"scene_01","char_id":"c01","speaker":"Mara Vale","line_intent":{"intent":"name the stamp and its repeated shelf number","arc_phase":"rising","clue_ids":["q1"]}},
-      {"beat_id":"b3","shot_id":"shot_01","scene_id":"scene_01","char_id":"c02","speaker":"Ivo Reed","line_intent":{"intent":"name the mitten scrape and card rustle","arc_phase":"rising","clue_ids":["q2","q3"]}},
+      {"beat_id":"b3","shot_id":"shot_01","scene_id":"scene_01","char_id":"c02","speaker":"Ivo Reed","line_intent":{"intent":"name the mitten scrape and card rustle beside the grille","arc_phase":"rising","clue_ids":["q2","q3"]}},
       {"beat_id":"b4","shot_id":"shot_02","scene_id":"scene_02","char_id":"c01","speaker":"Mara Vale","line_intent":{"intent":"reveal the grille cause","arc_phase":"reveal","clue_ids":[]}},
       {"beat_id":"b5","shot_id":"shot_02","scene_id":"scene_02","char_id":"c01","speaker":"Mara Vale","line_intent":{"intent":"confirm every item is returned","arc_phase":"closing","clue_ids":[]}}]
     score = {"title":truth["title"],"premise":truth["premise"],"setting":truth["setting"],"cast":cast,"scenes":scenes,"shots":shots,"beats":beats,"orientation_beat_id":"b1","reveal_beat_id":"b4","closure_beat_id":"b5","opening_music":{"description":"A curious warm station motif.","generation_prompt":"Warm plucked strings and soft dial tones, no vocals"},"closing_music":{"description":"The motif resolves gently.","generation_prompt":"Gentle resolved plucked strings, no vocals"}}
-    script_lines = [{"line_id":f"line_{i:03d}","char_id":b["char_id"],"speaker":b["speaker"],"text":t} for i,(b,t) in enumerate(zip(beats,["Lost and Found Frequency is listening.","The stamp's shelf number repeats after every answer.","The mitten scrapes softly, and the card rustles beside it.","The loose grille carries sounds from this shelf.","The echo is mapped; every item is returned." ]),1)]
+    script_lines = [{"line_id":f"line_{i:03d}","char_id":b["char_id"],"speaker":b["speaker"],"text":t} for i,(b,t) in enumerate(zip(beats,["Lost and Found Frequency is listening.","The stamp's shelf number repeats after every answer.","The mitten scrapes softly, and the card rustles beside the grille.","The loose grille carries sounds from this shelf.","The echo is mapped; every item is returned." ]),1)]
     slate = {"possibilities":[card,{**card,"possibility_id":"p2","title_seed":"Whisper Shelf"},{**card,"possibility_id":"p3","title_seed":"Three Notes Home"},{**card,"possibility_id":"p4","title_seed":"Kind Echo"}]}
     script = {"title":"The Helpful Echo","lines":script_lines}
     return {"card":card,"truth":truth,"score":score,"slate":slate,"script":script,
-            "triage":{"selected_possibility_id":"p1","findings":[]},
-            "fair":{"accepted":True,"findings":[]},
-            "listener":{"understood_cause":"The grille carried shelf sounds.","understood_resolution":"Mara returned the objects.","findings":[],"optional_notes":[]},
-            "audit":{"accepted":True,"findings":[],"warnings":[]}}
+            "triage":{"selected_possibility_id":"p1","findings":[]}}
 
 
 def _responses():
     f = _fixtures()
-    return [f["slate"], f["triage"], f["truth"], f["fair"], f["score"],
-            f["script"], f["listener"], f["audit"]]
+    return [f["slate"], f["triage"], f["truth"], f["score"], f["script"]]
 
 
 class Scheduler:
@@ -66,7 +62,7 @@ def test_mocked_complete_runner_fills_closed_ledger(tmp_path):
     meta = led.data.setdefault("meta", {})
     meta.update({"source_bank":"original_codex56sol","source_meta":{"constraint_draw":DRAW}})
     parts = lane.run_original_codex56sol_episode(payload={"seed_text":json.dumps(DRAW)},pack=pack,resolved={"target_words":30,"num_characters":3},led=led,meta=meta,creative_fn=generate,technical_fn=generate,slot_scheduler=Scheduler(),source_bank_row=None,story_rules=rules,episode_root=tmp_path,episode_id="codex56_mock")
-    assert len(calls) == 8
+    assert len(calls) == 5
     assert parts.run_story_spine is False
     assert len(led.data["cast"]) == 3
     assert len(led.data["lines"]) == 5
@@ -75,18 +71,23 @@ def test_mocked_complete_runner_fills_closed_ledger(tmp_path):
     lane_meta = led.data["meta"]["original_codex56sol"]
     assert lane_meta["grounding_receipt"]["complete"] is True
     assert set(lane_meta["accepted_artifacts"]) == {
-        "selected_possibility", "triage", "truth_map", "fair_play_report",
+        "selected_possibility", "triage", "truth_map",
         "grounding_contract", "broadcast_score", "performance_script",
-        "blind_listener_report", "final_contract_audit",
     }
+    # Fair play is proven, and the receipt carries the evidence: the device is
+    # heard on a clue line before the reveal explains it.
+    plant = next(row for row in lane_meta["grounding_receipt"]["evidence"]
+                 if row["kind"] == "device_plant")
+    assert plant["line_id"] == "line_003"
+    assert plant["anchor"] == "grille"
 
 
 def test_p5_missing_grounding_anchor_uses_small_intent_patch(tmp_path):
     responses = _responses()
-    responses[4]["beats"][1]["line_intent"]["intent"] = (
+    responses[3]["beats"][1]["line_intent"]["intent"] = (
         "name the repeated shelf number"
     )
-    responses.insert(5, {
+    responses.insert(4, {
         "replacements": [{
             "beat_id": "b2",
             "intent": "name the stamp and its repeated shelf number",
@@ -118,9 +119,9 @@ def test_p5_missing_grounding_anchor_uses_small_intent_patch(tmp_path):
         episode_root=tmp_path, episode_id="codex56_p5_grounding_patch",
     )
 
-    assert len(calls) == 9
-    assert "ScoreIntentPatch" in calls[5][0]["content"]
-    assert led.data["meta"]["original_codex56sol"]["call_journal"][5][
+    assert len(calls) == 6
+    assert "ScoreIntentPatch" in calls[4][0]["content"]
+    assert led.data["meta"]["original_codex56sol"]["call_journal"][4][
         "pass_id"
     ] == "P5_grounding_patch"
     accepted_score = led.data["meta"]["original_codex56sol"][
@@ -198,8 +199,8 @@ def test_p5_intent_patch_preserves_anchor_already_valid_on_target():
 
 def test_p6_missing_grounding_anchor_uses_small_line_patch(tmp_path):
     responses = _responses()
-    responses[5]["lines"][4]["text"] = "The echo is mapped; the desk is quiet."
-    responses.insert(6, {
+    responses[4]["lines"][4]["text"] = "The echo is mapped; the desk is quiet."
+    responses.insert(5, {
         "replacements": [{
             "line_id": "line_005",
             "text": "The echo is mapped; every item is returned.",
@@ -231,9 +232,9 @@ def test_p6_missing_grounding_anchor_uses_small_line_patch(tmp_path):
         episode_root=tmp_path, episode_id="codex56_p6_grounding_patch",
     )
 
-    assert len(calls) == 9
-    assert "ScriptLinePatch" in calls[6][0]["content"]
-    assert led.data["meta"]["original_codex56sol"]["call_journal"][6][
+    assert len(calls) == 6
+    assert "ScriptLinePatch" in calls[5][0]["content"]
+    assert led.data["meta"]["original_codex56sol"]["call_journal"][5][
         "pass_id"
     ] == "P6_grounding_patch"
     accepted_script = led.data["meta"]["original_codex56sol"][
@@ -242,61 +243,6 @@ def test_p6_missing_grounding_anchor_uses_small_line_patch(tmp_path):
     assert accepted_script["lines"][4]["text"] == (
         "The echo is mapped; every item is returned."
     )
-
-
-def test_p8_retake_missing_anchor_uses_the_same_small_line_patch(tmp_path):
-    fixtures = _fixtures()
-    responses = _responses()
-    responses[6] = {
-        "understood_cause": "The repeated sounds do not yet have a clear source.",
-        "understood_resolution": "Unknown.",
-        "findings": [{
-            "line_id": "line_003", "category": "Causal clarity",
-            "detail": "The repeated sounds still need a concrete source.",
-            "blocking": True,
-        }], "optional_notes": [],
-    }
-    retake = json.loads(json.dumps(fixtures["script"]))
-    retake["lines"][4]["text"] = "The echo is mapped; the desk is quiet."
-    responses.insert(7, retake)
-    responses.insert(8, {
-        "replacements": [{
-            "line_id": "line_005",
-            "text": "The echo is mapped; every item is returned.",
-        }],
-    })
-    responses.insert(9, fixtures["listener"])
-    calls = []
-
-    def generate(messages, **_kwargs):
-        calls.append(messages)
-        return json.dumps(responses.pop(0))
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(
-        episode_id="codex56_p8_grounding_patch", out_dir=str(tmp_path),
-    )
-    meta = led.data.setdefault("meta", {})
-    meta.update({
-        "source_bank": "original_codex56sol",
-        "source_meta": {"constraint_draw": DRAW},
-    })
-    lane.run_original_codex56sol_episode(
-        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-        resolved={"target_words": 30, "num_characters": 3}, led=led,
-        meta=meta, creative_fn=generate, technical_fn=generate,
-        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
-        episode_root=tmp_path, episode_id="codex56_p8_grounding_patch",
-    )
-
-    assert len(calls) == 11
-    assert "ScriptLinePatch" in calls[8][0]["content"]
-    assert led.data["meta"]["original_codex56sol"]["call_journal"][8][
-        "pass_id"
-    ] == "P8_grounding_patch"
 
 
 def test_p6_line_patch_preserves_anchor_already_valid_on_target():
@@ -375,7 +321,7 @@ def test_script_grounding_requires_objects_on_clue_lines_and_fixed_landmarks():
     )
 
 
-def test_production_muted_melody_detour_is_rejected_before_listener():
+def test_production_muted_melody_detour_is_rejected_by_grounding():
     contract = _grounding_fixture()
     manifest_rows = []
     for index in range(1, 8):
@@ -433,341 +379,6 @@ def test_grounding_anchor_matching_is_nfkc_casefolded():
     script = lane.PerformanceScript.model_validate(fixtures["script"])
     script.lines[1].text = script.lines[1].text.replace("stamp", "ＳＴＡＭＰ")
     assert lane._validate_script_grounding(contract, manifest, script) is None
-
-
-def test_blind_listener_does_not_require_a_reveal_only_anchor_token():
-    fixtures = _fixtures()
-    score = lane.BroadcastScore.model_validate(fixtures["score"])
-    manifest = lane._compile_manifest(score)
-    script = lane.PerformanceScript.model_validate(fixtures["script"])
-    packet = lane._preceding_lines(manifest, script)
-    report = lane.BlindListenerReport.model_validate({
-        "understood_cause": "An unstable resonance signature.",
-        "understood_resolution": "Unknown.",
-        "findings": [], "optional_notes": [],
-    })
-    blocks = lane._listener_blocks(report, {row["line_id"] for row in packet})
-    assert blocks == []
-
-
-def test_blocking_listener_retake_is_rechecked_blind_without_contract(
-        tmp_path):
-    fixtures = _fixtures()
-    responses = _responses()
-    responses[6] = {
-        "understood_cause": "The earlier lines do not connect the repeated sounds.",
-        "understood_resolution": "Unknown.",
-        "findings": [{
-            "line_id": "line_003", "category": "Causal clarity",
-            "detail": "The repeated sounds still have no concrete source.",
-            "blocking": True,
-        }], "optional_notes": [],
-    }
-    responses.insert(7, fixtures["script"])
-    responses.insert(8, fixtures["listener"])
-    queued = iter(responses)
-    prompts = []
-
-    def generate(messages, **_kwargs):
-        prompts.append(messages)
-        return json.dumps(next(queued))
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(
-        episode_id="listener_rerun", out_dir=str(tmp_path),
-    )
-    meta = led.data.setdefault("meta", {})
-    meta.update({"source_bank": "original_codex56sol",
-                 "source_meta": {"constraint_draw": DRAW}})
-    lane.run_original_codex56sol_episode(
-        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-        resolved={"target_words": 30, "num_characters": 3}, led=led,
-        meta=meta, creative_fn=generate, technical_fn=generate,
-        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
-        episode_root=tmp_path, episode_id="listener_rerun",
-    )
-    assert len(prompts) == 10
-    rerun_input = json.loads(prompts[8][1]["content"])
-    assert set(rerun_input) == {"preceding_lines"}
-    assert "grounding_contract" not in prompts[8][1]["content"]
-
-
-def _run_with_audit(tmp_path, episode_id, audit_responses, extra=()):
-    """Drive the mocked runner with a scripted P9 audit ladder."""
-    responses = _responses()[:-1] + list(audit_responses) + list(extra)
-    prompts = []
-
-    def generate(messages, **_kwargs):
-        prompts.append(json.loads(json.dumps(messages)))
-        if responses:
-            return json.dumps(responses.pop(0))
-        return json.dumps(audit_responses[-1])
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(episode_id=episode_id, out_dir=str(tmp_path))
-    meta = led.data.setdefault("meta", {})
-    meta.update({"source_bank": "original_codex56sol",
-                 "source_meta": {"constraint_draw": DRAW}})
-    lane.run_original_codex56sol_episode(
-        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-        resolved={"target_words": 30, "num_characters": 3}, led=led,
-        meta=meta, creative_fn=generate, technical_fn=generate,
-        slot_scheduler=Scheduler(), source_bank_row=None,
-        story_rules=rules, episode_root=tmp_path, episode_id=episode_id,
-    )
-    return led, prompts
-
-
-def test_manifest_only_audit_rejection_never_blocks_the_script(tmp_path):
-    """PBUG-20260713-01: a derived-artifact finding is advice, not a retake.
-
-    The manifest is compiled by Python from the accepted score and proven by
-    `_validate_manifest`, so an audit finding that names a manifest row or a
-    clue id cannot be repaired by a spoken-line retake and cannot overrule the
-    deterministic validator. It must never dead-end the episode.
-    """
-    led, prompts = _run_with_audit(tmp_path, "audit_manifest_only", [{
-        "accepted": False,
-        "findings": [{
-            "field_path": "manifest.lines[4].clue_ids",
-            "item_id": "c4",
-            "exact_span": "c4",
-            "category": "Clue bookkeeping",
-            "allowed_correction": "reassign the clue",
-            "blocking": True,
-        }],
-        "warnings": ["clue order looks unusual"],
-    }])
-    assert len(prompts) == 8
-    disposition = (
-        led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
-    )
-    assert disposition["script_retake_ran"] is False
-    assert disposition["blocking_script_findings"] == 0
-    assert [row["item_id"] for row in disposition["advisory_findings"]] == ["c4"]
-    assert disposition["warnings"] == ["clue order looks unusual"]
-    assert led.data["meta"]["original_codex56sol"]["phase_10_verdict"] == "accepted"
-    assert len(led.data["lines"]) == 5
-
-
-def test_grounded_script_finding_triggers_one_retake(tmp_path):
-    """A blocking finding that quotes a real spoken span still retakes."""
-    script = _fixtures()["script"]
-    led, prompts = _run_with_audit(
-        tmp_path, "audit_retake",
-        [{
-            "accepted": False,
-            "findings": [{
-                "field_path": "lines.0.text",
-                "item_id": "line_001",
-                "exact_span": "Lost and Found Frequency",
-                "category": "Safety",
-                "allowed_correction": "rephrase the station identification",
-                "blocking": True,
-            }],
-            "warnings": [],
-        }],
-        extra=[script, {"accepted": True, "findings": [], "warnings": []}],
-    )
-    assert len(prompts) == 10
-    retake_input = json.loads(prompts[8][1]["content"])
-    assert [row["exact_span"] for row in retake_input["findings"]] == [
-        "Lost and Found Frequency",
-    ]
-    disposition = (
-        led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
-    )
-    assert disposition["script_retake_ran"] is True
-    assert disposition["blocking_script_findings"] == 0
-    assert disposition["model_verdict"] is True
-    assert disposition["effective_verdict"] == "accepted_after_script_retake"
-
-
-def test_ungrounded_script_finding_returns_to_typed_repair(tmp_path):
-    """A script-line block with an unquotable span is ambiguous, not ignored."""
-    led, prompts = _run_with_audit(
-        tmp_path, "audit_ungrounded",
-        [
-            {
-                "accepted": False,
-                "findings": [{
-                    "field_path": "lines.0.text",
-                    "item_id": "line_001",
-                    "exact_span": "a phrase this line never speaks",
-                    "category": "Safety",
-                    "allowed_correction": "rephrase",
-                    "blocking": True,
-                }],
-                "warnings": [],
-            },
-            {"accepted": True, "findings": [], "warnings": []},
-        ],
-    )
-    assert len(prompts) == 9
-    repair_prompt = json.dumps(prompts[8])
-    assert "exact substring copied verbatim" in repair_prompt
-    disposition = (
-        led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
-    )
-    assert disposition["script_retake_ran"] is False
-    assert disposition["model_verdict"] is True
-    assert disposition["effective_verdict"] == "accepted"
-
-
-def test_exact_span_array_reaches_typed_repair_without_normalization(tmp_path):
-    """P9 arrays are a typed failure; Python never invents index semantics."""
-    with pytest.raises(ValidationError):
-        lane.FinalContractAudit.model_validate({
-            "accepted": False,
-            "findings": [{
-                "field_path": "lines.0.text", "item_id": "line_001",
-                "exact_span": ["Lost and Found", "Frequency"],
-                "category": "Safety", "allowed_correction": "rephrase",
-                "blocking": True,
-            }],
-            "warnings": [],
-        })
-
-    script = _fixtures()["script"]
-    led, prompts = _run_with_audit(
-        tmp_path, "audit_span_array",
-        [
-            {
-                "accepted": False,
-                "findings": [{
-                    "field_path": "lines.0.text", "item_id": "line_001",
-                    "exact_span": ["Lost and Found", "Frequency"],
-                    "category": "Safety",
-                    "allowed_correction": "rephrase",
-                    "blocking": True,
-                }],
-                "warnings": [],
-            },
-            {
-                "accepted": False,
-                "findings": [{
-                    "field_path": "lines.0.text", "item_id": "line_001",
-                    "exact_span": "Lost and Found Frequency",
-                    "category": "Safety",
-                    "allowed_correction": "rephrase",
-                    "blocking": True,
-                }],
-                "warnings": [],
-            },
-        ],
-        extra=[script, {"accepted": True, "findings": [], "warnings": []}],
-    )
-    assert len(prompts) == 11
-    audit = led.data["meta"]["original_codex56sol"]["accepted_artifacts"][
-        "final_contract_audit"
-    ]
-    assert audit["accepted"] is True
-    disposition = (
-        led.data["meta"]["original_codex56sol"]["final_audit_disposition"]
-    )
-    assert disposition["script_retake_ran"] is True
-
-
-def test_audit_rejection_with_no_finding_at_all_fails_closed(tmp_path):
-    """A rejection that locates nothing exhausts the ladder and fails closed."""
-    responses = _responses()[:-1]
-    stubborn = {"accepted": False, "findings": [], "warnings": []}
-
-    def generate(_messages, **_kwargs):
-        if responses:
-            return json.dumps(responses.pop(0))
-        return json.dumps(stubborn)
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(episode_id="audit_false", out_dir=str(tmp_path))
-    meta = led.data.setdefault("meta", {})
-    meta.update({"source_bank": "original_codex56sol",
-                 "source_meta": {"constraint_draw": DRAW}})
-    with pytest.raises(
-        lane.OriginalCodex56SolPassError,
-        match="at least one blocking finding",
-    ):
-        lane.run_original_codex56sol_episode(
-            payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-            resolved={"target_words": 30, "num_characters": 3}, led=led,
-            meta=meta, creative_fn=generate, technical_fn=generate,
-            slot_scheduler=Scheduler(), source_bank_row=None,
-            story_rules=rules, episode_root=tmp_path,
-            episode_id="audit_false",
-        )
-
-
-def test_audit_envelope_gate_classifies_every_finding_class():
-    script = lane.PerformanceScript.model_validate(_fixtures()["script"])
-    line_id = script.lines[0].line_id
-    spoken = script.lines[0].text
-
-    grounded = lane.FinalContractAudit.model_validate({
-        "accepted": False,
-        "findings": [{
-            "field_path": "lines.0.text", "item_id": line_id,
-            "exact_span": spoken.split(" is ")[0], "category": "Safety",
-            "allowed_correction": "rephrase", "blocking": True,
-        }],
-        "warnings": [],
-    })
-    assert lane._validate_audit_envelope(grounded, script) is None
-    assert len(lane._audit_blocks(grounded, script)) == 1
-    assert lane._audit_advisories(grounded, script) == []
-
-    ungrounded = lane.FinalContractAudit.model_validate({
-        "accepted": False,
-        "findings": [{
-            "field_path": "lines.0.text", "item_id": line_id,
-            "exact_span": "never spoken here", "category": "Safety",
-            "allowed_correction": "rephrase", "blocking": True,
-        }],
-        "warnings": [],
-    })
-    assert "verbatim" in lane._validate_audit_envelope(ungrounded, script)
-
-    manifest_only = lane.FinalContractAudit.model_validate({
-        "accepted": False,
-        "findings": [{
-            "field_path": "manifest.lines[4].clue_ids", "item_id": "c4",
-            "exact_span": "c4", "category": "Clue bookkeeping",
-            "allowed_correction": "reassign", "blocking": True,
-        }],
-        "warnings": [],
-    })
-    assert lane._validate_audit_envelope(manifest_only, script) is None
-    assert lane._audit_blocks(manifest_only, script) == []
-    assert [row.item_id
-            for row in lane._audit_advisories(manifest_only, script)] == ["c4"]
-
-    empty_rejection = lane.FinalContractAudit.model_validate({
-        "accepted": False, "findings": [], "warnings": ["unsure"],
-    })
-    assert "at least one blocking finding" in lane._validate_audit_envelope(
-        empty_rejection, script,
-    )
-
-    contradictory = lane.FinalContractAudit.model_validate({
-        "accepted": True,
-        "findings": [{
-            "field_path": "lines.0.text", "item_id": line_id,
-            "exact_span": spoken, "category": "Safety",
-            "allowed_correction": "rephrase", "blocking": True,
-        }],
-        "warnings": [],
-    })
-    assert "must not carry a blocking finding" in lane._validate_audit_envelope(
-        contradictory, script,
-    )
 
 
 def test_visual_style_cannot_change_any_codex56_story_message(tmp_path):
@@ -839,7 +450,7 @@ def test_p3_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
         slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
         episode_root=tmp_path, episode_id="codex56_p3_placement",
     )
-    assert len(calls) == 8
+    assert len(calls) == 5
 
 
 def test_cross_artifact_validators_return_retryable_error_strings():
@@ -850,16 +461,6 @@ def test_cross_artifact_validators_return_retryable_error_strings():
     ]})
     error = lane._validate_slate(bad, draw)
     assert isinstance(error, str) and "copied verbatim" in error
-
-
-def test_ungrounded_fair_play_opinion_is_not_a_fatal_coordinate():
-    report = lane.FairPlayReport.model_validate({
-        "accepted": False,
-        "findings": [{"category":"Helpful Ending","detail":"Could be warmer",
-                      "evidence_span":"","blocking":True}],
-    })
-    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
-    assert lane._corroborated_fair_blocks(report, truth) == []
 
 
 def test_structural_numeric_ids_canonicalize_without_authored_prose_change():
@@ -1333,9 +934,9 @@ def test_p5_repair_fails_closed_on_unknown_or_graph_invalid_shapes():
 
 def test_p5_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
     responses = _responses()
-    responses[4]["opening_music"]["music_file"] = "opening_music.mp3"
-    responses[4]["closing_music"]["music_file"] = "closing_music.mp3"
-    responses[4]["scenes"][0]["shots"] = [{
+    responses[3]["opening_music"]["music_file"] = "opening_music.mp3"
+    responses[3]["closing_music"]["music_file"] = "closing_music.mp3"
+    responses[3]["scenes"][0]["shots"] = [{
         "shot_id": "nested_extra", "scene_id": "scene_01",
         "description": "A redundant nested shot.",
         "visual_prompt": "A redundant nested composition.",
@@ -1366,20 +967,20 @@ def test_p5_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
         slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
         episode_root=tmp_path, episode_id="codex56_p5_placement",
     )
-    assert len(calls) == 8
+    assert len(calls) == 5
 
 
 def test_p5_schema_boundary_projects_topology_when_raw_projection_misses(
     tmp_path, monkeypatch,
 ):
     responses = _responses()
-    responses[4]["shots"].insert(1, {
+    responses[3]["shots"].insert(1, {
         "shot_id": "shot_03",
         "scene_id": "scene_01",
         "description": "The return shelf across the room.",
         "visual_prompt": "A return shelf opposite the radio desk.",
     })
-    responses[4]["beats"][1]["shot_id"] = "shot_03"
+    responses[3]["beats"][1]["shot_id"] = "shot_03"
     monkeypatch.setattr(
         lane, "_repair_score_collection_placement",
         lambda _raw, _truth: None,
@@ -1411,7 +1012,7 @@ def test_p5_schema_boundary_projects_topology_when_raw_projection_misses(
         episode_root=tmp_path, episode_id="codex56_p5_topology",
     )
 
-    assert len(calls) == 8
+    assert len(calls) == 5
     assert [row["beat_id"] for row in led.data["beats"]] == [
         "b1", "b2", "b3", "b4", "b5",
     ]
@@ -1425,14 +1026,14 @@ def test_p5_schema_boundary_projects_topology_when_raw_projection_misses(
 
 def test_p5_placement_repair_preserves_llm_fallback_for_safety(tmp_path):
     responses = _responses()
-    corrected_score = json.loads(json.dumps(responses[4]))
-    responses[4]["premise"] = "Kill the clue."
-    responses[4]["scenes"][0]["shots"] = [{
+    corrected_score = json.loads(json.dumps(responses[3]))
+    responses[3]["premise"] = "Kill the clue."
+    responses[3]["scenes"][0]["shots"] = [{
         "shot_id": "nested_extra", "scene_id": "scene_01",
         "description": "A redundant nested shot.",
         "visual_prompt": "A redundant nested composition.",
     }]
-    responses.insert(5, corrected_score)
+    responses.insert(4, corrected_score)
     queued = iter(responses)
     calls = []
     repair_prompts = []
@@ -1463,7 +1064,7 @@ def test_p5_placement_repair_preserves_llm_fallback_for_safety(tmp_path):
         slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
         episode_root=tmp_path, episode_id="codex56_p5_safety_fallback",
     )
-    assert len(calls) == 9
+    assert len(calls) == 6
     assert len(repair_prompts) == 1
     assert "forbidden term 'kill'" in repair_prompts[0][1]["content"]
 
@@ -1472,16 +1073,16 @@ def test_p5_typed_repair_response_gets_schema_boundary_topology_projection(
     tmp_path, monkeypatch,
 ):
     responses = _responses()
-    responses[4]["shots"].insert(1, {
+    responses[3]["shots"].insert(1, {
         "shot_id": "shot_03",
         "scene_id": "scene_01",
         "description": "The return shelf across the room.",
         "visual_prompt": "A return shelf opposite the radio desk.",
     })
-    responses[4]["beats"][1]["shot_id"] = "shot_03"
-    safe_repair_response = json.loads(json.dumps(responses[4]))
-    responses[4]["premise"] = "Kill the clue."
-    responses.insert(5, safe_repair_response)
+    responses[3]["beats"][1]["shot_id"] = "shot_03"
+    safe_repair_response = json.loads(json.dumps(responses[3]))
+    responses[3]["premise"] = "Kill the clue."
+    responses.insert(4, safe_repair_response)
     monkeypatch.setattr(
         lane, "_repair_score_collection_placement",
         lambda _raw, _truth: None,
@@ -1518,7 +1119,7 @@ def test_p5_typed_repair_response_gets_schema_boundary_topology_projection(
         episode_root=tmp_path, episode_id="codex56_p5_repair_topology",
     )
 
-    assert len(calls) == 9
+    assert len(calls) == 6
     assert len(repair_prompts) == 1
     assert "forbidden term 'kill'" in repair_prompts[0][1]["content"]
     assert [row["beat_id"] for row in led.data["beats"]] == [
@@ -1533,7 +1134,7 @@ def test_p5_schema_boundary_projects_duplicate_clue_ownership(
     tmp_path, monkeypatch,
 ):
     responses = _responses()
-    responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
+    responses[3]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
     monkeypatch.setattr(
         lane, "_repair_score_collection_placement",
         lambda _raw, _truth: None,
@@ -1562,17 +1163,17 @@ def test_p5_schema_boundary_projects_duplicate_clue_ownership(
         slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
         episode_root=tmp_path, episode_id="codex56_duplicate_clue",
     )
-    assert len(calls) == 8
+    assert len(calls) == 5
 
 
 def test_p5_typed_repair_response_gets_schema_boundary_clue_projection(
     tmp_path, monkeypatch,
 ):
     responses = _responses()
-    responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
-    safe_repair_response = json.loads(json.dumps(responses[4]))
-    responses[4]["premise"] = "Kill the clue."
-    responses.insert(5, safe_repair_response)
+    responses[3]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
+    safe_repair_response = json.loads(json.dumps(responses[3]))
+    responses[3]["premise"] = "Kill the clue."
+    responses.insert(4, safe_repair_response)
     monkeypatch.setattr(
         lane, "_repair_score_collection_placement",
         lambda _raw, _truth: None,
@@ -1608,7 +1209,7 @@ def test_p5_typed_repair_response_gets_schema_boundary_clue_projection(
         episode_root=tmp_path, episode_id="codex56_p5_repair_duplicate",
     )
 
-    assert len(calls) == 9
+    assert len(calls) == 6
     assert len(repair_prompts) == 1
     accepted_score = (
         led.data["meta"]["original_codex56sol"]
@@ -1624,16 +1225,16 @@ def test_p5_schema_boundary_composes_topology_and_clue_projections(
     tmp_path, monkeypatch,
 ):
     responses = _responses()
-    responses[4]["shots"].insert(1, {
+    responses[3]["shots"].insert(1, {
         "shot_id": "shot_03", "scene_id": "scene_01",
         "description": "The return shelf across the room.",
         "visual_prompt": "A return shelf opposite the radio desk.",
     })
-    responses[4]["beats"][1]["shot_id"] = "shot_03"
-    responses[4]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
-    safe_repair_response = json.loads(json.dumps(responses[4]))
-    responses[4]["premise"] = "Kill the clue."
-    responses.insert(5, safe_repair_response)
+    responses[3]["beats"][1]["shot_id"] = "shot_03"
+    responses[3]["beats"][2]["line_intent"]["clue_ids"].insert(0, "q1")
+    safe_repair_response = json.loads(json.dumps(responses[3]))
+    responses[3]["premise"] = "Kill the clue."
+    responses.insert(4, safe_repair_response)
     monkeypatch.setattr(
         lane, "_repair_score_collection_placement",
         lambda _raw, _truth: None,
@@ -1669,7 +1270,7 @@ def test_p5_schema_boundary_composes_topology_and_clue_projections(
         led.data["meta"]["original_codex56sol"]
         ["accepted_artifacts"]["broadcast_score"]
     )
-    assert len(calls) == 9
+    assert len(calls) == 6
     assert [beat["shot_id"] for beat in accepted_score["beats"]] == [
         "shot_01", "shot_03", "shot_01_return_2", "shot_02", "shot_02",
     ]
@@ -1679,7 +1280,7 @@ def test_p5_schema_boundary_composes_topology_and_clue_projections(
     ]
 
 
-def test_python_manifest_is_repeatable_closed_and_spoiler_safe():
+def test_python_manifest_is_repeatable_and_closed():
     score = lane.BroadcastScore.model_validate(_fixtures()["score"])
     first = lane._compile_manifest(score)
     second = lane._compile_manifest(score)
@@ -1688,12 +1289,11 @@ def test_python_manifest_is_repeatable_closed_and_spoiler_safe():
         "shot_start", "beat_start", "beat_start", "shot_start", "beat_start",
     ]
     assert first.lines[1].clue_ids == ["q1"]
-    script = lane.PerformanceScript.model_validate(_fixtures()["script"])
-    packet = lane._preceding_lines(first, script)
-    packet_ids = {row["line_id"] for row in packet}
-    assert first.reveal_line_id not in packet_ids
-    assert first.closure_line_id not in packet_ids
-    assert all("manifest" not in row for row in packet)
+    # The clue lines the fair-play contract is defined over: non-announcer,
+    # clue-carrying, and before the reveal.
+    assert [row.line_id for row in lane._pre_reveal_clue_lines(first)] == [
+        "line_002", "line_003",
+    ]
 
 
 def test_manifest_rejects_duplicate_beat_and_overlapping_landmark():
@@ -1709,37 +1309,6 @@ def test_manifest_rejects_duplicate_beat_and_overlapping_landmark():
         "reveal_line_id": manifest.orientation_line_id,
     })
     assert "must be distinct" in lane._validate_manifest(score, overlap)
-
-
-def test_p7_and_p9_only_ground_real_coordinates_and_literal_spans():
-    score = lane.BroadcastScore.model_validate(_fixtures()["score"])
-    manifest = lane._compile_manifest(score)
-    script = lane.PerformanceScript.model_validate(_fixtures()["script"])
-    packet = lane._preceding_lines(manifest, script)
-    report = lane.BlindListenerReport.model_validate({
-        "understood_cause":"unsure", "understood_resolution":"unsure",
-        "findings":[
-            {"line_id":"invented", "category":"Clue", "detail":"Missing", "blocking":True},
-            {"line_id":packet[0]["line_id"], "category":"Clue", "detail":"Missing", "blocking":True},
-        ], "optional_notes":[],
-    })
-    blocks = lane._listener_blocks(report, {row["line_id"] for row in packet})
-    assert [row.line_id for row in blocks] == [packet[0]["line_id"]]
-
-    audit = lane.FinalContractAudit.model_validate({
-        "accepted":False,
-        "findings":[
-            {"field_path":"lines.0.text", "item_id":script.lines[0].line_id,
-             "exact_span":"not present", "category":"Safety",
-             "allowed_correction":"replace", "blocking":True},
-            {"field_path":"lines.0.text", "item_id":script.lines[0].line_id,
-             "exact_span":"Lost and Found", "category":"Safety",
-             "allowed_correction":"replace", "blocking":True},
-        ], "warnings":[],
-    })
-    assert [row.exact_span for row in lane._audit_blocks(audit, script)] == [
-        "Lost and Found",
-    ]
 
 
 def test_safety_reports_all_authored_coordinates_in_one_repair():
@@ -1821,11 +1390,56 @@ def test_p1_clue_short_slate_is_repaired_by_the_authoring_model(tmp_path):
         slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
         episode_root=tmp_path, episode_id="p1_short",
     )
-    assert len(prompts) == 9
+    assert len(prompts) == 6
     repair_prompt = json.dumps(prompts[1])
     assert "one distinct audible clue for EVERY lost object" in repair_prompt
     assert "at least 3 items" in repair_prompt
     assert len(led.data["lines"]) == 5
+
+
+def test_device_anchor_must_be_planted_before_the_reveal(tmp_path):
+    """Fair play is a contract, not an opinion.
+
+    The device must be audible on a clue line BEFORE the reveal explains it.
+    A script that speaks it only at the reveal is repaired by the bounded line
+    patch that already exists -- the same rung that repairs any other missing
+    immutable anchor.
+    """
+    fixtures = _fixtures()
+    score = lane.BroadcastScore.model_validate(fixtures["score"])
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    draw = lane.ConstraintDraw.model_validate(DRAW)
+    grounding = lane._build_grounding_contract(draw, truth)
+    manifest = lane._compile_manifest(score)
+
+    # Strip the plant: "grille" now survives only on the reveal line.
+    late = lane.PerformanceScript.model_validate(fixtures["script"])
+    late.lines[2].text = "The mitten scrapes softly, and the card rustles."
+    assert "before the reveal line" in lane._validate_script_grounding(
+        grounding, manifest, late,
+    )
+    plan = lane._script_grounding_repair_plan(late, manifest, grounding)
+    assert [(row["line_id"], row["required_anchors"]) for row in plan] == [
+        ("line_003", ["card", "grille", "mitten"]),
+    ]
+
+    # The score half of the same rule: a clue intent must name it pre-reveal.
+    quiet = score.model_copy(deep=True)
+    quiet.beats[2].line_intent.intent = "name the mitten scrape and card rustle"
+    assert "pre-reveal clue intent" in lane._validate_score(
+        quiet, truth, grounding,
+    )
+
+    # And a score whose every clue lands at or after the reveal is not fair by
+    # construction -- only the score author can fix that, so it goes to the P5
+    # ladder rather than to a patch that cannot reorder beats.
+    unfair = score.model_copy(deep=True)
+    for beat in unfair.beats:
+        beat.line_intent.clue_ids = []
+    unfair.beats[3].line_intent.clue_ids = ["q1", "q2", "q3"]
+    assert "BEFORE the reveal beat" in lane._validate_score_clue_ownership(
+        unfair, grounding,
+    )
 
 
 def test_p5_announcer_owned_clue_reaches_the_p5_ladder():
@@ -1864,316 +1478,16 @@ def test_p5_announcer_owned_clue_reaches_the_p5_ladder():
     assert lane._validate_score(named_only, truth, grounding) is not None
 
 
-def test_p4_uncorroborated_block_is_advisory_not_fatal(tmp_path):
-    """A taste note mislabelled blocking must never end an episode.
-
-    Guards `test_ungrounded_fair_play_opinion_is_not_a_fatal_coordinate`
-    end-to-end: the episode completes, no retake runs, and the opinion is kept
-    verbatim as advice.
-    """
-    responses = _responses()
-    responses[3] = {
-        "accepted": False,
-        "findings": [{"category": "Helpful Ending",
-                      "detail": "Could be warmer", "evidence_span": "",
-                      "blocking": True}],
-        "warnings": ["the closing could land more gently"],
-    }
-    queued = iter(responses)
-    calls = []
-
-    def generate(_messages, **_kwargs):
-        calls.append(1)
-        return json.dumps(next(queued))
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(episode_id="fair_advisory", out_dir=str(tmp_path))
-    meta = led.data.setdefault("meta", {})
-    meta.update({"source_bank": "original_codex56sol",
-                 "source_meta": {"constraint_draw": DRAW}})
-    lane.run_original_codex56sol_episode(
-        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-        resolved={"target_words": 30, "num_characters": 3}, led=led,
-        meta=meta, creative_fn=generate, technical_fn=generate,
-        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
-        episode_root=tmp_path, episode_id="fair_advisory",
-    )
-    assert len(calls) == 8  # no retake, no repair
-    disposition = led.data["meta"]["original_codex56sol"]["fair_play_disposition"]
-    assert disposition["truth_map_retake_ran"] is False
-    assert disposition["model_verdict"] is False
-    assert disposition["effective_verdict"] == "accepted"
-    assert [row["detail"] for row in disposition["advisory_findings"]] == [
-        "Could be warmer",
-    ]
-    assert disposition["warnings"] == ["the closing could land more gently"]
-
-
-def test_p4_corroborated_block_retakes_the_truth_map(tmp_path):
-    """A real truth-map defect is returned to the model that authored it."""
-    responses = _responses()
-    truth = responses[2]
-    responses[3] = {
-        "accepted": False,
-        "findings": [{"field_path": "audible_clues.0.implication",
-                      "item_id": "q1", "category": "sole_declared_mundane_cause",
-                      "evidence_span": "the stamp is near the desk",
-                      "detail": "the shared cause is not linked to this clue",
-                      "blocking": True}],
-        "warnings": [],
-    }
-    # P3_rerun returns a repaired truth map; P4_rerun then accepts.
-    responses.insert(4, json.loads(json.dumps(truth)))
-    responses.insert(5, {"accepted": True, "findings": [], "warnings": []})
-    prompts = []
-
-    def generate(messages, **_kwargs):
-        prompts.append(json.loads(json.dumps(messages)))
-        return json.dumps(responses.pop(0))
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(episode_id="fair_retake", out_dir=str(tmp_path))
-    meta = led.data.setdefault("meta", {})
-    meta.update({"source_bank": "original_codex56sol",
-                 "source_meta": {"constraint_draw": DRAW}})
-    lane.run_original_codex56sol_episode(
-        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-        resolved={"target_words": 30, "num_characters": 3}, led=led,
-        meta=meta, creative_fn=generate, technical_fn=generate,
-        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
-        episode_root=tmp_path, episode_id="fair_retake",
-    )
-    assert len(prompts) == 10  # 8 + P3_rerun + P4_rerun
-    retake_system = prompts[4][0]["content"]
-    retake_input = json.loads(prompts[4][1]["content"])
-    assert "Re-author the audible truth map" in retake_system
-    assert set(retake_input) == {
-        "selected", "draw", "previous_truth_map", "fair_play_findings",
-    }
-    assert [row["item_id"] for row in retake_input["fair_play_findings"]] == ["q1"]
-    disposition = led.data["meta"]["original_codex56sol"]["fair_play_disposition"]
-    assert disposition["truth_map_retake_ran"] is True
-    assert disposition["effective_verdict"] == "accepted_after_truth_map_retake"
-    # The retake's CAUSE is persisted, not just the fact of it -- otherwise the
-    # retake rate cannot be calibrated from the receipt.
-    assert disposition["corroborated_blocking_findings"] == 1
-    assert [row["item_id"] for row in disposition["initial_blocking_findings"]] == [
-        "q1",
-    ]
-    journal = led.data["meta"]["original_codex56sol"]["call_journal"]
-    assert [row["pass_id"] for row in journal][:6] == [
-        "P1", "P2", "P3", "P4", "P3_rerun", "P4_rerun",
-    ]
-    assert len(led.data["lines"]) == 5
-
-
-def test_p4_rerun_still_blocked_fails_closed(tmp_path):
-    """One retake, then stop. No loop."""
-    responses = _responses()
-    block = {
-        "accepted": False,
-        "findings": [{"field_path": "audible_clues.0.implication",
-                      "item_id": "q1", "category": "sole_declared_mundane_cause",
-                      "evidence_span": "the stamp is near the desk",
-                      "detail": "the shared cause remains unlinked", "blocking": True}],
-        "warnings": [],
-    }
-    responses[3] = json.loads(json.dumps(block))
-    responses.insert(4, json.loads(json.dumps(responses[2])))
-    responses.insert(5, json.loads(json.dumps(block)))
-    queued = iter(responses)
-
-    def generate(_messages, **_kwargs):
-        return json.dumps(next(queued))
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(episode_id="fair_fail", out_dir=str(tmp_path))
-    meta = led.data.setdefault("meta", {})
-    meta.update({"source_bank": "original_codex56sol",
-                 "source_meta": {"constraint_draw": DRAW}})
-    with pytest.raises(
-        lane.OriginalCodex56SolContractError,
-        # The error must carry the finding, not just the fact of failure.
-        match=(r"rejected the retaken truth map: "
-               r"\[sole_declared_mundane_cause\] q1: "
-               r"the shared cause remains unlinked"),
-    ):
-        lane.run_original_codex56sol_episode(
-            payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-            resolved={"target_words": 30, "num_characters": 3}, led=led,
-            meta=meta, creative_fn=generate, technical_fn=generate,
-            slot_scheduler=Scheduler(), source_bank_row=None,
-            story_rules=rules, episode_root=tmp_path, episode_id="fair_fail",
-        )
-
-
-def test_fair_play_envelope_classifies_every_finding_class():
-    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
-
-    def report(**kwargs):
-        return lane.FairPlayReport.model_validate(kwargs)
-
-    # Uncoordinated blocking opinion -> advisory, never an envelope error.
-    advisory = report(accepted=False, findings=[
-        {"category": "Helpful Ending", "detail": "Could be warmer",
-         "evidence_span": "", "blocking": True}])
-    assert lane._validate_fair_play_envelope(advisory, truth) is None
-    assert lane._corroborated_fair_blocks(advisory, truth) == []
-    assert [f.detail for f in lane._fair_play_advisories(advisory, truth)] == [
-        "Could be warmer",
-    ]
-
-    # A sloppy path over a REAL, mapped item is still a real defect: the
-    # evidence/category route, not a locator spelling, grants authority.
-    sloppy = report(accepted=False, findings=[
-        {"field_path": "causal_steps.0.cause", "item_id": "q1",
-         "category": "sole_declared_mundane_cause",
-         "evidence_span": "the stamp is near the desk",
-         "detail": "sloppy path, real item",
-         "blocking": True}])
-    assert lane._validate_fair_play_envelope(sloppy, truth) is None
-    assert [f.item_id for f in lane._corroborated_fair_blocks(sloppy, truth)] == [
-        "q1",
-    ]
-
-    # A named in-scope blocker without fields needed to route evidence returns to
-    # P4's typed repair rather than becoming a fatal external error.
-    bare = report(accepted=False, findings=[
-        {"field_path": "audible_clues.0.implication", "item_id": "q1",
-         "category": "sole_declared_mundane_cause", "detail": "",
-         "evidence_span": "", "blocking": True}])
-    assert "must include a category, detail, and verbatim evidence_span" in (
-        lane._validate_fair_play_envelope(bare, truth)
-    )
-
-    # Corroborated -> actionable.
-    real = report(accepted=False, findings=[
-        {"field_path": "audible_clues.0.implication", "item_id": "q1",
-         "category": "sole_declared_mundane_cause",
-         "evidence_span": "the stamp is near the desk",
-         "detail": "shared cause missing", "blocking": True}])
-    assert lane._validate_fair_play_envelope(real, truth) is None
-    assert [f.item_id for f in lane._corroborated_fair_blocks(real, truth)] == ["q1"]
-
-    # P7-owned timing and listener claims stay advisory even if a model labels
-    # them blocking; P3 has no ordering field it could re-author to satisfy them.
-    timing = report(accepted=False, findings=[
-        {"field_path": "audible_clues.0.implication", "item_id": "q1",
-         "category": "clue_timing", "evidence_span": "the stamp is near the desk",
-         "detail": "not audible before reveal", "blocking": True}])
-    assert lane._validate_fair_play_envelope(timing, truth) is None
-    assert lane._corroborated_fair_blocks(timing, truth) == []
-    assert lane._fair_play_advisories(timing, truth) == timing.findings
-
-    # Self-contradiction and empty rejection both return to the model.
-    contradiction = report(accepted=True, findings=[
-        {"field_path": "audible_clues.0.implication", "item_id": "q1",
-         "category": "sole_declared_mundane_cause",
-         "evidence_span": "the stamp is near the desk",
-         "detail": "shared cause missing", "blocking": True}])
-    assert "must not carry a blocking finding" in (
-        lane._validate_fair_play_envelope(contradiction, truth)
-    )
-    empty = report(accepted=False, findings=[], warnings=["unsure"])
-    assert "at least one blocking finding" in (
-        lane._validate_fair_play_envelope(empty, truth)
-    )
-
-    # Warnings are legal now, and a warning-less report still validates.
-    assert lane._validate_fair_play_envelope(
-        report(accepted=True, findings=[], warnings=["tone note"]), truth,
-    ) is None
-    assert report(accepted=True, findings=[]).warnings == []
-
-
-def test_p3_rerun_shares_every_p3_repair_surface():
-    """A renamed pass must not silently escape its own repair machinery."""
-    base = lane._repair_rules("P3", "clue_ids must not be empty")
-    rerun = lane._repair_rules("P3_rerun", "clue_ids must not be empty")
-    assert "causal_steps MUST" in base
-    assert rerun == base
-
-    # The per-attempt collection normalizer must fire on the rerun too.
-    selected = lane.PossibilityCard.model_validate(_fixtures()["card"])
-    truth = _fixtures()["truth"]
-    nested = json.loads(json.dumps(truth))
-    nested["caller_threads"][0]["causal_steps"] = nested.pop("causal_steps")
-    raw = json.dumps(nested)
-    repaired = lane._repair_truth_map_collection_placement(raw, selected)
-    assert repaired is not None
-    assert len(repaired.causal_steps) == 2
-
-
 def test_p2_triage_contract_is_stated_in_seam_and_repair_rules():
     routing._REGISTRY = None
     seam = routing.resolve_story_pack(
         "original_codex56sol",
     ).prompt_stages["codex56_slate_triage"]
-    rules = lane._repair_rules("P2", "triage selected a possibility it marked blocking")
+    rules = lane._repair_rules("P2", "selected_possibility_id must match")
     for text in (seam, rules):
         assert "copied verbatim" in text
         assert "least compromised" in text
-    assert "Never mark the possibility you select as blocking" in seam
-    assert "NEVER mark the possibility you select as blocking" in rules
-
-
-def test_p4_blocking_authority_is_stated_in_seam_and_repair_rules():
-    routing._REGISTRY = None
-    seam = routing.resolve_story_pack(
-        "original_codex56sol",
-    ).prompt_stages["codex56_fair_play_audit"]
-    rules = lane._repair_rules("P4_rerun", "blocking must be a boolean")
-    for category in lane._FAIR_PLAY_BLOCKING_CAPABILITIES:
-        assert category in seam
-        assert category in rules
-    for text in (seam, rules):
-        assert "evidence_span" in text
-        assert "field_path is an advisory locator" in text
-    assert "truth-map retake" in seam
-
-
-def test_p4_may_not_grade_what_a_truth_map_cannot_express():
-    """PBUG-20260713-14: the audit blocked 3/3 live runs on an impossible question.
-
-    `AudibleTruthMap` carries no line order and no reveal position -- nothing in
-    it is "before" the reveal. Grading clue-before-reveal order there asked the
-    model to judge a property the artifact cannot state, so it invented a defect
-    on every run and the retake could never satisfy it. That property IS tested,
-    where it is representable: the P7 blind listener reads only pre-reveal lines
-    and must infer the cause.
-    """
-    routing._REGISTRY = None
-    stages = routing.resolve_story_pack("original_codex56sol").prompt_stages
-    fair = stages["codex56_fair_play_audit"]
-
-    # The truth map has no ordering to grade.
-    assert not any(
-        field in lane.AudibleTruthMap.model_fields
-        for field in ("reveal_index", "clue_order", "line_order", "arc_phase")
-    )
-    # So P4 must not grade it -- and must say so.
-    assert "Do NOT judge clue ordering" in fair
-    assert "clue-before-reveal placement" in fair
-    assert "audited downstream" in fair
-    # ...while still owning what a truth map CAN express.
-    assert "causal closure" in fair
-    assert "helpful resolution" in fair
-
-    # The ordering property is owned downstream, where order actually exists:
-    # the manifest carries arc_phase and a reveal line id, and the blind listener
-    # is the pass that tests it.
-    assert "arc_phase" in lane.ManifestLine.model_fields
-    assert "reveal_line_id" in lane.ClosedLineManifest.model_fields
-    assert "before the declared reveal" in stages["codex56_blind_listener"]
+        assert "advisory" in text.lower()
 
 
 def test_every_schema_bound_is_in_the_shared_model_visible_contract():
@@ -2183,16 +1497,12 @@ def test_every_schema_bound_is_in_the_shared_model_visible_contract():
         ("P1", "codex56_possibility_slate", lane.PossibilitySlate),
         ("P2", "codex56_slate_triage", lane.SlateTriage),
         ("P3", "codex56_audible_truth_map", lane.AudibleTruthMap),
-        ("P3_rerun", "codex56_truth_map_retake", lane.AudibleTruthMap),
-        ("P4", "codex56_fair_play_audit", lane.FairPlayReport),
         ("P5", "codex56_broadcast_score", lane.BroadcastScore),
         ("P5_grounding_patch", "codex56_score_anchor_patch",
          lane.ScoreIntentPatch),
         ("P6", "codex56_performance_script", lane.PerformanceScript),
         ("P6_grounding_patch", "codex56_script_anchor_patch",
          lane.ScriptLinePatch),
-        ("P7", "codex56_blind_listener", lane.BlindListenerReport),
-        ("P9", "codex56_final_contract_audit", lane.FinalContractAudit),
     ]
 
     def bounded(model, prefix="", seen=None, out=None):
@@ -2225,21 +1535,6 @@ def test_every_schema_bound_is_in_the_shared_model_visible_contract():
     )
 
 
-def test_blocking_is_demanded_as_a_field_not_invited_as_prose():
-    """PBUG-20260713-12: 'set blocking=false' read as text to write.
-
-    The model wrote the literal string into `detail` and omitted the real
-    boolean. The required path WAS in the model-visible contract -- the defect
-    was a seam that phrased a field as prose.
-    """
-    routing._REGISTRY = None
-    stages = routing.resolve_story_pack("original_codex56sol").prompt_stages
-    for seam_key in ("codex56_fair_play_audit", "codex56_blind_listener"):
-        seam = stages[seam_key]
-        assert "real JSON boolean field" in seam
-        assert "never written as prose inside detail" in seam
-
-
 def test_wide_draw_contracts_are_satisfiable():
     """A schema cap must never forbid the only artifact its validator accepts."""
     def max_length(model, field):
@@ -2256,63 +1551,6 @@ def test_wide_draw_contracts_are_satisfiable():
     # target -- so a cap below 8 forbids the only patch it would accept.
     assert max_length(lane.ScoreIntentPatch, "replacements") >= 8
     assert max_length(lane.ScriptLinePatch, "replacements") >= 8
-
-
-def test_fair_play_coordinates_survive_however_the_model_writes_them():
-    """PBUG-20260713-13: the item_id is the identity; field_path is a hint.
-
-    Two live episodes died inside a coordinate gate that could not change the
-    outcome of the repair -- once on a benign `truth_map.` prefix (the payload
-    key the artifact arrives under), once on a `thread_id`, which keys BOTH
-    caller_threads and resolution_links by design. The retake receives the
-    finding verbatim, so the owning collection is not a question Python needs to
-    ask. A guard that cannot improve the repair must not be able to cause an
-    outage.
-    """
-    truth = lane.AudibleTruthMap.model_validate(_fixtures()["truth"])
-
-    def report(field_path, item_id, evidence_span):
-        return lane.FairPlayReport.model_validate({
-            "accepted": False,
-            "findings": [{"field_path": field_path, "item_id": item_id,
-                          "category": "benign_safety",
-                          "evidence_span": evidence_span,
-                          "detail": "unsafe claim",
-                          "blocking": True}],
-        })
-
-    # Every one of these names the same real defect, however it was written --
-    # including the exact two coordinates that killed a live run.
-    for field_path, item_id, evidence_span in (
-        ("audible_clues[0].implication", "q1", "the stamp is near the desk"),
-        ("audible_clues.0.implication", "q1", "the stamp is near the desk"),
-        ("truth_map.audible_clues[0].implication", "q1", "the stamp is near the desk"),
-        ("truth_map.causal_steps[1].effect", "s1", "The grille is loose."),  # killed prompt d5f66b1a
-        ("caller_threads[0].lost_object", "t1", "finish a library return"),  # killed prompt 07725d30
-        ("truth_map", "t1", "finish a library return"),
-        ("", "q1", "the stamp is near the desk"),
-        ("a sloppy path", "q1", "the stamp is near the desk"),
-    ):
-        row = report(field_path, item_id, evidence_span)
-        assert lane._validate_fair_play_envelope(row, truth) is None, field_path
-        assert [f.item_id
-                for f in lane._corroborated_fair_blocks(row, truth)] == [item_id]
-        assert lane._fair_play_advisories(row, truth) == []
-
-    # `thread_id` genuinely belongs to two collections -- that is the schema, not
-    # a defect, and it must never fail closed.
-    ids = lane._truth_item_ids(truth)
-    assert {name for name, members in ids.items() if "t1" in members} == {
-        "caller_threads", "resolution_links",
-    }
-
-    # An id that names nothing is still advisory, never fatal.
-    unknown = report("audible_clues.0.implication", "nope", "not present")
-    assert lane._validate_fair_play_envelope(unknown, truth) is None
-    assert lane._corroborated_fair_blocks(unknown, truth) == []
-    assert [f.item_id for f in lane._fair_play_advisories(unknown, truth)] == [
-        "nope",
-    ]
 
 
 def test_p3_safety_repair_keeps_safety_and_collection_rules():
@@ -2339,25 +1577,3 @@ def test_p5_repair_spells_out_required_fields_and_exact_arc_phases():
     assert "shot MUST retain a non-empty visual_prompt" in rules
     assert "orientation_beat_id beat is `opening`" in rules
     assert "every other beat is `rising`" in rules
-
-
-def test_listener_and_final_audit_repair_envelopes_are_explicit():
-    listener = lane._repair_rules("P7", "optional_notes must be a list")
-    assert "optional_notes MUST be a list of strings" in listener
-    final = lane._repair_rules("P9", "accepted must be a boolean")
-    assert "accepted MUST be one boolean" in final
-    assert "Never copy the manifest or script" in final
-    assert "blocking MUST be a boolean" in final
-
-
-def test_final_audit_blocking_authority_is_stated_in_prompt_and_repair():
-    routing._REGISTRY = None
-    pack = routing.resolve_story_pack("original_codex56sol")
-    seam = pack.prompt_stages["codex56_final_contract_audit"]
-    rerun = lane._repair_rules("P9_rerun", "blocking must be a boolean")
-    for text in (seam, rerun):
-        assert "one line_id from script.lines" in text
-        assert "copied verbatim" in text
-        assert "never an array" in text
-    assert "cannot be retaken" in seam
-    assert "read-only evidence" in rerun

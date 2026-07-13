@@ -601,15 +601,10 @@
         "codex56_possibility_slate",
         "codex56_slate_triage",
         "codex56_audible_truth_map",
-        "codex56_truth_map_retake",
-        "codex56_fair_play_audit",
         "codex56_broadcast_score",
         "codex56_score_anchor_patch",
         "codex56_performance_script",
-        "codex56_script_anchor_patch",
-        "codex56_blind_listener",
-        "codex56_broadcast_retake",
-        "codex56_final_contract_audit"
+        "codex56_script_anchor_patch"
       ],
       "passes": [
         {
@@ -626,24 +621,15 @@
           "seam_refs": [
             "codex56_slate_triage"
           ],
-          "description": "Reject contract defects and select a buildable possibility."
+          "description": "Select a buildable possibility; findings are advisory and never reject a card."
         },
         {
           "pass_id": "P3_audible_truth_map",
           "slot": "creative",
           "seam_refs": [
-            "codex56_audible_truth_map",
-            "codex56_truth_map_retake"
+            "codex56_audible_truth_map"
           ],
           "description": "Build the causal clue and resolution graph."
-        },
-        {
-          "pass_id": "P4_fair_play_audit",
-          "slot": "technical",
-          "seam_refs": [
-            "codex56_fair_play_audit"
-          ],
-          "description": "Audit finite, text-evidenced P3-owned fair-play claims."
         },
         {
           "pass_id": "P5_broadcast_score",
@@ -662,44 +648,11 @@
             "codex56_script_anchor_patch"
           ],
           "description": "Write every canonical spoken line for the closed manifest; when a structurally valid script misses immutable grounding, repair only the affected spoken line through a bounded typed patch."
-        },
-        {
-          "pass_id": "P7_blind_listener",
-          "slot": "technical",
-          "seam_refs": [
-            "codex56_blind_listener"
-          ],
-          "description": "Evaluate the complete script using spoiler-safe clue evidence."
-        },
-        {
-          "pass_id": "P8_broadcast_retake",
-          "slot": "creative",
-          "seam_refs": [
-            "codex56_broadcast_retake",
-            "codex56_script_anchor_patch"
-          ],
-          "description": "Return a complete replacement script only when repair is required; localized grounding omissions use a bounded spoken-line patch."
-        },
-        {
-          "pass_id": "P9_retake",
-          "slot": "creative",
-          "seam_refs": [
-            "codex56_broadcast_retake",
-            "codex56_script_anchor_patch"
-          ],
-          "description": "Return one complete replacement script for corroborated final-audit defects; localized grounding omissions use a bounded spoken-line patch."
-        },
-        {
-          "pass_id": "P9_final_contract_audit",
-          "slot": "technical",
-          "seam_refs": [
-            "codex56_final_contract_audit"
-          ],
-          "description": "Final typed contract audit over the accepted complete script."
         }
       ],
       "notes": [
-        "Only workflow creative and technical slots are used; bounded retries fail closed."
+        "Only workflow creative and technical slots are used; bounded retries fail closed.",
+        "Fair play is a deterministic contract, not an audit: the device anchor is spoken on a clue line before the reveal line, proven by _validate_script_grounding and repaired by the bounded spoken-line patch."
       ]
     },
     {

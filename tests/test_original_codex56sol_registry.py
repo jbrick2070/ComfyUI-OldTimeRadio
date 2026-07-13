@@ -98,24 +98,13 @@ def test_broadcast_score_prompt_closes_music_bookend_key_sets():
     assert p6.seam_refs == (
         "codex56_performance_script", "codex56_script_anchor_patch",
     )
-    p8 = next(
-        row for row in registry.pipelines["acoustic_puzzle_v1"].passes
-        if row.pass_id == "P8_broadcast_retake"
-    )
-    p9_retake = next(
-        row for row in registry.pipelines["acoustic_puzzle_v1"].passes
-        if row.pass_id == "P9_retake"
-    )
-    assert p8.seam_refs == (
-        "codex56_broadcast_retake", "codex56_script_anchor_patch",
-    )
-    assert p9_retake.seam_refs == (
-        "codex56_broadcast_retake", "codex56_script_anchor_patch",
-    )
+    assert "clue-carrying beat MUST come BEFORE the reveal beat" in seam
+    script_seam = pack.prompt_stages["codex56_performance_script"]
+    assert "BEFORE the reveal line" in script_seam
 
 
-def test_truth_map_retake_seam_holds_three_way_registry_parity():
-    """The retake seam must exist on all three surfaces or the lane won't load.
+def test_every_seam_holds_three_way_registry_parity():
+    """Every seam must exist on all three surfaces or the lane won't load.
 
     `_otr_story_routing` enforces, at IMPORT time,
     pack.prompt_stages == pipeline.declared_seams == union(pass.seam_refs)
@@ -127,21 +116,13 @@ def test_truth_map_retake_seam_holds_three_way_registry_parity():
     pack = routing.resolve_story_pack("original_codex56sol")
     pipeline = registry.pipelines["acoustic_puzzle_v1"]
 
-    assert "codex56_truth_map_retake" in pack.prompt_stages
-    assert "codex56_truth_map_retake" in pipeline.declared_seams
     pass_refs = {seam for row in pipeline.passes for seam in row.seam_refs}
-    assert "codex56_truth_map_retake" in pass_refs
-    assert set(pack.prompt_stages) == set(pipeline.declared_seams)
+    assert set(pack.prompt_stages) == set(pipeline.declared_seams) == pass_refs
 
     truth_row = next(row for row in pipeline.passes
                      if row.pass_id == "P3_audible_truth_map")
     assert truth_row.slot == "creative"
-    assert truth_row.seam_refs == (
-        "codex56_audible_truth_map", "codex56_truth_map_retake",
-    )
-    seam = pack.prompt_stages["codex56_truth_map_retake"]
-    assert "Re-author the audible truth map" in seam
-    assert "never select a different possibility" in seam
+    assert truth_row.seam_refs == ("codex56_audible_truth_map",)
 
 
 @pytest.mark.parametrize("hint", ["", "please emphasize patient teamwork"])
