@@ -518,7 +518,35 @@ class CastVoice(BaseModel):
     role: str = Field(min_length=3, max_length=60)
     character_description: str = Field(min_length=40, max_length=240)
     gender: Literal["male", "female"]
-    age_band: Literal["20s", "30s", "40s", "50s", "60s"]
+    # "n/a" IS A REAL ANSWER. age_band is a casting HINT, and some characters
+    # genuinely have no age -- a ship's computer, a machine, a chorus, a voice.
+    # The schema offered only decades, so a model casting an ageless character had
+    # no legal way to be honest. Live 2026-07-14, 420w scifi_fable2: it wrote
+    # `age_band: "N/A"` for cast.1 and the episode DIED on a literal_error.
+    #
+    # Nothing downstream needs a decade. `assign_voice_for_slot` takes
+    # `age_band: str = ""` and its match ladder is explicitly
+    # (gender+timbre+role+age -> DROP AGE -> drop role -> gender-only), so an
+    # unmatched age simply degrades to the next tier. The voice bank's own
+    # vocabulary is "adult"/"elder" -- a decade never exact-matches anyway; the
+    # scoring is fuzzy. No ledger hole: the field is always present, and "n/a" is
+    # a truthful value with a defined consequence (cast on gender/timbre instead).
+    #
+    # This is the lesson the sibling fields below ALREADY learned four lines down
+    # ("a casting that omitted them schema-aborted a run -- paperwork tolerance,
+    # defaults allowed"). age_band was simply never given the same treatment.
+    age_band: Literal["20s", "30s", "40s", "50s", "60s", "n/a"] = "n/a"
+
+    @field_validator("age_band", mode="before")
+    @classmethod
+    def _normalize_ageless(cls, v):
+        """Accept the many ways a model spells "no age" -- N/A, NA, none, unknown."""
+        if v is None:
+            return "n/a"
+        text = str(v).strip().lower().replace("\\", "/")
+        if text in {"", "n/a", "na", "none", "null", "unknown", "n.a.", "-"}:
+            return "n/a"
+        return text
     # register/want/pressure are descriptive PAPERWORK (r1/A3: register
     # authority stays with the treatment; these never drive the voice or
     # the portrait). 31st live smoke 2026-07-10: a casting that omitted

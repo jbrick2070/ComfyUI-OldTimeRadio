@@ -186,6 +186,46 @@ class TestModels:
                           note="Change it to this. SELA: I never doubted "
                                "the mountain for a second.")
 
+    def test_an_ageless_character_can_say_so(self):
+        """Some characters have no age. The schema must let the model be honest.
+
+        Live 2026-07-14, 420w scifi_fable2: the model cast a character with no
+        meaningful age -- a machine, a computer, a voice -- and the schema offered
+        only 20s/30s/40s/50s/60s. It wrote `age_band: "N/A"` and the episode DIED
+        on a literal_error.
+
+        Nothing downstream needs a decade: assign_voice_for_slot takes
+        `age_band: str = ""` and its match ladder explicitly DROPS AGE as its second
+        tier, and the voice bank's own vocabulary is "adult"/"elder" -- so a decade
+        never exact-matches anyway. "n/a" is a truthful value with a defined
+        consequence: cast on gender and timbre instead.
+        """
+        def _voice(**over):
+            row = {
+                "name": "LAMPKEEPER",
+                "role": "The Lighthouse Computer",
+                "character_description": (
+                    "A patient machine intelligence that has kept the lamp lit "
+                    "alone for thirty years and speaks only when asked."),
+                "gender": "female",
+                "timbre": "cool, level",
+            }
+            row.update(over)
+            return row
+
+        # The exact string that killed the leg.
+        assert F2.CastVoice(**_voice(age_band="N/A")).age_band == "n/a"
+        # ...and its cousins.
+        for spelling in ("n/a", "NA", "none", "unknown", "", "-"):
+            assert F2.CastVoice(**_voice(age_band=spelling)).age_band == "n/a"
+        # Omitting it entirely is legal paperwork too (the sibling fields' lesson).
+        assert F2.CastVoice(**_voice()).age_band == "n/a"
+        # A real decade still means what it says.
+        assert F2.CastVoice(**_voice(age_band="40s")).age_band == "40s"
+        # Junk is still junk.
+        with pytest.raises(ValidationError):
+            F2.CastVoice(**_voice(age_band="middle-aged-ish"))
+
     def test_strips_the_chatter_a_model_wraps_around_the_script(self):
         """A reasoning model announces itself. That must not kill a good script.
 
