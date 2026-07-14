@@ -149,6 +149,81 @@ def test_public_domain_prompt_contains_no_visual_safety_terms(monkeypatch):
     assert brief.source_hash
 
 
+def test_prompt_asks_for_named_and_role_designated_cast_in_order(monkeypatch):
+    """Runtime cast extraction must pull the source's OWN people -- proper names
+    when the text gives them AND role-designations when it does not (the Time
+    Traveller), in appearance order, never a generic placeholder."""
+    captured = {}
+
+    def _fake_structured_call(**kwargs):
+        captured["prompt"] = kwargs["prompt"]
+        return _good_briefs(character_names=["the Time Traveller", "Filby"])
+
+    monkeypatch.setattr(
+        "nodes._otr_public_domain_sources.structured_call",
+        _fake_structured_call,
+    )
+    build_public_domain_briefs(
+        technical_fn=lambda *a, **kw: "{}",
+        payload=_sample_payload(),
+        model_id="test-model",
+    )
+    prompt_text = "\n".join(m["content"] for m in captured["prompt"]).lower()
+    assert "role-designation" in prompt_text          # the Time Traveller case
+    assert "order of appearance" in prompt_text
+    assert "never invent" in prompt_text
+    assert "placeholder" in prompt_text                # bans 'Witness 1'
+
+
+def test_role_designated_cast_survives_the_field_cleaner():
+    """A source that names no one (Wells) still yields a faithful cast: the
+    text's own role-designations, kept verbatim."""
+    brief = _good_briefs(character_names=["the Time Traveller", "the Medical Man", "Filby"])
+    assert brief.character_names == ["the Time Traveller", "the Medical Man", "Filby"]
+
+
+def test_empty_cast_is_rejected_and_retried_to_failure():
+    """The cast is a REQUIRED generation input, not best-effort. A source brain
+    that returns valid briefs but omits the cast must be retried, then fail loud
+    -- never fall through to a generic placeholder cast."""
+    import json
+
+    body = json.dumps({
+        "casting_brief": _good_briefs().casting_brief,
+        "script_brief": _good_briefs().script_brief,
+        "news_close_brief": _good_briefs().news_close_brief,
+        "key_terms": ["The Time Machine", "traveler", "witnesses"],
+        # character_names deliberately omitted -> validator must reject
+    })
+    with pytest.raises(PublicDomainInterpreterError):
+        build_public_domain_briefs(
+            technical_fn=lambda *a, **kw: body,
+            payload=_sample_payload(),
+            model_id="test",
+            max_attempts=2,
+        )
+
+
+def test_a_cast_bearing_brief_passes_the_ladder():
+    """The same source brain, now returning the story's real cast, passes."""
+    import json
+
+    body = json.dumps({
+        "casting_brief": _good_briefs().casting_brief,
+        "script_brief": _good_briefs().script_brief,
+        "news_close_brief": _good_briefs().news_close_brief,
+        "key_terms": ["The Time Machine", "traveler", "witnesses"],
+        "character_names": ["the Time Traveller", "the Medical Man", "Filby"],
+    })
+    brief = build_public_domain_briefs(
+        technical_fn=lambda *a, **kw: body,
+        payload=_sample_payload(),
+        model_id="test",
+        max_attempts=2,
+    )
+    assert brief.character_names[0] == "the Time Traveller"
+
+
 def test_public_domain_module_import_posture():
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
     for node in ast.walk(tree):

@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
 
 MANIFEST_SCHEMA_VERSION = "v1"
-PROMPT_VERSION = "public_domain_interpreter_v1"
+PROMPT_VERSION = "public_domain_interpreter_v2"
 SCHEMA_VERSION = "public_domain_briefs_v1"
 
 _MAX_CASTING_BRIEF_CHARS = 900
@@ -515,9 +515,13 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "  \"script_brief\": \"120-1000 chars; faithful radio adaptation brief\",\n"
         "  \"news_close_brief\": \"80-420 chars; source attribution note\",\n"
         "  \"key_terms\": [\"2-7 concise source/adaptation terms\"],\n"
-        "  \"character_names\": [\"the source's OWN named characters, verbatim, "
-        "e.g. Ebenezer Scrooge, Bob Cratchit; 1-6; the real names from the text, "
-        "never invented ones\"]\n"
+        "  \"character_names\": [\"REQUIRED, 2-6. The story's OWN cast, taken "
+        "straight from the source text, in order of appearance. Use each "
+        "character exactly as the text refers to them -- a proper name when the "
+        "source gives one (Ebenezer Scrooge, Bob Cratchit), OR the source's own "
+        "role-designation when it does not (the Time Traveller, the Medical Man, "
+        "Filby). List the real people from THIS source only; never invent a "
+        "name, never use a generic placeholder like 'Witness 1'\"]\n"
         "}\n\n"
         f"{source_block}"
     )
@@ -551,6 +555,17 @@ def build_public_domain_briefs(
     def _content_validator(brief: PublicDomainBriefs) -> str | None:
         if len(brief.key_terms) < 2:
             return "public-domain briefs require at least two key_terms"
+        # Runtime cast extraction is the ONLY faithful casting source for the
+        # public-domain lane (the manifest carries only generic role hints like
+        # "traveler"). So the cast is a REQUIRED generation input, not a
+        # best-effort side field: the source's real people, pulled from its own
+        # text. An empty list means the source brain skipped the cast -- retry
+        # until it returns one, or fail loud (a PD adaptation with no cast is a
+        # broken render, not a simplification). This is a generation floor like
+        # the key_terms one above, NOT a story-quality audit.
+        if len(brief.character_names) < 1:
+            return ("public-domain briefs require at least one source character "
+                    "name (the story's own cast, from its text)")
         hay = " ".join(
             [brief.casting_brief, brief.script_brief, brief.news_close_brief]
             + list(brief.key_terms)
