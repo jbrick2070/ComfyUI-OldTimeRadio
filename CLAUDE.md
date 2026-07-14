@@ -2,9 +2,20 @@
 **Operator directives -- these win over any handoff, doc, or memory that disagrees.**
 - **Fix bugs properly, at the root cause -- never a shim or band-aid.** Don't wait for me to
   fix anything: make the fix yourself, without asking. If it works, it's fine.
+- **TWO STRIKES, THEN THE PANEL (operator directive 2026-07-14 -- hard).** You get **two**
+  attempts to fix a given problem on your own. If the **third** attempt is about to begin --
+  i.e. the same bug/failure survived two of your fixes -- you MUST `/kibitz` (local, $0,
+  file-grounded) BEFORE writing more code. No third solo swing, ever. Two failed fixes means
+  the model of the problem is wrong, and a third guess from the same wrong model just burns a
+  live roll. The panel's job is to break your framing, not to bless your patch. You remain the
+  judge: ground every panel claim against the real files and discard what does not survive.
+  (Supersedes the older "kibitz on EVERY live failure" habit -- a first-try root fix does not
+  need a panel; a third try always does.)
 - **When genuinely torn between approaches, run the roundtable LIVE for convergence
   (ChatGPT + Gemini + DeepSeek).** Skip the dry-run / cost estimate -- just run it, pronto.
   You are the judge. Escalate to me only if the panel still leaves it unresolved.
+- `/kibitz` and `/roundtable` are also welcome for IDEAS at any time -- pressure-testing a
+  plan, hunting a defect class, hardening a doc -- not only as the two-strikes backstop.
 - This file is hard rules + the real Cowork operating model for this repo + hard-won gotchas.
 ## 0. WORKFLOW SOURCE OF TRUTH (hard)
 `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json`
