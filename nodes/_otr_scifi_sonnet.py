@@ -36,6 +36,8 @@ try:
         p0_contract_instruction,
         p0_contract_receipt,
         p0_output_token_budget,
+        p0_source_char_budget,
+        p0_source_chunks,
     )
     from ._otr_scifi_source_repair import repair_literal_source_metadata
     from ._otr_structured_call import schema_shape_instruction, structured_call
@@ -62,6 +64,8 @@ except ImportError:  # pragma: no cover
         p0_contract_instruction,
         p0_contract_receipt,
         p0_output_token_budget,
+        p0_source_char_budget,
+        p0_source_chunks,
     )
     from _otr_scifi_source_repair import repair_literal_source_metadata  # type: ignore
     from _otr_structured_call import schema_shape_instruction, structured_call  # type: ignore
@@ -352,10 +356,15 @@ def _allowed_numeric_tokens(dossier: "FragmentDossierV4") -> frozenset[str]:
     """Every numeric token the record is permitted to state.
 
     The source's own numbers, from everywhere the source actually speaks in the
-    dossier: the `key_numbers` the extractor pulled out, AND the literal
-    `source_spans` quotes -- those are verbatim slices of the payload, so a
-    number inside one IS a number the source states. Reading only `key_numbers`
-    meant a figure the fragment plainly contains was called an invention.
+    dossier: the `key_numbers` the extractor pulled out, the literal `source_spans`
+    quotes -- verbatim slices of the payload, so a number inside one IS a number the
+    source states -- and the `provenance_note` and `headline_clean`.
+
+    Those last two matter: the attestation seam ORDERS the announcer to name "the
+    outlet/date from provenance_note", and the date is a number. A proof that
+    forbids what the seam commands is not a proof, it is a contradiction -- and it
+    killed the record at the final read (live: prompt 415ca1fc's rerun, where the
+    announcer was condemned for stating the archive date it was told to state).
     """
     allowed: set[str] = set()
     for number in dossier.key_numbers:
@@ -367,6 +376,8 @@ def _allowed_numeric_tokens(dossier: "FragmentDossierV4") -> frozenset[str]:
     for entity in dossier.named_entities:
         for span in entity.source_spans:
             allowed.update(_NUMERIC_TOKEN_RE.findall(span.quote))
+    allowed.update(_NUMERIC_TOKEN_RE.findall(dossier.provenance_note or ""))
+    allowed.update(_NUMERIC_TOKEN_RE.findall(dossier.headline_clean or ""))
     return frozenset(allowed)
 
 
@@ -583,6 +594,92 @@ def validate_sonnet_payload(payload: Mapping[str, Any], resolved: Mapping[str, A
     if isinstance(target, bool) or not isinstance(target, int) or not 30 <= target <= 900:
         raise SonnetTargetRangeError("target_words must be an integer from 30 through 900")
     return PayloadV4(payload=clean, source_mode=mode, payload_sha256=_digest(clean)), {"requested_words": target}
+
+
+def _rebase_dossier(dossier: FragmentDossierV4, offset: int) -> FragmentDossierV4:
+    """Move a window's spans back onto the full article.
+
+    A span the model returned is an offset into the WINDOW it was shown. The record
+    cites the SOURCE. Adding the window's start position is the whole translation --
+    the quote text is untouched, so the citation still proves itself against the
+    full text.
+    """
+    if offset == 0:
+        return dossier
+    rebased = dossier.model_copy(deep=True)
+    for fact in rebased.verified_facts:
+        for span in fact.source_spans:
+            if span.field == "full_text":
+                span.start += offset
+                span.end += offset
+    for number in rebased.key_numbers:
+        if number.source_span.field == "full_text":
+            number.source_span.start += offset
+            number.source_span.end += offset
+    for entity in rebased.named_entities:
+        for span in entity.source_spans:
+            if span.field == "full_text":
+                span.start += offset
+                span.end += offset
+    return rebased
+
+
+def merge_dossiers(parts: "Sequence[FragmentDossierV4]") -> FragmentDossierV4:
+    """One dossier from every window of the article, ids renumbered to the caps.
+
+    The evidence rows are capped (6 facts, 4 numbers, 4 entities) and their ids are
+    `fact_1..fact_6` / `num_1..num_4` by schema -- so a merge cannot simply
+    concatenate, it has to RENUMBER, and every number's `fact_id` has to follow its
+    fact to the new name. Rows are taken round-robin across the windows so a long
+    article is represented from end to end, not just from its opening paragraphs.
+    """
+    if len(parts) == 1:
+        return parts[0]
+
+    facts: list[EvidenceFactV4] = []
+    fact_source: list[int] = []
+    for row_index in range(MAX_FACT_ROWS):
+        for part_index, part in enumerate(parts):
+            if row_index < len(part.verified_facts) and len(facts) < MAX_FACT_ROWS:
+                facts.append(part.verified_facts[row_index].model_copy(deep=True))
+                fact_source.append(part_index)
+
+    renamed: dict[tuple[int, str], str] = {}
+    for new_index, (fact, part_index) in enumerate(zip(facts, fact_source), 1):
+        renamed[(part_index, fact.fact_id)] = f"fact_{new_index}"
+        fact.fact_id = f"fact_{new_index}"
+
+    numbers: list[EvidenceNumberV4] = []
+    for row_index in range(MAX_NUMBER_ROWS):
+        for part_index, part in enumerate(parts):
+            if row_index >= len(part.key_numbers) or len(numbers) >= MAX_NUMBER_ROWS:
+                continue
+            number = part.key_numbers[row_index].model_copy(deep=True)
+            owner = renamed.get((part_index, number.fact_id))
+            if owner is None:
+                # Its fact did not survive the cap; a number with no fact to hang
+                # on is not evidence, it is a loose figure. Drop it.
+                continue
+            number.fact_id = owner
+            number.number_id = f"num_{len(numbers) + 1}"
+            numbers.append(number)
+
+    entities: list[EvidenceEntityV4] = []
+    for row_index in range(MAX_ENTITY_ROWS):
+        for part in parts:
+            if row_index < len(part.named_entities) and len(entities) < MAX_ENTITY_ROWS:
+                entities.append(part.named_entities[row_index].model_copy(deep=True))
+
+    head = parts[0]
+    return FragmentDossierV4(
+        verified_facts=facts,
+        key_numbers=numbers,
+        named_entities=entities,
+        tone=head.tone,
+        headline_clean=head.headline_clean,
+        provenance_note=head.provenance_note,
+        payload_sha256=head.payload_sha256,
+    )
 
 
 def _dossier_validator(dossier: FragmentDossierV4, payload: Mapping[str, str]) -> str | None:
@@ -1028,14 +1125,47 @@ def run_scifi_sonnet_episode(
     meta["scifi_sonnet"] = {"source_digest": envelope.payload_sha256, "source_mode": envelope.source_mode, "call_journal": {}}
     journal = meta["scifi_sonnet"]["call_journal"]
     p0_token_budget = p0_output_token_budget(extra_root_fields=2)
+    # THE SOURCE IS READ WHOLE, IN WINDOWS THAT FIT. The evidence artifact was
+    # always bounded; the article never was, and a long one walked straight past the
+    # context window (live: prompt 415ca1fc, 5,424 tokens into a 5,192 opening).
+    # Trimming would have been easier and wrong: the tail of the article would
+    # become uncitable, and the long episodes are the ones that need it most.
+    source_budget = p0_source_char_budget(extra_root_fields=2)
+    windows = p0_source_chunks(envelope.payload, budget_chars=source_budget)
     journal["fact_index_token_budget"] = {
         **p0_contract_receipt(extra_root_fields=2),
         "source_evidence_field_count": len(envelope.payload),
         "source_evidence_characters": sum(
             len(value) for value in envelope.payload.values()
         ),
+        "source_char_budget": source_budget,
+        "source_windows": len(windows),
     }
-    p0 = invoke_sonnet_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_intake_system", pack=pack, typed_inputs={"payload": envelope.model_dump(mode="json")}, result_type=FragmentDossierV4, post_validator=lambda x: _dossier_validator(x, payload), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=p0_token_budget, journal=journal, prompt_must_fit=True)
+    parts: list[FragmentDossierV4] = []
+    for index, (offset, window) in enumerate(windows):
+        # Each window is proven against ITS OWN text -- the model can only cite what
+        # it was shown -- and then rebased onto the full article.
+        part = invoke_sonnet_structured(
+            pass_id="P0" if len(windows) == 1 else f"P0:w{index}",
+            slot="technical", slot_fn=technical_fn,
+            seam_ref="sonnet_intake_system", pack=pack,
+            typed_inputs={"payload": PayloadV4(
+                payload=window, source_mode=envelope.source_mode,
+                payload_sha256=envelope.payload_sha256,
+            ).model_dump(mode="json")},
+            result_type=FragmentDossierV4,
+            post_validator=lambda x, w=window: _dossier_validator(x, w),
+            base_temperature=.20, structural_retry_temperature=.10,
+            max_new_tokens=p0_token_budget, journal=journal,
+            prompt_must_fit=True,
+        )
+        parts.append(_rebase_dossier(part, offset))
+    p0 = merge_dossiers(parts)
+    # And the merged record must prove itself against the WHOLE article, which is
+    # what every downstream citation is checked against.
+    merged_error = _dossier_validator(p0, envelope.payload)
+    if merged_error is not None:
+        raise SonnetPassError(f"merged dossier is not grounded: {merged_error}")
     p1 = invoke_sonnet_structured(pass_id="P1", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_frame_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "initial_session_word_steer": steer}, result_type=SessionFrameV4, post_validator=lambda x: None, base_temperature=.85, structural_retry_temperature=.40, max_new_tokens=2300, journal=journal)
     cast = lock_archive_cast(p1)
     orum = []

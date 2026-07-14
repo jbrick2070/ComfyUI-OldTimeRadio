@@ -321,6 +321,28 @@ def test_gemini_pitch_slate_still_pins_exactly_three_pitches():
             )
 
 
+def _p0_pass_id_literals(node):
+    """Every string a `pass_id=` expression could evaluate to, statically.
+
+    A source-grounded P0 may now be read in WINDOWS (a long article does not fit
+    one prompt), so its pass_id can be a conditional or an f-string -- `"P0"` for a
+    single window, `f"P0:w{i}"` for many. The guarantee is unchanged and must not be
+    dodged by either spelling: resolve them all, and hold every one to
+    `prompt_must_fit=True`.
+    """
+    import ast
+
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, ast.IfExp):
+        return _p0_pass_id_literals(node.body) + _p0_pass_id_literals(node.orelse)
+    if isinstance(node, ast.JoinedStr):
+        head = node.values[0] if node.values else None
+        if isinstance(head, ast.Constant) and isinstance(head.value, str):
+            return [head.value]
+    return []
+
+
 @pytest.mark.parametrize(
     "module_name,invoke_name",
     (
@@ -340,21 +362,23 @@ def test_source_grounded_p0_refuses_to_be_left_truncated(module_name, invoke_nam
 
     source = pathlib.Path(module_name.replace(".", "/") + ".py")
     tree = ast.parse(source.read_text(encoding="utf-8"))
+    found = 0
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         if not isinstance(node.func, ast.Name) or node.func.id != invoke_name:
             continue
         keywords = {kw.arg: kw.value for kw in node.keywords if kw.arg}
-        pass_node = keywords.get("pass_id")
-        if not (isinstance(pass_node, ast.Constant) and pass_node.value == "P0"):
+        literals = _p0_pass_id_literals(keywords.get("pass_id"))
+        if not any(literal.startswith("P0") for literal in literals):
             continue
+        found += 1
         must_fit = keywords.get("prompt_must_fit")
         assert isinstance(must_fit, ast.Constant) and must_fit.value is True, (
             f"{module_name} P0 is source-grounded and must pass prompt_must_fit=True"
         )
-        return
-    pytest.fail(f"no P0 call found in {module_name}")
+    if not found:
+        pytest.fail(f"no P0 call found in {module_name}")
 
 
 def test_source_grounded_p0_disables_generic_string_clamping():

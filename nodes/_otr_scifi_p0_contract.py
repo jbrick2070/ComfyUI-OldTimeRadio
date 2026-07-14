@@ -25,6 +25,100 @@ MAX_PROVENANCE_NOTE_CHARS = 240
 _P0_BASE_OUTPUT_TOKENS = 2800
 _P0_EXTRA_ROOT_FIELD_TOKENS = 100
 
+# THE OTHER HALF OF THE CAPACITY CONTRACT.
+#
+# The ARTIFACT was bounded (the limits above) so the P0 prompt would fit. The
+# SOURCE never was -- and the source is the only unbounded thing in that prompt.
+# A long RSS article walked straight past the window: 5,424 input tokens into a
+# 5,192-token opening, and `prompt_must_fit` correctly refused to left-truncate a
+# provenance prompt it cannot slice (live: scifi_sonnet, prompt 415ca1fc). Fail
+# loud is right; arriving there is not. Bound the evidence so it fits BY
+# CONSTRUCTION.
+#
+# Measured against the live tokenizer (Mistral-Nemo-Instruct-2407, chat template
+# applied, 2026-07-13):
+#   * fixed overhead -- seam + P0 contract + schema contract + JSON scaffolding
+#     + the chat template itself -- 2,544 tokens. Rounded up.
+#   * source prose -- 0.177 tokens/char. Rounded UP to 0.20, so the estimate can
+#     only ever over-count, never under-count.
+_P0_LOCAL_CONTEXT_CAP = 8192
+_P0_PROMPT_OVERHEAD_TOKENS = 2600
+_P0_TOKENS_PER_CHAR = 0.20
+_P0_FIT_MARGIN_TOKENS = 192
+
+# The fields whose text the model must be able to quote from verbatim. `seed_text`
+# and `headline`/`summary` are short and bounded by the fetcher; `full_text` is the
+# article body, and it is the one that grows without limit.
+_P0_TRIMMABLE_FIELD = "full_text"
+
+_SENTENCE_END = (". ", ".\n", "! ", "?\n", "? ", "!\n")
+
+
+def p0_source_char_budget(
+    *,
+    extra_root_fields: int = 0,
+    context_cap: int = _P0_LOCAL_CONTEXT_CAP,
+) -> int:
+    """How many characters of source evidence provably fit the P0 prompt."""
+    reserved = p0_output_token_budget(extra_root_fields=extra_root_fields)
+    usable = int(context_cap) - reserved
+    headroom = usable - _P0_PROMPT_OVERHEAD_TOKENS - _P0_FIT_MARGIN_TOKENS
+    if headroom <= 0:
+        return 0
+    return int(headroom / _P0_TOKENS_PER_CHAR)
+
+
+def p0_source_chunks(
+    payload: Mapping[str, str],
+    *,
+    budget_chars: int,
+) -> "list[tuple[int, dict[str, str]]]":
+    """Split the article body into windows the P0 prompt can actually hold.
+
+    NOT a trim. Trimming makes the tail of a long article UNCITABLE -- a fact in
+    the last paragraph could never be quoted, and a 720-word episode is exactly the
+    one that needs the evidence a short one can skip. So the article is read in
+    windows, each of which fits, and each window's dossier is rebased back onto the
+    full text afterwards.
+
+    Every window carries the headline and summary (they are the framing, and they
+    are small), so the budget for the BODY is what remains. Cuts land on sentence
+    boundaries where one exists.
+
+    Returns `(offset, payload)` pairs. `offset` is the character position of that
+    window's body inside the original `full_text` -- the caller adds it back to
+    every span it receives, which is what keeps the citations true.
+    """
+    windows: "list[tuple[int, dict[str, str]]]" = []
+    body = str(payload.get(_P0_TRIMMABLE_FIELD) or "")
+    frame_chars = sum(
+        len(str(value or "")) for key, value in payload.items()
+        if key != _P0_TRIMMABLE_FIELD
+    )
+    allowance = int(budget_chars) - frame_chars
+    if allowance <= 0:
+        # The frame alone exceeds the window; there is nothing honest to do but
+        # hand back one window and let `prompt_must_fit` refuse it out loud.
+        return [(0, dict(payload))]
+    if len(body) <= allowance:
+        return [(0, dict(payload))]
+
+    offset = 0
+    while offset < len(body):
+        window = body[offset:offset + allowance]
+        if offset + allowance < len(body):
+            boundary = max(window.rfind(mark) for mark in _SENTENCE_END)
+            # Honour a sentence boundary only if it keeps most of the window --
+            # otherwise a period near the start would shred the article into
+            # slivers and multiply the call count.
+            if boundary > allowance // 2:
+                window = window[: boundary + 1]
+        fitted = dict(payload)
+        fitted[_P0_TRIMMABLE_FIELD] = window
+        windows.append((offset, fitted))
+        offset += len(window)
+    return windows
+
 
 def p0_output_token_budget(*, extra_root_fields: int = 0) -> int:
     """Return the bounded Sci-Fi P0 output reservation.

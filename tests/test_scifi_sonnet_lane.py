@@ -62,6 +62,89 @@ def test_sonnet_payload_cast_lock_and_spoken_hygiene():
         lane.validate_spoken_text_and_lock([bad], cast)
 
 
+def test_a_long_article_is_read_in_windows_and_stays_citable_to_the_end():
+    """Live prompt 415ca1fc: a long RSS article made the P0 prompt 5,424 tokens
+    against a 5,192-token opening, and `prompt_must_fit` refused it -- correctly.
+
+    Trimming would have been easier and WRONG: the tail of the article becomes
+    uncitable, and the long episodes are the ones that need the evidence most. So
+    the article is read in windows that fit, and every window's spans are rebased
+    onto the full text -- a fact in the last paragraph is still quotable.
+    """
+    from nodes._otr_scifi_p0_contract import p0_source_chunks
+
+    tail = "The final instrument was switched on at dawn."
+    body = ("The probe carried sensors and returned data to the array. " * 400
+            + tail)
+    payload = {
+        "headline": "Probe returns", "summary": "It came back.",
+        "full_text": body, "seed_text": "",
+    }
+    budget = lane.p0_source_char_budget(extra_root_fields=2)
+
+    windows = p0_source_chunks(payload, budget_chars=budget)
+    assert len(windows) > 1, "a long article must be split, not truncated"
+    # Every window fits the budget...
+    for _offset, window in windows:
+        assert sum(len(v) for v in window.values()) <= budget
+    # ...and together they cover the article to its LAST sentence.
+    rebuilt = "".join(window["full_text"] for _offset, window in windows)
+    assert rebuilt == body
+    assert tail in windows[-1][1]["full_text"]
+
+    # A span the model returns in the LAST window rebases onto the full article,
+    # so the citation proves itself against the real source.
+    last_offset, last_window = windows[-1]
+    local = last_window["full_text"].index(tail)
+    part = lane.FragmentDossierV4.model_validate({
+        "verified_facts": [{
+            "fact_id": "fact_1", "claim": "The last instrument was switched on.",
+            "source_spans": [{"field": "full_text", "start": local,
+                              "end": local + len(tail), "quote": tail}],
+        }],
+        "key_numbers": [], "named_entities": [], "tone": "measured",
+        "headline_clean": "Probe returns", "provenance_note": "One fragment.",
+        "payload_sha256": "a" * 64,
+    })
+    rebased = lane._rebase_dossier(part, last_offset)
+    assert lane._dossier_validator(rebased, payload) is None
+
+
+def test_merging_windows_renumbers_the_ids_and_keeps_numbers_with_their_facts():
+    def part(fact_id, claim, quote, number=None):
+        rows = {
+            "verified_facts": [{
+                "fact_id": fact_id, "claim": claim,
+                "source_spans": [{"field": "summary", "start": 0,
+                                  "end": len(quote), "quote": quote}],
+            }],
+            "key_numbers": [], "named_entities": [], "tone": "measured",
+            "headline_clean": "H", "provenance_note": "P",
+            "payload_sha256": "a" * 64,
+        }
+        if number is not None:
+            rows["key_numbers"] = [{
+                "number_id": "num_1", "verbatim": number, "fact_id": fact_id,
+                "source_span": {"field": "summary", "start": 0,
+                                "end": len(quote), "quote": quote},
+            }]
+        return lane.FragmentDossierV4.model_validate(rows)
+
+    merged = lane.merge_dossiers([
+        part("fact_1", "First window.", "one", number="3"),
+        part("fact_1", "Second window.", "two", number="7"),
+    ])
+    # Both windows called their fact `fact_1`; the merge must renumber, and each
+    # number must FOLLOW its own fact to the new name -- not point at a stranger.
+    assert [f.fact_id for f in merged.verified_facts] == ["fact_1", "fact_2"]
+    assert [f.claim for f in merged.verified_facts] == [
+        "First window.", "Second window.",
+    ]
+    assert [(n.number_id, n.verbatim, n.fact_id) for n in merged.key_numbers] == [
+        ("num_1", "3", "fact_1"), ("num_2", "7", "fact_2"),
+    ]
+
+
 def test_the_grounding_proof_goes_to_the_doctor_not_to_an_exception():
     """Live prompt 7199a7b1: the model invented the number 13 and the proof was
     RIGHT to catch it -- but it raised at the END, after every pass had already
@@ -198,6 +281,17 @@ def test_grounding_is_proven_against_the_dossier_not_judged_by_the_warden():
     assert "2018" in lane._allowed_numeric_tokens(spanned)
     assert not any("," in token
                    for token in lane._allowed_numeric_tokens(spanned))
+
+    # The attestation seam ORDERS the announcer to name the date from the
+    # provenance note. A proof that forbids what the seam commands is not a proof.
+    dated = spanned.model_copy(update={
+        "provenance_note": "Filed by the outlet on 2026-07-13.",
+    })
+    assert "2026" in lane._allowed_numeric_tokens(dated)
+    assert lane.ungrounded_lines(
+        [line("Filed on 2026-07-13, and the record holds.", cites=["fact_1"])],
+        dated,
+    ) == []
 
     # A ceremonial line states nothing, so it can invent nothing.
     ceremonial = [line("The record holds. 47 seals.", non_fact=True,
