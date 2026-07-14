@@ -49,6 +49,26 @@ def test_payload_pin_and_advisory_centers():
     assert sum(x.advisory_word_center for x in bands) == 719
 
 
+def test_p5_critique_validator_never_fails_a_clean_pass():
+    """THE LAW: an audit may improve a story, it may never fail one.
+
+    A live 720 leg died (scifi_gemini P5:scene_01, 2026-07-14) because the P5
+    post-validator rejected a passed=True critique that ALSO carried a stray
+    note. The feedback is consumed ONLY on the not-passed (P6 rewrite) branch, so
+    a clean pass with a note is harmless. The validator must tolerate it; the one
+    load-bearing rule is that a FAILED critique must carry feedback to act on.
+    """
+    v = lane._p5_critique_validator
+    # Clean pass, no note -> OK.
+    assert v(lane.SceneCritiqueV4(passed=True, feedback="")) is None
+    # Clean pass WITH a stray note -> still OK (the regression that killed a leg).
+    assert v(lane.SceneCritiqueV4(passed=True, feedback="minor nit, ignore")) is None
+    # Failed critique WITH feedback -> OK (the rewrite has something to act on).
+    assert v(lane.SceneCritiqueV4(passed=False, feedback="line 3 states a fact")) is None
+    # Failed critique with NO feedback -> the one legitimate rejection.
+    assert v(lane.SceneCritiqueV4(passed=False, feedback="")) == "failed critique needs feedback"
+
+
 def test_clean_critique_and_spoken_rejections():
     clean = lane.SceneCritiqueV4(passed=True, feedback="", line_fact_ids={})
     assert clean.passed and clean.feedback == ""

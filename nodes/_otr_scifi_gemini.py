@@ -256,6 +256,22 @@ class SceneCritiqueV4(_Strict):
     line_fact_ids: dict[str, list[str]] = Field(default_factory=dict)
 
 
+def _p5_critique_validator(x: "SceneCritiqueV4") -> Optional[str]:
+    """Post-validator for the P5 scene critique.
+
+    THE LAW: an audit may improve a story, it may never fail one. The critique's
+    feedback is consumed ONLY on the not-passed branch (the P6 rewrite), so a
+    passed=True critique that ALSO carries a stray note is harmless -- the note
+    is ignored downstream. Rejecting it ("clean critique must have empty
+    feedback") killed a live 720 leg (scifi_gemini P5:scene_01, 2026-07-14) over
+    a benign contradiction. Only the load-bearing check survives: a FAILED
+    critique must carry feedback, because the rewrite needs something to act on.
+    """
+    if not x.passed and not x.feedback:
+        return "failed critique needs feedback"
+    return None
+
+
 GenerateFn = Callable[..., str]
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9'’-]*")
 _DECORATION_RE = re.compile(r"[\r\n\t\[\]()\x60*]|^\s*\x60\x60\x60|^\s*[-*]\s+")
@@ -1072,7 +1088,9 @@ def run_scifi_gemini_episode(
     drafts: dict[str, SceneDraftV4] = {}
     for scene in p3.scenes:
         draft = invoke_gemini_structured(pass_id=f"P4:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_draft", pack=pack, typed_inputs={"scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x, s=scene: validate_scene_draft(x, s, casts, allowed_caps), base_temperature=.74, structural_retry_temperature=.34, max_new_tokens=3000, journal=journal)
-        critique = invoke_gemini_structured(pass_id=f"P5:{scene.scene_id}", slot="technical", slot_fn=technical_fn, seam_ref="gemini_scene_critique", pack=pack, typed_inputs={"drafted_lines": draft.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneCritiqueV4, post_validator=lambda x: (("clean critique must have empty feedback" if x.passed and x.feedback else None) or ("failed critique needs feedback" if not x.passed and not x.feedback else None)), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1400, journal=journal)
+        # post_validator = _p5_critique_validator (module-level, tested): a clean
+        # critique tolerates a stray note; only a FAILED one must carry feedback.
+        critique = invoke_gemini_structured(pass_id=f"P5:{scene.scene_id}", slot="technical", slot_fn=technical_fn, seam_ref="gemini_scene_critique", pack=pack, typed_inputs={"drafted_lines": draft.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneCritiqueV4, post_validator=_p5_critique_validator, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1400, journal=journal)
         if not critique.passed:
             # The critique buys ONE bounded rewrite. It does not get a veto: the
             # rewritten draft has already cleared the same deterministic contract
