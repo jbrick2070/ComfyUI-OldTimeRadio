@@ -2178,7 +2178,14 @@ def test_p1_typed_repair_uses_compact_exact_contract_and_safe_rewrite_margin():
 
 
 def test_p4_typed_repair_keeps_exact_review_shape_and_only_compact_failed_review():
-    overlong_rationale = "A" * 241
+    # Derive the overflow from the SCHEMA, never a hardcoded literal. This test is
+    # about the typed-repair PATH, not about any particular cap: it just needs a
+    # rationale that is one character too long. Hardcoding 241 silently pinned the
+    # old 240 cap, so raising the cap (2026-07-14, 240 -> 400: the reviewer kept
+    # overshooting a limit set to a length it does not write in) made the trigger
+    # value VALID and the repair path stopped being exercised at all.
+    _rationale_cap = lane.StructureReviewV4.model_fields["rationale"].metadata[0].max_length
+    overlong_rationale = "A" * (_rationale_cap + 1)
     base = json.dumps({
         "verdict": "pass",
         "issues": [],

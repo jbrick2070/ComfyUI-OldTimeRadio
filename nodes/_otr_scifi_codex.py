@@ -185,11 +185,29 @@ class DramaticQuestionV4(_Strict):
 
 
 class CastPlanRowV4(_Strict):
+    # THE CAPS ARE A CONTEXT BUDGET, NOT A STYLE RULE. This artifact is not
+    # terminal: it is re-serialized into P3's prompt, the script pass, and the
+    # image briefs, so an unbounded field is re-injected into every downstream
+    # prompt. The caps keep the cast plan a TAG SHEET rather than an essay, and
+    # they tell the model what KIND of thing each field is.
+    #
+    # But a cap the model reliably overshoots is a cap that is simply set wrong.
+    # `role_in_conflict` was 120 and the model kept landing ~140 on run after run
+    # (2026-07-14: it killed a leg pre-clamp, then tripped the clamp again on the
+    # very next one -- "coerced 2 over-long field(s) ... cast.2.role_in_conflict").
+    # The clamp means overshoot no longer COSTS anything, but truncating a note
+    # the writer meant to finish is still lost signal, and this note feeds the
+    # score and the script. So give the field the room it actually needs: 180.
+    #
+    # Deliberately NOT loosened: P0's `source_spans` quotes. Those must be
+    # VERBATIM slices of the article -- silently trimming one would forge a
+    # citation -- so that cap stays strict AND fail-closed. A cap that guards
+    # provenance is a different animal from a cap that guards a budget.
     char_id: Literal["announcer", "c01", "c02", "c03"]
     name: str = Field(min_length=1, max_length=40)
     character_description: str = Field(min_length=1, max_length=160)
     gender: str = Field(min_length=1, max_length=24)
-    role_in_conflict: str = Field(min_length=1, max_length=120)
+    role_in_conflict: str = Field(min_length=1, max_length=180)
     voice_slot: Literal["announcer", "c01", "c02", "c03"]
 
 
@@ -1286,11 +1304,21 @@ def _validate_script_graph(script: ScriptArtifactV4, score: RadioScoreV4) -> Non
 
 
 class StructureReviewV4(_Strict):
+    # A critic's notes. `rationale` was 240 and the model overshot it twice on the
+    # same 420w leg (2026-07-14, f6c42c5f) -- the typed repair wrote a long one
+    # again -- and the episode DIED. The clamp (below, on the P4 call) means it can
+    # no longer kill anything, but the cap was still set to a length the reviewer
+    # does not naturally write in. Give it room to state a reason: 400.
+    #
+    # Nothing here is spoken aloud, and the only field that steers anything
+    # downstream is `verdict` -- a Literal, which no length change can touch. So
+    # the cost of extra room is a few tokens of context, and the benefit is a
+    # reviewer that gets to finish its sentence.
     verdict: Literal["pass", "rewrite"]
     issues: list[Annotated[str, Field(min_length=1, max_length=120)]] = Field(
         default_factory=list, max_length=6,
     )
-    rationale: str = Field(default="", max_length=240)
+    rationale: str = Field(default="", max_length=400)
 
 
 _STRUCTURE_REVIEW_CONTRACT_INSTRUCTION = (

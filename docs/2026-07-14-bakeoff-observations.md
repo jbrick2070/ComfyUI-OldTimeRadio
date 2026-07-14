@@ -61,6 +61,42 @@ announcer-framing defect already on the books.
 
 ---
 
+## OBS-1b -- SCHEMA CAPS RAISED MID-SWEEP: the 420 rung is now CONFOUNDED
+
+**Operator directive 2026-07-14, eyes open:** *"raise it now before we spend on
+720"* / *"I know we lose our scientific rigor but time is short."* Recorded so the
+verdict cannot quietly overstate what the 420 numbers mean.
+
+Raised (evidence-based -- ONLY fields the model was observed overshooting on live
+legs, never a blanket loosening):
+
+| Field | Was | Now | Live evidence |
+|---|---|---|---|
+| `CastPlanRowV4.role_in_conflict` | 120 | **180** | killed a leg pre-clamp; tripped the clamp AGAIN on the very next leg ("coerced 2 over-long field(s)") |
+| `StructureReviewV4.rationale` | 240 | **400** | overshot twice on one leg and killed it (f6c42c5f) |
+
+Deliberately NOT loosened: P0's `source_spans` quotes. Those are VERBATIM slices of
+the article -- trimming one would forge a citation. A cap that guards PROVENANCE is
+a different animal from a cap that guards a CONTEXT BUDGET, and only the latter was
+ever negotiable.
+
+**THE CONFOUND, stated plainly.** Each leg boots a fresh server, so the caps land on
+whatever leg starts next. At 420: the 7 banks that went green in the main sweep ran
+at cap=120/240; the re-legged banks run at 180/400. **420 is therefore NOT a clean
+bank-vs-bank comparison and must never be reported as one.** The effect is small
+(these are non-spoken tag fields; the only reason they matter at all is that
+`role_in_conflict` is re-serialized into P3's prompt), but it is real and it is
+one-directional.
+
+**What protects the verdict:** the judged rung is **720**, and every 720 leg runs
+AFTER this change, on identical code. 720 stays uniform -- the bank remains the only
+variable there, which is the whole premise of the bake-off. The 420 rung was always
+a LADDER STEP (prove the lanes survive at length), not the judged artifact.
+
+So: report 420 as a survival/structure rung, with this caveat attached. Rank on 720.
+
+---
+
 ## OBS-2 -- lane structure at length (EXPECTED, not a defect)
 
 The lanes do NOT write the same shape of show at length, and the operator has
