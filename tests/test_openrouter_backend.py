@@ -73,6 +73,141 @@ def _ok_result(content: str = "the decoded reply"):
     }
 
 
+@pytest.fixture
+def catalog_cache(tmp_path, monkeypatch):
+    """Point the catalog cache at an isolated dir and let a test seed it.
+
+    Without this the backend reads the REAL repo cache, so a context-window
+    assertion would depend on whatever OpenRouter last published.
+    """
+    monkeypatch.setenv("OTR_OPENROUTER_CACHE_DIR", str(tmp_path))
+
+    def seed(models):
+        import json
+
+        (tmp_path / "openrouter_models.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": orb.CATALOG_SCHEMA_VERSION,
+                    "fetched_at": "2026-07-13T12:36:57+00:00",
+                    "source": "live",
+                    "count": len(models),
+                    "models": models,
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+    return seed
+
+
+# ---------------------------------------------------------------------------
+# Context window belongs to the SLUG, never to the static virtual row
+# ---------------------------------------------------------------------------
+
+
+def test_context_window_comes_from_the_resolved_slug_not_the_row(
+    enabled_env, catalog_cache, monkeypatch,
+):
+    """The row is a stand-in for ANY bound slug; its 8192 cannot describe one.
+
+    `aion-labs/aion-3.0-mini` advertises 131,072 tokens. Reading the window off
+    the static virtual row handed it 8,192 -- a local, VRAM-shaped number that
+    is simply false for a remote model.
+    """
+    catalog_cache([
+        {"id": "aion-labs/aion-3.0-mini", "context_length": 131072},
+    ])
+    monkeypatch.setenv("OPENROUTER_MODEL_A", "aion-labs/aion-3.0-mini")
+
+    entry = orb.OpenRouterBackend().load(orb.SLOT_A_ID, _row(context_window=8192))
+
+    assert entry["context_cap"] == 131072
+    assert entry["context_window"] == 131072
+
+
+def test_context_window_falls_back_to_the_row_when_the_cache_is_cold(
+    enabled_env, catalog_cache, monkeypatch,
+):
+    """An unknown window is unknown. Stay conservative and say so."""
+    catalog_cache([])  # cold cache: the slug is absent
+    monkeypatch.setenv("OPENROUTER_MODEL_A", "aion-labs/aion-3.0-mini")
+
+    entry = orb.OpenRouterBackend().load(orb.SLOT_A_ID, _row(context_window=8192))
+
+    assert entry["context_cap"] == 8192
+
+
+def test_long_artifact_request_survives_intact_on_a_large_window(
+    enabled_env, catalog_cache, monkeypatch,
+):
+    """THE 720-WORD REGRESSION.
+
+    `original_codex56sol` P6 budgets `240 + 160*beats + 4*target_words`. At 720
+    words the beat ceiling is 40, so it asks for 9,520 output tokens. Against
+    the fictitious 8,192 window that request was silently reduced to whatever
+    was left after the prompt, and the performance script came back cut off
+    mid-JSON -- undecodable, three times, blaming the model instead of the
+    budget. Against the model's REAL 131,072-token window it must reach the
+    wire whole.
+    """
+    catalog_cache([
+        {"id": "aion-labs/aion-3.0-mini", "context_length": 131072},
+    ])
+    monkeypatch.setenv("OPENROUTER_MODEL_A", "aion-labs/aion-3.0-mini")
+    monkeypatch.setenv("OPENROUTER_A_MAXTOK", "16384")
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result('{"ok": true}'),
+    )
+
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row(context_window=8192))
+    backend.generate(
+        entry,
+        [{"role": "user", "content": "score + manifest + truth map"}],
+        temperature=0.72,
+        max_new_tokens=9520,
+    )
+
+    assert seen["payload"]["max_tokens"] == 9520
+
+
+def test_long_artifact_request_is_clamped_on_a_small_window(
+    enabled_env, catalog_cache, monkeypatch,
+):
+    """The clamp is still correct when the window really IS small.
+
+    This is the honest half of the fix: a genuinely 8k model cannot be handed a
+    9,520-token artifact request, and the reduction must still happen. What was
+    wrong was applying it to a model with 131k.
+    """
+    catalog_cache([
+        {"id": "tiny/eight-k", "context_length": 8192},
+    ])
+    monkeypatch.setenv("OPENROUTER_MODEL_A", "tiny/eight-k")
+    monkeypatch.setenv("OPENROUTER_A_MAXTOK", "16384")
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result('{"ok": true}'),
+    )
+
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row(context_window=8192))
+    backend.generate(
+        entry,
+        [{"role": "user", "content": "score + manifest + truth map"}],
+        temperature=0.72,
+        max_new_tokens=9520,
+    )
+
+    assert seen["payload"]["max_tokens"] < 9520
+    assert seen["payload"]["max_tokens"] <= 8192
+
+
 # ---------------------------------------------------------------------------
 # Registration + identity
 # ---------------------------------------------------------------------------

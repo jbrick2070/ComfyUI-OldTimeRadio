@@ -747,6 +747,47 @@ def _cached_model(slug: str) -> dict:
     return {}
 
 
+def resolve_context_window(slug: str, *, row_default: int | None = None) -> int:
+    """The REAL context window of the resolved remote model.
+
+    The virtual catalog rows (`openrouter:slot-a|b`) are STATIC: one row stands
+    in for every slug an operator may bind to it, so its `context_window` cannot
+    describe the model actually selected. It carried
+    ``DEFAULT_CONTEXT_WINDOW`` (8192) -- a LOCAL, VRAM-shaped number that is
+    simply false for a remote model. `fit_output_tokens` then clamped every
+    remote call against that fiction: `aion-labs/aion-3.0-mini` advertises
+    131,072 tokens and was handed 8,192, so a 9,520-token artifact request
+    (codex56sol P6 at 720 words) was silently reduced to whatever 8,192 minus
+    the prompt left, and the script came back cut off mid-JSON. The model that
+    could trivially write it was strangled by a constant.
+
+    The catalog cache ALREADY stores each slug's advertised `context_length`
+    (see `_slim_model`), so the truth was on disk the whole time and simply was
+    not read. Read it.
+
+    A cold / stale / corrupt cache has no entry for the slug. That is a
+    genuinely unknown window, so fall back to the row default and say so
+    LOUDLY -- a conservative 8,192 that the operator can see beats a confident
+    number nobody measured. Never raises: a cache miss must not break a load.
+    """
+    fallback = int(row_default or DEFAULT_CONTEXT_WINDOW)
+    advertised = _cached_model(slug).get("context_length")
+    try:
+        window = int(advertised)
+    except (TypeError, ValueError):
+        window = 0
+    if window > 0:
+        return window
+    log.warning(
+        "[OpenRouter] %s has no context_length in the catalog cache (cold or "
+        "stale?); falling back to %d tokens. A long artifact request will be "
+        "clamped against that floor. Refresh the catalog to use the model's "
+        "real window.",
+        slug, fallback,
+    )
+    return fallback
+
+
 def _parse_iso(ts: Any) -> datetime.datetime | None:
     if not ts or not isinstance(ts, str):
         return None
@@ -990,9 +1031,11 @@ class OpenRouterBackend:
         # explicit sort, so the wire payload + run meta hold the clean slug.
         slug, provider_sort = resolve_route(letter, resolve_slug(repo_id))
         cached_model = _cached_model(slug)
-        context_window = int(
-            getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW)
-            or DEFAULT_CONTEXT_WINDOW
+        # The window belongs to the SLUG, not to the static virtual row. Reading
+        # it from the row capped every remote model at the local 8192 default.
+        context_window = resolve_context_window(
+            slug,
+            row_default=getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW),
         )
         cache_entry: dict[str, Any] = {
             "provider": PROVIDER,

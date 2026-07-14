@@ -640,11 +640,14 @@ def _build_truncating_generate_fn(
     min_p: float = 0.0,
     repetition_penalty: float = 1.0,
 ):
-    """Return a generate_fn that normally left-truncates oversized prompts.
+    """Return a generate_fn that NEVER truncates a prompt.
 
-    A messages-list subclass may set ``_otr_prompt_must_fit = True``.  Those
-    provenance-sensitive callers fail loudly before generation instead of
-    losing the system/schema prefix to left truncation.
+    The name is historical. This wrapper used to left-slice an oversized prompt;
+    it no longer can, and no longer does. The output request is fitted to the
+    MEASURED prompt (see below), which makes the input allowance at least the
+    prompt's own length by construction, and a prompt with no honest room left
+    for an artifact raises ``PromptContextOverflowError`` instead of quietly
+    losing its system/schema prefix.
 
     Closure captures the four episode-level sampling knobs from the
     writer widgets: top_p, min_p, repetition_penalty. The per-call
@@ -715,7 +718,6 @@ def _build_truncating_generate_fn(
     def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
         import torch  # local import; never load torch at module import
         from . import _otr_loader_backends as _OTRLB
-        prompt_must_fit = bool(getattr(messages, "_otr_prompt_must_fit", False))
         if _system_role_supported[0] is None:
             _system_role_supported[0] = (
                 _OTRLB.tokenizer_supports_system_role(tokenizer)
@@ -739,8 +741,14 @@ def _build_truncating_generate_fn(
                 label="prompt",
             )
         except GenerationContextOverflowError as exc:
-            if prompt_must_fit:
-                raise PromptContextOverflowError(str(exc)) from exc
+            # A prompt that leaves no honest room for a usable artifact is a
+            # hard failure for EVERY caller, not only the ones that opt in via
+            # `_otr_prompt_must_fit`: left-truncating it would delete the
+            # system/schema prefix and the model would answer from whatever
+            # fragment survived. Both arms of the old branch already raised the
+            # same error, so the flag decided nothing here; the honest guard is
+            # unconditional. `prompt_must_fit` still selects fail-loud behavior
+            # at the lane preflights that own an artifact's provenance.
             raise PromptContextOverflowError(str(exc)) from exc
         if effective_max_new_tokens != requested_max_new_tokens:
             log.warning(
@@ -749,19 +757,15 @@ def _build_truncating_generate_fn(
                 requested_max_new_tokens, effective_max_new_tokens,
                 input_len, context_cap,
             )
-        max_input_tokens = context_cap - effective_max_new_tokens
-        if input_len > max_input_tokens:
-            trunc = input_len - max_input_tokens
-            inputs["input_ids"] = inputs["input_ids"][:, trunc:]
-            if "attention_mask" in inputs:
-                inputs["attention_mask"] = inputs["attention_mask"][:, trunc:]
-            log.warning(
-                "[OTR_LedgerScriptWriter] PROMPT_GUARD: Truncated "
-                "%d -> %d tokens (context_cap=%d, max_new_tokens=%d)",
-                input_len, max_input_tokens, context_cap,
-                effective_max_new_tokens,
-            )
-
+        # NO PROMPT TRUNCATION HAPPENS HERE, BY CONSTRUCTION. `fit_output_tokens`
+        # returns at most `context_cap - input_len`, so `context_cap -
+        # effective_max_new_tokens` is always >= input_len: the old PROMPT_GUARD
+        # left-slice could never fire once the output budget was fitted to the
+        # MEASURED prompt instead of the REQUESTED ceiling. It is deleted rather
+        # than left unreachable -- a dead lever is worse than no lever, because
+        # the next reader repairs the branch that never runs (operator, 2026-07-11)
+        # and the live defect keeps its hiding place. A prompt that genuinely
+        # cannot fit now raises PromptContextOverflowError above.
         gen_kwargs = {
             "do_sample": True,
             "temperature": float(temperature),
@@ -829,11 +833,32 @@ def _build_truncating_generate_fn(
         except Exception:  # pragma: no cover - exotic backend sequence shape
             generated_tokens = None
         if generated_tokens == effective_max_new_tokens:
-            log.info(
-                "[OTR_LedgerScriptWriter] OUTPUT_CAP: prompt_tokens=%d "
-                "generated_tokens=%d max_new_tokens=%d",
-                prompt_len, generated_tokens, effective_max_new_tokens,
-            )
+            # The model stopped because it ran OUT OF ROOM, not because it was
+            # finished. When the room it was given is also LESS than the room
+            # its caller asked for, that is the silent catastrophe: the artifact
+            # is cut off mid-JSON and the ladder reports a bare JSONDecodeError
+            # three times, naming the model instead of the budget. Say the real
+            # cause once, LOUDLY, with the whole arithmetic -- a reader of the
+            # leg log must never have to reconstruct it.
+            if effective_max_new_tokens < requested_max_new_tokens:
+                log.error(
+                    "[OTR_LedgerScriptWriter] OUTPUT_TRUNCATED: generation "
+                    "stopped at the ceiling after a CLAMP. The caller asked for "
+                    "%d output tokens; the %d-token context window left only %d "
+                    "after a %d-token prompt. Any JSON parse failure below is "
+                    "this budget, not the model. Give this pass a slot whose "
+                    "window fits prompt+artifact.",
+                    requested_max_new_tokens, context_cap,
+                    effective_max_new_tokens, prompt_len,
+                )
+            else:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] OUTPUT_CAP: generation stopped at "
+                    "the caller's own ceiling (prompt_tokens=%d "
+                    "generated_tokens=%d max_new_tokens=%d); output may be "
+                    "truncated.",
+                    prompt_len, generated_tokens, effective_max_new_tokens,
+                )
         decoded = tokenizer.decode(
             generated_ids, skip_special_tokens=True,
         )
