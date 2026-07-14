@@ -177,6 +177,28 @@ def test_grounding_is_proven_against_the_dossier_not_judged_by_the_warden():
     invented_number = [line("The probe carried 47 sensors.", cites=["fact_1"])]
     assert "47" in lane.ungrounded_lines(invented_number, dossier)[0]
 
+    # A number the SOURCE SPAN plainly contains is grounded, even if the
+    # extractor never lifted it into key_numbers -- the span is a verbatim slice
+    # of the payload, so the source does state it.
+    spanned = lane.FragmentDossierV4.model_validate({
+        "verified_facts": [{
+            "fact_id": "fact_1", "claim": "The probe launched in 2018.",
+            "source_spans": [{"field": "summary", "start": 0, "end": 28,
+                              "quote": "The probe launched in 2018."}],
+        }],
+        "key_numbers": [], "named_entities": [], "tone": "measured",
+        "headline_clean": "Probe", "provenance_note": "One fragment.",
+        "payload_sha256": "a" * 64,
+    })
+    assert lane.ungrounded_lines(
+        [line("It launched in 2018, as the record shows.", cites=["fact_1"])],
+        spanned,
+    ) == []
+    # And the trailing comma is punctuation, not an invented figure.
+    assert "2018" in lane._allowed_numeric_tokens(spanned)
+    assert not any("," in token
+                   for token in lane._allowed_numeric_tokens(spanned))
+
     # A ceremonial line states nothing, so it can invent nothing.
     ceremonial = [line("The record holds. 47 seals.", non_fact=True,
                        speaker="VESH", char_id="c04")]

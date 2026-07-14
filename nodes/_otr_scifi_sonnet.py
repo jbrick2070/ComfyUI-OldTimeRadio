@@ -341,19 +341,32 @@ def _audited_line_indices(events: "list[DraftLineV4]") -> list[int]:
     return [i for i, line in enumerate(events) if i > 0 and not line.non_fact]
 
 
-_NUMERIC_TOKEN_RE = re.compile(r"\d[\d,.]*")
+# A number is digits, optional thousands separators, optional decimals -- and NOT
+# the punctuation that happens to follow it. The greedy `[\d,.]*` form matched
+# "2024," from "in 2024, the probe" and then reported the comma as an invented
+# figure (live: prompt 7199a7b1's rerun).
+_NUMERIC_TOKEN_RE = re.compile(r"\d(?:[\d,]*\d)?(?:\.\d+)?")
 
 
 def _allowed_numeric_tokens(dossier: "FragmentDossierV4") -> frozenset[str]:
     """Every numeric token the record is permitted to state.
 
-    The dossier's `key_numbers` are the verbatim numbers the source itself used.
-    Anything else numeric in a factual line was invented between the source and
-    the microphone.
+    The source's own numbers, from everywhere the source actually speaks in the
+    dossier: the `key_numbers` the extractor pulled out, AND the literal
+    `source_spans` quotes -- those are verbatim slices of the payload, so a
+    number inside one IS a number the source states. Reading only `key_numbers`
+    meant a figure the fragment plainly contains was called an invention.
     """
     allowed: set[str] = set()
     for number in dossier.key_numbers:
         allowed.update(_NUMERIC_TOKEN_RE.findall(number.verbatim))
+        allowed.update(_NUMERIC_TOKEN_RE.findall(number.source_span.quote))
+    for fact in dossier.verified_facts:
+        for span in fact.source_spans:
+            allowed.update(_NUMERIC_TOKEN_RE.findall(span.quote))
+    for entity in dossier.named_entities:
+        for span in entity.source_spans:
+            allowed.update(_NUMERIC_TOKEN_RE.findall(span.quote))
     return frozenset(allowed)
 
 
