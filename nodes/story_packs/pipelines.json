@@ -599,7 +599,6 @@
         "codex56_slate_triage",
         "codex56_audible_truth_map",
         "codex56_broadcast_score",
-        "codex56_score_anchor_patch",
         "codex56_performance_script",
         "codex56_script_anchor_patch"
       ],
@@ -632,10 +631,9 @@
           "pass_id": "P5_broadcast_score",
           "slot": "creative",
           "seam_refs": [
-            "codex56_broadcast_score",
-            "codex56_score_anchor_patch"
+            "codex56_broadcast_score"
           ],
-          "description": "Design cast, scenes, shots, beats, intents and music bookends; when a structurally valid score misses an immutable grounding anchor, repair only the affected line intent through a bounded typed patch."
+          "description": "Design cast, scenes, shots, beats, intents and music bookends. The seam asks for the immutable anchors in the intents because that steers the script writer, but a line_intent is a private note nobody hears: the anchors are PROVEN in the spoken script, not here."
         },
         {
           "pass_id": "P6_performance_script",

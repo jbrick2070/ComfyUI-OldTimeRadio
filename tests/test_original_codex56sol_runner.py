@@ -83,121 +83,6 @@ def test_mocked_complete_runner_fills_closed_ledger(tmp_path):
     assert plant["anchor"] == "grille"
 
 
-def test_p5_missing_grounding_anchor_uses_small_intent_patch(tmp_path):
-    responses = _responses()
-    responses[3]["beats"][1]["line_intent"]["intent"] = (
-        "name the repeated shelf number"
-    )
-    responses.insert(4, {
-        "replacements": [{
-            "beat_id": "b2",
-            "intent": "name the stamp and its repeated shelf number",
-        }],
-    })
-    calls = []
-
-    def generate(messages, **_kwargs):
-        calls.append(messages)
-        return json.dumps(responses.pop(0))
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(
-        episode_id="codex56_p5_grounding_patch", out_dir=str(tmp_path),
-    )
-    meta = led.data.setdefault("meta", {})
-    meta.update({
-        "source_bank": "original_codex56sol",
-        "source_meta": {"constraint_draw": DRAW},
-    })
-    lane.run_original_codex56sol_episode(
-        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-        resolved={"target_words": 30, "num_characters": 3}, led=led,
-        meta=meta, creative_fn=generate, technical_fn=generate,
-        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
-        episode_root=tmp_path, episode_id="codex56_p5_grounding_patch",
-    )
-
-    assert len(calls) == 6
-    assert "ScoreIntentPatch" in calls[4][0]["content"]
-    assert led.data["meta"]["original_codex56sol"]["call_journal"][4][
-        "pass_id"
-    ] == "P5_grounding_patch"
-    accepted_score = led.data["meta"]["original_codex56sol"][
-        "accepted_artifacts"
-    ]["broadcast_score"]
-    assert accepted_score["beats"][1]["line_intent"]["intent"] == (
-        "name the stamp and its repeated shelf number"
-    )
-
-
-def test_p5_intent_patch_rejects_missing_or_unplanned_anchors():
-    plan = [{
-        "beat_id": "b2",
-        "current_intent": "name the repeated shelf number",
-        "required_anchors": ["stamp"],
-    }]
-    missing_anchor = lane.ScoreIntentPatch.model_validate({
-        "replacements": [{
-            "beat_id": "b2", "intent": "name the repeated shelf number",
-        }],
-    })
-    unexpected_beat = lane.ScoreIntentPatch.model_validate({
-        "replacements": [{
-            "beat_id": "b3", "intent": "name the stamp",
-        }],
-    })
-    assert lane._validate_score_intent_patch(missing_anchor, plan) == (
-        "score intent patch must name every required immutable anchor for "
-        "beat b2"
-    )
-    assert lane._validate_score_intent_patch(unexpected_beat, plan) == (
-        "score intent patch must replace every and only planned beat ids once"
-    )
-
-
-def test_p5_intent_patch_preserves_anchor_already_valid_on_target():
-    score = lane.BroadcastScore.model_validate(_fixtures()["score"])
-    score.beats[1].line_intent.clue_ids = []
-    score.beats[3].line_intent.clue_ids = ["q1"]
-    contract = _grounding_fixture()
-    plan = lane._score_grounding_repair_plan(score, contract)
-    assert plan == [{
-        "beat_id": "b4",
-        "current_intent": "reveal the grille cause",
-        "required_anchors": ["grille", "stamp"],
-    }]
-
-    patch = lane.ScoreIntentPatch.model_validate({
-        "replacements": [{
-            "beat_id": "b4",
-            "intent": "reveal the grille cause through the stamp clue",
-        }],
-    })
-    assert lane._validate_score_intent_patch_application(
-        patch, score, plan, lane.AudibleTruthMap.model_validate(
-            _fixtures()["truth"],
-        ), contract, story_rules.resolve_story_rules("original_codex56sol"),
-    ) is None
-
-    unsafe_patch = lane.ScoreIntentPatch.model_validate({
-        "replacements": [{
-            "beat_id": "b4",
-            "intent": "reveal the grille, stamp, and kill the mystery",
-        }],
-    })
-    assert "forbidden authored surface" in (
-        lane._validate_score_intent_patch_application(
-            unsafe_patch, score, plan, lane.AudibleTruthMap.model_validate(
-                _fixtures()["truth"],
-            ), contract,
-            story_rules.resolve_story_rules("original_codex56sol"),
-        ) or ""
-    )
-
-
 def test_p6_missing_grounding_anchor_uses_small_line_patch(tmp_path):
     responses = _responses()
     responses[4]["lines"][4]["text"] = "The echo is mapped; the desk is quiet."
@@ -267,10 +152,12 @@ def test_p6_line_patch_preserves_anchor_already_valid_on_target():
         }],
     })
     rules = story_rules.resolve_story_rules("original_codex56sol")
-    assert lane._validate_script_line_patch_application(
-        patch, script, plan, score, manifest, contract, rules,
+    assert lane._validate_script_line_patch_step(
+        patch, script, plan, score, manifest, rules,
     ) is None
 
+    # A replacement that smuggles a banned term goes back to the model, at the
+    # rung that can still repair it -- never into the episode.
     unsafe_patch = lane.ScriptLinePatch.model_validate({
         "replacements": [{
             "line_id": "line_004",
@@ -278,8 +165,8 @@ def test_p6_line_patch_preserves_anchor_already_valid_on_target():
         }],
     })
     assert "forbidden term 'kill'" in (
-        lane._validate_script_line_patch_application(
-            unsafe_patch, script, plan, score, manifest, contract, rules,
+        lane._validate_script_line_patch_step(
+            unsafe_patch, script, plan, score, manifest, rules,
         ) or ""
     )
 
@@ -631,7 +518,11 @@ def test_score_requires_exact_clue_coverage_and_contiguous_shots():
     score_data = fixtures["score"]
     score_data["beats"][2]["line_intent"]["clue_ids"] = ["q2"]
     score = lane.BroadcastScore.model_validate(score_data)
-    assert "cover every truth-map clue" in lane._validate_score(score, truth)
+    # The error NAMES the clue the model dropped: a repair prompt that says only
+    # "coverage is wrong" gives the model nothing to act on.
+    error = lane._validate_score(score, truth)
+    assert "assigned to exactly one line intent" in error
+    assert "q3" in error
 
     score_data = _fixtures()["score"]
     score_data["beats"][2], score_data["beats"][3] = (
@@ -639,27 +530,6 @@ def test_score_requires_exact_clue_coverage_and_contiguous_shots():
     score = lane.BroadcastScore.model_validate(score_data)
     assert lane._validate_score(score, truth) == (
         "beats for each shot must form one contiguous block"
-    )
-
-
-def test_score_must_carry_spoken_anchor_intents_before_script_generation():
-    fixtures = _fixtures()
-    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
-    grounding = _grounding_fixture()
-    score = lane.BroadcastScore.model_validate(fixtures["score"])
-    assert lane._validate_score(score, truth, grounding) is None
-
-    drifted = score.model_copy(deep=True)
-    drifted.beats[1].line_intent.intent = "analyze the first component"
-    assert lane._validate_score(drifted, truth, grounding) == (
-        "score needs a non-announcer clue intent naming exact lost-object "
-        "anchor 'stamp'"
-    )
-
-    drifted = score.model_copy(deep=True)
-    drifted.beats[3].line_intent.intent = "reveal a resonance signature"
-    assert lane._validate_score(drifted, truth, grounding) == (
-        "reveal intent must name exact device anchor 'grille'"
     )
 
 
@@ -1030,51 +900,6 @@ def test_p5_schema_boundary_projects_topology_when_raw_projection_misses(
     ]
 
 
-def test_p5_placement_repair_preserves_llm_fallback_for_safety(tmp_path):
-    responses = _responses()
-    corrected_score = json.loads(json.dumps(responses[3]))
-    responses[3]["premise"] = "Kill the clue."
-    responses[3]["scenes"][0]["shots"] = [{
-        "shot_id": "nested_extra", "scene_id": "scene_01",
-        "description": "A redundant nested shot.",
-        "visual_prompt": "A redundant nested composition.",
-    }]
-    responses.insert(4, corrected_score)
-    queued = iter(responses)
-    calls = []
-    repair_prompts = []
-
-    def generate(messages, **_kwargs):
-        calls.append(1)
-        if any("forbidden term 'kill'" in row["content"]
-               for row in messages):
-            repair_prompts.append(messages)
-        return json.dumps(next(queued))
-
-    routing._REGISTRY = None
-    story_rules._clear_caches()
-    pack = routing.resolve_story_pack("original_codex56sol")
-    rules = story_rules.resolve_story_rules("original_codex56sol")
-    led = ledger_mod.new_ledger(
-        episode_id="codex56_p5_safety_fallback", out_dir=str(tmp_path),
-    )
-    meta = led.data.setdefault("meta", {})
-    meta.update({
-        "source_bank": "original_codex56sol",
-        "source_meta": {"constraint_draw": DRAW},
-    })
-    lane.run_original_codex56sol_episode(
-        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
-        resolved={"target_words": 30, "num_characters": 3}, led=led,
-        meta=meta, creative_fn=generate, technical_fn=generate,
-        slot_scheduler=Scheduler(), source_bank_row=None, story_rules=rules,
-        episode_root=tmp_path, episode_id="codex56_p5_safety_fallback",
-    )
-    assert len(calls) == 6
-    assert len(repair_prompts) == 1
-    assert "forbidden term 'kill'" in repair_prompts[0][1]["content"]
-
-
 def test_p5_typed_repair_response_gets_schema_boundary_topology_projection(
     tmp_path, monkeypatch,
 ):
@@ -1432,14 +1257,7 @@ def test_device_anchor_must_be_planted_before_the_reveal(tmp_path):
         ("line_002", ["grille", "stamp"]),
     ]
 
-    # The score half of the same rule: a clue intent must name it pre-reveal.
-    quiet = score.model_copy(deep=True)
-    quiet.beats[2].line_intent.intent = "name the mitten scrape and card rustle"
-    assert "pre-reveal clue intent" in lane._validate_score(
-        quiet, truth, grounding,
-    )
-
-    # And a score whose every clue lands at or after the reveal is not fair by
+    # A score whose every clue lands at or after the reveal is not fair by
     # construction -- only the score author can fix that, so it goes to the P5
     # ladder rather than to a patch that cannot reorder beats.
     unfair = score.model_copy(deep=True)
@@ -1449,6 +1267,88 @@ def test_device_anchor_must_be_planted_before_the_reveal(tmp_path):
     assert "BEFORE the reveal beat" in lane._validate_score_clue_ownership(
         unfair, grounding,
     )
+
+
+def test_a_short_broadcast_cannot_hold_a_long_score():
+    """Live prompt 717f3a4f: the seam had a beat FLOOR and no ceiling, so a
+    30-word episode got a 19-beat score -- and the script that had to fill all
+    nineteen lines blew its token budget and came back as truncated JSON.
+    """
+    score = lane.BroadcastScore.model_validate(_fixtures()["score"])
+    assert lane._beat_ceiling(30) == 6
+    assert lane._beat_ceiling(120) == 24
+    assert lane._beat_ceiling(420) == 40  # capped: a broadcast is not a novel
+    assert lane._validate_score_scale(score, 30) is None
+
+    long_score = score.model_copy(deep=True)
+    extra = long_score.beats[1].model_copy(deep=True)
+    for index in range(7):
+        clone = extra.model_copy(deep=True)
+        clone.beat_id = f"bx{index}"
+        clone.line_intent.clue_ids = []
+        long_score.beats.insert(2, clone)
+    error = lane._validate_score_scale(long_score, 30)
+    assert "at most 6 beats" in error
+    assert "never delete a clue" not in error  # the seam says it; the error is short
+    assert "do not delete the clues" in error
+
+
+def test_arc_phase_is_derived_from_the_landmarks_not_spelled_by_the_model():
+    """Live prompt 55756bac: the model wrote `closure` for `closing` and the
+    whole score was rejected by the schema. The landmark ids already decide it.
+    """
+    fixtures = _fixtures()
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    payload = json.loads(json.dumps(fixtures["score"]))
+    payload["beats"][4]["line_intent"]["arc_phase"] = "closure"
+    payload["beats"][2]["line_intent"]["arc_phase"] = "climax"
+
+    repaired = lane._repair_score_collection_placement(
+        json.dumps(payload), truth,
+    )
+    assert repaired is not None
+    assert [b.line_intent.arc_phase for b in repaired.beats] == [
+        "opening", "rising", "rising", "reveal", "closing",
+    ]
+
+    # And an enum typo must never reach the schema even when the score is
+    # otherwise defective -- the ladder can only repair what it can parse.
+    broken = json.loads(json.dumps(payload))
+    broken["beats"][1]["line_intent"]["clue_ids"] = ["q1", "q1"]
+    parsed = lane._project_score_arc_phases_only(json.dumps(broken))
+    assert parsed is not None
+    assert parsed.beats[4].line_intent.arc_phase == "closing"
+
+
+def test_a_shortened_anchor_in_a_patch_is_restored_not_rejected():
+    """Live prompts 6fe52216 / 522e1581: the patch put the device in exactly the
+    right place and called it "the grille" instead of "ventilation grille".
+
+    It decided WHERE the anchor belongs. The exact wording was never its
+    decision, so restore it -- and when the model gives Python nothing to work
+    with, say precisely which string is missing.
+    """
+    plan = [{
+        "line_id": "line_002",
+        "current_text": "The shelf number repeats after every answer.",
+        "required_anchors": ["ventilation grille", "library stamp"],
+    }]
+    patch = lane.ScriptLinePatch.model_validate({"replacements": [{
+        "line_id": "line_002",
+        "text": "The stamp keeps answering back through the grille.",
+    }]})
+    assert lane._validate_script_line_patch(patch, plan) is None
+    assert patch.replacements[0].text == (
+        "The library stamp keeps answering back through the ventilation grille."
+    )
+
+    # Nothing to restore from -> a message that names the exact missing string.
+    empty = lane.ScriptLinePatch.model_validate({"replacements": [{
+        "line_id": "line_002", "text": "She listens to the room.",
+    }]})
+    error = lane._validate_script_line_patch(empty, plan)
+    assert "'ventilation grille'" in error
+    assert "She listens to the room." in error
 
 
 def test_the_plant_never_lands_on_an_already_loaded_line():
@@ -1602,7 +1502,7 @@ def test_every_shipped_draw_is_satisfiable_at_the_five_line_minimum(draw):
         "closing_music": {"description": "It resolves.",
                           "generation_prompt": "Gentle strings, no vocals"},
     })
-    assert lane._validate_score(score, truth, grounding) is None
+    assert lane._validate_score(score, truth) is None
     assert lane._validate_score_clue_ownership(score, grounding) is None
 
     manifest = lane._compile_manifest(score)
@@ -1787,7 +1687,6 @@ def test_p5_announcer_owned_clue_reaches_the_p5_ladder():
         if "q1" in beat.line_intent.clue_ids:
             beat.line_intent.intent = "mention the shelf number"
     assert lane._validate_score_clue_ownership(named_only, grounding) is None
-    assert lane._validate_score(named_only, truth, grounding) is not None
 
 
 def test_p2_triage_contract_is_stated_in_seam_and_repair_rules():
@@ -1810,8 +1709,6 @@ def test_every_schema_bound_is_in_the_shared_model_visible_contract():
         ("P2", "codex56_slate_triage", lane.SlateTriage),
         ("P3", "codex56_audible_truth_map", lane.AudibleTruthMap),
         ("P5", "codex56_broadcast_score", lane.BroadcastScore),
-        ("P5_grounding_patch", "codex56_score_anchor_patch",
-         lane.ScoreIntentPatch),
         ("P6", "codex56_performance_script", lane.PerformanceScript),
         ("P6_grounding_patch", "codex56_script_anchor_patch",
          lane.ScriptLinePatch),
@@ -1861,7 +1758,6 @@ def test_wide_draw_contracts_are_satisfiable():
     # The intent patch can target one beat per anchor (<=6) plus reveal and
     # closure = 8, and `_validate_score_intent_patch` demands EVERY planned
     # target -- so a cap below 8 forbids the only patch it would accept.
-    assert max_length(lane.ScoreIntentPatch, "replacements") >= 8
     assert max_length(lane.ScriptLinePatch, "replacements") >= 8
 
 

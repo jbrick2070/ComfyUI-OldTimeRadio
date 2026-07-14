@@ -77,20 +77,17 @@ def test_broadcast_score_prompt_closes_music_bookend_key_sets():
     assert "shot_01, shot_02, shot_01 is forbidden" in seam
     assert "beats array is chronological and MUST never be reordered" in seam
     assert "requires a new shot row with a new unique shot_id" in seam
-    patch_seam = pack.prompt_stages["codex56_score_anchor_patch"]
-    assert "ScoreIntentPatch JSON only" in patch_seam
-    assert "every required_anchors string verbatim" in patch_seam
-    assert "Do not write visual direction" in patch_seam
     script_patch_seam = pack.prompt_stages["codex56_script_anchor_patch"]
     assert "ScriptLinePatch JSON only" in script_patch_seam
     assert "natural spoken dialogue" in script_patch_seam
+    # The score has no anchor patch: a line_intent is a private note, and the
+    # anchors are proven in the spoken script where the listener meets them.
+    assert "codex56_score_anchor_patch" not in pack.prompt_stages
     p5 = next(
         row for row in registry.pipelines["acoustic_puzzle_v1"].passes
         if row.pass_id == "P5_broadcast_score"
     )
-    assert p5.seam_refs == (
-        "codex56_broadcast_score", "codex56_score_anchor_patch",
-    )
+    assert p5.seam_refs == ("codex56_broadcast_score",)
     p6 = next(
         row for row in registry.pipelines["acoustic_puzzle_v1"].passes
         if row.pass_id == "P6_performance_script"
