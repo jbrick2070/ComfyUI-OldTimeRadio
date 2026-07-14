@@ -1907,13 +1907,22 @@ def _run_original_qa_gate(
 ):
     """original_radio whole-script QA + the ONE coalesced bounded repair.
 
-    (kibitz r2-r4; V4 locks 2+7; r4 P3/P4.) Judge -> if dirty: any
-    fail-class finding raises OriginalQAError outright; epilogue-class
-    findings coalesce into ONE compose_announcer_outro re-run (the same
-    fictional-outro inputs the I.5 else-branch used), the outro row is
-    patched READ-EXTEND (news_coda_no_brief survives; kibitz r4 P3) --
-    then ONE re-judge; still dirty -> OriginalQAError. This lane does NOT
-    inherit stage-3 ship-on-exhaustion."""
+    Judge -> if dirty: a fail-class finding raises OriginalQAError ONLY when it
+    clears the deterministic evidence bar (lexicon hit or a grounded verbatim
+    quote -- see `_triage_or_raise`); unproven hard findings are discarded
+    loudly. Epilogue-class findings coalesce into ONE compose_announcer_outro
+    re-run (the same fictional-outro inputs the I.5 else-branch used), the outro
+    row is patched READ-EXTEND (news_coda_no_brief survives) -- then ONE
+    re-judge.
+
+    A re-judge that is STILL unhappy about the SUBJECTIVE epilogue classes
+    ("moralizes" / "contradicts") no longer fails the episode. THE LAW
+    (operator, 2026-07-13): an audit may improve a story, it may never fail
+    one -- only deterministic validators may end an episode. The bounded
+    recompose is the improvement this audit is entitled to; the episode then
+    ships with the recomposed outro and the objection stamped in meta.
+    `epilogue_missing` remains deterministically refutable and is discarded when
+    the outro row demonstrably exists."""
     try:
         from . import _otr_original_radio as _OTROR
         from . import _otr_line_composer as _OTRLC
@@ -2106,18 +2115,55 @@ def _run_original_qa_gate(
                     f for f in still_epilogue if f not in _refuted
                 ]
         if still_epilogue:
+            # THE LAW (operator, 2026-07-13): AN AUDIT MAY IMPROVE A STORY. IT
+            # MAY NEVER FAIL ONE. Only DETERMINISTIC validators may end an
+            # episode; an LLM verdict may trigger a bounded rewrite, never a
+            # raise.
+            #
+            # This raise was the last LLM veto left standing (live: 30-word
+            # `original_radio` Aion leg, prompt 030f73e6 -- "still dirty after
+            # the bounded repair (['epilogue_moralizes'])" killed the episode
+            # after every writer pass had already succeeded). The classes that
+            # reach here are the ones this module's own comments call the
+            # SUBJECTIVE epilogue classes: "moralizes" and "contradicts" are
+            # aesthetic opinions about an outro THE MODEL ITSELF JUST REWROTE at
+            # the audit's own request. They are not a contract, not a safety
+            # rule, and not deterministic -- there is no evidence bar behind
+            # them, unlike the hard classes, which still kill on lexicon
+            # evidence or a grounded verbatim quote (`_triage_or_raise` above),
+            # and unlike G9, the deterministic SFW ship-stop every lane crosses
+            # at Phase 10.
+            #
+            # So the audit has already done the only honest thing it is entitled
+            # to do: it IMPROVED the outro once, through the bounded recompose.
+            # A second opinion that the improved text is still not to its taste
+            # does not get to throw away a complete, frozen, otherwise-clean
+            # episode. Keep the recomposed outro, say so LOUDLY, stamp the
+            # disagreement in meta so a reader can find it, and SHIP.
             reclasses = [f.finding_class for f in refindings.findings]
+            objections = [
+                f"{f.finding_class}: {f.detail}" for f in still_epilogue
+            ]
+            log.warning(
+                "[OTR_LedgerScriptWriter] original_qa: SHIPPING over a "
+                "subjective objection. The bounded outro recompose ran; the "
+                "re-judge still dislikes the result on %s. That is an aesthetic "
+                "verdict on text the model just wrote at this audit's request, "
+                "not a deterministic contract -- an audit may improve a story, "
+                "it may never fail one. Keeping the recomposed outro. "
+                "Objections: %s",
+                [f.finding_class for f in still_epilogue],
+                "; ".join(objections),
+            )
             meta["original_qa"] = {
-                "status": "failed", "classes": reclasses,
-                "repaired": True, "discarded": sorted(set(all_discarded)),
+                "status": "shipped_over_subjective_objection",
+                "classes": reclasses,
+                "repaired": True,
+                "objections": objections,
+                "discarded": sorted(set(all_discarded)),
             }
             led.save()
-            raise _OTROR.OriginalQAError(
-                f"original_qa: still dirty after the bounded repair "
-                f"({[f.finding_class for f in still_epilogue]}); details: "
-                + "; ".join(f"{f.finding_class}: {f.detail}"
-                            for f in still_epilogue)
-            )
+            return
     if all_discarded:
         meta["original_qa"] = {
             "status": "clean_after_discard", "repaired": True,

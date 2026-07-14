@@ -383,9 +383,22 @@ QA_CLASSES: frozenset = frozenset({
     "epilogue_contradicts", "anachronism_dependency",
 })
 
-# kibitz r3 D8 + r4 P4: the bounded-repair interface is DATA. Epilogue
-# classes coalesce into ONE compose_announcer_outro re-run (writer-owned);
-# everything else fails the episode outright.
+# The bounded-repair interface is DATA. Epilogue classes coalesce into ONE
+# compose_announcer_outro re-run (writer-owned).
+#
+# "fail" here means ELIGIBLE to end the episode -- NOT that the judge's word is
+# enough. A fail-class finding must still clear the deterministic evidence bar
+# in `triage_hard_findings` (a lexicon hit, or a grounded verbatim quote from
+# the script itself); an unproven hard finding is discarded loudly. That
+# evidence bar is what makes these classes lawful ship-stops.
+#
+# The epilogue classes have NO evidence bar, because "the outro moralizes" is an
+# aesthetic opinion and there is nothing to corroborate it against. So they get
+# the bounded recompose and nothing more: after that one improvement the episode
+# SHIPS, even if the re-judge still dislikes the result (THE LAW, operator
+# 2026-07-13 -- an audit may improve a story, it may never fail one). Live proof
+# that this mattered: prompt 030f73e6, a complete 30-word episode killed by
+# `epilogue_moralizes` after every writer pass had already succeeded.
 REPAIR_ACTION_BY_CLASS: "dict[str, str]" = {
     "weapons_smoking": "fail",
     "news_source_framing": "fail",

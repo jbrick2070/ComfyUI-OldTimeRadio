@@ -458,13 +458,49 @@ class TestQAGate:
         assert "news_coda_no_brief" in row["compose_flags"]       # r4 P3
         assert "original_qa_outro_recomposed" in row["compose_flags"]
 
-    def test_still_dirty_after_repair_raises(self, monkeypatch):
+    def test_a_still_unhappy_re_judge_ships_instead_of_failing(self, monkeypatch):
+        """THE LAW: an audit may improve a story. It may never fail one.
+
+        Live proof this mattered: prompt `030f73e6`, a complete 30-word
+        `original_radio` episode killed by `epilogue_moralizes` after every
+        writer pass had already succeeded. "Moralizes" is an aesthetic opinion
+        about an outro the model itself just rewrote AT THIS AUDIT'S REQUEST --
+        there is no evidence bar behind it, unlike the hard classes. The bounded
+        recompose is the improvement the audit is entitled to; it does not also
+        get to throw the episode away.
+        """
+        led = _qa_ledger()
         fn = _findings_fn(
             [{"class": "epilogue_moralizes", "detail": "the lesson is"}],
             [{"class": "epilogue_moralizes", "detail": "still moralizing"}],
         )
-        with pytest.raises(ORR.OriginalQAError, match="still dirty"):
-            self._run(_qa_ledger(), fn, monkeypatch,
+
+        meta = self._run(led, fn, monkeypatch,
+                         compose_text="Another closing line.")
+
+        assert meta["original_qa"]["status"] == "shipped_over_subjective_objection"
+        assert meta["original_qa"]["repaired"] is True
+        assert meta["original_qa"]["objections"] == [
+            "epilogue_moralizes: still moralizing"
+        ]
+        # The recomposed outro is what ships -- the improvement is kept.
+        assert led.data["lines"][2]["text"] == "Another closing line."
+
+    def test_a_corroborated_hard_class_still_ends_the_episode(self, monkeypatch):
+        """The law frees SUBJECTIVE verdicts, not evidence-backed ship-stops.
+
+        A weapon actually spoken on the air still kills the run: that finding
+        clears the deterministic evidence bar. Pinned alongside the test above so
+        nobody reads "audits may not fail a story" as "nothing may fail a story".
+        """
+        led = _qa_ledger()
+        led.data["lines"][1]["text"] = "MARA: The pistol names no item."
+        fn = _findings_fn(
+            [{"class": "weapons_smoking", "detail": "MARA mentions a pistol"},
+             {"class": "epilogue_moralizes", "detail": "the lesson is"}],
+        )
+        with pytest.raises(ORR.OriginalQAError, match="weapons_smoking"):
+            self._run(led, fn, monkeypatch,
                       compose_text="Another closing line.")
 
     def test_epilogue_missing_refuted_when_outro_exists(self, monkeypatch):
