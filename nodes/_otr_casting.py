@@ -1180,6 +1180,7 @@ def assemble_pre_locked_rows(
     rng: Optional[random.Random] = None,
     force_lemmy: Optional[bool] = None,
     taken_names: Optional[set[str]] = None,
+    source_character_names: Optional[List[str]] = None,
 ) -> tuple[List[dict], List[CastSlot], bool]:
     """Roll ANNOUNCER + (maybe LEMMY) + open-slot names. Pure Python,
     no LLM.
@@ -1197,6 +1198,16 @@ def assemble_pre_locked_rows(
         taken_names: optional set of names to exclude from the pool
             roll (useful when re-running cast assembly across a
             soak / fixture matrix).
+        source_character_names: ADAPTATION lanes only (shakespeare,
+            public_domain_story). The SOURCE's real character names --
+            MACBETH, BANQUO, the WITCHES. When supplied, each open slot
+            takes the next unused source name (upper-cased, collision-
+            checked) BEFORE falling back to the random pool roll, so the
+            adaptation preserves the play's people instead of inventing
+            "QUASIMODO VAUGHN". None/empty -> byte-identical to the pool
+            path (C7: the invention lanes are untouched). When the source
+            names run out (fewer than num_characters), the remaining
+            slots fall through to pick_first_last as before.
 
     Returns:
         (pre_locked_rows, open_slots, lemmy_hit)
@@ -1245,10 +1256,24 @@ def assemble_pre_locked_rows(
     else:
         remaining_open = num_characters
 
-    # 3. Roll the open-slot NAMES from the pool; LLM fills the rest.
+    # 3. Open-slot NAMES. ADAPTATION lanes: take the SOURCE's real character
+    # names first (MACBETH, BANQUO), preserving the play's people; only fall back
+    # to the random pool when the source has fewer named characters than slots.
+    # INVENTION lanes pass source_character_names=None and this whole block is
+    # byte-identical to the pool-only path (C7).
+    source_queue: list[str] = []
+    for raw in (source_character_names or []):
+        nm = str(raw or "").strip().upper()
+        # Skip blanks, ANNOUNCER (always pre-locked), and anything already taken.
+        if nm and nm != "ANNOUNCER" and nm not in taken_names and nm not in source_queue:
+            source_queue.append(nm)
+
     open_slots: list[CastSlot] = []
     for _ in range(remaining_open):
-        name = _POOLS.pick_first_last(rng, taken_names)
+        if source_queue:
+            name = source_queue.pop(0)   # the source's real character name
+        else:
+            name = _POOLS.pick_first_last(rng, taken_names)  # pool fallback
         taken_names.add(name)
         open_slots.append(CastSlot(
             char_id=f"c{next_cid_int:02d}",
@@ -1545,6 +1570,7 @@ def lock_cast(
     force_lemmy: Optional[bool] = None,
     max_attempts_per_call: int = 3,
     casting_brief: str = "",
+    source_character_names: Optional[List[str]] = None,
 ) -> tuple[List[dict], dict]:
     """Build the full locked cast for an episode. Returns
     (cast_rows, meta).
@@ -1593,6 +1619,7 @@ def lock_cast(
         num_characters=num_characters,
         rng=cast_rng,
         force_lemmy=force_lemmy,
+        source_character_names=source_character_names,
     )
 
     cast: list[dict] = list(pre_locked)

@@ -107,6 +107,51 @@ def test_assemble_pre_locked_rows_no_lemmy_basic_shape():
         assert " " in s.name, f"slot name not 'FIRST LAST': {s.name!r}"
 
 
+def test_adaptation_lanes_use_source_character_names():
+    """Adaptation lanes cast the SOURCE's real people, not random pool names.
+
+    Shakespeare/public_domain pass the source's characters (MACBETH, BANQUO) so the
+    play is preserved instead of rolling "QUASIMODO VAUGHN". Source names fill the
+    open slots first, upper-cased; when they run out (fewer than num_characters) the
+    remaining slots fall back to the pool.
+    """
+    rng = random.Random("adapt-seed")
+    pre_locked, open_slots, lemmy_hit = _OTRC.assemble_pre_locked_rows(
+        num_characters=3, rng=rng, force_lemmy=False,
+        source_character_names=["Macbeth", "Banquo"],  # 2 names, 3 slots
+    )
+    names = [s.name for s in open_slots]
+    assert names[0] == "MACBETH"     # source name, upper-cased
+    assert names[1] == "BANQUO"
+    # 3rd slot: source exhausted -> pool fallback (still FIRST LAST, uppercase).
+    assert names[2] not in ("MACBETH", "BANQUO")
+    assert names[2].isupper() and " " in names[2]
+
+
+def test_source_names_none_is_byte_identical_to_pool():
+    """C7: invention lanes pass source_character_names=None -> pool path unchanged.
+
+    The same seed must produce the SAME names with source_character_names omitted
+    vs explicitly None -- proving the adaptation block is a no-op for invention.
+    """
+    a = _OTRC.assemble_pre_locked_rows(
+        num_characters=3, rng=random.Random("x"), force_lemmy=False)
+    b = _OTRC.assemble_pre_locked_rows(
+        num_characters=3, rng=random.Random("x"), force_lemmy=False,
+        source_character_names=None)
+    assert [s.name for s in a[1]] == [s.name for s in b[1]]
+
+
+def test_source_names_skip_blank_announcer_and_dupes():
+    """Blanks, ANNOUNCER, and duplicates never consume a slot."""
+    _, open_slots, _ = _OTRC.assemble_pre_locked_rows(
+        num_characters=2, rng=random.Random("y"), force_lemmy=False,
+        source_character_names=["", "ANNOUNCER", "Sela", "sela", "Nadia"],
+    )
+    names = [s.name for s in open_slots]
+    assert names == ["SELA", "NADIA"]  # blank/ANNOUNCER/dupe dropped
+
+
 def test_assemble_pre_locked_rows_lemmy_consumes_a_slot():
     rng = random.Random("test-seed-2")
     pre_locked, open_slots, lemmy_hit = _OTRC.assemble_pre_locked_rows(

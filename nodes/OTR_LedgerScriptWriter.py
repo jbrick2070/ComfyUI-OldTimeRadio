@@ -3986,6 +3986,21 @@ class OTR_LedgerScriptWriter:
             casting_brief = briefs.casting_brief
             script_brief = briefs.script_brief
             key_terms_tuple: tuple[str, ...] = tuple(briefs.key_terms)
+            # ADAPTATION lanes: surface the SOURCE's real character names so the
+            # cast preserves the play's people (MACBETH, BANQUO) instead of rolling
+            # "QUASIMODO VAUGHN" from the random pool. public_domain provides them
+            # via the brief's character_names field (LLM-extracted from prose);
+            # shakespeare's manifest cast_hints ARE the real character names. Stamped
+            # here where `briefs` is in scope; read at the lock_cast call below.
+            # Invention lanes never set this key -> casting is byte-identical (C7).
+            if _source_bank_row.source_bank_id in ("shakespeare", "public_domain_story"):
+                _adapt_names = list(
+                    getattr(briefs, "character_names", None)
+                    or (meta.get("source_meta") or {}).get("cast_hints")
+                    or []
+                )
+                if _adapt_names:
+                    meta["_adaptation_character_names"] = _adapt_names
             log.info(
                 "[OTR_LedgerScriptWriter] news_interpreter OK: "
                 "%d key_terms in %d attempt(s)",
@@ -4162,6 +4177,8 @@ class OTR_LedgerScriptWriter:
                 rng=cast_rng,
                 cast_seed=cast_seed,
                 force_lemmy=lemmy_force,
+                # Adaptation lanes only; None everywhere else (byte-identical C7).
+                source_character_names=meta.get("_adaptation_character_names"),
             )
         led.set_cast(cast_rows)
         meta["cast_status"]           = "locked"

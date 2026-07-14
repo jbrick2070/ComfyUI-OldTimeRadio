@@ -411,12 +411,38 @@ class PublicDomainBriefs(BaseModel):
     script_brief: str = Field(..., max_length=_MAX_SCRIPT_BRIEF_CHARS)
     news_close_brief: str = Field(..., max_length=_MAX_CLOSE_BRIEF_CHARS)
     key_terms: list[str] = Field(..., min_length=1, max_length=_MAX_KEY_TERMS)
+    # The SOURCE's real named characters (Ebenezer Scrooge, Bob Cratchit), so the
+    # adaptation cast preserves the story's people instead of rolling random pool
+    # names. OPTIONAL + default empty: a source with no named characters, or an
+    # older fixture, still validates; the writer then falls back to the pool. Public
+    # -domain prose has no speaker markup, so unlike shakespeare (manifest cast_hints)
+    # these must be LLM-extracted here.
+    character_names: list[str] = Field(default_factory=list, max_length=6)
 
     source_hash: str = ""
     prompt_version: str = PROMPT_VERSION
     schema_version: str = SCHEMA_VERSION
     model_id: str = ""
     attempts: int = 0
+
+    @field_validator("character_names", mode="before")
+    @classmethod
+    def _clean_character_names(cls, value):
+        """Strip/dedupe the source names; cap at 6. Never raises -- an absent or
+        malformed list simply yields an empty list (writer falls back to pool)."""
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        seen: set[str] = set()
+        for nm in value:
+            clean = " ".join(str(nm or "").split()).strip()
+            key = clean.upper()
+            if clean and key not in seen:
+                seen.add(key)
+                out.append(clean)
+            if len(out) >= 6:
+                break
+        return out
 
     @field_validator("key_terms", mode="before")
     @classmethod
@@ -488,7 +514,10 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "  \"casting_brief\": \"80-700 chars; source-grounded roles and voices\",\n"
         "  \"script_brief\": \"120-1000 chars; faithful radio adaptation brief\",\n"
         "  \"news_close_brief\": \"80-420 chars; source attribution note\",\n"
-        "  \"key_terms\": [\"2-7 concise source/adaptation terms\"]\n"
+        "  \"key_terms\": [\"2-7 concise source/adaptation terms\"],\n"
+        "  \"character_names\": [\"the source's OWN named characters, verbatim, "
+        "e.g. Ebenezer Scrooge, Bob Cratchit; 1-6; the real names from the text, "
+        "never invented ones\"]\n"
         "}\n\n"
         f"{source_block}"
     )
