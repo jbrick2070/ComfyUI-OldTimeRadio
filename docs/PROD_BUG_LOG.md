@@ -1727,3 +1727,75 @@ out until they independently meet the same production-only admission rule.
   count; a floor without a ceiling is not a size contract.
 - status: FIXED at `f3f88cb0`; LIVE REVERIFIED by the green 30-word leg, prompt
   `fb34bf4f` (6 lines, arc_verdict=strong).
+
+## PBUG-20260713-19 -- rerolled ledger text kept stale skip state
+- surfaced: canonical 30-word `shakespeare` Aion creative leg, prompt
+  `bfad7f51-042b-4733-ad8f-1257442148ae`, 2026-07-13
+- symptom: the deterministic freeze audit rejected `b004` because its row had
+  `skip=True` and non-empty text; `OTR_CastLock` stopped the run before render
+  and the queue recorded `RESULT FAIL` / `QUEUE_BLOCKED shakespeare`
+- root cause: the bounded reroll wrote replacement text through
+  `Ledger.update_line_text()` but that mutator updated counts without clearing
+  the row's old `skip`, `tts_skip_reason`, and `reviewer_skip_reason` fields
+- fix: `c25d63c6` clears stale skip metadata at the meaningful text-write seam
+  and preserves it for empty/whitespace text; focused regression coverage was
+  added for both transitions
+- verify idea: rerun the same canonical `shakespeare` Aion/local-Mistral leg
+  and require `RESULT SUCCESS`, `obs_publish OK`, duration/audio checks, and a
+  non-zero asset under `output\otr\obs`; unit-test a skipped row receiving
+  meaningful replacement text and an empty replacement
+- bible-worthy: yes -- paired authored state must be repaired at the seam that
+  writes its partner; relaxing the deterministic validator would hide a real
+  render contract violation
+- promotion: BUG-05.11
+- status: FIXED at `c25d63c6`; live requalification pending
+
+## PBUG-20260713-20 -- a remote model's context window was read from the static row
+- surfaced: live headless OpenRouter legs (`tmp/final2_42_server.log`,
+  `final3_42_server.log`, `final4_42_server.log`, 2026-07-13), each of which
+  logged `[OpenRouter] load slot=A ... slug=aion-labs/aion-3.0-mini
+  route=default ctx=8192 (remote, 0 VRAM)`. The same lines appear for
+  `tencent/hy3:free`. Aion advertises **131,072** tokens and HY3 **262,144**;
+  both ran the whole episode against an effective **8,192**.
+- symptom: no crash and no warning -- a SILENT 16x-to-32x understatement of the
+  usable window on every remote call. Short legs never noticed, because the
+  request stayed under `8192 - prompt` anyway. The damage was latent and
+  scheduled: `original_codex56sol` P6 budgets
+  `240 + 160*beats + 4*target_words`, and at 720 words (beat ceiling 40) that
+  is **9,520** output tokens. `fit_output_tokens` would have reduced it to
+  whatever 8,192 minus the prompt left, the performance script would have come
+  back cut off mid-JSON, and the ladder would have reported a bare
+  `JSONDecodeError` three times -- blaming the frontier model for a defect that
+  was a constant in our own catalog row.
+- root cause: `OpenRouterBackend.load()` took `context_window` from the
+  CuratedModel row. The two OpenRouter rows (`openrouter:slot-a|b`) are VIRTUAL
+  and STATIC: one row stands in for every slug an operator may bind to it, so
+  its `context_window` cannot describe the model actually selected. It carried
+  `DEFAULT_CONTEXT_WINDOW = 8192` -- a LOCAL, VRAM-shaped number that is simply
+  false for a remote model. The catalog cache ALREADY stored each slug's real
+  `context_length` (`_slim_model`), so the truth was on disk the whole time and
+  was never read.
+- fix: `32e680b2` adds `resolve_context_window(slug)`, which reads the resolved
+  slug's advertised `context_length` from the catalog cache. A cold/stale cache
+  has no entry -- that is a genuinely unknown window, so it falls back to the
+  row default and says so LOUDLY rather than inventing a confident number.
+  Also at the local transport: `OUTPUT_TRUNCATED` now logs the full arithmetic
+  at ERROR whenever generation stops at a ceiling that was itself a clamp (a
+  reader must never have to reconstruct why the JSON was cut), and the
+  unreachable PROMPT_GUARD left-slice is deleted rather than left as a dead
+  lever for the next reader to repair.
+- verify idea: a canonical leg with `creative_writing_model=openrouter:slot-a`
+  and `openrouter_slot_a_model=aion-labs/aion-3.0-mini` must log
+  `ctx=131072`, not `ctx=8192`; and a 9,520-token output request must reach the
+  wire whole (`max_tokens=9520`) instead of being clamped.
+- bible-worthy: yes -- a capability constant that stands in for a FAMILY of
+  models describes none of them. When a per-instance truth is already cached,
+  a static row default is not a fallback, it is a lie with a default value.
+  Measure a budget against the window of the model that will actually serve it.
+- promotion: queued for operator fan-out (overlaps the BUG-11.50 structured-
+  capacity family but is distinct: that family is about artifact size, this is
+  about the WINDOW the artifact is measured against).
+- status: FIXED at `32e680b2`; LIVE REVERIFIED by the green 30-word
+  `original_codex56sol` Aion leg, prompt `411c2f17-c05a-4af4-a6cf-c578183c072b`
+  -- server log shows `slug=aion-labs/aion-3.0-mini route=default ctx=131072`,
+  `RESULT SUCCESS`, `obs_publish OK`, 65.5 MB asset.
