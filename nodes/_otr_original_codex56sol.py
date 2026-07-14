@@ -971,15 +971,19 @@ def _restore_thread_lost_objects(
 
     for row in unmatched:
         spoken = _normalize_grounding_text(row.lost_object)
-        if not spoken:
-            return False
         candidates = [
             candidate for candidate in remaining
-            if spoken in _normalize_grounding_text(candidate)
-            or _normalize_grounding_text(candidate) in spoken
+            if spoken
+            and (spoken in _normalize_grounding_text(candidate)
+                 or _normalize_grounding_text(candidate) in spoken)
         ]
         if len(candidates) != 1:
-            return False
+            # No name to go on -- but if this is the last thread and the last
+            # unclaimed object, the assignment is FORCED: there is no other value
+            # it could take. Python is not choosing, it is counting.
+            if len(remaining) != 1 or len(unmatched) != 1:
+                return False
+            candidates = list(remaining)
         row.lost_object = candidates[0]
         remaining.remove(candidates[0])
     log.info(
@@ -1006,14 +1010,24 @@ def _validate_truth_map(
     clue_ids = set(collections["audible_clues"])
     if selected is not None:
         _restore_thread_lost_objects(truth, selected)
-        if Counter(
-            row.lost_object for row in truth.caller_threads
-        ) != Counter(selected.lost_objects):
+        written = Counter(row.lost_object for row in truth.caller_threads)
+        required = Counter(selected.lost_objects)
+        if written != required:
+            missing = sorted((required - written).elements())
+            invented = sorted((written - required).elements())
+            detail = []
+            if missing:
+                detail.append("missing a caller thread for " + ", ".join(
+                    repr(obj) for obj in missing))
+            if invented:
+                detail.append("wrote " + ", ".join(
+                    repr(obj) for obj in invented) + " instead")
             return (
                 "caller_threads must contain exactly one row per selected lost "
                 "object, and each lost_object MUST be copied VERBATIM from the "
-                "selected card's lost_objects array -- never shortened, never "
-                "reworded"
+                "selected card's lost_objects array "
+                f"{selected.lost_objects!r} -- never shortened, never reworded"
+                + ("; " + "; ".join(detail) if detail else "")
             )
     if any(clue.thread_id not in thread_ids for clue in truth.audible_clues):
         return "every audible clue thread_id must resolve"
@@ -1561,19 +1575,19 @@ def _score_grounding_repair_plan(
             reveal.line_intent.intent, grounding.device_anchor):
         targets.setdefault(reveal.beat_id, set()).add(grounding.device_anchor)
     # The device must also be PLANTED: named in a clue intent the listener hears
-    # before the reveal explains it.  Plant on the EARLIEST eligible clue beat --
-    # a clue the listener meets in the last breath before the reveal is fair only
-    # on paper.  Deterministic, so the validator, the plan, and the receipt all
-    # agree on which beat carries it.
+    # before the reveal explains it.
     pre_reveal_clue_beats = _pre_reveal_clue_beats(score)
     if not pre_reveal_clue_beats:
         return None
     if not any(_contains_grounding_anchor(
             beat.line_intent.intent, grounding.device_anchor)
             for beat in pre_reveal_clue_beats):
-        targets.setdefault(pre_reveal_clue_beats[0].beat_id, set()).add(
-            grounding.device_anchor,
-        )
+        targets.setdefault(
+            _plant_target(
+                [beat.beat_id for beat in pre_reveal_clue_beats], targets,
+            ),
+            set(),
+        ).add(grounding.device_anchor)
     if not _contains_grounding_anchor(
             closure.line_intent.intent, grounding.resolution_anchor):
         targets.setdefault(closure.beat_id, set()).add(
@@ -1706,6 +1720,29 @@ def _repair_score_grounding_intents(
             "P5 grounding patch did not clear the full score contract"
         )
     return repaired
+
+
+def _plant_target(
+    candidates: list[str],
+    targets: dict[str, set[str]],
+) -> str:
+    """Where the device plant goes: EARLY, but never onto a loaded line.
+
+    Fair play wants the plant early -- a clue the listener meets in the last
+    breath before the reveal is fair only on paper. But the earliest clue line is
+    usually the one already carrying its own lost-object anchor, and piling a
+    third verbatim string onto one line is how the bounded patch fails: the model
+    writes two of the three and the ladder exhausts (live: prompt 6fe52216, "must
+    name every required immutable anchor for beat b9").
+
+    So: the earliest candidate with the LIGHTEST anchor load. Deterministic, and
+    it keeps each line speaking one immutable thing.
+    """
+    return min(
+        candidates,
+        key=lambda candidate: (len(targets.get(candidate, ())),
+                               candidates.index(candidate)),
+    )
 
 
 def _patch_tokens(plan: list[dict[str, Any]]) -> int:
@@ -1848,8 +1885,6 @@ def _script_grounding_repair_plan(
     if not _contains_grounding_anchor(reveal.text, grounding.device_anchor):
         targets.setdefault(reveal.line_id, set()).add(grounding.device_anchor)
     # The pre-reveal plant of the device anchor (see `_validate_script_grounding`).
-    # Earliest eligible clue line, for the same reason the score plan uses the
-    # earliest clue beat: the listener needs to have heard it in time to solve it.
     pre_reveal_clue_lines = _pre_reveal_clue_lines(manifest)
     if not pre_reveal_clue_lines:
         return None
@@ -1860,9 +1895,12 @@ def _script_grounding_repair_plan(
         )
         for row in pre_reveal_clue_lines
     ):
-        targets.setdefault(pre_reveal_clue_lines[0].line_id, set()).add(
-            grounding.device_anchor,
-        )
+        targets.setdefault(
+            _plant_target(
+                [row.line_id for row in pre_reveal_clue_lines], targets,
+            ),
+            set(),
+        ).add(grounding.device_anchor)
     if not _contains_grounding_anchor(
             closure.text, grounding.resolution_anchor):
         targets.setdefault(closure.line_id, set()).add(

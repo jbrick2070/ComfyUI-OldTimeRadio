@@ -462,7 +462,7 @@
           "seam_refs": [
             "gemini_scene_critique"
           ],
-          "description": "Evaluate fact integration, locked roster fidelity, dialogue-only safety, and SFW compliance."
+          "description": "Evaluate fact integration, locked roster fidelity, and dialogue-only form. It buys ONE bounded rewrite and never ends an episode; SFW is owned by the deterministic G9 freeze gate, and spoken-text form by the P4/P6 post_validator."
         },
         {
           "pass_id": "gemini_rewrite",

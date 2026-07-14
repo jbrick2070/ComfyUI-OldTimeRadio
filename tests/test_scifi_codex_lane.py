@@ -2375,9 +2375,16 @@ def test_script_artifact_metadata_repair_fails_closed_for_bad_graph_mappings():
     duplicate_line["lines"].append(copy.deepcopy(duplicate_line["lines"][0]))
     assert lane.repair_script_artifact_metadata(_fenced_json(duplicate_line), score) is None
 
+    # `beat_id` is a coordinate the accepted score already owns -- the line_id
+    # determines it. It is restored from the same tuple as shot_id/boundary,
+    # not refused.
     wrong_beat = copy.deepcopy(raw)
     wrong_beat["lines"][0]["beat_id"] = "b999"
-    assert lane.repair_script_artifact_metadata(_fenced_json(wrong_beat), score) is None
+    repaired = lane.repair_script_artifact_metadata(
+        _fenced_json(wrong_beat), score,
+    )
+    assert repaired is not None
+    assert repaired.lines[0].beat_id == raw["lines"][0]["beat_id"]
 
     ambiguous_score = score.model_dump(mode="json")
     ambiguous_score["scenes"][0]["beats"][1]["line_ids"] = ["l002", "l003"]

@@ -403,7 +403,10 @@ class TestPitchValidator:
         with pytest.raises(F2.Fable2SelectError, match="exact pitch slate"):
             F2._make_select_validator(bad)
 
-    def test_pitch_i_must_use_card_i(self):
+    def test_pitch_i_is_restored_to_card_i(self):
+        """PYTHON dealt the cards. `frame_card` is the model echoing our own
+        string back -- so a mis-copied label is restored, not fatal.
+        """
         check = F2._make_pitch_validator(_CARDS3, F2._FULL_MODE, 4)
         slate = F2.PitchSlate(pitches=[
             _pitch_dict(1, "Card A"),
@@ -416,8 +419,10 @@ class TestPitchValidator:
                                 "same dawn before the village wakes.",
                         cast_size=4, ending_shape="open_question"),
         ])
-        err = check(slate)
-        assert err and "card i" in err
+        assert check(slate) is None
+        assert [p.frame_card for p in slate.pitches] == [
+            c["name"] for c in _CARDS3
+        ]
 
     def test_cast_size_over_n_max_rejected(self):
         check = F2._make_pitch_validator(_CARDS3[:1], F2._COMPACT_MODE, 2)

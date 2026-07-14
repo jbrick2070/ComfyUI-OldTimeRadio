@@ -1425,9 +1425,9 @@ def test_device_anchor_must_be_planted_before_the_reveal(tmp_path):
         grounding, manifest, late,
     )
     plan = lane._script_grounding_repair_plan(late, manifest, grounding)
-    # The plant goes on the EARLIEST pre-reveal clue line: a clue the listener
-    # meets in the last breath before the reveal is fair only on paper. The line
-    # keeps the anchor it already speaks.
+    # Both pre-reveal clue lines already speak their own lost-object anchors, so
+    # neither is "loaded" by the plan -- the plant takes the earliest, and keeps
+    # the anchor that line already speaks.
     assert [(row["line_id"], row["required_anchors"]) for row in plan] == [
         ("line_002", ["grille", "stamp"]),
     ]
@@ -1449,6 +1449,33 @@ def test_device_anchor_must_be_planted_before_the_reveal(tmp_path):
     assert "BEFORE the reveal beat" in lane._validate_score_clue_ownership(
         unfair, grounding,
     )
+
+
+def test_the_plant_never_lands_on_an_already_loaded_line():
+    """Live prompt 6fe52216: the patch had to write three verbatim anchors into
+    one intent, wrote two, and exhausted the ladder. One line, one new anchor.
+    """
+    fixtures = _fixtures()
+    score = lane.BroadcastScore.model_validate(fixtures["score"])
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+    grounding = lane._build_grounding_contract(
+        lane.ConstraintDraw.model_validate(DRAW), truth,
+    )
+    manifest = lane._compile_manifest(score)
+
+    # line_002 speaks NEITHER its own object nor the device: it is the line the
+    # lost-object plan must target. The device plant must therefore go elsewhere.
+    stripped = lane.PerformanceScript.model_validate(fixtures["script"])
+    stripped.lines[1].text = "The shelf number repeats after every answer."
+    stripped.lines[2].text = "The mitten scrapes softly, and the card rustles."
+
+    plan = lane._script_grounding_repair_plan(stripped, manifest, grounding)
+    by_line = {row["line_id"]: row["required_anchors"] for row in plan}
+    assert by_line["line_002"] == ["stamp"]
+    assert by_line["line_003"] == ["card", "grille", "mitten"] or \
+        by_line["line_003"] == ["card", "mitten"]
+    # No line is asked to carry the device on top of a fresh lost-object anchor.
+    assert "grille" not in by_line["line_002"]
 
 
 def _deck_draws():

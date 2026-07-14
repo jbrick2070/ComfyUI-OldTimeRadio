@@ -445,6 +445,45 @@ def stamp_music_skip_contract_after_set_lines(led: Any, music_line_ids: Sequence
             row["tts_skip_reason"] = "music_cue"
 
 
+def _compact_scene_repair_request(request: Mapping[str, Any]) -> dict[str, Any]:
+    """The bounded input surface a scene-draft repair actually needs.
+
+    The scene repair used to re-send the whole fact index -- every source span,
+    every entity, every number -- on top of the failed draft and the schema. The
+    local generator left-truncates a prompt that does not fit, and what falls off
+    is the contract, so the model answers with a fragment and the ladder exhausts
+    on a defect it was never shown how to fix (the same trap that killed
+    original_codex56sol P5 live at prompt a89a46a4).
+
+    The failed draft already carries the lines. What the model cannot reconstruct
+    from it is the beat list it must cover and the fact ids it may cite.
+    """
+    compact: dict[str, Any] = {}
+    typed = request.get("typed_inputs")
+    if not isinstance(typed, Mapping):
+        return dict(request)
+    bounded: dict[str, Any] = {}
+    scene = typed.get("scene_outline")
+    if isinstance(scene, Mapping):
+        bounded["scene_outline"] = scene
+    facts = typed.get("facts")
+    if isinstance(facts, Mapping):
+        bounded["facts"] = {
+            "facts": [
+                {"fact_id": row.get("fact_id"), "claim": row.get("claim")}
+                for row in facts.get("facts", [])
+                if isinstance(row, Mapping)
+            ],
+        }
+    for key in ("feedback", "previous_draft"):
+        if key in typed:
+            bounded[key] = typed[key]
+    compact["pass_id"] = request.get("pass_id")
+    compact["typed_inputs"] = bounded
+    compact["result_json_schema"] = request.get("result_json_schema")
+    return compact
+
+
 def _prompt(pack: Any, seam: str, pass_id: str, inputs: Mapping[str, Any], result_type: type[BaseModel]) -> list[dict[str, str]]:
     seam_text = str((getattr(pack, "prompt_stages", {}) or {}).get(seam) or "")
     if not seam_text:
@@ -844,9 +883,12 @@ def invoke_gemini_structured(
                     ),
                 },
             ]
+        original_request = json.loads(prompt[1]["content"])
+        if pass_id.startswith(("P4:", "P6:")):
+            original_request = _compact_scene_repair_request(original_request)
         return [
             {"role": "system", "content": prompt[0]["content"] + "\n" + repair_rules},
-            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": str(error), "original_request": json.loads(prompt[1]["content"])}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
+            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "validation_error": str(error), "original_request": original_request}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)},
         ]
     try:
         # LLM slot: per-sub-pass injected creative/technical closure.

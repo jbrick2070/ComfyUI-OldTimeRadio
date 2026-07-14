@@ -635,17 +635,26 @@ class TestEndToEndSpine:
         assert [r["pass_id"] for r in receipts] == [
             "dossier", "pitch_room", "pitch_select", "treatment",
             "news_read", "script", "critic", "revision",
-            "casting_voices", "assemble"]
+            "casting_voices", "assemble", "safety_scan"]
+        # Every runtime receipt names a pass the pipeline actually declares.
+        declared = {
+            p.pass_id for p in ROUTING.get_pipeline("fable2_multipass").passes
+        }
+        assert {r["pass_id"] for r in receipts} <= declared
         assert all(r["mode"] == "one_pitch_one_draft" for r in receipts)
         skipped = [r for r in receipts if r["status"] == "skipped"]
         assert [r["pass_id"] for r in skipped] == [
             "pitch_select", "critic", "revision"]
         assert all(r["attempts"] == 0 and r["reason"] for r in skipped)
+        # assemble and safety_scan are pure Python: no model, no attempts.
+        python_passes = {"assemble", "safety_scan"}
         llm_receipts = [
             r for r in receipts if r["status"] == "completed"
-            and r["pass_id"] != "assemble"
+            and r["pass_id"] not in python_passes
         ]
         assert all(r["attempts"] >= 1 for r in llm_receipts)
+        assert all(r["attempts"] == 0 for r in receipts
+                   if r["pass_id"] in python_passes)
         # the read-split stamped the P2c read onto the treatment
         assert f2["treatment"]["news_close_read"] == (
             _TREATMENT_DICT["news_close_read"])

@@ -1149,10 +1149,14 @@ def _make_pitch_validator(cards, mode: Fable2Mode, n_max: int):
                 f"pitch ids must be exactly {expected_ids} in dealt-card "
                 f"order, got {actual_ids}"
             )
+        # `frame_card` is not authored: PYTHON dealt the cards, in this order,
+        # and pitch i uses card i. The model is only echoing back which card it
+        # was given -- so when the count and order are right, restore the label
+        # instead of killing the first creative pass of the run over a re-worded
+        # copy of our own input.
         for i, p in enumerate(m.pitches):
             if p.frame_card != card_names[i]:
-                return (f"pitch {i + 1} frame_card {p.frame_card!r} != dealt "
-                        f"card {card_names[i]!r} (pitch i uses card i)")
+                p.frame_card = card_names[i]
             if p.cast_size > n_max:
                 return f"pitch {i + 1} cast_size {p.cast_size} > N_MAX {n_max}"
             hit = _scan_lexicon(
@@ -1358,6 +1362,15 @@ def _make_casting_validator(menu: VoiceMenu, speakers: "list[str]"):
     want = set(speakers)
 
     def _check(m: CastingVoices) -> "str | None":
+        # The speaker set is LOCKED and Python owns it: these are the names in
+        # the sealed script. A name the model re-typed with different case or
+        # spacing is a copy of our own string, not a casting decision -- restore
+        # it. A genuinely different name is a real defect and still goes back.
+        by_normal = {_norm_ws(name).casefold(): name for name in speakers}
+        for row in m.cast:
+            canonical = by_normal.get(_norm_ws(row.name).casefold())
+            if canonical is not None and row.name != canonical:
+                row.name = canonical
         got = [c.name for c in m.cast]
         if len(set(got)) != len(got):
             return f"duplicate cast names {got}"
@@ -3414,9 +3427,9 @@ def _assert_no_weapons_or_smoking(parsed: ParsedScript) -> None:
     hits = lexicon_hits(spoken, WEAPON_SMOKING_EVIDENCE)
     if hits:
         raise Fable2AuditError(
-            "ledger_audit",
+            "safety_scan",
             "spoken text names weapons or smoking: " + ", ".join(hits),
-            1,
+            0,
         )
 
 
@@ -3801,6 +3814,7 @@ def run_scifi_fable2_episode(
     # What survives is the one thing that must never reach the air, checked
     # directly on the spoken text with word boundaries.
     _assert_no_weapons_or_smoking(final_draft.parsed)
+    _receipt("safety_scan", "python", 0, 0.0, 0)
     f2["pass_receipts"] = receipts
     led.save()
     meta = _ledger_meta(led)

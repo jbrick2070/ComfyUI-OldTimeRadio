@@ -1187,13 +1187,18 @@ def repair_script_artifact_metadata(
         if len(repaired_line) != len(raw_line):
             changed = True
         beat_id, shot_id, boundary = expected[line_id]
+        # `beat_id` is exactly as forced a coordinate as `shot_id` and
+        # `boundary`, and it comes from the SAME accepted-score tuple two lines
+        # below. Refusing on it while restoring its two siblings stopped one
+        # field short of what the function already proves is safe: the line_id
+        # determines the beat, and Python holds that mapping.
         if raw_line.get("beat_id") != beat_id:
-            refuse(f"line {line_id} does not retain its accepted beat")
-            return None
+            changed = True
         if raw_line.get("shot_id") != shot_id:
             changed = True
         if raw_line.get("boundary") != boundary:
             changed = True
+        repaired_line["beat_id"] = beat_id
         repaired_line["shot_id"] = shot_id
         repaired_line["boundary"] = boundary
         repaired_lines.append(repaired_line)
