@@ -908,3 +908,92 @@ def test_runner_pure_import_never_pulls_the_writer():
         cwd=str(_REPO), timeout=120)
     assert out.returncode == 0, out.stderr
     assert "PURE_IMPORT_OK" in out.stdout
+
+
+# ---------------------------------------------------------------------------
+# 3. Per-scene budget -- refined-C (kibitz 2026-07-14)
+#    Advisory +/-30% (prompt vector + _draft_score steer) vs FATAL gross +/-50%.
+#    A live 720 leg died on scene 1 = 137 vs the +/-30% band [73,133] (a 4-word
+#    overage). refined-C renders it while still failing gross imbalance. The
+#    gate is `_script_budget_defects`, the SINGLE per-scene gate shared by both
+#    pass_id="script" and "revision" (both route through _run_markup_ladder).
+# ---------------------------------------------------------------------------
+
+def _markup_scene_counts(counts) -> str:
+    """Whole play with EXPLICIT per-scene character word counts. ANNOUNCER lines
+    are metered separately, so they never count toward scene character words."""
+    rows = [
+        "TITLE: The Long Count",
+        "MUSIC: slow theremin swell",
+        "ANNOUNCER: Tonight the instrument ledger answers before dawn.",
+    ]
+    for i, c in enumerate(counts, start=1):
+        sela = c // 2 + c % 2
+        darrow = c - sela
+        rows.extend([
+            f"SCENE {i}: instrument room {i}",
+            "SELA: " + " ".join(f"s{i}a{j}" for j in range(sela)),
+            "DARROW: " + " ".join(f"s{i}d{j}" for j in range(darrow)),
+        ])
+        if i < len(counts):
+            rows.append(f"MUSIC: brief bridge after scene {i}")
+    rows.extend([
+        "ANNOUNCER: The ledger closes and the village keeps the cost.",
+        "CODA: Beyond the measured heat, a real survey waits:",
+        "MUSIC: closing theme with warm brass",
+        "END.",
+    ])
+    return "\n".join(rows)
+
+
+def _parse_counts(counts):
+    parsed, defects = F2.parse_fable2_markup(_markup_scene_counts(counts), _CAST)
+    assert parsed is not None, defects
+    assert F2._scene_character_word_counts(parsed) == tuple(counts)
+    return parsed
+
+
+class TestPerSceneGrossBudget:
+    # 720 -> 7 scenes -> targets (103*6, 102). advisory[103]=[73,133];
+    # gross[103]=[52,154]. _word_band(720) total = [576, 864].
+    def _env(self):
+        return F2._build_envelope(720)
+
+    def test_advisory_band_is_still_plus_minus_30(self):
+        assert self._env().scene_word_bands[0] == (73, 133)
+
+    def test_gross_band_is_plus_minus_50(self):
+        assert self._env().scene_word_gross_bands[0] == (52, 154)
+
+    def test_the_live_137_scene_now_renders(self):
+        # The exact live failure: scene 1 = 137, the rest on target. Total 754 is
+        # inside the total band; scene 1 is outside +/-30% but inside gross ->
+        # NO fatal defect. Before refined-C this raised SCENE_WORD_BUDGET.
+        env = self._env()
+        parsed = _parse_counts((137, 103, 103, 103, 103, 103, 102))
+        assert F2._script_budget_defects(parsed, env) == ()
+
+    def test_a_grossly_long_scene_still_fails(self):
+        env = self._env()
+        parsed = _parse_counts((160, 103, 103, 103, 103, 103, 102))  # 160 > 154
+        defects = F2._script_budget_defects(parsed, env)
+        assert any("SCENE_WORD_GROSS" in d and "scene 1" in d for d in defects)
+
+    def test_a_grossly_short_scene_still_fails(self):
+        env = self._env()
+        parsed = _parse_counts((40, 122, 122, 122, 122, 122, 122))   # 40 < 52
+        defects = F2._script_budget_defects(parsed, env)
+        assert any("SCENE_WORD_GROSS" in d and "scene 1" in d for d in defects)
+
+    def test_draft_score_still_penalizes_an_ordinary_30pct_miss(self):
+        # refined-C keeps +/-30% as the SOFT steer: a 137 scene (advisory miss,
+        # gross OK) must still score strictly worse than an on-target draft, so
+        # the ladder prefers balanced pacing even though it no longer FAILS it.
+        env = self._env()
+        rules = F2.resolve_story_rules("scifi_fable2")
+        on_target = _parse_counts((103, 103, 103, 103, 103, 103, 102))
+        one_miss = _parse_counts((137, 103, 103, 103, 103, 103, 102))
+        s_ok = F2._draft_score(on_target, env, rules)
+        s_miss = F2._draft_score(one_miss, env, rules)
+        assert s_miss[1] > s_ok[1]        # +1 advisory violation
+        assert s_miss > s_ok              # strictly worse -> ladder de-prefers it

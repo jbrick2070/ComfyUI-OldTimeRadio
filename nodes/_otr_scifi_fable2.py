@@ -189,7 +189,17 @@ def _MARKUP_LADDER_TEMPS(t: float) -> "tuple[float, ...]":
 
 _MAX_BUDGET_REROLLS = 2
 _TOTAL_WORD_BAND = 0.20      # +/-20% band on CHARACTER words (r4/M4)
-_SCENE_WORD_BAND = 0.30      # prompt-stated per-scene tolerance
+_SCENE_WORD_BAND = 0.30      # prompt-stated per-scene tolerance (ADVISORY:
+#                              prompt vector + _draft_score steer, NOT fatal)
+# Per-scene FATAL guard (kibitz 2026-07-14, refined-C). The +/-30% advisory band is
+# tighter than a 12B/mini model's per-scene word-count precision at high scene counts
+# (720 -> 7 scenes -> 103-word targets -> band [73,133]; a live leg died on scene 1 =
+# 137, a 4-word overage). Making an ordinary +/-30% miss FATAL killed a complete,
+# correct-total episode. So per-scene FATAL now guards only GROSS imbalance -- a scene
+# structurally out of proportion (half / one-and-a-half its target). +/-50% is a
+# principled pacing bound, NOT reverse-engineered from the 137 sample; the ordinary
+# +/-30% band survives as the prompt vector and the _draft_score soft steer.
+_SCENE_WORD_GROSS_BAND = 0.50
 _ONE_DRAFT_THRESHOLD = 120   # below this: one-pitch + one-draft mode
 _SUPPORTED_WORD_CEILING = 900  # act-chunk mode deferred post-S3
 _DIGEST_CHAR_CAP = 3600
@@ -871,10 +881,27 @@ class SceneEnvelope:
 
     @property
     def scene_word_bands(self) -> "tuple[tuple[int, int], ...]":
+        """ADVISORY +/-30% band: the prompt vector + the _draft_score steer.
+        NOT the fatal gate -- see scene_word_gross_bands."""
         return tuple(
             (
                 math.ceil(target * (1.0 - _SCENE_WORD_BAND)),
                 math.floor(target * (1.0 + _SCENE_WORD_BAND)),
+            )
+            for target in self.scene_word_targets
+        )
+
+    @property
+    def scene_word_gross_bands(self) -> "tuple[tuple[int, int], ...]":
+        """FATAL +/-50% guard: a scene outside this is structurally out of
+        proportion (half / one-and-a-half its target) -- the only per-scene
+        condition that fails the episode. An ordinary +/-30% miss is advisory
+        (kibitz 2026-07-14, refined-C: render the correct-total episode, fail
+        only gross imbalance)."""
+        return tuple(
+            (
+                math.ceil(target * (1.0 - _SCENE_WORD_GROSS_BAND)),
+                math.floor(target * (1.0 + _SCENE_WORD_GROSS_BAND)),
             )
             for target in self.scene_word_targets
         )
@@ -1750,13 +1777,20 @@ def _script_budget_defects(parsed: ParsedScript,
             f"SCENE_COUNT: parsed {len(counts)} scene(s), expected "
             f"{envelope.scene_count}"
         )
-    for index, (count, target, band) in enumerate(zip(
+    # Per-scene FATAL check = the GROSS band (+/-50%), not the advisory +/-30%
+    # (kibitz 2026-07-14, refined-C). An ordinary +/-30% miss is steered by the
+    # prompt vector and penalized by _draft_score, but only GROSS imbalance --
+    # a scene structurally out of proportion -- fails the episode. This renders
+    # otherwise-good, correct-total episodes that a 12B/mini model wrote with a
+    # few words of per-scene jitter, while still catching a ballooned or starved
+    # scene. The total-word band and scene-count above remain fatal.
+    for index, (count, target, gross) in enumerate(zip(
             counts, envelope.scene_word_targets,
-            envelope.scene_word_bands), start=1):
-        if not (band[0] <= count <= band[1]):
+            envelope.scene_word_gross_bands), start=1):
+        if not (gross[0] <= count <= gross[1]):
             errors.append(
-                f"SCENE_WORD_BUDGET: scene {index} character words {count} "
-                f"outside {band[0]}-{band[1]} (target {target})"
+                f"SCENE_WORD_GROSS: scene {index} character words {count} "
+                f"grossly outside {gross[0]}-{gross[1]} (target {target})"
             )
     return tuple(errors)
 
