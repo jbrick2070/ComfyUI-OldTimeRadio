@@ -36,6 +36,12 @@ import time
 from pathlib import Path
 from typing import Any
 
+from ._otr_generation_budget import (
+    GenerationContextOverflowError,
+    estimate_prompt_tokens,
+    fit_output_tokens,
+)
+
 log = logging.getLogger(__name__)
 
 #: One-shot guard so the "reasoning_effort ACTIVE" evidence line logs once/process.
@@ -1057,6 +1063,24 @@ class OpenRouterBackend:
             out_tokens = max(requested_tokens, floor)
         if out_tokens > cap:
             out_tokens = cap
+        try:
+            fitted_tokens = fit_output_tokens(
+                out_tokens,
+                context_cap=int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
+                prompt_tokens=estimate_prompt_tokens(messages),
+                min_output_tokens=min(floor, cap),
+                label=f"OpenRouter {slug}",
+            )
+        except GenerationContextOverflowError as exc:
+            raise OpenRouterConfigError(str(exc)) from exc
+        if fitted_tokens != out_tokens:
+            log.warning(
+                "[OpenRouter] output budget clamped: requested=%d effective=%d "
+                "context_cap=%d",
+                out_tokens, fitted_tokens,
+                int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
+            )
+        out_tokens = fitted_tokens
         temp = (
             cache_entry.get("temperature_override")
             if cache_entry.get("temperature_override") is not None

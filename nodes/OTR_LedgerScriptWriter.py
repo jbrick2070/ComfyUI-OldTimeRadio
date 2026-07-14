@@ -121,6 +121,10 @@ from typing import Any, Mapping, Protocol
 # at INPUT_TYPES() registration time. Pure-Python module, no torch /
 # transformers / GPU work -- safe at module-import time.
 from . import _otr_model_catalog as _otr_model_catalog  # noqa: E501
+from ._otr_generation_budget import (
+    GenerationContextOverflowError,
+    fit_output_tokens,
+)
 # S1 platform-portability: the explicit LLM runtime policy (stdlib-only).
 from ._otr_shared import llm_policy as _llm_policy
 
@@ -659,9 +663,12 @@ def _build_truncating_generate_fn(
                                    doesn't damage short outputs)
     Each widget overrides per-episode from the workflow.
 
-    Cap math: max_input_tokens = max(64, context_cap - max_new_tokens).
-    Truncation is left-side (drops oldest tokens, preserves most
-    recent context).
+    The output request is first fitted against the measured prompt. This is
+    important for structured passes whose artifact-derived reservation can be
+    larger than the local context cap: the old ``context_cap - requested``
+    arithmetic reduced the input allowance to 64 tokens and silently deleted
+    the contract. A prompt is never truncated merely because its caller asked
+    for a generous output ceiling.
     """
     # [OpenRouter S3] Remote branch (FC2 seam 2). A provider-tagged remote
     # entry has no model/tokenizer/context_cap to close over; return the
@@ -722,16 +729,28 @@ def _build_truncating_generate_fn(
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
-        max_input_tokens = max(64, context_cap - int(max_new_tokens))
         input_len = inputs["input_ids"].shape[-1]
-        if input_len > max_input_tokens:
+        requested_max_new_tokens = max(1, int(max_new_tokens))
+        try:
+            effective_max_new_tokens = fit_output_tokens(
+                requested_max_new_tokens,
+                context_cap=context_cap,
+                prompt_tokens=input_len,
+                label="prompt",
+            )
+        except GenerationContextOverflowError as exc:
             if prompt_must_fit:
-                raise PromptContextOverflowError(
-                    "prompt requires %d input tokens but only %d fit "
-                    "(context_cap=%d, max_new_tokens=%d); refusing to "
-                    "left-truncate an unsliceable provenance prompt"
-                    % (input_len, max_input_tokens, context_cap, max_new_tokens)
-                )
+                raise PromptContextOverflowError(str(exc)) from exc
+            raise PromptContextOverflowError(str(exc)) from exc
+        if effective_max_new_tokens != requested_max_new_tokens:
+            log.warning(
+                "[OTR_LedgerScriptWriter] OUTPUT_BUDGET: requested %d -> %d "
+                "tokens (prompt_tokens=%d, context_cap=%d)",
+                requested_max_new_tokens, effective_max_new_tokens,
+                input_len, context_cap,
+            )
+        max_input_tokens = context_cap - effective_max_new_tokens
+        if input_len > max_input_tokens:
             trunc = input_len - max_input_tokens
             inputs["input_ids"] = inputs["input_ids"][:, trunc:]
             if "attention_mask" in inputs:
@@ -739,14 +758,15 @@ def _build_truncating_generate_fn(
             log.warning(
                 "[OTR_LedgerScriptWriter] PROMPT_GUARD: Truncated "
                 "%d -> %d tokens (context_cap=%d, max_new_tokens=%d)",
-                input_len, max_input_tokens, context_cap, max_new_tokens,
+                input_len, max_input_tokens, context_cap,
+                effective_max_new_tokens,
             )
 
         gen_kwargs = {
             "do_sample": True,
             "temperature": float(temperature),
             "top_p": active_top_p,
-            "max_new_tokens": int(max_new_tokens),
+            "max_new_tokens": effective_max_new_tokens,
             "pad_token_id": tokenizer.eos_token_id,
         }
         # Only forward non-default values so older transformers
@@ -808,11 +828,11 @@ def _build_truncating_generate_fn(
             generated_tokens = int(getattr(generated_ids, "shape", [len(generated_ids)])[-1])
         except Exception:  # pragma: no cover - exotic backend sequence shape
             generated_tokens = None
-        if generated_tokens == int(max_new_tokens):
+        if generated_tokens == effective_max_new_tokens:
             log.info(
                 "[OTR_LedgerScriptWriter] OUTPUT_CAP: prompt_tokens=%d "
                 "generated_tokens=%d max_new_tokens=%d",
-                prompt_len, generated_tokens, max_new_tokens,
+                prompt_len, generated_tokens, effective_max_new_tokens,
             )
         decoded = tokenizer.decode(
             generated_ids, skip_special_tokens=True,

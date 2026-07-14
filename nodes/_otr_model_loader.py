@@ -42,6 +42,17 @@ import os
 import time
 from typing import Any
 
+try:
+    from ._otr_generation_budget import (
+        GenerationContextOverflowError,
+        fit_output_tokens,
+    )
+except ImportError:  # pragma: no cover - flat-module compatibility tests
+    from _otr_generation_budget import (  # type: ignore
+        GenerationContextOverflowError,
+        fit_output_tokens,
+    )
+
 log = logging.getLogger("OTR")
 
 
@@ -1118,13 +1129,22 @@ def make_generate_fn(cache_entry: dict[str, Any]):
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        try:
+            effective_max_new_tokens = fit_output_tokens(
+                max_new_tokens,
+                context_cap=int(cache_entry.get("context_cap") or 8192),
+                prompt_tokens=inputs["input_ids"].shape[1],
+                label=f"local model {cache_entry.get('model_id', '<unknown>')}",
+            )
+        except GenerationContextOverflowError as exc:
+            raise ModelLoaderError(str(exc)) from exc
         with torch.no_grad():
             out = model.generate(
                 **inputs,
                 do_sample=True,
                 temperature=temperature,
                 top_p=0.92,
-                max_new_tokens=max_new_tokens,
+                max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
             )
         # Strip prompt prefix from decoded output.
@@ -1214,13 +1234,22 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        try:
+            effective_max_new_tokens = fit_output_tokens(
+                max_new_tokens,
+                context_cap=int(cache_entry.get("context_cap") or 8192),
+                prompt_tokens=inputs["input_ids"].shape[1],
+                label=f"local polish {cache_entry.get('model_id', '<unknown>')}",
+            )
+        except GenerationContextOverflowError as exc:
+            raise ModelLoaderError(str(exc)) from exc
         with torch.no_grad():
             out = model.generate(
                 **inputs,
                 do_sample=_POLISH_DO_SAMPLE,
                 temperature=temperature,
                 top_p=_POLISH_TOP_P,
-                max_new_tokens=max_new_tokens,
+                max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
             )
         prompt_len = inputs["input_ids"].shape[1]

@@ -5,6 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from .._otr_generation_budget import (
+    GenerationContextOverflowError,
+    estimate_prompt_tokens,
+    fit_output_tokens,
+)
 from .client import (
     GoogleAPIError,
     GoogleAPIRequestShapeError,
@@ -146,7 +151,18 @@ class GoogleAPIBackend:
         if temperature is not None:
             generation_config["temperature"] = float(temperature)
         if max_new_tokens is not None:
-            generation_config["max_output_tokens"] = max(1, int(max_new_tokens))
+            requested_tokens = max(1, int(max_new_tokens))
+            try:
+                generation_config["max_output_tokens"] = fit_output_tokens(
+                    requested_tokens,
+                    context_cap=int(
+                        cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
+                    ),
+                    prompt_tokens=estimate_prompt_tokens(messages),
+                    label=f"Google API {google_model}",
+                )
+            except GenerationContextOverflowError as exc:
+                raise GoogleAPIRequestShapeError(str(exc)) from exc
         if stop:
             generation_config["stop_sequences"] = [str(s) for s in stop if s]
         payload: dict[str, Any] = {

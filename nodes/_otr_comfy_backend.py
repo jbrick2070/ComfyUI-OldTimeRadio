@@ -38,6 +38,12 @@ import os
 import time
 from typing import Any
 
+from ._otr_generation_budget import (
+    GenerationContextOverflowError,
+    estimate_prompt_tokens,
+    fit_output_tokens,
+)
+
 log = logging.getLogger(__name__)
 
 
@@ -474,6 +480,24 @@ class ComfyCreditsBackend:
         out_tokens = max(int(max_new_tokens or 0), floor)
         if out_tokens > cap:
             out_tokens = cap
+        try:
+            fitted_tokens = fit_output_tokens(
+                out_tokens,
+                context_cap=int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
+                prompt_tokens=estimate_prompt_tokens(messages),
+                min_output_tokens=min(floor, cap),
+                label=f"Comfy Credits {slug}",
+            )
+        except GenerationContextOverflowError as exc:
+            raise ComfyCreditsConfigError(str(exc)) from exc
+        if fitted_tokens != out_tokens:
+            log.warning(
+                "[ComfyCredits] output budget clamped: requested=%d effective=%d "
+                "context_cap=%d",
+                out_tokens, fitted_tokens,
+                int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
+            )
+        out_tokens = fitted_tokens
         temp = (
             cache_entry.get("temperature_override")
             if cache_entry.get("temperature_override") is not None

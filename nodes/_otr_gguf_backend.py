@@ -19,6 +19,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from ._otr_generation_budget import (
+    GenerationContextOverflowError,
+    estimate_prompt_tokens,
+    fit_output_tokens,
+)
+
 log = logging.getLogger("OTR")
 
 GGUF_BACKEND_KEY = "gguf_native"
@@ -439,6 +445,25 @@ class GGUFNativeBackend:
                 out_tokens, cap,
             )
             out_tokens = cap
+        try:
+            fitted_tokens = fit_output_tokens(
+                out_tokens,
+                context_cap=int(
+                    (model.get("context_cap") if isinstance(model, dict) else 0)
+                    or DEFAULT_CONTEXT_WINDOW
+                ),
+                prompt_tokens=estimate_prompt_tokens(messages),
+                min_output_tokens=min(64, cap),
+                label=f"GGUF {ROW_ID}",
+            )
+        except GenerationContextOverflowError as exc:
+            raise GGUFNativeConfigError(str(exc)) from exc
+        if fitted_tokens != out_tokens:
+            log.warning(
+                "[GGUFNative] output budget clamped: requested=%d effective=%d",
+                out_tokens, fitted_tokens,
+            )
+        out_tokens = fitted_tokens
         kwargs: dict[str, Any] = {
             "messages": messages,
             "max_tokens": out_tokens,
