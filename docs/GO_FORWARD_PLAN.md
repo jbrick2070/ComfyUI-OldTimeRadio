@@ -39,6 +39,15 @@ it as an LLM opinion; codex and fable2 had none.
 
 PBUG-20260713-15..18 logged and closed by `fb34bf4f`; -14 marked SUPERSEDED.
 
+**Bakeoff follow-up note (2026-07-14):** the Shakespeare and likely
+`public_domain_story` source banks currently pass through the shared
+story-grammar/style adaptation layer, so their live episode framing is not
+source-native in the same way the source text is. Accept this for the current
+evidence run; after the bakeoff, consider source-specific dramatic framing
+modes and compare them against the shared adapter without changing the frozen
+receipts. Preserve source character names and roles by default in those banks;
+do not mint a fresh cast unless an explicit adaptation mode requests it.
+
 ### The bug class that cost twelve live rolls -- "the lost anchor"
 
 A pass hands an LLM an IMMUTABLE string Python already owns -- a constraint-draw
