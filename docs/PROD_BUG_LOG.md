@@ -1623,4 +1623,107 @@ out until they independently meet the same production-only admission rule.
   converge. Audit each artifact for what it can say, and put ordering checks
   where ordering exists. Found by asking why a repair route fired 100% of the
   time -- a repair path that always fires is a design smell, not a safety net.
-- status: FIXED IN TREE; LIVE REVERIFY PENDING
+- status: SUPERSEDED by the 2026-07-13 rip. P4 no longer exists: fair play is a
+  deterministic contract (`_validate_script_grounding` -- the device anchor is
+  spoken on a clue line before the reveal line), and P7's blind listener is gone
+  with it. Closed by the green 30-word canonical leg, prompt `fb34bf4f`.
+
+## PBUG-20260713-15 -- the score's repair prompt did not fit the window it was sent to
+
+- surfaced: canonical 30-word `original_codex56sol` run, prompt
+  `a89a46a4-196b-41ad-89fa-1bbac4bb496d`, Mistral-Nemo both slots, 2026-07-13.
+- symptom: P5 rejected a valid announcer cast row filed under `char_id: "a"`, and
+  then the ladder collapsed: the typed repair returned prose and a JSON fragment,
+  and the syntax retry returned ONE CAST ROW as the whole score (16 validation
+  errors: 12 missing top-level fields, 4 extra).
+- root cause: the P5 repair prompt was **5,772 tokens against a 4,592-token usable
+  window** (context_cap 8192, max_new_tokens 3600). PROMPT_GUARD truncated it, and
+  what fell off the end was the instruction to return a complete artifact. The
+  model answered with the last thing it could still see.
+- fix: `_repair_inputs` -- the P5/P6 repair no longer re-sends the full truth map
+  and grounding contract; the failed artifact already carries the graph, so it
+  sends only the anchors and the clue inventory. Plus `_project_announcer_char_id`:
+  an id is a coordinate, not authored content, so it is canonicalized at the
+  attempt boundary and the rejection never happens.
+- bible-worthy: yes. **A repair prompt that does not fit is worse than no repair.**
+  Silent left-truncation deletes the contract and the model answers from the
+  fragment it can still see. Measure the repair prompt against
+  `context_cap - max_new_tokens`, and bound the repair context to what the failed
+  artifact does not already carry.
+- status: FIXED at `b286c478`; LIVE REVERIFIED by the green 30-word leg, prompt
+  `fb34bf4f` (RESULT SUCCESS + obs_publish OK + asset).
+
+## PBUG-20260713-16 -- the lane died on echoes of its own inputs
+
+- surfaced: canonical 30-word `original_codex56sol` runs, prompts
+  `efafc6fa` (P1), `5bd46a5e` and `d199a783` (P3), `55756bac` (P5), Mistral-Nemo
+  both slots, 2026-07-13.
+- symptom: four separate deaths, all the same shape. P1: "lost_objects and
+  acoustic_device must be copied verbatim" -- the model wrote the right story
+  about the right device and re-worded the field that only ECHOES the immutable
+  draw. P3: wrote `timetable` for `folded timetable`, then dropped the third
+  caller thread entirely. P5: wrote `closure` for the `closing` enum and the
+  schema threw out the whole score.
+- root cause: the lane asked a 12B model to copy immutable strings back verbatim
+  into typed fields, and compared exactly. Every one of those strings was an INPUT
+  Python already owned. Worse, `caller_threads` carries `min_length=2` while the
+  real rule is one thread per lost object -- the schema and the contract said
+  different things, and the model believed the schema.
+- fix: restore the input instead of dying on the echo, but ONLY when the
+  correction is FORCED (exactly one value possible):
+  `_restore_slate_immutables`, `_restore_thread_lost_objects`,
+  `_project_arc_phases`, `_drop_unknown_clue_ids`. P3 is now handed the caller-
+  thread ROWS as data (`required_caller_threads`) rather than asked to remember
+  how many to write. Ambiguity still goes back to the model.
+- bible-worthy: yes. **Restoring an input is not authoring.** When a model is asked
+  to echo a string the program already owns, a mismatch is a coordinate error, not
+  a story decision -- restore it when the correction is forced, and never let a
+  schema bound contradict the real invariant.
+- status: FIXED at `b286c478` + `f3f88cb0` + `5879d6ef`; LIVE REVERIFIED by the
+  green 30-word leg, prompt `fb34bf4f`.
+
+## PBUG-20260713-17 -- a proxy gate with a repair the model could not perform
+
+- surfaced: canonical 30-word `original_codex56sol` runs, prompts `41faff33`,
+  `6fe52216`, `522e1581`, `6a325375` (P5 anchor patch) and `ec428576` (P6 anchor
+  patch), Mistral-Nemo both slots, 2026-07-13.
+- symptom: five deaths in the bounded anchor patch. It returned truncated JSON at
+  the creative temperature; then it wrote two of three required anchors into one
+  intent and failed; then, at the script level, it rewrote two of three planned
+  lines and the whole batch was rejected -- the two good lines went in the bin
+  with the missing one.
+- root cause: TWO design errors. (1) The score's intent-anchor rule was a PROXY: a
+  `line_intent` is a private note nobody hears, and the anchors are real in the
+  SPOKEN SCRIPT. The proxy's repair asked the model to fit two or three immutable
+  strings into one sentence. (2) The script patch asked for every planned line in
+  ONE call, so a partial success was a total failure.
+- fix: rip the score-intent anchor patch and its seam entirely -- the anchors are
+  proven in the script, whose patch rewrites dialogue the model is good at. The
+  script patch now rewrites ONE line per call, at 0.25 temperature, with a token
+  budget derived from the plan. A shortened anchor ("the grille" for "ventilation
+  grille") is RESTORED, since the model decided where it belongs and the exact
+  wording was never its decision.
+- bible-worthy: yes. **A bounded repair must ask for the unit the model can
+  deliver.** Batch a repair and a partial success becomes a total failure; enforce
+  a property on a proxy artifact and the repair fights the wrong object.
+- status: FIXED at `f3f88cb0`; LIVE REVERIFIED by the green 30-word leg, prompt
+  `fb34bf4f` -- four per-line patches, each accepted on its FIRST attempt.
+
+## PBUG-20260713-18 -- a 30-word broadcast with a nineteen-beat score
+
+- surfaced: canonical 30-word `original_codex56sol` run, prompt
+  `717f3a4f-53e4-47fc-9992-0aaedeb5fd72`, Mistral-Nemo both slots, 2026-07-13.
+- symptom: P6 returned undecodable JSON -- the script was cut off mid-object.
+- root cause: the P5 seam gave the score a beat FLOOR ("at least 5 beats") and NO
+  ceiling, so the model built a nineteen-beat graph for a thirty-word broadcast.
+  Every beat is a line the script must then write, and the script's token budget
+  was computed from the word target alone -- which knows nothing about how many
+  lines exist.
+- fix: `_validate_score_scale` (a broadcast of N words holds N/4 beats, floor 8,
+  cap 40) and a P6 token budget derived from the MANIFEST LINES. `max_beats` is
+  supplied to the score author as data.
+- bible-worthy: yes. **A generation budget must be derived from the artifact that
+  will be generated, not from a proxy.** A word target does not bound a line
+  count; a floor without a ceiling is not a size contract.
+- status: FIXED at `f3f88cb0`; LIVE REVERIFIED by the green 30-word leg, prompt
+  `fb34bf4f` (6 lines, arc_verdict=strong).
