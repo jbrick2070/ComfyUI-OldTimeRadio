@@ -1269,27 +1269,53 @@ def test_device_anchor_must_be_planted_before_the_reveal(tmp_path):
     )
 
 
+def test_a_schema_path_written_into_clue_ids_is_dropped_as_noise():
+    """Live prompt ac762dd9: the model wrote
+    "grounding_contract.device_anchor" into clue_ids. A string that names no clue
+    cannot be a clue -- dropping it invents nothing. But if dropping it would
+    leave a real clue uncovered, it was not noise, and the model must answer.
+    """
+    fixtures = _fixtures()
+    truth = lane.AudibleTruthMap.model_validate(fixtures["truth"])
+
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+
+    noisy = lane.BroadcastScore.model_validate(fixtures["score"])
+    noisy.beats[1].line_intent.clue_ids = [
+        "q1", "grounding_contract.device_anchor",
+    ]
+    # The whole attempt still validates: the noise is dropped at the boundary.
+    assert lane._validate_score_attempt(noisy, truth, rules) is None
+    assert noisy.beats[1].line_intent.clue_ids == ["q1"]
+
+    # Noise that hides a dropped clue is not noise -- back to the ladder.
+    lossy = lane.BroadcastScore.model_validate(fixtures["score"])
+    lossy.beats[1].line_intent.clue_ids = ["grounding_contract.x"]
+    assert "q1" in lane._validate_score_attempt(lossy, truth, rules)
+
+
 def test_a_short_broadcast_cannot_hold_a_long_score():
     """Live prompt 717f3a4f: the seam had a beat FLOOR and no ceiling, so a
     30-word episode got a 19-beat score -- and the script that had to fill all
     nineteen lines blew its token budget and came back as truncated JSON.
     """
     score = lane.BroadcastScore.model_validate(_fixtures()["score"])
-    assert lane._beat_ceiling(30) == 6
-    assert lane._beat_ceiling(120) == 24
+    # The floor is the show's own shape: announcer + one beat per caller +
+    # reveal + closure. Below that it is a different show, not a shorter one.
+    assert lane._beat_ceiling(30) == 8
+    assert lane._beat_ceiling(120) == 30
     assert lane._beat_ceiling(420) == 40  # capped: a broadcast is not a novel
     assert lane._validate_score_scale(score, 30) is None
 
     long_score = score.model_copy(deep=True)
     extra = long_score.beats[1].model_copy(deep=True)
-    for index in range(7):
+    for index in range(14):
         clone = extra.model_copy(deep=True)
         clone.beat_id = f"bx{index}"
         clone.line_intent.clue_ids = []
         long_score.beats.insert(2, clone)
     error = lane._validate_score_scale(long_score, 30)
-    assert "at most 6 beats" in error
-    assert "never delete a clue" not in error  # the seam says it; the error is short
+    assert "at most 8 beats" in error
     assert "do not delete the clues" in error
 
 

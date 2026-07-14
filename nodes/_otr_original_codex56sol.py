@@ -1285,6 +1285,44 @@ def _validate_authored_surface(value: Any, rules: Any) -> str | None:
     return None
 
 
+def _drop_unknown_clue_ids(
+    score: BroadcastScore,
+    truth: AudibleTruthMap,
+) -> bool:
+    """Remove clue ids that name no clue. Noise, not story.
+
+    The model wrote the SCHEMA PATH into the data -- clue_ids carrying
+    "grounding_contract.device_anchor" (live: prompts ac762dd9, faffc134). A
+    string that names no truth-map clue cannot be a clue, so deleting it invents
+    nothing and loses nothing.
+
+    Only when every REAL clue is still assigned afterwards. If dropping the noise
+    would leave a clue uncovered, it was not noise, and the model must answer for
+    it at the ladder.
+    """
+    known = {clue.clue_id for clue in truth.audible_clues}
+    trimmed: list[tuple[Any, list[str]]] = []
+    for beat in score.beats:
+        kept = [
+            clue_id for clue_id in beat.line_intent.clue_ids
+            if clue_id in known
+        ]
+        if len(kept) != len(beat.line_intent.clue_ids):
+            trimmed.append((beat, kept))
+    if not trimmed:
+        return False
+    projected = {
+        clue_id for beat in score.beats
+        for clue_id in beat.line_intent.clue_ids
+        if clue_id in known
+    }
+    if projected != known:
+        return False
+    for beat, kept in trimmed:
+        beat.line_intent.clue_ids = kept
+    return True
+
+
 def _project_announcer_char_id(score: BroadcastScore) -> BroadcastScore | None:
     """Canonicalize the announcer's char_id -- an ID, never authored content.
 
@@ -1334,6 +1372,8 @@ def _validate_score_attempt(
         score.cast = announcer_id.cast
         score.beats = announcer_id.beats
         repaired_kinds.append("announcer char_id")
+    if _drop_unknown_clue_ids(score, truth):
+        repaired_kinds.append("clue ids naming no clue")
     for _ in range(3):
         structural_error = _validate_score(score, truth)
         repaired: BroadcastScore | None = None
@@ -1409,8 +1449,15 @@ def _pre_reveal_clue_lines(manifest: ClosedLineManifest) -> list[ManifestLine]:
 
 
 def _beat_ceiling(target_words: int) -> int:
-    """How many spoken beats a broadcast of this length can actually hold."""
-    return max(5, min(40, int(target_words) // 5))
+    """How many spoken beats a broadcast of this length can actually hold.
+
+    The floor is 8, not 5: the show's own shape needs an announcer, one beat per
+    caller, a reveal and a closure, and squeezing that into five beats is not a
+    length rule, it is a different show. The ceiling exists to stop the model
+    building a nineteen-beat graph for a thirty-word broadcast -- every beat is a
+    line the script must then write.
+    """
+    return max(8, min(40, int(target_words) // 4))
 
 
 def _validate_score_scale(score: BroadcastScore, target_words: int) -> str | None:
