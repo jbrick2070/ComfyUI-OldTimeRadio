@@ -186,6 +186,31 @@ class TestModels:
                           note="Change it to this. SELA: I never doubted "
                                "the mountain for a second.")
 
+    def test_critic_note_speaker_is_optional_and_defaults_to_empty(self):
+        """A scene-wide note has no speaker to name, and must be able to say so.
+
+        THE LAW: an audit may improve a story, it may never fail one.
+
+        Live 2026-07-14, 420w scifi_fable2 leg: the critic wrote a note about a
+        scene rather than a character, omitted `speaker`, the typed repair omitted
+        it again, and pydantic killed the episode with
+        `notes.0.speaker Field required`.
+
+        Empty was ALWAYS a legal value -- `_note_scope_error` accepts it on both
+        branches -- so the schema was demanding a key its own consumer says may be
+        empty. That is the unstated-contract class: `schema_shape_instruction`
+        emits key NAMES only, so required-vs-optional is invisible to the model. A
+        semantically optional field must BE optional.
+        """
+        note = F2.CriticNote(
+            scene=1, problem="stakes_sag",
+            note="The turn lands without cost; let the scene charge for it.",
+        )
+        assert note.speaker == ""
+
+        # And the consumer agrees: an empty speaker is in scope for a real scene.
+        assert F2.CriticNotes(verdict="revise", notes=[note]).notes[0].speaker == ""
+
     def test_critic_revise_requires_a_note(self):
         with pytest.raises(ValidationError, match="revise"):
             F2.CriticNotes(verdict="revise", notes=[])

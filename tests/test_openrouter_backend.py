@@ -353,9 +353,17 @@ def test_generate_happy_path(enabled_env, monkeypatch):
     )
     assert out == "hello from sonnet"
     assert seen["payload"]["model"] == "anthropic/claude-3.5-sonnet"
-    # 128 is below the remote min-output floor (1024) and is bumped up so a
-    # free-form remote reply isn't truncated mid-JSON. max_tokens is a ceiling.
-    assert seen["payload"]["max_tokens"] == 1024
+    # 128 is below the remote min-output floor and is bumped up so a free-form
+    # remote reply isn't truncated mid-JSON. max_tokens is a ceiling.
+    #
+    # This asserted 1024 until 2026-07-14, which quietly pinned the BUG:
+    # DEFAULT_REASONING_EFFORT is "low", so reasoning is ON for this call, and
+    # `max_tokens` bounds reasoning + content TOGETHER with the reasoning emitted
+    # FIRST. At 1024 a reasoning model spends the whole budget thinking and is cut
+    # before it writes a content token (finish_reason=length). So the floor is
+    # reasoning-aware and the happy path gets the reasoning floor.
+    assert seen["payload"]["reasoning_effort"] == "low"
+    assert seen["payload"]["max_tokens"] == orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING
     assert seen["payload"]["temperature"] == 0.6
     assert seen["api_key_present"] is True
 
@@ -448,6 +456,8 @@ def test_small_max_new_tokens_is_floored(enabled_env, monkeypatch):
 
 
 def test_floor_overridable_via_env(enabled_env, monkeypatch):
+    # Reasoning OFF isolates the BASE floor, which is what this test is about.
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
     monkeypatch.setenv("OPENROUTER_MIN_OUTPUT_TOKENS", "1500")
     seen = {}
     monkeypatch.setattr(
@@ -459,6 +469,102 @@ def test_floor_overridable_via_env(enabled_env, monkeypatch):
     backend.generate(entry, [{"role": "user", "content": "x"}],
                      temperature=0.5, max_new_tokens=50)
     assert seen["payload"]["max_tokens"] == 1500
+
+
+# ---------------------------------------------------------------------------
+# The reasoning floor -- `max_tokens` bounds reasoning + content TOGETHER
+# ---------------------------------------------------------------------------
+
+
+def _seen_max_tokens(monkeypatch, *, max_new_tokens=50):
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result(),
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row(context_window=131072))
+    backend.generate(entry, [{"role": "user", "content": "x"}],
+                     temperature=0.5, max_new_tokens=max_new_tokens)
+    return seen["payload"]
+
+
+def test_reasoning_model_gets_room_to_think_AND_answer(enabled_env, monkeypatch):
+    """A reasoning model must not spend its whole budget on the preamble.
+
+    THE BUG (live 2026-07-14, 420w public_domain_story): `max_tokens` bounds
+    reasoning tokens and content tokens TOGETHER, and the hidden reasoning is
+    emitted FIRST. The announcer's news-coda bridge asks for ~150 tokens (a budget
+    sized for the LOCAL grammar-constrained path), the old floor lifted that to
+    1024, and aion-3.0-mini -- a MANDATORY-reasoning model -- burned all 1024
+    thinking and was cut before writing a single content token. Both attempts hit
+    finish_reason=length, the bridge failed, and the no-fallback rip correctly
+    aborted the episode rather than ship canned text.
+
+    The OUTPUT CAP had already learned this (8192 -> 16384, R3 2026-06-22) and it
+    protected the BIG calls. The FLOOR never did, so the SMALL calls kept dying.
+    """
+    payload = _seen_max_tokens(monkeypatch)
+    assert payload["reasoning_effort"] == "low"          # on by default
+    assert payload["max_tokens"] >= orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING
+    # Room for the preamble AND the answer -- strictly more than a budget the
+    # preamble alone can swallow.
+    assert payload["max_tokens"] > orb.DEFAULT_MIN_OUTPUT_TOKENS
+
+
+def test_reasoning_off_keeps_the_lean_base_floor(enabled_env, monkeypatch):
+    """No preamble to pay for -> no reason to inflate the budget."""
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
+    payload = _seen_max_tokens(monkeypatch)
+    assert "reasoning_effort" not in payload or payload["reasoning_effort"] == "none"
+    assert payload["max_tokens"] == orb.DEFAULT_MIN_OUTPUT_TOKENS
+
+
+def test_reasoning_floor_overridable_via_env(enabled_env, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_MIN_OUTPUT_TOKENS_REASONING", "6000")
+    payload = _seen_max_tokens(monkeypatch)
+    assert payload["max_tokens"] == 6000
+
+
+def test_reasoning_floor_never_lowers_a_bigger_request(enabled_env, monkeypatch):
+    """The floor is a FLOOR. A call that already asks for more keeps its budget."""
+    payload = _seen_max_tokens(
+        monkeypatch,
+        max_new_tokens=orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING + 5000,
+    )
+    assert payload["max_tokens"] == orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING + 5000
+
+
+def test_reasoning_floor_degrades_it_never_aborts_a_survivable_call(
+        enabled_env, monkeypatch):
+    """The reasoning floor is a DESIRED minimum, not a HARD one.
+
+    A long prompt on a small-context model can leave less room than the reasoning
+    floor (8192 cap minus a ~7000-token prompt = 1192 tokens). That call must still
+    RUN with what is left -- degraded -- not refuse to start. The HARD minimum (the
+    threshold below which fit_output_tokens raises context-overflow) stays the lean
+    BASE floor.
+
+    Caught by the known-fail guard on 2026-07-14: the first cut of the reasoning
+    floor passed it as `min_output_tokens`, which turned this survivable call into
+    an abort.
+    """
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kw: seen.update(kw) or _ok_result(),
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row(context_window=8192))
+    backend.generate(
+        entry,
+        [{"role": "user", "content": "x" * 28000}],   # ~7000 prompt tokens
+        temperature=0.2,
+        max_new_tokens=9520,
+    )
+    # It ran, and took the room that was actually left.
+    fitted = seen["payload"]["max_tokens"]
+    assert 0 < fitted < orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING
 
 
 def test_strict_message_budget_bypasses_overridden_floor(enabled_env, monkeypatch):

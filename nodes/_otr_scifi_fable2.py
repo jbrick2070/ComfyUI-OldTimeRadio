@@ -456,7 +456,25 @@ class Treatment(BaseModel):
 
 class CriticNote(BaseModel):
     scene: int = Field(ge=0, strict=True)
-    speaker: str
+    # DEFAULTS TO EMPTY, and empty is a real value: "this note is about the scene,
+    # not about one character". `_note_scope_error` -- the ONLY consumer -- already
+    # says so on both branches: a scene-zero note accepts speaker in ("", ANNOUNCER),
+    # and a scene note guards with `if note.speaker and ...`, so empty short-circuits
+    # past the membership check. The schema was nonetheless demanding the KEY be
+    # present, so a critic with nothing to pin on one speaker had no legal way to say
+    # so -- it omitted the key and pydantic raised `notes.0.speaker Field required`.
+    #
+    # Live 2026-07-14, 420w scifi_fable2 leg: the critic wrote a scene-wide note
+    # ("...something more enigmatic."), left `speaker` out, the typed repair left it
+    # out again, and the episode DIED. THE LAW: an audit may improve a story, it may
+    # never fail one -- and this audit failed one over a key its own validator says
+    # may be empty.
+    #
+    # The unstated-contract class: `schema_shape_instruction` emits key NAMES only,
+    # so "required vs optional" is invisible to the model. A field that is
+    # semantically optional must BE optional, not merely tolerated once it arrives.
+    # No ledger hole: the field is always present, owned by this default.
+    speaker: str = ""
     frame_scope: "Literal['intro', 'outro'] | None" = None
     problem: Literal[
         "register_bleed", "on_the_nose", "stakes_sag", "ending_unearned",

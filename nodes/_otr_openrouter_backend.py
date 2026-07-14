@@ -175,6 +175,37 @@ DEFAULT_MAX_RETRIES = 2  # total attempts = retries + 1
 # lets the remote model finish. Overridable via OPENROUTER_MIN_OUTPUT_TOKENS.
 DEFAULT_MIN_OUTPUT_TOKENS = 1024
 
+# ...and the SAME floor is nowhere near enough when the model REASONS.
+#
+# `max_tokens` bounds reasoning tokens + content tokens TOGETHER, and the hidden
+# reasoning is emitted FIRST. So a reasoning model spends the floor thinking and
+# gets cut before it writes a single content token -> finish_reason=length -> an
+# empty/truncated body -> unparseable JSON -> fail-closed abort. This is not
+# hypothetical: DEFAULT_REASONING_EFFORT is "low", so reasoning is ON for EVERY
+# remote call by default.
+#
+# The OUTPUT CAP already learned this (16384, R3 2026-06-22: "a reasoning model
+# spends part of the output budget on hidden reasoning ... could starve the story
+# body"). That fix protected the BIG calls -- the story body asks for thousands of
+# tokens, so it clears a reasoning preamble on its way past. It never protected
+# the SMALL ones. A short call (the announcer's news-coda bridge asks for ~150
+# tokens, sized for the local grammar-constrained path) is floored to 1024 and
+# dies, because 1024 is a reasoning budget, not a reasoning budget PLUS a bridge
+# line.
+#
+# Live 2026-07-14, 420w `public_domain_story` leg: aion-3.0-mini (mandatory
+# reasoning) hit finish_reason=length on BOTH news-coda bridge attempts and the
+# episode aborted -- correctly, since the no-fallback rip (2026-07-03) refuses to
+# paper a dead LLM over with canned text. The model was never given room to
+# answer.
+#
+# So the floor is reasoning-aware: when reasoning is active, it must cover the
+# preamble AND the answer. max_tokens is a CEILING -- the model still stops at
+# finish_reason=stop and bills only what it actually emits -- so a generous floor
+# costs nothing on a short reply. Overridable via
+# OPENROUTER_MIN_OUTPUT_TOKENS_REASONING.
+DEFAULT_MIN_OUTPUT_TOKENS_REASONING = 4096
+
 
 # ---------------------------------------------------------------------------
 # Errors -- all abort the run (C4 fail-closed / C5 no half-remote)
@@ -1098,7 +1129,28 @@ class OpenRouterBackend:
         # is a ceiling only -- the model stops at finish_reason=stop and bills
         # actual tokens, so a generous floor costs nothing on short replies.
         cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_OUTPUT_TOKENS_CAP)
-        floor = _int_env("OPENROUTER_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
+        # The BASE floor is also the HARD minimum: the value below which
+        # fit_output_tokens refuses the call outright (context overflow). It stays
+        # lean on purpose -- see the reasoning floor below.
+        base_floor = _int_env(
+            "OPENROUTER_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS,
+        )
+        floor = base_floor
+
+        # Resolve reasoning BEFORE the budget: `max_tokens` bounds reasoning +
+        # content together, and the reasoning is emitted FIRST. A floor that does
+        # not cover the preamble hands the model a budget it burns before it can
+        # answer (see DEFAULT_MIN_OUTPUT_TOKENS_REASONING). The same value is
+        # reused for the payload below -- resolve it once.
+        reasoning_effort = _mandatory_reasoning_effort(
+            slug, cache_entry.get("reasoning")
+        )
+        if reasoning_effort and reasoning_effort != "none":
+            floor = max(floor, _int_env(
+                "OPENROUTER_MIN_OUTPUT_TOKENS_REASONING",
+                DEFAULT_MIN_OUTPUT_TOKENS_REASONING,
+            ))
+
         requested_tokens = max(1, int(max_new_tokens or 0))
         if bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
             out_tokens = requested_tokens
@@ -1111,7 +1163,15 @@ class OpenRouterBackend:
                 out_tokens,
                 context_cap=int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
                 prompt_tokens=estimate_prompt_tokens(messages),
-                min_output_tokens=min(floor, cap),
+                # The HARD minimum stays the BASE floor, never the reasoning floor.
+                # The reasoning floor is a DESIRED minimum -- it lifts the budget
+                # when the window can afford it; it must never turn a survivable
+                # call into an abort. On a small-context model a long prompt can
+                # leave less than the reasoning floor (8192 cap - a ~7000-token
+                # prompt = 1192 tokens): that call should still RUN with what is
+                # left, degraded, not refuse to start. Gating the hard minimum on
+                # the reasoning floor would abort it.
+                min_output_tokens=min(base_floor, cap),
                 label=f"OpenRouter {slug}",
             )
         except GenerationContextOverflowError as exc:
@@ -1151,10 +1211,9 @@ class OpenRouterBackend:
         # reasoning (-> finish_reason=length -> unparseable JSON). Unset -> the
         # field is omitted, so non-thinking models / OpenRouter-proper are
         # byte-identical. Not require_parameters-gated: a backend that ignores it
-        # simply reasons as before -- the output-token floor is the safety net.
-        reasoning_effort = _mandatory_reasoning_effort(
-            slug, cache_entry.get("reasoning")
-        )
+        # simply reasons as before -- the output-token floor is the safety net,
+        # and that floor is now reasoning-aware (resolved with the budget above,
+        # because a net sized without the preamble is a net with a hole in it).
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort
             # EVIDENT (operator 2026-06-22): log ONCE per process so any server
