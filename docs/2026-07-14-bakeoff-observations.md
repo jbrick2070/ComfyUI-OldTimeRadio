@@ -97,6 +97,66 @@ So: report 420 as a survival/structure rung, with this caveat attached. Rank on 
 
 ---
 
+## OBS-1c -- the adaptation lanes were told to REWRITE the thing they adapt
+
+**Operator, by ear, 2026-07-14:** *"shakespeare and pub domain are trying to force a
+radio drama narrative onto an already proven narrative... they should mic the source
+material as much as possible, but fit within the ledger scope."* Prompt-only fix,
+before the 720 spend.
+
+He is right, and the packs were arguing with themselves.
+
+`public_domain_story` and `shakespeare` are ADAPTATION lanes: unlike `science_news`
+or `media_archive` -- which are handed a NON-story (a news item, an archive record)
+and must invent a drama around it -- these two are handed **a story that already
+works**. Their packs know it. `faithful_radio_adaptation` and
+`folger_scene_adaptation` both declare:
+
+> "Faithfulness outranks novelty." / "Compression is allowed; replacement is not."
+> forbidden: invented protagonist, changed ending, unrelated framing story
+
+and their `line_composer_system` says "Ground every character line in the source
+text ... never invent connective events, characters, or endings."
+
+**And then `exchange_system` told the model to invent modern drama anyway:**
+
+> "Write an EXCHANGE ... naturalistic, with subtext.
+>  - Characters should not answer each other too directly.
+>  - At least one line avoids the real question."
+
+Those are GENERATIVE craft rules for original drama, and they were being applied to
+Dickens and to Shakespeare. On the Shakespeare lane it is worse than generic: telling
+a model to make the verse "naturalistic" and to stop characters "answering too
+directly" is an instruction to rewrite rhetoric into modern evasive patter.
+Shakespeare's people answer each other directly, at length, in public -- the rhetoric
+IS the subtext. The pack contradicted its own law two keys later, and the craft rule
+won, because the craft rule was the one talking to the model at dialogue time.
+
+**Fix (seam-only, no Python -- per the standing law on framing defects):** rewrote
+`exchange_system` in both packs from an INVENTION seam into an ADAPTATION seam --
+carry the source's own words, keep its diction and rhetoric, convert narration into
+speech those characters would plausibly say, and impose NO subtext the source does
+not have. Added to both `tone_guardrails`: *"Put a MICROPHONE on the source; do not
+re-plot it"* and *"Faithfulness outranks craft rules. A craft rule that would rewrite
+a proven scene is wrong."* Added the operator's ledger-scope point to the outline
+seam: the radio cast is small, so CHOOSE the source's essential speakers and fold or
+drop minor figures -- never add a character to fill a scene. Also pinned the spine:
+`premise` / `central_tension` must RESTATE the question the source already asks,
+never a new one invented for radio.
+
+**Checked and deliberately NOT changed:** `story_rules/{shakespeare,public_domain_story}.json`
+is an anti-CLICHE lexicon ("the bard speaks", "the theme is", "the lesson is"), not a
+force-subtext rule -- it helps an adaptation too, since Shakespeare never writes "I'm
+so ambitious". The shared `_otr_slot_drama_contract` maps objective/obstacle/turn onto
+each beat, which is legitimate scaffolding for an adaptation as much as an invention.
+The forcing was in `exchange_system`, and only there.
+
+**Confound:** shakespeare and public_domain_story ran their 420 legs on the OLD seams.
+420 was already confounded (OBS-1b). Every 720 leg runs on the new seams, so the
+judged rung stays uniform.
+
+---
+
 ## OBS-2 -- lane structure at length (EXPECTED, not a defect)
 
 The lanes do NOT write the same shape of show at length, and the operator has
