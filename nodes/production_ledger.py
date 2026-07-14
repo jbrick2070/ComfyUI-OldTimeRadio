@@ -1070,6 +1070,17 @@ class Ledger:
                 row["text"] = safe_text
                 row["char_count"] = _char_count(safe_text)
                 row["word_count"] = _word_count(safe_text)
+                # A targeted reroll is an authoritative replacement for the
+                # row's prior text.  Script Doctor may have marked that row
+                # skipped while its text was empty; leaving the editorial
+                # skip state attached to the newly composed text creates the
+                # impossible Phase 10 state ``skip=True + text`` and blocks
+                # CastLock.  Clear only the skip metadata when a meaningful
+                # replacement arrives; empty text must retain its skip state.
+                if safe_text.strip():
+                    row.pop("skip", None)
+                    row.pop("tts_skip_reason", None)
+                    row.pop("reviewer_skip_reason", None)
                 if compose_flags_append:
                     for _flag in compose_flags_append:
                         append_compose_flag(row, _flag)
