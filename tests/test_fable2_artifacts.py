@@ -186,6 +186,40 @@ class TestModels:
                           note="Change it to this. SELA: I never doubted "
                                "the mountain for a second.")
 
+    def test_strips_the_chatter_a_model_wraps_around_the_script(self):
+        """A reasoning model announces itself. That must not kill a good script.
+
+        Live 2026-07-14, 420w scifi_fable2: aion-3.0-mini opened the revision with
+        "I will now produce the complete revised radio play episode, applying all
+        critic notes..." -> BAD_LINE_SHAPE (line 1) + SKELETON_BREAK (TITLE is not
+        the first line). The markup ladder is a RAW-TEXT pass with no schema to
+        constrain shape, so it just re-asked -- five times, five full episode
+        generations -- and the model politely announced itself every time. The leg
+        died over one sentence of throat-clearing in front of a fine script.
+
+        The format's own skeleton says TITLE: first and END. last, so anything
+        outside that is not script. Python owns the SHAPE; the LLM owns the WORDS.
+        """
+        script = "TITLE: The Ash\nMUSIC: up\nANNOUNCER: Good evening.\nEND."
+
+        wrapped = (
+            "I will now produce the complete revised radio play episode, "
+            "applying all critic notes.\n\n" + script +
+            "\n\nI hope this meets your requirements!"
+        )
+        assert F2._strip_conversational_wrapper(wrapped) == script
+
+    def test_a_clean_script_is_returned_byte_identical(self):
+        script = "TITLE: The Ash\nMUSIC: up\nANNOUNCER: Good evening.\nEND."
+        assert F2._strip_conversational_wrapper(script) is script
+
+    def test_a_script_with_no_title_still_fails_loud(self):
+        """Fail-safe: never massage a genuinely malformed draft into something
+        else. With no TITLE: line there is no script to find, so the text passes
+        through UNCHANGED and the parser reports its real defects."""
+        junk = "I could not write the episode. Sorry!"
+        assert F2._strip_conversational_wrapper(junk) == junk
+
     def test_critic_note_speaker_is_optional_and_defaults_to_empty(self):
         """A scene-wide note has no speaker to name, and must be able to say so.
 

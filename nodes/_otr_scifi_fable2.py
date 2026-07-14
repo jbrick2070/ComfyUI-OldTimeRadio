@@ -1733,6 +1733,63 @@ def _script_budget_defects(parsed: ParsedScript,
     return tuple(errors)
 
 
+_TITLE_LINE_RE = re.compile(r"^\s*TITLE\s*:", re.IGNORECASE)
+_END_LINE_RE = re.compile(r"^\s*END\s*\.\s*$", re.IGNORECASE)
+
+
+def _strip_conversational_wrapper(raw: str) -> str:
+    """Drop the chatter a model wraps around the script -- never the script.
+
+    The markup format's OWN skeleton is TITLE: first, END. last. So anything
+    BEFORE the first TITLE: line, or AFTER the END. line, is by definition not
+    part of the episode: it is the model talking to us about the episode.
+
+    Live 2026-07-14, 420w scifi_fable2: aion-3.0-mini opened the revision with
+        "I will now produce the complete revised radio play episode, applying
+         all critic notes..."
+    -> BAD_LINE_SHAPE (line 1) + SKELETON_BREAK (TITLE is not the first line).
+    The markup ladder is a RAW-TEXT pass -- there is no schema to constrain the
+    shape -- so it simply re-asked, five times, and the model politely announced
+    itself every single time. Five full episode generations, then a dead leg,
+    because of one sentence of throat-clearing in front of a script that was
+    otherwise fine.
+
+    This is NOT Python authoring story text, and it is not a shim: it removes a
+    conversational wrapper the model put AROUND the artifact, exactly as
+    `_strip_reasoning_tags` already removes a <think> preamble in the OpenRouter
+    backend. Same class -- a chatty/reasoning model wraps its answer. Python owns
+    the SHAPE; the LLM owns the WORDS, and not one word of the script is touched.
+
+    Fail-safe by construction: if there is no TITLE: line at all we return the
+    text UNCHANGED, so a genuinely malformed draft still raises its real defects
+    (SKELETON_BREAK) instead of being silently massaged into something else.
+    """
+    if not raw:
+        return raw
+    lines = raw.splitlines()
+
+    start = next(
+        (i for i, ln in enumerate(lines) if _TITLE_LINE_RE.match(ln)), None)
+    if start is None:
+        return raw  # no script here -- let the parser report the real defects
+
+    end = next(
+        (i for i in range(len(lines) - 1, start - 1, -1)
+         if _END_LINE_RE.match(lines[i])), None)
+    stop = (end + 1) if end is not None else len(lines)
+
+    if start == 0 and stop == len(lines):
+        return raw  # already clean -- byte-identical, never touched
+
+    trimmed = "\n".join(lines[start:stop])
+    log.info(
+        "[scifi_fable2] stripped a conversational wrapper: %d line(s) before "
+        "TITLE:, %d after END. (the script itself is untouched)",
+        start, len(lines) - stop,
+    )
+    return trimmed
+
+
 def _run_markup_ladder(
     creative_fn,
     *,
@@ -1777,6 +1834,7 @@ def _run_markup_ladder(
             # LLM slot: creative -- P3/P5 whole-play markup ladder.
             raw = creative_fn(
                 msgs, temperature=temp, max_new_tokens=requested_tokens)
+            raw = _strip_conversational_wrapper(raw)
             parsed, defects = parse_fable2_markup(raw, cast_names)
             if parsed is None:
                 defect_rows = tuple(str(defect) for defect in defects)

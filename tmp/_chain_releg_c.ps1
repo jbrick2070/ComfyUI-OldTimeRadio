@@ -22,8 +22,18 @@ while (-not (Test-Path -LiteralPath $bDone) -and (Get-Date) -lt $deadline) {
 "[chain-c] bake420b drained at $(Get-Date -Format 'HH:mm:ss'); re-legging scifi_codex vs the mux fix" |
     Out-File -FilePath (Join-Path $repo "tmp\chain_releg_c.log") -Encoding utf8
 
+# scifi_fable2 joins the queue: its critic fix WORKED (the critic now passes and
+# returns notes), which advanced the lane to a pass that never used to run -- the
+# REVISION. Aion opened that revision with "I will now produce the complete revised
+# radio play episode..." -> SKELETON_BREAK (TITLE is not the first line). The markup
+# ladder is a raw-text pass with no schema, so it re-asked five times and the model
+# announced itself every time. Python now strips the conversational wrapper (the
+# format's own skeleton says TITLE: first, END. last -- anything outside that is not
+# script).
+#
 # IN-PROCESS call with a REAL array -- `powershell -File` cannot carry an array.
-& (Join-Path $repo "tmp\_sweep.ps1") -Banks @("scifi_codex") -Words 420 -SweepName "bake420c"
+& (Join-Path $repo "tmp\_sweep.ps1") `
+    -Banks @("scifi_codex", "scifi_fable2") -Words 420 -SweepName "bake420c"
 
 "[chain-c] done at $(Get-Date -Format 'HH:mm:ss')" |
     Out-File -FilePath (Join-Path $repo "tmp\chain_releg_c.log") -Encoding utf8 -Append

@@ -16,7 +16,9 @@ $banks = @(
 # Wait for EVERY re-leg sweep to drain (bake420b, then bake420c -- the scifi_codex
 # re-run against the MasterAudioMux phantom-green fix).
 $deadline = (Get-Date).AddHours(9)
-foreach ($doneFile in @("tmp\bake420b_420w_ALLDONE.txt", "tmp\bake420c_420w_ALLDONE.txt")) {
+foreach ($doneFile in @("tmp\bake420b_420w_ALLDONE.txt",
+                        "tmp\bake420c_420w_ALLDONE.txt",
+                        "tmp\bake420d_420w_ALLDONE.txt")) {
     $p = Join-Path $repo $doneFile
     while (-not (Test-Path -LiteralPath $p) -and (Get-Date) -lt $deadline) {
         Start-Sleep -Seconds 30
@@ -26,7 +28,7 @@ foreach ($doneFile in @("tmp\bake420b_420w_ALLDONE.txt", "tmp\bake420c_420w_ALLD
 # Latest verdict per bank at 420, across the main sweep AND every re-leg sweep.
 # A later re-leg supersedes an earlier failure for the same bank.
 $verdict = @{}
-foreach ($name in @("bake420", "bake420b", "bake420c")) {
+foreach ($name in @("bake420", "bake420b", "bake420c", "bake420d")) {
     $sum = Join-Path $repo ("tmp\{0}_420w_summary.txt" -f $name)
     if (-not (Test-Path -LiteralPath $sum)) { continue }
     foreach ($line in (Get-Content -LiteralPath $sum)) {

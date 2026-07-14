@@ -5,6 +5,21 @@ param([int]$Words = 420)
 $repo = "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio"
 Set-Location -LiteralPath $repo
 
+# GROUND TRUTH: a leg is green only if it PUBLISHED an episode. RESULT SUCCESS is
+# not proof -- OTR_MasterAudioMux used to swallow its own fail-closed errors and
+# return an empty path, so a 25-minute render that published nothing was recorded
+# green (live 2026-07-14, scifi_codex 5ab3884b). `obs_publish OK` in that leg's own
+# server log is the only thing that cannot lie.
+function Test-Published([string]$bank, [int]$words) {
+    $legLog = Join-Path $repo ("tmp\leg_{0}_{1}w.log" -f $bank, $words)
+    if (-not (Test-Path -LiteralPath $legLog)) { return $false }
+    $portHit = Select-String -Path $legLog -Pattern "port=(\d+)" | Select-Object -Last 1
+    if (-not $portHit) { return $false }
+    $srv = Join-Path $repo ("tmp\otr_headless_{0}.log" -f $portHit.Matches[0].Groups[1].Value)
+    if (-not (Test-Path -LiteralPath $srv)) { return $false }
+    return [bool](Select-String -Path $srv -Pattern "obs_publish OK" -Quiet)
+}
+
 function Show-Sweep([string]$name, [int]$w) {
     $sum = Join-Path $repo ("tmp\{0}_{1}w_summary.txt" -f $name, $w)
     if (-not (Test-Path -LiteralPath $sum)) { return }
@@ -23,26 +38,11 @@ function Show-Sweep([string]$name, [int]$w) {
             # episode existed (live 2026-07-14, scifi_codex re-leg 5ab3884b). The only
             # ground truth is `obs_publish OK` in the leg's own server log. A SUCCESS
             # with no publish is a PHANTOM and must never be counted green.
-            if ($ok) {
-                $legLog = Join-Path $repo ("tmp\leg_{0}_{1}w.log" -f $bank, $w)
-                $published = $false
-                if (Test-Path -LiteralPath $legLog) {
-                    $portHit = Select-String -Path $legLog -Pattern "port=(\d+)" |
-                               Select-Object -Last 1
-                    if ($portHit) {
-                        $srv = Join-Path $repo ("tmp\otr_headless_{0}.log" -f $portHit.Matches[0].Groups[1].Value)
-                        if (Test-Path -LiteralPath $srv) {
-                            if (Select-String -Path $srv -Pattern "obs_publish OK" -Quiet) {
-                                $published = $true
-                            }
-                        }
-                    }
-                }
-                if (-not $published) {
-                    "{0} {1,-22} {2,6}s  {3}" -f "PHNT", $bank, $Matches[4], `
-                        "<- RESULT SUCCESS but NO obs_publish -- NO EPISODE. Re-leg required."
-                    continue
-                }
+            $secs = $Matches[4]
+            if ($ok -and -not (Test-Published $bank $w)) {
+                "{0} {1,-22} {2,6}s  {3}" -f "PHNT", $bank, $secs, `
+                    "<- RESULT SUCCESS but NO obs_publish -- NO EPISODE. Re-leg required."
+                continue
             }
 
             $mark = if ($ok) { "OK  " } else { "FAIL" }
@@ -50,15 +50,23 @@ function Show-Sweep([string]$name, [int]$w) {
             # Say so, or a stale red trains the eye to ignore reds that are real.
             $note = ""
             if (-not $ok) {
-                $releg = Join-Path $repo ("tmp\{0}b_{1}w_summary.txt" -f $name, $w)
-                if (Test-Path -LiteralPath $releg) {
-                    $fixed = Get-Content -LiteralPath $releg |
-                             Where-Object { $_ -match ("END\s+" + [regex]::Escape($bank) + "\s.*RESULT SUCCESS") }
-                    if ($fixed) { $mark = "OK  "; $note = "  (re-leg green; original FAIL superseded)" }
-                    else { $note = "  <- re-leg pending" }
-                } else { $note = "  <- re-leg pending" }
+                # A re-leg supersedes the original FAIL only if it actually PUBLISHED.
+                # A phantom re-leg (RESULT SUCCESS, no obs_publish) supersedes nothing --
+                # counting it would launder a dead render into a green.
+                $superseded = $false
+                foreach ($suffix in @("b", "c", "d")) {
+                    $releg = Join-Path $repo ("tmp\{0}{1}_{2}w_summary.txt" -f $name, $suffix, $w)
+                    if (-not (Test-Path -LiteralPath $releg)) { continue }
+                    $hit = Get-Content -LiteralPath $releg |
+                           Where-Object { $_ -match ("END\s+" + [regex]::Escape($bank) + "\s.*RESULT SUCCESS") }
+                    if ($hit -and (Test-Published $bank $w)) { $superseded = $true }
+                }
+                if ($superseded) { $mark = "OK  "; $note = "  (re-leg green + asset verified)" }
+                else { $note = "  <- re-leg pending" }
             }
-            "{0} {1,-22} {2,6}s{3}" -f $mark, $bank, $Matches[4], $note
+            # $secs, NOT $Matches[4] -- the -match inside the supersede loop above
+            # clobbers $Matches, and the leg time silently prints blank.
+            "{0} {1,-22} {2,6}s{3}" -f $mark, $bank, $secs, $note
         } else { $l }
     }
 
@@ -85,6 +93,8 @@ function Show-Sweep([string]$name, [int]$w) {
 
 Show-Sweep "bake420"  420
 Show-Sweep "bake420b" 420
+Show-Sweep "bake420c" 420
+Show-Sweep "bake420d" 420
 Show-Sweep "bake720"  720
 
 Write-Host ""
