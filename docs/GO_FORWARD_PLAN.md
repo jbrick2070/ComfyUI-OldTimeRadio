@@ -1,6 +1,68 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-12 21:04 PDT
+**Updated:** 2026-07-13 20:05 PDT
+
+## THE LAW (operator, 2026-07-13 -- supersedes every plan below that disagrees)
+
+> **AN AUDIT MAY IMPROVE A STORY. IT MAY NEVER FAIL ONE.**
+> Only DETERMINISTIC validators may end an episode. An LLM verdict may trigger a
+> bounded rewrite; it may never raise.
+
+### Done today (all pushed to `v2.0-alpha`)
+
+Every LLM veto in the codebase is gone. `original_codex56sol` lost P4 (fair play),
+P7/P8 (blind listener + retake), P9 (final contract audit) and the P5 score-intent
+anchor patch: 9 LLM passes -> 4 plus one per-line script patch. Fair play is now a
+deterministic contract -- the device anchor is SPOKEN on a clue line before the
+reveal line -- repaired by the bounded line patch. `scifi_gemini` lost `sfw_pass`,
+the P5-recheck and `SciFiGeminiRewriteExhaustedError`; its spoken-text check moved
+INTO the P4/P6 ladder with a cast-name/source-acronym exemption. `scifi_sonnet`
+lost the `severity`/`invented_fact_flags`/`sfw_pass` veto, replaced by
+`ungrounded_lines` (a factual line must cite a real dossier fact and may speak only
+numbers the source states -- a proof). `scifi_fable2` lost the P8 LLM ledger audit,
+which raised AFTER `_assemble` and two saves. `original_radio`'s corroboration was
+a raw substring scan over the judge's OWN prose -- now word-boundary, script-only.
+
+**G9** in `_otr_ledger_freeze.run_gap_audit` is the first working SFW ship-stop: a
+word-boundary DEFAULT_PROFANITY_TERMS scan over spoken ledger text, on the one path
+every lane crosses, raising at Phase 10. The lanes that had any profanity check had
+it as an LLM opinion; codex and fable2 had none.
+
+### Live proof
+
+| Leg | Prompt | Result |
+|---|---|---|
+| `original_codex56sol` 30w | `fb34bf4f` | SUCCESS + obs_publish + 54.5 MB asset |
+| `original_codex56sol` 120w | `9874b749` | SUCCESS + obs_publish + 84.3 MB asset |
+| `original_codex56sol` 420w | `b9c49e0d` | SUCCESS + obs_publish + 58.6 MB asset |
+| `scifi_gemini` 30w | `12f7ecde` | SUCCESS + obs_publish + 46.0 MB asset |
+
+PBUG-20260713-15..18 logged and closed by `fb34bf4f`; -14 marked SUPERSEDED.
+
+### The bug class that cost twelve live rolls -- "the lost anchor"
+
+A pass hands an LLM an IMMUTABLE string Python already owns -- a constraint-draw
+field, a dealt card, a locked speaker, a coordinate from an accepted artifact --
+and asks for it back verbatim. The model paraphrases. Python compares exactly and
+kills the episode over a copy of its own input.
+
+**Restoring an input is not authoring.** Restore when the correction is FORCED
+(exactly one value possible); return it to the model when it is not. Three further
+laws proven live: a repair prompt that does not fit is worse than no repair
+(PROMPT_GUARD truncates the contract silently); a bounded repair must ask for the
+unit the model can deliver (batch a patch and a partial success becomes a total
+failure); and "it is broken" is not a repair prompt -- name the missing object, the
+unassigned clue, the exact string.
+
+### Next
+
+Remaining live proof: `scifi_sonnet` (in flight), `scifi_fable2`, `scifi_codex`,
+`original_radio`, and the four legacy banks -- 30w, then 120w. Then the frozen
+bakeoff.
+
+---
+
+**Previously updated:** 2026-07-12 21:04 PDT
 
 **Branch:** `v2.0-alpha`
 

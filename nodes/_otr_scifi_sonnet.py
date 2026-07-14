@@ -357,6 +357,73 @@ def _allowed_numeric_tokens(dossier: "FragmentDossierV4") -> frozenset[str]:
     return frozenset(allowed)
 
 
+def _validate_attestation_grounding(
+    att: "AttestationV4",
+    dossier: "FragmentDossierV4",
+) -> "str | None":
+    """The final read is a factual line, so it is held to the factual contract."""
+    line = DraftLineV4(
+        text=att.attestation, cites=list(att.attestation_cites),
+        speaker="ANNOUNCER", char_id="announcer", source_pass="P6",
+    )
+    defects = ungrounded_lines([line], dossier)
+    if not defects:
+        return None
+    return (
+        "the attestation is not grounded in the dossier: "
+        + "; ".join(defects)
+        + ". State only what the fragment states, and cite the fact you state."
+    )
+
+
+def _merge_grounding_into_audit(
+    audit: "AuditVerdictV4",
+    events: "Sequence[DraftLineV4]",
+    dossier: "FragmentDossierV4",
+) -> "AuditVerdictV4":
+    """Give the PROOF a repair route: hand it to the doctor, not to the exception.
+
+    `ungrounded_lines` is deterministic and correct -- the model invented the
+    number "13" and the record must not state it (live: prompt 7199a7b1). But a
+    validator that raises at the END of the lane, after every pass has succeeded,
+    is a kill switch, not a gate. The lane already has a script doctor whose whole
+    job is fixing flagged lines, so the proof becomes an audit finding and the
+    doctor fixes it. Only when the doctor fails twice does the record die.
+    """
+    defects = ungrounded_lines(events, dossier)
+    if not defects:
+        return audit
+    audited = _audited_line_indices(events)
+    ref_by_index = {index: ref for ref, index in enumerate(audited)}
+    refs = [
+        ref_by_index[index] for index, line in enumerate(events)
+        if index in ref_by_index and _line_is_ungrounded(line, dossier)
+    ]
+    return audit.model_copy(update={
+        "status": "defect",
+        "defects": (list(audit.defects) + defects)[:5],
+        "flagged_line_refs": sorted(
+            set(list(audit.flagged_line_refs) + refs),
+        )[:5],
+    })
+
+
+def _line_is_ungrounded(
+    line: "DraftLineV4",
+    dossier: "FragmentDossierV4",
+) -> bool:
+    if line.non_fact:
+        return False
+    fact_ids = {row.fact_id for row in dossier.verified_facts}
+    if any(cite not in fact_ids for cite in line.cites):
+        return True
+    allowed = _allowed_numeric_tokens(dossier)
+    return any(
+        token not in allowed
+        for token in _NUMERIC_TOKEN_RE.findall(line.text)
+    )
+
+
 def ungrounded_lines(
     events: "Sequence[DraftLineV4]",
     dossier: "FragmentDossierV4",
@@ -599,8 +666,13 @@ def _spoken_error(
         token for token in _ALL_CAPS_RE.findall(without_cast_names)
         if token not in allowed_all_caps
     ]
-    if _DECORATION_RE.search(text):
-        return "spoken text contains decoration"
+    decoration = _DECORATION_RE.search(text)
+    if decoration:
+        return (
+            f"spoken text contains decoration {decoration.group(0)!r} -- no "
+            "brackets, parentheses, asterisks, backticks, tabs or newlines "
+            f"reach the microphone. You wrote: {text!r}"
+        )
     if shouted:
         return (
             "spoken text contains all-caps lexical text "
@@ -968,6 +1040,10 @@ def run_scifi_sonnet_episode(
     # silently comes to mean two different lines.
     audited = _audited_line_indices(events)
     audit = invoke_sonnet_structured(pass_id="P3", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_audit_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in audited], "coverage": {"count": len(audited)}}, result_type=AuditVerdictV4, post_validator=lambda x: None, base_temperature=.25, structural_retry_temperature=.12, max_new_tokens=2000, journal=journal)
+    # The deterministic grounding proof outranks the Warden's opinion in BOTH
+    # directions: it can open a defect the Warden missed, and it is the only thing
+    # that can close the record. Feed it to the doctor, not to an exception.
+    audit = _merge_grounding_into_audit(audit, events, p0)
     warden_seam = str(pack.prompt_stages.get("sonnet_warden_system") or "")
     if audit.status == "clear":
         block = select_warden_mode_block(warden_seam, "clear")
@@ -989,14 +1065,9 @@ def run_scifi_sonnet_episode(
             rewrite = invoke_sonnet_structured(pass_id=f"P5:{round_no}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_rewrite_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "audit": audit.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in audited]}, result_type=RewriteResultV4, post_validator=lambda x: None, base_temperature=.45, structural_retry_temperature=.20, max_new_tokens=3000, journal=journal)
             _apply_rewrite_corrections(events, audited, rewrite, audit, round_no)
             audit = invoke_sonnet_structured(pass_id=f"P3:recheck:{round_no}", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_audit_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in _audited_line_indices(events)], "coverage": {}}, result_type=AuditVerdictV4, post_validator=lambda x: None, base_temperature=.25, structural_retry_temperature=.12, max_new_tokens=2000, journal=journal)
+            audit = _merge_grounding_into_audit(audit, events, p0)
             if audit.status == "clear":
                 break
-        # The auditor is an LLM, and it will not stop calling craft notes defects no
-        # matter how plainly the seam forbids it -- it blocked three separate rolls on
-        # "line 2 repeats line 0's claim", in a 30-word script with a two-fact dossier,
-        # where saying something new is not possible.
-        #
-        # So stop ASKING it to classify and start USING the classification it already
         # The Warden bought its two rewrites. Whatever it still feels about the
         # record is a note, and a note ships with the episode -- the auditor is an
         # LLM, and it will not stop calling craft observations defects no matter
@@ -1020,7 +1091,10 @@ def run_scifi_sonnet_episode(
         # record is corrected. The model had written the line all along and the lane
         # was throwing it away to speak for the character itself.
         events.append(DraftLineV4(text=rewrite.vesh_resolution, cites=[], non_fact=True, speaker="VESH", char_id="c04", source_pass="P5"))
-    att = invoke_sonnet_structured(pass_id="P6", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_attestation_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "events": [e.model_dump(mode="json") for e in events]}, result_type=AttestationV4, post_validator=lambda x: None, base_temperature=.50, structural_retry_temperature=.22, max_new_tokens=2600, journal=journal)
+    # The attestation is authored AFTER the doctor has gone home, so its grounding
+    # has to be proven at its own rung -- otherwise an invented number in the final
+    # read kills a record that every other pass had already cleared.
+    att = invoke_sonnet_structured(pass_id="P6", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_attestation_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "events": [e.model_dump(mode="json") for e in events]}, result_type=AttestationV4, post_validator=lambda x, d=p0: _validate_attestation_grounding(x, d), base_temperature=.50, structural_retry_temperature=.22, max_new_tokens=2600, journal=journal)
     events.extend([
         # The attestation IS the citation-anchored read -- it states the facts, so it
         # cites them. The seal and the sign-off state nothing: they were borrowing the

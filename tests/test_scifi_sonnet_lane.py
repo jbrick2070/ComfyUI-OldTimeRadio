@@ -62,6 +62,54 @@ def test_sonnet_payload_cast_lock_and_spoken_hygiene():
         lane.validate_spoken_text_and_lock([bad], cast)
 
 
+def test_the_grounding_proof_goes_to_the_doctor_not_to_an_exception():
+    """Live prompt 7199a7b1: the model invented the number 13 and the proof was
+    RIGHT to catch it -- but it raised at the END, after every pass had already
+    succeeded. The lane has a script doctor whose job is fixing flagged lines.
+    """
+    dossier = lane.FragmentDossierV4.model_validate({
+        "verified_facts": [{
+            "fact_id": "fact_1", "claim": "The probe carried 3 sensors.",
+            "source_spans": [{"field": "summary", "start": 0, "end": 27,
+                              "quote": "The probe carried 3 sensors"}],
+        }],
+        "key_numbers": [{
+            "number_id": "num_1", "verbatim": "3", "fact_id": "fact_1",
+            "source_span": {"field": "summary", "start": 18, "end": 19,
+                            "quote": "3"},
+        }],
+        "named_entities": [], "tone": "measured",
+        "headline_clean": "Probe returns", "provenance_note": "One fragment.",
+        "payload_sha256": "a" * 64,
+    })
+    events = [
+        lane.DraftLineV4(text="The record opens.", cites=[], non_fact=True,
+                         speaker="ANNOUNCER", char_id="announcer",
+                         source_pass="P1"),
+        lane.DraftLineV4(text="The probe carried 3 sensors.", cites=["fact_1"],
+                         speaker="ORUM", char_id="c02", source_pass="P2a"),
+        lane.DraftLineV4(text="Flight 13 will follow.", cites=["fact_1"],
+                         speaker="THESSALY", char_id="c03", source_pass="P2b"),
+    ]
+    clear = lane.AuditVerdictV4.model_validate({"status": "clear"})
+
+    merged = lane._merge_grounding_into_audit(clear, events, dossier)
+    # The Warden said "clear"; the proof says otherwise, and the proof wins.
+    assert merged.status == "defect"
+    assert any("13" in defect for defect in merged.defects)
+    # It flags the line the DOCTOR numbers, not the raw index.
+    assert merged.flagged_line_refs == [1]
+
+    # A grounded record is left alone.
+    events[2] = lane.DraftLineV4(
+        text="Three sensors is a careful number.", cites=["fact_1"],
+        speaker="THESSALY", char_id="c03", source_pass="P2b",
+    )
+    assert lane._merge_grounding_into_audit(
+        clear, events, dossier,
+    ).status == "clear"
+
+
 def test_the_sources_own_acronyms_may_be_spoken():
     """Live prompt c7023ae8: the announcer's cold open said an acronym the
     fragment itself states, and the gate killed the episode AFTER every pass had
