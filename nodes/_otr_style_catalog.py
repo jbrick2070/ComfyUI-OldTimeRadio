@@ -439,6 +439,28 @@ STYLE_CATALOG: List[Dict[str, str]] = [
      "sound_world": "a single mic, room tone, a clock winding down, a breath, a soft hum",
      "story_engine": "one voice records the last thing it wants the world to hear, and why",
      "ending_mode": "a peace made, a hope handed forward, or a recording that ends on an open breath", "tags": "drama"},
+    # --- ADAPTATION styles (2026-07-14): for the FAITHFUL lanes (shakespeare,
+    # public_domain_story). Their story_engine is SOURCE-DEFERENTIAL by design --
+    # it defers to the source's own people, conflict, and ending and FORBIDS
+    # transposition to a modern genre/era. This is what keeps Macbeth on the heath
+    # instead of in a cryo-pod. Sound worlds are period, never modern machinery.
+    # Tag "adaptation" -> adaptation_slugs() -> select_style's adaptation branch.
+    {"slug": "faithful_stage_adaptation", "label": "faithful stage adaptation",
+     "sound_world": "the hush and echo of a bare stage, footfalls on boards, a single bell, wind at a door, distant voices -- period, no modern machinery",
+     "story_engine": "carry the SOURCE's own people, conflict, major turns and ending faithfully; compression is allowed, replacement is not; never impose a mystery, disaster, or modern-genre plot the source does not have",
+     "ending_mode": "the source's OWN ending -- its final image, its last line, or the reversal the text itself lands", "tags": "adaptation"},
+    {"slug": "storm_lit_tragedy", "label": "storm-lit tragedy",
+     "sound_world": "thunder over a heath, a guttering torch, iron on stone, a raven, rain on a castle wall -- period only",
+     "story_engine": "follow the source tragedy's own arc of ambition, fate and fall through its named characters; do not modernize the world or invent a new framing",
+     "ending_mode": "the source's tragic close -- a death, a prophecy met, a crown's cost, exactly as the text has it", "tags": "adaptation"},
+    {"slug": "candlelit_period_chamber", "label": "candlelit period chamber",
+     "sound_world": "a fire in the grate, a mantel clock, a teacup, a letter unfolded, a floorboard, a horse in the lane -- domestic, period",
+     "story_engine": "stage the source's intimate scene between its own characters -- their wants, their pressure, their decision -- with no new protagonist and no changed outcome",
+     "ending_mode": "the source's own resolution -- a bargain kept or broken, a truth spoken, a door closed on the room it always closes on", "tags": "adaptation"},
+    {"slug": "lamplit_road_and_threshold", "label": "lamplit road and threshold",
+     "sound_world": "a lamplit road, a cottage door, wind in bare trees, a lantern's clink, footsteps on gravel -- period, unhurried",
+     "story_engine": "follow the source's traveler/visitor and the people they meet through the source's own turns; preserve names and place; add no modern machinery or genre twist",
+     "ending_mode": "the source's own last beat -- an arrival, a parting, a lesson the text itself leaves at the threshold", "tags": "adaptation"},
 ]
 
 
@@ -502,6 +524,12 @@ _DEFAULT_ENDING_TAG = "revelation"
 # shape every episode; `irreversible_choice` is now ~6% of the pool (only the
 # stories that genuinely earn a decisive choice), not 100%.
 _ENDING_TAG_BY_SLUG: Dict[str, str] = {
+    # Adaptation styles (2026-07-14): the ending DEFERS to the source, but the
+    # climax CLASS still guides the writer's beat shaping toward the source's kind
+    # of ending. faithful_stage_adaptation keeps the generic default.
+    "storm_lit_tragedy": "irreversible_choice",
+    "candlelit_period_chamber": "bittersweet_parting",
+    "lamplit_road_and_threshold": "quiet_acceptance",
     "locked_room_suspense": "reversal",
     "detective_case_file_reconstruction": "revelation",
     "pulp_serial_cliffhanger": "unresolved_final_sound",
@@ -673,7 +701,16 @@ def _normalize(s: str) -> str:
 
 
 def non_emergency_slugs() -> List[str]:
-    return [s["slug"] for s in STYLE_CATALOG if s.get("tags") != EMERGENCY_TAG]
+    # Exclude BOTH the emergency register AND the adaptation styles. The adaptation
+    # styles are source-deferential (they forbid inventing a plot), so they must
+    # NEVER be drawn by an INVENTION lane (science_news, media_archive, the scifi
+    # lanes) -- only by the adaptation branch in select_style. Without this, a
+    # science episode could roll "faithful_stage_adaptation" and refuse to invent.
+    return [
+        s["slug"] for s in STYLE_CATALOG
+        if s.get("tags") != EMERGENCY_TAG
+        and "adaptation" not in str(s.get("tags", "")).split()
+    ]
 
 
 MEDIA_ARCHIVE_STYLE_SLUGS: tuple[str, ...] = (
@@ -701,6 +738,21 @@ MEDIA_ARCHIVE_STYLE_SLUGS: tuple[str, ...] = (
 def media_archive_slugs() -> List[str]:
     """Curated existing style pool for archive mystery/adventure runs."""
     return list(MEDIA_ARCHIVE_STYLE_SLUGS)
+
+
+def adaptation_slugs() -> List[str]:
+    """The FAITHFUL-adaptation style pool (shakespeare, public_domain_story).
+
+    Every entry tagged "adaptation" -- source-deferential engines with period
+    sound worlds. These are the ONLY styles the adaptation lanes should draw
+    from, so a Shakespeare episode never gets "cryogenic_revival_confusion".
+    Derived from the tag so a newly-authored adaptation style joins automatically.
+    """
+    return sorted(
+        e["slug"] for e in STYLE_CATALOG
+        if "adaptation" in str(e.get("tags", "")).split()
+        or str(e.get("tags", "")) == "adaptation"
+    )
 
 
 def render_style_grammar(slug: str) -> str:
@@ -762,10 +814,27 @@ def select_style(premise: Any, meta: Any, cast_seed: Any) -> str:
             f"{cast_seed}:style:media_archive".encode("utf-8")
         ).hexdigest(), 16)
         return pool[h % len(pool)]
+    # ADAPTATION lanes: draw ONLY from the faithful/period adaptation pool so
+    # Shakespeare/public_domain never get a sci-fi style ("cryogenic_revival_
+    # confusion"). Source-deferential styles keep Macbeth on the heath. (2026-07-14)
+    if source_bank in ("shakespeare", "public_domain_story"):
+        pool = sorted(adaptation_slugs())
+        if not pool:  # pragma: no cover -- defensive
+            pool = sorted(non_emergency_slugs())
+        h = int(hashlib.sha256(
+            f"{cast_seed}:style:adaptation".encode("utf-8")
+        ).hexdigest(), 16)
+        return pool[h % len(pool)]
     emergency = premise_wants_emergency(premise, meta)
-    pool = sorted(all_slugs() if emergency else non_emergency_slugs())
+    # The emergency pool is all_slugs; strip the adaptation styles so an invention
+    # lane never rolls a source-deferential style even under disaster keywords.
+    _emergency_pool = [
+        s for s in all_slugs()
+        if "adaptation" not in str((get_style(s) or {}).get("tags", "")).split()
+    ]
+    pool = sorted(_emergency_pool if emergency else non_emergency_slugs())
     if not pool:  # pragma: no cover -- defensive
-        pool = sorted(all_slugs())
+        pool = sorted(_emergency_pool)
     h = int(hashlib.sha256(
         f"{cast_seed}:style:{int(emergency)}".encode("utf-8")
     ).hexdigest(), 16)

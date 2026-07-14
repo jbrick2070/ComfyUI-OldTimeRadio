@@ -73,8 +73,10 @@ class TestCatalogEndings:
     def test_validate_catalog_passes(self):
         CAT.validate_catalog()
 
-    def test_all_100_have_climax_class_tag(self):
-        assert len(CAT.STYLE_CATALOG) == 100
+    def test_all_have_climax_class_tag(self):
+        # 100 invention/media styles + 4 faithful ADAPTATION styles (2026-07-14,
+        # shakespeare/public_domain source-deferential period styles).
+        assert len(CAT.STYLE_CATALOG) == 104
         for s in CAT.STYLE_CATALOG:
             assert s["ending_tag"] in L12.CLIMAX_CLASS_ROLES
 
@@ -137,6 +139,27 @@ class TestSelectStyle:
         emergency = set(CAT.all_slugs()) - set(CAT.non_emergency_slugs())
         for s in range(40):
             assert CAT.select_style("a slow afternoon at the library", {}, s) not in emergency
+
+    def test_adaptation_lanes_draw_only_faithful_styles(self):
+        # shakespeare / public_domain must ONLY ever get a source-deferential
+        # adaptation style -- never a sci-fi one like cryogenic_revival_confusion.
+        adapt = set(CAT.adaptation_slugs())
+        assert adapt and "faithful_stage_adaptation" in adapt
+        for bank in ("shakespeare", "public_domain_story"):
+            for s in range(40):
+                slug = CAT.select_style("Macbeth meets three witches on a heath",
+                                        {"source_bank": bank}, s)
+                assert slug in adapt, f"{bank} drew non-adaptation style {slug!r}"
+
+    def test_invention_lanes_never_draw_adaptation_styles(self):
+        # The reverse guard: a science/invention lane must NEVER roll a
+        # source-deferential adaptation style (it would refuse to invent).
+        adapt = set(CAT.adaptation_slugs())
+        for bank in ("science_news", "media_archive", ""):
+            for s in range(40):
+                slug = CAT.select_style("a reactor meltdown forces an evacuation",
+                                        {"source_bank": bank}, s)
+                assert slug not in adapt, f"{bank} drew adaptation style {slug!r}"
 
 
 # ---------------------------------------------------------------------------
