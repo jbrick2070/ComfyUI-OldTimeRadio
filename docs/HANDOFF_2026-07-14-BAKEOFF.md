@@ -3,6 +3,54 @@
 **Branch:** `v2.0-alpha`. **HEAD == origin.** Suite 7901 passed / 31 skipped /
 1 xfailed. Bug Bible 17/16/3.
 
+---
+
+## UPDATE 07:20 -- THE SWEEP IS RUNNING; scifi_codex NEEDED ONE MORE FIX
+
+**HEAD is now `80e30c2e`** (suite 7903 / 31 skipped / 1 xfailed; Bible 17/16/3).
+
+**The "third strike" on scifi_codex was a PHANTOM -- do not count it.** The P2
+clamp fix was committed at **06:57:36**; the 30w leg that "failed a third time"
+ran **06:42-06:45**, BEFORE the fix existed. The chain script fired the re-roll
+off a stale HEAD. Two-strikes never tripped. (The live ComfyUI tree at
+`C:\Users\jeffr\ComfyUI-Installs\...\custom_nodes\ComfyUI-OldTimeRadio` is a
+**junction** back to this repo, so a file-tool edit IS live the moment the server
+next boots -- verified, not assumed.)
+
+**The P2 clamp fix is now LIVE-PROVEN.** On the 420w leg (`f6c42c5f`) P0, P1, P2
+and P3 all landed clean. P2 never even warned.
+
+**Then P4 killed the leg -- and it was the same bug class.** `StructureReviewV4`
+is `verdict` (a Literal), `issues` (<=120-char critic notes) and `rationale` (a
+<=240-char critic note). Mistral-Nemo returned `verdict="rewrite"` with a 240+
+char rationale, the typed repair wrote a long one again, and the episode died.
+**An audit killed a story over the length of its own footnote.** P4 was the ONE
+audit pass explicitly opted out of the clamp; its siblings P6 (`ListenerReviewV4`)
+and P8 (`FinalAuditV4`) both take the `clamp=True` default and were never exposed.
+Fixed in `80e30c2e`, plus executable coverage pinning **all three** audit passes
+(P4/P6/P8) against ever being fail-closed on string length again. No ledger hole:
+the clamp preserves the field, so `verdict`/`issues`/`rationale` all still land.
+
+THE LAW: *an audit may improve a story, it may never fail one.*
+
+### What is running, unattended, right now
+
+A single serialized GPU chain -- do NOT start another render:
+
+1. `tmp\_go_bake420.ps1` -- 420w, all 10 banks (RSS banks interleaved).
+   `scifi_codex` led and is RED (the P4 kill, pre-fix).
+2. `tmp\_chain_codex_releg.ps1` -- waits for (1), then re-legs `scifi_codex` at
+   420w against the P4 fix. Sweep name `bake420b`.
+3. `tmp\_chain_720.ps1` -- waits for (2), then **GATES**: 720 launches only if all
+   10 banks are SUCCESS at 420. If any is red it writes
+   `tmp\bake720_GATE_BLOCKED.txt` naming them and stops. Nobody skips the ladder.
+
+**Monitor:** `powershell -File tmp\_status_bake.ps1` (all three sweeps at once).
+**Metrics:** `tmp\bakeoff_metrics.py` emits the per-leg beats / voiced lines /
+words-per-line / `actual_ratio` table the verdict needs. **Run it only when the
+GPU is idle** -- reading episode files mid-render collides with the per-beat
+ledger saves (WinError 5).
+
 **The goal, in the operator's words:** *"I want the 420 and 720 words to go so we
 can see what story models are worth keeping."* The bank is the ONLY variable.
 
