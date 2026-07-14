@@ -12,6 +12,14 @@ numpy>=1.24
 # Science news fetching (REQUIRED — no fallback, pipeline will hard-fail without it)
 feedparser>=6.0
 
+# Article BODY scraping. feedparser gets the headline + teaser; THIS gets the
+# methodology and findings the story is actually written from. It was never
+# listed here, and on 2026-07-14 it was found simply absent from the venv --
+# so _fetch_full_article() had been returning "" forever, every science episode
+# had been written from a ~120-character RSS teaser, and the v4 source floor was
+# failing runs with a message that blamed the feeds. Not optional.
+beautifulsoup4>=4.12
+
 # Tokenizers (required by transformers, listed for clarity)
 tokenizers>=0.15
 sentencepiece>=0.1.99

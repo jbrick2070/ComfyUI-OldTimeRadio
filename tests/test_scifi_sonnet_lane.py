@@ -217,6 +217,48 @@ def test_the_sources_own_acronyms_may_be_spoken():
     assert lane._spoken_error("NASA confirmed it.", "ORUM")
 
 
+def test_the_announcer_may_name_the_outlet_the_seam_orders_it_to_name():
+    """Live 2026-07-14: killed by "all-caps lexical text (BBC)".
+
+    The attestation seam ORDERS the announcer to name "the outlet/date from
+    provenance_note", and the outlet is routinely an all-caps acronym: BBC, NASA,
+    NIH, NSF, MIT. The gate read every surface of the dossier EXCEPT
+    provenance_note -- so it forbade the one word it had just commanded. A
+    validator that forbids what the seam commands is not a proof, it is a
+    contradiction.
+
+    `_allowed_numbers` already carries provenance_note for exactly this reason
+    (prompt 415ca1fc: the announcer was condemned for stating the archive date it
+    was told to state). This is that same lesson, applied to the letters instead
+    of the digits.
+
+    It only surfaced once article-body scraping started working and real outlets
+    reached the dossier at all.
+    """
+    dossier = lane.FragmentDossierV4.model_validate({
+        "verified_facts": [{
+            "fact_id": "fact_1", "claim": "The array recorded a burst.",
+            "source_spans": [{"field": "summary", "start": 0, "end": 26,
+                              "quote": "The array recorded a burst"}],
+        }],
+        "key_numbers": [], "named_entities": [],
+        "tone": "measured", "headline_clean": "Array records burst",
+        "provenance_note": "BBC science desk, 12 March 1953.",
+        "payload_sha256": "a" * 64,
+    })
+    allowed = lane.allowed_spoken_all_caps(dossier)
+
+    assert "BBC" in allowed, (
+        "the outlet named in provenance_note is the one word the seam ORDERS "
+        "the announcer to say"
+    )
+    assert lane._spoken_error(
+        "This record comes to us from the BBC science desk.", "ANNOUNCER", allowed,
+    ) is None
+    # The gate still catches genuine shouted emphasis.
+    assert "all-caps" in lane._spoken_error("It ARRIVED.", "ANNOUNCER", allowed)
+
+
 def test_grounding_is_proven_against_the_dossier_not_judged_by_the_warden():
     """`invented_fact_flags` was a model's feeling. This is a proof.
 

@@ -236,7 +236,16 @@ _DECK_PATH = (
 
 def _script_token_budget(target_words: int) -> int:
     """P3/P5 output budget: markup overhead ~1.5x words, ~1.35 tok/word,
-    +200 skeleton overhead; floor 1200, cap 4200."""
+    +200 skeleton overhead; floor 1200, cap 4200.
+
+    The 4,200 cap is NOT the strangling kind removed from scifi_codex on
+    2026-07-14 (that one asked for 6,960 at 720 words and was handed 5,400, so
+    the script came back cut off mid-JSON). This one never binds at any length we
+    run -- 720 words asks for 1,784 -- and it bounds a lane whose truncation
+    retry already re-asks at +25%. Left alone deliberately: a ceiling that is not
+    touching the artifact is not the bug, and pulling a guard that costs nothing
+    is how a green lane breaks overnight.
+    """
     return min(4200, max(1200, int(target_words * 2.2) + 200))
 
 

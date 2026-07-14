@@ -621,6 +621,17 @@ def outline_output_token_budget(requested_words: int, beat_count: int) -> int:
     ):
         raise SciFiGeminiTargetRangeError("requested_words must be 30..900")
     beats = max(1, int(beat_count))
+    # This ceiling STAYS, and it is not the same animal as the one removed from
+    # scifi_codex on 2026-07-14. That one was a guess about a window the function
+    # could not see, and at 720 words it strangled the artifact (asked 6,960, got
+    # 5,400 -> script cut off mid-JSON). THIS one is load-bearing and
+    # live-proven: it guards P3's own REPAIR ENVELOPE on the 8,192 local slot.
+    # Live 2026-07-11, a flat 3,600 reservation left 4,592 for input while the
+    # typed-repair prompt was 5,408 -- the guard truncated it and cut off the
+    # schema prefix, so every repair was doomed before it was sent (see
+    # test_outline_output_reservation_leaves_room_for_its_own_repair_prompt).
+    # It also never bites at the lengths we run: 720 words at this lane's
+    # hard-coded 6 beats is 3,220, comfortably under it.
     return min(3600, max(2000, int(requested_words * 3.0) + 110 * beats + 400))
 
 

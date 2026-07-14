@@ -11,6 +11,16 @@
   judge: ground every panel claim against the real files and discard what does not survive.
   (Supersedes the older "kibitz on EVERY live failure" habit -- a first-try root fix does not
   need a panel; a third try always does.)
+- **RIPPING AN LLM IS ALLOWED. A HOLE IN THE LEDGER IS NOT (operator directive 2026-07-14 --
+  hard, non-negotiable).** Removing or repurposing an LLM pass is a legitimate and sometimes
+  necessary hard decision. But the LEDGER MUST STILL BE FILLED COMPLETELY for downstream
+  consumers -- TTS, per-beat audio slicing, video/shot direction, captions, credits,
+  `obs_publish`. They read FIELDS, not intentions. Before you remove a pass: (1) enumerate
+  EVERY ledger field it wrote; (2) give each field a new owner -- deterministic Python,
+  another pass, or an explicit default -- exactly one owner each; (3) only then delete the
+  call; (4) prove it on a LIVE leg (RESULT SUCCESS + obs_publish OK + the asset on disk).
+  A green unit suite does NOT prove the ledger is complete. A ripped pass with an unowned
+  field is a broken render, not a simplification.
 - **When genuinely torn between approaches, run the roundtable LIVE for convergence
   (ChatGPT + Gemini + DeepSeek).** Skip the dry-run / cost estimate -- just run it, pronto.
   You are the judge. Escalate to me only if the panel still leaves it unresolved.

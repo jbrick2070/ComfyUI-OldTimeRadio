@@ -2237,14 +2237,30 @@ def _script_output_token_budget(
     # ~4.5 tokens per requested word of dialogue, ~130 tokens of strict metadata
     # per accepted line, plus the artifact envelope (title, scenes, music cues).
     # The 2,800 floor is the observed complete-artifact floor for the canonical
-    # 30-word graph; the 5,400 ceiling keeps the reservation inside the context
-    # cap alongside the pass input.
-    return min(
-        5400,
-        max(
-            2800,
-            int(requested_words * 4.5) + 130 * int(accepted_line_count) + 600,
-        ),
+    # 30-word graph.
+    #
+    # THE 5,400 CEILING IS GONE. Its comment said it "keeps the reservation
+    # inside the context cap alongside the pass input" -- that cap was the false
+    # 8,192 every remote model was being budgeted against (PBUG-20260713-20).
+    # P5/P7/P9 all run on the CREATIVE slot, and the creative slot is where the
+    # frontier model lives: aion-3.0-mini advertises 131,072 tokens, and
+    # OpenRouter's own per-call output ceiling (DEFAULT_OUTPUT_TOKENS_CAP) is
+    # 16,384. Nothing about 5,400 was ever a property of the artifact.
+    #
+    # It was a real 720-word killer: at 720 words with 24 accepted lines the
+    # formula asks for 720*4.5 + 130*24 + 600 = 6,960, and the ceiling handed it
+    # 5,400 -- 1,560 tokens short of the script it had to write. The ScriptArtifactV4
+    # would have come back cut off mid-JSON, the ladder would have exhausted, and
+    # the leg would have died blaming the model. The clamp bites at ANY line count
+    # >= 13 at 720 words; at 420 words it needed >= 23, which is why 420 was green
+    # and 720 would not have been.
+    #
+    # The transport still owns the final say: fit_output_tokens clamps the request
+    # to the slot's REAL window, so a small local model is protected without a
+    # constant here pretending to know its window.
+    return max(
+        2800,
+        int(requested_words * 4.5) + 130 * int(accepted_line_count) + 600,
     )
 
 

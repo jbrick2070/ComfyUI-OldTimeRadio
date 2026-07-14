@@ -2293,8 +2293,28 @@ def test_script_output_token_budget_receipts_and_bounds():
     # the strict per-line metadata cost, even in a 30-word script).
     assert lane._script_output_token_budget(30, 13) == 2800    # floor holds
     assert lane._script_output_token_budget(300, 13) == 3640   # 1350 + 1690 + 600
-    assert lane._script_output_token_budget(720, 13) == 5400   # ceiling holds
-    assert lane._script_output_token_budget(900, 40) == 5400   # ceiling holds
+
+    # THE 5,400 CEILING IS GONE, and this test used to enshrine it: it asserted
+    # `_script_output_token_budget(720, 13) == 5400  # ceiling holds`. Somebody
+    # evaluated the clamp AT 720 WORDS, saw it bite, and wrote down the bitten
+    # value as the contract. That is the whole bug, preserved in a green test.
+    #
+    # The ceiling's comment claimed it "keeps the reservation inside the context
+    # cap" -- the false 8,192 cap every remote model was budgeted against
+    # (PBUG-20260713-20). P5/P7/P9 run on the CREATIVE slot: aion-3.0-mini has
+    # 131,072 tokens. The artifact needs what the artifact needs.
+    assert lane._script_output_token_budget(720, 13) == 5530   # 3240 + 1690 + 600
+    assert lane._script_output_token_budget(720, 24) == 6960   # 3240 + 3120 + 600
+    assert lane._script_output_token_budget(900, 40) == 9850   # 4050 + 5200 + 600
+
+    # The budget must never be capped by a constant that pretends to know the
+    # slot's window. The transport owns that: fit_output_tokens clamps the
+    # request against the slot's REAL context cap.
+    assert lane._script_output_token_budget(720, 24) > 5400, (
+        "a constant ceiling under the artifact's real size is how a 720-word "
+        "script comes back cut off mid-JSON"
+    )
+
     # A wider accepted graph reserves more output at the SAME word steer --
     # this is the P7 live truncation (generated == max_new_tokens == 2800).
     assert (

@@ -1270,6 +1270,17 @@ SCIENCE_NEWS_FEEDS = [
 ]
 
 
+#: Set (once) to the ImportError text when the HTML body scraper cannot load.
+#: Read by the v4 source-floor failure path so a missing package is never
+#: misreported as an exhausted feed pool. Empty string = scraper is available.
+_BODY_SCRAPER_UNAVAILABLE: str = ""
+
+
+def body_scraper_unavailable() -> str:
+    """The reason article-body scraping is off, or "" when it is working."""
+    return _BODY_SCRAPER_UNAVAILABLE
+
+
 def _fetch_full_article(url, timeout=20):
     """Fetch the full text of a science article from its URL.
 
@@ -1286,7 +1297,37 @@ def _fetch_full_article(url, timeout=20):
     try:
         import requests
         from bs4 import BeautifulSoup
-    except ImportError:
+    except ImportError as exc:
+        # A MISSING PACKAGE MUST NOT LOOK LIKE A PAYWALL.
+        #
+        # This used to `return ""`, silently. The caller then logged "scrape
+        # blocked - RSS summary" and fell back to the RSS teaser, and the v4
+        # source floor eventually failed the run with "No science RSS candidate
+        # met the v4 source floor ... after inspecting 10 candidates" -- an error
+        # that blames the FEEDS for a package that was never installed.
+        #
+        # Found 2026-07-14: bs4 was absent from the ComfyUI venv, so EVERY
+        # science article body had been "" for as long as that was true. Every
+        # science-sourced episode was written from a ~120-character headline
+        # teaser instead of the methodology and findings this function exists to
+        # fetch (a live probe after installing it returned 2,041 and 6,708
+        # characters from the same feed, in 0.3s). The degradation was total,
+        # permanent, and invisible.
+        #
+        # So say it once, LOUDLY, and record it so the floor's own failure
+        # message can name the real cause instead of the feeds.
+        global _BODY_SCRAPER_UNAVAILABLE
+        if not _BODY_SCRAPER_UNAVAILABLE:
+            _BODY_SCRAPER_UNAVAILABLE = str(exc)
+            log.error(
+                "[NewsFetcher] ARTICLE BODY SCRAPING IS DISABLED: %s. Every "
+                "article will fall back to its RSS teaser (~100-300 chars), so "
+                "the v4 source floor (>=400 chars) can only ever be met by the "
+                "few feeds that publish full content:encoded. Stories will be "
+                "written from headlines, not findings. Fix: "
+                "pip install beautifulsoup4",
+                exc,
+            )
         return ""
 
     try:
@@ -2010,11 +2051,23 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
             )
         chosen = rich[0]
     elif require_science_floor:
+        # Name the REAL cause. When the HTML body scraper cannot load, every
+        # candidate here is an RSS teaser, and blaming the feed pool sends the
+        # reader hunting for a news outage that never happened (2026-07-14: bs4
+        # was simply absent from the venv, and this message cost hours).
+        scraper_note = ""
+        if _BODY_SCRAPER_UNAVAILABLE:
+            scraper_note = (
+                ". ROOT CAUSE: article-body scraping is DISABLED "
+                f"({_BODY_SCRAPER_UNAVAILABLE}), so every candidate above is "
+                "only its RSS teaser and no candidate CAN clear the floor. "
+                "This is not a feed problem. Fix: pip install beautifulsoup4"
+            )
         raise RuntimeError(
             "No science RSS candidate met the v4 source floor "
             f"(>={CONTENT_FLOOR} chars, >={MIN_WORDS} words, "
             f">={MIN_UNIQUE_TOKENS} unique tokens) after inspecting "
-            f"{len(fetched)} candidates"
+            f"{len(fetched)} candidates{scraper_note}"
         )
     else:
         # All candidates thin - take the richest available so the run

@@ -2236,7 +2236,26 @@ def run_original_codex56sol_episode(
             "max_beats": _beat_ceiling(int(resolved["target_words"])),
         },
         schema=BroadcastScore, scheduler=slot_scheduler, journal=journal,
-        tokens=3600,
+        # Budget by the GRAPH THIS PASS IS BEING ASKED TO BUILD, not a constant.
+        # The very next line of `inputs` hands the model `max_beats` -- 40 at 720
+        # words -- and then this budget used to say 3,600 tokens, flat, forever.
+        # A 40-beat BroadcastScore (cast + scenes + shots + 40 BeatConcept rows,
+        # each carrying line_intent, clue_ids, arc_phase) does not fit in 3,600;
+        # it would have come back cut off mid-JSON, exactly like P6 did before
+        # tonight's fix. Same defect, one pass upstream: a budget that never
+        # looked at the artifact it had to hold.
+        #
+        # 240 envelope + ~150/beat for a BeatConcept row + ~3/word of advisory
+        # steer. At 30 words (8 beats) that is 240 + 1,200 + 90 = 1,530 -> the
+        # 3,600 floor still governs the small graphs that were already green, so
+        # nothing regresses; at 720 words (40 beats) it asks for 240 + 6,000 +
+        # 2,160 = 8,400, which the creative slot (aion, 131k) can actually give.
+        tokens=max(
+            3600,
+            240
+            + 150 * _beat_ceiling(int(resolved["target_words"]))
+            + int(resolved["target_words"]) * 3,
+        ),
         # Clue OWNERSHIP and beat ORDER are the half of the contract the
         # ladder must see while it can still re-author the score: no patch may
         # touch clue_ids or move a beat. The immutable ANCHORS are not checked

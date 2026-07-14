@@ -738,6 +738,20 @@ def allowed_spoken_all_caps(dossier: "FragmentDossierV4 | None") -> frozenset[st
     killing it for doing its job (live: prompt c7023ae8 -- the announcer's cold
     open said an acronym the fragment states, and the gate ended the run AFTER
     every pass had succeeded).
+
+    ``provenance_note`` is in this list for the SAME reason it is in
+    ``_allowed_numbers``: the attestation seam ORDERS the announcer to name "the
+    outlet/date from provenance_note", and the outlet is very often an all-caps
+    acronym -- BBC, NASA, NIH, NSF, MIT. A validator that forbids what the seam
+    COMMANDS is not a proof, it is a contradiction.
+
+    That contradiction was live on 2026-07-14: with article-body scraping finally
+    working, real outlets started reaching the dossier, the announcer named its
+    source exactly as instructed, and the gate ended the run with "spoken text
+    contains all-caps lexical text (BBC)" -- after every pass had succeeded. The
+    numbers proof had already learned this lesson (prompt 415ca1fc, where the
+    announcer was condemned for stating the archive date it was told to state);
+    the all-caps proof simply never had it applied.
     """
     if dossier is None:
         return frozenset()
@@ -751,6 +765,7 @@ def allowed_spoken_all_caps(dossier: "FragmentDossierV4 | None") -> frozenset[st
         surfaces.append(entity.name)
         surfaces.extend(span.quote for span in entity.source_spans)
     surfaces.append(dossier.headline_clean)
+    surfaces.append(dossier.provenance_note)
     return frozenset(
         match.group(0)
         for surface in surfaces
