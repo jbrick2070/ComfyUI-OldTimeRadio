@@ -1501,10 +1501,17 @@ def _validate_score_clue_ownership(
             for beat in score.beats
             if role_by_char.get(beat.char_id) != "announcer"
         ):
+            # Name the clue AND the beats that could carry it. "Move it" with no
+            # candidates is a puzzle; "move it to b2 or b3" is an instruction.
+            candidates = [
+                f"{beat.beat_id} ({beat.speaker})" for beat in score.beats
+                if role_by_char.get(beat.char_id) != "announcer"
+            ]
             return (
-                f"a non-announcer beat must carry an audible clue for lost "
-                f"object {anchor!r}; the announcer may not be the only voice "
-                "that holds it"
+                f"the clue(s) {', '.join(sorted(clue_ids))} for lost object "
+                f"{anchor!r} are held by the announcer, who may not be the only "
+                "voice that carries a clue. Move the clue id into the clue_ids "
+                "of one of these beats: " + ", ".join(candidates)
             )
     # The bounded intent patch cannot create a pre-reveal clue beat -- only the
     # score author can -- so the existence of one belongs here, at the rung that

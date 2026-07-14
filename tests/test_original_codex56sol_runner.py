@@ -1704,8 +1704,12 @@ def test_p5_announcer_owned_clue_reaches_the_p5_ladder():
             ]
     hijacked.beats[0].line_intent.clue_ids = ["q1"]
     error = lane._validate_score_clue_ownership(hijacked, grounding)
-    assert "non-announcer beat must carry an audible clue" in error
+    assert "held by the announcer" in error
     assert "stamp" in error
+    assert "q1" in error
+    # The error names the beats that CAN carry it: "move it" with no candidates
+    # is a puzzle; "move it to b2 or b3" is an instruction.
+    assert "b2 (Mara Vale)" in error
 
     # The ownership rule belongs in the ladder; the naming rule does not.
     named_only = score.model_copy(deep=True)
