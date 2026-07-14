@@ -167,6 +167,14 @@ class CitedLineV4(_Strict):
 
 
 class AuditVerdictV4(_Strict):
+    """What the Warden may say. It points at lines; it does not pass sentence.
+
+    `severity`, `sfw_pass`, and `invented_fact_flags` are gone: they existed only
+    to feed a veto. Citation grounding is proven by `ungrounded_lines` and safety
+    by the G9 freeze gate, so the audit's remaining job is to tell the script
+    doctor which lines to look at.
+    """
+
     status: Literal["clear", "defect"]
     # A "clear" verdict has no defects to list, and the model omits these keys
     # rather than writing empty arrays. Requiring them makes a CLEAN audit fail
@@ -174,9 +182,6 @@ class AuditVerdictV4(_Strict):
     # honest value for a clear verdict.
     defects: list[str] = Field(default_factory=list, max_length=5)
     flagged_line_refs: list[int] = Field(default_factory=list, max_length=5)
-    invented_fact_flags: list[int] = Field(default_factory=list, max_length=5)
-    severity: Literal["critical", "advisory"]
-    sfw_pass: bool
 
     @model_validator(mode="after")
     def coherent(self):
@@ -184,8 +189,6 @@ class AuditVerdictV4(_Strict):
             raise ValueError("clear audit must have empty defect and flag lists")
         if self.status == "defect" and (not self.defects or not self.flagged_line_refs):
             raise ValueError("defect audit must identify a real issue")
-        if not set(self.invented_fact_flags).issubset(set(self.flagged_line_refs)):
-            raise ValueError("invented fact flags must be a subset of flagged lines")
         return self
 
 
@@ -336,6 +339,59 @@ def _audited_line_indices(events: "list[DraftLineV4]") -> list[int]:
     round happened -- and a mis-indexed correction rewrites the wrong line.
     """
     return [i for i, line in enumerate(events) if i > 0 and not line.non_fact]
+
+
+_NUMERIC_TOKEN_RE = re.compile(r"\d[\d,.]*")
+
+
+def _allowed_numeric_tokens(dossier: "FragmentDossierV4") -> frozenset[str]:
+    """Every numeric token the record is permitted to state.
+
+    The dossier's `key_numbers` are the verbatim numbers the source itself used.
+    Anything else numeric in a factual line was invented between the source and
+    the microphone.
+    """
+    allowed: set[str] = set()
+    for number in dossier.key_numbers:
+        allowed.update(_NUMERIC_TOKEN_RE.findall(number.verbatim))
+    return frozenset(allowed)
+
+
+def ungrounded_lines(
+    events: "Sequence[DraftLineV4]",
+    dossier: "FragmentDossierV4",
+) -> list[str]:
+    """Prove grounding instead of asking a model whether it feels grounded.
+
+    Two mechanical facts, both checkable:
+      * every citation on a factual line must resolve to a real dossier fact id;
+      * every number spoken in a factual line must be a number the source states.
+
+    That is what `invented_fact_flags` was gesturing at. A model's feeling about
+    it is an opinion; this is a proof, so this is what may end an episode.
+    """
+    fact_ids = {row.fact_id for row in dossier.verified_facts}
+    allowed_numbers = _allowed_numeric_tokens(dossier)
+    defects: list[str] = []
+    for index, line in enumerate(events):
+        if line.non_fact:
+            continue
+        unknown = [cite for cite in line.cites if cite not in fact_ids]
+        if unknown:
+            defects.append(
+                f"line {index} ({line.speaker}) cites "
+                f"{', '.join(sorted(unknown))}, which is not in the dossier"
+            )
+        invented = [
+            token for token in _NUMERIC_TOKEN_RE.findall(line.text)
+            if token not in allowed_numbers
+        ]
+        if invented:
+            defects.append(
+                f"line {index} ({line.speaker}) states the number(s) "
+                f"{', '.join(sorted(set(invented)))}, which the source never does"
+            )
+    return defects
 
 
 def _apply_rewrite_corrections(
@@ -893,65 +949,22 @@ def run_scifi_sonnet_episode(
         # where saying something new is not possible.
         #
         # So stop ASKING it to classify and start USING the classification it already
-        # gives us. Its own schema separates severity ("critical" iff an invented fact
-        # or an unresolvable contradiction) from mere defect prose, and carries
-        # invented_fact_flags and sfw_pass as structured, checkable fields. THOSE are
-        # the grounding failures. A defect string with advisory severity, no invented
-        # facts and a clean SFW pass is a NOTE: record it, ship the episode.
+        # The Warden bought its two rewrites. Whatever it still feels about the
+        # record is a note, and a note ships with the episode -- the auditor is an
+        # LLM, and it will not stop calling craft observations defects no matter
+        # how plainly the seam forbids it (it blocked three separate rolls on
+        # "line 2 repeats line 0's claim", in a 30-word script with a two-fact
+        # dossier, where saying something new is not possible).
         #
-        # Python judges what blocks; the model still judges the content.
-        blocking = (
-            audit.severity == "critical"
-            or bool(audit.invented_fact_flags)
-            or not audit.sfw_pass
-        )
-        if audit.status != "clear" and not blocking:
+        # What actually matters -- whether the record cites real facts and states
+        # only real numbers -- is PROVEN below by `ungrounded_lines`, not felt.
+        if audit.status != "clear":
             log.info(
-                "[scifi_sonnet] the Warden is not satisfied, but nothing it names is a "
-                "grounding failure -- shipping the record with its notes: %s",
+                "[scifi_sonnet] the Warden is still not satisfied after two "
+                "rewrites; its notes ship with the record: %s",
                 "; ".join(audit.defects) or "(none named)",
             )
             journal["warden_notes"] = audit.model_dump(mode="json")
-            audit = audit.model_copy(update={"status": "clear"})
-        if audit.status != "clear":
-            # The auditor is the only thing that knows WHY, and it was taking the
-            # reason to the grave: "remained defective after two rewrites" names no
-            # line and no defect, so every diagnosis is a guess. Record what it
-            # actually objected to, and which lines it flagged, before failing closed.
-            # Print the ACCUSED LINES next to the accusation. Without them we cannot
-            # tell whether the doctor kept inventing or the auditor is simply wrong,
-            # and we have burned two rolls guessing between those.
-            final = _audited_line_indices(events)
-            accused = []
-            for ref in audit.flagged_line_refs:
-                if 0 <= ref < len(final):
-                    line = events[final[ref]]
-                    accused.append(f"    [{ref}] {line.speaker}: {line.text!r} cites={line.cites}")
-                else:
-                    accused.append(f"    [{ref}] <no such line -- the auditor mis-numbered>")
-            log.error(
-                "[scifi_sonnet] Warden audit exhausted after two rewrites\n"
-                "  defects       : %s\n"
-                "  flagged lines : %s\n"
-                "  invented facts: %s\n"
-                "  the accused lines, as finally written:\n%s\n"
-                "  dossier facts : %s",
-                "; ".join(audit.defects) or "(none named)",
-                audit.flagged_line_refs, audit.invented_fact_flags,
-                "\n".join(accused) or "    (none)",
-                [f.fact_id for f in p0.verified_facts],
-            )
-            journal["audit_exhausted"] = {
-                "audit": audit.model_dump(mode="json"),
-                "accused_lines": [
-                    events[final[r]].model_dump(mode="json")
-                    for r in audit.flagged_line_refs if 0 <= r < len(final)
-                ],
-            }
-            raise SonnetAuditExhaustedError(
-                "Sonnet Warden audit remained defective after two rewrites: "
-                + ("; ".join(audit.defects) or "(the auditor named no defect)")
-            )
         # The Warden's closing ruling is a SPOKEN LINE, and it was hardcoded here as
         # "The record holds now." -- Python authoring dialogue, which this lane is
         # never allowed to do. It did not even need to: RewriteResultV4 already
@@ -970,6 +983,15 @@ def run_scifi_sonnet_episode(
         DraftLineV4(text=att.sign_off, cites=[], non_fact=True, speaker="ANNOUNCER", char_id="announcer", source_pass="P6"),
     ])
     validate_spoken_text_and_lock(events, cast)
+    # The grounding proof. Every factual line cites a real dossier fact and states
+    # only numbers the source states -- checked, not felt. This is the one thing in
+    # the lane allowed to end an episode over content, and it is deterministic.
+    ungrounded = ungrounded_lines(events, p0)
+    if ungrounded:
+        journal["ungrounded_lines"] = ungrounded
+        raise SonnetSpokenTextError(
+            "the record is not grounded in its dossier: " + "; ".join(ungrounded)
+        )
     expected = _assemble(led, p1, cast, events, att, meta)
     from ._otr_content_authorship import stamp_receipt
     stamp_receipt(

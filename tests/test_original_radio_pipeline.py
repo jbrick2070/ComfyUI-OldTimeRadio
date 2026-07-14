@@ -430,8 +430,19 @@ class TestQAGate:
     def test_fail_class_raises(self, monkeypatch):
         fn = _findings_fn([{"class": "weapons_smoking",
                             "detail": "MARA mentions a pistol"}])
+        # The weapon has to be ON THE AIR. A judge's own prose is not evidence.
+        led = _qa_ledger()
+        led.data["lines"][1]["text"] = "MARA: The pistol names no item."
         with pytest.raises(ORR.OriginalQAError, match="weapons_smoking"):
-            self._run(_qa_ledger(), fn, monkeypatch)
+            self._run(led, fn, monkeypatch)
+
+    def test_an_uncorroborated_weapons_flag_no_longer_kills(self, monkeypatch):
+        """The script is clean; only the judge said "pistol". Ship it."""
+        fn = _findings_fn([{"class": "weapons_smoking",
+                            "detail": "MARA mentions a pistol"}])
+        meta = self._run(_qa_ledger(), fn, monkeypatch)
+        assert meta["original_qa"]["status"] == "clean_after_discard"
+        assert meta["original_qa"]["discarded"] == ["weapons_smoking"]
 
     def test_epilogue_repair_preserves_flags(self, monkeypatch):
         led = _qa_ledger()
@@ -530,12 +541,34 @@ class TestHardFindingTriage:
             calls["n"] += 1
             return "{}"
 
+        armed = self._SCRIPT.replace(
+            "I am reaching for the lever by the door.",
+            "I am reaching for the pistol by the door.")
         kills, discarded = ORR.triage_hard_findings(
             [self._finding("weapons_smoking", "MARA draws a pistol")],
-            script=self._SCRIPT, technical_fn=tech_fn)
+            script=armed, technical_fn=tech_fn)
         assert len(kills) == 1 and not discarded
         assert "pistol" in kills[0][1]
         assert calls["n"] == 0, "lexicon kill must not spend an LLM call"
+
+    def test_the_judges_own_words_cannot_corroborate_the_judge(self):
+        """The old scan was `finding.detail + script`, so a judge that wrote
+        "MARA draws a pistol" proved its own flag against a clean script.
+        Evidence means the word is ON THE AIR.
+        """
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("weapons_smoking", "MARA draws a pistol")],
+            script=self._SCRIPT, technical_fn=_seq_fn("{}"))
+        assert not kills and len(discarded) == 1
+
+    def test_the_scan_is_word_boundary_not_substring(self):
+        """"gun" must never fire on "begun" -- the raw substring scan did."""
+        begun = self._SCRIPT.replace(
+            "Good evening.", "Good evening, the broadcast has begun.")
+        kills, discarded = ORR.triage_hard_findings(
+            [self._finding("weapons_smoking", "someone has a gun")],
+            script=begun, technical_fn=_seq_fn("{}"))
+        assert not kills and len(discarded) == 1
 
     def test_lexicon_only_class_discards_without_confirm(self):
         # Run-3 live catch (2026-07-10): 'coils start to smoke' is not

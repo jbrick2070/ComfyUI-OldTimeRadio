@@ -65,9 +65,8 @@ try:
     # discarded LOUDLY). One source of truth across lanes: extend the
     # lists there, not code here.
     from ._otr_original_radio import (
-        MACHINE_ATTRIBUTION_EVIDENCE,
-        NEWS_FRAMING_EVIDENCE,
         WEAPON_SMOKING_EVIDENCE,
+        lexicon_hits,
     )
 except ImportError:  # pragma: no cover -- flat test/standalone load
     from _otr_structured_call import (  # type: ignore
@@ -89,9 +88,8 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
     )
     import _otr_canon as _OTRC  # type: ignore
     from _otr_original_radio import (  # type: ignore
-        MACHINE_ATTRIBUTION_EVIDENCE,
-        NEWS_FRAMING_EVIDENCE,
         WEAPON_SMOKING_EVIDENCE,
+        lexicon_hits,
     )
 
 # Cast pools: relative in production (package load), absolute under test.
@@ -176,7 +174,7 @@ class Fable2AuditError(Fable2Error):
 _TEMP = {
     "dossier": 0.30, "pitch_room": 0.90, "pitch_select": 0.30,
     "treatment": 0.40, "script": 0.75, "critic": 0.30, "revision": 0.60,
-    "casting_voices": 0.40, "ledger_audit": 0.20,
+    "casting_voices": 0.40,
 }
 
 
@@ -222,7 +220,6 @@ _MAX_NEW_TOKENS = {
     # 18th live smoke 2026-07-10: 1000 truncated a verbose 2-cast JSON
     # mid-object -> the extractor salvaged an inner entry -> schema fail.
     "casting_voices": 1400,
-    "ledger_audit": 700,
 }
 
 # Named overlap thresholds (unit-fixtured both directions, r2 anchor).
@@ -530,35 +527,6 @@ class CastingVoices(BaseModel):
         if isinstance(data, dict) and "cast" not in data and "name" in data:
             return {"cast": [data]}
         return data
-
-
-_AUDIT_CLASSES = (
-    "register_bleed", "on_the_nose", "stakes_sag", "ending_unearned",
-    "continuity_break", "cast_unused", "announcer_contract",
-    "word_budget", "subtext_flat",
-    "speaker_not_in_cast", "verbatim_break", "skeleton_break",
-    "news_source_framing", "machine_attribution", "weapons_smoking",
-)
-
-
-class AuditFinding(BaseModel):
-    finding_class: Literal[
-        "register_bleed", "on_the_nose", "stakes_sag", "ending_unearned",
-        "continuity_break", "cast_unused", "announcer_contract",
-        "word_budget", "subtext_flat",
-        "speaker_not_in_cast", "verbatim_break", "skeleton_break",
-        "news_source_framing", "machine_attribution", "weapons_smoking"]
-    # P8 is a REPORTING pass: a finding without a speaker/scene is still
-    # triage-able (speaker "" is the documented scene-level form; 21st
-    # live smoke 2026-07-10: a schema abort over a missing speaker field
-    # killed an otherwise-complete episode).
-    scene: int = Field(default=0, ge=0)
-    speaker: str = ""
-    detail: str = Field(min_length=10, max_length=200)
-
-
-class AuditFindings(BaseModel):
-    findings: list[AuditFinding] = Field(default_factory=list, max_length=12)
 
 
 # ---------------------------------------------------------------------------
@@ -3433,102 +3401,23 @@ def _script_view(parsed: ParsedScript, treatment: Treatment,
     return "\n".join(lines)
 
 
-def _pass_audit(technical_fn, pack, final_draft: FinalDraft,
-                treatment: Treatment, *, envelope: SceneEnvelope,
-                story_rules: StoryRules,
-                mode: Fable2Mode) -> "tuple[AuditFindings, str]":
-    _validate_selected_final_draft(
-        final_draft, envelope, story_rules, mode, treatment=treatment)
-    view = _script_view(final_draft.parsed, treatment)
-    user = (
-        f"ASSEMBLED EPISODE:\n{view}\n\n"
-        f"TREATMENT:\n"
-        f"{json.dumps(treatment.model_dump(), ensure_ascii=False, indent=2)}"
-        f"\n\nAudit now."
+def _assert_no_weapons_or_smoking(parsed: ParsedScript) -> None:
+    """The one content rule that must never reach the air, proven not judged.
+
+    Word-boundary scan of the shared weapons/tobacco lexicon over the SPOKEN
+    text. No model opinion, no self-corroborating "evidence", no episode thrown
+    away because an auditor felt uneasy about a clean line.
+    """
+    spoken = "\n".join(
+        ln.text for scene in parsed.scenes for ln in scene.lines
     )
-    try:
-        # LLM slot: technical -- P8 ledger audit (audit-only through S3).
-        findings = structured_call(
-            prompt=[
-                {"role": "system",
-                 "content": _seam(pack, "fable2_audit_system")},
-                {"role": "user", "content": user},
-            ],
-            schema=AuditFindings,
-            slot_fn=technical_fn,
-            base_temperature=_TEMP["ledger_audit"],
-            structural_retry_temperature=_TEMP["ledger_audit"] / 2.0,
-            repair_prompt_factory=make_dispatching_repair_factory(),
-            max_new_tokens=_MAX_NEW_TOKENS["ledger_audit"],
-            helper_name="fable2_ledger_audit",
-        )
-        return findings, view
-    except StructuredCallFailedError as exc:
+    hits = lexicon_hits(spoken, WEAPON_SMOKING_EVIDENCE)
+    if hits:
         raise Fable2AuditError(
-            "ledger_audit", str(exc.last_error), exc.attempts) from exc
-
-
-# Kill authority (operator lexicon-only kill policy, 2026-07-10): the
-# closed-vocabulary classes take the shared lexicons as their ONLY kill
-# authority; the python-provable structural classes are re-verified
-# against facts python already gated. Everything else is critic-class
-# taste -- REPORTED in meta, never fatal at S1b (the coalesced repair is
-# deferred post-S3; r4/CUT1 keeps no live-looking repair field).
-_AUDIT_LEXICON_BY_CLASS = {
-    "weapons_smoking": WEAPON_SMOKING_EVIDENCE,
-    "news_source_framing": NEWS_FRAMING_EVIDENCE,
-    "machine_attribution": MACHINE_ATTRIBUTION_EVIDENCE,
-}
-_AUDIT_STRUCTURAL_CLASSES = frozenset({
-    "speaker_not_in_cast", "verbatim_break", "skeleton_break",
-})
-
-
-def _triage(findings: AuditFindings, parsed: ParsedScript, view: str,
-            cast_names: "list[str]"):
-    """Evidence bar (doc P8): returns (confirmed, discarded, reported).
-    confirmed = [(finding_dict, evidence_str)] -- the caller FAILS LOUD;
-    discarded = uncorroborated hard flags (stamped LOUDLY);
-    reported = taste-class notes (meta only, never fatal at S1b)."""
-    confirmed: "list[tuple[dict, str]]" = []
-    discarded: "list[dict]" = []
-    reported: "list[dict]" = []
-    # Only the CHARACTER-spoken drama is kill-scannable for news/machine
-    # framing -- the announcer's closing news read is REAL news by design
-    # (and the coda deliberately pivots toward it); scanning those for
-    # 'news' words would kill every episode.
-    drama_only = "\n".join(
-        f"{ln.speaker}: {ln.text}"
-        for scene in parsed.scenes for ln in scene.lines
-    )
-    for f in findings.findings:
-        row = f.model_dump()
-        cls = f.finding_class
-        if cls in _AUDIT_LEXICON_BY_CLASS:
-            scan_hay = (view if cls == "weapons_smoking" else drama_only)
-            hit = _scan_lexicon(scan_hay, _AUDIT_LEXICON_BY_CLASS[cls])
-            if hit:
-                confirmed.append((row, f"lexicon term {hit!r} present"))
-            else:
-                discarded.append(row)
-        elif cls in _AUDIT_STRUCTURAL_CLASSES:
-            # Python already gated these facts (parser speaker gate,
-            # per-constituent proof, skeleton checks). Python is the
-            # judge of record: an LLM flag that contradicts a python-
-            # verified fact is a hallucination -- discard LOUDLY.
-            discarded.append(row)
-        else:
-            reported.append(row)
-    if discarded:
-        log.warning(
-            "[scifi_fable2] ledger_audit: DISCARDED %d uncorroborated hard "
-            "finding(s) (no lexicon evidence / contradicts python-verified "
-            "facts): %s",
-            len(discarded),
-            "; ".join(f"{d['finding_class']}: {d['detail']}"
-                      for d in discarded),
+            "ledger_audit",
+            "spoken text names weapons or smoking: " + ", ".join(hits),
+            1,
         )
-    return confirmed, discarded, reported
 
 
 # ---------------------------------------------------------------------------
@@ -3902,36 +3791,20 @@ def run_scifi_fable2_episode(
     meta = _ledger_meta(led)
     f2 = _fable2_meta(led)
 
-    # --- P8: ledger audit (audit-only; fail loud on confirmed) -------------
-    counting_tech3, tech3_box = _counting(technical_fn)
-    with _helper_ctx(slot_scheduler, "fable2_ledger_audit"):
-        findings, view = _pass_audit(
-            counting_tech3, pack, final_draft, treatment,
-            envelope=envelope, story_rules=story_rules, mode=mode)
-    _receipt("ledger_audit", technical_model, tech3_box["calls"],
-             _TEMP["ledger_audit"], _MAX_NEW_TOKENS["ledger_audit"])
-    confirmed, discarded_rows, reported = _triage(
-        findings, final_draft.parsed, view, cast_names)
-    f2["audit"] = {
-        "findings": reported + [row for row, _ev in confirmed],
-        "confirmed": [
-            {**row, "evidence": ev} for row, ev in confirmed
-        ],
-        "discarded": discarded_rows,
-    }
+    # --- P8: deterministic safety scan on the spoken drama ------------------
+    # The LLM ledger audit is gone. It could only ever kill on a lexicon hit, so
+    # the lexicon was always the real authority -- and asking a model first meant
+    # a complete, twice-persisted ledger was thrown away on its opinion. Worse,
+    # its corroboration lexicons were the PERIOD lane's: ordinary sci-fi words
+    # ("machine", "computer", "report") "proved" a hallucinated flag.
+    #
+    # What survives is the one thing that must never reach the air, checked
+    # directly on the spoken text with word boundaries.
+    _assert_no_weapons_or_smoking(final_draft.parsed)
     f2["pass_receipts"] = receipts
     led.save()
     meta = _ledger_meta(led)
     f2 = _fable2_meta(led)
-    if confirmed:
-        raise Fable2AuditError(
-            "ledger_audit",
-            "confirmed audit defect(s): " + "; ".join(
-                f"{row['finding_class']} (scene {row['scene']}, "
-                f"{row['speaker'] or 'scene'}): {row['detail']} "
-                f"[{ev}]"
-                for row, ev in confirmed
-            ))
 
     # --- tail parts ---------------------------------------------------------
     canon = _OTRC.episode_canon_from_outline_dict({

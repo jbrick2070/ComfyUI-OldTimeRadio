@@ -46,8 +46,7 @@ class TestSeamShapes:
     def test_json_seams_declare_json_only_output(self, stages):
         for seam in ("fable2_dossier_system", "fable2_pitch_system",
                      "fable2_select_system", "fable2_treatment_system",
-                     "fable2_critic_system", "fable2_casting_system",
-                     "fable2_audit_system"):
+                     "fable2_critic_system", "fable2_casting_system"):
             assert "Return one JSON object only" in _flat(stages[seam]), seam
 
     def test_dossier_contract(self, stages):
@@ -163,15 +162,9 @@ class TestSeamShapes:
         for cls in _CRITIC_CLASSES:
             assert cls in flat, f"critic class {cls} missing"
 
-    def test_critic_classes_are_a_subset_of_audit_classes(self, stages):
-        # r4 anchor snapshot: every critic problem class must exist in the
-        # audit checklist (deferred P8 repair maps AuditFindings ->
-        # CriticNotes and reuses the revision seam).
-        audit_flat = _flat(stages["fable2_audit_system"])
-        for cls in _CRITIC_CLASSES:
-            assert cls in audit_flat, f"audit missing critic class {cls}"
-        for cls in _AUDIT_ONLY_CLASSES:
-            assert cls in audit_flat, f"audit missing class {cls}"
+    def test_the_audit_seam_is_gone(self, stages):
+        """P8 is a deterministic Python safety scan; no model, no seam."""
+        assert "fable2_audit_system" not in stages
 
     def test_casting_orders_by_menu_id(self, stages):
         # r2/S4: menu entries carry STABLE IDS; the LLM copies ids, never
@@ -181,13 +174,6 @@ class TestSeamShapes:
         assert "ids only, never invent one" in flat
         assert "never the ANNOUNCER" in flat
         assert "SFW. No weapons, no smoking." in flat
-
-    def test_audit_reports_never_rewrites(self, stages):
-        flat = _flat(stages["fable2_audit_system"])
-        assert "You report; you never rewrite." in flat
-        assert "array of 0-12 objects" in flat
-        assert ("An empty findings array is a legitimate, common result."
-                in flat)
 
     def test_sfw_line_on_the_creative_seams(self, stages):
         for seam in ("fable2_pitch_system", "fable2_treatment_system",

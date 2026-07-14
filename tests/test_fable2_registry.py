@@ -27,7 +27,7 @@ _FABLE2_SEAMS = frozenset({
     "fable2_dossier_system", "fable2_pitch_system", "fable2_select_system",
     "fable2_treatment_system", "fable2_news_read_system",
     "fable2_script_system", "fable2_critic_system",
-    "fable2_revision_system", "fable2_casting_system", "fable2_audit_system",
+    "fable2_revision_system", "fable2_casting_system",
 })
 
 
@@ -114,7 +114,7 @@ class TestPipelineRow:
             ("revision", "creative"),
             ("casting_voices", "technical"),
             ("assemble", "technical"),
-            ("ledger_audit", "technical"),
+            ("safety_scan", "technical"),
         ]
         assert {slot for _pid, slot in rows} <= ROUTING._VALID_PASS_SLOTS
 
@@ -123,7 +123,14 @@ class TestPipelineRow:
         p7 = next(p for p in pipe.passes if p.pass_id == "assemble")
         assert p7.seam_refs == ()
         assert "pure Python" in p7.description
-        assert "registry metadata" in p7.description
+
+    def test_p8_is_a_python_safety_scan_with_no_seam(self):
+        """The LLM ledger audit is gone: no seam, no model, no veto."""
+        pipe = ROUTING.get_pipeline("fable2_multipass")
+        p8 = next(p for p in pipe.passes if p.pass_id == "safety_scan")
+        assert p8.seam_refs == ()
+        assert "pure Python" in p8.description
+        assert "fable2_audit_system" not in pipe.declared_seams
 
     def test_slot_enum_rejection(self):
         # A non-registry slot (e.g. "judge") must die at parse time.

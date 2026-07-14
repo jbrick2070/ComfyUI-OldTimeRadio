@@ -62,6 +62,55 @@ def test_sonnet_payload_cast_lock_and_spoken_hygiene():
         lane.validate_spoken_text_and_lock([bad], cast)
 
 
+def test_grounding_is_proven_against_the_dossier_not_judged_by_the_warden():
+    """`invented_fact_flags` was a model's feeling. This is a proof.
+
+    A factual line may only cite a fact the dossier holds, and may only speak a
+    number the source itself states. Both are mechanical, so both may be fatal.
+    """
+    dossier = lane.FragmentDossierV4.model_validate({
+        "verified_facts": [{
+            "fact_id": "fact_1", "claim": "The probe carried 3 sensors.",
+            "source_spans": [{"field": "summary", "start": 0, "end": 27,
+                              "quote": "The probe carried 3 sensors"}],
+        }],
+        "key_numbers": [{
+            "number_id": "num_1", "verbatim": "3", "fact_id": "fact_1",
+            "source_span": {"field": "summary", "start": 18, "end": 19,
+                            "quote": "3"},
+        }],
+        "named_entities": [],
+        "tone": "measured",
+        "headline_clean": "Probe returns",
+        "provenance_note": "One recovered fragment.",
+        "payload_sha256": "a" * 64,
+    })
+
+    def line(text, cites=(), non_fact=False, speaker="ORUM", char_id="c02"):
+        return lane.DraftLineV4(
+            text=text, cites=list(cites), non_fact=non_fact, speaker=speaker,
+            char_id=char_id, source_pass="P2a",
+        )
+
+    grounded = [
+        line("The record opens.", non_fact=True, speaker="ANNOUNCER",
+             char_id="announcer"),
+        line("The probe carried 3 sensors.", cites=["fact_1"]),
+    ]
+    assert lane.ungrounded_lines(grounded, dossier) == []
+
+    phantom_cite = [line("The probe carried 3 sensors.", cites=["fact_4"])]
+    assert "fact_4" in lane.ungrounded_lines(phantom_cite, dossier)[0]
+
+    invented_number = [line("The probe carried 47 sensors.", cites=["fact_1"])]
+    assert "47" in lane.ungrounded_lines(invented_number, dossier)[0]
+
+    # A ceremonial line states nothing, so it can invent nothing.
+    ceremonial = [line("The record holds. 47 seals.", non_fact=True,
+                       speaker="VESH", char_id="c04")]
+    assert lane.ungrounded_lines(ceremonial, dossier) == []
+
+
 def test_sonnet_target_and_mode_fail_loud():
     with pytest.raises(lane.SonnetTargetRangeError):
         lane.validate_sonnet_payload(_payload(), {"seed_source": "rss_fetch", "target_words": 901})

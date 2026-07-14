@@ -349,6 +349,10 @@ def _repair_rules(pass_id: str, error: Any) -> str:
             "on one row, move each extra object into its own caller_threads row "
             "and give every caller thread exactly one resolution_links row; do "
             "not rename an unknown field and leave it in place. "
+            "Every caller_threads row's lost_object MUST be one string COPIED "
+            "VERBATIM from the selected card's lost_objects array -- never "
+            "shortened and never reworded: write `folded timetable`, not "
+            "`timetable`. "
             "causal_steps, audible_clues, interpretations, and "
             "resolution_links MUST appear only as top-level arrays; never "
             "place them inside caller_threads rows. "
@@ -782,15 +786,25 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
             )
         return [
             {"role": "system", "content": system + "\n" + artifact_instruction + pass_rules + " JSON only.\n" + schema_shape_instruction(schema)},
-            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "error": str(effective_error), "inputs": inputs}, ensure_ascii=False, sort_keys=True)},
+            {"role": "user", "content": json.dumps({"failed_artifact": failed_output, "error": str(effective_error), "inputs": _repair_inputs(pass_id, inputs)}, ensure_ascii=False, sort_keys=True)},
         ]
+    # A bounded anchor patch is a MECHANICAL edit -- put this exact string into
+    # this exact intent/line and keep everything else. Running it at the creative
+    # brainstorming temperature made the model keep writing past its own closing
+    # brace, and the truncated JSON came back undecodable on all three attempts
+    # (live: prompt 41faff33). Cool it down and give the output room to close.
+    is_patch = pass_id.endswith("_grounding_patch")
+    base_temperature = .25 if is_patch else (.72 if slot == "creative" else .18)
+    retry_temperature = .10 if is_patch else (
+        .25 if slot == "creative" else .08
+    )
     try:
         with scheduler.helper_context(f"original_codex56sol:{pass_id}"):
             # LLM slot: per-sub-pass workflow creative/technical closure.
             result = structured_call(
                 prompt=prompt, schema=schema, slot_fn=capture,
-                base_temperature=.72 if slot == "creative" else .18,
-                structural_retry_temperature=.25 if slot == "creative" else .08,
+                base_temperature=base_temperature,
+                structural_retry_temperature=retry_temperature,
                 max_new_tokens=tokens, max_attempts=3,
                 post_validator=post_validator,
                 repair_prompt_factory=repair,
@@ -802,10 +816,93 @@ def _call(*, pass_id: str, slot: str, fn: GenerateFn, pack: Any,
     return result
 
 
+def _repair_inputs(pass_id: str, inputs: Mapping[str, Any]) -> dict[str, Any]:
+    """The bounded input surface a typed repair actually needs.
+
+    A repair prompt carries the ORIGINAL seam, the schema contract, the repair
+    rules, the failed artifact -- and then re-sent every input as well. For P5
+    that reached 5,772 tokens against a 4,592-token usable window, so
+    PROMPT_GUARD truncated it, and what fell off the end was the part telling the
+    model to return a complete artifact. It answered with one cast row, and the
+    ladder exhausted on a defect the model had already been told how to fix
+    (live: prompt a89a46a4).
+
+    The failed artifact already carries the graph the model must repair. What it
+    cannot reconstruct from that alone are the IMMUTABLE anchors and the clue
+    inventory -- so send those, and nothing else.
+    """
+    if pass_id not in {"P5", "P6"}:
+        return dict(inputs)
+    bounded: dict[str, Any] = {}
+    grounding = inputs.get("grounding_contract")
+    if isinstance(grounding, Mapping):
+        bounded["grounding_contract"] = {
+            "lost_object_anchors": grounding.get("lost_object_anchors"),
+            "device_anchor": grounding.get("device_anchor"),
+            "resolution_anchor": grounding.get("resolution_anchor"),
+            "clues": [
+                {
+                    "clue_id": clue.get("clue_id"),
+                    "lost_object": clue.get("lost_object"),
+                }
+                for clue in grounding.get("clues", [])
+                if isinstance(clue, Mapping)
+            ],
+        }
+    truth = inputs.get("truth_map")
+    if isinstance(truth, Mapping):
+        bounded["truth_map"] = {
+            "audible_clues": [
+                {
+                    "clue_id": clue.get("clue_id"),
+                    "thread_id": clue.get("thread_id"),
+                }
+                for clue in truth.get("audible_clues", [])
+                if isinstance(clue, Mapping)
+            ],
+        }
+    for key in ("manifest", "target_words_advisory", "num_characters_advisory"):
+        if key in inputs:
+            bounded[key] = inputs[key]
+    return bounded
+
+
+def _restore_slate_immutables(
+    slate: PossibilitySlate,
+    draw: ConstraintDraw,
+) -> bool:
+    """Put the draw's own words back into the fields that only echo it.
+
+    `lost_objects` and `acoustic_device` are not authored: they are the immutable
+    constraint draw, handed to the model and asked for back verbatim. The model
+    paraphrases them ("a clockwork display chimes in the same rhythm" -> "a
+    chiming clockwork display") and the run dies on a string compare -- while the
+    STORY it wrote is about exactly the right device (live: prompt efafc6fa).
+
+    Restoring an input is not authoring. Everything downstream is anchored to the
+    draw anyway: the grounding contract is built from it, and the script must
+    speak its exact anchors on the air. So overwrite the echo and keep the story.
+    """
+    changed = False
+    for card in slate.possibilities:
+        if card.lost_objects != draw.lost_objects:
+            card.lost_objects = list(draw.lost_objects)
+            changed = True
+        if card.acoustic_device != draw.acoustic_device:
+            card.acoustic_device = draw.acoustic_device
+            changed = True
+    return changed
+
+
 def _validate_slate(slate: PossibilitySlate, draw: ConstraintDraw) -> str | None:
     ids = [card.possibility_id for card in slate.possibilities]
     if len(set(ids)) != len(ids):
         return "possibility ids must be unique"
+    if _restore_slate_immutables(slate, draw):
+        log.info(
+            "[original_codex56sol] P1 restored the immutable draw fields the "
+            "slate only echoes at the schema-validated attempt boundary",
+        )
     for card in slate.possibilities:
         if (card.lost_objects != draw.lost_objects
                 or card.acoustic_device != draw.acoustic_device):
@@ -839,6 +936,60 @@ def _validate_triage(triage: SlateTriage, slate: PossibilitySlate) -> str | None
     return None
 
 
+def _restore_thread_lost_objects(
+    truth: AudibleTruthMap,
+    selected: PossibilityCard,
+) -> bool:
+    """Restore the immutable object name a caller thread only echoes.
+
+    `lost_object` is not authored: it is one of the draw's strings, handed to the
+    model and asked for back. The model writes the thread's real content -- the
+    caller, the need -- and drops the modifier on the echo: "timetable" for
+    "folded timetable", "whistle" for "tin whistle" (live: prompt 37a3cedf).
+
+    Restore it ONLY when the correction is forced: same number of threads as
+    objects, and each mismatched thread names exactly one remaining draw object
+    by containment. Anything ambiguous -- a dropped thread, two candidates --
+    is the model's to fix, and goes back to the ladder untouched.
+    """
+    objects = list(selected.lost_objects)
+    threads = list(truth.caller_threads)
+    if len(threads) != len(objects):
+        return False
+    if Counter(row.lost_object for row in threads) == Counter(objects):
+        return False
+
+    remaining = list(objects)
+    unmatched: list[Any] = []
+    for row in threads:
+        if row.lost_object in remaining:
+            remaining.remove(row.lost_object)
+        else:
+            unmatched.append(row)
+    if not unmatched or len(unmatched) != len(remaining):
+        return False
+
+    for row in unmatched:
+        spoken = _normalize_grounding_text(row.lost_object)
+        if not spoken:
+            return False
+        candidates = [
+            candidate for candidate in remaining
+            if spoken in _normalize_grounding_text(candidate)
+            or _normalize_grounding_text(candidate) in spoken
+        ]
+        if len(candidates) != 1:
+            return False
+        row.lost_object = candidates[0]
+        remaining.remove(candidates[0])
+    log.info(
+        "[original_codex56sol] P3 restored %d immutable lost-object name(s) "
+        "the caller threads only echo",
+        len(unmatched),
+    )
+    return True
+
+
 def _validate_truth_map(
     truth: AudibleTruthMap,
     selected: PossibilityCard | None = None,
@@ -853,13 +1004,17 @@ def _validate_truth_map(
         return "truth-map structural ids must be unique within each collection"
     thread_ids = set(collections["caller_threads"])
     clue_ids = set(collections["audible_clues"])
-    if selected is not None and Counter(
-        row.lost_object for row in truth.caller_threads
-    ) != Counter(selected.lost_objects):
-        return (
-            "caller_threads must contain exactly one row per selected lost "
-            "object, with one lost_object field per row"
-        )
+    if selected is not None:
+        _restore_thread_lost_objects(truth, selected)
+        if Counter(
+            row.lost_object for row in truth.caller_threads
+        ) != Counter(selected.lost_objects):
+            return (
+                "caller_threads must contain exactly one row per selected lost "
+                "object, and each lost_object MUST be copied VERBATIM from the "
+                "selected card's lost_objects array -- never shortened, never "
+                "reworded"
+            )
     if any(clue.thread_id not in thread_ids for clue in truth.audible_clues):
         return "every audible clue thread_id must resolve"
     clue_thread_ids = {clue.thread_id for clue in truth.audible_clues}
@@ -1079,6 +1234,35 @@ def _validate_authored_surface(value: Any, rules: Any) -> str | None:
     return None
 
 
+def _project_announcer_char_id(score: BroadcastScore) -> BroadcastScore | None:
+    """Canonicalize the announcer's char_id -- an ID, never authored content.
+
+    The model writes a perfectly good announcer row (`role: "announcer"`, name,
+    description) and files it under `char_id: "a"`. That is a COORDINATE, not a
+    story decision, and the contract fixes it: the announcer is `announcer`.
+    Rejecting the whole score over it sends a 5,700-token repair prompt through
+    a 4,592-token window (live: prompt a89a46a4), and the truncated model comes
+    back with a fragment. Rename the id and the beats that point at it.
+    """
+    announcers = [row for row in score.cast if row.role == "announcer"]
+    if len(announcers) != 1:
+        return None
+    row = announcers[0]
+    if row.char_id == "announcer":
+        return None
+    if any(other.char_id == "announcer" for other in score.cast if other is not row):
+        return None
+    old_id = row.char_id
+    repaired = score.model_copy(deep=True)
+    for cast_row in repaired.cast:
+        if cast_row.char_id == old_id:
+            cast_row.char_id = "announcer"
+    for beat in repaired.beats:
+        if beat.char_id == old_id:
+            beat.char_id = "announcer"
+    return repaired
+
+
 def _validate_score_attempt(
     score: BroadcastScore,
     truth: AudibleTruthMap,
@@ -1097,7 +1281,12 @@ def _validate_score_attempt(
     afterward by the bounded ``ScoreIntentPatch`` tool.
     """
     repaired_kinds: list[str] = []
-    for _ in range(2):
+    announcer_id = _project_announcer_char_id(score)
+    if announcer_id is not None:
+        score.cast = announcer_id.cast
+        score.beats = announcer_id.beats
+        repaired_kinds.append("announcer char_id")
+    for _ in range(3):
         structural_error = _validate_score(score, truth, grounding_contract)
         repaired: BroadcastScore | None = None
         repaired_kind = ""
@@ -1503,7 +1692,8 @@ def _repair_score_grounding_intents(
         pass_id="P5_grounding_patch", slot="creative", fn=creative_fn,
         pack=pack, seam="codex56_score_anchor_patch",
         inputs={"targets": plan}, schema=ScoreIntentPatch,
-        scheduler=scheduler, journal=journal, tokens=900,
+        scheduler=scheduler, journal=journal,
+        tokens=_patch_tokens(plan),
         post_validator=lambda value: _validate_score_intent_patch_application(
             value, score, plan, truth, grounding, story_rules,
         ),
@@ -1516,6 +1706,23 @@ def _repair_score_grounding_intents(
             "P5 grounding patch did not clear the full score contract"
         )
     return repaired
+
+
+def _patch_tokens(plan: list[dict[str, Any]]) -> int:
+    """Room for one rewritten intent/line per target, plus the JSON envelope.
+
+    900 was a flat guess. A four-target patch ran out of room mid-object and the
+    truncated JSON was undecodable on every attempt -- so budget from the actual
+    work: each replacement restates the current text plus the anchors it must
+    carry, and the model needs headroom to close its own braces.
+    """
+    per_target = 0
+    for row in plan:
+        text = str(row.get("current_intent") or row.get("current_text") or "")
+        anchors = " ".join(str(a) for a in row.get("required_anchors", ()))
+        # ~4 chars/token, doubled: the replacement is a rewrite, not a copy.
+        per_target += 2 * (len(text) + len(anchors)) // 4 + 60
+    return max(900, 240 + per_target)
 
 
 def _raw_anchor_span(text: str, anchor: str) -> str | None:
@@ -1759,7 +1966,8 @@ def _repair_script_grounding_lines(
         fn=creative_fn,
         pack=pack, seam="codex56_script_anchor_patch",
         inputs={"targets": plan}, schema=ScriptLinePatch,
-        scheduler=scheduler, journal=journal, tokens=900,
+        scheduler=scheduler, journal=journal,
+        tokens=_patch_tokens(plan),
         post_validator=lambda value: _validate_script_line_patch_application(
             value, script, plan, score, manifest, grounding, story_rules,
         ),

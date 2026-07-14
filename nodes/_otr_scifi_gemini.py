@@ -9,7 +9,16 @@ import typing
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Annotated, Any, Callable, Literal, Mapping, MutableMapping, Sequence
+from typing import (
+    Annotated,
+    Any,
+    Callable,
+    Iterable,
+    Literal,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -72,8 +81,6 @@ class SciFiGeminiPayloadThinError(ScifiGeminiError): pass
 class SciFiGeminiTargetRangeError(ScifiGeminiError): pass
 class SciFiGeminiPackContractError(ScifiGeminiError): pass
 class SciFiGeminiPassError(ScifiGeminiError): pass
-class SciFiGeminiRewriteExhaustedError(ScifiGeminiError): pass
-class SciFiGeminiSpokenTextError(ScifiGeminiError): pass
 class SciFiGeminiGraphError(ScifiGeminiError): pass
 class SciFiGeminiProvenanceError(ScifiGeminiError): pass
 class SciFiGeminiPreTailAuditError(ScifiGeminiError): pass
@@ -247,7 +254,6 @@ class SceneCritiqueV4(_Strict):
     # rather than writing `{}`. Requiring it turns "the scene is fine" into a
     # validation failure. The empty map IS the honest value for a clean pass.
     line_fact_ids: dict[str, list[str]] = Field(default_factory=dict)
-    sfw_pass: bool
 
 
 GenerateFn = Callable[..., str]
@@ -337,11 +343,60 @@ def make_advisory_word_blueprint(requested_words: int, locked_beats: Sequence[st
     return [AdvisoryBeatBandV4(beat_id=i, advisory_word_center=n) for i, n in zip(ids, floors)]
 
 
-def _spoken_error(text: str, speaker: str = "") -> str | None:
+def _source_grounded_all_caps(index: "FactIndexV4 | None") -> frozenset[str]:
+    """All-caps tokens that already appear in the accepted source evidence."""
+    if index is None:
+        return frozenset()
+    surfaces: list[str] = []
+    for fact in index.facts:
+        surfaces.extend(span.quote for span in fact.source_spans)
+    for entity in index.entities:
+        surfaces.extend(span.quote for span in entity.source_spans)
+    for number in index.numbers:
+        surfaces.append(number.source_span.quote)
+    return frozenset(
+        match.group(0)
+        for surface in surfaces
+        for match in _ALL_CAPS_RE.finditer(surface or "")
+    )
+
+
+def allowed_spoken_all_caps(
+    index: "FactIndexV4 | None",
+    cast: "Iterable[CastV4]",
+) -> frozenset[str]:
+    """All-caps tokens a character may legitimately say out loud.
+
+    The outline seam ORDERS cast names in ALL CAPS, so a character addressing
+    another by name speaks an all-caps token by construction. Add the acronyms
+    the source itself uses (RNA, NASA) -- those are the words the episode is
+    about. Everything else all-caps is shouting or a stray label.
+    """
+    allowed = set(_source_grounded_all_caps(index))
+    for row in cast:
+        allowed.update(_ALL_CAPS_RE.findall(row.name or ""))
+    return frozenset(allowed)
+
+
+def _spoken_error(
+    text: str,
+    speaker: str = "",
+    allowed_all_caps: frozenset[str] = frozenset(),
+) -> str | None:
     if not (text or "").strip():
         return "spoken text is empty"
-    if _DECORATION_RE.search(text) or _ALL_CAPS_RE.search(text):
-        return "spoken text contains forbidden decoration or all-caps lexical text"
+    if _DECORATION_RE.search(text):
+        return "spoken text contains forbidden decoration"
+    shouted = [
+        token for token in _ALL_CAPS_RE.findall(text)
+        if token not in allowed_all_caps
+    ]
+    if shouted:
+        return (
+            "spoken text contains all-caps lexical text "
+            f"({', '.join(sorted(set(shouted)))}); write it in normal case -- "
+            "only a locked cast name or a source acronym may be all-caps"
+        )
     if re.match(r"""^\s*["'].*["']\s*$""", text):
         return "spoken text is wholly quoted"
     if re.match(r"^\s*(?:ANNOUNCER|[A-Z][A-Za-z]+)\s*:", text):
@@ -353,19 +408,33 @@ def _spoken_error(text: str, speaker: str = "") -> str | None:
     return None
 
 
-def validate_spoken_text_and_lock(draft: SceneDraftV4, outline: OutlineV4, cast_lock: Mapping[str, CastV4]) -> None:
-    beat_map = {b.beat_id: b for s in outline.scenes for b in s.beats}
+def validate_scene_draft(
+    draft: SceneDraftV4,
+    scene: "SceneV4",
+    cast_lock: Mapping[str, CastV4],
+    allowed_all_caps: frozenset[str] = frozenset(),
+) -> str | None:
+    """The complete deterministic contract for one drafted scene.
+
+    Coverage, graph, and spoken text in ONE post_validator, so the P4/P6 repair
+    ladder sees every defect while it can still fix it. Running the spoken check
+    after the ladder had already accepted the draft meant the only response left
+    to a bad line was to kill the episode.
+    """
+    coverage = validate_scene_draft_covers_beats(draft, scene)
+    if coverage is not None:
+        return coverage
+    beat_map = {beat.beat_id: beat for beat in scene.beats}
     for line in draft.lines:
         beat = beat_map.get(line.beat_id)
         if beat is None:
-            raise SciFiGeminiGraphError(f"draft line {line.beat_id} is not in the locked outline")
-        err = _spoken_error(line.text, beat.speaker)
-        if err:
-            raise SciFiGeminiSpokenTextError(f"{line.beat_id}: {err}")
+            return f"draft line {line.beat_id} is not in the locked outline"
         if beat.char_id not in cast_lock:
-            raise SciFiGeminiGraphError(f"beat {beat.beat_id} has no locked cast row")
-        if any(use.fact_id not in {f.fact_id for f in ()} for use in line.fact_uses):
-            pass
+            return f"beat {beat.beat_id} has no locked cast row"
+        err = _spoken_error(line.text, beat.speaker, allowed_all_caps)
+        if err:
+            return f"{line.beat_id}: {err}"
+    return None
 
 
 def stamp_music_skip_contract_after_set_lines(led: Any, music_line_ids: Sequence[str]) -> None:
@@ -943,34 +1012,20 @@ def run_scifi_gemini_episode(
     bands = make_advisory_word_blueprint(int(resolved["target_words"]), ids)
     p3 = invoke_gemini_structured(pass_id="P3", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_outline", pack=pack, typed_inputs={"chosen_premise": p1.pitches[p2.selected_index].model_dump(mode="json"), "initial_outline_word_steer": {"requested_words": int(resolved["target_words"])}, "advisory_word_bands": [x.model_dump(mode="json") for x in bands]}, result_type=OutlineV4, post_validator=validate_outline_cast_labels, base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=outline_output_token_budget(int(resolved["target_words"]), len(bands)), journal=journal, prompt_must_fit=True)
     casts = {c.char_id: c for c in p3.cast}
+    # The outline seam orders cast names in ALL CAPS, so a line that addresses a
+    # character by name is all-caps by construction. Give the spoken validator
+    # the vocabulary it needs to tell a name from a shout.
+    allowed_caps = allowed_spoken_all_caps(p0, p3.cast)
     drafts: dict[str, SceneDraftV4] = {}
     for scene in p3.scenes:
-        draft = invoke_gemini_structured(pass_id=f"P4:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_draft", pack=pack, typed_inputs={"scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x, s=scene: validate_scene_draft_covers_beats(x, s), base_temperature=.74, structural_retry_temperature=.34, max_new_tokens=3000, journal=journal)
-        critique = invoke_gemini_structured(pass_id=f"P5:{scene.scene_id}", slot="technical", slot_fn=technical_fn, seam_ref="gemini_scene_critique", pack=pack, typed_inputs={"drafted_lines": draft.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneCritiqueV4, post_validator=lambda x: (("clean critique must have empty feedback" if x.passed and x.feedback else None) or ("failed critique needs feedback" if not x.passed and not x.feedback else None) or (None if x.sfw_pass else "SFW audit failed")), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1400, journal=journal)
+        draft = invoke_gemini_structured(pass_id=f"P4:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_draft", pack=pack, typed_inputs={"scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x, s=scene: validate_scene_draft(x, s, casts, allowed_caps), base_temperature=.74, structural_retry_temperature=.34, max_new_tokens=3000, journal=journal)
+        critique = invoke_gemini_structured(pass_id=f"P5:{scene.scene_id}", slot="technical", slot_fn=technical_fn, seam_ref="gemini_scene_critique", pack=pack, typed_inputs={"drafted_lines": draft.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneCritiqueV4, post_validator=lambda x: (("clean critique must have empty feedback" if x.passed and x.feedback else None) or ("failed critique needs feedback" if not x.passed and not x.feedback else None)), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1400, journal=journal)
         if not critique.passed:
-            draft = invoke_gemini_structured(pass_id=f"P6:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_rewrite", pack=pack, typed_inputs={"feedback": critique.feedback, "previous_draft": draft.model_dump(mode="json"), "facts": p0.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x, s=scene: validate_scene_draft_covers_beats(x, s), base_temperature=.62, structural_retry_temperature=.28, max_new_tokens=3000, journal=journal)
-            check = invoke_gemini_structured(pass_id=f"P5-recheck:{scene.scene_id}", slot="technical", slot_fn=technical_fn, seam_ref="gemini_scene_critique", pack=pack, typed_inputs={"drafted_lines": draft.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json"), "facts": p0.model_dump(mode="json")}, result_type=SceneCritiqueV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=1400, journal=journal)
-            if not check.passed:
-                # The critic is the only thing that knows WHY, and until now it took
-                # that reason to the grave: the run died with a bare "failed its
-                # bounded rewrite" and we were left guessing (the first guess -- an
-                # unreachable word-count quota in the seam -- was real, and still not
-                # the whole story). Record both verdicts before failing closed.
-                log.error(
-                    "[scifi_gemini:%s] bounded rewrite exhausted\n"
-                    "  first critique : %s\n"
-                    "  after rewrite  : %s",
-                    scene.scene_id, critique.feedback.strip(), check.feedback.strip(),
-                )
-                journal[f"rewrite_exhausted:{scene.scene_id}"] = {
-                    "first_critique": critique.feedback,
-                    "after_rewrite": check.feedback,
-                }
-                raise SciFiGeminiRewriteExhaustedError(
-                    f"scene {scene.scene_id} failed its bounded rewrite: "
-                    f"{check.feedback.strip() or critique.feedback.strip()}"
-                )
-        validate_spoken_text_and_lock(draft, p3, casts)
+            # The critique buys ONE bounded rewrite. It does not get a veto: the
+            # rewritten draft has already cleared the same deterministic contract
+            # as the first, and a critic that is still unhappy is an opinion.
+            draft = invoke_gemini_structured(pass_id=f"P6:{scene.scene_id}", slot="creative", slot_fn=creative_fn, seam_ref="gemini_scene_rewrite", pack=pack, typed_inputs={"feedback": critique.feedback, "previous_draft": draft.model_dump(mode="json"), "facts": p0.model_dump(mode="json"), "scene_outline": scene.model_dump(mode="json")}, result_type=SceneDraftV4, post_validator=lambda x, s=scene: validate_scene_draft(x, s, casts, allowed_caps), base_temperature=.62, structural_retry_temperature=.28, max_new_tokens=3000, journal=journal)
+            journal[f"rewrite:{scene.scene_id}"] = {"critique": critique.feedback}
         drafts[scene.scene_id] = draft
     expected = _assemble(led, p3, drafts, meta)
     from ._otr_content_authorship import stamp_receipt

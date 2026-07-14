@@ -426,6 +426,35 @@ def _concept_corpus(sel: SelectedConcept) -> str:
     return "\n".join(p for p in parts if p)
 
 
+_LEXICON_PATTERNS: "dict[tuple[str, ...], re.Pattern[str]]" = {}
+
+
+def lexicon_hits(text: str, terms: "Sequence[str]") -> "list[str]":
+    """Word-boundary lexicon scan over spoken text. The only kill authority.
+
+    The old scan was a raw substring test over the JUDGE'S OWN PROSE plus the
+    script -- so "gun" fired on "begun", and a model that wrote "the scene
+    mentions a gun" in its detail corroborated itself. A closed vocabulary is
+    only meaningful if the match is a WORD.
+    """
+    key = tuple(terms)
+    pattern = _LEXICON_PATTERNS.get(key)
+    if pattern is None:
+        body = "|".join(
+            re.escape(term.strip().lower())
+            for term in terms if term and term.strip()
+        )
+        pattern = re.compile(rf"(?<!\w)(?:{body})(?!\w)", re.IGNORECASE) if body \
+            else re.compile(r"(?!x)x")
+        _LEXICON_PATTERNS[key] = pattern
+    found = {match.group(0).lower()
+             for match in pattern.finditer(_norm_ws_lower(text))}
+    # Lexicon order, not alphabetical: the vocabulary lists the plainest term
+    # first, and that is the one worth naming in the error.
+    return [term.strip().lower() for term in terms
+            if term and term.strip().lower() in found]
+
+
 def _norm_ws_lower(text: str) -> str:
     """Whitespace-collapsed lowercase form for A2 verbatim matching.
 
@@ -783,16 +812,14 @@ def run_original_qa(
 def corroborate_hard_finding(finding: QAFinding, script: str) -> "str | None":
     """Deterministic evidence check for an episode-killing finding.
 
-    Returns the evidence term found in the finding's quoted detail or
-    the script excerpt (whitespace-normalized, case-insensitive), or
-    None when the class has no lexicon hit -- the caller then runs the
-    bounded confirm re-judge. Pure text; no LLM."""
+    The SCRIPT is the only evidence. The finding's own prose is not: a judge that
+    writes "the scene mentions a gun" would otherwise corroborate itself, and
+    that is exactly what a closed vocabulary is supposed to prevent. Word
+    boundaries, so "gun" never fires on "begun". Pure text; no LLM.
+    """
     terms = HARD_CLASS_EVIDENCE.get(finding.finding_class) or ()
-    hay = " " + _norm_ws_lower(finding.detail + " " + script) + " "
-    for term in terms:
-        if term in hay:
-            return term
-    return None
+    hits = lexicon_hits(script, terms)
+    return hits[0] if hits else None
 
 
 def triage_hard_findings(

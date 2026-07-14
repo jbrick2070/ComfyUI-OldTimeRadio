@@ -240,7 +240,7 @@ class TestScriptLadder:
 
 
 # ---------------------------------------------------------------------------
-# 2. P8 triage evidence bar (lexicon-only kill policy)
+# 2. P8 safety scan (deterministic; the LLM ledger audit is gone)
 # ---------------------------------------------------------------------------
 
 def _parsed_good():
@@ -250,57 +250,41 @@ def _parsed_good():
     return parsed
 
 
-def _finding(cls, detail="the judge says something is wrong here"):
-    return F2.AuditFindings(findings=[{
-        "finding_class": cls, "scene": 1, "speaker": "SELA",
-        "detail": detail}])
+class TestSafetyScan:
+    def test_clean_drama_passes(self):
+        F2._assert_no_weapons_or_smoking(_parsed_good())
 
-
-class TestTriage:
-    def test_unproven_weapons_flag_discarded_loudly(self):
-        parsed = _parsed_good()
-        view = F2._script_view(parsed, _treatment())
-        confirmed, discarded, reported = F2._triage(
-            _finding("weapons_smoking"), parsed, view, _CAST)
-        assert not confirmed and len(discarded) == 1 and not reported
-
-    def test_lexicon_corroborated_weapons_flag_confirmed(self):
+    def test_a_spoken_weapon_is_fatal(self):
         from nodes._otr_fable2_markup import parse_fable2_markup
         armed = _GOOD_MARKUP.replace(
             "Play it again, and this time keep the gain low.",
             "Put the revolver down and play the tape again for me.")
         parsed, defects = parse_fable2_markup(armed, _CAST)
         assert parsed is not None, defects
-        view = F2._script_view(parsed, _treatment())
-        confirmed, discarded, reported = F2._triage(
-            _finding("weapons_smoking"), parsed, view, _CAST)
-        assert len(confirmed) == 1
-        assert "revolver" in confirmed[0][1]
+        with pytest.raises(F2.Fable2AuditError) as exc:
+            F2._assert_no_weapons_or_smoking(parsed)
+        assert "revolver" in str(exc.value)
 
-    def test_news_framing_never_killed_by_the_real_news_read(self):
-        # The closing news read IS real news by design -- only the
-        # character-spoken drama is kill-scannable for news framing.
-        parsed = _parsed_good()
-        view = F2._script_view(parsed, _treatment())  # includes the read
-        confirmed, discarded, reported = F2._triage(
-            _finding("news_source_framing"), parsed, view, _CAST)
-        assert not confirmed and len(discarded) == 1
+    def test_the_scan_is_word_boundary_not_substring(self):
+        """'gun' must never fire on 'begun' -- the old scan did exactly that."""
+        from nodes._otr_original_radio import lexicon_hits, WEAPON_SMOKING_EVIDENCE
+        assert lexicon_hits(
+            "The broadcast had begun and the pipeline was clear.",
+            WEAPON_SMOKING_EVIDENCE,
+        ) == []
+        assert lexicon_hits(
+            "She set the gun on the table.", WEAPON_SMOKING_EVIDENCE,
+        ) == ["gun"]
 
-    def test_python_verified_structural_flags_discarded(self):
-        parsed = _parsed_good()
-        view = F2._script_view(parsed, _treatment())
-        for cls in ("speaker_not_in_cast", "verbatim_break",
-                    "skeleton_break"):
-            confirmed, discarded, reported = F2._triage(
-                _finding(cls), parsed, view, _CAST)
-            assert not confirmed and len(discarded) == 1, cls
-
-    def test_taste_classes_report_only_never_fatal(self):
-        parsed = _parsed_good()
-        view = F2._script_view(parsed, _treatment())
-        confirmed, discarded, reported = F2._triage(
-            _finding("register_bleed"), parsed, view, _CAST)
-        assert not confirmed and not discarded and len(reported) == 1
+    def test_a_judges_own_prose_can_no_longer_corroborate_itself(self):
+        """The old bar scanned `finding.detail + script`, so a judge that wrote
+        'the scene mentions a gun' proved its own flag. Only the script counts.
+        """
+        from nodes._otr_original_radio import lexicon_hits, WEAPON_SMOKING_EVIDENCE
+        clean_script = "\n".join(
+            ln.text for scene in _parsed_good().scenes for ln in scene.lines
+        )
+        assert lexicon_hits(clean_script, WEAPON_SMOKING_EVIDENCE) == []
 
 
 # ---------------------------------------------------------------------------
@@ -542,10 +526,8 @@ def _boundary_e2e_run(tmp_path, monkeypatch, *, target_words: int,
             if revision_improves else
             {"verdict": "ship", "notes": []}
         ))
-    technical_responses.extend([
-        _casting_json_for_two,
-        json.dumps({"findings": []}),
-    ])
+    # Casting is the LAST technical LLM call: the P8 ledger audit is gone.
+    technical_responses.append(_casting_json_for_two)
 
     draft1 = _budgeted_markup(target_words)
     creative_responses = [
@@ -566,7 +548,7 @@ def _boundary_e2e_run(tmp_path, monkeypatch, *, target_words: int,
         real_choose = F2.choose_final_draft
         real_assemble = F2._assemble
         real_casting = F2._pass_casting
-        real_audit = F2._pass_audit
+        real_scan = F2._assert_no_weapons_or_smoking
 
         def _choose_spy(draft_a, draft_b, contract):
             selection = real_choose(draft_a, draft_b, contract)
@@ -582,15 +564,14 @@ def _boundary_e2e_run(tmp_path, monkeypatch, *, target_words: int,
             return real_casting(
                 slot_fn, pack, final_draft, *args, **kwargs)
 
-        def _audit_spy(technical_fn, pack, final_draft, *args, **kwargs):
-            captured["audit"].append(final_draft)
-            return real_audit(
-                technical_fn, pack, final_draft, *args, **kwargs)
+        def _scan_spy(parsed):
+            captured["audit"].append(parsed)
+            return real_scan(parsed)
 
         monkeypatch.setattr(F2, "choose_final_draft", _choose_spy)
         monkeypatch.setattr(F2, "_assemble", _assemble_spy)
         monkeypatch.setattr(F2, "_pass_casting", _casting_spy)
-        monkeypatch.setattr(F2, "_pass_audit", _audit_spy)
+        monkeypatch.setattr(F2, "_assert_no_weapons_or_smoking", _scan_spy)
 
     episode_id = f"fable2_boundary_{target_words}"
     led = _PL.new_ledger(
@@ -646,15 +627,15 @@ class TestEndToEndSpine:
         assert f2["draft1_sha256"] == f2["final_sha256"]
         assert f2["critic"] is None
         assert f2["proof_map"]
-        assert f2["audit"] == {
-            "findings": [], "confirmed": [], "discarded": []}
+        # The LLM ledger audit is gone; nothing stamps an audit verdict.
+        assert "audit" not in f2
         assert "_winning_draft_text" not in f2
         # receipts: every logical pass is explicit, including compact skips.
         receipts = f2["pass_receipts"]
         assert [r["pass_id"] for r in receipts] == [
             "dossier", "pitch_room", "pitch_select", "treatment",
             "news_read", "script", "critic", "revision",
-            "casting_voices", "assemble", "ledger_audit"]
+            "casting_voices", "assemble"]
         assert all(r["mode"] == "one_pitch_one_draft" for r in receipts)
         skipped = [r for r in receipts if r["status"] == "skipped"]
         assert [r["pass_id"] for r in skipped] == [
@@ -675,8 +656,9 @@ class TestEndToEndSpine:
         # credits receipt (25th live smoke): the fable2 seed is the
         # episode's seed receipt
         assert meta["episode_seed"] == 42
-        # exactly 4 technical + 3 creative calls on the happy path
-        assert len(technical.calls) == 4
+        # exactly 3 technical + 3 creative calls on the happy path
+        # (the P8 ledger audit is a Python scan now, not an LLM call)
+        assert len(technical.calls) == 3
         assert len(creative.calls) == 3
 
     def test_seed_reproduces_the_deal_across_runs(self, tmp_path,
@@ -733,7 +715,7 @@ class TestS2ModeExecution:
         assert f2["final_draft"]["p3_attempts"]
         assert f2["final_draft"]["p5_attempts"] == []
         assert len(creative.calls) == 3
-        assert len(technical.calls) == 4
+        assert len(technical.calls) == 3
         assert led.data["meta"]["fable2"] is f2
 
     @pytest.mark.parametrize(
@@ -778,7 +760,9 @@ class TestS2ModeExecution:
         assert len(captured["audit"]) == 1
         assert captured["assemble"][0] is winner
         assert captured["casting"][0] is winner
-        assert captured["audit"][0] is winner
+        # P8 scans the WINNER's parsed script -- the same draft that was
+        # assembled, not a re-derived one.
+        assert captured["audit"][0] is winner.parsed
         assert len(winner.p3_attempts) >= 1
         assert len(winner.p5_attempts) >= 1
         assert all(type(row) is F2.PassAttemptTrace
@@ -798,7 +782,7 @@ class TestS2ModeExecution:
             assert [row.outcome for row in winner.p3_attempts] == [
                 "accepted"]
         assert len(creative.calls) == creative_call_count
-        assert len(technical.calls) == 6
+        assert len(technical.calls) == 5
 
         final_receipt = f2["final_draft"]
         assert final_receipt == F2._final_draft_ledger_payload(winner)
@@ -862,7 +846,7 @@ class TestS2ModeExecution:
         assert f2["final_draft"]["p3_attempts"]
         assert f2["final_draft"]["p5_attempts"]
         assert len(creative.calls) == 4
-        assert len(technical.calls) == 6
+        assert len(technical.calls) == 5
 
 
 # ---------------------------------------------------------------------------

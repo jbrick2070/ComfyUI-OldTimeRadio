@@ -50,13 +50,34 @@ def test_payload_pin_and_advisory_centers():
 
 
 def test_clean_critique_and_spoken_rejections():
-    clean = lane.SceneCritiqueV4(passed=True, feedback="", line_fact_ids={}, sfw_pass=True)
+    clean = lane.SceneCritiqueV4(passed=True, feedback="", line_fact_ids={})
     assert clean.passed and clean.feedback == ""
     assert lane._spoken_error("(pause) the signal arrives", "ORUM")
     assert lane._spoken_error("NASA confirms it", "ORUM")
     assert lane._spoken_error("The signal arrives", "ORUM") is None
     with pytest.raises(lane.SciFiGeminiTargetRangeError):
         lane.validate_gemini_payload(_payload(), {"seed_source": "rss_fetch", "target_words": 901})
+
+
+def test_a_locked_cast_name_may_be_spoken_and_a_shout_may_not():
+    """The outline seam ORDERS cast names in ALL CAPS.
+
+    So a character addressing another by name speaks an all-caps token by
+    construction -- and the spoken validator used to kill the episode for it,
+    outside every repair ladder. The names and the source's own acronyms are
+    allowed; a shout is not, and now it comes back as a repairable defect.
+    """
+    cast = [
+        lane.CastV4(char_id="announcer", name="ANNOUNCER",
+                    character_description="host", gender="neutral"),
+        lane.CastV4(char_id="c01", name="ORUM",
+                    character_description="engineer", gender="female"),
+    ]
+    allowed = lane.allowed_spoken_all_caps(None, cast)
+    assert lane._spoken_error("ORUM, the signal arrives.", "Vesh", allowed) is None
+    assert "all-caps" in lane._spoken_error(
+        "The signal ARRIVES.", "Vesh", allowed,
+    )
 
 
 def test_gemini_tail_canon_uses_complete_episode_canon_protocol(tmp_path):

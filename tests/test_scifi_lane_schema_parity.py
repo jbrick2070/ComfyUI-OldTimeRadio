@@ -911,8 +911,7 @@ def test_sonnet_rewrite_corrections_are_written_back_into_the_record():
 
     audit = lane.AuditVerdictV4.model_validate({
         "status": "defect", "defects": ["line 0 misstates the wording"],
-        "flagged_line_refs": [0], "invented_fact_flags": [], "severity": "critical",
-        "sfw_pass": True,
+        "flagged_line_refs": [0],
     })
     rewrite = lane.RewriteResultV4.model_validate({
         "corrected_lines": [{

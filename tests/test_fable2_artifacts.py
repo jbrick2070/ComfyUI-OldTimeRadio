@@ -238,18 +238,11 @@ class TestModels:
                 note="Tighten the announcer frame without changing the coda.",
             )
 
-    def test_audit_finding_class_enum_closed(self):
+    def test_critic_problem_class_enum_closed(self):
         with pytest.raises(ValidationError):
-            F2.AuditFinding(finding_class="vibes_off", scene=1, speaker="",
-                            detail="not a registry class at all")
-
-    def test_critic_classes_are_subset_of_audit_classes(self):
-        # r4 anchor snapshot: every critic class is auditable.
-        critic = set(
-            F2.CriticNote.model_fields["problem"].annotation.__args__)
-        audit = set(
-            F2.AuditFinding.model_fields["finding_class"].annotation.__args__)
-        assert critic < audit
+            F2.CriticNote(scene=1, frame_scope=None, speaker="",
+                          problem="vibes_off",
+                          note="not a registry class at all")
 
 
 # ---------------------------------------------------------------------------

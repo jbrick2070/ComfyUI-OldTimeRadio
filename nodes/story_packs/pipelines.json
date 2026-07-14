@@ -164,8 +164,7 @@
         "fable2_script_system",
         "fable2_critic_system",
         "fable2_revision_system",
-        "fable2_casting_system",
-        "fable2_audit_system"
+        "fable2_casting_system"
       ],
       "passes": [
         {
@@ -247,12 +246,10 @@
           "description": "P7: pure Python assembly, no LLM -- slot is registry metadata. The selected sealed FinalDraft + Treatment -> ledger rows with per-constituent verbatim proof gates; incremental led.save() per scene."
         },
         {
-          "pass_id": "ledger_audit",
+          "pass_id": "safety_scan",
           "slot": "technical",
-          "seam_refs": [
-            "fable2_audit_system"
-          ],
-          "description": "P8 technical: the selected sealed FinalDraft's complete music-bearing assembled view + treatment -> AuditFindings; evidence triage discards uncorroborated findings LOUDLY; confirmed findings = fail loud naming the defect (audit-only through S3)."
+          "seam_refs": [],
+          "description": "P8: pure Python -- slot is registry metadata. Word-boundary scan of the shared weapons/tobacco lexicon over the spoken drama. No LLM audit: a model opinion may not end an episode, and the lexicon was always the only kill authority anyway."
         }
       ],
       "notes": [

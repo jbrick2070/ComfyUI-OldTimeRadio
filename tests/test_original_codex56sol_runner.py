@@ -455,13 +455,19 @@ def test_p3_collection_placement_repair_does_not_spend_an_llm_call(tmp_path):
 
 
 def test_cross_artifact_validators_return_retryable_error_strings():
+    """A defect Python CANNOT fix still comes back as a retryable string.
+
+    The echoed draw fields are restored (they are inputs, not authorship), but a
+    duplicate possibility id is the model's own structural mistake -- Python may
+    not pick which card to keep, so it goes back to the ladder.
+    """
     draw = lane.ConstraintDraw.model_validate(DRAW)
-    bad = lane.PossibilitySlate.model_validate({"possibilities": [
-        {"possibility_id":f"p{i}","title_seed":"Other","premise":"Other objects.","desk_operator":{"name":"Mara Vale"},"callers":[{"name":"Ivo Reed"},{"name":"Nell Park"}],"lost_objects":["other","items","here"],"acoustic_device":"A storm.","shared_cause":"A storm.","clue_plan":["one","two","three"],"helpful_resolution":"They meet."}
-        for i in range(1,5)
+    duplicated = lane.PossibilitySlate.model_validate({"possibilities": [
+        {"possibility_id":"p1","title_seed":"Other","premise":"Other objects.","desk_operator":{"name":"Mara Vale"},"callers":[{"name":"Ivo Reed"},{"name":"Nell Park"}],"lost_objects":["other","items","here"],"acoustic_device":"A storm.","shared_cause":"A storm.","clue_plan":["one","two","three"],"helpful_resolution":"They meet."}
+        for _ in range(4)
     ]})
-    error = lane._validate_slate(bad, draw)
-    assert isinstance(error, str) and "copied verbatim" in error
+    error = lane._validate_slate(duplicated, draw)
+    assert isinstance(error, str) and "unique" in error
 
 
 def test_structural_numeric_ids_canonicalize_without_authored_prose_change():
@@ -614,10 +620,9 @@ def test_truth_map_requires_one_thread_and_resolution_per_selected_object():
     incomplete_data["caller_threads"] = incomplete_data["caller_threads"][:2]
     incomplete_data["resolution_links"] = incomplete_data["resolution_links"][:2]
     incomplete = lane.AudibleTruthMap.model_validate(incomplete_data)
-    assert lane._validate_truth_map(incomplete, selected) == (
-        "caller_threads must contain exactly one row per selected lost object, "
-        "with one lost_object field per row"
-    )
+    error = lane._validate_truth_map(incomplete, selected)
+    assert "exactly one row per selected lost object" in error
+    assert "VERBATIM" in error
 
 
 def test_score_requires_exact_clue_coverage_and_contiguous_shots():
@@ -1594,6 +1599,132 @@ def test_every_shipped_draw_is_satisfiable_at_the_five_line_minimum(draw):
     assert receipt["complete"] is True
     plant = next(r for r in receipt["evidence"] if r["kind"] == "device_plant")
     assert plant["line_id"] == "line_002"
+
+
+def test_a_shortened_thread_lost_object_is_restored_when_forced():
+    """Live prompt 37a3cedf: the model wrote `timetable` for `folded timetable`.
+
+    The thread's real content -- the caller, the need -- is authored. The object
+    name is an echo of the draw, so restore it when exactly one draw object can
+    be meant. Ambiguity is the model's to resolve, and goes back to the ladder.
+    """
+    card = lane.PossibilityCard.model_validate({
+        **_fixtures()["card"],
+        "lost_objects": ["garden key", "folded timetable", "tin whistle"],
+    })
+    payload = json.loads(json.dumps(_fixtures()["truth"]))
+    for row, obj in zip(payload["caller_threads"],
+                        ["garden key", "timetable", "whistle"]):
+        row["lost_object"] = obj
+    truth = lane.AudibleTruthMap.model_validate(payload)
+
+    assert lane._validate_truth_map(truth, card) is None
+    assert [row.lost_object for row in truth.caller_threads] == [
+        "garden key", "folded timetable", "tin whistle",
+    ]
+    # The authored content of the thread is untouched.
+    assert truth.caller_threads[1].caller_name == "Nell Park"
+
+    # A DROPPED thread is not a coordinate error -- Python may not invent one.
+    short = lane.AudibleTruthMap.model_validate(payload)
+    short.caller_threads = short.caller_threads[:2]
+    assert "VERBATIM" in lane._validate_truth_map(short, card)
+
+
+def test_a_paraphrased_immutable_draw_field_is_restored_not_fatal():
+    """Live prompt efafc6fa: the model wrote the right story about the right
+    device and re-worded the field that only echoes the draw. Restore the input.
+    """
+    draw = lane.ConstraintDraw.model_validate(DRAW)
+    slate = lane.PossibilitySlate.model_validate(_fixtures()["slate"])
+    slate.possibilities[0].acoustic_device = "a grille that repeats phrases"
+    slate.possibilities[1].lost_objects = ["stamp", "mitten", "recipe card"]
+
+    assert lane._validate_slate(slate, draw) is None
+    for card in slate.possibilities:
+        assert card.acoustic_device == DRAW["acoustic_device"]
+        assert card.lost_objects == DRAW["lost_objects"]
+
+
+def test_announcer_char_id_is_canonicalized_not_rejected(tmp_path):
+    """An id is a coordinate, not a story decision.
+
+    Live prompt a89a46a4: the model wrote a valid announcer row and filed it
+    under char_id 'a'. Rejecting the score sent a 5,772-token repair prompt into
+    a 4,592-token window, PROMPT_GUARD cut the tail off, and the model came back
+    with a single cast row. Rename the id at the attempt boundary instead.
+    """
+    responses = _responses()
+    score = responses[3]
+    score["cast"][0]["char_id"] = "a"
+    for beat in score["beats"]:
+        if beat["char_id"] == "announcer":
+            beat["char_id"] = "a"
+    calls = []
+
+    def generate(messages, **_kwargs):
+        calls.append(messages)
+        return json.dumps(responses.pop(0))
+
+    routing._REGISTRY = None
+    story_rules._clear_caches()
+    pack = routing.resolve_story_pack("original_codex56sol")
+    rules = story_rules.resolve_story_rules("original_codex56sol")
+    led = ledger_mod.new_ledger(episode_id="codex56_announcer", out_dir=str(tmp_path))
+    meta = led.data.setdefault("meta", {})
+    meta.update({
+        "source_bank": "original_codex56sol",
+        "source_meta": {"constraint_draw": DRAW},
+    })
+    lane.run_original_codex56sol_episode(
+        payload={"seed_text": json.dumps(DRAW)}, pack=pack,
+        resolved={"target_words": 30, "num_characters": 3}, led=led, meta=meta,
+        creative_fn=generate, technical_fn=generate, slot_scheduler=Scheduler(),
+        source_bank_row=None, story_rules=rules, episode_root=tmp_path,
+        episode_id="codex56_announcer",
+    )
+
+    # No repair rung was spent: the id was projected at the attempt boundary.
+    assert len(calls) == 5
+    accepted = led.data["meta"]["original_codex56sol"]["accepted_artifacts"]
+    assert accepted["broadcast_score"]["cast"][0]["char_id"] == "announcer"
+    assert led.data["cast"][0]["char_id"] == "announcer"
+
+
+def test_p5_repair_context_is_bounded_to_what_the_model_cannot_infer():
+    """The repair prompt must FIT, or PROMPT_GUARD deletes the contract silently."""
+    inputs = {
+        "truth_map": _fixtures()["truth"],
+        "grounding_contract": {
+            "lost_object_anchors": ["stamp"], "device_anchor": "grille",
+            "resolution_anchor": "every item is returned",
+            "expected_cause": "a grille repeats phrases",
+            "expected_resolution": "return every item",
+            "clues": [{
+                "clue_id": "q1", "thread_id": "t1", "lost_object": "stamp",
+                "sound_or_phrase": "a repeated shelf number",
+                "implication": "the stamp is near the desk",
+            }],
+        },
+        "target_words_advisory": 30,
+    }
+    bounded = lane._repair_inputs("P5", inputs)
+    # The immutable anchors and the clue inventory survive.
+    assert bounded["grounding_contract"]["device_anchor"] == "grille"
+    assert bounded["truth_map"]["audible_clues"] == [
+        {"clue_id": "q1", "thread_id": "t1"},
+        {"clue_id": "q2", "thread_id": "t2"},
+        {"clue_id": "q3", "thread_id": "t3"},
+    ]
+    assert bounded["target_words_advisory"] == 30
+    # The prose the failed artifact already carries does not.
+    assert "caller_threads" not in bounded["truth_map"]
+    assert "sound_or_phrase" not in bounded["grounding_contract"]["clues"][0]
+    assert len(json.dumps(bounded)) < len(json.dumps(inputs)) / 2
+    # A pass with a small input surface keeps all of it.
+    assert lane._repair_inputs("P1", {"ingress": {"draw": 1}}) == {
+        "ingress": {"draw": 1},
+    }
 
 
 def test_p5_announcer_owned_clue_reaches_the_p5_ladder():
