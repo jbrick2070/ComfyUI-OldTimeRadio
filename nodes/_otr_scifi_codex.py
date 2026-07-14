@@ -3196,7 +3196,21 @@ def run_scifi_codex_episode(
         result_type=CastPlanV4, post_validator=_validate_cast_plan,
         base_temperature=.72, structural_retry_temperature=.32,
         max_new_tokens=1600, call_journal=journal,
-        clamp_overlong_strings=False,
+        # CLAMP ON, and P2 is the pass that earns it. `clamp_overlong_strings`
+        # is fail-closed everywhere else here because those artifacts carry
+        # AUTHORED PROSE, and prose must never be silently shortened. CastPlanV4
+        # carries none: every field is a tag -- char_id and voice_slot are
+        # Literals, name is 40 chars, gender 24, character_description 160,
+        # role_in_conflict 120. Nothing here is ever spoken aloud.
+        #
+        # Live 2026-07-14 (30-word Aion leg): the model wrote a 140-character
+        # `cast.2.role_in_conflict`, pydantic raised string_too_long, the typed
+        # repair wrote a long one again, and the episode died -- over a cast
+        # NOTE that no listener will ever hear. That is precisely the failure the
+        # clamp was built for ("a verbose model can overflow a short capped tag
+        # field ... the whole episode aborted", the outline's time_of_day,
+        # 2026-06-18). Trim it at a word boundary and get on with the story.
+        clamp_overlong_strings=True,
     )
     beat_ids = [f"b{i:03d}" for i in range(max(3, min(12, len(p2.cast) * 3)))]
     advisory = make_advisory_word_blueprint(steer.requested_words, beat_ids)
