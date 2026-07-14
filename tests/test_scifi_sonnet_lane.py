@@ -62,6 +62,30 @@ def test_sonnet_payload_cast_lock_and_spoken_hygiene():
         lane.validate_spoken_text_and_lock([bad], cast)
 
 
+def test_the_sources_own_acronyms_may_be_spoken():
+    """Live prompt c7023ae8: the announcer's cold open said an acronym the
+    fragment itself states, and the gate killed the episode AFTER every pass had
+    already succeeded. The record exists to state the source's words.
+    """
+    dossier = lane.FragmentDossierV4.model_validate({
+        "verified_facts": [{
+            "fact_id": "fact_1", "claim": "NASA confirmed the signal.",
+            "source_spans": [{"field": "summary", "start": 0, "end": 25,
+                              "quote": "NASA confirmed the signal"}],
+        }],
+        "key_numbers": [], "named_entities": [],
+        "tone": "measured", "headline_clean": "Signal confirmed",
+        "provenance_note": "One fragment.", "payload_sha256": "a" * 64,
+    })
+    allowed = lane.allowed_spoken_all_caps(dossier)
+    assert "NASA" in allowed
+
+    assert lane._spoken_error("NASA confirmed it.", "ORUM", allowed) is None
+    assert "all-caps" in lane._spoken_error("It ARRIVED.", "ORUM", allowed)
+    # And with no dossier, the old strictness stands.
+    assert lane._spoken_error("NASA confirmed it.", "ORUM")
+
+
 def test_grounding_is_proven_against_the_dossier_not_judged_by_the_warden():
     """`invented_fact_flags` was a model's feeling. This is a proof.
 

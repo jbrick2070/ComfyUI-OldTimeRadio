@@ -553,17 +553,61 @@ def lock_archive_cast(frame: SessionFrameV4) -> Mapping[str, CastLockV4]:
     }
 
 
-def _spoken_error(text: str, name: str = "") -> str | None:
+def allowed_spoken_all_caps(dossier: "FragmentDossierV4 | None") -> frozenset[str]:
+    """All-caps tokens the SOURCE itself uses.
+
+    The record is about the source, so the source's own acronyms are the words the
+    episode has to say: NASA, RNA, ESA. Killing the episode for saying them is
+    killing it for doing its job (live: prompt c7023ae8 -- the announcer's cold
+    open said an acronym the fragment states, and the gate ended the run AFTER
+    every pass had succeeded).
+    """
+    if dossier is None:
+        return frozenset()
+    surfaces: list[str] = []
+    for fact in dossier.verified_facts:
+        surfaces.append(fact.claim)
+        surfaces.extend(span.quote for span in fact.source_spans)
+    for number in dossier.key_numbers:
+        surfaces.append(number.source_span.quote)
+    for entity in dossier.named_entities:
+        surfaces.append(entity.name)
+        surfaces.extend(span.quote for span in entity.source_spans)
+    surfaces.append(dossier.headline_clean)
+    return frozenset(
+        match.group(0)
+        for surface in surfaces
+        for match in _ALL_CAPS_RE.finditer(surface or "")
+    )
+
+
+def _spoken_error(
+    text: str,
+    name: str = "",
+    allowed_all_caps: frozenset[str] = frozenset(),
+) -> str | None:
     if not (text or "").strip():
         return "spoken text is empty"
     # The all-caps rule exists to catch shouted emphasis and stage directions. But THIS
     # lane's characters are NAMED in all caps by contract -- CastLockV4.name is
     # Literal["ANNOUNCER", "ORUM", "THESSALY", "VESH"] -- so the moment the Warden
     # addressed the Literalist by name, the gate rejected the line for obeying the
-    # schema. A validator may not block on the system's own contract.
+    # schema. A validator may not block on the system's own contract. The same is
+    # true of the SOURCE's own acronyms: the record exists to state them.
     without_cast_names = _CAST_NAME_RE.sub("", text)
-    if _DECORATION_RE.search(text) or _ALL_CAPS_RE.search(without_cast_names):
-        return "spoken text contains decoration or all-caps lexical text"
+    shouted = [
+        token for token in _ALL_CAPS_RE.findall(without_cast_names)
+        if token not in allowed_all_caps
+    ]
+    if _DECORATION_RE.search(text):
+        return "spoken text contains decoration"
+    if shouted:
+        return (
+            "spoken text contains all-caps lexical text "
+            f"({', '.join(sorted(set(shouted)))}); write it in normal case -- "
+            "only a locked cast name or an acronym the source itself uses may "
+            "be all-caps"
+        )
     if re.match(r"""^\s*["'].*["']\s*$""", text):
         return "spoken text is wholly quoted"
     if re.match(r"^\s*(?:ANNOUNCER|ORUM|THESSALY|VESH)\s*:", text):
@@ -575,12 +619,16 @@ def _spoken_error(text: str, name: str = "") -> str | None:
     return None
 
 
-def validate_spoken_text_and_lock(events: Sequence[DraftLineV4], cast_lock: Mapping[str, CastLockV4]) -> None:
+def validate_spoken_text_and_lock(
+    events: Sequence[DraftLineV4],
+    cast_lock: Mapping[str, CastLockV4],
+    allowed_all_caps: frozenset[str] = frozenset(),
+) -> None:
     for event in events:
         lock = cast_lock.get(event.char_id)
         if lock is None or event.speaker != lock.name:
             raise SonnetSpokenTextError(f"{event.char_id} is not locked to speaker {event.speaker}")
-        err = _spoken_error(event.text, lock.name)
+        err = _spoken_error(event.text, lock.name, allowed_all_caps)
         if err:
             raise SonnetSpokenTextError(f"{event.speaker}: {err}")
 
@@ -982,7 +1030,7 @@ def run_scifi_sonnet_episode(
         DraftLineV4(text=att.vesh_final_seal, cites=[], non_fact=True, speaker="VESH", char_id="c04", source_pass="P6"),
         DraftLineV4(text=att.sign_off, cites=[], non_fact=True, speaker="ANNOUNCER", char_id="announcer", source_pass="P6"),
     ])
-    validate_spoken_text_and_lock(events, cast)
+    validate_spoken_text_and_lock(events, cast, allowed_spoken_all_caps(p0))
     # The grounding proof. Every factual line cites a real dossier fact and states
     # only numbers the source states -- checked, not felt. This is the one thing in
     # the lane allowed to end an episode over content, and it is deterministic.
