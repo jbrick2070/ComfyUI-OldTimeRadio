@@ -3243,7 +3243,23 @@ def run_scifi_codex_episode(
         result_type=StructureReviewV4, post_validator=lambda x: None,
         base_temperature=.20, structural_retry_temperature=.10,
         max_new_tokens=1800, call_journal=journal,
-        clamp_overlong_strings=False,
+        # CLAMP ON. P4 is an AUDIT, and StructureReviewV4 carries no authored
+        # prose: `verdict` is a Literal, `issues` are <=120-char critic notes,
+        # `rationale` is a <=240-char critic note that defaults to "". Not one
+        # character of it is ever spoken aloud, and the only field that steers
+        # anything downstream is `verdict` -- which a length clamp cannot touch.
+        # This now matches its SIBLING AUDITS, P6 (ListenerReviewV4) and P8
+        # (FinalAuditV4), both of which already take the default clamp=True.
+        # P4 was the lone audit left fail-closed, and the fail-closed arm here is
+        # reserved for artifacts that carry finite creative work (P0's verbatim
+        # source spans, P1's dramatic question, P3's score draft).
+        #
+        # Live 2026-07-14 (420-word Aion leg, f6c42c5f): Mistral-Nemo returned
+        # verdict="rewrite" with a 240+ char `rationale`, pydantic raised
+        # string_too_long, the typed repair wrote a long one again, and the
+        # episode DIED -- killed by the length of a critic's own footnote.
+        # THE LAW: an audit may improve a story, it may never fail one.
+        clamp_overlong_strings=True,
     )
     score = p3
     if review.verdict == "rewrite":

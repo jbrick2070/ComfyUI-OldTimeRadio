@@ -431,6 +431,55 @@ def test_source_grounded_p0_disables_generic_string_clamping():
             pytest.fail(f"no {invoke_name} function found in {module_path}")
 
 
+def test_codex_audit_passes_never_fail_a_story_over_a_critic_note():
+    """THE LAW: an audit may improve a story, it may never fail one.
+
+    Codex's audit passes (P4 structure review, P6 listening room, P8 final
+    audit) return CRITIQUE artifacts -- verdicts, issue notes, rationales. Not
+    one character of any of them is ever spoken aloud, and the only fields that
+    steer anything downstream are Literals that a length clamp cannot touch. So
+    an over-long critic NOTE must never be able to abort the episode.
+
+    This class has now killed two live legs:
+      * 2026-07-14, 30w  -- P2 died on a 140-char `cast.2.role_in_conflict`.
+      * 2026-07-14, 420w -- P4 died on a 240+ char `rationale` (f6c42c5f), the
+        model's own footnote on a story it had just reviewed.
+
+    P6 and P8 are protected by the clamp DEFAULT (True). P4 was the lone audit
+    explicitly opted out, which is exactly how it got to kill a leg. Pin all
+    three: an audit pass must never be fail-closed on string length.
+    """
+    import ast
+    import pathlib
+
+    tree = ast.parse(
+        pathlib.Path("nodes/_otr_scifi_codex.py").read_text(encoding="utf-8")
+    )
+    audit_passes = {"P4", "P6", "P8"}
+    seen: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name) or node.func.id != "invoke_codex_structured":
+            continue
+        keywords = {kw.arg: kw.value for kw in node.keywords if kw.arg}
+        pass_node = keywords.get("pass_id")
+        if not (isinstance(pass_node, ast.Constant) and pass_node.value in audit_passes):
+            continue
+        seen.add(pass_node.value)
+        clamp = keywords.get("clamp_overlong_strings")
+        # Either omitted (inherits the clamp=True default) or explicitly True.
+        # Explicit False on an audit is the bug this test exists to prevent.
+        assert clamp is None or (
+            isinstance(clamp, ast.Constant) and clamp.value is True
+        ), (
+            f"Codex audit pass {pass_node.value} is fail-closed on string "
+            f"length. An audit may improve a story, it may never fail one."
+        )
+
+    assert seen == audit_passes, f"missing Codex audit passes: {audit_passes - seen}"
+
+
 @pytest.mark.parametrize(
     "module_name,root_name,facts_key,entities_key,numbers_key,fact_def",
     (
