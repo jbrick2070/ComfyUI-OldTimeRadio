@@ -64,4 +64,3 @@ def fit_output_tokens(
             f"but at least {minimum} are required"
         )
     return min(requested_tokens, available)
-
