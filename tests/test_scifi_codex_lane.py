@@ -1087,10 +1087,78 @@ def test_max_width_p3_draft_envelopes_fit_the_local_gemma_context():
     patch_response_tokens = len(
         tokenizer(patch_response, add_special_tokens=False)["input_ids"]
     )
-    assert patch_response_tokens <= lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    patch_budget = lane._p3_text_patch_output_budget(patch_targets)
+    # NOTE what `patch_response` above actually is: a COMPACT object
+    # (separators=(",", ":"), no spaces) -- i.e. the shape the local
+    # grammar-constrained transport emits. Measuring only that shape is what
+    # made the old flat 1024 look safe. A free-form remote model pretty-prints,
+    # wraps the object in a ```json fence, and -- if it is a reasoning model --
+    # spends part of the SAME max_tokens budget thinking before it writes a
+    # character. Hence the transport headroom on top of the measured artifact.
+    assert patch_response_tokens <= patch_budget
+    assert patch_budget >= patch_response_tokens + (
+        lane._P3_TEXT_PATCH_TRANSPORT_HEADROOM_TOKENS // 2
+    ), "the budget must leave a free-form/reasoning transport real room, not a hair"
     assert (
-        patch_prompt_tokens + lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS <= 8192
+        patch_prompt_tokens + patch_budget <= 8192
     ), f"P3 text patch prompt tokens {patch_prompt_tokens} exceed the 8192 context cap"
+
+
+class TestP3TextPatchOutputBudget:
+    """The patch budget is ARITHMETIC over the real targets, not a constant.
+
+    Live failure that forced this (30-word `scifi_codex` Aion leg): P3 exhausted
+    with `PostValidationError: draft.text_patch at root: patch_json` -- the
+    free-form reasoning model's patch came back cut off mid-JSON, so
+    `parse_first_json_object` raised, so the lane's ONLY authored-text repair
+    route died, and it took a complete episode with it.
+    """
+
+    @staticmethod
+    def _target(path: str, max_chars: int):
+        return lane._P3TextPatchTarget(
+            loc=tuple(path.split(".")), path=path, max_chars=max_chars,
+            current_text="x" * max_chars,
+        )
+
+    def test_a_small_patch_keeps_the_local_floor(self):
+        """One short target must not shrink the budget below the proven floor.
+
+        This is what keeps the LOCAL grammar-constrained path byte-identical.
+        """
+        targets = (self._target("title", 64),)
+        assert (
+            lane._p3_text_patch_output_budget(targets)
+            == lane._P3_TEXT_PATCH_MIN_OUTPUT_TOKENS
+        )
+
+    def test_a_max_width_patch_outgrows_the_old_flat_constant(self):
+        """12 targets at their caps need MORE than the 1024 that used to be all
+        they could ever get -- which is exactly how the JSON got truncated."""
+        targets = tuple(
+            self._target(f"scenes.{i}.shots.1.visual_prompt", 120)
+            for i in range(lane._P3_TEXT_PATCH_MAX_TARGETS)
+        )
+        budget = lane._p3_text_patch_output_budget(targets)
+        assert budget > lane._P3_TEXT_PATCH_MIN_OUTPUT_TOKENS
+        # The artifact's own declared size, plus room for a fence + hidden
+        # reasoning tokens -- never less than the raw JSON it must emit.
+        raw_json_chars = sum(
+            len(t.path) + t.max_chars + lane._P3_TEXT_PATCH_ROW_JSON_CHARS
+            for t in targets
+        ) + lane._P3_TEXT_PATCH_ROOT_JSON_CHARS
+        assert budget >= raw_json_chars // lane._P3_TEXT_PATCH_CHARS_PER_TOKEN
+
+    def test_the_budget_grows_with_the_patch(self):
+        small = (self._target("title", 64),)
+        big = tuple(
+            self._target(f"scenes.{i}.shots.1.visual_prompt", 120)
+            for i in range(lane._P3_TEXT_PATCH_MAX_TARGETS)
+        )
+        assert (
+            lane._p3_text_patch_output_budget(big)
+            > lane._p3_text_patch_output_budget(small)
+        )
 
 
 def test_draft_compiler_derives_only_mechanical_score_metadata():
@@ -1346,7 +1414,7 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
     assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
     assert calls[1]["temperature"] == pytest.approx(lane.REPAIR_TEMPERATURE)
-    assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    assert calls[1]["max_new_tokens"] >= lane._P3_TEXT_PATCH_MIN_OUTPUT_TOKENS
     assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
     assert "replacements" in calls[1]["messages"][0]["content"]
     assert "source_to_shorten" in calls[1]["messages"][1]["content"]
@@ -1425,7 +1493,7 @@ def test_p3_rewrite_local_text_patch_preserves_locked_structure():
 
     assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
-    assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    assert calls[1]["max_new_tokens"] >= lane._P3_TEXT_PATCH_MIN_OUTPUT_TOKENS
     assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
 
 
@@ -1711,7 +1779,7 @@ def test_p3_scheduler_openrouter_uses_bounded_patch_and_forwards_json_mode(monke
     assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
     assert all(call["response_format"] == {"type": "json_object"} for call in calls)
-    assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    assert calls[1]["max_new_tokens"] >= lane._P3_TEXT_PATCH_MIN_OUTPUT_TOKENS
     assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
     assert getattr(
         calls[1]["messages"], "_otr_strict_remote_output_budget", False,
@@ -1779,7 +1847,7 @@ def test_p3_openrouter_repairs_captured_ten_target_shape_with_json_mode():
     assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
     assert all(call["response_format"] == {"type": "json_object"} for call in calls)
-    assert calls[1]["max_new_tokens"] == lane._P3_TEXT_PATCH_MAX_OUTPUT_TOKENS
+    assert calls[1]["max_new_tokens"] >= lane._P3_TEXT_PATCH_MIN_OUTPUT_TOKENS
     attempt = journal["calls"][0]["attempts"][1]
     assert attempt["patch_transport"] == "full_message_remote"
     assert attempt["patch_status"] == "accepted"

@@ -433,10 +433,33 @@ class RadioScoreDraftV4(_Strict):
 
 _P3_TEXT_PATCH_MAX_TARGETS = 12
 _P3_TEXT_PATCH_MAX_SOURCE_CHARS = 256
-_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 1024
 _P3_TEXT_PATCH_PATH_MAX_CHARS = 80
 _P3_TEXT_PATCH_SEAM = "codex_radio_score_text_patch"
 _P3_TEXT_PATCH_KIND = "p3_authored_text_patch"
+
+# The floor, and the ONLY budget the patch used to get. 1024 was calibrated for
+# the LOCAL grammar-constrained transport, where lm-format-enforcer holds the
+# model to a compact bare JSON object. It is not a size contract -- it is one
+# transport's habit, frozen into a constant.
+_P3_TEXT_PATCH_MIN_OUTPUT_TOKENS = 1024
+
+# JSON scaffolding the model must emit around each replacement row --
+# {"path": "...", "replacement_text": "..."}, -- and around the root object.
+_P3_TEXT_PATCH_ROW_JSON_CHARS = 48
+_P3_TEXT_PATCH_ROOT_JSON_CHARS = 32
+
+# Deliberately 3, not the 4 used by `estimate_prompt_tokens`. That estimate is
+# for PROSE; dense JSON (braces, quotes, colons, snake_case paths) tokenizes
+# worse, and a budget that under-counts is the failure we are fixing.
+_P3_TEXT_PATCH_CHARS_PER_TOKEN = 3
+
+# Headroom for a FREE-FORM remote transport, which has no token grammar to hold
+# it to a bare object: it adds a ```json fence, and a REASONING model spends
+# part of the very same max_tokens budget on hidden reasoning before it writes a
+# single character of the answer (this module's sibling documents the identical
+# trap: "a reasoning model spends part of the output budget on hidden
+# reasoning ... finish_reason=length -> unparseable JSON").
+_P3_TEXT_PATCH_TRANSPORT_HEADROOM_TOKENS = 768
 
 
 class _RadioScoreDraftTextPatchRowV4(_Strict):
@@ -1447,6 +1470,40 @@ def _p3_text_patch_transport(slot_fn: GenerateFn) -> str | None:
     return None
 
 
+def _p3_text_patch_output_budget(targets: "tuple[_P3TextPatchTarget, ...]") -> int:
+    """Size the patch's output budget from the patch the model must actually emit.
+
+    The old flat `_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS = 1024` was a LOCAL habit
+    wearing a contract's clothes. Every target's cap is already declared and
+    known (`_p3_text_patch_cap`: premise 144 chars, path <= 80, ...), so the
+    size of the artifact is not a mystery -- it is arithmetic we simply were not
+    doing.
+
+    At the worst legal shape (12 targets at their caps) the JSON alone is about
+    1,100 tokens, and the budget was 1,024 BEFORE a free-form model's ```json
+    fence and before a reasoning model spent any of that same budget thinking.
+    So the object came back cut off mid-JSON, `parse_first_json_object` raised,
+    and the lane's ONLY authored-text repair route died with `patch_json` --
+    taking a complete episode with it (live: 30-word `scifi_codex` Aion leg,
+    prompt 4bd68e4c... , P3 exhausted after 2 attempts).
+
+    Measure the artifact, then add honest headroom for the transport. A small
+    patch still lands on the 1,024 floor, so the local path is unchanged.
+    """
+    payload_chars = _P3_TEXT_PATCH_ROOT_JSON_CHARS
+    for target in targets:
+        payload_chars += (
+            len(str(target.path))
+            + int(target.max_chars)
+            + _P3_TEXT_PATCH_ROW_JSON_CHARS
+        )
+    tokens = -(-payload_chars // _P3_TEXT_PATCH_CHARS_PER_TOKEN)  # ceil
+    return max(
+        _P3_TEXT_PATCH_MIN_OUTPUT_TOKENS,
+        tokens + _P3_TEXT_PATCH_TRANSPORT_HEADROOM_TOKENS,
+    )
+
+
 def _is_p3_patch_index(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
@@ -1722,9 +1779,10 @@ def _run_p3_text_patch(
 ) -> RadioScoreDraftV4:
     """Make P3's sole author-owned text patch call with a complete receipt."""
     patch_attempt_index = len(calls) + 1
+    patch_output_tokens = _p3_text_patch_output_budget(targets)
     receipt: dict[str, Any] = {
         "temperature": REPAIR_TEMPERATURE,
-        "max_new_tokens": _P3_TEXT_PATCH_MAX_OUTPUT_TOKENS,
+        "max_new_tokens": patch_output_tokens,
         "raw_chars": None,
         "raw_sha256": None,
         "resolved_artifact_unwrapped": False,
@@ -1750,7 +1808,7 @@ def _run_p3_text_patch(
             slot_fn,
             _P3TextPatchMessages(_p3_text_patch_messages(pack, targets)),
             temperature=REPAIR_TEMPERATURE,
-            max_new_tokens=_P3_TEXT_PATCH_MAX_OUTPUT_TOKENS,
+            max_new_tokens=patch_output_tokens,
         ))
     except Exception:
         receipt.update({
