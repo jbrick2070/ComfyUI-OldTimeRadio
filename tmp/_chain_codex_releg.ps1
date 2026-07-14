@@ -1,24 +1,40 @@
-# Wait for the bake420 sweep to finish, then re-leg scifi_codex at 420w against
-# the P4 audit-clamp fix (80e30c2e). ONE GPU -- this must NOT overlap the sweep.
+# Wait for the bake420 sweep to finish, then RE-LEG every bank that died, against
+# the fixes shipped during the sweep. ONE GPU -- this must NOT overlap the sweep.
 #
-# scifi_codex led the sweep and died at P4 on a 240+ char critic rationale. The
-# P2 clamp fix proved out on that same leg (P0/P1/P2/P3 all landed), so this
-# re-leg is the first run of the lane with BOTH clamp fixes live.
+#   scifi_codex          -- died at P4 (an audit dying on the length of its own
+#                           240-char rationale). Fixed 80e30c2e. Its P2 clamp fix
+#                           already proved out on that same leg (P0-P3 all landed).
+#   public_domain_story  -- died at the announcer news-coda bridge: aion-3.0-mini
+#                           is a MANDATORY-reasoning model, `max_tokens` bounds
+#                           reasoning + content TOGETHER with the reasoning first,
+#                           and the 1024 floor was a thinking budget with no room
+#                           left to answer. finish_reason=length on both attempts.
+#                           Floor is now reasoning-aware.
+#
+# Banks are appended here as they fail, so this stays the single re-leg queue.
 $repo = "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio"
 Set-Location -LiteralPath $repo
 
+#   scifi_fable2         -- died at the 'critic' pass: CriticNote.speaker was
+#                           REQUIRED, but empty is a legal value meaning "this note
+#                           is about the scene, not one character" (its own consumer
+#                           `_note_scope_error` says so on both branches). The critic
+#                           wrote a scene-wide note, omitted the key, and died.
+#                           speaker now defaults to "".
+$relegBanks = @("scifi_codex", "public_domain_story", "scifi_fable2")
+
 $sweepDone = Join-Path $repo "tmp\bake420_420w_ALLDONE.txt"
-$deadline = (Get-Date).AddHours(6)
+$deadline = (Get-Date).AddHours(8)
 while (-not (Test-Path -LiteralPath $sweepDone) -and (Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 30
 }
 
-"[chain] bake420 finished at $(Get-Date -Format 'HH:mm:ss'); starting scifi_codex re-leg" |
+"[chain] bake420 finished at $(Get-Date -Format 'HH:mm:ss'); re-legging: $($relegBanks -join ', ')" |
     Out-File -FilePath (Join-Path $repo "tmp\chain_releg.log") -Encoding utf8
 
 & powershell.exe -NoProfile -ExecutionPolicy Bypass `
     -File (Join-Path $repo "tmp\_sweep.ps1") `
-    -Banks @("scifi_codex") -Words 420 -SweepName "bake420b"
+    -Banks $relegBanks -Words 420 -SweepName "bake420b"
 
-"[chain] scifi_codex re-leg finished at $(Get-Date -Format 'HH:mm:ss')" |
+"[chain] re-legs finished at $(Get-Date -Format 'HH:mm:ss')" |
     Out-File -FilePath (Join-Path $repo "tmp\chain_releg.log") -Encoding utf8 -Append

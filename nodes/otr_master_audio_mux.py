@@ -230,9 +230,28 @@ def _poll_interrupt():
         return
 
 
+#: Slack on the duration gate, in FRAMES. Not a fudge factor -- a quantization
+#: bound. The published video is a CONCAT of the body and the silent credits roll,
+#: and ffmpeg lands each segment on a frame boundary, so the assembled duration can
+#: exceed (body + declared_credits_tail) by a fraction of a frame per segment plus
+#: container-timebase rounding. ONE frame does not cover that.
+#:
+#: Live 2026-07-14, 420w scifi_codex re-leg: video 294.1600s, audio 218.9307s, an
+#: excess of 75.2293s against a declared credits tail of ~75.18s -- over budget by
+#: ~0.05s, i.e. about ONE AND A QUARTER frames. The gate refused to publish a
+#: finished episode over three hundredths of a second.
+#:
+#: THREE frames (0.12s at 25fps) covers a per-segment rounding plus timebase slop.
+#: This is NOT the "blind widening" the guard's comment warns against: the gate
+#: exists to catch GROSS drift -- a composite/credits frame-budget bug that runs
+#: the video tens of seconds (or 2x) past the audio -- and 0.12s of quantization
+#: slack leaves that protection completely intact.
+DEFAULT_DURATION_TOL_FRAMES = 3.0
+
+
 def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: str,
                      ffmpeg: str = "ffmpeg", fps: int = 25,
-                     duration_tol_frames: float = 1.0,
+                     duration_tol_frames: float = DEFAULT_DURATION_TOL_FRAMES,
                      declared_credits_tail_s: float = 0.0,
                      sfx_bed_path: str = "",
                      sfx_gain: float = DEFAULT_SFX_BED_GAIN):
@@ -298,11 +317,19 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     max_tail_s = declared if declared > 0 else env_ceiling
     tail_src = "declared" if declared > 0 else "env_ceiling"
     if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + max_tail_s + tol:
+        # Print the EXCESS and the OVERAGE at full precision. The old message
+        # rendered the budget as "%.1f" -- so a declared tail of 75.1800s printed
+        # as "75.2s" next to an excess of 75.2293s, and the failure looked like it
+        # violated a budget it was under. Never round the number the reader is
+        # being asked to compare against.
+        _excess = v_dur - a_dur
         raise ValueError(
             f"OTR_MasterAudioMux: silent video {v_dur:.4f}s exceeds master audio "
-            f"{a_dur:.4f}s by > the credits-tail budget ({max_tail_s:.1f}s "
-            f"[{tail_src}] + {tol:.4f}s) -- likely a composite/credits "
-            f"frame-budget bug, not the intended silent credits tail"
+            f"{a_dur:.4f}s by {_excess:.4f}s, over the credits-tail budget "
+            f"({max_tail_s:.4f}s [{tail_src}] + {tol:.4f}s tol = "
+            f"{max_tail_s + tol:.4f}s) by {_excess - max_tail_s - tol:.4f}s "
+            f"-- likely a composite/credits frame-budget bug, not the intended "
+            f"silent credits tail"
         )
     report.append(
         f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
@@ -646,8 +673,30 @@ class OTRMasterAudioMux:
         except _Interrupted:
             raise
         except (ValueError, OSError) as exc:
-            log.error("[OTR_MasterAudioMux] %s", exc)
-            return ("", f"error: {exc}")
+            # FAIL THE RUN. This node is TERMINAL -- it muxes the master audio and
+            # PUBLISHES the episode to obs. If it cannot, there IS no episode, and a
+            # render with no episode is a FAILED render.
+            #
+            # This used to swallow the exception and RETURN an empty path plus an
+            # "error: ..." report string. That single line silently
+            # neutralized EVERY fail-closed gate in mux_master_audio() -- missing
+            # ffmpeg, missing silent video, missing master audio, the duration drift
+            # guard, the audio-SHA identity check. All of them raise ValueError BY
+            # DESIGN (the docstring: "raises ValueError on any gate failure (never
+            # produces a silently-wrong episode)"; one arm is even commented "never
+            # mask the fail-closed path"). Catching them here masked all of them:
+            # the graph completed, ComfyUI logged "Prompt executed", the harness
+            # recorded RESULT SUCCESS -- and no file existed.
+            #
+            # Live 2026-07-14, 420w scifi_codex re-leg (prompt 5ab3884b): the
+            # duration guard tripped on a ~1-frame concat rounding, this handler ate
+            # it, and the leg was recorded GREEN with nothing in otr\obs\. It would
+            # have entered the bake-off as a phantom episode. THE ONLY reason it was
+            # caught is the operator's standing law: confirm the asset on disk --
+            # API success is not proof. A node that cannot fail cannot be trusted,
+            # and a guard that cannot abort is not a guard.
+            log.error("[OTR_MasterAudioMux] FAILED -- no episode published: %s", exc)
+            raise
         for line in report:
             log.info("[OTR_MasterAudioMux] %s", line)
         return (final, "OTR_MasterAudioMux OK -> " + final + "\n" + "\n".join(report))

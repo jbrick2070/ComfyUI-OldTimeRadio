@@ -13,17 +13,20 @@ $banks = @(
     "science_news", "original_radio"
 )
 
-# Wait for the codex re-leg chain (which itself waits for the main sweep).
-$relegDone = Join-Path $repo "tmp\bake420b_420w_ALLDONE.txt"
+# Wait for EVERY re-leg sweep to drain (bake420b, then bake420c -- the scifi_codex
+# re-run against the MasterAudioMux phantom-green fix).
 $deadline = (Get-Date).AddHours(9)
-while (-not (Test-Path -LiteralPath $relegDone) -and (Get-Date) -lt $deadline) {
-    Start-Sleep -Seconds 30
+foreach ($doneFile in @("tmp\bake420b_420w_ALLDONE.txt", "tmp\bake420c_420w_ALLDONE.txt")) {
+    $p = Join-Path $repo $doneFile
+    while (-not (Test-Path -LiteralPath $p) -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 30
+    }
 }
 
-# Latest verdict per bank at 420, across BOTH the main sweep and the re-leg
-# sweep. A later re-leg supersedes an earlier failure for the same bank.
+# Latest verdict per bank at 420, across the main sweep AND every re-leg sweep.
+# A later re-leg supersedes an earlier failure for the same bank.
 $verdict = @{}
-foreach ($name in @("bake420", "bake420b")) {
+foreach ($name in @("bake420", "bake420b", "bake420c")) {
     $sum = Join-Path $repo ("tmp\{0}_420w_summary.txt" -f $name)
     if (-not (Test-Path -LiteralPath $sum)) { continue }
     foreach ($line in (Get-Content -LiteralPath $sum)) {
@@ -33,10 +36,28 @@ foreach ($name in @("bake420", "bake420b")) {
     }
 }
 
+# RESULT SUCCESS IS NOT PROOF -- demand the ASSET. OTR_MasterAudioMux used to
+# swallow its own fail-closed errors and return an empty path, so a leg could
+# report SUCCESS with no episode on disk (live 2026-07-14, scifi_codex 5ab3884b).
+# The gate must never promote a PHANTOM to the 720 rung. Ground truth is
+# `obs_publish OK` in that leg's server log.
+function Test-Published([string]$bank) {
+    $legLog = Join-Path $repo ("tmp\leg_{0}_420w.log" -f $bank)
+    if (-not (Test-Path -LiteralPath $legLog)) { return $false }
+    $portHit = Select-String -Path $legLog -Pattern "port=(\d+)" | Select-Object -Last 1
+    if (-not $portHit) { return $false }
+    $srv = Join-Path $repo ("tmp\otr_headless_{0}.log" -f $portHit.Matches[0].Groups[1].Value)
+    if (-not (Test-Path -LiteralPath $srv)) { return $false }
+    return [bool](Select-String -Path $srv -Pattern "obs_publish OK" -Quiet)
+}
+
 $red = @()
 foreach ($b in $banks) {
     if ($verdict[$b] -ne "SUCCESS") {
         $red += ("{0}={1}" -f $b, $(if ($verdict[$b]) { $verdict[$b] } else { "NO_RESULT" }))
+    }
+    elseif (-not (Test-Published $b)) {
+        $red += ("{0}=PHANTOM_NO_ASSET" -f $b)
     }
 }
 

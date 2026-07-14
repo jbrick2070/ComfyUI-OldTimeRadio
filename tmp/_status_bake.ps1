@@ -14,8 +14,51 @@ function Show-Sweep([string]$name, [int]$w) {
 
     foreach ($l in ($lines | Where-Object { $_ -match "END" })) {
         if ($l -match "END\s+(\S+)\s+\d+w\s+::\s+EXIT=(\d+)\s+::.*RESULT (\w+).*::\s+(\d+)s") {
-            $mark = if ($Matches[3] -eq "SUCCESS") { "OK  " } else { "FAIL" }
-            "{0} {1,-22} {2,6}s" -f $mark, $Matches[1], $Matches[4]
+            $bank = $Matches[1]
+            $ok = ($Matches[3] -eq "SUCCESS")
+
+            # RESULT SUCCESS IS NOT PROOF. OTR_MasterAudioMux used to swallow its own
+            # fail-closed errors and return an empty path, so the graph "completed",
+            # ComfyUI logged "Prompt executed", the harness recorded SUCCESS -- and no
+            # episode existed (live 2026-07-14, scifi_codex re-leg 5ab3884b). The only
+            # ground truth is `obs_publish OK` in the leg's own server log. A SUCCESS
+            # with no publish is a PHANTOM and must never be counted green.
+            if ($ok) {
+                $legLog = Join-Path $repo ("tmp\leg_{0}_{1}w.log" -f $bank, $w)
+                $published = $false
+                if (Test-Path -LiteralPath $legLog) {
+                    $portHit = Select-String -Path $legLog -Pattern "port=(\d+)" |
+                               Select-Object -Last 1
+                    if ($portHit) {
+                        $srv = Join-Path $repo ("tmp\otr_headless_{0}.log" -f $portHit.Matches[0].Groups[1].Value)
+                        if (Test-Path -LiteralPath $srv) {
+                            if (Select-String -Path $srv -Pattern "obs_publish OK" -Quiet) {
+                                $published = $true
+                            }
+                        }
+                    }
+                }
+                if (-not $published) {
+                    "{0} {1,-22} {2,6}s  {3}" -f "PHNT", $bank, $Matches[4], `
+                        "<- RESULT SUCCESS but NO obs_publish -- NO EPISODE. Re-leg required."
+                    continue
+                }
+            }
+
+            $mark = if ($ok) { "OK  " } else { "FAIL" }
+            # A red leg that a later re-leg turned green is HISTORY, not a problem.
+            # Say so, or a stale red trains the eye to ignore reds that are real.
+            $note = ""
+            if (-not $ok) {
+                $releg = Join-Path $repo ("tmp\{0}b_{1}w_summary.txt" -f $name, $w)
+                if (Test-Path -LiteralPath $releg) {
+                    $fixed = Get-Content -LiteralPath $releg |
+                             Where-Object { $_ -match ("END\s+" + [regex]::Escape($bank) + "\s.*RESULT SUCCESS") }
+                    if ($fixed) { $mark = "OK  "; $note = "  (re-leg green; original FAIL superseded)" }
+                    else { $note = "  <- re-leg pending" }
+                } else { $note = "  <- re-leg pending" }
+            }
+            "{0} {1,-22} {2,6}s{3}" -f $mark, $bank, $Matches[4], $note
         } else { $l }
     }
 

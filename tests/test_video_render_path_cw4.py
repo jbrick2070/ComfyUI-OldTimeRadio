@@ -115,6 +115,93 @@ def test_master_audio_mux_missing_inputs_fail_closed(tmp_path):
                          str(tmp_path / "o.mkv"))
 
 
+def test_a_failed_publish_FAILS_THE_RUN_it_never_reports_success(tmp_path, monkeypatch):
+    """THE TERMINAL NODE MUST BE ABLE TO FAIL. A render with no episode is a
+    FAILED render -- it must never be recorded green.
+
+    OTR_MasterAudioMux is terminal: it muxes the master audio and PUBLISHES to obs.
+    Every gate inside mux_master_audio() raises ValueError BY DESIGN ("raises
+    ValueError on any gate failure (never produces a silently-wrong episode)").
+    The node used to catch (ValueError, OSError) and `return ("", f"error: {exc}")`,
+    which neutralized ALL of them: the graph completed, ComfyUI logged
+    "Prompt executed", the API reported RESULT SUCCESS -- and no file existed.
+
+    Live 2026-07-14, 420w scifi_codex re-leg (prompt 5ab3884b): the duration gate
+    tripped on ~1 frame of concat rounding, this handler ate it, and the leg was
+    recorded GREEN with nothing in otr\\obs\\. It would have entered the bake-off as
+    a phantom episode. Only the operator's standing law caught it -- confirm the
+    asset on disk; API success is not proof.
+
+    A node that cannot fail cannot be trusted, and a guard that cannot abort is not
+    a guard.
+    """
+    node = OTRMasterAudioMux()
+    # A missing silent video is one of the fail-closed gates.
+    with pytest.raises((ValueError, OSError)):
+        node.mux(
+            silent_video_path=str(tmp_path / "does_not_exist.mp4"),
+            master_audio_path=str(tmp_path / "also_missing.wav"),
+            clip_manifest_json="[]",
+            declared_credits_tail_s=0.0,
+            fps=25,
+            ffmpeg="ffmpeg",
+            output_path=str(tmp_path / "out.mkv"),
+        )
+
+    # And the swallow must be gone from the CODE -- no `return ("", ...)` escape
+    # hatch on the fail-closed arm. Scan executable lines only: a comment that
+    # merely DESCRIBES the old bug (as the fix's own does) must not trip this.
+    src = (REPO_ROOT / "nodes" / "otr_master_audio_mux.py").read_text(encoding="utf-8")
+    code_lines = [
+        ln.strip() for ln in src.splitlines()
+        if not ln.strip().startswith("#")
+    ]
+    assert not any(ln.startswith('return ("",') for ln in code_lines), (
+        "OTR_MasterAudioMux must RAISE when it cannot publish -- returning an "
+        "empty path lets a render with no episode be recorded as SUCCESS."
+    )
+
+
+@needs_ffmpeg
+def test_credits_tail_gate_absorbs_concat_frame_quantization(tmp_path):
+    """The duration gate must not refuse a finished episode over a rounding.
+
+    The published video is a CONCAT of body + silent credits roll, and ffmpeg lands
+    each segment on a frame boundary, so the assembled duration can exceed
+    (audio + declared_credits_tail) by a fraction of a frame per segment plus
+    timebase slop. The tolerance was ONE frame, which does not cover it.
+
+    Live 2026-07-14: video 294.1600s, audio 218.9307s -> an excess of 75.2293s
+    against a declared tail of ~75.18s. Over by ~0.05s -- about one and a quarter
+    frames -- and the gate refused to publish. Three hundredths of a second cost a
+    25-minute render.
+
+    The GROSS-drift protection is unchanged and still proven below.
+    """
+    master = tmp_path / "m.wav"
+    silent = tmp_path / "s.mp4"
+    _sine(master, 2.0)
+    _silent_video(silent, 3.0)
+
+    # Declare a credits tail that is a hair SHORT of the real excess -- exactly the
+    # quantization case. 1 frame of slack rejects this; the real bound accepts it.
+    declared_just_under = (3.0 - 2.0) - (1.5 / 25.0)   # ~1.25 frames short
+    final, _r = mux_master_audio(
+        str(silent), str(master), str(tmp_path / "quant.mkv"), fps=25,
+        declared_credits_tail_s=declared_just_under,
+    )
+    assert os.path.isfile(final)
+    assert audio_pcm_sha(final) == audio_pcm_sha(str(master))
+
+    # GROSS drift is STILL caught -- the slack is a quantization bound, not a
+    # blind widening. A tail budget of ~0 against a 1s excess must abort.
+    with pytest.raises(ValueError):
+        mux_master_audio(
+            str(silent), str(master), str(tmp_path / "gross.mkv"), fps=25,
+            declared_credits_tail_s=0.01,
+        )
+
+
 @needs_ffmpeg
 def test_sfx_bed_compile_rejects_invalid_manifest_rows(tmp_path):
     stem = tmp_path / "stem.wav"
