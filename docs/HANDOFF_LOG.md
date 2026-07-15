@@ -3,6 +3,62 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-15 late -- HEAD c32d4c04 (v2.0-alpha) [bank-bakeoff build: chunk 4 SHIPPED + kibitz r2]
+
+Did:
+- Ran kibitz r2 on the chunk-4 per-lane matrix (Codex gpt-5.5 high OK; agy lane
+  failed -- the known Cowork flake; codex + Claude anchor was the reliable panel).
+  Codex DISSOLVED the main risk: I had MISREAD the assemble timing -- codex/sonnet
+  DO assemble the ledger IN-runner (led.set_* inside _assemble_ledger), so a v3
+  wrapper reads led.data["lines"] uniformly. It also caught the fable2 early
+  word-budget gate hard-matching only "fable2_multipass" (a _v3 id would bypass it),
+  the runner-map bijection test, and simplified 3 runner files -> ONE wrapper
+  factory. Artifacts: docs/.../kibitz/r2-anchor.md + kibitz-runs/2026-07-15-chunk4-
+  v3-lanes/r2/{codex.md,final.md}.
+- CHUNK 4 SHIPPED @ c32d4c04: pipelines.json +5 clone pipelines; banks.json +8 _v3
+  rows (before custom; change default_story_model + default_story_pipeline); 8 v3
+  packs (copy v2 + header triple). Writer: run_v3_advisory (deterministic,
+  advisory-only, reads assembled ledger, stamps meta["<bank>_v3_advisory"],
+  try/except -> never raises, never mutates rows); _make_v3_runner wrapper factory +
+  3 sci-fi v3 registrations; _INLINE_V3_PIPELINES + the 2 inline v3 ids in
+  _LEGACY_INLINE_PIPELINES; one post-Phase-0 (after :6470 led.save) inline advisory
+  hook; fable2 early-gate now family-matches ("fable2_multipass" or "..._v3");
+  tooltip de-staled. TestChunk4V3Rows + 2 advisory regressions; pinned tuples
+  updated; bijection test validates the wiring.
+- Gates: suite 7884 passed / 31 skipped / 1 xfailed; Bug Bible 17 passed; canonical
+  delta = none (git diff --exit-code otr_canonical.json clean); no BOM; py_compile.
+Current step: source-snapshot injection (B7/B8) -- see GO_FORWARD NEXT.
+Next: build the snapshot-envelope load in _resolve_inputs + OTR_C7/OTR_FABLE2_SEED
+  controls; then kibitz r4 + Fable final gate + final registry/canonical verify.
+Commits: c32d4c04
+
+## 2026-07-15 evening -- HEAD 19872aa6 (v2.0-alpha) [bank-bakeoff build: chunk 2 SHIPPED]
+
+Did:
+- CHUNK 2 SHIPPED @ 19872aa6 (pushed, HEAD==origin, no BOM, py_compile clean).
+  8 `<bank>_v2` rows inserted before custom_source_bank (mirror base, only
+  default_story_model changed; byte-identical banks.json round-trip) + 8 v2 packs
+  (base prompt_stages copied, Sec-D target seams edited per pass01 Sec D with
+  Section-19 L-1/L-2/L-5/L-6/L-8; header triple = path coords, base pipeline kept).
+- B1 owner_bank threading: scifi codex/sonnet/fable2 stamp owner_bank=
+  source_bank_row.source_bank_id (never base-mapped); `_assemble` gained an
+  owner_bank param. Confirmed the writer stamps meta.source_bank to the SELECTED id
+  (:3758) BEFORE runner dispatch (:3853), so scifi_*_v2 pass the authorship gate.
+- B5 pinned tuples updated (test_fable2_registry tail + full-order); new
+  TestChunk2V2Rows (16 runnable / 17 visible + per-v2 own-pack/base-pipeline).
+  test_fable2_assembly direct _assemble calls pass owner_bank.
+- F8 resolved on first pass: "EDNA FROST've" is model output, NOT the shared
+  _otr_ledger_scrub._normalize_whitespace_and_quotes (which only normalizes
+  quotes/whitespace) -> the ALL-CAPS-no-contraction rule lives in media_archive_v2's
+  line_composer/exchange seams, not a baseline fix.
+- Gates: full suite 7873 passed / 31 skipped / 1 xfailed; Bug Bible 17 passed.
+- Grounded CHUNK 4 fully (dispatch/_LEGACY_INLINE_PIPELINES/_resolve_lane_runner/
+  telemetry/inline body/authorship) and wrote the per-lane v3 matrix into
+  GO_FORWARD_PLAN CURRENT STEP.
+Current step: CHUNK 4 (8 v3 lanes: sci-fi own-runner + adaptation/original inline).
+Next: build chunk 4 per the GO_FORWARD per-lane matrix; two-strikes -> /kibitz.
+Commits: 19872aa6
+
 ## 2026-07-15 13:15 PDT -- HEAD 9e0fdf9e (v2.0-alpha) [bank-bakeoff build: chunk 1 + r3]
 
 Did:

@@ -1,37 +1,58 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-15 13:15 PDT -- HEAD 9e0fdf9e (v2.0-alpha)
+**Updated:** 2026-07-15 evening -- HEAD c32d4c04 (v2.0-alpha)
 
-## CURRENT STEP (2026-07-15): Bank-Improvement Bake-off BUILD (16 lanes)
+## CURRENT STEP (2026-07-15): Bank-Improvement Bake-off -- source-snapshot injection (B7/B8)
 
-Building 24 selectable `source_bank` rows = 8 base + 8 `_v2` + 8 `_v3` in the ONE
-existing dropdown (surfaces from `list_bank_ids()`; zero canonical-JSON diff).
-Detail specs (the `2026-07-15-bank-improvement-bakeoff/` folder is gitignored --
-read from disk):
-- Build prompt: `docs/2026-07-15-bank-improvement-bakeoff/BUILD_PROMPT_16_lanes.md`
-- r3 CONVERGED wiring + rulings: `.../kibitz/r3-final.md`
-- per-bank v2/v3 content: `.../roundtable/pass01_plan.md` Sec D
+All 24 selectable `source_bank` lanes (8 base + 8 `_v2` + 8 `_v3`) are BUILT, green,
+and pushed; zero canonical-JSON diff (the dropdown is a dynamic `list_bank_ids()`
+combo, `OTR_LedgerScriptWriter.py:3106`). Detail specs (the
+`2026-07-15-bank-improvement-bakeoff/` folder is gitignored -- read from disk):
+r3 wiring `.../kibitz/r3-final.md`; per-bank v2/v3 content
+`.../roundtable/pass01_plan.md` Sec D; chunk-4 hardened design
+`kibitz-runs/2026-07-15-chunk4-v3-lanes/r2/final.md`.
 
-State @ HEAD `9e0fdf9e`:
-- **CHUNK 1 DONE + pushed:** `base_source_bank_id` helper (`nodes/_otr_bank_variants.py`)
-  + 5 family-behaviour sites + `tests/test_bank_variants.py`. Suite 7864 green, Bug
-  Bible 17 green.
-- **CHUNK 3 (D.2 extraction) = CUT** by r3 B2 (adaptation v3 stays inline).
-- **REMAINING:** chunk 2 (8 v2 rows+packs + owner_bank fix + pinned-test updates) ->
-  chunk 4 (8 v3 lanes: sci-fi = own-runner, adaptation + original_radio = inline) ->
-  source-snapshot injection -> kibitz r4 + Fable gate + final verify.
+Shipped:
+- **CHUNK 1** (`9e0fdf9e`): `base_source_bank_id` helper + 5 family sites.
+- **CHUNK 2** (`19872aa6`): 8 `_v2` rows + packs (Sec-D seams) + B1 owner_bank
+  threading + B5 pins. F8: "EDNA FROST've" is model output (NOT `_otr_ledger_scrub`),
+  so the ALL-CAPS-no-contraction rule lives in the `media_archive_v2` seam.
+- **CHUNK 3** = CUT (r3 B2).
+- **CHUNK 4** (`c32d4c04`): 5 clone pipelines + 8 `_v3` rows + 8 v3 packs +
+  `run_v3_advisory` (deterministic, advisory-only, L-6/no-hole) + `_make_v3_runner`
+  wrapper factory (kibitz r2: ONE factory, not 3 files -- the sci-fi runners assemble
+  the ledger IN-runner, so the wrapper reads `led` uniformly; the assemble-timing
+  "trap" was a misread) + `_INLINE_V3_PIPELINES` + one inline post-Phase-0 hook +
+  fable2 early word-budget gate family-fix + tooltip. 24 runnable / 25 visible;
+  bijection-validated (`test_custom_runner_truthfulness`); suite 7884 green, Bug
+  Bible 17 green, canonical delta = none.
 
-r3 rulings that MUST hold (verified live this session):
-- **B1:** `base_source_bank_id` is FAMILY behaviour ONLY. `owner_bank`/provenance uses
-  the ACTUAL variant id -- thread `source_bank_row.source_bank_id` into the sci-fi
-  runners' `build_receipt` owner_bank, else `scifi_*_v2/v3` throw ContentAuthorshipError.
-- **B2:** adaptation v3 (science_news/media_archive/public_domain_story/shakespeare)
-  stay INLINE (new v3 pipeline id in `_LEGACY_INLINE_PIPELINES` + a bounded advisory
-  pass at the seam), NOT pure own-runners -- an own-runner dispatch at `:3842` bypasses
-  `lock_cast` (`:4148`) + the whole inline core = ledger holes. Reverses the build
-  prompt; folded per the judge mandate.
-- **B5:** insert every variant row BEFORE `custom_source_bank`; update the pinned tuples
-  in `test_fable2_registry.py:51-53` + `test_original_radio_pipeline.py:41` same chunk.
+NEXT (in order):
+1. **Source-snapshot injection (B7/B8).** In `_resolve_inputs` (`:1398-1496`) load a
+   validated snapshot envelope IMMEDIATELY after bank resolution, BEFORE the three
+   source branches (entropy / custom-premise / external fetch) so a replay bypasses
+   RSS/random. Replay payload + `source_meta`/`source_rights` sidecars + `cast_hints`
+   + seed receipt; REJECT a snapshot whose declared base != `base_source_bank_id
+   (selected)`. Seed control: `OTR_C7=1` + fixed `OTR_FABLE2_SEED` + ONE process-wide
+   snapshot manifest keyed by base bank, inherited before boot
+   (`scripts/_otr_soak_server_launch.cmd:25-37`). Mostly the render window -- build
+   the path + recorded controls now.
+2. **kibitz r4 convergence + Fable final gate** on the v3 promotions.
+3. **Final verify**: dry registry-load resolving all 24 banks; canonical delta = none
+   (`git diff --exit-code otr_canonical.json` + OTR_WorkflowValidator + round-trip).
+
+Note: the v3 packs currently carry the v2 seam text; the STRUCTURAL v3 delta is the
+advisory diagnostic (kibitz-final ruling). If deeper per-lane v3 seam text is wanted
+(Sec-D one-liners), the packs are in place to edit -- a bake-off tuning follow-on.
+
+r3 rulings that MUST hold (all satisfied in the shipped chunks):
+- **B1:** provenance/owner_bank uses the ACTUAL variant id (never base-mapped);
+  `base_source_bank_id` is FAMILY behaviour only.
+- **B2:** adaptation + original v3 are INLINE (clone pipeline in
+  `_LEGACY_INLINE_PIPELINES`); only the 3 sci-fi v3 are own-runner (wrapper factory
+  in `_RUNNER_BY_PIPELINE`).
+- **B5:** every variant row is BEFORE `custom_source_bank`; pinned registry-order
+  tuples updated per chunk.
 - Every chunk: full suite + Bug Bible GREEN -> commit AND push `v2.0-alpha` -> HEAD==origin.
 
 ## THE LAW (operator, 2026-07-13 -- supersedes every plan below that disagrees)
