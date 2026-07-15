@@ -148,6 +148,12 @@ from . import _otr_visual_styles as _otr_visual_styles
 from . import _otr_source_payload as _otr_source_payload
 from . import _otr_bank_variants as _otr_bank_variants
 
+# Bake-off source-snapshot replay (2026-07-15, r3 ruling B7): a frozen source
+# for a base bank, replayed across the base/_v2/_v3 triplet so the pack is the
+# only variable. Stdlib-only leaf (imports only _otr_bank_variants) -- safe at
+# module-import time, same posture as the routing/source-payload imports.
+from . import _otr_source_snapshot as _otr_source_snapshot
+
 # Sprint C C5a2 (2026-05-15) module-level import per E-22 / RR-B4. The
 # reflection pure module is wired into execute() at K.5.5 -- see the
 # reflection call site below the K.5 visual_plan stamp. Module-level
@@ -1407,7 +1413,36 @@ def _resolve_inputs(
     # source_meta["operator_hint"] into the concept pass as material
     # (kibitz r4 P2) -- never the payload.
     _rb_bank = _otr_story_routing.get_bank(source_bank or "science_news")
-    if _bank_has_no_source_contract(_rb_bank):
+    # Bake-off source-snapshot replay (r3 ruling B7). Loaded IMMEDIATELY after
+    # bank resolution and BEFORE the three source branches so a frozen source
+    # replays across the base/_v2/_v3 triplet -- the ONLY variable under test is
+    # the pack, never a fresh RSS draw or a random spark. None => no snapshot for
+    # this bank; the live path below runs unchanged. A mismatched/malformed
+    # envelope raises SourceSnapshotError LOUD (never a silent fall-through to
+    # live sourcing). The replayed source_meta sidecar carries the same fields a
+    # live branch would (spark_atoms for the original lane, cast_hints for the
+    # adaptation lanes), so every downstream owner is fed unchanged.
+    _source_snapshot = _otr_source_snapshot.load_snapshot_for_bank(
+        source_bank or "science_news",
+    )
+    if _source_snapshot is not None:
+        news_article = _otr_source_payload.validate_source_payload(
+            _source_snapshot.payload,
+            origin="_resolve_inputs source_snapshot",
+        )
+        news_seed = _source_snapshot.seed_text or news_article["seed_text"]
+        seed_source = _source_snapshot.seed_source
+        source_meta = dict(_source_snapshot.source_meta)
+        source_rights = dict(_source_snapshot.source_rights)
+        log.info(
+            "[OTR_LedgerScriptWriter] source-snapshot REPLAY: bank=%r base=%r "
+            "seed_source=%r sha=%s",
+            source_bank or "science_news",
+            _source_snapshot.base_source_bank_id,
+            seed_source,
+            _source_snapshot.payload_sha256[:12],
+        )
+    elif _bank_has_no_source_contract(_rb_bank):
         try:
             from . import _otr_original_radio as _OTROR
         except ImportError:  # pragma: no cover -- flat standalone load

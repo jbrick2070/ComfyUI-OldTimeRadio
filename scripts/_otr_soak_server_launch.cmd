@@ -27,14 +27,25 @@ rem sets OTR_C7=1 (regression/baseline runs). Production headless runs leave
 rem these UNSET so every episode rolls a fresh OS-entropy cast + style --
 rem pinning them here was why every run cast GULLIVER REEVES with the same
 rem red-wash style (2026-06-12 operator catch).
+rem OTR_FABLE2_SEED is pinned alongside CAST/STYLE under C7 (r3 ruling B8): the
+rem fable2 frame-card/stance deal + voice tie-breaks reproduce only when it is
+rem fixed, so a snapshot replay of a fable2-family bank is byte-stable. Cleared
+rem in the else branch so production rolls fresh OS entropy, same as CAST/STYLE.
 if defined OTR_C7 (
   set OTR_CAST_SEED=42
   set OTR_STYLE_SEED=42
-  echo [launch] C7 mode: OTR_CAST_SEED=42 OTR_STYLE_SEED=42 ^(byte-identity^)
+  set OTR_FABLE2_SEED=42
+  echo [launch] C7 mode: OTR_CAST_SEED=42 OTR_STYLE_SEED=42 OTR_FABLE2_SEED=42 ^(byte-identity^)
 ) else (
   set OTR_CAST_SEED=
   set OTR_STYLE_SEED=
+  set OTR_FABLE2_SEED=
 )
+rem Bake-off source-snapshot manifest (r3 ruling B8): the process-wide frozen-
+rem source map keyed by BASE bank. Passed in the caller's own process env
+rem (auditable, not a hidden per-leg hook file per the note below); echoed here
+rem for the server log. Unset => every bank sources live (RSS / random / custom).
+if defined OTR_SOURCE_SNAPSHOT_MANIFEST echo [launch] source-snapshot manifest: %OTR_SOURCE_SNAPSHOT_MANIFEST%
 rem Hydrate per-user secrets a detached shell may not have inherited (the DC
 rem service env snapshot predates setx -- known gotcha). Value is NEVER echoed.
 for /f "usebackq delims=" %%k in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OPENROUTER_API_KEY','User')"`) do set OPENROUTER_API_KEY=%%k
