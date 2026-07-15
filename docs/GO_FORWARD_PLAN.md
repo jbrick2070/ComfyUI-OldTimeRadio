@@ -277,6 +277,27 @@ fixture creates a row.
 - Generated-SFX R4 is local/ignored evidence until the tracked R4.1 refit lands;
   it is not an executable queue.
 
+## Operator backlog (2026-07-14 night) -- render tuning, not bugs
+
+Two operator asks captured mid-bake-off. Both are audio/video RENDER tuning (SFW, no
+word-count involvement, no story-text rewrite). File pointers located this session.
+
+- **Kokoro TTS spells out ALL-CAPS.** Symptom: Kokoro reads ALL-CAPS tokens
+  letter-by-letter (as initialisms), so acronyms / emphasis-caps in the script get
+  spelled aloud in narration. Fix direction: a pre-TTS text-normalization pass that
+  Title-cases (or lower-cases) ALL-CAPS words >=2 letters BEFORE they reach the engine,
+  with an allowlist for genuine acronyms that SHOULD be spelled. Normalize a TTS-only
+  COPY of the line -- never the ledger `spoken_text` of record or the captions (keeps
+  "no Python rewrite of story text": this is render normalization, not a script edit).
+  Where: `nodes/_otr_audio_engines/eng_kokoro.py` (engine); the shared voice seam
+  `nodes/_otr_voice_node_common.py` is the likely normalization site. FIRST confirm
+  which engine is the canonical default (memory says indextts2 is default; Kokoro may be
+  an alt lane) -- fix the engine actually in `workflows/otr_canonical.json`.
+- **Ending credits ~50% faster.** Increase the credits-roll scroll rate by ~1.5x (or cut
+  the roll duration to ~0.667x). Where: `nodes/otr_credits_roll.py`. If the rate is a
+  node widget, the change lands IN `workflows/otr_canonical.json` in the SAME commit
+  (CLAUDE.md section 0 -- unwired code is dead).
+
 ## Pointers
 
 - `ROADMAP.md`
