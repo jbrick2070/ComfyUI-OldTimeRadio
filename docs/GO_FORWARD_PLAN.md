@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-15 night -- HEAD 031851ce (v2.0-alpha)
+**Updated:** 2026-07-15 night -- HEAD c28af5f4 (v2.0-alpha)
 
 ## CURRENT STEP (2026-07-15): Bank-Improvement Bake-off -- source-snapshot injection (B7/B8)
 
@@ -35,17 +35,27 @@ Shipped:
   `source_meta` sidecar carries the same fields a live branch would (spark_atoms
   for original, cast_hints for adaptation), so every downstream owner is fed.
   B8 seeds: `OTR_FABLE2_SEED=42` pinned under C7 + a manifest echo in
-  `_otr_soak_server_launch.cmd`. +20 tests -> suite 7904 green, Bug Bible 17,
-  canonical delta = none. Dry registry-load = 24 runnable / 25 visible.
+  `_otr_soak_server_launch.cmd`. Canonical delta = none. Dry registry-load = 24
+  runnable / 25 visible.
+- **kibitz r4 CONVERGED + hardened (`c28af5f4`):** Codex (gpt-5.5 high) + Claude
+  anchor (agy flaked). Folded one CONFIRMED footgun -> the source-snapshot is now
+  **strict-by-default**: a configured manifest that lacks the selected bank's base
+  now RAISES (opt-in `"allow_partial": true` for freeze-some/source-rest-live),
+  never a silent live source. Added a LOUD C7-replay warning (source frozen but
+  cast/style unpinned). +6 net tests -> suite 7907 green, Bug Bible 17. Artifacts:
+  `docs/2026-07-15-bank-improvement-bakeoff/kibitz/r4-convergence-plan.md` +
+  `kibitz-runs/2026-07-15-bank-bakeoff-r4/r4/{claude_anchor,codex,final}.md`.
 
 NEXT (in order):
-1. **kibitz r4 convergence + Fable final gate** on the v3 promotions + the
-   source-snapshot layer -- confirm no new must-fix; Fable = the final grounded
-   eyes on the shipped structural bake-off change (CLAUDE.md section 9).
-2. **Live replay proof (render window):** populate a snapshot manifest for one
-   base bank, run its base/_v2/_v3 triplet under `OTR_C7=1`, and confirm the pack
-   is the only variable (F2 discipline). Record payload sha + seed in each row.
-3. **Final verify** (code chunk done): dry registry-load resolved all 24 banks;
+1. **Fable final gate** on the shipped structural bake-off change (v3 promotions +
+   source-snapshot) -- HELD for operator go (operator-gated spend, CLAUDE.md
+   section 9). kibitz r4 already converged with no residual code MUST-FIX.
+2. **Live replay proof (render window):** populate a manifest for one base bank,
+   run its base/_v2/_v3 triplet under `OTR_C7=1`, and confirm the pack is the only
+   variable (F2). ACCEPTANCE (Codex r4): the server log shows BOTH the
+   source-snapshot manifest echo AND the C7 seed echo, and ledger meta shows
+   `cast_seed_source == "OTR_CAST_SEED override"`; record payload sha + seed per row.
+3. **Final verify** (code done): dry registry-load 24 runnable / 25 visible;
    `git diff --exit-code otr_canonical.json` clean; JSON round-trip 23 nodes / 57
    links; OTR_WorkflowValidator covered by the green suite.
 

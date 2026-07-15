@@ -3,6 +3,30 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-15 night -- HEAD c28af5f4 (v2.0-alpha) [bank-bakeoff: kibitz r4 CONVERGED + hardened]
+
+Did:
+- Ran kibitz r4 convergence on the as-built bake-off (chunks 1/2/4 + B7/B8).
+  Panel = Codex @ gpt-5.5 high (rc=0) + Claude anchor; Antigravity FAILED (agy
+  rc=1, the known Cowork flake). The skills-cache kibitz.py ignored
+  KIBITZ_CODEX_MODEL=gpt-5.6-sol and ran gpt-5.5 (documented drift) -- fine for r4.
+- Grounded Codex's review. CONFIRMED one real footgun (MUST-FIX 1): the snapshot
+  loader returned None when a manifest was configured but the selected base was
+  absent -> silent live sourcing, invalidating the F2 control. FOLDED: source-
+  snapshot is now STRICT by default (configured-manifest miss RAISES; opt-in
+  "allow_partial": true restores freeze-some/source-rest-live). REJECTED Codex's
+  "unconditional raise" (breaks the normal triplet run). Codex MUST-FIX 2 (C7
+  proof) -> a LOUD C7-replay warning in code + render-window acceptance criteria
+  in GO_FORWARD. Codex OPTIONAL (advisory-key wording) -> doc-only, no code.
+- Gates: full suite 7907 passed / 31 skipped / 1 xfailed (+3 r4 tests: strict
+  raise, allow_partial, C7 warn/quiet); Bug Bible 17 passed; no BOM; canonical
+  delta = none; HEAD==origin. Artifacts under kibitz-runs/2026-07-15-bank-
+  bakeoff-r4/r4/ (claude_anchor, codex, final) + docs/.../kibitz/r4-convergence-plan.md.
+Current step: Fable final gate (HELD for operator go) + the live replay triplet
+  proof (render window).
+Next: operator decides on the Fable gate; then the F2 live replay proof under C7.
+Commits: 031851ce (B7/B8), 57393879 (docs), c28af5f4 (r4 strict fold)
+
 ## 2026-07-15 night -- HEAD 031851ce (v2.0-alpha) [bank-bakeoff: source-snapshot B7/B8 SHIPPED]
 
 Did:
