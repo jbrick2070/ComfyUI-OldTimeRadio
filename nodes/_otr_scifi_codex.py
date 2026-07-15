@@ -3192,7 +3192,9 @@ def run_scifi_codex_episode(
     slot_scheduler: Any, source_bank_row: Any, story_rules: Mapping[str, Any],
     episode_root: Path, episode_id: str,
 ) -> CodexTailParts:
-    del slot_scheduler, source_bank_row, story_rules, episode_root, episode_id
+    # B1 (bake-off): source_bank_row provenance is threaded into owner_bank
+    # below (never base-mapped) so scifi_codex_v2/v3 pass the authorship gate.
+    del slot_scheduler, story_rules, episode_root, episode_id
     env, steer = validate_payload_envelope(payload, resolved)
     p0_inputs = _p0_artifact_inputs(env)
     p0_allowed_fields = frozenset(p0_inputs["allowed_source_fields"])
@@ -3337,7 +3339,7 @@ def run_scifi_codex_episode(
     expected = _assemble_ledger(led, score, p2, script, meta)
     from ._otr_content_authorship import stamp_receipt
     stamp_receipt(
-        led.data, owner_bank="scifi_codex",
+        led.data, owner_bank=source_bank_row.source_bank_id,
         accepted_artifacts={"final_script": script},
     )
     actual = sum(_words(v) for v in expected.values())

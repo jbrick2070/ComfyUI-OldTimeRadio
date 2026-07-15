@@ -127,3 +127,46 @@ class TestNoRegression:
         # _load_all() runnable-coverage gate runs here; the base-map keeps it
         # green for the current registry (no variant rows yet).
         assert RULES.list_rules_ids()  # non-empty => _load_all succeeded
+
+
+# ---------------------------------------------------------------------------
+# 5. Chunk 2: the 8 _v2 rows resolve (16 runnable / 17 visible)
+# ---------------------------------------------------------------------------
+
+_V2_BASE = {
+    "science_news_v2": "science_news",
+    "media_archive_v2": "media_archive",
+    "public_domain_story_v2": "public_domain_story",
+    "shakespeare_v2": "shakespeare",
+    "original_radio_v2": "original_radio",
+    "scifi_fable2_v2": "scifi_fable2",
+    "scifi_codex_v2": "scifi_codex",
+    "scifi_sonnet_v2": "scifi_sonnet",
+}
+
+
+class TestChunk2V2Rows:
+    def test_counts_16_runnable_17_visible(self):
+        ids = ROUTING.list_bank_ids()
+        assert len(ids) == 17                      # 8 base + 8 _v2 + custom
+        assert ids[-1] == "custom_source_bank"
+        runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
+        assert len(runnable) == 16                 # only custom is non-runnable
+        v2 = [b for b in ids if b.endswith("_v2")]
+        assert len(v2) == 8
+
+    @pytest.mark.parametrize("v2,base", sorted(_V2_BASE.items()))
+    def test_v2_owns_its_pack_on_the_base_pipeline(self, v2, base):
+        bank = ROUTING.get_bank(v2)
+        base_bank = ROUTING.get_bank(base)
+        assert bank.runnable is True
+        # variant rows change ONLY default_story_model -> its own _v2 pack;
+        # the pipeline mirrors the base family (B6).
+        assert bank.default_story_pipeline == base_bank.default_story_pipeline
+        pack = ROUTING.resolve_story_pack(v2)
+        assert pack.source_bank_id == v2
+        assert pack.story_model_id.endswith("_v2")
+        assert pack.story_pipeline_id == base_bank.default_story_pipeline
+        # family behaviour: a _v2 id resolves the BASE family's story rules.
+        assert BV.base_source_bank_id(v2) == base
+        assert RULES.resolve_story_rules(v2).rules_id == base

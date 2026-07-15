@@ -1135,7 +1135,9 @@ def run_scifi_sonnet_episode(
     slot_scheduler: Any, source_bank_row: Any, story_rules: Mapping[str, Any],
     episode_root: Path, episode_id: str,
 ) -> SonnetTailParts:
-    del slot_scheduler, source_bank_row, story_rules, episode_root, episode_id
+    # B1 (bake-off): source_bank_row provenance is threaded into owner_bank
+    # below (never base-mapped) so scifi_sonnet_v2/v3 pass the authorship gate.
+    del slot_scheduler, story_rules, episode_root, episode_id
     envelope, steer = validate_sonnet_payload(payload, resolved)
     meta["scifi_sonnet"] = {"source_digest": envelope.payload_sha256, "source_mode": envelope.source_mode, "call_journal": {}}
     journal = meta["scifi_sonnet"]["call_journal"]
@@ -1275,7 +1277,7 @@ def run_scifi_sonnet_episode(
     expected = _assemble(led, p1, cast, events, att, meta)
     from ._otr_content_authorship import stamp_receipt
     stamp_receipt(
-        led.data, owner_bank="scifi_sonnet",
+        led.data, owner_bank=source_bank_row.source_bank_id,
         accepted_artifacts={
             "final_events": [event.model_dump(mode="json") for event in events],
             "final_attestation": att,

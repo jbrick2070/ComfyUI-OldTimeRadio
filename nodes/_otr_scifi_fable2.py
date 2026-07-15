@@ -3253,7 +3253,7 @@ def choose_final_draft(draft1: FinalDraft, draft2: FinalDraft,
 def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
               cast_rows: "list[dict]", payload: "dict[str, Any]", *,
               envelope: SceneEnvelope, story_rules: StoryRules,
-              mode: Fable2Mode) -> None:
+              mode: Fable2Mode, owner_bank: str) -> None:
     """Emit ALL FIVE ledger hierarchies (r1/S2) with the proof gates.
     Incremental led.save() after the preamble and after each scene.
     Ambiguity = upstream reroll, never silent-fix; timing stays unset
@@ -3499,9 +3499,13 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
 
     from ._otr_content_authorship import stamp_receipt
     meta = _ledger_meta(led)
-    meta.setdefault("source_bank", "scifi_fable2")
+    # B1 (bake-off): provenance is the SELECTED lane id (scifi_fable2_v2/v3),
+    # never the base -- the writer already stamped meta.source_bank to it, so
+    # this setdefault is a no-op on the live path and keeps the direct-call
+    # tests self-consistent.
+    meta.setdefault("source_bank", owner_bank)
     stamp_receipt(
-        led.data, owner_bank="scifi_fable2",
+        led.data, owner_bank=owner_bank,
         accepted_artifacts={
             "winning_script": winning_draft_text,
             "final_treatment": (
@@ -3943,7 +3947,8 @@ def run_scifi_fable2_episode(
     # --- P7: assembly (pure python; proof gates; incremental saves) --------
     _assemble(
         led, final_draft, treatment, cast_rows, payload,
-        envelope=envelope, story_rules=story_rules, mode=mode)
+        envelope=envelope, story_rules=story_rules, mode=mode,
+        owner_bank=source_bank_row.source_bank_id)
     _receipt("assemble", "python", 0, 0.0, 0)
     # Ledger.save() replaces led.data with its merged payload. Reacquire
     # both mappings before every post-assembly mutation; caller aliases are
