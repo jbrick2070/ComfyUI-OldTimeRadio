@@ -3,6 +3,26 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-15 13:15 PDT -- HEAD 9e0fdf9e (v2.0-alpha) [bank-bakeoff build: chunk 1 + r3]
+
+Did:
+- Started the Bank-Improvement Bake-off BUILD (24 rows = 8 base + 8 _v2 + 8 _v3 in
+  the one existing source_bank dropdown; zero canonical-JSON diff). Grounded the
+  wiring against live HEAD (the tail refactor WriterTailContext/_run_writer_tail/
+  TailFinalizer has landed since the r2 anchor -- r2-wiring-anchor.md is stale).
+- Ran kibitz r3 (Codex @ gpt-5.6-sol + Antigravity/Gemini-3.5-Flash-High). Judgment:
+  docs/2026-07-15-bank-improvement-bakeoff/kibitz/r3-final.md (that folder is
+  gitignored -- read from disk). It caught 3 build-breakers.
+- CHUNK 1 SHIPPED @ 9e0fdf9e: nodes/_otr_bank_variants.py (base_source_bank_id) +
+  5 family-behaviour sites + tests/test_bank_variants.py (32). Suite 7864 green;
+  Bug Bible 17 green. Pushed; HEAD==origin.
+Key r3 rulings: B1 owner_bank uses the ACTUAL variant id (never base-mapped);
+  B2 adaptation v3 stays INLINE not own-runner + D.2 extraction CUT; B5 variant rows
+  insert BEFORE custom_source_bank and update the pinned tuples same chunk.
+Current step: bakeoff chunk 2 (8 v2 rows + packs + owner_bank fix + pinned-test updates).
+Next: build chunk 2 per r3-final.md Sec C.2.
+Commits: 9e0fdf9e
+
 ## 2026-07-11 -- HEAD 6899d940 (v2.0-alpha) [720-bakeoff C3 coder window]
 
 Did:

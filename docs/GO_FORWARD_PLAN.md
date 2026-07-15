@@ -1,6 +1,38 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-13 20:05 PDT
+**Updated:** 2026-07-15 13:15 PDT -- HEAD 9e0fdf9e (v2.0-alpha)
+
+## CURRENT STEP (2026-07-15): Bank-Improvement Bake-off BUILD (16 lanes)
+
+Building 24 selectable `source_bank` rows = 8 base + 8 `_v2` + 8 `_v3` in the ONE
+existing dropdown (surfaces from `list_bank_ids()`; zero canonical-JSON diff).
+Detail specs (the `2026-07-15-bank-improvement-bakeoff/` folder is gitignored --
+read from disk):
+- Build prompt: `docs/2026-07-15-bank-improvement-bakeoff/BUILD_PROMPT_16_lanes.md`
+- r3 CONVERGED wiring + rulings: `.../kibitz/r3-final.md`
+- per-bank v2/v3 content: `.../roundtable/pass01_plan.md` Sec D
+
+State @ HEAD `9e0fdf9e`:
+- **CHUNK 1 DONE + pushed:** `base_source_bank_id` helper (`nodes/_otr_bank_variants.py`)
+  + 5 family-behaviour sites + `tests/test_bank_variants.py`. Suite 7864 green, Bug
+  Bible 17 green.
+- **CHUNK 3 (D.2 extraction) = CUT** by r3 B2 (adaptation v3 stays inline).
+- **REMAINING:** chunk 2 (8 v2 rows+packs + owner_bank fix + pinned-test updates) ->
+  chunk 4 (8 v3 lanes: sci-fi = own-runner, adaptation + original_radio = inline) ->
+  source-snapshot injection -> kibitz r4 + Fable gate + final verify.
+
+r3 rulings that MUST hold (verified live this session):
+- **B1:** `base_source_bank_id` is FAMILY behaviour ONLY. `owner_bank`/provenance uses
+  the ACTUAL variant id -- thread `source_bank_row.source_bank_id` into the sci-fi
+  runners' `build_receipt` owner_bank, else `scifi_*_v2/v3` throw ContentAuthorshipError.
+- **B2:** adaptation v3 (science_news/media_archive/public_domain_story/shakespeare)
+  stay INLINE (new v3 pipeline id in `_LEGACY_INLINE_PIPELINES` + a bounded advisory
+  pass at the seam), NOT pure own-runners -- an own-runner dispatch at `:3842` bypasses
+  `lock_cast` (`:4148`) + the whole inline core = ledger holes. Reverses the build
+  prompt; folded per the judge mandate.
+- **B5:** insert every variant row BEFORE `custom_source_bank`; update the pinned tuples
+  in `test_fable2_registry.py:51-53` + `test_original_radio_pipeline.py:41` same chunk.
+- Every chunk: full suite + Bug Bible GREEN -> commit AND push `v2.0-alpha` -> HEAD==origin.
 
 ## THE LAW (operator, 2026-07-13 -- supersedes every plan below that disagrees)
 
