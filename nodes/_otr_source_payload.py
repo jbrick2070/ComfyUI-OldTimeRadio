@@ -282,7 +282,13 @@ def _fetch_science_rss(*, bank, technical_model: str,
     # three v4 lanes ask the shared selector for an eligible article instead of
     # receiving the richest thin fallback and failing after model setup.
     strict_v4_banks = {"scifi_codex", "scifi_sonnet"}
-    if getattr(bank, "source_bank_id", "") in strict_v4_banks:
+    try:
+        from ._otr_bank_variants import base_source_bank_id
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        from _otr_bank_variants import base_source_bank_id  # type: ignore
+    # Bake-off variants (<base>_v2/_v3) inherit the base family's strict-v4 floor.
+    if base_source_bank_id(
+            getattr(bank, "source_bank_id", "")) in strict_v4_banks:
         return _writer._fetch_rss_seed_or_die(
             technical_model, require_science_floor=True
         )

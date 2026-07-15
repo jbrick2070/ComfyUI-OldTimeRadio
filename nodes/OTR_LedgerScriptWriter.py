@@ -146,6 +146,7 @@ from . import _otr_visual_styles as _otr_visual_styles
 # never a silent slide into the science path). Stdlib-only + lazy wrapper
 # imports -- safe at module-import time, same posture as the routing import.
 from . import _otr_source_payload as _otr_source_payload
+from . import _otr_bank_variants as _otr_bank_variants
 
 # Sprint C C5a2 (2026-05-15) module-level import per E-22 / RR-B4. The
 # reflection pure module is wired into execute() at K.5.5 -- see the
@@ -3971,7 +3972,9 @@ class OTR_LedgerScriptWriter:
             # shakespeare's manifest cast_hints ARE the real character names. Stamped
             # here where `briefs` is in scope; read at the lock_cast call below.
             # Invention lanes never set this key -> casting is byte-identical (C7).
-            if _source_bank_row.source_bank_id in ("shakespeare", "public_domain_story"):
+            if _otr_bank_variants.base_source_bank_id(
+                    _source_bank_row.source_bank_id
+            ) in ("shakespeare", "public_domain_story"):
                 _adapt_names = list(
                     getattr(briefs, "character_names", None)
                     or (meta.get("source_meta") or {}).get("cast_hints")

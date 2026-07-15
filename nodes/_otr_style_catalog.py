@@ -803,9 +803,12 @@ def select_style(premise: Any, meta: Any, cast_seed: Any) -> str:
     sha256(cast_seed)-keyed index into the sorted pool, so the same episode seed
     always yields the same style (C7-safe) while different episodes vary."""
     import hashlib
+    from ._otr_bank_variants import base_source_bank_id
     source_bank = ""
     if isinstance(meta, dict):
         source_bank = str(meta.get("source_bank", "") or "")
+    # Bake-off variants (<base>_v2/_v3) draw their base family's style pool.
+    source_bank = base_source_bank_id(source_bank)
     if source_bank == "media_archive":
         pool = sorted(media_archive_slugs())
         if not pool:  # pragma: no cover -- defensive

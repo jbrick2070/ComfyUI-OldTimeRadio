@@ -273,7 +273,10 @@ def _load_all() -> "dict[str, StoryRules]":
             f"rules")
     # A RUNNABLE bank without a rules pack is a contract violation (a
     # runnable lane's gates would silently have no vocabulary source).
-    missing_runnable = sorted(_runnable_bank_ids() - set(rules))
+    from ._otr_bank_variants import base_source_bank_id
+    missing_runnable = sorted(
+        {base_source_bank_id(b) for b in _runnable_bank_ids()} - set(rules)
+    )
     if missing_runnable:
         raise StoryRulesValidationError(
             f"runnable bank(s) missing a story_rules pack: "
@@ -297,8 +300,9 @@ def resolve_story_rules(source_bank_id: str) -> StoryRules:
     """bank id -> compiled StoryRules. Missing pack = hard error (legal only
     for runnable:false banks, which the run gate keeps out of production)."""
     rules = _ensure_loaded()
+    from ._otr_bank_variants import base_source_bank_id
     try:
-        return rules[source_bank_id]
+        return rules[base_source_bank_id(source_bank_id)]
     except KeyError:
         raise UnknownStoryRulesError(
             f"no story_rules pack for source_bank {source_bank_id!r}; "
