@@ -1149,6 +1149,96 @@ every original-lane receipt (§6.5), and a mutation test proves it.
 
 ---
 
+## 19. Field lessons for pack authors -- don't repeat the bake-off mistakes
+
+These are REAL failures, logged live during the 30/420/720 bake-off -- not hypotheticals.
+Sources: `docs/2026-07-14-bakeoff-observations.md` (OBS-1..2), `docs/PROD_BUG_LOG.md`,
+`docs/SOURCE_BANK_PREFLIGHT.md`, `docs/SOURCE_BANK_GUIDE.md`. Every one of them produced a
+GREEN render and a WRONG show, so the activation checker (§6) cannot catch them -- they are
+prompt/authoring defects, not schema defects. The point of writing them into THIS doc: a
+person adding their own lane should not have to re-discover them by shipping a broken
+episode. Each lesson maps to a check to run on YOUR OWN pack before `--activate`.
+
+**L-1. If your lane ADAPTS an existing story, every generative seam must be an ADAPTATION
+instruction -- not a craft rule (OBS-1c; the headline mistake, caught by ear).** The
+`shakespeare` and `public_domain_story` packs declared the right law -- "Faithfulness
+outranks novelty. Compression is allowed; replacement is not. forbidden: invented
+protagonist, changed ending, unrelated framing story" -- and then their `exchange_system`
+seam said "write an exchange ... characters should not answer each other too directly ... at
+least one line avoids the real question." Those are GENERATIVE craft rules for ORIGINAL
+drama, and they were steering Dickens and Shakespeare. The pack contradicted its own law two
+keys later, and the CRAFT RULE WON, because the craft rule is the one talking to the model at
+dialogue time. On Shakespeare it inverted the source: "make the verse naturalistic, stop
+characters answering too directly" rewrites rhetoric into modern evasive patter -- but in
+Shakespeare the direct public answer IS the subtext. YOUR CHECK: if your source is already a
+story, read EVERY seam that reaches the model at generation time (`exchange_system`,
+`line_composer_system`, the outline seams) and confirm each says "carry the source's own
+words, keep its diction and rhetoric, convert narration into speech, impose no subtext the
+source lacks" -- never "invent / vary / add subtext." The fix that shipped: "Put a MICROPHONE
+on the source; do not re-plot it" + "Faithfulness outranks craft rules -- a craft rule that
+would rewrite a proven scene is wrong."
+
+**L-2. The seam that steers the model is not always the one you would suspect (OBS-1c).** The
+obvious suspect was `story_rules/<lane>.json`; it was checked and deliberately NOT changed --
+it is an anti-cliche lexicon that HELPS an adaptation. The forcing lived in `exchange_system`,
+and only there. YOUR CHECK: when a behavior is wrong, do not patch the file you ASSUME governs
+it -- trace which seam is actually in the prompt at the instant the behavior happens, and fix
+that one.
+
+**L-3. Your prompts are silently tuned to the SIZE and SHAPE of the source your feed returns
+-- test against the real body (OBS-1).** For months a missing `beautifulsoup4` made
+`_fetch_full_article` return "" silently, so every science episode was written from a
+~120-char RSS teaser. When bs4 landed, the same feed yielded 2,041-6,708 chars of real
+article body, and the logline seam -- implicitly tuned against a STARVED teaser -- began
+summarizing the article and naming no character. The model did not regress: "the source got
+richer, and the model followed the source instead of the story." YOUR CHECK: run your pack
+against the ACTUAL full body your feed yields, at both length extremes, not a toy sample. If
+you later swap feeds, re-test -- an input-distribution shift finds any seam tuned to the old
+shape.
+
+**L-4. Budget against the context window of the model that will actually serve your lane, at
+your LONGEST target (PROD_BUG_LOG -- the codex56sol P6 budget).** A budget formula
+(`240 + 160*beats + 4*target_words`) that was fine at short lengths overflowed the serving
+model's window at 720 words / 40 beats. "Measure a budget against the window of the model that
+will actually serve it." YOUR CHECK: whatever `word_range.max` your manifest declares, compute
+your worst-case prompt budget at that max against the REAL technical-model window -- not an
+abstract number, and not merely the length you happened to test at.
+
+**L-5. Extract the cast FROM the source; never let the model invent it (the public_domain
+source-cast fix -- runtime extraction, REQUIRED, with role designations).** An adaptation
+whose characters are invented is no longer an adaptation. YOUR CHECK: an adaptation pack must
+name its speakers from the source and fail loud if it cannot, rather than filling a scene with
+an invented character. Ledger-scope rule: CHOOSE the source's essential speakers, fold or drop
+minor figures, add no one to fill a scene.
+
+**L-6. An audit may IMPROVE a story; it may never FAIL one (the scifi_gemini P5 fix).** If your
+lane adds a critique/review pass, a clean critique that kills an otherwise-valid story is a
+bug, not a safety feature. Audits improve; the ONLY hard ship-stop is a deterministic SFW
+gate. (This is exactly why the gemini P5 leg is being re-run in the current chain.)
+
+**L-7. `RESULT SUCCESS` is not proof -- `obs_publish OK` + the asset on disk is (the
+scifi_codex phantom lesson).** A run can report success and still have published nothing. YOUR
+CHECK when qualifying your own lane: confirm the episode asset exists at `otr\obs\` (or
+`otr\episodes\<ep>\`), not just that the run returned green. This is the same gate the shipped
+re-leg chain enforces (`tmp/_chain_releg720.ps1`).
+
+**L-8. Freeze your pack across a comparison, and do not read a LENGTH difference as a QUALITY
+difference (OBS-1b, OBS-2).** The bank is meant to be the ONLY variable; any pack/seam edit
+mid-batch confounds every comparison across it (the 420 rung was confounded exactly this way
+when caps were raised between legs). And lanes legitimately write DIFFERENT SHAPES at length
+-- a 144-word monologue vs 40 short exchanges is a LANE PROPERTY, not a bank quality: record
+it, never normalize it, and do not chase target words. YOUR CHECK: change one thing at a time,
+and freeze the pack (hashed receipt, `SOURCE_BANK_PREFLIGHT.md`) before you A/B anything.
+
+**L-9. Provide feeds with provenance + rights, and fail CLOSED (SOURCE_BANK_GUIDE §5,
+SOURCE_BANK_PREFLIGHT Gate 2, §4 above).** Each feed record carries canonical URL, digest,
+outlet/author, rights status, license URL and attribution; unknown or incompatible adaptation
+rights FAIL the activation -- they do not warn. Network hardening (timeouts, redirect/size/
+retry bounds, and the second-hop article fetch) is PROVIDED by the `_otr_feed_fetch` seam
+(§4) -- use it; never hand a raw user URL to `feedparser` yourself.
+
+---
+
 **Next step (r4-revised):**
 1. **Operator ratifies §16 -- now NINE flags.** Flags 7-9 (article-body hop + shipped-lane
    re-baseline, numeric network bounds, per-feed rights records) change SCOPE and COST, so
