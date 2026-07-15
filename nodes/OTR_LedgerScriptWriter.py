@@ -1717,22 +1717,159 @@ def _run_scifi_sonnet_lane(**kwargs):
     return _SS.run_scifi_sonnet_episode(**kwargs)
 
 
+def _v3_max_run(seq):
+    """Longest run of the same value in a sequence (deterministic helper)."""
+    best = run = 0
+    prev = object()
+    for s in seq:
+        run = run + 1 if s == prev else 1
+        prev = s
+        best = max(best, run)
+    return best
+
+
+def run_v3_advisory(led, meta, *, lane, version: int = 1) -> None:
+    """Bake-off v3: bounded, ADVISORY-ONLY, deterministic structural diagnostic.
+
+    Reads the ALREADY-ASSEMBLED ledger (kibitz r2, CONFIRMED: sci-fi runners call
+    ``led.set_lines`` etc. INSIDE the runner before return, and the inline lanes
+    have saved at Phase-0 before this hook) and records ONE meta field it owns.
+    It NEVER mutates ``lines/beats/shots/music/cast`` and NEVER raises -- any
+    error is stamped, not thrown (operator law: an audit may improve a story, it
+    may never fail one; and every field it writes has exactly one owner)."""
+    # lane is the full v3 bank id (e.g. "scifi_codex_v3"); the owned meta field
+    # is "<lane>_advisory".
+    key = f"{lane}_advisory"
+    data = getattr(led, "data", None)
+    # Stamp into the LIVE ledger meta (survives incremental saves that replace
+    # led.data); fall back to the passed meta only if led has no data mapping.
+    target = data.setdefault("meta", {}) if isinstance(data, dict) else (
+        meta if isinstance(meta, dict) else None)
+    if target is None:
+        return
+    try:
+        try:
+            from ._otr_bank_variants import base_source_bank_id
+        except ImportError:  # pragma: no cover -- flat/standalone load
+            from _otr_bank_variants import base_source_bank_id  # type: ignore
+        data = data or {}
+        rows = []
+        for r in (data.get("lines") or []):
+            if not isinstance(r, dict):
+                continue
+            if r.get("skip") or r.get("skip_tts"):
+                continue
+            if not str(r.get("text") or "").strip():
+                continue
+            rows.append(r)
+        speakers = [str(r.get("char_id") or r.get("speaker_role") or "") for r in rows]
+        counts: dict[str, int] = {}
+        for s in speakers:
+            counts[s] = counts.get(s, 0) + 1
+        words = [len(str(r.get("text") or "").split()) for r in rows]
+        base = base_source_bank_id(lane)
+        focus = _v3_focus_metric(base, rows, speakers, words, counts)
+        target[key] = {
+            "status": "ok",
+            "version": int(version),
+            "basis": "assembled_ledger_lines",
+            "line_count": len(rows),
+            "distinct_speakers": len([s for s in counts if s]),
+            "max_same_speaker_run": _v3_max_run(speakers),
+            "total_words": sum(words),
+            "focus": focus,
+        }
+    except Exception as exc:  # noqa: BLE001 -- advisory must never fail an episode
+        target[key] = {
+            "status": "error",
+            "version": int(version),
+            "error_type": type(exc).__name__,
+            "message": str(exc)[:200],
+        }
+
+
+def _v3_focus_metric(base, rows, speakers, words, counts):
+    """Per-family deterministic focus metric (the v3 lane's improvement target)."""
+    import re
+    cast = len([s for s in counts if s])
+    if base == "scifi_codex":
+        by_beat: dict[str, int] = {}
+        for r, w in zip(rows, words):
+            bid = str(r.get("beat_id") or "")
+            by_beat[bid] = by_beat.get(bid, 0) + w
+        vals = list(by_beat.values())
+        if len(vals) >= 2:
+            mean = sum(vals) / len(vals)
+            var = sum((v - mean) ** 2 for v in vals) / len(vals)
+        else:
+            var = 0.0
+        return {"metric": "beat_word_variance", "beats": len(vals), "value": round(var, 2)}
+    if base == "scifi_sonnet":
+        return {"metric": "reader_alternation", "max_same_speaker_run": _v3_max_run(speakers)}
+    if base == "scifi_fable2":
+        non_ann = [s for r, s in zip(rows, speakers)
+                   if "announcer" not in str(r.get("speaker_role") or "").lower()]
+        distinct = len(set(s for s in non_ann if s))
+        return {"metric": "two_voice_exchange", "distinct_dramatic_speakers": distinct,
+                "present": distinct >= 2}
+    if base == "media_archive":
+        rx = re.compile(r"\b[A-Z][A-Z]+['’](ve|s|ll|re|d|t|m)\b")
+        hits = sum(len(rx.findall(str(r.get("text") or ""))) for r in rows)
+        return {"metric": "allcaps_name_contraction_hits", "value": hits}
+    if base == "public_domain_story":
+        return {"metric": "compression_line_count", "value": len(rows)}
+    if base == "shakespeare":
+        return {"metric": "distinct_source_speakers", "value": cast}
+    if base == "science_news":
+        return {"metric": "cast_size", "value": cast}
+    if base == "original_radio":
+        return {"metric": "spoken_line_count", "value": len(rows)}
+    return {"metric": "generic", "value": len(rows)}
+
+
+def _make_v3_runner(base_runner, lane):
+    """Bake-off v3 sci-fi lane: wrap a base runner so it produces the
+    field-complete ledger + parts, then run one advisory-only diagnostic. The
+    wrapper is a PURE post-read (no mutation of parts/led), so the fable2 720
+    golden path stays byte-identical (F6)."""
+    def _runner(**kwargs):
+        parts = base_runner(**kwargs)
+        run_v3_advisory(kwargs.get("led"), kwargs.get("meta"), lane=lane)
+        return parts
+    _runner.__name__ = f"_run_{lane}_lane"
+    return _runner
+
+
 # scifi_fable2 S2 (doc s11): pipeline-id -> lane runner. Consulted
 # exactly ONCE per run, after the shared front (bank resolve -> runnable
 # gate -> fetch -> validate -> D.1 ledger + meta stamps) and BEFORE the
 # D.2 news-interpreter branch. legacy_many_pass and original_multi_pass
 # are deliberately NOT in the map -- their execution lanes are the
 # writer's own inline branches (byte-identical on a map miss).
+# Bake-off v3: the three sci-fi v3 pipelines wrap the base runner with the
+# advisory-only diagnostic (kibitz r2: one generic factory, not 3 modules).
 _RUNNER_BY_PIPELINE = {
     "fable2_multipass": _run_fable2_lane,
     "scifi_codex_circuit": _run_scifi_codex_lane,
     "sonnet_archive_multipass": _run_scifi_sonnet_lane,
+    "fable2_multipass_v3": _make_v3_runner(_run_fable2_lane, "scifi_fable2_v3"),
+    "scifi_codex_circuit_v3": _make_v3_runner(_run_scifi_codex_lane, "scifi_codex_v3"),
+    "sonnet_archive_multipass_v3": _make_v3_runner(
+        _run_scifi_sonnet_lane, "scifi_sonnet_v3"),
 }
 
-# The two pipelines whose execution lane IS this writer's inline body.
+# Bake-off v3 inline lanes: clones of the two inline pipelines. They run the
+# inline body byte-identically (map miss -> None) plus one post-assembly
+# advisory diagnostic; they must be in _LEGACY_INLINE_PIPELINES so
+# _resolve_lane_runner returns None instead of raising.
+_INLINE_V3_PIPELINES = frozenset({
+    "legacy_many_pass_v3", "original_multi_pass_v3",
+})
+
+# The pipelines whose execution lane IS this writer's inline body.
 _LEGACY_INLINE_PIPELINES = frozenset({
     "legacy_many_pass", "original_multi_pass",
-})
+}) | _INLINE_V3_PIPELINES
 
 
 def _stamp_final_slot_telemetry(
@@ -2978,8 +3115,10 @@ class OTR_LedgerScriptWriter:
                             "supplies the pack-routed creative prompts and "
                             "which lane the episode runs. science_news = the "
                             "production sci-fi lane (default, "
-                            "byte-identical). Other banks are addressable "
-                            "but not yet runnable -- picking one FAILS LOUD "
+                            "byte-identical); the _v2 / _v3 rows are bake-off "
+                            "variants of each base lane and are runnable. The "
+                            "only non-runnable row is '+ Add Your Own' "
+                            "(custom_source_bank) -- picking it FAILS LOUD "
                             "before any story work (no fallback)."
                         ),
                     },
@@ -3472,7 +3611,7 @@ class OTR_LedgerScriptWriter:
         # non-Off refine widget fails loud here too.
         _selected_pipeline_id = str(getattr(
             _source_bank_row, "default_story_pipeline", "") or "")
-        if _selected_pipeline_id == "fable2_multipass":
+        if _selected_pipeline_id in ("fable2_multipass", "fable2_multipass_v3"):
             try:
                 from . import _otr_scifi_fable2 as _F2GATE
             except ImportError:  # pragma: no cover -- flat/standalone load
@@ -6468,6 +6607,17 @@ class OTR_LedgerScriptWriter:
             meta.get("total_word_count", 0),
         )
         led.save()
+
+        # Bake-off v3 (inline lanes): bounded advisory-only diagnostic over the
+        # composed + scrubbed + saved ledger, keyed on the v3 pipeline id. Reads
+        # + stamps the LIVE led.data meta; never mutates rows, never raises
+        # (L-6 + no-hole law). Base inline lanes are unaffected (map miss).
+        if str(getattr(_source_bank_row, "default_story_pipeline", "") or "") \
+                in _INLINE_V3_PIPELINES:
+            run_v3_advisory(
+                led, led.data.setdefault("meta", {}),
+                lane=str(resolved.get("source_bank") or ""),
+            )
 
         # --- Tail handoff (scifi_fable2 S1a extraction) ----------------
         # Everything from J.5 to the M save lives in _run_writer_tail and

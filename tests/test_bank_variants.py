@@ -146,14 +146,15 @@ _V2_BASE = {
 
 
 class TestChunk2V2Rows:
-    def test_counts_16_runnable_17_visible(self):
+    def test_counts_24_runnable_25_visible(self):
+        # chunk 4: 8 base + 8 _v2 + 8 _v3 + custom = 25 visible / 24 runnable.
         ids = ROUTING.list_bank_ids()
-        assert len(ids) == 17                      # 8 base + 8 _v2 + custom
+        assert len(ids) == 25
         assert ids[-1] == "custom_source_bank"
         runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
-        assert len(runnable) == 16                 # only custom is non-runnable
-        v2 = [b for b in ids if b.endswith("_v2")]
-        assert len(v2) == 8
+        assert len(runnable) == 24                 # only custom is non-runnable
+        assert len([b for b in ids if b.endswith("_v2")]) == 8
+        assert len([b for b in ids if b.endswith("_v3")]) == 8
 
     @pytest.mark.parametrize("v2,base", sorted(_V2_BASE.items()))
     def test_v2_owns_its_pack_on_the_base_pipeline(self, v2, base):
@@ -170,3 +171,86 @@ class TestChunk2V2Rows:
         # family behaviour: a _v2 id resolves the BASE family's story rules.
         assert BV.base_source_bank_id(v2) == base
         assert RULES.resolve_story_rules(v2).rules_id == base
+
+
+# ---------------------------------------------------------------------------
+# 6. Chunk 4: the 8 _v3 lanes (own v3 pipeline; sci-fi own-runner, rest inline)
+# ---------------------------------------------------------------------------
+
+# v3 bank id -> (base, v3 pipeline id, lane kind)
+_V3 = {
+    "science_news_v3":        ("science_news",        "legacy_many_pass_v3",         "inline"),
+    "media_archive_v3":       ("media_archive",       "legacy_many_pass_v3",         "inline"),
+    "public_domain_story_v3": ("public_domain_story", "legacy_many_pass_v3",         "inline"),
+    "shakespeare_v3":         ("shakespeare",         "legacy_many_pass_v3",         "inline"),
+    "original_radio_v3":      ("original_radio",      "original_multi_pass_v3",      "inline"),
+    "scifi_fable2_v3":        ("scifi_fable2",        "fable2_multipass_v3",         "runner"),
+    "scifi_codex_v3":         ("scifi_codex",         "scifi_codex_circuit_v3",      "runner"),
+    "scifi_sonnet_v3":        ("scifi_sonnet",        "sonnet_archive_multipass_v3", "runner"),
+}
+
+
+class TestChunk4V3Rows:
+    def test_v3_count_and_order(self):
+        ids = ROUTING.list_bank_ids()
+        assert len([b for b in ids if b.endswith("_v3")]) == 8
+        assert ids.index("science_news_v3") > ids.index("science_news_v2")
+        assert ids[-1] == "custom_source_bank"
+
+    @pytest.mark.parametrize("v3,base,pipe,kind",
+                             sorted((k, *v) for k, v in _V3.items()))
+    def test_v3_owns_pack_pipeline_and_lane(self, v3, base, pipe, kind):
+        from nodes import OTR_LedgerScriptWriter as W
+        bank = ROUTING.get_bank(v3)
+        assert bank.runnable is True
+        assert bank.default_story_pipeline == pipe
+        pack = ROUTING.resolve_story_pack(v3)
+        assert pack.source_bank_id == v3
+        assert pack.story_model_id.endswith("_v3")
+        assert pack.story_pipeline_id == pipe
+        assert BV.base_source_bank_id(v3) == base
+        assert RULES.resolve_story_rules(v3).rules_id == base
+        if kind == "runner":
+            assert pipe in W._RUNNER_BY_PIPELINE
+            assert pipe not in W._LEGACY_INLINE_PIPELINES
+            assert ROUTING.get_pipeline(pipe).executable is True
+        else:
+            assert pipe in W._LEGACY_INLINE_PIPELINES
+            assert pipe in W._INLINE_V3_PIPELINES
+            assert pipe not in W._RUNNER_BY_PIPELINE
+
+    def test_v3_advisory_is_bounded_and_owns_one_field(self):
+        from nodes import OTR_LedgerScriptWriter as W
+
+        class _Led:
+            def __init__(self):
+                self.data = {"lines": [
+                    {"line_id": "l1", "char_id": "c01", "speaker_role": "character",
+                     "text": "The wording is exact.", "beat_id": "b1"},
+                    {"line_id": "l2", "char_id": "c02", "speaker_role": "character",
+                     "text": "But what could it mean.", "beat_id": "b2"},
+                ], "meta": {}}
+
+        led = _Led()
+        before = [dict(r) for r in led.data["lines"]]
+        W.run_v3_advisory(led, led.data["meta"], lane="scifi_sonnet_v3")
+        rec = led.data["meta"]["scifi_sonnet_v3_advisory"]
+        assert rec["status"] == "ok"
+        assert rec["line_count"] == 2
+        assert rec["focus"]["metric"] == "reader_alternation"
+        # advisory-only: spoken rows untouched (no hole in the ledger).
+        assert led.data["lines"] == before
+        # exactly one owned meta field written.
+        assert list(led.data["meta"].keys()) == ["scifi_sonnet_v3_advisory"]
+
+    def test_v3_advisory_never_raises_on_bad_input(self):
+        from nodes import OTR_LedgerScriptWriter as W
+        meta = {}
+        W.run_v3_advisory(None, meta, lane="science_news_v3")   # None led
+        assert meta["science_news_v3_advisory"]["status"] in ("ok", "error")
+
+        class _Bad:
+            data = {"lines": "not a list", "meta": {}}
+        bad = _Bad()
+        W.run_v3_advisory(bad, bad.data["meta"], lane="media_archive_v3")
+        assert "media_archive_v3_advisory" in bad.data["meta"]

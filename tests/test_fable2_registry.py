@@ -49,10 +49,10 @@ class TestBankRow:
         # r3/M7: "+ Add Your Own" stays last; fable2 inserted BEFORE it.
         ids = ROUTING.list_bank_ids()
         assert ids[-1] == "custom_source_bank"
-        # bake-off chunk 2: 8 _v2 rows inserted BEFORE custom_source_bank;
-        # the _v2 sci-fi trio now occupies the tail ahead of custom.
-        assert ids[-4:] == ("scifi_fable2_v2", "scifi_codex_v2",
-                            "scifi_sonnet_v2", "custom_source_bank")
+        # bake-off chunk 4: 8 _v3 rows added after the _v2 block; the _v3 sci-fi
+        # trio now occupies the tail ahead of custom.
+        assert ids[-4:] == ("scifi_fable2_v3", "scifi_codex_v3",
+                            "scifi_sonnet_v3", "custom_source_bank")
 
     def test_row_shape_runnable_s1b(self):
         bank = ROUTING.get_bank("scifi_fable2")
@@ -269,7 +269,7 @@ class TestScienceNewsUntouched:
 
     def test_science_stays_first_and_order_holds(self):
         ids = ROUTING.list_bank_ids()
-        # bake-off chunk 2: base 8 -> +8 _v2 (mirrored order) -> custom last.
+        # bake-off chunk 4: base 8 -> +8 _v2 -> +8 _v3 (mirrored order) -> custom.
         assert ids == ("science_news", "media_archive",
                        "public_domain_story", "shakespeare",
                        "original_radio", "scifi_fable2", "scifi_codex",
@@ -278,6 +278,10 @@ class TestScienceNewsUntouched:
                        "public_domain_story_v2", "shakespeare_v2",
                        "original_radio_v2", "scifi_fable2_v2",
                        "scifi_codex_v2", "scifi_sonnet_v2",
+                       "science_news_v3", "media_archive_v3",
+                       "public_domain_story_v3", "shakespeare_v3",
+                       "original_radio_v3", "scifi_fable2_v3",
+                       "scifi_codex_v3", "scifi_sonnet_v3",
                        "custom_source_bank")
 
     def test_fable2_seams_never_shadow_production(self):
