@@ -49,7 +49,6 @@ _PACK_SIDECAR_FILENAMES_BY_BANK = {
     # + stance deck is entropy data for the P1 pitch pass, not a story pack --
     # _otr_scifi_fable2 validates it with its own schema at load (S1b).
     "scifi_fable2": frozenset({"frame_deck.json"}),
-    "original_codex56sol": frozenset({"constraint_deck.json"}),
 }
 
 _VALID_PASS_SLOTS = frozenset({"creative", "technical"})

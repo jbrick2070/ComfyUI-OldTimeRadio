@@ -292,7 +292,7 @@ def test_tail_preserves_selected_final_draft_seals_on_disk(
 
 @pytest.mark.parametrize(
     "source_bank",
-    ("scifi_fable2", "scifi_codex", "scifi_gemini", "scifi_sonnet"),
+    ("scifi_fable2", "scifi_codex", "scifi_sonnet"),
 )
 def test_content_owned_tail_stamps_delivery_before_finalizer(
     tmp_path, monkeypatch, source_bank,

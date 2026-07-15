@@ -2,7 +2,6 @@ import json
 
 from nodes._otr_scifi_codex import FactIndexV4
 from nodes._otr_scifi_codex import RadioScoreV4, ScriptArtifactV4, _schema_instruction as codex_schema_instruction
-from nodes._otr_scifi_gemini import _schema_instruction as gemini_schema_instruction
 from nodes._otr_scifi_sonnet import FragmentDossierV4, _schema_instruction as sonnet_schema_instruction
 from nodes._otr_json import parse_first_json_object
 from nodes._otr_scifi_source_repair import repair_literal_source_metadata
@@ -115,7 +114,6 @@ def test_repair_refuses_an_oversized_quote_that_is_not_literal_source_text():
 
 def test_all_lane_schema_seams_name_exact_top_level_keys():
     assert "facts" in codex_schema_instruction(FactIndexV4)
-    assert "facts" in gemini_schema_instruction(FactIndexV4)
     assert "verified_facts" in sonnet_schema_instruction(FragmentDossierV4)
     assert "scenes[*].shots[*].scene_id" in codex_schema_instruction(RadioScoreV4)
 

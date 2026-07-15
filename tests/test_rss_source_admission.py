@@ -8,7 +8,6 @@ from typing import Any, Callable
 import pytest
 
 from nodes import _otr_scifi_codex as codex
-from nodes import _otr_scifi_gemini as gemini
 from nodes import _otr_scifi_sonnet as sonnet
 from nodes import production_ledger
 from nodes import story_orchestrator as orchestrator
@@ -228,7 +227,6 @@ def test_legacy_floor_wrapper_forwards_threshold_kwargs() -> None:
     ("validator", "thin_error"),
     [
         (codex.validate_payload_envelope, codex.CodexPayloadThinError),
-        (gemini.validate_gemini_payload, gemini.SciFiGeminiPayloadThinError),
         (sonnet.validate_sonnet_payload, sonnet.SonnetThinPayloadError),
     ],
 )

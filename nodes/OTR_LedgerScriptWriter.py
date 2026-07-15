@@ -1436,7 +1436,7 @@ def _resolve_inputs(
                 "riding as operator_hint (%d chars)", len(custom),
             )
         source_rights = {"license_label": "synthetic original"}
-    elif custom and _rb_bank.source_bank_id != "original_codex56sol":
+    elif custom:
         # Custom premise path: synthesize the same dict shape RSS
         # would produce so news_interpreter sees a uniform article
         # surface no matter how the story entered the writer.
@@ -1494,8 +1494,6 @@ def _resolve_inputs(
         )
         news_seed = news_article["seed_text"]
         seed_source = _fetch_entry.seed_source
-        if (_fetch_bank.source_bank_id == "original_codex56sol" and custom):
-            source_meta["operator_hint"] = custom
 
     return {
         "news_seed":            news_seed,
@@ -1709,15 +1707,6 @@ def _run_scifi_codex_lane(**kwargs):
     return _SC.run_scifi_codex_episode(**kwargs)
 
 
-def _run_scifi_gemini_lane(**kwargs):
-    """Lazy dispatch for the additive Gemini v4 bake-off lane."""
-    try:
-        from . import _otr_scifi_gemini as _SG
-    except ImportError:  # pragma: no cover
-        import _otr_scifi_gemini as _SG  # type: ignore
-    return _SG.run_scifi_gemini_episode(**kwargs)
-
-
 def _run_scifi_sonnet_lane(**kwargs):
     """Lazy dispatch for the additive Sonnet v4 bake-off lane."""
     try:
@@ -1725,15 +1714,6 @@ def _run_scifi_sonnet_lane(**kwargs):
     except ImportError:  # pragma: no cover
         import _otr_scifi_sonnet as _SS  # type: ignore
     return _SS.run_scifi_sonnet_episode(**kwargs)
-
-
-def _run_original_codex56sol_lane(**kwargs):
-    """Lazy dispatch for the original Lost and Found Frequency lane."""
-    try:
-        from . import _otr_original_codex56sol as _OC56
-    except ImportError:  # pragma: no cover
-        import _otr_original_codex56sol as _OC56  # type: ignore
-    return _OC56.run_original_codex56sol_episode(**kwargs)
 
 
 # scifi_fable2 S2 (doc s11): pipeline-id -> lane runner. Consulted
@@ -1745,9 +1725,7 @@ def _run_original_codex56sol_lane(**kwargs):
 _RUNNER_BY_PIPELINE = {
     "fable2_multipass": _run_fable2_lane,
     "scifi_codex_circuit": _run_scifi_codex_lane,
-    "scifi_gemini_multipass": _run_scifi_gemini_lane,
     "sonnet_archive_multipass": _run_scifi_sonnet_lane,
-    "acoustic_puzzle_v1": _run_original_codex56sol_lane,
 }
 
 # The two pipelines whose execution lane IS this writer's inline body.
