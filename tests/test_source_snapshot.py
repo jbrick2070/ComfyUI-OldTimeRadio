@@ -58,12 +58,12 @@ def _envelope(base="science_news", **overrides):
     return env
 
 
-def _write_manifest(tmp_path, snapshots, *, name="manifest.json"):
+def _write_manifest(tmp_path, snapshots, *, name="manifest.json", allow_partial=False):
     path = tmp_path / name
-    path.write_text(
-        json.dumps({"schema_version": 1, "snapshots": snapshots}),
-        encoding="utf-8",
-    )
+    body = {"schema_version": 1, "snapshots": snapshots}
+    if allow_partial:
+        body["allow_partial"] = True
+    path.write_text(json.dumps(body), encoding="utf-8")
     return str(path)
 
 
@@ -94,8 +94,18 @@ def test_no_manifest_env_returns_none():
     assert SS.load_snapshot_for_bank("science_news") is None
 
 
-def test_manifest_without_bank_entry_returns_none(tmp_path, monkeypatch):
+def test_manifest_configured_but_base_absent_raises_by_default(tmp_path, monkeypatch):
+    # Codex r4 MUST-FIX 1: a configured manifest that lacks the selected base
+    # must NOT silently source live -- that invalidates the bake-off control.
     manifest = _write_manifest(tmp_path, {"media_archive": _envelope("media_archive")})
+    monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
+    with pytest.raises(SS.SourceSnapshotError, match="no .*entry for base"):
+        SS.load_snapshot_for_bank("science_news")
+
+
+def test_allow_partial_sources_absent_base_live(tmp_path, monkeypatch):
+    manifest = _write_manifest(
+        tmp_path, {"media_archive": _envelope("media_archive")}, allow_partial=True)
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     assert SS.load_snapshot_for_bank("science_news") is None
 
@@ -218,12 +228,13 @@ def test_path_pointer_entry_resolves_relative_to_manifest_dir(tmp_path, monkeypa
 
 
 def test_manifest_rewrite_is_seen_immediately(tmp_path, monkeypatch):
-    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    manifest = _write_manifest(
+        tmp_path, {"science_news": _envelope("science_news")}, allow_partial=True)
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     assert SS.load_snapshot_for_bank("media_archive") is None
     # A live re-pin of the manifest is honored on the next call (no stale cache).
     Path(manifest).write_text(
-        json.dumps({"schema_version": 1,
+        json.dumps({"schema_version": 1, "allow_partial": True,
                     "snapshots": {"media_archive": _envelope("media_archive")}}),
         encoding="utf-8",
     )
@@ -284,3 +295,31 @@ def test_resolve_inputs_without_snapshot_is_unaffected(tmp_path, monkeypatch):
     )
     assert out["seed_source"] == "custom_premise"
     assert out["news_seed"] == "a custom seed premise"
+
+
+def _no_fetch(*_a, **_k):
+    raise AssertionError("live fetcher must not run under a snapshot")
+
+
+def test_resolve_inputs_replay_warns_without_c7_seeds(tmp_path, monkeypatch, caplog):
+    import logging
+    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
+    monkeypatch.delenv("OTR_CAST_SEED", raising=False)
+    monkeypatch.delenv("OTR_STYLE_SEED", raising=False)
+    monkeypatch.setattr(SP, "resolve_fetcher", _no_fetch)
+    with caplog.at_level(logging.WARNING):
+        LSW._resolve_inputs(source_bank="science_news", target_words=120)
+    assert any("without C7 seed pinning" in r.getMessage() for r in caplog.records)
+
+
+def test_resolve_inputs_replay_quiet_with_c7_seeds(tmp_path, monkeypatch, caplog):
+    import logging
+    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
+    monkeypatch.setenv("OTR_CAST_SEED", "42")
+    monkeypatch.setenv("OTR_STYLE_SEED", "42")
+    monkeypatch.setattr(SP, "resolve_fetcher", _no_fetch)
+    with caplog.at_level(logging.WARNING):
+        LSW._resolve_inputs(source_bank="science_news", target_words=120)
+    assert not any("without C7 seed pinning" in r.getMessage() for r in caplog.records)

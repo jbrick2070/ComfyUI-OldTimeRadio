@@ -168,7 +168,20 @@ def load_snapshot_for_bank(selected_bank_id: str):
             f"object (got {type(snapshots).__name__})"
         )
     if base not in snapshots:
-        return None
+        # A manifest IS configured but this bank's base is not frozen. STRICT by
+        # default: refuse to silently source live (that would invalidate the
+        # bake-off's experimental control -- the very thing the manifest exists
+        # to guarantee). An operator running an ad-hoc partial manifest (freeze
+        # some banks, source the rest live) opts in with "allow_partial": true.
+        if bool(manifest.get("allow_partial", False)):
+            return None
+        raise SourceSnapshotError(
+            f"source-snapshot manifest {abspath!r} is configured but has no "
+            f"entry for base {base!r} (selected bank {selected_bank_id!r}); "
+            f"refusing to silently source live. Add a snapshot for {base!r}, or "
+            f'set "allow_partial": true in the manifest to source unfrozen banks '
+            f"live."
+        )
 
     envelope = _resolve_entry(
         snapshots[base], base=base, manifest_dir=os.path.dirname(abspath),

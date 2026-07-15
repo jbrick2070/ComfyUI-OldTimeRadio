@@ -1442,6 +1442,17 @@ def _resolve_inputs(
             seed_source,
             _source_snapshot.payload_sha256[:12],
         )
+        # The source is frozen, but cast/style still roll unless C7 pins them.
+        # A replay leg meant as a controlled A/B (F2) needs OTR_C7=1; warn LOUD
+        # if the seeds are unset so a mis-run does not masquerade as a control.
+        if not (os.environ.get("OTR_CAST_SEED", "").strip()
+                and os.environ.get("OTR_STYLE_SEED", "").strip()):
+            log.warning(
+                "[OTR_LedgerScriptWriter] source-snapshot REPLAY without C7 seed "
+                "pinning (OTR_CAST_SEED/OTR_STYLE_SEED unset): the SOURCE is "
+                "frozen but cast/style will roll fresh -- set OTR_C7=1 for a "
+                "byte-stable replay leg.",
+            )
     elif _bank_has_no_source_contract(_rb_bank):
         try:
             from . import _otr_original_radio as _OTROR
