@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-15 evening -- HEAD c32d4c04 (v2.0-alpha)
+**Updated:** 2026-07-15 night -- HEAD 031851ce (v2.0-alpha)
 
 ## CURRENT STEP (2026-07-15): Bank-Improvement Bake-off -- source-snapshot injection (B7/B8)
 
@@ -26,20 +26,28 @@ Shipped:
   fable2 early word-budget gate family-fix + tooltip. 24 runnable / 25 visible;
   bijection-validated (`test_custom_runner_truthfulness`); suite 7884 green, Bug
   Bible 17 green, canonical delta = none.
+- **SOURCE-SNAPSHOT (B7/B8)** (`031851ce`): frozen-source replay layer. New leaf
+  `nodes/_otr_source_snapshot.py` -- a process-wide manifest keyed by BASE bank
+  (env `OTR_SOURCE_SNAPSHOT_MANIFEST`), loaded in `_resolve_inputs` IMMEDIATELY
+  after bank resolution and BEFORE the three source branches, so a replay
+  bypasses RSS/random. Base-mismatch / malformed / altered-payload envelopes
+  raise `SourceSnapshotError` LOUD (never a silent fall-through). The replayed
+  `source_meta` sidecar carries the same fields a live branch would (spark_atoms
+  for original, cast_hints for adaptation), so every downstream owner is fed.
+  B8 seeds: `OTR_FABLE2_SEED=42` pinned under C7 + a manifest echo in
+  `_otr_soak_server_launch.cmd`. +20 tests -> suite 7904 green, Bug Bible 17,
+  canonical delta = none. Dry registry-load = 24 runnable / 25 visible.
 
 NEXT (in order):
-1. **Source-snapshot injection (B7/B8).** In `_resolve_inputs` (`:1398-1496`) load a
-   validated snapshot envelope IMMEDIATELY after bank resolution, BEFORE the three
-   source branches (entropy / custom-premise / external fetch) so a replay bypasses
-   RSS/random. Replay payload + `source_meta`/`source_rights` sidecars + `cast_hints`
-   + seed receipt; REJECT a snapshot whose declared base != `base_source_bank_id
-   (selected)`. Seed control: `OTR_C7=1` + fixed `OTR_FABLE2_SEED` + ONE process-wide
-   snapshot manifest keyed by base bank, inherited before boot
-   (`scripts/_otr_soak_server_launch.cmd:25-37`). Mostly the render window -- build
-   the path + recorded controls now.
-2. **kibitz r4 convergence + Fable final gate** on the v3 promotions.
-3. **Final verify**: dry registry-load resolving all 24 banks; canonical delta = none
-   (`git diff --exit-code otr_canonical.json` + OTR_WorkflowValidator + round-trip).
+1. **kibitz r4 convergence + Fable final gate** on the v3 promotions + the
+   source-snapshot layer -- confirm no new must-fix; Fable = the final grounded
+   eyes on the shipped structural bake-off change (CLAUDE.md section 9).
+2. **Live replay proof (render window):** populate a snapshot manifest for one
+   base bank, run its base/_v2/_v3 triplet under `OTR_C7=1`, and confirm the pack
+   is the only variable (F2 discipline). Record payload sha + seed in each row.
+3. **Final verify** (code chunk done): dry registry-load resolved all 24 banks;
+   `git diff --exit-code otr_canonical.json` clean; JSON round-trip 23 nodes / 57
+   links; OTR_WorkflowValidator covered by the green suite.
 
 Note: the v3 packs currently carry the v2 seam text; the STRUCTURAL v3 delta is the
 advisory diagnostic (kibitz-final ruling). If deeper per-lane v3 seam text is wanted

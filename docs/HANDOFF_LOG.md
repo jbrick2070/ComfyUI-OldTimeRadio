@@ -3,6 +3,33 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-15 night -- HEAD 031851ce (v2.0-alpha) [bank-bakeoff: source-snapshot B7/B8 SHIPPED]
+
+Did:
+- Built the bake-off frozen-source replay layer (r3 rulings B7/B8). New stdlib
+  leaf `nodes/_otr_source_snapshot.py`: a process-wide manifest (env
+  `OTR_SOURCE_SNAPSHOT_MANIFEST`) keyed by BASE bank, so one frozen source serves
+  the base/_v2/_v3 triplet. `load_snapshot_for_bank` validates the envelope
+  (base match via `base_source_bank_id`, seven-key payload presence, non-empty
+  seed_source, optional payload_sha256 receipt) and REJECTS base-mismatch /
+  malformed / altered-payload loud; returns None when no manifest is configured.
+- Wired it into `OTR_LedgerScriptWriter._resolve_inputs` as the FIRST source
+  branch, immediately after bank resolution and BEFORE entropy/custom/fetch, so a
+  replay bypasses RSS/random; the replayed source_meta carries spark_atoms
+  (original) / cast_hints (adaptation) so no downstream owner is starved.
+- B8 seed control in `scripts/_otr_soak_server_launch.cmd`: pin
+  `OTR_FABLE2_SEED=42` alongside CAST/STYLE under C7 (cleared otherwise) + an
+  auditable manifest echo. Dropped an mtime-keyed cache (Windows coarse-mtime
+  stale-read hazard) -- the manifest is re-read per episode.
+- Gates: full suite 7904 passed / 31 skipped / 1 xfailed (+20 new); Bug Bible 17
+  passed; no BOM; py_compile clean; canonical delta = none; dry registry-load 24
+  runnable / 25 visible + round-trip 23 nodes/57 links. Pushed; HEAD==origin.
+Current step: kibitz r4 convergence + Fable final gate on the v3 promotions + the
+  source-snapshot layer (see GO_FORWARD NEXT).
+Next: run kibitz r4 (local Codex+Antigravity) then the Fable final gate; then the
+  live replay triplet proof in the render window.
+Commits: 031851ce
+
 ## 2026-07-15 late -- HEAD c32d4c04 (v2.0-alpha) [bank-bakeoff build: chunk 4 SHIPPED + kibitz r2]
 
 Did:
