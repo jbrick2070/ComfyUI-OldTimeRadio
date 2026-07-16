@@ -1,7 +1,7 @@
 pin_meta:
   combo_options_excluded: true
-  comfyui_commit: c2638ce6c00e3426c48d56a775bc46e9a8464094
-  generated_utc: '2026-07-09T07:19:00.991795+00:00'
+  comfyui_commit: 700821e1364eaab0e8f21c538a2131719fec57bf
+  generated_utc: '2026-07-16T20:11:52.439052+00:00'
   generator: scripts/otr_pin_partner_nodes.py
   schema_version: pin-2026-07-02
 rows:
@@ -355,7 +355,8 @@ rows:
         auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
         comfy_usage_source: COMFY_USAGE_SOURCE
         unique_id: UNIQUE_ID
-      optional: {}
+      optional:
+        thinking: BOOLEAN
       required:
         model: COMFY_DYNAMICCOMBO_V3
         prompt: STRING
