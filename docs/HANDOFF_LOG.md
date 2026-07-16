@@ -3,6 +3,32 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-16 -- HEAD f58ed6e6 (v2.0-alpha) [Qwen3-8B GGUF writer row PROMOTED -- orthogonal model-roster task]
+
+Did (GGUF-row bake-off per `docs/2026-07-16-gguf-row-registry.md`; NOT a forward-order step):
+- 3-leg live Qwen3-8B-Q4_K_M bake-off, both writer slots Qwen, ctx=8192 on CUDA:
+  3x RESULT SUCCESS + obs asset; peak ~11.8 GB (<14.5); KV 5.60 GB @ 8192 =
+  0.70/1k; no silent fallback. Row PROMOTED UNKNOWN->PASS (pinned
+  size=5027784512 / sha256=120307ba... / kv=0.70). First GGUF build roster is
+  now gemma-4-12b + Qwen3-8B (14B deferred).
+- Leg 1 root-fixed 7 Mistral-era assumptions that break a reasoning model:
+  `_fetch_science_news` signature; `/no_think` on every gguf call (non-structured
+  truncation + json_object `{}`); announcer stop-hygiene + robust dangling-`<think>`
+  strip; freeze/shot `load_config` threading (live: a VRAM-eviction cache-miss
+  reloaded Qwen NOT gemma); shot-lock re-raise (no silent template);
+  `PreAuditReport` null->default (a clean audit's null reason was forcing a
+  spurious needs_full_rerun). `/kibitz` (codex) on the `<think>` class per the
+  two-strikes law -- it converged + flagged the load_config gap before it cost a leg.
+- Full suite **7967** + Bug Bible green. Fail-loud rip honored throughout (operator
+  "no local-LM fallbacks"). Docs (gitignored): `docs/2026-07-16-qwen-thinking/`.
+Current step: UNCHANGED forward order -- Source-bank bake-off (render window).
+Next (operator directive 2026-07-16): complete the **8-bank x 3-leg** bake-off --
+  run the remaining legs, ROOT-FIX any failing lane (THE LAW / no-fallback /
+  LLM-first: model/prompt/budget-contract fix or explicit lane disqualification,
+  NEVER a canned line or blind retry bump), then produce the final 8x3 per-bank
+  verdicts + World Cup scoreboard (GO_FORWARD "Then, in order" item 1).
+Commits: ee0b2318 (7 fixes), f58ed6e6 (row pinned).
+
 ## 2026-07-15 late night -- HEAD 4cd36761 (v2.0-alpha) [plan-stack baseline: every go-forward doc re-grounded]
 
 Did (docs-only session -- no code, no suite run needed; phase C render untouched):

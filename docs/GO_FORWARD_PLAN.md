@@ -232,9 +232,12 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (kibitz r4 fold, `c28af5f4`): **7,907 passed / 31
+- Current whole-tree receipt (`f58ed6e6`, 2026-07-16): **7,967 passed / 31
   skipped / 1 xfailed**; Bug Bible **17 passed**; canonical workflow **23 nodes /
-  57 links**, delta = none; dry registry-load 24 runnable / 25 visible.
+  57 links**, delta = none. (Qwen3-8B GGUF writer row PROMOTED UNKNOWN->PASS this
+  session -- an orthogonal model-roster task per `docs/2026-07-16-gguf-row-registry.md`,
+  NOT a forward-order step; first GGUF build roster is now gemma-4-12b + Qwen3-8B.
+  Detail in HANDOFF_LOG.)
 - Every code chunk: focused tests, full Windows suite, Bug Bible, AST/JSON/BOM/
   zero-byte checks, commit, push, and verify `HEAD == origin/v2.0-alpha`.
 - Every node/widget/link/schema change edits `workflows/otr_canonical.json` in
