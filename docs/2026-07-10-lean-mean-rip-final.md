@@ -1,5 +1,18 @@
 # OTR Lean-Mean Rip -- De-Slop / Ship-Shape Campaign Plan
 
+> **DRIFT-CHECK 2026-07-15 (vs HEAD 4cd36761; 263 commits since verification HEAD 20185542):**
+> kill lists and W5's positional obligation (inputs[9] rip + link 279 dst_slot 34->33)
+> re-verified LIVE and intact; W2/W3/W4/W7/W8 targets byte-stable; the veto rip + lane rip +
+> bake-off chunks double-ripped NOTHING. Before execution: (1) SW-1 needs a FULL seam
+> re-survey -- the writer is 7,703 LOC (+827, 26 commits), `_run_writer_tail` was already
+> extracted (948c5a0a), and `_otr_source_snapshot` is now wired inside `_resolve_inputs`
+> (031851ce/c28af5f4); (2) SW-3 news_ingest ranges need re-survey (3 commits landed there);
+> (3) W6 keep-list must add `otr_run_watcher.ps1` + `otr_headless_process.psm1`; the
+> ENGINE_MATRIX.md precondition is STILL unmet; (4) W7: re-triage
+> `test_fetch_science_news_no_legacy_wrapper` (grew 219->231 -- may now guard live behavior);
+> (5) all line cites need the plan's own R-7 re-grep (suite now 7,907).
+> W0-W5/W8/C1-C5/SW-2/SW-4 remain executable after the re-grep.
+
 **Date:** 2026-07-10 (analysis-only session; NO code changes tonight -- operator directive)
 **Status:** CODE-READY, VERIFIED AGAINST REAL POST-PORTABILITY CODE. Portability
 S0-S6 SHIPPED same night (through `20185542`, operator ratifications folded, 7 variants

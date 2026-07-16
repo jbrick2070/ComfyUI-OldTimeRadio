@@ -1,5 +1,12 @@
 # Vibe-Coder Extensibility -- Coding Plan (r4-CONVERGED)
 
+> **STATUS 2026-07-15 (baseline): SUPERSEDED -- do not execute (banner below still governs).**
+> Replacement update: `docs/2026-07-12-user-source-lanes-architecture.md` has since completed
+> its kibitz arc r1-r4 (r3 folded @ 1af3d2bc, r4 @ 34fd5c18) but is NOT converged -- one r5
+> confirmation pass + operator ratification of its section 16 (nine flags) are required before
+> any coder slot. Its estimate is ~21-31 coder-days, superseding the "4-7 days" that
+> GO_FORWARD_PLAN formerly attached to this retired plan.
+
 > **SUPERSEDED FOR SCOPE (operator correction, 2026-07-12 late).** This plan's
 > "content packs only -- NO user-created lanes" ruling is RETIRED: the operator
 > requires real user source lanes (safe feed variants + original lane plug-ins).

@@ -1,5 +1,14 @@
 # codex56sol LLM telemetry capture -- CODE-READY PLAN
 
+> **STATUS 2026-07-15 (baseline): SUPERSEDED -- target ripped; do not execute.**
+> This plan instruments `_otr_original_codex56sol.py`'s nine-pass ladder. THE LAW rip
+> (2026-07-13) cut that lane to 4 passes + a per-line patch, then the lane itself was deleted
+> @ 3312aec7 (zero references remain in `nodes/`). PARKED FOR PORTABILITY: the
+> `_otr_structured_call.py` callback seam (reconcile with the existing `on_attempt_complete`
+> hook), the P-C clamp census (all lanes), and laws F1-F7 are lane-agnostic -- re-target at a
+> surviving lane if telemetry is revived. GO_FORWARD queue items citing this plan were
+> re-pointed in the 2026-07-15 baseline.
+
 2026-07-12. Hardened through a full kibitz r1->r4 arc (Codex `gpt-5.5` +
 Antigravity, with Cowork Claude as grounded anchor panelist and sole judge).
 Artifacts: `kibitz-runs/2026-07-12-p5-telemetry/`.

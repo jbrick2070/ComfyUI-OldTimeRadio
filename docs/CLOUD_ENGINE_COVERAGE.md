@@ -1,5 +1,12 @@
 # CLOUD ENGINE COVERAGE LEDGER
 
+> **STATUS 2026-07-15 (baseline): PARKED -- awaiting operator cloud keys.**
+> Coverage rows remain the source of truth, but the harness named below
+> (`scripts/_otr_cloud_audio_babysit.py`) is GONE at HEAD -- re-derive from
+> `scripts/otr_api.py` direct-submit -- and node 83 wiring changed @ 6899d940 (music-bus
+> links 280-283). Re-verify recipes before resuming the sweep. Predates the
+> `otr_cloud_lanes` variant rename.
+
 The methodical test matrix: every cloud engine x every role POSITION it can serve x
 its 30-word full-episode status. "PASS" = rendered end-to-end with a real `otr/obs`
 final. Keep this updated as legs run (source of truth for the cloud sweep).

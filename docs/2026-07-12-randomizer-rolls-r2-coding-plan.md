@@ -1,5 +1,16 @@
 # Randomizer Rolls -- CODING PLAN (Design A: source-bank roll)
 
+> **STATUS 2026-07-15 (baseline): STALE -- re-ground before code; NOT "coder slot only".**
+> (1) Section A1's `_otr_lane_specs` is ABSORBED by
+> `docs/2026-07-12-user-source-lanes-architecture.md` (that build lands first and CREATES the
+> authority; this build shrinks to `_otr_bank_roll` + eligibility on top). That plan awaits its
+> r5 pass + section-16 ratification; this doc gets its delta note after. (2) The roster changed
+> under section 0: 24 runnable banks (8 base + 8 _v2 + 8 _v3), scifi_gemini +
+> original_codex56sol lanes DELETED @ 3312aec7, the three _v3 dispatched runners are
+> factory-wrapped closures (`_make_v3_runner`) that strain the NAMES-ONLY LaneSpec design, and
+> the 11f6214a line pins drifted ~+300 lines. Design A itself (sentinel, receipt, sorted
+> eligible_order, two-filter pool) is unchallenged.
+
 **Date:** 2026-07-12. **Stage:** CODE-READY -- converged through the full /kibitz
 arc **r2 (coding) -> r3 (wiring) -> r4 (convergence)**; panel = codex
 `gpt-5.6-sol` @ ultra + antigravity `gemini-3.5-pro`; Claude = anchor panelist +

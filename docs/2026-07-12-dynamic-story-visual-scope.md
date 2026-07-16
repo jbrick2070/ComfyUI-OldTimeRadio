@@ -1,5 +1,12 @@
 # dynamic_story -- Story-Derived Visual Direction: Scoped Design (docs-only)
 
+> **STATUS 2026-07-15 (baseline): CURRENT -- rev-5 FINAL stands; do not rerun panels.**
+> Re-checked against HEAD 4cd36761 after the bank-improvement chunks (8 _v2 + 8 _v3 lanes)
+> and the 3312aec7 lane rip: no claim invalidated -- the design is roster-agnostic and the
+> section-1.4 wiring snapshot (23 nodes / 57 links) still matches the live canonical JSON.
+> Writer line pins drifted ~+300 lines since 2026-07-12: re-derive at build per section 11.
+> Executes after user-source-lanes extensibility and Randomizer A.
+
 Date: 2026-07-12 (rev 5 -- FINAL. r1 arc + r2 coding plan + r3 wiring + r4
 convergence, each hardened by a kibitz round: codex gpt-5.6-sol @ ultra +
 antigravity gemini-3.5-pro; driver anchors, panel reviews and judgments in

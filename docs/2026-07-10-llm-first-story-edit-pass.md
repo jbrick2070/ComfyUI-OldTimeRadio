@@ -1,5 +1,13 @@
 # LLM-First Story Edit Pass -- science_news + media_archive lanes
 
+> **STATUS 2026-07-15 (baseline): STALE -- partially overtaken; Wave-3 excision NOT executed.**
+> The pitch room shipped independently (`nodes/_otr_pitch_room.py`) and THE LAW (2026-07-13)
+> re-framed the audit surface, but X1 is LIVE WORK: `repair_cliche_span` still rewrites
+> spoken lines (`_otr_line_composer.py` ~:2632/:2676) and `cliche_replacements` persists in
+> all 8 story_rules JSONs -- a standing violation of the "Python judges, the LLM writes"
+> directive. X3 (`OTR_COMPOSER_ACTION_STRIP`) + X4 (`render_few_shot_block`) targets are
+> also still live. Re-ground E-items against the 24-lane roster before executing.
+
 - Date: 2026-07-10
 - Status: EDIT PLAN (analysis-only; no code changed yet). Supersedes the PLAN section of
   `2026-07-10-scifi-media-archive-story-qa.md` (the findings + codex addendum there remain the

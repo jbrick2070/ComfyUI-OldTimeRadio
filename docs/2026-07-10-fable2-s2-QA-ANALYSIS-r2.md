@@ -1,5 +1,12 @@
 # Fable2 S2 QA analysis, round 2
 
+> **STATUS 2026-07-15 (baseline): SUPERSEDED -- runway complete; historical analysis only.**
+> All three P0s folded @ 47bf50f2 (2026-07-10). P1.1/1.3/1.4 shipped as 720-bakeoff C1/C2/C3
+> (9949bb6e / 2f335c28 / 6899d940); P1.2 landed inside the FreezePolicy fold; P1.5 landed via
+> the S2 full-loop enable @ 95582643 (P1.5's item-by-item acceptance list was not re-verified
+> in this baseline). scifi_fable2 subsequently ranked #1 in the 2026-07-15 720 bake-off
+> verdict.
+
 **Audit date:** 2026-07-10
 **Audited baseline:** branch `v2.0-alpha`, fix commit `af378aad`
 **Scope:** the real Windows worktree, the canonical workflow, focused regression tests, and

@@ -155,6 +155,15 @@ The forcing was in `exchange_system`, and only there.
 420 was already confounded (OBS-1b). Every 720 leg runs on the new seams, so the
 judged rung stays uniform.
 
+**OPERATOR RULING (2026-07-14, mid-720):** *"we can re-run 420 for them later, I just
+want them to get the best overall scoring, but we do need to re-run those two."* So:
+the VERDICT scores shakespeare and public_domain_story on their **720 (new-seam)**
+episodes ONLY -- their old 420 episodes ("The Ink That Shows" etc.) are pre-fix and
+must NOT be what a judge sees for these two banks. GATE 3 scores the 720 rung, so this
+is automatic; pinned here so it cannot slip. A same-length 420 A/B on the new seams is
+a POST-sweep nice-to-have, not a blocker. The 720 sweep is NOT interrupted -- shakespeare
+is already live on the new seams as this was written.
+
 ---
 
 ## OBS-2 -- lane structure at length (EXPECTED, not a defect)

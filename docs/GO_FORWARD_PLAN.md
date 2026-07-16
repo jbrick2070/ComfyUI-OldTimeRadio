@@ -1,6 +1,9 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-15 evening -- HEAD b57be02b (v2.0-alpha)
+**Updated:** 2026-07-15 late night -- HEAD 4cd36761 (v2.0-alpha). Full plan-stack
+baseline: every active plan doc audited against HEAD and re-headered (fan-out
+audit, 3 grounded agents); this file's queue re-grounded. Session record in
+HANDOFF_LOG.md (top entry).
 
 **CAMPAIGN IN FLIGHT (2026-07-15 evening):** the three-phase bake-off campaign is
 running. PHASE A (Fable final gate on the 8 _v3 promotions + source-snapshot
@@ -76,6 +79,15 @@ NEXT (in order):
 3. **Phase C bake-off (IN FLIGHT):** 30w smokes (32 legs) running; then
    120/320/420/720 x {local,aion}. Then the durable report + World Cup scoreboard.
    Code-state verify unchanged (no fold): 24 runnable / 25 visible; canonical clean.
+4. **After phase C -- operator decisions:** (a) roster trim (operator may remove
+   weak lanes; verdict + phase-C receipts are the evidence); (b) which `_v2`/`_v3`
+   seams promote into their base packs; (c) the 720-verdict IMPROVE passes (below).
+   The F2 finding (original_radio `_v2`/`_v3` seam steers toward weapons content vs
+   base) feeds the same seam-tuning pass. `tencent/hy3:free` panel seat expires
+   2026-07-21.
+5. **Unblock the mistral/gemma creative-writer matrices** (verdict open item 3) --
+   the smoke-blocked local writer matrices are the only path to "best model" rather
+   than "best bank on aion". Render-window work, not coder-slot.
 
 Note: the v3 packs currently carry the v2 seam text; the STRUCTURAL v3 delta is the
 advisory diagnostic (kibitz-final ruling). If deeper per-lane v3 seam text is wanted
@@ -97,7 +109,7 @@ r3 rulings that MUST hold (all satisfied in the shipped chunks):
 > Only DETERMINISTIC validators may end an episode. An LLM verdict may trigger a
 > bounded rewrite; it may never raise.
 
-### Done today (all pushed to `v2.0-alpha`)
+### Done 2026-07-13 (all pushed to `v2.0-alpha`)
 
 Every LLM veto in the codebase is gone. `original_codex56sol` lost P4 (fair play),
 P7/P8 (blind listener + retake), P9 (final contract audit) and the P5 score-intent
@@ -116,6 +128,9 @@ a raw substring scan over the judge's OWN prose -- now word-boundary, script-onl
 word-boundary DEFAULT_PROFANITY_TERMS scan over spoken ledger text, on the one path
 every lane crosses, raising at Phase 10. The lanes that had any profanity check had
 it as an LLM opinion; codex and fable2 had none.
+
+(Historical note: `scifi_gemini` and `original_codex56sol` were subsequently ripped
+from the roster entirely @ `3312aec7`, on the 720-verdict LEAVE ruling.)
 
 ### Live proof
 
@@ -152,152 +167,85 @@ unit the model can deliver (batch a patch and a partial success becomes a total
 failure); and "it is broken" is not a repair prompt -- name the missing object, the
 unassigned clue, the exact string.
 
-### Next
+### Per-lane live-proof ladder
 
-Remaining live proof: `scifi_sonnet` (in flight), `scifi_fable2`, `scifi_codex`,
-`original_radio`, and the four legacy banks -- 30w, then 120w. Then the frozen
-bakeoff.
+DONE -- superseded by the executed campaigns: the 720 bake-off (all ten
+then-rostered banks, verdict `docs/2026-07-15-720-bakeoff-verdict.md`) and the
+in-flight phase-C sweep supply the per-lane live proofs; receipts in
+`tmp/_phaseC_receipts.csv` and HANDOFF_LOG.
 
 ---
 
-**Previously updated:** 2026-07-12 21:04 PDT
+## Re-grounded coder queue (2026-07-15 baseline)
 
-**Branch:** `v2.0-alpha`
-
-**Grounded base:** `7c806eec`, equal to `origin/v2.0-alpha` when the active
-P3 transport replacement began
-
-**Scope:** the active qualification/release-prep sprint and the immediately
-following feature sprint only
-
-**Longer runway:** `ROADMAP.md`
-
-This is the only active go-forward file. Dated plans are implementation evidence,
-not competing queues. Git history owns completed sprint narratives.
-
-## Ordered coding path
+Replaces the 2026-07-12 sprint table (prior full revision: 2026-07-12 21:04 PDT,
+in git history). Same discipline: one coder window at a time; every chunk =
+focused tests + full suite + Bug Bible + commit AND push + HEAD==origin. Dated
+plans are implementation evidence, not competing queues; each doc now carries a
+2026-07-15 status header stating exactly what it needs before execution.
 
 ```text
-active Sci-Fi Codex fix
-  -> watchdog -> C5 -> interstitial-audio rip
-  -> Codex56 telemetry -> PBUG-17 root fix -> context/cap authority
-  -> user LLM/content-pack extensibility
-  -> Fable2 qualification -> one frozen bakeoff
-  -> Engine Matrix -> Randomizer A -> dynamic_story
-  -> ROADMAP
+finish bake-off campaign (render window; operator verdicts)
+  -> quick-wins block (reverify tail, cliche excision, announcer contract,
+     watchdog, fable2 C5, interstitial-audio rip, ENGINE_MATRIX, context/cap)
+  -> LEAN-MEAN RIP (dedicated window; drift-check header first)   [operator may
+  -> user source lanes / extensibility (gated: sec-16 + r5)        swap these two]
+  -> Randomizer A -> dynamic_story
+  -> ROADMAP (SFX campaign after Timeline Cue Ledger gate)
 ```
 
-The important re-prioritization is deliberate: **user extensibility lands before
-final qualification and the bakeoff**, not after them. It changes story-pack
-resolution and validation, writer execution, ledger replay stamps, and canonical
-JSON. Landing it after the event would stale relevant receipts and risk creating
-the second bakeoff this plan forbids.
+### Quick-wins block (~4-9 coder-days, small chunks, any order inside the block)
 
-## Coordination and ownership
-
-- C4b is complete and pushed at `95582643`. Its full receipt remains in git
-  history; it is no longer a queue item.
-- The filtered OpenRouter catalog work is pushed at `961e095a`; the old dirty
-  model-catalog warning is retired.
-- The exact Sci-Fi Codex repair-envelope fix is pushed at `7aa3140e`; the
-  compact P3 repair-context follow-up is pushed at `915c8314`. Both await live
-  reverify with the same canonical `scifi_codex` leg.
-- The all-visualizer effective-consumer root fix (`PBUG-20260712-19`) is pushed
-  at `496689da`; the shared P0 bounded-evidence repair (`PBUG-20260712-21`) is
-  pushed at `e1d3a035`. **The sole coder slot is currently held by the live
-  Sci-Fi Codex qualification follow-on (`PBUG-20260712-24`).** The bounded
-  direct-score correction failed again at live prompt
-  `edbbac48-9aa8-4907-8086-f63134604604`; root commit `c942b2ae` replaces only
-  P3 and P3-rewrite model transport with `RadioScoreDraftV4` plus a fail-closed
-  compiler returning the same final `RadioScoreV4`. It is pushed and equals
-  origin after focused/full/Bible/workflow gates. Its reverify reached a new
-  shared P0 failure at prompt `81e0b0c9-2f20-4085-9fd0-e7f8034f75da`: an exact
-  literal quote exceeded the finite cap, the generic clamp retained stale
-  coordinates, and the raw metadata repair could not accept it. The active
-  root fix moves only that proven literal metadata case into the shared Sci-Fi
-  P0 repair and disables generic clamp at all three P0 boundaries. That rerun
-  live-proved P0, then exposed P3's compact contract omitting nested literal
-  semantics: numeric `arc_phase` values and descriptive cue names survived its
-  typed repair. The active root fix restores those exact model-visible rules at
-  the compact P3/P3-rewrite seam without moving authorship to Python; canonical
-  live reverify remains the next action before the coder slot releases. It
-  preserves the canonical workflow and shared all-visualizer no-image gate.
-  The full four-round Kibitz campaign (8 local reviews) and four-round frontier
-  panel ($0.8618 actual) are recorded under the dated transport-recovery artifacts.
-  The RSS parity audit found no safe schema copy/paste: Gemini, Sonnet,
-  Fable2, Media Archive, and original lanes remain artifact-specific follow-ups.
-- Preserve the untracked cue-ledger prompt, Sci-Fi Codex repair plan, and local
-  bakeoff logs. They are not owned by this planning rewrite.
-- One coder edits code or `workflows/otr_canonical.json` at a time. Read-only
-  audits and documentation preparation may run in parallel.
-
-## Current sprint -- stabilize once, then run one final event
-
-A coder-day is one focused engineering day. GPU time is elapsed qualification
-time and is listed separately.
-
-| Order | Chunk | Hard completion gate | Estimate |
+| # | Chunk | Gate | Est |
 |---:|---|---|---:|
-| 1 | Close active Sci-Fi Codex production fixes | Land the `PBUG-20260712-22` compact P3 draft/compiler root fix, `PBUG-20260712-23` exact-oversized-source-span root fix, and `PBUG-20260712-24` compact nested-literal-contract root fix; focused tests, full suite, Bible, canonical validator/audits, commit/push; canonical 120-word `scifi_codex` rerun reaches `RESULT SUCCESS`, makes no visual-authoring LLM call or image objects under all-visualizer policy, and proves ledger, episode, `obs_publish OK`, and final OBS asset. The same rerun supplies pending live reverifies for shipped PBUGs 18-24. | 0.5-1 day + <=1 GPU day |
-| 2 | Canonical watchdog support | Canonical runner emits heartbeats; watchdog recognizes canonical `RESULT`; healthy long runs never false-dead; explicit failure and stalled/down-server paths are pinned. This is a harness defect, not a production-admitted PBUG. | 0.5 day |
-| 3 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. | 0.5-1 day |
-| 4 | Rip interstitial **audio** only | Remove synthesis, insertion, timing, and dead tests; retain `music_inter` story/visual semantics. | 0.5-1 day |
-| 5 | Codex56 attempt telemetry | Land the code-ready retention, recorder, pure callback seam, scheduler metadata, lane wiring, reader, and 30-word live proof without changing ledger bytes or canonical JSON. | 2-4 days + <=1 GPU day |
-| 6 | Root-fix `PBUG-20260712-17` | Reproduce with retained raw/projected/error records; fix the owning model/seam/validator boundary, never retries or a shim; canonical rerun proves closure. If the evidence identifies context fit as the cause, merge this work into item 7 rather than fixing twice. | 0.5-3 days + live proof |
-| 7 | Context/cap foundation | One provider-effective cap/count/reservation/must-fit authority feeds preflight, invocation, and receipts; measure base and repair envelopes; no silent truncation and no blind 8192->16384 raise. | 1-3 days |
-| 8 | User extensibility -- local LLMs and content packs | Execute the converged W0-W5 plan: `user_packs/` overlay/quarantine, selectable content/story packs inside any existing runnable source lane, replay SHA integrity, `otr_check`, templates/generated schema docs/README recipes, and local causal-LM selection safety. New source lanes remain the expert preflight path. | 4-7 days + <=1 GPU day |
-| 9 | Fable2 qualification | 30 words on two local families and one declared cloud lane; same pairings at 120; then one frozen 720 leg with ledger/episode/OBS proof. | 0.5-1 day + 1-3 GPU days |
-| 10 | Fresh two-matrix bakeoff | After item 1 commits/pushes and all ten 120-word canonical legs are individually green with receipt/ledger/OBS proof, update the durable report and World Cup scoreboard. Then run all ten 420-word legs sequentially with OpenRouter creative `tencent/hy3:free` and local technical Mistral-Nemo; fail loud if HY3 is unavailable. No 320- or 720-word legs. | 2-5 GPU days |
+| 1 | Sci-Fi Codex reverify tail | PBUGs 20260712-22/23/24/25 are FIXED IN TREE, LIVE REVERIFY PENDING; the campaign's canonical `scifi_codex` legs (phase C 120w) are the natural reverify vehicle -- confirm receipts, mark the log, release the coder slot formally. | 0.25 d |
+| 2 | Cliche-span excision (X1-X4) | `docs/2026-07-10-llm-first-story-edit-pass.md` Wave 3: `repair_cliche_span` (`_otr_line_composer.py` ~:2632/:2676) + `cliche_replacements` in all 8 story_rules JSONs still rewrite SPOKEN lines -- a standing violation of the LLM-first directive. Excise; suite + Bible. | 0.5-1 d |
+| 3 | Announcer framing contract | `docs/2026-07-11-announcer-framing-defect.md` -- still fully OPEN. Pack seam + score contract + fail-closed STRUCTURAL validator (lawful under THE LAW); `original_radio_v2`'s billboard/sign-off seam is prior art. Fold into the same pass as the 720-verdict IMPROVE seam work (below) so packs are touched once. | 0.5-1 d |
+| 4 | 720-verdict IMPROVE passes | shakespeare: confirm which seam version produced judged leg `c42700e1`, second prompt pass if the fix didn't take; scifi_sonnet: seam consolidation (nine seams -> fewer; it owns the set's only outright FAIL); original_radio: clarity/throughline without losing the noir mood + the F2 weapons-steering seam finding; science_news: constrain the concept, keep the steady 18-beat template. Seam/prompt work, no Python authorship. | 1-3 d |
+| 5 | Canonical watchdog support | Unchanged scope: runner heartbeats, watchdog recognizes canonical `RESULT`, pinned failure/stall paths -- plus the campaign follow-up: launcher echoes C7/manifest vars into `%1` (one line). Harness defect, not a PBUG. | 0.5 d |
+| 6 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. | 0.5-1 d |
+| 7 | Rip interstitial audio only | Remove synthesis, insertion, timing, and dead tests; retain `music_inter` story/visual semantics. | 0.5-1 d |
+| 8 | `docs/ENGINE_MATRIX.md` | Extend `scripts/build_variants.py --check` to emit + diff the matrix from the three live CAPABILITIES registries; link from README. PRECONDITION for Lean-Mean W6. | 0.5-1 d |
+| 9 | Context/cap foundation | One provider-effective cap/count/reservation/must-fit authority feeding preflight, invocation, receipts; no silent truncation, no blind cap raise. Partially advanced by the static-row ctx fix (`32e680b2`, PBUG-20260713-20, live-reverified at ctx=131072); the authority itself is still open. Carries the diagnostic-gap class from SUPERSEDED PBUG-20260712-17 (target lane ripped @ `3312aec7`): if attempt capture is needed, re-target the PARKED telemetry seam (generic `_otr_structured_call` callback; reconcile with the existing `on_attempt_complete` hook) at a surviving lane. | 1-3 d |
+| 10 | Operator backlog (render tuning) | Kokoro ALL-CAPS pre-TTS normalization (TTS-only copy, never the ledger `spoken_text` or captions; confirm the canonical default engine first) + ending credits ~1.5x faster (`nodes/otr_credits_roll.py`; if a widget, the canonical JSON changes in the SAME commit). Ideal filler during render campaigns. | 0.5-1 d |
 
-**Current-sprint planning range:** about **11-25 coder-days + 4-11 elapsed
-GPU days**. The top of the range covers the still-unknown `PBUG-20260712-17`
-root cause; it is not permission to bypass that gate.
+RETIRED from the old table: **item 5, Codex56 attempt telemetry** (target lane
+ripped @ `3312aec7`; plan `docs/2026-07-12-codex56sol-llm-telemetry-plan.md` is
+SUPERSEDED, its lane-agnostic pieces PARKED for portability -- see its header);
+**item 6, PBUG-20260712-17 root fix** (entry SUPERSEDED in the log, same rip);
+**item 10, the "fresh two-matrix bakeoff"** (superseded by the executed 720
+bake-off + the in-flight phase-C campaign; its hy3-creative 420 design dies with
+the 2026-07-21 hy3 expiry).
 
-### Current-sprint plans of record
+### Big blocks (in order; the first two may be swapped by operator call)
 
-- Watchdog: `scripts/otr_canonical_api_run.py` and
-  `scripts/otr_render_watchdog.ps1`; add focused heartbeat/result/failure/stall
-  tests before any new long run.
-- C5 and audio rip: preserve story/visual interstitial cues while removing only
-  the banned audio path.
-- Telemetry: `docs/2026-07-12-codex56sol-llm-telemetry-plan.md`; follow its
-  internal pushed-green-chunk order. It precedes context/cap changes so the
-  failing PBUG-17 boundary is captured before a foundation change can mask it;
-  later attempts automatically record the new effective cap.
-- User extensibility:
-  `docs/2026-07-12-vibe-coder-extensibility-r2-coding-plan.md` at `97d4f9eb`.
-  Claim clean-or-released ownership for every activation surface before W0.
-  Execute `W0 -> W1 -> W2 -> W4`, the independently gated W3 branch, then W5.
-  W1 is the one canonical-JSON activation change; re-derive live input/widget
-  positions and prove the headless harness resolves by widget name/schema rather
-  than a hard-coded index.
-- Qualification/event: `docs/2026-07-10-fable2-720-bakeoff-runway.md` and
-  `docs/2026-07-11-720-bakeoff-kickoff.md`. Every live leg loads
-  `workflows/otr_canonical.json` and proves the canonical asset paths.
+1. **LEAN-MEAN RIP** -- `docs/2026-07-10-lean-mean-rip-final.md`, D-1..D-6
+   RATIFIED, CLEARED TO EXECUTE **after its 2026-07-15 drift-check header is
+   satisfied**: SW-1 full seam re-survey (writer now 7,703 LOC; `_run_writer_tail`
+   already extracted; `_otr_source_snapshot` now lives inside `_resolve_inputs`),
+   SW-3 news_ingest re-survey, W6 keep-list adds + the ENGINE_MATRIX precondition
+   (quick-win 8), W7 tombstone re-triage, R-7 re-grep of all line cites. Kill
+   lists + W5's positional obligation re-verified LIVE 2026-07-15 and intact;
+   nothing was double-ripped. Dedicated window; multi-day.
+2. **User source lanes / extensibility** -- `docs/2026-07-12-user-source-lanes-architecture.md`
+   (supersedes the vibe-coder r2 plan). GATED: operator ratifies its section 16
+   (nine flags) + one r5 confirmation kibitz pass; THEN fold into this plan and
+   claim the coder slot. **~21-31 coder-days** (not the old "4-7"). The
+   ratification + r5 are docs/panel work and can run DURING the lean-mean window.
+3. **Randomizer Rolls Design A** -- `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`,
+   AFTER extensibility (its `_otr_lane_specs` authority is ABSORBED by the
+   extensibility build; this build shrinks to `_otr_bank_roll` + eligibility).
+   Re-ground per its 2026-07-15 header (24-lane roster, factory-wrapped _v3
+   runners, drifted pins). 1-2 d + 1 GPU day.
+4. **`dynamic_story` visual direction** -- rev-5 FINAL, do not rerun panels;
+   re-checked 2026-07-15: roster-agnostic, wiring snapshot still matches live
+   canonical. After extensibility + randomizer; re-derive IDs at build.
+   5-9 coder-days + 2-4 GPU days.
 
-## Immediate next sprint -- expose, randomize, then direct
-
-1. **Generate `docs/ENGINE_MATRIX.md`.** Extend `scripts/build_variants.py` so
-   `--check` emits and diffs the matrix from all three live CAPABILITIES
-   registries; link it from the already-rebased README. Estimate: **0.5-1 day**.
-2. **Randomizer Rolls Design A.** Establish `_otr_lane_specs` as the one
-   dispatch/compatibility authority, then add the source-bank roll and three
-   canonical 30-word proofs. `banks.json` and `_otr_story_routing.py` remain
-   unchanged by the ratified plan; re-ground writer/import assumptions after
-   extensibility. Estimate: **1-2 days + 1 GPU day**.
-3. **`dynamic_story` visual direction.** The rev-5 design is FINAL; do not rerun
-   R2-R4. Capture named-pack byte baselines, then land the node, shared context
-   and receipt helpers, all consumers, registration, tests, canonical node/link
-   delta, and regenerated variants as one serial activation. Re-derive every
-   canonical ID/slot from the then-current workflow after extensibility. Estimate:
-   **5-9 coder-days + 2-4 GPU days**.
-
-**Immediate-next range:** about **7-12 coder-days + 3-5 elapsed GPU days**.
-
-**Combined GO_FORWARD range:** about **18-37 coder-days + 7-16 elapsed GPU
-days**. Adding the non-optional ROADMAP runway yields roughly **46-83
-coder-days** from the current dirty fix through core v2 release work; optional
-product-expansion campaigns are excluded.
+**Ranges:** quick-wins ~4-9 coder-days; lean-mean = a dedicated multi-day window
+(see its doc); extensibility ~21-31; randomizer 1-2; dynamic_story 5-9. Combined
+~31-51 coder-days AFTER the lean-mean window, plus campaign GPU days. ROADMAP
+runway (SFX campaign etc.) excluded as before.
 
 ## Parallel planning only -- one future SFX campaign
 
@@ -325,11 +273,21 @@ different facts. Do not encode promotion state inside a bug's fix status.
 
 | Record | Production/fix status | Promotion status |
 |---|---|---|
-| `PBUG-20260712-17` | Live failure; root cause open until telemetry captures it | **Not eligible** -- no proved reusable law yet |
-| `PBUG-20260712-18` | Live-proven exact repair-envelope failure; fix pushed at `7aa3140e`; live reverify pending | After reverify: overlap check + operator approval, then add to the promotion queue |
-| `PBUG-20260712-19` | Live-proven all-visualizer authoring failure; fix pushed at `496689da`, live reverify pending | After live reverify: overlap check + operator approval, then add to the promotion queue |
-| `PBUG-20260712-20` / `21` / `22` | Live-proven P3/P0 structured-capacity failures; fixes use compact repair context and bounded artifact surfaces | Already generalized into BUG-11.50; live reverify remains required |
-| historical `PBUG-20260711-18` | Analysis-only 720-word context risk, historically mislabelled as a PBUG | **Never eligible from static evidence**; keep only as the item-7 engineering risk unless a future live artifact independently admits it |
+| `PBUG-20260712-17` | **SUPERSEDED 2026-07-15** -- target lane ripped @ `3312aec7`; diagnostic-gap class carried by quick-win 9 | Never eligible from this record |
+| `PBUG-20260712-18` / `19` / `26` | FIXED AND LIVE VERIFIED (per log) | Overlap check + operator approval at the next fan-out |
+| `PBUG-20260712-20` / `21` | FIXED AND LIVE VERIFIED | Already generalized into BUG-11.50 |
+| `PBUG-20260712-22` / `23` / `24` / `25` | FIXED IN TREE; LIVE REVERIFY PENDING (quick-win 1: phase-C `scifi_codex` legs) | After reverify + fan-out |
+| `PBUG-20260713-15..18` | CLOSED (live leg `fb34bf4f`) | Bible-worthy flags set; awaiting the next operator fan-out |
+| `PBUG-20260713-19` | FIXED `c25d63c6`; live requalification pending | Promoted BUG-05.11 |
+| `PBUG-20260713-20` | FIXED `32e680b2`; LIVE REVERIFIED (ctx=131072) | Queued for operator fan-out |
+| historical `PBUG-20260711-18` | Analysis-only 720w context risk; the `32e680b2` ctx fix removed its named mechanism, but real closure is the quick-win-9 authority | **Never eligible from static evidence** |
+
+Log hygiene folded in this baseline: the duplicate id `PBUG-20260713-10` is
+resolved (the P1-overlong-question entry renumbered to `-21`; `-10` stays with
+the P9-audit entry). BUG_BIBLE.yaml carries two `legacy_id: -10` rows
+(~:4357/:4379) -- reconcile both at the next fan-out (see the log's renumber
+note). No 07-14/15 bake-off-era PBUGs are logged yet; the campaign window owns
+admitting any (e.g. the F2 weapons-steering finding, if operator admits it).
 
 The active production-fix owner updates `docs/PROD_BUG_LOG.md`. The thin approval
 queue remains `docs/BUG_BIBLE_PROMOTION_QUEUE.md`; no plan review or invented
@@ -337,11 +295,9 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Active P3 transport receipt: focused suite **139 passed, 1 skipped**;
-  final whole-tree rerun **7,807 passed, 31 skipped, 1 xfailed**. Bug Bible
-  **17 passed, 11 skipped, 3 xfailed**. The canonical validator, JSON round-
-  trip, live widget-vector, link, and input audits report **23 nodes / 57
-  links** with no canonical workflow delta.
+- Current whole-tree receipt (kibitz r4 fold, `c28af5f4`): **7,907 passed / 31
+  skipped / 1 xfailed**; Bug Bible **17 passed**; canonical workflow **23 nodes /
+  57 links**, delta = none; dry registry-load 24 runnable / 25 visible.
 - Every code chunk: focused tests, full Windows suite, Bug Bible, AST/JSON/BOM/
   zero-byte checks, commit, push, and verify `HEAD == origin/v2.0-alpha`.
 - Every node/widget/link/schema change edits `workflows/otr_canonical.json` in
@@ -350,54 +306,42 @@ fixture creates a row.
 - Reset selectively before every headless run; never blanket-kill Python. Every
   run loads the canonical workflow and writes directly to canonical episode/OBS
   paths. Asset existence, not resident VRAM, proves completion.
-- Multi-platform engines, profiles, registries, and generated variants are
-  already implemented. Representative platform smokes are release acceptance,
-  not a coding campaign unless they prove a real defect.
+- One coder edits code or `workflows/otr_canonical.json` at a time; read-only
+  audits and documentation may run in parallel. **Two windows are active around
+  this baseline** (render campaign + this planning window): the campaign window
+  should RE-READ this file before its wrap-up edit -- the lower half was
+  rewritten 2026-07-15 late night.
 
 ## Open risks
 
-- The active dirty Sci-Fi Codex P3 owner must land/release before any new coder
-  claims the slot.
-- `PBUG-20260712-17` can expand item 6 only after telemetry identifies the real
-  boundary; retries and cap inflation are forbidden substitutes.
+- Extensibility is gated on operator section-16 ratification + the r5 pass; its
+  ~21-31-day estimate is latent scope, not creep. Until ratified, it holds no
+  slot and blocks randomizer + dynamic_story sequencing only.
+- Lean-mean vs extensibility ORDER is an operator call. Baseline recommendation:
+  lean-mean first (it deletes ~32-33k LOC the extensibility build would
+  otherwise have to comprehend and preserve; the extensibility gate work --
+  ratification + r5 -- is panel/docs work that runs in parallel). Both rip into
+  the writer: NEVER interleave them.
+- Phase C may surface new lane defects (the F2 weapons-steering finding already
+  did for original_radio seams); the campaign window owns admitting PBUGs.
 - User extensibility and `dynamic_story` both touch the writer, visual-style
   authority, and canonical workflow. They remain serial and each re-derives the
   live JSON.
-- Generated-SFX R4 is local/ignored evidence until the tracked R4.1 refit lands;
-  it is not an executable queue.
-
-## Operator backlog (2026-07-14 night) -- render tuning, not bugs
-
-Two operator asks captured mid-bake-off. Both are audio/video RENDER tuning (SFW, no
-word-count involvement, no story-text rewrite). File pointers located this session.
-
-- **Kokoro TTS spells out ALL-CAPS.** Symptom: Kokoro reads ALL-CAPS tokens
-  letter-by-letter (as initialisms), so acronyms / emphasis-caps in the script get
-  spelled aloud in narration. Fix direction: a pre-TTS text-normalization pass that
-  Title-cases (or lower-cases) ALL-CAPS words >=2 letters BEFORE they reach the engine,
-  with an allowlist for genuine acronyms that SHOULD be spelled. Normalize a TTS-only
-  COPY of the line -- never the ledger `spoken_text` of record or the captions (keeps
-  "no Python rewrite of story text": this is render normalization, not a script edit).
-  Where: `nodes/_otr_audio_engines/eng_kokoro.py` (engine); the shared voice seam
-  `nodes/_otr_voice_node_common.py` is the likely normalization site. FIRST confirm
-  which engine is the canonical default (memory says indextts2 is default; Kokoro may be
-  an alt lane) -- fix the engine actually in `workflows/otr_canonical.json`.
-- **Ending credits ~50% faster.** Increase the credits-roll scroll rate by ~1.5x (or cut
-  the roll duration to ~0.667x). Where: `nodes/otr_credits_roll.py`. If the rate is a
-  node widget, the change lands IN `workflows/otr_canonical.json` in the SAME commit
-  (CLAUDE.md section 0 -- unwired code is dead).
+- Generated-SFX R4 stays local/ignored evidence until the tracked R4.1 refit
+  lands; it is not an executable queue.
 
 ## Pointers
 
-- `ROADMAP.md`
+- `ROADMAP.md` (current, 2026-07-12; lean-mean pin self-declares stale cites)
 - `docs/PRODUCTION_SPRINT_LESSONS.md`
-- `docs/PROD_BUG_LOG.md`
-- `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
-- `docs/2026-07-12-codex56sol-llm-telemetry-plan.md`
-- `docs/2026-07-12-vibe-coder-extensibility-r2-coding-plan.md`
+- `docs/PROD_BUG_LOG.md` / `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
+- `docs/2026-07-15-720-bakeoff-verdict.md` (KEEP/IMPROVE/LEAVE + open items)
+- `docs/2026-07-12-user-source-lanes-architecture.md` (extensibility successor)
+- `docs/2026-07-10-lean-mean-rip-final.md` (drift-check header 2026-07-15)
 - `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`
 - `docs/2026-07-12-dynamic-story-visual-scope.md`
-- `docs/2026-07-11-720-bakeoff-kickoff.md`
-- `docs/2026-07-11-timeline-cue-ledger.md`
+- `docs/2026-07-10-llm-first-story-edit-pass.md` (X1-X4 live remainder)
+- `docs/2026-07-11-announcer-framing-defect.md` (OPEN)
+- `docs/2026-07-11-720-bakeoff-kickoff.md` / `docs/2026-07-11-timeline-cue-ledger.md`
 - `docs/2026-07-11-sfx-engine-architecture/roundtable/pass04_final.md`
 - `workflows/otr_canonical.json`

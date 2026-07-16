@@ -3,6 +3,44 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-15 late night -- HEAD 4cd36761 (v2.0-alpha) [plan-stack baseline: every go-forward doc re-grounded]
+
+Did (docs-only session -- no code, no suite run needed; phase C render untouched):
+- Read-only fan-out audit (3 grounded agents) of the full plan stack vs HEAD
+  4cd36761. Status headers folded into 10 docs -- verdicts: dynamic_story
+  CURRENT (rev-5 stands; wiring snapshot still matches live canonical);
+  lean-mean-rip NEEDS a bounded re-verify before execution (kill lists + W5
+  positional obligation re-verified LIVE and intact; SW-1/SW-3 re-surveys, W6
+  keep-list adds, W7 tombstone re-triage, R-7 re-grep -- see its header);
+  randomizer-r2 STALE (lane-specs authority absorbed by user-source-lanes;
+  24-lane roster; factory-wrapped _v3 runners); vibe-coder-r2 + codex56sol
+  telemetry + fable2-s2-QA-r2 + source-banks-v2 SUPERSEDED; llm-first STALE
+  with a LIVE remainder (`repair_cliche_span` still rewrites spoken lines +
+  `cliche_replacements` in all 8 story_rules JSONs -- X1-X4 queued as a
+  quick-win); announcer-framing defect fully OPEN (fix surface untouched in
+  code; original_radio_v2 seam is prior art); CLOUD_ENGINE_COVERAGE PARKED
+  (babysit harness gone at HEAD; node-83 wiring changed @ 6899d940).
+- GO_FORWARD_PLAN lower half REWRITTEN (2026-07-12 sprint table retired):
+  telemetry + PBUG-17 items retired (target lane ripped @ 3312aec7), item 8
+  re-pointed to user-source-lanes-architecture (~21-31 d, gated on sec-16
+  ratification + r5), old item-10 bakeoff removed (superseded by the real
+  campaigns), verdict IMPROVE passes + cliche excision + announcer contract +
+  ENGINE_MATRIX folded into a quick-wins block, lean-mean added as big block 1
+  (order vs extensibility = operator call, recommendation lean-mean first).
+  Campaign block + THE LAW + current step preserved as written.
+- PROD_BUG_LOG hygiene: duplicate id PBUG-20260713-10 resolved (the
+  P1-overlong-question entry renumbered to -21; -10 stays with the P9-audit
+  entry). BUG_BIBLE.yaml carries two `legacy_id: -10` rows (~:4357/:4379) --
+  reconcile at next fan-out. PBUG-20260712-17 marked SUPERSEDED (its lane was
+  ripped; diagnostic-gap class carried by the context/cap quick-win).
+- Committed the stranded untracked docs (720 verdict, the 07-13 rip-gates set,
+  codex handoff, bakeoff observations, cue-ledger prompt) -- never-lose-work.
+Current step: UNCHANGED -- phase C 30w smoke sweep (the render window owns it;
+  monitor tmp/_phaseC_receipts.csv).
+Next: campaign window RE-READS GO_FORWARD before its wrap-up edit (the lower
+  half changed under it). Coder queue order per the re-grounded queue.
+Commits: this baseline commit (docs only).
+
 ## 2026-07-15 evening -- HEAD b57be02b (v2.0-alpha) [three-phase bake-off campaign: A PASSED, B F2 PROVEN, C smokes LAUNCHED]
 
 Did:

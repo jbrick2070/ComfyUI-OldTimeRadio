@@ -1,5 +1,11 @@
 # OTR Source Banks v2 - Code-Ready Plan
 
+> **STATUS 2026-07-15 (baseline): SUPERSEDED -- executed; historical spec only.**
+> public_domain_story / shakespeare / original_radio shipped and are runnable (now inside
+> the 24-lane bake-off roster); `source_ref` is wired in the writer. The "LLM Creative
+> Visual Style" section was overtaken by the visual-style registry rip and was never
+> built -- do not implement from here. The planned test filenames landed elsewhere.
+
 Date: 2026-07-08
 Scope: planning only. No production source or workflow changes made.
 

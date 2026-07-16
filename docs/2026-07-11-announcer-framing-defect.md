@@ -67,3 +67,12 @@ just Codex -- verify each pack's seams and the shared cast/announcer contract.
 OPEN -- operator is planning a Codex revision pass for this. Independent of the
 720w context/budget work. Do not let the 720w bake-off ship 6x more of a frameless
 episode.
+
+**Status update 2026-07-15 (baseline):** still fully OPEN -- none of the three fix surfaces
+is in code. `8b7c2a53` added author GUIDANCE only (`docs/WRITING_YOUR_OWN_SOURCE_PACK.md`);
+the scifi_codex v1/v2 packs still carry zero announcer/billboard/sign-off instructions, and
+no fail-closed frame validator exists. The 2026-07-14 adaptation fixes
+(bb2dc200/d3d91a13/1530e228) address a different defect class. The fix shape above is
+already lawful under THE LAW (2026-07-13): a deterministic structural contract; the words
+stay the model's. Partial prior art: `original_radio_v2`'s seam carries billboard/sign-off
+language -- a template for the sci-fi lanes.

@@ -747,7 +747,13 @@ out until they independently meet the same production-only admission rule.
 - fix: none yet; first reproduce or inspect the retained attempt artifacts after the code-ready Codex56 telemetry seam lands, then fix the owning representation/validator boundary rather than increasing retries
 - verify idea: run the same 120-word model pairing with attempt telemetry; require the failing rung's exact raw/projected/error record, then add a focused regression for the isolated cause and a canonical rerun proving ledger, episode asset, `obs_publish OK`, and final OBS file
 - bible-worthy: pending -- live admission is proved, but no reusable rule exists until the root cause and fix are known
-- status: OPEN
+- status: SUPERSEDED 2026-07-15 (baseline) -- the target lane
+  `original_codex56sol` was ripped from the roster @ `3312aec7`, so the failure
+  cannot recur as logged, and the code-ready telemetry seam this fix was gated
+  on was retired with it. The diagnostic gap it names (no retained
+  raw/projected/error attempt record) is carried forward as an engineering risk
+  on the GO_FORWARD context/cap item, re-targetable at any surviving
+  structured-call lane. Not Bible-eligible from this record.
 
 ## PBUG-20260712-18 -- Sci-Fi Codex P3 repair envelope rejected as the artifact root
 - surfaced: canonical 120-word `scifi_codex` queue leg, prompt
@@ -956,8 +962,16 @@ out until they independently meet the same production-only admission rule.
   shared Sci-Fi P0 fan-out; promoted as an executable BUG-11.50 extension.
 - status: FIXED IN TREE; LIVE REVERIFY PENDING
 
-## PBUG-20260713-10 -- P1 repeated an overlong Aion dramatic question
+## PBUG-20260713-21 -- P1 repeated an overlong Aion dramatic question
 
+- renumbered: 2026-07-15 baseline -- originally logged as PBUG-20260713-10,
+  colliding with the P9-audit entry below (which keeps -10: it is the id cited
+  by the contract-gap docs and commit `3a98a6f1`). BUG_BIBLE.yaml currently
+  carries two `legacy_id: PBUG-20260713-10` rows (~:4357/:4379); at the next
+  operator fan-out, re-point the BUG-11.54 row's legacy_id to PBUG-20260713-21,
+  and verify the acronym-union rule (~:4357, also citing -10) against its true
+  source entries (the acronym PBUGs -07/-09) -- the P9-audit entry that owns
+  -10 is not an acronym bug.
 - promotion: BUG-11.54
 - surfaced: canonical 120-word `scifi_codex` smoke, prompt
   `2147f181-8821-461f-a5dc-8cb9bfefd48c`, Aion 3.0 Mini creative +
