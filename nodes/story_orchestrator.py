@@ -1511,6 +1511,8 @@ def _llm_rank_news_candidates(
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
     optimization_profile: str = "Standard",
     top_k: int = 5,
+    load_config=None,
+    policy=None,
 ) -> list[dict]:
     """Use the LLM to rank news headlines for genre-fit, return top_k.
 
@@ -1568,7 +1570,9 @@ def _llm_rank_news_candidates(
             # per-call top_p override -- acceptable for a stochastic-
             # argmax ranker at temperature=0.05).
             from . import _otr_model_loader as _OTRML
-            cache_entry = _OTRML.request_slot("technical", model_id)
+            cache_entry = _OTRML.request_slot(
+                "technical", model_id, policy=policy, load_config=load_config,
+            )
             gen_fn = _OTRML.make_generate_fn(cache_entry)
             return gen_fn(
                 messages=[{"role": "user", "content": prompt}],
@@ -1615,6 +1619,8 @@ def _llm_rerank_with_bodies(
     candidates_with_body: list[dict],
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
     optimization_profile: str = "Standard",
+    load_config=None,
+    policy=None,
 ) -> list[dict]:
     """Body-aware second-pass news rank ("Option B / 65s budget").
 
@@ -1664,7 +1670,9 @@ def _llm_rerank_with_bodies(
             #
             # LLM slot: technical -- single-index body rerank.
             from . import _otr_model_loader as _OTRML
-            cache_entry = _OTRML.request_slot("technical", model_id)
+            cache_entry = _OTRML.request_slot(
+                "technical", model_id, policy=policy, load_config=load_config,
+            )
             gen_fn = _OTRML.make_generate_fn(cache_entry)
             return gen_fn(
                 messages=[{"role": "user", "content": prompt}],
@@ -1924,6 +1932,8 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
             model_id=model_id,
             optimization_profile=optimization_profile,
             top_k=5,
+            load_config=load_config,
+            policy=policy,
         )
         # Put LLM-ranked picks at the front of the pool; everything
         # else stays as a fallback in case all 5 ranked picks have
@@ -2048,6 +2058,8 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
                 rich,
                 model_id=model_id,
                 optimization_profile=optimization_profile,
+                load_config=load_config,
+                policy=policy,
             )
         chosen = rich[0]
     elif require_science_floor:

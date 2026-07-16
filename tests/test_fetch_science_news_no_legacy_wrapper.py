@@ -64,6 +64,11 @@ def _kwarg_value(call: ast.Call, name: str):
     return None
 
 
+def _has_kwarg(call: ast.Call, name: str) -> bool:
+    """True iff `call` passes a keyword argument named `name` (any value)."""
+    return any(kw.arg == name for kw in call.keywords)
+
+
 # ---------------------------------------------------------------------------
 # Structural assertions on the refactored RSS news path
 # ---------------------------------------------------------------------------
@@ -228,4 +233,72 @@ def test_orchestrator_no_remaining_generate_with_llm_callers():
         "`_generate_with_llm(...)` -- the legacy wrapper is uncalled "
         "going into B4 deletion. Offenders:\n  "
         + "\n  ".join(offenders)
+    )
+
+
+# ---------------------------------------------------------------------------
+# GGUF row registry (2026-07-16): preflight load_config + policy thread the
+# whole RSS technical rerank chain, so a gguf technical slot loads its real
+# per-row artifact instead of the gemma env-fallback path.
+# ---------------------------------------------------------------------------
+
+
+def test_rss_rank_rerank_thread_load_config_and_policy_to_request_slot():
+    """`_llm_rank_news_candidates` + `_llm_rerank_with_bodies` must pass
+    BOTH `load_config=` and `policy=` into every `request_slot(...)` call.
+
+    An unthreaded `request_slot("technical", model_id)` leaves load_config
+    None, so the gguf backend's env-fallback resolves the GEMMA artifact
+    for a Qwen id (silent wrong-model path) -- the exact bug this wiring
+    closes for both-slots-Qwen runs."""
+    tree = _orch_tree()
+    offenders: dict[str, list[str]] = {}
+    for fname in ("_llm_rank_news_candidates", "_llm_rerank_with_bodies"):
+        fn = _find_function(tree, fname)
+        rs_calls = _calls_named(fn, "request_slot")
+        if not rs_calls:
+            offenders.setdefault(fname, []).append("no request_slot(...) call")
+            continue
+        for call in rs_calls:
+            if not _has_kwarg(call, "load_config"):
+                offenders.setdefault(fname, []).append(
+                    f"request_slot at line {call.lineno} missing load_config="
+                )
+            if not _has_kwarg(call, "policy"):
+                offenders.setdefault(fname, []).append(
+                    f"request_slot at line {call.lineno} missing policy="
+                )
+    assert not offenders, (
+        "GGUF row registry: RSS rank/rerank must thread load_config + "
+        "policy into request_slot. Offenders:\n"
+        + "\n".join(f"  {k}: {v}" for k, v in offenders.items())
+    )
+
+
+def test_fetch_science_news_forwards_load_config_and_policy():
+    """`_fetch_science_news` is the middle link: it must forward
+    `load_config=` + `policy=` into BOTH `_llm_rank_news_candidates` and
+    `_llm_rerank_with_bodies` so the preflight-resolved config reaches the
+    request_slot calls above."""
+    tree = _orch_tree()
+    fn = _find_function(tree, "_fetch_science_news")
+    offenders: dict[str, list[str]] = {}
+    for target in ("_llm_rank_news_candidates", "_llm_rerank_with_bodies"):
+        calls = _calls_named(fn, target)
+        if not calls:
+            offenders.setdefault(target, []).append("not called")
+            continue
+        for call in calls:
+            if not _has_kwarg(call, "load_config"):
+                offenders.setdefault(target, []).append(
+                    f"call at line {call.lineno} missing load_config="
+                )
+            if not _has_kwarg(call, "policy"):
+                offenders.setdefault(target, []).append(
+                    f"call at line {call.lineno} missing policy="
+                )
+    assert not offenders, (
+        "GGUF row registry: _fetch_science_news must forward load_config + "
+        "policy to rank/rerank. Offenders:\n"
+        + "\n".join(f"  {k}: {v}" for k, v in offenders.items())
     )

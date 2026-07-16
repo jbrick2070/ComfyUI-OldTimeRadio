@@ -1284,7 +1284,8 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
 
 
 def _fetch_rss_seed_or_die(
-    model_id: str, *, require_science_floor: bool = False
+    model_id: str, *, require_science_floor: bool = False,
+    load_config=None, policy=None,
 ) -> dict:
     """Run the story_orchestrator RSS fetcher and return the article dict.
 
@@ -1313,6 +1314,7 @@ def _fetch_rss_seed_or_die(
             max_feeds=10, model_id=model_id,
             optimization_profile="Standard",
             require_science_floor=require_science_floor,
+            load_config=load_config, policy=policy,
         )
         if not news:
             raise RuntimeError(
@@ -1423,6 +1425,13 @@ def _resolve_inputs(
     llm_vram_ceiling_gb: float = 14.5,
     gguf_n_ctx: int = 4096,
     gguf_quant: str = "Q8_0",
+    # GGUF row registry (2026-07-16): the preflight-resolved technical-slot
+    # load_config + the ONE validated policy, threaded into the RSS fetch/
+    # rerank dispatch so a gguf technical slot reranks under its real per-row
+    # load_config (path/quant/n_ctx) instead of the gemma env fallback. Both
+    # None on a non-gguf run (request_slot then resolves from the policy).
+    preflight_policy: Any = None,
+    technical_load_config: Any = None,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1618,6 +1627,8 @@ def _resolve_inputs(
                     bank=_fetch_bank,
                     technical_model=technical_model,
                     source_ref=source_ref,
+                    load_config=technical_load_config,
+                    policy=preflight_policy,
                 ),
                 origin=_fetch_origin,
             )
@@ -3915,6 +3926,12 @@ class OTR_LedgerScriptWriter:
             llm_vram_ceiling_gb=llm_vram_ceiling_gb,
             gguf_n_ctx=gguf_n_ctx,
             gguf_quant=gguf_quant,
+            # GGUF row registry (2026-07-16): hand the RSS fetch/rerank the
+            # preflight's ONE policy + the technical-slot load_config so a
+            # gguf technical slot reranks under its real per-row config, not
+            # the gemma env fallback.
+            preflight_policy=_llm_preflight.policy,
+            technical_load_config=_llm_preflight.load_config_by_slot.get("technical"),
         )
 
         # Stage 4 (2026-07-06): resolve the bank's story-content RULES once

@@ -333,21 +333,39 @@ def test_shipped_pipeline_flags():
 
 def test_science_rss_wrapper_forwards_exact_args_and_ignores_source_ref(monkeypatch):
     """Style-engine consolidation (2026-07-05): the fetch/rerank chain is
-    style-agnostic now -- _fetch_rss_seed_or_die takes only model_id, and
-    the wrapper forwards it POSITIONALLY (single-arg call)."""
+    style-agnostic -- _fetch_rss_seed_or_die takes model_id positionally.
+    GGUF row registry (2026-07-16): the science wrapper ALSO forwards the
+    optional preflight-resolved load_config + policy so a gguf technical
+    slot reranks under its real per-row config, not the gemma env fallback."""
     calls = {}
 
-    def _fake(model_id):
+    def _fake(model_id, *, require_science_floor=False,
+              load_config=None, policy=None):
         calls["args"] = (model_id,)
+        calls["kwargs"] = {
+            "require_science_floor": require_science_floor,
+            "load_config": load_config,
+            "policy": policy,
+        }
         return _payload()
 
     import nodes.OTR_LedgerScriptWriter as writer
     monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
     bank = routing.get_bank("science_news")
     entry = osp.resolve_fetcher(bank)
+    _lc = object()
+    _pol = object()
     out = entry.fetch(bank=bank, technical_model="tm-id",
-                      source_ref="ignored://source")
+                      source_ref="ignored://source",
+                      load_config=_lc, policy=_pol)
     assert calls["args"] == ("tm-id",)
+    # non-strict science branch: no require_science_floor, but the threaded
+    # load_config + policy are forwarded verbatim.
+    assert calls["kwargs"] == {
+        "require_science_floor": False,
+        "load_config": _lc,
+        "policy": _pol,
+    }
     assert out == _payload()
 
 
@@ -362,9 +380,17 @@ def test_scifi_rss_wrapper_requests_v4_source_floor(monkeypatch):
     monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
     bank = routing.get_bank("scifi_codex")
     entry = osp.resolve_fetcher(bank)
+    _lc = object()
+    _pol = object()
     entry.fetch(bank=bank, technical_model="tm-id",
-                source_ref="ignored://source")
-    assert calls["args"] == ("tm-id", {"require_science_floor": True})
+                source_ref="ignored://source",
+                load_config=_lc, policy=_pol)
+    # strict-v4 (scifi) branch: require_science_floor=True AND the threaded
+    # load_config + policy forwarded (GGUF row registry, 2026-07-16).
+    assert calls["args"] == (
+        "tm-id",
+        {"require_science_floor": True, "load_config": _lc, "policy": _pol},
+    )
 
 
 def test_media_archive_wrapper_forwards_source_ref_keyword(monkeypatch):
