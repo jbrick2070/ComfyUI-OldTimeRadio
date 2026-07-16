@@ -35,11 +35,26 @@ Did (docs-only session -- no code, no suite run needed; phase C render untouched
   ripped; diagnostic-gap class carried by the context/cap quick-win).
 - Committed the stranded untracked docs (720 verdict, the 07-13 rip-gates set,
   codex handoff, bakeoff observations, cue-ledger prompt) -- never-lose-work.
+- Operator mid-session directives, executed: (1) "nuke it" -> the
+  otr-build-tracker artifact is RETIRED (tombstone page pointing at
+  HANDOFF_LOG + GO_FORWARD; it had been stale since 06-29). (2) GO_FORWARD
+  leaned to TRULY forward-only: campaign shipped-lists, THE LAW done-narrative
+  + live-proof table, and the per-lane ladder section stripped (this log +
+  PROD_BUG_LOG own them); the "lost anchor" doctrine moved to
+  PRODUCTION_SPRINT_LESSONS.md as lesson 24. (3) kibitz r4 confirm pass run on
+  the baseline GFP -- panel = codex gpt-5.6-sol (verified via
+  codex_model_selected.txt) + agy "Gemini 3.5 Flash (High)", Claude anchor +
+  judge; anchor caught 2 must-fixes itself (quick-win-1 reverify vehicle
+  overstated: phase C runs only _v2/_v3 lanes, so the base scifi_codex 120w
+  reverify needs its own leg or explicit operator acceptance; quick-wins range
+  arithmetic understated: ~6-13 d, combined ~33-55 d) -- both folded; panel
+  survivors folded per kibitz-runs/2026-07-15-gfp-baseline/r4/final.md.
 Current step: UNCHANGED -- phase C 30w smoke sweep (the render window owns it;
   monitor tmp/_phaseC_receipts.csv).
-Next: campaign window RE-READS GO_FORWARD before its wrap-up edit (the lower
-  half changed under it). Coder queue order per the re-grounded queue.
-Commits: this baseline commit (docs only).
+Next: campaign window RE-READS GO_FORWARD before its wrap-up edit (rewritten,
+  then leaned, 2026-07-15 late night). Coder queue order per the re-grounded
+  queue. NO code lands while phase C is mid-sweep (uniform-code confound).
+Commits: b94f0c70 (baseline) + the lean/kibitz-fold commit (docs only).
 
 ## 2026-07-15 evening -- HEAD b57be02b (v2.0-alpha) [three-phase bake-off campaign: A PASSED, B F2 PROVEN, C smokes LAUNCHED]
 

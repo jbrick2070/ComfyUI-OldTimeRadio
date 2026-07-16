@@ -329,6 +329,25 @@ then validates the merged canonical artifact. Declare the repair seam on every
 pipeline pass that can traverse this helper and use pass-specific journal IDs so
 production receipts show where the correction occurred.
 
+## 24. Restoring an input is not authoring -- the "lost anchor" class
+
+(2026-07-13: this class cost twelve live rolls before it was named. Causal
+record: PBUG-20260713-15..18 in `PROD_BUG_LOG.md`; moved here from
+GO_FORWARD_PLAN in the 2026-07-15 baseline.)
+
+A pass hands an LLM an IMMUTABLE string Python already owns -- a constraint-draw
+field, a dealt card, a locked speaker, a coordinate from an accepted artifact --
+and asks for it back verbatim. The model paraphrases. Python compares exactly
+and kills the episode over a copy of its own input.
+
+Restore when the correction is FORCED (exactly one value possible); return it to
+the model when it is not. Three further laws proven live: a repair prompt that
+does not fit is worse than no repair (PROMPT_GUARD truncates the contract
+silently); a bounded repair must ask for the unit the model can deliver (batch a
+patch and a partial success becomes a total failure); and "it is broken" is not
+a repair prompt -- name the missing object, the unassigned clue, the exact
+string.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

@@ -1,296 +1,184 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-15 late night -- HEAD 4cd36761 (v2.0-alpha). Full plan-stack
-baseline: every active plan doc audited against HEAD and re-headered (fan-out
-audit, 3 grounded agents); this file's queue re-grounded. Session record in
-HANDOFF_LOG.md (top entry).
+**Updated:** 2026-07-15 midnight -- branch `v2.0-alpha`. Truly forward-only by
+operator directive: completed work lives in `docs/HANDOFF_LOG.md` (history) and
+`docs/PROD_BUG_LOG.md` (bugs); doctrine lives in
+`docs/PRODUCTION_SPRINT_LESSONS.md` (the "lost anchor" class is now lesson 24
+there). Dated plan docs are implementation evidence, not competing queues; each
+carries a 2026-07-15 status header stating what it needs before execution.
+Hardened by a kibitz r4 confirm pass (codex `gpt-5.6-sol` + agy `Gemini 3.5
+Flash (High)` + Claude anchor/judge; grounded survivors folded 2026-07-16
+pre-dawn, run record local under `kibitz-runs/2026-07-15-gfp-baseline/r4/`).
 
-**CAMPAIGN IN FLIGHT (2026-07-15 evening):** the three-phase bake-off campaign is
-running. PHASE A (Fable final gate on the 8 _v3 promotions + source-snapshot
-B7/B8) = PASSED, no build-breakers, nothing folded (general-purpose grounded
-review + Claude anchor both clean; Fable out of credits + codex CLI unhealthy ->
-substituted by the grounded reviews + the live renders). PHASE B (F2 live-replay
-proof) = DONE: original_radio snapshot captured (sha ed1c941f8e99), triplet run
-30w local under C7 -> base GREEN, _v2/_v3 content-failed IDENTICALLY on the
-deterministic weapons gate (clean F2: the pack is the only causal variable);
-acceptance met (REPLAY sha + cast_seed_source == "OTR_CAST_SEED override").
-PHASE C (160-leg bake-off: 16 _v2/_v3 lanes x 5 tiers x 2 profiles) = 30w smokes
-(32 legs) LAUNCHED, production mode, autonomous (~5h); then 120/320/420/720.
-Runner tmp/_phaseC_sweep.ps1; receipts tmp/_phaseC_receipts.csv. Content-FAILs
-recorded with reason, never re-rolled. See HANDOFF_LOG.md (top entry) for detail.
-
-## CURRENT STEP (2026-07-15): Bank-Improvement Bake-off -- source-snapshot injection (B7/B8)
-
-All 24 selectable `source_bank` lanes (8 base + 8 `_v2` + 8 `_v3`) are BUILT, green,
-and pushed; zero canonical-JSON diff (the dropdown is a dynamic `list_bank_ids()`
-combo, `OTR_LedgerScriptWriter.py:3106`). Detail specs (the
-`2026-07-15-bank-improvement-bakeoff/` folder is gitignored -- read from disk):
-r3 wiring `.../kibitz/r3-final.md`; per-bank v2/v3 content
-`.../roundtable/pass01_plan.md` Sec D; chunk-4 hardened design
-`kibitz-runs/2026-07-15-chunk4-v3-lanes/r2/final.md`.
-
-Shipped:
-- **CHUNK 1** (`9e0fdf9e`): `base_source_bank_id` helper + 5 family sites.
-- **CHUNK 2** (`19872aa6`): 8 `_v2` rows + packs (Sec-D seams) + B1 owner_bank
-  threading + B5 pins. F8: "EDNA FROST've" is model output (NOT `_otr_ledger_scrub`),
-  so the ALL-CAPS-no-contraction rule lives in the `media_archive_v2` seam.
-- **CHUNK 3** = CUT (r3 B2).
-- **CHUNK 4** (`c32d4c04`): 5 clone pipelines + 8 `_v3` rows + 8 v3 packs +
-  `run_v3_advisory` (deterministic, advisory-only, L-6/no-hole) + `_make_v3_runner`
-  wrapper factory (kibitz r2: ONE factory, not 3 files -- the sci-fi runners assemble
-  the ledger IN-runner, so the wrapper reads `led` uniformly; the assemble-timing
-  "trap" was a misread) + `_INLINE_V3_PIPELINES` + one inline post-Phase-0 hook +
-  fable2 early word-budget gate family-fix + tooltip. 24 runnable / 25 visible;
-  bijection-validated (`test_custom_runner_truthfulness`); suite 7884 green, Bug
-  Bible 17 green, canonical delta = none.
-- **SOURCE-SNAPSHOT (B7/B8)** (`031851ce`): frozen-source replay layer. New leaf
-  `nodes/_otr_source_snapshot.py` -- a process-wide manifest keyed by BASE bank
-  (env `OTR_SOURCE_SNAPSHOT_MANIFEST`), loaded in `_resolve_inputs` IMMEDIATELY
-  after bank resolution and BEFORE the three source branches, so a replay
-  bypasses RSS/random. Base-mismatch / malformed / altered-payload envelopes
-  raise `SourceSnapshotError` LOUD (never a silent fall-through). The replayed
-  `source_meta` sidecar carries the same fields a live branch would (spark_atoms
-  for original, cast_hints for adaptation), so every downstream owner is fed.
-  B8 seeds: `OTR_FABLE2_SEED=42` pinned under C7 + a manifest echo in
-  `_otr_soak_server_launch.cmd`. Canonical delta = none. Dry registry-load = 24
-  runnable / 25 visible.
-- **kibitz r4 CONVERGED + hardened (`c28af5f4`):** Codex (gpt-5.5 high) + Claude
-  anchor (agy flaked). Folded one CONFIRMED footgun -> the source-snapshot is now
-  **strict-by-default**: a configured manifest that lacks the selected bank's base
-  now RAISES (opt-in `"allow_partial": true` for freeze-some/source-rest-live),
-  never a silent live source. Added a LOUD C7-replay warning (source frozen but
-  cast/style unpinned). +6 net tests -> suite 7907 green, Bug Bible 17. Artifacts:
-  `docs/2026-07-15-bank-improvement-bakeoff/kibitz/r4-convergence-plan.md` +
-  `kibitz-runs/2026-07-15-bank-bakeoff-r4/r4/{claude_anchor,codex,final}.md`.
-
-NEXT (in order):
-1. **Fable final gate** -- DONE 2026-07-15 evening: PASSED, no build-breakers,
-   nothing folded (Fable out of credits + codex CLI unhealthy -> substituted by the
-   general-purpose grounded review + Claude anchor + the live renders; see the
-   CAMPAIGN block above + HANDOFF_LOG top entry).
-2. **Live replay proof (F2)** -- DONE 2026-07-15 evening: original_radio triplet at
-   30w local under `OTR_C7=1` + captured manifest (sha ed1c941f8e99). Acceptance
-   met: server log `source-snapshot REPLAY ... sha=ed1c941f8e99` + ledger meta
-   `cast_seed_source == "OTR_CAST_SEED override"` on all 3. base GREEN; _v2/_v3
-   content-failed identically (weapons gate) -> pack is the only causal variable.
-   NOTE: the literal `[launch]` C7/manifest echoes route to the hidden console (not
-   the server log); the writer's REPLAY line + cast_seed_source are the ground-truth
-   proofs -- a one-line launcher echo->%1 fix would satisfy the literal-echo wording.
-3. **Phase C bake-off (IN FLIGHT):** 30w smokes (32 legs) running; then
-   120/320/420/720 x {local,aion}. Then the durable report + World Cup scoreboard.
-   Code-state verify unchanged (no fold): 24 runnable / 25 visible; canonical clean.
-4. **After phase C -- operator decisions:** (a) roster trim (operator may remove
-   weak lanes; verdict + phase-C receipts are the evidence); (b) which `_v2`/`_v3`
-   seams promote into their base packs; (c) the 720-verdict IMPROVE passes (below).
-   The F2 finding (original_radio `_v2`/`_v3` seam steers toward weapons content vs
-   base) feeds the same seam-tuning pass. `tencent/hy3:free` panel seat expires
-   2026-07-21.
-5. **Unblock the mistral/gemma creative-writer matrices** (verdict open item 3) --
-   the smoke-blocked local writer matrices are the only path to "best model" rather
-   than "best bank on aion". Render-window work, not coder-slot.
-
-Note: the v3 packs currently carry the v2 seam text; the STRUCTURAL v3 delta is the
-advisory diagnostic (kibitz-final ruling). If deeper per-lane v3 seam text is wanted
-(Sec-D one-liners), the packs are in place to edit -- a bake-off tuning follow-on.
-
-r3 rulings that MUST hold (all satisfied in the shipped chunks):
-- **B1:** provenance/owner_bank uses the ACTUAL variant id (never base-mapped);
-  `base_source_bank_id` is FAMILY behaviour only.
-- **B2:** adaptation + original v3 are INLINE (clone pipeline in
-  `_LEGACY_INLINE_PIPELINES`); only the 3 sci-fi v3 are own-runner (wrapper factory
-  in `_RUNNER_BY_PIPELINE`).
-- **B5:** every variant row is BEFORE `custom_source_bank`; pinned registry-order
-  tuples updated per chunk.
-- Every chunk: full suite + Bug Bible GREEN -> commit AND push `v2.0-alpha` -> HEAD==origin.
-
-## THE LAW (operator, 2026-07-13 -- supersedes every plan below that disagrees)
+## THE LAW (operator, 2026-07-13 -- supersedes anything below that disagrees)
 
 > **AN AUDIT MAY IMPROVE A STORY. IT MAY NEVER FAIL ONE.**
 > Only DETERMINISTIC validators may end an episode. An LLM verdict may trigger a
 > bounded rewrite; it may never raise.
 
-### Done 2026-07-13 (all pushed to `v2.0-alpha`)
+Standing enforcement: the deterministic G9 SFW gate in
+`_otr_ledger_freeze.run_gap_audit` (Phase 10, the one path every lane crosses).
+Veto-rip record: HANDOFF_LOG + PROD_BUG_LOG (PBUG-20260713-15..18).
 
-Every LLM veto in the codebase is gone. `original_codex56sol` lost P4 (fair play),
-P7/P8 (blind listener + retake), P9 (final contract audit) and the P5 score-intent
-anchor patch: 9 LLM passes -> 4 plus one per-line script patch. Fair play is now a
-deterministic contract -- the device anchor is SPOKEN on a clue line before the
-reveal line -- repaired by the bounded line patch. `scifi_gemini` lost `sfw_pass`,
-the P5-recheck and `SciFiGeminiRewriteExhaustedError`; its spoken-text check moved
-INTO the P4/P6 ladder with a cast-name/source-acronym exemption. `scifi_sonnet`
-lost the `severity`/`invented_fact_flags`/`sfw_pass` veto, replaced by
-`ungrounded_lines` (a factual line must cite a real dossier fact and may speak only
-numbers the source states -- a proof). `scifi_fable2` lost the P8 LLM ledger audit,
-which raised AFTER `_assemble` and two saves. `original_radio`'s corroboration was
-a raw substring scan over the judge's OWN prose -- now word-boundary, script-only.
+## IN FLIGHT -- Bank-Improvement Bake-off, Phase C (render window owns this)
 
-**G9** in `_otr_ledger_freeze.run_gap_audit` is the first working SFW ship-stop: a
-word-boundary DEFAULT_PROFANITY_TERMS scan over spoken ledger text, on the one path
-every lane crosses, raising at Phase 10. The lanes that had any profanity check had
-it as an LLM opinion; codex and fable2 had none.
+24 selectable `source_bank` lanes (8 base + 8 `_v2` + 8 `_v3`), zero
+canonical-JSON diff. Phase A (Fable final gate) = **SUBSTITUTED, not run**:
+Fable was out of credits and the codex CLI was unhealthy, so the gate was
+stood in for by the general-purpose grounded review + Claude anchor + the live
+renders -- record it as SUBSTITUTED with operator authority; operator may
+demand a true Fable gate later. Phase B (F2 frozen-source replay proof) = DONE.
+Records in `docs/HANDOFF_LOG.md` 2026-07-15 entries. Phase C = 160-leg sweep
+(16 `_v2`/`_v3` lanes x 5 tiers x 2 profiles): 30w smokes running autonomously;
+then 120/320/420/720. Runner `tmp/_phaseC_sweep.ps1`; receipts
+`tmp/_phaseC_receipts.csv`. Content-FAILs are RECORDED with reason, never
+re-rolled. Invariants for any future variant work: B1 (owner_bank = actual
+variant id), B2 (only the 3 sci-fi v3 are own-runner), B5 (variant rows before
+`custom_source_bank`, pinned order tuples updated).
 
-(Historical note: `scifi_gemini` and `original_codex56sol` were subsequently ripped
-from the roster entirely @ `3312aec7`, on the 720-verdict LEAVE ruling.)
+Standing campaign notes (kibitz r4 fold, grounded):
 
-### Live proof
+- **`science_news_v3` + local profile is a recorded live FAIL** (news-coda
+  bridge LLM failed both attempts; the resume sweep hard-skips that cell --
+  `tmp/_phaseC_KNOWN_BUGS.md`). The triage note's own "deterministic pool /
+  arc-bridge fallback" suggestion is UNLAWFUL (canned spoken content -- the
+  2026-07-03 no-fallback rip + LLM-first both forbid it). The fix is a
+  model/prompt/budget-contract root fix or an explicit lane/profile
+  disqualification -- never Python-authored dialogue, never a blind retry bump.
+  Count the cell FAIL in the report; campaign window owns the PBUG admission
+  (it is a live production failure). Fix owner: next coder window.
+- **Evidence discipline for seam promotion:** phase C runs production mode
+  (no C7, fresh source per leg) and generation payloads pin temperature but
+  not a model-sampling seed -- so phase C supports reliability + blind-quality
+  ranking, NOT causal seam attribution. Promotion of a `_v2`/`_v3` seam into a
+  base pack needs a matched frozen-source A/B per family (the B7/B8 snapshot
+  layer exists for exactly this), or is an explicit operator quality-judgment
+  call. Say "pack-associated", not "pack-caused", outside the F2-style
+  controlled triplets.
+- **Phase C is story-quality evidence first.** Known full-media consumer
+  defects (quick-win 6: captions exact `char_id` map, credits raw-ID voice
+  receipts, HuMo literal-`announcer` stale guard) ship after it -- so any
+  full-media promotion claim waits for quick-win 6 plus one canonical fable2
+  full-media qualification leg.
+- **Cost option (campaign call):** after the 30w structural smoke, the `_v2`
+  arms duplicate `_v3` content (v3 = v2 seam text + read-only advisory);
+  dropping `_v2` at the higher tiers roughly halves the remaining legs.
 
-| Leg | Prompt | Result |
-|---|---|---|
-| `original_codex56sol` 30w | `fb34bf4f` | SUCCESS + obs_publish + 54.5 MB asset |
-| `original_codex56sol` 120w | `9874b749` | SUCCESS + obs_publish + 84.3 MB asset |
-| `original_codex56sol` 420w | `b9c49e0d` | SUCCESS + obs_publish + 58.6 MB asset |
-| `scifi_gemini` 30w | `12f7ecde` | SUCCESS + obs_publish + 46.0 MB asset |
+Then, in order:
 
-PBUG-20260713-15..18 logged and closed by `fb34bf4f`; -14 marked SUPERSEDED.
+1. **Durable report + World Cup scoreboard** from the phase-C receipts: named
+   scoring axes, every intended cell explicitly SUCCESS / FAIL / DISQUALIFIED /
+   NOT RUN (no silent omissions), receipts carrying matrix id + commit +
+   resolved models. At wrap-up, move the still-authoritative bake-off contracts
+   (r3 rulings, Sec-D seam rules, acceptance criteria) out of the gitignored
+   `docs/2026-*/` + `kibitz-runs/` folders into a tracked doc -- a clean clone
+   currently cannot see the campaign's design authorities.
+2. **Operator decisions:** roster trim (which lanes go), which `_v2`/`_v3` seams
+   promote into their base packs (per the evidence discipline above), and the
+   IMPROVE passes (quick-win 4 below). The F2 finding -- original_radio
+   `_v2`/`_v3` seam steers toward weapons content vs base -- feeds the same
+   seam-tuning pass. `tencent/hy3:free` panel seat expires 2026-07-21.
+3. **Unblock the mistral/gemma creative-writer matrices** (verdict open item 3)
+   -- the only path from "best bank on aion" to "best model". Render-window
+   work, not coder-slot.
+4. Optional tuning follow-on: the v3 packs still carry v2 seam text (the
+   structural v3 delta is the advisory diagnostic); per-lane Sec-D one-liners
+   are in place to edit if wanted.
 
-**Bakeoff follow-up note (2026-07-14):** the Shakespeare and likely
-`public_domain_story` source banks currently pass through the shared
-story-grammar/style adaptation layer, so their live episode framing is not
-source-native in the same way the source text is. Accept this for the current
-evidence run; after the bakeoff, consider source-specific dramatic framing
-modes and compare them against the shared adapter without changing the frozen
-receipts. Preserve source character names and roles by default in those banks;
-do not mint a fresh cast unless an explicit adaptation mode requests it.
+## Coder queue (2026-07-15 baseline, re-grounded)
 
-### The bug class that cost twelve live rolls -- "the lost anchor"
-
-A pass hands an LLM an IMMUTABLE string Python already owns -- a constraint-draw
-field, a dealt card, a locked speaker, a coordinate from an accepted artifact --
-and asks for it back verbatim. The model paraphrases. Python compares exactly and
-kills the episode over a copy of its own input.
-
-**Restoring an input is not authoring.** Restore when the correction is FORCED
-(exactly one value possible); return it to the model when it is not. Three further
-laws proven live: a repair prompt that does not fit is worse than no repair
-(PROMPT_GUARD truncates the contract silently); a bounded repair must ask for the
-unit the model can deliver (batch a patch and a partial success becomes a total
-failure); and "it is broken" is not a repair prompt -- name the missing object, the
-unassigned clue, the exact string.
-
-### Per-lane live-proof ladder
-
-DONE -- superseded by the executed campaigns: the 720 bake-off (all ten
-then-rostered banks, verdict `docs/2026-07-15-720-bakeoff-verdict.md`) and the
-in-flight phase-C sweep supply the per-lane live proofs; receipts in
-`tmp/_phaseC_receipts.csv` and HANDOFF_LOG.
-
----
-
-## Re-grounded coder queue (2026-07-15 baseline)
-
-Replaces the 2026-07-12 sprint table (prior full revision: 2026-07-12 21:04 PDT,
-in git history). Same discipline: one coder window at a time; every chunk =
-focused tests + full suite + Bug Bible + commit AND push + HEAD==origin. Dated
-plans are implementation evidence, not competing queues; each doc now carries a
-2026-07-15 status header stating exactly what it needs before execution.
+One coder window at a time; every chunk = focused tests + full suite + Bug
+Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
 
 ```text
 finish bake-off campaign (render window; operator verdicts)
   -> quick-wins block (reverify tail, cliche excision, announcer contract,
-     watchdog, fable2 C5, interstitial-audio rip, ENGINE_MATRIX, context/cap)
+     IMPROVE seams, watchdog, fable2 C5, interstitial-audio rip,
+     ENGINE_MATRIX, context/cap)
   -> LEAN-MEAN RIP (dedicated window; drift-check header first)   [operator may
   -> user source lanes / extensibility (gated: sec-16 + r5)        swap these two]
   -> Randomizer A -> dynamic_story
   -> ROADMAP (SFX campaign after Timeline Cue Ledger gate)
 ```
 
-### Quick-wins block (~4-9 coder-days, small chunks, any order inside the block)
+### Quick-wins block (~6-13 coder-days; small chunks, any order inside the block)
 
 | # | Chunk | Gate | Est |
 |---:|---|---|---:|
-| 1 | Sci-Fi Codex reverify tail | PBUGs 20260712-22/23/24/25 are FIXED IN TREE, LIVE REVERIFY PENDING; the campaign's canonical `scifi_codex` legs (phase C 120w) are the natural reverify vehicle -- confirm receipts, mark the log, release the coder slot formally. | 0.25 d |
-| 2 | Cliche-span excision (X1-X4) | `docs/2026-07-10-llm-first-story-edit-pass.md` Wave 3: `repair_cliche_span` (`_otr_line_composer.py` ~:2632/:2676) + `cliche_replacements` in all 8 story_rules JSONs still rewrite SPOKEN lines -- a standing violation of the LLM-first directive. Excise; suite + Bible. | 0.5-1 d |
-| 3 | Announcer framing contract | `docs/2026-07-11-announcer-framing-defect.md` -- still fully OPEN. Pack seam + score contract + fail-closed STRUCTURAL validator (lawful under THE LAW); `original_radio_v2`'s billboard/sign-off seam is prior art. Fold into the same pass as the 720-verdict IMPROVE seam work (below) so packs are touched once. | 0.5-1 d |
-| 4 | 720-verdict IMPROVE passes | shakespeare: confirm which seam version produced judged leg `c42700e1`, second prompt pass if the fix didn't take; scifi_sonnet: seam consolidation (nine seams -> fewer; it owns the set's only outright FAIL); original_radio: clarity/throughline without losing the noir mood + the F2 weapons-steering seam finding; science_news: constrain the concept, keep the steady 18-beat template. Seam/prompt work, no Python authorship. | 1-3 d |
-| 5 | Canonical watchdog support | Unchanged scope: runner heartbeats, watchdog recognizes canonical `RESULT`, pinned failure/stall paths -- plus the campaign follow-up: launcher echoes C7/manifest vars into `%1` (one line). Harness defect, not a PBUG. | 0.5 d |
-| 6 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. | 0.5-1 d |
-| 7 | Rip interstitial audio only | Remove synthesis, insertion, timing, and dead tests; retain `music_inter` story/visual semantics. | 0.5-1 d |
-| 8 | `docs/ENGINE_MATRIX.md` | Extend `scripts/build_variants.py --check` to emit + diff the matrix from the three live CAPABILITIES registries; link from README. PRECONDITION for Lean-Mean W6. | 0.5-1 d |
-| 9 | Context/cap foundation | One provider-effective cap/count/reservation/must-fit authority feeding preflight, invocation, receipts; no silent truncation, no blind cap raise. Partially advanced by the static-row ctx fix (`32e680b2`, PBUG-20260713-20, live-reverified at ctx=131072); the authority itself is still open. Carries the diagnostic-gap class from SUPERSEDED PBUG-20260712-17 (target lane ripped @ `3312aec7`): if attempt capture is needed, re-target the PARKED telemetry seam (generic `_otr_structured_call` callback; reconcile with the existing `on_attempt_complete` hook) at a surviving lane. | 1-3 d |
-| 10 | Operator backlog (render tuning) | Kokoro ALL-CAPS pre-TTS normalization (TTS-only copy, never the ledger `spoken_text` or captions; confirm the canonical default engine first) + ending credits ~1.5x faster (`nodes/otr_credits_roll.py`; if a widget, the canonical JSON changes in the SAME commit). Ideal filler during render campaigns. | 0.5-1 d |
+| 1 | Sci-Fi Codex reverify tail | PBUGs 20260712-22/23/24/25 are FIXED IN TREE, LIVE REVERIFY PENDING. Phase C runs only `_v2`/`_v3` lanes, so a variant leg exercises the same runner/transport seams but is NOT the literal "same canonical bank" condition: either run ONE base `scifi_codex` 120w leg after phase C, or record explicit operator acceptance of variant-leg coverage. Then mark the log and release the coder slot formally. | 0.25-0.5 d |
+| 2 | Cliche-span excision (X1-X4) | `docs/2026-07-10-llm-first-story-edit-pass.md` Wave 3: `repair_cliche_span` (`_otr_line_composer.py` ~:2632/:2676) + `cliche_replacements` in all 8 story_rules JSONs still rewrite SPOKEN lines -- a standing violation of the LLM-first directive. Excise deterministically. **Do not land while phase C is mid-sweep** (uniform-code confound -- the 420-rung lesson). | 0.5-1 d |
+| 3 | Announcer framing contract | `docs/2026-07-11-announcer-framing-defect.md` -- still fully OPEN, but the blast radius is narrower than the doc assumed (kibitz r4, grounded): fable2 already contracts "ANNOUNCER speaks ONLY in the intro and the outro" (`_otr_scifi_fable2.py:1741-1743`) and sonnet builds a cold open + sign-off; the structural gap is the CODEX lane (`CastPlanRowV4`/`ScriptLineV4`/`make_advisory_word_blueprint` live only in `_otr_scifi_codex.py`). Ship a codex structural-contract chunk (seam + score contract + fail-closed validator, lawful under THE LAW; `original_radio_v2`'s billboard/sign-off seam is prior art), then AUDIT the other lanes' existing frames before touching them. Fold into the same pass as quick-win 4 so packs are touched once. | 0.5-1 d |
+| 4 | 720-verdict IMPROVE passes | shakespeare: confirm which seam version produced judged leg `c42700e1`; second prompt pass if the fix didn't take. scifi_sonnet: seam consolidation (nine seams; owns the set's only outright FAIL). original_radio: clarity/throughline without losing the noir mood + the F2 weapons-steering finding. science_news: constrain the concept, keep the steady 18-beat template. Related standing consideration (2026-07-14): source-native dramatic framing modes for shakespeare/public_domain vs the shared adapter -- compare without changing frozen receipts; preserve source names/roles by default. Seam/prompt work, no Python authorship. | 1-3 d |
+| 5 | Canonical watchdog support | Runner heartbeats, watchdog recognizes canonical `RESULT`, pinned failure/stall paths -- plus the campaign follow-up: the launcher has TWO missing-log echoes, C7 at `scripts/_otr_soak_server_launch.cmd:38` and manifest at `:48`; redirect both to quoted `%~1` and prove both appear in the server log. Harness defect, not a PBUG. | 0.5 d |
+| 6 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. Current gaps (kibitz r4, grounded): captions use an exact `char_id` map (`_otr_captions.py` ~:180), credits resolve display names alias-aware but voice receipts by raw ID (`otr_credits_roll.py` ~:402), HuMo guard requires literal `char_id == "announcer"` (`render_driver.py` ~:1262). PRECEDES any full-media promotion claim from phase C (see campaign notes). | 0.5-1 d |
+| 7 | Rip interstitial audio only | The exact surgery (kibitz r4; link endpoints re-derived at build): node 83's cue audio/manifest fans to SceneSequencer via links 280/281 and to EpisodeAssembler via 282/283; SceneSequencer inserts interstitials at `scene_sequencer.py` ~:794-951. Remove ONLY the SceneSequencer side (links 280/281, its two cue inputs, the insertion path, timing + mirrored-ledger fields being retired -- enumerate them); RETAIN 282/283 and opening/closing synthesis; RETAIN `music_inter` story/visual semantics. Canonical JSON updated + validated in the SAME commit. | 0.5-1 d |
+| 8 | `docs/ENGINE_MATRIX.md` | Emit the matrix from the three live CAPABILITIES registries following the existing generator pattern (`build_variants.py` ~:276-338): write during `--all`/an explicit emit mode; `--check` regenerates in memory and FAILS on drift without writing. Define columns + stable ordering; link from README. PRECONDITION for Lean-Mean W6. | 0.5-1 d |
+| 9 | Context/cap foundation | One provider-effective cap/count/reservation/must-fit authority feeding preflight, invocation, receipts; no silent truncation, no blind cap raise. The owner module must be CREATED -- none exists at HEAD (both r4 panelists cited `nodes/_otr_generation_budget.py` as existing; grounded: it does not -- cap logic is scattered across the writer + backends). Migrations to enumerate at build: `_otr_openrouter_backend.py`, `_otr_comfy_backend.py`, `_otr_google_api/llm.py`, `_otr_gguf_backend.py`, `_otr_model_loader.py`, writer preflight. Acceptance: preflight and invocation provably make the SAME decision; must-fit overflow fails loud; receipts show provider, resolved model, cap source, counts, reservation, effective output. Partially advanced by the static-row ctx fix (`32e680b2`, PBUG-20260713-20). Carries the diagnostic-gap class from SUPERSEDED PBUG-20260712-17: if attempt capture is needed, re-target the PARKED telemetry seam (generic `_otr_structured_call` callback; reconcile with the existing `on_attempt_complete` hook) at a surviving lane. | 1-3 d |
+| 10 | Operator backlog (render tuning) | Two SEPARATE fixes (kibitz r4, grounded). (a) Kokoro ALL-CAPS pre-TTS normalization: kokoro serves the ANNOUNCER bus, indextts2 the character bus (canonical nodes ~81/82 -- confirm at build); normalize a TTS-only copy, never the ledger `spoken_text` or captions. (b) Credits ~1.5x faster is a CONSTANT-ONLY change: no speed widget exists; scroll rate is `_SCROLL_PPS = 60.0` (`otr_credits_roll.py:70`) -> 90.0, duration/`_MAX_HOLD_S`/no-truncation tests, NO canonical JSON change. Note: the node reads a filesystem path + global ledger with no `IS_CHANGED` -- add a change key or conservatively force rerun. Ideal filler during render campaigns. | 0.5-1 d |
 
-RETIRED from the old table: **item 5, Codex56 attempt telemetry** (target lane
-ripped @ `3312aec7`; plan `docs/2026-07-12-codex56sol-llm-telemetry-plan.md` is
-SUPERSEDED, its lane-agnostic pieces PARKED for portability -- see its header);
-**item 6, PBUG-20260712-17 root fix** (entry SUPERSEDED in the log, same rip);
-**item 10, the "fresh two-matrix bakeoff"** (superseded by the executed 720
-bake-off + the in-flight phase-C campaign; its hy3-creative 420 design dies with
-the 2026-07-21 hy3 expiry).
+Retired 2026-07-15 (do not re-derive): codex56sol attempt telemetry + the
+PBUG-20260712-17 root fix (target lane ripped @ `3312aec7`; the telemetry plan
+doc is SUPERSEDED with its portable pieces parked in its header) and the old
+"fresh two-matrix bakeoff" item (superseded by the executed campaigns).
 
-### Big blocks (in order; the first two may be swapped by operator call)
+### Big blocks (in order; operator may swap 1<->2 -- but note the gate)
 
 1. **LEAN-MEAN RIP** -- `docs/2026-07-10-lean-mean-rip-final.md`, D-1..D-6
    RATIFIED, CLEARED TO EXECUTE **after its 2026-07-15 drift-check header is
-   satisfied**: SW-1 full seam re-survey (writer now 7,703 LOC; `_run_writer_tail`
-   already extracted; `_otr_source_snapshot` now lives inside `_resolve_inputs`),
-   SW-3 news_ingest re-survey, W6 keep-list adds + the ENGINE_MATRIX precondition
-   (quick-win 8), W7 tombstone re-triage, R-7 re-grep of all line cites. Kill
-   lists + W5's positional obligation re-verified LIVE 2026-07-15 and intact;
-   nothing was double-ripped. Dedicated window; multi-day.
+   satisfied**: SW-1 full seam re-survey (writer now 7,703 LOC;
+   `_run_writer_tail` already extracted; `_otr_source_snapshot` now lives inside
+   `_resolve_inputs`), SW-3 news_ingest re-survey, W6 keep-list adds + the
+   ENGINE_MATRIX precondition (quick-win 8), W7 tombstone re-triage, R-7 re-grep
+   of all line cites. Kill lists + W5's positional obligation re-verified LIVE
+   2026-07-15 and intact; nothing was double-ripped. Dedicated window; multi-day.
 2. **User source lanes / extensibility** -- `docs/2026-07-12-user-source-lanes-architecture.md`
    (supersedes the vibe-coder r2 plan). GATED: operator ratifies its section 16
    (nine flags) + one r5 confirmation kibitz pass; THEN fold into this plan and
-   claim the coder slot. **~21-31 coder-days** (not the old "4-7"). The
-   ratification + r5 are docs/panel work and can run DURING the lean-mean window.
+   claim the coder slot. **~21-31 coder-days** (not the old "4-7"). Because this
+   gate is unsatisfied today, lean-mean-first is currently the only non-blocking
+   order; the swap is live only if ratification + r5 land before the lean-mean
+   window opens. The ratification + r5 are docs/panel work and can run DURING
+   the lean-mean window.
 3. **Randomizer Rolls Design A** -- `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`,
    AFTER extensibility (its `_otr_lane_specs` authority is ABSORBED by the
    extensibility build; this build shrinks to `_otr_bank_roll` + eligibility).
-   Re-ground per its 2026-07-15 header (24-lane roster, factory-wrapped _v3
-   runners, drifted pins). 1-2 d + 1 GPU day.
+   Re-ground per its 2026-07-15 header. 1-2 d + 1 GPU day.
 4. **`dynamic_story` visual direction** -- rev-5 FINAL, do not rerun panels;
    re-checked 2026-07-15: roster-agnostic, wiring snapshot still matches live
    canonical. After extensibility + randomizer; re-derive IDs at build.
    5-9 coder-days + 2-4 GPU days.
 
-**Ranges:** quick-wins ~4-9 coder-days; lean-mean = a dedicated multi-day window
-(see its doc); extensibility ~21-31; randomizer 1-2; dynamic_story 5-9. Combined
-~31-51 coder-days AFTER the lean-mean window, plus campaign GPU days. ROADMAP
-runway (SFX campaign etc.) excluded as before.
+**Ranges:** quick-wins ~6-13 coder-days; lean-mean = a dedicated multi-day
+window (see its doc); extensibility ~21-31; randomizer 1-2; dynamic_story 5-9.
+Combined ~33-55 coder-days after the lean-mean window, plus campaign GPU days.
+ROADMAP runway (SFX campaign etc.) excluded as before.
 
 ## Parallel planning only -- one future SFX campaign
 
-Spend **0.5-1 docs day** re-grounding the local generated-SFX R4 candidate into a
-tracked current-HEAD R4.1 plan. This does not claim the coder slot and does not
-pull implementation forward.
+**0.5-1 docs day** (no coder slot): re-ground the local generated-SFX R4
+candidate into a tracked current-HEAD R4.1 plan. Sequencing and the full
+retained-scope contract live in `ROADMAP.md`: Timeline Cue Ledger C0/C1 and its
+blind noun-detector gate come first; the generated design supersedes the CC0
+library renderer -- no second SFX queue, no library fallback.
 
-The result updates the single later campaign in `ROADMAP.md`: Timeline Cue
-Ledger C0/C1 and its blind noun-detector gate come first; if that gate passes,
-the generated-SFX design supplies the renderer/mix/canonical work and supersedes
-the obsolete CC0-library renderer. No second SFX implementation queue and no
-library fallback survive.
-
-The generated path retains: a static selector for Stable Audio 3 Small-SFX and
-Medium, selected-profile hard failures with no fallback, ledger-bound semantic
-cue authoring, in-SceneSequencer mixing, and no post-video or Whisper/alignment
-lane. R4.1 must pin writer/consumer/lifecycle ownership, prompt-schema-fixture-
-validator-repair parity, context budgets, receipts, and the 30/120/720
-qualification ladder before roadmap coding starts.
-
-## Bug Bible promotion field -- separate from coding status
+## Bug Bible promotion field -- pending actions only
 
 Production admission, implementation status, and portable-rule promotion are
-different facts. Do not encode promotion state inside a bug's fix status.
+different facts; the log is the record, this table is only what still needs an
+action.
 
-| Record | Production/fix status | Promotion status |
-|---|---|---|
-| `PBUG-20260712-17` | **SUPERSEDED 2026-07-15** -- target lane ripped @ `3312aec7`; diagnostic-gap class carried by quick-win 9 | Never eligible from this record |
-| `PBUG-20260712-18` / `19` / `26` | FIXED AND LIVE VERIFIED (per log) | Overlap check + operator approval at the next fan-out |
-| `PBUG-20260712-20` / `21` | FIXED AND LIVE VERIFIED | Already generalized into BUG-11.50 |
-| `PBUG-20260712-22` / `23` / `24` / `25` | FIXED IN TREE; LIVE REVERIFY PENDING (quick-win 1: phase-C `scifi_codex` legs) | After reverify + fan-out |
-| `PBUG-20260713-15..18` | CLOSED (live leg `fb34bf4f`) | Bible-worthy flags set; awaiting the next operator fan-out |
-| `PBUG-20260713-19` | FIXED `c25d63c6`; live requalification pending | Promoted BUG-05.11 |
-| `PBUG-20260713-20` | FIXED `32e680b2`; LIVE REVERIFIED (ctx=131072) | Queued for operator fan-out |
-| historical `PBUG-20260711-18` | Analysis-only 720w context risk; the `32e680b2` ctx fix removed its named mechanism, but real closure is the quick-win-9 authority | **Never eligible from static evidence** |
+| Record | Pending action |
+|---|---|
+| `PBUG-20260712-22/23/24/25` | Live reverify (quick-win 1), then fan-out |
+| `PBUG-20260712-18/19/26` + `PBUG-20260713-15..18` + `-20` | Awaiting the next operator Bible fan-out (overlap check + approval) |
+| `PBUG-20260713-19` | Live requalification pending (promoted BUG-05.11) |
+| duplicate-id cleanup | At the same fan-out: BUG-11.54 legacy_id -> `PBUG-20260713-21`; verify the acronym-union rule's legacy_id (both Bible rows cite `-10`; see the log's renumber note) |
+| historical `PBUG-20260711-18` | Keep as the quick-win-9 engineering risk; never eligible from static evidence |
 
-Log hygiene folded in this baseline: the duplicate id `PBUG-20260713-10` is
-resolved (the P1-overlong-question entry renumbered to `-21`; `-10` stays with
-the P9-audit entry). BUG_BIBLE.yaml carries two `legacy_id: -10` rows
-(~:4357/:4379) -- reconcile both at the next fan-out (see the log's renumber
-note). No 07-14/15 bake-off-era PBUGs are logged yet; the campaign window owns
+No 07-14/15 bake-off-era PBUGs are logged yet; the campaign window owns
 admitting any (e.g. the F2 weapons-steering finding, if operator admits it).
-
-The active production-fix owner updates `docs/PROD_BUG_LOG.md`. The thin approval
-queue remains `docs/BUG_BIBLE_PROMOTION_QUEUE.md`; no plan review or invented
+The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval
+queue is `docs/BUG_BIBLE_PROMOTION_QUEUE.md`; no plan review or invented
 fixture creates a row.
 
 ## Validation and handoff law
@@ -309,21 +197,22 @@ fixture creates a row.
 - One coder edits code or `workflows/otr_canonical.json` at a time; read-only
   audits and documentation may run in parallel. **Two windows are active around
   this baseline** (render campaign + this planning window): the campaign window
-  should RE-READ this file before its wrap-up edit -- the lower half was
-  rewritten 2026-07-15 late night.
+  should RE-READ this file before its wrap-up edit -- it was rewritten and then
+  leaned 2026-07-15 late night. The otr-build-tracker artifact is RETIRED
+  (tombstoned 2026-07-15); HANDOFF_LOG + this file are the only tracking
+  surfaces.
 
 ## Open risks
 
 - Extensibility is gated on operator section-16 ratification + the r5 pass; its
-  ~21-31-day estimate is latent scope, not creep. Until ratified, it holds no
-  slot and blocks randomizer + dynamic_story sequencing only.
-- Lean-mean vs extensibility ORDER is an operator call. Baseline recommendation:
-  lean-mean first (it deletes ~32-33k LOC the extensibility build would
-  otherwise have to comprehend and preserve; the extensibility gate work --
-  ratification + r5 -- is panel/docs work that runs in parallel). Both rip into
-  the writer: NEVER interleave them.
-- Phase C may surface new lane defects (the F2 weapons-steering finding already
-  did for original_radio seams); the campaign window owns admitting PBUGs.
+  ~21-31-day estimate is latent scope, not creep. Until ratified it holds no
+  slot and only constrains randomizer + dynamic_story sequencing.
+- Lean-mean vs extensibility ORDER is an operator call (see the gate note in
+  Big blocks). Both rip into the writer: NEVER interleave them.
+- No code lands while phase C is mid-sweep -- landing mid-sweep re-creates the
+  uniform-code confound that made the 420 rung unjudgeable.
+- Phase C may surface new lane defects; the campaign window owns admitting
+  PBUGs.
 - User extensibility and `dynamic_story` both touch the writer, visual-style
   authority, and canonical workflow. They remain serial and each re-derives the
   live JSON.
@@ -333,8 +222,9 @@ fixture creates a row.
 ## Pointers
 
 - `ROADMAP.md` (current, 2026-07-12; lean-mean pin self-declares stale cites)
-- `docs/PRODUCTION_SPRINT_LESSONS.md`
+- `docs/PRODUCTION_SPRINT_LESSONS.md` (incl. lesson 24, the lost-anchor class)
 - `docs/PROD_BUG_LOG.md` / `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
+- `docs/HANDOFF_LOG.md` (all completed-work history, newest at top)
 - `docs/2026-07-15-720-bakeoff-verdict.md` (KEEP/IMPROVE/LEAVE + open items)
 - `docs/2026-07-12-user-source-lanes-architecture.md` (extensibility successor)
 - `docs/2026-07-10-lean-mean-rip-final.md` (drift-check header 2026-07-15)
@@ -343,5 +233,5 @@ fixture creates a row.
 - `docs/2026-07-10-llm-first-story-edit-pass.md` (X1-X4 live remainder)
 - `docs/2026-07-11-announcer-framing-defect.md` (OPEN)
 - `docs/2026-07-11-720-bakeoff-kickoff.md` / `docs/2026-07-11-timeline-cue-ledger.md`
-- `docs/2026-07-11-sfx-engine-architecture/roundtable/pass04_final.md`
+- `docs/2026-07-11-sfx-engine-architecture/roundtable/pass04_final.md` (local, gitignored)
 - `workflows/otr_canonical.json`
