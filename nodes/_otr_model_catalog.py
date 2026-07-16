@@ -42,9 +42,12 @@ added to the dropdown."""
 
 _REMOVED_GEMMA4_12B_MODEL_IDS: frozenset[str] = frozenset({"google/gemma-4-12b-it"})
 
-# Suffix appended to a curated dropdown entry whose weights are NOT
-# present in the local HF cache. Validator strips this before any
-# allow-list check; outputs / meta keys MUST broadcast the stripped id.
+# LEGACY dropdown state suffixes. As of 2026-07-16 the dropdown no longer
+# appends any download-state badge (a per-user HF cache layout makes the
+# "downloaded" state impossible to show correctly for everyone). These are
+# RETAINED only so validate_model_id / _strip_label_suffix still normalize a
+# value saved by an OLDER workflow (e.g. "mistralai/... [NOT DOWNLOADED]")
+# back to the bare repo id. Do NOT append them to new labels.
 NOT_DOWNLOADED_SUFFIX = " [NOT DOWNLOADED]"
 LOCAL_HF_SUFFIX = " [LOCAL HF]"
 LOCAL_GGUF_SUFFIX = " [LOCAL GGUF]"
@@ -553,30 +556,6 @@ def _snapshot_is_causal_lm(snapshot_path: str | None) -> bool:
     return any(isinstance(a, str) and a.endswith("ForCausalLM") for a in archs)
 
 
-def _is_google_gemma_local_row(repo_id: str) -> bool:
-    """True for local Google-owned Gemma HF rows that need a UI label.
-
-    Direct Google API models live behind ``google_api:slot-a/b`` and the
-    separate slot pickers. Rows matching this predicate are local HuggingFace
-    weights despite their ``google/...`` namespace, so the dropdown labels must
-    say so visibly.
-    """
-    return isinstance(repo_id, str) and repo_id.startswith("google/gemma")
-
-
-def _display_label_for_local_row(repo_id: str, *, local_kind: str = "hf") -> str:
-    """Return the user-facing label for a local model row.
-
-    The returned label is still a string COMBO value, so
-    ``_strip_label_suffix`` must keep it round-trippable to ``repo_id``.
-    """
-    if local_kind == "gguf":
-        return repo_id + LOCAL_GGUF_SUFFIX
-    if _is_google_gemma_local_row(repo_id):
-        return repo_id + LOCAL_HF_SUFFIX
-    return repo_id
-
-
 def _gguf_native_row_on_disk() -> bool:
     """Side-effect-free GGUF presence probe for dropdown metadata."""
     try:
@@ -684,8 +663,19 @@ class DropdownEntry:
 def build_dropdown_choices(
     hub_root: Path | None = None,
 ) -> list[DropdownEntry]:
-    """Merge curated set with locally-scanned cache; apply
-    [NOT DOWNLOADED] suffix to curated entries not present on disk.
+    """List the curated writer models + enabled remote handles + any
+    locally-discovered causal-LM repos.
+
+    Labels are the bare repo id / remote handle -- NO download-state badge.
+    The "downloaded" state of an HF-cache model depends on each machine's
+    HF cache layout (HF_HOME / HF_HUB_CACHE vary per user and even per
+    launch, and can be split across roots), so a "[NOT DOWNLOADED]" /
+    "[LOCAL HF]" label can never be reliably correct for every user -- a
+    wrong badge is worse than none. A model that is not already cached is
+    simply fetched by auto_download_if_missing on first Queue; selection is
+    never gated on the badge. `on_disk` is still tracked (it drives the
+    recovery hint + the auto-download short-circuit), it just no longer
+    decorates the visible label.
     """
     scan = {r.repo_id: r for r in scan_local_llm_cache(hub_root=hub_root)}
     entries: list[DropdownEntry] = []
@@ -694,53 +684,28 @@ def build_dropdown_choices(
         provider = getattr(m, "provider", "local")
         if provider == "gguf_native":
             on_disk = _gguf_native_row_on_disk()
-            entries.append(DropdownEntry(
-                _display_label_for_local_row(m.repo_id, local_kind="gguf"),
-                m.repo_id,
-                on_disk,
-                curated=True,
-            ))
-            continue
-        if provider != "local":
-            # Remote (OpenRouter / Comfy Credits): no local weights, so the
-            # [NOT DOWNLOADED] suffix would be misleading. Show the clean
-            # named handle and treat it as available (selectable) whenever
-            # it is present -- a remote row is present only when its lane is
-            # enabled (C3).
-            entries.append(DropdownEntry(m.repo_id, m.repo_id, True, curated=True))
-            continue
-        on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
-        # State suffix is EXCLUSIVE: a present row gets its local-kind badge
-        # (e.g. [LOCAL HF] for a Google Gemma row); an absent row gets
-        # [NOT DOWNLOADED] and nothing else. The old code appended
-        # [NOT DOWNLOADED] on top of the [LOCAL HF] badge, emitting the
-        # contradictory "[LOCAL HF] [NOT DOWNLOADED]" double suffix.
-        if on_disk:
-            label = _display_label_for_local_row(m.repo_id)
+        elif provider != "local":
+            # Remote lane (OpenRouter / Comfy Credits / Google API): present
+            # in the active set only when its lane is enabled, so selectable.
+            on_disk = True
         else:
-            label = m.repo_id + NOT_DOWNLOADED_SUFFIX
-        entries.append(DropdownEntry(label, m.repo_id, on_disk, curated=True))
+            on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
+        entries.append(DropdownEntry(m.repo_id, m.repo_id, on_disk, curated=True))
     curated_ids = {m.repo_id for m in active}
     for repo_id, result in scan.items():
         if repo_id in curated_ids:
             continue
         if not result.on_disk:
             continue
-        # The HF hub cache mixes every model type OTR downloads, so a
-        # non-curated cache hit is not necessarily a text-generation
-        # LLM. Admit it to the writer dropdown only if its config.json
-        # declares a `*ForCausalLM` architecture; this keeps diffusion
-        # (FLUX, LTX-Video) and vision (Depth-Anything) checkpoints out
-        # of the model picker. The curated rows above are exempt -- they
-        # are the explicit writer set. See BUG-LOCAL-257.
+        # The HF cache mixes every model type OTR downloads, so a non-curated
+        # cache hit is not necessarily a text-generation LLM. Admit it only if
+        # its config.json declares a `*ForCausalLM` architecture -- keeps
+        # diffusion (FLUX, LTX-Video) and vision (Depth-Anything) checkpoints
+        # out of the writer picker. Curated rows above are exempt (the
+        # explicit writer set). See BUG-LOCAL-257.
         if not _snapshot_is_causal_lm(result.snapshot_path):
             continue
-        entries.append(DropdownEntry(
-            _display_label_for_local_row(repo_id),
-            repo_id,
-            True,
-            curated=False,
-        ))
+        entries.append(DropdownEntry(repo_id, repo_id, True, curated=False))
     return entries
 
 

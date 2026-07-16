@@ -194,50 +194,33 @@ def test_scan_skips_non_models_dirs(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_dropdown_empty_cache_marks_all_curated_not_downloaded(empty_hub_root):
+def _assert_no_state_badge(label):
+    assert catalog.NOT_DOWNLOADED_SUFFIX not in label
+    assert catalog.LOCAL_HF_SUFFIX not in label
+    assert catalog.LOCAL_GGUF_SUFFIX not in label
+
+
+def test_dropdown_empty_cache_labels_are_bare(empty_hub_root):
+    """The dropdown carries NO download-state badge. Even with an empty
+    cache, every label is the bare repo id / handle -- the "downloaded"
+    state of an HF-cache model is per-user and not shown."""
     entries = catalog.build_dropdown_choices(hub_root=empty_hub_root)
     active_ids = set(catalog._by_repo_id())
     assert {e.repo_id for e in entries} == active_ids
-    by_id = catalog._by_repo_id()
     for e in entries:
-        provider = by_id[e.repo_id].provider
-        if provider == "gguf_native":
-            assert isinstance(e.on_disk, bool)
-            assert e.label == e.repo_id + catalog.LOCAL_GGUF_SUFFIX
-            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
-        elif provider != "local":
-            assert e.on_disk is True
-            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
-        else:
-            assert e.on_disk is False
-            # Off-disk local row: [NOT DOWNLOADED] ONLY. The [LOCAL HF]
-            # badge marks a PRESENT row; emitting both was the
-            # contradictory "[LOCAL HF] [NOT DOWNLOADED]" double suffix.
-            assert catalog.LOCAL_HF_SUFFIX not in e.label
-            assert e.label == e.repo_id + catalog.NOT_DOWNLOADED_SUFFIX
+        assert e.label == e.repo_id
+        _assert_no_state_badge(e.label)
 
 
-def test_dropdown_with_mistral_nemo_marks_only_that_on_disk(hub_root_with_mistral_nemo):
+def test_dropdown_with_mistral_nemo_sets_on_disk_flag(hub_root_with_mistral_nemo):
+    """on_disk still reflects the cache (Mistral present -> True, other local
+    rows -> False), but the label is the bare id for every row regardless."""
     entries = catalog.build_dropdown_choices(hub_root=hub_root_with_mistral_nemo)
-    by_id = catalog._by_repo_id()
     for e in entries:
+        assert e.label == e.repo_id
+        _assert_no_state_badge(e.label)
         if e.repo_id == catalog.DEFAULT_LLM:
             assert e.on_disk is True
-            assert e.label == catalog.DEFAULT_LLM
-            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
-        elif by_id.get(e.repo_id) and by_id[e.repo_id].provider == "gguf_native":
-            assert e.label == e.repo_id + catalog.LOCAL_GGUF_SUFFIX
-            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
-        elif by_id.get(e.repo_id) and by_id[e.repo_id].provider != "local":
-            assert e.on_disk is True
-            assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
-        else:
-            assert e.on_disk is False
-            # Off-disk local row: [NOT DOWNLOADED] ONLY. The [LOCAL HF]
-            # badge marks a PRESENT row; emitting both was the
-            # contradictory "[LOCAL HF] [NOT DOWNLOADED]" double suffix.
-            assert catalog.LOCAL_HF_SUFFIX not in e.label
-            assert e.label == e.repo_id + catalog.NOT_DOWNLOADED_SUFFIX
 
 
 def test_dropdown_appends_uncurated_locally_scanned_at_end(hub_root_with_uncurated):
@@ -651,27 +634,28 @@ def test_scan_materialized_snapshot_reports_on_disk(tmp_path):
     assert results["google/gemma-2-2b-it"].on_disk is True
 
 
-# Every curated LOCAL row, asserted one-by-one against a known disk state.
-# `expected_badge` is the sole state suffix the label may carry.
+# Every curated LOCAL row, asserted one-by-one against a known disk state:
+# the label is ALWAYS the bare repo id (no download-state badge), and on_disk
+# still tracks whether a materialized weight blob is present.
 _LOCAL_ROW_CASES = [
-    ("google/gemma-4-E2B-it", True, catalog.LOCAL_HF_SUFFIX),
-    ("google/gemma-4-E2B-it", False, catalog.NOT_DOWNLOADED_SUFFIX),
-    ("google/gemma-4-E4B-it", True, catalog.LOCAL_HF_SUFFIX),
-    ("google/gemma-4-E4B-it", False, catalog.NOT_DOWNLOADED_SUFFIX),
-    ("google/gemma-2-2b-it", True, catalog.LOCAL_HF_SUFFIX),
-    ("google/gemma-2-2b-it", False, catalog.NOT_DOWNLOADED_SUFFIX),
-    ("mistralai/Mistral-Nemo-Instruct-2407", True, ""),  # non-gemma: bare id
-    ("mistralai/Mistral-Nemo-Instruct-2407", False, catalog.NOT_DOWNLOADED_SUFFIX),
-    ("Qwen/Qwen2.5-14B-Instruct", True, ""),
-    ("Qwen/Qwen2.5-14B-Instruct", False, catalog.NOT_DOWNLOADED_SUFFIX),
+    ("google/gemma-4-E2B-it", True),
+    ("google/gemma-4-E2B-it", False),
+    ("google/gemma-4-E4B-it", True),
+    ("google/gemma-4-E4B-it", False),
+    ("google/gemma-2-2b-it", True),
+    ("google/gemma-2-2b-it", False),
+    ("mistralai/Mistral-Nemo-Instruct-2407", True),
+    ("mistralai/Mistral-Nemo-Instruct-2407", False),
+    ("Qwen/Qwen2.5-14B-Instruct", True),
+    ("Qwen/Qwen2.5-14B-Instruct", False),
 ]
 
 
-@pytest.mark.parametrize(("repo_id", "present", "expected_badge"), _LOCAL_ROW_CASES)
-def test_curated_local_row_label_matches_disk(tmp_path, repo_id, present, expected_badge):
-    """Per-item contract: a curated local row's label reflects exactly its
-    disk state, with EXACTLY ONE state suffix -- never both, never the
-    contradictory [LOCAL HF] [NOT DOWNLOADED]."""
+@pytest.mark.parametrize(("repo_id", "present"), _LOCAL_ROW_CASES)
+def test_curated_local_row_label_is_bare_regardless_of_disk(tmp_path, repo_id, present):
+    """Per-item contract: a curated local row's label is the bare repo id
+    whether or not it is on disk -- no download-state badge, ever. on_disk
+    still reflects the materialized-weight check."""
     root = tmp_path / "hub"
     root.mkdir()
     org, name = repo_id.split("/", 1)
@@ -682,14 +666,10 @@ def test_curated_local_row_label_matches_disk(tmp_path, repo_id, present, expect
         if e.repo_id == repo_id
     )
     assert entry.on_disk is present
-    assert entry.label == repo_id + expected_badge
-    # Exclusive suffix invariant: the two state badges are mutually exclusive.
-    assert not (
-        catalog.LOCAL_HF_SUFFIX in entry.label
-        and catalog.NOT_DOWNLOADED_SUFFIX in entry.label
-    )
-    # The stored label round-trips back to the canonical repo id.
-    assert catalog._strip_label_suffix(entry.label) == repo_id
+    assert entry.label == repo_id
+    _assert_no_state_badge(entry.label)
+    # A value saved by an OLDER (badge-bearing) workflow still normalizes.
+    assert catalog._strip_label_suffix(repo_id + catalog.NOT_DOWNLOADED_SUFFIX) == repo_id
 
 
 @pytest.fixture
@@ -704,32 +684,32 @@ def hub_root_operator_gemma_mix(tmp_path: Path) -> Path:
     return root
 
 
-def test_no_dropdown_label_carries_double_state_suffix(
+def test_no_dropdown_label_carries_any_state_badge(
     hub_root_operator_gemma_mix, empty_hub_root
 ):
-    """No label may carry BOTH [LOCAL HF] and [NOT DOWNLOADED] in any cache
-    state -- the exact contradiction the operator reported."""
+    """No label carries ANY download-state badge in any cache state -- the
+    dropdown shows clean model names for every user regardless of storage."""
     for hub in (hub_root_operator_gemma_mix, empty_hub_root):
         for e in catalog.build_dropdown_choices(hub_root=hub):
-            assert not (
-                catalog.LOCAL_HF_SUFFIX in e.label
-                and catalog.NOT_DOWNLOADED_SUFFIX in e.label
-            ), f"double state suffix in {e.label!r}"
+            assert e.label == e.repo_id
+            _assert_no_state_badge(e.label)
 
 
-def test_operator_gemma_mix_exact_labels(hub_root_operator_gemma_mix):
-    """The reported scenario, resolved: materialized E4B -> [LOCAL HF];
-    config-only E2B + gemma-2-2b -> [NOT DOWNLOADED] (single suffix each)."""
+def test_operator_gemma_mix_labels_bare_on_disk_tracked(hub_root_operator_gemma_mix):
+    """The reported scenario, resolved: all three gemma rows show the bare id;
+    on_disk still distinguishes materialized E4B (True) from the config-only
+    E2B / gemma-2-2b (False)."""
     by_repo = {
         e.repo_id: e
         for e in catalog.build_dropdown_choices(hub_root=hub_root_operator_gemma_mix)
     }
-    assert by_repo["google/gemma-4-E4B-it"].label == (
-        "google/gemma-4-E4B-it" + catalog.LOCAL_HF_SUFFIX
-    )
-    assert by_repo["google/gemma-4-E2B-it"].label == (
-        "google/gemma-4-E2B-it" + catalog.NOT_DOWNLOADED_SUFFIX
-    )
-    assert by_repo["google/gemma-2-2b-it"].label == (
-        "google/gemma-2-2b-it" + catalog.NOT_DOWNLOADED_SUFFIX
-    )
+    for rid in (
+        "google/gemma-4-E4B-it",
+        "google/gemma-4-E2B-it",
+        "google/gemma-2-2b-it",
+    ):
+        assert by_repo[rid].label == rid
+        _assert_no_state_badge(by_repo[rid].label)
+    assert by_repo["google/gemma-4-E4B-it"].on_disk is True
+    assert by_repo["google/gemma-4-E2B-it"].on_disk is False
+    assert by_repo["google/gemma-2-2b-it"].on_disk is False

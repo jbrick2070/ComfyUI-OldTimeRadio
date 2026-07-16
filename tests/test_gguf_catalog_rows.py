@@ -12,7 +12,7 @@ def test_row_present_by_default(monkeypatch, tmp_path):
         monkeypatch.delenv(key, raising=False)
     ids = cat._by_repo_id()
     assert gguf.ROW_ID in ids
-    assert gguf.ROW_ID + cat.LOCAL_GGUF_SUFFIX in cat.dropdown_choices(hub_root=tmp_path)
+    assert gguf.ROW_ID in cat.dropdown_choices(hub_root=tmp_path)
     assert cat.validate_model_id(gguf.ROW_ID) == gguf.ROW_ID
 
 
@@ -27,11 +27,14 @@ def test_virtual_row_schema():
     assert row.context_window == 4096
 
 
-def test_dropdown_label_marks_local_gguf(tmp_path):
+def test_dropdown_gguf_row_is_bare_and_validates(tmp_path):
+    """The GGUF row shows the bare repo id -- no [LOCAL GGUF] / download
+    badge. A value saved by an older badge-bearing workflow still normalizes."""
     choices = cat.dropdown_choices(hub_root=tmp_path)
-    assert gguf.ROW_ID + cat.LOCAL_GGUF_SUFFIX in choices
-    assert gguf.ROW_ID not in choices
+    assert gguf.ROW_ID in choices
+    assert (gguf.ROW_ID + cat.LOCAL_GGUF_SUFFIX) not in choices
     assert (gguf.ROW_ID + cat.NOT_DOWNLOADED_SUFFIX) not in choices
+    assert cat.validate_model_id(gguf.ROW_ID) == gguf.ROW_ID
     assert cat.validate_model_id(gguf.ROW_ID + cat.LOCAL_GGUF_SUFFIX) == gguf.ROW_ID
 
 
