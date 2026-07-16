@@ -601,7 +601,12 @@ def invoke_structured_slot(
     unchanged, and the local path is byte-identical.
     """
     if (
-        getattr(slot_fn, "_otr_openrouter", False)
+        (
+            getattr(slot_fn, "_otr_supports_json_object", False)
+            # Compat fallback: older/direct OpenRouter fns predate the
+            # _otr_supports_json_object marker but still force json_object.
+            or getattr(slot_fn, "_otr_openrouter", False)
+        )
         and getattr(slot_fn, "_otr_response_format", None) is None
     ):
         return slot_fn(

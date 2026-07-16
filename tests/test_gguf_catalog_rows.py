@@ -22,7 +22,11 @@ def test_virtual_row_schema():
     assert row.loader_backend == gguf.GGUF_BACKEND_KEY
     assert row.provider == "gguf_native"
     assert row.vram_fit_tier == "PASS"
-    assert row.approx_safetensors_gb == 13.4
+    # DERIVED from the pinned Q8_0 bytes (no guessed constant): the first
+    # pinned artifact size in GiB, rounded to 1 dp.
+    assert row.approx_safetensors_gb == round(
+        gguf.EXPECTED_Q8_0_SIZE_BYTES / (1024 ** 3), 1
+    )
     assert row.requires_auth is False
     assert row.context_window == 4096
 

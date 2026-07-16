@@ -167,9 +167,9 @@ def _patched_scheduler(monkeypatch, *, creative_id, technical_id):
 
     trace: list[tuple[str, str]] = []
 
-    def fake_request_slot(slot, model_id, policy=None):
-        # S1: production threads the LLMRuntimePolicy kwarg; the fake
-        # mirrors the signature (trace shape unchanged).
+    def fake_request_slot(slot, model_id, policy=None, load_config=None):
+        # S1: production threads the LLMRuntimePolicy + load_config kwargs;
+        # the fake mirrors the signature (trace shape unchanged).
         trace.append((slot, model_id))
         return _StubCacheEntry(model_id)
 

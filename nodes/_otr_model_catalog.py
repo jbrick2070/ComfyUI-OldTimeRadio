@@ -351,36 +351,53 @@ def _google_api_virtual_rows() -> tuple[CuratedModel, ...]:
 
 
 def _gguf_native_virtual_rows() -> tuple[CuratedModel, ...]:
-    """The native GGUF Gemma 4 12B row.
+    """Project every ``_otr_gguf_backend.GGUF_ROWS`` registry row into a
+    visible catalog peer.
 
     The visible handle is the actual GGUF repository id so the dropdown reads
-    like a peer to the other Gemma rows. The loader resolves the local Q8_0
-    file from C:\\ComfyUI-Models by default.
+    like a peer to the other Gemma rows. The loader resolves the local file
+    from C:\\ComfyUI-Models by default.
+
+    Guards ONLY the optional backend IMPORT (llama-cpp is an optional dep). A
+    registry-VALIDATION error (a malformed GGUF_ROWS row) PROPAGATES so a bad
+    row fails startup/tests loudly instead of silently deleting the lane.
+    ``approx_safetensors_gb`` is DERIVED from the row's pinned bytes; an
+    unpinned row projects 0.0 (= UNKNOWN, never a guessed estimate).
     """
     try:
         from . import _otr_gguf_backend as _gguf
-    except Exception:  # noqa: BLE001 -- catalog import must stay robust
+    except ImportError:  # optional-dep safe -- backend module unavailable
         return ()
-    return (
-        CuratedModel(
-            repo_id=_gguf.ROW_ID,
-            requires_auth=False,
+    rows: list[CuratedModel] = []
+    for row in _gguf.GGUF_ROWS:
+        if row.repo_id == _gguf.ROW_ID:
+            notes = (
+                "Gemma 4 12B Q8_0 GGUF via in-process llama-cpp-python. "
+                "Default file: C:\\ComfyUI-Models\\LLM\\converted\\"
+                "gemma-4-12b-it\\gemma-4-12b-it-Q8_0.gguf. No Ollama, no "
+                "sidecar, no port."
+            )
+        else:
+            notes = (
+                f"{row.repo_id} GGUF via in-process llama-cpp-python "
+                f"(local subdir {row.subdir}). No Ollama, no sidecar, no port."
+            )
+        rows.append(CuratedModel(
+            repo_id=row.repo_id,
+            requires_auth=row.requires_auth,
             loader_backend=_gguf.GGUF_BACKEND_KEY,
-            vram_fit_tier="PASS",
-            approx_safetensors_gb=13.4,
-            notes="Gemma 4 12B Q8_0 GGUF via in-process llama-cpp-python. "
-            "Default file: C:\\ComfyUI-Models\\LLM\\converted\\"
-            "gemma-4-12b-it\\gemma-4-12b-it-Q8_0.gguf. No Ollama, no "
-            "sidecar, no port.",
+            vram_fit_tier=row.vram_fit_tier,
+            approx_safetensors_gb=row.approx_artifact_gb(),
+            notes=notes,
             prompt_profile="modern",
             chat_template_kind="transformers_default",
-            stop_tokens=(),
-            context_window=_gguf.DEFAULT_CONTEXT_WINDOW,
-            license="apache_2_0",
-            license_audit_status="mit_equivalent",
+            stop_tokens=row.stop_tokens,
+            context_window=row.context_window,
+            license=row.license,
+            license_audit_status=row.license_audit_status,
             provider="gguf_native",
-        ),
-    )
+        ))
+    return tuple(rows)
 
 
 def _curated_with_gguf_native_peer() -> tuple[CuratedModel, ...]:
@@ -556,14 +573,16 @@ def _snapshot_is_causal_lm(snapshot_path: str | None) -> bool:
     return any(isinstance(a, str) and a.endswith("ForCausalLM") for a in archs)
 
 
-def _gguf_native_row_on_disk() -> bool:
-    """Side-effect-free GGUF presence probe for dropdown metadata."""
+def _gguf_native_row_on_disk(repo_id: str) -> bool:
+    """Side-effect-free GGUF presence probe for dropdown metadata: True iff
+    ANY registered artifact for ``repo_id`` resolves to a regular non-zero
+    file. The dropdown has no quant context, so any materialized quant counts."""
     try:
         from . import _otr_gguf_backend as _gguf
-    except Exception:  # noqa: BLE001 -- catalog dropdowns must be import-safe
+    except ImportError:  # keep INPUT_TYPES import-safe (optional dep)
         return False
     try:
-        return _gguf.resolve_gguf_path().exists()
+        return _gguf.gguf_native_row_on_disk(repo_id)
     except Exception:  # noqa: BLE001 -- keep INPUT_TYPES import-safe
         return False
 
@@ -683,7 +702,7 @@ def build_dropdown_choices(
     for m in active:
         provider = getattr(m, "provider", "local")
         if provider == "gguf_native":
-            on_disk = _gguf_native_row_on_disk()
+            on_disk = _gguf_native_row_on_disk(m.repo_id)
         elif provider != "local":
             # Remote lane (OpenRouter / Comfy Credits / Google API): present
             # in the active set only when its lane is enabled, so selectable.
@@ -1441,6 +1460,25 @@ def _estimate_resident_gb(
         return float(special)
     curated = _by_repo_id().get(model_id)
     if curated is not None:
+        # gguf_native rows carry the REAL on-disk artifact size (derived from
+        # pinned bytes), not a BF16 download -- so NO /2 halve. Peak resident
+        # ~= weights on disk + the per-row KV cache at its context window. An
+        # unpinned row (approx 0.0 = UNKNOWN) yields None (can't estimate).
+        if getattr(curated, "provider", "local") == "gguf_native":
+            weights_gb = float(curated.approx_safetensors_gb)
+            if weights_gb <= 0.0:
+                return None
+            kv_gb = 0.0
+            try:
+                from . import _otr_gguf_backend as _gguf
+                _row = _gguf.gguf_row_for_repo(model_id)
+                if _row.kv_gb_per_1k is not None:
+                    kv_gb = (
+                        float(_row.context_window) / 1024.0
+                    ) * float(_row.kv_gb_per_1k)
+            except Exception:  # noqa: BLE001 -- KV additive; absent -> weights only
+                kv_gb = 0.0
+            return weights_gb + kv_gb
         return float(curated.approx_safetensors_gb) / 2.0
     if safetensors_gb_hint is not None and safetensors_gb_hint > 0:
         return float(safetensors_gb_hint) / 2.0

@@ -1735,7 +1735,9 @@ def test_p3_scheduler_openrouter_uses_bounded_patch_and_forwards_json_mode(monke
     monkeypatch.setattr(
         model_loader,
         "request_slot",
-        lambda slot, model_id, policy=None: {"provider": "openrouter"},
+        lambda slot, model_id, policy=None, load_config=None: {
+            "provider": "openrouter",
+        },
     )
 
     def fake_build(cache_entry, **_sampling):

@@ -13,8 +13,11 @@ Override with ``GEMMA4_12B_GGUF_PATH`` when needed.
 """
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -71,6 +74,523 @@ class GGUFNativeConfigError(GGUFNativeError):
 
 class GGUFNativeCallFailedError(GGUFNativeError):
     """The native GGUF call failed."""
+
+
+class GGUFRegistryError(GGUFNativeError):
+    """A GGUF_ROWS entry is malformed. Raised at construction -- an
+    explicit raise (never an ``assert``, which vanishes under ``-O``) so a
+    bad row fails tests/startup loudly instead of silently deleting a lane."""
+
+
+# ---------------------------------------------------------------------------
+# GGUF row registry -- the canonical multi-row source of truth
+# ---------------------------------------------------------------------------
+# One GGUFRow per shippable GGUF writer model. The catalog projects each row
+# into a visible dropdown peer; the preflight resolves a per-slot load_config
+# from the selected row + policy. Adding a model is a data edit here, not new
+# code.
+
+#: Pinned top_k for every native GGUF generate call. 40 is also llama-cpp's
+#: own default, so pinning it is byte-identical for the top_k dimension.
+GGUF_TOP_K = 40
+
+#: Closed think-strip policy enum. "none" = leave output untouched;
+#: "qwen3_no_think" = strip a single LEADING <think>...</think> envelope when
+#: no response_format is in force (see _strip_leading_think_envelope).
+_THINK_POLICIES = frozenset({"none", "qwen3_no_think"})
+
+#: characters that make a subdir/filename unsafe (path traversal / absolute).
+_UNSAFE_PATH_RE = re.compile(r"(^\s*$)|(\.\.)|([\\/])|(^[A-Za-z]:)|(^~)")
+
+
+def _require_safe_component(kind: str, repo_id: str, value: str) -> None:
+    if not isinstance(value, str) or _UNSAFE_PATH_RE.search(value):
+        raise GGUFRegistryError(
+            f"GGUF_ROWS[{repo_id!r}]: {kind} {value!r} is not a plain, safe "
+            "path component (no separators, parent refs, drive, or ~)."
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class GGUFRow:
+    """A single native-GGUF writer model row.
+
+    ``artifacts`` maps a quant name -> (filename, size_bytes|None, sha256|None).
+    A pinned size/sha is FAIL-LOUD verified at load; None means the artifact
+    has never been materialized on this box (absence/existence checked only,
+    pin the real values when first derived). ``kv_gb_per_1k`` is None until the
+    per-row KV cost has been MEASURED (never a guessed constant).
+    """
+
+    repo_id: str
+    subdir: str
+    artifacts: dict[str, tuple[str, int | None, str | None]]
+    context_window: int
+    kv_gb_per_1k: float | None
+    vram_fit_tier: str
+    license: str
+    license_audit_status: str
+    requires_auth: bool
+    stop_tokens: tuple[str, ...]
+    think_policy: str
+
+    def __post_init__(self) -> None:
+        rid = self.repo_id
+        if not isinstance(rid, str) or not rid.strip():
+            raise GGUFRegistryError(f"GGUF_ROWS: empty/invalid repo_id {rid!r}")
+        _require_safe_component("subdir", rid, self.subdir)
+        if not isinstance(self.artifacts, dict) or not self.artifacts:
+            raise GGUFRegistryError(
+                f"GGUF_ROWS[{rid!r}]: artifacts must be a non-empty dict."
+            )
+        for quant, spec in self.artifacts.items():
+            if not isinstance(quant, str) or not quant.strip():
+                raise GGUFRegistryError(
+                    f"GGUF_ROWS[{rid!r}]: invalid quant key {quant!r}."
+                )
+            if not (isinstance(spec, tuple) and len(spec) == 3):
+                raise GGUFRegistryError(
+                    f"GGUF_ROWS[{rid!r}] quant {quant!r}: artifact must be a "
+                    "(filename, size|None, sha|None) 3-tuple."
+                )
+            filename, size, sha = spec
+            _require_safe_component(f"{quant} filename", rid, filename)
+            if size is not None and (not isinstance(size, int) or size <= 0):
+                raise GGUFRegistryError(
+                    f"GGUF_ROWS[{rid!r}] quant {quant!r}: size must be a "
+                    f"positive int or None; got {size!r}."
+                )
+            if sha is not None and (not isinstance(sha, str) or not sha.strip()):
+                raise GGUFRegistryError(
+                    f"GGUF_ROWS[{rid!r}] quant {quant!r}: sha must be a "
+                    "non-empty str or None."
+                )
+        if not isinstance(self.context_window, int) or self.context_window <= 0:
+            raise GGUFRegistryError(
+                f"GGUF_ROWS[{rid!r}]: context_window must be a positive int; "
+                f"got {self.context_window!r}."
+            )
+        if self.kv_gb_per_1k is not None and (
+            not isinstance(self.kv_gb_per_1k, (int, float))
+            or self.kv_gb_per_1k <= 0
+        ):
+            raise GGUFRegistryError(
+                f"GGUF_ROWS[{rid!r}]: kv_gb_per_1k must be a positive number "
+                f"or None (measure it); got {self.kv_gb_per_1k!r}."
+            )
+        if self.think_policy not in _THINK_POLICIES:
+            raise GGUFRegistryError(
+                f"GGUF_ROWS[{rid!r}]: think_policy {self.think_policy!r} not "
+                f"in {sorted(_THINK_POLICIES)}."
+            )
+        for field_name in ("vram_fit_tier", "license", "license_audit_status"):
+            val = getattr(self, field_name)
+            if not isinstance(val, str) or not val.strip():
+                raise GGUFRegistryError(
+                    f"GGUF_ROWS[{rid!r}]: {field_name} must be an explicit "
+                    f"non-empty str; got {val!r}."
+                )
+        if not isinstance(self.requires_auth, bool):
+            raise GGUFRegistryError(
+                f"GGUF_ROWS[{rid!r}]: requires_auth must be an explicit bool."
+            )
+        if not isinstance(self.stop_tokens, tuple):
+            raise GGUFRegistryError(
+                f"GGUF_ROWS[{rid!r}]: stop_tokens must be a tuple."
+            )
+
+    def artifact_for_quant(
+        self, quant: str,
+    ) -> tuple[str, int | None, str | None]:
+        try:
+            return self.artifacts[quant]
+        except KeyError:
+            raise GGUFNativeConfigError(
+                f"GGUF row {self.repo_id!r} has no artifact for quant "
+                f"{quant!r} (available: {sorted(self.artifacts)})."
+            ) from None
+
+    def approx_artifact_gb(self) -> float:
+        """Coarse on-disk size in GiB DERIVED from the first PINNED artifact.
+        A row whose artifacts are all unpinned (size=None) projects 0.0 =
+        UNKNOWN -- never a measured/guessed estimate."""
+        for _filename, size, _sha in self.artifacts.values():
+            if size is not None:
+                return round(size / (1024 ** 3), 1)
+        return 0.0
+
+
+# The two shipped rows. gemma-4-12b (baseline, PASS) + Qwen3-8B (deferred
+# UNKNOWN until the live bakeoff pins size/sha/kv). The gemma artifacts reuse
+# the legacy GGUF_ARTIFACTS table (single source of truth) + a sha=None slot.
+GGUF_ROWS: tuple[GGUFRow, ...] = (
+    GGUFRow(
+        repo_id=ROW_ID,  # unsloth/gemma-4-12b-it-GGUF
+        subdir="gemma-4-12b-it",
+        artifacts={
+            quant: (filename, size, None)
+            for quant, (filename, size) in GGUF_ARTIFACTS.items()
+        },
+        context_window=DEFAULT_CONTEXT_WINDOW,  # 4096
+        kv_gb_per_1k=KV_GB_PER_1K_CTX,          # 0.7
+        vram_fit_tier="PASS",
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+        requires_auth=False,
+        stop_tokens=(),
+        think_policy="none",
+    ),
+    GGUFRow(
+        repo_id="unsloth/Qwen3-8B-GGUF",
+        subdir="Qwen3-8B",
+        # Q4_K_M size/sha stay None until the download gate pins them.
+        artifacts={"Q4_K_M": ("Qwen3-8B-Q4_K_M.gguf", None, None)},
+        context_window=8192,
+        kv_gb_per_1k=None,   # measure on the live leg
+        vram_fit_tier="UNKNOWN",
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+        requires_auth=False,
+        stop_tokens=(),
+        think_policy="qwen3_no_think",
+    ),
+)
+
+
+def _build_rows_by_repo() -> dict[str, GGUFRow]:
+    out: dict[str, GGUFRow] = {}
+    for row in GGUF_ROWS:
+        if row.repo_id in out:
+            raise GGUFRegistryError(
+                f"GGUF_ROWS: duplicate repo_id {row.repo_id!r} -- repo ids "
+                "must be unique."
+            )
+        out[row.repo_id] = row
+    return out
+
+
+# Constructed at import -> a malformed/duplicate row fails module import LOUD.
+GGUF_ROWS_BY_REPO: dict[str, GGUFRow] = _build_rows_by_repo()
+
+
+def gguf_row_for_repo(repo_id: str) -> GGUFRow:
+    try:
+        return GGUF_ROWS_BY_REPO[repo_id]
+    except KeyError:
+        raise GGUFNativeConfigError(
+            f"no GGUF_ROWS entry for repo_id {repo_id!r} "
+            f"(known: {sorted(GGUF_ROWS_BY_REPO)})."
+        ) from None
+
+
+def row_artifact_path(row: GGUFRow, quant: str) -> Path:
+    """Resolve the on-disk path for (row, quant). GEMMA4_12B_GGUF_PATH is the
+    whole-path escape hatch for the GEMMA row ONLY -- it never resolves a Qwen
+    id to a gemma file."""
+    filename, _size, _sha = row.artifact_for_quant(quant)
+    if row.repo_id == ROW_ID:
+        raw = os.environ.get("GEMMA4_12B_GGUF_PATH")
+        if raw:
+            return Path(raw).expanduser()
+    return _models_root() / "LLM" / "converted" / row.subdir / filename
+
+
+def gguf_native_row_on_disk(repo_id: str) -> bool:
+    """True iff ANY registered artifact for this row resolves to a regular,
+    non-zero file. The dropdown has no quant context, so a row is "present"
+    when at least one of its quants is materialized."""
+    try:
+        row = gguf_row_for_repo(repo_id)
+    except GGUFNativeConfigError:
+        return False
+    for quant in row.artifacts:
+        try:
+            p = row_artifact_path(row, quant)
+            if p.is_file() and p.stat().st_size > 0:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Effective load-config -- one immutable, row-keyed object per gguf slot
+# ---------------------------------------------------------------------------
+
+
+def _strict_int_env(name: str) -> int | None:
+    """Parse an int env override. Absent/blank -> None (use the next source in
+    precedence). A PRESENT-but-malformed value RAISES -- no silent fallback."""
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return int(raw.strip())
+    except ValueError:
+        raise GGUFNativeConfigError(
+            f"{name} must be an integer; got {raw!r} (no silent fallback)."
+        ) from None
+
+
+def _resolve_int_override(
+    otr_name: str, gemma_name: str | None, default: int,
+) -> int:
+    """Whitelisted precedence: OTR_GGUF_* > GEMMA4_12B_* (gemma row only) >
+    default. Malformed overrides raise via _strict_int_env."""
+    v = _strict_int_env(otr_name)
+    if v is not None:
+        return v
+    if gemma_name is not None:
+        v = _strict_int_env(gemma_name)
+        if v is not None:
+            return v
+    return default
+
+
+def _resolve_effective_n_ctx(
+    *, policy_n_ctx: int, is_gemma: bool, context_window: int,
+) -> int:
+    """OTR_GGUF_N_CTX > GEMMA4_12B_N_CTX (gemma only) > policy. VALIDATE (never
+    clamp): 512 <= n_ctx <= row.context_window, else RAISE."""
+    n_ctx = int(policy_n_ctx)
+    source = "policy.gguf_n_ctx"
+    v = _strict_int_env("OTR_GGUF_N_CTX")
+    if v is not None:
+        n_ctx, source = v, "OTR_GGUF_N_CTX"
+    elif is_gemma:
+        v = _strict_int_env("GEMMA4_12B_N_CTX")
+        if v is not None:
+            n_ctx, source = v, "GEMMA4_12B_N_CTX"
+    if not (512 <= n_ctx <= context_window):
+        raise GGUFNativeConfigError(
+            f"effective n_ctx {n_ctx} (from {source}) is outside "
+            f"[512, {context_window}] for this row -- NO clamp; pick a valid "
+            "n_ctx or a row with a larger context_window."
+        )
+    return n_ctx
+
+
+def _resolve_gguf_seed() -> int:
+    """OTR_GGUF_SEED is a REQUIRED uint32 env when a gguf row is selected. It
+    is an env (NOT a widget) on purpose: a widget named "seed" trips the
+    workflow validator's control_after_generate companion-slot rule."""
+    raw = os.environ.get("OTR_GGUF_SEED")
+    if raw is None or not raw.strip():
+        raise GGUFNativeConfigError(
+            "OTR_GGUF_SEED is REQUIRED when a GGUF writer row is selected. "
+            "Set it to a uint32 (0..4294967295) env value."
+        )
+    try:
+        val = int(raw.strip())
+    except ValueError:
+        raise GGUFNativeConfigError(
+            f"OTR_GGUF_SEED must be a uint32 integer; got {raw!r}."
+        ) from None
+    if not (0 <= val <= 0xFFFFFFFF):
+        raise GGUFNativeConfigError(
+            f"OTR_GGUF_SEED must be in [0, 4294967295]; got {val}."
+        )
+    return val
+
+
+#: seed derivation algorithm version stamped into the receipt.
+GGUF_SEED_ALGO = "v1_base_plus_ordinal_u32"
+
+
+@dataclasses.dataclass(frozen=True)
+class GGUFLoadConfig:
+    """The resolved, immutable per-slot GGUF load contract. Threaded from the
+    preflight through request_slot / backend.load / the generate factory and
+    serialized into the ledger receipt. NO consumer rebuilds it from live env.
+    ``reuse_key`` is the resident-model cache identity (load-shaping fields
+    only); sampling + seed are generate-time and excluded."""
+
+    repo_id: str
+    model_path: str
+    quant: str
+    n_ctx: int
+    n_batch: int
+    n_gpu_layers: int
+    kv_gb_per_1k: float | None
+    seed: int
+    stop_tokens: tuple[str, ...]
+    think_policy: str
+    top_p: float | None = None
+    min_p: float | None = None
+    repeat_penalty: float | None = None
+    seed_algo: str = GGUF_SEED_ALGO
+
+    def reuse_key(self) -> tuple:
+        return (
+            self.repo_id, self.model_path, self.quant,
+            self.n_ctx, self.n_batch, self.n_gpu_layers,
+        )
+
+    def sampling_dict(self) -> dict[str, float]:
+        out: dict[str, float] = {}
+        if self.top_p is not None:
+            out["top_p"] = float(self.top_p)
+        if self.min_p is not None:
+            out["min_p"] = float(self.min_p)
+        if self.repeat_penalty is not None:
+            out["repeat_penalty"] = float(self.repeat_penalty)
+        return out
+
+    def with_sampling(
+        self, *, top_p=None, min_p=None, repeat_penalty=None,
+    ) -> "GGUFLoadConfig":
+        return dataclasses.replace(
+            self, top_p=top_p, min_p=min_p, repeat_penalty=repeat_penalty,
+        )
+
+    def as_receipt(self) -> dict[str, Any]:
+        return {
+            "repo_id": self.repo_id,
+            "model_path": self.model_path,
+            "quant": self.quant,
+            "n_ctx": self.n_ctx,
+            "n_batch": self.n_batch,
+            "n_gpu_layers": self.n_gpu_layers,
+            "kv_gb_per_1k": self.kv_gb_per_1k,
+            "seed": self.seed,
+            "seed_algo": self.seed_algo,
+            "top_k": GGUF_TOP_K,
+            "sampling": self.sampling_dict(),
+            "stop_tokens": list(self.stop_tokens),
+            "think_policy": self.think_policy,
+        }
+
+
+def build_gguf_load_config(
+    *, repo_id: str, policy: Any, slot: str = "?", seed: int | None = None,
+    top_p: float | None = None, min_p: float | None = None,
+    repeat_penalty: float | None = None,
+) -> GGUFLoadConfig:
+    """Resolve the immutable load_config for a selected gguf ``repo_id`` under
+    ``policy``. FAIL LOUD on an unknown quant (slot/row/available) and on a
+    malformed override. ``seed`` defaults to the required OTR_GGUF_SEED env."""
+    row = gguf_row_for_repo(repo_id)
+    is_gemma = repo_id == ROW_ID
+    quant = policy.gguf_quant
+    try:
+        _filename, _size, _sha = row.artifact_for_quant(quant)
+    except GGUFNativeConfigError as exc:
+        raise GGUFNativeConfigError(
+            f"slot {slot!r}: {exc}"
+        ) from None
+    model_path = row_artifact_path(row, quant)
+    n_ctx = _resolve_effective_n_ctx(
+        policy_n_ctx=policy.gguf_n_ctx, is_gemma=is_gemma,
+        context_window=row.context_window,
+    )
+    n_batch = _resolve_int_override(
+        "OTR_GGUF_N_BATCH", "GEMMA4_12B_N_BATCH" if is_gemma else None,
+        DEFAULT_N_BATCH,
+    )
+    default_layers = DEFAULT_N_GPU_LAYERS if policy.device == "cuda" else 0
+    n_gpu_layers = _resolve_int_override(
+        "OTR_GGUF_N_GPU_LAYERS", "GEMMA4_12B_N_GPU_LAYERS" if is_gemma else None,
+        default_layers,
+    )
+    base_seed = _resolve_gguf_seed() if seed is None else int(seed)
+    return GGUFLoadConfig(
+        repo_id=repo_id, model_path=str(model_path), quant=quant,
+        n_ctx=n_ctx, n_batch=n_batch, n_gpu_layers=n_gpu_layers,
+        kv_gb_per_1k=row.kv_gb_per_1k, seed=base_seed,
+        stop_tokens=row.stop_tokens, think_policy=row.think_policy,
+        top_p=top_p, min_p=min_p, repeat_penalty=repeat_penalty,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Readiness validation (row path + pinned size/sha, memoized hashing)
+# ---------------------------------------------------------------------------
+
+_SHA_MEMO: dict[tuple[str, int, int], str] = {}
+
+
+def _memoized_sha256(path: Path, size: int, mtime_ns: int) -> str:
+    key = (str(path), int(size), int(mtime_ns))
+    cached = _SHA_MEMO.get(key)
+    if cached is not None:
+        return cached
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    digest = h.hexdigest()
+    _SHA_MEMO[key] = digest
+    return digest
+
+
+def validate_gguf_ready(repo_id: str, quant: str, load_config: Any) -> None:
+    """Fail-loud readiness check for a resolved (repo_id, quant, load_config).
+    Wraps exists/stat/permission as GGUFNativeConfigError; verifies a pinned
+    size + sha when present (existence-only when None); memoizes hashing by
+    (resolved path, size, mtime_ns) so a post-replace file re-hashes."""
+    row = gguf_row_for_repo(repo_id)
+    _filename, expected_size, expected_sha = row.artifact_for_quant(quant)
+    path = Path(load_config.model_path)
+    try:
+        exists = path.exists()
+    except OSError as exc:
+        raise GGUFNativeConfigError(
+            f"cannot stat GGUF path {path} for {repo_id!r}/{quant}: {exc}"
+        ) from exc
+    if not exists:
+        raise GGUFNativeConfigError(
+            f"missing {repo_id!r} {quant} GGUF file: {path}."
+        )
+    try:
+        st = path.stat()
+    except OSError as exc:
+        raise GGUFNativeConfigError(
+            f"cannot stat GGUF file {path}: {exc}"
+        ) from exc
+    if not path.is_file() or st.st_size == 0:
+        raise GGUFNativeConfigError(
+            f"{repo_id!r} {quant} GGUF path is not a regular non-empty file: "
+            f"{path}."
+        )
+    if expected_size is not None and st.st_size != expected_size:
+        raise GGUFNativeConfigError(
+            f"incomplete {repo_id!r} {quant} GGUF file: {path} has "
+            f"{st.st_size} bytes, expected {expected_size}."
+        )
+    if expected_sha is not None:
+        actual = _memoized_sha256(path, st.st_size, st.st_mtime_ns)
+        if actual != expected_sha:
+            raise GGUFNativeConfigError(
+                f"SHA256 mismatch for {repo_id!r} {quant} at {path}: got "
+                f"{actual}, expected {expected_sha}."
+            )
+
+
+# ---------------------------------------------------------------------------
+# think-strip + stop merge helpers
+# ---------------------------------------------------------------------------
+
+_LEADING_THINK_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
+
+
+def _strip_leading_think_envelope(text: str) -> str:
+    """Strip ONE leading, complete <think>...</think> envelope (and its
+    surrounding whitespace). A later literal <think> in the body is preserved
+    -- the pattern is anchored at the start and non-greedy."""
+    if not isinstance(text, str):
+        return text
+    return _LEADING_THINK_RE.sub("", text, count=1)
+
+
+def _merge_stop_tokens(row_stops: Any, caller_stop: Any) -> list[str]:
+    """Ordered, de-duplicated union of the row's stop_tokens and the caller's
+    per-call stop list (row first)."""
+    merged: list[str] = []
+    for source in (row_stops or (), caller_stop or ()):
+        for s in source:
+            if s and s not in merged:
+                merged.append(s)
+    return merged
 
 
 def _int_env(name: str, default: int) -> int:
@@ -285,22 +805,62 @@ def _llamacpp_response_format(response_format: dict | None) -> dict | None:
 class GGUFNativeBackend:
     """LoaderBackend adapter for in-process llama-cpp-python GGUF inference."""
 
-    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
+    def load(
+        self, repo_id: str, row: Any, policy: Any = None,
+        load_config: Any = None,
+    ) -> dict[str, Any]:
         # S1 platform-portability (2026-07-10): resolve the explicit policy
         # (None = nv50 baseline: cuda / Q8_0 / n_ctx 4096 -- identical to
         # the previous hardcoded behavior).
         from ._otr_shared.llm_policy import BASELINE_POLICY
         _policy = policy if policy is not None else BASELINE_POLICY
 
-        quant = _policy.gguf_quant
-        expected_name, expected_size = gguf_artifact_for_quant(quant)
-        model_path = resolve_gguf_path(quant)
+        # GGUF row registry (2026-07-16): when the preflight threads an
+        # immutable load_config, every effective value comes FROM it -- no
+        # live-env rebuild. When absent (direct/API callers, legacy tests) the
+        # env-fallback path below reproduces the pre-registry behavior exactly.
+        _registry_row = None
+        try:
+            _registry_row = gguf_row_for_repo(repo_id)
+        except GGUFNativeConfigError:
+            _registry_row = None
+        if load_config is not None:
+            quant = load_config.quant
+            model_path = Path(load_config.model_path)
+            _lc_row = _registry_row or gguf_row_for_repo(repo_id)
+            expected_name, expected_size, expected_sha = _lc_row.artifact_for_quant(quant)
+            eff_n_ctx = int(load_config.n_ctx)
+            eff_n_batch = int(load_config.n_batch)
+            eff_n_gpu_layers = int(load_config.n_gpu_layers)
+            eff_kv_rate = (
+                float(load_config.kv_gb_per_1k)
+                if load_config.kv_gb_per_1k is not None else KV_GB_PER_1K_CTX
+            )
+            think_policy = load_config.think_policy
+            stop_tokens = tuple(load_config.stop_tokens)
+            gguf_seed = int(load_config.seed)
+        else:
+            quant = _policy.gguf_quant
+            expected_name, expected_size = gguf_artifact_for_quant(quant)
+            expected_sha = None
+            model_path = resolve_gguf_path(quant)
+            eff_n_ctx = _int_env("GEMMA4_12B_N_CTX", _policy.gguf_n_ctx)
+            eff_n_batch = _int_env("GEMMA4_12B_N_BATCH", DEFAULT_N_BATCH)
+            _default_layers = DEFAULT_N_GPU_LAYERS if _policy.device == "cuda" else 0
+            eff_n_gpu_layers = _int_env("GEMMA4_12B_N_GPU_LAYERS", _default_layers)
+            eff_kv_rate = _float_env("GEMMA4_12B_KV_GB_PER_1K", KV_GB_PER_1K_CTX)
+            think_policy = _registry_row.think_policy if _registry_row else "none"
+            stop_tokens = _registry_row.stop_tokens if _registry_row else ()
+            gguf_seed = None
+        # Keep the gemma row's human label so its error UX (and the tests
+        # pinning it) stay identical; other rows report their repo id.
+        _label = "Gemma 4 12B" if repo_id == ROW_ID else repo_id
         if not model_path.exists():
             raise GGUFNativeConfigError(
-                f"Missing Gemma 4 12B {quant} GGUF file: {model_path}. "
-                f"Download/convert {expected_name} from {ROW_ID} and place "
-                "it under C:\\ComfyUI-Models\\LLM\\converted\\"
-                "gemma-4-12b-it\\, or set GEMMA4_12B_GGUF_PATH."
+                f"Missing {_label} {quant} GGUF file: {model_path}. "
+                f"Download/convert {expected_name} and place it under "
+                "C:\\ComfyUI-Models\\LLM\\converted\\, or set "
+                "GEMMA4_12B_GGUF_PATH (gemma row only)."
                 + (f" Expected size: {expected_size} bytes."
                    if expected_size else "")
             )
@@ -310,11 +870,19 @@ class GGUFNativeBackend:
             and model_path.stat().st_size != expected_size
         ):
             raise GGUFNativeConfigError(
-                f"Incomplete Gemma 4 12B {quant} GGUF file: {model_path} "
+                f"Incomplete {_label} {quant} GGUF file: {model_path} "
                 f"has {model_path.stat().st_size} bytes, expected "
                 f"{expected_size}. Let the download finish or "
                 "delete the partial file and retry."
             )
+        if expected_sha is not None and model_path.name == expected_name:
+            _st = model_path.stat()
+            _actual_sha = _memoized_sha256(model_path, _st.st_size, _st.st_mtime_ns)
+            if _actual_sha != expected_sha:
+                raise GGUFNativeConfigError(
+                    f"SHA256 mismatch for {repo_id} {quant} at {model_path}: "
+                    f"got {_actual_sha}, expected {expected_sha}."
+                )
 
         # 1. Nuclear Power Wash: Evict ComfyUI models & empty PyTorch CUDA cache
         log.info("[GGUFNative] Running pre-load VRAM eviction to clean resident PyTorch models...")
@@ -324,9 +892,10 @@ class GGUFNativeBackend:
         except Exception as exc:
             log.warning("[GGUFNative] VRAM eviction failed (non-fatal): %s", exc)
 
-        # n_ctx precedence: explicit env escape hatch > policy. The policy
-        # default (4096) equals the old row-derived default.
-        n_ctx = _int_env("GEMMA4_12B_N_CTX", _policy.gguf_n_ctx)
+        # Effective n_ctx resolved above (load_config when threaded, else the
+        # env>policy fallback). The policy default (4096) equals the old
+        # row-derived default.
+        n_ctx = eff_n_ctx
         context_window = int(
             getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW)
             or DEFAULT_CONTEXT_WINDOW
@@ -360,7 +929,9 @@ class GGUFNativeBackend:
             # one lever we have when a model will not fit; a gate that cannot see
             # the quant cannot be reasoned with.
             weights_gb = model_path.stat().st_size / (1024 ** 3)
-            kv_rate = _float_env("GEMMA4_12B_KV_GB_PER_1K", KV_GB_PER_1K_CTX)
+            # Per-row KV rate (load_config-threaded or the env>default fallback
+            # resolved above). NO global _KV_GB_PER_1K -- KV is per row.
+            kv_rate = eff_kv_rate
             kv_gb = (n_ctx / 1024.0) * kv_rate
             estimated_needed_gb = weights_gb + kv_gb + 0.1
             log.info(
@@ -378,12 +949,14 @@ class GGUFNativeBackend:
                     "4096->2048 downgrade truncated generations)."
                 )
 
-        n_batch = _int_env("GEMMA4_12B_N_BATCH", DEFAULT_N_BATCH)
-        # Device policy: cuda offloads all layers (-1); cpu keeps every
-        # layer on host (0). The env stays the explicit escape hatch.
-        _default_layers = DEFAULT_N_GPU_LAYERS if _policy.device == "cuda" else 0
-        n_gpu_layers = _int_env("GEMMA4_12B_N_GPU_LAYERS", _default_layers)
-        verbose = _bool_env("GEMMA4_12B_VERBOSE", False)
+        # Effective n_batch / n_gpu_layers resolved above (load_config when
+        # threaded, else the whitelisted env>default fallback). Device policy:
+        # cuda offloads all layers (-1); cpu keeps every layer on host (0).
+        n_batch = eff_n_batch
+        n_gpu_layers = eff_n_gpu_layers
+        verbose = _bool_env(
+            "OTR_GGUF_VERBOSE", _bool_env("GEMMA4_12B_VERBOSE", False)
+        )
 
         log.info(
             "[GGUFNative] Initializing llama.cpp Llama instance: n_ctx=%d, n_gpu_layers=%d, n_batch=%d",
@@ -401,10 +974,16 @@ class GGUFNativeBackend:
             "model_id": repo_id,
             "model": model,
             "model_path": str(model_path),
+            "quant": quant,
             "context_cap": n_ctx,
             "context_window": context_window,
             "n_gpu_layers": n_gpu_layers,
             "n_batch": n_batch,
+            # Stamped at load so generate() honors per-row behavior without
+            # re-reading env: stop-token merge, think-strip, per-call seed base.
+            "stop_tokens": tuple(stop_tokens),
+            "think_policy": think_policy,
+            "gguf_seed": gguf_seed,
         }
         log.info(
             "[GGUFNative] load %s -> %s ctx=%d gpu_layers=%d batch=%d",
@@ -426,6 +1005,10 @@ class GGUFNativeBackend:
         stop: Any = None,
         response_format: dict | None = None,
         grammar: str | None = None,
+        top_p: float | None = None,
+        min_p: float | None = None,
+        repeat_penalty: float | None = None,
+        seed: int | None = None,
         **_ignored: Any,
     ) -> str:
         if grammar:
@@ -468,19 +1051,44 @@ class GGUFNativeBackend:
             "messages": messages,
             "max_tokens": out_tokens,
             "temperature": float(temperature if temperature is not None else 0.7),
+            # top_k pinned to the registry constant (also llama-cpp's own
+            # default, so the pin is byte-identical for the top_k dimension).
+            "top_k": GGUF_TOP_K,
         }
-        if stop:
-            kwargs["stop"] = [s for s in stop if s]
+        if top_p is not None:
+            kwargs["top_p"] = float(top_p)
+        if min_p is not None:
+            kwargs["min_p"] = float(min_p)
+        if repeat_penalty is not None:
+            kwargs["repeat_penalty"] = float(repeat_penalty)
+        if seed is not None:
+            kwargs["seed"] = int(seed)
+        row_stops = model.get("stop_tokens") if isinstance(model, dict) else ()
+        merged_stop = _merge_stop_tokens(row_stops, stop)
+        if merged_stop:
+            kwargs["stop"] = merged_stop
         rf = _llamacpp_response_format(response_format)
         if rf is not None:
             kwargs["response_format"] = rf
+        _row_id = model.get("model_id") if isinstance(model, dict) else None
         try:
             result = llm.create_chat_completion(**kwargs)
         except Exception as exc:  # noqa: BLE001
             raise GGUFNativeCallFailedError(
-                f"Native GGUF call failed for {ROW_ID}: {type(exc).__name__}: {exc}"
+                f"Native GGUF call failed for {_row_id or ROW_ID}: "
+                f"{type(exc).__name__}: {exc}"
             ) from exc
-        return self._extract_text(result)
+        text = self._extract_text(result)
+        # think-strip: a qwen3-style row emits a leading <think>...</think>
+        # envelope on free-form calls. Strip it ONLY when no response_format is
+        # in force (structured passes always carry rf and never think-wrap).
+        if rf is None:
+            think_policy = (
+                model.get("think_policy") if isinstance(model, dict) else None
+            )
+            if think_policy == "qwen3_no_think":
+                text = _strip_leading_think_envelope(text)
+        return text
 
     def unload(self, model: Any) -> None:
         llm = model.get("model") if isinstance(model, dict) else model
@@ -512,13 +1120,32 @@ class GGUFNativeBackend:
         return content
 
 
-def make_gguf_generate_fn(cache_entry: dict, *, response_format: dict | None = None):
+def make_gguf_generate_fn(
+    cache_entry: dict, *, response_format: dict | None = None,
+    sampling: dict | None = None, seed: int | None = None,
+):
     backend = GGUFNativeBackend()
     bound_rf = response_format
+    _s = sampling or {}
+    bound_top_p = _s.get("top_p")
+    bound_min_p = _s.get("min_p")
+    bound_repeat = _s.get("repeat_penalty")
+    # Base seed: an explicit arg wins, else the value stamped into cache_entry
+    # at load (from the preflight load_config). None => llama-cpp picks its own.
+    base_seed = seed
+    if base_seed is None and isinstance(cache_entry, dict):
+        base_seed = cache_entry.get("gguf_seed")
+    _ordinal = {"n": 0}
 
     def generate_fn(messages, *, temperature=None, max_new_tokens=None,
                     stop=None, response_format=None, grammar=None):
         rf = response_format if response_format is not None else bound_rf
+        per_call_seed = None
+        if base_seed is not None:
+            # Deterministic per-call derivation (GGUF_SEED_ALGO): base seed +
+            # monotonic call ordinal, wrapped into uint32.
+            per_call_seed = (int(base_seed) + _ordinal["n"]) & 0xFFFFFFFF
+        _ordinal["n"] += 1
         return backend.generate(
             cache_entry,
             messages,
@@ -527,10 +1154,15 @@ def make_gguf_generate_fn(cache_entry: dict, *, response_format: dict | None = N
             stop=stop,
             response_format=rf,
             grammar=grammar,
+            top_p=bound_top_p,
+            min_p=bound_min_p,
+            repeat_penalty=bound_repeat,
+            seed=per_call_seed,
         )
 
     generate_fn._otr_gguf_native = True  # type: ignore[attr-defined]
     generate_fn._otr_response_format = bound_rf  # type: ignore[attr-defined]
+    generate_fn._otr_supports_json_object = True  # type: ignore[attr-defined]
     return generate_fn
 
 
@@ -542,10 +1174,22 @@ __all__ = [
     "EXPECTED_Q8_0_SIZE_BYTES",
     "DEFAULT_CONTEXT_WINDOW",
     "DEFAULT_OUTPUT_TOKENS_CAP",
+    "GGUF_TOP_K",
+    "GGUF_SEED_ALGO",
     "GGUFNativeError",
     "GGUFNativeConfigError",
     "GGUFNativeCallFailedError",
+    "GGUFRegistryError",
+    "GGUFRow",
+    "GGUF_ROWS",
+    "GGUF_ROWS_BY_REPO",
+    "GGUFLoadConfig",
     "GGUFNativeBackend",
+    "gguf_row_for_repo",
+    "row_artifact_path",
+    "gguf_native_row_on_disk",
+    "build_gguf_load_config",
+    "validate_gguf_ready",
     "default_gguf_path",
     "resolve_gguf_path",
     "validate_gemma_gguf_ready",

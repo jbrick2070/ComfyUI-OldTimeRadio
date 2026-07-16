@@ -1527,6 +1527,9 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
     # call GBNF only to backends that honour it (the remote llama-server
     # lane); local backends lack the marker and stay byte-identical.
     generate_fn._otr_openrouter = True  # type: ignore[attr-defined]
+    # Backend accepts a json_object response_format -> invoke_structured_slot
+    # forces it for a schema-less structured pass (mirrors the GGUF lane).
+    generate_fn._otr_supports_json_object = True  # type: ignore[attr-defined]
     generate_fn._otr_response_format = bound_rf  # type: ignore[attr-defined]
     generate_fn._otr_supports_grammar = True  # type: ignore[attr-defined]
     return generate_fn

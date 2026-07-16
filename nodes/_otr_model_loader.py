@@ -798,9 +798,17 @@ def invalidate_cache_no_gpu_teardown() -> None:
     LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
 
 
-def request_slot(slot: str, model_id: str, policy: Any = None) -> dict[str, Any]:
+def request_slot(
+    slot: str, model_id: str, policy: Any = None, load_config: Any = None,
+) -> dict[str, Any]:
     """Slot-aware entry point. Loads (or reuses cached) LLM, handling
     cache reuse vs full teardown automatically.
+
+    ``load_config`` (GGUF row registry, 2026-07-16): the immutable per-slot
+    GGUF load contract resolved by the writer's preflight. When present it is
+    the resident-reuse identity (repo_id + resolved path + quant + n_ctx +
+    n_batch + n_gpu_layers) and is threaded to the backend load -- no live-env
+    rebuild. Ignored for non-GGUF rows.
 
     B1d order (vram-fit BEFORE any network/disk work):
       1. normalize model_id via catalog.validate_model_id (strips
@@ -902,21 +910,31 @@ def request_slot(slot: str, model_id: str, policy: Any = None) -> dict[str, Any]
         and getattr(_virtual_row, "loader_backend", None) in _GGUF_DISPATCH_BACKENDS
     ):
         from ._otr_model_runtime import get_backend_for_row
+        # Resident-reuse identity for the in-process GGUF singleton. The
+        # threaded load_config's reuse_key (repo_id + resolved path + quant +
+        # n_ctx + n_batch + n_gpu_layers) is the artifact-shaping identity that
+        # policy.cache_key() alone cannot see (it misses the resolved path /
+        # n_batch / n_gpu_layers). Without a load_config (direct/legacy caller)
+        # fall back to the raw policy key -- the pre-registry behavior.
+        _gguf_key = (
+            load_config.reuse_key() if load_config is not None
+            else _policy.cache_key()
+        )
         if (
             LLM_CACHE.get("model_id") == normalized
             and LLM_CACHE.get("cache_entry") is not None
         ):
-            # S1: a resident model only counts as a hit when it was loaded
-            # under the SAME artifact-shaping policy (device / attn /
-            # quant / gguf fields). Silent stale-policy reuse is the bug
-            # class this campaign kills.
-            if LLM_CACHE.get("policy_key") == _policy.cache_key():
+            # A resident model only counts as a hit when it was loaded under
+            # the SAME load identity. Silent stale reuse is the bug class this
+            # campaign kills.
+            if LLM_CACHE.get("gguf_load_key") == _gguf_key:
                 log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
                 LLM_CACHE["slot"] = slot
                 return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
             log.info(
-                "[Selector] policy change for %s (%s -> %s): full teardown",
-                normalized, LLM_CACHE.get("policy_key"), _policy.cache_key(),
+                "[Selector] gguf load-config change for %s (%s -> %s): "
+                "full teardown",
+                normalized, LLM_CACHE.get("gguf_load_key"), _gguf_key,
             )
             unload_llm()
         if LLM_CACHE.get("model_id") not in (None, normalized):
@@ -927,12 +945,13 @@ def request_slot(slot: str, model_id: str, policy: Any = None) -> dict[str, Any]
             )
             unload_llm()
         cache_entry = get_backend_for_row(_virtual_row).load(
-            normalized, _virtual_row, policy=_policy,
+            normalized, _virtual_row, policy=_policy, load_config=load_config,
         )
         LLM_CACHE["model_id"] = normalized
         LLM_CACHE["slot"] = slot
         LLM_CACHE["cache_entry"] = cache_entry
         LLM_CACHE["policy_key"] = _policy.cache_key()
+        LLM_CACHE["gguf_load_key"] = _gguf_key
         return cache_entry
 
     # Step 2: cache hit on the same model id (regardless of slot) -- policy

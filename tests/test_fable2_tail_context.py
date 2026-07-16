@@ -119,7 +119,9 @@ def _make_ctx(tmp_path: Path, monkeypatch, **over) -> WriterTailContext:
 
     monkeypatch.setattr(
         _OTRML, "request_slot",
-        lambda slot, model_id, policy=None: {"model": None, "tokenizer": None},
+        lambda slot, model_id, policy=None, load_config=None: {
+            "model": None, "tokenizer": None,
+        },
     )
 
     episode_id = "s1a_tail_pin_ep"
