@@ -44,6 +44,7 @@ def _make_snapshot(
     *,
     advertised_context: int | None = 8192,
     architectures: tuple[str, ...] | None = ("LlamaForCausalLM",),
+    weights: bool = True,
 ) -> Path:
     """Create a fake HF cache snapshot directory structure under `hub_root`.
 
@@ -54,6 +55,11 @@ def _make_snapshot(
     A config.json is written when `advertised_context` or `architectures`
     is non-None. Pass both as None to model a diffusers pipeline repo,
     which ships a model_index.json and carries no root config.json.
+
+    A non-empty ``model.safetensors`` weight blob is written when
+    ``weights`` is True (default), so the snapshot counts as materialized
+    (on_disk). Pass ``weights=False`` to model a config-only / metadata
+    pull that is present on the HF layout but not loadable.
     """
     repo_dir = hub_root / f"models--{org}--{name}"
     snapshot = repo_dir / "snapshots" / "fakecommit0001"
@@ -66,6 +72,8 @@ def _make_snapshot(
             cfg_data["architectures"] = list(architectures)
         cfg = snapshot / "config.json"
         cfg.write_text(json.dumps(cfg_data), encoding="utf-8")
+    if weights:
+        (snapshot / "model.safetensors").write_bytes(b"\0" * 64)
     return snapshot
 
 
@@ -202,9 +210,11 @@ def test_dropdown_empty_cache_marks_all_curated_not_downloaded(empty_hub_root):
             assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
         else:
             assert e.on_disk is False
-            if catalog._is_google_gemma_local_row(e.repo_id):
-                assert catalog.LOCAL_HF_SUFFIX in e.label
-            assert e.label.endswith(catalog.NOT_DOWNLOADED_SUFFIX)
+            # Off-disk local row: [NOT DOWNLOADED] ONLY. The [LOCAL HF]
+            # badge marks a PRESENT row; emitting both was the
+            # contradictory "[LOCAL HF] [NOT DOWNLOADED]" double suffix.
+            assert catalog.LOCAL_HF_SUFFIX not in e.label
+            assert e.label == e.repo_id + catalog.NOT_DOWNLOADED_SUFFIX
 
 
 def test_dropdown_with_mistral_nemo_marks_only_that_on_disk(hub_root_with_mistral_nemo):
@@ -223,9 +233,11 @@ def test_dropdown_with_mistral_nemo_marks_only_that_on_disk(hub_root_with_mistra
             assert catalog.NOT_DOWNLOADED_SUFFIX not in e.label
         else:
             assert e.on_disk is False
-            if catalog._is_google_gemma_local_row(e.repo_id):
-                assert catalog.LOCAL_HF_SUFFIX in e.label
-            assert e.label.endswith(catalog.NOT_DOWNLOADED_SUFFIX)
+            # Off-disk local row: [NOT DOWNLOADED] ONLY. The [LOCAL HF]
+            # badge marks a PRESENT row; emitting both was the
+            # contradictory "[LOCAL HF] [NOT DOWNLOADED]" double suffix.
+            assert catalog.LOCAL_HF_SUFFIX not in e.label
+            assert e.label == e.repo_id + catalog.NOT_DOWNLOADED_SUFFIX
 
 
 def test_dropdown_appends_uncurated_locally_scanned_at_end(hub_root_with_uncurated):
@@ -549,3 +561,175 @@ def test_resolve_context_cap_never_raises_on_arbitrary_input(empty_hub_root):
         v = catalog.resolve_context_cap(weird, hub_root=empty_hub_root)
         assert v.tier in ("PASS", "WARN", "UNKNOWN")
         assert v.value >= 512
+
+
+# ---------------------------------------------------------------------------
+# Regression: HF cache-root resolution honors HF_HUB_CACHE, weight-blob
+# completeness gates on_disk, and the dropdown state suffix is EXCLUSIVE
+# (no contradictory "[LOCAL HF] [NOT DOWNLOADED]" double suffix).
+#
+# Root cause (2026-07-16): _hf_hub_root() read only HF_HOME + the legacy
+# HUGGINGFACE_HUB_CACHE, so on a box that sets the modern HF_HUB_CACHE the
+# scanner fell through to the stale ~/.cache default and reported real,
+# on-disk Gemma weights as NOT DOWNLOADED. Separately, e412e84b appended
+# [NOT DOWNLOADED] on top of the [LOCAL HF] badge for a Google Gemma row
+# whose scan missed, emitting the contradictory double suffix.
+# ---------------------------------------------------------------------------
+
+
+def test_hf_hub_root_honors_hf_hub_cache(tmp_path, monkeypatch):
+    """The modern HF_HUB_CACHE var (what huggingface_hub itself honors)
+    must resolve as the cache root. Regression guard for the mislabel bug."""
+    cache = tmp_path / "models_cache"
+    cache.mkdir()
+    monkeypatch.setenv("HF_HUB_CACHE", str(cache))
+    monkeypatch.delenv("HUGGINGFACE_HUB_CACHE", raising=False)
+    monkeypatch.delenv("HF_HOME", raising=False)
+    assert catalog._hf_hub_root() == cache
+
+
+def test_hf_hub_root_precedence_matches_huggingface_hub(tmp_path, monkeypatch):
+    """HF_HUB_CACHE wins over HF_HOME/hub, mirroring huggingface_hub so the
+    scanner and the model loader can never disagree about the cache root."""
+    cache = tmp_path / "wins"
+    cache.mkdir()
+    home = tmp_path / "home"
+    (home / "hub").mkdir(parents=True)
+    monkeypatch.setenv("HF_HUB_CACHE", str(cache))
+    monkeypatch.setenv("HF_HOME", str(home))
+    assert catalog._hf_hub_root() == cache
+
+
+def test_hf_hub_root_falls_back_to_hf_home_hub(tmp_path, monkeypatch):
+    """With neither HF_HUB_CACHE nor HUGGINGFACE_HUB_CACHE set, HF_HOME/hub
+    is used (OTR's shared-root convention)."""
+    home = tmp_path / "home"
+    (home / "hub").mkdir(parents=True)
+    monkeypatch.delenv("HF_HUB_CACHE", raising=False)
+    monkeypatch.delenv("HUGGINGFACE_HUB_CACHE", raising=False)
+    monkeypatch.setenv("HF_HOME", str(home))
+    assert catalog._hf_hub_root() == home / "hub"
+
+
+def test_hf_hub_root_legacy_huggingface_hub_cache_still_read(tmp_path, monkeypatch):
+    """The legacy HUGGINGFACE_HUB_CACHE alias remains honored."""
+    cache = tmp_path / "legacy"
+    cache.mkdir()
+    monkeypatch.delenv("HF_HUB_CACHE", raising=False)
+    monkeypatch.setenv("HUGGINGFACE_HUB_CACHE", str(cache))
+    monkeypatch.delenv("HF_HOME", raising=False)
+    assert catalog._hf_hub_root() == cache
+
+
+def test_snapshot_has_weights_true_with_materialized_blob(tmp_path):
+    snap = _make_snapshot(tmp_path, "x", "writer-lm", weights=True)
+    assert catalog._snapshot_has_weights(snap) is True
+
+
+def test_snapshot_has_weights_false_for_config_only(tmp_path):
+    snap = _make_snapshot(tmp_path, "x", "writer-lm", weights=False)
+    assert catalog._snapshot_has_weights(snap) is False
+
+
+def test_scan_config_only_snapshot_reports_not_on_disk(tmp_path):
+    """A snapshot dir carrying config.json but no weight blob is on the HF
+    layout yet NOT usable -> on_disk False (distinguish config-present from
+    fully-materialized-and-usable)."""
+    root = tmp_path / "hub"
+    root.mkdir()
+    _make_snapshot(root, "google", "gemma-2-2b-it", weights=False)
+    results = {r.repo_id: r for r in catalog.scan_local_llm_cache(hub_root=root)}
+    assert "google/gemma-2-2b-it" in results
+    assert results["google/gemma-2-2b-it"].on_disk is False
+
+
+def test_scan_materialized_snapshot_reports_on_disk(tmp_path):
+    root = tmp_path / "hub"
+    root.mkdir()
+    _make_snapshot(root, "google", "gemma-2-2b-it", weights=True)
+    results = {r.repo_id: r for r in catalog.scan_local_llm_cache(hub_root=root)}
+    assert results["google/gemma-2-2b-it"].on_disk is True
+
+
+# Every curated LOCAL row, asserted one-by-one against a known disk state.
+# `expected_badge` is the sole state suffix the label may carry.
+_LOCAL_ROW_CASES = [
+    ("google/gemma-4-E2B-it", True, catalog.LOCAL_HF_SUFFIX),
+    ("google/gemma-4-E2B-it", False, catalog.NOT_DOWNLOADED_SUFFIX),
+    ("google/gemma-4-E4B-it", True, catalog.LOCAL_HF_SUFFIX),
+    ("google/gemma-4-E4B-it", False, catalog.NOT_DOWNLOADED_SUFFIX),
+    ("google/gemma-2-2b-it", True, catalog.LOCAL_HF_SUFFIX),
+    ("google/gemma-2-2b-it", False, catalog.NOT_DOWNLOADED_SUFFIX),
+    ("mistralai/Mistral-Nemo-Instruct-2407", True, ""),  # non-gemma: bare id
+    ("mistralai/Mistral-Nemo-Instruct-2407", False, catalog.NOT_DOWNLOADED_SUFFIX),
+    ("Qwen/Qwen2.5-14B-Instruct", True, ""),
+    ("Qwen/Qwen2.5-14B-Instruct", False, catalog.NOT_DOWNLOADED_SUFFIX),
+]
+
+
+@pytest.mark.parametrize(("repo_id", "present", "expected_badge"), _LOCAL_ROW_CASES)
+def test_curated_local_row_label_matches_disk(tmp_path, repo_id, present, expected_badge):
+    """Per-item contract: a curated local row's label reflects exactly its
+    disk state, with EXACTLY ONE state suffix -- never both, never the
+    contradictory [LOCAL HF] [NOT DOWNLOADED]."""
+    root = tmp_path / "hub"
+    root.mkdir()
+    org, name = repo_id.split("/", 1)
+    _make_snapshot(root, org, name, weights=present)
+
+    entry = next(
+        e for e in catalog.build_dropdown_choices(hub_root=root)
+        if e.repo_id == repo_id
+    )
+    assert entry.on_disk is present
+    assert entry.label == repo_id + expected_badge
+    # Exclusive suffix invariant: the two state badges are mutually exclusive.
+    assert not (
+        catalog.LOCAL_HF_SUFFIX in entry.label
+        and catalog.NOT_DOWNLOADED_SUFFIX in entry.label
+    )
+    # The stored label round-trips back to the canonical repo id.
+    assert catalog._strip_label_suffix(entry.label) == repo_id
+
+
+@pytest.fixture
+def hub_root_operator_gemma_mix(tmp_path: Path) -> Path:
+    """Mirror the operator's real cache: E4B materialized (weights present),
+    E2B + gemma-2-2b config-only (metadata pull, no weight blob)."""
+    root = tmp_path / "opmix_hub"  # distinct name -> safe to co-request empty_hub_root
+    root.mkdir()
+    _make_snapshot(root, "google", "gemma-4-E4B-it", weights=True)
+    _make_snapshot(root, "google", "gemma-4-E2B-it", weights=False)
+    _make_snapshot(root, "google", "gemma-2-2b-it", weights=False)
+    return root
+
+
+def test_no_dropdown_label_carries_double_state_suffix(
+    hub_root_operator_gemma_mix, empty_hub_root
+):
+    """No label may carry BOTH [LOCAL HF] and [NOT DOWNLOADED] in any cache
+    state -- the exact contradiction the operator reported."""
+    for hub in (hub_root_operator_gemma_mix, empty_hub_root):
+        for e in catalog.build_dropdown_choices(hub_root=hub):
+            assert not (
+                catalog.LOCAL_HF_SUFFIX in e.label
+                and catalog.NOT_DOWNLOADED_SUFFIX in e.label
+            ), f"double state suffix in {e.label!r}"
+
+
+def test_operator_gemma_mix_exact_labels(hub_root_operator_gemma_mix):
+    """The reported scenario, resolved: materialized E4B -> [LOCAL HF];
+    config-only E2B + gemma-2-2b -> [NOT DOWNLOADED] (single suffix each)."""
+    by_repo = {
+        e.repo_id: e
+        for e in catalog.build_dropdown_choices(hub_root=hub_root_operator_gemma_mix)
+    }
+    assert by_repo["google/gemma-4-E4B-it"].label == (
+        "google/gemma-4-E4B-it" + catalog.LOCAL_HF_SUFFIX
+    )
+    assert by_repo["google/gemma-4-E2B-it"].label == (
+        "google/gemma-4-E2B-it" + catalog.NOT_DOWNLOADED_SUFFIX
+    )
+    assert by_repo["google/gemma-2-2b-it"].label == (
+        "google/gemma-2-2b-it" + catalog.NOT_DOWNLOADED_SUFFIX
+    )

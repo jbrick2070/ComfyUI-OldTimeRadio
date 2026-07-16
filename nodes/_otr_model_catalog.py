@@ -445,19 +445,34 @@ _HF_REPO_DIR_RE = re.compile(r"^models--(?P<org>[^-]+)--(?P<name>.+)$")
 
 
 def _hf_hub_root() -> Path | None:
-    """Resolve the HuggingFace hub cache root. Order:
-        1. HF_HOME env (OTR's canonical location -- see memory)
-        2. HUGGINGFACE_HUB_CACHE env
-        3. ~/.cache/huggingface/hub  (default)
+    """Resolve the HuggingFace hub cache root the SAME way huggingface_hub
+    (and therefore the transformers model loader) does, so the dropdown's
+    "downloaded" state can never disagree with where weights actually
+    resolve at load time.
+
+    Precedence mirrors huggingface_hub.constants (HF_HUB_CACHE wins, then
+    the legacy alias, then HF_HOME/hub, then the library default):
+        1. HF_HUB_CACHE env            -- modern canonical override (full path)
+        2. HUGGINGFACE_HUB_CACHE env   -- legacy alias (full path)
+        3. HF_HOME env + "/hub"        -- OTR's shared-root convention
+        4. ~/.cache/huggingface/hub    -- library default
+
+    Read live from os.environ (no import-time cached constant) so the
+    resolver reflects the process env at call time and stays monkeypatch-
+    testable. HF_HUB_CACHE was the missing branch: the box sets it (the
+    var huggingface_hub honors) but the old resolver read only HF_HOME +
+    the legacy HUGGINGFACE_HUB_CACHE, so it silently fell through to the
+    stale ~/.cache default and mislabeled on-disk models NOT DOWNLOADED.
     """
+    for var in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"):
+        val = os.environ.get(var)
+        if val:
+            root = Path(val)
+            if root.is_dir():
+                return root
     hf_home = os.environ.get("HF_HOME")
     if hf_home:
         root = Path(hf_home) / "hub"
-        if root.is_dir():
-            return root
-    hub_cache = os.environ.get("HUGGINGFACE_HUB_CACHE")
-    if hub_cache:
-        root = Path(hub_cache)
         if root.is_dir():
             return root
     default = Path.home() / ".cache" / "huggingface" / "hub"
@@ -574,6 +589,44 @@ def _gguf_native_row_on_disk() -> bool:
         return False
 
 
+# Weight-file suffixes that mark a materialized (loadable) transformers
+# snapshot. A config-only snapshot -- config.json present but no weight
+# blob -- is on the HF layout but NOT usable: the loader would re-download
+# or fail. Detection must distinguish "config present" from "fully
+# materialized + usable" (HF snapshots are symlink farms into ../../blobs;
+# a metadata-only pull lands config.json with no weight symlink at all).
+_WEIGHT_SUFFIXES = (".safetensors", ".bin")
+
+
+def _safe_snapshot_mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _snapshot_has_weights(snapshot_path: Path) -> bool:
+    """True iff `snapshot_path` holds at least one materialized weight blob.
+
+    Follows HF symlinks: a snapshot weight entry is a symlink into
+    ``../../blobs/<sha>``; ``stat().st_size`` resolves through the link to
+    the real blob size, so a present-but-unmaterialized (broken/absent)
+    link never counts. Returns False on any read error -- fail closed.
+    """
+    try:
+        for child in snapshot_path.iterdir():
+            if child.suffix.lower() not in _WEIGHT_SUFFIXES:
+                continue
+            try:
+                if child.stat().st_size > 0:  # follows symlink to the blob
+                    return True
+            except OSError:
+                continue  # broken symlink / unresolved blob -> not materialized
+    except OSError:
+        return False
+    return False
+
+
 def scan_local_llm_cache(hub_root: Path | None = None) -> list[ScanResult]:
     """Walk HF_HOME/hub/models--*/snapshots/* and return one ScanResult
     per resolved snapshot. Offline-only -- no HF API calls.
@@ -598,11 +651,20 @@ def scan_local_llm_cache(hub_root: Path | None = None) -> list[ScanResult]:
         if not snapshot_paths:
             out.append(ScanResult(repo_id, False, None, None))
             continue
-        # Most recently modified snapshot wins (HF stores multiple
-        # snapshots per repo by commit hash).
-        snapshot = max(snapshot_paths, key=lambda p: p.stat().st_mtime)
+        # Prefer the newest snapshot that actually carries weight blobs, so
+        # a config-only (metadata) pull is reported NOT usable even though
+        # its snapshot dir exists. Fall back to the newest snapshot overall
+        # (on_disk stays False) so callers still get a snapshot_path for
+        # diagnostics. HF stores multiple snapshots per repo by commit hash.
+        weighted = [p for p in snapshot_paths if _snapshot_has_weights(p)]
+        if weighted:
+            snapshot = max(weighted, key=_safe_snapshot_mtime)
+            on_disk = True
+        else:
+            snapshot = max(snapshot_paths, key=_safe_snapshot_mtime)
+            on_disk = False
         ctx = _read_advertised_context(snapshot)
-        out.append(ScanResult(repo_id, True, str(snapshot), ctx))
+        out.append(ScanResult(repo_id, on_disk, str(snapshot), ctx))
     return out
 
 
@@ -648,9 +710,15 @@ def build_dropdown_choices(
             entries.append(DropdownEntry(m.repo_id, m.repo_id, True, curated=True))
             continue
         on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
-        label = _display_label_for_local_row(m.repo_id)
-        if not on_disk:
-            label += NOT_DOWNLOADED_SUFFIX
+        # State suffix is EXCLUSIVE: a present row gets its local-kind badge
+        # (e.g. [LOCAL HF] for a Google Gemma row); an absent row gets
+        # [NOT DOWNLOADED] and nothing else. The old code appended
+        # [NOT DOWNLOADED] on top of the [LOCAL HF] badge, emitting the
+        # contradictory "[LOCAL HF] [NOT DOWNLOADED]" double suffix.
+        if on_disk:
+            label = _display_label_for_local_row(m.repo_id)
+        else:
+            label = m.repo_id + NOT_DOWNLOADED_SUFFIX
         entries.append(DropdownEntry(label, m.repo_id, on_disk, curated=True))
     curated_ids = {m.repo_id for m in active}
     for repo_id, result in scan.items():

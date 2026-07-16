@@ -104,6 +104,9 @@ def _seed_fake_snapshot(tmp_path: Path, repo_id: str) -> Path:
     (snap_dir / "config.json").write_text(
         '{"max_position_embeddings": 8192}', encoding="utf-8"
     )
+    # A materialized weight blob so the snapshot counts as on_disk (the
+    # local-cache short-circuit requires a usable snapshot, not config-only).
+    (snap_dir / "model.safetensors").write_bytes(b"\0" * 64)
     return snap_dir
 
 
