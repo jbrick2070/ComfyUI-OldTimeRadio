@@ -3,6 +3,49 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-15 evening -- HEAD b57be02b (v2.0-alpha) [three-phase bake-off campaign: A PASSED, B F2 PROVEN, C smokes LAUNCHED]
+
+Did:
+- Confirmed live tip = b57be02b (HEAD==origin), tracked tree clean (only tmp/ +
+  docs scratch dirty). Fixed the doc-lag: GO_FORWARD + prior top log entry said
+  c28af5f4; live tip is the b57be02b docs-handoff commit atop it.
+- PHASE A (Fable final gate on the 8 _v3 promotions + source-snapshot B7/B8):
+  PASSED, no build-breakers, nothing folded, tree stays clean. general-purpose
+  grounded review = NO build-breakers (all 5 checks file:line grounded); my anchor
+  independently confirmed the KeyError class (5 _v3 pipelines defined at
+  pipelines.json 566/665/715/824/966 + wired in _RUNNER_BY_PIPELINE/_INLINE_V3_
+  PIPELINES; fable2 gate catches _v3; base_source_bank_id maps variants; snapshot
+  strict-by-default). Fable UNAVAILABLE (out of usage credits -- failed loud);
+  codex CLI unhealthy today (17-min hang + stalled relaunch, killed after ~50min).
+  Substitute gate = the two grounded reviews + the live renders themselves.
+- PHASE B (F2 live-replay proof): DONE. Captured a real source snapshot for
+  original_radio (local spark draw, seeded OTR_ORIGINAL_SEED, sha ed1c941f8e99) ->
+  tmp/_phaseB_snapshot_manifest.json; strict loader self-verified for base/_v2/_v3.
+  Ran the triplet at 30w local under OTR_C7=1 + manifest. Acceptance met on all 3:
+  server log shows source-snapshot REPLAY sha=ed1c941f8e99 + ledger meta
+  cast_seed_source == "OTR_CAST_SEED override". RESULT: base GREEN (52.9MB obs
+  asset); _v2 AND _v3 both content-FAILED IDENTICALLY on the deterministic
+  weapons_smoking gate ("cocking his revolver") -- a clean F2 demonstration that the
+  PACK is the only causal variable (same frozen source+seeds, base seam -> clean
+  story, v2/v3 seam -> identical weapon content). Lawful under THE LAW (deterministic
+  gate). Finding: original_radio _v2/_v3 seam steers to weapons content vs base.
+- PHASE C (160-leg bake-off = 16 _v2/_v3 lanes x 5 tiers x 2 profiles): 30w smoke
+  sweep (32 legs) LAUNCHED in production mode (no C7/manifest -- verified first leg
+  science_news_v2 sources live). Runner tmp/_phaseC_sweep.ps1 (tier-param), receipts
+  tmp/_phaseC_receipts.csv, progress tmp/_phaseC_progress.txt, per-leg .done markers.
+  ~9 min/30w leg -> smokes ~5h; full 160 legs is a multi-day autonomous run.
+- Harness note (follow-up): the launcher's [launch] C7/manifest echoes go to the
+  hidden Start-Process console + python's `> %1` truncates, so they do NOT reach the
+  server log; the writer's own REPLAY line + cast_seed_source are the ground-truth
+  proofs. A one-line launcher/wrapper fix (append, echo the two vars into %1) would
+  satisfy the literal-echo acceptance.
+Current step: Phase C 30w smoke sweep running (autonomous). After smokes gate:
+  120 -> 320 -> 420 -> 720, both profiles; then durable report + World Cup scoreboard.
+Next: monitor tmp/_phaseC_receipts.csv; when smokes complete, launch
+  `tmp\_phaseC_sweep.ps1 -Tiers 120,320,420,720 -Label full`; content-FAILs
+  (weapons/profanity) are RECORDED with reason, never re-rolled to force green.
+Commits: docs only (no code fold in Phase A). tmp/ sweep scripts are scratch.
+
 ## 2026-07-15 night -- HEAD c28af5f4 (v2.0-alpha) [bank-bakeoff: kibitz r4 CONVERGED + hardened]
 
 Did:

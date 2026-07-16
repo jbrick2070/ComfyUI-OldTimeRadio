@@ -1,6 +1,20 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-15 night -- HEAD c28af5f4 (v2.0-alpha)
+**Updated:** 2026-07-15 evening -- HEAD b57be02b (v2.0-alpha)
+
+**CAMPAIGN IN FLIGHT (2026-07-15 evening):** the three-phase bake-off campaign is
+running. PHASE A (Fable final gate on the 8 _v3 promotions + source-snapshot
+B7/B8) = PASSED, no build-breakers, nothing folded (general-purpose grounded
+review + Claude anchor both clean; Fable out of credits + codex CLI unhealthy ->
+substituted by the grounded reviews + the live renders). PHASE B (F2 live-replay
+proof) = DONE: original_radio snapshot captured (sha ed1c941f8e99), triplet run
+30w local under C7 -> base GREEN, _v2/_v3 content-failed IDENTICALLY on the
+deterministic weapons gate (clean F2: the pack is the only causal variable);
+acceptance met (REPLAY sha + cast_seed_source == "OTR_CAST_SEED override").
+PHASE C (160-leg bake-off: 16 _v2/_v3 lanes x 5 tiers x 2 profiles) = 30w smokes
+(32 legs) LAUNCHED, production mode, autonomous (~5h); then 120/320/420/720.
+Runner tmp/_phaseC_sweep.ps1; receipts tmp/_phaseC_receipts.csv. Content-FAILs
+recorded with reason, never re-rolled. See HANDOFF_LOG.md (top entry) for detail.
 
 ## CURRENT STEP (2026-07-15): Bank-Improvement Bake-off -- source-snapshot injection (B7/B8)
 
@@ -47,17 +61,21 @@ Shipped:
   `kibitz-runs/2026-07-15-bank-bakeoff-r4/r4/{claude_anchor,codex,final}.md`.
 
 NEXT (in order):
-1. **Fable final gate** on the shipped structural bake-off change (v3 promotions +
-   source-snapshot) -- HELD for operator go (operator-gated spend, CLAUDE.md
-   section 9). kibitz r4 already converged with no residual code MUST-FIX.
-2. **Live replay proof (render window):** populate a manifest for one base bank,
-   run its base/_v2/_v3 triplet under `OTR_C7=1`, and confirm the pack is the only
-   variable (F2). ACCEPTANCE (Codex r4): the server log shows BOTH the
-   source-snapshot manifest echo AND the C7 seed echo, and ledger meta shows
-   `cast_seed_source == "OTR_CAST_SEED override"`; record payload sha + seed per row.
-3. **Final verify** (code done): dry registry-load 24 runnable / 25 visible;
-   `git diff --exit-code otr_canonical.json` clean; JSON round-trip 23 nodes / 57
-   links; OTR_WorkflowValidator covered by the green suite.
+1. **Fable final gate** -- DONE 2026-07-15 evening: PASSED, no build-breakers,
+   nothing folded (Fable out of credits + codex CLI unhealthy -> substituted by the
+   general-purpose grounded review + Claude anchor + the live renders; see the
+   CAMPAIGN block above + HANDOFF_LOG top entry).
+2. **Live replay proof (F2)** -- DONE 2026-07-15 evening: original_radio triplet at
+   30w local under `OTR_C7=1` + captured manifest (sha ed1c941f8e99). Acceptance
+   met: server log `source-snapshot REPLAY ... sha=ed1c941f8e99` + ledger meta
+   `cast_seed_source == "OTR_CAST_SEED override"` on all 3. base GREEN; _v2/_v3
+   content-failed identically (weapons gate) -> pack is the only causal variable.
+   NOTE: the literal `[launch]` C7/manifest echoes route to the hidden console (not
+   the server log); the writer's REPLAY line + cast_seed_source are the ground-truth
+   proofs -- a one-line launcher echo->%1 fix would satisfy the literal-echo wording.
+3. **Phase C bake-off (IN FLIGHT):** 30w smokes (32 legs) running; then
+   120/320/420/720 x {local,aion}. Then the durable report + World Cup scoreboard.
+   Code-state verify unchanged (no fold): 24 runnable / 25 visible; canonical clean.
 
 Note: the v3 packs currently carry the v2 seam text; the STRUCTURAL v3 delta is the
 advisory diagnostic (kibitz-final ruling). If deeper per-lane v3 seam text is wanted
