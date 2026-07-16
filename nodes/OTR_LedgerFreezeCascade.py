@@ -349,13 +349,20 @@ class OTR_LedgerFreezeCascade:
         # writer's full budget was already spent. None (pre-stamp
         # ledger) keeps the documented BASELINE backstop.
         from ._otr_shared.llm_policy import policy_from_meta
+        from ._otr_gguf_backend import load_config_from_meta
         # `led` is the production Ledger HANDLE (dict lives at .data).
         _lfc_data = getattr(led, "data", led)
         _lfc_meta = (_lfc_data.get("meta") or {}) if isinstance(
             _lfc_data, dict) else {}
         _lfc_policy = policy_from_meta(_lfc_meta)
+        # GGUF row registry (2026-07-16): thread the writer's exact per-slot
+        # load contract (ledger stamp) so a resident-cache MISS reloads the
+        # selected row (e.g. Qwen) under ITS registry entry, never the gemma
+        # env-fallback. None for a non-GGUF run -> unchanged behavior.
+        _lfc_load_config = load_config_from_meta(_lfc_meta, "technical")
         cache_entry = _OTRML.request_slot(  # LLM slot: technical
             "technical", resolved_technical_id, policy=_lfc_policy,
+            load_config=_lfc_load_config,
         )
         generate_fn = _OTRML.make_generate_fn(cache_entry)
         # LFC commit 12, ADR section 6.4: build the polish-specific

@@ -47,7 +47,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Literal, Optional
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 log = logging.getLogger("OTR")
 
@@ -188,6 +188,20 @@ class PreAuditReport(BaseModel):
     # so the caller fails SOFT (proceeds unreviewed) instead of refusing a
     # finished episode with needs_full_rerun.
     audit_unavailable: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _null_fields_use_defaults(cls, data: object) -> object:
+        # Reasoning models (e.g. Qwen3) emit `null` for a semantically-absent
+        # value on a CLEAN audit -- most often ``audit_failure_reason`` when
+        # ``pass_clean=true`` and ``audit_failed=false``. Every field here carries
+        # a safe default, so drop null-valued keys and let the defaults apply,
+        # rather than raising a str/None type error that would mis-read a correct
+        # clean audit as an audit FAILURE -> spurious needs_full_rerun. A missing
+        # REQUIRED field still errors (nothing to default to).
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if v is not None}
+        return data
 
 
 def _audit_failed_sentinel(reason: str) -> "PreAuditReport":

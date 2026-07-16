@@ -696,10 +696,15 @@ def _resolve_writer_llm(meta: dict, warnings: list):
         # Post-ship audit fix (2026-07-10): same policy the writer ran
         # under (ledger stamp); None = pre-stamp backstop.
         from ._otr_shared.llm_policy import policy_from_meta
+        from ._otr_gguf_backend import load_config_from_meta
 
+        # GGUF row registry (2026-07-16): thread the writer's exact per-slot load
+        # contract so a resident-cache MISS reloads the selected row under ITS
+        # registry entry, never the gemma env-fallback. None for a non-GGUF run.
         entry = request_slot(  # LLM slot: technical
             "technical", model_id,
-            policy=policy_from_meta(meta))
+            policy=policy_from_meta(meta),
+            load_config=load_config_from_meta(meta, "technical"))
         gen = make_generate_fn(entry)
 
         def _call(prompt: str) -> str:
@@ -711,8 +716,14 @@ def _resolve_writer_llm(meta: dict, warnings: list):
 
         return _call
     except Exception as exc:  # noqa: BLE001
-        warnings.append(f"writer LLM unavailable ({exc}); derivation uses template")
-        return None
+        # Operator directive (2026-07-16): a REQUESTED writer LLM that fails must
+        # FAIL LOUD -- never silently degrade shot/creative derivation to the
+        # deterministic template (that is the local-LM fallback we ban). model_id
+        # is non-empty here (the no-model path returned above), and TEST_MODE
+        # already returned None up front, so this is always a live requested-model
+        # failure.
+        warnings.append(f"writer LLM failed ({exc}); no template fallback")
+        raise
 
 
 # ---------------------------------------------------------------------------

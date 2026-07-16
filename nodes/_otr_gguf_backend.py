@@ -460,6 +460,52 @@ class GGUFLoadConfig:
             "think_policy": self.think_policy,
         }
 
+    @classmethod
+    def from_receipt(cls, receipt: dict[str, Any]) -> "GGUFLoadConfig":
+        """Inverse of :meth:`as_receipt`: reconstruct the immutable load_config a
+        downstream phase (freeze cascade / shot lock) needs from the ledger stamp
+        ``meta['llm_gguf_load_config'][slot]`` -- so it loads under the EXACT
+        contract the writer used, never a live-env rebuild."""
+        sampling = receipt.get("sampling") or {}
+        return cls(
+            repo_id=str(receipt["repo_id"]),
+            model_path=str(receipt["model_path"]),
+            quant=str(receipt["quant"]),
+            n_ctx=int(receipt["n_ctx"]),
+            n_batch=int(receipt["n_batch"]),
+            n_gpu_layers=int(receipt["n_gpu_layers"]),
+            kv_gb_per_1k=(
+                float(receipt["kv_gb_per_1k"])
+                if receipt.get("kv_gb_per_1k") is not None else None
+            ),
+            seed=int(receipt["seed"]),
+            stop_tokens=tuple(receipt.get("stop_tokens") or ()),
+            think_policy=str(receipt["think_policy"]),
+            top_p=sampling.get("top_p"),
+            min_p=sampling.get("min_p"),
+            repeat_penalty=sampling.get("repeat_penalty"),
+            seed_algo=str(receipt.get("seed_algo") or GGUF_SEED_ALGO),
+        )
+
+
+def load_config_from_meta(meta: Any, slot: str) -> "GGUFLoadConfig | None":
+    """Reconstruct the per-slot GGUFLoadConfig from a ledger ``meta`` stamp, or
+    None when the run was not a GGUF run / the slot was not stamped. Lets a
+    downstream phase thread the writer's exact load contract into request_slot
+    without rebuilding from the live environment."""
+    if not isinstance(meta, dict):
+        return None
+    table = meta.get("llm_gguf_load_config")
+    if not isinstance(table, dict):
+        return None
+    receipt = table.get(slot)
+    if not isinstance(receipt, dict) or not receipt:
+        return None
+    try:
+        return GGUFLoadConfig.from_receipt(receipt)
+    except (KeyError, TypeError, ValueError):
+        return None
+
 
 def build_gguf_load_config(
     *, repo_id: str, policy: Any, slot: str = "?", seed: int | None = None,
@@ -570,16 +616,68 @@ def validate_gguf_ready(repo_id: str, quant: str, load_config: Any) -> None:
 # think-strip + stop merge helpers
 # ---------------------------------------------------------------------------
 
-_LEADING_THINK_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
+_LEADING_THINK_RE = re.compile(
+    r"^\s*<think\b[^>]*>.*?</think\s*>\s*", re.DOTALL | re.IGNORECASE)
+#: A leading <think> whose close was clipped -- a caller stop string can cut
+#: Qwen3's empty `<think>\n\n</think>` wrapper before `</think>`, leaving an
+#: unstrippable, unclosed `<think>`. From that open to end-of-string is all
+#: (clipped) wrapper.
+_LEADING_DANGLING_THINK_RE = re.compile(r"^\s*<think\b.*\Z", re.DOTALL | re.IGNORECASE)
 
 
 def _strip_leading_think_envelope(text: str) -> str:
-    """Strip ONE leading, complete <think>...</think> envelope (and its
-    surrounding whitespace). A later literal <think> in the body is preserved
-    -- the pattern is anchored at the start and non-greedy."""
+    """Strip ONE leading <think> reasoning wrapper, preserving any LATER literal
+    <think> in the body (anchored at the start, non-greedy).
+
+    Handles a COMPLETE leading ``<think>...</think>`` envelope AND a DANGLING
+    leading ``<think>...``(clipped, no close). The dangling case appears when a
+    caller stop string cuts Qwen3's empty ``<think>\\n\\n</think>`` wrapper before
+    the closing tag."""
     if not isinstance(text, str):
         return text
-    return _LEADING_THINK_RE.sub("", text, count=1)
+    new = _LEADING_THINK_RE.sub("", text, count=1)
+    if new != text:
+        return new
+    # No complete leading envelope: if the text STARTS with an unclosed <think>
+    # open, the whole reply is a clipped wrapper -> drop it (a later literal
+    # <think> that is NOT at the start is left untouched by the anchor).
+    return _LEADING_DANGLING_THINK_RE.sub("", text, count=1)
+
+
+#: Qwen3 soft-switch appended to non-structured prompts under the
+#: "qwen3_no_think" policy. Without it Qwen3 opens a long <think> reasoning
+#: block, so a short-output call (rank/rerank, max_tokens 8-64) exhausts its
+#: whole budget mid-thought and never emits the answer. `/no_think` makes the
+#: model skip reasoning and answer directly (it still emits an empty
+#: <think></think> that _strip_leading_think_envelope removes).
+_QWEN3_NO_THINK_DIRECTIVE = "/no_think"
+
+
+def _apply_qwen3_no_think(messages: Any) -> list:
+    """Return a NEW messages list with the Qwen3 `/no_think` soft-switch applied.
+
+    Appends the directive to the LAST user message with string content. If none
+    exists, prepends a system directive (Qwen3 honors it there too). Idempotent:
+    never appends the directive twice."""
+    try:
+        out = [dict(m) if isinstance(m, dict) else m for m in messages]
+    except TypeError:
+        return messages
+    for m in reversed(out):
+        if isinstance(m, dict) and m.get("role") == "user":
+            content = m.get("content")
+            if isinstance(content, str):
+                if _QWEN3_NO_THINK_DIRECTIVE in content:
+                    return out
+                stripped = content.rstrip()
+                m["content"] = (
+                    f"{stripped} {_QWEN3_NO_THINK_DIRECTIVE}"
+                    if stripped else _QWEN3_NO_THINK_DIRECTIVE
+                )
+                return out
+            break
+    out.insert(0, {"role": "system", "content": _QWEN3_NO_THINK_DIRECTIVE})
+    return out
 
 
 def _merge_stop_tokens(row_stops: Any, caller_stop: Any) -> list[str]:
@@ -840,6 +938,24 @@ class GGUFNativeBackend:
             stop_tokens = tuple(load_config.stop_tokens)
             gguf_seed = int(load_config.seed)
         else:
+            # Operator directive (2026-07-16, "no local-LM fallbacks"): the
+            # env-fallback below is GEMMA-ONLY -- gguf_artifact_for_quant /
+            # resolve_gguf_path resolve the gemma artifact regardless of
+            # repo_id. A non-gemma row that reaches here without a threaded
+            # load_config would SILENTLY load the gemma file (a local-LM / path
+            # fallback). Fail LOUD instead: a non-gemma row MUST arrive with an
+            # immutable load_config (reconstruct it from the ledger receipt
+            # meta['llm_gguf_load_config'] in the calling phase).
+            if repo_id != ROW_ID:
+                raise GGUFNativeConfigError(
+                    f"GGUF backend reached the gemma-only env-fallback for "
+                    f"repo_id {repo_id!r} with no threaded load_config; that "
+                    f"path resolves the gemma artifact only and would silently "
+                    f"load gemma for a non-gemma row. Thread the immutable "
+                    f"load_config (reconstruct from "
+                    f"meta['llm_gguf_load_config']) into this caller "
+                    f"(operator directive: no silent local-LM/path fallback)."
+                )
             quant = _policy.gguf_quant
             expected_name, expected_size = gguf_artifact_for_quant(quant)
             expected_sha = None
@@ -1047,6 +1163,20 @@ class GGUFNativeBackend:
                 out_tokens, fitted_tokens,
             )
         out_tokens = fitted_tokens
+        # Qwen3 reasoning suppression (root fix 2026-07-16): a "qwen3_no_think"
+        # row must be told to SKIP its <think> block on EVERY call. Non-
+        # structured short-output calls (rank/rerank, max_tokens 8-64) otherwise
+        # spend their whole budget mid-thought and never emit the answer;
+        # structured (json_object) calls otherwise emit a degenerate empty "{}"
+        # because the JSON grammar blocks the <think> the model still opens
+        # (casting DescriptionResponse came back as {} -> pydantic "Field
+        # required"). `/no_think` makes Qwen answer/fill directly in both modes.
+        rf = _llamacpp_response_format(response_format)
+        _think_policy = (
+            model.get("think_policy") if isinstance(model, dict) else None
+        )
+        if _think_policy == "qwen3_no_think":
+            messages = _apply_qwen3_no_think(messages)
         kwargs: dict[str, Any] = {
             "messages": messages,
             "max_tokens": out_tokens,
@@ -1065,9 +1195,15 @@ class GGUFNativeBackend:
             kwargs["seed"] = int(seed)
         row_stops = model.get("stop_tokens") if isinstance(model, dict) else ()
         merged_stop = _merge_stop_tokens(row_stops, stop)
+        if _think_policy == "qwen3_no_think":
+            # Qwen3 emits an empty `<think>\n\n</think>` wrapper even under
+            # /no_think. A pure-whitespace stop (e.g. "\n\n") would fire INSIDE
+            # that wrapper and clip the reply to a dangling "<think>" before the
+            # answer is generated. Drop whitespace-only stops for this row;
+            # content stops (e.g. "\n[", "\n(") still delimit the answer.
+            merged_stop = [s for s in merged_stop if s.strip()]
         if merged_stop:
             kwargs["stop"] = merged_stop
-        rf = _llamacpp_response_format(response_format)
         if rf is not None:
             kwargs["response_format"] = rf
         _row_id = model.get("model_id") if isinstance(model, dict) else None
@@ -1079,15 +1215,20 @@ class GGUFNativeBackend:
                 f"{type(exc).__name__}: {exc}"
             ) from exc
         text = self._extract_text(result)
-        # think-strip: a qwen3-style row emits a leading <think>...</think>
-        # envelope on free-form calls. Strip it ONLY when no response_format is
-        # in force (structured passes always carry rf and never think-wrap).
-        if rf is None:
-            think_policy = (
-                model.get("think_policy") if isinstance(model, dict) else None
-            )
-            if think_policy == "qwen3_no_think":
-                text = _strip_leading_think_envelope(text)
+        # think-strip: a qwen3 row emits a leading <think>...</think> envelope on
+        # free-form calls (structured passes carry rf and are JSON-constrained).
+        # The strip also drops a DANGLING/clipped leading <think>. If nothing but
+        # a wrapper was produced, FAIL LOUD -- never return an empty reply
+        # (operator directive: no local-LM fallbacks).
+        if rf is None and _think_policy == "qwen3_no_think":
+            stripped = _strip_leading_think_envelope(text)
+            if not stripped.strip():
+                raise GGUFNativeCallFailedError(
+                    f"Native GGUF (qwen3_no_think) returned only a reasoning "
+                    f"wrapper, no answer (raw head: {text[:80]!r}). No fallback "
+                    f"(operator directive: no local-LM fallbacks)."
+                )
+            text = stripped
         return text
 
     def unload(self, model: Any) -> None:

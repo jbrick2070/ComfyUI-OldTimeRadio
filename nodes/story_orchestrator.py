@@ -1600,6 +1600,13 @@ def _llm_rank_news_candidates(
             if len(indices) >= top_k:
                 break
         if not indices:
+            if load_config is not None:
+                raise RuntimeError(
+                    "[NewsFetcher] local GGUF news ranking returned no "
+                    f"parseable indices (response={str(response)[:120]!r}); "
+                    "refusing to silently fall back to shuffle order "
+                    "(operator directive: no local-LM fallbacks)."
+                )
             log.warning("[NewsFetcher] LLM ranking returned no parseable indices "
                         "(response=%r) - falling back to shuffle order",
                         str(response)[:120])
@@ -1609,7 +1616,13 @@ def _llm_rank_news_candidates(
         for r in ranked:
             log.info("[NewsFetcher]   - %s", (r.get("headline") or "")[:80])
         return ranked
-    except Exception as exc:  # noqa: BLE001 -- enhancement, never blocks
+    except Exception as exc:  # noqa: BLE001 -- enhancement for non-GGUF lanes only
+        if load_config is not None:
+            log.error(
+                "[NewsFetcher] local GGUF news ranking failed (%s); failing "
+                "loud (operator directive: no local-LM fallbacks)", exc,
+            )
+            raise
         log.warning("[NewsFetcher] LLM ranking failed (%s) - falling back to "
                     "shuffle order", exc)
         return list(pool[:top_k])
@@ -1687,6 +1700,13 @@ def _llm_rerank_with_bodies(
         )
         m = re.search(r"\d+", str(response or ""))
         if not m:
+            if load_config is not None:
+                raise RuntimeError(
+                    "[NewsFetcher] local GGUF body re-rank returned no "
+                    f"parseable index (response={str(response)[:120]!r}); "
+                    "refusing to silently keep headline order "
+                    "(operator directive: no local-LM fallbacks)."
+                )
             log.warning(
                 "[NewsFetcher] body re-rank returned no parseable index "
                 "(response=%r) - keeping headline order",
@@ -1695,6 +1715,13 @@ def _llm_rerank_with_bodies(
             return list(candidates_with_body)
         idx = int(m.group(0)) - 1
         if not (0 <= idx < len(candidates_with_body)):
+            if load_config is not None:
+                raise RuntimeError(
+                    f"[NewsFetcher] local GGUF body re-rank index {idx + 1} out "
+                    f"of range (have {len(candidates_with_body)}); refusing to "
+                    "silently keep headline order (operator directive: no "
+                    "local-LM fallbacks)."
+                )
             log.warning(
                 "[NewsFetcher] body re-rank index %d out of range "
                 "(have %d) - keeping headline order",
@@ -1708,7 +1735,13 @@ def _llm_rerank_with_bodies(
             idx + 1, (chosen.get("headline") or "")[:80],
         )
         return [chosen] + rest
-    except Exception as exc:  # noqa: BLE001 -- enhancement, never blocks
+    except Exception as exc:  # noqa: BLE001 -- enhancement for non-GGUF lanes only
+        if load_config is not None:
+            log.error(
+                "[NewsFetcher] local GGUF body re-rank failed (%s); failing "
+                "loud (operator directive: no local-LM fallbacks)", exc,
+            )
+            raise
         log.warning(
             "[NewsFetcher] body re-rank failed (%s) - keeping headline order",
             exc,
@@ -1749,7 +1782,8 @@ def _prioritize_strict_rss_candidates(pool: list[dict]) -> list[dict]:
 
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
                          model_id=None, optimization_profile="Standard",
-                         *, require_science_floor=False):
+                         *, require_science_floor=False,
+                         load_config=None, policy=None):
     """Fetch science stories from multiple RSS feeds in parallel.
 
     2026-04-29: now also (a) filters out previously-used URLs via
