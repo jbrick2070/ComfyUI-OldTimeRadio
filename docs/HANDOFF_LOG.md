@@ -49,12 +49,25 @@ Did (docs-only session -- no code, no suite run needed; phase C render untouched
   reverify needs its own leg or explicit operator acceptance; quick-wins range
   arithmetic understated: ~6-13 d, combined ~33-55 d) -- both folded; panel
   survivors folded per kibitz-runs/2026-07-15-gfp-baseline/r4/final.md.
+- ROADMAP swept for the parallel lane; GO_FORWARD gains a Window-packing
+  section (RENDER + CODER A-G + PLANNER, one-line otr-handoff kickoffs, credit
+  rules) and the lean-mean/extensibility order DISSOLVES on ROADMAP's ratified
+  edges: front waves (W0..C1-C5) before extensibility, SW tail (SW1-SW3, C6,
+  C7, W8) after extensibility/randomizer/dynamic_story. Combined range now
+  ~45-71 coder-days through the tail. Live dashboard artifact rebuilt
+  (otr-plan-dashboard: GFP queue + HANDOFF current step + phase-C receipts via
+  Desktop Commander), replacing the retired tracker.
+- Live observation from receipts (23:19): `scifi_codex_v2` 30w local FAILED at
+  P3 -- `RadioScoreDraftV4` ValidationError after 2 attempts -- the exact
+  PBUG-20260712-22..25 transport seam awaiting reverify. Campaign window owns
+  triage; quick-win 1's reverify just got more interesting.
 Current step: UNCHANGED -- phase C 30w smoke sweep (the render window owns it;
   monitor tmp/_phaseC_receipts.csv).
 Next: campaign window RE-READS GO_FORWARD before its wrap-up edit (rewritten,
   then leaned, 2026-07-15 late night). Coder queue order per the re-grounded
   queue. NO code lands while phase C is mid-sweep (uniform-code confound).
-Commits: b94f0c70 (baseline) + the lean/kibitz-fold commit (docs only).
+Commits: b94f0c70 (baseline), 0ed44a3b (lean + kibitz fold), + the
+  packing/parallel-lane commit (docs only).
 
 ## 2026-07-15 evening -- HEAD b57be02b (v2.0-alpha) [three-phase bake-off campaign: A PASSED, B F2 PROVEN, C smokes LAUNCHED]
 

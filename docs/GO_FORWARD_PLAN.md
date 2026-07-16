@@ -92,14 +92,20 @@ Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
 
 ```text
 finish bake-off campaign (render window; operator verdicts)
-  -> quick-wins block (reverify tail, cliche excision, announcer contract,
-     IMPROVE seams, watchdog, fable2 C5, interstitial-audio rip,
-     ENGINE_MATRIX, context/cap)
-  -> LEAN-MEAN RIP (dedicated window; drift-check header first)   [operator may
-  -> user source lanes / extensibility (gated: sec-16 + r5)        swap these two]
+  -> quick-wins block (coder windows A/B/C -- see Window packing)
+  -> LEAN-MEAN FRONT (W0->W1->W2->W3->W4a->W4b->W7->W6->W5+SW4->C1-C5)
+       [sec-16 ratification + r5 kibitz run in PARALLEL, $0, planner window]
+  -> user source lanes / extensibility
   -> Randomizer A -> dynamic_story
+  -> LEAN-MEAN TAIL (SW1/SW2/SW3 -> C6 -> C7 -> W8)
   -> ROADMAP (SFX campaign after Timeline Cue Ledger gate)
 ```
+
+The lean-mean/extensibility ordering question DISSOLVES on ROADMAP's ratified
+dependency edges (ROADMAP.md section 1): the front waves have no extensibility
+dependency, while "user extensibility, Randomizer, and dynamic_story [come]
+before the writer/widget structural split" -- so the SW tail was always
+sequenced after them. Split the campaign; interleave nothing.
 
 ### Quick-wins block (~6-13 coder-days; small chunks, any order inside the block)
 
@@ -121,24 +127,22 @@ PBUG-20260712-17 root fix (target lane ripped @ `3312aec7`; the telemetry plan
 doc is SUPERSEDED with its portable pieces parked in its header) and the old
 "fresh two-matrix bakeoff" item (superseded by the executed campaigns).
 
-### Big blocks (in order; operator may swap 1<->2 -- but note the gate)
+### Big blocks (in ROADMAP-ratified order)
 
-1. **LEAN-MEAN RIP** -- `docs/2026-07-10-lean-mean-rip-final.md`, D-1..D-6
-   RATIFIED, CLEARED TO EXECUTE **after its 2026-07-15 drift-check header is
-   satisfied**: SW-1 full seam re-survey (writer now 7,703 LOC;
-   `_run_writer_tail` already extracted; `_otr_source_snapshot` now lives inside
-   `_resolve_inputs`), SW-3 news_ingest re-survey, W6 keep-list adds + the
-   ENGINE_MATRIX precondition (quick-win 8), W7 tombstone re-triage, R-7 re-grep
-   of all line cites. Kill lists + W5's positional obligation re-verified LIVE
-   2026-07-15 and intact; nothing was double-ripped. Dedicated window; multi-day.
+1. **LEAN-MEAN FRONT** (`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 ->
+   W5+SW4 -> C1-C5`) -- `docs/2026-07-10-lean-mean-rip-final.md`, D-1..D-6
+   RATIFIED. Execute **after its 2026-07-15 drift-check header is satisfied**
+   (SW-3 news_ingest re-survey, W6 keep-list adds + the ENGINE_MATRIX
+   precondition = quick-win 8, W7 tombstone re-triage, R-7 re-grep; the SW-1
+   writer re-survey can wait for the TAIL). Kill lists + W5's positional
+   obligation re-verified LIVE 2026-07-15 and intact; nothing was double-ripped.
+   If quick-win 7 shipped first, mark the plan's standalone interstitial-audio
+   rip SATISFIED at re-ground (ROADMAP note). Dedicated window; multi-day.
 2. **User source lanes / extensibility** -- `docs/2026-07-12-user-source-lanes-architecture.md`
    (supersedes the vibe-coder r2 plan). GATED: operator ratifies its section 16
-   (nine flags) + one r5 confirmation kibitz pass; THEN fold into this plan and
-   claim the coder slot. **~21-31 coder-days** (not the old "4-7"). Because this
-   gate is unsatisfied today, lean-mean-first is currently the only non-blocking
-   order; the swap is live only if ratification + r5 land before the lean-mean
-   window opens. The ratification + r5 are docs/panel work and can run DURING
-   the lean-mean window.
+   (nine flags) + one r5 confirmation kibitz pass ($0, planner window, runs in
+   parallel with block 1); THEN fold into this plan and claim the coder slot.
+   **~21-31 coder-days** (not the old "4-7").
 3. **Randomizer Rolls Design A** -- `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`,
    AFTER extensibility (its `_otr_lane_specs` authority is ABSORBED by the
    extensibility build; this build shrinks to `_otr_bank_roll` + eligibility).
@@ -147,19 +151,64 @@ doc is SUPERSEDED with its portable pieces parked in its header) and the old
    re-checked 2026-07-15: roster-agnostic, wiring snapshot still matches live
    canonical. After extensibility + randomizer; re-derive IDs at build.
    5-9 coder-days + 2-4 GPU days.
+5. **LEAN-MEAN TAIL** (`SW1/SW2/SW3 -> C6 -> C7 -> W8`) -- the writer/widget
+   structural split, REQUIRED by ROADMAP to come after blocks 2-4 (preserve
+   overlay quarantine, pack replay hashes, and the final live widget layout).
+   SW-1 full seam re-survey happens here, against the then-current writer.
 
-**Ranges:** quick-wins ~6-13 coder-days; lean-mean = a dedicated multi-day
-window (see its doc); extensibility ~21-31; randomizer 1-2; dynamic_story 5-9.
-Combined ~33-55 coder-days after the lean-mean window, plus campaign GPU days.
-ROADMAP runway (SFX campaign etc.) excluded as before.
+**Ranges:** quick-wins ~6-13 coder-days; lean-mean front+tail = ROADMAP's 12-16;
+extensibility ~21-31; randomizer 1-2; dynamic_story 5-9. Combined ~45-71
+coder-days through the lean-mean tail, plus campaign GPU days. ROADMAP items
+2-5 (SFX campaign, product expansion, RunPod/install, release docs) excluded.
 
-## Parallel planning only -- one future SFX campaign
+## Window packing (credit discipline -- one line starts any window)
 
-**0.5-1 docs day** (no coder slot): re-ground the local generated-SFX R4
-candidate into a tracked current-HEAD R4.1 plan. Sequencing and the full
-retained-scope contract live in `ROADMAP.md`: Timeline Cue Ledger C0/C1 and its
-blind noun-detector gate come first; the generated design supersedes the CC0
-library renderer -- no second SFX queue, no library fallback.
+Starting any window costs the same boot context, so BATCH chunks per window and
+never open one for a single small item. Every window starts the same way: open
+a fresh Cowork chat and paste its one-line kickoff -- the `otr-handoff` skill
+reads this file + git and states the current step. **No manual context
+handoff, ever**; this planner window keeps GO_FORWARD + HANDOFF_LOG current,
+coder windows never write plans (window-roles rule).
+
+| Window | Scope | Gate | Size |
+|---|---|---|---|
+| RENDER (running now) | phase C tiers -> durable report -> operator decisions; fillers between tiers: cpu-tier smoke + nv50 re-soak (release QA, render time not code) | -- | GPU days |
+| CODER A "seams" | base `scifi_codex` 120w reverify leg (quick-win 1), then quick-wins 2 + 3 + 4 | AFTER phase C completes (no mid-sweep code) | ~2-4 d |
+| CODER B "harness + consumers" | quick-wins 5 + 6 + 10, then one canonical fable2 full-media qualification leg | after A | ~1.5-3 d |
+| CODER C "foundations" | quick-wins 7 + 8 + 9 (canonical surgery, generator, new budget owner) | after B | ~2-5 d |
+| CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | after C (W6 needs quick-win 8) | multi-day |
+| PLANNER (this window) | sec-16 ratification session + r5 kibitz ($0), Bug Bible operator fan-out, plan upkeep | parallel with D | docs |
+| CODER E | extensibility (user source lanes) | after sec-16 + r5 | 21-31 d |
+| CODER F | Randomizer A -> `dynamic_story` | after E | ~6-11 d |
+| CODER G "lean-mean tail" | SW1-SW3, C6, C7, W8 | after F | multi-day |
+
+Kickoff lines (paste as the FIRST message of the new window; swap the letter):
+
+> resume the OTR build -- you are CODER WINDOW A per GO_FORWARD "Window
+> packing"; execute your scope in order, one green pushed chunk at a time.
+
+Credit rules: kibitz local ($0) for ALL mechanical review -- the two-strikes
+law stands; cloud roundtable only for genuine R1-ideas passes; Fable only as
+the single final gate on a lean-mean epoch commit (section-9 reality
+exception); codex-CLI delegation via a HANDOFF_CODEX file remains available
+for grind chunks (2026-07-13 precedent).
+
+## Parallel lane -- no coder slot required
+
+- **sec-16 ratification + r5 confirm** on the extensibility architecture --
+  the operator bottleneck on the critical path; planner window, $0.
+- **Bug Bible operator fan-out** -- the promotion table above has 9+ closed
+  candidates + the duplicate-legacy_id cleanup waiting on one fan-out session.
+- **Render-window fillers:** cpu-tier smoke (needs the google image lane or
+  stills) + nv50 re-soak -- the two open portability remainders; release QA
+  validation time, not coding.
+- **SFX R4.1 re-ground** (0.5-1 docs day): re-ground the local generated-SFX R4
+  candidate into a tracked current-HEAD R4.1 plan. Sequencing + retained-scope
+  contract live in `ROADMAP.md` (Timeline Cue Ledger C0/C1 gate first; no
+  second SFX queue, no library fallback).
+- **Operator-promotable option:** SFX C0 (per-line WAV stems + transcript
+  drift report) is independently shippable per ROADMAP but stays parked with
+  its campaign unless explicitly promoted.
 
 ## Bug Bible promotion field -- pending actions only
 
@@ -207,8 +256,11 @@ fixture creates a row.
 - Extensibility is gated on operator section-16 ratification + the r5 pass; its
   ~21-31-day estimate is latent scope, not creep. Until ratified it holds no
   slot and only constrains randomizer + dynamic_story sequencing.
-- Lean-mean vs extensibility ORDER is an operator call (see the gate note in
-  Big blocks). Both rip into the writer: NEVER interleave them.
+- Lean-mean/extensibility ordering is RESOLVED by ROADMAP's ratified edges
+  (front waves first, SW tail after extensibility/randomizer/dynamic_story);
+  the residual risk is drift between the front and tail windows -- the tail's
+  SW-1 re-survey is mandatory against the then-current writer. Never
+  interleave the two campaigns inside one window.
 - No code lands while phase C is mid-sweep -- landing mid-sweep re-creates the
   uniform-code confound that made the 420 rung unjudgeable.
 - Phase C may surface new lane defects; the campaign window owns admitting
