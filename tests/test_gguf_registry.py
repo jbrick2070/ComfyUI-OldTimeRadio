@@ -65,15 +65,21 @@ def test_gemma_row_shape():
     assert "Q8_0" in row.artifacts
 
 
-def test_qwen_row_is_unknown_and_unpinned():
+def test_qwen_row_is_pinned_and_pass():
+    # PROMOTED 2026-07-16 after the live bake-off (3x RESULT SUCCESS + obs asset,
+    # ctx=8192 CUDA, peak ~11.8 GB, no fallback): UNKNOWN/unpinned -> PASS/pinned.
     row = GGF.gguf_row_for_repo(QWEN)
     assert row.context_window == 8192
-    assert row.kv_gb_per_1k is None            # measure on the live leg
-    assert row.vram_fit_tier == "UNKNOWN"
+    assert row.kv_gb_per_1k == 0.70            # measured 5.60 GB @ n_ctx=8192
+    assert row.vram_fit_tier == "PASS"
     assert row.think_policy == "qwen3_no_think"
     fn, size, sha = row.artifacts["Q4_K_M"]
-    assert size is None and sha is None         # size/sha=None until download
-    assert row.approx_artifact_gb() == 0.0      # UNKNOWN, not a guess
+    assert fn == "Qwen3-8B-Q4_K_M.gguf"
+    assert size == 5027784512
+    assert sha == (
+        "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4"
+    )
+    assert row.approx_artifact_gb() > 0.0       # pinned bytes -> a real estimate
 
 
 def test_gemma_approx_derived_from_pinned_bytes():
@@ -265,8 +271,12 @@ def test_vram_estimate_no_halve_plus_kv():
     assert mistral == pytest.approx(24.0 / 2.0, abs=1e-6)
 
 
-def test_vram_estimate_unknown_qwen_returns_none():
-    assert cat._estimate_resident_gb(QWEN) is None  # unpinned -> UNKNOWN
+def test_vram_estimate_pinned_qwen():
+    # PROMOTED 2026-07-16: pinned bytes (no /2) + per-row measured KV @ ctx window.
+    est = cat._estimate_resident_gb(QWEN)
+    weights = round(5027784512 / (1024 ** 3), 1)
+    kv = (8192 / 1024.0) * 0.70
+    assert est == pytest.approx(weights + kv, abs=1e-6)
 
 
 def test_qwen_row_visible_and_ordered_after_gemma(tmp_path):
@@ -484,10 +494,14 @@ def test_validate_ready_missing_file_raises(tmp_path):
 
 
 def test_validate_ready_existence_only_when_unpinned(tmp_path):
-    # Qwen Q4_K_M size/sha are None -> existence + non-zero is enough.
-    art = tmp_path / "Qwen3-8B-Q4_K_M.gguf"
+    # An UNPINNED artifact (size/sha None) -> existence + non-zero is enough.
+    # gemma Q6_K stays unpinned; qwen Q4_K_M is now PINNED (promoted 2026-07-16),
+    # so it validates size+sha and is covered by the pinned tests instead.
+    art = tmp_path / "gemma-4-12b-it-Q6_K.gguf"
     art.write_bytes(b"gguf")
-    GGF.validate_gguf_ready(QWEN, "Q4_K_M", _lc_for(art))  # no raise
+    GGF.validate_gguf_ready(
+        GEMMA, "Q6_K", _lc_for(art, quant="Q6_K", repo=GEMMA)
+    )  # no raise
 
 
 def test_validate_ready_sha_mismatch_and_memo_invalidation(tmp_path, monkeypatch):

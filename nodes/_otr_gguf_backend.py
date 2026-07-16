@@ -243,11 +243,20 @@ GGUF_ROWS: tuple[GGUFRow, ...] = (
     GGUFRow(
         repo_id="unsloth/Qwen3-8B-GGUF",
         subdir="Qwen3-8B",
-        # Q4_K_M size/sha stay None until the download gate pins them.
-        artifacts={"Q4_K_M": ("Qwen3-8B-Q4_K_M.gguf", None, None)},
+        # PINNED at the 2026-07-16 live bake-off: 3x RESULT SUCCESS + obs asset,
+        # both writer slots Qwen, ctx=8192 on CUDA, peak ~11.8 GB (< 14.5),
+        # no silent fallback. size/sha256 from the download gate; kv measured
+        # 5.60 GB @ n_ctx=8192 -> 0.70 GB / 1k. vram_fit_tier UNKNOWN -> PASS.
+        artifacts={
+            "Q4_K_M": (
+                "Qwen3-8B-Q4_K_M.gguf",
+                5027784512,
+                "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4",
+            ),
+        },
         context_window=8192,
-        kv_gb_per_1k=None,   # measure on the live leg
-        vram_fit_tier="UNKNOWN",
+        kv_gb_per_1k=0.70,
+        vram_fit_tier="PASS",
         license="apache_2_0",
         license_audit_status="mit_equivalent",
         requires_auth=False,
