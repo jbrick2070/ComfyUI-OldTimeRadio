@@ -4131,6 +4131,25 @@ class OTR_LedgerScriptWriter:
         )
         if _credits_line:
             meta["credits_source_line"] = _credits_line
+        # v4 P1(viii): opt-in source-provenance normalizer. Map source_rights ->
+        # one normalized record; stamp the spoken coda line + fill
+        # credits_source_line when the bank default did not. The deterministic
+        # G14 terminal blocks publish on a research_only source. Default False ->
+        # key absent -> inert for every current bank.
+        if bool((_source_bank_row.defaults or {}).get("provenance_normalize", False)):
+            try:
+                from . import _otr_provenance as _OTRPROV
+            except ImportError:  # pragma: no cover -- flat load
+                import _otr_provenance as _OTRPROV  # type: ignore
+            _prov = _OTRPROV.normalize_provenance(meta.get("source_rights"))
+            meta["provenance"] = _prov
+            _coda = _OTRPROV.spoken_coda_line(_prov)
+            if _coda:
+                meta["provenance_coda_line"] = _coda
+            if not str(meta.get("credits_source_line") or "").strip():
+                _pc = _OTRPROV.printed_credit_line(_prov)
+                if _pc:
+                    meta["credits_source_line"] = _pc
         meta["story_scaffold"] = _scaffold
         # Stage 3C: stamp the visual style -- THE threading channel: every
         # downstream visual composer reads meta["visual_style"] via

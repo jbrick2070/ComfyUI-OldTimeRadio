@@ -642,6 +642,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g13_placeholder_tokens(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g14_provenance_publish(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
 
 
@@ -895,6 +898,37 @@ def _check_g13_placeholder_tokens(
             f"{'; '.join(sample)}{more}. A placeholder that survives to freeze is "
             f"a generation bug -- the pack must author a real value, never ship "
             f"'X'/'Y'/'TBD' on the microphone or in the credits."
+        )
+
+
+# G14 PROVENANCE PUBLISH GATE (v4 campaign P1(viii)). Phase 0 collect / Phase 10
+# raise. Operator decision (2026-07-17): a research_only source BLOCKS publish.
+# Opt-in via meta["provenance"] (the writer stamps the normalized record when the
+# bank sets defaults.provenance_normalize); inert for every current bank. Freeze
+# precedes publish, so raising here prevents the episode from ever publishing --
+# the deterministic realisation of the rule. Only the research_only status blocks;
+# public_domain_us / cc0 / licensed / synthetic all pass.
+
+
+def _check_g14_provenance_publish(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G14: a research_only source must not reach a published episode."""
+    meta = ledger_data.get("meta")
+    if not isinstance(meta, dict):
+        return
+    prov = meta.get("provenance")
+    if not isinstance(prov, dict):
+        return  # opt-in only; inert for every current bank
+    if prov.get("blocks_publish"):
+        label = str(prov.get("source_label") or prov.get("license_label") or "")
+        errors.append(
+            f"G14: source provenance is 'research_only' ({label!r}) -- the "
+            f"operator rule BLOCKS publication of a research-only source. This "
+            f"episode cannot freeze; select a public-domain / cc0 / cleared "
+            f"source, or the operator must lift the block for this lane."
         )
 
 
