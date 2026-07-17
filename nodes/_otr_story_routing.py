@@ -216,6 +216,24 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
         raise RegistryValidationError(
             f"{origin}: defaults must be an object of scalar values"
         )
+    # v4 campaign (2026-07-17): three VALIDATED scalar bank-defaults that
+    # replace the former hardcoded exact-id sets (visual-style pool / science
+    # floor / adaptation-cast). They live inside `defaults` (already scalar-
+    # checked above) but carry stricter contracts so a bad value fails loud at
+    # load -- the mechanism that lets a fully-independent _v4 bank re-own each
+    # behaviour without a family base-map.
+    _spc = defaults.get("style_pool_class")
+    if _spc is not None and _spc not in ("media", "adaptation", "generic"):
+        raise RegistryValidationError(
+            f"{origin}: defaults.style_pool_class must be one of "
+            f"'media'|'adaptation'|'generic', got {_spc!r}"
+        )
+    for _bkey in ("require_science_floor", "propagate_adaptation_cast"):
+        _bval = defaults.get(_bkey)
+        if _bval is not None and not isinstance(_bval, bool):
+            raise RegistryValidationError(
+                f"{origin}: defaults.{_bkey} must be a bool, got {_bval!r}"
+            )
     runnable = obj.get("runnable")
     if not isinstance(runnable, bool):
         raise RegistryValidationError(f"{origin}: runnable must be a bool")

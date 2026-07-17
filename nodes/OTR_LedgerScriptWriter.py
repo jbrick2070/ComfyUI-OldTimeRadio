@@ -4067,6 +4067,14 @@ class OTR_LedgerScriptWriter:
         # Stage 2C: stamp the authoritative story-path selection (resolved
         # dict is the single source; run() gated it runnable already).
         meta["source_bank"] = resolved["source_bank"]
+        # v4 campaign (2026-07-17): stamp the resolved VISUAL-STYLE pool class so
+        # the style catalog (select_style) picks the right pool WITHOUT a family
+        # base-map -- each _v4 bank is fully independent. Default 'generic'. This
+        # is the visual-style axis, orthogonal to the source FEED / science floor.
+        meta["style_pool_class"] = str(
+            (_source_bank_row.defaults or {}).get("style_pool_class", "generic")
+            or "generic"
+        )
         meta["source_ref"] = resolved["source_ref"]
         meta["source_meta"] = dict(resolved["source_meta"])
         meta["source_rights"] = dict(resolved["source_rights"])
@@ -4283,8 +4291,8 @@ class OTR_LedgerScriptWriter:
             # shakespeare's manifest cast_hints ARE the real character names. Stamped
             # here where `briefs` is in scope; read at the lock_cast call below.
             # Invention lanes never set this key -> casting is byte-identical (C7).
-            if _source_bank_row.source_bank_id in (
-                    "shakespeare_v3", "public_domain_story_v3"):
+            if (_source_bank_row.defaults or {}).get(
+                    "propagate_adaptation_cast"):
                 _adapt_names = list(
                     getattr(briefs, "character_names", None)
                     or (meta.get("source_meta") or {}).get("cast_hints")

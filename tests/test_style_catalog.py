@@ -145,10 +145,13 @@ class TestSelectStyle:
         # adaptation style -- never a sci-fi one like cryogenic_revival_confusion.
         adapt = set(CAT.adaptation_slugs())
         assert adapt and "faithful_stage_adaptation" in adapt
-        for bank in ("shakespeare", "public_domain_story"):
+        # v4: the visual-style pool is chosen by the stamped style_pool_class
+        # (the writer stamps it from bank.defaults), no longer by a base-map.
+        for bank in ("shakespeare_v3", "public_domain_story_v3"):
             for s in range(40):
-                slug = CAT.select_style("Macbeth meets three witches on a heath",
-                                        {"source_bank": bank}, s)
+                slug = CAT.select_style(
+                    "Macbeth meets three witches on a heath",
+                    {"source_bank": bank, "style_pool_class": "adaptation"}, s)
                 assert slug in adapt, f"{bank} drew non-adaptation style {slug!r}"
 
     def test_invention_lanes_never_draw_adaptation_styles(self):
@@ -179,7 +182,8 @@ class TestMediaArchiveStylePool:
         pool = set(CAT.media_archive_slugs())
         for seed in range(50):
             slug = CAT.select_style(
-                "an archivist finds a lost recording", {"source_bank": "media_archive"}, seed
+                "an archivist finds a lost recording",
+                {"source_bank": "media_archive", "style_pool_class": "media"}, seed
             )
             assert slug in pool, f"seed {seed} -> {slug!r} not in media_archive pool"
 

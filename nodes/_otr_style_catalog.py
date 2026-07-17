@@ -803,13 +803,18 @@ def select_style(premise: Any, meta: Any, cast_seed: Any) -> str:
     sha256(cast_seed)-keyed index into the sorted pool, so the same episode seed
     always yields the same style (C7-safe) while different episodes vary."""
     import hashlib
-    from ._otr_bank_variants import base_source_bank_id
-    source_bank = ""
+    # v4 campaign (2026-07-17): the VISUAL-STYLE pool is chosen by the bank's
+    # VALIDATED `style_pool_class` default (media|adaptation|generic), STAMPED
+    # into meta by the writer from bank.defaults. This replaces the former
+    # base_source_bank_id exact-id branch, so a fully-independent _v4 bank keeps
+    # its pool without a family base-map. The source FEED (science_rss vs
+    # media_archive_rss vs folger) is a SEPARATE axis and is unaffected here. The
+    # per-branch hash keys are UNCHANGED -> byte-identical slug selection for
+    # every existing bank (C7).
+    pool_class = "generic"
     if isinstance(meta, dict):
-        source_bank = str(meta.get("source_bank", "") or "")
-    # Bake-off variants (<base>_v2/_v3) draw their base family's style pool.
-    source_bank = base_source_bank_id(source_bank)
-    if source_bank == "media_archive":
+        pool_class = str(meta.get("style_pool_class", "") or "generic")
+    if pool_class == "media":
         pool = sorted(media_archive_slugs())
         if not pool:  # pragma: no cover -- defensive
             pool = sorted(non_emergency_slugs())
@@ -820,7 +825,7 @@ def select_style(premise: Any, meta: Any, cast_seed: Any) -> str:
     # ADAPTATION lanes: draw ONLY from the faithful/period adaptation pool so
     # Shakespeare/public_domain never get a sci-fi style ("cryogenic_revival_
     # confusion"). Source-deferential styles keep Macbeth on the heath. (2026-07-14)
-    if source_bank in ("shakespeare", "public_domain_story"):
+    if pool_class == "adaptation":
         pool = sorted(adaptation_slugs())
         if not pool:  # pragma: no cover -- defensive
             pool = sorted(non_emergency_slugs())

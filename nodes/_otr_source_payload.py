@@ -282,10 +282,12 @@ def _fetch_science_rss(*, bank, technical_model: str,
     # the legacy science_news forwarding surface byte-compatible, but make all
     # three v4 lanes ask the shared selector for an eligible article instead of
     # receiving the richest thin fallback and failing after model setup.
-    # Independence refactor 2026-07-17: each strict-v4 lane by EXACT id (no
-    # family base-map). scifi_sonnet survives only as its _v3.
-    strict_v4_banks = {"scifi_codex", "scifi_codex_v3", "scifi_sonnet_v3"}
-    if getattr(bank, "source_bank_id", "") in strict_v4_banks:
+    # v4 campaign 2026-07-17: the science-floor requirement is a VALIDATED bank
+    # default (`require_science_floor`), read PRE-writer directly off
+    # bank.defaults -- no hardcoded exact-id set, no family base-map, so an
+    # independent _v4 bank opts in by its own row. (Source FEED axis: science_rss
+    # eligibility, distinct from the visual-style pool.)
+    if bool((getattr(bank, "defaults", None) or {}).get("require_science_floor")):
         return _writer._fetch_rss_seed_or_die(
             technical_model, require_science_floor=True,
             load_config=load_config, policy=policy,
