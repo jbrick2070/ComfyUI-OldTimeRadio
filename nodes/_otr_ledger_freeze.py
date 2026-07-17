@@ -630,6 +630,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g9_sfw_spoken_text(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g10_genre_spoken_text(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
 
 
@@ -705,6 +708,53 @@ def _check_g9_sfw_spoken_text(
             f"episode does not freeze with these words on the microphone. "
             f"The vocabulary is DEFAULT_PROFANITY_TERMS in "
             f"_otr_stage3_validators."
+        )
+
+
+# G10 GENRE spoken-text ship-stop (v4 campaign P1(iii)). Phase 0 collect / Phase
+# 10 raise -- the deterministic terminal for a banned GENRE phrase surviving on
+# the microphone. Bank-aware + OPT-IN: reads meta["genre_banned_phrases"], which
+# the writer stamps ONLY when the bank sets defaults.genre_guard_spoken=True. The
+# key is absent for every current bank, so G10 is INERT until a v4 lane opts in.
+#
+# THE LAW: an audit may improve a story, never fail one; only a DETERMINISTIC
+# validator ends an episode. The upstream authored repair (_otr_genre_guard.
+# apply_genre_spoken_repair, run at the writer creative boundary) is the "improve"
+# side; this read-only scan is the terminal for a surviving hit. It uses the
+# boundary matcher (casefolded, Unicode-aware) so "gun" never fires on "begun".
+# Runs on the one path EVERY execution family crosses (codex phase_10 finalizer,
+# inline run_freeze_cascade, fable2 finalizer), exactly like G9.
+
+
+def _check_g10_genre_spoken_text(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G10: no banned GENRE phrase in the spoken text of any ledger line."""
+    meta = ledger_data.get("meta")
+    if not isinstance(meta, dict):
+        return
+    phrases = meta.get("genre_banned_phrases")
+    if not isinstance(phrases, list) or not phrases:
+        return  # opt-in only; inert for every current bank
+    try:
+        from ._otr_genre_guard import scan_spoken_lines
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        from _otr_genre_guard import scan_spoken_lines  # type: ignore
+    hits = [
+        f"{lid}: {', '.join(found)}"
+        for lid, found in scan_spoken_lines(ledger_data, phrases)
+    ]
+    if hits:
+        sample = hits[:5]
+        more = "" if len(hits) <= 5 else f" (+{len(hits) - 5} more)"
+        errors.append(
+            f"G10: banned genre phrase in the spoken text of {len(hits)} "
+            f"line(s): {'; '.join(sample)}{more}. The bank sets "
+            f"genre_guard_spoken; the vocabulary is its story_rules."
+            f"banned_phrases. An audit may improve a story, never fail one -- "
+            f"the fix is the upstream authored repair, not a relaxed gate."
         )
 
 

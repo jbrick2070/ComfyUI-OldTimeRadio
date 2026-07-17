@@ -228,7 +228,11 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
             f"{origin}: defaults.style_pool_class must be one of "
             f"'media'|'adaptation'|'generic', got {_spc!r}"
         )
-    for _bkey in ("require_science_floor", "propagate_adaptation_cast"):
+    for _bkey in (
+        "require_science_floor",
+        "propagate_adaptation_cast",
+        "genre_guard_spoken",  # v4 P1(iii): opt-in bank-aware spoken-text genre gate
+    ):
         _bval = defaults.get(_bkey)
         if _bval is not None and not isinstance(_bval, bool):
             raise RegistryValidationError(

@@ -4075,6 +4075,14 @@ class OTR_LedgerScriptWriter:
             (_source_bank_row.defaults or {}).get("style_pool_class", "generic")
             or "generic"
         )
+        # v4 campaign P1(iii): opt-in bank-aware GENRE spoken-text guard. A bank
+        # with defaults.genre_guard_spoken=True stamps its story_rules.
+        # banned_phrases so the deterministic Phase-10 G10 terminal (and the
+        # upstream authored repair below) scan the spoken text. Default False ->
+        # key absent -> G10 inert for every current (non-v4) bank.
+        if bool((_source_bank_row.defaults or {}).get("genre_guard_spoken", False)):
+            meta["genre_guard_spoken"] = True
+            meta["genre_banned_phrases"] = list(story_rules.banned_phrases)
         meta["source_ref"] = resolved["source_ref"]
         meta["source_meta"] = dict(resolved["source_meta"])
         meta["source_rights"] = dict(resolved["source_rights"])
@@ -6765,6 +6773,28 @@ class OTR_LedgerScriptWriter:
             log.warning(
                 "[OTR_LedgerScriptWriter] self-vocative attribution pass "
                 "fixed %d line(s) pre-freeze", _att_fixed)
+
+        # --- I.7 GENRE spoken-text authored repair (v4 P1(iii), opt-in) ----
+        # The LAST creative pass before the J rollup + freeze. For a bank that
+        # opted in (meta.genre_guard_spoken), re-author any spoken line hitting a
+        # banned genre phrase via the creative slot (bounded, keep-if-clean).
+        # Survivors fall through to the deterministic Phase-10 G10 terminal.
+        # Inert for every current bank (key absent). Never raises.
+        if meta.get("genre_guard_spoken"):
+            try:
+                from . import _otr_genre_guard as _OTRGENRE
+            except ImportError:  # pragma: no cover -- flat load
+                import _otr_genre_guard as _OTRGENRE  # type: ignore
+            _genre_fixed = _OTRGENRE.apply_genre_spoken_repair(
+                led.data,
+                meta.get("genre_banned_phrases") or [],
+                creative_generate_fn,
+            )
+            if _genre_fixed:
+                led.save()
+                log.warning(
+                    "[OTR_LedgerScriptWriter] genre spoken-text repair "
+                    "re-authored %d line(s) pre-freeze", _genre_fixed)
 
         # --- J. Phase 0 aggregate + §6.G word counts + final save ----
         # No set_lines + post-patch pass any more -- every line was
