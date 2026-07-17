@@ -4083,6 +4083,12 @@ class OTR_LedgerScriptWriter:
         if bool((_source_bank_row.defaults or {}).get("genre_guard_spoken", False)):
             meta["genre_guard_spoken"] = True
             meta["genre_banned_phrases"] = list(story_rules.banned_phrases)
+        # v4 P1(v): opt-in outro cast-completeness gate. Stamp the flag; the
+        # deterministic G12 terminal + the authored outro repair both read the
+        # final cast + outro line from the ledger. Default False -> inert.
+        if bool((_source_bank_row.defaults or {}).get(
+                "require_outro_cast_complete", False)):
+            meta["outro_cast_complete"] = True
         # v4 P1(iv): record the beat-bounds contract -- the SOFT word-derived
         # target (WORDS_PER_BEAT=40) + the family band. Length is
         # recorded-not-gated (operator); only the structural floor (min) is
@@ -6818,6 +6824,24 @@ class OTR_LedgerScriptWriter:
                 log.warning(
                     "[OTR_LedgerScriptWriter] genre spoken-text repair "
                     "re-authored %d line(s) pre-freeze", _genre_fixed)
+
+        # --- I.8 OUTRO cast-completeness authored repair (v4 P1(v), opt-in) ----
+        # Re-author the announcer sign-off so it credits the full final cast.
+        # Keep-if-complete; survivors fall through to the deterministic G12
+        # terminal. Inert for every current bank (flag absent). Never raises.
+        if meta.get("outro_cast_complete"):
+            try:
+                from . import _otr_outro_guard as _OTROUTRO
+            except ImportError:  # pragma: no cover -- flat load
+                import _otr_outro_guard as _OTROUTRO  # type: ignore
+            _outro_fixed = _OTROUTRO.apply_outro_completeness_repair(
+                led.data, creative_generate_fn,
+            )
+            if _outro_fixed:
+                led.save()
+                log.warning(
+                    "[OTR_LedgerScriptWriter] outro cast-completeness repair "
+                    "re-authored the sign-off pre-freeze")
 
         # --- J. Phase 0 aggregate + §6.G word counts + final save ----
         # No set_lines + post-patch pass any more -- every line was

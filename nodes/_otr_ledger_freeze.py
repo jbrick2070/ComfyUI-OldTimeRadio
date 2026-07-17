@@ -636,6 +636,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g11_beat_floor(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g12_outro_cast_complete(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
 
 
@@ -818,6 +821,42 @@ def _check_g11_beat_floor(
             f"floor of {floor} (family={bounds.get('family')!r}). Below this an "
             f"episode is not assemblable downstream. Episode length is "
             f"recorded-not-gated; only this structural floor ends the episode."
+        )
+
+
+# G12 OUTRO CAST-COMPLETENESS (v4 campaign P1(v)). Phase 0 collect / Phase 10
+# raise. Opt-in via meta["outro_cast_complete"] (the writer stamps it when the
+# bank sets defaults.require_outro_cast_complete); inert for every current bank.
+# Reads the REAL final rows (character char_ids with a non-skipped spoken line)
+# and checks each name is credited in the last announcer line -- lenient
+# (full-name OR significant token) so it never false-fails a good sign-off. THE
+# LAW: the deterministic validator ends the episode; the upstream authored repair
+# (_otr_outro_guard.apply_outro_completeness_repair) is the improve side. Skips
+# cleanly when there is no outro line (presence is the existing epilogue check).
+
+
+def _check_g12_outro_cast_complete(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G12: the outro must credit every character who appears in the final rows."""
+    meta = ledger_data.get("meta")
+    if not isinstance(meta, dict) or not meta.get("outro_cast_complete"):
+        return  # opt-in only; inert for every current bank
+    try:
+        from ._otr_outro_guard import missing_final_cast_names
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        from _otr_outro_guard import missing_final_cast_names  # type: ignore
+    missing = missing_final_cast_names(ledger_data)
+    if missing:
+        sample = missing[:6]
+        more = "" if len(missing) <= 6 else f" (+{len(missing) - 6} more)"
+        errors.append(
+            f"G12: the outro does not credit {len(missing)} cast member(s): "
+            f"{', '.join(sample)}{more}. A radio sign-off names its cast; the fix "
+            f"is the upstream authored outro repair, not a relaxed gate (Python "
+            f"never appends a name to prose)."
         )
 
 

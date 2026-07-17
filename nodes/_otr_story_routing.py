@@ -232,6 +232,7 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
         "require_science_floor",
         "propagate_adaptation_cast",
         "genre_guard_spoken",  # v4 P1(iii): opt-in bank-aware spoken-text genre gate
+        "require_outro_cast_complete",  # v4 P1(v): opt-in outro cast-completeness gate
     ):
         _bval = defaults.get(_bkey)
         if _bval is not None and not isinstance(_bval, bool):
