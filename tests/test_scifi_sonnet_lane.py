@@ -62,6 +62,31 @@ def test_sonnet_payload_cast_lock_and_spoken_hygiene():
         lane.validate_spoken_text_and_lock([bad], cast)
 
 
+def test_rewrite_spoken_purity_is_surfaced_to_the_p5_ladder():
+    # Regression: the spoken-purity contract used to fire ONLY at the terminal
+    # validate_spoken_text_and_lock gate, so a stray parenthetical in an authored
+    # or rewritten line killed the episode with no bounded repair (scifi_sonnet
+    # 320w bake-off FAIL: "ORUM: spoken text contains decoration '('"). The P5
+    # rewrite post_validator must now REPORT the slip so the typed-repair ladder
+    # lets the model fix its own line.
+    dirty_line = lane.RewriteResultV4(
+        corrected_lines=[lane.RewriteLineV4(line_ref=2, speaker="ORUM", text="(softly) the record holds", cites=["fact_1"])],
+        vesh_resolution="The record is corrected.",
+    )
+    err = lane._rewrite_spoken_error(dirty_line)
+    assert err and "corrected line 2" in err and "decoration" in err
+    dirty_vesh = lane.RewriteResultV4(
+        corrected_lines=[lane.RewriteLineV4(line_ref=2, speaker="ORUM", text="The record holds.", cites=["fact_1"])],
+        vesh_resolution="The record holds *now*.",
+    )
+    assert "vesh_resolution" in (lane._rewrite_spoken_error(dirty_vesh) or "")
+    clean = lane.RewriteResultV4(
+        corrected_lines=[lane.RewriteLineV4(line_ref=2, speaker="THESSALY", text="The signal never repeats.", cites=["fact_1"])],
+        vesh_resolution="The record is corrected.",
+    )
+    assert lane._rewrite_spoken_error(clean) is None
+
+
 def test_a_long_article_is_read_in_windows_and_stays_citable_to_the_end():
     """Live prompt 415ca1fc: a long RSS article made the P0 prompt 5,424 tokens
     against a 5,192-token opening, and `prompt_must_fit` refused it -- correctly.

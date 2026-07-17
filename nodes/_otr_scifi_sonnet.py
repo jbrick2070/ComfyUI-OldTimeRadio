@@ -830,6 +830,29 @@ def validate_spoken_text_and_lock(
             raise SonnetSpokenTextError(f"{event.speaker}: {err}")
 
 
+def _rewrite_spoken_error(
+    rewrite: "RewriteResultV4",
+    allowed_all_caps: frozenset[str] = frozenset(),
+) -> str | None:
+    """Surface the spoken-purity contract to the P5 rewrite ladder.
+
+    The corrected lines and the Warden's on-air resolution are SPOKEN, so a
+    decoration / all-caps / non-lexical slip in a rewrite must be repaired by the
+    model inside the bounded typed-repair ladder -- not left to detonate at the
+    terminal `validate_spoken_text_and_lock` gate, which has no recovery path.
+    This never authors a line; it only names the offending field so the model
+    fixes its own text (LLM-first).
+    """
+    for item in rewrite.corrected_lines:
+        err = _spoken_error(item.text, item.speaker, allowed_all_caps)
+        if err:
+            return f"corrected line {item.line_ref} ({item.speaker}): {err}"
+    err = _spoken_error(rewrite.vesh_resolution, "VESH", allowed_all_caps)
+    if err:
+        return f"vesh_resolution (VESH): {err}"
+    return None
+
+
 def _prompt(pack: Any, seam: str, pass_id: str, inputs: Mapping[str, Any], schema: type[BaseModel]) -> list[dict[str, str]]:
     seam_text = str((getattr(pack, "prompt_stages", {}) or {}).get(seam) or "")
     if not seam_text:
@@ -1185,11 +1208,19 @@ def run_scifi_sonnet_episode(
         raise SonnetPassError(f"merged dossier is not grounded: {merged_error}")
     p1 = invoke_sonnet_structured(pass_id="P1", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_frame_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "initial_session_word_steer": steer}, result_type=SessionFrameV4, post_validator=lambda x: None, base_temperature=.85, structural_retry_temperature=.40, max_new_tokens=2300, journal=journal)
     cast = lock_archive_cast(p1)
+    # The spoken-purity contract (`_spoken_error`) was enforced ONLY at the terminal
+    # `validate_spoken_text_and_lock` gate, so a stray parenthetical / stage direction
+    # in an authored line killed the whole episode with no bounded repair (the
+    # scifi_sonnet 320w bake-off FAIL, 2026-07-14: "ORUM: spoken text contains
+    # decoration '('"). Surface the same contract to the character-dialogue passes so a
+    # slip triggers the existing typed-repair ladder -- the model fixes its own line
+    # (LLM-first), and the terminal gate stays as the deterministic last word.
+    allowed = allowed_spoken_all_caps(p0)
     orum = []
     thessaly = []
     for n in range(2):
-        orum.append(invoke_sonnet_structured(pass_id=f"P2a:{n}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_literalist_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "frame": p1.model_dump(mode="json"), "line_index": n}, result_type=CitedLineV4, post_validator=lambda x: None, base_temperature=.55, structural_retry_temperature=.25, max_new_tokens=2200, journal=journal))
-        thessaly.append(invoke_sonnet_structured(pass_id=f"P2b:{n}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_speculator_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "frame": p1.model_dump(mode="json"), "line_index": n}, result_type=CitedLineV4, post_validator=lambda x: None, base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=2600, journal=journal))
+        orum.append(invoke_sonnet_structured(pass_id=f"P2a:{n}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_literalist_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "frame": p1.model_dump(mode="json"), "line_index": n}, result_type=CitedLineV4, post_validator=lambda x, a=allowed: _spoken_error(x.text, "ORUM", a), base_temperature=.55, structural_retry_temperature=.25, max_new_tokens=2200, journal=journal))
+        thessaly.append(invoke_sonnet_structured(pass_id=f"P2b:{n}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_speculator_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "frame": p1.model_dump(mode="json"), "line_index": n}, result_type=CitedLineV4, post_validator=lambda x, a=allowed: _spoken_error(x.text, "THESSALY", a), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=2600, journal=journal))
     events: list[DraftLineV4] = [DraftLineV4(text=p1.registrar_cold_open, cites=[], non_fact=True, speaker="ANNOUNCER", char_id="announcer", source_pass="P1")]
     for i, (a, b) in enumerate(zip(orum, thessaly)):
         events.append(DraftLineV4(text=a.text, cites=a.cites, speaker="ORUM", char_id="c02", source_pass="P2a"))
@@ -1222,7 +1253,7 @@ def run_scifi_sonnet_episode(
             # it could not see, so it wrote fact ids into its prose and omitted the
             # cites array entirely, twice, and the lane died. Hand it the dossier it is
             # required to cite.
-            rewrite = invoke_sonnet_structured(pass_id=f"P5:{round_no}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_rewrite_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "audit": audit.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in audited]}, result_type=RewriteResultV4, post_validator=lambda x: None, base_temperature=.45, structural_retry_temperature=.20, max_new_tokens=3000, journal=journal)
+            rewrite = invoke_sonnet_structured(pass_id=f"P5:{round_no}", slot="creative", slot_fn=creative_fn, seam_ref="sonnet_rewrite_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "audit": audit.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in audited]}, result_type=RewriteResultV4, post_validator=lambda x, a=allowed: _rewrite_spoken_error(x, a), base_temperature=.45, structural_retry_temperature=.20, max_new_tokens=3000, journal=journal)
             _apply_rewrite_corrections(events, audited, rewrite, audit, round_no)
             audit = invoke_sonnet_structured(pass_id=f"P3:recheck:{round_no}", slot="technical", slot_fn=technical_fn, seam_ref="sonnet_audit_system", pack=pack, typed_inputs={"dossier": p0.model_dump(mode="json"), "draft_lines": [events[i].model_dump(mode="json") for i in _audited_line_indices(events)], "coverage": {}}, result_type=AuditVerdictV4, post_validator=lambda x: None, base_temperature=.25, structural_retry_temperature=.12, max_new_tokens=2000, journal=journal)
             audit = _merge_grounding_into_audit(audit, events, p0)
@@ -1264,7 +1295,7 @@ def run_scifi_sonnet_episode(
         DraftLineV4(text=att.vesh_final_seal, cites=[], non_fact=True, speaker="VESH", char_id="c04", source_pass="P6"),
         DraftLineV4(text=att.sign_off, cites=[], non_fact=True, speaker="ANNOUNCER", char_id="announcer", source_pass="P6"),
     ])
-    validate_spoken_text_and_lock(events, cast, allowed_spoken_all_caps(p0))
+    validate_spoken_text_and_lock(events, cast, allowed)
     # The grounding proof. Every factual line cites a real dossier fact and states
     # only numbers the source states -- checked, not felt. This is the one thing in
     # the lane allowed to end an episode over content, and it is deterministic.
