@@ -633,6 +633,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g10_genre_spoken_text(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g11_beat_floor(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
 
 
@@ -755,6 +758,66 @@ def _check_g10_genre_spoken_text(
             f"genre_guard_spoken; the vocabulary is its story_rules."
             f"banned_phrases. An audit may improve a story, never fail one -- "
             f"the fix is the upstream authored repair, not a relaxed gate."
+        )
+
+
+# G11 STRUCTURAL BEAT FLOOR (v4 campaign P1(iv)). Phase 0 collect / Phase 10
+# raise. Operator decision (2026-07-17): beat_bounds gates ONLY a structural
+# beat-count floor that would break downstream consumers; episode length is
+# recorded-not-gated (never chase word count). OPT-IN: reads meta["beat_bounds"]
+# (the writer stamps it with the family band + soft word-derived target); inert
+# when absent (every current freeze-unit fixture). Counts distinct beat_ids
+# among SPOKEN (non-music) lines. Every real episode clears the floor (codex
+# beat_ids = max(3, ...); the legacy adapter pads to >=3), so this never
+# false-fails a shipping lane -- it is the deterministic terminal for a
+# degenerate v4 outline. The family MAX in meta is recorded, NOT gated here
+# (Phase-2 live). Lawful under THE LAW: a deterministic validator ends an
+# episode; the soft length target only steers.
+
+
+def _check_g11_beat_floor(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G11: an episode must clear the structural voiced-beat floor."""
+    meta = ledger_data.get("meta")
+    if not isinstance(meta, dict):
+        return
+    bounds = meta.get("beat_bounds")
+    if not isinstance(bounds, dict):
+        return  # opt-in only; inert for every current freeze-unit fixture
+    try:
+        floor = int(bounds.get("min"))
+    except (TypeError, ValueError):
+        return
+    lines = ledger_data.get("lines")
+    if not isinstance(lines, list):
+        return
+    try:
+        from ._otr_genre_guard import is_spoken_role
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        from _otr_genre_guard import is_spoken_role  # type: ignore
+    beat_ids: set = set()
+    spoken = 0
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        if not is_spoken_role(line.get("speaker_role")):
+            continue
+        spoken += 1
+        bid = line.get("beat_id")
+        if bid:
+            beat_ids.add(str(bid))
+    # Prefer distinct beat_ids; fall back to spoken-line count when a ledger
+    # carries no beat_id (so a missing field never manufactures a false floor).
+    observed = len(beat_ids) if beat_ids else spoken
+    if observed < floor:
+        errors.append(
+            f"G11: episode has {observed} voiced beat(s), below the structural "
+            f"floor of {floor} (family={bounds.get('family')!r}). Below this an "
+            f"episode is not assemblable downstream. Episode length is "
+            f"recorded-not-gated; only this structural floor ends the episode."
         )
 
 

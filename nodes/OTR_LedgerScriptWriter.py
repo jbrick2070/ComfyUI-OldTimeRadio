@@ -4083,6 +4083,29 @@ class OTR_LedgerScriptWriter:
         if bool((_source_bank_row.defaults or {}).get("genre_guard_spoken", False)):
             meta["genre_guard_spoken"] = True
             meta["genre_banned_phrases"] = list(story_rules.banned_phrases)
+        # v4 P1(iv): record the beat-bounds contract -- the SOFT word-derived
+        # target (WORDS_PER_BEAT=40) + the family band. Length is
+        # recorded-not-gated (operator); only the structural floor (min) is
+        # enforced at freeze (G11). family = codex vs inline by pipeline.
+        try:
+            from . import _otr_episode_budget as _OTRB_BB
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_episode_budget as _OTRB_BB  # type: ignore
+        _bb_family = (
+            "codex"
+            if "codex" in str(
+                getattr(_source_bank_row, "default_story_pipeline", "") or ""
+            ).lower()
+            else "inline"
+        )
+        _bb_min, _bb_max = _OTRB_BB.beat_bounds(target_words, _bb_family)
+        meta["beat_bounds"] = {
+            "family": _bb_family,
+            "min": _bb_min,
+            "max": _bb_max,
+            "target": _OTRB_BB.target_beat_count(target_words, _bb_family),
+            "words_per_beat": _OTRB_BB.WORDS_PER_BEAT,
+        }
         meta["source_ref"] = resolved["source_ref"]
         meta["source_meta"] = dict(resolved["source_meta"])
         meta["source_rights"] = dict(resolved["source_rights"])
