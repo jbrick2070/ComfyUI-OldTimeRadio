@@ -130,18 +130,27 @@ def _schemas(offline: bool) -> dict:
 
 
 def build_api_prompt(args) -> tuple[dict, list[str]]:
-    canonical = CANONICAL_WORKFLOW.resolve()
-    expected = (
-        REPO_ROOT / "workflows" / "otr_canonical.json"
-    ).resolve()
-    if canonical != expected:
-        raise SystemExit(f"canonical workflow path mismatch: {canonical}")
-    if not canonical.is_file():
-        raise SystemExit(f"canonical workflow missing: {canonical}")
-
-    print(f"[canonical-api] workflow={canonical}", flush=True)
+    # Default: the canonical workflow, with the deliberate path assertion.
+    # Opt-in --workflow loads an EXPLICIT graph (the story-only scoring graph),
+    # which is a workflow change the caller has deliberately asked for -- not a
+    # silent smoke-vs-canonical drift. When --workflow is absent the behaviour is
+    # byte-identical to before.
+    explicit = getattr(args, "workflow", None)
+    if explicit:
+        wf_path = pathlib.Path(explicit).resolve()
+        if not wf_path.is_file():
+            raise SystemExit(f"--workflow missing: {wf_path}")
+        print(f"[canonical-api] workflow={wf_path} (explicit --workflow)", flush=True)
+    else:
+        wf_path = CANONICAL_WORKFLOW.resolve()
+        expected = (REPO_ROOT / "workflows" / "otr_canonical.json").resolve()
+        if wf_path != expected:
+            raise SystemExit(f"canonical workflow path mismatch: {wf_path}")
+        if not wf_path.is_file():
+            raise SystemExit(f"canonical workflow missing: {wf_path}")
+        print(f"[canonical-api] workflow={wf_path}", flush=True)
     schemas = _schemas(args.offline_schemas)
-    workflow = load_workflow(str(canonical))
+    workflow = load_workflow(str(wf_path))
 
     applied: list[str] = []
     if args.profile and args.profile.lower() != "none":
@@ -184,6 +193,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="build and dump the API prompt without POST /prompt")
     parser.add_argument("--offline-schemas", action="store_true",
                         help="use offline node schemas; for unit tests only")
+    parser.add_argument("--workflow", default=None,
+                        help="explicit workflow JSON path (opt-in; default = the "
+                             "canonical graph). Used for the story-only scoring "
+                             "graph (writer+freeze, no media).")
     parser.add_argument("--dump-prompt", default=str(DEFAULT_PROMPT_DUMP))
     parser.add_argument("--timeout", type=int, default=5400)
     parser.add_argument("--poll-s", type=int, default=5)

@@ -1,0 +1,799 @@
+{
+  "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
+  "revision": 0,
+  "last_node_id": 63,
+  "last_link_id": 279,
+  "nodes": [
+    {
+      "id": 63,
+      "type": "OTR_WorkflowValidator",
+      "pos": [
+        80,
+        470
+      ],
+      "size": [
+        399.96875,
+        271.5625
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "workflow_json_path",
+          "name": "workflow_json_path",
+          "type": "STRING",
+          "widget": {
+            "name": "workflow_json_path"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "validate_anyway",
+          "name": "validate_anyway",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "validate_anyway"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "strict_unknown_types",
+          "name": "strict_unknown_types",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "strict_unknown_types"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "profile_id",
+          "name": "profile_id",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "profile_id"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "master_hash",
+          "name": "master_hash",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "master_hash"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "generated_by",
+          "name": "generated_by",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "generated_by"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "label": "validation_report",
+          "localized_name": "validation_report",
+          "name": "validation_report",
+          "type": "STRING",
+          "links": [
+            279
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_WorkflowValidator",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "",
+        false,
+        true,
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 1,
+      "type": "OTR_LedgerScriptWriter",
+      "pos": [
+        80,
+        80
+      ],
+      "size": [
+        399.96875,
+        1091.4375
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "episode_title",
+          "name": "episode_title",
+          "type": "STRING",
+          "widget": {
+            "name": "episode_title"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "target_words",
+          "name": "target_words",
+          "type": "INT",
+          "widget": {
+            "name": "target_words"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "num_characters",
+          "name": "num_characters",
+          "type": "INT",
+          "widget": {
+            "name": "num_characters"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "creative_writing_model",
+          "name": "creative_writing_model",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "creative_writing_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "technical_model",
+          "name": "technical_model",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "technical_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "custom_premise",
+          "name": "custom_premise",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "custom_premise"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "include_act_breaks",
+          "name": "include_act_breaks",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "include_act_breaks"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "act_count",
+          "name": "act_count",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "act_count"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "creativity",
+          "name": "creativity",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "creativity"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "perfect_run_spacesaver",
+          "name": "perfect_run_spacesaver",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "perfect_run_spacesaver"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "min_p",
+          "name": "min_p",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "min_p"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "repetition_penalty",
+          "name": "repetition_penalty",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "repetition_penalty"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_new_tokens_cap",
+          "name": "max_new_tokens_cap",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "max_new_tokens_cap"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "lemmy_cameo",
+          "name": "lemmy_cameo",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "lemmy_cameo"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "use_exchange",
+          "name": "use_exchange",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "use_exchange"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "enable_production_stage3_validators",
+          "name": "enable_production_stage3_validators",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "enable_production_stage3_validators"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "news_briefs_required",
+          "name": "news_briefs_required",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "news_briefs_required"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "openrouter_slot_a_model",
+          "name": "openrouter_slot_a_model",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "openrouter_slot_a_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "openrouter_slot_b_model",
+          "name": "openrouter_slot_b_model",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "openrouter_slot_b_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "comfy_slot_a_model",
+          "name": "comfy_slot_a_model",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "comfy_slot_a_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "comfy_slot_b_model",
+          "name": "comfy_slot_b_model",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "comfy_slot_b_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "refine_target_grade",
+          "name": "refine_target_grade",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "refine_target_grade"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "story_scaffold",
+          "name": "story_scaffold",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "story_scaffold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "source_bank",
+          "name": "source_bank",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "source_bank"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "visual_style",
+          "name": "visual_style",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "visual_style"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "google_api_slot_a_model",
+          "name": "google_api_slot_a_model",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "google_api_slot_a_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "google_api_slot_b_model",
+          "name": "google_api_slot_b_model",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "google_api_slot_b_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "source_ref",
+          "name": "source_ref",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "source_ref"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "llm_device",
+          "name": "llm_device",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "llm_device"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "llm_attn_impl",
+          "name": "llm_attn_impl",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "llm_attn_impl"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "llm_quant_policy",
+          "name": "llm_quant_policy",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "llm_quant_policy"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "llm_vram_ceiling_gb",
+          "name": "llm_vram_ceiling_gb",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "llm_vram_ceiling_gb"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "gguf_n_ctx",
+          "name": "gguf_n_ctx",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "gguf_n_ctx"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "gguf_quant",
+          "name": "gguf_quant",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "gguf_quant"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "gate_in",
+          "name": "gate_in",
+          "shape": 7,
+          "type": "STRING",
+          "link": 279
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "script_text",
+          "name": "script_text",
+          "type": "STRING",
+          "slot_index": 0,
+          "links": [
+            106
+          ]
+        },
+        {
+          "localized_name": "script_json",
+          "name": "script_json",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": [
+            230
+          ]
+        },
+        {
+          "localized_name": "news_used",
+          "name": "news_used",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": [
+            108
+          ]
+        },
+        {
+          "localized_name": "estimated_minutes",
+          "name": "estimated_minutes",
+          "type": "INT",
+          "slot_index": 3,
+          "links": [
+            109
+          ]
+        },
+        {
+          "localized_name": "technical_model",
+          "name": "technical_model",
+          "type": "STRING",
+          "slot_index": 4,
+          "links": [
+            115
+          ]
+        }
+      ],
+      "title": "1. Story Writer (LPL v2.0)",
+      "properties": {
+        "Node name for S&R": "OTR_LedgerScriptWriter"
+      },
+      "widgets_values": [
+        "",
+        30,
+        2,
+        "mistralai/Mistral-Nemo-Instruct-2407",
+        "mistralai/Mistral-Nemo-Instruct-2407",
+        "",
+        true,
+        "auto",
+        "balanced",
+        false,
+        0.05,
+        1.03,
+        200,
+        "roll (~11% chance)",
+        true,
+        true,
+        true,
+        "(enable OpenRouter)",
+        "(enable OpenRouter)",
+        "(enable Comfy Credits)",
+        "(enable Comfy Credits)",
+        "Off",
+        "auto",
+        "science_news",
+        "sci_fi_radio",
+        "(select Google API model)",
+        "(select Google API model)",
+        "",
+        "cuda",
+        "sdpa",
+        "bnb_nf4",
+        14.5,
+        4096,
+        "Q8_0"
+      ],
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 62,
+      "type": "OTR_LedgerFreezeCascade",
+      "pos": [
+        620,
+        80
+      ],
+      "size": [
+        379.96875,
+        431.578125
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "script_text",
+          "name": "script_text",
+          "type": "STRING",
+          "link": 106
+        },
+        {
+          "localized_name": "script_json",
+          "name": "script_json",
+          "shape": 7,
+          "type": "STRING",
+          "link": 230
+        },
+        {
+          "localized_name": "news_used",
+          "name": "news_used",
+          "shape": 7,
+          "type": "STRING",
+          "link": 108
+        },
+        {
+          "localized_name": "estimated_minutes",
+          "name": "estimated_minutes",
+          "shape": 7,
+          "type": "INT",
+          "link": 109
+        },
+        {
+          "localized_name": "technical_model",
+          "name": "technical_model",
+          "shape": 7,
+          "type": "STRING",
+          "link": 115
+        },
+        {
+          "localized_name": "enable_phase_7_audio_readiness",
+          "name": "enable_phase_7_audio_readiness",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "enable_phase_7_audio_readiness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "enable_phase_8_video_readiness",
+          "name": "enable_phase_8_video_readiness",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "enable_phase_8_video_readiness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "render_selection",
+          "name": "render_selection",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "render_selection"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "render_max_n",
+          "name": "render_max_n",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "render_max_n"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "protagonist_only",
+          "name": "protagonist_only",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "protagonist_only"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "manual_line_ids",
+          "name": "manual_line_ids",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "manual_line_ids"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "script_text",
+          "name": "script_text",
+          "type": "STRING",
+          "slot_index": 0,
+          "links": []
+        },
+        {
+          "localized_name": "script_json",
+          "name": "script_json",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": []
+        },
+        {
+          "localized_name": "news_used",
+          "name": "news_used",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": []
+        },
+        {
+          "localized_name": "estimated_minutes",
+          "name": "estimated_minutes",
+          "type": "INT",
+          "slot_index": 3,
+          "links": []
+        },
+        {
+          "localized_name": "freeze_verdict",
+          "name": "freeze_verdict",
+          "type": "STRING",
+          "slot_index": 4,
+          "links": []
+        },
+        {
+          "localized_name": "episode_seed",
+          "name": "episode_seed",
+          "type": "INT",
+          "slot_index": 5,
+          "links": []
+        },
+        {
+          "localized_name": "v2_ledger_json",
+          "name": "v2_ledger_json",
+          "type": "STRING",
+          "slot_index": 6,
+          "links": []
+        }
+      ],
+      "title": "1b. Ledger Freeze Cascade (Phase 0.10)",
+      "properties": {
+        "Node name for S&R": "OTR_LedgerFreezeCascade"
+      },
+      "widgets_values": [
+        true,
+        true,
+        "all",
+        6,
+        false,
+        ""
+      ],
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    }
+  ],
+  "links": [
+    [
+      106,
+      1,
+      0,
+      62,
+      0,
+      "STRING"
+    ],
+    [
+      108,
+      1,
+      2,
+      62,
+      2,
+      "STRING"
+    ],
+    [
+      109,
+      1,
+      3,
+      62,
+      3,
+      "INT"
+    ],
+    [
+      115,
+      1,
+      4,
+      62,
+      4,
+      "STRING"
+    ],
+    [
+      230,
+      1,
+      1,
+      62,
+      1,
+      "STRING"
+    ],
+    [
+      279,
+      63,
+      0,
+      1,
+      34,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6363636363636366,
+      "offset": [
+        -101.2635191751642,
+        74.11313678632712
+      ]
+    },
+    "info": {
+      "name": "Old-Time Radio Sci-Fi Anthology",
+      "author": "Jeffrey Brick",
+      "description": "Full pipeline: LLM scripts + TTS + spatial audio + dropdown-routed image/video model selection.",
+      "version": "2.0-alpha"
+    }
+  },
+  "version": 0.4
+}

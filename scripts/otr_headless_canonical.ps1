@@ -24,7 +24,8 @@ param(
     [int]$Timeout = 5400,
     [int]$PollSeconds = 5,
     [int]$Port = 0,
-    [string]$ServerLog = ""
+    [string]$ServerLog = "",
+    [string]$Workflow = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -155,6 +156,9 @@ $argsList = @(
     "--timeout", "$Timeout",
     "--poll-s", "$PollSeconds"
 )
+if ($Workflow -ne "") {
+    $argsList += @("--workflow", $Workflow)
+}
 foreach ($patch in $Set) {
     $argsList += @("--set", $patch)
 }

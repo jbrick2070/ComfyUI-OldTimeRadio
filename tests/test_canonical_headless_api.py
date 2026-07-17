@@ -79,10 +79,18 @@ def _node(prompt: dict, class_type: str) -> dict:
     return matches[0]
 
 
-def test_canonical_runner_has_no_workflow_argument():
+def test_canonical_runner_workflow_arg_is_opt_in_default_canonical():
+    # The runner defaults to the canonical graph WITH its path assertion; an
+    # OPT-IN --workflow loads an explicit graph (the story-only scoring graph:
+    # writer+freeze, no media) only when the caller deliberately asks. Absent
+    # the flag, behaviour is byte-identical to the canonical-only contract, so
+    # there is still no silent smoke-vs-canonical drift.
     src = (SCRIPTS / "otr_canonical_api_run.py").read_text(encoding="utf-8")
-    assert '"--workflow"' not in src
     assert "CANONICAL_WORKFLOW" in src
+    assert '"--workflow"' in src, "the opt-in --workflow arg must exist"
+    assert "explicit --workflow" in src, "the opt-in branch must be present"
+    # The default (no --workflow) path must still assert the canonical path.
+    assert "canonical workflow path mismatch" in src
 
 
 def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):

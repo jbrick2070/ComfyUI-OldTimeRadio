@@ -129,6 +129,12 @@ class OTR_LedgerFreezeCascade:
         # R0a: appended at indices 5,6 -- never inserted (outputs 0-4 frozen).
         "episode_seed", "v2_ledger_json",
     )
+    # OUTPUT_NODE so a stripped "story-only" workflow (validator -> writer ->
+    # freeze) can terminate HERE: ComfyUI runs the freeze as a terminal and the
+    # frozen ledger lands on disk with no downstream media node. In the full
+    # canonical this node already always executes, so marking it terminal is
+    # inert there -- downstream nodes still consume its outputs normally.
+    OUTPUT_NODE = True
 
     @classmethod
     def INPUT_TYPES(cls):
