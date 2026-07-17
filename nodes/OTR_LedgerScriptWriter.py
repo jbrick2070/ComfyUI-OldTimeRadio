@@ -4089,6 +4089,10 @@ class OTR_LedgerScriptWriter:
         if bool((_source_bank_row.defaults or {}).get(
                 "require_outro_cast_complete", False)):
             meta["outro_cast_complete"] = True
+        # v4 P1(vii): opt-in literal-placeholder-token gate (deterministic G13).
+        # Default False -> key absent -> inert for every current bank.
+        if bool((_source_bank_row.defaults or {}).get("placeholder_guard", False)):
+            meta["placeholder_guard"] = True
         # v4 P1(iv): record the beat-bounds contract -- the SOFT word-derived
         # target (WORDS_PER_BEAT=40) + the family band. Length is
         # recorded-not-gated (operator); only the structural floor (min) is

@@ -639,6 +639,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g12_outro_cast_complete(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g13_placeholder_tokens(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
 
 
@@ -857,6 +860,41 @@ def _check_g12_outro_cast_complete(
             f"{', '.join(sample)}{more}. A radio sign-off names its cast; the fix "
             f"is the upstream authored outro repair, not a relaxed gate (Python "
             f"never appends a name to prose)."
+        )
+
+
+# G13 LITERAL PLACEHOLDER TOKENS (v4 campaign P1(vii)). Phase 0 collect / Phase
+# 10 raise. Opt-in via meta["placeholder_guard"] (the writer stamps it when the
+# bank sets defaults.placeholder_guard); inert for every current bank. Flags a
+# named field (cast name / character description, line speaker, or a spoken line
+# that is WHOLLY a placeholder) carrying a bare scaffolding token (X, Y, TBD,
+# ...). Whole-value + token-boundary, so a real word containing those letters
+# never trips. Deterministic terminal -- no authored repair (a placeholder is a
+# generation bug the pack fixes, not prose to re-author).
+
+
+def _check_g13_placeholder_tokens(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G13: no bare placeholder token in a named field."""
+    meta = ledger_data.get("meta")
+    if not isinstance(meta, dict) or not meta.get("placeholder_guard"):
+        return  # opt-in only; inert for every current bank
+    try:
+        from ._otr_placeholder_guard import find_placeholder_fields
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        from _otr_placeholder_guard import find_placeholder_fields  # type: ignore
+    hits = find_placeholder_fields(ledger_data)
+    if hits:
+        sample = hits[:6]
+        more = "" if len(hits) <= 6 else f" (+{len(hits) - 6} more)"
+        errors.append(
+            f"G13: {len(hits)} field(s) carry a literal placeholder token: "
+            f"{'; '.join(sample)}{more}. A placeholder that survives to freeze is "
+            f"a generation bug -- the pack must author a real value, never ship "
+            f"'X'/'Y'/'TBD' on the microphone or in the credits."
         )
 
 
