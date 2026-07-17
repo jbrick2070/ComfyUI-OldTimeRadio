@@ -3,6 +3,70 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-17 night -- HEAD c3a9d420 (v2.0-alpha) [v4 campaign: Phase 0 done + P1(i) pushed]
+
+Did:
+- Phase 0: root-caused PBUG-20260710-07 STATICALLY -- the D3 pre-freeze coerce
+  sweep (_otr_freeze_cascade.py:1367 -> production_ledger.coerce_speaker_role_for_char_id)
+  resolves the announcer<->char_id ambiguity via cast_ids (announcer-named slots
+  excluded; the "Chandra c02" mis-stamp is a real character, correctly coerced).
+  Already closed by sentinel char_id mint + name exclusion + the role_coerce
+  compose_flags breadcrumb; pinned by tests/test_d3_role_coercion.py (14/14). NO
+  coerce code change -- adding one is a shim (operator directive). Durable v4
+  protection = per-lane "announcer lines carry the sentinel char_id" minting
+  invariant, enforced in Phase 2; a live v4 leg formally retires the PBUG (kept
+  ROOT-OPEN in PROD_BUG_LOG until then). Exact-id/sidecar audit + nine-defect
+  disposition done. Defect #2 (name-splice) stays OPEN per the timebox.
+- P1(i) @ c3a9d420: validated scalar bank defaults (style_pool_class,
+  require_science_floor, propagate_adaptation_cast) added to _parse_bank; deleted
+  the strict_v4_banks set + the (shakespeare_v3,public_domain_story_v3) tuple + the
+  media/adaptation literal branches in select_style. Writer stamps
+  meta.style_pool_class from bank.defaults; select_style reads meta (hash keys
+  UNCHANGED -> byte-identical slugs, C7); science-floor + adaptation-cast consumers
+  read bank.defaults directly. Migrated all 10 runnable banks.json rows.
+  tests/test_bank_scalar_defaults.py (new, 27) + updated test_style_catalog.py.
+  Full suite 7974 passed / 32 skipped / 1 xfailed; Bug Bible 17; AST/JSON/BOM PASS.
+  Visual-STYLE pool axis is separate from the source FEED (science_rss vs
+  media_archive_rss); scifi_fable2 keeps the science_rss feed but no science floor
+  (matches prior). base_source_bank_id retained (bakeoff logic) -- only its use in
+  the 3 consumers removed.
+Current step: v4 campaign Phase 1 -- P1(ii) breadcrumb regression + reason stamp.
+Next: P1(ii) -> P1(iii) genre/spoken-text -> (iv) beat_bounds -> (v) outro -> (vi)
+  header<->scene -> (vii) placeholder -> (viii) provenance (each its own green pushed
+  chunk); then Phase 2 (5 v4 banks, each a live GPU leg). Operator decisions defaulted
+  (vetoable at the consuming chunk): WORDS_PER_BEAT=40 (soft; length recorded-not-gated),
+  media_archive_v4 OWN drama_seeds, public_domain research_only BLOCKS publish.
+Commits: c3a9d420
+
+## 2026-07-17 evening -- HEAD 659ce5b2 (v2.0-alpha) [v4 campaign: full kibitz arc r1-r4 CONVERGED; final.md plan of record; NO code yet]
+
+Did:
+- Ran the LESSONS GATE (PRODUCTION_SPRINT_LESSONS incl. lesson 24 + PROD_BUG_LOG + Bug Bible)
+  and mapped the live seams for the 5 lanes -> docs/2026-07-17-v4-campaign/LESSONS_GATE_BRIEF.md.
+- Ran the FULL kibitz arc r1-r4 (operator routing: Codex @ gpt-5.6-sol + agy @ Gemini 3.1 Pro
+  (High); Claude anchor+judge; $0 local). agy model corrected to "Gemini 3.1 Pro (High)" (3.5 Pro
+  is not an installed slug). Every folded panel claim grounded CONFIRMED against real Windows files
+  (5 grounding subagents). Artifacts: docs/2026-07-17-v4-campaign/{pass00,r1_plan,r2_plan,r3_plan,
+  final}.md + r{1..4}_judgment.md + roundtable/r{1..4}_claude_anchor.md + kibitz-runs/2026-07-17-v4-campaign/.
+- Converged design of record = final.md. Key grounded corrections vs the naive plan: a `_v4` id
+  silently drops out of style pool / science floor / adaptation-cast (:4286) / sidecars -> each v4
+  re-owns via validated scalar bank defaults (style_pool_class, require_science_floor,
+  propagate_adaptation_cast); wiring mirrors v3 (shared legacy_many_pass_v4 for the 3 inline lanes,
+  original_multi_pass_v4 + scifi_codex_circuit_v4 executable:true); genre banned_phrases does NOT
+  gate spoken text today -> new boundary-aware spoken-text validator (writer-boundary repair +
+  Phase-10 FreezeAssertionError scan); beat_bounds terminal = raise (no STORY_META output); outro
+  missing name = bounded authored patch (no forced coordinate); text_for_tts already FIXED (dropped);
+  weapons_smoking is an EXISTING lexicon-corroborated hard class (retain+author to pass, no new filter);
+  A/B "strictly better" = POST-BUILD qualification (may be cloud), ship gate = green+live.
+- Plan is Phase 0 (audit + PBUG-20260710-07 breadcrumb root-fix + verifies) -> Phase 1 (8 shared
+  fixes, each green pushed chunk, canary per execution family) -> Phase 2 (5 v4 banks serialized,
+  atomic per-bank chunk). 11-item VERIFY-AT-BUILD checklist in final.md.
+Current step: v4 campaign -- ARC DONE; awaiting operator GO to start Phase 0 (first code).
+Next: Phase 0 audit + breadcrumb root-hunt; then Phase 1 shared fixes; then the 5 v4 banks.
+  Open operator decisions surfaced in final.md: WORDS_PER_BEAT constant, media_archive_v4 sidecar
+  own-vs-share, whether public_domain research_only blocks publish.
+Commits: none (docs only; campaign docs under gitignored docs/2026-07-17-v4-campaign/ + kibitz-runs/).
+
 ## 2026-07-17 afternoon -- HEAD 499386aa (v2.0-alpha) [roster trim -> 10 INDEPENDENT lanes + science_news family retired; ONE combined commit]
 
 Did:

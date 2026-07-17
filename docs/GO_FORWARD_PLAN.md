@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-17 afternoon -- HEAD `499386aa`, branch `v2.0-alpha`. Truly forward-only by
+**Updated:** 2026-07-17 night -- HEAD `c3a9d420`, branch `v2.0-alpha`. Truly forward-only by
 operator directive: completed work lives in `docs/HANDOFF_LOG.md` (history) and
 `docs/PROD_BUG_LOG.md` (bugs); doctrine lives in
 `docs/PRODUCTION_SPRINT_LESSONS.md` (the "lost anchor" class is now lesson 24
@@ -33,11 +33,42 @@ design in `docs/2026-07-17-roster-trim-rip-plan.md`.
 
 **NEXT (operator 2026-07-17): a v4 improvement campaign** to lift the kept banks
 -- produce a **v4** for `scifi_codex` (improve on v1), `shakespeare`,
-`public_domain`, `media_archive`, and `original_radio`. Arc: frontier
-`/roundtable` **R1-R2** (seat the new **Kimi 3** alongside GPT/Gemini/DeepSeek)
-for ideas + coding approach, then local `/kibitz` **R3-R4** for wiring +
-convergence. Author every v4 lane as a fully INDEPENDENT bank (own pack +
-story_rules + pipeline; no base-map).
+`public_domain`, `media_archive`, and `original_radio`, each a fully INDEPENDENT
+bank (own row + pack + story_rules by exact id + pipeline; no base-map).
+
+**ARC COMPLETE (2026-07-17 evening):** the full kibitz arc r1-r4 ran and CONVERGED
+(operator routing: Codex @ gpt-5.6-sol + agy @ Gemini 3.1 Pro (High); Claude
+anchor+judge; $0 local -- the cloud roundtable was skipped per operator "also
+/kibitz GPT-5.6-sol and Gemini Pro"). Plan of record =
+`docs/2026-07-17-v4-campaign/final.md` (+ LESSONS_GATE_BRIEF.md, r1..r3_plan.md,
+r1..r4_judgment.md; raw panels under `kibitz-runs/2026-07-17-v4-campaign/`). Every
+folded panel claim was grounded CONFIRMED against the real files.
+**IN EXECUTION (coder window, 2026-07-17 night).** Plan of record =
+`docs/2026-07-17-v4-campaign/final.md`. Phase 0 -> Phase 1 (8 shared fixes, each
+its own green pushed chunk, canary per execution family) -> Phase 2 (5 v4 banks
+serialized, atomic per-bank chunk). Ship gate = green+live+pushed; "strictly
+better" = a POST-BUILD blind A/B.
+
+- **Phase 0 DONE** (detail in HANDOFF_LOG 2026-07-17 night). PBUG-20260710-07
+  root-caused STATICALLY = the D3 pre-freeze coerce sweep; already closed by
+  sentinel-mint + name-exclusion + the `role_coerce` compose_flags breadcrumb,
+  pinned by `tests/test_d3_role_coercion.py`. No coerce change (a shim). Durable
+  v4 protection = per-lane announcer-sentinel minting invariant (Phase 2 + a live
+  leg retires the PBUG, kept ROOT-OPEN in the log until then). Defect #2
+  (name-splice) stays OPEN per the timebox.
+- **P1(i) PUSHED @ `c3a9d420`** -- validated scalar bank defaults
+  (`style_pool_class`|`require_science_floor`|`propagate_adaptation_cast`) replace
+  the 3 hardcoded exact-id sets; all 10 runnable rows migrated; `select_style`
+  hash keys preserved -> byte-identical slugs (C7). Suite 7974 / Bible 17.
+- **CURRENT: P1(ii)** breadcrumb regression + reason stamp, then (iii)
+  genre/spoken-text validator, (iv) beat_bounds, (v) outro, (vi) header<->scene,
+  (vii) placeholder, (viii) provenance -- each its own green pushed chunk. Then
+  Phase 2 banks (each a live GPU leg): scifi_codex_v4, shakespeare_v4,
+  public_domain_story_v4, media_archive_v4, original_radio_v4.
+
+Open operator decisions (defaulted, vetoable at the consuming chunk):
+WORDS_PER_BEAT=40 (soft target; length recorded-not-gated); media_archive_v4 ships
+its OWN drama_seeds; public_domain `research_only` BLOCKS publish.
 
 The 24-lane bake-off campaign that produced the scoreboard is **CONCLUDED** (its
 verdict drove this trim); records live in HANDOFF_LOG +
