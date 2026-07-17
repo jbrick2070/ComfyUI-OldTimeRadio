@@ -42,20 +42,6 @@ _WRITER = _REPO / "nodes" / "OTR_LedgerScriptWriter.py"
 
 
 class TestByteIdentity:
-    def test_science_pack_seam_matches_constant(self):
-        pack = resolve_story_pack("science_news")
-        assert get_pack_prompt(pack, "exchange_system") == EXCHANGE_SYSTEM_PROMPT
-
-    def test_router_default_bank_matches_constant(self):
-        assert resolve_creative_system_prompt(
-            None, phase="exchange_system"
-        ) == EXCHANGE_SYSTEM_PROMPT
-
-    def test_router_explicit_science_bank_matches_constant(self):
-        assert resolve_creative_system_prompt(
-            None, phase="exchange_system", source_bank_id="science_news"
-        ) == EXCHANGE_SYSTEM_PROMPT
-
     def test_constant_still_fixture(self):
         # The constant stays in _otr_compose_exchange as the extraction
         # fixture; the router imports it for _MODERN_BY_PHASE.
@@ -79,10 +65,6 @@ class TestAssemblyIdentity:
             system_prompt=system_prompt,
         )
 
-    def test_none_vs_routed_science_byte_identical(self):
-        routed = resolve_creative_system_prompt(None, phase="exchange_system")
-        assert self._messages(None) == self._messages(routed)
-
     def test_dynamic_bullets_still_appended(self):
         # The pack owns only the STATIC portion; the grounding clause and
         # soft nudge stay Python-owned and are appended after it.
@@ -103,7 +85,7 @@ class TestPublicDomainRouting:
     def test_public_domain_exchange_seam_routes(self):
         resolved = resolve_creative_system_prompt(
             None, phase="exchange_system",
-            source_bank_id="public_domain_story")
+            source_bank_id="public_domain_story_v3")
         assert "public-domain" in resolved
         assert resolved != EXCHANGE_SYSTEM_PROMPT
 

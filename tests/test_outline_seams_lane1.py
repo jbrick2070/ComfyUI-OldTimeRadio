@@ -35,17 +35,6 @@ _SEAM_TO_CONST = {
 
 
 class TestByteIdentity:
-    @pytest.mark.parametrize("phase", sorted(_SEAM_TO_CONST))
-    def test_router_science_matches_constant(self, phase):
-        resolved = resolve_creative_system_prompt(None, phase=phase)
-        assert resolved == _SEAM_TO_CONST[phase]
-
-    @pytest.mark.parametrize("phase", sorted(_SEAM_TO_CONST))
-    def test_explicit_science_bank_identical(self, phase):
-        assert resolve_creative_system_prompt(
-            None, phase=phase, source_bank_id="science_news"
-        ) == _SEAM_TO_CONST[phase]
-
     def test_plain_outline_phase_object_identity_untouched(self):
         resolved = resolve_creative_system_prompt(
             "mistralai/Mistral-Nemo-Instruct-2407", phase="outline")
@@ -56,7 +45,7 @@ class TestPublicDomainRouting:
     @pytest.mark.parametrize("phase", sorted(_SEAM_TO_CONST))
     def test_public_domain_outline_seams_route(self, phase):
         resolved = resolve_creative_system_prompt(
-            None, phase=phase, source_bank_id="public_domain_story")
+            None, phase=phase, source_bank_id="public_domain_story_v3")
         assert "public-domain" in resolved or "adaptation" in resolved
         assert resolved != _SEAM_TO_CONST[phase]
 
@@ -65,7 +54,7 @@ class TestThreading:
     def test_generate_outline_signature(self):
         params = inspect.signature(outline_mod.generate_outline).parameters
         assert "source_bank_id" in params
-        assert params["source_bank_id"].default == "science_news"
+        assert params["source_bank_id"].default == "media_archive"
 
     def test_writer_call_sites_pass_bank(self):
         src = (_REPO / "nodes" / "OTR_LedgerScriptWriter.py").read_text(

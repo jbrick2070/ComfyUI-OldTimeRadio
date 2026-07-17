@@ -19,7 +19,8 @@ Sweep contract (kibitz r2 M5 / r3 S3 / r4):
 - only <registered_bank_id>.json files under nodes/story_rules/ (dirs and
   stray files = hard error);
 - rules_id == filename stem == a REGISTERED source_bank_id (banks.json);
-- science_news.json REQUIRED (the production lane always has rules);
+  each runnable lane owns its OWN rules pack by EXACT id (no family base-map);
+- the DEFAULT_RULES_ID pack REQUIRED (the production lane always has rules);
 - a MISSING pack is legal ONLY for a runnable:false bank; explicit
   resolve_story_rules() on a bank without a pack raises
   UnknownStoryRulesError (unreachable in production while the run gate
@@ -34,10 +35,9 @@ Sweep contract (kibitz r2 M5 / r3 S3 / r4):
   the repair path's swallow).
 
 JSON escape rule (load-bearing): files carry the regex SOURCE with DOUBLED
-backslashes (`\\\\b` in-file -> `\\b` to re.compile). science_news.json is
-GENERATED from the live Python constants, so fidelity holds by construction;
-the extraction test pins the round-trip and the corpus test pins compiled
-behavior.
+backslashes (`\\\\b` in-file -> `\\b` to re.compile). Each lane owns an
+AUTHORED pack (independence refactor 2026-07-17); the loader compiles it
+fail-loud and the corpus test pins compiled behavior.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ from pathlib import Path
 
 _STORY_RULES_ROOT = Path(__file__).resolve().parent / "story_rules"
 
-DEFAULT_RULES_ID = "science_news"
+DEFAULT_RULES_ID = "scifi_fable2"
 
 KNOWN_RULES_SCHEMA_VERSIONS = frozenset({"v1"})
 
@@ -273,9 +273,10 @@ def _load_all() -> "dict[str, StoryRules]":
             f"rules")
     # A RUNNABLE bank without a rules pack is a contract violation (a
     # runnable lane's gates would silently have no vocabulary source).
-    from ._otr_bank_variants import base_source_bank_id
+    # Each runnable lane resolves its rules by EXACT id -- independence
+    # refactor 2026-07-17: no family base-mapping, every kept lane owns its pack.
     missing_runnable = sorted(
-        {base_source_bank_id(b) for b in _runnable_bank_ids()} - set(rules)
+        set(_runnable_bank_ids()) - set(rules)
     )
     if missing_runnable:
         raise StoryRulesValidationError(
@@ -300,9 +301,8 @@ def resolve_story_rules(source_bank_id: str) -> StoryRules:
     """bank id -> compiled StoryRules. Missing pack = hard error (legal only
     for runnable:false banks, which the run gate keeps out of production)."""
     rules = _ensure_loaded()
-    from ._otr_bank_variants import base_source_bank_id
     try:
-        return rules[base_source_bank_id(source_bank_id)]
+        return rules[source_bank_id]
     except KeyError:
         raise UnknownStoryRulesError(
             f"no story_rules pack for source_bank {source_bank_id!r}; "

@@ -69,7 +69,12 @@ class TestReroll:
             calls["n"] += 1
             return dirty if calls["n"] == 1 else _CLEAN
 
-        res = compose_line(creative_fn=mock, req=_req())
+        # Roster trim (2026-07-17): the composer default source_bank_id moved
+        # science_news -> media_archive, whose rules do NOT flag these generic
+        # cliche/stage-business phrases; pin a kept lane whose rules do (matching
+        # the pre-trim default behavior) so the reroll contract is exercised.
+        res = compose_line(creative_fn=mock, req=_req(),
+                           source_bank_id="original_radio")
         # The flagged draft triggers EXACTLY one reroll and stamps the quality
         # retry breadcrumb. story-quality v2 (baked in): whether the reroll's
         # output ships is decided by line_quality_defect_score (keep only if it
@@ -85,7 +90,12 @@ class TestReroll:
             calls["n"] += 1
             return _CLEAN
 
-        res = compose_line(creative_fn=mock, req=_req())
+        # Roster trim (2026-07-17): the composer default source_bank_id moved
+        # science_news -> media_archive, whose rules do NOT flag these generic
+        # cliche/stage-business phrases; pin a kept lane whose rules do (matching
+        # the pre-trim default behavior) so the reroll contract is exercised.
+        res = compose_line(creative_fn=mock, req=_req(),
+                           source_bank_id="original_radio")
         assert calls["n"] == 1
         assert res.text == _CLEAN
 

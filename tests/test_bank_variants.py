@@ -70,20 +70,20 @@ class TestHelper:
 
 
 # ---------------------------------------------------------------------------
-# 2. story_rules base-map (resolve): a variant id resolves the base rules pack
+# 2. story_rules independence (resolve): each lane owns its rules by EXACT id
 # ---------------------------------------------------------------------------
+# Independence refactor 2026-07-17: the base_source_bank_id family-mapping is
+# SEVERED for story_rules -- a _v3 lane resolves its OWN pack by exact id, NOT
+# its base family's. The old "variant resolves base rules" pin is obsolete.
 
-class TestStoryRulesBaseMap:
-    @pytest.mark.parametrize("base", [
-        "science_news", "media_archive", "public_domain_story", "shakespeare",
-        "original_radio", "scifi_fable2", "scifi_codex", "scifi_sonnet",
+class TestStoryRulesIndependence:
+    @pytest.mark.parametrize("bank_id", [
+        "media_archive", "original_radio", "scifi_fable2", "scifi_codex",
+        "media_archive_v3", "public_domain_story_v3", "shakespeare_v3",
+        "scifi_fable2_v3", "scifi_codex_v3", "scifi_sonnet_v3",
     ])
-    def test_variant_resolves_base_rules(self, base):
-        base_rules = RULES.resolve_story_rules(base)
-        for suffix in ("_v2", "_v3"):
-            variant_rules = RULES.resolve_story_rules(base + suffix)
-            assert variant_rules is base_rules
-            assert variant_rules.rules_id == base
+    def test_lane_resolves_its_own_rules(self, bank_id):
+        assert RULES.resolve_story_rules(bank_id).rules_id == bank_id
 
     def test_unknown_bank_still_raises(self):
         with pytest.raises(RULES.UnknownStoryRulesError):
@@ -130,60 +130,18 @@ class TestNoRegression:
 
 
 # ---------------------------------------------------------------------------
-# 5. Chunk 2: the 8 _v2 rows resolve (16 runnable / 17 visible)
+# 5. Roster trim 2026-07-17: the 6 surviving _v3 lanes (own v3 pipeline; sci-fi
+#    own-runner, rest inline). The whole _v2 family and the science_news family
+#    are REMOVED -- roster is now 10 runnable / 11 visible.
 # ---------------------------------------------------------------------------
 
-_V2_BASE = {
-    "science_news_v2": "science_news",
-    "media_archive_v2": "media_archive",
-    "public_domain_story_v2": "public_domain_story",
-    "shakespeare_v2": "shakespeare",
-    "original_radio_v2": "original_radio",
-    "scifi_fable2_v2": "scifi_fable2",
-    "scifi_codex_v2": "scifi_codex",
-    "scifi_sonnet_v2": "scifi_sonnet",
-}
-
-
-class TestChunk2V2Rows:
-    def test_counts_24_runnable_25_visible(self):
-        # chunk 4: 8 base + 8 _v2 + 8 _v3 + custom = 25 visible / 24 runnable.
-        ids = ROUTING.list_bank_ids()
-        assert len(ids) == 25
-        assert ids[-1] == "custom_source_bank"
-        runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
-        assert len(runnable) == 24                 # only custom is non-runnable
-        assert len([b for b in ids if b.endswith("_v2")]) == 8
-        assert len([b for b in ids if b.endswith("_v3")]) == 8
-
-    @pytest.mark.parametrize("v2,base", sorted(_V2_BASE.items()))
-    def test_v2_owns_its_pack_on_the_base_pipeline(self, v2, base):
-        bank = ROUTING.get_bank(v2)
-        base_bank = ROUTING.get_bank(base)
-        assert bank.runnable is True
-        # variant rows change ONLY default_story_model -> its own _v2 pack;
-        # the pipeline mirrors the base family (B6).
-        assert bank.default_story_pipeline == base_bank.default_story_pipeline
-        pack = ROUTING.resolve_story_pack(v2)
-        assert pack.source_bank_id == v2
-        assert pack.story_model_id.endswith("_v2")
-        assert pack.story_pipeline_id == base_bank.default_story_pipeline
-        # family behaviour: a _v2 id resolves the BASE family's story rules.
-        assert BV.base_source_bank_id(v2) == base
-        assert RULES.resolve_story_rules(v2).rules_id == base
-
-
-# ---------------------------------------------------------------------------
-# 6. Chunk 4: the 8 _v3 lanes (own v3 pipeline; sci-fi own-runner, rest inline)
-# ---------------------------------------------------------------------------
-
-# v3 bank id -> (base, v3 pipeline id, lane kind)
+# v3 bank id -> (base, v3 pipeline id, lane kind). `base` is the pure
+# base_source_bank_id strip (still a valid string op); rules now resolve by
+# EXACT id, not by base family.
 _V3 = {
-    "science_news_v3":        ("science_news",        "legacy_many_pass_v3",         "inline"),
     "media_archive_v3":       ("media_archive",       "legacy_many_pass_v3",         "inline"),
     "public_domain_story_v3": ("public_domain_story", "legacy_many_pass_v3",         "inline"),
     "shakespeare_v3":         ("shakespeare",         "legacy_many_pass_v3",         "inline"),
-    "original_radio_v3":      ("original_radio",      "original_multi_pass_v3",      "inline"),
     "scifi_fable2_v3":        ("scifi_fable2",        "fable2_multipass_v3",         "runner"),
     "scifi_codex_v3":         ("scifi_codex",         "scifi_codex_circuit_v3",      "runner"),
     "scifi_sonnet_v3":        ("scifi_sonnet",        "sonnet_archive_multipass_v3", "runner"),
@@ -191,10 +149,22 @@ _V3 = {
 
 
 class TestChunk4V3Rows:
+    def test_roster_counts_10_runnable_11_visible(self):
+        # roster trim: 4 base + 6 _v3 + custom = 11 visible / 10 runnable.
+        ids = ROUTING.list_bank_ids()
+        assert len(ids) == 11
+        assert ids[-1] == "custom_source_bank"
+        runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
+        assert len(runnable) == 10                 # only custom is non-runnable
+        assert len([b for b in ids if b.endswith("_v2")]) == 0
+        assert len([b for b in ids if b.endswith("_v3")]) == 6
+
     def test_v3_count_and_order(self):
         ids = ROUTING.list_bank_ids()
-        assert len([b for b in ids if b.endswith("_v3")]) == 8
-        assert ids.index("science_news_v3") > ids.index("science_news_v2")
+        assert len([b for b in ids if b.endswith("_v3")]) == 6
+        # the _v3 lanes are seated after the base lanes, before custom.
+        assert min(ids.index(b) for b in ids if b.endswith("_v3")) > \
+            ids.index("scifi_codex")
         assert ids[-1] == "custom_source_bank"
 
     @pytest.mark.parametrize("v3,base,pipe,kind",
@@ -209,7 +179,8 @@ class TestChunk4V3Rows:
         assert pack.story_model_id.endswith("_v3")
         assert pack.story_pipeline_id == pipe
         assert BV.base_source_bank_id(v3) == base
-        assert RULES.resolve_story_rules(v3).rules_id == base
+        # independence: a _v3 lane resolves its OWN rules by exact id, not base.
+        assert RULES.resolve_story_rules(v3).rules_id == v3
         if kind == "runner":
             assert pipe in W._RUNNER_BY_PIPELINE
             assert pipe not in W._LEGACY_INLINE_PIPELINES
@@ -246,8 +217,8 @@ class TestChunk4V3Rows:
     def test_v3_advisory_never_raises_on_bad_input(self):
         from nodes import OTR_LedgerScriptWriter as W
         meta = {}
-        W.run_v3_advisory(None, meta, lane="science_news_v3")   # None led
-        assert meta["science_news_v3_advisory"]["status"] in ("ok", "error")
+        W.run_v3_advisory(None, meta, lane="public_domain_story_v3")   # None led
+        assert meta["public_domain_story_v3_advisory"]["status"] in ("ok", "error")
 
         class _Bad:
             data = {"lines": "not a list", "meta": {}}

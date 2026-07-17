@@ -98,7 +98,10 @@ def test_refine_core_carries_source_ref(monkeypatch):
 
     monkeypatch.setattr(OTR_LedgerScriptWriter, "_refine_loop", _fake_loop)
     node = OTR_LedgerScriptWriter()
-    out = node.run(source_ref="archive://fixture-001", refine_target_grade="B")
+    # Writer refine re-entry is a legacy-lane seam; thread a legacy many-pass
+    # bank (the new default scifi_fable2 -> fable2_multipass rejects re-entry).
+    out = node.run(source_bank="media_archive",
+                   source_ref="archive://fixture-001", refine_target_grade="B")
 
     assert out == ("", "", "", 0, "")
     assert captured["source_ref"] == "archive://fixture-001"
@@ -140,7 +143,7 @@ def test_patch_widget_by_name_lands_source_ref_slot_27():
     # stays at 27). schemas comes from the LIVE INPUT_TYPES() above, so
     # this already reflects the new vector -- only the pin needed updating.
     assert len(node1["widgets_values"]) == 34
-    assert node1["widgets_values"][23] == "science_news"
+    assert node1["widgets_values"][23] == "scifi_fable2"
     assert node1["widgets_values"][24] == "sci_fi_radio"
     assert node1["widgets_values"][25] == "(select Google API model)"
     assert node1["widgets_values"][26] == "(select Google API model)"

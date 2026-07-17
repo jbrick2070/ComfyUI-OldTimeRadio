@@ -245,7 +245,11 @@ class TestComposerQualityGate:
             calls["n"] += 1
             return draft if calls["n"] == 1 else worse
 
-        res = compose_line(creative_fn=mock, req=_req())
+        # Roster trim (2026-07-17): composer default moved science_news ->
+        # media_archive, whose rules do not flag this cliche; pin a kept lane
+        # whose rules do (pre-trim default behavior) to exercise the reroll.
+        res = compose_line(creative_fn=mock, req=_req(),
+                           source_bank_id="original_radio")
         assert calls["n"] == 2                       # one reroll attempted
         assert res.text != worse                     # the worse reroll is rejected
         assert "Watson" in res.text                  # repaired original, not the reroll
@@ -262,7 +266,10 @@ class TestComposerQualityGate:
             calls["n"] += 1
             return draft if calls["n"] == 1 else clean
 
-        res = compose_line(creative_fn=mock, req=_req())
+        # Roster trim (2026-07-17): pin a kept lane whose rules flag the cliche
+        # (the media_archive default no longer does) -- see note above.
+        res = compose_line(creative_fn=mock, req=_req(),
+                           source_bank_id="original_radio")
         assert res.text == clean
         assert "cliche_retry" in res.compose_flags
         assert "quality_reroll_degraded" not in res.compose_flags

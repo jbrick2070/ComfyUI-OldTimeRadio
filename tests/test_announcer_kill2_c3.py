@@ -20,6 +20,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_line_composer as LC  # noqa: E402
+from nodes._otr_creative_prompt_router import (  # noqa: E402
+    resolve_creative_system_prompt as _RESOLVE)
+
+# Roster trim (2026-07-17): compose_news_coda's default source_bank_id moved
+# science_news -> media_archive, so the DEFAULT coda now routes its system prompt
+# through media_archive's coda_system pack seam (the science base+examples fast
+# path only fires for the removed science lane). The fact-starvation contract
+# (the LLM never sees the outcome; the real fact is appended) is unchanged.
+_BANK = "media_archive"
 
 
 def _make_fn(reply, capture):
@@ -55,10 +64,10 @@ class TestComposeNewsCoda:
         assert "landed safely" not in usermsg.lower()
         assert "A keeper waits for a ship" in usermsg          # premise passed
         assert "lamp turns over black water" in usermsg.lower()  # safe intro tone
-        # story-quality v2 (baked in): the sent system message is the base
-        # _NEWS_CODA_SYSTEM contract with the few-shot _NEWS_CODA_SYSTEM_V2_EXAMPLES
-        # appended (the base constant is never mutated).
-        assert sysmsg.startswith(LC._NEWS_CODA_SYSTEM)
+        # story-quality v2 (baked in): the sent system message is the routed
+        # coda_system pack seam for the default bank, which inlines the few-shot
+        # "Examples (...)" block (nothing is appended on the routed path).
+        assert sysmsg == _RESOLVE(None, "coda_system", _BANK)
         assert "Examples (tonight's tale -> your bridge clause):" in sysmsg
 
     def test_generic_opener_retries_then_fails_loud(self):

@@ -35,6 +35,8 @@ from nodes import _otr_line_composer  # noqa: E402
 from nodes import _otr_model_catalog  # noqa: E402
 from nodes import _otr_outline  # noqa: E402
 from nodes import _otr_period_prompts  # noqa: E402
+from nodes._otr_story_pack import get_pack_prompt  # noqa: E402
+from nodes._otr_story_routing import resolve_story_pack  # noqa: E402
 
 MISTRAL_NEMO = "mistralai/Mistral-Nemo-Instruct-2407"
 
@@ -51,6 +53,32 @@ PHASES: tuple[str, ...] = (
     "announcer_outro_system",
 )
 
+# The router's default source_bank_id for pack-routed seams. Every phase
+# except the object-identity "outline" sentinel now resolves through this
+# lane's story pack, so the modern-value expectation is the pack seam, not a
+# Python constant. (The old science byte-identity baseline was retired with
+# the science_news roster trim.)
+_DEFAULT_SEAM_BANK = "media_archive"
+
+
+def _expected_modern_by_phase() -> dict[str, str]:
+    """Value a modern-profile / non-curated slot must resolve to per phase:
+    the default bank's pack seam for pack-routed phases, and the modern
+    outline constant (object-identity) for the plain ``outline`` phase."""
+    pack = resolve_story_pack(_DEFAULT_SEAM_BANK)
+    return {
+        "outline":                       _otr_outline._SYSTEM_PROMPT,
+        "line_composer_system":          get_pack_prompt(pack, "line_composer_system"),
+        "outline_macro_system":          get_pack_prompt(pack, "outline_macro_system"),
+        "outline_phase_system":          get_pack_prompt(pack, "outline_phase_system"),
+        "outline_beat_system":           get_pack_prompt(pack, "outline_beat_system"),
+        "exchange_system":               get_pack_prompt(pack, "exchange_system"),
+        "coda_system":                   get_pack_prompt(pack, "coda_system"),
+        "announcer_intro_system":        get_pack_prompt(pack, "announcer_intro_system"),
+        "announcer_intro_safe_system":   get_pack_prompt(pack, "announcer_intro_safe_system"),
+        "announcer_outro_system":        get_pack_prompt(pack, "announcer_outro_system"),
+    }
+
 
 # ---------------------------------------------------------------------------
 # Resolver behavior
@@ -59,26 +87,11 @@ PHASES: tuple[str, ...] = (
 
 def test_router_returns_modern_for_default_mistral_nemo() -> None:
     """Every phase under Mistral-Nemo returns the corresponding modern
-    phase prompt VALUE. Stage 1b: line_composer_system is sourced from the
-    JSON story pack (byte-identical; drift pinned by
-    tests/test_story_pack_stage1.py), so value-equality is the contract now,
-    not object identity. outline stays object-identical (untouched).
+    phase prompt VALUE. The pack-routed seams resolve from the router's
+    default lane's story pack (media_archive) -- value-equality is the
+    contract, not object identity. outline stays object-identical (untouched).
     """
-    expected_modern_by_phase = {
-        "outline":                       _otr_outline._SYSTEM_PROMPT,
-        "line_composer_system":          _otr_line_composer._SYSTEM_PROMPT,
-        "outline_macro_system":          _otr_outline._MACRO_SYSTEM_PROMPT,
-        "outline_phase_system":          _otr_outline._PHASE_SYSTEM_PROMPT,
-        "outline_beat_system":           _otr_outline._BEAT_SYSTEM_PROMPT,
-        "exchange_system":               _otr_compose_exchange.EXCHANGE_SYSTEM_PROMPT,
-        "coda_system":                   (
-            _otr_line_composer._NEWS_CODA_SYSTEM
-            + _otr_line_composer._NEWS_CODA_SYSTEM_V2_EXAMPLES
-        ),
-        "announcer_intro_system":        _otr_line_composer._ANNOUNCER_INTRO_SYSTEM,
-        "announcer_intro_safe_system":   _otr_line_composer._ANNOUNCER_INTRO_SYSTEM_SAFE,
-        "announcer_outro_system":        _otr_line_composer._ANNOUNCER_OUTRO_SYSTEM,
-    }
+    expected_modern_by_phase = _expected_modern_by_phase()
     for phase in PHASES:
         out = router.resolve_creative_system_prompt(MISTRAL_NEMO, phase)
         assert out == expected_modern_by_phase[phase], (
@@ -114,21 +127,7 @@ def test_router_returns_modern_for_remote_slot_handles() -> None:
     aborted a whole episode when the creative slot was an OpenRouter model
     (2026-06-18).
     """
-    expected_modern_by_phase = {
-        "outline":                       _otr_outline._SYSTEM_PROMPT,
-        "line_composer_system":          _otr_line_composer._SYSTEM_PROMPT,
-        "outline_macro_system":          _otr_outline._MACRO_SYSTEM_PROMPT,
-        "outline_phase_system":          _otr_outline._PHASE_SYSTEM_PROMPT,
-        "outline_beat_system":           _otr_outline._BEAT_SYSTEM_PROMPT,
-        "exchange_system":               _otr_compose_exchange.EXCHANGE_SYSTEM_PROMPT,
-        "coda_system":                   (
-            _otr_line_composer._NEWS_CODA_SYSTEM
-            + _otr_line_composer._NEWS_CODA_SYSTEM_V2_EXAMPLES
-        ),
-        "announcer_intro_system":        _otr_line_composer._ANNOUNCER_INTRO_SYSTEM,
-        "announcer_intro_safe_system":   _otr_line_composer._ANNOUNCER_INTRO_SYSTEM_SAFE,
-        "announcer_outro_system":        _otr_line_composer._ANNOUNCER_OUTRO_SYSTEM,
-    }
+    expected_modern_by_phase = _expected_modern_by_phase()
     for handle in ("openrouter:slot-a", "openrouter:slot-b",
                    "comfy:slot-a", "comfy:slot-b", "some/uncurated-model"):
         for phase in PHASES:

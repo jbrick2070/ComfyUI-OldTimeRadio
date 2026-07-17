@@ -43,9 +43,16 @@ def test_default_config_both_slots_mistral_nemo_returns_modern_prompts_byte_stab
     audio C7 contract at the D2b boundary -- the LLM call sees the
     EXACT SAME byte sequence pre/post wiring.
     """
+    # Roster trim 2026-07-17: the default seam bank is now media_archive
+    # (science_news retired). "outline" is not pack-routed -> the modern
+    # constant; "line_composer_system" is pack-routed -> the default bank's
+    # pack seam. The D2b audio-C7 invariant is that the resolver's default is
+    # STABLE and pack-sourced, which this still pins.
     expected = {
         "outline":              _otr_outline._SYSTEM_PROMPT,
-        "line_composer_system": _otr_line_composer._SYSTEM_PROMPT,
+        "line_composer_system": router.get_pack_prompt(
+            router.resolve_story_pack("media_archive"),
+            "line_composer_system"),
     }
     for phase in PHASES:
         actual = router.resolve_creative_system_prompt(MISTRAL_NEMO, phase)

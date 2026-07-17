@@ -84,7 +84,7 @@ def test_policy_untagged_ledger_is_legacy():
 
 
 def test_policy_seam_bank_is_legacy():
-    pol = LFC.resolve_freeze_policy({"source_bank": "science_news"})
+    pol = LFC.resolve_freeze_policy({"source_bank": "media_archive"})
     assert pol.name == "legacy_full"
     assert pol.run_legacy_content_passes is True
 

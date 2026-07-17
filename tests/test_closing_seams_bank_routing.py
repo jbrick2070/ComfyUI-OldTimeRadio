@@ -35,10 +35,9 @@ from nodes import _otr_line_composer as LC  # noqa: E402
 
 
 RUNNABLE_BANKS = (
-    "science_news",
     "media_archive",
-    "public_domain_story",
-    "shakespeare",
+    "public_domain_story_v3",
+    "shakespeare_v3",
 )
 CLOSING_PHASES = (
     "coda_system",
@@ -92,36 +91,14 @@ def test_closing_phase_resolves_the_banks_own_pack_seam(bank, phase):
     assert resolved == expected
 
 
-def test_science_closing_phases_byte_match_legacy_constants():
-    """Science stays byte-identical to the pre-fix constants/assembly
-    (the audio C7-style value contract for the closing layer)."""
-    assert resolve_creative_system_prompt(
-        None, phase="coda_system", source_bank_id="science_news"
-    ) == LC._NEWS_CODA_SYSTEM + LC._NEWS_CODA_SYSTEM_V2_EXAMPLES
-    assert resolve_creative_system_prompt(
-        None, phase="announcer_intro_system", source_bank_id="science_news"
-    ) == LC._ANNOUNCER_INTRO_SYSTEM
-    assert resolve_creative_system_prompt(
-        None, phase="announcer_intro_safe_system",
-        source_bank_id="science_news",
-    ) == LC._ANNOUNCER_INTRO_SYSTEM_SAFE
-    assert resolve_creative_system_prompt(
-        None, phase="announcer_outro_system", source_bank_id="science_news"
-    ) == LC._ANNOUNCER_OUTRO_SYSTEM
-
-
-@pytest.mark.parametrize("bank", [b for b in RUNNABLE_BANKS
-                                  if b != "science_news"])
-def test_non_science_coda_seam_is_not_the_science_text(bank):
-    """Guards against a pack byte-copying the science coda (the exact
-    failure QA F1 found: 'real news report' framing on a source note)."""
-    science = resolve_creative_system_prompt(
-        None, phase="coda_system", source_bank_id="science_news"
-    )
+@pytest.mark.parametrize("bank", RUNNABLE_BANKS)
+def test_legacy_coda_seam_is_not_a_news_report(bank):
+    """The retired science lane's 'real news report' coda framing must not
+    survive in any legacy lane's coda seam (the exact failure QA F1 found:
+    'real news report' framing leaking onto a source note)."""
     other = resolve_creative_system_prompt(
         None, phase="coda_system", source_bank_id=bank
     )
-    assert other != science
     assert "real news report" not in other
 
 
@@ -129,7 +106,7 @@ def test_non_science_coda_seams_keep_the_bridge_contract():
     """The re-authored PD/Shakespeare coda seams (and media's) must keep
     the KILL-2 bridge mechanics the composer enforces: a SHORT pivot
     clause; the real note is appended by the producer."""
-    for bank in ("media_archive", "public_domain_story", "shakespeare"):
+    for bank in ("media_archive", "public_domain_story_v3", "shakespeare_v3"):
         seam = resolve_creative_system_prompt(
             None, phase="coda_system", source_bank_id=bank
         )
@@ -152,25 +129,13 @@ def test_compose_news_coda_sends_bank_coda_system():
             "noncommercial terms."
         ),
         premise="Three strangers on a storm-lit heath make a promise.",
-        source_bank_id="shakespeare",
+        source_bank_id="shakespeare_v3",
     )
     expected = get_pack_prompt(
-        resolve_story_pack("shakespeare"), "coda_system"
+        resolve_story_pack("shakespeare_v3"), "coda_system"
     )
     assert _sysmsg(calls) == expected
     assert res.text.startswith(_VALID_BRIDGE)
-
-
-def test_compose_news_coda_science_default_is_legacy_assembly():
-    fn, calls = _capturing_fn(_VALID_BRIDGE)
-    LC.compose_news_coda(
-        creative_fn=fn,
-        news_close_brief="Researchers mapped a new deep-sea vent system.",
-        premise="Two mapmakers argue over a trench that should not exist.",
-    )
-    assert _sysmsg(calls) == (
-        LC._NEWS_CODA_SYSTEM + LC._NEWS_CODA_SYSTEM_V2_EXAMPLES
-    )
 
 
 def test_compose_announcer_intro_sends_bank_intro_system():
@@ -203,22 +168,13 @@ def test_compose_announcer_intro_safe_sends_bank_safe_system():
         script_brief="",
         story_scaffold=True,
         safe_open_brief=brief,
-        source_bank_id="public_domain_story",
+        source_bank_id="public_domain_story_v3",
     )
     expected = get_pack_prompt(
-        resolve_story_pack("public_domain_story"),
+        resolve_story_pack("public_domain_story_v3"),
         "announcer_intro_safe_system",
     )
     assert _sysmsg(calls) == expected
-
-
-def test_compose_announcer_intro_science_default_keeps_constant():
-    fn, calls = _capturing_fn(_VALID_INTRO)
-    LC.compose_announcer_intro(
-        creative_fn=fn,
-        script_brief="A keeper guards a light that blinks a name.",
-    )
-    assert _sysmsg(calls) == LC._ANNOUNCER_INTRO_SYSTEM
 
 
 def test_compose_announcer_outro_sends_bank_outro_system():
@@ -234,10 +190,10 @@ def test_compose_announcer_outro_sends_bank_outro_system():
             "preserved."
         ),
         intro_text="",
-        source_bank_id="public_domain_story",
+        source_bank_id="public_domain_story_v3",
     )
     expected = get_pack_prompt(
-        resolve_story_pack("public_domain_story"),
+        resolve_story_pack("public_domain_story_v3"),
         "announcer_outro_system",
     )
     assert _sysmsg(calls) == expected
@@ -296,8 +252,7 @@ def test_title_prompt_default_stays_scifi():
 
 def test_every_runnable_bank_declares_a_title_form_label():
     """The writer threads banks.json defaults.title_form_label into the
-    title pass -- every runnable bank must declare one (science's value
-    is the legacy hardcode, keeping that lane byte-identical)."""
+    title pass -- every runnable bank must declare one."""
     import json
 
     banks = json.loads(
@@ -312,10 +267,6 @@ def test_every_runnable_bank_declares_a_title_form_label():
         assert isinstance(label, str) and label.strip(), (
             f"{row['source_bank_id']} lacks defaults.title_form_label"
         )
-    science = next(
-        r for r in banks["banks"] if r["source_bank_id"] == "science_news"
-    )
-    assert science["defaults"]["title_form_label"] == "sci-fi radio drama"
 
 
 if __name__ == "__main__":

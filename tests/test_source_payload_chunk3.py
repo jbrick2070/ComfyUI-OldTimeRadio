@@ -142,9 +142,11 @@ def test_normalize_fetch_result_rejects_non_dict_sidecars(field):
 # ---------------------------------------------------------------------------
 
 def test_science_bank_resolves_both_contracts():
-    bank = routing.get_bank("science_news")
+    # science_news lane removed (roster trim 2026-07-17); media_archive is the
+    # kept legacy lane that resolves BOTH the fetcher and interpreter contracts.
+    bank = routing.get_bank("media_archive")
     entry = osp.resolve_fetcher(bank)
-    assert entry.seed_source == "rss_fetch"
+    assert entry.seed_source == "media_archive_rss"
     assert callable(entry.fetch)
     assert callable(osp.resolve_interpreter(bank))
 
@@ -159,7 +161,7 @@ def test_empty_id_bank_raises_missing_contract(bank_id):
 
 
 def test_public_domain_bank_resolves_both_contracts_and_is_runnable():
-    bank = routing.get_bank("public_domain_story")
+    bank = routing.get_bank("public_domain_story_v3")
     entry = osp.resolve_fetcher(bank)
     assert entry.seed_source == "public_domain_source"
     assert callable(entry.fetch)
@@ -170,7 +172,7 @@ def test_public_domain_bank_resolves_both_contracts_and_is_runnable():
 
 
 def test_public_domain_fetcher_wrapper_returns_source_fetch_result():
-    bank = routing.get_bank("public_domain_story")
+    bank = routing.get_bank("public_domain_story_v3")
     entry = osp.resolve_fetcher(bank)
     result = entry.fetch(bank=bank, technical_model="ignored-technical")
     payload, meta, rights = osp.normalize_fetch_result(
@@ -351,7 +353,9 @@ def test_science_rss_wrapper_forwards_exact_args_and_ignores_source_ref(monkeypa
 
     import nodes.OTR_LedgerScriptWriter as writer
     monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
-    bank = routing.get_bank("science_news")
+    # science_news lane removed; scifi_fable2 is the kept NON-strict lane that
+    # uses the science_rss fetcher (require_science_floor stays False).
+    bank = routing.get_bank("scifi_fable2")
     entry = osp.resolve_fetcher(bank)
     _lc = object()
     _pol = object()
@@ -426,7 +430,10 @@ def test_news_interpreter_wrapper_forwards_exact_kwargs(monkeypatch):
 
     import nodes.news_interpreter as ni
     monkeypatch.setattr(ni, "build_news_briefs", _fake)
-    bank = routing.get_bank("science_news")
+    # science_news LANE removed, but the news_interpreter WRAPPER (_interpret_news)
+    # is still registered; probe it directly via a bank that declares that id.
+    bank = SimpleNamespace(source_bank_id="news_wrapper_probe",
+                           interpreter="news_interpreter")
     interp = osp.resolve_interpreter(bank)
     payload = _payload()
     out = interp(bank=bank, payload=payload, technical_fn="TFN",
@@ -452,7 +459,10 @@ def test_news_interpreter_wrapper_forwards_exact_kwargs(monkeypatch):
 
 def test_wrapper_translates_only_news_interpreter_error(monkeypatch):
     import nodes.news_interpreter as ni
-    bank = routing.get_bank("science_news")
+    # science_news LANE removed; the news_interpreter WRAPPER is still registered
+    # and still owns the NewsInterpreterError -> SourceInterpretError translation.
+    bank = SimpleNamespace(source_bank_id="news_wrapper_probe",
+                           interpreter="news_interpreter")
     interp = osp.resolve_interpreter(bank)
 
     def _raise_nie(**kw):
@@ -507,7 +517,7 @@ def test_resolve_inputs_passes_source_ref_and_returns_sidecars(monkeypatch):
     )
 
     out = writer._resolve_inputs(custom_premise="",
-                                 source_bank="science_news",
+                                 source_bank="scifi_fable2",
                                  source_ref="pd://fixture")
 
     assert seen["source_ref"] == "pd://fixture"

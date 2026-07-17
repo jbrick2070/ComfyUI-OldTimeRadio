@@ -40,7 +40,7 @@ def _payload(seed="the frozen source seed text"):
     }
 
 
-def _envelope(base="science_news", **overrides):
+def _envelope(base="scifi_fable2", **overrides):
     env = {
         "base_source_bank_id": base,
         "captured_from_bank_id": base,
@@ -91,7 +91,7 @@ def test_payload_sha256_is_canonical_and_key_order_independent():
 # ---------------------------------------------------------------------------
 
 def test_no_manifest_env_returns_none():
-    assert SS.load_snapshot_for_bank("science_news") is None
+    assert SS.load_snapshot_for_bank("scifi_fable2") is None
 
 
 def test_manifest_configured_but_base_absent_raises_by_default(tmp_path, monkeypatch):
@@ -100,14 +100,14 @@ def test_manifest_configured_but_base_absent_raises_by_default(tmp_path, monkeyp
     manifest = _write_manifest(tmp_path, {"media_archive": _envelope("media_archive")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError, match="no .*entry for base"):
-        SS.load_snapshot_for_bank("science_news")
+        SS.load_snapshot_for_bank("scifi_fable2")
 
 
 def test_allow_partial_sources_absent_base_live(tmp_path, monkeypatch):
     manifest = _write_manifest(
         tmp_path, {"media_archive": _envelope("media_archive")}, allow_partial=True)
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    assert SS.load_snapshot_for_bank("science_news") is None
+    assert SS.load_snapshot_for_bank("scifi_fable2") is None
 
 
 # ---------------------------------------------------------------------------
@@ -115,24 +115,24 @@ def test_allow_partial_sources_absent_base_live(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_valid_snapshot_is_returned_with_validated_fields(tmp_path, monkeypatch):
-    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": _envelope("scifi_fable2")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    snap = SS.load_snapshot_for_bank("science_news")
+    snap = SS.load_snapshot_for_bank("scifi_fable2")
     assert snap is not None
-    assert snap.base_source_bank_id == "science_news"
+    assert snap.base_source_bank_id == "scifi_fable2"
     assert snap.seed_source == "science_rss_frozen"
     assert snap.payload["seed_text"] == "the frozen source seed text"
     assert snap.source_rights == {"license_label": "frozen"}
     assert snap.payload_sha256 == SS.snapshot_payload_sha256(_payload())
 
 
-@pytest.mark.parametrize("selected", ["science_news_v2", "science_news_v3"])
+@pytest.mark.parametrize("selected", ["scifi_fable2_v3"])
 def test_variant_id_resolves_to_base_keyed_snapshot(tmp_path, monkeypatch, selected):
-    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": _envelope("scifi_fable2")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     snap = SS.load_snapshot_for_bank(selected)
     assert snap is not None
-    assert snap.base_source_bank_id == "science_news"
+    assert snap.base_source_bank_id == "scifi_fable2"
 
 
 # ---------------------------------------------------------------------------
@@ -140,56 +140,56 @@ def test_variant_id_resolves_to_base_keyed_snapshot(tmp_path, monkeypatch, selec
 # ---------------------------------------------------------------------------
 
 def test_base_mismatch_is_rejected_loud(tmp_path, monkeypatch):
-    # Envelope keyed under science_news but DECLARES a different base.
+    # Envelope keyed under scifi_fable2 but DECLARES a different base.
     manifest = _write_manifest(
-        tmp_path, {"science_news": _envelope(base="media_archive")})
+        tmp_path, {"scifi_fable2": _envelope(base="media_archive")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError, match="mismatched source"):
-        SS.load_snapshot_for_bank("science_news")
+        SS.load_snapshot_for_bank("scifi_fable2")
 
 
 def test_variant_selecting_wrong_base_snapshot_is_rejected(tmp_path, monkeypatch):
-    # science_news_v2 -> base science_news, but the entry declares media_archive.
+    # scifi_fable2_v3 -> base scifi_fable2, but the entry declares media_archive.
     manifest = _write_manifest(
-        tmp_path, {"science_news": _envelope(base="media_archive")})
+        tmp_path, {"scifi_fable2": _envelope(base="media_archive")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError):
-        SS.load_snapshot_for_bank("science_news_v2")
+        SS.load_snapshot_for_bank("scifi_fable2_v3")
 
 
 def test_missing_seed_source_is_rejected(tmp_path, monkeypatch):
-    env = _envelope("science_news")
+    env = _envelope("scifi_fable2")
     del env["seed_source"]
-    manifest = _write_manifest(tmp_path, {"science_news": env})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": env})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError, match="seed_source"):
-        SS.load_snapshot_for_bank("science_news")
+        SS.load_snapshot_for_bank("scifi_fable2")
 
 
 def test_missing_payload_key_is_rejected(tmp_path, monkeypatch):
-    env = _envelope("science_news")
+    env = _envelope("scifi_fable2")
     del env["payload"]["seed_text"]
-    manifest = _write_manifest(tmp_path, {"science_news": env})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": env})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError, match="missing key"):
-        SS.load_snapshot_for_bank("science_news")
+        SS.load_snapshot_for_bank("scifi_fable2")
 
 
 def test_altered_payload_sha_receipt_is_rejected(tmp_path, monkeypatch):
-    env = _envelope("science_news")
+    env = _envelope("scifi_fable2")
     env["seed_receipt"]["payload_sha256"] = "deadbeef" * 8
-    manifest = _write_manifest(tmp_path, {"science_news": env})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": env})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError, match="altered after capture"):
-        SS.load_snapshot_for_bank("science_news")
+        SS.load_snapshot_for_bank("scifi_fable2")
 
 
 def test_matching_payload_sha_receipt_passes(tmp_path, monkeypatch):
-    env = _envelope("science_news")
+    env = _envelope("scifi_fable2")
     env["seed_receipt"]["payload_sha256"] = SS.snapshot_payload_sha256(_payload())
-    manifest = _write_manifest(tmp_path, {"science_news": env})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": env})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    assert SS.load_snapshot_for_bank("science_news") is not None
+    assert SS.load_snapshot_for_bank("scifi_fable2") is not None
 
 
 # ---------------------------------------------------------------------------
@@ -197,39 +197,39 @@ def test_matching_payload_sha_receipt_passes(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_top_level_cast_hints_merge_into_source_meta(tmp_path, monkeypatch):
-    env = _envelope("shakespeare")
+    env = _envelope("scifi_fable2")
     env["source_meta"] = {}
-    env["cast_hints"] = ["MACBETH", "BANQUO"]
-    manifest = _write_manifest(tmp_path, {"shakespeare": env})
+    env["cast_hints"] = ["VEGA", "LUCIA"]
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": env})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    snap = SS.load_snapshot_for_bank("shakespeare")
-    assert snap.source_meta["cast_hints"] == ["MACBETH", "BANQUO"]
+    snap = SS.load_snapshot_for_bank("scifi_fable2")
+    assert snap.source_meta["cast_hints"] == ["VEGA", "LUCIA"]
 
 
 def test_existing_source_meta_cast_hints_not_clobbered(tmp_path, monkeypatch):
-    env = _envelope("shakespeare")
-    env["source_meta"] = {"cast_hints": ["DUNCAN"]}
-    env["cast_hints"] = ["MACBETH"]
-    manifest = _write_manifest(tmp_path, {"shakespeare": env})
+    env = _envelope("scifi_fable2")
+    env["source_meta"] = {"cast_hints": ["ORSON"]}
+    env["cast_hints"] = ["VEGA"]
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": env})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    snap = SS.load_snapshot_for_bank("shakespeare")
-    assert snap.source_meta["cast_hints"] == ["DUNCAN"]
+    snap = SS.load_snapshot_for_bank("scifi_fable2")
+    assert snap.source_meta["cast_hints"] == ["ORSON"]
 
 
 def test_path_pointer_entry_resolves_relative_to_manifest_dir(tmp_path, monkeypatch):
-    (tmp_path / "science_news_env.json").write_text(
-        json.dumps(_envelope("science_news")), encoding="utf-8")
+    (tmp_path / "scifi_fable2_env.json").write_text(
+        json.dumps(_envelope("scifi_fable2")), encoding="utf-8")
     manifest = _write_manifest(
-        tmp_path, {"science_news": {"path": "science_news_env.json"}})
+        tmp_path, {"scifi_fable2": {"path": "scifi_fable2_env.json"}})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    snap = SS.load_snapshot_for_bank("science_news")
+    snap = SS.load_snapshot_for_bank("scifi_fable2")
     assert snap is not None
     assert snap.seed_source == "science_rss_frozen"
 
 
 def test_manifest_rewrite_is_seen_immediately(tmp_path, monkeypatch):
     manifest = _write_manifest(
-        tmp_path, {"science_news": _envelope("science_news")}, allow_partial=True)
+        tmp_path, {"scifi_fable2": _envelope("scifi_fable2")}, allow_partial=True)
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     assert SS.load_snapshot_for_bank("media_archive") is None
     # A live re-pin of the manifest is honored on the next call (no stale cache).
@@ -248,7 +248,7 @@ def test_manifest_rewrite_is_seen_immediately(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_resolve_inputs_replays_snapshot_and_bypasses_rss(tmp_path, monkeypatch):
-    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": _envelope("scifi_fable2")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
 
     def _boom(*_a, **_k):
@@ -256,7 +256,7 @@ def test_resolve_inputs_replays_snapshot_and_bypasses_rss(tmp_path, monkeypatch)
 
     monkeypatch.setattr(SP, "resolve_fetcher", _boom)
 
-    out = LSW._resolve_inputs(source_bank="science_news", target_words=120)
+    out = LSW._resolve_inputs(source_bank="scifi_fable2", target_words=120)
     assert out["seed_source"] == "science_rss_frozen"
     assert out["news_article"] == _payload()
     assert out["news_seed"] == "the frozen source seed text"
@@ -265,31 +265,31 @@ def test_resolve_inputs_replays_snapshot_and_bypasses_rss(tmp_path, monkeypatch)
 
 
 def test_resolve_inputs_variant_shares_base_snapshot(tmp_path, monkeypatch):
-    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": _envelope("scifi_fable2")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     monkeypatch.setattr(
         SP, "resolve_fetcher",
         lambda *_a, **_k: (_ for _ in ()).throw(
             AssertionError("must not fetch under snapshot")),
     )
-    out = LSW._resolve_inputs(source_bank="science_news_v2", target_words=120)
-    assert out["source_bank"] == "science_news_v2"
+    out = LSW._resolve_inputs(source_bank="scifi_fable2_v3", target_words=120)
+    assert out["source_bank"] == "scifi_fable2_v3"
     assert out["seed_source"] == "science_rss_frozen"
 
 
 def test_resolve_inputs_propagates_base_mismatch_loud(tmp_path, monkeypatch):
     manifest = _write_manifest(
-        tmp_path, {"science_news": _envelope(base="media_archive")})
+        tmp_path, {"scifi_fable2": _envelope(base="media_archive")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError):
-        LSW._resolve_inputs(source_bank="science_news", target_words=120)
+        LSW._resolve_inputs(source_bank="scifi_fable2", target_words=120)
 
 
 def test_resolve_inputs_without_snapshot_is_unaffected(tmp_path, monkeypatch):
     # No manifest -> the snapshot loader returns None -> the custom-premise
     # branch runs exactly as before (hermetic, no network).
     out = LSW._resolve_inputs(
-        source_bank="science_news",
+        source_bank="scifi_fable2",
         custom_premise="a custom seed premise",
         target_words=120,
     )
@@ -303,23 +303,23 @@ def _no_fetch(*_a, **_k):
 
 def test_resolve_inputs_replay_warns_without_c7_seeds(tmp_path, monkeypatch, caplog):
     import logging
-    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": _envelope("scifi_fable2")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     monkeypatch.delenv("OTR_CAST_SEED", raising=False)
     monkeypatch.delenv("OTR_STYLE_SEED", raising=False)
     monkeypatch.setattr(SP, "resolve_fetcher", _no_fetch)
     with caplog.at_level(logging.WARNING):
-        LSW._resolve_inputs(source_bank="science_news", target_words=120)
+        LSW._resolve_inputs(source_bank="scifi_fable2", target_words=120)
     assert any("without C7 seed pinning" in r.getMessage() for r in caplog.records)
 
 
 def test_resolve_inputs_replay_quiet_with_c7_seeds(tmp_path, monkeypatch, caplog):
     import logging
-    manifest = _write_manifest(tmp_path, {"science_news": _envelope("science_news")})
+    manifest = _write_manifest(tmp_path, {"scifi_fable2": _envelope("scifi_fable2")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     monkeypatch.setenv("OTR_CAST_SEED", "42")
     monkeypatch.setenv("OTR_STYLE_SEED", "42")
     monkeypatch.setattr(SP, "resolve_fetcher", _no_fetch)
     with caplog.at_level(logging.WARNING):
-        LSW._resolve_inputs(source_bank="science_news", target_words=120)
+        LSW._resolve_inputs(source_bank="scifi_fable2", target_words=120)
     assert not any("without C7 seed pinning" in r.getMessage() for r in caplog.records)

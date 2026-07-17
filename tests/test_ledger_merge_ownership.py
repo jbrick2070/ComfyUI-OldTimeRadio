@@ -98,7 +98,7 @@ def test_freeze_policy_replaces_capability_gate():
             {"source_bank": "scifi_fable2"}
         ).run_legacy_content_passes is False
         assert resolve_freeze_policy(
-            {"source_bank": "science_news"}
+            {"source_bank": "media_archive"}
         ).run_legacy_content_passes is True
         assert resolve_freeze_policy({}).run_legacy_content_passes is True
         bad = resolve_freeze_policy({"source_bank": "no_such_bank"})

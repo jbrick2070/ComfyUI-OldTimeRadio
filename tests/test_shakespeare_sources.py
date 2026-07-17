@@ -190,7 +190,7 @@ def test_sidecars_are_separate_and_noncommercial():
 def test_fetch_shakespeare_scene_blank_ref_selects_from_manifest_and_sidecars(monkeypatch):
     from nodes import _otr_story_routing as routing
 
-    bank = routing.get_bank("shakespeare")
+    bank = routing.get_bank("shakespeare_v3")
     monkeypatch.setattr(
         shx,
         "select_shakespeare_scene_ref",
@@ -238,7 +238,7 @@ def test_fetch_shakespeare_scene_honors_explicit_ref(monkeypatch):
 
     monkeypatch.setattr(shx, "select_shakespeare_scene_ref", _should_not_randomize)
 
-    bank = routing.get_bank("shakespeare")
+    bank = routing.get_bank("shakespeare_v3")
     result = shx.fetch_shakespeare_scene(
         bank=bank,
         source_ref="folger-macbeth:act1-scene3-witches",

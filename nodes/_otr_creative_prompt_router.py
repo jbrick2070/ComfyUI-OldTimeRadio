@@ -132,8 +132,9 @@ _MODERN_BY_PHASE: dict[str, str] = {
 # Stage 2: the pack is resolved through the ROUTING layer
 # (resolve_story_pack via banks.json), no fixed path. Stage 2C: the workflow
 # `source_bank` widget selection threads through `source_bank_id`; this
-# literal is now ONLY the parameter default (byte-identical science lane).
-_SCIENCE_BANK_ID = "science_news"
+# literal is now ONLY the parameter default. It must name a LEGACY-SEAM bank
+# (fable2 declares only fable2_* stages), so it points at a kept legacy lane.
+_DEFAULT_SEAM_BANK_ID = "media_archive"
 _PHASE_TO_PACK_SEAM: dict[str, str] = {
     "line_composer_system": "line_composer_system",
     # Lane chunk 1 (2026-07-06): the outline stage seams. A bank whose pack
@@ -157,7 +158,7 @@ _PHASE_TO_PACK_SEAM: dict[str, str] = {
 def resolve_creative_system_prompt(
     repo_id: "str | None",
     phase: Phase,
-    source_bank_id: str = _SCIENCE_BANK_ID,
+    source_bank_id: str = _DEFAULT_SEAM_BANK_ID,
 ) -> str:
     """Return the system-prompt string for a creative-phase call.
 
@@ -167,8 +168,8 @@ def resolve_creative_system_prompt(
             `meta.creative_model` in D2b).
         phase: one of the creative-phase identifiers in `Phase`.
         source_bank_id: the story-path bank whose pack supplies any
-            pack-routed seam (Stage 2C widget selection). Default is the
-            science lane -- all pre-2C callers stay byte-identical.
+            pack-routed seam (Stage 2C widget selection). Default is a kept
+            legacy-seam lane (media_archive); production always passes an id.
 
     Returns:
         The system-prompt string for that (model, phase) pair.

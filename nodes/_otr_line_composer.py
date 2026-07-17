@@ -2047,7 +2047,7 @@ def compose_line_draft(
     creative_repo_id: str | None = None,
     reroll_hint: str | None = None,  # Sprint 5C
     _stage_dir_repair_attempted: bool = False,  # D1 Tier-2 reroll guard
-    source_bank_id: str = "science_news",  # Stage 2C widget threading
+    source_bank_id: str = "media_archive",  # Stage 2C widget threading
 ) -> str:
     """Run the creative retry ladder and return ONE draft dialogue line.
 
@@ -2438,7 +2438,7 @@ def compose_line(
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     creative_repo_id: str | None = None,  # Sprint D D2b
     reroll_hint: str | None = None,  # Sprint 5C
-    source_bank_id: str = "science_news",  # Stage 2C widget threading
+    source_bank_id: str = "media_archive",  # Stage 2C widget threading
     # Sprint 10B Wave 1 Agent B (2026-05-27): in-line Stage 3
     # validators. When enable_stage3_validators=True AND both
     # stage3_plan + stage3_beat are provided, the final cleaned
@@ -3254,7 +3254,7 @@ def compose_announcer_intro(
     # Closing-layer routing (2026-07-09 QA F1): the episode's story-path bank;
     # the intro system prompts resolve from its pack seams. Default keeps
     # every legacy caller byte-identical (science constants).
-    source_bank_id: str = "science_news",
+    source_bank_id: str = "media_archive",
 ) -> LineResult:
     """Compose the episode's opening announcer line.
 
@@ -3559,7 +3559,7 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
                       # Closing-layer routing (2026-07-09 QA F1): the bank
                       # whose pack seam supplies the coda system prompt.
                       # Default keeps legacy callers byte-identical.
-                      source_bank_id: str = "science_news") -> LineResult:
+                      source_bank_id: str = "media_archive") -> LineResult:
     """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
     clause from the premise + the safe intro tone (NEVER the outcome / the news
     fact); the real ``news_close_brief`` is appended deterministically, so the
@@ -3644,7 +3644,7 @@ def compose_announcer_outro(
     # Stage 4 (2026-07-06): the episode's story-path bank; the thesis-close
     # gate's vocabulary resolves from its rules pack (this function had NO
     # bank-context slot at all -- the worst threading gap, kibitz r2).
-    source_bank_id: str = "science_news",
+    source_bank_id: str = "media_archive",
 ) -> LineResult:
     """Compose the episode's closing announcer line.
 

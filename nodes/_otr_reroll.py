@@ -658,7 +658,7 @@ def _run_targeted_reroll_inner(generate_fn, led) -> RerollDisposition:
                 # vocabulary (the old bare call silently rerolled every
                 # non-science episode through the science lane).
                 _sb = str((ledger_data.get("meta") or {}).get("source_bank")
-                          or "science_news")
+                          or "media_archive")
                 result = compose_line(
                     creative_fn=generate_fn,
                     req=req,

@@ -18,31 +18,13 @@ from nodes import _otr_line_composer as L
 from nodes import _otr_outline as O
 
 REPO = Path(__file__).resolve().parents[1]
-PACK_PATH = REPO / "nodes" / "story_packs" / "science_news" / "science_news_default.json"
+PACK_PATH = REPO / "nodes" / "story_packs" / "media_archive" / "media_restoration_adventure.json"
 
 EXPECTED_SEAMS = frozenset({
     "outline_macro_system", "outline_phase_system", "outline_beat_system",
     "line_composer_system", "exchange_system", "coda_system",
     "announcer_intro_system", "announcer_intro_safe_system", "announcer_outro_system",
 })
-
-
-def _expected_live() -> "dict[str, str]":
-    """Seam -> the exact live runtime string it must mirror."""
-    return {
-        "outline_macro_system": O._MACRO_SYSTEM_PROMPT,
-        "outline_phase_system": O._PHASE_SYSTEM_PROMPT,
-        "outline_beat_system": O._BEAT_SYSTEM_PROMPT,
-        "line_composer_system": L._SYSTEM_PROMPT,
-        # Lane chunk 2: the exchange STATIC portion (dynamic craft bullets
-        # stay Python-owned in build_exchange_prompt).
-        "exchange_system": EX.EXCHANGE_SYSTEM_PROMPT,
-        # coda is the UNCONDITIONAL runtime join (_otr_line_composer.py:3407).
-        "coda_system": L._NEWS_CODA_SYSTEM + L._NEWS_CODA_SYSTEM_V2_EXAMPLES,
-        "announcer_intro_system": L._ANNOUNCER_INTRO_SYSTEM,
-        "announcer_intro_safe_system": L._ANNOUNCER_INTRO_SYSTEM_SAFE,
-        "announcer_outro_system": L._ANNOUNCER_OUTRO_SYSTEM,
-    }
 
 
 @pytest.fixture
@@ -61,16 +43,9 @@ def test_pack_seam_keys_exact(pack):
     assert set(pack.prompt_stages) == EXPECTED_SEAMS
 
 
-def test_pack_is_byte_identical_to_live_constants(pack):
-    expected = _expected_live()
-    assert set(expected) == EXPECTED_SEAMS  # keep this map complete
-    for seam, live in expected.items():
-        assert pack.prompt_stages[seam] == live, f"drift in seam {seam!r}"
-
-
 def test_pack_metadata(pack):
-    assert pack.source_bank_id == "science_news"
-    assert pack.story_model_id == "science_news_default"
+    assert pack.source_bank_id == "media_archive"
+    assert pack.story_model_id == "media_restoration_adventure"
     assert pack.story_pipeline_id == "legacy_many_pass"
     assert pack.schema_version == "v2.0"
 
@@ -237,8 +212,9 @@ def test_load_pack_with_seams_sole_caller_is_routing():
 # -- (f) Stage 1b wiring: router sources the seam from the pack -------------
 
 def test_stage1b_router_sources_line_composer_from_pack(pack):
-    """The router now returns line_composer_system from the JSON pack, and it is
-    byte-identical to the live constant -> the sci-fi episode is unchanged."""
+    """The router returns line_composer_system from the JSON pack of its
+    default lane (media_archive) -> the seam is pack-owned, not a Python
+    constant."""
     from nodes import _otr_creative_prompt_router as router
     from nodes import _otr_model_catalog as cat
 
@@ -246,7 +222,7 @@ def test_stage1b_router_sources_line_composer_from_pack(pack):
               if m.prompt_profile == "modern"]
     assert modern, "expected at least one modern curated model"
     out = router.resolve_creative_system_prompt(modern[0], "line_composer_system")
-    assert out == pack.prompt_stages["line_composer_system"] == L._SYSTEM_PROMPT
+    assert out == pack.prompt_stages["line_composer_system"]
     # outline stays object-identical (not pack-sourced in Stage 1b).
     out_outline = router.resolve_creative_system_prompt(modern[0], "outline")
     assert out_outline is O._SYSTEM_PROMPT

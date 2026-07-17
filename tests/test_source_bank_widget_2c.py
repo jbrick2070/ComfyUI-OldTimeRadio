@@ -7,7 +7,7 @@ kibitz-runs/2026-07-05-multimodal-2c/r4/final.md).
 Pins:
   1. Widget surface: source_bank stays pinned at slot 23; choices come
      LIVE from the routing registry (exact list, registry order, including
-     non-runnable custom banks -- the honest-error contract); default science_news.
+     non-runnable custom banks -- the honest-error contract); default scifi_fable2.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
      (deliberate exception to the "INPUT_TYPES must never raise"
      convention; no baked-in fallback choice list).
@@ -53,7 +53,7 @@ from nodes._otr_creative_prompt_router import (  # noqa: E402
 )
 
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
-_PUBLIC_DOMAIN_BANK = "public_domain_story"
+_PUBLIC_DOMAIN_BANK = "public_domain_story_v3"
 _NON_RUNNABLE_BANK = "custom_source_bank"
 
 
@@ -77,13 +77,13 @@ class TestWidgetSurface:
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         choices, meta = spec["optional"]["source_bank"]
         assert choices == list(routing.list_bank_ids())
-        assert meta["default"] == "science_news"
+        assert meta["default"] == "scifi_fable2"
         # The honest-error contract: non-runnable custom banks ARE listed.
         assert _NON_RUNNABLE_BANK in choices
         assert _PUBLIC_DOMAIN_BANK in choices
 
     def test_default_is_a_runnable_bank(self):
-        bank = routing.require_runnable_bank("science_news")
+        bank = routing.require_runnable_bank("scifi_fable2")
         assert bank.runnable is True
 
 
@@ -151,7 +151,11 @@ class TestRefineCoreCapture:
         monkeypatch.setattr(
             OTR_LedgerScriptWriter, "_refine_loop", _fake_loop)
         node = OTR_LedgerScriptWriter()
-        out = node.run(source_bank="science_news",
+        # Writer refine re-entry is a LEGACY-lane seam; the LLM-first custom
+        # pipelines (the new default scifi_fable2 -> fable2_multipass) reject
+        # it by design. Thread a legacy many-pass bank so the capture test
+        # targets the refine re-entry contract, not lane dispatch.
+        out = node.run(source_bank="media_archive",
                        refine_target_grade="B")
         assert out == ("", "", "", 0, "")
         # The regression: non-parameter locals leaked into the capture and
@@ -164,7 +168,7 @@ class TestRefineCoreCapture:
                   "_refine_forced_cast_seed"):
             assert k not in captured
         # The selection survives re-entry.
-        assert captured["source_bank"] == "science_news"
+        assert captured["source_bank"] == "media_archive"
         # Every captured key is a real run() parameter -> **_core is safe.
         import inspect
         params = inspect.signature(OTR_LedgerScriptWriter.run).parameters
@@ -190,18 +194,9 @@ class TestThreading:
         )
         # Cross-check against the lane pack on disk.
         pack_path = (_REPO / "nodes" / "story_packs" / _PUBLIC_DOMAIN_BANK /
-                     "faithful_radio_adaptation.json")
+                     "faithful_radio_adaptation_v3.json")
         pack = json.loads(pack_path.read_text(encoding="utf-8"))
         assert other == pack["prompt_stages"]["line_composer_system"]
-
-    def test_default_is_byte_identical_science(self):
-        default = resolve_creative_system_prompt(
-            "mistralai/Mistral-Nemo-Instruct-2407",
-            phase="line_composer_system")
-        explicit = resolve_creative_system_prompt(
-            "mistralai/Mistral-Nemo-Instruct-2407",
-            phase="line_composer_system", source_bank_id="science_news")
-        assert default == explicit
 
     def test_compose_line_draft_threads_source_bank(self, monkeypatch):
         from nodes import _otr_line_composer as lc
@@ -209,7 +204,7 @@ class TestThreading:
         seen = []
         real = router.resolve_creative_system_prompt
 
-        def _spy(repo_id, phase, source_bank_id="science_news"):
+        def _spy(repo_id, phase, source_bank_id="media_archive"):
             seen.append(source_bank_id)
             return real(repo_id, phase, source_bank_id=source_bank_id)
 
@@ -223,16 +218,16 @@ class TestThreading:
             canon_header="",
             last_lines=[],
         )
-        # public_domain_story now has its own story_rules pack, but pass the
-        # science rules explicitly so this test keeps targeting PROMPT
-        # threading rather than content-rule vocabulary.
+        # public_domain_story_v3 now has its own story_rules pack, but pass the
+        # kept legacy-seam (media_archive) rules explicitly so this test keeps
+        # targeting PROMPT threading rather than content-rule vocabulary.
         from nodes._otr_story_rules import resolve_story_rules
         out = lc.compose_line(
             creative_fn=lambda *a, **k: "A quiet line about the machine.",
             req=req,
             creative_repo_id="mistralai/Mistral-Nemo-Instruct-2407",
             source_bank_id=_PUBLIC_DOMAIN_BANK,
-            _story_rules=resolve_story_rules("science_news"),
+            _story_rules=resolve_story_rules("media_archive"),
         )
         assert out.text
         assert seen and all(s == _PUBLIC_DOMAIN_BANK for s in seen)
@@ -294,7 +289,7 @@ class TestThreading:
 class TestResolvedSurface:
     def test_resolve_inputs_carries_source_bank(self):
         resolved = _resolve_inputs(custom_premise="test premise")
-        assert resolved["source_bank"] == "science_news"
+        assert resolved["source_bank"] == "scifi_fable2"
         resolved2 = _resolve_inputs(
             custom_premise="test premise", source_bank=_PUBLIC_DOMAIN_BANK)
         assert resolved2["source_bank"] == _PUBLIC_DOMAIN_BANK
@@ -323,14 +318,14 @@ class TestHeadlessSurface:
         }
         workflow = otr_api.load_workflow(str(_CANONICAL_WORKFLOW))
         otr_api.patch_widget_by_name(
-            workflow, 1, "source_bank", "science_news", schemas)
+            workflow, 1, "source_bank", "scifi_fable2", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
         # The Google API selectors and source_ref were appended after
         # visual_style; source_bank stays at slot 23 (was 25 before the
         # style-engine consolidation). S5 platform-portability appended
         # the six llm runtime-policy widgets at 28-33 (vector = 34).
         assert len(node1["widgets_values"]) == 34
-        assert node1["widgets_values"][23] == "science_news"
+        assert node1["widgets_values"][23] == "scifi_fable2"
         assert node1["widgets_values"][25] == "(select Google API model)"
         assert node1["widgets_values"][26] == "(select Google API model)"
         assert node1["widgets_values"][27] == ""

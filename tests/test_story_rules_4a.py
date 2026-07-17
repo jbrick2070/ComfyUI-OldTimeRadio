@@ -37,7 +37,9 @@ from nodes._otr_stage3_validators import DEFAULT_BANNED_PHRASES
 
 _REPO = Path(__file__).resolve().parent.parent
 _NODES = _REPO / "nodes"
-_PACK = _NODES / "story_rules" / "science_news.json"
+# Roster trim 2026-07-17: science_news.json is deleted. The loader/mutation
+# tests exercise a surviving pack instead.
+_PACK = _NODES / "story_rules" / "media_archive.json"
 
 _CONST_SETS = {
     "cliche_patterns": hyg._CLICHE_RES,
@@ -64,35 +66,17 @@ def _mutated_pack(tmp_path, monkeypatch, mutate):
     mutate(raw)
     scratch = tmp_path / "story_rules"
     scratch.mkdir()
-    (scratch / "science_news.json").write_text(
+    (scratch / "media_archive.json").write_text(
         json.dumps(raw), encoding="utf-8")
     monkeypatch.setattr(sr, "_STORY_RULES_ROOT", scratch)
     sr._clear_caches()
 
 
 # ---------------------------------------------------------------------------
-# 1. Extraction fidelity
+# 1. Extraction fidelity -- REMOVED (roster trim 2026-07-17): the
+#    science_news.json byte-identity-to-python-constants baseline is obsolete
+#    (the pack is deleted; no surviving pack mirrors the fixture constants).
 # ---------------------------------------------------------------------------
-class TestExtractionFidelity:
-    def test_pattern_sources_match_constants(self):
-        raw = json.loads(_PACK.read_text(encoding="utf-8"))
-        for field, consts in _CONST_SETS.items():
-            assert raw[field] == [rx.pattern for rx in consts], field
-
-    def test_replacements_and_phrases_match(self):
-        raw = json.loads(_PACK.read_text(encoding="utf-8"))
-        assert raw["cliche_replacements"] == [
-            [rx.pattern, repl] for rx, repl in hyg._CLICHE_REPLACEMENTS]
-        assert raw["banned_phrases"] == list(DEFAULT_BANNED_PHRASES)
-
-    def test_loaded_pack_compiles_equivalently(self):
-        rules = sr.resolve_story_rules("science_news")
-        assert [rx.pattern for rx in rules.cliche] == [
-            rx.pattern for rx in hyg._CLICHE_RES]
-        assert all(rx.flags == hyg._CLICHE_RES[0].flags
-                   for rx in rules.cliche)
-        assert [(rx.pattern, r) for rx, r in rules.cliche_replacements] == [
-            (rx.pattern, r) for rx, r in hyg._CLICHE_REPLACEMENTS]
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +101,7 @@ class TestLoader:
             mod = importlib.import_module("nodes._otr_story_rules")
             assert calls == [], f"import-time I/O: {calls}"
             mod._clear_caches()
-            mod.resolve_story_rules("science_news")
+            mod.resolve_story_rules("media_archive")
             assert calls
         finally:
             if original is not None:
@@ -127,23 +111,24 @@ class TestLoader:
         # custom_source_bank is registered + runnable:false + has NO rules
         # pack: legal at sweep time, hard error on explicit resolve.
         ids = sr.list_rules_ids()
-        assert "science_news" in ids
         assert "media_archive" in ids
-        assert "public_domain_story" in ids
+        assert "scifi_fable2" in ids
+        assert "public_domain_story_v3" in ids
         assert "custom_source_bank" not in ids
         with pytest.raises(sr.UnknownStoryRulesError):
             sr.resolve_story_rules("custom_source_bank")
 
     def test_public_domain_rules_load(self):
-        rules = sr.resolve_story_rules("public_domain_story")
-        assert rules.rules_id == "public_domain_story"
+        rules = sr.resolve_story_rules("public_domain_story_v3")
+        assert rules.rules_id == "public_domain_story_v3"
         assert "smoking" in rules.banned_phrases
 
     def test_get_story_rules_meta_paths(self):
-        assert sr.get_story_rules({}).rules_id == "science_news"
-        assert sr.get_story_rules(None).rules_id == "science_news"
+        # DEFAULT_RULES_ID is now "scifi_fable2" (roster trim 2026-07-17).
+        assert sr.get_story_rules({}).rules_id == "scifi_fable2"
+        assert sr.get_story_rules(None).rules_id == "scifi_fable2"
         assert sr.get_story_rules(
-            {"source_bank": "science_news"}).rules_id == "science_news"
+            {"source_bank": "media_archive"}).rules_id == "media_archive"
 
     @pytest.mark.parametrize("mutate,fragment", [
         (lambda d: d.update(extra=1), "unknown key"),
@@ -170,19 +155,19 @@ class TestLoader:
         dup = raw_text.rstrip().rstrip("}") + ', "label": "dup twice"}'
         scratch = tmp_path / "story_rules"
         scratch.mkdir()
-        (scratch / "science_news.json").write_text(dup, encoding="utf-8")
+        (scratch / "media_archive.json").write_text(dup, encoding="utf-8")
         monkeypatch.setattr(sr, "_STORY_RULES_ROOT", scratch)
         sr._clear_caches()
         with pytest.raises(sr.StoryRulesValidationError) as ei:
             sr.list_rules_ids()
         assert "duplicate JSON key" in str(ei.value)
 
-    def test_unregistered_stem_and_missing_science(self, tmp_path,
-                                                   monkeypatch):
+    def test_unregistered_stem_and_missing_default(self, tmp_path,
+                                                    monkeypatch):
         raw = _PACK.read_text(encoding="utf-8")
         scratch = tmp_path / "story_rules"
         scratch.mkdir()
-        (scratch / "science_news.json").write_text(raw, encoding="utf-8")
+        (scratch / "media_archive.json").write_text(raw, encoding="utf-8")
         (scratch / "not_a_bank.json").write_text(raw, encoding="utf-8")
         monkeypatch.setattr(sr, "_STORY_RULES_ROOT", scratch)
         sr._clear_caches()
@@ -195,60 +180,19 @@ class TestLoader:
         sr._clear_caches()
         with pytest.raises(sr.StoryRulesValidationError) as ei2:
             sr.list_rules_ids()
-        assert "science_news" in str(ei2.value)
+        # DEFAULT_RULES_ID is now "scifi_fable2": an empty root fails on the
+        # missing default pack.
+        assert "scifi_fable2" in str(ei2.value)
 
 
 # ---------------------------------------------------------------------------
-# 3. Flag parity (rules=science == fixture defaults; reason strings)
+# 3. Flag parity -- REMOVED (roster trim 2026-07-17): the "rules=science ==
+#    fixture defaults" parity and the science-pack every-pattern-has-a-repair
+#    coverage lock were both byte-identity-to-python-constants baselines tied
+#    to the deleted science_news pack. No surviving pack mirrors the fixture
+#    constants (scifi_fable2 ships empty cliche_replacements), so the parity is
+#    obsolete rather than repointable.
 # ---------------------------------------------------------------------------
-_TRIP = {
-    "cliche": "Listen, you're playing with fire, and we must act.",
-    "stage_business": "I'll go check the readings and report back.",
-    "on_the_nose": "I'm so scared, and this is dangerous.",
-    "thesis": "Tonight's revelation is the cost of speed.",
-    "personal_cost": "Think about the trust they will lose either way.",
-    "clean": "The reactor hums a half-step flat tonight.",
-}
-
-
-class TestFlagParity:
-    def test_all_wrappers_parity(self):
-        rules = sr.resolve_story_rules("science_news")
-        for text in _TRIP.values():
-            assert hyg.flag_cliche(text) == hyg.flag_cliche(
-                text, rules=rules)
-            assert hyg.flag_stage_business(text) == hyg.flag_stage_business(
-                text, rules=rules)
-            assert hyg.flag_on_the_nose(text) == hyg.flag_on_the_nose(
-                text, rules=rules)
-            assert hyg.flag_thesis_close(text) == hyg.flag_thesis_close(
-                text, rules=rules)
-            assert (hyg.flag_personal_cost_boilerplate(text)
-                    == hyg.flag_personal_cost_boilerplate(text, rules=rules))
-            assert hyg.find_cliche_phrase(text) == hyg.find_cliche_phrase(
-                text, rules=rules)
-            assert hyg.repair_cliche_span(text) == hyg.repair_cliche_span(
-                text, rules=rules)
-
-    def test_every_json_cliche_pattern_has_live_repair(self):
-        # r4 S2: the science pack twin of the every-pattern-has-a-repair
-        # coverage lock, run against the LOADED pack.
-        rules = sr.resolve_story_rules("science_news")
-        probes = (
-            "You're playing with fire.", "This changes everything.",
-            "We're not leaving anything to chance.",
-            "Leaving nothing to chance.", "There's no turning back.",
-            "Against all odds, we made it.", "It hangs in the balance.",
-            "Over my dead body.", "Not on my watch.",
-            "Some things are best left buried.", "We are running out of time.",
-            "Act before it's too late.", "Safety first.",
-            "The plan goes up in smoke.",
-        )
-        for probe in probes:
-            hit, _ = hyg.flag_cliche(probe, rules=rules)
-            assert hit, probe
-            repaired = hyg.repair_cliche_span(probe, rules=rules)
-            assert not hyg.flag_cliche(repaired, rules=rules)[0], probe
 
 
 # ---------------------------------------------------------------------------

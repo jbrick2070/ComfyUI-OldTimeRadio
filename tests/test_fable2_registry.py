@@ -238,49 +238,21 @@ class TestStoryRules:
 
 
 # ---------------------------------------------------------------------------
-# 6. science_news untouched (hard rule, doc s0/s12)
+# 6. Roster order (roster-trim 2026-07-17: 10 independent lanes + custom)
 # ---------------------------------------------------------------------------
 
-class TestScienceNewsUntouched:
-    """The fable2 lane is ADDITIVE: the science_news registry surfaces the
-    S0 change could have disturbed are pinned to their pre-fable2 values.
-    (File-level byte identity is verified at commit time via git diff; a
-    baseline hash here would collide with the science lane's own campaign.)
-    """
+class TestRosterOrder:
+    """Roster-trim 2026-07-17: the science_news family, all _v2 rows, and the
+    orphan bases (public_domain_story/shakespeare/scifi_sonnet/original_radio_v3)
+    were ripped. Each surviving lane is an INDEPENDENT bank (own pack +
+    story_rules, no family base-map). custom stays last."""
 
-    def test_science_bank_row_pinned(self):
-        bank = ROUTING.get_bank("science_news")
-        assert bank.runnable is True
-        assert bank.interpreter == "news_interpreter"
-        assert bank.fetcher == "science_rss"
-        assert bank.default_story_model == "science_news_default"
-        assert bank.default_story_pipeline == "legacy_many_pass"
-        assert bank.defaults == {
-            "story_form_label": "science-fiction audio drama",
-            "source_material_label": "Science story",
-            "source_develop_verb":
-                "extrapolate dramatically from this science story",
-            "source_grounding_label": "news facts",
-            "key_terms_label": "NEWS KEY TERMS",
-            "close_brief_label": "closing news read",
-            "title_form_label": "sci-fi radio drama",
-            "coda_mode": "real_news_report",
-        }
-
-    def test_science_stays_first_and_order_holds(self):
+    def test_roster_order_holds(self):
         ids = ROUTING.list_bank_ids()
-        # bake-off chunk 4: base 8 -> +8 _v2 -> +8 _v3 (mirrored order) -> custom.
-        assert ids == ("science_news", "media_archive",
-                       "public_domain_story", "shakespeare",
-                       "original_radio", "scifi_fable2", "scifi_codex",
-                       "scifi_sonnet",
-                       "science_news_v2", "media_archive_v2",
-                       "public_domain_story_v2", "shakespeare_v2",
-                       "original_radio_v2", "scifi_fable2_v2",
-                       "scifi_codex_v2", "scifi_sonnet_v2",
-                       "science_news_v3", "media_archive_v3",
-                       "public_domain_story_v3", "shakespeare_v3",
-                       "original_radio_v3", "scifi_fable2_v3",
+        assert ids == ("media_archive", "original_radio",
+                       "scifi_fable2", "scifi_codex",
+                       "media_archive_v3", "public_domain_story_v3",
+                       "shakespeare_v3", "scifi_fable2_v3",
                        "scifi_codex_v3", "scifi_sonnet_v3",
                        "custom_source_bank")
 

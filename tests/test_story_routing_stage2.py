@@ -97,23 +97,26 @@ def _mk_registry(root: Path, banks=None, pipelines=None, packs=None,
 # (a) shipped registries + science routing
 # ---------------------------------------------------------------------------
 
-def test_shipped_registries_load_and_route_science():
-    bank = routing.get_bank("science_news")
+def test_shipped_registries_load_and_route_media_archive():
+    # Roster trim 2026-07-17: science_news is removed; media_archive is the
+    # surviving legacy_many_pass lane exercised for generic load+route.
+    bank = routing.get_bank("media_archive")
     assert bank.runnable is True
-    assert bank.default_story_model == "science_news_default"
+    assert bank.default_story_model == "media_restoration_adventure"
     pipe = routing.get_pipeline("legacy_many_pass")
     assert pipe.executable is False and pipe.declared_seams == frozenset()
     assert routing.get_pipeline("simple_4_prompt_experimental").executable is False
-    assert "science_news" in routing.list_bank_ids()
+    assert "media_archive" in routing.list_bank_ids()
 
-    pack = routing.resolve_story_pack("science_news")
+    pack = routing.resolve_story_pack("media_archive")
     strict = sp.load_pack(
-        REPO / "nodes" / "story_packs" / "science_news" / "science_news_default.json")
+        REPO / "nodes" / "story_packs" / "media_archive"
+        / "media_restoration_adventure.json")
     assert pack.prompt_stages == strict.prompt_stages  # byte-identical routing
 
 
-def test_shipped_science_is_runnable_gate():
-    assert routing.require_runnable_bank("science_news").runnable is True
+def test_shipped_media_archive_is_runnable_gate():
+    assert routing.require_runnable_bank("media_archive").runnable is True
 
 
 def test_unknown_ids_raise():
@@ -122,7 +125,7 @@ def test_unknown_ids_raise():
     with pytest.raises(routing.UnknownPipelineError):
         routing.get_pipeline("nope")
     with pytest.raises(routing.UnknownStoryModelError):
-        routing.resolve_story_pack("science_news", "no_such_model")
+        routing.resolve_story_pack("media_archive", "no_such_model")
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +140,7 @@ LANE_PACK_KEYS = {
             "exchange_system", "coda_system", "announcer_intro_system",
             "announcer_intro_safe_system", "announcer_outro_system",
         }),
-    ("public_domain_story", "faithful_radio_adaptation"):
+    ("public_domain_story_v3", "faithful_radio_adaptation_v3"):
         frozenset({
             "outline_macro_system", "outline_phase_system",
             "outline_beat_system", "line_composer_system",
@@ -171,8 +174,10 @@ def test_lane_bank_not_runnable(bank_id):
 
 def test_public_domain_lane_is_runnable():
     """Public-domain now has fetcher, interpreter, story rules, default
-    source_ref, and all production seams, so it can pass the run-intent gate."""
-    assert routing.require_runnable_bank("public_domain_story").runnable is True
+    source_ref, and all production seams, so it can pass the run-intent gate.
+    Roster trim 2026-07-17: the base id is retired; the surviving lane is
+    public_domain_story_v3."""
+    assert routing.require_runnable_bank("public_domain_story_v3").runnable is True
 
 
 def test_media_archive_lane_is_runnable():

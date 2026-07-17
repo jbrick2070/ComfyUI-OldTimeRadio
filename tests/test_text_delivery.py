@@ -81,8 +81,8 @@ def test_legacy_passthrough_ignores_any_text_for_tts_stamp():
 # 2. delivery mode resolution
 # ---------------------------------------------------------------------------
 
-def test_delivery_mode_science_news_is_legacy():
-    assert delivery_mode_for_meta({"source_bank": "science_news"}) == LEGACY
+def test_delivery_mode_media_archive_is_legacy():
+    assert delivery_mode_for_meta({"source_bank": "media_archive"}) == LEGACY
 
 
 def test_delivery_mode_untagged_is_legacy():

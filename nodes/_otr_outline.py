@@ -1779,7 +1779,7 @@ def generate_outline(
     # The three outline STAGE system prompts resolve from its pack seams
     # (outline_macro/phase/beat_system) via the router's repo=None lane --
     # science stays byte-identical (pack == constants, test-pinned).
-    source_bank_id: str = "science_news",
+    source_bank_id: str = "media_archive",
 ) -> Outline:
     """Generate a validated Outline via a tree of small LLM calls.
 

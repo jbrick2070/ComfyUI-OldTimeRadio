@@ -171,7 +171,7 @@ def _make_recompose_fn(led: Any, creative_generate_fn: Callable[..., str]):
             # (no `meta` in this scope -- kibitz r3 M3; a NameError here
             # would be swallowed by the fail-soft catch below).
             _meta = data.get("meta", {}) if isinstance(data, dict) else {}
-            _sb = str((_meta or {}).get("source_bank") or "science_news")
+            _sb = str((_meta or {}).get("source_bank") or "media_archive")
             res = _LC.compose_line(
                 creative_fn=creative_generate_fn,
                 req=req,
@@ -219,7 +219,7 @@ def _recompose_announcer_tagline(
                 # QA F1 (2026-07-09): pack-routed intro seam (mirrors the
                 # outro sibling below).
                 source_bank_id=str(
-                    meta.get("source_bank") or "science_news"),
+                    meta.get("source_bank") or "media_archive"),
             )
         else:
             res = _LC.compose_announcer_outro(
@@ -230,7 +230,7 @@ def _recompose_announcer_tagline(
                 creative_repo_id=repo,
                 # Stage 4: the thesis gate scores with the bank's rules.
                 source_bank_id=str(
-                    meta.get("source_bank") or "science_news"),
+                    meta.get("source_bank") or "media_archive"),
             )
         text = getattr(res, "text", None)
         return str(text) if (text and str(text).strip()) else ""

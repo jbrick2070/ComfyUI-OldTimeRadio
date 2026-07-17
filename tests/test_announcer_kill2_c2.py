@@ -20,6 +20,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_line_composer as LC  # noqa: E402
+from nodes._otr_creative_prompt_router import (  # noqa: E402
+    resolve_creative_system_prompt as _RESOLVE)
+
+# Roster trim (2026-07-17): compose_announcer_intro's default source_bank_id moved
+# science_news -> media_archive, so the DEFAULT path now routes the intro system
+# prompt through media_archive's pack seams (not the raw module constants). The
+# selection contract (safe vs unsafe phase) + no-spoiler starvation is unchanged;
+# pin the expected prompt to the routed seam for the default legacy-seam bank.
+_BANK = "media_archive"
 
 
 def _make_fn(reply, capture):
@@ -65,8 +74,9 @@ class TestComposeOpenFlagOn:
         # the spoiler brief reached NEITHER message
         assert "SPOILER" not in sysmsg and "SPOILER" not in usermsg
         assert "sank" not in usermsg.lower() and "drowned" not in usermsg.lower()
-        # the safe system prompt + the locked cast were used
-        assert sysmsg == LC._ANNOUNCER_INTRO_SYSTEM_SAFE
+        # the safe system prompt + the locked cast were used (routed seam)
+        assert sysmsg == _RESOLVE(None, "announcer_intro_safe_system", _BANK)
+        assert sysmsg != _RESOLVE(None, "announcer_intro_system", _BANK)
         assert "do not reveal" in sysmsg.lower()
         assert "KEEPER" in usermsg and "MARA" in usermsg
         assert "a fog-bound lighthouse" in usermsg
@@ -91,7 +101,8 @@ class TestComposeOpenFlagOn:
             script_brief="a quiet tale about a signal in the archives",
             story_scaffold=True, safe_open_brief=None,
         )
-        assert cap[0][0]["content"] == LC._ANNOUNCER_INTRO_SYSTEM
+        assert cap[0][0]["content"] == _RESOLVE(
+            None, "announcer_intro_system", _BANK)
         assert res.compose_flags == ("announcer_intro",)
 
 
@@ -104,7 +115,7 @@ class TestComposeOpenFlagOff:
             story_scaffold=False, safe_open_brief=_SB,
         )
         sysmsg, usermsg = cap[0][0]["content"], cap[0][1]["content"]
-        assert sysmsg == LC._ANNOUNCER_INTRO_SYSTEM           # original prompt
+        assert sysmsg == _RESOLVE(None, "announcer_intro_system", _BANK)  # original phase
         assert "a quiet tale about a signal" in usermsg       # real brief used
         assert res.compose_flags == ("announcer_intro",)
 

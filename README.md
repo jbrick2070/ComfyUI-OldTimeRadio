@@ -89,17 +89,19 @@ News → LedgerScriptWriter (LLM) → FreezeCascade → CastLock
 ## Story sources (source banks)
 
 The writer's `source_bank` dropdown selects where each episode's story comes from.
-Default: `science_news`.
+Default: `scifi_fable2`. Every lane is an INDEPENDENT bank (its own story pack +
+story_rules); a `_v3` suffix on some ids is a bake-off naming artifact, not a
+dependency on any other lane.
 
 | Bank | What it does |
 |------|--------------|
-| `science_news` | real science RSS → sci-fi radio drama (the shipped default) |
-| `media_archive` | media RSS / archive items → restoration-adventure episodes |
-| `public_domain_story` | faithful radio adaptation of a public-domain source |
-| `shakespeare` | Folger scene adaptation |
+| `scifi_fable2` (+ `scifi_fable2_v3`) | LLM-first multipass sci-fi writer (the shipped default) |
+| `scifi_codex` (+ `scifi_codex_v3`) | proof-pressure sci-fi radio, a distinct multipass architecture |
+| `scifi_sonnet_v3` | continuity-archive frame-narrative multipass sci-fi |
+| `media_archive` (+ `media_archive_v3`) | media RSS / archive items → restoration-adventure episodes |
+| `public_domain_story_v3` | faithful radio adaptation of a public-domain source |
+| `shakespeare_v3` | Folger scene adaptation |
 | `original_radio` | no-source original fiction seeded from an entropy spark draw |
-| `scifi_fable2`, `scifi_codex`, `scifi_gemini`, `scifi_sonnet` | independent multipass sci-fi writer lanes — four genuinely different story architectures |
-| `original_codex56sol` | "Lost and Found Frequency" — an original fair-play audio mystery lane |
 
 A typed `custom_premise` rides along as an operator hint on the original lanes and as a
 source override on the article lanes. Every lane is fail-closed: a bad source, context

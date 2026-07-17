@@ -1,6 +1,6 @@
 {
-  "rules_id": "scifi_sonnet",
-  "label": "Sci-Fi Sonnet v4",
+  "rules_id": "scifi_codex_v3",
+  "label": "Sci-Fi Codex v4",
   "schema_version": "v1",
   "cliche_patterns": [],
   "stage_business_patterns": [],

@@ -38,7 +38,7 @@ def _frame() -> lane.SessionFrameV4:
 
 
 def test_clear_path_uses_satisfied_schema_first():
-    pack = routing.resolve_story_pack("scifi_sonnet")
+    pack = routing.resolve_story_pack("scifi_sonnet_v3")
     seam = pack.prompt_stages["sonnet_warden_system"]
     clear = lane.select_warden_mode_block(seam, "clear")
     defect = lane.select_warden_mode_block(seam, "defect")

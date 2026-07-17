@@ -138,7 +138,11 @@ class TestRefineCarry:
 
         monkeypatch.setattr(OTR_LedgerScriptWriter, "_refine_loop", _fake_loop)
         node = OTR_LedgerScriptWriter()
-        out = node.run(visual_style="anime", refine_target_grade="B")
+        # Writer refine re-entry is a legacy-lane seam; thread a legacy
+        # many-pass bank (the new default scifi_fable2 -> fable2_multipass
+        # rejects re-entry by design).
+        out = node.run(source_bank="media_archive",
+                       visual_style="anime", refine_target_grade="B")
         assert out == ("", "", "", 0, "")
         assert captured["visual_style"] == "anime"
         assert "os" not in captured and "_scaffold" not in captured
@@ -181,7 +185,7 @@ class TestHeadlessSurface:
         # reflects the new vector -- only the pin needed updating.
         assert len(node1["widgets_values"]) == 34
         assert node1["widgets_values"][24] == "anime"
-        assert node1["widgets_values"][23] == "science_news"
+        assert node1["widgets_values"][23] == "scifi_fable2"
         assert node1["widgets_values"][25] == "(select Google API model)"
         assert node1["widgets_values"][26] == "(select Google API model)"
         assert node1["widgets_values"][27] == ""

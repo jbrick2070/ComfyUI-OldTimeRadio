@@ -700,11 +700,13 @@ class TestWriterB2aSurface:
             f"scaffold setting in the shipped bake); got {wv[22]!r}"
         )
         # Slot 23: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
-        # -- APPENDED at the END; ships the production science lane AND must
-        # be a REGISTERED bank id (cross-checked against the live routing
-        # registry so a re-order / typo cannot ship silently).
-        assert wv[23] == "science_news", (
-            f"source_bank (slot 23) must ship 'science_news' (the production "
+        # -- APPENDED at the END; ships the production sci-fi fable2 lane AND
+        # must be a REGISTERED bank id (cross-checked against the live routing
+        # registry so a re-order / typo cannot ship silently). The roster trim
+        # (2026-07-17) retired the science_news family; the default lane is now
+        # scifi_fable2 (an LLM-first runnable bank).
+        assert wv[23] == "scifi_fable2", (
+            f"source_bank (slot 23) must ship 'scifi_fable2' (the production "
             f"story lane); got {wv[23]!r}"
         )
         from nodes import _otr_story_routing as _routing

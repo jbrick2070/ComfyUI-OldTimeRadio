@@ -1404,7 +1404,7 @@ def _resolve_inputs(
     # Threaded into the resolved dict as the ONE authoritative value for
     # meta/ledger stamping + prompt threading. Already gated runnable by
     # run() (require_runnable_bank fires before this call).
-    source_bank: str = "science_news",
+    source_bank: str = "scifi_fable2",
     # Stage 3C (2026-07-06): the visual_style widget selection; same
     # authoritative-value contract (gated by resolve_visual_style in run()).
     visual_style: str = "sci_fi_radio",
@@ -1504,7 +1504,7 @@ def _resolve_inputs(
     # custom_premise on this lane is NOT a source article: it rides
     # source_meta["operator_hint"] into the concept pass as material
     # (kibitz r4 P2) -- never the payload.
-    _rb_bank = _otr_story_routing.get_bank(source_bank or "science_news")
+    _rb_bank = _otr_story_routing.get_bank(source_bank or "scifi_fable2")
     # Bake-off source-snapshot replay (r3 ruling B7). Loaded IMMEDIATELY after
     # bank resolution and BEFORE the three source branches so a frozen source
     # replays across the base/_v2/_v3 triplet -- the ONLY variable under test is
@@ -1515,7 +1515,7 @@ def _resolve_inputs(
     # live branch would (spark_atoms for the original lane, cast_hints for the
     # adaptation lanes), so every downstream owner is fed unchanged.
     _source_snapshot = _otr_source_snapshot.load_snapshot_for_bank(
-        source_bank or "science_news",
+        source_bank or "scifi_fable2",
     )
     if _source_snapshot is not None:
         news_article = _otr_source_payload.validate_source_payload(
@@ -1529,7 +1529,7 @@ def _resolve_inputs(
         log.info(
             "[OTR_LedgerScriptWriter] source-snapshot REPLAY: bank=%r base=%r "
             "seed_source=%r sha=%s",
-            source_bank or "science_news",
+            source_bank or "scifi_fable2",
             _source_snapshot.base_source_bank_id,
             seed_source,
             _source_snapshot.payload_sha256[:12],
@@ -1615,7 +1615,7 @@ def _resolve_inputs(
         # Style-engine consolidation (2026-07-05): the fetch is
         # style-agnostic now -- there is no style value yet at this
         # pre-contract sourcing stage, and none is needed for rerank.
-        _fetch_bank = _otr_story_routing.get_bank(source_bank or "science_news")
+        _fetch_bank = _otr_story_routing.get_bank(source_bank or "scifi_fable2")
         _fetch_entry = _otr_source_payload.resolve_fetcher(_fetch_bank)
         _fetch_origin = (
             f"_resolve_inputs fetch (bank={_fetch_bank.source_bank_id!r}, "
@@ -1693,7 +1693,7 @@ def _resolve_inputs(
         "comfy_slot_b_model": str(comfy_slot_b_model or ""),
         # Stage 2C: the ONE authoritative source_bank value for prompt
         # threading + meta/ledger stamping (run() gated it runnable already).
-        "source_bank": str(source_bank or "science_news"),
+        "source_bank": str(source_bank or "scifi_fable2"),
         # Stage 3C: the ONE authoritative visual_style value (gated in run()).
         "visual_style": str(visual_style or "sci_fi_radio"),
         "google_api_slot_a_model": str(google_api_slot_a_model or ""),
@@ -1960,8 +1960,6 @@ def _v3_focus_metric(base, rows, speakers, words, counts):
         return {"metric": "compression_line_count", "value": len(rows)}
     if base == "shakespeare":
         return {"metric": "distinct_source_speakers", "value": cast}
-    if base == "science_news":
-        return {"metric": "cast_size", "value": cast}
     if base == "original_radio":
         return {"metric": "spoken_line_count", "value": len(rows)}
     return {"metric": "generic", "value": len(rows)}
@@ -1991,19 +1989,19 @@ def _make_v3_runner(base_runner, lane):
 _RUNNER_BY_PIPELINE = {
     "fable2_multipass": _run_fable2_lane,
     "scifi_codex_circuit": _run_scifi_codex_lane,
-    "sonnet_archive_multipass": _run_scifi_sonnet_lane,
     "fable2_multipass_v3": _make_v3_runner(_run_fable2_lane, "scifi_fable2_v3"),
     "scifi_codex_circuit_v3": _make_v3_runner(_run_scifi_codex_lane, "scifi_codex_v3"),
     "sonnet_archive_multipass_v3": _make_v3_runner(
         _run_scifi_sonnet_lane, "scifi_sonnet_v3"),
 }
 
-# Bake-off v3 inline lanes: clones of the two inline pipelines. They run the
-# inline body byte-identically (map miss -> None) plus one post-assembly
-# advisory diagnostic; they must be in _LEGACY_INLINE_PIPELINES so
-# _resolve_lane_runner returns None instead of raising.
+# Bake-off v3 inline lane: a clone of the legacy_many_pass inline pipeline. It
+# runs the inline body byte-identically (map miss -> None) plus one post-assembly
+# advisory diagnostic; it must be in _LEGACY_INLINE_PIPELINES so
+# _resolve_lane_runner returns None instead of raising. (original_multi_pass_v3
+# was retired with the original_radio_v3 lane in the 2026-07-17 roster trim.)
 _INLINE_V3_PIPELINES = frozenset({
-    "legacy_many_pass_v3", "original_multi_pass_v3",
+    "legacy_many_pass_v3",
 })
 
 # The pipelines whose execution lane IS this writer's inline body.
@@ -3248,18 +3246,18 @@ class OTR_LedgerScriptWriter:
                 "source_bank": (
                     list(_otr_story_routing.list_bank_ids()),
                     {
-                        "default": "science_news",
+                        "default": "scifi_fable2",
                         "tooltip": (
                             "Story-path SOURCE BANK (multi-modal story "
                             "schema). Selects which registered story pack "
                             "supplies the pack-routed creative prompts and "
-                            "which lane the episode runs. science_news = the "
-                            "production sci-fi lane (default, "
-                            "byte-identical); the _v2 / _v3 rows are bake-off "
-                            "variants of each base lane and are runnable. The "
-                            "only non-runnable row is '+ Add Your Own' "
-                            "(custom_source_bank) -- picking it FAILS LOUD "
-                            "before any story work (no fallback)."
+                            "which lane the episode runs. scifi_fable2 = the "
+                            "default production lane (LLM-first multipass). "
+                            "Each lane is an INDEPENDENT bank (own pack + "
+                            "story_rules); some carry a _v3 id from the "
+                            "bake-off. The only non-runnable row is '+ Add "
+                            "Your Own' (custom_source_bank) -- picking it "
+                            "FAILS LOUD before any story work (no fallback)."
                         ),
                     },
                 ),
@@ -3687,7 +3685,7 @@ class OTR_LedgerScriptWriter:
         # appended at the END of the widget surface (slot 23). Default
         # science_news = the production lane, byte-identical. Gated FIRST
         # in the body via require_runnable_bank (no fallback).
-        source_bank="science_news",
+        source_bank="scifi_fable2",
         # Stage 3C (2026-07-06): the visual-style selector, appended at the
         # END of the widget surface (slot 24). Default sci_fi_radio = the
         # production look, byte-identical. Validated fail-loud beside the
@@ -4285,9 +4283,8 @@ class OTR_LedgerScriptWriter:
             # shakespeare's manifest cast_hints ARE the real character names. Stamped
             # here where `briefs` is in scope; read at the lock_cast call below.
             # Invention lanes never set this key -> casting is byte-identical (C7).
-            if _otr_bank_variants.base_source_bank_id(
-                    _source_bank_row.source_bank_id
-            ) in ("shakespeare", "public_domain_story"):
+            if _source_bank_row.source_bank_id in (
+                    "shakespeare_v3", "public_domain_story_v3"):
                 _adapt_names = list(
                     getattr(briefs, "character_names", None)
                     or (meta.get("source_meta") or {}).get("cast_hints")

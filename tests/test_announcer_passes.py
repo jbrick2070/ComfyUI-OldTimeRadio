@@ -31,8 +31,12 @@ for _p in (_REPO_ROOT, _NODES_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-import _otr_ledger as _LED  # noqa: E402
-import _otr_line_composer as _LC  # noqa: E402
+# Package imports (roster trim 2026-07-17): the composer's default
+# source_bank_id moved science_news -> media_archive, so compose_announcer_*
+# now routes system prompts through the bank's pack seams via a relative
+# import -- that needs the real `nodes` package context, not a flat import.
+from nodes import _otr_ledger as _LED  # noqa: E402
+from nodes import _otr_line_composer as _LC  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
