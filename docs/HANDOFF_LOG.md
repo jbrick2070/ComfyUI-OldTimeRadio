@@ -3,6 +3,109 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-17 afternoon -- HEAD 499386aa (v2.0-alpha) [roster trim -> 10 INDEPENDENT lanes + science_news family retired; ONE combined commit]
+
+Did:
+- Executed the operator roster trim as ONE combined commit @ 499386aa. Ripped
+  the whole science_news family (v1/v2/v3), ALL _v2 lanes, orphan bases
+  (public_domain_story/shakespeare/scifi_sonnet v1) + original_radio_v3 -> 10
+  runnable lanes + custom. banks.json + pipelines.json + 14 pack dirs +
+  story_rules + both canonical workflows (widget[23] -> scifi_fable2), all same
+  commit. Roster now: media_archive(+_v3), original_radio, scifi_fable2(+_v3),
+  scifi_codex(+_v3), public_domain_story_v3, shakespeare_v3, scifi_sonnet_v3.
+- Independence (operator "real future-proof, no family dependency"): each kept
+  lane resolves its OWN story_rules by EXACT id -- severed base_source_bank_id
+  family-map in _otr_story_rules (resolve + coverage), the strict_v4 set, and
+  the adaptation-cast classifier. Added 6 _v3 rules packs; renamed 3 orphan
+  bases -> _v3; DEFAULT_RULES_ID -> scifi_fable2. Default repoint SPLIT:
+  lane-selecting sites -> scifi_fable2; legacy-seam resolvers -> media_archive
+  (kibitz r3 build-breaker catch: scifi_fable2 declares no legacy seams).
+- Retired dead pipelines sonnet_archive_multipass (base) + original_multi_pass_v3
+  and their runner-map / inline-set entries (bijection restored; _run_scifi_sonnet_lane
+  kept -- the _v3 wrapper uses it).
+- Method: /kibitz r3 (codex, grounded) on the rip PLAN first; ~150 stale
+  roster/science-baseline tests repointed via 4 parallel subagents (disjoint
+  file groups) + verified centrally. Obsolete science-lane / base-map /
+  byte-identity tests removed (intent preserved by repointing to
+  media_archive/original_radio where possible).
+- Gates: full suite 7947 passed / 32 skipped / 1 xfailed; Bug Bible 17 passed;
+  canonical 23 nodes / 57 links (widget value only); no BOM / no 0-byte;
+  AST+JSON parse clean; HEAD == origin @ 499386aa.
+Current step: v4 improvement campaign (post-rip) -- NOT started.
+Next: roundtable R1-R2 (frontier panel + the new Kimi 3) then /kibitz R3-R4 to
+  produce v4 for scifi_codex (improve on v1), shakespeare, public_domain,
+  media_archive, original_radio; author the v4 lanes as INDEPENDENT banks.
+  Parked (task 7): canonical root-fixes (scifi_codex P3 unstated-contract,
+  scifi_fable2 SCENE_WORD_GROSS scene-gate, original_radio weapons/X-Y-placeholder/
+  phantom-outro) + the shared pipeline-bug class the scoreboard flagged
+  (speaker-attribution collapse, name-token splice, contract-vocab bleed,
+  720-length knob).
+Commits: 499386aa.
+
+## 2026-07-17 morning -- HEAD f265c044 (v2.0-alpha) [variant scoreboard delivered; roster-trim decision -> rip in a fresh window]
+
+Did:
+- Ran the full story-only variant sweep (v2/v3 x {420,720}) on the harness. aion
+  (OpenRouter) had a ~3-4am HTTP-502 outage that killed ~11 of the 720 legs;
+  classified aion-drops vs content-fails and re-ran ONLY the aion drops (hardened
+  tmp/_rerun_failed_720.ps1 to never blind-retry a content fail). Final: 420 rung
+  COMPLETE; 720 rung 12/16 clean + 4 DISQUALIFIED content-fails (original_radio_v2
+  weapons gate, scifi_codex_v2/v3 P3 contract, scifi_fable2_v3 SCENE_WORD_GROSS).
+- Grading pipeline: tmp/_extract_for_grading.py + tmp/_assemble_matrix.py ->
+  tmp/grading/matrix/*.txt (42/48 cells). ONE Fable pass -> the scoreboard at
+  **docs/2026-07-17-variant-scoreboard.md**. fable2 v1 = flagship; order fable2 >>
+  public_domain > original_radio > codex > shakespeare > media_archive > sonnet >
+  science_news. BIG finding: most defects are PIPELINE bugs, not bank problems --
+  speaker-attribution collapse (5/7 cases are _v2 cells), speaker-name splice into
+  dialogue, phantom outro characters, contract-vocab bleed, and the 720-length knob
+  barely steering. Code fixes that lift every bank.
+- OPERATOR ROSTER-TRIM DECISION (task 8): KEEP 11 lanes -- fable2 v1+v3,
+  public_domain v3, original_radio v1, shakespeare v3, science_news v3,
+  scifi_sonnet v3, media_archive v1+v3, scifi_codex v1+v3. RIP 13 -- all 8 _v2 +
+  public_domain v1 + original_radio v3 + shakespeare v1 + science_news v1 +
+  scifi_sonnet v1. To be done as a CLEAN rip in a FRESH window (kibitz the plan
+  first; canonical source_bank roster in the same commit; suite+Bible+push;
+  precedent = codex56sol+gemini rip @ 3312aec7). Sonnet-on-v1 model-check killed
+  (deck cleared); re-run it on the 11 kept lanes AFTER the rip.
+- Earlier this session: sonnet decoration root-fix (2794e8a2) + story-only scoring
+  harness (f265c044), both pushed, suite 7984 + Bible 17 green.
+Current step: roster trim (task 8) in a fresh window.
+Next: clean 13-lane rip -> Sonnet check on kept lanes -> parked canonical root-fixes (task 7).
+Commits: 2794e8a2, f265c044 (pushed). Scoreboard doc uncommitted.
+
+## 2026-07-16 evening -- HEAD f265c044 (v2.0-alpha) [sonnet decoration root-fix + story-only scoring harness; 32-leg variant sweep RUNNING]
+
+Did:
+- Root-fixed the scifi_sonnet 320w bake-off FAIL ("ORUM: spoken text contains
+  decoration '('"): the spoken-purity contract (`_spoken_error`) was enforced
+  ONLY at the terminal `validate_spoken_text_and_lock` raise, so a stray
+  parenthetical killed the episode with no bounded repair. Wired it into the
+  P2a/P2b (CitedLineV4) + P5 (RewriteResultV4) typed-repair ladder so the model
+  fixes its own line (LLM-first); terminal gate stays the deterministic last
+  word. Live: scifi_sonnet 320w RESULT SUCCESS + obs asset (recovery_session,
+  508w/13 lines). Commit 2794e8a2. Applies to all 3 sonnet versions (shared runner).
+- Built the story-only scoring harness (operator: "splice the canonical, use the
+  latest"): `OTR_LedgerFreezeCascade.OUTPUT_NODE=True` + `otr_canonical_api_run.py`
+  opt-in `--workflow` (default = canonical WITH its path assertion) + wrapper
+  `-Workflow` passthrough + `scripts/build_story_only.py` ->
+  `workflows/otr_story_only.json` (validator->writer->freeze, 3 nodes / 6 links).
+  Skips the ~30 min TTS/video tail; each leg ~12-20 min, produces the frozen
+  ledger/transcript we grade from (video carries no cross-bank grading signal).
+  Live 30w leg RESULT SUCCESS in 10:37, freeze terminal executes. Commit f265c044.
+- Suite 7984 passed / 32 skipped / 1 xfailed + Bible 17 passed after BOTH commits.
+- LAUNCHED the 32-leg story-only variant sweep (16 `_v2`/`_v3` lanes x {420,720},
+  aion-3.0-mini + Mistral-Nemo) for the v1/v2/v3 comparison. Receipts
+  `tmp/_storysweep_receipts.csv`; ~9-12h; hourly scheduled check-in task
+  "otr-story-sweep-checkin". Base v1 420/720 transcripts reused from existing
+  ledgers (no re-render). 4 full-render `_v2` @420 legs already banked
+  (media_archive/original_radio/public_domain_story/science_news).
+Current step: 32-leg story-only variant sweep RUNNING (render window).
+Next: as legs land, root-fix any failing variant lane per THE LAW (sonnet
+  decoration already fixed; watch P3 AuditVerdictV4 / P6 attestation / codex
+  premise-cap), then build the 8x3x3 scoring report (v1/v2/v3 per bank at
+  420+720) + whittle to the top-8 keepers (best version per bank).
+Commits: 2794e8a2 (sonnet fix), f265c044 (story-only harness).
+
 ## 2026-07-16 -- HEAD f58ed6e6 (v2.0-alpha) [Qwen3-8B GGUF writer row PROMOTED -- orthogonal model-roster task]
 
 Did (GGUF-row bake-off per `docs/2026-07-16-gguf-row-registry.md`; NOT a forward-order step):

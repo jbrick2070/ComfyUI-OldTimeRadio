@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-15 midnight -- branch `v2.0-alpha`. Truly forward-only by
+**Updated:** 2026-07-17 afternoon -- HEAD `499386aa`, branch `v2.0-alpha`. Truly forward-only by
 operator directive: completed work lives in `docs/HANDOFF_LOG.md` (history) and
 `docs/PROD_BUG_LOG.md` (bugs); doctrine lives in
 `docs/PRODUCTION_SPRINT_LESSONS.md` (the "lost anchor" class is now lesson 24
@@ -20,21 +20,29 @@ Standing enforcement: the deterministic G9 SFW gate in
 `_otr_ledger_freeze.run_gap_audit` (Phase 10, the one path every lane crosses).
 Veto-rip record: HANDOFF_LOG + PROD_BUG_LOG (PBUG-20260713-15..18).
 
-## IN FLIGHT -- Bank-Improvement Bake-off, Phase C (render window owns this)
+## CURRENT STEP -- v4 improvement campaign (post roster-trim)
 
-24 selectable `source_bank` lanes (8 base + 8 `_v2` + 8 `_v3`), zero
-canonical-JSON diff. Phase A (Fable final gate) = **SUBSTITUTED, not run**:
-Fable was out of credits and the codex CLI was unhealthy, so the gate was
-stood in for by the general-purpose grounded review + Claude anchor + the live
-renders -- record it as SUBSTITUTED with operator authority; operator may
-demand a true Fable gate later. Phase B (F2 frozen-source replay proof) = DONE.
-Records in `docs/HANDOFF_LOG.md` 2026-07-15 entries. Phase C = 160-leg sweep
-(16 `_v2`/`_v3` lanes x 5 tiers x 2 profiles): 30w smokes running autonomously;
-then 120/320/420/720. Runner `tmp/_phaseC_sweep.ps1`; receipts
-`tmp/_phaseC_receipts.csv`. Content-FAILs are RECORDED with reason, never
-re-rolled. Invariants for any future variant work: B1 (owner_bank = actual
-variant id), B2 (only the 3 sci-fi v3 are own-runner), B5 (variant rows before
-`custom_source_bank`, pinned order tuples updated).
+The **roster trim LANDED @ `499386aa`** (2026-07-17). The `source_bank` roster is
+now **10 INDEPENDENT lanes + custom** (media_archive(+_v3), original_radio,
+scifi_fable2(+_v3), scifi_codex(+_v3), public_domain_story_v3, shakespeare_v3,
+scifi_sonnet_v3): the science_news family, ALL `_v2` lanes, and the orphan bases
+were retired; each kept lane owns its pack + `story_rules` by EXACT id (the
+`base_source_bank_id` family-map is severed -- no lane depends on another).
+Default bank = `scifi_fable2`. Full record: HANDOFF_LOG 2026-07-17 afternoon;
+design in `docs/2026-07-17-roster-trim-rip-plan.md`.
+
+**NEXT (operator 2026-07-17): a v4 improvement campaign** to lift the kept banks
+-- produce a **v4** for `scifi_codex` (improve on v1), `shakespeare`,
+`public_domain`, `media_archive`, and `original_radio`. Arc: frontier
+`/roundtable` **R1-R2** (seat the new **Kimi 3** alongside GPT/Gemini/DeepSeek)
+for ideas + coding approach, then local `/kibitz` **R3-R4** for wiring +
+convergence. Author every v4 lane as a fully INDEPENDENT bank (own pack +
+story_rules + pipeline; no base-map).
+
+The 24-lane bake-off campaign that produced the scoreboard is **CONCLUDED** (its
+verdict drove this trim); records live in HANDOFF_LOG +
+`docs/2026-07-17-variant-scoreboard.md`. The old B1/B2/B5 variant-family
+invariants are RETIRED with the family mechanism.
 
 Standing campaign notes (kibitz r4 fold, grounded):
 
