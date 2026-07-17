@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-17 night -- HEAD `c3a9d420`, branch `v2.0-alpha`. Truly forward-only by
+**Updated:** 2026-07-17 night2 -- HEAD `90ed495e`, branch `v2.0-alpha`. Truly forward-only by
 operator directive: completed work lives in `docs/HANDOFF_LOG.md` (history) and
 `docs/PROD_BUG_LOG.md` (bugs); doctrine lives in
 `docs/PRODUCTION_SPRINT_LESSONS.md` (the "lost anchor" class is now lesson 24
@@ -60,11 +60,24 @@ better" = a POST-BUILD blind A/B.
   (`style_pool_class`|`require_science_floor`|`propagate_adaptation_cast`) replace
   the 3 hardcoded exact-id sets; all 10 runnable rows migrated; `select_style`
   hash keys preserved -> byte-identical slugs (C7). Suite 7974 / Bible 17.
-- **CURRENT: P1(ii)** breadcrumb regression + reason stamp, then (iii)
-  genre/spoken-text validator, (iv) beat_bounds, (v) outro, (vi) header<->scene,
-  (vii) placeholder, (viii) provenance -- each its own green pushed chunk. Then
-  Phase 2 banks (each a live GPU leg): scifi_codex_v4, shakespeare_v4,
-  public_domain_story_v4, media_archive_v4, original_radio_v4.
+- **P1(ii) PUSHED @ `f859036c`** -- named regression pinning PBUG-20260710-07
+  (cast-keyed-mutation class): reason-stamp-on-every-coercion + announcer-sentinel
+  protection. Test-only (root fix shipped pre-campaign; no coerce shim). PBUG stays
+  ROOT-OPEN until a live v4 leg.
+- **P1(iii) PUSHED @ `e7ba2627`** -- bank-aware genre/spoken-text guard: new
+  `_otr_genre_guard` boundary matcher + writer authored-repair + deterministic G10
+  terminal in `run_gap_audit`. OPT-IN via `defaults.genre_guard_spoken` (default
+  False -> INERT for all 10 current banks; v4 flips in Phase 2). Suite 8018.
+- **P1(iv) PUSHED @ `90ed495e`** -- `beat_bounds` structural contract in
+  `_otr_episode_budget` (WORDS_PER_BEAT=40 SOFT/recorded; floor 3) + deterministic
+  G11 floor terminal (opt-in via `meta.beat_bounds`); writer stamps it. Only the
+  structural floor gates (operator: length recorded-not-gated); MAX + word->beat
+  derivation deferred to Phase-2 live. Suite 8031 / Bible 17.
+- **CURRENT: P1(v)** outro completeness (bounded authored per-line patch; Python
+  only canonicalizes an already-present unambiguous alias, never appends prose),
+  then (vi) header<->scene, (vii) placeholder token, (viii) provenance -- each its
+  own green pushed chunk. Then Phase 2 banks (each a live GPU leg): scifi_codex_v4,
+  shakespeare_v4, public_domain_story_v4, media_archive_v4, original_radio_v4.
 
 Open operator decisions (defaulted, vetoable at the consuming chunk):
 WORDS_PER_BEAT=40 (soft target; length recorded-not-gated); media_archive_v4 ships

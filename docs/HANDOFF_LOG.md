@@ -3,6 +3,40 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-17 night2 -- HEAD 90ed495e (v2.0-alpha) [v4 campaign: P1(ii)+(iii)+(iv) pushed]
+
+Did (coder window, autonomous):
+- P1(ii) @ f859036c: named regression pinning PBUG-20260710-07 (the cast-keyed
+  mutation class) -- INVARIANT A (every coercion stamps a role_coerce reason
+  breadcrumb + meta.role_coercions audit; no silent flip) + INVARIANT B
+  (announcer-sentinel / name-excluded lines never coerced). Test-only; NO coerce
+  code added (root fix shipped pre-campaign; adding more = shim). PBUG stays
+  ROOT-OPEN until a live v4 leg. tests/test_pbug_20260710_07_cast_keyed_mutation.py.
+- P1(iii) @ e7ba2627: bank-aware GENRE/spoken-text guard. New nodes/_otr_genre_guard.py
+  (casefolded/Unicode boundary matcher: gun !~ begun, +s/es plural, phrase ws-flex;
+  + writer-boundary authored repair via creative slot, keep-if-clean, never raises,
+  breadcrumb). Deterministic terminal = G10 in run_gap_audit -> Phase-10
+  FreezeAssertionError (one path every family crosses; mirrors G9). OPT-IN via
+  validated scalar default defaults.genre_guard_spoken (default False -> INERT for
+  all 10 current banks; v4 banks flip in Phase 2). Fixed 2 static-audit collisions
+  at root (LLM slot tag on the creative_fn call; label=pre in the collect-test).
+- P1(iv) @ 90ed495e: beat_bounds structural contract in _otr_episode_budget
+  (WORDS_PER_BEAT=40 SOFT/recorded; STRUCTURAL_MIN_BEATS=3; family caps codex 12 /
+  inline 40; target_beat_count round-half-up; classify) + deterministic G11 floor
+  terminal in run_gap_audit (opt-in via meta.beat_bounds; counts distinct spoken
+  beat_ids; raises below floor). Writer stamps meta.beat_bounds. Operator: length
+  recorded-not-gated -> only the structural floor gates; MAX + word->beat derivation
+  deferred to Phase-2 live. 8031 suite green with the writer stamping every real
+  episode = empirical proof the floor never false-fails a shipping lane.
+- Each chunk: full suite (7980 -> 8018 -> 8031) + Bible 17 + AST/BOM/zero-byte +
+  commit AND push + HEAD==origin verified. No canonical JSON change (no graph edit).
+Current step: v4 campaign Phase 1 -- P1(v) outro completeness validator (next), then
+  (vi) header<->scene, (vii) placeholder token, (viii) provenance normalizer; then
+  Phase 2 (5 v4 banks, each a live GPU leg).
+Next: P1(v) bounded authored per-line outro patch (Python only canonicalizes an
+  already-present unambiguous alias; never appends prose; seed from episode seed).
+Commits: f859036c, e7ba2627, 90ed495e
+
 ## 2026-07-17 night -- HEAD c3a9d420 (v2.0-alpha) [v4 campaign: Phase 0 done + P1(i) pushed]
 
 Did:
