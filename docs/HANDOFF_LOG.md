@@ -3,6 +3,52 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-17 night3 -- HEAD d29ba920 (v2.0-alpha) [v4 campaign: PHASE 1 COMPLETE (ii-viii)]
+
+Did (coder window, autonomous -- continued):
+- P1(v) @ 0066f5ab: outro cast-completeness. New nodes/_otr_outro_guard.py (final
+  cast = character char_ids with a non-skipped spoken line -> name; outro = LAST
+  announcer line BY POSITION; missing = name absent full-or-significant-token,
+  casefold word-bounded, titles ignored). Authored keep-if-complete repair (creative
+  slot; Python never appends prose; restores original on exhaustion). Deterministic
+  G12 terminal, opt-in via defaults.require_outro_cast_complete. Root fix caught by
+  my own tests: outro is positional, not last-non-empty (that was the intro).
+- P1(vii) @ e7bfb1fe: literal placeholder-token guard. New _otr_placeholder_guard.py
+  (whole-value, token-boundary, quote/punct/case-tolerant over NAMED fields; X/Y/TBD/
+  ...; 'X marks the spot' NOT flagged; music out of scope). G13, opt-in
+  defaults.placeholder_guard. No repair (placeholder = generation bug the pack fixes).
+- P1(viii) @ 4f8bd7aa: source-provenance normalizer. New _otr_provenance.py
+  (public_domain license_status + shakespeare license_label/commercial_use_allowed +
+  synthetic -> one record; spoken_coda + printed_credit templates). Writer stamps
+  meta.provenance + fills credits_source_line when the bank default did not.
+  Deterministic G14 blocks publish on research_only (operator decision).
+- P1(vi) @ d29ba920: header<->scene STRUCTURAL coherence. New _otr_scene_guard.py
+  (unique scene_ids + no non-music line referencing an undeclared scene). Semantic
+  scene-vs-beat match is an unlawful LLM gate -> structural only; exact
+  scene.line_count matching omitted (unit-ambiguity risk). G15, opt-in
+  defaults.scene_coherence_check. INTERPRETATION FLAGGED structural (vetoable at the
+  Phase-2 consuming chunk). Done LAST after vii/viii per its under-specification.
+- Pattern for all 7: each shared fix is a SELF-CONTAINED module + a deterministic
+  terminal in _otr_ledger_freeze.run_gap_audit (G10 genre, G11 beat-floor, G12 outro,
+  G13 placeholder, G14 provenance, G15 scene) -- the ONE path every execution family
+  crosses (codex phase_10 finalizer, inline run_freeze_cascade, fable2 finalizer),
+  mirroring G9. Every gate is OPT-IN via a validated scalar bank default (_parse_bank
+  bool loop) -> INERT for all 10 current banks, so the full suite stayed green while
+  the machinery is ready for Phase-2 v4 banks to flip on. THE LAW honored throughout
+  (deterministic terminal ends; authored repairs only improve).
+- Gates each chunk: full suite (8018->8031->8061->8084->8110->8134) + Bible 17 +
+  AST/BOM/zero-byte + commit AND push + HEAD==origin. No canonical JSON change (no
+  graph edit in any Phase-1 chunk).
+Current step: v4 campaign PHASE 1 DONE. NEXT = Phase 2 -- build the 5 v4 banks,
+  serialized, each an atomic per-bank chunk gated on a LIVE GPU leg (RESULT SUCCESS +
+  obs_publish + asset). Order: scifi_codex_v4, shakespeare_v4, public_domain_story_v4,
+  media_archive_v4, original_radio_v4.
+Next: scifi_codex_v4 -- bank row + pack + story_rules(exact id) + pipeline
+  scifi_codex_circuit_v4 (executable:true, runner-map) + roster/bijection tests; flip
+  the opt-in gates it wants; runnable:true LAST; then the live leg (per-lane
+  announcer-sentinel mint retires PBUG-20260710-07).
+Commits: 0066f5ab, e7bfb1fe, 4f8bd7aa, d29ba920 (+ f5acd44a docs checkpoint)
+
 ## 2026-07-17 night2 -- HEAD 90ed495e (v2.0-alpha) [v4 campaign: P1(ii)+(iii)+(iv) pushed]
 
 Did (coder window, autonomous):

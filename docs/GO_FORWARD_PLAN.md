@@ -1,6 +1,6 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-17 night2 -- HEAD `90ed495e`, branch `v2.0-alpha`. Truly forward-only by
+**Updated:** 2026-07-17 night3 -- HEAD `d29ba920`, branch `v2.0-alpha`. Truly forward-only by
 operator directive: completed work lives in `docs/HANDOFF_LOG.md` (history) and
 `docs/PROD_BUG_LOG.md` (bugs); doctrine lives in
 `docs/PRODUCTION_SPRINT_LESSONS.md` (the "lost anchor" class is now lesson 24
@@ -73,11 +73,22 @@ better" = a POST-BUILD blind A/B.
   G11 floor terminal (opt-in via `meta.beat_bounds`); writer stamps it. Only the
   structural floor gates (operator: length recorded-not-gated); MAX + word->beat
   derivation deferred to Phase-2 live. Suite 8031 / Bible 17.
-- **CURRENT: P1(v)** outro completeness (bounded authored per-line patch; Python
-  only canonicalizes an already-present unambiguous alias, never appends prose),
-  then (vi) header<->scene, (vii) placeholder token, (viii) provenance -- each its
-  own green pushed chunk. Then Phase 2 banks (each a live GPU leg): scifi_codex_v4,
-  shakespeare_v4, public_domain_story_v4, media_archive_v4, original_radio_v4.
+- **P1(v)/(vii)/(viii)/(vi) PUSHED** @ `0066f5ab`/`e7bfb1fe`/`4f8bd7aa`/`d29ba920`
+  -- outro cast-completeness (G12), literal-placeholder-token (G13), provenance
+  normalizer + research_only publish gate (G14), header<->scene structural coherence
+  (G15). Each a SELF-CONTAINED module + a deterministic terminal in run_gap_audit,
+  OPT-IN via a validated scalar bank default -> INERT for the 10 current banks.
+- **PHASE 1 COMPLETE** (7 shared fixes ii-viii, each a green pushed chunk; suite
+  8134 / Bible 17). New opt-in flags a v4 bank can set: `genre_guard_spoken`,
+  `require_outro_cast_complete`, `placeholder_guard`, `provenance_normalize`,
+  `scene_coherence_check`; plus the recorded `beat_bounds` contract (floor-only gate).
+- **CURRENT: PHASE 2** -- build the 5 v4 banks serialized, each an atomic per-bank
+  chunk (bank row + pack + story_rules by exact id + pipeline + roster/bijection
+  tests; flip the opt-in gates the lane wants; `runnable:true` LAST) gated on a LIVE
+  GPU leg (RESULT SUCCESS + obs_publish + asset). Order: scifi_codex_v4,
+  shakespeare_v4, public_domain_story_v4, media_archive_v4, original_radio_v4. A live
+  codex/original leg retires PBUG-20260710-07 via the per-lane announcer-sentinel mint.
+  P1(vi) header<->scene interpretation (structural) is vetoable/refinable here.
 
 Open operator decisions (defaulted, vetoable at the consuming chunk):
 WORDS_PER_BEAT=40 (soft target; length recorded-not-gated); media_archive_v4 ships
