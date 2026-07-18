@@ -13,8 +13,9 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
 is "gone"/"unknown"/"not runnable"), and NO "retired-variant coverage" kept alive. If a test's SUBJECT
 is a ripped bank, DELETE the case -- do not migrate it to a survivor to preserve the ripped thing's
 coverage. Tests reference ONLY surviving banks, and the roster/bijection tests assert the surviving 7
-POSITIVELY (they list what exists, they do not assert what was removed). A grep for any of the 4 ids
-across `nodes`/`tests`/`workflows` returns nothing -- including in test bodies.
+POSITIVELY (they list what exists, they do not assert what was removed). A grep for any of the 4 bank
+ids -- PLUS the 3 retired pipeline ids and `_otr_scifi_sonnet` -- across `nodes`/`tests`/`workflows`
+returns nothing, test bodies included (but NOT bare `scifi_sonnet`: the `:1947` focus branch is kept).
 
 ### Kibitz r1 hardening (folded, all CONFIRMED against the code)
 - **BOTH pipeline registries** -- delete the 3 v3 pipelines from `_RUNNER_BY_PIPELINE` AND
@@ -59,7 +60,11 @@ across `nodes`/`tests`/`workflows` returns nothing -- including in test bodies.
 3. **Delete story_rules:** `nodes/story_rules/{scifi_sonnet_v3,media_archive_v3,scifi_codex_v3,scifi_fable2_v3}.json`.
 4. **`nodes/OTR_LedgerScriptWriter.py`** `_RUNNER_BY_PIPELINE` (~:1996-2001) -- delete the 3 entries
    `fable2_multipass_v3`, `scifi_codex_circuit_v3`, `sonnet_archive_multipass_v3`. Then remove
-   `_run_scifi_sonnet_lane` (:1851-1857) and the base route `if base == "scifi_sonnet":` (:1947).
+   `_run_scifi_sonnet_lane` (:1851-1857). **(kibitz-QA CORRECTION -- do NOT touch `if base ==
+   "scifi_sonnet":` at :1947: it is the `reader_alternation` advisory branch INSIDE `_v3_focus_metric`,
+   NOT a dispatch route, and the MUST-KEEP fence keeps it -- surviving inline-v3 banks reach it via :6907.
+   Sonnet dispatch is fully removed by the `_RUNNER_BY_PIPELINE` entry + `_run_scifi_sonnet_lane` + the
+   module; there is no separate base-route to delete.)**
    **`_make_v3_runner` (:1968-1994) goes DEAD once those 3 entries are removed** -- it has NO other
    caller (`legacy_many_pass_v3` runs via `_INLINE_V3_PIPELINES` :2008-2010, not `_make_v3_runner`;
    verified in-source, QA flag 3) -- so DELETE it in the same change or it is a dead lever
@@ -90,7 +95,8 @@ across `nodes`/`tests`/`workflows` returns nothing -- including in test bodies.
 4d. **`nodes/OTR_LedgerScriptWriter.py:3757`** (kibitz r2 MUST-FIX -- a SECOND live `fable2_multipass_v3`
    ref) -- the fable2 target-word gate is `if _selected_pipeline_id in ("fable2_multipass",
    "fable2_multipass_v3"):`. Drop `fable2_multipass_v3` (leave the surviving `fable2_multipass`) in the same
-   writer change, or it is a dangling ref that fails this plan's own no-dangling-ref gate.
+   writer change -- it is a PIPELINE id, so it is only caught by the WIDENED gate grep (a bank-id-only grep
+   misses it; kibitz-QA Flag 2).
 5. **Tests** -- update each (do not just delete assertions; keep coverage honest):
    - `tests/test_scifi_sonnet_lane.py` -> DELETE (lane gone).
    - `tests/test_rss_source_admission.py` (:11), `tests/test_scifi_source_repair.py` (:5),
@@ -147,7 +153,11 @@ across `nodes`/`tests`/`workflows` returns nothing -- including in test bodies.
   the canonical WORKFLOW. **No-BOM/UTF-8 `head -c3`** on both JSONs after edit (QA flag 5 -- Bible
   02.11/12/13). `workflows/otr_canonical.json` byte-unchanged (QA-verified: none of the 4 ids present,
   no stranded COMBO -- BUG-08.06/12.23 not triggered).
-- No dangling ref: `grep -r "scifi_sonnet_v3\|media_archive_v3\|scifi_codex_v3\|scifi_fable2_v3" nodes tests workflows` returns nothing (docs/tmp excepted).
+- No dangling ref (kibitz-QA Flag 2 -- must cover the PIPELINE ids + module, not just bank ids; §4c/§4d
+  retire different strings):
+  `grep -r "scifi_sonnet_v3\|media_archive_v3\|scifi_codex_v3\|scifi_fable2_v3\|fable2_multipass_v3\|scifi_codex_circuit_v3\|sonnet_archive_multipass_v3\|_otr_scifi_sonnet\|run_scifi_sonnet_episode" nodes tests workflows`
+  returns nothing (docs/tmp excepted). **Do NOT grep bare `scifi_sonnet`** -- the kept `:1947` focus branch
+  (MUST-KEEP fence) would false-fail; the pinned `_v3_*` follow-up removes that later.
 - Commit + push to `v2.0-alpha`; verify `HEAD == origin`; AST-parse touched .py.
 
 ## Follow-up (PINNED 2026-07-18 -- separate coder chunk, AFTER this rip)
