@@ -17,6 +17,11 @@ POSITIVELY (they list what exists, they do not assert what was removed). A grep 
 ids -- PLUS the 3 retired pipeline ids and `_otr_scifi_sonnet` -- across `nodes`/`tests`/`workflows`
 returns nothing, test bodies included (but NOT bare `scifi_sonnet`: the `:1947` focus branch is kept).
 
+**ATOMIC (kibitz r3 SHOULD-FIX 1).** Delete the bank rows + pack dirs + `story_rules` + BOTH pipeline
+entries as ONE change BEFORE running `_otr_story_routing._ensure_loaded()`: `_sweep_and_crossref()`
+(`_otr_story_routing.py:375-390`) rejects a `story_packs/` subdir not registered in `banks.json`, so a
+half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fails validation.
+
 ### Kibitz r1 hardening (folded, all CONFIRMED against the code)
 - **BOTH pipeline registries** -- delete the 3 v3 pipelines from `_RUNNER_BY_PIPELINE` AND
   `nodes/story_packs/pipelines.json` (:554/:663/:948); keep `legacy_many_pass_v3` (shared). See §4/§4b.
@@ -122,8 +127,17 @@ returns nothing, test bodies included (but NOT bare `scifi_sonnet`: the `:1947` 
      `test_scene_guard_v4.py:91-92`, `test_provenance_v4.py:112-113`) -- regenerate those lists from the
      surviving runnable roster or pin the exact 7 ids; the v4-guard "gate-off" contrast likely uses
      `scifi_codex_v3`, so pick a surviving contrast bank.
+   - `tests/test_fable2_tail_context.py:295-299` (kibitz r3 MUST-FIX 1) -> drop `"scifi_sonnet"` from the
+     `source_bank` parametrize (:297); the sonnet lane is gone. (Bare-sonnet -- caught by the tests-only
+     grep, not the main sweep.)
+   - Also update the now-stale `_RUNNER_BY_PIPELINE` comment at `OTR_LedgerScriptWriter.py:1981-1988`
+     (it still describes "the three sci-fi v3 pipelines"); cosmetic but it misleads the next wiring edit
+     (kibitz r3 SHOULD-FIX 3).
 6. **Docs** -- README.md (4 refs) roster list; `docs/GO_FORWARD_PLAN.md` current roster + the item-3
-   note; append `docs/HANDOFF_LOG.md`. Mark the NEWBUG doc CLOSED-BY-RIP.
+   note; append `docs/HANDOFF_LOG.md`. **NEWBUG handling (kibitz r3 MUST-FIX 2):** `docs/PROD_BUG_LOG.md`
+   has NO `scifi_fable2_v3` entry yet -- APPEND one FIRST (the live failure + fix = "retired the runnable
+   bank + its pipeline/route"), THEN mark `docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md` CLOSED-BY-RIP.
+   NEVER delete it -- it is the only causal record of a live failure.
 
 ## Gate (per CLAUDE.md -- all must pass before commit)
 
@@ -131,11 +145,13 @@ returns nothing, test bodies included (but NOT bare `scifi_sonnet`: the `:1947` 
   the node registry clean ("All N nodes loaded, 0 skips") and grep `nodes/__init__.py` +
   `NODE_CLASS_MAPPINGS` for any leftover sonnet key. A string grep proves the ids are gone; it does NOT
   prove the pack still imports.
-- **Ledger-ownership enumeration (QA flag 2 -- CLAUDE.md "no hole in the ledger" + PBUG-20260712-05 /
-  BUG-12.49):** for EACH of the 4 banks, enumerate what it stamped into the ledger -- including COMPUTED
-  keys (`f"{source_bank_id}_..."`) a literal grep misses -- and confirm zero surviving readers in the
-  shared writer tail. A green suite does not prove ledger completeness (bank provenance is self-keyed so
-  the residual is likely narrow -- but state the step, don't skip it).
+- **Ledger-ownership (QA flag 2 / CLAUDE.md "no hole in the ledger"; narrowed by kibitz r3 CUT 1):** for
+  the 3 `_v3` banks the removed EXACT ids are the only computed-key prefixes -> already covered by the
+  retired-id grep. The one non-obvious residual is SONNET: `meta["scifi_sonnet"]` (BARE) is written all
+  over the deleted `_otr_scifi_sonnet.py` and is excluded from the main grep -- so confirm no SURVIVING
+  reader of `meta["scifi_sonnet"]` (its readers die with the module; the kept `:1947`/advisory path reads
+  a DIFFERENT `<lane>_advisory` key, not this one). So the enumeration collapses to: retired-id grep +
+  one `meta["scifi_sonnet"]`-reader check.
 - **Dead-runner check (QA flag 3):** every KEPT runner has a live caller post-rip; `_make_v3_runner` is
   DELETED (dead once the 3 v3 pipelines go), but its `_v3_*` neighbors are KEPT (see the MUST-KEEP fence).
 - **Runtime advisory smoke (QA -- the gap every other gate misses):** a targeted unit test OR a 30-word
@@ -156,8 +172,17 @@ returns nothing, test bodies included (but NOT bare `scifi_sonnet`: the `:1947` 
 - No dangling ref (kibitz-QA Flag 2 -- must cover the PIPELINE ids + module, not just bank ids; §4c/§4d
   retire different strings):
   `grep -r "scifi_sonnet_v3\|media_archive_v3\|scifi_codex_v3\|scifi_fable2_v3\|fable2_multipass_v3\|scifi_codex_circuit_v3\|sonnet_archive_multipass_v3\|_otr_scifi_sonnet\|run_scifi_sonnet_episode" nodes tests workflows`
-  returns nothing (docs/tmp excepted). **Do NOT grep bare `scifi_sonnet`** -- the kept `:1947` focus branch
-  (MUST-KEEP fence) would false-fail; the pinned `_v3_*` follow-up removes that later.
+  returns nothing (docs/tmp excepted). Run it **SOURCE-ONLY** -- `--include='*.py' --include='*.json'
+  --exclude-dir=__pycache__` (or delete `nodes/**/__pycache__` + `tests/**/__pycache__` first): stale
+  `.pyc` files false-fail otherwise (kibitz r3 MUST-FIX 3). **Do NOT grep bare `scifi_sonnet`** in the
+  main sweep -- the kept `:1947` focus branch (MUST-KEEP fence) would false-fail.
+- Carve-out blind-spot closer (kibitz r3 MUST-FIX 1 / SHOULD-FIX 2): the bare-`scifi_sonnet` exclusion
+  above means bare-`scifi_sonnet` TEST refs slip through, so ALSO run `grep -rn '"scifi_sonnet"' tests`
+  -> returns nothing. Every bare-sonnet test ref is to the ripped lane and must be DELETED:
+  `test_fable2_tail_context.py:297` (drop `"scifi_sonnet"` from the parametrize) and
+  `test_bank_variants.py` `:49` (the `("scifi_sonnet_v3","scifi_sonnet")` tuple), `:58` (the real-base
+  list), `:148` (the bijection row). The ONLY allowed bare `scifi_sonnet` is the `:1947` branch in
+  `nodes/OTR_LedgerScriptWriter.py`.
 - Commit + push to `v2.0-alpha`; verify `HEAD == origin`; AST-parse touched .py.
 
 ## Follow-up (PINNED 2026-07-18 -- separate coder chunk, AFTER this rip)
