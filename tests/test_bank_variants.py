@@ -132,7 +132,8 @@ class TestNoRegression:
 # ---------------------------------------------------------------------------
 # 5. Roster trim 2026-07-17: the 6 surviving _v3 lanes (own v3 pipeline; sci-fi
 #    own-runner, rest inline). The whole _v2 family and the science_news family
-#    are REMOVED -- roster is now 10 runnable / 11 visible.
+#    are REMOVED -- roster is now 11 runnable / 12 visible (scifi_codex_v4 added
+#    by the 2026-07-17 v4 improvement campaign).
 # ---------------------------------------------------------------------------
 
 # v3 bank id -> (base, v3 pipeline id, lane kind). `base` is the pure
@@ -149,15 +150,17 @@ _V3 = {
 
 
 class TestChunk4V3Rows:
-    def test_roster_counts_10_runnable_11_visible(self):
-        # roster trim: 4 base + 6 _v3 + custom = 11 visible / 10 runnable.
+    def test_roster_counts_11_runnable_12_visible(self):
+        # roster trim + v4 campaign: 4 base + 6 _v3 + 1 _v4 + custom =
+        # 12 visible / 11 runnable.
         ids = ROUTING.list_bank_ids()
-        assert len(ids) == 11
+        assert len(ids) == 12
         assert ids[-1] == "custom_source_bank"
         runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
-        assert len(runnable) == 10                 # only custom is non-runnable
+        assert len(runnable) == 11                 # only custom is non-runnable
         assert len([b for b in ids if b.endswith("_v2")]) == 0
         assert len([b for b in ids if b.endswith("_v3")]) == 6
+        assert len([b for b in ids if b.endswith("_v4")]) == 1
 
     def test_v3_count_and_order(self):
         ids = ROUTING.list_bank_ids()
@@ -225,3 +228,54 @@ class TestChunk4V3Rows:
         bad = _Bad()
         W.run_v3_advisory(bad, bad.data["meta"], lane="media_archive_v3")
         assert "media_archive_v3_advisory" in bad.data["meta"]
+
+
+# ---------------------------------------------------------------------------
+# 6. v4 improvement campaign 2026-07-17: scifi_codex_v4 is the FIRST fully
+#    INDEPENDENT _v4 bank (own row + pack + rules by exact id + own pipeline;
+#    the dedicated codex runner is reused DIRECTLY -- no v3 advisory wrapper).
+#    `_v4` is NOT a bake-off variant suffix, so base_source_bank_id leaves it
+#    unchanged (independence by construction).
+# ---------------------------------------------------------------------------
+
+class TestScifiCodexV4:
+    def test_v4_is_not_a_bakeoff_variant(self):
+        assert BV.base_source_bank_id("scifi_codex_v4") == "scifi_codex_v4"
+        assert BV.is_bakeoff_variant("scifi_codex_v4") is False
+
+    def test_v4_bank_wiring(self):
+        from nodes import OTR_LedgerScriptWriter as W
+        bank = ROUTING.get_bank("scifi_codex_v4")
+        assert bank.runnable is True
+        assert bank.default_story_pipeline == "scifi_codex_circuit_v4"
+        assert bank.default_story_model == "scifi_codex_v4"
+        assert bank.fetcher == "science_rss"
+        pack = ROUTING.resolve_story_pack("scifi_codex_v4")
+        assert pack.source_bank_id == "scifi_codex_v4"
+        assert pack.story_model_id == "scifi_codex_v4"
+        assert pack.story_pipeline_id == "scifi_codex_circuit_v4"
+        # dedicated-runner lane, mapped DIRECTLY to the base codex runner (NOT
+        # the v3 advisory wrapper -- identity with the v1 map proves it).
+        assert "scifi_codex_circuit_v4" in W._RUNNER_BY_PIPELINE
+        assert "scifi_codex_circuit_v4" not in W._LEGACY_INLINE_PIPELINES
+        assert (W._RUNNER_BY_PIPELINE["scifi_codex_circuit_v4"]
+                is W._RUNNER_BY_PIPELINE["scifi_codex_circuit"])
+        assert ROUTING.get_pipeline("scifi_codex_circuit_v4").executable is True
+
+    def test_v4_owns_rules_by_exact_id(self):
+        assert RULES.resolve_story_rules("scifi_codex_v4").rules_id == "scifi_codex_v4"
+
+    def test_v4_science_floor_and_style_pool(self):
+        bank = ROUTING.get_bank("scifi_codex_v4")
+        assert bank.defaults.get("require_science_floor") is True
+        assert bank.defaults.get("style_pool_class") == "generic"
+
+    def test_v4_opt_in_gates_first_leg_posture(self):
+        # The two deterministic gates codex's fail-closed compiler structurally
+        # satisfies are ON; the gates with no codex-path authored repair stay
+        # OFF for the first live leg (documented, vetoable in the bank guide_ref).
+        bank = ROUTING.get_bank("scifi_codex_v4")
+        assert bank.defaults.get("placeholder_guard") is True
+        assert bank.defaults.get("scene_coherence_check") is True
+        assert bank.defaults.get("genre_guard_spoken") in (None, False)
+        assert bank.defaults.get("require_outro_cast_complete") in (None, False)

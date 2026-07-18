@@ -1989,6 +1989,11 @@ def _make_v3_runner(base_runner, lane):
 _RUNNER_BY_PIPELINE = {
     "fable2_multipass": _run_fable2_lane,
     "scifi_codex_circuit": _run_scifi_codex_lane,
+    # v4 campaign (2026-07-17): scifi_codex_v4 reuses the dedicated codex runner
+    # DIRECTLY. The proof-pressure improvement is pack-seam-only, and v4 deliberately
+    # does NOT invoke the v3 advisory wrapper (no <lane>_advisory meta field, no
+    # _v3_focus_metric) -- final.md "v4 pipelines don't invoke the v3 wrapper".
+    "scifi_codex_circuit_v4": _run_scifi_codex_lane,
     "fable2_multipass_v3": _make_v3_runner(_run_fable2_lane, "scifi_fable2_v3"),
     "scifi_codex_circuit_v3": _make_v3_runner(_run_scifi_codex_lane, "scifi_codex_v3"),
     "sonnet_archive_multipass_v3": _make_v3_runner(

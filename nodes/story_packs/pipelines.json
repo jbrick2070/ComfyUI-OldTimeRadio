@@ -802,6 +802,149 @@
       ]
     },
     {
+      "story_pipeline_id": "scifi_codex_circuit_v4",
+      "label": "Sci-Fi Codex Circuit (v4)",
+      "executable": true,
+      "requires_source_contract": false,
+      "declared_seams": [
+        "codex_fact_index_system",
+        "codex_question_system",
+        "codex_pressure_cast_system",
+        "codex_radio_score_system",
+        "codex_radio_score_text_patch",
+        "codex_coda_contract_system",
+        "codex_play_system",
+        "codex_listening_room_system",
+        "codex_retake_system",
+        "codex_final_audit_system",
+        "codex_structured_repair_system"
+      ],
+      "passes": [
+        {
+          "pass_id": "P0_fact_index",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_fact_index_system"
+          ],
+          "description": "Consumes A0, extracts source-spanned facts, entities, numbers, and tone, and fails if evidence cannot be indexed."
+        },
+        {
+          "pass_id": "P1_dramatic_question",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_question_system"
+          ],
+          "description": "Turns P0 constraints into a fiction-marked dramatic question without treating invention as reporting."
+        },
+        {
+          "pass_id": "P2_pressure_cast",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_pressure_cast_system"
+          ],
+          "description": "Builds the fixed-size cast and audible conflict graph from P1."
+        },
+        {
+          "pass_id": "P3_radio_score",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_radio_score_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Builds scenes, shots, beats, music cues, fact placements, and advisory beat-length centers."
+        },
+        {
+          "pass_id": "P3_authored_text_patch",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_radio_score_text_patch"
+          ],
+          "description": "Conditional P3/P3-rewrite text shortening repair over an explicitly proven transport. It returns a bounded replacement patch, never a complete score, and reuses the originating creative slot."
+        },
+        {
+          "pass_id": "P4_structure_review",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_radio_score_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Reviews P3; a rewrite verdict loops once to P3 and a second rewrite verdict fails loud."
+        },
+        {
+          "pass_id": "P5_first_play",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_play_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Writes a complete first ScriptArtifact, including every announcer and music line."
+        },
+        {
+          "pass_id": "P6_listening_room",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_listening_room_system"
+          ],
+          "description": "Produces a listener-facing diagnosis of the whole first play and always sends it to full rewrite."
+        },
+        {
+          "pass_id": "P7_full_retake",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_retake_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Writes a complete replacement ScriptArtifact from P5 and P6, never a line-level patch."
+        },
+        {
+          "pass_id": "P8_final_audit",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_final_audit_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Audits current full script, source mappings, word counts, and ledger-ready role references; it feeds P9 and repeats after P9."
+        },
+        {
+          "pass_id": "P9_closing_rewrite",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_retake_system",
+            "codex_play_system",
+            "codex_coda_contract_system"
+          ],
+          "description": "Writes a complete final replacement. One additional full P9 rewrite is allowed only when the repeated P8 audit requests it."
+        },
+        {
+          "pass_id": "P10_structured_repair",
+          "slot": "technical",
+          "seam_refs": [
+            "codex_structured_repair_system"
+          ],
+          "description": "Metadata-only repair seam: it supplies messages but makes no standalone call; shared repair reuses the originating pass slot and never changes model selection."
+        },
+        {
+          "pass_id": "P11_pre_tail_assembly",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "Validates and assembles the complete canonical ledger, then requires a warning-free Phase 0 report."
+        },
+        {
+          "pass_id": "P12_post_tail_freeze",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "Runs through the planned tail finalizer: warning-free Phase 10 before save, then a read-only persisted-ledger verification after save."
+        }
+      ],
+      "notes": [
+        "A0 is the first artifact and P0 is the first model call.",
+        "P3 to P4 to P3 is bounded to one structural rewrite.",
+        "P5 to P6 to P7 to P8 to P9 to P8 is non-linear full-rewrite topology; P9 may run once more after a rewrite audit.",
+        "Every model invocation uses only the pass slot. P11 and P12 are deterministic orchestration stages.",
+        "v4 improvement campaign (2026-07-17): the proof-pressure delta lives entirely in the scifi_codex_v4 pack seams; this pipeline reuses the dedicated _run_scifi_codex_lane runner DIRECTLY (no v3 advisory wrapper)."
+      ]
+    },
+    {
       "story_pipeline_id": "sonnet_archive_multipass_v3",
       "label": "Sonnet Archive Multipass (Continuity Archive frame narrative) (v3)",
       "executable": true,
