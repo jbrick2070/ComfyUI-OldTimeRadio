@@ -372,7 +372,12 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
   ripped ids) across `tests/` to find EVERY such list (2026-07-18: two guard tests were missed on the first
   hand-enumeration). Advisory/positive tests that DRIVE a ripped lane string: DELETE if the subject is the
   ripped bank, MIGRATE to a surviving lane if they test surviving machinery. A dedicated lane test is
-  deleted on full-family removal.
+  deleted on full-family removal. **Imported AND used:** on full-family removal a surviving test may import
+  a symbol FROM the deleted module AND use it downstream (an assertion/fixture, not just the `import` line);
+  deleting only the import then NameErrors at COLLECTION (whole file fails, not one case). Grep the deleted
+  module name across `tests/` and, per hit, delete the USAGE too -- or re-source the symbol from a surviving
+  module if the surviving coverage genuinely needs it -- never just the import line (2026-07-18:
+  `test_scifi_source_repair.py` imported a sonnet schema symbol at :5 and used it at :117).
 - [ ] **Hard:** Ledger discipline -- if the removed bank carried a repeatable LIVE production failure,
   RECORD a PBUG in `docs/PROD_BUG_LOG.md` with fix = "retired the runnable bank + its pipeline/route" and
   mark any open NEWBUG doc CLOSED-BY-RIP. Never delete the only causal record; a rip is a legitimate fix,
