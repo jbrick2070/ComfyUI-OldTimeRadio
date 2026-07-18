@@ -8,6 +8,14 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
 **Execute against the reusable checklist:** the Teardown protocol in `docs/SOURCE_BANK_PREFLIGHT.md`
 (+ lesson 25 in `PRODUCTION_SPRINT_LESSONS.md`) -- this plan is the concrete instance of it.
 
+**HARD RULE -- CLEAN RIP (operator, 2026-07-18):** the 4 banks leave ZERO footprint. No half-rip items
+(every surface below removed in the one change), NO negative/absence tests (nothing asserts a ripped id
+is "gone"/"unknown"/"not runnable"), and NO "retired-variant coverage" kept alive. If a test's SUBJECT
+is a ripped bank, DELETE the case -- do not migrate it to a survivor to preserve the ripped thing's
+coverage. Tests reference ONLY surviving banks, and the roster/bijection tests assert the surviving 7
+POSITIVELY (they list what exists, they do not assert what was removed). A grep for any of the 4 ids
+across `nodes`/`tests`/`workflows` returns nothing -- including in test bodies.
+
 ### Kibitz r1 hardening (folded, all CONFIRMED against the code)
 - **BOTH pipeline registries** -- delete the 3 v3 pipelines from `_RUNNER_BY_PIPELINE` AND
   `nodes/story_packs/pipelines.json` (:554/:663/:948); keep `legacy_many_pass_v3` (shared). See §4/§4b.
@@ -73,20 +81,41 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
    (surviving banks use it at `banks.json:149`, `:185`). A retired pipeline left here is a semantic
    registry failure even if no bank points at it.
 4c. **`nodes/_otr_scifi_sonnet.py`** (kibitz r1 MUST-FIX) -- DELETE the whole module (~1300 LOC; the sonnet
-   lane implementation, entrypoint `run_scifi_sonnet_episode` :1155). It has no surviving consumer once the
-   runner + pipeline are gone. Grep `_otr_scifi_sonnet` / `scifi_sonnet` across `nodes/` after deletion and
-   clean any orphaned import (e.g. an interpreter/`validate_source_payload("scifi_sonnet")` registration).
+   lane implementation, entrypoint `run_scifi_sonnet_episode` :1155). No RUNTIME consumer once the runner +
+   pipeline are gone -- **BUT (kibitz r2 MUST-FIX) three SURVIVING tests import it directly and fail at
+   COLLECTION** if the module vanishes: `test_rss_source_admission.py:11`, `test_scifi_source_repair.py:5`,
+   `test_scifi_lane_schema_parity.py` (:32/:114/:316/:373/:452/:477/:626/:655/:747). Handle them in the
+   SAME change (§5). Remove sonnet from any `LANE_MODULES` list; the dangling-ref grep must also cover
+   `_otr_scifi_sonnet` + `sonnet_archive_multipass_v3` across `nodes/` + `tests/`, not just the 4 bank ids.
+4d. **`nodes/OTR_LedgerScriptWriter.py:3757`** (kibitz r2 MUST-FIX -- a SECOND live `fable2_multipass_v3`
+   ref) -- the fable2 target-word gate is `if _selected_pipeline_id in ("fable2_multipass",
+   "fable2_multipass_v3"):`. Drop `fable2_multipass_v3` (leave the surviving `fable2_multipass`) in the same
+   writer change, or it is a dangling ref that fails this plan's own no-dangling-ref gate.
 5. **Tests** -- update each (do not just delete assertions; keep coverage honest):
    - `tests/test_scifi_sonnet_lane.py` -> DELETE (lane gone).
-   - `tests/test_bank_variants.py` (13 refs) -> update the runnable-count + the id lists/bijection
-     (12 visible / 11 runnable -> 8 visible / 7 runnable; drop the 4 ids).
-   - `tests/test_fable2_registry.py`, `tests/test_bank_scalar_defaults.py`,
-     `tests/test_source_snapshot.py` (5), and the v4-guard tests
-     (`test_genre_guard_spoken_v4`, `test_outro_guard_v4`, `test_placeholder_guard_v4`,
-     `test_scene_guard_v4`, `test_provenance_v4`) -> read each; where a ripped bank is used as a
-     fixture/param/baseline, swap to a surviving bank (e.g. `scifi_codex_v4` or base `scifi_codex`) or
-     drop that case. The v4-guard tests likely use `scifi_codex_v3` as a "gate-off" contrast -- pick a
-     surviving contrast bank.
+   - `tests/test_rss_source_admission.py` (:11), `tests/test_scifi_source_repair.py` (:5),
+     `tests/test_scifi_lane_schema_parity.py` (the ~10 refs above) -> remove the `_otr_scifi_sonnet` import
+     and DELETE the sonnet-only schema/parity cases (sonnet is fully removed -- there is no surviving sonnet
+     to migrate to); keep the codex/fable2 coverage intact (kibitz r2 MUST-FIX 1, CLEAN RIP).
+   - `tests/test_bank_variants.py` -> update the runnable-count (11->7) + id lists + DELETE the 4 ripped
+     bijection rows (incl. `:146` `scifi_fable2_v3`) so it asserts the surviving 7 POSITIVELY (not the
+     absence of the 4). The advisory tests using retired ids (`:210-218` `scifi_sonnet_v3`, `:229-230`
+     `media_archive_v3`): if the case's SUBJECT is the ripped bank, DELETE it; if it tests the SURVIVING
+     inline-v3 advisory mechanism, keep it with a surviving fixture id (`public_domain_story_v3` /
+     `shakespeare_v3`) -- a live positive test, never an absence test (kibitz r2 MUST-FIX 3, CLEAN RIP).
+   - `tests/test_fable2_registry.py` -> state the NEW EXACT order, not just counts: `:54` pins
+     `ids[-3:]` and `:252-260` pins the full order incl. all 4 retired rows -> new tail ends
+     `("scifi_codex_v4", "custom_source_bank")` (kibitz r2 MUST-FIX 4).
+   - `tests/test_source_snapshot.py` (`:129`/`:157`/`:275-276`, `scifi_fable2_v3`) -> **DELETE those cases**
+     (CLEAN RIP). That coverage was FOR the ripped variant; do NOT migrate it to a survivor and do NOT add
+     an absence test. (If a SURVIVING inline-v3 bank needs snapshot coverage, that is a separate positive
+     test, not a rescue of this one.)
+   - `tests/test_bank_scalar_defaults.py` and the v4-guard tests (`test_genre_guard_spoken_v4`,
+     `test_outro_guard_v4`, `test_placeholder_guard_v4`, `test_scene_guard_v4`, `test_provenance_v4`) ->
+     the guard tests enumerate banks directly (`test_placeholder_guard_v4.py:103-104`,
+     `test_scene_guard_v4.py:91-92`, `test_provenance_v4.py:112-113`) -- regenerate those lists from the
+     surviving runnable roster or pin the exact 7 ids; the v4-guard "gate-off" contrast likely uses
+     `scifi_codex_v3`, so pick a surviving contrast bank.
 6. **Docs** -- README.md (4 refs) roster list; `docs/GO_FORWARD_PLAN.md` current roster + the item-3
    note; append `docs/HANDOFF_LOG.md`. Mark the NEWBUG doc CLOSED-BY-RIP.
 
@@ -112,12 +141,26 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
 - Bug Bible regression GREEN. **Record the count as evidence; do NOT pin "17"** (QA flag 4 -- same
   anti-brittle rule as the suite total; a hardcoded count false-fails or masks a real drop if a ripped
   bank had Bible coverage).
-- `OTR_WorkflowValidator` + JSON round-trip on `banks.json` + `pipelines.json`; **no-BOM/UTF-8 check
-  (`head -c3`) on both after edit** (QA flag 5 -- Bible 02.11/12/13); `workflows/otr_canonical.json`
-  byte-unchanged (QA-verified: it carries none of the 4 ids, so no stranded COMBO -- BUG-08.06/12.23 not
-  triggered).
+- Registry correctness on `banks.json` + `pipelines.json`: JSON load/round-trip **+
+  `_otr_story_routing._ensure_loaded()` (registry load + crossref sweep, :499-505)** -- that is what
+  enforces registry JSON, NOT the workflow node (kibitz r2 SHOULD-FIX 1). Run `OTR_WorkflowValidator` on
+  the canonical WORKFLOW. **No-BOM/UTF-8 `head -c3`** on both JSONs after edit (QA flag 5 -- Bible
+  02.11/12/13). `workflows/otr_canonical.json` byte-unchanged (QA-verified: none of the 4 ids present,
+  no stranded COMBO -- BUG-08.06/12.23 not triggered).
 - No dangling ref: `grep -r "scifi_sonnet_v3\|media_archive_v3\|scifi_codex_v3\|scifi_fable2_v3" nodes tests workflows` returns nothing (docs/tmp excepted).
 - Commit + push to `v2.0-alpha`; verify `HEAD == origin`; AST-parse touched .py.
+
+## Follow-up (PINNED 2026-07-18 -- separate coder chunk, AFTER this rip)
+
+Decouple the "v3 class" toward fully independent banks: rip the shared `_v3_*` advisory
+(`run_v3_advisory` :1871 + `_v3_focus_metric` + `_v3_max_run`), `_INLINE_V3_PIPELINES` :2008, and the
+:6907 inline call. `run_v3_advisory` is ADVISORY-ONLY (writes `meta["<lane>_advisory"]`, never mutates
+lines/beats/cast, never raises) with no story-critical consumer -- so there is NOTHING to inline. Bonus:
+it imports `base_source_bank_id` (:1892) and is likely the LAST writer-path user of the version-family
+map -- rip it and the lineage machinery goes too. Touches the surviving inline-v3 banks
+(`public_domain_story_v3`, `shakespeare_v3`) + the freeze-cascade/ledger-scrub persistence + its
+persistence test, so it is its own gated chunk. Verify `base_source_bank_id` has no other live caller
+before removing the family-map.
 
 ## Kickoff line for a fresh coder window
 

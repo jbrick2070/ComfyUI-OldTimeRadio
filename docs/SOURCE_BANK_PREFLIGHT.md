@@ -335,6 +335,13 @@ Removing a bank is a coder-window change with the same rigor as adding one. A ba
 this section prevents. Playbook proven by the `499386aa` roster trim and the 2026-07-18 4-bank rip
 (`docs/2026-07-18-rip-4-banks-plan.md`).
 
+**CLEAN RIP (operator law).** The removed bank leaves ZERO footprint: no half-rip items, NO
+negative/absence tests (nothing asserts a ripped id is "gone"/"unknown"/"not runnable"), and NO
+"retired-variant coverage" migrated to a survivor to keep the ripped thing alive. If a test's SUBJECT
+is the ripped bank, DELETE the case; tests reference ONLY surviving banks; roster/bijection tests assert
+the survivors POSITIVELY (what exists), never the absence of what was removed. The final grep for the
+ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies included.
+
 **Step 0 -- decide the removal DEPTH (this drives everything below):**
 - **Variant removal** (a base or sibling version of the same lane SURVIVES, e.g. rip `scifi_codex_v3`
   while `scifi_codex`/`scifi_codex_v4` stay): remove only the bank's OWN row/pack/rules + its
