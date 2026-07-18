@@ -3,6 +3,32 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-17 night4 -- HEAD 1fd7743d (v2.0-alpha) [v4 P2: bank #1 scifi_codex_v4 CODE SHIPPED]
+
+Did (coder window, autonomous):
+- Built scifi_codex_v4 as a fully INDEPENDENT bank: banks.json row (before custom) + pack
+  nodes/story_packs/scifi_codex_v4/scifi_codex_v4.json (11 codex seams + the proof-pressure
+  delta: want / gating proof / mandatory cost beat / one reversal) + story_rules/scifi_codex_v4.json
+  (exact id) + pipeline scifi_codex_circuit_v4 mapped DIRECTLY to _run_scifi_codex_lane (NOT the
+  v3 advisory wrapper) + roster/bijection tests (test_bank_variants 11->12 visible/10->11 runnable
+  + TestScifiCodexV4; test_fable2_registry tail/order). Gates ON: require_science_floor +
+  placeholder_guard(G13) + scene_coherence_check(G15). Gates DEFERRED: genre_guard_spoken(G10) +
+  require_outro_cast_complete(G12) -- the dedicated codex runner does NOT cross the inline I.7/I.8
+  authored-repair boundary, so they would be no-repair hard gates (vetoable). Full suite 8139 /
+  Bible 17 / AST+JSON+BOM clean / canonical hash unchanged / HEAD==origin. Commit 1fd7743d pushed.
+- Live 30w leg via scripts/otr_headless_canonical.ps1: attempt1 (Mistral-Nemo both) AND attempt2
+  (gemma-4-E4B creative) BOTH failed at codex P3 RadioScoreV4 string_too_long -> proven
+  MODEL-INDEPENDENT = the unstated-cap class (PBUG-20260713-11/12). ROOT FIX (operator-steered):
+  restate the exact RadioScoreV4 caps in the codex_radio_score_system seam -- NOT a model swap.
+  Re-proving with Mistral-both + the restated caps (the strict model-agnostic test).
+- Wrote docs/BANK_PLAN_scifi_codex_v4.md (tracked; wiring + gate rationale + the PBUGs/lessons +
+  the go-forward recipe for the remaining 4 banks).
+Current step: scifi_codex_v4 code shipped @ 1fd7743d; live leg re-proving with the P3 cap fix.
+Next: confirm RESULT SUCCESS + obs_publish + asset; if green, commit the cap fix + bank plan +
+  doc refresh and retire PBUG-20260710-07, then bank #2 shakespeare_v4 (inline lane -> genre+outro
+  gates ARE safe there). If the fix leg fails P3 again -> /kibitz (two-strikes) before a 3rd fix.
+Commits: 1fd7743d (code). Cap-restatement + bank plan + doc refresh pending the live proof.
+
 ## 2026-07-17 night3 -- HEAD d29ba920 (v2.0-alpha) [v4 campaign: PHASE 1 COMPLETE (ii-viii)]
 
 Did (coder window, autonomous -- continued):

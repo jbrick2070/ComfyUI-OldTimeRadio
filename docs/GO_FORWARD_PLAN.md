@@ -1,6 +1,8 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-17 night3 -- HEAD `d29ba920`, branch `v2.0-alpha`. Truly forward-only by
+**Updated:** 2026-07-17 night4 -- HEAD `1fd7743d` (v4 Phase 2 bank #1 `scifi_codex_v4` code
+shipped; P3 cap-restatement + bank plan pending commit with the live proof), branch
+`v2.0-alpha`. Truly forward-only by
 operator directive: completed work lives in `docs/HANDOFF_LOG.md` (history) and
 `docs/PROD_BUG_LOG.md` (bugs); doctrine lives in
 `docs/PRODUCTION_SPRINT_LESSONS.md` (the "lost anchor" class is now lesson 24
@@ -82,17 +84,34 @@ better" = a POST-BUILD blind A/B.
   8134 / Bible 17). New opt-in flags a v4 bank can set: `genre_guard_spoken`,
   `require_outro_cast_complete`, `placeholder_guard`, `provenance_normalize`,
   `scene_coherence_check`; plus the recorded `beat_bounds` contract (floor-only gate).
-- **CURRENT: PHASE 2** -- build the 5 v4 banks serialized, each an atomic per-bank
-  chunk (bank row + pack + story_rules by exact id + pipeline + roster/bijection
-  tests; flip the opt-in gates the lane wants; `runnable:true` LAST) gated on a LIVE
-  GPU leg (RESULT SUCCESS + obs_publish + asset). Order: scifi_codex_v4,
-  shakespeare_v4, public_domain_story_v4, media_archive_v4, original_radio_v4. A live
-  codex/original leg retires PBUG-20260710-07 via the per-lane announcer-sentinel mint.
-  P1(vi) header<->scene interpretation (structural) is vetoable/refinable here.
+- **PHASE 2 -- bank #1 `scifi_codex_v4` CODE SHIPPED @ `1fd7743d`** (full suite 8139 /
+  Bible 17 / `otr_canonical.json` byte-unchanged / HEAD==origin). Fully INDEPENDENT bank:
+  banks.json row + pack + `story_rules/scifi_codex_v4.json` (exact id) + pipeline
+  `scifi_codex_circuit_v4` mapped **DIRECTLY** to `_run_scifi_codex_lane` (no v3 advisory
+  wrapper) + roster/bijection tests. Proof-pressure delta is pack-seam-only (a want, the
+  gating proof, a mandatory cost beat, one reversal). Gates ON: `require_science_floor` +
+  `placeholder_guard` (G13) + `scene_coherence_check` (G15). Gates DEFERRED: `genre_guard_spoken`
+  (G10) + `require_outro_cast_complete` (G12) -- the dedicated codex runner does NOT cross the
+  inline I.7/I.8 authored-repair boundary, so they would be no-repair hard gates until that
+  boundary is wired for the codex family (vetoable). Full record + lessons:
+  `docs/BANK_PLAN_scifi_codex_v4.md` (tracked; the campaign folder is gitignored).
+- **LIVE-LEG LESSON (operator-flagged 2026-07-17):** the codex **P3 `RadioScoreV4 string_too_long`**
+  failure is **MODEL-INDEPENDENT** -- first legs failed at P3 with BOTH Mistral-Nemo AND gemma-4-E4B
+  creative (both overran the unstated schema caps; the typed-repair copied the over-cap value). This
+  is the unstated-cap class (PBUG-20260713-11/12). ROOT FIX = restate the EXACT `RadioScoreV4` caps
+  (title 64 / premise 144 / setting 80 / scene env 56 / desc 72 / shot desc 72 / visual_prompt 120 /
+  beat intent 64 / arc_phase 28) in the `codex_radio_score_system` seam -- NOT a model swap. Applied;
+  pending commit with the live proof (a codex leg also retires PBUG-20260710-07 via the announcer-sentinel mint).
+- **NEXT:** finish the `scifi_codex_v4` live leg (Mistral + restated caps), then bank #2
+  `shakespeare_v4` -> `public_domain_story_v4` -> `media_archive_v4` -> `original_radio_v4`. Each
+  writes its OWN idiom (never sci-fi); the non-codex lanes are INLINE (`legacy_many_pass_v4` /
+  `original_multi_pass_v4`) and DO cross the authored-repair boundary -- so genre+outro gates ARE
+  safe to enable there. Pre-emptively restate any capped schema field in each lane's authoring seam.
 
 Open operator decisions (defaulted, vetoable at the consuming chunk):
 WORDS_PER_BEAT=40 (soft target; length recorded-not-gated); media_archive_v4 ships
-its OWN drama_seeds; public_domain `research_only` BLOCKS publish.
+its OWN drama_seeds; public_domain `research_only` BLOCKS publish; scifi_codex_v4 genre+outro
+gates deferred pending the codex authored-repair boundary.
 
 The 24-lane bake-off campaign that produced the scoreboard is **CONCLUDED** (its
 verdict drove this trim); records live in HANDOFF_LOG +
