@@ -308,7 +308,7 @@ _RADIO_SCORE_CONTEXT_CAP_TOKENS = 8192
 # Measured 2026-07-12 with the actual local Gemma E4B chat template: the
 # max-width compact draft serializes to 1,418 tokens. Reserve that surface plus
 # max(128, ceil(15%)) and a 16-token framing margin: 1,647 tokens.
-_RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS = 1647
+_RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS = 1829
 _RADIO_SCORE_MAX_SCENES = 3
 _RADIO_SCORE_MAX_SHOTS_PER_SCENE = 2
 _RADIO_SCORE_MAX_BEATS_PER_SCENE = 4
@@ -359,14 +359,14 @@ class BeatPlanV4(_Strict):
 class ShotPlanV4(_Strict):
     shot_id: str = Field(pattern=r"^shot_\d{3}$")
     scene_id: str = Field(pattern=r"^scene_\d{3}$")
-    description: str = Field(min_length=1, max_length=72)
+    description: str = Field(min_length=1, max_length=144)
     visual_prompt: str = Field(min_length=1, max_length=120)
 
 
 class ScenePlanV4(_Strict):
     scene_id: str = Field(pattern=r"^scene_\d{3}$")
     env: str = Field(min_length=1, max_length=56)
-    description: str = Field(min_length=1, max_length=72)
+    description: str = Field(min_length=1, max_length=144)
     shots: list[ShotPlanV4] = Field(
         min_length=1, max_length=_RADIO_SCORE_MAX_SHOTS_PER_SCENE,
     )
@@ -386,7 +386,7 @@ class MusicCueV4(_Strict):
 
 class RadioScoreV4(_Strict):
     title: str = Field(min_length=1, max_length=64)
-    premise: str = Field(min_length=1, max_length=144)
+    premise: str = Field(min_length=1, max_length=240)
     setting: str = Field(min_length=1, max_length=80)
     advisory_word_plan: AdvisoryWordPlanV4
     scenes: list[ScenePlanV4] = Field(
@@ -412,13 +412,13 @@ class RadioScoreDraftBeatV4(_Strict):
 
 
 class RadioScoreDraftShotV4(_Strict):
-    description: str = Field(min_length=1, max_length=72)
+    description: str = Field(min_length=1, max_length=144)
     visual_prompt: str = Field(min_length=1, max_length=120)
 
 
 class RadioScoreDraftSceneV4(_Strict):
     env: str = Field(min_length=1, max_length=56)
-    description: str = Field(min_length=1, max_length=72)
+    description: str = Field(min_length=1, max_length=144)
     shots: list[RadioScoreDraftShotV4] = Field(
         min_length=1, max_length=_RADIO_SCORE_MAX_SHOTS_PER_SCENE,
     )
@@ -439,7 +439,7 @@ class RadioScoreDraftV4(_Strict):
     """Compact P3 transport. Python derives the final score mechanics."""
 
     title: str = Field(min_length=1, max_length=64)
-    premise: str = Field(min_length=1, max_length=144)
+    premise: str = Field(min_length=1, max_length=240)
     setting: str = Field(min_length=1, max_length=80)
     scenes: list[RadioScoreDraftSceneV4] = Field(
         min_length=1, max_length=_RADIO_SCORE_MAX_SCENES,
@@ -484,7 +484,7 @@ class _RadioScoreDraftTextPatchRowV4(_Strict):
     """One author-owned text replacement addressed by an opaque path token."""
 
     path: str = Field(min_length=1, max_length=_P3_TEXT_PATCH_PATH_MAX_CHARS)
-    replacement_text: str = Field(min_length=1, max_length=144)
+    replacement_text: str = Field(min_length=1, max_length=240)
 
 
 class _RadioScoreDraftTextPatchV4(_Strict):
@@ -547,7 +547,7 @@ def _radio_score_draft_surface_receipt() -> dict[str, int | str | bool]:
         "max_music_cues": _RADIO_SCORE_MAX_MUSIC_CUES,
         "max_fact_ids_per_beat": _RADIO_SCORE_MAX_FACT_IDS_PER_BEAT,
         "max_title_chars": 64,
-        "max_premise_chars": 144,
+        "max_premise_chars": 240,
         "max_setting_chars": 80,
         "max_scene_env_chars": 56,
         "max_scene_description_chars": 72,
@@ -1560,14 +1560,14 @@ def _p3_text_patch_cap(loc: tuple[str | int, ...]) -> int | None:
     if not all(isinstance(item, str) or _is_p3_patch_index(item) for item in loc):
         return None
     if len(loc) == 1 and isinstance(loc[0], str):
-        return {"title": 64, "premise": 144, "setting": 80}.get(loc[0])
+        return {"title": 64, "premise": 240, "setting": 80}.get(loc[0])
     if (
         len(loc) == 3
         and loc[0] == "scenes"
         and _is_p3_patch_index(loc[1])
         and isinstance(loc[2], str)
     ):
-        return {"env": 56, "description": 72}.get(loc[2])
+        return {"env": 56, "description": 144}.get(loc[2])
     if (
         len(loc) == 5
         and loc[0] == "scenes"
@@ -1576,7 +1576,7 @@ def _p3_text_patch_cap(loc: tuple[str | int, ...]) -> int | None:
         and _is_p3_patch_index(loc[3])
         and isinstance(loc[4], str)
     ):
-        return {"description": 72, "visual_prompt": 120}.get(loc[4])
+        return {"description": 144, "visual_prompt": 120}.get(loc[4])
     if (
         len(loc) == 5
         and loc[0] == "scenes"

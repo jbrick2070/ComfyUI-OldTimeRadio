@@ -218,15 +218,15 @@ def _draft_for_advisory(
             })
         scenes.append({
             "env": _bounded_prose(56 if max_width else 20, f"env{scene_number}"),
-            "description": _bounded_prose(72 if max_width else 28, f"scene{scene_number}"),
+            "description": _bounded_prose(144 if max_width else 28, f"scene{scene_number}"),
             "shots": [
                 {
-                    "description": _bounded_prose(72 if max_width else 24, f"shot{scene_number}a"),
+                    "description": _bounded_prose(144 if max_width else 24, f"shot{scene_number}a"),
                     "visual_prompt": _bounded_prose(120 if max_width else 32, f"visual{scene_number}a"),
                 },
             ] + ([
                 {
-                    "description": _bounded_prose(72 if max_width else 24, f"shot{scene_number}b"),
+                    "description": _bounded_prose(144 if max_width else 24, f"shot{scene_number}b"),
                     "visual_prompt": _bounded_prose(120 if max_width else 32, f"visual{scene_number}b"),
                 },
             ] if shot_count == 2 else []),
@@ -240,7 +240,7 @@ def _draft_for_advisory(
         cue_specs.append(("music_close", beat_total - 1, 1 if max_width else 0))
     return lane.RadioScoreDraftV4(
         title=_bounded_prose(64 if max_width else 32, "title"),
-        premise=_bounded_prose(144 if max_width else 56, "premise"),
+        premise=_bounded_prose(240 if max_width else 56, "premise"),
         setting=_bounded_prose(80 if max_width else 32, "setting"),
         scenes=scenes,
         music_cues=[
@@ -1034,10 +1034,10 @@ def test_max_width_p3_draft_envelopes_fit_the_local_gemma_context():
 
     draft_tokens = len(tokenizer(draft_json, add_special_tokens=False)["input_ids"])
     prompt_tokens = [token_count(messages) for messages in all_calls]
-    assert draft_tokens == 1418
+    assert draft_tokens == 1576
     assert reservation["max_new_tokens"] == (
         draft_tokens + max(128, math.ceil(draft_tokens * .15)) + 16
-    ) == 1647
+    ) == 1829
     assert all(
         prompt_tokens_for_call + reservation["max_new_tokens"] <= 8192
         for prompt_tokens_for_call in prompt_tokens
@@ -1046,13 +1046,13 @@ def test_max_width_p3_draft_envelopes_fit_the_local_gemma_context():
     patch_raw = copy.deepcopy(draft.model_dump(mode="json"))
     patch_loc_caps = [
         (("title",), 64),
-        (("premise",), 144),
+        (("premise",), 240),
         (("setting",), 80),
         (("scenes", 0, "env"), 56),
-        (("scenes", 0, "description"), 72),
-        (("scenes", 0, "shots", 0, "description"), 72),
+        (("scenes", 0, "description"), 144),
+        (("scenes", 0, "shots", 0, "description"), 144),
         (("scenes", 0, "shots", 0, "visual_prompt"), 120),
-        (("scenes", 0, "shots", 1, "description"), 72),
+        (("scenes", 0, "shots", 1, "description"), 144),
         (("scenes", 0, "shots", 1, "visual_prompt"), 120),
         (("scenes", 0, "beats", 0, "intent"), 64),
         (("scenes", 0, "beats", 0, "arc_phase"), 28),
@@ -1332,11 +1332,11 @@ def test_p3_base_and_repair_bind_locked_total_to_per_scene_cap():
     ("loc", "cap"),
     [
         (("title",), 64),
-        (("premise",), 144),
+        (("premise",), 240),
         (("setting",), 80),
         (("scenes", 0, "env"), 56),
-        (("scenes", 0, "description"), 72),
-        (("scenes", 0, "shots", 0, "description"), 72),
+        (("scenes", 0, "description"), 144),
+        (("scenes", 0, "shots", 0, "description"), 144),
         (("scenes", 0, "shots", 1, "visual_prompt"), 120),
         (("scenes", 0, "beats", 0, "intent"), 64),
         (("scenes", 0, "beats", 1, "arc_phase"), 28),
@@ -1382,7 +1382,7 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
     facts = _metadata_repair_fact_index()
     draft = _draft_for_advisory(advisory)
     invalid = draft.model_dump(mode="json")
-    invalid["scenes"][0]["description"] = "x" * 73
+    invalid["scenes"][0]["description"] = "x" * 145
     replacement = "A receiver hums under a cold sky."
     responses = [
         json.dumps(invalid),
@@ -1420,7 +1420,7 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
     assert "source_to_shorten" in calls[1]["messages"][1]["content"]
     patch_request = json.loads(calls[1]["messages"][1]["content"])
     assert set(patch_request) == {"rewrite_tasks"}
-    assert patch_request["rewrite_tasks"][0]["max_chars"] == 54
+    assert patch_request["rewrite_tasks"][0]["max_chars"] == 108
     assert "original_text" not in patch_request["rewrite_tasks"][0]
     assert "Never copy source_to_shorten unchanged" in calls[1]["messages"][0]["content"]
 
@@ -1433,9 +1433,9 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
     assert attempts[1]["schema_status"] == "accepted"
     assert attempts[1]["draft_status"] == "accepted"
     assert attempts[1]["patch_targets"] == [
-        {"path": "scenes.0.description", "max_chars": 72},
+        {"path": "scenes.0.description", "max_chars": 144},
     ]
-    assert "x" * 73 not in json.dumps(attempts, ensure_ascii=False)
+    assert "x" * 145 not in json.dumps(attempts, ensure_ascii=False)
     expected = draft.model_dump(mode="json")
     expected["scenes"][0]["description"] = replacement
     expected_wire = json.dumps(
@@ -1506,7 +1506,7 @@ def test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect(caplog):
     facts = _metadata_repair_fact_index()
     draft = _draft_for_advisory(advisory)
     invalid = draft.model_dump(mode="json")
-    invalid["scenes"][0]["description"] = "x" * 73
+    invalid["scenes"][0]["description"] = "x" * 145
     invalid["music_cues"][1]["cue_id"] = "music_open"
     responses = [json.dumps(invalid), json.dumps(draft.model_dump(mode="json"))]
     calls: list[dict[str, object]] = []
@@ -1543,7 +1543,7 @@ def test_p3_malformed_text_patch_fails_without_a_third_reroll():
     cast = _metadata_repair_cast()
     facts = _metadata_repair_fact_index()
     invalid = _draft_for_advisory(advisory).model_dump(mode="json")
-    invalid["scenes"][0]["description"] = "x" * 73
+    invalid["scenes"][0]["description"] = "x" * 145
     calls: list[dict[str, object]] = []
     journal: dict[str, object] = {}
     responses = [json.dumps(invalid), "not JSON"]
@@ -1581,7 +1581,7 @@ def test_p3_malformed_text_patch_fails_without_a_third_reroll():
 def test_p3_text_patch_contract_rejects_missing_duplicate_unknown_blank_and_overcap_rows():
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
     raw = _draft_for_advisory(advisory).model_dump(mode="json")
-    raw["scenes"][0]["description"] = "x" * 73
+    raw["scenes"][0]["description"] = "x" * 145
     raw["scenes"][0]["beats"][0]["intent"] = "y" * 65
     with pytest.raises(ValidationError) as exc_info:
         lane.RadioScoreDraftV4.model_validate(raw)
@@ -1627,12 +1627,12 @@ def test_p3_text_patch_receipt_distinguishes_model_prose_over_schema_cap():
     cast = _metadata_repair_cast()
     facts = _metadata_repair_fact_index()
     invalid = _draft_for_advisory(advisory).model_dump(mode="json")
-    invalid["premise"] = "x" * 145
+    invalid["premise"] = "x" * 241
     journal: dict[str, object] = {}
     responses = [
         json.dumps(invalid),
         json.dumps({"replacements": [{
-            "path": "premise", "replacement_text": "y" * 145,
+            "path": "premise", "replacement_text": "y" * 241,
         }]}),
     ]
 
@@ -1662,7 +1662,7 @@ def test_p3_text_patch_rejects_a_resolved_artifact_wrapper_without_reroll():
     cast = _metadata_repair_cast()
     facts = _metadata_repair_fact_index()
     invalid = _draft_for_advisory(advisory).model_dump(mode="json")
-    invalid["scenes"][0]["description"] = "x" * 73
+    invalid["scenes"][0]["description"] = "x" * 145
     wrapped_patch = {
         "resolved_artifact": {
             "replacements": [{
@@ -1719,7 +1719,7 @@ def test_p3_scheduler_openrouter_uses_bounded_patch_and_forwards_json_mode(monke
     facts = _metadata_repair_fact_index()
     draft = _draft_for_advisory(advisory)
     invalid = draft.model_dump(mode="json")
-    invalid["scenes"][0]["description"] = "x" * 73
+    invalid["scenes"][0]["description"] = "x" * 145
     replacement = "A compact receiver hums."
     responses = [json.dumps(invalid), json.dumps({"replacements": [{
         "path": "scenes.0.description",
@@ -1801,13 +1801,13 @@ def test_p3_openrouter_repairs_captured_ten_target_shape_with_json_mode():
     invalid = draft.model_dump(mode="json")
     target_loc_caps = [
         (("title",), 64),
-        (("premise",), 144),
+        (("premise",), 240),
         (("setting",), 80),
         (("scenes", 0, "env"), 56),
-        (("scenes", 0, "description"), 72),
-        (("scenes", 0, "shots", 0, "description"), 72),
+        (("scenes", 0, "description"), 144),
+        (("scenes", 0, "shots", 0, "description"), 144),
         (("scenes", 0, "shots", 0, "visual_prompt"), 120),
-        (("scenes", 0, "shots", 1, "description"), 72),
+        (("scenes", 0, "shots", 1, "description"), 144),
         (("scenes", 0, "shots", 1, "visual_prompt"), 120),
         (("scenes", 0, "beats", 0, "intent"), 64),
     ]
@@ -1866,12 +1866,12 @@ def test_p3_openrouter_thirteen_targets_retain_full_repair():
     draft = _draft_for_advisory(advisory)
     invalid = draft.model_dump(mode="json")
     target_loc_caps = [
-        (("title",), 64), (("premise",), 144), (("setting",), 80),
+        (("title",), 64), (("premise",), 240), (("setting",), 80),
         (("scenes", 0, "env"), 56),
-        (("scenes", 0, "description"), 72),
-        (("scenes", 0, "shots", 0, "description"), 72),
+        (("scenes", 0, "description"), 144),
+        (("scenes", 0, "shots", 0, "description"), 144),
         (("scenes", 0, "shots", 0, "visual_prompt"), 120),
-        (("scenes", 0, "shots", 1, "description"), 72),
+        (("scenes", 0, "shots", 1, "description"), 144),
         (("scenes", 0, "shots", 1, "visual_prompt"), 120),
         (("scenes", 0, "beats", 0, "intent"), 64),
         (("scenes", 0, "beats", 0, "arc_phase"), 28),
