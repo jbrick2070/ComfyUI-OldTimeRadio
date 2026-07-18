@@ -176,9 +176,20 @@ Then, in order:
    IMPROVE passes (quick-win 4 below). The F2 finding -- original_radio
    `_v2`/`_v3` seam steers toward weapons content vs base -- feeds the same
    seam-tuning pass. `tencent/hy3:free` panel seat expires 2026-07-21.
-3. **Unblock the mistral/gemma creative-writer matrices** (verdict open item 3)
-   -- the only path from "best bank on aion" to "best model". Render-window
-   work, not coder-slot.
+3. **Creative-writer model question (verdict open item 3)** -- the path from
+   "best bank on aion" to "best model". Render-window work, not coder-slot.
+   **A Sonnet arm is DONE (2026-07-18):** the `claude-sonnet-4.5` (creative,
+   remote) / `Mistral-Nemo` (technical, local) cross-bank bake-off ran all 11
+   banks x 420/720 (18 SUCCESS / 4 FAIL). **New winner under Sonnet-4.5 =
+   `scifi_codex_v4`** (runner-up `scifi_fable2`); the codex circuit swept the
+   podium. The crown SHIFTS from the aion baseline's `scifi_fable2`, so "best
+   bank" depends on the writer. Mistral-Nemo stays the free local DEFAULT --
+   cloud is opt-in (cost + off-machine + trips the codex all-caps / original_radio
+   framing gates + degrades the v3 lanes). Full record:
+   `docs/2026-07-17-model-bakeoff-scoreboard.md`. STILL OPEN: the local
+   mistral/gemma writer matrix (this arm was cloud Sonnet, not the local roster).
+   Surfaced a NEWBUG: `scifi_fable2_v3` rules_id
+   (`docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md`, deferred to a coder window).
 4. Optional tuning follow-on: the v3 packs still carry v2 seam text (the
    structural v3 delta is the advisory diagnostic); per-lane Sec-D one-liners
    are in place to edit if wanted.

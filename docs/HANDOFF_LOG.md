@@ -3,6 +3,28 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-18 morning -- HEAD 60c73618 (v2.0-alpha) [RENDER: Sonnet-4.5 cross-bank bake-off COMPLETE]
+
+Did (render window, autonomous overnight):
+- Ran the creative=`claude-sonnet-4.5` (OpenRouter remote) / technical=`Mistral-Nemo` (local) bake-off
+  across all 11 runnable banks x 420/720 = 22 story-only legs (18 SUCCESS / 4 FAIL). Built the harness
+  (tmp/_sonnet_bakeoff_sweep.ps1); fixed 2 wiring bugs live: the concrete-4.5 dropdown pin (the picker
+  prunes concrete slugs for ~latest aliases -> surface it via OTR_OPENROUTER_SLOT_A_DEFAULT) and the
+  -Banks [string[]] array-binding trap via Start-Process/-File (-> single comma-string the script splits).
+- Fable BLIND grade of the 10 720-SUCCESS transcripts. NEW WINNER under Sonnet = scifi_codex_v4 (24/25,
+  "The Halicin Gamble"); runner-up scifi_fable2 (24/25, monologue-capped at 720); the codex circuit swept
+  #1/#3/#4; weakest scifi_sonnet_v3 (12/25, essayistic). The crown SHIFTS from the aion baseline's fable2.
+- Cost ~3.07M Sonnet tokens ~= $15-20 (creative slot only; technical local/free; 0 creative VRAM).
+- FAILs diagnosed: original_radio 420 (deterministic news_source_framing gate; PASSED at 720),
+  scifi_codex_v4 420 (codex P5 all-caps-word gate; PASSED at 720), scifi_fable2_v3 BOTH tiers = NEWBUG
+  (fable2 revision_contract hardcodes rules_id=='scifi_fable2', model-independent) ->
+  docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md.
+- Scoreboard: docs/2026-07-17-model-bakeoff-scoreboard.md. Full-media confirmation leg on the winner
+  scifi_codex_v4 @ 720w (canonical) run; result appended to the scoreboard.
+Current step: bake-off item 3 (Sonnet arm) DONE; Mistral-Nemo stays the free local default, cloud opt-in.
+Next: (coder) fix the scifi_fable2_v3 rules_id NEWBUG; (render, optional) the local mistral/gemma writer matrix.
+Commits: docs only (scoreboard + NEWBUG + GO_FORWARD + HANDOFF); NO code changes (NEWBUG deferred to coder).
+
 ## 2026-07-17 night6 -- HEAD 9730e2dc (v2.0-alpha) [v4 P2 bank #1 scifi_codex_v4 GREEN + LIVE-PROVEN]
 
 Did (coder window, autonomous + operator cross-check):
