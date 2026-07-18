@@ -131,7 +131,10 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
    - `tests/test_rss_source_admission.py` (:11), `tests/test_scifi_source_repair.py` (:5),
      `tests/test_scifi_lane_schema_parity.py` (the ~10 refs above) -> remove the `_otr_scifi_sonnet` import
      and DELETE the sonnet-only schema/parity cases (sonnet is fully removed -- there is no surviving sonnet
-     to migrate to); keep the codex/fable2 coverage intact (kibitz r2 MUST-FIX 1, CLEAN RIP).
+     to migrate to); keep the codex/fable2 coverage intact (kibitz r2 MUST-FIX 1, CLEAN RIP). **NOTE
+     (operator r4): in `test_scifi_source_repair.py` the sonnet import at :5 is USED at :117
+     (`sonnet_schema_instruction(FragmentDossierV4)`) -- delete that assertion line TOO, not just the
+     import, or collection NameErrors; keep the codex asserts at :116/:118.**
    - `tests/test_bank_variants.py` -> update the runnable-count (11->7) + id lists + DELETE the 4 ripped
      bijection rows (incl. `:146` `scifi_fable2_v3`) so it asserts the surviving 7 POSITIVELY (not the
      absence of the 4). The advisory tests using retired ids (`:210-218` `scifi_sonnet_v3`, `:229-230`
@@ -145,6 +148,10 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
      new full order (4 retired rows removed from the live tuple, checked against `:253-259`):
      `("media_archive", "original_radio", "scifi_fable2", "scifi_codex", "public_domain_story_v3",
      "shakespeare_v3", "scifi_codex_v4", "custom_source_bank")` (kibitz r2 MUST-FIX 4 + r4 SHOULD-FIX 3).
+     ALSO refresh the `TestRosterOrder` DOCSTRING at `:244-249` -- it carries a stale bare `scifi_sonnet`
+     in its 2026-07-17 orphan-base list (operator r4); drop/update that token for the 2026-07-18 rip so the
+     bare-sonnet post-condition holds at exactly 2. (Roster-description prose, NOT load-bearing forensic
+     history like the p0-contract comment -> refresh it, do not carve it out.)
    - `tests/test_source_snapshot.py` (`:129`/`:157`/`:275-276`, `scifi_fable2_v3`) -> **DELETE those cases**
      (CLEAN RIP). That coverage was FOR the ripped variant; do NOT migrate it to a survivor and do NOT add
      an absence test. (If a SURVIVING inline-v3 bank needs snapshot coverage, that is a separate positive
@@ -153,8 +160,10 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
      `test_outro_guard_v4`, `test_placeholder_guard_v4`, `test_scene_guard_v4`, `test_provenance_v4`) ->
      the guard tests enumerate banks directly (`test_placeholder_guard_v4.py:103-104`,
      `test_scene_guard_v4.py:91-92`, `test_provenance_v4.py:112-113`) -- regenerate those lists from the
-     surviving runnable roster or pin the exact 7 ids; the v4-guard "gate-off" contrast likely uses
-     `scifi_codex_v3`, so pick a surviving contrast bank.
+     surviving runnable roster or pin the exact ids; the v4-guard "gate-off" contrast likely uses
+     `scifi_codex_v3`, so pick a surviving contrast bank the guard is GENUINELY OFF for -- a BASE bank
+     (`scifi_codex`), NOT a `_v4` bank; a `_v4` pick makes the test pass for the WRONG reason
+     (wrong-but-green is silent -- operator r4 flags this step for a human eyeball, not just a gate).
    - `tests/test_fable2_tail_context.py:295-299` (kibitz r3 MUST-FIX 1) -> drop `"scifi_sonnet"` from the
      `source_bank` parametrize (:297); the sonnet lane is gone. (Bare-sonnet -- caught by the separate
      nodes+tests bare-sonnet scan, not the main retired-id sweep.)
@@ -220,9 +229,10 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
      by the sci-fi lanes). KEEP it -- forensic "why the P0 source bounds exist" history; do NOT let a coder
      "clean" it (and do NOT false-fail the gate on it).
   ANY OTHER bare `scifi_sonnet` = a missed ripped ref. Every bare-sonnet TEST ref is to a ripped lane and
-  must be DELETED first so the scan lands on exactly those two: `test_fable2_tail_context.py:297`;
+  must be DELETED/refreshed first so the scan lands on exactly those two: `test_fable2_tail_context.py:297`;
   `test_bank_variants.py` `:49` (the `("scifi_sonnet_v3","scifi_sonnet")` tuple), `:58` (real-base list),
-  `:148` (bijection row), the sonnet advisory test `:196-218`; and the whole ripped
+  `:148` (bijection row), the sonnet advisory test `:196-218`; `test_fable2_registry.py:246` (stale bare
+  `scifi_sonnet` in the `TestRosterOrder` docstring -- refresh, operator r4); and the whole ripped
   `test_scifi_sonnet_lane.py` (it also cites `415ca1fc`).
 
 **PowerShell gate commands (kibitz r4 MUST-FIX 4 -- the builder runs powershell.exe; `grep`/`head` do
