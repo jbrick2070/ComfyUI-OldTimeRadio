@@ -19,8 +19,11 @@ Did (render window, autonomous overnight):
   scifi_codex_v4 420 (codex P5 all-caps-word gate; PASSED at 720), scifi_fable2_v3 BOTH tiers = NEWBUG
   (fable2 revision_contract hardcodes rules_id=='scifi_fable2', model-independent) ->
   docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md.
-- Scoreboard: docs/2026-07-17-model-bakeoff-scoreboard.md. Full-media confirmation leg on the winner
-  scifi_codex_v4 @ 720w (canonical) run; result appended to the scoreboard.
+- Scoreboard: docs/2026-07-17-model-bakeoff-scoreboard.md. Full-media confirmation: the winner
+  scifi_codex_v4 @ 720w canonical FAILED fast (codex 240-char string_too_long on a fresh source -> the
+  winner is production-fragile with Sonnet, different gate than its 420 all-caps fail). Re-ran on the
+  robust runner-up scifi_fable2 @ 720w -> RESULT SUCCESS + obs_publish OK ("The Stone Frequency", 406 MB,
+  34:12). Shippable Sonnet pairing = scifi_fable2; codex_v4 = best script, least reliable producer.
 Current step: bake-off item 3 (Sonnet arm) DONE; Mistral-Nemo stays the free local default, cloud opt-in.
 Next: (coder) fix the scifi_fable2_v3 rules_id NEWBUG; (render, optional) the local mistral/gemma writer matrix.
 Commits: docs only (scoreboard + NEWBUG + GO_FORWARD + HANDOFF); NO code changes (NEWBUG deferred to coder).

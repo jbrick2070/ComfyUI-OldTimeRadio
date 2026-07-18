@@ -96,5 +96,21 @@ the codex all-caps gate is too strict for an emphasis-prone writer.
 One canonical (full-pipeline) leg on the winner `scifi_codex_v4` @ 720w with this config, to prove the
 remote-creative winner survives TTS + video + obs_publish. Result recorded below.
 
-**PENDING** -- the confirmation leg is rendering; its RESULT / obs_publish / asset path is appended here
-on completion (follow-up commit).
+**Winner `scifi_codex_v4` @ 720w full-media: FAILED** -- on a fresh production source it hit the codex
+240-char `string_too_long` contract (PBUG-20260713-04 lineage), a different deterministic gate than its
+420 all-caps fail. So `scifi_codex_v4` trips codex contracts under Sonnet's verbose style at BOTH tiers
+depending on the draw: it is **production-fragile** with Sonnet despite topping the single blind read.
+Recorded, not re-rolled (the gate is working as designed; the NEWBUG/codex-contract tightening is a
+coder-window question, not a render fix).
+
+**Practical confirmation re-run on the robust runner-up `scifi_fable2` @ 720w** (clean SUCCESS both
+story-only tiers): **RESULT SUCCESS** -- full canonical pipeline in **34:12**, `obs_publish OK` ->
+`signal_lost_the_stone_frequency_20260718_081037_silent_procgen_blended_captioned_with_credits_final.mp4`
+(**406 MB** on disk; 53 beats / 9,756 frames @ 1080p25). The Sonnet-4.5-creative / Mistral-technical config
+survives the whole pipeline (story -> TTS -> video -> captions/credits -> obs) end-to-end on `scifi_fable2`.
+Net: the shippable Sonnet pairing is **`scifi_fable2`**; `scifi_codex_v4` is the better script but is not a
+reliable full-media producer on this writer.
+
+**Adoption takeaway:** the blind-read winner (`scifi_codex_v4`) is the strongest *script* but the least
+*reliable* producer on Sonnet; for an actually shippable Sonnet pairing use **`scifi_fable2`** (robust +
+runner-up craft). This sharpens the recommendation above.
