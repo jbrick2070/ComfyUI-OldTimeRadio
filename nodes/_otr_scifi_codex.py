@@ -583,6 +583,11 @@ _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION = (
     "any scene/shot/beat/line ID, order, parent, speaker, speaker_role, canonical "
     "cue anchor, spoken line text, wrapper, pass_id, artifact_inputs, or "
     "result_json_schema."
+    " Coverage the compiler enforces: every declared shot MUST be referenced by "
+    "at least one beat's shot_index (an unused shot is rejected); every accepted "
+    "cast ID MUST own at least one beat, announcer included (a missing cast ID is "
+    "rejected); each cue_id MUST appear at most once; and each music cue "
+    "anchor_beat_index MUST be less than the total number of beats across all scenes."
 )
 
 
@@ -607,6 +612,16 @@ def _radio_score_draft_topology_instruction(
     minimum_scene_count = (
         beat_count + _RADIO_SCORE_MAX_BEATS_PER_SCENE - 1
     ) // _RADIO_SCORE_MAX_BEATS_PER_SCENE
+    tight_clause = ""
+    if beat_count == minimum_scene_count * _RADIO_SCORE_MAX_BEATS_PER_SCENE:
+        # Fully constrained (e.g. 12 beats == 3 scenes * 4): the only valid
+        # distribution is every scene at the per-scene cap. State it explicitly
+        # so a weaker model does not attempt an over-cap or over-scene split.
+        tight_clause = (
+            f" With exactly {beat_count} beats the layout is fully constrained: "
+            f"emit exactly {minimum_scene_count} scenes, each holding exactly "
+            f"{_RADIO_SCORE_MAX_BEATS_PER_SCENE} beats."
+        )
     return (
         f" The accepted advisory_word_plan contains exactly {beat_count} beat "
         "rows. The flattened total across every scenes[*].beats array MUST be "
@@ -614,6 +629,7 @@ def _radio_score_draft_topology_instruction(
         f"{_RADIO_SCORE_MAX_BEATS_PER_SCENE} beats, so distribute the locked "
         f"beats across at least {minimum_scene_count} scene(s); never place all "
         "locked beats into one scene when that crosses the per-scene cap."
+        + tight_clause
     )
 
 
@@ -851,7 +867,10 @@ def compile_radio_score_draft(
     if flat_draft_beat_count != len(advisory_rows):
         raise RadioScoreDraftCompileError(
             code="beat_count", path="scenes[*].beats",
-            detail="flattened draft beat count must equal accepted advisory count",
+            detail=(
+                f"flattened draft beat count {flat_draft_beat_count} must equal "
+                f"accepted advisory count {len(advisory_rows)}"
+            ),
         )
 
     cast_by_id = {row.char_id: row for row in cast.cast}

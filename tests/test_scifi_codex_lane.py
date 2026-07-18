@@ -1949,6 +1949,83 @@ def test_p3_compact_contract_names_nested_literal_values_on_base_and_repair():
         assert "never a descriptive music name" in system
 
 
+def test_p3_surface_instruction_exposes_hidden_compiler_gates():
+    # kibitz r2 (2026-07-17): the compiler enforces unused_shot / cast_coverage /
+    # cue_id-unique / cue_anchor<beat_count, none of which were model-visible.
+    surface = lane._RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION
+    assert "every declared shot MUST be referenced by at least one beat" in surface
+    assert "every accepted cast ID MUST own at least one beat, announcer included" in surface
+    assert "each cue_id MUST appear at most once" in surface
+    assert "anchor_beat_index MUST be less than the total number of beats" in surface
+
+
+def test_p3_topology_pins_fully_constrained_twelve_beat_layout():
+    def topo(n):
+        advisory = lane.make_advisory_word_blueprint(
+            30, [f"b{i:03d}" for i in range(n)],
+        )
+        return lane._radio_score_draft_topology_instruction(
+            {"advisory_word_plan": advisory.model_dump(mode="json")},
+        )
+
+    twelve = topo(12)
+    assert "fully constrained" in twelve
+    assert "emit exactly 3 scenes, each holding exactly 4 beats" in twelve
+    # 6 and 9 beats have layout freedom -> no tight clause.
+    for n in (6, 9):
+        assert "fully constrained" not in topo(n)
+
+
+def test_scifi_codex_v4_p3_prompt_contract():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    responses = [json.dumps(draft.model_dump(mode="json"))]
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return responses.pop(0)
+
+    result = lane._call_radio_score_draft(
+        pass_id="P3", slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+        artifact_inputs=_draft_context(advisory, cast, facts),
+        advisory=advisory, cast=cast, fact_index=facts,
+        base_temperature=.72, structural_retry_temperature=.32,
+        max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        call_journal={},
+    )
+
+    assert isinstance(result, lane.RadioScoreV4)
+    system = calls[0]["messages"][0]["content"]
+    # v4 beat-budget harmonization present; additive-beat wording + the reverted
+    # cap-list both absent (the caps live in the tighter surface ceilings only).
+    assert "produce exactly as many beats as the advisory plan lists" in system
+    assert "include one mandatory COST beat" not in system
+    assert "hard length budget" not in system
+    # the newly model-visible coverage gates ride the shared surface instruction.
+    assert "every declared shot MUST be referenced by at least one beat" in system
+    assert "every accepted cast ID MUST own at least one beat" in system
+
+
+def test_p3_beat_count_error_reports_expected_count():
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    baseline = _draft_for_advisory(advisory).model_dump(mode="json")
+    baseline["scenes"][0]["beats"].pop()
+    draft = lane.RadioScoreDraftV4.model_validate(baseline)
+    with pytest.raises(lane.RadioScoreDraftCompileError) as exc_info:
+        lane.compile_radio_score_draft(draft, advisory, cast, facts)
+    assert exc_info.value.code == "beat_count"
+    # enriched receipt (kibitz r2): the expected count is interpolated so a live
+    # leg rejection is diagnosable without storing unbounded model output.
+    assert "accepted advisory count 3" in exc_info.value.detail
+
+
 def test_p3_two_decode_failures_restart_only_from_trusted_draft_context():
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
     cast = _metadata_repair_cast()

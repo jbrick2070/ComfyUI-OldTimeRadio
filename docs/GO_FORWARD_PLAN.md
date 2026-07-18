@@ -95,13 +95,17 @@ better" = a POST-BUILD blind A/B.
   inline I.7/I.8 authored-repair boundary, so they would be no-repair hard gates until that
   boundary is wired for the codex family (vetoable). Full record + lessons:
   `docs/BANK_PLAN_scifi_codex_v4.md` (tracked; the campaign folder is gitignored).
-- **LIVE-LEG LESSON (operator-flagged 2026-07-17):** the codex **P3 `RadioScoreV4 string_too_long`**
-  failure is **MODEL-INDEPENDENT** -- first legs failed at P3 with BOTH Mistral-Nemo AND gemma-4-E4B
-  creative (both overran the unstated schema caps; the typed-repair copied the over-cap value). This
-  is the unstated-cap class (PBUG-20260713-11/12). ROOT FIX = restate the EXACT `RadioScoreV4` caps
-  (title 64 / premise 144 / setting 80 / scene env 56 / desc 72 / shot desc 72 / visual_prompt 120 /
-  beat intent 64 / arc_phase 28) in the `codex_radio_score_system` seam -- NOT a model swap. Applied;
-  pending commit with the live proof (a codex leg also retires PBUG-20260710-07 via the announcer-sentinel mint).
+- **LIVE-LEG LESSON (operator-flagged 2026-07-17; CORRECTED by the two-strikes kibitz r2):** the codex
+  **P3** failures (`string_too_long`, then `beat_count`) are **MODEL-INDEPENDENT** (both Mistral-Nemo and
+  gemma-4-E4B) and belong to the **unstated DETERMINISTIC-CONTRACT class (PBUG-20260713-02 + -06)** -- NOT
+  a simple "unstated cap". The kibitz (Codex `gpt-5.6-sol` + Antigravity Gemini 3.1 Pro, grounded) proved
+  `_RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION` ALREADY injects tighter caps into every P3 prompt, so the seam
+  cap-restatement was **reverted**. ROOT FIX = make the whole compiler contract model-visible
+  (`unused_shot` / `cast_coverage` / `cue_id`-unique / `cue_anchor<beat_count` added to the shared surface
+  instruction + a 12-beat distribution clause), KEEP the v4 beat-count harmonization, and enrich the
+  `beat_count` receipt (observed-vs-expected). `string_too_long` recovery stays the text-patch seam. Full
+  record: `docs/BANK_PLAN_scifi_codex_v4.md` + `kibitz-runs/2026-07-17-p3-beatcount/`. A codex leg still
+  retires PBUG-20260710-07 via the announcer-sentinel mint. Pending the live 30w Mistral-both proof.
 - **NEXT:** finish the `scifi_codex_v4` live leg (Mistral + restated caps), then bank #2
   `shakespeare_v4` -> `public_domain_story_v4` -> `media_archive_v4` -> `original_radio_v4`. Each
   writes its OWN idiom (never sci-fi); the non-codex lanes are INLINE (`legacy_many_pass_v4` /
