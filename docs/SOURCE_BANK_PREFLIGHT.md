@@ -96,6 +96,14 @@ Creative quality remains a taste decision, not a runtime validator.
 - [ ] **Hard:** Every on-air quotation, claim, number, and proper noun
   presented as real or source-derived fact resolves to validated evidence.
   Fictional invention is distinguishable from source fact.
+- [ ] **Hard:** Every evidence span satisfies the literal-identity contract:
+  each quoted span equals `payload[field][start:end]` exactly, offsets are computed
+  against the actual slice (never a normalized copy), span and evidence IDs are
+  zero-padded to a fixed width (`F01`, not `F0`/`F00`), and no quote exceeds its
+  payload field. Span-bearing source fields are whitespace-normalized AT ADMISSION,
+  upstream of any offset computation, so a dirty-source (leading whitespace/tabs)
+  cannot shift a literal span. **N/A** only for a no-source bank. This is the
+  most-hit source-backed P0 (literal-span / offset-integrity).
 - [ ] **Hard:** A no-source bank stamps honest original/synthetic provenance
   and contains no fabricated citation, URL, author, or license. **N/A** for a
   source-backed bank.
@@ -112,6 +120,15 @@ Creative quality remains a taste decision, not a runtime validator.
   `prompt_stages`. Every referenced seam exists.
 - [ ] **Hard:** Each structured seam, worked example, typed schema, parser,
   and repair prompt agree exactly. Worked examples validate in a test.
+- [ ] **Hard:** Every schema BOUND is model-visible and never tighter than its
+  validator. Each seam restates the field's max length, exact count, and pattern:
+  the automatic shape instruction emits required paths but NOT min/max/pattern, so
+  a seam and schema can "agree exactly" on shape while the bound stays invisible and
+  the model overruns it. No seam or projection caps a field below what its
+  post-validator demands. Each model-authored value is requested AS a typed field,
+  never as prose describing the value -- a value written in prose makes the model
+  emit prose and drop the field. This is the `string_too_long` / wrong-count /
+  `Field required` family; a bank must not pass preflight with the bound unstated.
 - [ ] **Hard:** Every model-authored collection defines a concrete item model.
   No collection of things is typed as `list[dict[...]]`,
   `dict[str, Any]`, or `Any`. Identifier-keyed mappings are allowed.
@@ -206,6 +223,11 @@ Creative quality remains a taste decision, not a runtime validator.
 - [ ] **Hard:** The pack is duplicate-key-safe JSON at
   `nodes/story_packs/<source_bank_id>/<story_model_id>.json`, uses the live
   schema version, and its header coordinates match its path.
+- [ ] **Hard:** Every new or edited JSON -- the bank and pipeline rows, the pack
+  `<story_model_id>.json`, and `story_rules/<source_bank_id>.json` -- is UTF-8 with
+  NO byte-order mark. A leading BOM survives the duplicate-key, round-trip, and
+  validator checks but breaks downstream string matching, so a `head -c3` no-BOM
+  check is explicit (matches the Teardown gate).
 - [ ] **Hard:** The exact bank row and pipeline row schemas validate. Defaults,
   declared seams, required seams, pass slots, and cross-references resolve.
 - [ ] **Hard:** Custom seams live in pipeline `declared_seams` and pass rows
