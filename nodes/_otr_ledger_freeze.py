@@ -645,6 +645,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g14_provenance_publish(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g15_scene_coherence(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
 
 
@@ -929,6 +932,39 @@ def _check_g14_provenance_publish(
             f"operator rule BLOCKS publication of a research-only source. This "
             f"episode cannot freeze; select a public-domain / cc0 / cleared "
             f"source, or the operator must lift the block for this lane."
+        )
+
+
+# G15 HEADER<->SCENE STRUCTURAL COHERENCE (v4 campaign P1(vi)). Phase 0 collect /
+# Phase 10 raise. Opt-in via meta["scene_coherence_check"] (the writer stamps it
+# when the bank sets defaults.scene_coherence_check); inert for every current
+# bank. STRUCTURAL only (unique scene_ids + no line referencing an undeclared
+# scene) -- a semantic scene-vs-beat match would be an unlawful LLM verdict. Skips
+# cleanly when no scenes are declared.
+
+
+def _check_g15_scene_coherence(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G15: the scene records (header) and the lines assigned to scenes (body)
+    must be structurally consistent."""
+    meta = ledger_data.get("meta")
+    if not isinstance(meta, dict) or not meta.get("scene_coherence_check"):
+        return  # opt-in only; inert for every current bank
+    try:
+        from ._otr_scene_guard import find_scene_coherence_issues
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        from _otr_scene_guard import find_scene_coherence_issues  # type: ignore
+    issues = find_scene_coherence_issues(ledger_data)
+    if issues:
+        sample = issues[:5]
+        more = "" if len(issues) <= 5 else f" (+{len(issues) - 5} more)"
+        errors.append(
+            f"G15: {len(issues)} header<->scene mismatch(es): "
+            f"{'; '.join(sample)}{more}. The scene records and the lines "
+            f"assigned to scenes disagree structurally."
         )
 
 

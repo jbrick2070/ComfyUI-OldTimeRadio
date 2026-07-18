@@ -235,6 +235,7 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
         "require_outro_cast_complete",  # v4 P1(v): opt-in outro cast-completeness gate
         "placeholder_guard",  # v4 P1(vii): opt-in literal-placeholder-token gate
         "provenance_normalize",  # v4 P1(viii): opt-in source-provenance normalizer
+        "scene_coherence_check",  # v4 P1(vi): opt-in header<->scene structural gate
     ):
         _bval = defaults.get(_bkey)
         if _bval is not None and not isinstance(_bval, bool):

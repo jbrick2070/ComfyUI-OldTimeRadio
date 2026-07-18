@@ -4093,6 +4093,10 @@ class OTR_LedgerScriptWriter:
         # Default False -> key absent -> inert for every current bank.
         if bool((_source_bank_row.defaults or {}).get("placeholder_guard", False)):
             meta["placeholder_guard"] = True
+        # v4 P1(vi): opt-in header<->scene structural gate (deterministic G15).
+        # Default False -> key absent -> inert for every current bank.
+        if bool((_source_bank_row.defaults or {}).get("scene_coherence_check", False)):
+            meta["scene_coherence_check"] = True
         # v4 P1(iv): record the beat-bounds contract -- the SOFT word-derived
         # target (WORDS_PER_BEAT=40) + the family band. Length is
         # recorded-not-gated (operator); only the structural floor (min) is
