@@ -2005,7 +2005,10 @@ def test_scifi_codex_v4_p3_prompt_contract():
     # cap-list both absent (the caps live in the tighter surface ceilings only).
     assert "produce exactly as many beats as the advisory plan lists" in system
     assert "include one mandatory COST beat" not in system
-    assert "hard length budget" not in system
+    # cap restatement is load-bearing salience (live evidence overturned the r2
+    # panel's "redundant" call: reverting it regressed string_too_long on premise).
+    assert "premise at most 144" in system
+    assert "Keep the premise to one tight sentence" in system
     # the newly model-visible coverage gates ride the shared surface instruction.
     assert "every declared shot MUST be referenced by at least one beat" in system
     assert "every accepted cast ID MUST own at least one beat" in system

@@ -100,7 +100,9 @@ better" = a POST-BUILD blind A/B.
   gemma-4-E4B) and belong to the **unstated DETERMINISTIC-CONTRACT class (PBUG-20260713-02 + -06)** -- NOT
   a simple "unstated cap". The kibitz (Codex `gpt-5.6-sol` + Antigravity Gemini 3.1 Pro, grounded) proved
   `_RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION` ALREADY injects tighter caps into every P3 prompt, so the seam
-  cap-restatement was **reverted**. ROOT FIX = make the whole compiler contract model-visible
+  cap-restatement was first reverted -- but a LIVE leg OVERTURNED that (reverting regressed
+  `string_too_long` on `premise`; the text-patch never clips prose), so it was **RE-ADDED** as load-bearing
+  salience. ROOT FIX (also) = make the whole compiler contract model-visible
   (`unused_shot` / `cast_coverage` / `cue_id`-unique / `cue_anchor<beat_count` added to the shared surface
   instruction + a 12-beat distribution clause), KEEP the v4 beat-count harmonization, and enrich the
   `beat_count` receipt (observed-vs-expected). `string_too_long` recovery stays the text-patch seam. Full
