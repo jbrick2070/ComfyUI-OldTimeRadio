@@ -1848,15 +1848,6 @@ def _run_scifi_codex_lane(**kwargs):
     return _SC.run_scifi_codex_episode(**kwargs)
 
 
-def _run_scifi_sonnet_lane(**kwargs):
-    """Lazy dispatch for the additive Sonnet v4 bake-off lane."""
-    try:
-        from . import _otr_scifi_sonnet as _SS
-    except ImportError:  # pragma: no cover
-        import _otr_scifi_sonnet as _SS  # type: ignore
-    return _SS.run_scifi_sonnet_episode(**kwargs)
-
-
 def _v3_max_run(seq):
     """Longest run of the same value in a sequence (deterministic helper)."""
     best = run = 0
@@ -1877,8 +1868,8 @@ def run_v3_advisory(led, meta, *, lane, version: int = 1) -> None:
     It NEVER mutates ``lines/beats/shots/music/cast`` and NEVER raises -- any
     error is stamped, not thrown (operator law: an audit may improve a story, it
     may never fail one; and every field it writes has exactly one owner)."""
-    # lane is the full v3 bank id (e.g. "scifi_codex_v3"); the owned meta field
-    # is "<lane>_advisory".
+    # lane is the full v3 bank id (e.g. "public_domain_story_v3"); the owned meta
+    # field is "<lane>_advisory".
     key = f"{lane}_advisory"
     data = getattr(led, "data", None)
     # Stamp into the LIVE ledger meta (survives incremental saves that replace
@@ -1965,27 +1956,12 @@ def _v3_focus_metric(base, rows, speakers, words, counts):
     return {"metric": "generic", "value": len(rows)}
 
 
-def _make_v3_runner(base_runner, lane):
-    """Bake-off v3 sci-fi lane: wrap a base runner so it produces the
-    field-complete ledger + parts, then run one advisory-only diagnostic. The
-    wrapper is a PURE post-read (no mutation of parts/led), so the fable2 720
-    golden path stays byte-identical (F6)."""
-    def _runner(**kwargs):
-        parts = base_runner(**kwargs)
-        run_v3_advisory(kwargs.get("led"), kwargs.get("meta"), lane=lane)
-        return parts
-    _runner.__name__ = f"_run_{lane}_lane"
-    return _runner
-
-
 # scifi_fable2 S2 (doc s11): pipeline-id -> lane runner. Consulted
 # exactly ONCE per run, after the shared front (bank resolve -> runnable
 # gate -> fetch -> validate -> D.1 ledger + meta stamps) and BEFORE the
 # D.2 news-interpreter branch. legacy_many_pass and original_multi_pass
 # are deliberately NOT in the map -- their execution lanes are the
 # writer's own inline branches (byte-identical on a map miss).
-# Bake-off v3: the three sci-fi v3 pipelines wrap the base runner with the
-# advisory-only diagnostic (kibitz r2: one generic factory, not 3 modules).
 _RUNNER_BY_PIPELINE = {
     "fable2_multipass": _run_fable2_lane,
     "scifi_codex_circuit": _run_scifi_codex_lane,
@@ -1994,10 +1970,6 @@ _RUNNER_BY_PIPELINE = {
     # does NOT invoke the v3 advisory wrapper (no <lane>_advisory meta field, no
     # _v3_focus_metric) -- final.md "v4 pipelines don't invoke the v3 wrapper".
     "scifi_codex_circuit_v4": _run_scifi_codex_lane,
-    "fable2_multipass_v3": _make_v3_runner(_run_fable2_lane, "scifi_fable2_v3"),
-    "scifi_codex_circuit_v3": _make_v3_runner(_run_scifi_codex_lane, "scifi_codex_v3"),
-    "sonnet_archive_multipass_v3": _make_v3_runner(
-        _run_scifi_sonnet_lane, "scifi_sonnet_v3"),
 }
 
 # Bake-off v3 inline lane: a clone of the legacy_many_pass inline pipeline. It
@@ -3754,7 +3726,7 @@ class OTR_LedgerScriptWriter:
         # non-Off refine widget fails loud here too.
         _selected_pipeline_id = str(getattr(
             _source_bank_row, "default_story_pipeline", "") or "")
-        if _selected_pipeline_id in ("fable2_multipass", "fable2_multipass_v3"):
+        if _selected_pipeline_id == "fable2_multipass":
             try:
                 from . import _otr_scifi_fable2 as _F2GATE
             except ImportError:  # pragma: no cover -- flat/standalone load

@@ -25,14 +25,16 @@ Veto-rip record: HANDOFF_LOG + PROD_BUG_LOG (PBUG-20260713-15..18).
 
 ## CURRENT STEP -- v4 improvement campaign (post roster-trim)
 
-The **roster trim LANDED @ `499386aa`** (2026-07-17). The `source_bank` roster is
-now **10 INDEPENDENT lanes + custom** (media_archive(+_v3), original_radio,
-scifi_fable2(+_v3), scifi_codex(+_v3), public_domain_story_v3, shakespeare_v3,
-scifi_sonnet_v3): the science_news family, ALL `_v2` lanes, and the orphan bases
-were retired; each kept lane owns its pack + `story_rules` by EXACT id (the
-`base_source_bank_id` family-map is severed -- no lane depends on another).
-Default bank = `scifi_fable2`. Full record: HANDOFF_LOG 2026-07-17 afternoon;
-design in `docs/2026-07-17-roster-trim-rip-plan.md`.
+The **roster trim LANDED @ `499386aa`** (2026-07-17); the **Sonnet-bake-off rip
+LANDED 2026-07-18** (this change) retired 4 more banks -- `media_archive_v3`,
+`scifi_codex_v3`, `scifi_fable2_v3`, `scifi_sonnet_v3` (KEEPING the `scifi_codex`
+base). The `source_bank` roster is now **7 INDEPENDENT runnable lanes + custom**
+(media_archive, original_radio, scifi_fable2, scifi_codex, public_domain_story_v3,
+shakespeare_v3, scifi_codex_v4): the science_news family, ALL `_v2` lanes, the
+orphan bases, and the 4 bake-off variants were retired; each kept lane owns its
+pack + `story_rules` by EXACT id (the `base_source_bank_id` family-map is severed
+-- no lane depends on another). Default bank = `scifi_fable2`. Full record:
+HANDOFF_LOG 2026-07-18; design in `docs/2026-07-18-rip-4-banks-plan.md`.
 
 **NEXT (operator 2026-07-17): a v4 improvement campaign** to lift the kept banks
 -- produce a **v4** for `scifi_codex` (improve on v1), `shakespeare`,
@@ -191,7 +193,8 @@ Then, in order:
    `docs/2026-07-17-model-bakeoff-scoreboard.md`. STILL OPEN: the local
    mistral/gemma writer matrix (this arm was cloud Sonnet, not the local roster).
    Surfaced a NEWBUG: `scifi_fable2_v3` rules_id
-   (`docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md`, deferred to a coder window).
+   (`docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md`) -- CLOSED-BY-RIP 2026-07-18
+   (bank retired in the Sonnet-bake-off rip; logged as PBUG-20260718-01).
 4. Optional tuning follow-on: the v3 packs still carry v2 seam text (the
    structural v3 delta is the advisory diagnostic); per-lane Sec-D one-liners
    are in place to edit if wanted.

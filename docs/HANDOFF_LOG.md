@@ -3,6 +3,45 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-18 midday -- baseline HEAD 178e935a (v2.0-alpha) [CODER: Sonnet-bake-off rip -- 4 banks retired]
+
+Executed `docs/2026-07-18-rip-4-banks-plan.md` in one green chunk.
+
+Did:
+- RETIRED `scifi_sonnet_v3` (FULL sonnet lane): bank row + pack + story_rules +
+  `sonnet_archive_multipass_v3` pipeline (both registries) + the
+  `_run_scifi_sonnet_lane` runner + deleted `nodes/_otr_scifi_sonnet.py` +
+  `tests/test_scifi_sonnet_lane.py`. RETIRED `media_archive_v3` / `scifi_codex_v3`
+  / `scifi_fable2_v3` (v3-only): row + pack + story_rules + each dedicated pipeline
+  in BOTH `_RUNNER_BY_PIPELINE` and `pipelines.json`. KEPT the `scifi_codex` /
+  `scifi_fable2` / `media_archive` bases, `scifi_codex_v4`, and `legacy_many_pass_v3`.
+  Roster: 12->8 visible, 11->7 runnable.
+- MUST-KEEP fence honored: deleted ONLY `_make_v3_runner`; KEPT `run_v3_advisory`
+  / `_v3_focus_metric` / `_v3_max_run` (public_domain_story_v3 + shakespeare_v3 call
+  them every render). KEPT the now-unreachable `base=="scifi_sonnet"` focus branch
+  and the `_otr_scifi_p0_contract.py` P0-contract comment -- the only 2 surviving
+  bare-`scifi_sonnet` hits, both in shipped code. Dropped `fable2_multipass_v3` from
+  the writer target-word gate; refreshed the stale `_RUNNER_BY_PIPELINE` comment.
+- CLEAN RIP tests (positive only): migrated the surviving-machinery advisory tests
+  to `public_domain_story_v3` / `shakespeare_v3`; scrubbed `_otr_scifi_sonnet`
+  imports + sonnet-only cases from schema-parity / rss-admission / source-repair;
+  regenerated the roster/bijection pins and the v4-guard `_CURRENT_BANKS` lists.
+  Operator eyeball on the v4-guard gate-off contrast: KEEP base `scifi_codex` (guard
+  genuinely OFF), NO `_v4` substitute.
+- NEWBUG->PBUG: appended `PBUG-20260718-01` to PROD_BUG_LOG FIRST, then marked
+  `docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md` CLOSED-BY-RIP (retained, never deleted).
+- Docs: README roster table, GO_FORWARD current-roster + NEWBUG note refreshed.
+
+Gate (all green): import-smoke 0 skips; `_ensure_loaded()` carries no retired
+pipeline id (atomic delete validated by the crossref sweep); `otr_canonical.json`
+byte-unchanged; source-only retired-id scan over nodes/tests/workflows = ZERO;
+bare-sonnet scan = EXACTLY 2 (both kept); no surviving `meta["scifi_sonnet"]` reader;
+runtime-advisory proof via the migrated `public_domain_story_v3` unit test (plan's
+"targeted unit test OR 30w live smoke" -- unit-test path taken; live smoke not run);
+**full Windows suite 8081 passed / 32 skipped / 1 xfailed** (was ~8144 pre-rip -- drop
+is the retired banks' own tests); **Bug Bible 17 passed / 16 skipped / 3 xfailed**;
+no-BOM/UTF-8 + AST-parse on every touched file. Counts recorded, not pinned.
+
 ## 2026-07-18 morning -- HEAD 60c73618 (v2.0-alpha) [RENDER: Sonnet-4.5 cross-bank bake-off COMPLETE]
 
 Did (render window, autonomous overnight):

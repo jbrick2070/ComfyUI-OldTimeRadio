@@ -44,9 +44,7 @@ class TestHelper:
         ("shakespeare_v3", "shakespeare"),
         ("science_news_v2", "science_news"),
         ("science_news_v3", "science_news"),
-        ("media_archive_v3", "media_archive"),
         ("scifi_codex_v2", "scifi_codex"),
-        ("scifi_sonnet_v3", "scifi_sonnet"),
         ("scifi_fable2_v2", "scifi_fable2"),
     ])
     def test_variant_strips_to_base(self, variant, base):
@@ -55,7 +53,7 @@ class TestHelper:
 
     @pytest.mark.parametrize("base", [
         "science_news", "media_archive", "public_domain_story", "shakespeare",
-        "original_radio", "scifi_fable2", "scifi_codex", "scifi_sonnet",
+        "original_radio", "scifi_fable2", "scifi_codex",
         "custom_source_bank",
     ])
     def test_base_ids_are_inert(self, base):
@@ -79,8 +77,7 @@ class TestHelper:
 class TestStoryRulesIndependence:
     @pytest.mark.parametrize("bank_id", [
         "media_archive", "original_radio", "scifi_fable2", "scifi_codex",
-        "media_archive_v3", "public_domain_story_v3", "shakespeare_v3",
-        "scifi_fable2_v3", "scifi_codex_v3", "scifi_sonnet_v3",
+        "public_domain_story_v3", "shakespeare_v3",
     ])
     def test_lane_resolves_its_own_rules(self, bank_id):
         assert RULES.resolve_story_rules(bank_id).rules_id == bank_id
@@ -130,41 +127,37 @@ class TestNoRegression:
 
 
 # ---------------------------------------------------------------------------
-# 5. Roster trim 2026-07-17: the 6 surviving _v3 lanes (own v3 pipeline; sci-fi
-#    own-runner, rest inline). The whole _v2 family and the science_news family
-#    are REMOVED -- roster is now 11 runnable / 12 visible (scifi_codex_v4 added
-#    by the 2026-07-17 v4 improvement campaign).
+# 5. Sonnet-bake-off rip 2026-07-18: four bake-off _v3 variants are RETIRED,
+#    leaving two inline _v3 lanes -- roster is now 7 runnable / 8 visible
+#    (scifi_codex_v4 from the 2026-07-17 v4 improvement campaign remains). The
+#    _v2 family and the science_news family were already removed.
 # ---------------------------------------------------------------------------
 
 # v3 bank id -> (base, v3 pipeline id, lane kind). `base` is the pure
 # base_source_bank_id strip (still a valid string op); rules now resolve by
 # EXACT id, not by base family.
 _V3 = {
-    "media_archive_v3":       ("media_archive",       "legacy_many_pass_v3",         "inline"),
-    "public_domain_story_v3": ("public_domain_story", "legacy_many_pass_v3",         "inline"),
-    "shakespeare_v3":         ("shakespeare",         "legacy_many_pass_v3",         "inline"),
-    "scifi_fable2_v3":        ("scifi_fable2",        "fable2_multipass_v3",         "runner"),
-    "scifi_codex_v3":         ("scifi_codex",         "scifi_codex_circuit_v3",      "runner"),
-    "scifi_sonnet_v3":        ("scifi_sonnet",        "sonnet_archive_multipass_v3", "runner"),
+    "public_domain_story_v3": ("public_domain_story", "legacy_many_pass_v3", "inline"),
+    "shakespeare_v3":         ("shakespeare",         "legacy_many_pass_v3", "inline"),
 }
 
 
 class TestChunk4V3Rows:
-    def test_roster_counts_11_runnable_12_visible(self):
-        # roster trim + v4 campaign: 4 base + 6 _v3 + 1 _v4 + custom =
-        # 12 visible / 11 runnable.
+    def test_roster_counts_7_runnable_8_visible(self):
+        # sonnet-bake-off rip + v4 campaign: 4 base + 2 _v3 + 1 _v4 + custom =
+        # 8 visible / 7 runnable.
         ids = ROUTING.list_bank_ids()
-        assert len(ids) == 12
+        assert len(ids) == 8
         assert ids[-1] == "custom_source_bank"
         runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
-        assert len(runnable) == 11                 # only custom is non-runnable
+        assert len(runnable) == 7                  # only custom is non-runnable
         assert len([b for b in ids if b.endswith("_v2")]) == 0
-        assert len([b for b in ids if b.endswith("_v3")]) == 6
+        assert len([b for b in ids if b.endswith("_v3")]) == 2
         assert len([b for b in ids if b.endswith("_v4")]) == 1
 
     def test_v3_count_and_order(self):
         ids = ROUTING.list_bank_ids()
-        assert len([b for b in ids if b.endswith("_v3")]) == 6
+        assert len([b for b in ids if b.endswith("_v3")]) == 2
         # the _v3 lanes are seated after the base lanes, before custom.
         assert min(ids.index(b) for b in ids if b.endswith("_v3")) > \
             ids.index("scifi_codex")
@@ -207,15 +200,15 @@ class TestChunk4V3Rows:
 
         led = _Led()
         before = [dict(r) for r in led.data["lines"]]
-        W.run_v3_advisory(led, led.data["meta"], lane="scifi_sonnet_v3")
-        rec = led.data["meta"]["scifi_sonnet_v3_advisory"]
+        W.run_v3_advisory(led, led.data["meta"], lane="public_domain_story_v3")
+        rec = led.data["meta"]["public_domain_story_v3_advisory"]
         assert rec["status"] == "ok"
         assert rec["line_count"] == 2
-        assert rec["focus"]["metric"] == "reader_alternation"
+        assert rec["focus"]["metric"] == "compression_line_count"
         # advisory-only: spoken rows untouched (no hole in the ledger).
         assert led.data["lines"] == before
         # exactly one owned meta field written.
-        assert list(led.data["meta"].keys()) == ["scifi_sonnet_v3_advisory"]
+        assert list(led.data["meta"].keys()) == ["public_domain_story_v3_advisory"]
 
     def test_v3_advisory_never_raises_on_bad_input(self):
         from nodes import OTR_LedgerScriptWriter as W
@@ -226,8 +219,8 @@ class TestChunk4V3Rows:
         class _Bad:
             data = {"lines": "not a list", "meta": {}}
         bad = _Bad()
-        W.run_v3_advisory(bad, bad.data["meta"], lane="media_archive_v3")
-        assert "media_archive_v3_advisory" in bad.data["meta"]
+        W.run_v3_advisory(bad, bad.data["meta"], lane="shakespeare_v3")
+        assert "shakespeare_v3_advisory" in bad.data["meta"]
 
 
 # ---------------------------------------------------------------------------

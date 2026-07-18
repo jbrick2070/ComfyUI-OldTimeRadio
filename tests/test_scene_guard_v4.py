@@ -88,8 +88,7 @@ class TestParserValidation:
 
 _CURRENT_BANKS = [
     "media_archive", "original_radio", "scifi_fable2", "scifi_codex",
-    "media_archive_v3", "public_domain_story_v3", "shakespeare_v3",
-    "scifi_fable2_v3", "scifi_codex_v3", "scifi_sonnet_v3",
+    "public_domain_story_v3", "shakespeare_v3",
 ]
 
 

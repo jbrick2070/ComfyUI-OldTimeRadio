@@ -22,14 +22,12 @@ import importlib
 import json
 import pathlib
 import typing
-from types import SimpleNamespace
 
 import pytest
 from pydantic import BaseModel
 
 LANE_MODULES = (
     "nodes._otr_scifi_codex",
-    "nodes._otr_scifi_sonnet",
 )
 
 # Types JSON cannot represent. A JSON document has exactly one sequence type
@@ -109,9 +107,6 @@ ALLOWED_SHAPELESS = {
     # list of dicts and rejects score-shaped echoes, and a deterministic repair covers
     # the rest. The free keys inside are deliberate room for the script's scene prose.
     "nodes._otr_scifi_codex.ScriptArtifactV4.scenes",
-    # justification: the source payload Python hands IN (headline/summary/full_text ->
-    # text), echoed back. A real mapping over known keys, never guessed.
-    "nodes._otr_scifi_sonnet.PayloadV4.payload",
 }
 
 
@@ -288,65 +283,6 @@ def test_no_lane_demands_frozen_clean():
     )
 
 
-def _p0_pass_id_literals(node):
-    """Every string a `pass_id=` expression could evaluate to, statically.
-
-    A source-grounded P0 may now be read in WINDOWS (a long article does not fit
-    one prompt), so its pass_id can be a conditional or an f-string -- `"P0"` for a
-    single window, `f"P0:w{i}"` for many. The guarantee is unchanged and must not be
-    dodged by either spelling: resolve them all, and hold every one to
-    `prompt_must_fit=True`.
-    """
-    import ast
-
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return [node.value]
-    if isinstance(node, ast.IfExp):
-        return _p0_pass_id_literals(node.body) + _p0_pass_id_literals(node.orelse)
-    if isinstance(node, ast.JoinedStr):
-        head = node.values[0] if node.values else None
-        if isinstance(head, ast.Constant) and isinstance(head.value, str):
-            return [head.value]
-    return []
-
-
-@pytest.mark.parametrize(
-    "module_name,invoke_name",
-    (
-        ("nodes._otr_scifi_sonnet", "invoke_sonnet_structured"),
-    ),
-)
-def test_source_grounded_p0_refuses_to_be_left_truncated(module_name, invoke_name):
-    """P0 carries the source payload: it must fail loud, not lose its prefix.
-
-    Parity with the Codex lane, which already pins this. A provenance prompt that
-    is silently left-truncated drops the system/schema prefix and yields a
-    confidently wrong artifact instead of an honest failure.
-    """
-    import ast
-    import pathlib
-
-    source = pathlib.Path(module_name.replace(".", "/") + ".py")
-    tree = ast.parse(source.read_text(encoding="utf-8"))
-    found = 0
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        if not isinstance(node.func, ast.Name) or node.func.id != invoke_name:
-            continue
-        keywords = {kw.arg: kw.value for kw in node.keywords if kw.arg}
-        literals = _p0_pass_id_literals(keywords.get("pass_id"))
-        if not any(literal.startswith("P0") for literal in literals):
-            continue
-        found += 1
-        must_fit = keywords.get("prompt_must_fit")
-        assert isinstance(must_fit, ast.Constant) and must_fit.value is True, (
-            f"{module_name} P0 is source-grounded and must pass prompt_must_fit=True"
-        )
-    if not found:
-        pytest.fail(f"no P0 call found in {module_name}")
-
-
 def test_source_grounded_p0_disables_generic_string_clamping():
     """P0 may repair literal metadata, never silently truncate authored fields."""
     import ast
@@ -368,32 +304,6 @@ def test_source_grounded_p0_disables_generic_string_clamping():
         break
     else:
         pytest.fail("no Codex P0 call found")
-
-    for module_path, invoke_name in (
-        ("nodes/_otr_scifi_sonnet.py", "invoke_sonnet_structured"),
-    ):
-        tree = ast.parse(pathlib.Path(module_path).read_text(encoding="utf-8"))
-        for function in ast.walk(tree):
-            if not isinstance(function, ast.FunctionDef) or function.name != invoke_name:
-                continue
-            calls = [
-                call for call in ast.walk(function)
-                if isinstance(call, ast.Call)
-                and isinstance(call.func, ast.Name)
-                and call.func.id == "structured_call"
-            ]
-            assert len(calls) == 1
-            keywords = {kw.arg: kw.value for kw in calls[0].keywords if kw.arg}
-            clamp = keywords.get("clamp_overlong_strings")
-            assert isinstance(clamp, ast.Compare)
-            assert isinstance(clamp.left, ast.Name) and clamp.left.id == "pass_id"
-            assert len(clamp.ops) == 1 and isinstance(clamp.ops[0], ast.NotEq)
-            assert len(clamp.comparators) == 1
-            assert isinstance(clamp.comparators[0], ast.Constant)
-            assert clamp.comparators[0].value == "P0"
-            break
-        else:
-            pytest.fail(f"no {invoke_name} function found in {module_path}")
 
 
 def test_codex_audit_passes_never_fail_a_story_over_a_critic_note():
@@ -449,7 +359,6 @@ def test_codex_audit_passes_never_fail_a_story_over_a_critic_note():
     "module_name,root_name,facts_key,entities_key,numbers_key,fact_def",
     (
         ("nodes._otr_scifi_codex", "FactIndexV4", "facts", "entities", "numbers", "FactV4"),
-        ("nodes._otr_scifi_sonnet", "FragmentDossierV4", "verified_facts", "named_entities", "key_numbers", "EvidenceFactV4"),
     ),
 )
 def test_source_grounded_p0_has_a_finite_shared_output_envelope(
@@ -469,89 +378,6 @@ def test_source_grounded_p0_has_a_finite_shared_output_envelope(
     assert fact_schema["properties"]["source_spans"]["maxItems"] == 1
     assert fact_schema["properties"]["claim"]["maxLength"] == 240
     assert module.p0_output_token_budget() == 2800
-
-
-@pytest.mark.parametrize(
-    "module_name,invoke_name,envelope_name,seam,root_name,kind",
-    (
-        ("nodes._otr_scifi_sonnet", "invoke_sonnet_structured", "PayloadV4", "sonnet_intake_system", "FragmentDossierV4", "dossier"),
-    ),
-)
-def test_sibling_p0_typed_repairs_are_compact_and_require_scalar_tone(
-    module_name, invoke_name, envelope_name, seam, root_name, kind,
-):
-    """Sonnet must not revive the generic copyable repair envelope."""
-    module = importlib.import_module(module_name)
-    source_payload = {
-        "headline": "Signal report",
-        "summary": "A careful observatory report.",
-        "full_text": "A careful observatory report records a signal.",
-        "source": "Test Wire",
-        "date": "2026-07-12",
-        "link": "https://example.invalid/report",
-        "seed_text": "A careful observatory report records a signal.",
-    }
-    envelope = getattr(module, envelope_name)(
-        payload=source_payload, source_mode="rss", payload_sha256="0" * 64,
-    )
-    span = {"field": "headline", "start": 0, "end": 6, "quote": "Signal"}
-    if kind == "fact_index":
-        artifact = {
-            "facts": [{
-                "fact_id": "F01", "claim": "A signal is reported.",
-                "source_spans": [span], "numeric_tokens": [],
-            }],
-            "entities": [], "numbers": [], "tone": [], "payload_sha256": "0" * 64,
-        }
-    else:
-        artifact = {
-            "verified_facts": [{
-                "fact_id": "fact_1", "claim": "A signal is reported.",
-                "source_spans": [span],
-            }],
-            "key_numbers": [], "named_entities": [], "tone": [],
-            "headline_clean": "Signal report", "provenance_note": "Test Wire, 2026-07-12.",
-            "payload_sha256": "0" * 64,
-        }
-    repaired = {**artifact, "tone": "cautious"}
-    replies = iter((json.dumps(artifact), json.dumps(repaired)))
-    calls: list[dict[str, object]] = []
-    journal: dict[str, object] = {}
-
-    def slot_fn(messages, **kwargs):
-        calls.append({"messages": messages, **kwargs})
-        return next(replies)
-
-    result = getattr(module, invoke_name)(
-        pass_id="P0", slot="technical", slot_fn=slot_fn,
-        seam_ref=seam, pack=SimpleNamespace(prompt_stages={seam: "Read source."}),
-        typed_inputs={"payload": envelope.model_dump(mode="json")},
-        result_type=getattr(module, root_name), post_validator=lambda _: None,
-        base_temperature=.20, structural_retry_temperature=.10,
-        max_new_tokens=module.p0_output_token_budget(), journal=journal,
-        prompt_must_fit=True,
-    )
-
-    assert result.tone == "cautious"
-    assert len(calls) == 2
-    assert all(
-        getattr(call["messages"], "_otr_prompt_must_fit", False)
-        for call in calls
-    )
-    assert "P0 COMPACT EXTRACTION CONTRACT" in calls[0]["messages"][0]["content"]
-    repair_system = calls[-1]["messages"][0]["content"]
-    repair_user = calls[-1]["messages"][1]["content"]
-    assert "tone is one nonempty scalar" in repair_system
-    assert "<failed_fact_index>" in repair_user
-    assert "<source_evidence>" in repair_user
-    assert "original_request" not in repair_user
-    assert "artifact_inputs" not in repair_user
-    attempts = journal["calls"][0]["attempts"]
-    assert all(
-        {"temperature", "max_new_tokens", "raw_chars", "raw_sha256"}
-        <= set(attempt)
-        for attempt in attempts
-    )
 
 
 def test_no_lane_seam_treats_the_word_target_as_a_quota():
@@ -607,133 +433,6 @@ def test_no_lane_seam_treats_the_word_target_as_a_quota():
     )
 
 
-def _sonnet_line(lane, text, cites=(), non_fact=False, speaker="ORUM", char_id="c02"):
-    return lane.DraftLineV4(
-        text=text, cites=list(cites), non_fact=non_fact,
-        speaker=speaker, char_id=char_id, source_pass="P2a",
-    )
-
-
-def test_sonnet_ceremonial_line_may_cite_nothing_instead_of_a_fact_that_cannot_exist():
-    """`cites` required >= 1, so lines that state no fact cited a sentinel `fact_0`.
-
-    No such fact can ever exist: the P0 dossier contract is one-based (fact_1,
-    fact_2, ...). Every ceremonial line in the episode -- the cold open, the
-    Warden's rulings, the sign-off -- was carrying a FALSE citation, and the seal
-    and sign-off borrowed the attestation's real fact id for a claim they never
-    make. An honest empty is the truthful record.
-    """
-    from nodes import _otr_scifi_sonnet as lane
-
-    ceremonial = _sonnet_line(
-        lane, "The Archive is convened.", non_fact=True,
-        speaker="ANNOUNCER", char_id="announcer",
-    )
-    assert ceremonial.cites == []
-
-    # A line that states a fact must still cite one...
-    assert _sonnet_line(lane, "The wording says sixty kelvin.", cites=["fact_1"]).cites
-
-    # ...and the two may never disagree.
-    with pytest.raises(Exception):
-        _sonnet_line(lane, "x", cites=["fact_1"], non_fact=True)   # cites a fact it disclaims
-    with pytest.raises(Exception):
-        _sonnet_line(lane, "x", cites=[], non_fact=False)          # claims a fact, cites none
-
-    # The attestation contract is 1-3, matching every line schema it becomes.
-    assert lane.AttestationV4.model_fields["attestation_cites"].metadata
-
-
-def test_sonnet_rewrite_corrections_are_written_back_into_the_record():
-    """They never were -- which is why Sonnet has never completed a run.
-
-    The loop validated the doctor's corrections, threw them away, and re-audited
-    the UNCHANGED draft. The recheck re-read the very text it had just condemned,
-    so the audit could only exhaust. Python integrates the model's replacement
-    text; it authors none of it.
-    """
-    from nodes import _otr_scifi_sonnet as lane
-
-    events = [
-        _sonnet_line(lane, "cold open", non_fact=True,
-                     speaker="ANNOUNCER", char_id="announcer"),
-        _sonnet_line(lane, "ORUM says a wrong thing", cites=["fact_1"]),
-        _sonnet_line(lane, "THESSALY speculates", cites=["fact_2"],
-                     speaker="THESSALY", char_id="c03"),
-    ]
-    audited = lane._audited_line_indices(events)
-    assert audited == [1, 2], "the cold open is never numbered for the audit"
-
-    audit = lane.AuditVerdictV4.model_validate({
-        "status": "defect", "defects": ["line 0 misstates the wording"],
-        "flagged_line_refs": [0],
-    })
-    rewrite = lane.RewriteResultV4.model_validate({
-        "corrected_lines": [{
-            "line_ref": 0, "speaker": "ORUM",
-            "text": "ORUM says the accurate thing", "cites": ["fact_1"],
-        }],
-        "vesh_resolution": "The record stands corrected.",
-    })
-
-    lane._apply_rewrite_corrections(events, audited, rewrite, audit, 0)
-
-    assert events[1].text == "ORUM says the accurate thing"
-    assert events[1].char_id == "c02"          # locked cast identity survives
-    assert events[1].source_pass == "P5:0"
-    assert events[2].text == "THESSALY speculates"   # untouched line is byte-identical
-    assert events[0].text == "cold open"
-
-    # The same line returned twice is incoherent -- two texts for one line, nothing
-    # to choose between them. Fail closed.
-    with pytest.raises(lane.SonnetCompletenessError):
-        lane._apply_rewrite_corrections(
-            events, audited,
-            lane.RewriteResultV4.model_validate({
-                "corrected_lines": [
-                    {"line_ref": 0, "speaker": "ORUM", "text": "a", "cites": ["fact_1"]},
-                    {"line_ref": 0, "speaker": "ORUM", "text": "b", "cites": ["fact_1"]},
-                ],
-                "vesh_resolution": "r",
-            }),
-            audit, 0,
-        )
-
-    # An index that does not exist points at no line we can correct. Refuse the edit,
-    # but do not kill the episode over the doctor miscounting -- the recheck is still
-    # the judge (live: it returned line_ref 4 for a 0..3 draft).
-    kept = [line.text for line in events]
-    lane._apply_rewrite_corrections(
-        events, audited,
-        lane.RewriteResultV4.model_validate({
-            "corrected_lines": [
-                {"line_ref": 9, "speaker": "ORUM", "text": "t", "cites": ["fact_1"]},
-            ],
-            "vesh_resolution": "r",
-        }),
-        audit, 0,
-    )
-    assert [line.text for line in events] == kept
-
-    # An eager doctor correcting a line the AUDIT never flagged is coherent but out
-    # of scope. The auditor decides what is defective -- so the edit is ignored and
-    # the original line stands, rather than the whole episode dying over it (live:
-    # "rewrite corrected line 3, which the audit never flagged").
-    before = events[2].text
-    lane._apply_rewrite_corrections(
-        events, audited,
-        lane.RewriteResultV4.model_validate({
-            "corrected_lines": [
-                {"line_ref": 1, "speaker": "THESSALY", "text": "unasked-for edit",
-                 "cites": ["fact_2"]},
-            ],
-            "vesh_resolution": "r",
-        }),
-        audit, 0,
-    )
-    assert events[2].text == before
-
-
 # --------------------------------------------------------------------------- #
 # The guard below exists because the lessons were NOT automatically carried
 # from one lane to the next. Codex and Sonnet were each written
@@ -744,7 +443,6 @@ def test_sonnet_rewrite_corrections_are_written_back_into_the_record():
 
 LANE_SOURCES = (
     "nodes/_otr_scifi_codex.py",
-    "nodes/_otr_scifi_sonnet.py",
 )
 
 

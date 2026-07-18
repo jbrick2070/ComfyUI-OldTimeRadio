@@ -8,7 +8,6 @@ from typing import Any, Callable
 import pytest
 
 from nodes import _otr_scifi_codex as codex
-from nodes import _otr_scifi_sonnet as sonnet
 from nodes import production_ledger
 from nodes import story_orchestrator as orchestrator
 from nodes._otr_rss_source_contract import meets_v4_rss_source_floor
@@ -227,7 +226,6 @@ def test_legacy_floor_wrapper_forwards_threshold_kwargs() -> None:
     ("validator", "thin_error"),
     [
         (codex.validate_payload_envelope, codex.CodexPayloadThinError),
-        (sonnet.validate_sonnet_payload, sonnet.SonnetThinPayloadError),
     ],
 )
 def test_v4_envelopes_share_the_rss_floor(

@@ -50,8 +50,9 @@ class TestBankRow:
         ids = ROUTING.list_bank_ids()
         assert ids[-1] == "custom_source_bank"
         # v4 campaign 2026-07-17: scifi_codex_v4 inserted directly before custom,
-        # after the _v3 tail; custom stays last.
-        assert ids[-3:] == ("scifi_sonnet_v3", "scifi_codex_v4",
+        # after the _v3 tail; custom stays last. Sonnet-bake-off rip 2026-07-18:
+        # shakespeare_v3 is now the last _v3 lane before scifi_codex_v4.
+        assert ids[-3:] == ("shakespeare_v3", "scifi_codex_v4",
                             "custom_source_bank")
 
     def test_row_shape_runnable_s1b(self):
@@ -243,18 +244,17 @@ class TestStoryRules:
 
 class TestRosterOrder:
     """Roster-trim 2026-07-17: the science_news family, all _v2 rows, and the
-    orphan bases (public_domain_story/shakespeare/scifi_sonnet/original_radio_v3)
-    were ripped. Each surviving lane is an INDEPENDENT bank (own pack +
-    story_rules, no family base-map). custom stays last. v4 campaign 2026-07-17:
-    scifi_codex_v4 added as the first independent _v4 lane, before custom."""
+    orphan bases (public_domain_story/shakespeare/original_radio_v3) were ripped.
+    Each surviving lane is an INDEPENDENT bank (own pack + story_rules, no family
+    base-map). custom stays last. v4 campaign 2026-07-17: scifi_codex_v4 added as
+    the first independent _v4 lane, before custom. Sonnet-bake-off rip 2026-07-18:
+    four bake-off _v3 variants were retired, leaving two inline _v3 lanes."""
 
     def test_roster_order_holds(self):
         ids = ROUTING.list_bank_ids()
         assert ids == ("media_archive", "original_radio",
                        "scifi_fable2", "scifi_codex",
-                       "media_archive_v3", "public_domain_story_v3",
-                       "shakespeare_v3", "scifi_fable2_v3",
-                       "scifi_codex_v3", "scifi_sonnet_v3",
+                       "public_domain_story_v3", "shakespeare_v3",
                        "scifi_codex_v4",
                        "custom_source_bank")
 

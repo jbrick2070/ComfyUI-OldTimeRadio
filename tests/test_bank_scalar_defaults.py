@@ -29,12 +29,8 @@ EXPECTED = {
     "original_radio":         ("generic",    False, False),
     "scifi_fable2":           ("generic",    False, False),
     "scifi_codex":            ("generic",    True,  False),
-    "media_archive_v3":       ("media",      False, False),
     "public_domain_story_v3": ("adaptation", False, True),
     "shakespeare_v3":         ("adaptation", False, True),
-    "scifi_fable2_v3":        ("generic",    False, False),
-    "scifi_codex_v3":         ("generic",    True,  False),
-    "scifi_sonnet_v3":        ("generic",    True,  False),
 }
 
 

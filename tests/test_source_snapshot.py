@@ -126,15 +126,6 @@ def test_valid_snapshot_is_returned_with_validated_fields(tmp_path, monkeypatch)
     assert snap.payload_sha256 == SS.snapshot_payload_sha256(_payload())
 
 
-@pytest.mark.parametrize("selected", ["scifi_fable2_v3"])
-def test_variant_id_resolves_to_base_keyed_snapshot(tmp_path, monkeypatch, selected):
-    manifest = _write_manifest(tmp_path, {"scifi_fable2": _envelope("scifi_fable2")})
-    monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    snap = SS.load_snapshot_for_bank(selected)
-    assert snap is not None
-    assert snap.base_source_bank_id == "scifi_fable2"
-
-
 # ---------------------------------------------------------------------------
 # 4. load_snapshot_for_bank -- loud rejections (B7 + shape)
 # ---------------------------------------------------------------------------
@@ -146,15 +137,6 @@ def test_base_mismatch_is_rejected_loud(tmp_path, monkeypatch):
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError, match="mismatched source"):
         SS.load_snapshot_for_bank("scifi_fable2")
-
-
-def test_variant_selecting_wrong_base_snapshot_is_rejected(tmp_path, monkeypatch):
-    # scifi_fable2_v3 -> base scifi_fable2, but the entry declares media_archive.
-    manifest = _write_manifest(
-        tmp_path, {"scifi_fable2": _envelope(base="media_archive")})
-    monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    with pytest.raises(SS.SourceSnapshotError):
-        SS.load_snapshot_for_bank("scifi_fable2_v3")
 
 
 def test_missing_seed_source_is_rejected(tmp_path, monkeypatch):
@@ -262,19 +244,6 @@ def test_resolve_inputs_replays_snapshot_and_bypasses_rss(tmp_path, monkeypatch)
     assert out["news_seed"] == "the frozen source seed text"
     assert out["source_meta"] == {"kind": "frozen_rss"}
     assert out["source_rights"] == {"license_label": "frozen"}
-
-
-def test_resolve_inputs_variant_shares_base_snapshot(tmp_path, monkeypatch):
-    manifest = _write_manifest(tmp_path, {"scifi_fable2": _envelope("scifi_fable2")})
-    monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
-    monkeypatch.setattr(
-        SP, "resolve_fetcher",
-        lambda *_a, **_k: (_ for _ in ()).throw(
-            AssertionError("must not fetch under snapshot")),
-    )
-    out = LSW._resolve_inputs(source_bank="scifi_fable2_v3", target_words=120)
-    assert out["source_bank"] == "scifi_fable2_v3"
-    assert out["seed_source"] == "science_rss_frozen"
 
 
 def test_resolve_inputs_propagates_base_mismatch_loud(tmp_path, monkeypatch):

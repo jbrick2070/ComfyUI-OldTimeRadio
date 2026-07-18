@@ -108,38 +108,6 @@
       "guide_ref": ""
     },
     {
-      "source_bank_id": "media_archive_v3",
-      "label": "Media RSS / Archive",
-      "source_kind": "archive_item",
-      "interpreter": "media_archive_interpreter",
-      "fetcher": "media_archive_rss",
-      "default_story_model": "media_restoration_adventure_v3",
-      "default_story_pipeline": "legacy_many_pass_v3",
-      "defaults": {
-        "story_form_label": "archive-inspired radio drama",
-        "source_material_label": "Media archive item",
-        "source_develop_verb": "build a fictional story from this archive/media-history material",
-        "source_grounding_label": "archive material",
-        "key_terms_label": "ARCHIVE KEY TERMS",
-        "close_brief_label": "archive source note",
-        "title_form_label": "archive-inspired radio drama",
-        "coda_mode": "archive_source_note",
-        "style_pool_class": "media"
-      },
-      "required_seams": [
-        "outline_macro_system",
-        "outline_phase_system",
-        "outline_beat_system",
-        "line_composer_system",
-        "coda_system",
-        "announcer_intro_system",
-        "announcer_intro_safe_system",
-        "announcer_outro_system"
-      ],
-      "runnable": true,
-      "guide_ref": ""
-    },
-    {
       "source_bank_id": "public_domain_story_v3",
       "label": "Public Domain",
       "source_kind": "public_domain_source",
@@ -211,68 +179,6 @@
       ],
       "runnable": true,
       "guide_ref": "Folger Digital Texts are CC BY-NC 3.0; stamp noncommercial rights and do not present this bank as commercially cleared."
-    },
-    {
-      "source_bank_id": "scifi_fable2_v3",
-      "label": "Sci-Fi Fable2 (LLM-first multipass)",
-      "source_kind": "article",
-      "interpreter": "",
-      "fetcher": "science_rss",
-      "default_story_model": "scifi_fable2_v3",
-      "default_story_pipeline": "fable2_multipass_v3",
-      "defaults": {
-        "story_form_label": "science-fiction audio drama",
-        "source_material_label": "Science story",
-        "title_form_label": "science-fiction radio drama",
-        "coda_mode": "real_news_report",
-        "credits_source_line": "dramatized by machine from tonight's science wire",
-        "style_pool_class": "generic"
-      },
-      "required_seams": [],
-      "runnable": true,
-      "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass. S2: compact one-draft mode below 120 words; real three-pitch/P2a/P4/P5/keep-better full mode from 120 through 900 words."
-    },
-    {
-      "source_bank_id": "scifi_codex_v3",
-      "label": "Sci-Fi Codex - Proof-Pressure Radio",
-      "source_kind": "article",
-      "interpreter": "",
-      "fetcher": "science_rss",
-      "default_story_model": "scifi_codex_v3",
-      "default_story_pipeline": "scifi_codex_circuit_v3",
-      "defaults": {
-        "story_form_label": "science-fiction audio drama",
-        "source_material_label": "science story",
-        "title_form_label": "science-fiction radio drama",
-        "coda_mode": "real_news_report",
-        "credits_source_line": "dramatized by machine from a science report",
-        "style_pool_class": "generic",
-        "require_science_floor": true
-      },
-      "required_seams": [],
-      "runnable": true,
-      "guide_ref": ""
-    },
-    {
-      "source_bank_id": "scifi_sonnet_v3",
-      "label": "Sci-Fi Sonnet (Continuity Archive multipass)",
-      "source_kind": "article",
-      "interpreter": "",
-      "fetcher": "science_rss",
-      "default_story_model": "scifi_sonnet_v3",
-      "default_story_pipeline": "sonnet_archive_multipass_v3",
-      "defaults": {
-        "story_form_label": "science-fiction audio drama",
-        "source_material_label": "Science story",
-        "title_form_label": "science-fiction radio drama",
-        "coda_mode": "real_news_report",
-        "credits_source_line": "dramatized by machine from a recovered instrumental-age transmission",
-        "style_pool_class": "generic",
-        "require_science_floor": true
-      },
-      "required_seams": [],
-      "runnable": true,
-      "guide_ref": "Archive frame-narrative multipass lane: the intake pass IS the interpretation (empty interpreter, mirrors scifi_fable2's own contract at nodes/story_packs/banks.json:171). The retry loop is diegetic -- the Warden's objection and the Registrar's on-air reopening ARE the technical audit/rewrite cycle, not a hidden gate. Dossier is stamped at meta.sonnet_dossier, never meta.news (avoids a false gen_params_by_phase.news_interpreter stamp, nodes/OTR_LedgerScriptWriter.py:6390-6394). No fallback to legacy_many_pass, ever."
     },
     {
       "source_bank_id": "scifi_codex_v4",

@@ -1,5 +1,15 @@
 # NEWBUG -- scifi_fable2_v3 cannot run: fable2 revision_contract hardcodes rules_id == 'scifi_fable2'
 
+> **CLOSED-BY-RIP 2026-07-18.** Resolved by RETIRING `scifi_fable2_v3` (bank row + pack +
+> `story_rules` + the `fable2_multipass_v3` pipeline in BOTH registries `pipelines.json` and
+> `_RUNNER_BY_PIPELINE` + the writer's fable2 target-word gate entry), per
+> `docs/2026-07-18-rip-4-banks-plan.md`. Logged as `PBUG-20260718-01` in `docs/PROD_BUG_LOG.md`
+> (appended BEFORE this close, so the causal record is never lost). This file is retained as the
+> ONLY causal record of the live failure -- do NOT delete. No code fix was made to
+> `_otr_scifi_fable2.py`: the defective revision_contract literal is simply no longer reachable by
+> any shipped bank. If the fable2 family ever re-adds a `_v3`, re-open the fix-direction below
+> (accept the lane's DECLARED rules_id, not a single literal).
+
 **Discovered:** 2026-07-18, Sonnet-4.5 cross-bank bake-off (render window), baseline HEAD `60c73618`.
 **Class:** hard lane-contract defect (model-independent). NOT a Sonnet content fail, NOT a deterministic
 SFW/quality gate. Repeatable live production failure -> candidate PBUG (coder/campaign window owns admission).
