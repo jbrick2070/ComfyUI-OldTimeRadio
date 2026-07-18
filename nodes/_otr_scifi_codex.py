@@ -1969,6 +1969,26 @@ def _digest(payload: Mapping[str, str]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+# The four fields SourceSpanV4 permits as literal-span coordinates.
+_SPAN_SOURCE_FIELDS = ("headline", "summary", "full_text", "seed_text")
+
+
+def _normalize_span_source_text(text: str) -> str:
+    """Collapse every whitespace run to a single space and strip the ends.
+
+    PBUG-20260717: RSS/HTML payloads carry ``\\n``/``\\t`` runs, so a literal
+    source-span offset can land mid-whitespace or mid-word -- a slice no model
+    can reproduce verbatim, so P0 paraphrases and the exact-literal fact-index
+    contract rejects it. Cleaning the span-bearing fields at admission (BEFORE
+    the digest, the P0 projection, and the span validator all read ``clean``)
+    makes the cleaned text the SOLE coordinate system, so no accepted offset
+    can shift (the BUG-11.37 span-integrity constraint). Codex-scoped on
+    purpose: the shared ``validate_source_payload`` stays byte-identical for the
+    science ledger stamps.
+    """
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
 def validate_payload_envelope(
     payload: Mapping[str, Any], resolved: Mapping[str, Any]
 ) -> tuple[PayloadEnvelopeV4, WordSteerV4]:
@@ -1976,6 +1996,14 @@ def validate_payload_envelope(
         clean = validate_source_payload(dict(payload), "scifi_codex")
     except Exception as exc:
         raise CodexPayloadShapeError(str(exc)) from exc
+    # PBUG-20260717: normalize the span-bearing source fields to single-spaced
+    # text at admission -- UPSTREAM of the digest, the P0 evidence projection,
+    # and the literal-span validator, which all read `clean` below. This makes
+    # every P0 offset index clean word boundaries (no \n/\t runs) so the model
+    # can reproduce a literal quote; the same cleaned text is the one coordinate
+    # system, so no accepted offset shifts (BUG-11.37 constraint).
+    for _field in _SPAN_SOURCE_FIELDS:
+        clean[_field] = _normalize_span_source_text(clean[_field])
     seed_source = str(resolved.get("seed_source") or "")
     if seed_source == "custom_premise":
         mode = "operator_pinned"
@@ -3217,6 +3245,11 @@ def run_scifi_codex_episode(
     env, steer = validate_payload_envelope(payload, resolved)
     p0_inputs = _p0_artifact_inputs(env)
     p0_allowed_fields = frozenset(p0_inputs["allowed_source_fields"])
+    # PBUG-20260717: validate literal spans against the NORMALIZED A0
+    # (env.payload) -- the SAME cleaned text the P0 projection shows the model,
+    # not the raw input `payload`. Pre-normalization these are byte-identical,
+    # so this is a no-op for existing clean sources and correct for dirty ones.
+    a0_payload = env.payload.model_dump(mode="json")
     lane_meta: dict[str, Any] = {"source_digest": env.source_digest, "source_mode": env.source_mode, "call_journal": {}}
     meta["scifi_codex"] = lane_meta
     journal = lane_meta["call_journal"]
@@ -3228,7 +3261,7 @@ def run_scifi_codex_episode(
             len(value) for value in p0_inputs["payload"]["payload"].values()
         ),
     }
-    p0 = invoke_codex_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_fact_index_system",), artifact_inputs=p0_inputs, result_type=FactIndexV4, post_validator=lambda x: _validate_fact_index(x, payload, allowed_source_fields=p0_allowed_fields, expected_payload_sha256=env.source_digest), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=p0_token_budget, call_journal=journal, prompt_must_fit=True, clamp_overlong_strings=False)
+    p0 = invoke_codex_structured(pass_id="P0", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_fact_index_system",), artifact_inputs=p0_inputs, result_type=FactIndexV4, post_validator=lambda x: _validate_fact_index(x, a0_payload, allowed_source_fields=p0_allowed_fields, expected_payload_sha256=env.source_digest), base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=p0_token_budget, call_journal=journal, prompt_must_fit=True, clamp_overlong_strings=False)
     p1 = invoke_codex_structured(
         pass_id="P1", slot="creative", slot_fn=creative_fn, pack=pack,
         seam_refs=("codex_question_system",),

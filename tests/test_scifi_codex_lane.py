@@ -2005,10 +2005,12 @@ def test_scifi_codex_v4_p3_prompt_contract():
     # cap-list both absent (the caps live in the tighter surface ceilings only).
     assert "produce exactly as many beats as the advisory plan lists" in system
     assert "include one mandatory COST beat" not in system
-    # cap restatement is load-bearing salience (live evidence overturned the r2
-    # panel's "redundant" call: reverting it regressed string_too_long on premise).
-    assert "premise at most 144" in system
-    assert "Keep the premise to one tight sentence" in system
+    # BUG B / PBUG-20260713-04: the base seam must NOT restate the true 144 cap
+    # (exposing the rejection edge makes the model aim at it and cross it -- the
+    # cross-check anti-pattern). The conservative target lives in the surface
+    # instruction (premise <=108) + the text-patch 75% margin; base seam stays cap-free.
+    assert "premise at most 144" not in system
+    assert "hard length budget" not in system
     # the newly model-visible coverage gates ride the shared surface instruction.
     assert "every declared shot MUST be referenced by at least one beat" in system
     assert "every accepted cast ID MUST own at least one beat" in system
@@ -2027,6 +2029,48 @@ def test_p3_beat_count_error_reports_expected_count():
     # enriched receipt (kibitz r2): the expected count is interpolated so a live
     # leg rejection is diagnosable without storing unbounded model output.
     assert "accepted advisory count 3" in exc_info.value.detail
+
+
+def test_p0_source_spans_survive_whitespace_polluted_source():
+    # PBUG-20260717: dirty RSS whitespace is normalized at admission so literal
+    # source spans index clean word boundaries (the model can reproduce them).
+    dirty = "\n\t\t\t\t\t\t\t\tThe Growing Crescent of Mars as NASA approached the planet."
+    assert lane._normalize_span_source_text(dirty) == (
+        "The Growing Crescent of Mars as NASA approached the planet."
+    )
+    # idempotent on already-clean text -> no accepted offset shifts vs a control.
+    clean_ctrl = "The crescent of Mars grew as the spacecraft approached."
+    assert lane._normalize_span_source_text(clean_ctrl) == clean_ctrl
+
+    payload = {
+        "headline": "Mars crescent grows in new images",
+        "summary": "\t\tThe crescent of Mars grew as the craft approached the planet.",
+        "full_text": dirty,
+        "source": "Example News",
+        "date": "2026-07-17",
+        "link": "https://example.test/mars",
+        "seed_text": (
+            "Mars crescent grows in new images.\n\tThe crescent of Mars grew "
+            "as the craft approached the planet."
+        ),
+    }
+    env, _steer = lane.validate_payload_envelope(
+        payload, {"seed_source": "custom_premise", "target_words": 30},
+    )
+    a0 = env.payload.model_dump(mode="json")
+    for field in ("headline", "summary", "full_text", "seed_text"):
+        assert "\n" not in a0[field]
+        assert "\t" not in a0[field]
+        assert "  " not in a0[field]
+        assert a0[field] == a0[field].strip()
+    # a literal span into the CLEANED full_text validates first-try.
+    full = a0["full_text"]
+    start = full.index("Growing")
+    end = start + len("Growing Crescent")
+    span = lane.SourceSpanV4(
+        field="full_text", start=start, end=end, quote=full[start:end],
+    )
+    assert lane._span_ok(span, a0) is True
 
 
 def test_p3_two_decode_failures_restart_only_from_trusted_draft_context():
