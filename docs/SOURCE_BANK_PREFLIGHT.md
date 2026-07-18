@@ -347,7 +347,21 @@ this section prevents. Playbook proven by the `499386aa` roster trim and the 202
 - [ ] **Hard:** Canonical -- `workflows/otr_canonical.json` stays byte-unchanged (bank removal is
   registry-driven; it must not touch the graph). If it did change, that is a red flag to investigate.
 
-**Gate (identical to adding):** full Windows suite + Bug Bible GREEN; gate on GREEN **plus retired-id
-absence** (`grep -r "<id>" nodes tests workflows` returns nothing) rather than a predicted test count;
-`OTR_WorkflowValidator` + JSON round-trip on `banks.json`/`pipelines.json`; commit + push; `HEAD == origin`;
-AST-parse touched `.py`.
+**Gate (identical to adding + the 2026-07-18 QA hardening):**
+- [ ] **Import-smoke (Bible 03.01/03.02):** on a full-family removal, after deleting the lane module,
+  LOAD the node registry clean ("All N nodes loaded, 0 skips") and grep `nodes/__init__.py` +
+  `NODE_CLASS_MAPPINGS` for a leftover key. A string grep proves the ids are gone, NOT that the pack
+  still imports.
+- [ ] **Ledger-ownership (CLAUDE.md "no hole in the ledger"; PBUG-20260712-05):** enumerate every ledger
+  field each removed bank stamped -- including COMPUTED keys (`f"{source_bank_id}_..."`) a literal grep
+  misses -- and confirm zero surviving readers in the shared writer tail. A green suite does not prove
+  ledger completeness.
+- [ ] **No dead levers (GO_FORWARD item 5):** every KEPT runner/helper still has a live caller post-rip;
+  excise any that went dead (a shared factory used only by the removed pipelines dies with them).
+- [ ] Full Windows suite + Bug Bible GREEN -- gate on GREEN **plus retired-id absence**
+  (`grep -r "<id>" nodes tests workflows` empty), and **record suite/Bible counts as evidence, never pin
+  them** (a hardcoded count false-fails or masks a real drop).
+- [ ] `OTR_WorkflowValidator` + JSON round-trip **+ a no-BOM/UTF-8 `head -c3` check** on `banks.json` /
+  `pipelines.json` (Bible 02.11/12/13); `workflows/otr_canonical.json` byte-unchanged (registry-driven --
+  a change there is a red flag; verify it strands no COMBO id, BUG-08.06/12.23); commit + push;
+  `HEAD == origin`; AST-parse touched `.py`.

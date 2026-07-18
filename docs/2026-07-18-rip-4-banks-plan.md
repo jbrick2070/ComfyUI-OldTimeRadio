@@ -52,7 +52,12 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
 4. **`nodes/OTR_LedgerScriptWriter.py`** `_RUNNER_BY_PIPELINE` (~:1996-2001) -- delete the 3 entries
    `fable2_multipass_v3`, `scifi_codex_circuit_v3`, `sonnet_archive_multipass_v3`. Then remove
    `_run_scifi_sonnet_lane` (:1851-1857) and the base route `if base == "scifi_sonnet":` (:1947).
-   Leave `_run_scifi_codex_lane` / `_run_fable2_lane` / `_make_v3_runner` (still used by base/v4).
+   **`_make_v3_runner` (:1968-1994) goes DEAD once those 3 entries are removed** -- it has NO other
+   caller (`legacy_many_pass_v3` runs via `_INLINE_V3_PIPELINES` :2008-2010, not `_make_v3_runner`;
+   verified in-source, QA flag 3) -- so DELETE it in the same change or it is a dead lever
+   (GO_FORWARD item 5 / "dead levers cost live rolls"). KEEP `_run_scifi_codex_lane`
+   (`scifi_codex_circuit_v4` + base) and `_run_fable2_lane` (base `fable2_multipass`) -- both retain a
+   live caller; confirm each at build (no kept runner left without a consumer).
 4b. **`nodes/story_packs/pipelines.json`** (kibitz r1 MUST-FIX -- the OTHER pipeline registry; loaded by
    `nodes/_otr_story_routing.py:499-505`) -- delete the pipeline objects `fable2_multipass_v3` (:554),
    `scifi_codex_circuit_v3` (:663), `sonnet_archive_multipass_v3` (:948). KEEP `legacy_many_pass_v3`
@@ -78,10 +83,26 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
 
 ## Gate (per CLAUDE.md -- all must pass before commit)
 
-- Full Windows suite (`.venv` python, `$env:PYTHONUTF8=1`, `pytest -q -p no:cacheprovider`) GREEN --
-  expect the total to DROP from 8144 by the removed cases; record the new number.
-- Bug Bible regression GREEN (17).
-- `OTR_WorkflowValidator` + JSON round-trip on `banks.json`; `workflows/otr_canonical.json` byte-unchanged.
+- **Import-smoke (QA flag 1 -- Bible 03.01/03.02):** after deleting `nodes/_otr_scifi_sonnet.py`, load
+  the node registry clean ("All N nodes loaded, 0 skips") and grep `nodes/__init__.py` +
+  `NODE_CLASS_MAPPINGS` for any leftover sonnet key. A string grep proves the ids are gone; it does NOT
+  prove the pack still imports.
+- **Ledger-ownership enumeration (QA flag 2 -- CLAUDE.md "no hole in the ledger" + PBUG-20260712-05 /
+  BUG-12.49):** for EACH of the 4 banks, enumerate what it stamped into the ledger -- including COMPUTED
+  keys (`f"{source_bank_id}_..."`) a literal grep misses -- and confirm zero surviving readers in the
+  shared writer tail. A green suite does not prove ledger completeness (bank provenance is self-keyed so
+  the residual is likely narrow -- but state the step, don't skip it).
+- **Dead-runner check (QA flag 3):** every KEPT runner has a live caller post-rip; `_make_v3_runner` is
+  DELETED (dead once the 3 v3 pipelines go).
+- Full Windows suite (`.venv` python, `$env:PYTHONUTF8=1`, `pytest -q -p no:cacheprovider`) GREEN.
+  **Gate on GREEN + retired-id absence, NOT a predicted total** -- record old/new suite counts as evidence.
+- Bug Bible regression GREEN. **Record the count as evidence; do NOT pin "17"** (QA flag 4 -- same
+  anti-brittle rule as the suite total; a hardcoded count false-fails or masks a real drop if a ripped
+  bank had Bible coverage).
+- `OTR_WorkflowValidator` + JSON round-trip on `banks.json` + `pipelines.json`; **no-BOM/UTF-8 check
+  (`head -c3`) on both after edit** (QA flag 5 -- Bible 02.11/12/13); `workflows/otr_canonical.json`
+  byte-unchanged (QA-verified: it carries none of the 4 ids, so no stranded COMBO -- BUG-08.06/12.23 not
+  triggered).
 - No dangling ref: `grep -r "scifi_sonnet_v3\|media_archive_v3\|scifi_codex_v3\|scifi_fable2_v3" nodes tests workflows` returns nothing (docs/tmp excepted).
 - Commit + push to `v2.0-alpha`; verify `HEAD == origin`; AST-parse touched .py.
 
@@ -89,5 +110,6 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
 
 > resume the OTR build as a CODER window. Execute `docs/2026-07-18-rip-4-banks-plan.md` in one green
 > pushed chunk: rip scifi_sonnet_v3 (full lane) + media_archive_v3 + scifi_codex_v3 + scifi_fable2_v3,
-> KEEP scifi_codex base. Full gate (suite + Bible 17 + canonical byte-unchanged + no dangling ref),
-> then commit+push to v2.0-alpha and update GO_FORWARD + HANDOFF.
+> KEEP scifi_codex base. Full gate (import-smoke 0-skips + ledger-ownership enumeration + suite/Bible
+> GREEN-recorded-not-pinned + no-BOM + canonical byte-unchanged + no dangling ref), then commit+push to
+> v2.0-alpha and update GO_FORWARD + HANDOFF.
