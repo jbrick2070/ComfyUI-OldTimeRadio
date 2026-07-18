@@ -58,6 +58,15 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
    (GO_FORWARD item 5 / "dead levers cost live rolls"). KEEP `_run_scifi_codex_lane`
    (`scifi_codex_circuit_v4` + base) and `_run_fable2_lane` (base `fable2_multipass`) -- both retain a
    live caller; confirm each at build (no kept runner left without a consumer).
+   **MUST-KEEP FENCE (QA -- SEV-high over-rip, Bible 05.07 NameError / 12.24 regression):** delete ONLY
+   `_make_v3_runner`. Its callees `run_v3_advisory` (:1871), `_v3_focus_metric` (:1911), `_v3_max_run`
+   (:1860) sit in the same contiguous `_v3_*` block (:1860-1978) and share the "v3 bake-off" name -- but
+   they are NOT dead: `run_v3_advisory` has a SECOND caller at :6905-6908 (the inline lane, guarded by
+   `default_story_pipeline in _INLINE_V3_PIPELINES`) that the SURVIVING `legacy_many_pass_v3` banks
+   (`public_domain_story_v3`, `shakespeare_v3`) execute on EVERY render. Deleting them = runtime
+   `NameError` for both banks. Do NOT sweep the `_v3_*` block; excise the one wrapper. (Aside: the
+   `scifi_codex`/`sonnet`/`fable2` branches in `_v3_focus_metric` :1935-1954 go unreachable post-rip --
+   LEAVE them; trimming a live helper mid-rip reopens this risk for no gain.)
 4b. **`nodes/story_packs/pipelines.json`** (kibitz r1 MUST-FIX -- the OTHER pipeline registry; loaded by
    `nodes/_otr_story_routing.py:499-505`) -- delete the pipeline objects `fable2_multipass_v3` (:554),
    `scifi_codex_circuit_v3` (:663), `sonnet_archive_multipass_v3` (:948). KEEP `legacy_many_pass_v3`
@@ -93,7 +102,11 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
   shared writer tail. A green suite does not prove ledger completeness (bank provenance is self-keyed so
   the residual is likely narrow -- but state the step, don't skip it).
 - **Dead-runner check (QA flag 3):** every KEPT runner has a live caller post-rip; `_make_v3_runner` is
-  DELETED (dead once the 3 v3 pipelines go).
+  DELETED (dead once the 3 v3 pipelines go), but its `_v3_*` neighbors are KEPT (see the MUST-KEEP fence).
+- **Runtime advisory smoke (QA -- the gap every other gate misses):** a targeted unit test OR a 30-word
+  live smoke of a SURVIVING inline-v3 bank (`public_domain_story_v3` or `shakespeare_v3`) that reaches the
+  advisory call at :6907. The bank-id grep never contains `run_v3_advisory`; import-smoke is import-time
+  while :6907 is RUNTIME -- only running a surviving inline-v3 bank proves the `_v3_*` helpers survived.
 - Full Windows suite (`.venv` python, `$env:PYTHONUTF8=1`, `pytest -q -p no:cacheprovider`) GREEN.
   **Gate on GREEN + retired-id absence, NOT a predicted total** -- record old/new suite counts as evidence.
 - Bug Bible regression GREEN. **Record the count as evidence; do NOT pin "17"** (QA flag 4 -- same
