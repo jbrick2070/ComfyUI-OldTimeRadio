@@ -5,6 +5,23 @@
 stays production-fragile. Rationale + evidence: `docs/2026-07-18-sonnet-bakeoff-analysis.md`.
 **Type:** coder-window structural change (roster + packs + pipeline registry + tests + full gate),
 mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
+**Execute against the reusable checklist:** the Teardown protocol in `docs/SOURCE_BANK_PREFLIGHT.md`
+(+ lesson 25 in `PRODUCTION_SPRINT_LESSONS.md`) -- this plan is the concrete instance of it.
+
+### Kibitz r1 hardening (folded, all CONFIRMED against the code)
+- **BOTH pipeline registries** -- delete the 3 v3 pipelines from `_RUNNER_BY_PIPELINE` AND
+  `nodes/story_packs/pipelines.json` (:554/:663/:948); keep `legacy_many_pass_v3` (shared). See §4/§4b.
+- **Sonnet full-lane** -- also delete the module `nodes/_otr_scifi_sonnet.py` + the `base == "scifi_sonnet"`
+  route (§4/§4c).
+- **NEWBUG -> PBUG, don't discard** -- `scifi_fable2_v3` carried a repeatable LIVE failure; append a
+  `docs/PROD_BUG_LOG.md` entry (fix = "retired the runnable bank + pipeline/route"), THEN mark the NEWBUG
+  doc CLOSED-BY-RIP. Do NOT edit `_otr_scifi_fable2.py` for the deleted lane.
+- **Gate: registry invariant + no brittle count** -- add "no retired `story_pipeline_id` in
+  `_otr_story_routing._ensure_loaded().pipelines`" and gate on GREEN suite + retired-id absence, not a
+  predicted 8144 total (record old/new counts as evidence only).
+- **v4-guard tests enumerate banks directly** (`test_placeholder_guard_v4.py:103-104`,
+  `test_scene_guard_v4.py:91-92`, `test_provenance_v4.py:112-113`) -- regenerate those lists from the
+  surviving runnable roster or pin the exact 7 ids.
 
 ## Removal depth (READ FIRST -- not all four are equal)
 
@@ -32,10 +49,19 @@ mirrors the `499386aa` roster trim. Do NOT run in a render/analysis session.
 2. **Delete pack dirs:** `nodes/story_packs/scifi_sonnet_v3/`, `nodes/story_packs/media_archive_v3/`,
    `nodes/story_packs/scifi_codex_v3/`, `nodes/story_packs/scifi_fable2_v3/`.
 3. **Delete story_rules:** `nodes/story_rules/{scifi_sonnet_v3,media_archive_v3,scifi_codex_v3,scifi_fable2_v3}.json`.
-4. **`nodes/OTR_LedgerScriptWriter.py`** PIPELINE_REGISTRY (~:1996-2001) -- delete the 3 entries
+4. **`nodes/OTR_LedgerScriptWriter.py`** `_RUNNER_BY_PIPELINE` (~:1996-2001) -- delete the 3 entries
    `fable2_multipass_v3`, `scifi_codex_circuit_v3`, `sonnet_archive_multipass_v3`. Then remove
-   `_run_scifi_sonnet_lane` and any sonnet-only helper now unreferenced (grep first). Leave
-   `_run_scifi_codex_lane` / `_run_fable2_lane` / `_make_v3_runner` (still used).
+   `_run_scifi_sonnet_lane` (:1851-1857) and the base route `if base == "scifi_sonnet":` (:1947).
+   Leave `_run_scifi_codex_lane` / `_run_fable2_lane` / `_make_v3_runner` (still used by base/v4).
+4b. **`nodes/story_packs/pipelines.json`** (kibitz r1 MUST-FIX -- the OTHER pipeline registry; loaded by
+   `nodes/_otr_story_routing.py:499-505`) -- delete the pipeline objects `fable2_multipass_v3` (:554),
+   `scifi_codex_circuit_v3` (:663), `sonnet_archive_multipass_v3` (:948). KEEP `legacy_many_pass_v3`
+   (surviving banks use it at `banks.json:149`, `:185`). A retired pipeline left here is a semantic
+   registry failure even if no bank points at it.
+4c. **`nodes/_otr_scifi_sonnet.py`** (kibitz r1 MUST-FIX) -- DELETE the whole module (~1300 LOC; the sonnet
+   lane implementation, entrypoint `run_scifi_sonnet_episode` :1155). It has no surviving consumer once the
+   runner + pipeline are gone. Grep `_otr_scifi_sonnet` / `scifi_sonnet` across `nodes/` after deletion and
+   clean any orphaned import (e.g. an interpreter/`validate_source_payload("scifi_sonnet")` registration).
 5. **Tests** -- update each (do not just delete assertions; keep coverage honest):
    - `tests/test_scifi_sonnet_lane.py` -> DELETE (lane gone).
    - `tests/test_bank_variants.py` (13 refs) -> update the runnable-count + the id lists/bijection

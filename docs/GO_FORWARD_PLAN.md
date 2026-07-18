@@ -388,7 +388,9 @@ fixture creates a row.
 ## Pointers
 
 - `ROADMAP.md` (current, 2026-07-12; lean-mean pin self-declares stale cites)
-- `docs/PRODUCTION_SPRINT_LESSONS.md` (incl. lesson 24, the lost-anchor class)
+- `docs/PRODUCTION_SPRINT_LESSONS.md` (incl. lesson 24 lost-anchor; lesson 25 bank-teardown)
+- `docs/SOURCE_BANK_PREFLIGHT.md` -- add-a-bank gate **+ the Teardown protocol for ripping a bank**
+  (the mechanical checklist of every wired surface, so a rip is not re-derived each time)
 - `docs/PROD_BUG_LOG.md` / `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
 - `docs/HANDOFF_LOG.md` (all completed-work history, newest at top)
 - `docs/2026-07-15-720-bakeoff-verdict.md` (KEEP/IMPROVE/LEAVE + open items)

@@ -305,3 +305,49 @@ warnings:
 
 `PASS` means `hard_failures: 0` and every hard item above has concrete
 evidence.
+
+## Teardown protocol -- removing a bank (the inverse of Gate 5)
+
+Removing a bank is a coder-window change with the same rigor as adding one. A bank lives in
+~10 wired surfaces, not just `banks.json` -- rediscovering them by hand each time is the failure
+this section prevents. Playbook proven by the `499386aa` roster trim and the 2026-07-18 4-bank rip
+(`docs/2026-07-18-rip-4-banks-plan.md`).
+
+**Step 0 -- decide the removal DEPTH (this drives everything below):**
+- **Variant removal** (a base or sibling version of the same lane SURVIVES, e.g. rip `scifi_codex_v3`
+  while `scifi_codex`/`scifi_codex_v4` stay): remove only the bank's OWN row/pack/rules + its
+  DEDICATED pipeline. KEEP the shared lane runner module and any shared pipeline.
+- **Full-family removal** (NO surviving sibling of that lane, e.g. `scifi_sonnet_v3` is the only sonnet
+  bank): ALSO delete the lane runner module + its interpreter/source-kind registration + the dedicated
+  lane test. "Only version of its family" is the tell that a rip goes deep.
+
+**Surfaces to clean (each: PASS + a file:line / test / grep evidence):**
+- [ ] **Hard:** Bank row deleted from `nodes/story_packs/banks.json`.
+- [ ] **Hard:** Pack dir `nodes/story_packs/<id>/` and `nodes/story_rules/<id>.json` deleted.
+- [ ] **Hard:** Pipeline removed from BOTH registries when dedicated -- `_RUNNER_BY_PIPELINE` in
+  `nodes/OTR_LedgerScriptWriter.py` AND the JSON catalog `nodes/story_packs/pipelines.json`
+  (**the easy-to-miss one** -- a retired pipeline left in the JSON is a semantic registry failure even
+  with no bank pointing at it). KEEP any pipeline a surviving bank still uses (e.g. `legacy_many_pass_v3`).
+- [ ] **Hard:** Runner + routes -- delete the bank's `_run_*_lane` registry entry and any
+  `if base == "<family>":` route. **Full-family only:** delete the lane module `nodes/_otr_<family>.py`
+  and its `validate_source_payload("<family>")` / interpreter registration; grep the family id across
+  `nodes/` and clean every orphaned import.
+- [ ] **Hard:** Registry consistency -- no retired `story_pipeline_id` remains in
+  `_otr_story_routing._ensure_loaded().pipelines`; `runnable`(bank) and `executable`(pipeline) stay in
+  sync or `_otr_story_routing` raises `RegistryValidationError`.
+- [ ] **Hard:** Tests UPDATED, not just deleted -- the roster/bijection test (`tests/test_bank_variants.py`
+  counts + id lists) reflects the new runnable roster; guard tests that enumerate banks
+  (`test_placeholder_guard_v4`, `test_scene_guard_v4`, `test_provenance_v4`, `test_source_snapshot`, ...)
+  regenerate their lists from the surviving roster or pin the exact surviving ids; a dedicated lane test
+  is deleted on full-family removal.
+- [ ] **Hard:** Ledger discipline -- if the removed bank carried a repeatable LIVE production failure,
+  RECORD a PBUG in `docs/PROD_BUG_LOG.md` with fix = "retired the runnable bank + its pipeline/route" and
+  mark any open NEWBUG doc CLOSED-BY-RIP. Never delete the only causal record; a rip is a legitimate fix,
+  a hole in the ledger is not.
+- [ ] **Hard:** Canonical -- `workflows/otr_canonical.json` stays byte-unchanged (bank removal is
+  registry-driven; it must not touch the graph). If it did change, that is a red flag to investigate.
+
+**Gate (identical to adding):** full Windows suite + Bug Bible GREEN; gate on GREEN **plus retired-id
+absence** (`grep -r "<id>" nodes tests workflows` returns nothing) rather than a predicted test count;
+`OTR_WorkflowValidator` + JSON round-trip on `banks.json`/`pipelines.json`; commit + push; `HEAD == origin`;
+AST-parse touched `.py`.

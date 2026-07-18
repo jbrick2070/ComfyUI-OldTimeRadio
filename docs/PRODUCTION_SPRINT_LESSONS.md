@@ -348,6 +348,22 @@ patch and a partial success becomes a total failure); and "it is broken" is not
 a repair prompt -- name the missing object, the unassigned clue, the exact
 string.
 
+## 25. A bank lives in ~10 wired surfaces -- rip by the Teardown protocol
+
+(2026-07-18: the Sonnet bake-off retired 4 banks; the hard part was rediscovering where a bank is
+wired, not the decision. Runbook: the Teardown protocol in `SOURCE_BANK_PREFLIGHT.md`; proven by the
+`499386aa` roster trim and `docs/2026-07-18-rip-4-banks-plan.md`.)
+
+A source bank is not just its `banks.json` row -- it is wired across ~10 surfaces: the row, the pack
+dir, the `story_rules` file, the runner entry in `_RUNNER_BY_PIPELINE`, the pipeline object in
+`pipelines.json` (a SECOND registry -- the one hand-removal always forgets), the lane runner module, a
+possible `if base == "<family>"` route, the runnable<->executable registry law in `_otr_story_routing`,
+the roster/bijection + bank-enumerating guard tests, and any PBUG the bank's live failures earned. Two
+rules that end the re-derivation: (1) removal DEPTH is set by whether a sibling version survives -- a
+variant rip keeps the shared lane module, a full-family rip (the only version of its lane) deletes it;
+(2) retiring a bank that carried a live failure is a legitimate fix, but RECORD the PBUG -- ripping the
+lane must not rip the causal record. Gate on a green suite + retired-id absence, never a predicted count.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:
