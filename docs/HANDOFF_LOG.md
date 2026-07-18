@@ -3,6 +3,33 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-17 night6 -- HEAD 9730e2dc (v2.0-alpha) [v4 P2 bank #1 scifi_codex_v4 GREEN + LIVE-PROVEN]
+
+Did (coder window, autonomous + operator cross-check):
+- Resumed after the operator cross-check verdict: BUG A (P0 literal-span fail) = NEW upstream root in the
+  S5 family (-> PBUG-20260717-01); BUG B (P3 premise string_too_long) = re-occurrence of PBUG-20260713-04,
+  and my base-seam 144 re-add was the -04 anti-pattern (exposing the rejection edge).
+- P0 fix @ 26ba8e1d: normalize the 4 span-bearing source fields to single-spaced text in
+  validate_payload_envelope -- at admission, UPSTREAM of the digest/projection/validator (BUG-11.37
+  offset-shift constraint); point the P0 validator at env.payload. Codex-scoped (shared
+  validate_source_payload stays byte-identical for science). +1 test; reverted the anti-pattern caps.
+- Live legs: 6883758f (P3 premise), ac027c36 (P0), 90f22b15 (cleared P0 -> BUG A proven, then P3
+  string_too_long on premise+description: the -04 recipe is insufficient for the verbose v4 lane).
+- Operator "allow longer text": P3 fix @ 9730e2dc = RAISE the non-spoken metadata caps (premise 144->240,
+  scene/shot description 72->144) across draft+final models + _p3_text_patch_cap + replacement_text schema
+  + receipt. Caps are LOAD-BEARING (P3 draft fits the 8192 context+output budget) -> resized the reservation
+  1647->1829 + updated every exact-token guard (max-width helper draft 1418->1576; envelope re-verified
+  prompt+output=5935<=8192). Full suite 8144 / Bible 17 at each chunk; canonical unchanged.
+- LIVE PROOF: leg c1f3891f RESULT SUCCESS + obs_publish (signal_lost_the_whisker_effect..._final.mp4,
+  56.6 MB; obs + episode dirs Test-Path OK). Bank #1 DONE.
+- PBUGs: PBUG-20260717-01 (P0) LIVE-VERIFIED; BUG B recorded as re-occurrence of -04 (not a new PBUG);
+  PBUG-20260710-07 = retire candidate via the green codex leg (announcer rows clean, freeze passed).
+Current step: bank #1 scifi_codex_v4 GREEN + live-proven. NEXT = bank #2 shakespeare_v4.
+Next: build shakespeare_v4 (own idiom; inline legacy_many_pass_v4; genre+outro gates safe there;
+  pre-emptively raise tight non-spoken caps + resize the budget/guards when raising).
+Commits: 3b74b7e3 (contract-visibility fold), 48f2a278 (caps re-add, later reverted), cc76dcc5 (pause docs),
+  26ba8e1d (P0 fix + anti-pattern revert), 9730e2dc (P3 caps raised). All pushed, HEAD==origin.
+
 ## 2026-07-17 night5 -- HEAD 48f2a278 (v2.0-alpha) [v4 P2 bank #1: two-strikes kibitz + P3 fold; LIVE LEG BLOCKED at P0+P3 -> PAUSED for cross-check]
 
 Did (coder window, autonomous):

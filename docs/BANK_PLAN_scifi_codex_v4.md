@@ -15,6 +15,8 @@
 
 Gates: full suite 8139 / Bug Bible 17 / AST+JSON+BOM+zero-byte clean / `otr_canonical.json` byte-unchanged (dropdown auto-enumerates -- no graph edit) / HEAD==origin.
 
+**LIVE-PROVEN (2026-07-17 night6):** leg `c1f3891f` RESULT SUCCESS + obs_publish -- "The Whisker Effect" (56.6 MB, obs + episode dirs Test-Path OK), Mistral-Nemo both slots, 30w. Reaching green required TWO pre-existing codex-lane fixes the live legs surfaced (both grounded via the operator cross-check window): **P0** source-whitespace normalization at admission (PBUG-20260717-01 @ `26ba8e1d`) and **P3** non-spoken metadata cap raise (premise 144->240, scene/shot description 72->144; load-bearing on the 8192 budget so the output reservation was resized 1647->1829 + all exact-token guards updated) @ `9730e2dc`. Full suite 8144 / Bible 17. See section 3 lessons + PROD_BUG_LOG PBUG-20260717-01.
+
 ## 2. Gate posture (opt-in Phase-1 gates) -- vetoable
 
 ON: `require_science_floor` (core codex contract, same as v1), `placeholder_guard` (G13), `scene_coherence_check` (G15).
