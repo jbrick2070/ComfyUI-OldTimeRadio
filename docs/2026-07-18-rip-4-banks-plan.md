@@ -16,7 +16,8 @@ coverage. Tests reference ONLY surviving banks, and the roster/bijection tests a
 POSITIVELY (they list what exists, they do not assert what was removed). A grep for any of the 4 bank
 ids -- PLUS the 3 retired pipeline ids and `_otr_scifi_sonnet` -- across `nodes`/`tests`/`workflows`
 returns nothing, test bodies included -- but NOT bare `scifi_sonnet`: the `:1947` focus branch is KEPT
-(unreachable post-rip but harmless, agy r4), so it legitimately holds bare `scifi_sonnet` -> carve it out.
+(unreachable post-rip but harmless, agy r4). Bare `scifi_sonnet` survives in TWO kept spots (:1947 + the
+P0-contract comment at `_otr_scifi_p0_contract.py:34`, operator r4) -> carve both out of the main sweep.
 
 **ATOMIC (kibitz r3 SHOULD-FIX 1).** Delete the bank rows + pack dirs + `story_rules` + BOTH pipeline
 entries as ONE change BEFORE running `_otr_story_routing._ensure_loaded()`: `_sweep_and_crossref()`
@@ -36,8 +37,9 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
   (scifi_fable2 / media_archive / original_radio): harmless dead branches inside a LIVE helper, and
   trimming a live helper mid-rip reopens NameError risk for no gain (see the §4 aside). What DOES go is the
   branch's only pin, the sonnet advisory TEST `test_bank_variants.py:196-218` (its subject is the ripped
-  `scifi_sonnet_v3` lane -> it trips the no-dangling-ref gate). Because :1947 stays, bare `scifi_sonnet`
-  legitimately remains in `nodes/` -> KEEP the main-sweep carve-out.
+  `scifi_sonnet_v3` lane -> it trips the no-dangling-ref gate). Because :1947 stays (and a P0-contract
+  comment at `_otr_scifi_p0_contract.py:34`), bare `scifi_sonnet` legitimately remains in `nodes/` -> KEEP
+  the main-sweep carve-out and scan for EXACTLY those two (operator r4).
 - **NEWBUG -> PBUG, don't discard** -- `scifi_fable2_v3` carried a repeatable LIVE failure; append a
   `docs/PROD_BUG_LOG.md` entry (fix = "retired the runnable bank + pipeline/route"), THEN mark the NEWBUG
   doc CLOSED-BY-RIP. Do NOT edit `_otr_scifi_fable2.py` for the deleted lane.
@@ -154,8 +156,8 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
      surviving runnable roster or pin the exact 7 ids; the v4-guard "gate-off" contrast likely uses
      `scifi_codex_v3`, so pick a surviving contrast bank.
    - `tests/test_fable2_tail_context.py:295-299` (kibitz r3 MUST-FIX 1) -> drop `"scifi_sonnet"` from the
-     `source_bank` parametrize (:297); the sonnet lane is gone. (Bare-sonnet -- caught by the tests-only
-     grep, not the main sweep.)
+     `source_bank` parametrize (:297); the sonnet lane is gone. (Bare-sonnet -- caught by the separate
+     nodes+tests bare-sonnet scan, not the main retired-id sweep.)
    - Also update the now-stale `_RUNNER_BY_PIPELINE` comment at `OTR_LedgerScriptWriter.py:1981-1988`
      (it still describes "the three sci-fi v3 pipelines"); cosmetic but it misleads the next wiring edit
      (kibitz r3 SHOULD-FIX 3).
@@ -206,22 +208,31 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
   returns nothing (docs/tmp excepted). Run it **SOURCE-ONLY** -- `--include='*.py' --include='*.json'
   --exclude-dir=__pycache__` (or delete `nodes/**/__pycache__` + `tests/**/__pycache__` first): stale
   `.pyc` files false-fail otherwise (kibitz r3 MUST-FIX 3). **Do NOT grep bare `scifi_sonnet` in the main
-  sweep** -- the KEPT `:1947` focus branch (unreachable but retained, agy r4) legitimately holds it and
-  would false-fail.
-- Carve-out blind-spot closer: because bare `scifi_sonnet` is excluded from the main sweep, ALSO run a
-  TESTS-ONLY `Select-String '"scifi_sonnet"' tests` -> returns nothing. Every bare-sonnet TEST ref is to a
-  ripped lane and must be DELETED: `test_fable2_tail_context.py:297`; `test_bank_variants.py` `:49` (the
-  `("scifi_sonnet_v3","scifi_sonnet")` tuple), `:58` (real-base list), `:148` (bijection row), and the
-  sonnet advisory test `:196-218`. The ONLY allowed bare `scifi_sonnet` post-rip is the kept `:1947`
-  branch in `nodes/OTR_LedgerScriptWriter.py`.
+  sweep** -- the KEPT `:1947` focus branch (unreachable but retained, agy r4) AND the P0-contract comment
+  at `_otr_scifi_p0_contract.py:34` (operator r4) legitimately hold it and would false-fail.
+- Bare-sonnet scan (CORRECTED by the operator's r4 grounding -- the earlier "ONLY :1947" invariant was
+  FALSE; a quoted-only grep missed a bare prose token). Because bare `scifi_sonnet` is excluded from the
+  main retired-id sweep, run a SEPARATE bare-sonnet scan over `nodes` + `tests` (`Select-String
+  'scifi_sonnet'`, `__pycache__` excluded) and expect EXACTLY TWO surviving hits, both in code that STAYS:
+  1. `nodes/OTR_LedgerScriptWriter.py:1947` -- the kept `_v3_focus_metric` advisory branch.
+  2. `nodes/_otr_scifi_p0_contract.py:34` -- a load-bearing P0 capacity-contract comment
+     (`live: scifi_sonnet, prompt 415ca1fc`) in a SURVIVING shared module (`p0_source_chunks` is imported
+     by the sci-fi lanes). KEEP it -- forensic "why the P0 source bounds exist" history; do NOT let a coder
+     "clean" it (and do NOT false-fail the gate on it).
+  ANY OTHER bare `scifi_sonnet` = a missed ripped ref. Every bare-sonnet TEST ref is to a ripped lane and
+  must be DELETED first so the scan lands on exactly those two: `test_fable2_tail_context.py:297`;
+  `test_bank_variants.py` `:49` (the `("scifi_sonnet_v3","scifi_sonnet")` tuple), `:58` (real-base list),
+  `:148` (bijection row), the sonnet advisory test `:196-218`; and the whole ripped
+  `test_scifi_sonnet_lane.py` (it also cites `415ca1fc`).
 
 **PowerShell gate commands (kibitz r4 MUST-FIX 4 -- the builder runs powershell.exe; `grep`/`head` do
 not exist).** Translate the unix forms above to PS:
 - Source-only retired-id scan: `Get-ChildItem nodes,tests,workflows -Recurse -Include *.py,*.json |
   Where-Object FullName -notmatch '__pycache__' | Select-String -Pattern 'scifi_sonnet_v3|media_archive_v3|scifi_codex_v3|scifi_fable2_v3|fable2_multipass_v3|scifi_codex_circuit_v3|sonnet_archive_multipass_v3|_otr_scifi_sonnet|run_scifi_sonnet_episode'`
   -> zero rows.
-- Tests-only bare-sonnet scan: `Get-ChildItem tests -Recurse -Include *.py | Select-String -Pattern '"scifi_sonnet"'`
-  -> zero rows.
+- Bare-sonnet scan (nodes + tests): `Get-ChildItem nodes,tests -Recurse -Include *.py | Where-Object FullName -notmatch '__pycache__' | Select-String -Pattern 'scifi_sonnet'`
+  -> EXACTLY 2 hits post-rip: `OTR_LedgerScriptWriter.py:1947` + `_otr_scifi_p0_contract.py:34`. Any other
+  hit = a ripped ref still present (the module, `_run_scifi_sonnet_lane`, a `_v3` id, or a test ref).
 - No-BOM/UTF-8 (SHOULD-FIX 2 -- check EVERY touched text file, not just the two JSONs: the edited `.md`,
   `.py` tests, `banks.json`, `pipelines.json`): for each `$p`, `[System.IO.File]::ReadAllBytes($p)[0..2]`
   must NOT equal `239 187 191` (the UTF-8 BOM). AST-parse touched `.py` via the venv python.
@@ -264,8 +275,10 @@ before removing the family-map.
    `shakespeare_v3`) reaches `run_v3_advisory` at :6907 (import-smoke does NOT prove this -- it is runtime).
 7. **Source-only retired-ref scan** (PS `Select-String`, `__pycache__` excluded) over `nodes,tests,workflows`
    returns nothing for the 4 bank ids, 3 pipeline ids, `_otr_scifi_sonnet`, `run_scifi_sonnet_episode`.
-8. **Tests-only bare-sonnet scan** returns no `"scifi_sonnet"` in tests; the ONLY allowed bare
-   `scifi_sonnet` post-rip is the kept (unreachable) `:1947` branch in `nodes/` (agy r4).
+8. **Bare-sonnet scan over `nodes` + `tests`** yields EXACTLY TWO hits, both in surviving code:
+   `OTR_LedgerScriptWriter.py:1947` (kept advisory branch) + `_otr_scifi_p0_contract.py:34` (load-bearing
+   P0-contract comment). ANY other bare `scifi_sonnet` = a missed ripped ref (operator r4 -- the "only
+   :1947" invariant was false).
 9. **Full Windows suite green; Bug Bible regression green;** counts RECORDED, not pinned.
 10. `docs/PROD_BUG_LOG.md` appended BEFORE the NEWBUG doc is marked CLOSED-BY-RIP (never deleted).
 11. Touched `.py` AST-parse; touched text files no BOM / UTF-8; commit AND push to `v2.0-alpha`; verify
