@@ -15,7 +15,8 @@ is a ripped bank, DELETE the case -- do not migrate it to a survivor to preserve
 coverage. Tests reference ONLY surviving banks, and the roster/bijection tests assert the surviving 7
 POSITIVELY (they list what exists, they do not assert what was removed). A grep for any of the 4 bank
 ids -- PLUS the 3 retired pipeline ids and `_otr_scifi_sonnet` -- across `nodes`/`tests`/`workflows`
-returns nothing, test bodies included (but NOT bare `scifi_sonnet`: the `:1947` focus branch is kept).
+returns nothing, test bodies included -- but NOT bare `scifi_sonnet`: the `:1947` focus branch is KEPT
+(unreachable post-rip but harmless, agy r4), so it legitimately holds bare `scifi_sonnet` -> carve it out.
 
 **ATOMIC (kibitz r3 SHOULD-FIX 1).** Delete the bank rows + pack dirs + `story_rules` + BOTH pipeline
 entries as ONE change BEFORE running `_otr_story_routing._ensure_loaded()`: `_sweep_and_crossref()`
@@ -25,20 +26,30 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
 ### Kibitz r1 hardening (folded, all CONFIRMED against the code)
 - **BOTH pipeline registries** -- delete the 3 v3 pipelines from `_RUNNER_BY_PIPELINE` AND
   `nodes/story_packs/pipelines.json` (:554/:663/:948); keep `legacy_many_pass_v3` (shared). See §4/§4b.
-- **Sonnet full-lane** -- delete the module `nodes/_otr_scifi_sonnet.py` (§4/§4c). **Do NOT** delete the
-  `base == "scifi_sonnet"` branch at `OTR_LedgerScriptWriter.py:1947` -- that is `_v3_focus_metric`
-  (advisory, NOT a dispatch route), reachable via the surviving inline-v3 advisory at :6905-6910, and it
-  is on the MUST-KEEP fence. Delete only `_make_v3_runner`; KEEP `run_v3_advisory` / `_v3_focus_metric` /
-  `_v3_max_run` and the :1947 branch (kibitz r4 MUST-FIX 1 -- resolves the stale-vs-corrected contradiction).
+- **Sonnet full-lane** -- delete the module `nodes/_otr_scifi_sonnet.py` (§4/§4c) and delete only
+  `_make_v3_runner` from the runner factory. KEEP the shared advisory machinery `run_v3_advisory` /
+  `_v3_focus_metric` (the FUNCTION) / `_v3_max_run` -- `public_domain_story_v3` + `shakespeare_v3` call it
+  on EVERY render (:6905-6908). **CORRECTION (agy r4 real panel -- fixes the "reachable" claim codex r1-r4
+  carried, but does NOT delete the branch):** `run_v3_advisory` derives `base` from the LANE STRING (strips
+  `_v3`), never the bank registry, so the `base == "scifi_sonnet"` branch at :1947-1948 is UNREACHABLE
+  post-rip. It is KEPT anyway -- exactly like the other now-unreachable non-inline base branches
+  (scifi_fable2 / media_archive / original_radio): harmless dead branches inside a LIVE helper, and
+  trimming a live helper mid-rip reopens NameError risk for no gain (see the §4 aside). What DOES go is the
+  branch's only pin, the sonnet advisory TEST `test_bank_variants.py:196-218` (its subject is the ripped
+  `scifi_sonnet_v3` lane -> it trips the no-dangling-ref gate). Because :1947 stays, bare `scifi_sonnet`
+  legitimately remains in `nodes/` -> KEEP the main-sweep carve-out.
 - **NEWBUG -> PBUG, don't discard** -- `scifi_fable2_v3` carried a repeatable LIVE failure; append a
   `docs/PROD_BUG_LOG.md` entry (fix = "retired the runnable bank + pipeline/route"), THEN mark the NEWBUG
   doc CLOSED-BY-RIP. Do NOT edit `_otr_scifi_fable2.py` for the deleted lane.
 - **Gate: registry invariant + no brittle count** -- add "no retired `story_pipeline_id` in
   `_otr_story_routing._ensure_loaded().pipelines`" and gate on GREEN suite + retired-id absence, not a
   predicted 8144 total (record old/new counts as evidence only).
-- **v4-guard tests enumerate banks directly** (`test_placeholder_guard_v4.py:103-104`,
-  `test_scene_guard_v4.py:91-92`, `test_provenance_v4.py:112-113`) -- regenerate those lists from the
-  surviving runnable roster or pin the exact 7 ids.
+- **v4-guard tests enumerate banks directly** via `_CURRENT_BANKS` / inline lists
+  (`test_placeholder_guard_v4.py:103-104`, `test_scene_guard_v4.py:91-92`, `test_provenance_v4.py:112-113`,
+  **`test_genre_guard_spoken_v4.py:141-145` + `test_outro_guard_v4.py:164-168`** -- agy r4 found these last
+  two that my scope enumeration MISSED) -- regenerate EVERY such list from the surviving roster. Do NOT
+  trust this enumeration as complete: `grep _CURRENT_BANKS` + the 4 ripped ids across `tests/` and fix
+  every hit (each drops the 4 ripped `_v3` ids).
 
 ## Removal depth (READ FIRST -- not all four are equal)
 
@@ -69,11 +80,13 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
 3. **Delete story_rules:** `nodes/story_rules/{scifi_sonnet_v3,media_archive_v3,scifi_codex_v3,scifi_fable2_v3}.json`.
 4. **`nodes/OTR_LedgerScriptWriter.py`** `_RUNNER_BY_PIPELINE` (~:1996-2001) -- delete the 3 entries
    `fable2_multipass_v3`, `scifi_codex_circuit_v3`, `sonnet_archive_multipass_v3`. Then remove
-   `_run_scifi_sonnet_lane` (:1851-1857). **(kibitz-QA CORRECTION -- do NOT touch `if base ==
-   "scifi_sonnet":` at :1947: it is the `reader_alternation` advisory branch INSIDE `_v3_focus_metric`,
-   NOT a dispatch route, and the MUST-KEEP fence keeps it -- surviving inline-v3 banks reach it via :6907.
-   Sonnet dispatch is fully removed by the `_RUNNER_BY_PIPELINE` entry + `_run_scifi_sonnet_lane` + the
-   module; there is no separate base-route to delete.)**
+   `_run_scifi_sonnet_lane` (:1851-1857). **(agy r4 CORRECTION -- the `if base == "scifi_sonnet":` branch
+   at :1947-1948 (`reader_alternation` inside `_v3_focus_metric`) was called "reachable" through r1-r4; it
+   is actually UNREACHABLE post-rip -- `run_v3_advisory` derives `base` from the LANE STRING, and no
+   surviving lane maps to base `scifi_sonnet`. But KEEP it: harmless dead branch inside the LIVE
+   `_v3_focus_metric`, like its non-inline siblings (see the aside below). Do NOT delete the branch or any
+   part of `_v3_focus_metric`. What DOES go is its only pin, the sonnet advisory test
+   `test_bank_variants.py:196-218`, whose subject is the ripped `scifi_sonnet_v3` lane.)**
    **`_make_v3_runner` (:1968-1994) goes DEAD once those 3 entries are removed** -- it has NO other
    caller (`legacy_many_pass_v3` runs via `_INLINE_V3_PIPELINES` :2008-2010, not `_make_v3_runner`;
    verified in-source, QA flag 3) -- so DELETE it in the same change or it is a dead lever
@@ -86,9 +99,12 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
    they are NOT dead: `run_v3_advisory` has a SECOND caller at :6905-6908 (the inline lane, guarded by
    `default_story_pipeline in _INLINE_V3_PIPELINES`) that the SURVIVING `legacy_many_pass_v3` banks
    (`public_domain_story_v3`, `shakespeare_v3`) execute on EVERY render. Deleting them = runtime
-   `NameError` for both banks. Do NOT sweep the `_v3_*` block; excise the one wrapper. (Aside: the
-   `scifi_codex`/`sonnet`/`fable2` branches in `_v3_focus_metric` :1935-1954 go unreachable post-rip --
-   LEAVE them; trimming a live helper mid-rip reopens this risk for no gain.)
+   `NameError` for both banks. Do NOT sweep the `_v3_*` block; excise the one wrapper only. (Aside, refined
+   by agy r4: inside the LIVE `_v3_focus_metric`, the `scifi_sonnet` / `scifi_fable2` / `media_archive` /
+   `original_radio` base branches all become UNREACHABLE post-rip -- only the `public_domain_story` +
+   `shakespeare` bases stay live, since those are the only surviving inline-v3 lanes. LEAVE every
+   unreachable branch: harmless dead code in a live helper, and trimming one mid-rip reopens NameError risk
+   for no gain. The sonnet :1947 branch is KEPT like its siblings; only the sonnet TEST goes.)
 4b. **`nodes/story_packs/pipelines.json`** (kibitz r1 MUST-FIX -- the OTHER pipeline registry; loaded by
    `nodes/_otr_story_routing.py:499-505`) -- delete the pipeline objects `fable2_multipass_v3` (:554),
    `scifi_codex_circuit_v3` (:663), `sonnet_archive_multipass_v3` (:948). KEEP `legacy_many_pass_v3`
@@ -121,7 +137,9 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
      inline-v3 advisory mechanism, keep it with a surviving fixture id (`public_domain_story_v3` /
      `shakespeare_v3`) -- a live positive test, never an absence test (kibitz r2 MUST-FIX 3, CLEAN RIP).
    - `tests/test_fable2_registry.py` -> state the NEW EXACT order, not just counts: `:54` pins
-     `ids[-3:]` and `:253-259` pins the full `list_bank_ids()` tuple incl. all 4 retired rows. VERIFIED
+     `ids[-3:]` -> new value `("shakespeare_v3", "scifi_codex_v4", "custom_source_bank")` (agy r4; the
+     current pin `("scifi_sonnet_v3", "scifi_codex_v4", "custom_source_bank")` names a ripped id).
+     `:253-259` pins the full `list_bank_ids()` tuple incl. all 4 retired rows. VERIFIED
      new full order (4 retired rows removed from the live tuple, checked against `:253-259`):
      `("media_archive", "original_radio", "scifi_fable2", "scifi_codex", "public_domain_story_v3",
      "shakespeare_v3", "scifi_codex_v4", "custom_source_bank")` (kibitz r2 MUST-FIX 4 + r4 SHOULD-FIX 3).
@@ -158,11 +176,15 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
   the 3 `_v3` banks the removed EXACT ids are the only computed-key prefixes -> already covered by the
   retired-id grep. The one non-obvious residual is SONNET: `meta["scifi_sonnet"]` (BARE) is written all
   over the deleted `_otr_scifi_sonnet.py` and is excluded from the main grep -- so confirm no SURVIVING
-  reader of `meta["scifi_sonnet"]` (its readers die with the module; the kept `:1947`/advisory path reads
-  a DIFFERENT `<lane>_advisory` key, not this one). So the enumeration collapses to: retired-id grep +
+  reader of `meta["scifi_sonnet"]` (its readers die with the module; the surviving advisory path writes a
+  DIFFERENT `<lane>_advisory` key, never `meta["scifi_sonnet"]`; the kept `:1947` branch computes a metric
+  and never reads `meta["scifi_sonnet"]`).
+  So the enumeration collapses to: retired-id grep +
   one `meta["scifi_sonnet"]`-reader check.
 - **Dead-runner check (QA flag 3):** every KEPT runner has a live caller post-rip; `_make_v3_runner` is
-  DELETED (dead once the 3 v3 pipelines go), but its `_v3_*` neighbors are KEPT (see the MUST-KEEP fence).
+  DELETED (dead once the 3 v3 pipelines go), but its `_v3_*` neighbors `run_v3_advisory` /
+  `_v3_focus_metric` / `_v3_max_run` are KEPT (MUST-KEEP fence); the now-unreachable base branches inside
+  `_v3_focus_metric` (incl. sonnet) are LEFT in place (agy r4 -- harmless dead code in a live helper).
 - **Runtime advisory smoke (QA -- the gap every other gate misses):** a targeted unit test OR a 30-word
   live smoke of a SURVIVING inline-v3 bank (`public_domain_story_v3` or `shakespeare_v3`) that reaches the
   advisory call at :6907. The bank-id grep never contains `run_v3_advisory`; import-smoke is import-time
@@ -183,15 +205,15 @@ half-applied delete (row gone, pack dir still on disk -- or vice-versa) false-fa
   `grep -r "scifi_sonnet_v3\|media_archive_v3\|scifi_codex_v3\|scifi_fable2_v3\|fable2_multipass_v3\|scifi_codex_circuit_v3\|sonnet_archive_multipass_v3\|_otr_scifi_sonnet\|run_scifi_sonnet_episode" nodes tests workflows`
   returns nothing (docs/tmp excepted). Run it **SOURCE-ONLY** -- `--include='*.py' --include='*.json'
   --exclude-dir=__pycache__` (or delete `nodes/**/__pycache__` + `tests/**/__pycache__` first): stale
-  `.pyc` files false-fail otherwise (kibitz r3 MUST-FIX 3). **Do NOT grep bare `scifi_sonnet`** in the
-  main sweep -- the kept `:1947` focus branch (MUST-KEEP fence) would false-fail.
-- Carve-out blind-spot closer (kibitz r3 MUST-FIX 1 / SHOULD-FIX 2): the bare-`scifi_sonnet` exclusion
-  above means bare-`scifi_sonnet` TEST refs slip through, so ALSO run `grep -rn '"scifi_sonnet"' tests`
-  -> returns nothing. Every bare-sonnet test ref is to the ripped lane and must be DELETED:
-  `test_fable2_tail_context.py:297` (drop `"scifi_sonnet"` from the parametrize) and
-  `test_bank_variants.py` `:49` (the `("scifi_sonnet_v3","scifi_sonnet")` tuple), `:58` (the real-base
-  list), `:148` (the bijection row). The ONLY allowed bare `scifi_sonnet` is the `:1947` branch in
-  `nodes/OTR_LedgerScriptWriter.py`.
+  `.pyc` files false-fail otherwise (kibitz r3 MUST-FIX 3). **Do NOT grep bare `scifi_sonnet` in the main
+  sweep** -- the KEPT `:1947` focus branch (unreachable but retained, agy r4) legitimately holds it and
+  would false-fail.
+- Carve-out blind-spot closer: because bare `scifi_sonnet` is excluded from the main sweep, ALSO run a
+  TESTS-ONLY `Select-String '"scifi_sonnet"' tests` -> returns nothing. Every bare-sonnet TEST ref is to a
+  ripped lane and must be DELETED: `test_fable2_tail_context.py:297`; `test_bank_variants.py` `:49` (the
+  `("scifi_sonnet_v3","scifi_sonnet")` tuple), `:58` (real-base list), `:148` (bijection row), and the
+  sonnet advisory test `:196-218`. The ONLY allowed bare `scifi_sonnet` post-rip is the kept `:1947`
+  branch in `nodes/OTR_LedgerScriptWriter.py`.
 
 **PowerShell gate commands (kibitz r4 MUST-FIX 4 -- the builder runs powershell.exe; `grep`/`head` do
 not exist).** Translate the unix forms above to PS:
@@ -236,12 +258,14 @@ before removing the family-map.
 4. **Ledger ownership:** no surviving reader of `meta["scifi_sonnet"]`; retired computed keys covered by
    the retired-id grep.
 5. **Dead-runner:** kept runners have live callers; `_make_v3_runner` deleted; `run_v3_advisory` /
-   `_v3_focus_metric` / `_v3_max_run` + the :1947 branch still exercised.
+   `_v3_focus_metric` / `_v3_max_run` still exercised via `public_domain_story_v3`/`shakespeare_v3`; the
+   unreachable sonnet :1947 branch LEFT in place (agy r4).
 6. **Runtime advisory:** a 30-word live smoke of a SURVIVING inline-v3 bank (`public_domain_story_v3` or
    `shakespeare_v3`) reaches `run_v3_advisory` at :6907 (import-smoke does NOT prove this -- it is runtime).
 7. **Source-only retired-ref scan** (PS `Select-String`, `__pycache__` excluded) over `nodes,tests,workflows`
    returns nothing for the 4 bank ids, 3 pipeline ids, `_otr_scifi_sonnet`, `run_scifi_sonnet_episode`.
-8. **Tests-only bare-sonnet scan** returns no `"scifi_sonnet"` except the allowed `:1947` branch.
+8. **Tests-only bare-sonnet scan** returns no `"scifi_sonnet"` in tests; the ONLY allowed bare
+   `scifi_sonnet` post-rip is the kept (unreachable) `:1947` branch in `nodes/` (agy r4).
 9. **Full Windows suite green; Bug Bible regression green;** counts RECORDED, not pinned.
 10. `docs/PROD_BUG_LOG.md` appended BEFORE the NEWBUG doc is marked CLOSED-BY-RIP (never deleted).
 11. Touched `.py` AST-parse; touched text files no BOM / UTF-8; commit AND push to `v2.0-alpha`; verify
