@@ -180,9 +180,11 @@ Then, in order:
    "best bank on aion" to "best model". Render-window work, not coder-slot.
    **A Sonnet arm is DONE (2026-07-18):** the `claude-sonnet-4.5` (creative,
    remote) / `Mistral-Nemo` (technical, local) cross-bank bake-off ran all 11
-   banks x 420/720 (18 SUCCESS / 4 FAIL). **New winner under Sonnet-4.5 =
+   banks x 420/720 (18 SUCCESS / 4 FAIL). **Best script under Sonnet-4.5 =
    `scifi_codex_v4`** (runner-up `scifi_fable2`); the codex circuit swept the
-   podium. The crown SHIFTS from the aion baseline's `scifi_fable2`, so "best
+   podium -- BUT codex_v4 is **production-fragile** (its full-media confirmation
+   FAILED on a codex string-cap; the robust runner-up `scifi_fable2` confirmed
+   full-media SUCCESS + obs asset), so the **shippable Sonnet pairing = `scifi_fable2`**. The crown SHIFTS from the aion baseline's `scifi_fable2`, so "best
    bank" depends on the writer. Mistral-Nemo stays the free local DEFAULT --
    cloud is opt-in (cost + off-machine + trips the codex all-caps / original_radio
    framing gates + degrades the v3 lanes). Full record:
