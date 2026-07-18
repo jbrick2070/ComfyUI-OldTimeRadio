@@ -3,6 +3,32 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-17 night5 -- HEAD 48f2a278 (v2.0-alpha) [v4 P2 bank #1: two-strikes kibitz + P3 fold; LIVE LEG BLOCKED at P0+P3 -> PAUSED for cross-check]
+
+Did (coder window, autonomous):
+- Two-strikes gate on the codex P3 contract: ran /kibitz r2 (local $0; Codex gpt-5.6-sol + Antigravity
+  Gemini 3.1 Pro, both grounded + Claude anchor/judge). Panel BROKE the framing: the seam cap-restatement
+  was (argued) redundant with the surface instruction's tighter ceilings, and FOUR deterministic P3 compiler
+  gates were model-invisible (unused_shot/cast_coverage/cue_id/cue_anchor), plus a 12-beat distribution trap.
+  Folded grounded survivors @ 3b74b7e3: reverted the cap list, exposed the 4 gates + 12-beat clause in the
+  shared surface/topology instruction, enriched the beat_count receipt (observed-vs-expected), +4 tests, doc
+  fixes (PBUG cites -> -02/-06; cast beats 6/9/12; P5 does not cap prose). Suite 8143 / Bible 17.
+- LIVE 30w Mistral-both leg 1 (6883758f) FAILED P3 string_too_long on `premise`. Grounded: the text-patch
+  deliberately never clips prose (_otr_scifi_codex.py:1748), so model-visible caps are the ONLY lever -> the
+  live evidence OVERTURNED the panel's "redundant" call (reverting the caps regressed it). RE-ADDED the caps
+  + a premise-brevity nudge @ 48f2a278 (suite 8143 / Bible 17).
+- LIVE leg 2 (ac027c36) then FAILED EARLIER at P0 PostValidationError -- FactIndex literal-span vs
+  whitespace-polluted RSS source (full_text leading \n+8 tabs; offset slices land mid-word; model
+  paraphrases; exact-literal contract rejects). PRE-EXISTING + SHARED across all codex banks; NOT v4-caused.
+  So the P3 caps fix is UNPROVEN (leg 2 never reached P3).
+- Per operator's new directive, wrote BOTH bugs as problem statements (docs/2026-07-17-v4-campaign/NEWBUG-*.md)
+  for a cross-check window. Operator chose PAUSE for cross-check. Reset the box (killed the resident server).
+  NO further codex code until the operator returns the fix approach.
+Current step: v4 P2 bank #1 live leg BLOCKED at P0+P3 -> PAUSED for operator cross-check vs past PBUGs.
+Next: operator cross-checks BUG A (P0 span/whitespace) + BUG B (P3 premise) vs PROD_BUG_LOG/BUG_BIBLE/
+  BUG_SYMPTOM_INDEX; then kibitz the offset-sensitive P0 fix + confirm the P3 caps on a leg that clears P0.
+Commits: 3b74b7e3 (contract-visibility fold), 48f2a278 (caps re-add). Both pushed, HEAD==origin.
+
 ## 2026-07-17 night4 -- HEAD 1fd7743d (v2.0-alpha) [v4 P2: bank #1 scifi_codex_v4 CODE SHIPPED]
 
 Did (coder window, autonomous):

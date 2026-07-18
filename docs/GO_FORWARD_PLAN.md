@@ -1,8 +1,9 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-17 night4 -- HEAD `1fd7743d` (v4 Phase 2 bank #1 `scifi_codex_v4` code
-shipped; P3 cap-restatement + bank plan pending commit with the live proof), branch
-`v2.0-alpha`. Truly forward-only by
+**Updated:** 2026-07-17 night5 -- HEAD `48f2a278` (v4 Phase 2 bank #1 `scifi_codex_v4` code +
+P3 contract-visibility fold + caps re-add shipped; LIVE LEG BLOCKED at two distinct pre-existing
+codex bugs (P0 literal-span/source-whitespace, P3 premise length) -- PAUSED for operator
+cross-check, see CURRENT STEP), branch `v2.0-alpha`. Truly forward-only by
 operator directive: completed work lives in `docs/HANDOFF_LOG.md` (history) and
 `docs/PROD_BUG_LOG.md` (bugs); doctrine lives in
 `docs/PRODUCTION_SPRINT_LESSONS.md` (the "lost anchor" class is now lesson 24
@@ -108,11 +109,21 @@ better" = a POST-BUILD blind A/B.
   `beat_count` receipt (observed-vs-expected). `string_too_long` recovery stays the text-patch seam. Full
   record: `docs/BANK_PLAN_scifi_codex_v4.md` + `kibitz-runs/2026-07-17-p3-beatcount/`. A codex leg still
   retires PBUG-20260710-07 via the announcer-sentinel mint. Pending the live 30w Mistral-both proof.
-- **NEXT:** finish the `scifi_codex_v4` live leg (Mistral + restated caps), then bank #2
-  `shakespeare_v4` -> `public_domain_story_v4` -> `media_archive_v4` -> `original_radio_v4`. Each
-  writes its OWN idiom (never sci-fi); the non-codex lanes are INLINE (`legacy_many_pass_v4` /
-  `original_multi_pass_v4`) and DO cross the authored-repair boundary -- so genre+outro gates ARE
-  safe to enable there. Pre-emptively restate any capped schema field in each lane's authoring seam.
+- **LIVE LEG BLOCKED -- PAUSED for operator cross-check (2026-07-17 night).** Two 30w Mistral-both legs
+  surfaced TWO distinct PRE-EXISTING codex bugs (neither caused by the v4 pack): leg 1 (`6883758f`) died
+  at P3 `string_too_long` on `premise`; leg 2 (`ac027c36`) died at P0 `PostValidationError` -- FactIndex
+  literal-span vs whitespace-polluted RSS source (`full_text` leading `\n`+8 tabs -> offset slices land
+  mid-whitespace/word; model paraphrases; exact-literal contract rejects). P3 caps RE-ADDED but UNPROVEN
+  (leg 2 never reached P3). Both written up:
+  `docs/2026-07-17-v4-campaign/NEWBUG-p0-literal-span-source-whitespace.md` + `NEWBUG-p3-unstated-contract.md`.
+  Operator chose to CROSS-CHECK both vs PROD_BUG_LOG/BUG_BIBLE/BUG_SYMPTOM_INDEX before the fix. NO further
+  codex code until the operator returns the approach (the P0 fix touches a shared, offset-sensitive
+  cross-lane path). Two-strikes: do NOT solo-swing a 3rd leg.
+- **NEXT (after cross-check):** root-fix P0 source-hygiene (kibitz the offset-sensitive fix first) + confirm
+  the P3 caps on a leg that clears P0; then bank #2 `shakespeare_v4` -> `public_domain_story_v4` ->
+  `media_archive_v4` -> `original_radio_v4`. Each writes its OWN idiom (never sci-fi); the non-codex lanes
+  are INLINE (`legacy_many_pass_v4` / `original_multi_pass_v4`) and DO cross the authored-repair boundary --
+  so genre+outro gates ARE safe there. Pre-emptively restate any capped schema field in each lane's seam.
 
 Open operator decisions (defaulted, vetoable at the consuming chunk):
 WORDS_PER_BEAT=40 (soft target; length recorded-not-gated); media_archive_v4 ships
