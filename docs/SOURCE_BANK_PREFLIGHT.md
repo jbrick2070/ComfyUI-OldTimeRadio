@@ -365,10 +365,14 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
   `_otr_story_routing._ensure_loaded().pipelines`; `runnable`(bank) and `executable`(pipeline) stay in
   sync or `_otr_story_routing` raises `RegistryValidationError`.
 - [ ] **Hard:** Tests UPDATED, not just deleted -- the roster/bijection test (`tests/test_bank_variants.py`
-  counts + id lists) reflects the new runnable roster; guard tests that enumerate banks
-  (`test_placeholder_guard_v4`, `test_scene_guard_v4`, `test_provenance_v4`, `test_source_snapshot`, ...)
-  regenerate their lists from the surviving roster or pin the exact surviving ids; a dedicated lane test
-  is deleted on full-family removal.
+  counts + id lists) reflects the new runnable roster; guard tests that enumerate banks via `_CURRENT_BANKS`/
+  inline lists (`test_placeholder_guard_v4`, `test_scene_guard_v4`, `test_provenance_v4`,
+  `test_genre_guard_spoken_v4`, `test_outro_guard_v4`, `test_source_snapshot`, ...) regenerate their lists
+  from the surviving roster or pin the exact ids. Do NOT trust a hand list -- `grep _CURRENT_BANKS` (+ the
+  ripped ids) across `tests/` to find EVERY such list (2026-07-18: two guard tests were missed on the first
+  hand-enumeration). Advisory/positive tests that DRIVE a ripped lane string: DELETE if the subject is the
+  ripped bank, MIGRATE to a surviving lane if they test surviving machinery. A dedicated lane test is
+  deleted on full-family removal.
 - [ ] **Hard:** Ledger discipline -- if the removed bank carried a repeatable LIVE production failure,
   RECORD a PBUG in `docs/PROD_BUG_LOG.md` with fix = "retired the runnable bank + its pipeline/route" and
   mark any open NEWBUG doc CLOSED-BY-RIP. Never delete the only causal record; a rip is a legitimate fix,
@@ -378,19 +382,26 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
 
 **Gate (identical to adding + the 2026-07-18 QA hardening):**
 - [ ] **Import-smoke (Bible 03.01/03.02):** on a full-family removal, after deleting the lane module,
-  LOAD the node registry clean ("All N nodes loaded, 0 skips") and grep `nodes/__init__.py` +
-  `NODE_CLASS_MAPPINGS` for a leftover key. A string grep proves the ids are gone, NOT that the pack
-  still imports.
+  LOAD the node registry clean ("All N nodes loaded, 0 skips") and grep the REPO-ROOT `__init__.py` for a
+  leftover key -- that is the real loader surface (`NODE_CLASS_MAPPINGS` lives at `__init__.py:116` +
+  `:351-363`), NOT `nodes/__init__.py` (corrected 2026-07-18). A string grep proves the ids are gone, NOT
+  that the pack still imports.
 - [ ] **Ledger-ownership (CLAUDE.md "no hole in the ledger"; PBUG-20260712-05):** enumerate every ledger
   field each removed bank stamped -- including COMPUTED keys (`f"{source_bank_id}_..."`) a literal grep
   misses -- and confirm zero surviving readers in the shared writer tail. A green suite does not prove
   ledger completeness.
 - [ ] **No dead levers (GO_FORWARD item 5):** every KEPT runner/helper still has a live caller post-rip;
   excise any that went dead (a shared factory used only by the removed pipelines dies with them).
-- [ ] Full Windows suite + Bug Bible GREEN -- gate on GREEN **plus retired-id absence**
-  (`grep -r "<id>" nodes tests workflows` empty), and **record suite/Bible counts as evidence, never pin
-  them** (a hardcoded count false-fails or masks a real drop).
-- [ ] `OTR_WorkflowValidator` + JSON round-trip **+ a no-BOM/UTF-8 `head -c3` check** on `banks.json` /
-  `pipelines.json` (Bible 02.11/12/13); `workflows/otr_canonical.json` byte-unchanged (registry-driven --
+- [ ] Full Windows suite + Bug Bible GREEN -- gate on GREEN **plus retired-id absence**. Scan SOURCE-ONLY
+  (exclude `__pycache__` -- stale `.pyc` false-fail) with `Select-String` (the builder runs PowerShell; no
+  `grep`). Grep the **BARE** token, NOT the quoted `"<id>"` -- a quoted grep MISSES prose/comment tokens
+  (2026-07-18: a bare `scifi_sonnet` in a surviving `_otr_scifi_p0_contract.py` comment slipped a
+  quoted-only scan and falsified an "only one ref" invariant). For a FULL-FAMILY removal the family token
+  can legitimately SURVIVE in kept code (advisory branches, forensic/PBUG comments) -- ENUMERATE those
+  carve-outs and gate on EXACTLY-N surviving hits, never a blind zero. **Record suite/Bible counts as
+  evidence, never pin them** (a hardcoded count false-fails or masks a real drop).
+- [ ] `OTR_WorkflowValidator` + JSON round-trip **+ a no-BOM/UTF-8 check on EVERY touched text file** (not
+  just the JSONs -- edited `.md`/`.py` too; PowerShell `[System.IO.File]::ReadAllBytes($p)[0..2]` must not
+  equal `239 187 191`, since the builder has no `head`) (Bible 02.11/12/13); `workflows/otr_canonical.json` byte-unchanged (registry-driven --
   a change there is a red flag; verify it strands no COMBO id, BUG-08.06/12.23); commit + push;
   `HEAD == origin`; AST-parse touched `.py`.
