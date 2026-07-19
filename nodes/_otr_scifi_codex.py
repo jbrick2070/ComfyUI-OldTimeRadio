@@ -1457,6 +1457,43 @@ def _normalize_script_line_coordinates(
     return json.dumps(data, ensure_ascii=False)
 
 
+def _normalize_draft_cue_anchors(raw: str) -> str:
+    """Clamp a P3 draft's music-cue anchor indices into their schema bounds.
+
+    ``anchor_beat_index``/``anchor_line_index`` are mechanical routing indices
+    that ``compile_radio_score_draft`` ALREADY clamps to the real beat/line
+    counts -- but the local model sometimes overshoots the schema cap, which
+    fails pydantic (``RadioScoreDraftCueV4`` ``le=...``) BEFORE the compiler's
+    clamp can run.  Clamping the raw indices to the schema bounds here (Python
+    owns them, Gate 3) lets the draft validate; the compiler then applies the
+    precise per-beat clamp.  Best-effort: any parse problem returns the raw
+    output unchanged.
+    """
+    try:
+        data = parse_first_json_object(raw)
+    except Exception:
+        return raw
+    if not isinstance(data, dict) or not isinstance(data.get("music_cues"), list):
+        return raw
+    changed = False
+    for cue in data["music_cues"]:
+        if not isinstance(cue, dict):
+            continue
+        for field, hi in (
+            ("anchor_beat_index", _RADIO_SCORE_MAX_BEATS - 1),
+            ("anchor_line_index", _RADIO_SCORE_MAX_LINES_PER_BEAT - 1),
+        ):
+            value = cue.get(field)
+            if isinstance(value, int) and not isinstance(value, bool):
+                clamped = min(max(value, 0), hi)
+                if clamped != value:
+                    cue[field] = clamped
+                    changed = True
+    if not changed:
+        return raw
+    return json.dumps(data, ensure_ascii=False)
+
+
 def _validate_script_graph(script: ScriptArtifactV4, score: RadioScoreV4) -> None:
     """Require the accepted artifact to retain the score's exact metadata graph."""
     expected = _accepted_script_line_metadata(score)
@@ -2879,6 +2916,8 @@ def invoke_codex_structured(
             )
         if script_coords is not None:
             raw = _normalize_script_line_coordinates(raw, script_coords)
+        if draft_score_pass:
+            raw = _normalize_draft_cue_anchors(raw)
         calls.append({
             "temperature": kwargs.get("temperature"),
             "max_new_tokens": kwargs.get("max_new_tokens"),

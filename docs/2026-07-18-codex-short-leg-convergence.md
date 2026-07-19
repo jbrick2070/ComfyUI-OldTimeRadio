@@ -42,6 +42,17 @@ advisory-coverage policy (`ed7b37de`) and Gate 3 ("no count field gates
 production"). The FORWARD dangling-reference gate (every line `char_id` is a
 locked cast id) and graph closure stay fatal. Called out for the eyeball.
 
+## Axis 4 -- P3 music-cue anchor indices (landed, live-surfaced)
+A third re-draw failed on `music_cues.N.anchor_line_index Input should be less
+than or equal to 1` -- the SAME class as Axis 1: `anchor_beat_index` /
+`anchor_line_index` are mechanical routing indices that `compile_radio_score_draft`
+ALREADY clamps to the real beat/line counts (1122-1134), but the local model
+overshoots the schema cap (`RadioScoreDraftCueV4`, 512-513) and pydantic rejects
+BEFORE the compiler's clamp can run. `_normalize_draft_cue_anchors` clamps them
+to the schema bounds in the draft capture wrapper (Python owns them); the
+compiler then applies the precise per-beat clamp. Same principle as Axis 1, same
+existing-clamp precedent -- not a new problem model.
+
 ## Invariants kept FATAL
 Line-ID set closure, forward speaker/`char_id` locking, `shot_index`/`cast_id`/
 `fact_id`/`cue_id`/`unused_shot`/graph closure/G9 SFW, the self-vocative repair.

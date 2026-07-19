@@ -1017,6 +1017,21 @@ def test_p3_late_recovery_text_patch_shortens_overcap_leaf_on_exhaustion():
     assert result.scenes[0].description == replacement
 
 
+def test_normalize_draft_cue_anchors_clamps_out_of_range_indices():
+    raw = json.dumps({"music_cues": [
+        {"cue_id": "music_open", "anchor_beat_index": 99, "anchor_line_index": 2},
+        {"cue_id": "music_close", "anchor_beat_index": 0, "anchor_line_index": 0},
+    ]})
+    out = json.loads(lane._normalize_draft_cue_anchors(raw))
+    assert out["music_cues"][0]["anchor_beat_index"] == lane._RADIO_SCORE_MAX_BEATS - 1
+    assert out["music_cues"][0]["anchor_line_index"] == lane._RADIO_SCORE_MAX_LINES_PER_BEAT - 1
+    assert out["music_cues"][1]["anchor_beat_index"] == 0  # in-range untouched
+    assert out["music_cues"][1]["anchor_line_index"] == 0
+    # Malformed / no cue array -> raw returned unchanged.
+    assert lane._normalize_draft_cue_anchors("not json") == "not json"
+    assert lane._normalize_draft_cue_anchors(json.dumps({"x": 1})) == json.dumps({"x": 1})
+
+
 def test_dramatic_question_repair_trims_overlong_fields_at_word_boundary():
     raw = json.dumps({
         "question": "Should park manager Lena approve drone flights over the river, knowing the science makes tracking possible but the drones may disturb nesting birds? " * 2,
