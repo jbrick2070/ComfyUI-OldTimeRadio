@@ -3,6 +3,51 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-18 evening -- HEAD `ed7b37de` (v2.0-alpha) [RENDER->CODER: short-episode structural COUNT gates -> advisory (Gate 3)]
+
+Started as the RENDER window for the local Mistral-Nemo bake-off (codex_v4 vs
+fable2 vs base codex). Precondition confirmed (HEAD `c507acff`, exact 8-id roster).
+The Step-1 wiring smokes surfaced a blocker that turned into the session's real work.
+
+DIAGNOSIS (docs/2026-07-18-render-step1-blocker.md):
+- 30w AND 120w canonical smokes hard-fail in the WRITER on deterministic STRUCTURAL
+  COUNT gates: codex P3 exact-beat-count (`beat count 6 must equal advisory 12`;
+  root: `_otr_scifi_codex.py:3297` derived beats from `cast*3`, word-blind), and
+  fable2 WORD_BUDGET/SCENE_COUNT bands. NOT a rip regression (c507acff never touched
+  the video path or fable2 lane); the gates are v4-bake-off-era regressions (git:
+  `c22eef0a`/`c942b2ae`/`95582643`) -- the pre-source-bank lanes ran any length.
+- One EARLY false lead: the first codex smoke booted in leaked `OTR_TEST_MODE=1`
+  (Start-Process inherits parent env) -> in-memory stubs -> empty video manifest.
+  Fixed the harness (leg runner strips test env) and re-ran clean.
+- Governing contract = `docs/SOURCE_BANK_PREFLIGHT.md` Gate 3: "no model-produced or
+  unused count field can gate production"; `target_words` advisory, never a fatal
+  quota gate. The gates were non-compliant.
+
+FIX (committed `ed7b37de`; operator-approved "fix the gates", kibitz r3 hardened):
+- codex: beat count scales to the word budget; a beat-count mismatch is RECONCILED
+  (advisory rebuilt to the draft's actual count) and propagated into P3/P4/P3_rewrite;
+  cast_coverage is advisory; an out-of-range cue anchor is deterministically CLAMPED.
+  Dangling-reference gates (shot_index/cast_id/fact_id/cue_id/unused_shot/graph) stay
+  fatal -- `_validate_radio_score_graph` still closes.
+- fable2: word/scene COUNT defects drive bounded rerolls only; on exhaustion the
+  cleanly-parsed draft is ACCEPTED and residuals recorded advisory in the ledger
+  (`f2.parse`/`parse_p5`). PARSE defects still fail closed.
+- kibitz r3 (Codex + Antigravity/Gemini 3.5 Flash High) caught 3 real wiring gaps I
+  folded: advisory-recording, the P3_rewrite reconcile propagation, and the
+  cast_coverage accidental-fatal-successor (both fired correctly on the live leg).
+
+VALIDATION: full suite 8082 passed / 32 skipped / 1 xfailed; Bug Bible 17 passed;
+AST + no-BOM + HEAD==origin verified. LIVE PROOF: `scifi_fable2` 120w Mistral-Nemo
+leg RESULT SUCCESS + obs_publish OK + asset on disk ("The Caretaker's Dilemma",
+108.0 MB) -- previously a hard WORD_BUDGET fail.
+
+STILL OPEN (a SEPARATE facet, NOT count gates): codex_v4 short legs still fail
+stochastically on P2 cast-name Title-Case (e.g. `Maxwell 'Max' Hart`) and P5
+self-vocative -- a codex-writer robustness follow-up under the same Gate-3
+"mechanical normalization" principle (P2 could be as small as stripping quote
+tokens from names). The local Mistral bake-off itself is NOT yet run (blocked on
+these codex facets); run it at 420/720w once codex short legs are clean.
+
 ## 2026-07-18 midday -- baseline HEAD 178e935a (v2.0-alpha) [CODER: Sonnet-bake-off rip -- 4 banks retired]
 
 Executed `docs/2026-07-18-rip-4-banks-plan.md` in one green chunk.
