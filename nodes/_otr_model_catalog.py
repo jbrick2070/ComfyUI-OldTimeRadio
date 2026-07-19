@@ -123,11 +123,15 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         loader_backend="transformers_safetensors",
         vram_fit_tier="PASS",
         approx_safetensors_gb=24.0,
-        notes="Audio C7 regression baseline -- soak-tested. Default for both slots.",
+        notes="Audio C7 regression baseline -- soak-tested. Default for both "
+        "slots. Effective context window raised to 16384 (2026-07-19) so the "
+        "scifi_codex_v4 420/720w script pass fits; short legs are unaffected "
+        "(they never reached the 8192 output-budget clamp) so C7 audio "
+        "byte-identity holds.",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
-        context_window=8192,
+        context_window=16384,
         license="apache_2_0",
         license_audit_status="mit_equivalent",
     ),
@@ -1310,12 +1314,18 @@ HARD_VRAM_CONTEXT_LIMIT = _hard_vram_context_limit()
 
 # Explicit per-model effective-context overrides for the curated set
 # only (where config.json advertises a larger window than what the
-# inference pipeline can sanely feed). The Mistral-Nemo entry pins the
-# C7 audio-baseline value -- _otr_model_loader's prior static dict said
-# 8192 for Mistral-Nemo even though config.json advertises 131072.
-# Holding that here keeps audio byte-identity across B1b.
+# inference pipeline can sanely feed). A soak-tested override for a
+# vram_fit_tier=="PASS" row is AUTHORITATIVE (see resolve_context_cap):
+# it is the value that row was proven at, not a guess to be re-clamped by
+# the generic HARD_VRAM_CONTEXT_LIMIT. Mistral-Nemo is raised to 16384
+# (2026-07-19) so the local scifi_codex_v4 420/720w script pass fits the
+# context window (config.json advertises 131072); NF4 4-bit weights + a
+# DynamicCache keep the ~1.8 GB KV at 720w inside the 16 GB card
+# (live-proven). Short legs never reached the old 8192 output-budget
+# clamp, so C7 audio byte-identity holds. Every other row stays at its
+# soak-tested 8192 (a WARN-tier override stays clamped by the hard limit).
 CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
-    "mistralai/Mistral-Nemo-Instruct-2407": 8192,
+    "mistralai/Mistral-Nemo-Instruct-2407": 16384,
     "google/gemma-2-2b-it": 8192,
     "google/gemma-4-E2B-it": 8192,
     "google/gemma-4-E4B-it": 8192,
@@ -1352,8 +1362,17 @@ def resolve_context_cap(
     """Resolve the effective context-window cap for `model_id`.
 
     Returns a tiered verdict (never raises):
-        PASS    -- model_id has an explicit override (soak-tested cap);
-                   value = min(override, HARD_VRAM_CONTEXT_LIMIT).
+        PASS    -- model_id has an explicit override (soak-tested cap). For a
+                   vram_fit_tier=="PASS" catalog row the override is
+                   AUTHORITATIVE: value = override (un-clamped), because a
+                   soak-tested cap is not a guess to be re-clamped by the
+                   generic hardware limit -- re-clamping is exactly what pinned
+                   Mistral-Nemo to a false 8192 and truncated the 420/720w
+                   script pass. If the operator has EXPLICITLY set
+                   OTR_HARD_VRAM_CONTEXT_LIMIT (a smaller-card escape hatch) the
+                   value is re-clamped to min(override, limit). A WARN/UNKNOWN
+                   catalog row's override is not soak-tested, so it also stays
+                   min(override, limit).
         WARN    -- config.json parses cleanly but model isn't in the
                    override table; value = min(parsed, HARD_VRAM_CONTEXT_LIMIT).
         UNKNOWN -- neither source resolves; value = HARD_VRAM_CONTEXT_LIMIT
@@ -1363,15 +1382,30 @@ def resolve_context_cap(
     The clamp handles two real failure modes:
       * "model says 4k but we feed 8k": parsed used, clamped down to
         limit if needed.
-      * "model says 128k, we'd OOM on 16 GB": clamped to limit.
+      * "model says 128k, we'd OOM on 16 GB": clamped to limit -- except a
+        PASS-tier override, whose window was already proven on the card.
     """
     limit = HARD_VRAM_CONTEXT_LIMIT
     override = CURATED_CONTEXT_OVERRIDES.get(model_id)
     if override is not None:
+        row = _by_repo_id().get(model_id)
+        row_is_pass = (
+            row is not None
+            and getattr(row, "vram_fit_tier", None) == "PASS"
+        )
+        # An operator who pins OTR_HARD_VRAM_CONTEXT_LIMIT is on a card whose
+        # budget we must respect even over a soak-tested override.
+        env_pinned = bool(os.environ.get("OTR_HARD_VRAM_CONTEXT_LIMIT"))
+        if row_is_pass and not env_pinned:
+            return ContextCapVerdict(
+                tier="PASS",
+                value=int(override),
+                source=f"curated-override authoritative (PASS, raw {override})",
+            )
         return ContextCapVerdict(
             tier="PASS",
             value=min(override, limit),
-            source=f"curated-override (raw {override})",
+            source=f"curated-override (raw {override}, clamped to {limit})",
         )
     parsed = _read_config_context(model_id, hub_root=hub_root)
     if parsed is not None:

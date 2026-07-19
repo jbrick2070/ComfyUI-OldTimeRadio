@@ -496,12 +496,46 @@ def test_hard_vram_context_limit_garbage_env_falls_back(monkeypatch):
     assert catalog._hard_vram_context_limit() == 8192
 
 
-def test_resolve_context_cap_pass_for_curated_override(empty_hub_root):
-    """C7 audio-baseline guard: Mistral-Nemo must return PASS @ 8192."""
+def test_resolve_context_cap_pass_for_curated_override(empty_hub_root, monkeypatch):
+    """Mistral-Nemo (vram_fit_tier=PASS) returns its AUTHORITATIVE soak-tested
+    override, un-clamped, so the local scifi_codex_v4 420/720w script pass fits
+    (2026-07-19: raised 8192 -> 16384)."""
+    monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
     v = catalog.resolve_context_cap(catalog.DEFAULT_LLM, hub_root=empty_hub_root)
     assert v.tier == "PASS"
-    assert v.value == 8192
+    assert v.value == 16384
     assert "curated-override" in v.source
+
+
+def test_resolve_context_cap_pass_override_exceeds_hard_limit(empty_hub_root, monkeypatch):
+    """The PASS-tier authoritative override is NOT clamped down to the default
+    HARD_VRAM_CONTEXT_LIMIT (8192). That re-clamp was the false-8192 wall that
+    truncated the production-length P5 script pass."""
+    monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
+    v = catalog.resolve_context_cap(catalog.DEFAULT_LLM, hub_root=empty_hub_root)
+    assert v.value > catalog.HARD_VRAM_CONTEXT_LIMIT
+
+
+def test_resolve_context_cap_env_pin_reclamps_pass_override(empty_hub_root, monkeypatch):
+    """An operator who EXPLICITLY sets OTR_HARD_VRAM_CONTEXT_LIMIT (a smaller
+    card's escape hatch) re-clamps even a PASS-tier soak-tested override."""
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "4096")
+    monkeypatch.setattr(catalog, "HARD_VRAM_CONTEXT_LIMIT", 4096)
+    v = catalog.resolve_context_cap(catalog.DEFAULT_LLM, hub_root=empty_hub_root)
+    assert v.tier == "PASS"
+    assert v.value == 4096
+
+
+def test_resolve_context_cap_warn_tier_override_not_authoritative(empty_hub_root, monkeypatch):
+    """A WARN-tier catalog row's override is NOT soak-tested, so it stays on the
+    clamped path even though it sits in CURATED_CONTEXT_OVERRIDES -- the
+    authoritative branch is gated on the real vram_fit_tier=='PASS', not merely
+    on the presence of an override entry."""
+    monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
+    v = catalog.resolve_context_cap("Qwen/Qwen2.5-14B-Instruct", hub_root=empty_hub_root)
+    assert v.tier == "PASS"
+    assert "authoritative" not in v.source
+    assert "clamped" in v.source
 
 
 def test_resolve_context_cap_warn_for_uncurated_with_config(hub_root_with_uncurated):

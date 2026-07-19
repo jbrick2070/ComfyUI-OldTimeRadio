@@ -22,9 +22,10 @@ Public surface:
         Handoff helper: skips the full torch/CUDA teardown when the writer
         used only remote LLM providers and no local cache entry exists.
 
-    MODEL_CONTEXT_CAPS: dict[str, int]
-        Local copy of the per-model context-window caps. Drift-checked at
-        first use against the function-local dict in _load_llm.
+    Per-model context caps are resolved by
+    _otr_model_catalog.resolve_context_cap (single source of truth); load_llm
+    uses the caller-supplied context_cap when given and resolves through the
+    catalog otherwise. The old local MODEL_CONTEXT_CAPS table is gone.
 
     make_generate_fn(cache_entry) -> GenerateFn
         Wraps a cache_entry into a chat-template-aware callable matching
@@ -182,8 +183,8 @@ def load_llm(
             "model_id":     <canonical model_id, no UI suffix>,
             "device":       <device string actually placed on>,
             "quantized":    <bool, True for NF4/8-bit profiles>,
-            "context_cap":  <int, from internal _MODEL_CONTEXT_CAPS
-                            or caller-provided override>,
+            "context_cap":  <int, caller-provided override or resolved
+                            via _otr_model_catalog.resolve_context_cap>,
         }
 
     Args:
@@ -191,13 +192,12 @@ def load_llm(
                   "[8-bit]" are tolerated and stripped.
         device:   target device. Defaults "cuda".
         optimization_profile: one of "Standard", "Obsidian", "8-bit".
-        context_cap: optional caller-provided context cap that
-                  overrides the internal `_MODEL_CONTEXT_CAPS` lookup.
-                  `request_slot` pre-resolves via
-                  `_otr_model_catalog.resolve_context_cap` (tiered
-                  ContextCapVerdict) and forwards the resolved value
-                  through to skip the second filesystem scan. Defaults
-                  to None (use internal lookup).
+        context_cap: optional caller-provided context cap. `request_slot`
+                  pre-resolves via `_otr_model_catalog.resolve_context_cap`
+                  (tiered ContextCapVerdict) and forwards the resolved value
+                  through. Defaults to None, in which case load_llm resolves
+                  through the SAME catalog function -- the single source of
+                  truth for every load path.
 
     Raises ModelLoaderError on any underlying failure (wraps the
     original exception via __cause__).
@@ -226,28 +226,27 @@ def load_llm(
         # production id was NF4, which is exactly the policy default.
         requested_quantized = _policy.quant_policy in ("bnb_nf4", "bnb_8bit")
 
-        # 2026-04-29: per-model context cap. See full rationale in the
-        # original story_orchestrator._load_llm header (S30 B8 hash
-        # ccf583d, lines 2019-2048). Conservative slices of native
-        # context, chosen to leave VRAM headroom for KV cache +
-        # co-resident Bark/FLUX/HuMo on a 16 GB Blackwell.
-        # BUG-LOCAL-101 dropped Mistral-Nemo from 16384 to 8192. S21.2
-        # (IMP-27) aligned the whole table at 8192 to free up dynamic
-        # VRAM during long generation for audio co-residency.
-        _MODEL_CONTEXT_CAPS = {
-            "mistralai/Mistral-Nemo-Instruct-2407":               8192,
-            "google/gemma-4-E2B-it":                              8192,
-            "google/gemma-4-E4B-it":                              8192,
-            "Qwen/Qwen2.5-14B-Instruct":                          8192,
-            "Nitral-AI/Captain-Eris_Violet-V0.420-12B":           8192,
-            "inflatebot/MN-12B-Mag-Mell-R1":                      8192,
-            "google/gemma-2-2b-it":                               8192,
-            "google/gemma-2-9b-it":                               8192,
-        }
+        # 2026-07-19: context-cap resolution is the catalog's SINGLE source of
+        # truth -- _otr_model_catalog.resolve_context_cap (tiered
+        # PASS/WARN/UNKNOWN; an authoritative soak-tested override for a
+        # vram_fit_tier=="PASS" row, otherwise clamped to
+        # HARD_VRAM_CONTEXT_LIMIT). request_slot already passes the resolved
+        # value in via `context_cap`; a direct/legacy caller that reaches
+        # load_llm WITHOUT it (e.g. the _LegacyTransformersBackendBase
+        # delegate in _otr_model_runtime) now resolves through the SAME path
+        # instead of a stale hardcoded table. This completes the S30 B1b
+        # migration that already deleted the module-level MODEL_CONTEXT_CAPS:
+        # a duplicated function-local table is exactly how Mistral-Nemo would
+        # load at a stale 8192 on the no-cap path while request_slot loaded
+        # 16384 (the BUG-LOCAL-101 lineage -- Mistral was 16384, dropped to
+        # 8192 in S21.2 for audio co-residency; the 420/720w script pass needs
+        # 16384 back and NF4 + a DynamicCache make it fit the 16 GB card).
         _resolved_id = str(model_id_full).split(" ", 1)[0].strip()
-        _cap = _MODEL_CONTEXT_CAPS.get(_resolved_id, 8192)
         if context_cap is not None:
-            _cap = context_cap
+            _cap = int(context_cap)
+        else:
+            from . import _otr_model_catalog as _otr_catalog
+            _cap = int(_otr_catalog.resolve_context_cap(_resolved_id).value)
 
         log.info(f"Loading LLM model: {_stripped_model_id} (quantized={requested_quantized})")
 

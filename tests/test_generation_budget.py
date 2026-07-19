@@ -14,6 +14,27 @@ def test_720_word_script_request_is_clamped_to_remaining_context():
     ) == 4992
 
 
+def test_prod_length_script_fits_only_at_raised_context_cap():
+    """The production-length context-cap wall (2026-07-19) and its fix, at the
+    transport-arithmetic level. The source banks inflate the P5 prompt to
+    ~4785 tokens; a 720w script needs ~6960 output tokens
+    (_script_output_token_budget). At the false 8192 cap the request is CLAMPED
+    (-> truncated JSON -> the live P5 JSONDecodeError); at Mistral-Nemo's raised
+    16384 authoritative cap the full request is admitted unclamped.
+    """
+    prompt_tokens = 4785
+    needed_output = 6960
+    # The wall: 8192 clamps below what the 720w script needs.
+    assert fit_output_tokens(
+        needed_output, context_cap=8192, prompt_tokens=prompt_tokens,
+    ) == 8192 - prompt_tokens
+    assert 8192 - prompt_tokens < needed_output
+    # The fix: 16384 admits the full request, no truncation.
+    assert fit_output_tokens(
+        needed_output, context_cap=16384, prompt_tokens=prompt_tokens,
+    ) == needed_output
+
+
 def test_context_budget_fails_when_prompt_leaves_no_viable_artifact_room():
     with pytest.raises(GenerationContextOverflowError, match="cannot fit"):
         fit_output_tokens(512, context_cap=8192, prompt_tokens=8150)

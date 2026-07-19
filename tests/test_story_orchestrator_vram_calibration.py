@@ -65,47 +65,39 @@ def test_flagship_vram_threshold_is_14_5():
 # ----- S21.2 ----------------------------------------------------------------
 
 
-def test_all_model_context_caps_at_8192():
-    """Every entry in _MODEL_CONTEXT_CAPS must be 8192. S21.2 aligned
-    Gemma 4 E2B/E4B (formerly 16384) with the rest of the table.
+def test_no_hardcoded_model_context_caps_table():
+    """The function-local ``_MODEL_CONTEXT_CAPS`` fallback table is GONE
+    (2026-07-19). S30 B1b migrated context-cap resolution to
+    ``_otr_model_catalog.resolve_context_cap``; this removed the last hardcoded
+    vestige so a no-cap ``load_llm`` caller (the ``_LegacyTransformersBackendBase``
+    delegate) can no longer silently load a model at a stale value that
+    disagrees with the catalog. Guard against anyone re-introducing a parallel
+    table (that is how Mistral-Nemo would load at a stale 8192 on the no-cap
+    path while ``request_slot`` loaded 16384).
 
-    Source-level AST walk so we don't have to import story_orchestrator
-    (which pulls torch + transformers + the OTR class graph).
+    Source-level AST walk so we don't import torch + transformers.
     """
     tree = ast.parse(_ORCH_SRC)
-    found_dict = None
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for tgt in node.targets:
-                if (
-                    isinstance(tgt, ast.Name)
-                    and tgt.id == "_MODEL_CONTEXT_CAPS"
-                ):
-                    found_dict = node.value
-                    break
-        if found_dict is not None:
-            break
-    assert isinstance(found_dict, ast.Dict), (
-        "S21.2: _MODEL_CONTEXT_CAPS dict not found at expected name."
-    )
-    for k_node, v_node in zip(found_dict.keys, found_dict.values):
-        if not isinstance(k_node, ast.Constant):
-            continue
-        if not isinstance(v_node, ast.Constant):
-            continue
-        assert v_node.value == 8192, (
-            f"S21.2: model {k_node.value!r} has cap {v_node.value} "
-            f"!= 8192. Aligning Gemma 4 E-series to 8192 was the "
-            f"S21.2 change; new entries must follow the same cap "
-            f"unless the audit-and-decide path is documented inline."
-        )
+                if isinstance(tgt, ast.Name) and tgt.id == "_MODEL_CONTEXT_CAPS":
+                    raise AssertionError(
+                        "A hardcoded _MODEL_CONTEXT_CAPS table was re-added to "
+                        "nodes/_otr_model_loader.py. Context caps are the "
+                        "catalog's single source of truth "
+                        "(_otr_model_catalog.resolve_context_cap); a parallel "
+                        "table drifts."
+                    )
 
 
-def test_default_cap_is_8192():
-    """The fallback ``_cap = _MODEL_CONTEXT_CAPS.get(_resolved_id, 8192)``
-    line still uses 8192 as the default."""
-    assert "_MODEL_CONTEXT_CAPS.get(_resolved_id, 8192)" in _ORCH_SRC, (
-        "S21.2: default-cap fallback no longer uses 8192. Audit any "
-        "change to this default in lockstep with the per-model caps "
-        "above."
+def test_load_llm_delegates_context_cap_to_catalog():
+    """When called without an explicit ``context_cap``, ``load_llm`` resolves
+    through ``_otr_model_catalog.resolve_context_cap`` -- the SAME path
+    ``request_slot`` uses -- so every load path agrees on the effective
+    window."""
+    assert "resolve_context_cap(_resolved_id)" in _ORCH_SRC, (
+        "load_llm no longer delegates its context-cap fallback to "
+        "resolve_context_cap. The catalog is the single source of truth; a "
+        "hardcoded default here is exactly the drift this guard prevents."
     )
