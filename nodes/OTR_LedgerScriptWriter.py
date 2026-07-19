@@ -1964,11 +1964,10 @@ def _v3_focus_metric(base, rows, speakers, words, counts):
 # writer's own inline branches (byte-identical on a map miss).
 _RUNNER_BY_PIPELINE = {
     "fable2_multipass": _run_fable2_lane,
-    "scifi_codex_circuit": _run_scifi_codex_lane,
-    # v4 campaign (2026-07-17): scifi_codex_v4 reuses the dedicated codex runner
-    # DIRECTLY. The proof-pressure improvement is pack-seam-only, and v4 deliberately
-    # does NOT invoke the v3 advisory wrapper (no <lane>_advisory meta field, no
-    # _v3_focus_metric) -- final.md "v4 pipelines don't invoke the v3 wrapper".
+    # 2026-07-19: base scifi_codex (v1) ripped. scifi_codex_v4 reuses the
+    # dedicated codex runner DIRECTLY; the proof-pressure improvement is
+    # pack-seam-only, and v4 deliberately does NOT invoke the v3 advisory
+    # wrapper (no <lane>_advisory meta field, no _v3_focus_metric).
     "scifi_codex_circuit_v4": _run_scifi_codex_lane,
 }
 

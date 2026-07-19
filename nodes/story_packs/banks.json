@@ -87,27 +87,6 @@
       "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass. S2: compact one-draft mode below 120 words; real three-pitch/P2a/P4/P5/keep-better full mode from 120 through 900 words."
     },
     {
-      "source_bank_id": "scifi_codex",
-      "label": "Sci-Fi Codex - Proof-Pressure Radio",
-      "source_kind": "article",
-      "interpreter": "",
-      "fetcher": "science_rss",
-      "default_story_model": "scifi_codex_v1",
-      "default_story_pipeline": "scifi_codex_circuit",
-      "defaults": {
-        "story_form_label": "science-fiction audio drama",
-        "source_material_label": "science story",
-        "title_form_label": "science-fiction radio drama",
-        "coda_mode": "real_news_report",
-        "credits_source_line": "dramatized by machine from a science report",
-        "style_pool_class": "generic",
-        "require_science_floor": true
-      },
-      "required_seams": [],
-      "runnable": true,
-      "guide_ref": ""
-    },
-    {
       "source_bank_id": "public_domain_story_v3",
       "label": "Public Domain",
       "source_kind": "public_domain_source",

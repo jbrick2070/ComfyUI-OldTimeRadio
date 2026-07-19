@@ -76,7 +76,7 @@ class TestHelper:
 
 class TestStoryRulesIndependence:
     @pytest.mark.parametrize("bank_id", [
-        "media_archive", "original_radio", "scifi_fable2", "scifi_codex",
+        "media_archive", "original_radio", "scifi_fable2",
         "public_domain_story_v3", "shakespeare_v3",
     ])
     def test_lane_resolves_its_own_rules(self, bank_id):
@@ -143,14 +143,14 @@ _V3 = {
 
 
 class TestChunk4V3Rows:
-    def test_roster_counts_7_runnable_8_visible(self):
-        # sonnet-bake-off rip + v4 campaign: 4 base + 2 _v3 + 1 _v4 + custom =
-        # 8 visible / 7 runnable.
+    def test_roster_counts_6_runnable_7_visible(self):
+        # sonnet-bake-off rip + v4 campaign + base scifi_codex rip (2026-07-19):
+        # 3 base + 2 _v3 + 1 _v4 + custom = 7 visible / 6 runnable.
         ids = ROUTING.list_bank_ids()
-        assert len(ids) == 8
+        assert len(ids) == 7
         assert ids[-1] == "custom_source_bank"
         runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
-        assert len(runnable) == 7                  # only custom is non-runnable
+        assert len(runnable) == 6                  # only custom is non-runnable
         assert len([b for b in ids if b.endswith("_v2")]) == 0
         assert len([b for b in ids if b.endswith("_v3")]) == 2
         assert len([b for b in ids if b.endswith("_v4")]) == 1
@@ -160,7 +160,7 @@ class TestChunk4V3Rows:
         assert len([b for b in ids if b.endswith("_v3")]) == 2
         # the _v3 lanes are seated after the base lanes, before custom.
         assert min(ids.index(b) for b in ids if b.endswith("_v3")) > \
-            ids.index("scifi_codex")
+            ids.index("scifi_fable2")
         assert ids[-1] == "custom_source_bank"
 
     @pytest.mark.parametrize("v3,base,pipe,kind",
@@ -247,12 +247,13 @@ class TestScifiCodexV4:
         assert pack.source_bank_id == "scifi_codex_v4"
         assert pack.story_model_id == "scifi_codex_v4"
         assert pack.story_pipeline_id == "scifi_codex_circuit_v4"
-        # dedicated-runner lane, mapped DIRECTLY to the base codex runner (NOT
-        # the v3 advisory wrapper -- identity with the v1 map proves it).
+        # dedicated-runner lane, mapped DIRECTLY to the codex runner
+        # (_run_scifi_codex_lane). base scifi_codex / scifi_codex_circuit were
+        # ripped 2026-07-19; v4 owns the shared codex runner outright now.
         assert "scifi_codex_circuit_v4" in W._RUNNER_BY_PIPELINE
         assert "scifi_codex_circuit_v4" not in W._LEGACY_INLINE_PIPELINES
         assert (W._RUNNER_BY_PIPELINE["scifi_codex_circuit_v4"]
-                is W._RUNNER_BY_PIPELINE["scifi_codex_circuit"])
+                is W._run_scifi_codex_lane)
         assert ROUTING.get_pipeline("scifi_codex_circuit_v4").executable is True
 
     def test_v4_owns_rules_by_exact_id(self):

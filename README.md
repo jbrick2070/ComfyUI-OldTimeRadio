@@ -96,7 +96,7 @@ dependency on any other lane.
 | Bank | What it does |
 |------|--------------|
 | `scifi_fable2` | LLM-first multipass sci-fi writer (the shipped default) |
-| `scifi_codex` (+ `scifi_codex_v4`) | proof-pressure sci-fi radio, a distinct multipass architecture |
+| `scifi_codex_v4` | proof-pressure sci-fi radio, a distinct multipass architecture |
 | `media_archive` | media RSS / archive items → restoration-adventure episodes |
 | `public_domain_story_v3` | faithful radio adaptation of a public-domain source |
 | `shakespeare_v3` | Folger scene adaptation |

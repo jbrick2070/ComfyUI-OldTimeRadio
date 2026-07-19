@@ -382,7 +382,7 @@ def test_scifi_rss_wrapper_requests_v4_source_floor(monkeypatch):
 
     import nodes.OTR_LedgerScriptWriter as writer
     monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
-    bank = routing.get_bank("scifi_codex")
+    bank = routing.get_bank("scifi_codex_v4")
     entry = osp.resolve_fetcher(bank)
     _lc = object()
     _pol = object()

@@ -363,7 +363,7 @@ def test_content_owned_lane_preserves_its_own_voices_without_replay():
     # A cast_seed in the contract must NOT drag a lane-owned cast into the
     # writer-picker replay -- not even when num_characters_request is absent,
     # which is exactly the live crash.
-    meta = {"source_bank": "scifi_codex", "episode_seed": 1234,
+    meta = {"source_bank": "scifi_codex_v4", "episode_seed": 1234,
             "cast_contract": {"cast_seed": 1234}}
     report: list = []
 
@@ -381,7 +381,7 @@ def test_content_owned_lane_still_fails_on_colliding_bark_voices():
 
     cast = _content_owned_cast()
     cast[2]["voice_preset"] = cast[1]["voice_preset"]  # duplicate bark voice
-    meta = {"source_bank": "scifi_codex", "episode_seed": 1234}
+    meta = {"source_bank": "scifi_codex_v4", "episode_seed": 1234}
 
     # Skipping the replay must not skip Gate 1: a lane-owned cast can never
     # ship two bark rows on the same voice.
