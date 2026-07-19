@@ -240,6 +240,67 @@ def _is_canonical_character_name(name: str) -> bool:
     )
 
 
+# Nickname decorations the model wraps around an inner Title-Case token, e.g.
+# ``Maxwell 'Max' Hart``.  Straight and curly single/double quotes are stripped.
+_CAST_NAME_QUOTE_CHARS = "\"'‘’“”"
+
+
+def _canonicalize_cast_token(raw: str) -> str | None:
+    """Canonicalize one cast-name token.
+
+    Mechanical name shape is routing metadata, not spoken prose, so Python may
+    normalize it (SOURCE_BANK_PREFLIGHT Gate 3).  Returns:
+
+    * the canonical token -- after stripping a quoted nickname wrapper
+      (``'Max'`` -> ``Max``) or an honorific abbreviation's trailing period
+      (``Col.`` -> ``Col``) and recovering Title-Case for a plain alphabetic
+      token (``marcus`` -> ``Marcus``, ``ROBOT`` -> ``Robot``); a short 2-3
+      letter acronym is kept verbatim;
+    * ``""`` to DROP a quoted nickname aside that is not itself a canonical
+      word (an "unparseable nickname"); or
+    * ``None`` when a bare token is not mechanically fixable (e.g. it carries a
+      digit) -- the whole name then defers to the bounded model repair so the
+      author's meaning (such as spelling out a number) is never lost.
+    """
+    was_quoted = (
+        len(raw) >= 2
+        and raw[0] in _CAST_NAME_QUOTE_CHARS
+        and raw[-1] in _CAST_NAME_QUOTE_CHARS
+    )
+    token = raw.strip(_CAST_NAME_QUOTE_CHARS).rstrip(".")
+    if not token:
+        return "" if was_quoted else None
+    if _CAST_NAME_WORD_RE.fullmatch(token) or _CAST_NAME_ACRONYM_RE.fullmatch(token):
+        return token
+    if token.isalpha():
+        titled = token[:1].upper() + token[1:].lower()
+        if _CAST_NAME_WORD_RE.fullmatch(titled):
+            return titled
+    return "" if was_quoted else None
+
+
+def _normalize_character_name(name: str) -> str | None:
+    """Deterministically canonicalize a fixable Title-Case cast name.
+
+    Returns the canonical name when the mechanical normalization yields one
+    that satisfies :func:`_is_canonical_character_name`, otherwise None so the
+    bounded model repair still owns the genuinely broken cases.  This never
+    invents a name: it only strips decorations, recovers casing, and drops an
+    unparseable quoted nickname aside.
+    """
+    tokens: list[str] = []
+    for raw in name.split():
+        canonical = _canonicalize_cast_token(raw)
+        if canonical is None:
+            return None
+        if canonical:
+            tokens.append(canonical)
+    candidate = " ".join(tokens)
+    if candidate and _is_canonical_character_name(candidate):
+        return candidate
+    return None
+
+
 def _validate_cast_plan(cast: CastPlanV4) -> str | None:
     """Lock the fixed roster before downstream score/script generation."""
     by_id = {row.char_id: row for row in cast.cast}
@@ -257,7 +318,15 @@ def _validate_cast_plan(cast: CastPlanV4) -> str | None:
 
 
 def repair_cast_plan_metadata(failed_output: str) -> CastPlanV4 | None:
-    """Normalize the fixed announcer identity without changing character work."""
+    """Normalize fixed announcer identity and mechanical cast-name shape.
+
+    Character work (description, gender, role, voice slot) is never touched.
+    Only two mechanical repairs run: the fixed announcer name and a
+    deterministic Title-Case normalization of a non-announcer name that failed
+    validation for a fixable reason (a quoted nickname or an honorific period),
+    per SOURCE_BANK_PREFLIGHT Gate 3.  A name that cannot be canonicalized is
+    left for the bounded model repair.
+    """
     try:
         cast = CastPlanV4.model_validate(parse_first_json_object(failed_output))
     except Exception:
@@ -265,11 +334,20 @@ def repair_cast_plan_metadata(failed_output: str) -> CastPlanV4 | None:
     rows = []
     changed = False
     for row in cast.cast:
-        if row.char_id == "announcer" and row.name != "ANNOUNCER":
-            rows.append(row.model_copy(update={"name": "ANNOUNCER"}))
-            changed = True
-        else:
-            rows.append(row)
+        if row.char_id == "announcer":
+            if row.name != "ANNOUNCER":
+                rows.append(row.model_copy(update={"name": "ANNOUNCER"}))
+                changed = True
+            else:
+                rows.append(row)
+            continue
+        if not _is_canonical_character_name(row.name):
+            normalized = _normalize_character_name(row.name)
+            if normalized is not None and normalized != row.name:
+                rows.append(row.model_copy(update={"name": normalized}))
+                changed = True
+                continue
+        rows.append(row)
     return cast.model_copy(update={"cast": rows}) if changed else None
 
 
@@ -2272,6 +2350,55 @@ def validate_spoken_text_and_roster(
         raise CodexGraphError("every locked cast row must own a voiced line")
 
 
+# ScriptArtifactV4 typed-repair guidance.  The metadata rule leaves every line's
+# text byte-for-byte intact -- correct for the boundary/shot_id/closed-graph
+# defect family.  A self-vocative is instead a spoken-PROSE defect: a character
+# opens by addressing their own name.  Python may not rewrite spoken prose
+# (SOURCE_BANK_PREFLIGHT Gate 3 line 147), so the bounded repair returns the
+# defect to the model with a named line, evidence, and the allowed correction
+# (Gate 3 line 149-153); exhaustion still fails closed.
+_SCRIPT_ARTIFACT_REPAIR_RULES = (
+    "This is a typed repair of the same ScriptArtifactV4, not a new "
+    "creative response. Return one JSON object only. Its schema_version "
+    "MUST be the exact literal scifi_codex.script_artifact.v4. Preserve "
+    "every existing title, scene, beat, character intent, and line text. "
+    "Remove every forbidden extra key. For each script line, use the "
+    "accepted score graph's owning shot_id and set boundary to shot_start "
+    "when the accepted previous line is in another shot, beat_start when "
+    "it is in the same shot but another beat, or continue otherwise. "
+    "The accepted_line_graph is closed: return every and only its line IDs; "
+    "music_cues never create a line row."
+)
+_SCRIPT_ARTIFACT_SELF_VOCATIVE_REPAIR_RULES = (
+    "This is a typed repair of the same ScriptArtifactV4, not a new "
+    "creative response. Return one JSON object only. Its schema_version "
+    "MUST be the exact literal scifi_codex.script_artifact.v4. One or more "
+    "spoken lines were rejected because the speaker opens by addressing "
+    "their OWN character by name -- a self-vocative. A character never says "
+    "their own name to themselves. Rewrite ONLY the text of each rejected "
+    "line named in validation_error so it carries the same beat, intent, and "
+    "speaker WITHOUT opening on that speaker's own name; then scan every "
+    "other line and give the same minimal rewrite to any line that opens on "
+    "its own speaker's name. Preserve every other line's text, and every "
+    "title, scene, beat, character intent, boundary, and shot_id, byte for "
+    "byte. Remove every forbidden extra key. The accepted_line_graph is "
+    "closed: return every and only its line IDs; music_cues never create a "
+    "line row."
+)
+
+
+def _script_artifact_repair_rules(detail: str) -> str:
+    """Pick ScriptArtifactV4 repair guidance from the rejection detail.
+
+    A self-vocative rejection needs the model to reword the offending line(s);
+    every other rejection keeps the metadata-preserving guidance that leaves
+    line text untouched.
+    """
+    if "self-vocative" in detail:
+        return _SCRIPT_ARTIFACT_SELF_VOCATIVE_REPAIR_RULES
+    return _SCRIPT_ARTIFACT_REPAIR_RULES
+
+
 def make_advisory_word_blueprint(requested_words: int, locked_beats: Sequence[str]) -> AdvisoryWordPlanV4:
     if not isinstance(requested_words, int) or isinstance(requested_words, bool) or not 30 <= requested_words <= 900:
         raise CodexTargetRangeError("requested_words must be 30..900")
@@ -2661,18 +2788,7 @@ def invoke_codex_structured(
                     ),
                     expected_graph.get("l001") if expected_graph is not None else None,
                 )
-            repair_rules = (
-                "This is a typed repair of the same ScriptArtifactV4, not a new "
-                "creative response. Return one JSON object only. Its schema_version "
-                "MUST be the exact literal scifi_codex.script_artifact.v4. Preserve "
-                "every existing title, scene, beat, character intent, and line text. "
-                "Remove every forbidden extra key. For each script line, use the "
-                "accepted score graph's owning shot_id and set boundary to shot_start "
-                "when the accepted previous line is in another shot, beat_start when "
-                "it is in the same shot but another beat, or continue otherwise. "
-                "The accepted_line_graph is closed: return every and only its line IDs; "
-                "music_cues never create a line row."
-            )
+            repair_rules = _script_artifact_repair_rules(detail)
         elif draft_score_pass:
             # A live P3 compact draft can be structurally complete with only a
             # few authored strings over their strict caps. Let the author make

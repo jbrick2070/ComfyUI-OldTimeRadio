@@ -767,6 +767,66 @@ def test_allowed_spoken_acronyms_include_only_bounded_short_cast_role_tokens():
     assert lane._spoken_error("The RUN ends.", allowed_all_caps=allowed) == "spoken text contains an all-caps lexical word"
 
 
+def test_repair_cast_plan_metadata_normalizes_fixable_title_case_names():
+    # The two live 30w codex failures: a quoted nickname and an honorific
+    # prefix.  Both are mechanical name shape (routing metadata), so the
+    # deterministic repair canonicalizes them instead of failing the episode.
+    cast = _metadata_repair_cast()
+    assert lane._is_canonical_character_name("Maxwell 'Max' Hart") is False
+    assert lane._is_canonical_character_name("Col. Marcus Grant") is False
+
+    for bad_name, expected in (
+        ("Maxwell 'Max' Hart", "Maxwell Max Hart"),
+        ("Col. Marcus Grant", "Col Marcus Grant"),
+        ("dr. amelia hart", "Dr Amelia Hart"),
+        ("AI UNIT", "AI Unit"),
+    ):
+        bad_row = cast.cast[1].model_copy(update={"name": bad_name})
+        broken = cast.model_copy(update={"cast": [cast.cast[0], bad_row]})
+        assert lane._validate_cast_plan(broken) is not None
+        repaired = lane.repair_cast_plan_metadata(
+            json.dumps(broken.model_dump(mode="json")),
+        )
+        assert repaired is not None, bad_name
+        assert lane._validate_cast_plan(repaired) is None
+        assert repaired.cast[1].name == expected
+        # Only the name shape changes; character work is preserved verbatim.
+        assert repaired.cast[1].character_description == bad_row.character_description
+        assert repaired.cast[1].role_in_conflict == bad_row.role_in_conflict
+        assert repaired.cast[1].gender == bad_row.gender
+        assert repaired.cast[1].voice_slot == bad_row.voice_slot
+
+    # A digit token carries meaning the model must spell out, so the whole name
+    # defers to the bounded model repair rather than silently dropping it.
+    assert lane._normalize_character_name("Unit 7") is None
+    assert lane._normalize_character_name("!!!") is None
+    # A quoted aside that is not a canonical word is an unparseable nickname.
+    assert lane._normalize_character_name("Maxwell '7' Hart") == "Maxwell Hart"
+    # An already-canonical name is left untouched (repair returns None).
+    ok_row = cast.cast[1].model_copy(update={"name": "Maxwell Hart"})
+    ok_cast = cast.model_copy(update={"cast": [cast.cast[0], ok_row]})
+    assert lane.repair_cast_plan_metadata(json.dumps(ok_cast.model_dump(mode="json"))) is None
+
+
+def test_script_artifact_repair_rules_reword_only_on_self_vocative():
+    # A self-vocative is a spoken-prose defect: the bounded repair must ask the
+    # model to reword the offending line, never preserve its text.
+    self_vocative = lane._script_artifact_repair_rules(
+        "l003: spoken text begins with a self-vocative",
+    )
+    assert "self-vocative" in self_vocative
+    assert "Rewrite ONLY the text of each rejected line" in self_vocative
+    assert "byte for byte" in self_vocative  # every OTHER line stays intact
+
+    # Every other ScriptArtifactV4 rejection keeps the metadata-preserving rule
+    # that leaves all line text untouched.
+    metadata = lane._script_artifact_repair_rules(
+        "l001 has an invalid accepted-order boundary",
+    )
+    assert metadata is lane._SCRIPT_ARTIFACT_REPAIR_RULES
+    assert "Preserve every existing title, scene, beat, character intent, and line text" in metadata
+
+
 def test_dramatic_question_repair_trims_overlong_fields_at_word_boundary():
     raw = json.dumps({
         "question": "Should park manager Lena approve drone flights over the river, knowing the science makes tracking possible but the drones may disturb nesting birds? " * 2,
