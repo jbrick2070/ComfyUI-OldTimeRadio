@@ -2559,21 +2559,24 @@ _SCRIPT_ARTIFACT_REPAIR_RULES = (
     "The accepted_line_graph is closed: return every and only its line IDs; "
     "music_cues never create a line row."
 )
-_SCRIPT_ARTIFACT_SELF_VOCATIVE_REPAIR_RULES = (
+_SCRIPT_ARTIFACT_SPOKEN_REWORD_REPAIR_RULES = (
     "This is a typed repair of the same ScriptArtifactV4, not a new "
     "creative response. Return one JSON object only. Its schema_version "
     "MUST be the exact literal scifi_codex.script_artifact.v4. One or more "
-    "spoken lines were rejected because the speaker opens by addressing "
-    "their OWN character by name -- a self-vocative. A character never says "
-    "their own name to themselves. Rewrite ONLY the text of each rejected "
-    "line named in validation_error so it carries the same beat, intent, and "
-    "speaker WITHOUT opening on that speaker's own name; then scan every "
-    "other line and give the same minimal rewrite to any line that opens on "
-    "its own speaker's name. Preserve every other line's text, and every "
-    "title, scene, beat, character intent, boundary, and shot_id, byte for "
-    "byte. Remove every forbidden extra key. The accepted_line_graph is "
-    "closed: return every and only its line IDs; music_cues never create a "
-    "line row."
+    "spoken lines were rejected for a spoken-text hygiene defect that "
+    "validation_error names and locates by line id -- for example a "
+    "self-vocative opening on the speaker's own name, an all-caps word, a "
+    "stage direction / markup / role label, a punctuation-only non-lexical "
+    "token, or empty text. Rewrite ONLY the text of each rejected line named "
+    "in validation_error so it carries the same beat, intent, and speaker as "
+    "clean plain spoken dialogue: a full sentence, no markup or stage "
+    "directions, no all-caps words, no stray punctuation-only tokens, and "
+    "never opening on the speaker's own name. Then scan every other line and "
+    "give the same minimal rewrite to any line with the same defect. Preserve "
+    "every other line's text, and every title, scene, beat, character intent, "
+    "boundary, and shot_id, byte for byte. Remove every forbidden extra key. "
+    "The accepted_line_graph is closed: return every and only its line IDs; "
+    "music_cues never create a line row."
 )
 
 
@@ -2592,16 +2595,30 @@ _SCRIPT_ARTIFACT_COVERAGE_REPAIR_RULES = (
 )
 
 
+# The per-line spoken-PROSE defects `_spoken_error` can raise. Each needs the
+# model to reword the named line (Gate 3: Python may not rewrite spoken prose),
+# NOT the metadata rule that preserves line text. Structural spoken rejections
+# (unlocked cast id, illegal role, music skip contract) are NOT here -- those
+# keep the metadata/generic guidance and their own fatal gates.
+_SPOKEN_PROSE_DEFECT_MARKERS = (
+    "self-vocative",
+    "non-lexical token",
+    "all-caps lexical word",
+    "stage direction, markup, or a role label",
+    "spoken text is empty",
+)
+
+
 def _script_artifact_repair_rules(detail: str) -> str:
     """Pick ScriptArtifactV4 repair guidance from the rejection detail.
 
-    A self-vocative rejection needs the model to reword the offending line(s); a
-    coverage rejection needs it to voice the named silent speaker(s); every other
-    rejection keeps the metadata-preserving guidance that leaves line text
-    untouched.
+    A per-line spoken-prose defect needs the model to reword the offending
+    line(s); a coverage rejection needs it to voice the named silent speaker(s);
+    every other rejection keeps the metadata-preserving guidance that leaves line
+    text untouched.
     """
-    if "self-vocative" in detail:
-        return _SCRIPT_ARTIFACT_SELF_VOCATIVE_REPAIR_RULES
+    if any(marker in detail for marker in _SPOKEN_PROSE_DEFECT_MARKERS):
+        return _SCRIPT_ARTIFACT_SPOKEN_REWORD_REPAIR_RULES
     if "must own a voiced line" in detail:
         return _SCRIPT_ARTIFACT_COVERAGE_REPAIR_RULES
     return _SCRIPT_ARTIFACT_REPAIR_RULES

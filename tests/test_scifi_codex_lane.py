@@ -808,18 +808,25 @@ def test_repair_cast_plan_metadata_normalizes_fixable_title_case_names():
     assert lane.repair_cast_plan_metadata(json.dumps(ok_cast.model_dump(mode="json"))) is None
 
 
-def test_script_artifact_repair_rules_reword_only_on_self_vocative():
-    # A self-vocative is a spoken-prose defect: the bounded repair must ask the
-    # model to reword the offending line, never preserve its text.
-    self_vocative = lane._script_artifact_repair_rules(
+def test_script_artifact_repair_rules_reword_on_any_spoken_prose_defect():
+    # Every per-line spoken-prose defect routes to the reword rule (Gate 3: the
+    # model, not Python, fixes spoken prose) -- not just the self-vocative.
+    for detail in (
         "l003: spoken text begins with a self-vocative",
+        "l001: spoken text contains a non-lexical token",
+        "l002: spoken text contains an all-caps lexical word",
+        "l004: spoken text contains stage direction, markup, or a role label",
+        "l005: spoken text is empty",
+    ):
+        rule = lane._script_artifact_repair_rules(detail)
+        assert rule is lane._SCRIPT_ARTIFACT_SPOKEN_REWORD_REPAIR_RULES, detail
+    assert (
+        "Rewrite ONLY the text of each rejected line"
+        in lane._SCRIPT_ARTIFACT_SPOKEN_REWORD_REPAIR_RULES
     )
-    assert "self-vocative" in self_vocative
-    assert "Rewrite ONLY the text of each rejected line" in self_vocative
-    assert "byte for byte" in self_vocative  # every OTHER line stays intact
+    assert "byte for byte" in lane._SCRIPT_ARTIFACT_SPOKEN_REWORD_REPAIR_RULES
 
-    # Every other ScriptArtifactV4 rejection keeps the metadata-preserving rule
-    # that leaves all line text untouched.
+    # A structural (non-prose) rejection keeps the metadata-preserving rule.
     metadata = lane._script_artifact_repair_rules(
         "l001 has an invalid accepted-order boundary",
     )

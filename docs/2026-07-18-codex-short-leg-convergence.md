@@ -69,6 +69,20 @@ the accepted P3 draft's, which already compiled into a valid ledger, so the
 model can only improve wording, never punch a hole. kibitz r2 (codex + antigravity)
 converged; the old reject-and-repair test became a one-call re-imposition test.
 
+## Axis 6 -- generalize the P5 spoken-prose reword (completes Fix 2)
+With Axis 1-5 the writer now reaches P5, and a live 30w leg failed
+`P5: l001 spoken text contains a non-lexical token`. Root: the original
+self-vocative fix (Fix 2) rerouted ONLY `self-vocative` to the reword rule; the
+other per-line spoken-prose defects `_spoken_error` raises (non-lexical token,
+all-caps lexical word, stage direction/markup/role label, empty text) still fell
+to the generic rule that tells the model to PRESERVE the defective prose.
+`_script_artifact_repair_rules` now routes ALL of them (`_SPOKEN_PROSE_DEFECT_MARKERS`)
+to `_SCRIPT_ARTIFACT_SPOKEN_REWORD_REPAIR_RULES` -- reword the named line to clean
+plain dialogue, preserve every other line (Gate 3: the model, not Python, fixes
+spoken prose; fail-closed on exhaustion). Structural spoken rejections (unlocked
+cast id, illegal role, music skip contract) stay on the metadata/generic rule and
+their own fatal gates.
+
 ## Invariants kept FATAL
 Line-ID set closure, forward speaker/`char_id` locking, `shot_index`/`cast_id`/
 `fact_id`/`cue_id`/`unused_shot`/graph closure/G9 SFW, the self-vocative repair.
