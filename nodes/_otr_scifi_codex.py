@@ -749,9 +749,12 @@ class ScriptArtifactV4(_Strict):
 _SCRIPT_ARTIFACT_FIELDS = frozenset(ScriptArtifactV4.model_fields)
 _SCRIPT_LINE_FIELDS = frozenset(ScriptLineV4.model_fields)
 _MUSIC_CUE_FIELDS = frozenset(MusicCueV4.model_fields)
-_SCRIPT_LINE_REPAIRABLE_FIELDS = frozenset({"shot_id", "boundary"})
+# beat_id/shot_id/boundary are score-derived graph coordinates: Python owns them
+# (normalized from the accepted score before validation), so the model authors
+# only line_id, char_id, speaker_role, text, and the creative line fields.
+_SCRIPT_LINE_REPAIRABLE_FIELDS = frozenset({"beat_id", "shot_id", "boundary"})
 _SCRIPT_LINE_AUTHORED_FIELDS = frozenset({
-    "line_id", "beat_id", "char_id", "speaker_role", "text",
+    "line_id", "char_id", "speaker_role", "text",
     "arc_phase", "beat_intent", "dialogue_slot_id",
 })
 _SCRIPT_SCENE_FORBIDDEN_KEYS = frozenset({"speaker", "shots", "beats"})
@@ -1410,6 +1413,48 @@ def repair_script_artifact_metadata(
     except Exception as exc:
         refuse(f"metadata-only result does not satisfy ScriptArtifactV4: {exc}")
         return None
+
+
+def _normalize_script_line_coordinates(
+    raw: str, expected: Mapping[str, tuple[str, str, str]],
+) -> str:
+    """Set each script line's score-derived coordinates before validation.
+
+    ``beat_id``/``shot_id``/``boundary`` are 100% determined by the accepted
+    score (:func:`_accepted_script_line_metadata`), so Python owns them (Gate 3):
+    the model never has to restate the exact graph position, and a stochastic
+    mismatch can no longer fail the pass.  Only lines whose ``line_id`` is in the
+    accepted graph are touched; an unknown/missing ``line_id`` is left as-is so
+    the closed-graph check still fails fatally.  Any parse problem returns the
+    raw output unchanged -- normalization is best-effort and never corrupts a
+    response or invents a line.
+    """
+    try:
+        data = parse_first_json_object(raw)
+    except Exception:
+        return raw
+    if not isinstance(data, dict) or not isinstance(data.get("lines"), list):
+        return raw
+    changed = False
+    for line in data["lines"]:
+        if not isinstance(line, dict):
+            continue
+        coords = expected.get(line.get("line_id"))
+        if coords is None:
+            continue
+        beat_id, shot_id, boundary = coords
+        if (
+            line.get("beat_id") != beat_id
+            or line.get("shot_id") != shot_id
+            or line.get("boundary") != boundary
+        ):
+            line["beat_id"] = beat_id
+            line["shot_id"] = shot_id
+            line["boundary"] = boundary
+            changed = True
+    if not changed:
+        return raw
+    return json.dumps(data, ensure_ascii=False)
 
 
 def _validate_script_graph(script: ScriptArtifactV4, score: RadioScoreV4) -> None:
@@ -2346,8 +2391,26 @@ def validate_spoken_text_and_roster(
         if err:
             raise CodexSpokenTextError(f"{line.line_id}: {err}")
     voiced = {line.char_id for line in script.lines if not line.skip}
-    if any(cid not in voiced for cid in locked):
-        raise CodexGraphError("every locked cast row must own a voiced line")
+    # Coverage is measured against the speakers the ACCEPTED score actually
+    # scheduled (its beat owners), not the full planned roster. Score-level cast
+    # coverage is advisory: a reconciled short draft may leave a planned cast
+    # member beat-less (compile logs it; it carries no lines). So P5 must not
+    # fatally resurrect the removed count gate for a cast row the score never
+    # scheduled -- doing so is what made short legs impossible (a beat-less
+    # announcer failed here every time). The forward gate (every line char_id is
+    # a locked cast id) stays fatal above; this is the reverse, closure direction.
+    scheduled = {
+        beat.char_id
+        for scene in score.scenes
+        for beat in scene.beats
+        if beat.char_id in locked
+    }
+    missing = sorted(scheduled - voiced)
+    if missing:
+        raise CodexGraphError(
+            "every cast row the score schedules must own a voiced line; "
+            f"missing: {', '.join(missing)}"
+        )
 
 
 # ScriptArtifactV4 typed-repair guidance.  The metadata rule leaves every line's
@@ -2387,15 +2450,33 @@ _SCRIPT_ARTIFACT_SELF_VOCATIVE_REPAIR_RULES = (
 )
 
 
+_SCRIPT_ARTIFACT_COVERAGE_REPAIR_RULES = (
+    "This is a typed repair of the same ScriptArtifactV4, not a new "
+    "creative response. Return one JSON object only. Its schema_version "
+    "MUST be the exact literal scifi_codex.script_artifact.v4. One or more cast "
+    "rows the score scheduled to speak have no voiced line; validation_error "
+    "names the missing cast id(s). For each named cast id, set char_id to that "
+    "id on the line(s) that belong to its scheduled beat so the character "
+    "actually speaks its own turn, and write that line's text in that speaker's "
+    "voice. Do not add, drop, or renumber lines, and preserve every other "
+    "line's text byte for byte. Remove every forbidden extra key. The "
+    "accepted_line_graph is closed: return every and only its line IDs; "
+    "music_cues never create a line row."
+)
+
+
 def _script_artifact_repair_rules(detail: str) -> str:
     """Pick ScriptArtifactV4 repair guidance from the rejection detail.
 
-    A self-vocative rejection needs the model to reword the offending line(s);
-    every other rejection keeps the metadata-preserving guidance that leaves
-    line text untouched.
+    A self-vocative rejection needs the model to reword the offending line(s); a
+    coverage rejection needs it to voice the named silent speaker(s); every other
+    rejection keeps the metadata-preserving guidance that leaves line text
+    untouched.
     """
     if "self-vocative" in detail:
         return _SCRIPT_ARTIFACT_SELF_VOCATIVE_REPAIR_RULES
+    if "must own a voiced line" in detail:
+        return _SCRIPT_ARTIFACT_COVERAGE_REPAIR_RULES
     return _SCRIPT_ARTIFACT_REPAIR_RULES
 
 
@@ -2695,6 +2776,16 @@ def invoke_codex_structured(
             "graph_status": "not_run" if draft_score_pass else "not_applicable",
         })
 
+    # Python owns the script graph coordinates: for a whole-script pass with an
+    # accepted score, precompute the score-derived (beat_id, shot_id, boundary)
+    # per line so the capture wrapper can normalize every attempt's raw output
+    # before validation (Gate 3). None disables it for every other pass.
+    script_coords = (
+        _accepted_script_line_metadata(repair_score)
+        if script_artifact_pass and repair_score is not None
+        else None
+    )
+
     def capture(messages_in, **kwargs):
         call_messages = (
             _PromptMustFitMessages(messages_in)
@@ -2730,6 +2821,8 @@ def invoke_codex_structured(
                 "[scifi_codex:%s] normalized exact resolved_artifact repair envelope",
                 pass_id,
             )
+        if script_coords is not None:
+            raw = _normalize_script_line_coordinates(raw, script_coords)
         calls.append({
             "temperature": kwargs.get("temperature"),
             "max_new_tokens": kwargs.get("max_new_tokens"),

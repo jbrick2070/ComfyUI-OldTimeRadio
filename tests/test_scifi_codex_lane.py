@@ -827,6 +827,116 @@ def test_script_artifact_repair_rules_reword_only_on_self_vocative():
     assert "Preserve every existing title, scene, beat, character intent, and line text" in metadata
 
 
+def _coverage_cast() -> lane.CastPlanV4:
+    return lane.CastPlanV4(cast=[
+        lane.CastPlanRowV4(
+            char_id="announcer", name="ANNOUNCER", character_description="Witness.",
+            gender="neutral", role_in_conflict="Frames the choice.", voice_slot="announcer",
+        ),
+        lane.CastPlanRowV4(
+            char_id="c01", name="Iona", character_description="Observer.",
+            gender="female", role_in_conflict="Tests the report.", voice_slot="c01",
+        ),
+        lane.CastPlanRowV4(
+            char_id="c02", name="Vera", character_description="Engineer.",
+            gender="female", role_in_conflict="Doubts the signal.", voice_slot="c02",
+        ),
+        lane.CastPlanRowV4(
+            char_id="c03", name="Milo", character_description="Skeptic.",
+            gender="male", role_in_conflict="Wants to reply.", voice_slot="c03",
+        ),
+    ])
+
+
+def _score_with_beat_owners(*char_ids: str) -> lane.RadioScoreV4:
+    base = _metadata_repair_score()
+    scene = base.scenes[0]
+    proto = scene.beats[0]
+    beats = [
+        proto.model_copy(update={
+            "beat_id": f"b{i + 1:03d}",
+            "shot_id": "shot_001",
+            "char_id": cid,
+            "speaker_role": "announcer" if cid == "announcer" else "character",
+            "speaker": "ANNOUNCER" if cid == "announcer" else cid.upper(),
+            "line_ids": [f"l{i + 1:03d}"],
+            "order": i + 1,
+        })
+        for i, cid in enumerate(char_ids)
+    ]
+    return base.model_copy(update={
+        "scenes": [scene.model_copy(update={"beats": beats})],
+    })
+
+
+def _script_voicing(*char_ids: str) -> lane.ScriptArtifactV4:
+    lines = [
+        lane.ScriptLineV4(
+            line_id=f"l{i + 1:03d}", beat_id=f"b{i + 1:03d}", shot_id="shot_001",
+            char_id=cid, speaker_role="announcer" if cid == "announcer" else "character",
+            text="The signal holds steady tonight.", boundary="shot_start",
+            arc_phase="arrival", beat_intent="Establish.", dialogue_slot_id=None,
+        )
+        for i, cid in enumerate(char_ids)
+    ]
+    return lane.ScriptArtifactV4(
+        schema_version="scifi_codex.script_artifact.v4", title="Coverage",
+        scenes=[{"scene_id": "scene_001", "env": "Observatory", "description": "A cold sky."}],
+        lines=lines,
+        music_cues=[lane.MusicCueV4(
+            cue_id="music_open", placement="open", description="A pulse.",
+            generation_prompt="Low pulse.", anchor_line_id="l001", anchor_beat_id="b001",
+        )],
+    )
+
+
+def test_p5_coverage_uses_score_scheduled_speakers_not_full_roster():
+    # The systematic short-leg blocker: P3 makes coverage advisory (a cast row
+    # may own no beat) but P5 used to fatally require EVERY locked row voiced.
+    cast = _coverage_cast()
+    score = _score_with_beat_owners("c01", "c02")  # announcer + c03 own no beat
+    # Voicing exactly the scheduled speakers passes; the beat-less announcer and
+    # c03 are advisory-unused, never a fatal successor to the removed count gate.
+    lane.validate_spoken_text_and_roster(_script_voicing("c01", "c02"), cast, score)
+    # A scheduled speaker left silent still fails closed, naming the missing id.
+    with pytest.raises(lane.CodexGraphError) as exc:
+        lane.validate_spoken_text_and_roster(_script_voicing("c01", "c01"), cast, score)
+    assert "missing: c02" in str(exc.value)
+    # A scheduled announcer that is silent is still fatal (not exempt).
+    with pytest.raises(lane.CodexGraphError) as exc2:
+        lane.validate_spoken_text_and_roster(
+            _script_voicing("c01"), cast, _score_with_beat_owners("announcer", "c01"),
+        )
+    assert "missing: announcer" in str(exc2.value)
+
+
+def test_normalize_script_line_coordinates_from_score():
+    score = _metadata_repair_score()
+    expected = lane._accepted_script_line_metadata(score)
+    assert expected is not None
+    raw = json.dumps({"lines": [
+        {"line_id": "l001", "beat_id": "bZZZ", "shot_id": "shot_zzz",
+         "boundary": "continue", "text": "keep me"},
+        {"line_id": "lXXX", "beat_id": "b999", "shot_id": "s999", "boundary": "continue"},
+    ]})
+    out = json.loads(lane._normalize_script_line_coordinates(raw, expected))
+    beat_id, shot_id, boundary = expected["l001"]
+    line0 = out["lines"][0]
+    assert (line0["beat_id"], line0["shot_id"], line0["boundary"]) == (beat_id, shot_id, boundary)
+    assert line0["text"] == "keep me"  # non-coordinate fields untouched
+    assert out["lines"][1]["beat_id"] == "b999"  # unknown line_id left as-is
+    # Best-effort: any parse problem returns the raw output unchanged.
+    assert lane._normalize_script_line_coordinates("not json", expected) == "not json"
+
+
+def test_script_artifact_repair_rules_coverage_branch():
+    rule = lane._script_artifact_repair_rules(
+        "every cast row the score schedules must own a voiced line; missing: c02",
+    )
+    assert rule is lane._SCRIPT_ARTIFACT_COVERAGE_REPAIR_RULES
+    assert "no voiced line" in rule
+
+
 def test_dramatic_question_repair_trims_overlong_fields_at_word_boundary():
     raw = json.dumps({
         "question": "Should park manager Lena approve drone flights over the river, knowing the science makes tracking possible but the drones may disturb nesting birds? " * 2,
