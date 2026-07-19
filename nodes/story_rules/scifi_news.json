@@ -1,6 +1,6 @@
 {
-  "rules_id": "scifi_codex_v4",
-  "label": "Sci-Fi Codex v4 - Proof-Pressure Radio",
+  "rules_id": "scifi_news",
+  "label": "Sci-Fi News - Proof-Pressure Radio",
   "schema_version": "v1",
   "cliche_patterns": [],
   "stage_business_patterns": [],

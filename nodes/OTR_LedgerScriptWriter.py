@@ -1964,11 +1964,12 @@ def _v3_focus_metric(base, rows, speakers, words, counts):
 # writer's own inline branches (byte-identical on a map miss).
 _RUNNER_BY_PIPELINE = {
     "fable2_multipass": _run_fable2_lane,
-    # 2026-07-19: base scifi_codex (v1) ripped. scifi_codex_v4 reuses the
-    # dedicated codex runner DIRECTLY; the proof-pressure improvement is
-    # pack-seam-only, and v4 deliberately does NOT invoke the v3 advisory
-    # wrapper (no <lane>_advisory meta field, no _v3_focus_metric).
-    "scifi_codex_circuit_v4": _run_scifi_codex_lane,
+    # 2026-07-19: base scifi_codex (v1) ripped; scifi_codex_v4 renamed ->
+    # scifi_news (local default). It reuses the dedicated codex runner DIRECTLY;
+    # the proof-pressure improvement is pack-seam-only, and it deliberately does
+    # NOT invoke the v3 advisory wrapper (no <lane>_advisory meta field, no
+    # _v3_focus_metric).
+    "scifi_news_circuit": _run_scifi_codex_lane,
 }
 
 # Bake-off v3 inline lane: a clone of the legacy_many_pass inline pipeline. It

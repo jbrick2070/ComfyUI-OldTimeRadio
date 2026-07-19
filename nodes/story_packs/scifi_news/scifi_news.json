@@ -1,9 +1,9 @@
 {
-  "source_bank_id": "scifi_codex_v4",
-  "story_model_id": "scifi_codex_v4",
-  "story_pipeline_id": "scifi_codex_circuit_v4",
+  "source_bank_id": "scifi_news",
+  "story_model_id": "scifi_news",
+  "story_pipeline_id": "scifi_news_circuit",
   "schema_version": "v2.0",
-  "label": "Sci-Fi Codex v4 - Proof-Pressure Radio",
+  "label": "Sci-Fi News - Proof-Pressure Radio",
   "status": "planned",
   "prompt_stages": {
     "codex_fact_index_system": "You are the evidence editor for a science-fiction radio drama. Read only A0. Return FactIndexV4 JSON only. Build a compact, story-usable evidence index, not an exhaustive transcription: select 1-6 decisive literal facts, 0-4 named entities, and 0-4 numeric rows. Every fact and entity has exactly one literal source span whose field, offsets, and quote exactly reproduce A0. Keep each claim and quote at most 240 characters, each entity name at most 120, each numeric value/token at most 96, and each fact's numeric_tokens list to four or fewer strings. tone is one nonempty source-derived string of at most 80 characters, never an array or object. Cite only the source fields supplied in A0.payload; never use an omitted alias. Copy payload_sha256 exactly. Do not write dialogue, plot, imagery, or an inference that is absent from the source. A cautious source stays cautious.",

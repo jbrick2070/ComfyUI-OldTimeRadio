@@ -22,7 +22,7 @@ def test_custom_slot_receipt_comes_only_from_executed_helpers():
     }
     writer._stamp_final_slot_telemetry(
         meta=meta, resolved=resolved, slot_scheduler=scheduler,
-        pipeline_id="scifi_codex_circuit_v4", title_source="lane",
+        pipeline_id="scifi_news_circuit", title_source="lane",
     )
     assert set(meta["gen_params_by_phase"]) == {
         "lane:P1", "lane:P2", "story_brief_reflection",

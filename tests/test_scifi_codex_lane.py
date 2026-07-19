@@ -1002,7 +1002,7 @@ def test_p3_late_recovery_text_patch_shortens_overcap_leaf_on_exhaustion():
 
     result = lane._p3_late_recovery_text_patch(
         exc=_Exhausted(), draft_score_pass=True, slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         last_raw=json.dumps(draft), post_validator=post_validator, calls=[],
         mark_attempt_complete=lambda *a: None,
     )
@@ -1212,7 +1212,7 @@ def test_max_width_p3_draft_envelopes_fit_the_local_gemma_context():
     invalid_json = json.dumps(
         invalid, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
     )
-    pack = routing.resolve_story_pack("scifi_codex_v4")
+    pack = routing.resolve_story_pack("scifi_news")
     context = _draft_context(advisory, cast, fact_index)
     reservation = lane._radio_score_draft_surface_receipt()
 
@@ -1512,7 +1512,7 @@ def test_p3_semantic_repair_uses_minified_draft_and_bounded_receipts():
     bad["music_cues"].append(copy.deepcopy(bad["music_cues"][0]))
     responses = [json.dumps(bad), json.dumps(draft.model_dump(mode="json"))]
     calls: list[dict[str, object]] = []
-    pack = routing.resolve_story_pack("scifi_codex_v4")
+    pack = routing.resolve_story_pack("scifi_news")
     journal: dict[str, object] = {}
 
     def slot_fn(messages, **kwargs):
@@ -1565,7 +1565,7 @@ def test_p3_base_and_repair_bind_locked_total_to_per_scene_cap():
         json.dumps(valid.model_dump(mode="json")),
     ]
     calls: list[dict[str, object]] = []
-    pack = routing.resolve_story_pack("scifi_codex_v4")
+    pack = routing.resolve_story_pack("scifi_news")
 
     def slot_fn(messages, **kwargs):
         calls.append({"messages": messages, **kwargs})
@@ -1666,7 +1666,7 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -1741,7 +1741,7 @@ def test_p3_rewrite_local_text_patch_preserves_locked_structure():
 
     result = lane._call_radio_score_draft(
         pass_id="P3_rewrite", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs={
             **_draft_context(advisory, cast, facts),
@@ -1784,7 +1784,7 @@ def test_p3_text_patch_preflight_falls_back_for_hidden_compiler_defect(caplog):
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -1821,7 +1821,7 @@ def test_p3_malformed_text_patch_fails_without_a_third_reroll():
     with pytest.raises(lane.CodexPassError):
         lane._call_radio_score_draft(
             pass_id="P3", slot_fn=slot_fn,
-            pack=routing.resolve_story_pack("scifi_codex_v4"),
+            pack=routing.resolve_story_pack("scifi_news"),
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
             artifact_inputs=_draft_context(advisory, cast, facts),
             advisory=advisory, cast=cast, fact_index=facts,
@@ -1907,7 +1907,7 @@ def test_p3_text_patch_receipt_distinguishes_model_prose_over_schema_cap():
     with pytest.raises(lane.CodexPassError, match="replacement_over_schema_cap"):
         lane._call_radio_score_draft(
             pass_id="P3", slot_fn=slot_fn,
-            pack=routing.resolve_story_pack("scifi_codex_v4"),
+            pack=routing.resolve_story_pack("scifi_news"),
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
             artifact_inputs=_draft_context(advisory, cast, facts),
             advisory=advisory, cast=cast, fact_index=facts,
@@ -1948,7 +1948,7 @@ def test_p3_text_patch_rejects_a_resolved_artifact_wrapper_without_reroll():
     with pytest.raises(lane.CodexPassError):
         lane._call_radio_score_draft(
             pass_id="P3", slot_fn=slot_fn,
-            pack=routing.resolve_story_pack("scifi_codex_v4"),
+            pack=routing.resolve_story_pack("scifi_news"),
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
             artifact_inputs=_draft_context(advisory, cast, facts),
             advisory=advisory, cast=cast, fact_index=facts,
@@ -2033,7 +2033,7 @@ def test_p3_scheduler_openrouter_uses_bounded_patch_and_forwards_json_mode(monke
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -2101,7 +2101,7 @@ def test_p3_openrouter_repairs_captured_ten_target_shape_with_json_mode():
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -2158,7 +2158,7 @@ def test_p3_openrouter_thirteen_targets_retain_full_repair():
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -2189,7 +2189,7 @@ def test_p3_compact_contract_names_nested_literal_values_on_base_and_repair():
         return responses.pop(0)
 
     result = lane._call_radio_score_draft(
-        pass_id="P3", slot_fn=slot_fn, pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pass_id="P3", slot_fn=slot_fn, pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -2240,7 +2240,7 @@ def test_p3_topology_pins_fully_constrained_twelve_beat_layout():
         assert "fully constrained" not in topo(n)
 
 
-def test_scifi_codex_v4_p3_prompt_contract():
+def test_scifi_news_p3_prompt_contract():
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
     cast = _metadata_repair_cast()
     facts = _metadata_repair_fact_index()
@@ -2254,7 +2254,7 @@ def test_scifi_codex_v4_p3_prompt_contract():
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -2373,7 +2373,7 @@ def test_p3_two_decode_failures_restart_only_from_trusted_draft_context():
         return responses.pop(0)
 
     result = lane._call_radio_score_draft(
-        pass_id="P3", slot_fn=slot_fn, pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pass_id="P3", slot_fn=slot_fn, pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -2444,7 +2444,7 @@ def test_p3_rewrite_reimposes_structural_drift_in_one_call():
 
     result = lane._call_radio_score_draft(
         pass_id="P3_rewrite", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=artifact_inputs,
         advisory=advisory, cast=cast, fact_index=facts,
@@ -2587,7 +2587,7 @@ def test_p3_exact_resolved_artifact_repair_envelope_is_unwrapped():
     journal: dict[str, object] = {}
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
-        pack=routing.resolve_story_pack("scifi_codex_v4"),
+        pack=routing.resolve_story_pack("scifi_news"),
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
         artifact_inputs=_draft_context(advisory, cast, facts),
         advisory=advisory, cast=cast, fact_index=facts,
@@ -2768,7 +2768,7 @@ def test_resolved_artifact_envelope_with_sibling_key_stays_fail_loud():
     with pytest.raises(lane.CodexPassError):
         lane._call_radio_score_draft(
             pass_id="P3", slot_fn=slot_fn,
-            pack=routing.resolve_story_pack("scifi_codex_v4"),
+            pack=routing.resolve_story_pack("scifi_news"),
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
             artifact_inputs=_draft_context(advisory, cast, facts),
             advisory=advisory, cast=cast, fact_index=facts,
@@ -2790,7 +2790,7 @@ def test_resolved_artifact_non_object_value_stays_fail_loud(wrapped_value):
             slot_fn=lambda messages, **kwargs: json.dumps({
                 "resolved_artifact": wrapped_value,
             }),
-            pack=routing.resolve_story_pack("scifi_codex_v4"),
+            pack=routing.resolve_story_pack("scifi_news"),
             seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
             artifact_inputs=_draft_context(advisory, cast, facts),
             advisory=advisory, cast=cast, fact_index=facts,
@@ -2801,7 +2801,7 @@ def test_resolved_artifact_non_object_value_stays_fail_loud(wrapped_value):
 
 
 def test_scifi_codex_prompt_seams_forbid_envelope_key():
-    pack = routing.resolve_story_pack("scifi_codex_v4")
+    pack = routing.resolve_story_pack("scifi_news")
     assert pack.prompt_stages
     assert all(
         "resolved_artifact" not in str(text)

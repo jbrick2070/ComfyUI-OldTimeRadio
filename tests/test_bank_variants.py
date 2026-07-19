@@ -129,7 +129,7 @@ class TestNoRegression:
 # ---------------------------------------------------------------------------
 # 5. Sonnet-bake-off rip 2026-07-18: four bake-off _v3 variants are RETIRED,
 #    leaving two inline _v3 lanes -- roster is now 7 runnable / 8 visible
-#    (scifi_codex_v4 from the 2026-07-17 v4 improvement campaign remains). The
+#    (scifi_news from the 2026-07-17 v4 improvement campaign remains). The
 #    _v2 family and the science_news family were already removed.
 # ---------------------------------------------------------------------------
 
@@ -144,8 +144,8 @@ _V3 = {
 
 class TestChunk4V3Rows:
     def test_roster_counts_6_runnable_7_visible(self):
-        # sonnet-bake-off rip + v4 campaign + base scifi_codex rip (2026-07-19):
-        # 3 base + 2 _v3 + 1 _v4 + custom = 7 visible / 6 runnable.
+        # scifi_codex_v4 renamed -> scifi_news (2026-07-19), so it is now a
+        # suffix-free base: 4 base + 2 _v3 + custom = 7 visible / 6 runnable.
         ids = ROUTING.list_bank_ids()
         assert len(ids) == 7
         assert ids[-1] == "custom_source_bank"
@@ -153,7 +153,7 @@ class TestChunk4V3Rows:
         assert len(runnable) == 6                  # only custom is non-runnable
         assert len([b for b in ids if b.endswith("_v2")]) == 0
         assert len([b for b in ids if b.endswith("_v3")]) == 2
-        assert len([b for b in ids if b.endswith("_v4")]) == 1
+        assert len([b for b in ids if b.endswith("_v4")]) == 0
 
     def test_v3_count_and_order(self):
         ids = ROUTING.list_bank_ids()
@@ -224,43 +224,43 @@ class TestChunk4V3Rows:
 
 
 # ---------------------------------------------------------------------------
-# 6. v4 improvement campaign 2026-07-17: scifi_codex_v4 is the FIRST fully
-#    INDEPENDENT _v4 bank (own row + pack + rules by exact id + own pipeline;
-#    the dedicated codex runner is reused DIRECTLY -- no v3 advisory wrapper).
-#    `_v4` is NOT a bake-off variant suffix, so base_source_bank_id leaves it
-#    unchanged (independence by construction).
+# 6. scifi_news (renamed from scifi_codex_v4, 2026-07-19; the local default
+#    sci-fi lane): a fully INDEPENDENT bank (own row + pack + rules by exact id
+#    + own pipeline; the dedicated codex runner is reused DIRECTLY -- no v3
+#    advisory wrapper). It carries no bake-off variant suffix, so
+#    base_source_bank_id leaves it unchanged (independence by construction).
 # ---------------------------------------------------------------------------
 
-class TestScifiCodexV4:
+class TestScifiNews:
     def test_v4_is_not_a_bakeoff_variant(self):
-        assert BV.base_source_bank_id("scifi_codex_v4") == "scifi_codex_v4"
-        assert BV.is_bakeoff_variant("scifi_codex_v4") is False
+        assert BV.base_source_bank_id("scifi_news") == "scifi_news"
+        assert BV.is_bakeoff_variant("scifi_news") is False
 
     def test_v4_bank_wiring(self):
         from nodes import OTR_LedgerScriptWriter as W
-        bank = ROUTING.get_bank("scifi_codex_v4")
+        bank = ROUTING.get_bank("scifi_news")
         assert bank.runnable is True
-        assert bank.default_story_pipeline == "scifi_codex_circuit_v4"
-        assert bank.default_story_model == "scifi_codex_v4"
+        assert bank.default_story_pipeline == "scifi_news_circuit"
+        assert bank.default_story_model == "scifi_news"
         assert bank.fetcher == "science_rss"
-        pack = ROUTING.resolve_story_pack("scifi_codex_v4")
-        assert pack.source_bank_id == "scifi_codex_v4"
-        assert pack.story_model_id == "scifi_codex_v4"
-        assert pack.story_pipeline_id == "scifi_codex_circuit_v4"
+        pack = ROUTING.resolve_story_pack("scifi_news")
+        assert pack.source_bank_id == "scifi_news"
+        assert pack.story_model_id == "scifi_news"
+        assert pack.story_pipeline_id == "scifi_news_circuit"
         # dedicated-runner lane, mapped DIRECTLY to the codex runner
         # (_run_scifi_codex_lane). base scifi_codex / scifi_codex_circuit were
         # ripped 2026-07-19; v4 owns the shared codex runner outright now.
-        assert "scifi_codex_circuit_v4" in W._RUNNER_BY_PIPELINE
-        assert "scifi_codex_circuit_v4" not in W._LEGACY_INLINE_PIPELINES
-        assert (W._RUNNER_BY_PIPELINE["scifi_codex_circuit_v4"]
+        assert "scifi_news_circuit" in W._RUNNER_BY_PIPELINE
+        assert "scifi_news_circuit" not in W._LEGACY_INLINE_PIPELINES
+        assert (W._RUNNER_BY_PIPELINE["scifi_news_circuit"]
                 is W._run_scifi_codex_lane)
-        assert ROUTING.get_pipeline("scifi_codex_circuit_v4").executable is True
+        assert ROUTING.get_pipeline("scifi_news_circuit").executable is True
 
     def test_v4_owns_rules_by_exact_id(self):
-        assert RULES.resolve_story_rules("scifi_codex_v4").rules_id == "scifi_codex_v4"
+        assert RULES.resolve_story_rules("scifi_news").rules_id == "scifi_news"
 
     def test_v4_science_floor_and_style_pool(self):
-        bank = ROUTING.get_bank("scifi_codex_v4")
+        bank = ROUTING.get_bank("scifi_news")
         assert bank.defaults.get("require_science_floor") is True
         assert bank.defaults.get("style_pool_class") == "generic"
 
@@ -268,7 +268,7 @@ class TestScifiCodexV4:
         # The two deterministic gates codex's fail-closed compiler structurally
         # satisfies are ON; the gates with no codex-path authored repair stay
         # OFF for the first live leg (documented, vetoable in the bank guide_ref).
-        bank = ROUTING.get_bank("scifi_codex_v4")
+        bank = ROUTING.get_bank("scifi_news")
         assert bank.defaults.get("placeholder_guard") is True
         assert bank.defaults.get("scene_coherence_check") is True
         assert bank.defaults.get("genre_guard_spoken") in (None, False)

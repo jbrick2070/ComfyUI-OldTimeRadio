@@ -409,8 +409,8 @@
       ]
     },
     {
-      "story_pipeline_id": "scifi_codex_circuit_v4",
-      "label": "Sci-Fi Codex Circuit (v4)",
+      "story_pipeline_id": "scifi_news_circuit",
+      "label": "Sci-Fi News Circuit",
       "executable": true,
       "requires_source_contract": false,
       "declared_seams": [
