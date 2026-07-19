@@ -1196,9 +1196,11 @@ def test_draft_compiler_rejects_unowned_or_invalid_runtime_decisions():
     baseline = _draft_for_advisory(advisory).model_dump(mode="json")
 
     cases = []
-    missing_beat = copy.deepcopy(baseline)
-    missing_beat["scenes"][0]["beats"].pop()
-    cases.append(("beat_count", missing_beat))
+    # NOTE: beat_count (a short draft) and cast_coverage (an uncovered planned
+    # cast member) are NO LONGER rejections -- they are reconciled/advisory per
+    # Gate 3 (counts never gate production). Their cases were removed; the checks
+    # below are the integrity gates that stay fatal (dangling references, dup IDs,
+    # unknown facts/cast, an unowned declared shot, out-of-range cue anchors).
     one_shot = copy.deepcopy(baseline)
     one_shot["scenes"][0]["shots"].pop()
     one_shot["scenes"][0]["beats"][1]["shot_index"] = 1
@@ -1210,10 +1212,6 @@ def test_draft_compiler_rejects_unowned_or_invalid_runtime_decisions():
     unknown_cast = copy.deepcopy(baseline)
     unknown_cast["scenes"][0]["beats"][0]["char_id"] = "c02"
     cases.append(("cast_id", unknown_cast))
-    uncovered_cast = copy.deepcopy(baseline)
-    for beat in uncovered_cast["scenes"][0]["beats"]:
-        beat["char_id"] = "announcer"
-    cases.append(("cast_coverage", uncovered_cast))
     unknown_fact = copy.deepcopy(baseline)
     unknown_fact["scenes"][0]["beats"][0]["fact_ids"] = ["F02"]
     cases.append(("fact_id", unknown_fact))
@@ -1223,9 +1221,11 @@ def test_draft_compiler_rejects_unowned_or_invalid_runtime_decisions():
     duplicate_cue = copy.deepcopy(baseline)
     duplicate_cue["music_cues"].append(copy.deepcopy(duplicate_cue["music_cues"][0]))
     cases.append(("cue_id", duplicate_cue))
-    bad_anchor = copy.deepcopy(baseline)
-    bad_anchor["music_cues"][0]["anchor_beat_index"] = 5
-    cases.append(("cue_anchor", bad_anchor))
+    # NOTE: an out-of-range cue anchor is no longer a rejection -- it is a
+    # MECHANICAL routing index that Python CLAMPS deterministically to a valid
+    # beat/line per Gate 3 (a stale index after a reconciled short draft must not
+    # gate production). Its former reject case was removed; see the dedicated
+    # clamp test below.
 
     for expected_code, raw_draft in cases:
         draft = lane.RadioScoreDraftV4.model_validate(raw_draft)
@@ -1295,7 +1295,13 @@ def test_p3_base_and_repair_bind_locked_total_to_per_scene_cap():
     facts = _metadata_repair_fact_index()
     valid = _draft_for_advisory(advisory)
     wrong_total = valid.model_dump(mode="json")
-    wrong_total["scenes"] = wrong_total["scenes"][:1]
+    # A per-scene-cap violation (all 6 beats in a single scene, above the
+    # max-4-per-scene draft schema) forces the structural retry. NOTE: the old
+    # truncated-total variant (scenes[:1]) is now RECONCILED by the compiler
+    # (Gate 3), not rejected, so it would no longer trigger a repair.
+    all_beats = [beat for scene in wrong_total["scenes"] for beat in scene["beats"]]
+    wrong_total["scenes"] = [wrong_total["scenes"][0]]
+    wrong_total["scenes"][0]["beats"] = all_beats
     responses = [
         json.dumps(wrong_total),
         json.dumps(valid.model_dump(mode="json")),
@@ -2016,19 +2022,40 @@ def test_scifi_codex_v4_p3_prompt_contract():
     assert "every accepted cast ID MUST own at least one beat" in system
 
 
-def test_p3_beat_count_error_reports_expected_count():
+def test_p3_beat_count_mismatch_is_reconciled_not_rejected():
+    # Gate 3 (SOURCE_BANK_PREFLIGHT): "no model-produced or unused count field
+    # can gate production". A beat-count mismatch is RECONCILED -- the advisory
+    # word plan is rebuilt onto the draft's ACTUAL beat count -- never raised. A
+    # 3-beat plan whose draft carries 2 beats compiles to a 2-beat score.
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
     cast = _metadata_repair_cast()
     facts = _metadata_repair_fact_index()
     baseline = _draft_for_advisory(advisory).model_dump(mode="json")
     baseline["scenes"][0]["beats"].pop()
     draft = lane.RadioScoreDraftV4.model_validate(baseline)
-    with pytest.raises(lane.RadioScoreDraftCompileError) as exc_info:
-        lane.compile_radio_score_draft(draft, advisory, cast, facts)
-    assert exc_info.value.code == "beat_count"
-    # enriched receipt (kibitz r2): the expected count is interpolated so a live
-    # leg rejection is diagnosable without storing unbounded model output.
-    assert "accepted advisory count 3" in exc_info.value.detail
+    score = lane.compile_radio_score_draft(draft, advisory, cast, facts)
+    assert isinstance(score, lane.RadioScoreV4)
+    observed = [beat for scene in score.scenes for beat in scene.beats]
+    assert len(observed) == 2
+    assert len(score.advisory_word_plan.per_beat) == 2
+
+
+def test_cue_anchor_out_of_range_is_clamped_not_rejected():
+    # Gate 3: a stale cue anchor (index past the beats/lines a reconciled short
+    # draft actually carries) is MECHANICAL routing metadata that Python clamps
+    # to the last valid beat/line -- never a fatal gate. The cue still lands on a
+    # real beat/line, so the executable graph stays closed.
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    baseline = _draft_for_advisory(advisory).model_dump(mode="json")
+    baseline["music_cues"][0]["anchor_beat_index"] = 5  # past the 3 beats
+    baseline["music_cues"][0]["anchor_line_index"] = 1  # past this beat's 1 line
+    draft = lane.RadioScoreDraftV4.model_validate(baseline)
+    score = lane.compile_radio_score_draft(draft, advisory, cast, facts)
+    assert isinstance(score, lane.RadioScoreV4)
+    assert lane._validate_radio_score_graph(
+        score, score.advisory_word_plan) is None
 
 
 def test_p0_source_spans_survive_whitespace_polluted_source():

@@ -222,10 +222,18 @@ class TestScriptLadder:
         assert trace[0].character_words is not None
         assert trace[0].scene_character_words
 
-    def test_budget_exhaustion_fails_loud(self):
+    def test_budget_exhaustion_accepts_as_advisory(self):
+        # Gate 3 (SOURCE_BANK_PREFLIGHT): word/scene COUNT defects are advisory
+        # and recorded, never a fatal quota gate. Once the bounded reroll budget
+        # is spent, the cleanly-parsed draft is ACCEPTED and the residual defects
+        # are recorded in meta -- the pass no longer raises on a budget miss.
         fn = _ScriptedFn([_FAT_MARKUP, _FAT_MARKUP, _FAT_MARKUP])
-        with pytest.raises(F2.Fable2ScriptError, match="WORD_BUDGET"):
-            _run_script_pass(fn)
+        raw, parsed, meta = _run_script_pass(fn)
+        assert parsed is not None
+        assert any(
+            "WORD_BUDGET" in defect
+            for defect in meta["advisory_budget_defects"]
+        )
 
     def test_ladder_exhaustion_fails_loud_naming_the_pass(self):
         fn = _ScriptedFn([_BAD_SHAPE_MARKUP] * 4)

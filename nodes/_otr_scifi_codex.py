@@ -864,14 +864,30 @@ def compile_radio_score_draft(
         )
 
     flat_draft_beat_count = sum(len(scene.beats) for scene in draft.scenes)
-    if flat_draft_beat_count != len(advisory_rows):
+    if flat_draft_beat_count < 1:
         raise RadioScoreDraftCompileError(
             code="beat_count", path="scenes[*].beats",
-            detail=(
-                f"flattened draft beat count {flat_draft_beat_count} must equal "
-                f"accepted advisory count {len(advisory_rows)}"
-            ),
+            detail="draft must contain at least one beat",
         )
+    if flat_draft_beat_count != len(advisory_rows):
+        # Gate 3 (SOURCE_BANK_PREFLIGHT): "No model-produced or unused count
+        # field can gate production"; `target_words` is advisory, never a fatal
+        # quota gate. A beat-count mismatch must NOT fail the episode. Reconcile
+        # the advisory word plan onto the draft's ACTUAL beat count so word
+        # centers redistribute deterministically; the positional compile below
+        # stays valid for any count. (advisory_total_center == requested_words,
+        # already range-validated 30..900 by make_advisory_word_blueprint.)
+        log.info(
+            "[scifi_codex] P3 beat-count reconciled: draft=%d advisory=%d "
+            "(Gate 3: counts are advisory, never a fatal quota gate)",
+            flat_draft_beat_count, len(advisory_rows),
+        )
+        advisory = make_advisory_word_blueprint(
+            advisory.advisory_total_center,
+            [f"b{i:03d}" for i in range(flat_draft_beat_count)],
+        )
+        advisory_rows = list(advisory.per_beat)
+        advisory_ids = [row.beat_id for row in advisory_rows]
 
     cast_by_id = {row.char_id: row for row in cast.cast}
     if len(cast_by_id) != len(cast.cast) or "announcer" not in cast_by_id:
@@ -989,9 +1005,17 @@ def compile_radio_score_draft(
         ))
 
     if used_cast_ids != set(cast_by_id):
-        raise RadioScoreDraftCompileError(
-            code="cast_coverage", path="scenes[*].beats[*].char_id",
-            detail="every accepted cast ID must own at least one spoken beat",
+        # Gate 3 (SOURCE_BANK_PREFLIGHT): coverage is a COUNT field and must not
+        # gate production. A short/reconciled draft may not give every planned
+        # cast member a beat; that is ADVISORY (recorded), not fatal -- otherwise
+        # cast_coverage becomes an accidental fatal successor to the removed
+        # beat-count gate (kibitz r3, Codex). The reverse hole -- a beat naming an
+        # unknown cast id -- is still rejected per-beat above, so the executable
+        # graph stays closed (an uncovered cast member simply carries no lines).
+        log.info(
+            "[scifi_codex] cast_coverage advisory: %d/%d planned cast own a beat "
+            "(uncovered: %s)", len(used_cast_ids), len(cast_by_id),
+            sorted(set(cast_by_id) - used_cast_ids),
         )
 
     compiled_cues: list[MusicCueV4] = []
@@ -1004,23 +1028,35 @@ def compile_radio_score_draft(
                 detail="draft music cue IDs must be unique",
             )
         seen_cue_ids.add(draft_cue.cue_id)
-        if not 0 <= draft_cue.anchor_beat_index < len(line_manifest):
-            raise RadioScoreDraftCompileError(
-                code="cue_anchor", path=f"{cue_path}.anchor_beat_index",
-                detail="cue anchor beat index is outside the flattened draft beats",
+        # Gate 3 (SOURCE_BANK_PREFLIGHT): a cue anchor is MECHANICAL routing
+        # metadata (an index/reference), not authored prose -- "Python creates
+        # only mechanical data such as IDs, order, references ... routing
+        # metadata". When a reconciled draft has fewer beats than the model
+        # assumed (it placed cues against the requested count), its anchor can
+        # point past the real beats. CLAMP the index to the last valid beat/line
+        # deterministically rather than failing the episode -- a stale index must
+        # never be a fatal count gate. The cue still lands on a real beat, so the
+        # executable graph stays closed. (line_manifest has >=1 entry: >=1 beat
+        # is enforced above.)
+        anchor_beat_index = draft_cue.anchor_beat_index
+        if not 0 <= anchor_beat_index < len(line_manifest):
+            clamped = min(max(anchor_beat_index, 0), len(line_manifest) - 1)
+            log.info(
+                "[scifi_codex] cue_anchor clamped: %s beat %d -> %d (of %d beats)",
+                draft_cue.cue_id, anchor_beat_index, clamped, len(line_manifest),
             )
-        anchor_beat_id, anchor_line_ids = line_manifest[draft_cue.anchor_beat_index]
-        if not 0 <= draft_cue.anchor_line_index < len(anchor_line_ids):
-            raise RadioScoreDraftCompileError(
-                code="cue_anchor", path=f"{cue_path}.anchor_line_index",
-                detail="cue anchor line index is outside its selected beat",
-            )
+            anchor_beat_index = clamped
+        anchor_beat_id, anchor_line_ids = line_manifest[anchor_beat_index]
+        anchor_line_index = draft_cue.anchor_line_index
+        if not 0 <= anchor_line_index < len(anchor_line_ids):
+            anchor_line_index = min(
+                max(anchor_line_index, 0), len(anchor_line_ids) - 1)
         compiled_cues.append(MusicCueV4(
             cue_id=draft_cue.cue_id,
             placement=_DRAFT_CUE_PLACEMENTS[draft_cue.cue_id],
             description=draft_cue.description,
             generation_prompt=draft_cue.generation_prompt,
-            anchor_line_id=anchor_line_ids[draft_cue.anchor_line_index],
+            anchor_line_id=anchor_line_ids[anchor_line_index],
             anchor_beat_id=anchor_beat_id,
         ))
 
@@ -3294,7 +3330,16 @@ def run_scifi_codex_episode(
         # 2026-06-18). Trim it at a word boundary and get on with the story.
         clamp_overlong_strings=True,
     )
-    beat_ids = [f"b{i:03d}" for i in range(max(3, min(12, len(p2.cast) * 3)))]
+    # Gate 3 (SOURCE_BANK_PREFLIGHT): structure scales from the real size driver,
+    # not a fixed cast-derived count. A short episode cannot carry 12 beats;
+    # demanding them is what made P3 fail below ~480 words (the cast*3 count
+    # ignored the word budget entirely). Scale the beat count by the word budget
+    # (~15 words/beat floor) while keeping it >= cast size so every cast member
+    # can still own a beat, capped at the original ceiling of 12.
+    _cast_n = max(1, len(p2.cast))
+    _words_cap = max(3, steer.requested_words // 15)
+    _beat_n = max(_cast_n, 3, min(12, _cast_n * 3, _words_cap))
+    beat_ids = [f"b{i:03d}" for i in range(_beat_n)]
     advisory = make_advisory_word_blueprint(steer.requested_words, beat_ids)
     score_token_budget = _radio_score_draft_output_token_budget(
         steer.requested_words, len(beat_ids),
@@ -3318,6 +3363,21 @@ def run_scifi_codex_episode(
         base_temperature=.72, structural_retry_temperature=.32,
         max_new_tokens=score_token_budget, call_journal=journal,
     )
+    # Gate 3 reconcile propagation (kibitz r3, Codex -- grounded): P3's compiler
+    # may have rebuilt the advisory to the draft's ACTUAL beat count. Rebind the
+    # pipeline's advisory to the ACCEPTED plan so P4, the P3_rewrite topology +
+    # structural round-trip, and expected_signature all bind to the accepted
+    # count -- never the stale pre-P3 request count (which would hand P3_rewrite a
+    # contradictory "exactly N beats" instruction vs the previous draft).
+    accepted_advisory = p3.advisory_word_plan
+    if accepted_advisory.model_dump(mode="json") != advisory.model_dump(mode="json"):
+        journal["radio_score_draft_reconcile"] = {
+            "requested_beat_count": len(advisory.per_beat),
+            "accepted_beat_count": len(accepted_advisory.per_beat),
+            "reconciled": True,
+        }
+    advisory = accepted_advisory
+    p3_draft_inputs["advisory_word_plan"] = advisory.model_dump(mode="json")
     review = invoke_codex_structured(
         pass_id="P4", slot="technical", slot_fn=technical_fn, pack=pack,
         seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),

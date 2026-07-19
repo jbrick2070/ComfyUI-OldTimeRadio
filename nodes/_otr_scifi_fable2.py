@@ -1777,13 +1777,14 @@ def _script_budget_defects(parsed: ParsedScript,
             f"SCENE_COUNT: parsed {len(counts)} scene(s), expected "
             f"{envelope.scene_count}"
         )
-    # Per-scene FATAL check = the GROSS band (+/-50%), not the advisory +/-30%
-    # (kibitz 2026-07-14, refined-C). An ordinary +/-30% miss is steered by the
-    # prompt vector and penalized by _draft_score, but only GROSS imbalance --
-    # a scene structurally out of proportion -- fails the episode. This renders
-    # otherwise-good, correct-total episodes that a 12B/mini model wrote with a
-    # few words of per-scene jitter, while still catching a ballooned or starved
-    # scene. The total-word band and scene-count above remain fatal.
+    # Per-scene check = the GROSS band (+/-50%), not the advisory +/-30% (kibitz
+    # 2026-07-14, refined-C). An ordinary +/-30% miss is steered by the prompt
+    # vector and penalized by _draft_score; the GROSS band still drives a reroll
+    # for a scene structurally out of proportion. NOTE (Gate 3, 2026-07-18): these
+    # word/scene COUNT defects (total-word band, scene-count, per-scene gross) now
+    # drive BOUNDED REROLLS only -- once the reroll budget is spent, _run_markup_ladder
+    # ACCEPTS the cleanly-parsed draft and records the residuals as advisory. They
+    # are no longer a fatal quota gate ("no count field can gate production").
     for index, (count, target, gross) in enumerate(zip(
             counts, envelope.scene_word_targets,
             envelope.scene_word_gross_bands), start=1):
@@ -1937,7 +1938,15 @@ def _run_markup_ladder(
 
             scene_counts = _scene_character_word_counts(parsed)
             budget_defects = _script_budget_defects(parsed, envelope)
-            if budget_defects:
+            # Gate 3 (SOURCE_BANK_PREFLIGHT): word/scene COUNT defects are ADVISORY
+            # and recorded -- `target_words` "does not trigger ... a fatal quota
+            # gate", and "no model-produced or unused count field can gate
+            # production". So reroll only while the bounded reroll budget remains;
+            # once it is spent, ACCEPT the cleanly-parsed draft below and record
+            # the residual budget defects, never fail the episode on counts.
+            # (PARSE defects above still fail closed per Gate 3's bounded-repair
+            # rule -- a malformed script cannot become a ledger.)
+            if budget_defects and budget_rerolls < _MAX_BUDGET_REROLLS:
                 traces.append(PassAttemptTrace(
                     attempt=attempt,
                     temperature=float(temp),
@@ -1949,9 +1958,6 @@ def _run_markup_ladder(
                 ))
                 defects_by_attempt.append(list(budget_defects))
                 last_defect_text = "; ".join(budget_defects)
-                if budget_rerolls >= _MAX_BUDGET_REROLLS:
-                    raise Fable2ScriptError(
-                        pass_id, last_defect_text, len(traces))
                 budget_rerolls += 1
                 lo, hi = _word_band(envelope.total_words)
                 verb = (
@@ -2003,6 +2009,9 @@ def _run_markup_ladder(
                 "attempt_trace": trace_tuple,
                 "actual_max_new_tokens": max(
                     row.requested_max_new_tokens for row in trace_tuple),
+                # Residual word/scene count defects accepted as ADVISORY per
+                # Gate 3 (empty when the draft met the bands). Recorded, not gated.
+                "advisory_budget_defects": list(budget_defects),
             }
 
     raise Fable2ScriptError(
@@ -3879,6 +3888,10 @@ def run_scifi_fable2_episode(
             "attempt_trace": [
                 _attempt_payload(row) for row in p5_attempts
             ],
+            # Gate 3: residual word/scene COUNT defects accepted as ADVISORY are
+            # RECORDED here (empty when the draft met the bands). Never gated.
+            "advisory_budget_defects": p5_meta.get(
+                "advisory_budget_defects", []),
         }
     else:
         draft1 = draft1_pre
@@ -3916,6 +3929,9 @@ def run_scifi_fable2_episode(
         "attempt_trace": [
             _attempt_payload(row) for row in p3_attempts
         ],
+        # Gate 3: residual word/scene COUNT defects accepted as ADVISORY are
+        # RECORDED here (empty when the draft met the bands). Never gated.
+        "advisory_budget_defects": p3_meta.get("advisory_budget_defects", []),
     }
     if final_draft.parsed.normalizations:
         log.warning(
