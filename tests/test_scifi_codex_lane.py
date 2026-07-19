@@ -2424,7 +2424,10 @@ def test_project_compile_round_trip_preserves_the_rewrite_structure():
     ]
 
 
-def test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft():
+def test_p3_rewrite_reimposes_structural_drift_in_one_call():
+    # Python owns the rewrite's locked structure: a structural drift is
+    # re-imposed in the capture wrapper and accepted in ONE call -- no second
+    # (repair) model call. Supersedes the old reject-and-repair behavior.
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
     cast = _metadata_repair_cast()
     facts = _metadata_repair_fact_index()
@@ -2432,9 +2435,9 @@ def test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft():
     score = lane.compile_radio_score_draft(draft, advisory, cast, facts)
     projected = lane.project_radio_score_to_draft(score)
     signature = lane._radio_score_draft_structure_signature(projected)
-    changed = projected.model_dump(mode="json")
-    changed["scenes"][0]["beats"][0]["char_id"] = "c01"
-    responses = [json.dumps(changed), json.dumps(projected.model_dump(mode="json"))]
+    drifted = projected.model_dump(mode="json")
+    original = drifted["scenes"][0]["beats"][0]["char_id"]
+    drifted["scenes"][0]["beats"][0]["char_id"] = "c02" if original != "c02" else "c01"
     calls: list[dict[str, object]] = []
     artifact_inputs = {
         **_draft_context(advisory, cast, facts),
@@ -2444,7 +2447,7 @@ def test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft():
 
     def slot_fn(messages, **kwargs):
         calls.append({"messages": messages, **kwargs})
-        return responses.pop(0)
+        return json.dumps(drifted)
 
     result = lane._call_radio_score_draft(
         pass_id="P3_rewrite", slot_fn=slot_fn,
@@ -2456,13 +2459,95 @@ def test_p3_rewrite_rejects_structural_mutation_then_repairs_the_draft():
         max_new_tokens=lane._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
         call_journal={}, expected_signature=signature,
     )
-
     assert isinstance(result, lane.RadioScoreV4)
-    assert len(calls) == 2
-    assert "Preserve the previous_draft structural decisions" in calls[0]["messages"][0]["content"]
-    assert "preserve every other previous_draft prose leaf byte for byte" in calls[0]["messages"][0]["content"]
-    assert "safe ceilings: title <=48; premise <=108; setting <=60" in calls[0]["messages"][0]["content"]
-    assert "<failed_radio_score_draft>" in calls[1]["messages"][1]["content"]
+    assert len(calls) == 1  # re-imposed, not repaired
+    # The locked structure won -- the re-projected signature matches the lock,
+    # so the ledger skeleton is byte-identical to the accepted P3 draft.
+    assert lane._radio_score_draft_structure_signature(
+        lane.project_radio_score_to_draft(result)
+    ) == signature
+
+
+def _rewrite_draft_dict() -> dict:
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    draft = _draft_for_advisory(advisory)
+    score = lane.compile_radio_score_draft(draft, advisory, cast, facts)
+    return lane.project_radio_score_to_draft(score).model_dump(mode="json")
+
+
+def test_reimpose_rewrite_structure_forces_locked_fields_and_bails_safely():
+    locked = _rewrite_draft_dict()
+    sig = lane._radio_score_draft_structure_signature(
+        lane.RadioScoreDraftV4.model_validate(locked)
+    )
+    # Drift beat char_id + a cue anchor (same counts); improve a description.
+    drifted = json.loads(json.dumps(locked))
+    b0 = drifted["scenes"][0]["beats"][0]
+    b0["char_id"] = "c03" if b0["char_id"] != "c03" else "c01"
+    drifted["scenes"][0]["shots"][0]["description"] = "New improved prose here."
+    drifted["music_cues"][0]["anchor_line_index"] = 9
+    out = json.loads(lane._reimpose_rewrite_structure(json.dumps(drifted), locked))
+    # Locked structure re-imposed -> signature matches (incl. the cue anchor).
+    assert lane._radio_score_draft_structure_signature(
+        lane.RadioScoreDraftV4.model_validate(out)
+    ) == sig
+    # The model's improved prose is preserved.
+    assert out["scenes"][0]["shots"][0]["description"] == "New improved prose here."
+    # A COUNT change cannot be mapped -> bail, raw returned unchanged (the
+    # signature gate then fails closed on it).
+    if len(locked["scenes"][0]["beats"]) >= 2:
+        count_changed = json.loads(json.dumps(locked))
+        count_changed["scenes"][0]["beats"] = count_changed["scenes"][0]["beats"][:-1]
+        cc_raw = json.dumps(count_changed)
+        assert lane._reimpose_rewrite_structure(cc_raw, locked) == cc_raw
+    # Malformed raw -> unchanged.
+    assert lane._reimpose_rewrite_structure("not json", locked) == "not json"
+
+
+def test_reimpose_rewrite_structure_matches_cues_by_id_not_position():
+    # Hand-built 2-cue draft: exercise cue-by-cue_id matching across a reorder
+    # (the positional-forcing bug codex caught would mislabel cue prose).
+    locked = {
+        "scenes": [{
+            "env": "Lab", "description": "d",
+            "shots": [{"description": "s", "visual_prompt": "v"}],
+            "beats": [{"shot_index": 0, "char_id": "c01", "line_count": 1}],
+        }],
+        "music_cues": [
+            {"cue_id": "music_open", "anchor_beat_index": 0, "anchor_line_index": 0,
+             "description": "open-lock"},
+            {"cue_id": "music_close", "anchor_beat_index": 0, "anchor_line_index": 1,
+             "description": "close-lock"},
+        ],
+    }
+    # The model reorders the cues (same set), drifts their anchors, rewrites prose.
+    reordered = {
+        "scenes": [{
+            "env": "Lab", "description": "d2",
+            "shots": [{"description": "s2", "visual_prompt": "v2"}],
+            "beats": [{"shot_index": 0, "char_id": "c01", "line_count": 1}],
+        }],
+        "music_cues": [
+            {"cue_id": "music_close", "anchor_beat_index": 5, "anchor_line_index": 9,
+             "description": "prose for music_close"},
+            {"cue_id": "music_open", "anchor_beat_index": 5, "anchor_line_index": 9,
+             "description": "prose for music_open"},
+        ],
+    }
+    out = json.loads(lane._reimpose_rewrite_structure(json.dumps(reordered), locked))
+    # Cues return in LOCKED order with LOCKED anchors, each keeping ITS OWN prose.
+    assert [c["cue_id"] for c in out["music_cues"]] == ["music_open", "music_close"]
+    assert out["music_cues"][0]["anchor_line_index"] == 0  # music_open lock
+    assert out["music_cues"][1]["anchor_line_index"] == 1  # music_close lock
+    assert out["music_cues"][0]["description"] == "prose for music_open"
+    assert out["music_cues"][1]["description"] == "prose for music_close"
+    # A cue-id set change (dropped/renamed cue) -> bail, raw returned unchanged.
+    mismatched = json.loads(json.dumps(reordered))
+    mismatched["music_cues"][0]["cue_id"] = "music_inter"
+    mm_raw = json.dumps(mismatched)
+    assert lane._reimpose_rewrite_structure(mm_raw, locked) == mm_raw
 
 
 def test_p3_exact_resolved_artifact_repair_envelope_is_unwrapped():

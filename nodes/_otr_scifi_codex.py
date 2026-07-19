@@ -1494,6 +1494,96 @@ def _normalize_draft_cue_anchors(raw: str) -> str:
     return json.dumps(data, ensure_ascii=False)
 
 
+def _reimpose_rewrite_structure(raw: str, previous_draft: Mapping[str, Any]) -> str:
+    """Force a P3_rewrite's locked structural fields back to the accepted draft.
+
+    The rewrite may improve prose but must preserve the ledger skeleton the P3
+    draft locked (:func:`_radio_score_draft_structure_signature`): per scene the
+    shot COUNT + per beat ``(shot_index, char_id, line_count)``; per cue
+    ``(cue_id, anchor_beat_index, anchor_line_index)``.  The local model
+    sometimes drifts one of these though it should touch only text.  Python
+    re-imposes them from the accepted draft (Gate 3 / ledger safety): the
+    rewrite's structure then equals the accepted draft's -- which already
+    compiled into a valid ledger -- so the model can only improve wording, never
+    punch a ledger hole.  Only the locked mechanical fields are overwritten;
+    every prose leaf (title/premise/setting/env/descriptions/visual_prompts/
+    intents) and the typed ``fact_ids`` stay model-owned.  Cues are matched by
+    ``cue_id`` (which determines placement), never by position, so a reordered
+    same-count cue list never attaches one cue's prose to another's placement.
+    Best-effort: any parse problem, malformed shape, or COUNT mismatch returns
+    the raw output unchanged -- the structural signature gate then owns the
+    un-re-imposable case and still fails closed.
+    """
+    try:
+        if not isinstance(previous_draft, Mapping):
+            return raw
+        try:
+            data = parse_first_json_object(raw)
+        except Exception:
+            return raw
+        if not isinstance(data, dict):
+            return raw
+        scenes, prev_scenes = data.get("scenes"), previous_draft.get("scenes")
+        cues, prev_cues = data.get("music_cues"), previous_draft.get("music_cues")
+        if (
+            not isinstance(scenes, list) or not isinstance(prev_scenes, list)
+            or not isinstance(cues, list) or not isinstance(prev_cues, list)
+            or len(scenes) != len(prev_scenes) or len(cues) != len(prev_cues)
+        ):
+            return raw
+        changed = False
+        for scene, prev_scene in zip(scenes, prev_scenes):
+            if not isinstance(scene, dict) or not isinstance(prev_scene, Mapping):
+                return raw
+            shots, prev_shots = scene.get("shots"), prev_scene.get("shots")
+            beats, prev_beats = scene.get("beats"), prev_scene.get("beats")
+            if (
+                not isinstance(shots, list) or not isinstance(prev_shots, list)
+                or not isinstance(beats, list) or not isinstance(prev_beats, list)
+                or len(shots) != len(prev_shots) or len(beats) != len(prev_beats)
+            ):
+                return raw
+            for beat, prev_beat in zip(beats, prev_beats):
+                if not isinstance(beat, dict) or not isinstance(prev_beat, Mapping):
+                    return raw
+                for field in ("shot_index", "char_id", "line_count"):
+                    if beat.get(field) != prev_beat.get(field):
+                        beat[field] = prev_beat.get(field)
+                        changed = True
+        raw_by_cue_id: dict[Any, dict[str, Any]] = {}
+        for cue in cues:
+            if not isinstance(cue, dict):
+                return raw
+            cue_id = cue.get("cue_id")
+            if cue_id in raw_by_cue_id:
+                return raw
+            raw_by_cue_id[cue_id] = cue
+        locked_cues: list[Mapping[str, Any]] = []
+        for prev_cue in prev_cues:
+            if not isinstance(prev_cue, Mapping):
+                return raw
+            locked_cues.append(prev_cue)
+        if set(raw_by_cue_id) != {cue.get("cue_id") for cue in locked_cues}:
+            return raw
+        rebuilt_cues: list[dict[str, Any]] = []
+        for prev_cue in locked_cues:
+            cue_id = prev_cue.get("cue_id")
+            merged = dict(raw_by_cue_id[cue_id])
+            merged["cue_id"] = cue_id
+            merged["anchor_beat_index"] = prev_cue.get("anchor_beat_index")
+            merged["anchor_line_index"] = prev_cue.get("anchor_line_index")
+            rebuilt_cues.append(merged)
+        if rebuilt_cues != cues:
+            data["music_cues"] = rebuilt_cues
+            changed = True
+        if not changed:
+            return raw
+        log.info("[scifi_codex:P3_rewrite] re-imposed locked draft structure")
+        return json.dumps(data, ensure_ascii=False)
+    except Exception:
+        return raw
+
+
 def _validate_script_graph(script: ScriptArtifactV4, score: RadioScoreV4) -> None:
     """Require the accepted artifact to retain the score's exact metadata graph."""
     expected = _accepted_script_line_metadata(score)
@@ -2878,6 +2968,15 @@ def invoke_codex_structured(
     # (the in-factory patch never sees a string_too_long raised on the last
     # attempt's response).
     last_capture_raw = [""]
+    # The accepted P3 draft, present only on the P3_rewrite pass: Python owns the
+    # rewrite's locked structure (ledger skeleton) and re-imposes it from this
+    # template so the model can only improve prose, never drift a structural
+    # field that would fail the signature gate or hole the ledger.
+    rewrite_template = (
+        artifact_inputs.get("previous_draft")
+        if pass_id == "P3_rewrite"
+        else None
+    )
 
     def capture(messages_in, **kwargs):
         call_messages = (
@@ -2918,6 +3017,8 @@ def invoke_codex_structured(
             raw = _normalize_script_line_coordinates(raw, script_coords)
         if draft_score_pass:
             raw = _normalize_draft_cue_anchors(raw)
+        if rewrite_template is not None:
+            raw = _reimpose_rewrite_structure(raw, rewrite_template)
         calls.append({
             "temperature": kwargs.get("temperature"),
             "max_new_tokens": kwargs.get("max_new_tokens"),

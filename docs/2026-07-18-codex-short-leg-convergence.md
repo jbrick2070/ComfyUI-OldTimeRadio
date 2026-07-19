@@ -53,6 +53,22 @@ to the schema bounds in the draft capture wrapper (Python owns them); the
 compiler then applies the precise per-beat clamp. Same principle as Axis 1, same
 existing-clamp precedent -- not a new problem model.
 
+## Axis 5 -- P3_rewrite structure re-imposition (landed, kibitz r2)
+A further re-draw failed `P3_rewrite: rewrite changed a locked draft structural
+decision`. The rewrite must improve PROSE while preserving the STRUCTURE the P3
+draft locked -- because that structure IS the ledger skeleton: per beat
+`(shot_index, char_id, line_count)`, per scene the shot count, per cue
+`(cue_id, anchor_beat_index, anchor_line_index)` (`_radio_score_draft_structure_signature`).
+The local model drifts one though it should touch only text.
+`_reimpose_rewrite_structure` (Axis-1 pattern) forces those locked fields back
+from the accepted draft (`artifact_inputs["previous_draft"]`) in the P3_rewrite
+capture wrapper, keeping the model's prose; cues are matched by `cue_id` (not
+position) so a reorder never mislabels cue prose; a COUNT mismatch bails and the
+signature gate still fails closed. Ledger guarantee: the re-imposed structure ==
+the accepted P3 draft's, which already compiled into a valid ledger, so the
+model can only improve wording, never punch a hole. kibitz r2 (codex + antigravity)
+converged; the old reject-and-repair test became a one-call re-imposition test.
+
 ## Invariants kept FATAL
 Line-ID set closure, forward speaker/`char_id` locking, `shot_index`/`cast_id`/
 `fact_id`/`cue_id`/`unused_shot`/graph closure/G9 SFW, the self-vocative repair.
