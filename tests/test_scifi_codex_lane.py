@@ -2557,6 +2557,30 @@ def test_reimpose_rewrite_structure_matches_cues_by_id_not_position():
     assert lane._reimpose_rewrite_structure(mm_raw, locked) == mm_raw
 
 
+def test_record_failsoft_only_on_ladder_exhaustion():
+    # A genuine ladder exhaustion (cause is StructuredCallFailedError) -> record
+    # an advisory and tell the caller to keep the prior (THE LAW).
+    meta: dict = {}
+    exhausted = lane.StructuredCallFailedError(
+        helper_name="scifi_codex:P7", attempts=2, last_error=ValueError("nope"),
+    )
+    exc = lane.CodexPassError("P7 failed: ladder exhausted")
+    exc.__cause__ = exhausted
+    assert lane._record_failsoft("P7", "retake", exc, meta) is True
+    entry = meta["scifi_codex"]["fail_soft"][0]
+    assert entry["pass_id"] == "P7"
+    assert entry["kind"] == "retake"
+    assert entry["error_type"] == "StructuredCallFailedError"
+
+    # A real bug (any other cause) -> False (caller RE-RAISES); no advisory, so a
+    # transport/pack/code defect is never silently swallowed.
+    meta2: dict = {}
+    bug = lane.CodexPassError("P7 failed: KeyError")
+    bug.__cause__ = KeyError("boom")
+    assert lane._record_failsoft("P7", "retake", bug, meta2) is False
+    assert not meta2.get("scifi_codex", {}).get("fail_soft")
+
+
 def test_p3_exact_resolved_artifact_repair_envelope_is_unwrapped():
     """Live 2026-07-12: typed repair returned one transport wrapper."""
     advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])

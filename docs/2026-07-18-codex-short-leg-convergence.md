@@ -83,6 +83,23 @@ spoken prose; fail-closed on exhaustion). Structural spoken rejections (unlocked
 cast id, illegal role, music skip contract) stay on the metadata/generic rule and
 their own fatal gates.
 
+## Axis 7 -- ledger-first fail-soft audits + retakes (operator 2026-07-19, kibitz r2)
+Even reaching P5, 30w keeps producing a different micro-malformation each draw
+(the blocker's "too little material" -- bottomless). Operator directive: "as long
+as the ledger is intact the story shall progress; if the ledger is not intact a
+new LLM call fixes it." THE LAW: an audit may improve a story, it may never fail
+one. The codex writer has three AUDIT passes (P4/P6/P8) and three audit-triggered
+RETAKE passes (P3_rewrite/P7/P9); none writes ledger content a valid prior
+artifact does not already carry, yet all six could HARD-FAIL the episode. Now
+fail-soft: an audit that exhausts falls back to None (its retake is skipped); a
+retake that exhausts keeps the prior valid artifact (P3 draft / P5 script / P7
+script). CONTENT passes P0-P5 stay fail-closed (the ledger needs them). Fires
+ONLY on genuine ladder exhaustion (`_record_failsoft` checks the CodexPassError
+cause is a `StructuredCallFailedError`) -- a pack/transport/code bug still
+propagates; the P3_rewrite projection round-trip invariant stays fatal. Advisory
+recorded in `meta["scifi_codex"]["fail_soft"]`. kibitz r2 (codex flagged the
+too-broad catch + tight scoping; antigravity added the audit passes) converged.
+
 ## Invariants kept FATAL
 Line-ID set closure, forward speaker/`char_id` locking, `shot_index`/`cast_id`/
 `fact_id`/`cue_id`/`unused_shot`/graph closure/G9 SFW, the self-vocative repair.

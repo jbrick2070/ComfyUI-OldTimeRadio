@@ -47,6 +47,7 @@ try:
         invoke_structured_slot,
         schema_shape_instruction,
         structured_call,
+        StructuredCallFailedError,
     )
     from . import _otr_ledger_freeze
     from .production_ledger import stamp_word_counts
@@ -77,6 +78,7 @@ except ImportError:  # pragma: no cover
         invoke_structured_slot,
         schema_shape_instruction,
         structured_call,
+        StructuredCallFailedError,
     )
     import _otr_ledger_freeze  # type: ignore
     from production_ledger import stamp_word_counts  # type: ignore
@@ -3704,6 +3706,39 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
     return expected
 
 
+def _record_failsoft(
+    pass_id: str, kind: str, exc: CodexPassError, meta: MutableMapping[str, Any],
+) -> bool:
+    """Decide whether an audit/retake failure is a fail-soft non-convergence.
+
+    THE LAW: an audit may improve a story, it may never fail one. An audit
+    (P4/P6/P8) or its retake (P3_rewrite/P7/P9) writes nothing the ledger needs
+    that a valid prior artifact does not already carry, so a pass that EXHAUSTS
+    its bounded repair keeps the last valid artifact instead of aborting.
+
+    Returns True (record an advisory; the caller keeps the prior) ONLY when the
+    structured ladder actually exhausted -- the ``CodexPassError``'s cause is a
+    ``StructuredCallFailedError``. A setup / pack / transport / code defect (any
+    other cause) is a real bug: returns False so the caller RE-RAISES and it is
+    never silently swallowed.
+    """
+    if not isinstance(exc.__cause__, StructuredCallFailedError):
+        return False
+    detail = " ".join(str(exc).split())[:300]
+    log.info(
+        "[scifi_codex] %s did not converge; keeping the prior valid artifact "
+        "(THE LAW: an audit may improve a story, never fail one; ledger intact): "
+        "%s", pass_id, detail,
+    )
+    meta.setdefault("scifi_codex", {}).setdefault("fail_soft", []).append({
+        "pass_id": pass_id,
+        "kind": kind,
+        "error_type": type(exc.__cause__).__name__,
+        "error": detail,
+    })
+    return True
+
+
 def run_scifi_codex_episode(
     *, payload: dict[str, str], pack: Any, resolved: Mapping[str, Any], led: Any,
     meta: dict[str, Any], creative_fn: GenerateFn, technical_fn: GenerateFn,
@@ -3813,33 +3848,28 @@ def run_scifi_codex_episode(
         }
     advisory = accepted_advisory
     p3_draft_inputs["advisory_word_plan"] = advisory.model_dump(mode="json")
-    review = invoke_codex_structured(
-        pass_id="P4", slot="technical", slot_fn=technical_fn, pack=pack,
-        seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-        artifact_inputs={"score": p3.model_dump(mode="json")},
-        result_type=StructureReviewV4, post_validator=lambda x: None,
-        base_temperature=.20, structural_retry_temperature=.10,
-        max_new_tokens=1800, call_journal=journal,
-        # CLAMP ON. P4 is an AUDIT, and StructureReviewV4 carries no authored
-        # prose: `verdict` is a Literal, `issues` are <=120-char critic notes,
-        # `rationale` is a <=240-char critic note that defaults to "". Not one
-        # character of it is ever spoken aloud, and the only field that steers
-        # anything downstream is `verdict` -- which a length clamp cannot touch.
-        # This now matches its SIBLING AUDITS, P6 (ListenerReviewV4) and P8
-        # (FinalAuditV4), both of which already take the default clamp=True.
-        # P4 was the lone audit left fail-closed, and the fail-closed arm here is
-        # reserved for artifacts that carry finite creative work (P0's verbatim
-        # source spans, P1's dramatic question, P3's score draft).
-        #
-        # Live 2026-07-14 (420-word Aion leg, f6c42c5f): Mistral-Nemo returned
-        # verdict="rewrite" with a 240+ char `rationale`, pydantic raised
-        # string_too_long, the typed repair wrote a long one again, and the
-        # episode DIED -- killed by the length of a critic's own footnote.
-        # THE LAW: an audit may improve a story, it may never fail one.
-        clamp_overlong_strings=True,
-    )
+    # P4 AUDIT is fail-soft (THE LAW): StructureReviewV4 carries no authored
+    # prose and only its `verdict` steers anything (triggers the P3_rewrite
+    # retake), so a non-converged audit must not abort -- it falls back to None
+    # and the retake is simply skipped, keeping the valid P3 draft.
+    try:
+        review = invoke_codex_structured(
+            pass_id="P4", slot="technical", slot_fn=technical_fn, pack=pack,
+            seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+            artifact_inputs={"score": p3.model_dump(mode="json")},
+            result_type=StructureReviewV4, post_validator=lambda x: None,
+            base_temperature=.20, structural_retry_temperature=.10,
+            max_new_tokens=1800, call_journal=journal,
+            clamp_overlong_strings=True,
+        )
+    except CodexPassError as exc:
+        if not _record_failsoft("P4", "audit", exc, meta):
+            raise
+        review = None
     score = p3
-    if review.verdict == "rewrite":
+    if review is not None and review.verdict == "rewrite":
+        # The projection round-trip is a Python INVARIANT on the accepted draft,
+        # not an LLM non-convergence -- it stays FATAL (outside the retake wrap).
         projected_p3 = project_radio_score_to_draft(p3)
         rewrite_signature = _radio_score_draft_structure_signature(projected_p3)
         roundtrip_score = compile_radio_score_draft(projected_p3, advisory, p2, p0)
@@ -3852,19 +3882,27 @@ def run_scifi_codex_episode(
             raise CodexPassError(
                 "P3_rewrite draft projection failed its structural round-trip"
             )
-        score = _call_radio_score_draft(
-            pass_id="P3_rewrite", slot_fn=creative_fn, pack=pack,
-            seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
-            artifact_inputs={
-                **p3_draft_inputs,
-                "previous_draft": projected_p3.model_dump(mode="json"),
-                "review": review.model_dump(mode="json"),
-            },
-            advisory=advisory, cast=p2, fact_index=p0,
-            base_temperature=.55, structural_retry_temperature=.20,
-            max_new_tokens=score_token_budget, call_journal=journal,
-            expected_signature=rewrite_signature,
-        )
+        # P3_rewrite RETAKE is fail-soft: on non-convergence keep the accepted P3
+        # draft (already compiled -> ledger intact). An audit may improve, never
+        # fail, the story.
+        try:
+            score = _call_radio_score_draft(
+                pass_id="P3_rewrite", slot_fn=creative_fn, pack=pack,
+                seam_refs=("codex_radio_score_system", "codex_coda_contract_system"),
+                artifact_inputs={
+                    **p3_draft_inputs,
+                    "previous_draft": projected_p3.model_dump(mode="json"),
+                    "review": review.model_dump(mode="json"),
+                },
+                advisory=advisory, cast=p2, fact_index=p0,
+                base_temperature=.55, structural_retry_temperature=.20,
+                max_new_tokens=score_token_budget, call_journal=journal,
+                expected_signature=rewrite_signature,
+            )
+        except CodexPassError as exc:
+            if not _record_failsoft("P3_rewrite", "retake", exc, meta):
+                raise
+            score = p3
     # The whole-script reservation is only knowable once the score's accepted
     # line graph is final (P3, or P3_rewrite): the artifact serializes strict
     # metadata for every accepted line, so the line count -- not the word steer
@@ -3875,11 +3913,40 @@ def run_scifi_codex_episode(
     script_token_budget = _script_output_token_budget(steer.requested_words, accepted_line_count)
     journal["script_token_budget"] = {"requested_words": steer.requested_words, "accepted_line_count": accepted_line_count, "max_new_tokens": script_token_budget}
     script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
-    listener = invoke_codex_structured(pass_id="P6", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_listening_room_system",), artifact_inputs={"script": script.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ListenerReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2200, call_journal=journal)
-    script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
-    audit = invoke_codex_structured(pass_id="P8", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_final_audit_system", "codex_coda_contract_system"), artifact_inputs={"script": script.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json")}, result_type=FinalAuditV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2400, call_journal=journal)
-    if audit.verdict == "rewrite":
-        script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+    # P6 AUDIT fail-soft: a non-converged listener review skips the P7 retake and
+    # keeps the valid P5 script (THE LAW; the review writes no ledger content).
+    try:
+        listener = invoke_codex_structured(pass_id="P6", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_listening_room_system",), artifact_inputs={"script": script.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ListenerReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2200, call_journal=journal)
+    except CodexPassError as exc:
+        if not _record_failsoft("P6", "audit", exc, meta):
+            raise
+        listener = None
+    if listener is not None:
+        # P7 RETAKE fail-soft: keep the prior (P5) script on non-convergence.
+        script_before_p7 = script
+        try:
+            script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+        except CodexPassError as exc:
+            if not _record_failsoft("P7", "retake", exc, meta):
+                raise
+            script = script_before_p7
+    # P8 AUDIT fail-soft: a non-converged final audit skips the P9 retake and
+    # keeps the current valid script (THE LAW; the audit writes no ledger content).
+    try:
+        audit = invoke_codex_structured(pass_id="P8", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_final_audit_system", "codex_coda_contract_system"), artifact_inputs={"script": script.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json")}, result_type=FinalAuditV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2400, call_journal=journal)
+    except CodexPassError as exc:
+        if not _record_failsoft("P8", "audit", exc, meta):
+            raise
+        audit = None
+    if audit is not None and audit.verdict == "rewrite":
+        # P9 RETAKE fail-soft: keep the prior (P7/P5) script on non-convergence.
+        script_before_p9 = script
+        try:
+            script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+        except CodexPassError as exc:
+            if not _record_failsoft("P9", "retake", exc, meta):
+                raise
+            script = script_before_p9
     validate_spoken_text_and_roster(
         script, p2, score, _allowed_spoken_all_caps(p0, p2),
     )
