@@ -52,10 +52,14 @@ Full suite 8087 passed / 32 skipped / 1 xfailed; Bug Bible 17; AST + no-BOM.
 Focused: coverage-vs-roster, coordinate normalization, coverage repair-rule
 branch. LIVE 30w/120w legs pending.
 
-## Still open (next chunk)
-**Axis 3 -- `P3_rewrite` over-cap `description`.** The existing `_p3_text_patch`
-(author-bounded shortening) only fires when the CURRENT repair-factory error is a
-`ValidationError`; a `string_too_long` that emerges on the typed-repair RESPONSE
-never gets a patch swing. Add a late-recovery patch on draft-pass exhaustion
-(reuse `_derive_p3_text_patch_targets` + `_p3_text_patch_preflight` +
-`_run_p3_text_patch`). No new clamp; prose-protection policy untouched.
+## Axis 3 -- `P3_rewrite` over-cap `description` (landed, second chunk)
+The existing `_p3_text_patch` (author-bounded shortening) only fires when the
+CURRENT repair-factory error is a `ValidationError`; a `string_too_long` that
+emerges on the typed-repair RESPONSE exhausts the ladder with no patch swing
+(proven live: `P3_rewrite` `scenes[].description`). `_p3_late_recovery_text_patch`
+now runs in `invoke_codex_structured`'s exhaustion handler: for a draft pass
+whose `last_error` is a `string_too_long` `ValidationError`, with a declared
+patch transport and a parseable last draft, it reuses the existing, tested
+`_derive_p3_text_patch_targets` + `_p3_text_patch_preflight` + `_run_p3_text_patch`
+to shorten only the over-cap authored leaves. No new clamp; the prose-protection
+policy is untouched; a failed patch lets the original failure stand.

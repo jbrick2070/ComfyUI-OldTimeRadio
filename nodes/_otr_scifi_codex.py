@@ -2643,6 +2643,57 @@ def _script_artifact_inputs(
     }
 
 
+def _p3_late_recovery_text_patch(
+    *,
+    exc: BaseException,
+    draft_score_pass: bool,
+    slot_fn: GenerateFn,
+    pack: Any,
+    last_raw: str,
+    post_validator: Callable[[BaseModel], str | None],
+    calls: list[dict[str, Any]],
+    mark_attempt_complete: Callable[[int, str, BaseException | None], None],
+) -> RadioScoreDraftV4 | None:
+    """Give a draft pass one author-bounded text-patch swing after exhaustion.
+
+    The in-factory patch (``draft_score_pass`` branch of ``typed_repair_factory``)
+    only fires when the CURRENT repair-factory error is a ``ValidationError``; a
+    ``string_too_long`` that first appears on the typed-repair RESPONSE exhausts
+    the ladder with no patch swing (proven live 2026-07-18: ``P3_rewrite``
+    ``scenes[].description``).  This reuses the existing, tested transport to
+    shorten only the over-cap authored leaves, exactly as the base-path patch
+    would -- no new clamp, the prose-protection policy is untouched.  Returns the
+    repaired draft, or None to let the original failure stand.
+    """
+    if not draft_score_pass:
+        return None
+    last_error = getattr(exc, "last_error", None)
+    if not isinstance(last_error, ValidationError):
+        return None
+    transport = _p3_text_patch_transport(slot_fn)
+    if transport is None:
+        return None
+    try:
+        raw_draft = parse_first_json_object(last_raw)
+    except Exception:
+        return None
+    if not isinstance(raw_draft, dict):
+        return None
+    targets = _derive_p3_text_patch_targets(raw_draft, last_error)
+    if targets is None:
+        return None
+    if not _p3_text_patch_preflight(raw_draft, targets, post_validator):
+        return None
+    try:
+        return _run_p3_text_patch(
+            slot_fn=slot_fn, pack=pack, raw_draft=raw_draft, targets=targets,
+            post_validator=post_validator, calls=calls,
+            mark_attempt_complete=mark_attempt_complete, patch_transport=transport,
+        )
+    except Exception:
+        return None
+
+
 def invoke_codex_structured(
     *, pass_id: str, slot: Literal["creative", "technical"], slot_fn: GenerateFn,
     pack: Any, seam_refs: tuple[str, ...], artifact_inputs: Mapping[str, Any],
@@ -2785,6 +2836,11 @@ def invoke_codex_structured(
         if script_artifact_pass and repair_score is not None
         else None
     )
+    # The most recent slot output, kept so a draft pass that EXHAUSTS on an
+    # over-cap authored string can still take one author-bounded text-patch swing
+    # (the in-factory patch never sees a string_too_long raised on the last
+    # attempt's response).
+    last_capture_raw = [""]
 
     def capture(messages_in, **kwargs):
         call_messages = (
@@ -2835,6 +2891,7 @@ def invoke_codex_structured(
             "compiler_status": "pending" if draft_score_pass else "not_applicable",
             "graph_status": "pending" if draft_score_pass else "not_applicable",
         })
+        last_capture_raw[0] = raw
         return raw
 
     # `structured_call` sees this wrapper rather than the original slot. Keep
@@ -3214,6 +3271,18 @@ def invoke_codex_structured(
             on_attempt_complete=mark_attempt_complete,
         )
     except Exception as exc:
+        recovered = _p3_late_recovery_text_patch(
+            exc=exc, draft_score_pass=draft_score_pass, slot_fn=slot_fn,
+            pack=pack, last_raw=last_capture_raw[0], post_validator=post_validator,
+            calls=calls, mark_attempt_complete=mark_attempt_complete,
+        )
+        if recovered is not None:
+            log.info(
+                "[scifi_codex:%s] late-recovery author text-patch resolved an "
+                "over-cap draft leaf after ladder exhaustion", pass_id,
+            )
+            journal_entry["accepted"] = recovered.model_dump(mode="json")
+            return recovered
         journal_entry["terminal_error"] = (
             f"{type(exc).__name__}: {' '.join(str(exc).split())[:500]}"
         )

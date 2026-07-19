@@ -937,6 +937,86 @@ def test_script_artifact_repair_rules_coverage_branch():
     assert "no voiced line" in rule
 
 
+def _overcap_draft_string_too_long():
+    """A schema-valid-but-for-one-over-cap-leaf draft + its ValidationError."""
+    advisory = lane.make_advisory_word_blueprint(30, ["b000", "b001", "b002"])
+    draft = _draft_for_advisory(advisory).model_dump(mode="json")
+    draft["scenes"][0]["description"] = "x" * 145
+    try:
+        lane.RadioScoreDraftV4.model_validate(draft)
+        raise AssertionError("expected a string_too_long ValidationError")
+    except ValidationError as ve:
+        return advisory, draft, ve
+
+
+def test_p3_late_recovery_text_patch_is_guarded():
+    advisory, draft, verr = _overcap_draft_string_too_long()
+    raw = json.dumps(draft)
+    noop = lambda *a: None  # noqa: E731
+
+    class _Exhausted(Exception):
+        last_error = verr
+
+    # Not a draft pass -> never runs, even with a real string_too_long.
+    assert lane._p3_late_recovery_text_patch(
+        exc=_Exhausted(), draft_score_pass=False, slot_fn=lambda *a, **k: "",
+        pack=None, last_raw=raw, post_validator=lambda x: None, calls=[],
+        mark_attempt_complete=noop,
+    ) is None
+
+    # A draft pass whose last_error is NOT a ValidationError -> never runs.
+    class _PostFail(Exception):
+        last_error = RuntimeError("compile defect, not a schema cap")
+
+    slot = lambda *a, **k: ""  # noqa: E731
+    slot._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
+    assert lane._p3_late_recovery_text_patch(
+        exc=_PostFail(), draft_score_pass=True, slot_fn=slot, pack=None,
+        last_raw=raw, post_validator=lambda x: None, calls=[],
+        mark_attempt_complete=noop,
+    ) is None
+
+    # A real string_too_long but no patch transport declared -> never runs.
+    assert lane._p3_late_recovery_text_patch(
+        exc=_Exhausted(), draft_score_pass=True, slot_fn=lambda *a, **k: "",
+        pack=None, last_raw=raw, post_validator=lambda x: None, calls=[],
+        mark_attempt_complete=noop,
+    ) is None
+
+
+def test_p3_late_recovery_text_patch_shortens_overcap_leaf_on_exhaustion():
+    advisory, draft, verr = _overcap_draft_string_too_long()
+    cast = _metadata_repair_cast()
+    facts = _metadata_repair_fact_index()
+    replacement = "A receiver hums under a cold sky."
+
+    def post_validator(candidate):
+        try:
+            lane.compile_radio_score_draft(candidate, advisory, cast, facts)
+        except lane.ScifiCodexError as exc:
+            return str(exc)
+        return None
+
+    def slot_fn(messages, **kwargs):
+        return json.dumps({"replacements": [{
+            "path": "scenes.0.description", "replacement_text": replacement,
+        }]})
+
+    slot_fn._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
+
+    class _Exhausted(Exception):
+        last_error = verr
+
+    result = lane._p3_late_recovery_text_patch(
+        exc=_Exhausted(), draft_score_pass=True, slot_fn=slot_fn,
+        pack=routing.resolve_story_pack("scifi_codex"),
+        last_raw=json.dumps(draft), post_validator=post_validator, calls=[],
+        mark_attempt_complete=lambda *a: None,
+    )
+    assert isinstance(result, lane.RadioScoreDraftV4)
+    assert result.scenes[0].description == replacement
+
+
 def test_dramatic_question_repair_trims_overlong_fields_at_word_boundary():
     raw = json.dumps({
         "question": "Should park manager Lena approve drone flights over the river, knowing the science makes tracking possible but the drones may disturb nesting birds? " * 2,
