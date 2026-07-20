@@ -16,6 +16,15 @@ Spec keys:
                                  "snapshot_to_cache"  -> snapshot_download into HF cache
                                  "file"               -> hf_hub_download of spec["file"]
     file   (str, optional)    -- required when kind=="file"
+    revision        (str, optional) -- pin an exact commit/tag/branch for kind=="file"
+                                       (and the snapshot kinds); passed straight to
+                                       huggingface_hub so a repo re-tag cannot swap
+                                       the weight under us.
+    expected_size   (int, optional) -- byte length the materialized "file" MUST match.
+    expected_sha256 (str, optional) -- lowercase hex SHA-256 the materialized "file"
+                                       MUST match. Either check failing => exit 1
+                                       (a wrong-revision / truncated / corrupt weight
+                                       is rejected LOUD, never accepted silently).
 
 HF_TOKEN is picked up from the environment for gated repos
 (e.g. black-forest-labs/FLUX.1-dev).  Public repos don't need it.
@@ -28,10 +37,37 @@ Exit codes:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
 import traceback
+
+
+def _verify_materialized(path: str, expected_size, expected_sha256) -> str:
+    """Return an error string if ``path`` fails the size / SHA-256 checks, else "".
+
+    A wrong-revision or truncated/corrupt weight is caught HERE (fail loud) rather
+    than surfacing later as an opaque runtime load/decode error. Both checks are
+    optional; a check that is not requested (None/empty) is skipped."""
+    try:
+        actual_size = os.path.getsize(path)
+    except OSError as exc:
+        return "cannot stat materialized file %r: %s" % (path, exc)
+    if expected_size is not None:
+        if int(actual_size) != int(expected_size):
+            return ("size mismatch: got %d bytes, expected %d"
+                    % (actual_size, int(expected_size)))
+    if expected_sha256:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(8 * 1024 * 1024), b""):
+                h.update(chunk)
+        actual = h.hexdigest().lower()
+        if actual != str(expected_sha256).strip().lower():
+            return ("SHA-256 mismatch: got %s, expected %s"
+                    % (actual, str(expected_sha256).strip().lower()))
+    return ""
 
 
 def main(argv: list[str]) -> int:
@@ -56,6 +92,9 @@ def main(argv: list[str]) -> int:
     target = spec["target"]
     kind = spec["kind"]
     token = os.environ.get("HF_TOKEN") or None
+    revision = spec.get("revision") or None
+    expected_size = spec.get("expected_size")
+    expected_sha256 = spec.get("expected_sha256")
 
     try:
         from huggingface_hub import snapshot_download, hf_hub_download
@@ -82,6 +121,7 @@ def main(argv: list[str]) -> int:
                 local_dir=target,
                 local_dir_use_symlinks=False,
                 token=token,
+                revision=revision,
                 allow_patterns=allow_patterns,
                 ignore_patterns=ignore_patterns,
             )
@@ -89,7 +129,7 @@ def main(argv: list[str]) -> int:
             return 0
 
         if kind == "snapshot_to_cache":
-            out = snapshot_download(repo_id=repo, token=token)
+            out = snapshot_download(repo_id=repo, token=token, revision=revision)
             print(f"OK cache {repo} -> {out}")
             return 0
 
@@ -102,8 +142,14 @@ def main(argv: list[str]) -> int:
                 local_dir=target,
                 local_dir_use_symlinks=False,
                 token=token,
+                revision=revision,
             )
-            print(f"OK file {repo}::{fname} -> {out}")
+            err = _verify_materialized(out, expected_size, expected_sha256)
+            if err:
+                print(f"FAIL {repo}::{fname} integrity: {err}")
+                return 1
+            _rev = f" @ {revision}" if revision else ""
+            print(f"OK file {repo}::{fname}{_rev} -> {out}")
             return 0
 
         print(f"SKIP unknown kind {kind}")
