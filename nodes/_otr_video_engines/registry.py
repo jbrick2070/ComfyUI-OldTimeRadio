@@ -408,6 +408,19 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["wan2.2-ti2v-5b"]},
+    # ltx_8gb (video-tiers, 2026-07-20): the 8GB-tier LTX-Video 0.9.8 distilled 2B
+    # I2V engine. Modeled on wan_ti2v -- cuda, NO vendor gate, NO fp8/fp4 (the 0.9.8
+    # distilled all-in-one is bf16; the LTXQ8Patch quantizer is deliberately NOT
+    # adopted). requires_flag None; ordinary asset preflight only. Built after the
+    # live /object_info capture + a functional in-process smoke (the
+    # registry-consistency invariant forbids a row without a registered engine, so
+    # this lands WITH eng_ltx_8gb + its __init__ import).
+    "ltx_8gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltxv-2b-0.9.8-distilled"]},
     # triposg_talk / triposr / hunyuan3d_talk / trellis_talk CAPABILITIES rows
     # REMOVED 2026-06-29 (C3 -- "registry IS the menu"): these dark 3D scaffolds
     # render NotImplementedError and are now UNREGISTERED, and the

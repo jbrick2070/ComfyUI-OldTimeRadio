@@ -308,6 +308,10 @@ class WanInitImageMixin:
             "has_audio": False,            # V-1: only OTR_MasterAudioMux emits audio
             "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
             "engine_id": self.name, "family": self.family,
+            # PASS-PM / NEWBUG-1 (2026-07-20): the REAL render-window NVML peak the
+            # engine threaded into raw (None off the GPU box / when not measured).
+            # The render batch reads clip.get("vram_peak_mb") for the manifest receipt.
+            "vram_peak_mb": raw.get("vram_peak_mb"),
         }
 
     @staticmethod

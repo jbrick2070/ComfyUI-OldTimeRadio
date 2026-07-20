@@ -482,7 +482,11 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             post_mb = _MC.vram_used_mb() or 0
             _LOG.info("[OTR video] wan_ti2v VRAM render-phase peak %s MB / post %s "
                       "MB", render_peak, post_mb)
-        return {"out_path": path, "frame_count": n}
+        # NEWBUG-1 (2026-07-20): thread the MEASURED render-window peak into the raw
+        # so _clip_from_raw stamps it -> the manifest vram_peak_mb receipt is populated
+        # for the wan lane (was ALWAYS None: the peak was logged, never returned).
+        # Required for the wan_8gb VRAM-acceptance telemetry.
+        return {"out_path": path, "frame_count": n, "vram_peak_mb": render_peak}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)

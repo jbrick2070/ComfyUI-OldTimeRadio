@@ -53,6 +53,19 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# video-tiers (2026-07-20): register the 8GB-tier LTX-Video 0.9.8 distilled 2B I2V
+# engine (ltx_8gb). Unlike the older dark motion engines it is a NORMAL selectable
+# row -- requires_flag=None, empty default_roles (selectable, not a default); no
+# enable flag (registry IS the menu). It fails CLOSED (ordinary asset preflight) until
+# the 0.9.8 checkpoint + the shared t5xxl_fp16 are on disk. Its 0.9.8 core node graph
+# was captured from a live /object_info + a functional in-process smoke before coding.
+# Cold-import clean (V-12: lazy LTX core nodes + torch inside load/render_clip).
+# Guarded so a packaging quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ltx_8gb as _eng_ltx_8gb  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 
 # 2026-06-15: register the LTX-2.3 AUDIO-INPUT (A2V) lane -- ltx_av_talk
 # (audio_driven_face) + ltx_av_music (audio_conditioned_video). ADDITIVE + DARK:
