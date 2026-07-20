@@ -51,8 +51,8 @@ class TestBankRow:
         assert ids[-1] == "custom_source_bank"
         # v4 campaign 2026-07-17: scifi_codex_v4 inserted directly before custom,
         # after the _v3 tail; custom stays last. Sonnet-bake-off rip 2026-07-18:
-        # shakespeare_v3 is now the last _v3 lane before scifi_codex_v4.
-        assert ids[-3:] == ("shakespeare_v3", "scifi_news",
+        # shakespeare is now the last _v3 lane before scifi_codex_v4.
+        assert ids[-3:] == ("shakespeare", "scifi_news",
                             "custom_source_bank")
 
     def test_row_shape_runnable_s1b(self):
@@ -254,7 +254,7 @@ class TestRosterOrder:
         ids = ROUTING.list_bank_ids()
         assert ids == ("media_archive", "original_radio",
                        "scifi_news_pro",
-                       "public_domain_story_v3", "shakespeare_v3",
+                       "public_domain_story_v3", "shakespeare",
                        "scifi_news",
                        "custom_source_bank")
 

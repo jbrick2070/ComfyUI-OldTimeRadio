@@ -1,6 +1,6 @@
 {
-  "source_bank_id": "shakespeare_v3",
-  "story_model_id": "folger_scene_adaptation_v3",
+  "source_bank_id": "shakespeare",
+  "story_model_id": "folger_scene_adaptation",
   "story_pipeline_id": "legacy_many_pass_v3",
   "schema_version": "v2.0",
   "label": "Folger Scene Radio Adaptation",

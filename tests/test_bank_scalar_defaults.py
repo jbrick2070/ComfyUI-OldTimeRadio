@@ -2,7 +2,7 @@
 exact-id sets (visual-style pool / science floor / adaptation cast).
 
 Asserts every runnable bank preserves its pre-migration behaviour (the former
-base_source_bank_id / strict_v4_banks / (shakespeare_v3, public_domain_story_v3)
+base_source_bank_id / strict_v4_banks / (shakespeare, public_domain_story_v3)
 semantics, now DECLARED as validated `defaults` scalars) and that the parser
 validates the three new keys. The visual-STYLE pool (media|adaptation|generic)
 is a separate axis from the source FEED (science_rss vs media_archive_rss vs
@@ -29,7 +29,7 @@ EXPECTED = {
     "original_radio":         ("generic",    False, False),
     "scifi_news_pro":           ("generic",    False, False),
     "public_domain_story_v3": ("adaptation", False, True),
-    "shakespeare_v3":         ("adaptation", False, True),
+    "shakespeare":         ("adaptation", False, True),
 }
 
 

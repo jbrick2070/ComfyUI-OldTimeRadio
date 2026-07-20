@@ -77,7 +77,7 @@ class TestHelper:
 class TestStoryRulesIndependence:
     @pytest.mark.parametrize("bank_id", [
         "media_archive", "original_radio", "scifi_news_pro",
-        "public_domain_story_v3", "shakespeare_v3",
+        "public_domain_story_v3", "shakespeare",
     ])
     def test_lane_resolves_its_own_rules(self, bank_id):
         assert RULES.resolve_story_rules(bank_id).rules_id == bank_id
@@ -138,26 +138,26 @@ class TestNoRegression:
 # EXACT id, not by base family.
 _V3 = {
     "public_domain_story_v3": ("public_domain_story", "legacy_many_pass_v3", "inline"),
-    "shakespeare_v3":         ("shakespeare",         "legacy_many_pass_v3", "inline"),
 }
 
 
 class TestChunk4V3Rows:
     def test_roster_counts_6_runnable_7_visible(self):
-        # scifi_codex_v4 renamed -> scifi_news (2026-07-19), so it is now a
-        # suffix-free base: 4 base + 2 _v3 + custom = 7 visible / 6 runnable.
+        # scifi_codex_v4 -> scifi_news, scifi_fable2 -> scifi_news_pro,
+        # shakespeare_v3 -> shakespeare (2026-07-19): 5 base + 1 _v3
+        # (public_domain_story_v3) + custom = 7 visible / 6 runnable.
         ids = ROUTING.list_bank_ids()
         assert len(ids) == 7
         assert ids[-1] == "custom_source_bank"
         runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
         assert len(runnable) == 6                  # only custom is non-runnable
         assert len([b for b in ids if b.endswith("_v2")]) == 0
-        assert len([b for b in ids if b.endswith("_v3")]) == 2
+        assert len([b for b in ids if b.endswith("_v3")]) == 1
         assert len([b for b in ids if b.endswith("_v4")]) == 0
 
     def test_v3_count_and_order(self):
         ids = ROUTING.list_bank_ids()
-        assert len([b for b in ids if b.endswith("_v3")]) == 2
+        assert len([b for b in ids if b.endswith("_v3")]) == 1
         # the _v3 lanes are seated after the base lanes, before custom.
         assert min(ids.index(b) for b in ids if b.endswith("_v3")) > \
             ids.index("scifi_news_pro")
@@ -219,8 +219,8 @@ class TestChunk4V3Rows:
         class _Bad:
             data = {"lines": "not a list", "meta": {}}
         bad = _Bad()
-        W.run_v3_advisory(bad, bad.data["meta"], lane="shakespeare_v3")
-        assert "shakespeare_v3_advisory" in bad.data["meta"]
+        W.run_v3_advisory(bad, bad.data["meta"], lane="shakespeare")
+        assert "shakespeare_advisory" in bad.data["meta"]
 
 
 # ---------------------------------------------------------------------------

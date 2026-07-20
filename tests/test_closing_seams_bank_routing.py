@@ -37,7 +37,7 @@ from nodes import _otr_line_composer as LC  # noqa: E402
 RUNNABLE_BANKS = (
     "media_archive",
     "public_domain_story_v3",
-    "shakespeare_v3",
+    "shakespeare",
 )
 CLOSING_PHASES = (
     "coda_system",
@@ -106,7 +106,7 @@ def test_non_science_coda_seams_keep_the_bridge_contract():
     """The re-authored PD/Shakespeare coda seams (and media's) must keep
     the KILL-2 bridge mechanics the composer enforces: a SHORT pivot
     clause; the real note is appended by the producer."""
-    for bank in ("media_archive", "public_domain_story_v3", "shakespeare_v3"):
+    for bank in ("media_archive", "public_domain_story_v3", "shakespeare"):
         seam = resolve_creative_system_prompt(
             None, phase="coda_system", source_bank_id=bank
         )
@@ -129,10 +129,10 @@ def test_compose_news_coda_sends_bank_coda_system():
             "noncommercial terms."
         ),
         premise="Three strangers on a storm-lit heath make a promise.",
-        source_bank_id="shakespeare_v3",
+        source_bank_id="shakespeare",
     )
     expected = get_pack_prompt(
-        resolve_story_pack("shakespeare_v3"), "coda_system"
+        resolve_story_pack("shakespeare"), "coda_system"
     )
     assert _sysmsg(calls) == expected
     assert res.text.startswith(_VALID_BRIDGE)

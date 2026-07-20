@@ -123,12 +123,12 @@
       "guide_ref": ""
     },
     {
-      "source_bank_id": "shakespeare_v3",
+      "source_bank_id": "shakespeare",
       "label": "Shakespeare / Folger",
       "source_kind": "shakespeare_scene",
       "interpreter": "shakespeare_interpreter",
       "fetcher": "shakespeare_folger",
-      "default_story_model": "folger_scene_adaptation_v3",
+      "default_story_model": "folger_scene_adaptation",
       "default_story_pipeline": "legacy_many_pass_v3",
       "defaults": {
         "story_form_label": "Shakespeare radio adaptation",

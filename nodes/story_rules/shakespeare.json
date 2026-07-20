@@ -1,5 +1,5 @@
 {
-  "rules_id": "shakespeare_v3",
+  "rules_id": "shakespeare",
   "label": "Shakespeare / Folger (scene adaptation lane)",
   "schema_version": "v1",
   "cliche_patterns": [
