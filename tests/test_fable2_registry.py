@@ -252,7 +252,7 @@ class TestRosterOrder:
 
     def test_roster_order_holds(self):
         ids = ROUTING.list_bank_ids()
-        assert ids == ("media_archive", "original_radio",
+        assert ids == ("media_archive", "original",
                        "scifi_news_pro",
                        "public_domain", "shakespeare",
                        "scifi_news",

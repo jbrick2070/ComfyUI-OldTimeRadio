@@ -26,7 +26,7 @@ from nodes import _otr_style_catalog as SC  # noqa: E402
 # per runnable bank -- exactly the pre-migration behaviour.
 EXPECTED = {
     "media_archive":          ("media",      False, False),
-    "original_radio":         ("generic",    False, False),
+    "original":         ("generic",    False, False),
     "scifi_news_pro":           ("generic",    False, False),
     "public_domain": ("adaptation", False, True),
     "shakespeare":         ("adaptation", False, True),

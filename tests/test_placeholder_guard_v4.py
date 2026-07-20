@@ -99,7 +99,7 @@ class TestParserValidation:
 
 
 _CURRENT_BANKS = [
-    "media_archive", "original_radio", "scifi_news_pro",
+    "media_archive", "original", "scifi_news_pro",
     "public_domain", "shakespeare",
 ]
 

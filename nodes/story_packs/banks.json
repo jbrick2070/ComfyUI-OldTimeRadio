@@ -34,7 +34,7 @@
       "guide_ref": ""
     },
     {
-      "source_bank_id": "original_radio",
+      "source_bank_id": "original",
       "label": "Original Radio Drama",
       "source_kind": "original_llm",
       "interpreter": "",

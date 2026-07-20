@@ -37,11 +37,11 @@ def _fresh_registry():
 class TestRegistry:
     def test_real_registry_loads_with_original_row(self):
         ids = ROUTING.list_bank_ids()
-        assert "original_radio" in ids
+        assert "original" in ids
         assert ids[-1] == "custom_source_bank"  # "+ Add Your Own" stays last
 
     def test_bank_row_shape(self):
-        bank = ROUTING.get_bank("original_radio")
+        bank = ROUTING.get_bank("original")
         assert bank.runnable is True
         assert bank.fetcher == "" and bank.interpreter == ""
         assert bank.default_story_pipeline == "original_multi_pass"
@@ -60,8 +60,8 @@ class TestRegistry:
         })
 
     def test_pack_carries_13_stages_and_required_subset(self):
-        bank = ROUTING.get_bank("original_radio")
-        pack = ROUTING.resolve_story_pack("original_radio")
+        bank = ROUTING.get_bank("original")
+        pack = ROUTING.resolve_story_pack("original")
         assert len(pack.prompt_stages) == 13
         assert set(bank.required_seams) <= set(pack.prompt_stages)
         for seam in ("original_concept_system", "original_select_system",
@@ -89,7 +89,7 @@ class TestRegistry:
     def test_story_rules_resolve_for_original(self):
         rules = __import__(
             "nodes._otr_story_rules", fromlist=["resolve_story_rules"]
-        ).resolve_story_rules("original_radio")
+        ).resolve_story_rules("original")
         assert rules is not None
 
 
@@ -100,7 +100,7 @@ class TestRegistry:
 class TestDispatch:
     def test_bank_shape_test(self):
         assert W._bank_has_no_source_contract(
-            ROUTING.get_bank("original_radio")) is True
+            ROUTING.get_bank("original")) is True
         assert W._bank_has_no_source_contract(
             ROUTING.get_bank("media_archive")) is False
         # custom is empty-empty but runnable:false -> NOT the original
@@ -118,7 +118,7 @@ class TestResolveInputsOriginal:
     def test_payload_contract_and_sidecars(self, monkeypatch):
         monkeypatch.setenv("OTR_ORIGINAL_SEED", "pin-42")
         r = W._resolve_inputs(
-            source_bank="original_radio", custom_premise="  a night ferry  ",
+            source_bank="original", custom_premise="  a night ferry  ",
         )
         art = r["news_article"]
         assert set(art) == OSP.SOURCE_PAYLOAD_KEYS
@@ -134,8 +134,8 @@ class TestResolveInputsOriginal:
 
     def test_seeded_draw_is_reproducible(self, monkeypatch):
         monkeypatch.setenv("OTR_ORIGINAL_SEED", "pin-42")
-        a = W._resolve_inputs(source_bank="original_radio")
-        b = W._resolve_inputs(source_bank="original_radio")
+        a = W._resolve_inputs(source_bank="original")
+        b = W._resolve_inputs(source_bank="original")
         assert (a["source_meta"]["spark_atoms"]
                 == b["source_meta"]["spark_atoms"])
 
@@ -196,7 +196,7 @@ class TestCreativeFront:
             ORR.scan_forbidden("he drew a gun", origin="t")
 
     def _pack(self):
-        return ROUTING.resolve_story_pack("original_radio")
+        return ROUTING.resolve_story_pack("original")
 
     def test_front_green_and_contract(self):
         briefs, delta = ORR.build_original_briefs(
@@ -340,7 +340,7 @@ class TestInterpreterAdapter:
             creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
             resolved=resolved, meta=meta,
         )
-        bank = ROUTING.get_bank("original_radio")
+        bank = ROUTING.get_bank("original")
         briefs = adapter(bank=bank, payload={"ignored": "yes"},
                          technical_fn=_seq_fn(_BRIEFS_JSON),
                          model_id="t-model")
@@ -356,7 +356,7 @@ class TestInterpreterAdapter:
             "num_characters": 2, "creative_writing_model": "c"}, meta={},
         )
         with pytest.raises(ORR.OriginalBriefsError, match="spark_atoms"):
-            adapter(bank=ROUTING.get_bank("original_radio"), payload={},
+            adapter(bank=ROUTING.get_bank("original"), payload={},
                     technical_fn=_seq_fn(_BRIEFS_JSON), model_id="t")
 
 
@@ -396,12 +396,12 @@ class TestQAGate:
                                      compose_flags=("announcer_outro",))
             monkeypatch.setattr(LC, "compose_announcer_outro", _fake_outro)
         resolved = {"technical_model": "t", "creative_writing_model": "c",
-                    "source_bank": "original_radio"}
+                    "source_bank": "original"}
         meta = {"source_meta": {"concept_corpus": "the lock"},
                 "dramatic_state": {"ending_change": "the ticket is read"}}
         W._run_original_qa_gate(
             led, meta, resolved,
-            bank_row=ROUTING.get_bank("original_radio"),
+            bank_row=ROUTING.get_bank("original"),
             technical_fn=technical_fn,
             creative_fn=lambda *a, **k: "",
             first_announcer_id="a0", last_announcer_id="z9",

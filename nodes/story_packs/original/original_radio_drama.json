@@ -1,5 +1,5 @@
 {
-  "source_bank_id": "original_radio",
+  "source_bank_id": "original",
   "story_model_id": "original_radio_drama",
   "story_pipeline_id": "original_multi_pass",
   "label": "Original Radio Drama (LLM-original)",

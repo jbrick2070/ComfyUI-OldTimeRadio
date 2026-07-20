@@ -189,7 +189,7 @@ DECK_AXES: tuple[str, ...] = (
 _DECK_MIN_ATOMS_PER_AXIS = 6
 
 _DECK_PATH = Path(__file__).resolve().parent / "story_packs" / \
-    "original_radio" / "spark_deck.json"
+    "original" / "spark_deck.json"
 
 
 @dataclass(frozen=True)

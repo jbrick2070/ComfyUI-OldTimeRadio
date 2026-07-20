@@ -41,10 +41,10 @@ _PIPELINES_FILENAME = "pipelines.json"
 _REGISTRY_FILENAMES = frozenset({_BANKS_FILENAME, _PIPELINES_FILENAME})
 _PACK_SIDECAR_FILENAMES_BY_BANK = {
     "media_archive": frozenset({"drama_seeds.json"}),
-    # original_radio (kibitz r2-r4): the spark deck is entropy data for the
-    # concept pass, not a story pack -- _otr_original_radio validates it
-    # with its own schema at load.
-    "original_radio": frozenset({"spark_deck.json"}),
+    # original (renamed from original_radio 2026-07-19; kibitz r2-r4): the spark
+    # deck is entropy data for the concept pass, not a story pack --
+    # _otr_original_radio validates it with its own schema at load.
+    "original": frozenset({"spark_deck.json"}),
     # scifi_news_pro (renamed from scifi_fable2 2026-07-19; S0 architecture doc
     # section 11): the frame-card + stance deck is entropy data for the P1 pitch
     # pass, not a story pack -- _otr_scifi_fable2 validates it at load (S1b).

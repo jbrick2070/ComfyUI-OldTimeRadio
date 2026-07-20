@@ -1,5 +1,5 @@
 {
-  "rules_id": "original_radio",
+  "rules_id": "original",
   "label": "Original Radio (LLM-original drama lane)",
   "schema_version": "v1",
   "cliche_patterns": [

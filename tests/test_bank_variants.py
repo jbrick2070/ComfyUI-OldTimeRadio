@@ -76,7 +76,7 @@ class TestHelper:
 
 class TestStoryRulesIndependence:
     @pytest.mark.parametrize("bank_id", [
-        "media_archive", "original_radio", "scifi_news_pro",
+        "media_archive", "original", "scifi_news_pro",
         "public_domain", "shakespeare",
     ])
     def test_lane_resolves_its_own_rules(self, bank_id):
