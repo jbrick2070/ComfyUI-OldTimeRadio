@@ -85,7 +85,7 @@ class TestPublicDomainRouting:
     def test_public_domain_exchange_seam_routes(self):
         resolved = resolve_creative_system_prompt(
             None, phase="exchange_system",
-            source_bank_id="public_domain_story_v3")
+            source_bank_id="public_domain")
         assert "public-domain" in resolved
         assert resolved != EXCHANGE_SYSTEM_PROMPT
 

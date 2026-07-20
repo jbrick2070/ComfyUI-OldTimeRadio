@@ -130,7 +130,7 @@ def test_sidecars_are_separate_from_payload():
 def test_fetch_public_domain_source_uses_default_ref_and_sidecars():
     from nodes import _otr_story_routing as routing
 
-    bank = routing.get_bank("public_domain_story_v3")
+    bank = routing.get_bank("public_domain")
     result = pd.fetch_public_domain_source(bank=bank)
 
     payload, meta, rights = osp.normalize_fetch_result(
@@ -152,7 +152,7 @@ def test_fetch_public_domain_source_uses_default_ref_and_sidecars():
 def test_fetch_public_domain_source_honors_explicit_ref():
     from nodes import _otr_story_routing as routing
 
-    bank = routing.get_bank("public_domain_story_v3")
+    bank = routing.get_bank("public_domain")
     result = pd.fetch_public_domain_source(
         bank=bank,
         source_ref="gutenberg-time-machine-sample:arrival",

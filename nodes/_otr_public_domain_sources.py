@@ -351,7 +351,7 @@ def fetch_public_domain_source(
     )
     effective_ref = str(source_ref or defaults.get("source_ref", "") or "").strip()
     if not effective_ref:
-        bank_id = getattr(bank, "source_bank_id", "public_domain_story")
+        bank_id = getattr(bank, "source_bank_id", "public_domain")
         raise PublicDomainSourceRefError(
             f"source_bank {bank_id!r} requires source_ref or "
             "defaults.source_ref; there is no fallback"

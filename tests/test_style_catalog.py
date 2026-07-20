@@ -147,7 +147,7 @@ class TestSelectStyle:
         assert adapt and "faithful_stage_adaptation" in adapt
         # v4: the visual-style pool is chosen by the stamped style_pool_class
         # (the writer stamps it from bank.defaults), no longer by a base-map.
-        for bank in ("shakespeare", "public_domain_story_v3"):
+        for bank in ("shakespeare", "public_domain"):
             for s in range(40):
                 slug = CAT.select_style(
                     "Macbeth meets three witches on a heath",

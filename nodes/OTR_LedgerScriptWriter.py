@@ -1868,7 +1868,7 @@ def run_v3_advisory(led, meta, *, lane, version: int = 1) -> None:
     It NEVER mutates ``lines/beats/shots/music/cast`` and NEVER raises -- any
     error is stamped, not thrown (operator law: an audit may improve a story, it
     may never fail one; and every field it writes has exactly one owner)."""
-    # lane is the full v3 bank id (e.g. "public_domain_story_v3"); the owned meta
+    # lane is the full bank id (e.g. "public_domain"); the owned meta
     # field is "<lane>_advisory".
     key = f"{lane}_advisory"
     data = getattr(led, "data", None)
@@ -1947,7 +1947,7 @@ def _v3_focus_metric(base, rows, speakers, words, counts):
         rx = re.compile(r"\b[A-Z][A-Z]+['’](ve|s|ll|re|d|t|m)\b")
         hits = sum(len(rx.findall(str(r.get("text") or ""))) for r in rows)
         return {"metric": "allcaps_name_contraction_hits", "value": hits}
-    if base == "public_domain_story":
+    if base == "public_domain":
         return {"metric": "compression_line_count", "value": len(rows)}
     if base == "shakespeare":
         return {"metric": "distinct_source_speakers", "value": cast}
@@ -1978,7 +1978,7 @@ _RUNNER_BY_PIPELINE = {
 # _resolve_lane_runner returns None instead of raising. (original_multi_pass_v3
 # was retired with the original_radio_v3 lane in the 2026-07-17 roster trim.)
 _INLINE_V3_PIPELINES = frozenset({
-    "legacy_many_pass_v3",
+    "legacy_many_pass_adapt",
 })
 
 # The pipelines whose execution lane IS this writer's inline body.

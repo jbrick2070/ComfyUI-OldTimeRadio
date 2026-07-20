@@ -161,7 +161,7 @@ def test_empty_id_bank_raises_missing_contract(bank_id):
 
 
 def test_public_domain_bank_resolves_both_contracts_and_is_runnable():
-    bank = routing.get_bank("public_domain_story_v3")
+    bank = routing.get_bank("public_domain")
     entry = osp.resolve_fetcher(bank)
     assert entry.seed_source == "public_domain_source"
     assert callable(entry.fetch)
@@ -172,7 +172,7 @@ def test_public_domain_bank_resolves_both_contracts_and_is_runnable():
 
 
 def test_public_domain_fetcher_wrapper_returns_source_fetch_result():
-    bank = routing.get_bank("public_domain_story_v3")
+    bank = routing.get_bank("public_domain")
     entry = osp.resolve_fetcher(bank)
     result = entry.fetch(bank=bank, technical_model="ignored-technical")
     payload, meta, rights = osp.normalize_fetch_result(

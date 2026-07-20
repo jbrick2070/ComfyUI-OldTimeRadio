@@ -45,7 +45,7 @@ class TestPublicDomainRouting:
     @pytest.mark.parametrize("phase", sorted(_SEAM_TO_CONST))
     def test_public_domain_outline_seams_route(self, phase):
         resolved = resolve_creative_system_prompt(
-            None, phase=phase, source_bank_id="public_domain_story_v3")
+            None, phase=phase, source_bank_id="public_domain")
         assert "public-domain" in resolved or "adaptation" in resolved
         assert resolved != _SEAM_TO_CONST[phase]
 

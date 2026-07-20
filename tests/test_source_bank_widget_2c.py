@@ -53,7 +53,7 @@ from nodes._otr_creative_prompt_router import (  # noqa: E402
 )
 
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
-_PUBLIC_DOMAIN_BANK = "public_domain_story_v3"
+_PUBLIC_DOMAIN_BANK = "public_domain"
 _NON_RUNNABLE_BANK = "custom_source_bank"
 
 
@@ -194,7 +194,7 @@ class TestThreading:
         )
         # Cross-check against the lane pack on disk.
         pack_path = (_REPO / "nodes" / "story_packs" / _PUBLIC_DOMAIN_BANK /
-                     "faithful_radio_adaptation_v3.json")
+                     "faithful_radio_adaptation.json")
         pack = json.loads(pack_path.read_text(encoding="utf-8"))
         assert other == pack["prompt_stages"]["line_composer_system"]
 
@@ -218,7 +218,7 @@ class TestThreading:
             canon_header="",
             last_lines=[],
         )
-        # public_domain_story_v3 now has its own story_rules pack, but pass the
+        # public_domain now has its own story_rules pack, but pass the
         # kept legacy-seam (media_archive) rules explicitly so this test keeps
         # targeting PROMPT threading rather than content-rule vocabulary.
         from nodes._otr_story_rules import resolve_story_rules

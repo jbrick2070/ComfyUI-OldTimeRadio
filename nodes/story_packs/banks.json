@@ -87,13 +87,13 @@
       "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass. S2: compact one-draft mode below 120 words; real three-pitch/P2a/P4/P5/keep-better full mode from 120 through 900 words."
     },
     {
-      "source_bank_id": "public_domain_story_v3",
+      "source_bank_id": "public_domain",
       "label": "Public Domain",
       "source_kind": "public_domain_source",
       "interpreter": "public_domain_interpreter",
       "fetcher": "public_domain_source",
-      "default_story_model": "faithful_radio_adaptation_v3",
-      "default_story_pipeline": "legacy_many_pass_v3",
+      "default_story_model": "faithful_radio_adaptation",
+      "default_story_pipeline": "legacy_many_pass_adapt",
       "defaults": {
         "story_form_label": "public-domain radio adaptation",
         "source_material_label": "Public-domain source text",
@@ -129,7 +129,7 @@
       "interpreter": "shakespeare_interpreter",
       "fetcher": "shakespeare_folger",
       "default_story_model": "folger_scene_adaptation",
-      "default_story_pipeline": "legacy_many_pass_v3",
+      "default_story_pipeline": "legacy_many_pass_adapt",
       "defaults": {
         "story_form_label": "Shakespeare radio adaptation",
         "source_material_label": "Shakespeare scene",

@@ -77,7 +77,7 @@ class TestHelper:
 class TestStoryRulesIndependence:
     @pytest.mark.parametrize("bank_id", [
         "media_archive", "original_radio", "scifi_news_pro",
-        "public_domain_story_v3", "shakespeare",
+        "public_domain", "shakespeare",
     ])
     def test_lane_resolves_its_own_rules(self, bank_id):
         assert RULES.resolve_story_rules(bank_id).rules_id == bank_id
@@ -133,50 +133,40 @@ class TestNoRegression:
 #    _v2 family and the science_news family were already removed.
 # ---------------------------------------------------------------------------
 
-# v3 bank id -> (base, v3 pipeline id, lane kind). `base` is the pure
-# base_source_bank_id strip (still a valid string op); rules now resolve by
-# EXACT id, not by base family.
-_V3 = {
-    "public_domain_story_v3": ("public_domain_story", "legacy_many_pass_v3", "inline"),
+# Adaptation-lane bank id -> (base, pipeline id, lane kind). The two inline lanes
+# that run the bounded post-assembly advisory diagnostic (legacy_many_pass_adapt
+# is in _INLINE_V3_PIPELINES). Rules resolve by EXACT id, not by base family.
+_ADAPT_LANES = {
+    "public_domain": ("public_domain", "legacy_many_pass_adapt", "inline"),
+    "shakespeare":   ("shakespeare",   "legacy_many_pass_adapt", "inline"),
 }
 
 
 class TestChunk4V3Rows:
     def test_roster_counts_6_runnable_7_visible(self):
-        # scifi_codex_v4 -> scifi_news, scifi_fable2 -> scifi_news_pro,
-        # shakespeare_v3 -> shakespeare (2026-07-19): 5 base + 1 _v3
-        # (public_domain_story_v3) + custom = 7 visible / 6 runnable.
+        # Keep-6 rename (2026-07-19): every bank id is de-versioned.
+        # 6 base + custom = 7 visible / 6 runnable.
         ids = ROUTING.list_bank_ids()
         assert len(ids) == 7
         assert ids[-1] == "custom_source_bank"
         runnable = [b for b in ids if ROUTING.get_bank(b).runnable]
         assert len(runnable) == 6                  # only custom is non-runnable
-        assert len([b for b in ids if b.endswith("_v2")]) == 0
-        assert len([b for b in ids if b.endswith("_v3")]) == 1
-        assert len([b for b in ids if b.endswith("_v4")]) == 0
+        # the roster is fully de-versioned: no id carries a _v2/_v3/_v4 suffix.
+        assert not any(b.endswith(("_v2", "_v3", "_v4")) for b in ids)
 
-    def test_v3_count_and_order(self):
-        ids = ROUTING.list_bank_ids()
-        assert len([b for b in ids if b.endswith("_v3")]) == 1
-        # the _v3 lanes are seated after the base lanes, before custom.
-        assert min(ids.index(b) for b in ids if b.endswith("_v3")) > \
-            ids.index("scifi_news_pro")
-        assert ids[-1] == "custom_source_bank"
-
-    @pytest.mark.parametrize("v3,base,pipe,kind",
-                             sorted((k, *v) for k, v in _V3.items()))
-    def test_v3_owns_pack_pipeline_and_lane(self, v3, base, pipe, kind):
+    @pytest.mark.parametrize("lane,base,pipe,kind",
+                             sorted((k, *v) for k, v in _ADAPT_LANES.items()))
+    def test_adapt_lane_owns_pack_pipeline_and_lane(self, lane, base, pipe, kind):
         from nodes import OTR_LedgerScriptWriter as W
-        bank = ROUTING.get_bank(v3)
+        bank = ROUTING.get_bank(lane)
         assert bank.runnable is True
         assert bank.default_story_pipeline == pipe
-        pack = ROUTING.resolve_story_pack(v3)
-        assert pack.source_bank_id == v3
-        assert pack.story_model_id.endswith("_v3")
+        pack = ROUTING.resolve_story_pack(lane)
+        assert pack.source_bank_id == lane
         assert pack.story_pipeline_id == pipe
-        assert BV.base_source_bank_id(v3) == base
-        # independence: a _v3 lane resolves its OWN rules by exact id, not base.
-        assert RULES.resolve_story_rules(v3).rules_id == v3
+        assert BV.base_source_bank_id(lane) == base
+        # independence: each lane resolves its OWN rules by exact id, not base.
+        assert RULES.resolve_story_rules(lane).rules_id == lane
         if kind == "runner":
             assert pipe in W._RUNNER_BY_PIPELINE
             assert pipe not in W._LEGACY_INLINE_PIPELINES
@@ -200,21 +190,21 @@ class TestChunk4V3Rows:
 
         led = _Led()
         before = [dict(r) for r in led.data["lines"]]
-        W.run_v3_advisory(led, led.data["meta"], lane="public_domain_story_v3")
-        rec = led.data["meta"]["public_domain_story_v3_advisory"]
+        W.run_v3_advisory(led, led.data["meta"], lane="public_domain")
+        rec = led.data["meta"]["public_domain_advisory"]
         assert rec["status"] == "ok"
         assert rec["line_count"] == 2
         assert rec["focus"]["metric"] == "compression_line_count"
         # advisory-only: spoken rows untouched (no hole in the ledger).
         assert led.data["lines"] == before
         # exactly one owned meta field written.
-        assert list(led.data["meta"].keys()) == ["public_domain_story_v3_advisory"]
+        assert list(led.data["meta"].keys()) == ["public_domain_advisory"]
 
     def test_v3_advisory_never_raises_on_bad_input(self):
         from nodes import OTR_LedgerScriptWriter as W
         meta = {}
-        W.run_v3_advisory(None, meta, lane="public_domain_story_v3")   # None led
-        assert meta["public_domain_story_v3_advisory"]["status"] in ("ok", "error")
+        W.run_v3_advisory(None, meta, lane="public_domain")   # None led
+        assert meta["public_domain_advisory"]["status"] in ("ok", "error")
 
         class _Bad:
             data = {"lines": "not a list", "meta": {}}

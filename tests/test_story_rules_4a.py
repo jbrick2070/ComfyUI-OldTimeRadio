@@ -113,14 +113,14 @@ class TestLoader:
         ids = sr.list_rules_ids()
         assert "media_archive" in ids
         assert "scifi_news_pro" in ids
-        assert "public_domain_story_v3" in ids
+        assert "public_domain" in ids
         assert "custom_source_bank" not in ids
         with pytest.raises(sr.UnknownStoryRulesError):
             sr.resolve_story_rules("custom_source_bank")
 
     def test_public_domain_rules_load(self):
-        rules = sr.resolve_story_rules("public_domain_story_v3")
-        assert rules.rules_id == "public_domain_story_v3"
+        rules = sr.resolve_story_rules("public_domain")
+        assert rules.rules_id == "public_domain"
         assert "smoking" in rules.banned_phrases
 
     def test_get_story_rules_meta_paths(self):

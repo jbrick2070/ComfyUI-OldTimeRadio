@@ -140,7 +140,7 @@ LANE_PACK_KEYS = {
             "exchange_system", "coda_system", "announcer_intro_system",
             "announcer_intro_safe_system", "announcer_outro_system",
         }),
-    ("public_domain_story_v3", "faithful_radio_adaptation_v3"):
+    ("public_domain", "faithful_radio_adaptation"):
         frozenset({
             "outline_macro_system", "outline_phase_system",
             "outline_beat_system", "line_composer_system",
@@ -176,8 +176,8 @@ def test_public_domain_lane_is_runnable():
     """Public-domain now has fetcher, interpreter, story rules, default
     source_ref, and all production seams, so it can pass the run-intent gate.
     Roster trim 2026-07-17: the base id is retired; the surviving lane is
-    public_domain_story_v3."""
-    assert routing.require_runnable_bank("public_domain_story_v3").runnable is True
+    public_domain."""
+    assert routing.require_runnable_bank("public_domain").runnable is True
 
 
 def test_media_archive_lane_is_runnable():

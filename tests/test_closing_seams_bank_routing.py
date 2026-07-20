@@ -36,7 +36,7 @@ from nodes import _otr_line_composer as LC  # noqa: E402
 
 RUNNABLE_BANKS = (
     "media_archive",
-    "public_domain_story_v3",
+    "public_domain",
     "shakespeare",
 )
 CLOSING_PHASES = (
@@ -106,7 +106,7 @@ def test_non_science_coda_seams_keep_the_bridge_contract():
     """The re-authored PD/Shakespeare coda seams (and media's) must keep
     the KILL-2 bridge mechanics the composer enforces: a SHORT pivot
     clause; the real note is appended by the producer."""
-    for bank in ("media_archive", "public_domain_story_v3", "shakespeare"):
+    for bank in ("media_archive", "public_domain", "shakespeare"):
         seam = resolve_creative_system_prompt(
             None, phase="coda_system", source_bank_id=bank
         )
@@ -168,10 +168,10 @@ def test_compose_announcer_intro_safe_sends_bank_safe_system():
         script_brief="",
         story_scaffold=True,
         safe_open_brief=brief,
-        source_bank_id="public_domain_story_v3",
+        source_bank_id="public_domain",
     )
     expected = get_pack_prompt(
-        resolve_story_pack("public_domain_story_v3"),
+        resolve_story_pack("public_domain"),
         "announcer_intro_safe_system",
     )
     assert _sysmsg(calls) == expected
@@ -190,10 +190,10 @@ def test_compose_announcer_outro_sends_bank_outro_system():
             "preserved."
         ),
         intro_text="",
-        source_bank_id="public_domain_story_v3",
+        source_bank_id="public_domain",
     )
     expected = get_pack_prompt(
-        resolve_story_pack("public_domain_story_v3"),
+        resolve_story_pack("public_domain"),
         "announcer_outro_system",
     )
     assert _sysmsg(calls) == expected

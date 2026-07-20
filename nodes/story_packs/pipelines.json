@@ -310,8 +310,8 @@
       ]
     },
     {
-      "story_pipeline_id": "legacy_many_pass_v3",
-      "label": "Legacy Many-Pass (production writer) (v3)",
+      "story_pipeline_id": "legacy_many_pass_adapt",
+      "label": "Legacy Many-Pass adaptation lane (shakespeare + public_domain)",
       "executable": false,
       "requires_source_contract": true,
       "declared_seams": [],
