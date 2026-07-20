@@ -73,7 +73,7 @@ def test_context_window_precondition_above_hard_limit_passes() -> None:
 
 def test_context_window_precondition_mistral_nemo_real_row_passes() -> None:
     """Mistral-Nemo at context_window=16384 (2026-07-19: raised from 8192 so
-    the local scifi_codex_v4 420/720w script pass fits) is >= the default
+    the local scifi_news 420/720w script pass fits) is >= the default
     HARD_VRAM_CONTEXT_LIMIT=8192, so it does NOT trip the precondition.
     """
     rows_by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}

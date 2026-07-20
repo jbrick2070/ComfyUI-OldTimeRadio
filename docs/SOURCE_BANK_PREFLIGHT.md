@@ -57,7 +57,7 @@ Creative quality remains a taste decision, not a runtime validator.
   operator-pinned `source_ref`, or automatic public/keyless selection.
 - [ ] **Hard:** A no-source bank has an explicit bank-specific initialization
   path. It does not use empty `fetcher` plus empty `interpreter` and
-  accidentally enter the reserved `original_radio` architecture. **N/A**
+  accidentally enter the reserved `original` architecture. **N/A**
   only for a source-backed bank.
 - [ ] **Hard:** The bank introduces no API key, login, paid service, protected
   browser session, or endpoint that normally returns a paywall, CAPTCHA, or
@@ -343,8 +343,8 @@ the survivors POSITIVELY (what exists), never the absence of what was removed. T
 ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies included.
 
 **Step 0 -- decide the removal DEPTH (this drives everything below):**
-- **Variant removal** (a base or sibling version of the same lane SURVIVES, e.g. rip `scifi_codex_v3`
-  while `scifi_codex`/`scifi_codex_v4` stay): remove only the bank's OWN row/pack/rules + its
+- **Variant removal** (a base or sibling version of the same lane SURVIVES, e.g. the 2026-07-19 rip
+  of base `scifi_codex` while its shared runner + the renamed `scifi_news` sibling stayed): remove only the bank's OWN row/pack/rules + its
   DEDICATED pipeline. KEEP the shared lane runner module and any shared pipeline.
 - **Full-family removal** (NO surviving sibling of that lane, e.g. `scifi_sonnet_v3` is the only sonnet
   bank): ALSO delete the lane runner module + its interpreter/source-kind registration + the dedicated
@@ -356,7 +356,7 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
 - [ ] **Hard:** Pipeline removed from BOTH registries when dedicated -- `_RUNNER_BY_PIPELINE` in
   `nodes/OTR_LedgerScriptWriter.py` AND the JSON catalog `nodes/story_packs/pipelines.json`
   (**the easy-to-miss one** -- a retired pipeline left in the JSON is a semantic registry failure even
-  with no bank pointing at it). KEEP any pipeline a surviving bank still uses (e.g. `legacy_many_pass_v3`).
+  with no bank pointing at it). KEEP any pipeline a surviving bank still uses (e.g. `legacy_many_pass_adapt`).
 - [ ] **Hard:** Runner + routes -- delete the bank's `_run_*_lane` registry entry and any
   `if base == "<family>":` route. **Full-family only:** delete the lane module `nodes/_otr_<family>.py`
   and its `validate_source_payload("<family>")` / interpreter registration; grep the family id across

@@ -8,7 +8,7 @@ section 4/5 happen OUTSIDE this script.
 
 Usage:
     python scripts/otr_queue_smoke.py                       # canonical, 30w
-    python scripts/otr_queue_smoke.py --words 30 --source-bank original_radio
+    python scripts/otr_queue_smoke.py --words 30 --source-bank original
     python scripts/otr_queue_smoke.py --workflow workflows/variants/otr_cpu_floor.json
 
 Exit 0 only on history SUCCESS. The obs/episode asset check (Test-Path)

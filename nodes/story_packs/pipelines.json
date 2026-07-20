@@ -548,7 +548,7 @@
         "P3 to P4 to P3 is bounded to one structural rewrite.",
         "P5 to P6 to P7 to P8 to P9 to P8 is non-linear full-rewrite topology; P9 may run once more after a rewrite audit.",
         "Every model invocation uses only the pass slot. P11 and P12 are deterministic orchestration stages.",
-        "v4 improvement campaign (2026-07-17): the proof-pressure delta lives entirely in the scifi_codex_v4 pack seams; this pipeline reuses the dedicated _run_scifi_codex_lane runner DIRECTLY (no v3 advisory wrapper)."
+        "Proof-pressure campaign (renamed from scifi_codex_v4 2026-07-19): the delta lives entirely in the scifi_news pack seams; this pipeline reuses the dedicated _run_scifi_codex_lane runner DIRECTLY (no v3 advisory wrapper)."
       ]
     }
   ]

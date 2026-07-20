@@ -38,7 +38,7 @@ Guarded boundaries by path:
   * inline lanes -- writer ``OTR_LedgerScriptWriter.run()`` last creative pass,
     just after the self-vocative attribution repair, before the J rollup + tail.
   * codex lane -- deterministic terminal covers it now; its own authored repair
-    lands with ``scifi_codex_v4`` (Phase 2), at its structured slot seam.
+    lands with ``scifi_news`` (Phase 2), at its structured slot seam.
 
 Self-contained (no ledger/rules imports -> no circular import from the freeze
 module). UTF-8 no BOM, SFW.

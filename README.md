@@ -89,18 +89,18 @@ News → LedgerScriptWriter (LLM) → FreezeCascade → CastLock
 ## Story sources (source banks)
 
 The writer's `source_bank` dropdown selects where each episode's story comes from.
-Default: `scifi_fable2`. Every lane is an INDEPENDENT bank (its own story pack +
-story_rules); a `_v3` suffix on some ids is a bake-off naming artifact, not a
-dependency on any other lane.
+Default: `scifi_news` (the local, offline-first sci-fi lane). Every lane is an
+INDEPENDENT bank (its own story pack + story_rules) with no dependency on any
+other lane.
 
 | Bank | What it does |
 |------|--------------|
-| `scifi_fable2` | LLM-first multipass sci-fi writer (the shipped default) |
-| `scifi_codex_v4` | proof-pressure sci-fi radio, a distinct multipass architecture |
+| `scifi_news` | proof-pressure sci-fi radio; the local default (robust on a local LLM) |
+| `scifi_news_pro` | LLM-first multipass sci-fi writer; the cloud/quality lane (needs a strong API model) |
 | `media_archive` | media RSS / archive items → restoration-adventure episodes |
-| `public_domain_story_v3` | faithful radio adaptation of a public-domain source |
-| `shakespeare_v3` | Folger scene adaptation |
-| `original_radio` | no-source original fiction seeded from an entropy spark draw |
+| `public_domain` | faithful radio adaptation of a public-domain source |
+| `shakespeare` | Folger scene adaptation |
+| `original` | no-source original fiction seeded from an entropy spark draw |
 
 A typed `custom_premise` rides along as an operator hint on the original lanes and as a
 source override on the article lanes. Every lane is fail-closed: a bad source, context

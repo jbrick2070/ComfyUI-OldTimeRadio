@@ -1,9 +1,17 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-17 night6 -- HEAD `9730e2dc` (v4 Phase 2 bank #1 `scifi_codex_v4` DONE +
-LIVE-PROVEN: leg `c1f3891f` RESULT SUCCESS + obs asset "The Whisker Effect" 56.6 MB; two pre-existing
-codex bugs fixed -- P0 source-whitespace @ `26ba8e1d`, P3 caps raised @ `9730e2dc`; NEXT = bank #2
-`shakespeare_v4`), branch `v2.0-alpha`. Truly forward-only by
+**Updated:** 2026-07-19 -- **keep-6 bank RENAME COMPLETE (offline-green)** on `v2.0-alpha`.
+The roster is now fully de-versioned: `scifi_news` (local default, was `scifi_codex_v4`),
+`scifi_news_pro` (cloud/quality, was `scifi_fable2`), `shakespeare` (was `_v3`), `public_domain`
+(was `_v3`), `original` (was `original_radio`), `media_archive`; shared pipeline
+`legacy_many_pass_v3` -> `legacy_many_pass_adapt`. Full suite 8085 passed / Bug Bible 17 / stale-ID
+audit clean; the source_bank widget default + both canonical workflows flipped to `scifi_news`
+(local, offline-first). DEFERRED: (1) LIVE proof (`scifi_news` + `scifi_news_pro` 30w smokes) until
+the operator's internet returns; (2) Phase-2 de-naming (module filenames, `meta[]` ledger keys,
+wire-schema `.v4` literals) -- flagged for the operator, NOT done in this pass.
+Prior step -- 2026-07-17 night6, HEAD `9730e2dc` (v4 Phase 2 bank #1 `scifi_codex_v4` DONE +
+LIVE-PROVEN: leg `c1f3891f` RESULT SUCCESS + obs asset "The Whisker Effect" 56.6 MB; codex bugs
+fixed @ `26ba8e1d` / `9730e2dc`). Truly forward-only by
 operator directive: completed work lives in `docs/HANDOFF_LOG.md` (history) and
 `docs/PROD_BUG_LOG.md` (bugs); doctrine lives in
 `docs/PRODUCTION_SPRINT_LESSONS.md` (the "lost anchor" class is now lesson 24

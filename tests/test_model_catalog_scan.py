@@ -498,7 +498,7 @@ def test_hard_vram_context_limit_garbage_env_falls_back(monkeypatch):
 
 def test_resolve_context_cap_pass_for_curated_override(empty_hub_root, monkeypatch):
     """Mistral-Nemo (vram_fit_tier=PASS) returns its AUTHORITATIVE soak-tested
-    override, un-clamped, so the local scifi_codex_v4 420/720w script pass fits
+    override, un-clamped, so the local scifi_news 420/720w script pass fits
     (2026-07-19: raised 8192 -> 16384)."""
     monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
     v = catalog.resolve_context_cap(catalog.DEFAULT_LLM, hub_root=empty_hub_root)

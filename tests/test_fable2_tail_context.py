@@ -294,7 +294,7 @@ def test_tail_preserves_selected_final_draft_seals_on_disk(
 
 @pytest.mark.parametrize(
     "source_bank",
-    ("scifi_news_pro", "scifi_codex_v4"),
+    ("scifi_news_pro", "scifi_news"),
 )
 def test_content_owned_tail_stamps_delivery_before_finalizer(
     tmp_path, monkeypatch, source_bank,

@@ -49,9 +49,8 @@ class TestBankRow:
         # r3/M7: "+ Add Your Own" stays last; new lanes inserted BEFORE it.
         ids = ROUTING.list_bank_ids()
         assert ids[-1] == "custom_source_bank"
-        # v4 campaign 2026-07-17: scifi_codex_v4 inserted directly before custom,
-        # after the _v3 tail; custom stays last. Sonnet-bake-off rip 2026-07-18:
-        # shakespeare is now the last _v3 lane before scifi_codex_v4.
+        # Keep-6 rename 2026-07-19: the roster is de-versioned; scifi_news (the
+        # local sci-fi lane) sits directly before custom, which stays last.
         assert ids[-3:] == ("shakespeare", "scifi_news",
                             "custom_source_bank")
 

@@ -1826,7 +1826,7 @@ def _apply_intro_rewrite_result(led, first_announcer_id, new_text, flag):
 
 
 def _run_fable2_lane(**kwargs):
-    """Lane entry for `fable2_multipass` (scifi_fable2 S2, doc s11).
+    """Lane entry for `scifi_news_pro_multipass` (scifi_fable2 S2, doc s11).
 
     Late-imports the PURE runner module (r4/M3: the runner never imports
     this writer; the import points one way only) and returns its
