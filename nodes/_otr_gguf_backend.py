@@ -380,15 +380,18 @@ def _resolve_effective_n_ctx(
 
 
 def _resolve_gguf_seed() -> int:
-    """OTR_GGUF_SEED is a REQUIRED uint32 env when a gguf row is selected. It
-    is an env (NOT a widget) on purpose: a widget named "seed" trips the
-    workflow validator's control_after_generate companion-slot rule."""
+    """The GGUF writer seed. ``OTR_GGUF_SEED`` PINS it (a uint32) for a byte-repro
+    run; UNSET/blank draws a fresh OS-entropy uint32 -- matching OTR's creative-RNG
+    model (fresh cast/style each run unless explicitly pinned, feedback_true_
+    randomization). It is an env (NOT a widget) on purpose: a widget named "seed"
+    trips the workflow validator's control_after_generate companion-slot rule.
+
+    (2026-07-20, operator: the old hard "OTR_GGUF_SEED is REQUIRED" guard was
+    removed as unneeded -- an unset seed defaults to fresh entropy rather than
+    failing the writer. An explicitly-set-but-malformed value still fails LOUD.)"""
     raw = os.environ.get("OTR_GGUF_SEED")
     if raw is None or not raw.strip():
-        raise GGUFNativeConfigError(
-            "OTR_GGUF_SEED is REQUIRED when a GGUF writer row is selected. "
-            "Set it to a uint32 (0..4294967295) env value."
-        )
+        return int.from_bytes(os.urandom(4), "big")   # fresh OS-entropy uint32
     try:
         val = int(raw.strip())
     except ValueError:

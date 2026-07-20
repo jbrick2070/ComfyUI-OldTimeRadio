@@ -224,14 +224,16 @@ def test_quant_mismatch_raises_with_slot(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# OTR_GGUF_SEED: required uint32 env when not passed explicitly
+# OTR_GGUF_SEED: OPTIONAL uint32 env (2026-07-20 operator: the hard "required"
+# guard was removed as unneeded -- unset draws fresh OS entropy; a pinned value is
+# byte-reproducible; a malformed pin still fails loud).
 # ---------------------------------------------------------------------------
 
 
-def test_seed_required_env_when_gguf_selected(monkeypatch):
+def test_seed_env_optional_defaults_to_entropy(monkeypatch):
     monkeypatch.delenv("OTR_GGUF_SEED", raising=False)
-    with pytest.raises(GGF.GGUFNativeConfigError):
-        GGF.build_gguf_load_config(repo_id=GEMMA, policy=BASELINE_POLICY)
+    lc = GGF.build_gguf_load_config(repo_id=GEMMA, policy=BASELINE_POLICY)
+    assert isinstance(lc.seed, int) and 0 <= lc.seed <= 0xFFFFFFFF
     monkeypatch.setenv("OTR_GGUF_SEED", "4294967295")
     lc = GGF.build_gguf_load_config(repo_id=GEMMA, policy=BASELINE_POLICY)
     assert lc.seed == 4294967295
