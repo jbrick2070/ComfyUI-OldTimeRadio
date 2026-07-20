@@ -2477,7 +2477,10 @@ def parse_engine_override(spec: str) -> dict:
     ``role=engine`` pairs; the role ``*`` means EVERY shot regardless of role.
     Examples: ``*=ltx_video`` (the all-LTX episode);
     ``character_video=wan_i2v,announcer_visual=humo``.
-    Unknown engines raise at parse time (fail-closed, before any render)."""
+    A PUBLIC menu id (``wan_8gb``) or a LEGACY id resolves to its internal engine id
+    before the registry check, so the map is stored as internal ids (video-tiers
+    2026-07-20, boundary 6). Unknown engines raise at parse time (fail-closed)."""
+    from .._otr_shared.public_engines import resolve_engine_id
     out = {}
     for pair in (spec or "").split(","):
         pair = pair.strip()
@@ -2487,6 +2490,7 @@ def parse_engine_override(spec: str) -> dict:
             raise ValueError(
                 "OTR_FORCE_ENGINE_MAP entry %r is not role=engine" % pair)
         role, engine = (s.strip() for s in pair.split("=", 1))
+        engine = resolve_engine_id(engine)   # public/legacy -> internal
         if engine not in ENGINE_FAMILY and not _vreg.is_registered(engine):
             raise ValueError(
                 "OTR_FORCE_ENGINE_MAP names unknown engine %r" % engine)

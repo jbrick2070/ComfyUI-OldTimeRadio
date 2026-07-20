@@ -226,13 +226,13 @@ def _is_engine_director_admissible(widget_name: str, value: Any) -> bool:
         return True
     if widget_name in _VIDEO_DIRECTOR_WIDGETS:
         from ._otr_video_engines import registry as _vreg
-        # The video dropdown DISPLAYS aspect-labelled engines ("humo (portrait)",
-        # 2026-06-17), and that label is what a fresh save stores. Parse the bare
-        # engine id back out (token before the first " (") before the registry
-        # check, mirroring OTR_VideoDirector._engine_id_from_pick. A bare legacy
-        # value has no " (" and passes through unchanged.
-        bare = value.split(" (", 1)[0]
-        return bare in _vreg.all_engine_names()
+        from ._otr_shared.public_engines import resolve_engine_id
+        # The video dropdown DISPLAYS public/aspect-labelled engines
+        # ("wan_8gb (16:9)", "humo (portrait)"), and that label is what a fresh save
+        # stores. Resolve the label / PUBLIC id / LEGACY id back to the concrete
+        # internal engine id before the registry check (mirrors
+        # OTR_VideoDirector._engine_id_from_pick). A bare internal value passes through.
+        return resolve_engine_id(value) in _vreg.all_engine_names()
     if widget_name in _IMAGE_DIRECTOR_WIDGETS:
         from ._otr_image_engines import registry as _ireg
         return value in _ireg.all_engine_names()
@@ -536,6 +536,31 @@ def _flatten_profile_values(profile: dict) -> dict:
     return flat
 
 
+def _director_option_value(node_type: str, widget: str, value: Any) -> Any:
+    """For an OTR_VideoDirector role widget selecting one of the four PUBLIC-aliased
+    tier engines, write the EXACT live menu option (the public label) -- so a
+    generated variant stores what the UI would save and round-trips (e.g. profile
+    ``wan_ti2v`` -> ``'wan_8gb (16:9)'``). Video-tiers (2026-07-20), boundary 5.
+
+    SCOPED to the four renamed tier engines (``_INTERNAL_TO_PUBLIC``): their id
+    CHANGED, so a stored bare internal id would not match any visible menu option.
+    Every OTHER engine keeps its existing stored form (its bare id -- still admissible
+    via the resolver), so non-tier variants do NOT churn (additive only). The
+    ``OTR_VideoRenderBatch.engine`` widget and every non-director target keep the raw
+    INTERNAL value. ADD_CUSTOM / empty / unregistered pass through raw."""
+    if node_type != "OTR_VideoDirector" or widget not in _VIDEO_DIRECTOR_WIDGETS:
+        return value
+    if not isinstance(value, str) or not value or value == "+ Add Custom Model":
+        return value
+    from ._otr_shared.public_engines import resolve_engine_id, _INTERNAL_TO_PUBLIC
+    from ._otr_video_engines import registry as _vreg
+    internal = resolve_engine_id(value)
+    if internal not in _INTERNAL_TO_PUBLIC or not _vreg.is_registered(internal):
+        return value
+    from .otr_video_director import exact_menu_option_for
+    return exact_menu_option_for(internal)
+
+
 def apply_profile(workflow: dict, profile, mapping: Optional[dict] = None,
                   schemas: Optional[dict] = None) -> dict:
     """PURE semantic widget patching: return a DEEP COPY of ``workflow`` with
@@ -570,8 +595,9 @@ def apply_profile(workflow: dict, profile, mapping: Optional[dict] = None,
             )
         for node_type, widget in entry["targets"]:
             node = _node_by_type(out, node_type)
-            _patch_node_widget(node, widget, flat[dotted], schemas)
-            applied.append(f"{dotted} -> {node_type}.{widget} = {flat[dotted]!r}")
+            value = _director_option_value(node_type, widget, flat[dotted])
+            _patch_node_widget(node, widget, value, schemas)
+            applied.append(f"{dotted} -> {node_type}.{widget} = {value!r}")
     log.info(
         "apply_profile: profile=%s (%s) applied %d widget writes:\n  %s",
         profile.get("id"), profile.get("display_name"), len(applied),

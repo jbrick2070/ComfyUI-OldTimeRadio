@@ -484,7 +484,11 @@ def cross_validate_profile(profile: dict, mapping: dict,
             problems.append(f"{dotted}={value!r}: unknown registry namespace {registry!r}")
             continue
         avail = availability(profile, decls)
-        reason = avail.get(value)
+        # Video-tiers (2026-07-20), boundary 7: resolve a PUBLIC menu id / LEGACY id
+        # to its internal engine id before the CAPABILITIES membership check
+        # (idempotent for a bare internal id / a non-video override).
+        from .public_engines import resolve_engine_id
+        reason = avail.get(resolve_engine_id(value))
         if reason is None:
             problems.append(
                 f"{dotted}={value!r}: engine not declared in the {registry} "

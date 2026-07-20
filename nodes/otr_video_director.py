@@ -28,6 +28,14 @@ from ._otr_video_engines import registry as _vreg
 from ._otr_image_engines import registry as _ireg
 from ._otr_shared import role_compat as _rc
 from ._otr_shared import role_slots as _role_slots
+# Video-tiers (2026-07-20): the public-name resolver is the SINGLE source of truth
+# for the menu id <-> internal id mapping AND the legacy-alias table (moved out of
+# this module). Dep-free / cold-import clean.
+from ._otr_shared.public_engines import (
+    _INTERNAL_TO_PUBLIC,
+    _LEGACY_ENGINE_ALIASES,
+    resolve_engine_id,
+)
 
 #: Sentinel COMBO entry that opens the "declare a custom model" path. When a role
 #: is set to this, its real engine id is read from the ``custom_models_json``
@@ -49,9 +57,10 @@ _ASPECT_SUFFIX = {"portrait": " (portrait)", "wide": " (16:9)"}
 def _aspect_suffix(engine_id) -> str:
     """The display suffix for ``engine_id`` derived from its ``render_aspect``
     (portrait -> ' (portrait)', wide -> ' (16:9)'). Unknown engine / unknown
-    aspect -> '' (bare id). Pure registry read, never raises."""
+    aspect -> '' (bare id). Resolves a public / legacy id to its internal id
+    first so the registry read hits the concrete engine. Pure, never raises."""
     try:
-        eng = _vreg.get_engine(str(engine_id))
+        eng = _vreg.get_engine(resolve_engine_id(engine_id))
         aspect = getattr(eng, "render_aspect", None)
     except Exception:  # noqa: BLE001 -- unknown engine -> no suffix
         aspect = None
@@ -75,7 +84,7 @@ def _descriptor_suffix(engine_id) -> str:
     (family ``"abstract"`` that mint no still) carry one; every other engine ->
     ``''`` (bare label unchanged). Pure registry read, never raises."""
     try:
-        eng = _vreg.get_engine(str(engine_id))
+        eng = _vreg.get_engine(resolve_engine_id(engine_id))
         family = getattr(eng, "family", None)
         accepts_still = getattr(eng, "accepts_still", None)
     except Exception:  # noqa: BLE001 -- unknown engine -> no descriptor
@@ -86,45 +95,38 @@ def _descriptor_suffix(engine_id) -> str:
 
 
 def _label_for(engine_id) -> str:
-    """The dropdown LABEL for an engine id:
-    ``'<id><aspect suffix><descriptor suffix>'`` (e.g.
-    ``'humo_1.7B (portrait)'`` or
-    ``'viz_green (16:9) (audio-reactive, no scene image)'``). The descriptor
-    suffix (2026-07-01 E4) is auto-derived from the engine's family/``accepts_still``
-    (:func:`_descriptor_suffix`) -- never hand-maintained, same contract as
-    the aspect suffix. Every suffix starts with ``' ('`` so
-    :func:`_engine_id_from_pick`'s first-``' ('``-truncation strips them all
-    together; a no-aspect, no-descriptor engine still round-trips to
-    the bare id."""
-    return "%s%s%s" % (engine_id, _aspect_suffix(engine_id),
+    """The dropdown LABEL for an INTERNAL engine id:
+    ``'<public-or-internal id><aspect suffix><descriptor suffix>'`` (e.g.
+    ``'wan_8gb (16:9)'`` for internal ``wan_ti2v``, ``'humo_1.7B (portrait)'``,
+    or ``'viz_green (16:9) (audio-reactive, no scene image)'``).
+
+    Video-tiers (2026-07-20): the visible token is the PUBLIC menu id when the engine
+    has one (``_INTERNAL_TO_PUBLIC``), else the bare internal id -- so the four
+    tier rows read ``wan_8gb`` / ``ltx_8gb`` / ``ltx23_16gb_audio_in`` /
+    ``ltx23_16gb_video`` while every other engine keeps its id. The suffixes are
+    still DERIVED from the engine's own ``render_aspect`` / family (passed the
+    INTERNAL id). Every suffix starts with ``' ('`` so
+    :func:`_engine_id_from_pick`'s resolver strips them all and round-trips the label
+    back to the internal id (``_engine_id_from_pick(_label_for('wan_ti2v'))=='wan_ti2v'``)."""
+    public = _INTERNAL_TO_PUBLIC.get(engine_id, engine_id)
+    return "%s%s%s" % (public, _aspect_suffix(engine_id),
                        _descriptor_suffix(engine_id))
 
 
-#: Legacy engine-id aliases (renamed engines). A saved graph or old ledger that
-#: still carries the pre-rename name resolves to the current engine so the pick
-#: keeps working. 2026-06-29: flat_still -> still_flat, flux_still -> still_pan
-#: (the misleading "flux" name was dropped -- the engine is ffmpeg, never Flux);
-#: still_kenburns -> still_motion (the always-renders radio floor was renamed).
-#: 2026-06-30 (item 2): visualizer -> viz_green (companion to viz_mxc_cpu /
-#: viz_mxc_mandala; the old name no longer has a CAPABILITIES row).
-_LEGACY_ENGINE_ALIASES = {"flat_still": "still_flat", "flux_still": "still_pan",
-                          "still_kenburns": "still_motion",
-                          "visualizer": "viz_green"}
+# _LEGACY_ENGINE_ALIASES now lives in _otr_shared.public_engines (the SINGLE source
+# of truth for the menu-id <-> internal-id + legacy-alias mapping) and is imported
+# above; every boundary reads that one table. (2026-06-29 flat_still/flux_still/
+# still_kenburns renames + 2026-06-30 visualizer->viz_green are preserved there.)
 
 
 def _engine_id_from_pick(pick) -> str:
-    """Parse a dropdown pick back to the bare engine id (the saved/looked-up
-    VALUE). Take the token BEFORE the first ' (' so a suffixed label
-    (``'humo (portrait)'``) yields ``'humo'``; a bare legacy value with no
-    suffix (old saved graphs) passes through unchanged; the ADD_CUSTOM sentinel
-    (no ' (') is preserved so the custom path still triggers. A renamed engine's
-    old id is mapped via :data:`_LEGACY_ENGINE_ALIASES` so old picks resolve."""
-    s = str(pick or "")
-    if s == ADD_CUSTOM:
-        return s
-    idx = s.find(" (")
-    bare = s[:idx] if idx != -1 else s
-    return _LEGACY_ENGINE_ALIASES.get(bare, bare)
+    """Parse a dropdown pick back to the concrete internal engine id (the
+    saved/looked-up VALUE) via the shared resolver: strip the ' (' suffix, map a
+    PUBLIC menu id (``'wan_8gb (16:9)'`` -> ``'wan_ti2v'``) then a LEGACY id
+    (``'visualizer'`` -> ``'viz_green'``) to the current internal id. A bare
+    internal value (old saved graphs) and the ADD_CUSTOM sentinel pass through
+    unchanged -- fully back-compatible."""
+    return resolve_engine_id(pick)
 
 #: Which role(s) each video slot must be compatible with (fail-closed filter).
 #: The ONE shared map (nodes/_otr_shared/role_slots.py). Three first-class video
@@ -142,12 +144,36 @@ def _video_model_combo() -> list:
     hard-fail LOUD; validation is the operator's MANUAL process, never a code gate).
     ``+ Add Custom Model`` stays the escape hatch for an explicitly-declared engine.
 
-    Each entry is the engine's aspect-DERIVED label (``humo (portrait)`` vs
-    ``humo_1.7B_169 (16:9)``) so the two HuMo paths are obvious at a glance; the
-    SAVED value stays the bare engine id (``direct()`` parses the label back via
-    :func:`_engine_id_from_pick`, and a bare legacy value still resolves)."""
-    names = list(_vreg.all_engine_names())
-    return [_label_for(n) for n in names] + [ADD_CUSTOM]
+    Each entry is the engine's PUBLIC-or-internal label (``wan_8gb (16:9)`` for
+    internal ``wan_ti2v``, ``humo (portrait)``, ...) so the tier rows read by their
+    public name; the SAVED value is that same label (``direct()`` resolves it back
+    to the internal id via :func:`_engine_id_from_pick`). Deduped by PUBLIC id so a
+    public row can never appear twice (a defensive no-op given the bijection)."""
+    seen: set = set()
+    out: list = []
+    for internal in _vreg.all_engine_names():
+        public = _INTERNAL_TO_PUBLIC.get(internal, internal)
+        if public in seen:
+            continue
+        seen.add(public)
+        out.append(_label_for(internal))
+    return out + [ADD_CUSTOM]
+
+
+def exact_menu_option_for(internal_id) -> str:
+    """The UNIQUE live-combo option (menu label) that resolves to ``internal_id``.
+
+    Used by the applier + build_variants to write the EXACT string the UI would save
+    for a given internal engine (e.g. ``wan_ti2v`` -> ``'wan_8gb (16:9)'``), so a
+    generated variant stores a real, round-trippable menu value rather than a bare
+    internal id. Fails LOUD on 0 or >1 matches (a menu/registry inconsistency)."""
+    opts = [o for o in _video_model_combo()
+            if o != ADD_CUSTOM and _engine_id_from_pick(o) == internal_id]
+    if len(opts) != 1:
+        raise ValueError(
+            "exact_menu_option_for(%r): expected exactly ONE live combo option "
+            "resolving to it, found %d: %r" % (internal_id, len(opts), opts))
+    return opts[0]
 
 
 def _image_model_combo() -> list:
