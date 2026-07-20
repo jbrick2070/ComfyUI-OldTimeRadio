@@ -21,7 +21,7 @@ from nodes import _otr_story_rules as RULES  # noqa: E402
 from nodes import OTR_LedgerScriptWriter as W  # noqa: E402
 
 _REPO = Path(__file__).resolve().parents[1]
-_PACK_DIR = _REPO / "nodes" / "story_packs" / "scifi_fable2"
+_PACK_DIR = _REPO / "nodes" / "story_packs" / "scifi_news_pro"
 
 _FABLE2_SEAMS = frozenset({
     "fable2_dossier_system", "fable2_pitch_system", "fable2_select_system",
@@ -56,18 +56,18 @@ class TestBankRow:
                             "custom_source_bank")
 
     def test_row_shape_runnable_s1b(self):
-        bank = ROUTING.get_bank("scifi_fable2")
+        bank = ROUTING.get_bank("scifi_news_pro")
         assert bank.runnable is True                # S1b: runner shipped
         assert bank.fetcher == "science_rss"
         assert bank.interpreter == ""
-        assert bank.default_story_model == "scifi_fable2_v1"
-        assert bank.default_story_pipeline == "fable2_multipass"
+        assert bank.default_story_model == "scifi_news_pro"
+        assert bank.default_story_pipeline == "scifi_news_pro_multipass"
         assert bank.required_seams == ()
         assert "No fallback to legacy_many_pass" in bank.guide_ref
 
     def test_runnable_defaults_contract(self):
         # r3/M6: title_form_label present ahead of the runnable flip.
-        d = ROUTING.get_bank("scifi_fable2").defaults
+        d = ROUTING.get_bank("scifi_news_pro").defaults
         assert d["title_form_label"] == "science-fiction radio drama"
         assert d["coda_mode"] == "real_news_report"
         assert "machine" in d["credits_source_line"]
@@ -78,13 +78,13 @@ class TestBankRow:
         # NEVER fire for this bank -- the shared fetch lane hands the runner
         # a validated RSS payload.
         assert W._bank_has_no_source_contract(
-            ROUTING.get_bank("scifi_fable2")) is False
+            ROUTING.get_bank("scifi_news_pro")) is False
 
     def test_run_gate_admits_runnable_bank(self):
         # S1b flip: the runnable gate now admits the bank (the runner
         # ships in the SAME change -- sweep rule b).
-        bank = ROUTING.require_runnable_bank("scifi_fable2")
-        assert bank.source_bank_id == "scifi_fable2"
+        bank = ROUTING.require_runnable_bank("scifi_news_pro")
+        assert bank.source_bank_id == "scifi_news_pro"
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ class TestBankRow:
 
 class TestPipelineRow:
     def test_row_shape_executable_s1b(self):
-        pipe = ROUTING.get_pipeline("fable2_multipass")
+        pipe = ROUTING.get_pipeline("scifi_news_pro_multipass")
         assert pipe.executable is True              # S1b: runner shipped
         assert pipe.requires_source_contract is False
         assert pipe.declared_seams == _FABLE2_SEAMS
@@ -103,7 +103,7 @@ class TestPipelineRow:
     def test_pass_graph_order_and_slots(self):
         # r4/M2: registry-legal slots ONLY (creative | technical); the
         # judge/creative subtype language lives in descriptions.
-        pipe = ROUTING.get_pipeline("fable2_multipass")
+        pipe = ROUTING.get_pipeline("scifi_news_pro_multipass")
         rows = [(p.pass_id, p.slot) for p in pipe.passes]
         assert rows == [
             ("dossier", "technical"),
@@ -121,14 +121,14 @@ class TestPipelineRow:
         assert {slot for _pid, slot in rows} <= ROUTING._VALID_PASS_SLOTS
 
     def test_assemble_pass_is_marked_pure_python_metadata(self):
-        pipe = ROUTING.get_pipeline("fable2_multipass")
+        pipe = ROUTING.get_pipeline("scifi_news_pro_multipass")
         p7 = next(p for p in pipe.passes if p.pass_id == "assemble")
         assert p7.seam_refs == ()
         assert "pure Python" in p7.description
 
     def test_p8_is_a_python_safety_scan_with_no_seam(self):
         """The LLM ledger audit is gone: no seam, no model, no veto."""
-        pipe = ROUTING.get_pipeline("fable2_multipass")
+        pipe = ROUTING.get_pipeline("scifi_news_pro_multipass")
         p8 = next(p for p in pipe.passes if p.pass_id == "safety_scan")
         assert p8.seam_refs == ()
         assert "pure Python" in p8.description
@@ -153,19 +153,19 @@ class TestPipelineRow:
 
 class TestPackAndSidecar:
     def test_pack_resolves_with_all_nine_seams(self):
-        pack = ROUTING.resolve_story_pack("scifi_fable2")
-        assert pack.story_pipeline_id == "fable2_multipass"
+        pack = ROUTING.resolve_story_pack("scifi_news_pro")
+        assert pack.story_pipeline_id == "scifi_news_pro_multipass"
         assert set(pack.prompt_stages) == _FABLE2_SEAMS
         for seam, text in pack.prompt_stages.items():
             assert text.strip(), f"seam {seam} is empty"
 
     def test_sidecar_registered(self):
-        assert ROUTING._PACK_SIDECAR_FILENAMES_BY_BANK["scifi_fable2"] == \
+        assert ROUTING._PACK_SIDECAR_FILENAMES_BY_BANK["scifi_news_pro"] == \
             frozenset({"frame_deck.json"})
 
     def test_pack_dir_carries_exactly_the_two_files(self):
         names = sorted(p.name for p in _PACK_DIR.glob("*.json"))
-        assert names == ["frame_deck.json", "scifi_fable2_v1.json"]
+        assert names == ["frame_deck.json", "scifi_news_pro.json"]
 
 
 # ---------------------------------------------------------------------------
@@ -227,14 +227,14 @@ class TestFrameDeckLint:
 
 class TestStoryRules:
     def test_rules_resolve(self):
-        rules = RULES.resolve_story_rules("scifi_fable2")
-        assert rules.rules_id == "scifi_fable2"
+        rules = RULES.resolve_story_rules("scifi_news_pro")
+        assert rules.rules_id == "scifi_news_pro"
         assert rules.cliche and rules.on_the_nose and rules.banned_thesis
 
     def test_detection_only_no_replacement_tables(self):
         # Operator law (LLM-first): Python judges, the LLM writes -- this
         # lane carries NO python rewriting vocabulary, ever.
-        rules = RULES.resolve_story_rules("scifi_fable2")
+        rules = RULES.resolve_story_rules("scifi_news_pro")
         assert rules.cliche_replacements == ()
 
 
@@ -253,7 +253,7 @@ class TestRosterOrder:
     def test_roster_order_holds(self):
         ids = ROUTING.list_bank_ids()
         assert ids == ("media_archive", "original_radio",
-                       "scifi_fable2",
+                       "scifi_news_pro",
                        "public_domain_story_v3", "shakespeare_v3",
                        "scifi_news",
                        "custom_source_bank")

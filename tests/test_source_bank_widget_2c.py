@@ -7,7 +7,7 @@ kibitz-runs/2026-07-05-multimodal-2c/r4/final.md).
 Pins:
   1. Widget surface: source_bank stays pinned at slot 23; choices come
      LIVE from the routing registry (exact list, registry order, including
-     non-runnable custom banks -- the honest-error contract); default scifi_fable2.
+     non-runnable custom banks -- the honest-error contract); default scifi_news.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
      (deliberate exception to the "INPUT_TYPES must never raise"
      convention; no baked-in fallback choice list).
@@ -77,13 +77,13 @@ class TestWidgetSurface:
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         choices, meta = spec["optional"]["source_bank"]
         assert choices == list(routing.list_bank_ids())
-        assert meta["default"] == "scifi_fable2"
+        assert meta["default"] == "scifi_news"
         # The honest-error contract: non-runnable custom banks ARE listed.
         assert _NON_RUNNABLE_BANK in choices
         assert _PUBLIC_DOMAIN_BANK in choices
 
     def test_default_is_a_runnable_bank(self):
-        bank = routing.require_runnable_bank("scifi_fable2")
+        bank = routing.require_runnable_bank("scifi_news")
         assert bank.runnable is True
 
 
@@ -152,7 +152,7 @@ class TestRefineCoreCapture:
             OTR_LedgerScriptWriter, "_refine_loop", _fake_loop)
         node = OTR_LedgerScriptWriter()
         # Writer refine re-entry is a LEGACY-lane seam; the LLM-first custom
-        # pipelines (the new default scifi_fable2 -> fable2_multipass) reject
+        # pipelines (the new default scifi_news -> scifi_news_circuit) reject
         # it by design. Thread a legacy many-pass bank so the capture test
         # targets the refine re-entry contract, not lane dispatch.
         out = node.run(source_bank="media_archive",
@@ -289,7 +289,7 @@ class TestThreading:
 class TestResolvedSurface:
     def test_resolve_inputs_carries_source_bank(self):
         resolved = _resolve_inputs(custom_premise="test premise")
-        assert resolved["source_bank"] == "scifi_fable2"
+        assert resolved["source_bank"] == "scifi_news"
         resolved2 = _resolve_inputs(
             custom_premise="test premise", source_bank=_PUBLIC_DOMAIN_BANK)
         assert resolved2["source_bank"] == _PUBLIC_DOMAIN_BANK
@@ -318,14 +318,14 @@ class TestHeadlessSurface:
         }
         workflow = otr_api.load_workflow(str(_CANONICAL_WORKFLOW))
         otr_api.patch_widget_by_name(
-            workflow, 1, "source_bank", "scifi_fable2", schemas)
+            workflow, 1, "source_bank", "scifi_news", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
         # The Google API selectors and source_ref were appended after
         # visual_style; source_bank stays at slot 23 (was 25 before the
         # style-engine consolidation). S5 platform-portability appended
         # the six llm runtime-policy widgets at 28-33 (vector = 34).
         assert len(node1["widgets_values"]) == 34
-        assert node1["widgets_values"][23] == "scifi_fable2"
+        assert node1["widgets_values"][23] == "scifi_news"
         assert node1["widgets_values"][25] == "(select Google API model)"
         assert node1["widgets_values"][26] == "(select Google API model)"
         assert node1["widgets_values"][27] == ""

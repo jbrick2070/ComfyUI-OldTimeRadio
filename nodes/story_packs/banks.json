@@ -67,13 +67,13 @@
       "guide_ref": "LLM-original lane: no source, no fetcher/interpreter; provenance is printed (news_used + HUD origin label + credits line), never spoken."
     },
     {
-      "source_bank_id": "scifi_fable2",
-      "label": "Sci-Fi Fable2 (LLM-first multipass)",
+      "source_bank_id": "scifi_news_pro",
+      "label": "Sci-Fi News Pro (LLM-first multipass)",
       "source_kind": "article",
       "interpreter": "",
       "fetcher": "science_rss",
-      "default_story_model": "scifi_fable2_v1",
-      "default_story_pipeline": "fable2_multipass",
+      "default_story_model": "scifi_news_pro",
+      "default_story_pipeline": "scifi_news_pro_multipass",
       "defaults": {
         "story_form_label": "science-fiction audio drama",
         "source_material_label": "Science story",

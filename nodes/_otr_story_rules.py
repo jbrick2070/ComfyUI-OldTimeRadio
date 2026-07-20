@@ -48,7 +48,7 @@ from pathlib import Path
 
 _STORY_RULES_ROOT = Path(__file__).resolve().parent / "story_rules"
 
-DEFAULT_RULES_ID = "scifi_fable2"
+DEFAULT_RULES_ID = "scifi_news_pro"   # bankless-scan rules fallback = pure rename of scifi_fable2 (content-neutral; the RUN default bank is scifi_news -- see the source_bank widget)
 
 KNOWN_RULES_SCHEMA_VERSIONS = frozenset({"v1"})
 

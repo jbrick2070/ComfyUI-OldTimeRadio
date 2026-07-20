@@ -353,9 +353,9 @@ def test_science_rss_wrapper_forwards_exact_args_and_ignores_source_ref(monkeypa
 
     import nodes.OTR_LedgerScriptWriter as writer
     monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
-    # science_news lane removed; scifi_fable2 is the kept NON-strict lane that
+    # science_news lane removed; scifi_news_pro is the kept NON-strict lane that
     # uses the science_rss fetcher (require_science_floor stays False).
-    bank = routing.get_bank("scifi_fable2")
+    bank = routing.get_bank("scifi_news_pro")
     entry = osp.resolve_fetcher(bank)
     _lc = object()
     _pol = object()
@@ -517,7 +517,7 @@ def test_resolve_inputs_passes_source_ref_and_returns_sidecars(monkeypatch):
     )
 
     out = writer._resolve_inputs(custom_premise="",
-                                 source_bank="scifi_fable2",
+                                 source_bank="scifi_news_pro",
                                  source_ref="pd://fixture")
 
     assert seen["source_ref"] == "pd://fixture"

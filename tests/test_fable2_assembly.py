@@ -158,7 +158,7 @@ def _sealed_draft(markup: str, *, target_words: int = 50,
     )
     draft = F2.build_final_draft(
         markup, parsed, treatment, envelope,
-        F2.resolve_story_rules("scifi_fable2"),
+        F2.resolve_story_rules("scifi_news_pro"),
         p3_attempts=(trace,),
     )
     return parsed, draft, envelope
@@ -173,8 +173,8 @@ def _assembled(tmp_path: Path):
     # the golden play carries 51 character words -> target 50 (band 40-60)
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
-        envelope=envelope, story_rules=F2.resolve_story_rules("scifi_fable2"),
-        mode=F2._COMPACT_MODE, owner_bank="scifi_fable2")
+        envelope=envelope, story_rules=F2.resolve_story_rules("scifi_news_pro"),
+        mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
     return led, parsed, led.data["meta"]
 
 
@@ -274,8 +274,8 @@ def test_verbatim_proof_gate_fails_loud_on_foreign_text(tmp_path):
         F2._assemble(
             led, forged, _treatment(), _CAST_ROWS, _PAYLOAD,
             envelope=envelope,
-            story_rules=F2.resolve_story_rules("scifi_fable2"),
-            mode=F2._COMPACT_MODE, owner_bank="scifi_fable2")
+            story_rules=F2.resolve_story_rules("scifi_news_pro"),
+            mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
 
 
 def test_no_double_append_of_the_news_read(tmp_path):
@@ -301,8 +301,8 @@ def test_multiple_inter_cues_after_one_scene_all_survive(tmp_path):
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
         envelope=envelope,
-        story_rules=F2.resolve_story_rules("scifi_fable2"),
-        mode=F2._COMPACT_MODE, owner_bank="scifi_fable2")
+        story_rules=F2.resolve_story_rules("scifi_news_pro"),
+        mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
     assert [r["cue_id"] for r in led.data["music"]] == [
         "opening", "inter_01", "inter_02", "closing"]
     inter_rows = [r for r in led.data["lines"]
@@ -403,8 +403,8 @@ def test_incremental_saves_after_preamble_and_each_scene(tmp_path,
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
         envelope=envelope,
-        story_rules=F2.resolve_story_rules("scifi_fable2"),
-        mode=F2._COMPACT_MODE, owner_bank="scifi_fable2")
+        story_rules=F2.resolve_story_rules("scifi_news_pro"),
+        mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
     # preamble + 2 scenes + final = 4 saves minimum
     assert len(saves) >= 4
 
@@ -419,8 +419,8 @@ def test_speaker_set_gate_fails_loud(tmp_path):
         F2._assemble(
             led, draft, _treatment(), missing_doku, _PAYLOAD,
             envelope=envelope,
-            story_rules=F2.resolve_story_rules("scifi_fable2"),
-            mode=F2._COMPACT_MODE, owner_bank="scifi_fable2")
+            story_rules=F2.resolve_story_rules("scifi_news_pro"),
+            mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
 
 
 def test_word_band_gate_reasserts_at_assembly(tmp_path):
@@ -433,8 +433,8 @@ def test_word_band_gate_reasserts_at_assembly(tmp_path):
         F2._assemble(
             led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
             envelope=envelope,
-            story_rules=F2.resolve_story_rules("scifi_fable2"),
-            mode=F2._COMPACT_MODE, owner_bank="scifi_fable2")  # play is 51 words; band 80-120
+            story_rules=F2.resolve_story_rules("scifi_news_pro"),
+            mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")  # play is 51 words; band 80-120
 
 
 # ---------------------------------------------------------------------------

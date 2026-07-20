@@ -45,10 +45,10 @@ _PACK_SIDECAR_FILENAMES_BY_BANK = {
     # concept pass, not a story pack -- _otr_original_radio validates it
     # with its own schema at load.
     "original_radio": frozenset({"spark_deck.json"}),
-    # scifi_fable2 (S0, 2026-07-10 architecture doc section 11): the frame-card
-    # + stance deck is entropy data for the P1 pitch pass, not a story pack --
-    # _otr_scifi_fable2 validates it with its own schema at load (S1b).
-    "scifi_fable2": frozenset({"frame_deck.json"}),
+    # scifi_news_pro (renamed from scifi_fable2 2026-07-19; S0 architecture doc
+    # section 11): the frame-card + stance deck is entropy data for the P1 pitch
+    # pass, not a story pack -- _otr_scifi_fable2 validates it at load (S1b).
+    "scifi_news_pro": frozenset({"frame_deck.json"}),
 }
 
 _VALID_PASS_SLOTS = frozenset({"creative", "technical"})

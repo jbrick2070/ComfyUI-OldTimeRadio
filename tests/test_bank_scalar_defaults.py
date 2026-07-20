@@ -27,7 +27,7 @@ from nodes import _otr_style_catalog as SC  # noqa: E402
 EXPECTED = {
     "media_archive":          ("media",      False, False),
     "original_radio":         ("generic",    False, False),
-    "scifi_fable2":           ("generic",    False, False),
+    "scifi_news_pro":           ("generic",    False, False),
     "public_domain_story_v3": ("adaptation", False, True),
     "shakespeare_v3":         ("adaptation", False, True),
 }

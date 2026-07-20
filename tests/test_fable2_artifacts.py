@@ -999,7 +999,7 @@ def _parse_revision(raw: str):
 
 def _fable2_rules():
     STORY_RULES._clear_caches()
-    return STORY_RULES.resolve_story_rules("scifi_fable2")
+    return STORY_RULES.resolve_story_rules("scifi_news_pro")
 
 
 def _revision_notes(scene=1, speaker="SELA", *, frame_scope=None):

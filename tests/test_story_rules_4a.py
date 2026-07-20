@@ -112,7 +112,7 @@ class TestLoader:
         # pack: legal at sweep time, hard error on explicit resolve.
         ids = sr.list_rules_ids()
         assert "media_archive" in ids
-        assert "scifi_fable2" in ids
+        assert "scifi_news_pro" in ids
         assert "public_domain_story_v3" in ids
         assert "custom_source_bank" not in ids
         with pytest.raises(sr.UnknownStoryRulesError):
@@ -124,9 +124,9 @@ class TestLoader:
         assert "smoking" in rules.banned_phrases
 
     def test_get_story_rules_meta_paths(self):
-        # DEFAULT_RULES_ID is now "scifi_fable2" (roster trim 2026-07-17).
-        assert sr.get_story_rules({}).rules_id == "scifi_fable2"
-        assert sr.get_story_rules(None).rules_id == "scifi_fable2"
+        # DEFAULT_RULES_ID is now "scifi_news_pro" (pure rename of scifi_fable2).
+        assert sr.get_story_rules({}).rules_id == "scifi_news_pro"
+        assert sr.get_story_rules(None).rules_id == "scifi_news_pro"
         assert sr.get_story_rules(
             {"source_bank": "media_archive"}).rules_id == "media_archive"
 
@@ -180,9 +180,9 @@ class TestLoader:
         sr._clear_caches()
         with pytest.raises(sr.StoryRulesValidationError) as ei2:
             sr.list_rules_ids()
-        # DEFAULT_RULES_ID is now "scifi_fable2": an empty root fails on the
+        # DEFAULT_RULES_ID is now "scifi_news_pro": an empty root fails on the
         # missing default pack.
-        assert "scifi_fable2" in str(ei2.value)
+        assert "scifi_news_pro" in str(ei2.value)
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ class TestLoader:
 #    fixture defaults" parity and the science-pack every-pattern-has-a-repair
 #    coverage lock were both byte-identity-to-python-constants baselines tied
 #    to the deleted science_news pack. No surviving pack mirrors the fixture
-#    constants (scifi_fable2 ships empty cliche_replacements), so the parity is
+#    constants (scifi_news_pro ships empty cliche_replacements), so the parity is
 #    obsolete rather than repointable.
 # ---------------------------------------------------------------------------
 

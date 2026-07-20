@@ -64,7 +64,7 @@ def _forbid_legacy_passes(monkeypatch):
                         _boom("run_targeted_reroll"))
 
 
-def _golden_fable2_ledger(tmp_path, *, source_bank="scifi_fable2"):
+def _golden_fable2_ledger(tmp_path, *, source_bank="scifi_news_pro"):
     led, _parsed, meta = _F2A._assembled(tmp_path)
     if source_bank is not None:
         meta["source_bank"] = source_bank
@@ -90,7 +90,7 @@ def test_policy_seam_bank_is_legacy():
 
 
 def test_policy_fable2_is_content_owned_readonly():
-    pol = LFC.resolve_freeze_policy({"source_bank": "scifi_fable2"})
+    pol = LFC.resolve_freeze_policy({"source_bank": "scifi_news_pro"})
     assert pol.name == "content_owned_readonly"
     assert pol.run_legacy_content_passes is False
     assert pol.terminal_error == ""

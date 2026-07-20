@@ -164,7 +164,7 @@ def _make_ctx(tmp_path: Path, monkeypatch, **over) -> WriterTailContext:
         episode_id=episode_id,
         contract=None,
         style_grammar_on=False,
-        source_bank_row=SimpleNamespace(source_bank_id="scifi_fable2", defaults={
+        source_bank_row=SimpleNamespace(source_bank_id="scifi_news_pro", defaults={
             "title_form_label": "science-fiction radio drama",
             "hud_origin_label": "",
         }),
@@ -271,7 +271,7 @@ def test_tail_preserves_selected_final_draft_seals_on_disk(
     ctx = _make_ctx(
         tmp_path / "sealed", monkeypatch, run_story_spine=False,
         final_title_override="The Sealed Draft")
-    ctx.led.data["meta"]["source_bank"] = "scifi_fable2"
+    ctx.led.data["meta"]["source_bank"] = "scifi_news_pro"
     sealed = {
         "raw_sha256": "1" * 64,
         "normalized_sha256": "2" * 64,
@@ -294,7 +294,7 @@ def test_tail_preserves_selected_final_draft_seals_on_disk(
 
 @pytest.mark.parametrize(
     "source_bank",
-    ("scifi_fable2", "scifi_codex_v4"),
+    ("scifi_news_pro", "scifi_codex_v4"),
 )
 def test_content_owned_tail_stamps_delivery_before_finalizer(
     tmp_path, monkeypatch, source_bank,

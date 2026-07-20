@@ -37,7 +37,7 @@ def _flat(text: str) -> str:
 def stages():
     ROUTING._REGISTRY = None
     try:
-        return dict(ROUTING.resolve_story_pack("scifi_fable2").prompt_stages)
+        return dict(ROUTING.resolve_story_pack("scifi_news_pro").prompt_stages)
     finally:
         ROUTING._REGISTRY = None
 

@@ -95,7 +95,7 @@ def test_freeze_policy_replaces_capability_gate():
     ROUTING._REGISTRY = None
     try:
         assert resolve_freeze_policy(
-            {"source_bank": "scifi_fable2"}
+            {"source_bank": "scifi_news_pro"}
         ).run_legacy_content_passes is False
         assert resolve_freeze_policy(
             {"source_bank": "media_archive"}

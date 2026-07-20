@@ -100,7 +100,7 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
         "--dry-run",
         "--profile", "otr_cloud_lanes",
         "--words", "30",
-        "--source-bank", "scifi_fable2",
+        "--source-bank", "scifi_news_pro",
         "--dump-prompt", str(dump),
     ])
     assert rc == 0
@@ -111,7 +111,7 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")
     assert writer["inputs"]["target_words"] == 30
-    assert writer["inputs"]["source_bank"] == "scifi_fable2"
+    assert writer["inputs"]["source_bank"] == "scifi_news_pro"
     assert str(director["inputs"]["announcer_video_model"]).startswith("cloud_")
     assert str(director["inputs"]["announcer_image_model"]).startswith("cloud_")
 

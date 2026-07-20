@@ -1404,7 +1404,7 @@ def _resolve_inputs(
     # Threaded into the resolved dict as the ONE authoritative value for
     # meta/ledger stamping + prompt threading. Already gated runnable by
     # run() (require_runnable_bank fires before this call).
-    source_bank: str = "scifi_fable2",
+    source_bank: str = "scifi_news",
     # Stage 3C (2026-07-06): the visual_style widget selection; same
     # authoritative-value contract (gated by resolve_visual_style in run()).
     visual_style: str = "sci_fi_radio",
@@ -1504,7 +1504,7 @@ def _resolve_inputs(
     # custom_premise on this lane is NOT a source article: it rides
     # source_meta["operator_hint"] into the concept pass as material
     # (kibitz r4 P2) -- never the payload.
-    _rb_bank = _otr_story_routing.get_bank(source_bank or "scifi_fable2")
+    _rb_bank = _otr_story_routing.get_bank(source_bank or "scifi_news")
     # Bake-off source-snapshot replay (r3 ruling B7). Loaded IMMEDIATELY after
     # bank resolution and BEFORE the three source branches so a frozen source
     # replays across the base/_v2/_v3 triplet -- the ONLY variable under test is
@@ -1515,7 +1515,7 @@ def _resolve_inputs(
     # live branch would (spark_atoms for the original lane, cast_hints for the
     # adaptation lanes), so every downstream owner is fed unchanged.
     _source_snapshot = _otr_source_snapshot.load_snapshot_for_bank(
-        source_bank or "scifi_fable2",
+        source_bank or "scifi_news",
     )
     if _source_snapshot is not None:
         news_article = _otr_source_payload.validate_source_payload(
@@ -1529,7 +1529,7 @@ def _resolve_inputs(
         log.info(
             "[OTR_LedgerScriptWriter] source-snapshot REPLAY: bank=%r base=%r "
             "seed_source=%r sha=%s",
-            source_bank or "scifi_fable2",
+            source_bank or "scifi_news",
             _source_snapshot.base_source_bank_id,
             seed_source,
             _source_snapshot.payload_sha256[:12],
@@ -1615,7 +1615,7 @@ def _resolve_inputs(
         # Style-engine consolidation (2026-07-05): the fetch is
         # style-agnostic now -- there is no style value yet at this
         # pre-contract sourcing stage, and none is needed for rerank.
-        _fetch_bank = _otr_story_routing.get_bank(source_bank or "scifi_fable2")
+        _fetch_bank = _otr_story_routing.get_bank(source_bank or "scifi_news")
         _fetch_entry = _otr_source_payload.resolve_fetcher(_fetch_bank)
         _fetch_origin = (
             f"_resolve_inputs fetch (bank={_fetch_bank.source_bank_id!r}, "
@@ -1693,7 +1693,7 @@ def _resolve_inputs(
         "comfy_slot_b_model": str(comfy_slot_b_model or ""),
         # Stage 2C: the ONE authoritative source_bank value for prompt
         # threading + meta/ledger stamping (run() gated it runnable already).
-        "source_bank": str(source_bank or "scifi_fable2"),
+        "source_bank": str(source_bank or "scifi_news"),
         # Stage 3C: the ONE authoritative visual_style value (gated in run()).
         "visual_style": str(visual_style or "sci_fi_radio"),
         "google_api_slot_a_model": str(google_api_slot_a_model or ""),
@@ -1963,7 +1963,7 @@ def _v3_focus_metric(base, rows, speakers, words, counts):
 # are deliberately NOT in the map -- their execution lanes are the
 # writer's own inline branches (byte-identical on a map miss).
 _RUNNER_BY_PIPELINE = {
-    "fable2_multipass": _run_fable2_lane,
+    "scifi_news_pro_multipass": _run_fable2_lane,
     # 2026-07-19: base scifi_codex (v1) ripped; scifi_codex_v4 renamed ->
     # scifi_news (local default). It reuses the dedicated codex runner DIRECTLY;
     # the proof-pressure improvement is pack-seam-only, and it deliberately does
@@ -2634,7 +2634,7 @@ def _stamp_story_style_receipt(meta: dict, *, contract,
 def _title_source_for_custom_override(source_bank_row: Any) -> str:
     """Return truthful custom-lane title provenance without changing ctx."""
     bank_id = str(getattr(source_bank_row, "source_bank_id", "") or "").strip()
-    if bank_id == "scifi_fable2":
+    if bank_id == "scifi_news_pro":
         return "fable2_script_title"
     if bank_id:
         return f"{bank_id}_script_title"
@@ -3223,16 +3223,16 @@ class OTR_LedgerScriptWriter:
                 "source_bank": (
                     list(_otr_story_routing.list_bank_ids()),
                     {
-                        "default": "scifi_fable2",
+                        "default": "scifi_news",
                         "tooltip": (
                             "Story-path SOURCE BANK (multi-modal story "
                             "schema). Selects which registered story pack "
                             "supplies the pack-routed creative prompts and "
-                            "which lane the episode runs. scifi_fable2 = the "
-                            "default production lane (LLM-first multipass). "
+                            "which lane the episode runs. scifi_news = the "
+                            "local default lane; scifi_news_pro = the "
+                            "cloud/quality lane (needs a strong API model). "
                             "Each lane is an INDEPENDENT bank (own pack + "
-                            "story_rules); some carry a _v3 id from the "
-                            "bake-off. The only non-runnable row is '+ Add "
+                            "story_rules). The only non-runnable row is '+ Add "
                             "Your Own' (custom_source_bank) -- picking it "
                             "FAILS LOUD before any story work (no fallback)."
                         ),
@@ -3662,7 +3662,7 @@ class OTR_LedgerScriptWriter:
         # appended at the END of the widget surface (slot 23). Default
         # science_news = the production lane, byte-identical. Gated FIRST
         # in the body via require_runnable_bank (no fallback).
-        source_bank="scifi_fable2",
+        source_bank="scifi_news",
         # Stage 3C (2026-07-06): the visual-style selector, appended at the
         # END of the widget surface (slot 24). Default sci_fi_radio = the
         # production look, byte-identical. Validated fail-loud beside the
@@ -3726,7 +3726,7 @@ class OTR_LedgerScriptWriter:
         # non-Off refine widget fails loud here too.
         _selected_pipeline_id = str(getattr(
             _source_bank_row, "default_story_pipeline", "") or "")
-        if _selected_pipeline_id == "fable2_multipass":
+        if _selected_pipeline_id == "scifi_news_pro_multipass":
             try:
                 from . import _otr_scifi_fable2 as _F2GATE
             except ImportError:  # pragma: no cover -- flat/standalone load

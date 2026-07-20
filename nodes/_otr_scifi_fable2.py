@@ -239,7 +239,7 @@ _LOGLINE_OVERLAP_MAX = 0.6
 _SCHEMA_VERSION = "fable2_v1"
 
 _DECK_PATH = (
-    Path(__file__).resolve().parent / "story_packs" / "scifi_fable2"
+    Path(__file__).resolve().parent / "story_packs" / "scifi_news_pro"
     / "frame_deck.json"
 )
 
@@ -2313,10 +2313,10 @@ def _validate_fable2_story_rules(story_rules: Any) -> None:
             "story_rules must be the resolved StoryRules artifact, got "
             f"{type(story_rules).__name__}",
         )
-    if getattr(story_rules, "rules_id", None) != "scifi_fable2":
+    if getattr(story_rules, "rules_id", None) != "scifi_news_pro":
         raise Fable2ScriptError(
             "revision_contract",
-            "story_rules.rules_id must be 'scifi_fable2', got "
+            "story_rules.rules_id must be 'scifi_news_pro', got "
             f"{getattr(story_rules, 'rules_id', None)!r}",
         )
     if getattr(story_rules, "schema_version", None) != "v1":
@@ -2368,12 +2368,12 @@ def _validate_fable2_story_rules(story_rules: Any) -> None:
             "revision_contract",
             "story_rules.banned_phrases must be a resolved string tuple",
         )
-    canonical = resolve_story_rules("scifi_fable2")
+    canonical = resolve_story_rules("scifi_news_pro")
     if _story_rules_signature(story_rules) != _story_rules_signature(canonical):
         raise Fable2ScriptError(
             "revision_contract",
             "story_rules content does not match the canonical resolved "
-            "scifi_fable2 pack",
+            "scifi_news_pro pack",
         )
 
 

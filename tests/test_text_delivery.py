@@ -90,8 +90,8 @@ def test_delivery_mode_untagged_is_legacy():
     assert delivery_mode_for_meta(None) == LEGACY
 
 
-def test_delivery_mode_scifi_fable2_is_content_owned():
-    assert delivery_mode_for_meta({"source_bank": "scifi_fable2"}) == CONTENT_OWNED
+def test_delivery_mode_scifi_news_pro_is_content_owned():
+    assert delivery_mode_for_meta({"source_bank": "scifi_news_pro"}) == CONTENT_OWNED
 
 
 # ---------------------------------------------------------------------------

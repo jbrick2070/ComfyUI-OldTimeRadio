@@ -138,7 +138,7 @@ class _ScriptedFn:
 
 
 def _pack():
-    return ROUTING.resolve_story_pack("scifi_fable2")
+    return ROUTING.resolve_story_pack("scifi_news_pro")
 
 
 def _run_script_pass(fn):
@@ -389,8 +389,8 @@ def _e2e_run(tmp_path, monkeypatch):
         payload=_PAYLOAD, pack=_pack(), resolved=resolved, led=led,
         meta=meta, creative_fn=creative, technical_fn=technical,
         slot_scheduler=None,
-        source_bank_row=ROUTING.get_bank("scifi_fable2"),
-        story_rules=F2.resolve_story_rules("scifi_fable2"),
+        source_bank_row=ROUTING.get_bank("scifi_news_pro"),
+        story_rules=F2.resolve_story_rules("scifi_news_pro"),
         episode_root=tmp_path / "ep",
         episode_id="fable2_e2e")
     return parts, led, led.data["meta"], creative, technical
@@ -599,8 +599,8 @@ def _boundary_e2e_run(tmp_path, monkeypatch, *, target_words: int,
         creative_fn=creative,
         technical_fn=technical,
         slot_scheduler=None,
-        source_bank_row=ROUTING.get_bank("scifi_fable2"),
-        story_rules=F2.resolve_story_rules("scifi_fable2"),
+        source_bank_row=ROUTING.get_bank("scifi_news_pro"),
+        story_rules=F2.resolve_story_rules("scifi_news_pro"),
         episode_root=tmp_path / "ep",
         episode_id=episode_id,
     )
@@ -646,7 +646,7 @@ class TestEndToEndSpine:
             "casting_voices", "assemble", "safety_scan"]
         # Every runtime receipt names a pass the pipeline actually declares.
         declared = {
-            p.pass_id for p in ROUTING.get_pipeline("fable2_multipass").passes
+            p.pass_id for p in ROUTING.get_pipeline("scifi_news_pro_multipass").passes
         }
         assert {r["pass_id"] for r in receipts} <= declared
         assert all(r["mode"] == "one_pitch_one_draft" for r in receipts)
@@ -709,8 +709,8 @@ class TestEndToEndSpine:
                 led=led, meta=led.data.setdefault("meta", {}),
                 creative_fn=_must_not_run, technical_fn=_must_not_run,
                 slot_scheduler=None,
-                source_bank_row=ROUTING.get_bank("scifi_fable2"),
-                story_rules=F2.resolve_story_rules("scifi_fable2"),
+                source_bank_row=ROUTING.get_bank("scifi_news_pro"),
+                story_rules=F2.resolve_story_rules("scifi_news_pro"),
                 episode_root=tmp_path,
                 episode_id="fable2_gate")
         assert calls == []
@@ -873,7 +873,7 @@ class TestS2ModeExecution:
 class TestWriterDispatch:
     def test_lane_map_hit_and_legacy_misses(self):
         from nodes import OTR_LedgerScriptWriter as W
-        assert W._resolve_lane_runner("fable2_multipass") is not None
+        assert W._resolve_lane_runner("scifi_news_pro_multipass") is not None
         assert W._resolve_lane_runner("legacy_many_pass") is None
         assert W._resolve_lane_runner("original_multi_pass") is None
 
@@ -889,13 +889,13 @@ class TestWriterDispatch:
         from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
         with pytest.raises(F2.Fable2ScriptError, match="ceiling"):
             OTR_LedgerScriptWriter().run(
-                source_bank="scifi_fable2", target_words=901)
+                source_bank="scifi_news_pro", target_words=901)
 
     def test_run_entry_gate_rejects_refine_loop(self):
         from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
         with pytest.raises(RuntimeError, match="refine"):
             OTR_LedgerScriptWriter().run(
-                source_bank="scifi_fable2", target_words=30,
+                source_bank="scifi_news_pro", target_words=30,
                 refine_target_grade="B")
 
 
@@ -998,7 +998,7 @@ class TestPerSceneGrossBudget:
         # gross OK) must still score strictly worse than an on-target draft, so
         # the ladder prefers balanced pacing even though it no longer FAILS it.
         env = self._env()
-        rules = F2.resolve_story_rules("scifi_fable2")
+        rules = F2.resolve_story_rules("scifi_news_pro")
         on_target = _parse_counts((103, 103, 103, 103, 103, 103, 102))
         one_miss = _parse_counts((137, 103, 103, 103, 103, 103, 102))
         s_ok = F2._draft_score(on_target, env, rules)

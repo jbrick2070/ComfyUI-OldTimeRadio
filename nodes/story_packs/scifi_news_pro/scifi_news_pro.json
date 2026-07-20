@@ -1,8 +1,8 @@
 {
-  "source_bank_id": "scifi_fable2",
-  "story_model_id": "scifi_fable2_v1",
-  "story_pipeline_id": "fable2_multipass",
-  "label": "Sci-Fi Fable2 v1 (LLM-first whole-play markup)",
+  "source_bank_id": "scifi_news_pro",
+  "story_model_id": "scifi_news_pro",
+  "story_pipeline_id": "scifi_news_pro_multipass",
+  "label": "Sci-Fi News Pro (LLM-first whole-play markup)",
   "status": "live_s2",
   "prompt_stages": {
     "fable2_dossier_system": "You prepare source dossiers for a science-fiction radio anthology. Read the\nscience news story below and extract ONLY what the writers need. Return one\nJSON object only -- no prose, no fences.\n\nSchema:\n{\n  \"facts_to_keep\":        3-10 short strings; the load-bearing facts, each\n                          under 200 chars, faithful to the story,\n  \"allowed_numbers\":      0-10 strings; the ONLY numerals the drama may speak\n                          (quantities, dates, measurements) copied verbatim,\n  \"named_entities\":       { \"people\": [...], \"places\": [...], \"things\": [...] }\n                          verbatim from the story, 0-10 each,\n  \"dramatizable_vectors\": 3-5 strings, 10-160 chars each; where a DRAMA could\n                          grow from this science -- a pressure, a rivalry, a\n                          risk, a promise, a cost. Not plot pitches; raw\n                          dramatic soil.\n}\n\nRules:\n- Copy, never invent: every entity and number must appear in the story text.\n- dramatizable_vectors name human pressure, not technology specs.\n- No editorializing, no opinions about the science.\n",

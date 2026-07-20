@@ -76,7 +76,7 @@ class TestHelper:
 
 class TestStoryRulesIndependence:
     @pytest.mark.parametrize("bank_id", [
-        "media_archive", "original_radio", "scifi_fable2",
+        "media_archive", "original_radio", "scifi_news_pro",
         "public_domain_story_v3", "shakespeare_v3",
     ])
     def test_lane_resolves_its_own_rules(self, bank_id):
@@ -160,7 +160,7 @@ class TestChunk4V3Rows:
         assert len([b for b in ids if b.endswith("_v3")]) == 2
         # the _v3 lanes are seated after the base lanes, before custom.
         assert min(ids.index(b) for b in ids if b.endswith("_v3")) > \
-            ids.index("scifi_fable2")
+            ids.index("scifi_news_pro")
         assert ids[-1] == "custom_source_bank"
 
     @pytest.mark.parametrize("v3,base,pipe,kind",

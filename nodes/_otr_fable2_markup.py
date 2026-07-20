@@ -2,7 +2,7 @@
 
 Parses the whole-play markup the P3/P5 script passes emit (grammar single
 source of truth: pack seam ``fable2_script_system`` in
-nodes/story_packs/scifi_fable2/scifi_fable2_v1.json, section 4 of
+nodes/story_packs/scifi_news_pro/scifi_news_pro.json, section 4 of
 docs/2026-07-10-scifi-fable2-architecture.md). Pure stdlib functions, no
 ComfyUI imports, no I/O -- property-tested in tests/test_fable2_markup.py.
 

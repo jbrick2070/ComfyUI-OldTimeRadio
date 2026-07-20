@@ -1,6 +1,6 @@
 {
-  "rules_id": "scifi_fable2",
-  "label": "Sci-Fi Fable2 (LLM-first multipass lane) -- detection-only",
+  "rules_id": "scifi_news_pro",
+  "label": "Sci-Fi News Pro (LLM-first multipass lane) -- detection-only",
   "schema_version": "v1",
   "cliche_patterns": [
     "\\b(?:you|we|i|they)['’]?re playing with fire\\b",
