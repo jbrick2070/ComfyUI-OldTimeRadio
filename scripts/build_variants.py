@@ -286,7 +286,10 @@ def cmd_check() -> int:
         failures.append("otr_api.py: the stale-variant soft-skip TRIM "
                         "path is back (must stay a hard fail)")
 
-    committed = sorted(VARIANTS_DIR.glob("otr_*.json"))
+    # The paired <variant>.env.json recipe-knob files also match otr_*.json but are
+    # NOT variants -- exclude them (video-tiers 2026-07-20).
+    committed = sorted(p for p in VARIANTS_DIR.glob("otr_*.json")
+                       if not p.name.endswith(".env.json"))
     if not committed:
         print("check: no committed variants yet (nothing to diff); "
               "soft-skip guard " +
