@@ -6818,6 +6818,14 @@ class OTR_LedgerScriptWriter:
                         # a "real news report" pivot.
                         source_bank_id=resolved["source_bank"],
                         repair_fn=technical_generate_fn,
+                        # Live-bug 5: score the exact complete coda against the
+                        # same injected anchors and breath range as every other
+                        # authored row. The factual tail is still starved from
+                        # every model call.
+                        canon_header=canon_header,
+                        words_per_beat_range=tuple(
+                            episode_budget.words_per_beat_range
+                        ),
                     )
                 if not outro_res.text:
                     # Pathological (brief cleaned to empty) -- never ship an empty
@@ -6827,9 +6835,17 @@ class OTR_LedgerScriptWriter:
                         "(brief=%r); using the deterministic outro fallback",
                         nc_brief,
                     )
+                    # The factual note remains in meta/credits. Never route it
+                    # through the older character-truncating outro template,
+                    # and do not mark this generic close as a protected coda
+                    # that later repair could mistake for a fact-bearing row.
                     outro_res = _OTRLC.LineResult(
-                        text=_OTRLC.fallback_announcer_outro(nc_brief),
-                        compose_flags=("news_coda_fallback", "news_coda_empty_close"),
+                        text=_OTRLC.fallback_announcer_outro(""),
+                        compose_flags=(
+                            "announcer_outro_fallback",
+                            "source_note_deferred_to_credits",
+                            "spoken_surface_emergency",
+                        ),
                     )
             else:
                 # The fictional-outro path (flag off, OR on but no news brief).
@@ -6880,6 +6896,30 @@ class OTR_LedgerScriptWriter:
                 led.data, last_announcer_id,
                 {"compose_flags": list(outro_res.compose_flags)},
             )
+            _coda_action = (
+                "fact_reduced"
+                if "news_coda_fact_reduced" in outro_res.compose_flags
+                else "fact_deferred_to_credits"
+                if "news_coda_fact_deferred_to_credits"
+                in outro_res.compose_flags
+                else ""
+            )
+            if _coda_action:
+                import hashlib as _hashlib_coda
+                meta["news_coda_spoken_reduction"] = {
+                    "schema_version": 1,
+                    "line_id": last_announcer_id,
+                    "action": _coda_action,
+                    "source_fact_sha256": _hashlib_coda.sha256(
+                        nc_brief.encode("utf-8")
+                    ).hexdigest(),
+                    "spoken_line_sha256": _hashlib_coda.sha256(
+                        outro_res.text.encode("utf-8")
+                    ).hexdigest(),
+                    "source_fact_retained_in_meta_news": True,
+                }
+            else:
+                meta.pop("news_coda_spoken_reduction", None)
             led.save()
             log.info(
                 "[OTR_LedgerScriptWriter] announcer outro pass wrote "
@@ -7615,12 +7655,26 @@ class OTR_LedgerScriptWriter:
         from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
         if delivery_mode_for_meta(meta) != CONTENT_OWNED:
             from . import _otr_reroll as _OTRRR_FINAL
+            # The extracted tail consumes ctx/meta only. In the normal writer
+            # run, meta.canon_header is the exact injected header (including
+            # specificity anchors); synthetic/legacy callers may not have it,
+            # so fall back to the final EpisodeCanon rendering.
+            _final_scour_canon_header = str(
+                meta.get("canon_header")
+                or _OTRC.render_episode_canon_header(canon)
+            ).replace(
+                "EPISODE_TITLE: TBD",
+                f"EPISODE_TITLE: {str(canon.title or 'TBD')}",
+                1,
+            )
             with slot_scheduler.helper_context("spoken_hygiene_final"):
                 _final_hygiene = _OTRRR_FINAL.repair_ledger_spoken_hygiene(
                     led.data,
                     creative_fn=creative_generate_fn,
                     repair_fn=technical_generate_fn,
-                    canon_header=_OTRC.render_episode_canon_header(canon),
+                    # Preserve the injected specificity block. Re-rendering
+                    # from EpisodeCanon here silently dropped those anchors.
+                    canon_header=_final_scour_canon_header,
                 )
             if _final_hygiene.repaired or _final_hygiene.failed:
                 # Story Spine unloads before returning. A dirty late row can

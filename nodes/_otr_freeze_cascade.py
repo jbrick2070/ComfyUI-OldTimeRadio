@@ -1529,11 +1529,10 @@ def run_freeze_cascade(
             edits_applied=_p7_hygiene.repaired,
             failures=[
                 {
-                    "line_id": str(receipt.get("line_id") or ""),
-                    "reason": str(receipt.get("failure") or ""),
+                    "line_id": str(failure.get("line_id") or ""),
+                    "reason": str(failure.get("failure") or ""),
                 }
-                for receipt in _p7_hygiene.receipts
-                if receipt.get("failure")
+                for failure in _p7_hygiene.failures
             ],
         )
         if _p7_hygiene.repaired or _p7_hygiene.failed:

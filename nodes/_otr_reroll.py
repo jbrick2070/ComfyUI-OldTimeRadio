@@ -76,6 +76,7 @@ try:
         LineCompositionFailedError,
         build_voice_card,
         compose_line,
+        finalize_news_coda_surface,
         repair_existing_spoken_line,
     )
 except ImportError:  # pragma: no cover - standalone / test load
@@ -84,6 +85,7 @@ except ImportError:  # pragma: no cover - standalone / test load
         LineCompositionFailedError,
         build_voice_card,
         compose_line,
+        finalize_news_coda_surface,
         repair_existing_spoken_line,
     )
 
@@ -178,6 +180,7 @@ class SpokenHygieneRepairReport:
     repaired: int
     failed: int = 0
     receipts: tuple[dict, ...] = ()
+    failures: tuple[dict, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -511,6 +514,23 @@ def repair_ledger_spoken_hygiene(
     if not isinstance(ledger_data, dict):
         return SpokenHygieneRepairReport(scanned=0, repaired=0)
     meta = ledger_data.setdefault("meta", {})
+    # Defend the mutator itself, not only its known callers. Content-owned
+    # banks repair the accepted artifact and rebuild their seals before
+    # assembly; a direct shared-scour call must never rewrite those canonical
+    # rows or invalidate their proof maps/hashes.
+    try:
+        from ._otr_freeze_cascade import resolve_freeze_policy
+    except ImportError:  # pragma: no cover - package fallback for flat tests
+        from nodes._otr_freeze_cascade import (  # type: ignore
+            resolve_freeze_policy,
+        )
+    policy = resolve_freeze_policy(meta)
+    if not policy.run_legacy_content_passes:
+        log.info(
+            "[OTR_Reroll] shared spoken scour skipped by %s policy (%s)",
+            policy.name, policy.source,
+        )
+        return SpokenHygieneRepairReport(scanned=0, repaired=0)
     if story_rules is None:
         try:
             from ._otr_story_rules import DEFAULT_RULES_ID, get_story_rules, resolve_story_rules
@@ -585,15 +605,26 @@ def repair_ledger_spoken_hygiene(
         is_news_coda = _is_news_coda_row(row)
         line_id = str(row.get("line_id") or row.get("beat_id") or "")
         repair_text = text
-        protected_coda_suffix = ""
+        protected_coda_fact = ""
         if is_news_coda:
             bridge, separator, fact_tail = text.partition(":")
             if separator and fact_tail.strip():
                 # The coda composer starves the model of this deterministic
-                # factual suffix. Later generic hygiene must preserve the same
-                # contract: repair only the bridge and reattach the suffix
-                # byte-for-byte after a clean result.
-                protected_coda_suffix = separator + fact_tail
+                # factual suffix. Later generic hygiene preserves the same
+                # authorship contract: repair only the bridge with a model,
+                # then let the deterministic coda finalizer score/reduce the
+                # complete exact delivery surface.
+                # Recover from the durable source owner when available. Old
+                # rows may already contain a character-cut suffix; treating
+                # that manufactured fragment as source truth would preserve
+                # the exact live defect this scour is meant to repair.
+                source_news = meta.get("news")
+                source_news = (
+                    source_news if isinstance(source_news, dict) else {}
+                )
+                protected_coda_fact = str(
+                    source_news.get("news_close_brief") or fact_tail
+                ).strip()
                 repair_text = bridge.rstrip(" .!?;:") + "."
         result = repair_existing_spoken_line(
             text=repair_text,
@@ -607,7 +638,7 @@ def repair_ledger_spoken_hygiene(
             "hygiene_row_failed_mechanical" in result.compose_flags
             or not result.text.strip()
         )
-        if row_failed and protected_coda_suffix:
+        if row_failed and protected_coda_fact:
             # A malformed bridge must not mute or rewrite the protected fact.
             # This curated bridge passes the dedicated coda validator and keeps
             # the factual suffix exact.
@@ -622,6 +653,35 @@ def repair_ledger_spoken_hygiene(
                 ),
             )
             row_failed = False
+        if not row_failed and protected_coda_fact:
+            # The protected suffix is protected from LLM rewriting, not from
+            # exact-surface hygiene. Reassemble it through the same fact-safe
+            # coda finalizer used at first composition, scoring the projected
+            # TTS delivery and reducing only at complete sentence boundaries.
+            coda_result = finalize_news_coda_surface(
+                bridge=result.text,
+                fact=protected_coda_fact,
+                req=req,
+                rules=story_rules,
+                allow_fact_reduction=True,
+            )
+            if not coda_result.text.strip():
+                result = replace(
+                    result,
+                    text="",
+                    compose_flags=tuple(dict.fromkeys(
+                        result.compose_flags + coda_result.compose_flags
+                    )),
+                )
+                row_failed = True
+            else:
+                result = replace(
+                    result,
+                    text=coda_result.text,
+                    compose_flags=tuple(dict.fromkeys(
+                        result.compose_flags + coda_result.compose_flags
+                    )),
+                )
         if row_failed:
             if line_id:
                 _OTRL.patch_line_text(ledger_data, line_id, "")
@@ -665,10 +725,6 @@ def repair_ledger_spoken_hygiene(
         if "hygiene_repaired_after_reroll" not in result.compose_flags:
             continue
         final_text = result.text
-        if protected_coda_suffix:
-            final_text = (
-                result.text.rstrip(" .!?;:") + protected_coda_suffix
-            )
         if not _OTRL.patch_line_text(ledger_data, line_id, final_text):
             # A missing line id is a malformed-row condition, but the exact
             # row object is already in hand.  Patch it locally so a craft
@@ -699,6 +755,36 @@ def repair_ledger_spoken_hygiene(
                 if flag.startswith("hygiene_repaired_after_reroll:")
             ],
         })
+        if is_news_coda and any(
+            flag in result.compose_flags
+            for flag in (
+                "news_coda_fact_reduced",
+                "news_coda_fact_deferred_to_credits",
+            )
+        ):
+            source_news = meta.get("news")
+            source_news = source_news if isinstance(source_news, dict) else {}
+            source_fact = str(source_news.get("news_close_brief") or "")
+            action = (
+                "fact_reduced"
+                if "news_coda_fact_reduced" in result.compose_flags
+                else "fact_deferred_to_credits"
+            )
+            meta["news_coda_spoken_reduction"] = {
+                "schema_version": 1,
+                "line_id": line_id,
+                "action": action,
+                "source_fact_sha256": hashlib.sha256(
+                    source_fact.encode("utf-8")
+                ).hexdigest(),
+                "prior_line_sha256": hashlib.sha256(
+                    text.encode("utf-8")
+                ).hexdigest(),
+                "spoken_line_sha256": hashlib.sha256(
+                    final_text.encode("utf-8")
+                ).hexdigest(),
+                "source_fact_retained_in_meta_news": bool(source_fact),
+            }
 
     if receipts:
         existing = meta.get("hygiene_repaired_after_reroll")
@@ -748,6 +834,7 @@ def repair_ledger_spoken_hygiene(
         repaired=len(receipts),
         failed=len(failures),
         receipts=tuple(receipts),
+        failures=tuple(failures),
     )
 
 

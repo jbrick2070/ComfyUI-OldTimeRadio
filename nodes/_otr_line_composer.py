@@ -113,6 +113,7 @@ __all__ = [
     "compose_line",
     "repair_existing_spoken_line",
     "spoken_surface_flags_for_line",
+    "finalize_news_coda_surface",
     "strip_line_formatting",
     "build_allowed_roster",
     "build_banned_source_proper_nouns",
@@ -4323,6 +4324,17 @@ _BRIDGE_MAX_CHARS = 80
 _CODA_FACT_MAX = 200
 _CODA_TOTAL_MAX = 320
 
+# A coda source fact is prose, not an arbitrary character buffer. The old
+# `_CODA_FACT_MAX` / `_CODA_TOTAL_MAX` cuts could stop a true source sentence at
+# a word boundary and add a period, manufacturing a statement the source never
+# made. Keep the constants exported for old measurement fixtures, but the live
+# coda path now selects only complete exact sentences and never character-cuts.
+_CODA_NONTERMINAL_ABBREVIATIONS = frozenset({
+    "ave", "blvd", "capt", "col", "cpl", "dr", "etc", "fig", "gen",
+    "jr", "lt", "maj", "mr", "mrs", "ms", "no", "prof", "rev", "sgt",
+    "sr", "st", "vol", "vs",
+})
+
 _NEWS_CODA_SYSTEM = """\
 You are the radio announcer for SIGNAL LOST, an old-time radio drama.
 Write ONE short bridge clause that turns from tonight's fictional tale to the real
@@ -4409,20 +4421,200 @@ def validate_news_coda_bridge(text) -> tuple[bool, str]:
 
 
 def _news_coda_fact_flags(raw_fact, cleaned_fact) -> "tuple[str, ...]":
-    """3.5 (2026-06-27) coda execution flag -- MEASUREMENT-ONLY. The coda fact is
-    NEVER trimmed by this; it only RECORDS when the deterministic _CODA_FACT_MAX
-    cap actually bit, so the scan can count truncations. MF-2: compare the
-    hygiene-only clean (max_chars=0 disables truncation) against the capped fact
-    -- NEVER a raw len>200 (which would false-fire on whitespace/quotes). Pure;
-    never raises. (mojibake + generic-bridge stay scan-derived per the W-C map;
-    news_coda_fallback is already stamped on the fallback path.)"""
+    """Record when the spoken coda carries less than the cleaned source fact.
+
+    The helper remains measurement-only. It compares two already-selected
+    values and never performs the reduction itself. This preserves the legacy
+    ``news_coda_truncated`` telemetry name while the live path now reduces only
+    at complete sentence boundaries (or defers the full note to credits).
+    """
     try:
-        full = clean_one_line(str(raw_fact or ""), 0)
+        full = _clean_news_coda_fact(raw_fact)
         if full != str(cleaned_fact or ""):
             return ("news_coda_truncated",)
     except Exception:  # noqa: BLE001
         return ()
     return ()
+
+
+def _clean_news_coda_fact(text) -> str:
+    """Collapse fact whitespace without stripping a quoted title's closer."""
+    try:
+        value = " ".join(str(text or "").split()).strip()
+        quote_pairs = {
+            '"': '"',
+            "'": "'",
+            "\u201c": "\u201d",
+            "\u2018": "\u2019",
+        }
+        if len(value) >= 2 and quote_pairs.get(value[0]) == value[-1]:
+            value = value[1:-1].strip()
+        return value
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _news_coda_complete_sentence_prefixes(fact: str) -> "tuple[str, ...]":
+    """Return shorter exact complete-sentence prefixes, longest first.
+
+    This intentionally recognizes only conservative prose boundaries. Initials
+    (``H. G. Wells``), common titles/abbreviations, and decimals/version numbers
+    are never split. If a boundary is ambiguous, it is omitted and the total
+    coda floor can truthfully point to the intact credits instead of inventing
+    a factual fragment. Pure and never raises.
+    """
+    try:
+        value = _clean_news_coda_fact(fact)
+        if not value:
+            return ()
+        ends: list[int] = []
+        for match in re.finditer(
+            r"[.!?](?:[\"'\u2019\u201d])?(?=\s+[A-Z0-9]|$)", value,
+        ):
+            end = match.end()
+            if end >= len(value):
+                continue
+            if value[match.start()] == ".":
+                token_match = re.search(r"([A-Za-z]+|\d+)$", value[:match.start()])
+                token = token_match.group(1) if token_match else ""
+                if (
+                    (len(token) == 1 and token.isalpha())
+                    or token.casefold() in _CODA_NONTERMINAL_ABBREVIATIONS
+                ):
+                    continue
+            ends.append(end)
+        return tuple(value[:end].strip() for end in reversed(ends))
+    except Exception:  # noqa: BLE001 - conservative fallback is no prefix
+        return ()
+
+
+def _news_coda_delivery_projection(text: str) -> str:
+    """Project one coda onto the exact deterministic legacy TTS surface."""
+    try:
+        from ._otr_readiness import normalize_for_delivery
+    except ImportError:  # pragma: no cover - package fallback for flat tests
+        from nodes._otr_readiness import normalize_for_delivery  # type: ignore
+    try:
+        return str(normalize_for_delivery(str(text or ""))[0] or "")
+    except Exception as exc:  # noqa: BLE001 - scorer stays total
+        log.warning(
+            "[OTR_LineComposer] coda delivery projection failed (%s: %s); "
+            "scoring the canonical surface",
+            type(exc).__name__, str(exc)[:160],
+        )
+        return str(text or "")
+
+
+def _assemble_news_coda_surface(bridge: str, fact: str) -> str:
+    """Join one bridge and one exact fact without character truncation."""
+    clean_bridge = clean_one_line(
+        bridge or "", max_chars=_BRIDGE_MAX_CHARS,
+    ).rstrip(".!?,;: ")
+    clean_fact = _clean_news_coda_fact(fact)
+    if not clean_bridge or not clean_fact:
+        return ""
+    # `clean_one_line` strips every trailing quote character, even when that
+    # quote closes a title inside otherwise unquoted prose (``... Lawn.'``).
+    # Both halves are already one-line-clean, so whitespace collapse is the
+    # only safe final normalization here.
+    return " ".join(f"{clean_bridge}: {clean_fact}".split())
+
+
+def finalize_news_coda_surface(
+    *,
+    bridge: str,
+    fact: str,
+    req: LineRequest,
+    rules=None,
+    allow_fact_reduction: bool = True,
+) -> LineResult:
+    """Build and verify the complete coda surface TTS will consume.
+
+    Full exact source prose wins. On a dirty full surface, only exact complete
+    sentence prefixes may be selected; an LLM never sees or rewrites the fact.
+    If no fact-safe prefix is speakable, a short truthful pointer leaves the
+    complete source note in ledger metadata/credits. Every returned nonempty
+    result has passed the authoritative final-row scorer after delivery
+    projection. ``allow_fact_reduction=False`` is the authored-bridge probe used
+    before the bounded bridge ladder is exhausted.
+    """
+    full_fact = _clean_news_coda_fact(fact)
+    full_surface = _assemble_news_coda_surface(bridge, full_fact)
+    if not full_surface:
+        return LineResult(text="", compose_flags=())
+    grounded_fact_all_caps = tuple(
+        match.group(0) for match in _ALL_CAPS_TOKEN_RE.finditer(full_fact)
+    )
+
+    def _surface_flags(candidate: str):
+        return spoken_surface_flags_for_line(
+            _news_coda_delivery_projection(candidate),
+            req,
+            rules=rules,
+            allowed_all_caps=grounded_fact_all_caps,
+        )
+
+    initial_flags = _surface_flags(full_surface)
+    if not initial_flags:
+        return LineResult(text=full_surface, compose_flags=())
+    if not allow_fact_reduction:
+        return LineResult(text="", compose_flags=())
+
+    defect_codes = tuple(dict.fromkeys(
+        str(code) for code, _reason, _flag in initial_flags if str(code)
+    ))
+
+    def _repair_flags(action: str, rung: str) -> "tuple[str, ...]":
+        return (
+            action,
+            "news_coda_delivery_floor",
+            "hygiene_repaired_after_reroll",
+        ) + tuple(
+            f"hygiene_repaired_after_reroll:{code}:{rung}"
+            for code in defect_codes
+        )
+
+    for prefix in _news_coda_complete_sentence_prefixes(full_fact):
+        candidate = _assemble_news_coda_surface(bridge, prefix)
+        if candidate and not _surface_flags(candidate):
+            return LineResult(
+                text=candidate,
+                compose_flags=_repair_flags(
+                    "news_coda_fact_reduced", "news_coda_fact_prefix",
+                ),
+            )
+
+    # The complete source fact remains in meta.news.news_close_brief and is
+    # printed by the credits treatment. These candidates make no factual claim
+    # beyond that durable truth and are intentionally tiny, deterministic, and
+    # independent of bank vocabulary.
+    for pointer in (
+        "For tonight's source note: See tonight's credits.",
+        "The complete source note appears in tonight's credits.",
+        "See tonight's credits for the source note.",
+        "See the credits.",
+    ):
+        if not _surface_flags(pointer):
+            return LineResult(
+                text=pointer,
+                compose_flags=_repair_flags(
+                    "news_coda_fact_deferred_to_credits",
+                    "news_coda_credits_pointer",
+                ),
+            )
+
+    # Future rule packs should never make all four neutral pointers dirty. Do
+    # not recreate the original bypass with an unscored emergency sentence:
+    # return an explicit mechanical failure so the row-local contract (or the
+    # writer's generic non-factual close) can handle it observably.
+    return LineResult(
+        text="",
+        compose_flags=(
+            "news_coda_no_clean_surface",
+            "hygiene_row_failed_mechanical",
+            "hygiene_row_failed_mechanical:news_coda_no_clean_surface",
+        ),
+    )
 
 
 def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
@@ -4432,7 +4624,9 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
                       # whose pack seam supplies the coda system prompt.
                       # Default keeps legacy callers byte-identical.
                       source_bank_id: str = "media_archive",
-                      repair_fn=None) -> LineResult:
+                      repair_fn=None,
+                      canon_header: str = "",
+                      words_per_beat_range: tuple = (0, 0)) -> LineResult:
     """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
     clause from the premise + the safe intro tone (NEVER the outcome / the news
     fact); the real ``news_close_brief`` is appended deterministically, so the
@@ -4443,19 +4637,51 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
     script_brief (whose news distillation can hint the resolution). ``intro_text``
     is the SAFE no-spoiler open -- safe to pass for tone.
     """
-    # 1) clean the FACT first (defined before generate/validate/fallback).
-    fact = clean_one_line(news_close_brief or "", max_chars=_CODA_FACT_MAX)
+    # 1) clean the FACT first (defined before generate/validate/fallback). Do
+    # not character-cut factual prose: the total finalizer below selects only
+    # complete exact sentences or a truthful credits pointer.
+    fact = _clean_news_coda_fact(news_close_brief)
     if not fact:
         return LineResult(text="", compose_flags=("news_coda_no_brief",))  # caller handles
-    # 3.5 (measurement-only): record if the _CODA_FACT_MAX cap bit, BEFORE the
-    # capitalization step so a leading-letter case change never false-fires.
-    _coda_extra = _news_coda_fact_flags(news_close_brief, fact)
     fact = (fact[0].upper() + fact[1:]) if fact[0].isalpha() else fact
 
-    def _assemble(bridge: str) -> str:
-        b = clean_one_line(bridge, max_chars=_BRIDGE_MAX_CHARS).rstrip(".!?,;: ")
-        b = b + ":"                                   # normalize the turn (no "x.:")
-        return clean_one_line(f"{b} {fact}", max_chars=_CODA_TOTAL_MAX)
+    try:
+        from ._otr_story_rules import resolve_story_rules
+    except ImportError:  # pragma: no cover - package fallback for flat tests
+        from nodes._otr_story_rules import resolve_story_rules  # type: ignore
+    _story_rules = resolve_story_rules(source_bank_id)
+    _coda_req = LineRequest(
+        speaker="ANNOUNCER",
+        intent="bridge the completed tale to its factual source note",
+        mood="reflective",
+        target_words=15,
+        canon_header=str(canon_header or ""),
+        last_lines=[],
+        speaker_role="announcer",
+        words_per_beat_range=tuple(words_per_beat_range or ()),
+    )
+
+    def _finish(bridge: str, base_flags, *, allow_fact_reduction: bool):
+        finished = finalize_news_coda_surface(
+            bridge=bridge,
+            fact=fact,
+            req=_coda_req,
+            rules=_story_rules,
+            allow_fact_reduction=allow_fact_reduction,
+        )
+        if not finished.text:
+            return None
+        _separator = finished.text.partition(":")
+        selected_fact = (
+            _separator[2].strip() if _separator[1] else finished.text
+        )
+        fact_flags = _news_coda_fact_flags(fact, selected_fact)
+        return LineResult(
+            text=finished.text,
+            compose_flags=tuple(dict.fromkeys(
+                tuple(base_flags) + finished.compose_flags + fact_flags
+            )),
+        )
 
     # 2) dynamic bridge: setup-only inputs (NO ending_change / final_char / fact).
     # Closing-layer routing (2026-07-09 QA F1): the coda system prompt resolves
@@ -4490,8 +4716,11 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
         raw = _announcer_generate(creative_fn, _msgs(attempt))   # no seed arg
         ok, bridge = validate_news_coda_bridge(strip_line_formatting(raw or ""))
         if ok:
-            return LineResult(
-                text=_assemble(bridge), compose_flags=(flag,) + _coda_extra)
+            finished = _finish(
+                bridge, (flag,), allow_fact_reduction=False,
+            )
+            if finished is not None:
+                return finished
 
     # 3) Authored repair B/C: lower-temperature same slot, then the alternate
     # writer. The real fact remains starved from both prompts and is appended
@@ -4520,14 +4749,17 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
             strip_line_formatting(repair_raw or "")
         )
         if ok:
-            return LineResult(
-                text=_assemble(bridge),
-                compose_flags=(
+            finished = _finish(
+                bridge,
+                (
                     "news_coda_bridge_repaired",
                     "hygiene_repaired_after_reroll",
                     "hygiene_repaired_after_reroll:news_coda_bridge:" + rung,
-                ) + _coda_extra,
+                ),
+                allow_fact_reduction=False,
             )
+            if finished is not None:
+                return finished
 
     # 4) Deterministic sanitize floor. Every chosen clause passes the same
     # validator that rejected the authored attempts; NEWS_CODA_POOL is retained
@@ -4556,15 +4788,26 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
             valid_curated = ("Beyond tonight's tale",)
         floor_bridge = valid_curated[h % len(valid_curated)]
         floor_kind = "news_coda_curated_bridge"
-    return LineResult(
-        text=_assemble(floor_bridge),
-        compose_flags=(
+    finished = _finish(
+        floor_bridge,
+        (
             "news_coda_fallback",
             "news_coda_bridge_invalid",
             floor_kind,
-        ) + _coda_extra + (
+        ) + (
             "hygiene_repaired_after_reroll",
             "hygiene_repaired_after_reroll:news_coda_bridge:deterministic_floor",
+        ),
+        allow_fact_reduction=True,
+    )
+    if finished is not None:
+        return finished
+    return LineResult(
+        text="",
+        compose_flags=(
+            "news_coda_no_clean_surface",
+            "hygiene_row_failed_mechanical",
+            "hygiene_row_failed_mechanical:news_coda_no_clean_surface",
         ),
     )
 

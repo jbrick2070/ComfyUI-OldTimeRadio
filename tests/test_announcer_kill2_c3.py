@@ -160,9 +160,19 @@ class TestWriterC3Wiring:
 
     def test_coda_passes_premise_not_script_brief(self):
         i_coda = self.SRC.index("_OTRLC.compose_news_coda(")
-        seg = self.SRC[i_coda:i_coda + 400]
+        seg = self.SRC[i_coda:i_coda + 2600]
         assert 'premise=str(getattr(outline, "premise"' in seg
         assert "script_brief" not in seg          # the bridge never sees the brief
+
+    def test_coda_threads_injected_canon_and_episode_breath_range(self):
+        i_coda = self.SRC.index("_OTRLC.compose_news_coda(")
+        i_end = self.SRC.index("\n                if not outro_res.text:", i_coda)
+        i_canon = self.SRC.index("canon_header=canon_header", i_coda)
+        i_range = self.SRC.index(
+            "episode_budget.words_per_beat_range", i_coda,
+        )
+        assert i_coda < i_canon < i_end
+        assert i_coda < i_range < i_end
 
     def test_no_brief_marker_via_frozen_replace(self):
         assert "news_coda_no_brief" in self.SRC

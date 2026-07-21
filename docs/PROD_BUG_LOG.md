@@ -2107,3 +2107,40 @@ out until they independently meet the same production-only admission rule.
   present receipts make no mutation
 - bible-worthy: yes -- BUG-12.59
 - status: **LIVE-ADMITTED / ROOT-FIXED; focused + offline self-test + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**
+
+## PBUG-20260721-07 -- the protected news-coda fact bypassed final spoken-surface validation
+- surfaced: completed and published canonical `media_archive` qualification
+  prompt `f7bffc53-bada-45c1-9256-4a27a3caed51`, episode
+  `signal_lost_the_diary_keys_20260721_040039`, 2026-07-21
+- symptom: strict audit rejected exact TTS coda row `b009`. The canonical row
+  contained all three episode anchors and expanded to 44 delivery words after
+  normalization, producing `anchor_stuffing` and `one_breath`, even though the
+  bridge itself had passed hygiene. The Phase 7 record reported a failed row
+  count but exposed no corresponding failure receipt
+- root cause: both first-pass composition and the later shared spoken scour
+  validated only the authored bridge, then reattached the protected factual
+  suffix without rescoring the assembled surface TTS would consume. The
+  composer could also character-cut the factual suffix, manufacturing a false
+  sentence boundary. Phase 7 built failure detail by filtering the successful
+  repair receipts, so row-local failure evidence was always empty
+- fix: one shared coda finalizer now assembles the bridge with the exact source
+  fact, projects it through the authoritative delivery normalizer, and scores
+  the complete spoken row. A dirty full fact may reduce only to the longest
+  clean exact complete-sentence prefix; if no such prefix exists, the spoken
+  row points truthfully to credits while the full source note remains in
+  `meta.news.news_close_brief`. Models never receive or rewrite factual prose,
+  and no character truncation is permitted. First-pass composition receives
+  injected canon and the live breath range; later scour stamps only hash
+  receipts for any reduction. The mutator itself refuses both content-owned
+  sci-fi policies, preserving their accepted rows, seals, and hashes. Phase 7
+  now carries explicit row-local failure details
+- verify idea: replay the exact live `b009` note and require its projected TTS
+  surface to pass the final row scorer without exposing the fact to any model.
+  Exercise multi-sentence, initials/version, and single-sentence facts: permit
+  only whole exact sentences or a truthful credits deferral, never fragments.
+  Require the same behavior in the `media_archive`, `public_domain`, and
+  `shakespeare` legacy routes; keep `original` empty-coda behavior and direct
+  `scifi_news`/`scifi_news_pro` shared-scour inputs byte-identical. A forced
+  row-local failure must appear in the Phase 7 receipt
+- bible-worthy: yes -- BUG-12.60
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + cross-bank + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**
