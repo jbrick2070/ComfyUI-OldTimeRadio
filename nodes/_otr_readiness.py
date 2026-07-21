@@ -38,6 +38,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import set_line_text_metrics
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
+
 log = logging.getLogger("OTR.readiness")
 
 
@@ -266,9 +271,7 @@ def phase_7_audio_readiness(led) -> AudioReadinessReport:
             rep.numbers_expanded += num_hits
 
         if expanded_3 != original:
-            ln["text"] = expanded_3
-            ln["char_count"] = len(expanded_3)
-            ln["word_count"] = sum(1 for _ in expanded_3.split())
+            set_line_text_metrics(ln, expanded_3)
             rep.lines_normalized += 1
 
     ledger_data.setdefault("meta", {})["audio_readiness"] = rep.to_dict()

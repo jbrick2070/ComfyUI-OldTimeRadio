@@ -126,6 +126,7 @@ from ._otr_generation_budget import (
     GenerationContextOverflowError,
     fit_output_tokens,
 )
+from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
 # S1 platform-portability: the explicit LLM runtime policy (stdlib-only).
 from ._otr_shared import llm_policy as _llm_policy
 
@@ -1980,7 +1981,7 @@ def run_v3_advisory(led, meta, *, lane, version: int = 1) -> None:
         counts: dict[str, int] = {}
         for s in speakers:
             counts[s] = counts.get(s, 0) + 1
-        words = [len(str(r.get("text") or "").split()) for r in rows]
+        words = [canonical_word_count(r.get("text")) for r in rows]
         base = base_source_bank_id(lane)
         focus = _v3_focus_metric(base, rows, speakers, words, counts)
         target[key] = {
@@ -7044,8 +7045,7 @@ class OTR_LedgerScriptWriter:
             log.warning(
                 "[OTR_LedgerScriptWriter] stage-direction scrub %s: %r -> %r",
                 _ln.get("line_id"), _txt[:70], _new[:70])
-            _ln["text"] = _new
-            _ln["word_count"] = len(_new.split())
+            set_line_text_metrics(_ln, _new)
             _sd_fixed += 1
         if _sd_fixed:
             led.save()
@@ -7084,8 +7084,7 @@ class OTR_LedgerScriptWriter:
             log.warning(
                 "[OTR_LedgerScriptWriter] self-vocative scrub %s (%s): "
                 "%r -> %r", _ln.get("line_id"), _nm, _txt[:60], _fixed[:60])
-            _ln["text"] = _fixed
-            _ln["word_count"] = len(_fixed.split())
+            set_line_text_metrics(_ln, _fixed)
             _voc_fixed += 1
         if _voc_fixed:
             led.save()
@@ -7150,8 +7149,7 @@ class OTR_LedgerScriptWriter:
                         "%s (%s, ambiguous %d-char cast): %r -> %r",
                         _ln.get("line_id"), _nm, len(_char_rows),
                         _txt[:50], _fixed[:50])
-                    _ln["text"] = _fixed
-                    _ln["word_count"] = len(_fixed.split())
+                    set_line_text_metrics(_ln, _fixed)
                     _att_fixed += 1
                 else:
                     log.warning(
@@ -7437,7 +7435,7 @@ class OTR_LedgerScriptWriter:
                     continue
                 if _row.get("skip"):
                     continue
-                _actual_words += len(str(_row.get("text") or "").split())
+                _actual_words += canonical_word_count(_row.get("text"))
             _actual_ratio = _actual_words / max(1, _target_wb)
             _actual_drift = not (
                 _band_lo <= _actual_ratio <= _band_hi

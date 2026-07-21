@@ -41,6 +41,7 @@ try:
         spoken_surface_flags_for_line,
     )
     from ._otr_readiness import normalize_for_delivery
+    from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
     from ._otr_generation_budget import GenerationContextOverflowError
     from ._otr_story_rules import StoryRules
     from ._otr_scifi_p0_contract import (
@@ -87,6 +88,10 @@ except ImportError:  # pragma: no cover
         spoken_surface_flags_for_line,
     )
     from _otr_readiness import normalize_for_delivery  # type: ignore
+    from _otr_text_metrics import (  # type: ignore
+        canonical_word_count,
+        set_line_text_metrics,
+    )
     from _otr_generation_budget import (  # type: ignore
         GenerationContextOverflowError,
     )
@@ -2323,7 +2328,6 @@ def _run_p3_text_patch(
     mark_attempt_complete(patch_attempt_index, raw_patch, None)
     receipt["patch_status"] = "accepted"
     return merged_draft
-_WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9'’-]*")
 _DECORATION_RE = re.compile(r"[\r\n\t\[\]()\x60*]|^\s*\x60\x60\x60|^\s*[-*]\s+")
 _ALL_CAPS_RE = re.compile(r"(?<![A-Za-z0-9])[A-Z]{2,}(?![A-Za-z0-9])")
 _LABEL_RE = re.compile(r"^\s*(?:ANNOUNCER|[A-Z][A-Za-z]+)\s*:")
@@ -2331,7 +2335,7 @@ _QUOTED_RE = re.compile(r"^\s*[\"'].*[\"']\s*$")
 
 
 def _words(text: str) -> int:
-    return len(_WORD_RE.findall(text or ""))
+    return canonical_word_count(text)
 
 
 def _digest(payload: Mapping[str, str]) -> str:
@@ -4765,13 +4769,11 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
         source_row = script_by_line.get(row.get("line_id"))
         if row.get("line_id") in music_ids:
             row["skip"] = True
-            row["text"] = ""
+            set_line_text_metrics(row, "")
             row["tts_skip_reason"] = "music_cue"
         elif source_row is not None and source_row.skip:
             row["skip"] = True
-            row["text"] = ""
-            row["char_count"] = 0
-            row["word_count"] = 0
+            set_line_text_metrics(row, "")
             row["tts_skip_reason"] = source_row.tts_skip_reason
     # The compact authoring schema deliberately speaks in score-local IDs
     # (music_open/music_inter/music_close and open/inter/close).  The durable

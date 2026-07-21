@@ -1538,6 +1538,16 @@ def run_freeze_cascade(
         if _p7_hygiene.repaired or _p7_hygiene.failed:
             meta["phase_7_hygiene_repaired_rows"] = _p7_hygiene.repaired
             meta["phase_7_hygiene_failed_rows"] = _p7_hygiene.failed
+
+    # PBUG-20260721-15: one derived-metric owner at the final text boundary.
+    # Phase 0 intentionally preserves the incoming producer diagnosis. After
+    # every permitted text mutator has finished, refresh row/root/meta counts
+    # once before Phase 10. This is count-only and therefore preserves sealed
+    # canonical text, text_for_tts, and content-authorship hashes.
+    _PL.refresh_ledger_text_metrics(led)
+    ledger_data = led.data
+    meta = ledger_data.setdefault("meta", {})
+
     started_8 = _isoformat_utc_now()
     hash_before_8 = _hash_lines_text(ledger_data)
     _phase_8_video_readiness(

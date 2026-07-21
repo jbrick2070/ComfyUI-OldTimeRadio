@@ -43,6 +43,11 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any, Callable, List, Optional
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import set_line_text_metrics
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
+
 log = logging.getLogger("OTR_AntiLoop")
 
 # Tunables (kept module-level so tests + the cascade share one source).
@@ -296,7 +301,7 @@ def repair_character_anti_loops(
             original = str(line.get("text") or "")
             new_text = recompose_fn(i, original, t.hint)
             if new_text and str(new_text).strip() and str(new_text) != original:
-                line["text"] = str(new_text)
+                set_line_text_metrics(line, str(new_text))
                 summary["repaired"] += 1
         return summary
     except Exception as exc:  # noqa: BLE001 -- repair must never break a run

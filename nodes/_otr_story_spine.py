@@ -53,6 +53,11 @@ import logging
 import os
 from typing import Any, Callable, Optional
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import set_line_text_metrics
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
+
 log = logging.getLogger("OTR_StorySpine")
 
 _ENV_FLAG = "OTR_ENABLE_STORY_SPINE"
@@ -643,7 +648,7 @@ def run_post_script_spine(
                     _hy_clean = _HY.clean_spoken_character_line(
                         _hy_orig, _hy_name)
                     if _hy_clean != _hy_orig and _hy_clean.strip():
-                        _hy_line["text"] = _hy_clean
+                        set_line_text_metrics(_hy_line, _hy_clean)
                         _hy_report["scrubbed"] += 1
                         _hy_orig = _hy_clean
                     # ROOT-CAUSE repair (2026-06-22): a character beat with NO
@@ -669,7 +674,7 @@ def run_post_script_spine(
                         )
                         if (_hy_sd and str(_hy_sd).strip()
                                 and not _HY.is_stage_direction_only(str(_hy_sd))):
-                            _hy_line["text"] = str(_hy_sd)
+                            set_line_text_metrics(_hy_line, str(_hy_sd))
                             _hy_orig = str(_hy_sd)
                             _hy_report["stage_direction_recomposed"] += 1
                     if _HY.is_truncated(_hy_orig):
@@ -680,7 +685,7 @@ def run_post_script_spine(
                         )
                         if (_hy_new and str(_hy_new).strip()
                                 and str(_hy_new) != _hy_orig):
-                            _hy_line["text"] = str(_hy_new)
+                            set_line_text_metrics(_hy_line, str(_hy_new))
                             _hy_report["char_recomposed"] += 1
                     # F7 (story-engine v1): narration / self-address repair.
                     # One recompose attempt via the SAME seam; LOUD marker;
@@ -700,7 +705,7 @@ def run_post_script_spine(
                         )
                         if (_hy_nn and str(_hy_nn).strip()
                                 and str(_hy_nn) != _hy_cur):
-                            _hy_line["text"] = str(_hy_nn)
+                            set_line_text_metrics(_hy_line, str(_hy_nn))
                             _hy_report["narration_recomposed"] += 1
                 elif _hy_role == "announcer" and _hy_i in (
                         _hy_first_ann, _hy_last_ann):
@@ -718,7 +723,7 @@ def run_post_script_spine(
                         )
                         if (_hy_fixed and _hy_fixed.strip()
                                 and _hy_fixed != _hy_orig):
-                            _hy_line["text"] = _hy_fixed
+                            set_line_text_metrics(_hy_line, _hy_fixed)
                             _hy_flags = list(
                                 _hy_line.get("compose_flags") or []
                             )

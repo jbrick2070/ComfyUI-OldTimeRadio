@@ -110,6 +110,7 @@ try:  # pragma: no cover - exercised by both import styles
         leak_floor_v2_enabled,
         transcript_sanitizer_enabled,
     )
+    from ._otr_text_metrics import set_line_text_metrics
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         BARE_STAGE_FLOOR_ACTIVE,
@@ -123,6 +124,7 @@ except ImportError:  # pragma: no cover
         leak_floor_v2_enabled,
         transcript_sanitizer_enabled,
     )
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
 
 __all__ = [
     "ScrubResult",
@@ -878,11 +880,7 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
                 if not get_line_action(row):
                     _dlg, _action, _split_reason = split_stage_business(raw_text)
                     if _action:
-                        row["text"] = _dlg
-                        if "word_count" in row:
-                            row["word_count"] = len(_dlg.split())
-                        if "char_count" in row:
-                            row["char_count"] = len(_dlg)
+                        set_line_text_metrics(row, _dlg)
                         raw_text = _dlg
                         append_compose_flag(
                             row,
@@ -943,13 +941,9 @@ def scrub_ledger(led: Dict[str, Any], *, repair_available: bool) -> ScrubResult:
                 cleaned = _san_text
 
         if cleaned != raw_text:
-            row["text"] = cleaned
-            # Restamp the length fields so a bare/delimited strip does not leave
-            # a stale word_count for downstream consumers (caption/timing).
-            if "word_count" in row:
-                row["word_count"] = len(cleaned.split())
-            if "char_count" in row:
-                row["char_count"] = len(cleaned)
+            # Restamp both derived fields atomically so every downstream
+            # consumer sees the same canonical text metrics.
+            set_line_text_metrics(row, cleaned)
             normalized_any = True
             findings.append(ScrubFinding(
                 code=CODE_LINE_NORMALIZED, where=f"lines[{i}]",

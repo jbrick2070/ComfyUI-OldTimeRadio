@@ -48,6 +48,11 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, List, Optional, Sequence, Tuple
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import set_line_text_metrics
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
+
 __all__ = [
     "find_banned_phrase_hits",
     "is_spoken_role",
@@ -254,8 +259,7 @@ def apply_genre_spoken_repair(
             continue
         new_text = _reauthor_line(text, hits, creative_fn, phrases, max_attempts)
         if new_text and new_text != text:
-            line["text"] = new_text
-            line["word_count"] = len(new_text.split())
+            set_line_text_metrics(line, new_text)
             _append_flag(line, f"genre_repair:removed={','.join(hits)}")
             fixed += 1
     return fixed

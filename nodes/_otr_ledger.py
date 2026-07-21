@@ -40,6 +40,15 @@ import tempfile
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import WORD_RE, canonical_char_count, canonical_word_count
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import (  # type: ignore
+        WORD_RE,
+        canonical_char_count,
+        canonical_word_count,
+    )
+
 log = logging.getLogger("OTR")
 
 # ---------------------------------------------------------------------------
@@ -484,13 +493,9 @@ def patch_line_fields(
     return False
 
 
-# Mirror of production_ledger._word_count -- the same regex the writer
-# uses at initial set_lines() stamp time. Naive ``str.split()`` would
-# drift by a few percent on text containing punctuation glue, so any
-# downstream consumer comparing a revised line's word_count against
-# budget plans would see stale numbers. Keep this in sync with
-# production_ledger.py if either side changes.
-_WORD_COUNT_RE = __import__("re").compile(r"[A-Za-z][A-Za-z0-9'\-]*")
+# Backward-compatible private alias for callers that imported the old mirror.
+# The compiled expression itself now has one owner in _otr_text_metrics.
+_WORD_COUNT_RE = WORD_RE
 
 
 def patch_line_text(
@@ -515,8 +520,8 @@ def patch_line_text(
     safe_text = text or ""
     fields = {
         "text": safe_text,
-        "char_count": len(safe_text),
-        "word_count": len(_WORD_COUNT_RE.findall(safe_text)),
+        "char_count": canonical_char_count(safe_text),
+        "word_count": canonical_word_count(safe_text),
     }
     return patch_line_fields(ledger, line_id, fields)
 

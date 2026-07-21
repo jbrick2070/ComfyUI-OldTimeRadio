@@ -89,6 +89,11 @@ except ImportError:  # pragma: no cover - standalone / test load
         repair_existing_spoken_line,
     )
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import set_line_text_metrics
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
+
 try:
     from ._otr_story_critic import StoryCriticReport, run_story_critic
 except ImportError:  # pragma: no cover - standalone / test load
@@ -730,11 +735,7 @@ def repair_ledger_spoken_hygiene(
             # row object is already in hand.  Patch it locally so a craft
             # repair can never escalate that unrelated defect to an episode
             # terminal.
-            row.update({
-                "text": final_text,
-                "char_count": len(final_text),
-                "word_count": len(_OTRL._WORD_COUNT_RE.findall(final_text)),
-            })
+            set_line_text_metrics(row, final_text)
         merged_flags = list(prior_flags)
         for flag in result.compose_flags:
             if flag not in merged_flags:

@@ -2396,3 +2396,39 @@ out until they independently meet the same production-only admission rule.
   link 284 and live-qualify both sci-fi banks through terminal OBS publication
 - bible-worthy: yes -- BUG-12.66
 - status: **LIVE-ADMITTED / ROOT-FIXED; focused cross-bank + consumer tests, full-suite (8,297 passed), Bug Bible, and canonical workflow gates GREEN; live `scifi_news` + `scifi_news_pro` requalification pending**
+
+## PBUG-20260721-15 -- split word-count ownership falsely dirtied a correct live ledger
+- surfaced: canonical `scifi_news` qualification prompt
+  `1435f170-78fa-45ec-81a7-779b44533eb7`, pending artifact
+  `pending_20260721_131620`, 2026-07-21. The source was the MIT News article
+  `Study finds cell memory can be more like a dimmer dial than an on/off
+  switch`. The run was stopped at TTS immediately after the freeze warning
+- symptom: line `l003` contained the canonical surface `'off'—it's`. Its stored
+  regex-derived `word_count=21` was correct, but Phase 0 and Phase 10 counted
+  whitespace fields and reported only 20. The ledger froze
+  `frozen_with_warns`; root `total_word_count=186` disagreed with the durable
+  meta total `185`. The text, character count, and authored hashes were valid
+- root cause: derived ledger metrics had several owners. Production row
+  writers used an ASCII word regex, Scifi Codex used a slightly different
+  smart-apostrophe regex, readiness/freeze/meta stamps used `str.split()`, and
+  multiple repair/scrub/editor paths changed `text` without atomically
+  refreshing both counts. Save aggregated stored fields instead of deriving
+  them from canonical text, so stale or merely differently-tokenized values
+  could survive into cast, scene, root, and budget receipts on every bank
+- fix: one stdlib-only text-metrics leaf now owns character and word boundaries:
+  ASCII hyphens plus straight/smart apostrophes remain intra-word, while en/em
+  dashes are boundaries. Every confirmed durable text mutator calls the atomic
+  text/count setter. Production save re-derives every row before rolling up
+  cast, scene, root, and character/announcer meta totals, clearing stale zero-
+  line aggregates. The freeze cascade preserves the raw Phase-0 diagnosis,
+  then performs one count-only refresh after all permitted text mutation and
+  before Phase 10. It does not alter canonical text, `text_for_tts`, hashes,
+  authorship receipts, or seals. The freeze audit consumes the same helper
+- verify idea: pin straight/smart apostrophe, ASCII-hyphen, en-dash, and em-dash
+  counts including the exact live sentence. Parameterize all six banks through
+  a save with deliberately corrupted row/root/cast/scene/meta counts and
+  require complete self-healing. Show Phase 0 retaining an incoming mismatch
+  while Phase 10 is clean after the final refresh. AST-audit production nodes
+  so direct `row['text']` writes cannot bypass the atomic owner
+- bible-worthy: yes -- BUG-12.67
+- status: **LIVE-ADMITTED / ROOT-FIXED; exact six-bank + writer/freeze focused tests, full suite (8,315 passed), Bug Bible, and canonical workflow gates GREEN; live six-bank requalification pending**

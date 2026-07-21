@@ -34,6 +34,11 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, List, Optional, Sequence, Tuple
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import set_line_text_metrics
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
+
 __all__ = [
     "final_cast_names",
     "find_outro_text",
@@ -218,11 +223,10 @@ def apply_outro_completeness_repair(
         cand = str(raw or "").strip().strip('"').strip()
         if not cand:
             continue
-        row["text"] = cand
+        set_line_text_metrics(row, cand)
         if not missing_final_cast_names(ledger_data):
-            row["word_count"] = len(cand.split())
             _append_flag(row, "outro_cast_repair")
             return 1
     # exhausted: restore the original (Python invents nothing) for the terminal
-    row["text"] = original
+    set_line_text_metrics(row, original)
     return 0

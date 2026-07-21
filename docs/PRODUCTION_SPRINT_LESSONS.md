@@ -488,6 +488,28 @@ rescues should validate the durable episode against its directory and use the
 freeze receipt whenever the caller carries it. A render is not qualified until
 the final ledger can locate every asset without referring to the retired root.
 
+## 31. Derived ledger metrics need one lexical owner and one final boundary
+
+Word count is not `len(text.split())` once authored dialogue contains em dashes,
+smart apostrophes, or punctuation glued for performance. Pick one explicit
+lexical contract and put it in a dependency-free leaf that every producer,
+repair pass, editor, readiness normalizer, aggregate writer, and freeze auditor
+can import. A text mutation is one atomic operation over `text`, `char_count`,
+and `word_count`; never rely on a later caller remembering the other two.
+
+The durable save is still the ownership backstop. Re-derive row metrics from
+canonical text before rolling them into cast, scene, root, and role-specific
+meta totals, and reset empty aggregates instead of leaving values from a prior
+composition. Preserve the incoming audit before self-healing so production
+diagnostics still identify the offending producer. After the last legal text
+mutator, refresh derived metrics once more before the final freeze audit.
+
+Counts are derived state, not authorship. A count-only refresh must not rewrite
+canonical text, delivery projections, accepted-line hashes, content-authorship
+receipts, or seals. Enforce the boundary mechanically: scan production modules
+for direct ledger-text assignments so a new sibling writer cannot silently
+reintroduce split ownership.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

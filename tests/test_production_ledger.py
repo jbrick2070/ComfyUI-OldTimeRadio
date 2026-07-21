@@ -76,6 +76,12 @@ class TestUtilities:
         assert _word_count("") == 0
         assert _word_count(None) == 0
 
+    def test_word_count_uses_canonical_punctuation_boundaries(self):
+        assert _word_count("forty-two") == 1
+        assert _word_count("don't don\u2019t") == 2
+        assert _word_count("off\u2014it's") == 2
+        assert _word_count("off\u2013it\u2019s") == 2
+
     def test_char_count_is_len(self):
         assert _char_count("abcdef") == 6
         assert _char_count("") == 0
@@ -818,6 +824,71 @@ class TestSetters:
         led.set_lines(self._sample_lines())
         s01 = led.data["scenes"][0]
         assert s01["line_count"] == 3  # all three lines land in s01
+
+    @pytest.mark.parametrize("source_bank", [
+        "media_archive",
+        "original",
+        "public_domain",
+        "shakespeare",
+        "scifi_news",
+        "scifi_news_pro",
+    ])
+    def test_save_self_heals_all_text_metrics_for_every_bank(
+        self, tmp_out, source_bank,
+    ):
+        led = Ledger(f"metrics_{source_bank}", str(tmp_out))
+        led.data.setdefault("meta", {})["source_bank"] = source_bank
+        led.set_cast([
+            {"char_id": "c01", "name": "VALE"},
+            {"char_id": "announcer", "name": "ANNOUNCER"},
+        ])
+        led.set_scenes([{"scene_id": "s01"}])
+        led.set_shots([{"shot_id": "sh01", "scene_id": "s01"}])
+        led.set_lines([
+            {
+                "line_id": "l001", "shot_id": "sh01", "char_id": "c01",
+                "speaker_role": "character",
+                "text": "The ghost-state isn't off\u2014it's elsewhere.",
+            },
+            {
+                "line_id": "l002", "shot_id": "sh01",
+                "char_id": "announcer", "speaker_role": "announcer",
+                "text": "Tonight\u2014Signal Lost returns.",
+            },
+        ])
+
+        for row in led.data["lines"]:
+            row["char_count"] = 999
+            row["word_count"] = 999
+        led.data["total_char_count"] = 999
+        led.data["total_word_count"] = 999
+        led.data["meta"].update({
+            "character_word_count": 999,
+            "announcer_word_count": 999,
+            "total_word_count": 999,
+        })
+        led.data["cast"][0].update({"line_count": 999, "word_count": 999})
+        led.data["scenes"][0].update({"line_count": 999, "word_count": 999})
+
+        assert led.save()
+        saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+        rows = saved["lines"]
+        expected_words = [_word_count(row["text"]) for row in rows]
+        assert [row["word_count"] for row in rows] == expected_words
+        assert [row["char_count"] for row in rows] == [
+            len(row["text"]) for row in rows
+        ]
+        assert saved["total_word_count"] == sum(expected_words)
+        assert saved["total_char_count"] == sum(
+            len(row["text"]) for row in rows
+        )
+        assert saved["meta"]["character_word_count"] == expected_words[0]
+        assert saved["meta"]["announcer_word_count"] == expected_words[1]
+        assert saved["meta"]["total_word_count"] == sum(expected_words)
+        assert saved["cast"][0]["line_count"] == 1
+        assert saved["cast"][0]["word_count"] == expected_words[0]
+        assert saved["scenes"][0]["line_count"] == 2
+        assert saved["scenes"][0]["word_count"] == sum(expected_words)
 
     def test_set_final_paths(self, tmp_out):
         led = Ledger("t", str(tmp_out))

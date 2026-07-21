@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_readiness as _LFC_RDY  # noqa: E402
+from nodes._otr_text_metrics import canonical_word_count  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +181,19 @@ class TestPhase7Boundaries:
             "Mister Smith spoke."
         )
 
+    def test_punctuation_glue_uses_canonical_metrics_after_expansion(self):
+        led = _ledger([
+            _line(
+                "l001", "c01", "character",
+                "Dr. Vale said off\u2014it's elsewhere.",
+            ),
+        ])
+        _LFC_RDY.phase_7_audio_readiness(led)
+        row = led.data["lines"][0]
+        assert row["text"].startswith("Doctor Vale")
+        assert row["word_count"] == canonical_word_count(row["text"])
+        assert row["char_count"] == len(row["text"])
+
     def test_meta_audio_readiness_stamped(self):
         led = _ledger([
             _line("l001", "c01", "character", "Mr. Smith."),
@@ -258,6 +272,57 @@ class TestPhase8VideoReadiness:
 
 
 class TestCascadeWiring:
+    def test_final_metric_refresh_preserves_pre_diagnosis_and_cleans_post(self):
+        from unittest.mock import patch
+        from nodes import _otr_freeze_cascade as _LFC_ORCH
+        from nodes import _otr_ledger_reviewer as _OTRLR
+
+        text = "The dial says off\u2014it's actually elsewhere."
+        led = _ledger([
+            _line("l001", "c01", "character", text),
+        ])
+        led.data["lines"][0].update({"word_count": 999, "char_count": 999})
+        reviewer_disp = _OTRLR.ReviewerDisposition(
+            verdict="clean_no_edits",
+            pre_audit_violations=0, pre_audit_repairs_applied=0,
+            doctor_edits_proposed=0, doctor_edits_applied=0,
+            post_audit_violations=0,
+        )
+        hygiene = SimpleNamespace(repaired=0, failed=0, failures=[])
+
+        with (
+            patch.object(
+                _LFC_ORCH,
+                "_run_legacy_content_chain",
+                return_value=(None, reviewer_disp, None),
+            ),
+            patch.object(
+                _LFC_ORCH._OTRRR,
+                "repair_ledger_spoken_hygiene",
+                return_value=hygiene,
+            ),
+        ):
+            disp = _LFC_ORCH.run_freeze_cascade(
+                lambda *a, **k: "",
+                led,
+                enable_phase_7_audio_readiness=False,
+            )
+
+        assert any(
+            "word_count=999" in warning
+            for warning in disp.gap_audit_pre.warnings
+        )
+        assert not any(
+            "word_count=" in warning
+            for warning in disp.gap_audit_post.warnings
+        )
+        row = led.data["lines"][0]
+        expected = canonical_word_count(text)
+        assert row["word_count"] == expected
+        assert row["char_count"] == len(text)
+        assert led.data["total_word_count"] == expected
+        assert led.data["meta"]["character_word_count"] == expected
+
     def test_phase_7_record_appended_to_readiness_passes(self):
         from unittest.mock import patch
         from nodes import _otr_freeze_cascade as _LFC_ORCH

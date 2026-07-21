@@ -25,6 +25,7 @@ from types import SimpleNamespace
 import pytest
 
 from nodes import _otr_ledger_freeze as _LFC
+from nodes._otr_text_metrics import canonical_word_count
 
 
 # ---------------------------------------------------------------------------
@@ -486,6 +487,34 @@ class TestMetaInvariants:
 
 
 class TestSoftGapsAdvanceCleanly:
+    @pytest.mark.parametrize("source_bank", [
+        "media_archive",
+        "original",
+        "public_domain",
+        "shakespeare",
+        "scifi_news",
+        "scifi_news_pro",
+    ])
+    def test_punctuation_glue_count_is_clean_for_every_bank(self, source_bank):
+        data = _clean_ledger_data()
+        text = (
+            "You're talking about pushing her into the ghost-state, a middle "
+            "ground that isn't 'on' and certainly isn't 'off'\u2014it's just... "
+            "elsewhere."
+        )
+        data["meta"]["source_bank"] = source_bank
+        data["lines"][1]["text"] = text
+        data["lines"][1]["word_count"] = canonical_word_count(text)
+        data["lines"][1]["char_count"] = len(text)
+
+        rep = _LFC.phase_10_gap_audit_post_and_freeze(data)
+
+        assert canonical_word_count(text) == 21
+        assert not any(
+            "line_id='l002' word_count=" in warning
+            for warning in rep.warnings
+        )
+
     def test_word_count_drift_is_warning(self):
         data = _clean_ledger_data()
         # Synthetic drift.

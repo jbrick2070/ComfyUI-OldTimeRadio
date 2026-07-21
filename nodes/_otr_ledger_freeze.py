@@ -44,6 +44,14 @@ Status: Phase 0 + Phase 10 of the Multi-Turn Polish sprint (2026-05-11).
 """
 from __future__ import annotations
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import canonical_char_count, canonical_word_count
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import (  # type: ignore
+        canonical_char_count,
+        canonical_word_count,
+    )
+
 import logging
 import re
 from dataclasses import dataclass, field
@@ -375,8 +383,8 @@ def _check_per_line_invariants(
         if isinstance(text, str) and text != "":
             wc = ln.get("word_count")
             cc = ln.get("char_count")
-            real_wc = sum(1 for _ in text.split())
-            real_cc = len(text)
+            real_wc = canonical_word_count(text)
+            real_cc = canonical_char_count(text)
             if isinstance(wc, int) and wc != real_wc:
                 warnings.append(
                     f"line_id={line_id!r} word_count={wc} but text has "

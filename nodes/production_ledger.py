@@ -70,8 +70,20 @@ log = logging.getLogger("OTR.production_ledger")
 # import keeps the module loadable both as a package node and standalone.
 try:  # pragma: no cover - exercised by both import styles
     from ._otr_ledger_scrub import is_spoken_role, append_compose_flag
+    from ._otr_text_metrics import (
+        canonical_char_count,
+        canonical_word_count,
+        set_line_text_metrics,
+        stamp_line_text_metrics,
+    )
 except ImportError:  # pragma: no cover
     from _otr_ledger_scrub import is_spoken_role, append_compose_flag  # type: ignore
+    from _otr_text_metrics import (  # type: ignore
+        canonical_char_count,
+        canonical_word_count,
+        set_line_text_metrics,
+        stamp_line_text_metrics,
+    )
 
 _LEDGER_LOCK = threading.Lock()
 _CURRENT: Optional["Ledger"] = None
@@ -216,15 +228,11 @@ def _git_head_short() -> str:
 
 
 def _word_count(text: str) -> int:
-    if not text:
-        return 0
-    return len(re.findall(r"[A-Za-z][A-Za-z0-9'\-]*", text))
+    return canonical_word_count(text)
 
 
 def _char_count(text: str) -> int:
-    if not text:
-        return 0
-    return len(text)
+    return canonical_char_count(text)
 
 
 def _safe_float(v: Any, default: Optional[float] = None) -> Optional[float]:
@@ -605,24 +613,59 @@ def stamp_word_counts(ledger: "Ledger") -> None:
     Existing root-level `data["total_word_count"]` maintained by
     `_recompute_totals` is unchanged (used by the save log line).
     """
-    if ledger is None or not hasattr(ledger, "data"):
+    if ledger is None:
+        return
+    data = ledger if isinstance(ledger, dict) else getattr(ledger, "data", None)
+    if not isinstance(data, dict):
         return
     char_n = 0
     ann_n = 0
-    for line in ledger.data.get("lines", []) or []:
+    for line in data.get("lines", []) or []:
         if line.get("skip"):
             continue
         text = line.get("text") or ""
-        n = len(text.split()) if text else 0
+        n = canonical_word_count(text)
         role = line.get("speaker_role", "")
         if role == "character":
             char_n += n
         elif role == "announcer":
             ann_n += n
-    meta = ledger.data.setdefault("meta", {})
+    meta = data.setdefault("meta", {})
     meta["character_word_count"] = char_n
     meta["announcer_word_count"] = ann_n
     meta["total_word_count"] = char_n + ann_n
+
+
+def refresh_ledger_text_metrics(ledger: Any) -> None:
+    """Refresh row, root, and budget-facing derived text metrics.
+
+    Production ``Ledger`` instances use their full aggregate roll-up.  The
+    lightweight fallback keeps tests and adapter-shaped ledger objects honest
+    without requiring a concrete Ledger class.
+    """
+    if ledger is None:
+        return
+    data = ledger if isinstance(ledger, dict) else getattr(ledger, "data", None)
+    if not isinstance(data, dict):
+        return
+    recompute = getattr(ledger, "_recompute_totals", None)
+    if callable(recompute):
+        recompute()
+    else:
+        total_chars = 0
+        total_words = 0
+        total_lines = 0
+        for row in data.get("lines", []) or []:
+            if not isinstance(row, dict):
+                continue
+            stamp_line_text_metrics(row)
+            total_chars += _safe_int(row.get("char_count"))
+            total_words += _safe_int(row.get("word_count"))
+            total_lines += 1
+        data["total_char_count"] = total_chars
+        data["total_word_count"] = total_words
+        data["total_dialogue_lines"] = total_lines
+    stamp_word_counts(ledger)
 
 
 # ---------------------------------------------------------------------------
@@ -1246,9 +1289,7 @@ class Ledger:
         for row in self.data["lines"]:
             if (row.get("beat_id") == target
                     or row.get("line_id") == target):
-                row["text"] = safe_text
-                row["char_count"] = _char_count(safe_text)
-                row["word_count"] = _word_count(safe_text)
+                set_line_text_metrics(row, safe_text)
                 # A targeted reroll is an authoritative replacement for the
                 # row's prior text.  Script Doctor may have marked that row
                 # skipped while its text was empty; leaving the editorial
@@ -1443,6 +1484,7 @@ class Ledger:
         per_scene_count: Dict[str, int] = {}
         per_scene_words: Dict[str, int] = {}
         for ln in self.data["lines"]:
+            stamp_line_text_metrics(ln)
             total_lines += 1
             total_chars += _safe_int(ln.get("char_count"))
             total_words += _safe_int(ln.get("word_count"))
@@ -1463,14 +1505,17 @@ class Ledger:
         self.data["total_dialogue_lines"] = total_lines
         for row in self.data["cast"]:
             cid = row.get("char_id")
-            if cid in per_char_count:
-                row["line_count"] = per_char_count[cid]
-                row["word_count"] = per_char_words[cid]
+            row["line_count"] = per_char_count.get(cid, 0)
+            row["word_count"] = per_char_words.get(cid, 0)
         for row in self.data["scenes"]:
             sid = row.get("scene_id")
-            if sid in per_scene_count:
-                row["line_count"] = per_scene_count[sid]
-                row["word_count"] = per_scene_words[sid]
+            row["line_count"] = per_scene_count.get(sid, 0)
+            row["word_count"] = per_scene_words.get(sid, 0)
+
+    def refresh_text_metrics(self) -> "Ledger":
+        """Re-derive every persisted count from canonical line text."""
+        refresh_ledger_text_metrics(self)
+        return self
 
     # -- save ----------------------------------------------------------
 
@@ -1488,7 +1533,7 @@ class Ledger:
         destroy them when its in-memory state is flushed.
         """
         try:
-            self._recompute_totals()
+            self.refresh_text_metrics()
             path = self.path
 
             # Build the payload to write: start from in-memory data,

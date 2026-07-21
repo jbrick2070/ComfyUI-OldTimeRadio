@@ -49,6 +49,14 @@ from typing import Any, Iterable, Literal, Optional
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import (  # type: ignore
+        canonical_word_count,
+        set_line_text_metrics,
+    )
+
 log = logging.getLogger("OTR")
 
 
@@ -624,7 +632,7 @@ def _render_lines_for_doctor(lines: list[dict], tension_by_id=None) -> str:
         mood = (ln.get("mood") or ln.get("traits") or "").strip()
         actual_words = ln.get("word_count")
         if actual_words is None:
-            actual_words = len((ln.get("text") or "").split())
+            actual_words = canonical_word_count(ln.get("text"))
         parts = [
             f"- line_id={ln.get('line_id','')}",
             f"beat_id={ln.get('beat_id','')}",
@@ -992,7 +1000,7 @@ def apply_deterministic_cast_repairs(
             text = line.get("text") or ""
             target = _resolve_cast_member(v.expected, full_roster)
             if target and v.found and v.found in text:
-                line["text"] = text.replace(v.found, target)
+                set_line_text_metrics(line, text.replace(v.found, target))
                 repaired += 1
             elif v.found and v.found in text:
                 log.warning(
@@ -1145,7 +1153,7 @@ def apply_deterministic_cast_repairs(
             text = line.get("text") or ""
             target = _resolve_cast_member(v.expected, full_roster)
             if target and v.found and v.found in text:
-                line["text"] = text.replace(v.found, target)
+                set_line_text_metrics(line, text.replace(v.found, target))
                 repaired += 1
             elif v.found and v.found in text:
                 log.warning(
@@ -1161,7 +1169,7 @@ def apply_deterministic_cast_repairs(
             if remap is not None:
                 text = line.get("text") or ""
                 if v.found and v.found in text:
-                    line["text"] = text.replace(v.found, remap)
+                    set_line_text_metrics(line, text.replace(v.found, remap))
                     repaired += 1
                 # else: phantom isn't in the visible text; Pass 2
                 # Script Doctor handles. (S33 B4 retired Step 2.5.)
@@ -1844,12 +1852,7 @@ def apply_doctor_edits(
                     "unavailable (%s); applying rewrite payload raw", exc,
                 )
                 rewritten = edit.payload or ""
-            line["text"] = rewritten
-            # Recompute counts in lockstep with the stripped text.
-            line["char_count"] = len(rewritten)
-            line["word_count"] = len(re.findall(
-                r"[A-Za-z][A-Za-z0-9'\-]*", rewritten,
-            ))
+            set_line_text_metrics(line, rewritten)
         elif edit.action == "skip":
             line["skip"] = True
             line["reviewer_skip_reason"] = edit.payload or "skip"
@@ -1859,9 +1862,7 @@ def apply_doctor_edits(
             line["tts_skip_reason"] = (
                 f"reviewer_skip: {edit.payload or 'skip'}")
             # Wiring-review #14 belt-and-suspenders.
-            line["text"] = ""
-            line["char_count"] = 0
-            line["word_count"] = 0
+            set_line_text_metrics(line, "")
         elif edit.action == "annotate":
             # BUG-LOCAL-284 belt-and-braces: `payload` was relaxed to
             # default "" so the doctor LLM can flag a line without

@@ -99,6 +99,19 @@ from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, model_validator
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_text_metrics import (
+        canonical_char_count,
+        canonical_word_count,
+        set_line_text_metrics,
+    )
+except ImportError:  # pragma: no cover
+    from _otr_text_metrics import (  # type: ignore
+        canonical_char_count,
+        canonical_word_count,
+        set_line_text_metrics,
+    )
+
 
 log = logging.getLogger("OTR")
 
@@ -366,24 +379,13 @@ class RadioEditPlan(BaseModel):
 # Word / char counting -- match the writer's stamp formula
 # ---------------------------------------------------------------------------
 
-# Mirror of production_ledger._word_count / _otr_ledger._WORD_COUNT_RE:
-# the same regex the writer uses at set_lines()/update_line_text() stamp
-# time. A naive str.split() drifts by a few percent on punctuation glue,
-# which would desync projected_word_total from the ledger's own
-# word_count and trip the +/-20% gate spuriously. Keep in sync with
-# production_ledger.py if either side changes.
-_WORD_COUNT_RE = re.compile(r"[A-Za-z][A-Za-z0-9'\-]*")
-
-
 def _word_count(text: str) -> int:
     """Word count matching the writer's ledger stamp formula."""
-    if not text:
-        return 0
-    return len(_WORD_COUNT_RE.findall(text))
+    return canonical_word_count(text)
 
 
 def _char_count(text: str) -> int:
-    return len(text or "")
+    return canonical_char_count(text)
 
 
 # ---------------------------------------------------------------------------
@@ -1182,10 +1184,7 @@ def _stamp_line_text(row: Dict[str, Any], text: str) -> None:
     production_ledger.update_line_text / _otr_ledger.patch_line_text so
     downstream budget consumers never read a stale count). Bindings are
     untouched."""
-    safe = text or ""
-    row["text"] = safe
-    row["char_count"] = _char_count(safe)
-    row["word_count"] = _word_count(safe)
+    set_line_text_metrics(row, text)
 
 
 def _mark_realign(row: Dict[str, Any]) -> None:
