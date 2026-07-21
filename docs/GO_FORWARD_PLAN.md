@@ -1,14 +1,16 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-20 -- **Gemma 4 12B HF writer runtime-qualified; local quality matrix still open** on `v2.0-alpha`.
-The saved canonical workflow now selects `google/gemma-4-12b-it` for both writer
-slots on the offline, in-process Transformers lane (`cuda` / `sdpa` /
-`bnb_nf4`, OTR context 8192). The official Gemma4Unified model loads with a
-7.15 GiB VRAM delta and produces LMFE-constrained parseable JSON through P5.
-The latest canonical leg stopped only when the model repeated an existing P5
-spoken-hygiene defect after bounded semantic repair; this restoration is a
-runtime/grammar qualification, not a claim that the open local-model quality
-matrix has been won. No LoRA or auxiliary tensor artifact is required.
+**Updated:** 2026-07-20 -- **spoken-hygiene ship guarantee LIVE-VERIFIED across
+the shared six-bank contract; local quality matrix still open** on
+`v2.0-alpha`. A CRAFT/quality reject now escalates through same-slot,
+lower-temperature CRITICAL, alternate-slot, and deterministic SFW-floor rungs;
+it stamps the gate/rung and cannot terminal-skip the episode. Structural graph
+ambiguity and G9 content safety remain fail-closed. Final canonical prompt
+`f3770246-2d6a-4302-90af-153120edddf2` exercised real P5/P7 defects, froze
+`frozen_with_warns`, rendered 4 clean lines / 45 words, and published the
+22,892,541-byte OBS asset. No workflow or minimum-word widget change was
+needed. The P9 8K whole-artifact capacity issue and the GGUF structured-
+enforcement bug remain separate from this completed fix.
 
 Prior status -- 2026-07-19: **keep-6 bank RENAME COMPLETE (offline-green)**.
 The roster is now fully de-versioned: `scifi_news` (local default, was `scifi_codex_v4`),
@@ -41,7 +43,16 @@ Standing enforcement: the deterministic G9 SFW gate in
 `_otr_ledger_freeze.run_gap_audit` (Phase 10, the one path every lane crosses).
 Veto-rip record: HANDOFF_LOG + PROD_BUG_LOG (PBUG-20260713-15..18).
 
-## CURRENT STEP -- v4 improvement campaign (post roster-trim)
+## CURRENT STEP -- local-writer quality matrix (spoken-hygiene blocker closed)
+
+PBUG-20260720-03 is complete: all six runnable banks share the total repair
+floor, the exact TTS surface is rechecked, content-owned seals are rebuilt, and
+quality exhaustion no longer owns episode liveness. Resume the local-writer
+quality matrix at ordinary episode lengths; keep the P9 8K structured-capacity
+follow-up and the GGUF structured-enforcement NEWBUG as independent work. Do
+not raise the minimum word target as a capacity workaround: the 30-word proof
+already shipped 45 words, while a larger target makes a whole-artifact retry
+larger.
 
 The **roster trim LANDED @ `499386aa`** (2026-07-17); the **Sonnet-bake-off rip
 LANDED 2026-07-18** (this change) retired 4 more banks -- `media_archive_v3`,
@@ -364,10 +375,12 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-20): **8,123 passed / 33 skipped / 1
-  expected xfail** across all 488 test files; survival-guide suite **30 passed**
-  plus BUG-02.16/BUG-11.55 OTR regressions **2 passed**; canonical workflow
-  **23 nodes / 57 links**, JSON/widget/link audits green. Detail in HANDOFF_LOG.
+- Current whole-tree receipt (2026-07-20): **8,161 passed / 33 skipped / 1
+  expected xfail**; focused spoken-cascade/Codex coverage **119 passed** and
+  expanded six-bank coverage **395 passed**. The clean survival-guide suite is
+  **17 passed / 19 skipped / 3 expected xfails**, with BUG-11.56's executable
+  OTR regression green. Canonical workflow **23 nodes / 57 links**, JSON/widget/
+  link audits green and byte-identical. Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible, AST/JSON/BOM/
   zero-byte checks, commit, push, and verify `HEAD == origin/v2.0-alpha`.
 - Every node/widget/link/schema change edits `workflows/otr_canonical.json` in

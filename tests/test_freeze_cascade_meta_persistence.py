@@ -409,18 +409,18 @@ class TestBug278CascadeMetaPersistedAtEveryExit:
     reads from disk + writes back, silently dropping the cascade's
     in-memory modifications.
 
-    Fix: _persist_cascade_meta(led) called at every cascade exit
-    (terminal-skip from reviewer, reroll-exhaustion, Phase 10 reject,
-    successful freeze). These tests pin that the save fires.
+    Fix: _persist_cascade_meta(led) called at every cascade exit or final
+    disposition (structural reviewer terminal, reroll repair-then-ship,
+    Phase 10 reject, successful freeze). These tests pin that the save fires.
 
     The render_plan exit was already covered by BUG-LOCAL-274's fix
     (TestBug274RenderPlanPersistedAfterStamp above) and stays green.
     """
 
     def test_save_fires_on_reroll_exhaustion_exit(self):
-        """The reroll-exhaustion path stamps freeze_verdict=needs_full_rerun
+        """The reroll-exhaustion path stamps its A2 repair-then-ship receipt
         + freeze_disposition + meta keys from Sprint 5B critic + Sprint 10A
-        step 7 shadow critic. Pre-fix, the cascade returned without saving;
+        step 7 shadow critic. Pre-fix, the cascade finished without saving;
         Kokoro's subsequent disk read missed every one of them. The fix
         persists before the return.
 
@@ -583,8 +583,8 @@ class TestBug278CascadeMetaPersistedAtEveryExit:
         assert led.data["meta"].get("freeze_verdict") is not None
 
     def test_persist_helper_is_called_at_terminal_reviewer_exit(self):
-        """The reviewer-terminal exit (too_many_edits / needs_full_rerun
-        from review_ledger itself) also needs to persist. Pin that
+        """The structural reviewer-terminal exit (needs_full_rerun from
+        review_ledger itself) also needs to persist. Pin that
         _persist_cascade_meta is reached on this path.
 
         Test approach: same as test_save_fires_on_reroll_exhaustion_exit

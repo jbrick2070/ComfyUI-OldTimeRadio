@@ -30,6 +30,10 @@ from nodes._otr_text_delivery import (  # noqa: E402
     delivery_mode_for_meta,
     resolve_line_delivery,
 )
+from nodes._otr_line_hygiene import (  # noqa: E402
+    flag_one_breath,
+    is_non_dialogue_stage_line,
+)
 from nodes.scene_sequencer import _verify_bus_clip_counts  # noqa: E402
 from nodes import production_ledger as _PL  # noqa: E402
 
@@ -81,17 +85,26 @@ def test_legacy_passthrough_ignores_any_text_for_tts_stamp():
 # 2. delivery mode resolution
 # ---------------------------------------------------------------------------
 
-def test_delivery_mode_media_archive_is_legacy():
-    assert delivery_mode_for_meta({"source_bank": "media_archive"}) == LEGACY
+@pytest.mark.parametrize(
+    "bank,expected",
+    (
+        ("media_archive", LEGACY),
+        ("original", LEGACY),
+        ("public_domain", LEGACY),
+        ("shakespeare", LEGACY),
+        ("scifi_news", CONTENT_OWNED),
+        ("scifi_news_pro", CONTENT_OWNED),
+    ),
+)
+def test_all_six_runnable_banks_resolve_the_correct_delivery_mode(
+    bank, expected,
+):
+    assert delivery_mode_for_meta({"source_bank": bank}) == expected
 
 
 def test_delivery_mode_untagged_is_legacy():
     assert delivery_mode_for_meta({}) == LEGACY
     assert delivery_mode_for_meta(None) == LEGACY
-
-
-def test_delivery_mode_scifi_news_pro_is_content_owned():
-    assert delivery_mode_for_meta({"source_bank": "scifi_news_pro"}) == CONTENT_OWNED
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +167,39 @@ def test_stamp_covers_line_even_when_delivery_equals_canonical(tmp_path):
     row = led.data["lines"][0]
     assert row["text_for_tts"] == "Plain spoken words."  # stamped anyway
     assert row["text_for_tts_source_sha256"]
+
+
+def test_stamp_has_total_emergency_floor_for_missed_delivery_projection(
+    tmp_path,
+):
+    """A future missed pre-seal call site still cannot air a dirty surface."""
+    canonical = "Read 999999 999999 999999."
+    led = _PL.new_ledger(
+        episode_id="stamp_emergency", out_dir=str(tmp_path / "ep"),
+    )
+    led.set_lines([_voiced("l1", canonical)])
+    before_wc = led.data["lines"][0]["word_count"]
+    summary = stamp_text_for_tts_delivery(led)
+    row = led.data["lines"][0]
+    receipt = row["text_for_tts_receipt"]
+
+    assert row["text"] == canonical
+    assert row["word_count"] == before_wc
+    assert row["text_for_tts_source_sha256"] == (
+        text_for_tts_source_sha256(canonical)
+    )
+    assert row["text_for_tts"].strip()
+    assert not flag_one_breath(row["text_for_tts"])[0]
+    assert not is_non_dialogue_stage_line(row["text_for_tts"])
+    assert receipt["delivery_hygiene_emergency"] is True
+    assert receipt["delivery_hygiene_rung"] == (
+        "deterministic_emergency_floor"
+    )
+    assert "one_breath" in receipt["delivery_hygiene_gates"]
+    assert receipt["delivery_hygiene_pre_sha256"] != (
+        receipt["delivery_hygiene_post_sha256"]
+    )
+    assert summary["lines_emergency_hygiene_repaired"] == 1
 
 
 # ---------------------------------------------------------------------------

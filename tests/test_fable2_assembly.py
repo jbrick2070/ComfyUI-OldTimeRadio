@@ -29,6 +29,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes import _otr_scifi_fable2 as F2  # noqa: E402
 from nodes import production_ledger as _PL  # noqa: E402
 from nodes._otr_fable2_markup import parse_fable2_markup  # noqa: E402
+from nodes._otr_line_hygiene import (  # noqa: E402
+    flag_one_breath,
+    flag_thesis_close,
+)
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures" / "fable2"
 _LEGACY = _FIXTURES / "legacy_reference_ledger.json"
@@ -423,18 +427,151 @@ def test_speaker_set_gate_fails_loud(tmp_path):
             mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
 
 
-def test_word_band_gate_reasserts_at_assembly(tmp_path):
+def test_word_band_defect_is_advisory_at_assembly(tmp_path):
     _parsed, draft, envelope = _sealed_draft(
         _MARKUP, target_words=100)
     led = _PL.new_ledger(episode_id="fable2_bandgate",
                          out_dir=str(tmp_path / "ep5"))
     led.data.setdefault("meta", {})["fable2"] = {}
-    with pytest.raises(F2.Fable2AssembleError, match="character_word_count"):
-        F2._assemble(
-            led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
-            envelope=envelope,
-            story_rules=F2.resolve_story_rules("scifi_news_pro"),
-            mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")  # play is 51 words; band 80-120
+    F2._assemble(
+        led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
+        envelope=envelope,
+        story_rules=F2.resolve_story_rules("scifi_news_pro"),
+        mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
+    defects = led.data["meta"]["fable2"]["spoken_hygiene"][
+        "advisory_budget_defects"
+    ]
+    assert defects
+    assert any("character words 51" in defect for defect in defects)
+
+
+def _echo_line(value):
+    def _fn(messages, *, temperature, max_new_tokens, stop=None):
+        return value
+    return _fn
+
+
+def test_fable_content_owned_projection_repairs_and_reseals_tts_surface():
+    treatment = _treatment().model_copy(update={
+        "news_close_read": (
+            "The report records 999999 999999 999999 signal cycles tonight."
+        ),
+    })
+    _parsed, draft, envelope = _sealed_draft(
+        _MARKUP, treatment=treatment,
+    )
+    dirty = treatment.news_close_read
+    repaired, repaired_treatment, receipts = (
+        F2._repair_final_draft_spoken_hygiene(
+            draft,
+            treatment,
+            envelope,
+            F2.resolve_story_rules("scifi_news_pro"),
+            creative_fn=_echo_line(dirty),
+            technical_fn=_echo_line(dirty),
+        )
+    )
+    delivery, _ = F2.normalize_for_delivery(
+        repaired_treatment.news_close_read
+    )
+    assert repaired_treatment.news_close_read != dirty
+    assert not flag_one_breath(delivery)[0]
+    assert repaired.hashes.raw_sha256 != draft.hashes.raw_sha256
+    assert any(
+        any(
+            flag.startswith("hygiene_repaired_after_reroll:one_breath:")
+            for flag in receipt["compose_flags"]
+        )
+        for receipt in receipts
+    )
+
+
+def test_news_candidate_rejection_reaches_grounded_nonterminal_floor():
+    dirty = (
+        "(checks notes) Tonight the source record remains under review."
+    )
+    treatment = _treatment().model_copy(
+        update={"news_close_read": dirty},
+    )
+    _parsed, draft, envelope = _sealed_draft(
+        _MARKUP, treatment=treatment,
+    )
+    emergency = (
+        "The verified source record remains clear, and the facts stand as "
+        "reported in tonight's account."
+    )
+
+    def news_validator(model):
+        return None if model.news_close_read == emergency else "reject"
+
+    repaired, repaired_treatment, receipts = (
+        F2._repair_final_draft_spoken_hygiene(
+            draft,
+            treatment,
+            envelope,
+            F2.resolve_story_rules("scifi_news_pro"),
+            creative_fn=_echo_line("Invented 42 Observatory report."),
+            technical_fn=_echo_line("Invented 42 Observatory report."),
+            news_read_validator=news_validator,
+        )
+    )
+    assert repaired_treatment.news_close_read == emergency
+    news_receipt = receipts[-1]
+    assert news_receipt["status"] == "repaired"
+    assert (
+        "hygiene_repaired_after_reroll:spoken_surface:"
+        "deterministic_grounded_floor"
+    ) in news_receipt["compose_flags"]
+    assert repaired.hashes.raw_sha256 != draft.hashes.raw_sha256
+
+
+def test_trailing_mechanical_outro_cannot_hide_or_create_thesis():
+    treatment = _treatment()
+    parsed, draft, envelope = _sealed_draft(_MARKUP, treatment=treatment)
+    dirty_outro = (
+        "The moral is that patience always matters.",
+        "...",
+    )
+    dirty_parsed = replace(
+        parsed,
+        announcer_outro=dirty_outro,
+        announcer_word_count=(
+            parsed.announcer_word_count
+            - sum(len(text.split()) for text in parsed.announcer_outro)
+            + sum(len(text.split()) for text in dirty_outro)
+        ),
+    )
+    raw_source = F2._script_view(
+        dirty_parsed, treatment, include_news_read=False,
+    )
+    dirty_draft = F2.build_final_draft(
+        raw_source,
+        dirty_parsed,
+        treatment,
+        envelope,
+        F2.resolve_story_rules("scifi_news_pro"),
+        p3_attempts=draft.p3_attempts,
+    )
+    repaired, _treatment_out, receipts = (
+        F2._repair_final_draft_spoken_hygiene(
+            dirty_draft,
+            treatment,
+            envelope,
+            F2.resolve_story_rules("scifi_news_pro"),
+            creative_fn=_echo_line("The moral is that patience matters."),
+            technical_fn=_echo_line("The moral is that patience matters."),
+        )
+    )
+    assert repaired.parsed.announcer_outro
+    assert all(
+        not flag_thesis_close(text)[0]
+        for text in repaired.parsed.announcer_outro
+        if any(ch.isalpha() for ch in text)
+    )
+    assert any(
+        any("thesis_close" in flag for flag in receipt["compose_flags"])
+        for receipt in receipts
+    )
 
 
 # ---------------------------------------------------------------------------

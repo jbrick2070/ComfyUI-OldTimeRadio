@@ -55,7 +55,8 @@ def test_no_reroll_on_clean_draft():
 
 
 def test_guard_caps_at_one_reroll():
-    # both drafts leak -> exactly one reroll, then accept (freeze floor backstop)
+    # Every authored rung leaks -> the bounded ladder reaches its floor. The
+    # stage action never ships and the episode remains renderable.
     calls = {"n": 0}
 
     def mock(messages, *, temperature, max_new_tokens):
@@ -63,8 +64,13 @@ def test_guard_caps_at_one_reroll():
         return _DIRTY
 
     res = compose_line(creative_fn=mock, req=_req())
-    assert calls["n"] == 2            # one reroll, then accept the leak
-    assert "Look, Pinky" in res.text  # drafted line kept; freeze floor cleans it
+    assert calls["n"] == 4  # draft stage retry + quality A + lower-temp B
+    assert res.text.startswith("Look, Pinky")
+    assert "twirls his pen" not in res.text
+    assert (
+        "hygiene_repaired_after_reroll:stage_direction:deterministic_floor"
+        in res.compose_flags
+    )
 
 
 def test_reroll_prompt_carries_the_hint_and_existing_critic_hint():

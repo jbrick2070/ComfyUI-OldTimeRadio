@@ -272,21 +272,28 @@ def test_compose_announcer_intro_empty_brief_fails_loud():
     assert fn.calls == [], "no LLM call should fire with an empty brief"
 
 
-def test_compose_announcer_intro_llm_raises_fails_loud():
-    # NO-FALLBACK (2026-07-03): a failed intro LLM RAISES; no canned template.
-    import pytest
+def test_compose_announcer_intro_llm_exhaustion_uses_clean_floor():
     fn = _make_creative_fn(RuntimeError("backend exploded"))
-    with pytest.raises(RuntimeError):
-        _LC.compose_announcer_intro(creative_fn=fn, script_brief=_INTRO_BRIEF)
+    res = _LC.compose_announcer_intro(
+        creative_fn=fn, script_brief=_INTRO_BRIEF,
+    )
+    assert res.text.strip()
+    assert "announcer_intro_fallback" in res.compose_flags
+    assert "hygiene_repaired_after_reroll" in res.compose_flags
+    assert any(
+        flag.endswith(":deterministic_floor")
+        for flag in res.compose_flags
+    )
 
 
-def test_compose_announcer_intro_invalid_output_fails_loud():
-    # NO-FALLBACK (2026-07-03): output too short to clear the min-char band ->
-    # validation fails -> RAISES (no canned template).
-    import pytest
+def test_compose_announcer_intro_invalid_output_uses_clean_floor():
     fn = _make_creative_fn("Hello.")
-    with pytest.raises(RuntimeError, match="no-fallback"):
-        _LC.compose_announcer_intro(creative_fn=fn, script_brief=_INTRO_BRIEF)
+    res = _LC.compose_announcer_intro(
+        creative_fn=fn, script_brief=_INTRO_BRIEF,
+    )
+    assert res.text.strip()
+    assert "announcer_intro_fallback" in res.compose_flags
+    assert "hygiene_repaired_after_reroll" in res.compose_flags
 
 
 def test_compose_announcer_intro_handles_no_stop_loader():
@@ -352,30 +359,29 @@ def test_compose_announcer_outro_empty_briefs_fails_loud():
     assert fn.calls == []
 
 
-def test_compose_announcer_outro_llm_raises_fails_loud():
-    # NO-FALLBACK (2026-07-03): a failed outro LLM RAISES; no canned template.
-    import pytest
+def test_compose_announcer_outro_llm_exhaustion_uses_clean_floor():
     fn = _make_creative_fn(RuntimeError("backend exploded"))
-    with pytest.raises(RuntimeError):
-        _LC.compose_announcer_outro(
-            creative_fn=fn, script_brief=_INTRO_BRIEF,
-            news_close_brief=_CLOSE_BRIEF, intro_text=_GOOD_INTRO,
-        )
+    res = _LC.compose_announcer_outro(
+        creative_fn=fn, script_brief=_INTRO_BRIEF,
+        news_close_brief=_CLOSE_BRIEF, intro_text=_GOOD_INTRO,
+    )
+    assert res.text.strip()
+    assert "announcer_outro_fallback" in res.compose_flags
+    assert "hygiene_repaired_after_reroll" in res.compose_flags
 
 
-def test_compose_announcer_outro_multiline_output_fails_loud():
-    # NO-FALLBACK (2026-07-03): a multi-line read fails one-line validation ->
-    # RAISES (no canned template).
-    import pytest
+def test_compose_announcer_outro_multiline_output_uses_clean_floor():
     fn = _make_creative_fn(
         "First line of the closing read.\n"
         "Second line of the closing read."
     )
-    with pytest.raises(RuntimeError, match="no-fallback"):
-        _LC.compose_announcer_outro(
-            creative_fn=fn, script_brief=_INTRO_BRIEF,
-            news_close_brief=_CLOSE_BRIEF, intro_text="",
-        )
+    res = _LC.compose_announcer_outro(
+        creative_fn=fn, script_brief=_INTRO_BRIEF,
+        news_close_brief=_CLOSE_BRIEF, intro_text="",
+    )
+    assert "\n" not in res.text
+    assert res.text.strip()
+    assert "hygiene_repaired_after_reroll" in res.compose_flags
 
 
 def test_compose_announcer_outro_strips_leaked_label_then_validates():
@@ -485,19 +491,18 @@ def test_bug255_news_close_brief_reaches_closing_line():
     assert _CLOSE_BRIEF in outro_user_msg
 
 
-def test_bug255_outro_llm_failure_fails_loud():
-    """NO-FALLBACK (2026-07-03): when the outro LLM fails, the episode FAILS LOUD
-    -- it no longer lands a deterministic canned close. The narrative bookend is
-    guaranteed by STOPPING the run on failure, not by shipping filler text."""
-    import pytest
+def test_bug255_outro_llm_failure_ships_stamped_clean_floor():
+    """An exhausted bookend is repaired/floored instead of ending the episode."""
     outro_fn = _make_creative_fn(RuntimeError("backend down"))
-    with pytest.raises(RuntimeError):
-        _LC.compose_announcer_outro(
-            creative_fn=outro_fn,
-            script_brief=_INTRO_BRIEF,
-            news_close_brief=_CLOSE_BRIEF,
-            intro_text="intro text here",
-        )
+    res = _LC.compose_announcer_outro(
+        creative_fn=outro_fn,
+        script_brief=_INTRO_BRIEF,
+        news_close_brief=_CLOSE_BRIEF,
+        intro_text="intro text here",
+    )
+    assert res.text.strip()
+    assert "announcer_outro_fallback" in res.compose_flags
+    assert "hygiene_repaired_after_reroll" in res.compose_flags
 
 
 # ---------------------------------------------------------------------------

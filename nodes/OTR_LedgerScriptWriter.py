@@ -1817,7 +1817,9 @@ def _build_cast_rows(cast_names) -> tuple:
     return cast_rows, char_id_by_name
 
 
-def _apply_intro_rewrite_result(led, first_announcer_id, new_text, flag):
+def _apply_intro_rewrite_result(
+    led, first_announcer_id, new_text, flag, extra_flags=(),
+):
     """Apply the intro-rewrite outcome to the ledger intro row.
 
     Sits OUTSIDE the rewrite try/except BY DESIGN (kibitz r4 P1): a
@@ -1853,7 +1855,9 @@ def _apply_intro_rewrite_result(led, first_announcer_id, new_text, flag):
                 f"[OTR_LedgerScriptWriter] intro rewrite: patch_line_text "
                 f"returned False for line_id={first_announcer_id!r}"
             )
+    flags.extend(str(value) for value in (extra_flags or ()) if str(value))
     flags.append(flag)
+    flags = list(dict.fromkeys(flags))
     if not _OTRL.patch_line_fields(
         led.data, first_announcer_id, {"compose_flags": flags},
     ):
@@ -2312,6 +2316,7 @@ def _run_original_qa_gate(
                 break
     outro_res = _OTRLC.compose_announcer_outro(
         creative_fn=creative_fn,
+        repair_fn=technical_fn,
         script_brief=script_brief,
         news_close_brief=nc_brief,
         intro_text=intro_text,
@@ -2335,10 +2340,12 @@ def _run_original_qa_gate(
             f"line_id={last_announcer_id!r}"
         )
     _flags = list(row.get("compose_flags") or [])
+    _flags.extend(outro_res.compose_flags)
+    _flags.append("original_qa_outro_recomposed")
     _OTRL.patch_line_text(led.data, last_announcer_id, outro_res.text)
     _OTRL.patch_line_fields(
         led.data, last_announcer_id,
-        {"compose_flags": _flags + ["original_qa_outro_recomposed"]},
+        {"compose_flags": list(dict.fromkeys(_flags))},
     )
     led.save()
 
@@ -6123,6 +6130,7 @@ class OTR_LedgerScriptWriter:
                     with slot_scheduler.helper_context("compose_line"):
                         line_res = _OTRLC.compose_line(
                             creative_fn=creative_generate_fn,
+                            repair_fn=technical_generate_fn,
                             req=line_req,
                             base_temperature=base_temp,
                             max_new_tokens_cap=resolved["max_new_tokens_cap"],
@@ -6193,6 +6201,7 @@ class OTR_LedgerScriptWriter:
                             with slot_scheduler.helper_context("compose_line"):
                                 _bg_res = _OTRLC.compose_line(
                                     creative_fn=creative_generate_fn,
+                                    repair_fn=technical_generate_fn,
                                     req=line_req,
                                     base_temperature=base_temp,
                                     max_new_tokens_cap=resolved[
@@ -6305,6 +6314,7 @@ class OTR_LedgerScriptWriter:
                             safe_open_brief=safe_open_brief,
                             # QA F1 (2026-07-09): pack-routed intro seam.
                             source_bank_id=resolved["source_bank"],
+                            repair_fn=technical_generate_fn,
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
@@ -6336,6 +6346,7 @@ class OTR_LedgerScriptWriter:
                     with slot_scheduler.helper_context("compose_line"):
                         line_res = _OTRLC.compose_line(
                             creative_fn=creative_generate_fn,
+                            repair_fn=technical_generate_fn,
                             req=line_req,
                             base_temperature=base_temp,
                             max_new_tokens_cap=resolved[
@@ -6394,6 +6405,16 @@ class OTR_LedgerScriptWriter:
             # matched -- the ledger skeleton and the outline have
             # drifted apart and the disk ledger silently misses this
             # beat while script_text_parts populates. Fail loud.
+            _mechanical_row_failure = (
+                "hygiene_row_failed_mechanical" in beat_compose_flags
+            )
+            if _mechanical_row_failure:
+                # Empty/punctuation-only exhaustion is a row-local mechanical
+                # failure, not permission to invent speech and not an episode
+                # terminal. Keep the accepted graph row, exclude it from TTS,
+                # and stamp the exact reason for the gap/readiness audits.
+                cleaned = ""
+                token = ""
             _ok = led.update_line_text(beat.beat_id, cleaned)
             if not _ok:
                 raise RuntimeError(
@@ -6404,14 +6425,17 @@ class OTR_LedgerScriptWriter:
                     f"the same outline object? "
                     f"lines={[ln.get('beat_id') for ln in (led.data.get('lines') or [])]}"
                 )
-            _OTRL.patch_line_fields(
-                led.data, beat.beat_id,
-                {
-                    "char_id":       cid,
-                    "traits":        traits,
-                    "compose_flags": list(beat_compose_flags),
-                },
-            )
+            _line_fields = {
+                "char_id":       cid,
+                "traits":        traits,
+                "compose_flags": list(beat_compose_flags),
+            }
+            if _mechanical_row_failure:
+                _line_fields.update({
+                    "skip": True,
+                    "tts_skip_reason": "spoken_hygiene_unspeakable_row",
+                })
+            _OTRL.patch_line_fields(led.data, beat.beat_id, _line_fields)
             led.save()
             # rip-sfx-broll (2026-07-01): music render-contract rows emit
             # an empty token -- skip it (the post-loop
@@ -6445,6 +6469,7 @@ class OTR_LedgerScriptWriter:
         ):
             _rw_text = None
             _rw_flag = "announcer_intro_rewrite_failed"
+            _rw_compose_flags = ()
             try:
                 # LLM slot: technical -- structured scene-1 derive.
                 with slot_scheduler.helper_context(
@@ -6478,8 +6503,10 @@ class OTR_LedgerScriptWriter:
                             era=str(meta.get("period", "") or ""),
                         ),
                         source_bank_id=resolved["source_bank"],
+                        repair_fn=technical_generate_fn,
                     )
                 _rw_text = _rw_res.text
+                _rw_compose_flags = _rw_res.compose_flags
                 _rw_flag = "announcer_intro_rewritten"
             except Exception as _rw_exc:  # noqa: BLE001 -- a polish pass
                 # must never kill a finished episode; the in-loop intro
@@ -6491,6 +6518,7 @@ class OTR_LedgerScriptWriter:
                 )
             _apply_intro_rewrite_result(
                 led, first_announcer_id, _rw_text, _rw_flag,
+                _rw_compose_flags,
             )
             meta.setdefault("announcer_intro_rewrite", {})["status"] = (
                 _rw_flag
@@ -6564,6 +6592,7 @@ class OTR_LedgerScriptWriter:
                         # PD/Shakespeare/archive close is a source note, not
                         # a "real news report" pivot.
                         source_bank_id=resolved["source_bank"],
+                        repair_fn=technical_generate_fn,
                     )
                 if not outro_res.text:
                     # Pathological (brief cleaned to empty) -- never ship an empty
@@ -6593,6 +6622,7 @@ class OTR_LedgerScriptWriter:
                 with slot_scheduler.helper_context("compose_announcer_outro"):
                     outro_res = _OTRLC.compose_announcer_outro(
                         creative_fn=creative_generate_fn,
+                        repair_fn=technical_generate_fn,
                         script_brief=script_brief,
                         news_close_brief=nc_brief,
                         intro_text=intro_text,
@@ -7346,6 +7376,38 @@ class OTR_LedgerScriptWriter:
                 f"OTR reject gate: "
                 f"{meta.get('story_reject_reason') or 'story rejected'}"
             )
+
+        # Final INLINE spoken-row authoring boundary. The story-spine length
+        # editor above can rewrite text after the ordinary composer, grouped
+        # exchange, announcer, and genre passes. Scour its exact output before
+        # any delivery/freeze consumer sees it. The two content-owned whole-
+        # script lanes repair before sealing inside their own runners, so their
+        # canonical/proof contract remains read-only in this shared tail.
+        from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
+        if delivery_mode_for_meta(meta) != CONTENT_OWNED:
+            from . import _otr_reroll as _OTRRR_FINAL
+            with slot_scheduler.helper_context("spoken_hygiene_final"):
+                _final_hygiene = _OTRRR_FINAL.repair_ledger_spoken_hygiene(
+                    led.data,
+                    creative_fn=creative_generate_fn,
+                    repair_fn=technical_generate_fn,
+                    canon_header=_OTRC.render_episode_canon_header(canon),
+                )
+            if _final_hygiene.repaired or _final_hygiene.failed:
+                # Story Spine unloads before returning. A dirty late row can
+                # reload either writer slot for B/C, so reclaim once more before
+                # TTS. The helper is best-effort and never turns craft into an
+                # episode stop.
+                from . import _otr_writer_vram as _OTRVRAM_FINAL
+                meta["writer_llm_unload"] = (
+                    _OTRVRAM_FINAL.unload_writer_llm_after_script()
+                )
+                log.warning(
+                    "[OTR_LedgerScriptWriter] final spoken hygiene resolved "
+                    "%d row(s), with %d row-local mechanical failure(s), "
+                    "after all inline authoring passes",
+                    _final_hygiene.repaired, _final_hygiene.failed,
+                )
 
         # Sprint D D2b: stamp creative slot identity into meta so
         # FreezeCascade preserves it via the existing script_json

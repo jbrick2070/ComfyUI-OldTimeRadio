@@ -22,6 +22,10 @@ unchanged; v2_ledger_json carries the frozen ledger for OTR_CastLock (Wave 2a).
     too_many_edits
     needs_full_rerun
 
+``too_many_edits`` is an observable quality-budget verdict, not a terminal
+episode disposition. Only ``needs_full_rerun`` may enter the structural
+terminal-skip path; spoken craft exhaustion repairs and continues to freeze.
+
 `cast_unrecoverable` and `post_audit_failed` retired in S33 B2 with
 their respective rollback gates per the refined no-auditors rule.
 

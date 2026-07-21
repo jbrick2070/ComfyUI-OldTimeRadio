@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from nodes import _otr_scifi_codex as lane
 from nodes import _otr_story_routing as routing
+from nodes._otr_line_hygiene import flag_one_breath
 
 
 def _payload(words: int = 90) -> dict[str, str]:
@@ -3272,3 +3273,343 @@ def test_script_artifact_inputs_flatten_the_score_without_losing_line_constraint
         "tone": "cautious",
     }
     assert inputs["initial_draft_word_steer"] == {"requested_words": 30}
+
+
+# ---------------------------------------------------------------------------
+# 2026-07-20: script spoken-hygiene exhaustion must repair, never abort P5.
+# ---------------------------------------------------------------------------
+
+
+def _hygiene_script(text: str) -> tuple[
+    lane.RadioScoreV4,
+    lane.CastPlanV4,
+    lane.FactIndexV4,
+    lane.ScriptArtifactV4,
+]:
+    score = _metadata_repair_score()
+    cast = _metadata_repair_cast()
+    fact_index = _metadata_repair_fact_index()
+    script = lane.repair_script_artifact_metadata(
+        _fenced_json(_legacy_metadata_artifact()), score,
+    )
+    assert script is not None
+    changed = script.model_copy(deep=True)
+    target = next(line for line in changed.lines if line.line_id == "l001")
+    target.text = text
+    return score, cast, fact_index, changed
+
+
+def _invoke_hygiene_script(
+    *,
+    text: str,
+    creative_patch_text: str,
+    creative_patch_text_b: str | None = None,
+    technical_patch_text: str | None = None,
+):
+    score, cast, fact_index, script = _hygiene_script(text)
+    next(line for line in script.lines if line.line_id == "l001").compose_flags.append(
+        "hygiene_repaired_after_rereroll:spoken_format:deterministic_floor"
+    )
+    pack = SimpleNamespace(prompt_stages={
+        "codex_play_system": "Write a ScriptArtifactV4.",
+        "codex_coda_contract_system": "Keep the coda cautious.",
+    })
+    creative_calls: list[dict[str, object]] = []
+    technical_calls: list[dict[str, object]] = []
+    creative_patch_calls = 0
+
+    def _is_patch(messages) -> bool:
+        return "CRITICAL SPOKEN-LINE HYGIENE REPAIR" in messages[0]["content"]
+
+    def creative(messages, **kwargs):
+        nonlocal creative_patch_calls
+        creative_calls.append({"messages": messages, **kwargs})
+        if _is_patch(messages):
+            replacement = creative_patch_text
+            if creative_patch_calls and creative_patch_text_b is not None:
+                replacement = creative_patch_text_b
+            creative_patch_calls += 1
+            return json.dumps({
+                "replacements": [{
+                    "line_id": "l001",
+                    "replacement_text": replacement,
+                }],
+            })
+        return script.model_dump_json()
+
+    def technical(messages, **kwargs):
+        technical_calls.append({"messages": messages, **kwargs})
+        return json.dumps({
+            "replacements": [{
+                "line_id": "l001",
+                "replacement_text": (
+                    technical_patch_text
+                    if technical_patch_text is not None
+                    else creative_patch_text
+                ),
+            }],
+        })
+
+    journal: dict[str, object] = {}
+    result = lane.invoke_codex_structured(
+        pass_id="P5",
+        slot="creative",
+        slot_fn=creative,
+        pack=pack,
+        seam_refs=("codex_play_system", "codex_coda_contract_system"),
+        artifact_inputs={"score": score.model_dump(mode="json")},
+        result_type=lane.ScriptArtifactV4,
+        post_validator=lambda candidate: lane._validate_script_post(
+            candidate, cast, score, fact_index,
+        ),
+        base_temperature=.78,
+        structural_retry_temperature=.35,
+        max_new_tokens=2200,
+        call_journal=journal,
+        repair_score=score,
+        spoken_repair_cast=cast,
+        spoken_repair_fact_index=fact_index,
+        spoken_repair_alternate_slot_fn=technical,
+        spoken_repair_alternate_slot="technical",
+    )
+    return result, journal, creative_calls, technical_calls
+
+
+def test_hygiene_iteration_uses_exact_score_order_and_rejects_bad_graphs():
+    score, _cast, _facts, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+    expected = tuple(lane._accepted_script_line_metadata(score) or ())
+    shuffled = script.model_copy(deep=True)
+    shuffled.lines = list(reversed(shuffled.lines))
+    assert tuple(
+        line.line_id
+        for line in lane._script_lines_in_score_order(shuffled, score)
+    ) == expected
+
+    missing = script.model_copy(deep=True)
+    missing.lines = missing.lines[:-1]
+    with pytest.raises(lane.CodexGraphError, match="exactly match"):
+        lane._script_lines_in_score_order(missing, score)
+
+    duplicate = script.model_copy(deep=True)
+    duplicate.lines.append(duplicate.lines[0].model_copy(deep=True))
+    with pytest.raises(lane.CodexGraphError, match="duplicate"):
+        lane._script_lines_in_score_order(duplicate, score)
+
+    ambiguous_score = score.model_copy(deep=True)
+    ambiguous_score.scenes[0].beats[1].line_ids[0] = (
+        ambiguous_score.scenes[0].beats[0].line_ids[0]
+    )
+    with pytest.raises(lane.CodexGraphError, match="ambiguous"):
+        lane._script_lines_in_score_order(script, ambiguous_score)
+
+
+def test_p5_craft_reject_bypasses_whole_artifact_repair_a_ships_and_stamps():
+    dirty = "(lowering his voice) The receiver catches a quiet pulse."
+    clean = "The receiver catches a quiet pulse."
+    result, journal, creative_calls, technical_calls = _invoke_hygiene_script(
+        text=dirty,
+        creative_patch_text=clean,
+    )
+    target = next(line for line in result.lines if line.line_id == "l001")
+    assert target.text == clean
+    assert technical_calls == []
+    assert [call["temperature"] for call in creative_calls] == [.78, .10]
+    assert not any(
+        "typed repair of the same ScriptArtifactV4"
+        in call["messages"][0]["content"]
+        for call in creative_calls
+    )
+    assert (
+        "hygiene_repaired_after_reroll:stage_direction:repair_a_same_slot"
+        in target.compose_flags
+    )
+    assert not any("rerereroll" in flag for flag in target.compose_flags)
+    receipt = journal["calls"][-1]["hygiene_repair"]
+    assert receipt["status"] == "accepted"
+    assert receipt["shared_artifact_repair_bypassed"] is True
+    assert dirty not in json.dumps(receipt)
+
+
+def test_p5_hygiene_repair_b_is_lower_temperature_and_sharpened():
+    dirty = "(lowering his voice) The receiver catches a quiet pulse."
+    clean = "The receiver catches a quiet pulse."
+    result, _journal, creative_calls, technical_calls = _invoke_hygiene_script(
+        text=dirty,
+        creative_patch_text=dirty,
+        creative_patch_text_b=clean,
+    )
+    target = next(line for line in result.lines if line.line_id == "l001")
+    assert target.text == clean
+    assert technical_calls == []
+    assert [call["temperature"] for call in creative_calls] == [.78, .10, .05]
+    assert "prior line-only repair" in creative_calls[-1]["messages"][0]["content"]
+    assert (
+        "hygiene_repaired_after_reroll:stage_direction:repair_b_same_slot"
+        in target.compose_flags
+    )
+
+
+def test_p5_hygiene_exhaustion_uses_alternate_slot_then_floor():
+    dirty = "(lowering his voice) The receiver catches a quiet pulse."
+    clean = "The receiver catches a quiet pulse."
+    result, _journal, creative_calls, technical_calls = _invoke_hygiene_script(
+        text=dirty,
+        creative_patch_text=dirty,
+        technical_patch_text=clean,
+    )
+    target = next(line for line in result.lines if line.line_id == "l001")
+    assert target.text == clean
+    assert creative_calls[-1]["temperature"] == .05
+    assert technical_calls[-1]["temperature"] == .05
+    assert not any(
+        "typed repair of the same ScriptArtifactV4"
+        in call["messages"][0]["content"]
+        for call in creative_calls
+    )
+    assert (
+        "hygiene_repaired_after_reroll:stage_direction:repair_c_alternate_slot"
+        in target.compose_flags
+    )
+
+    floor_result, _journal2, _creative2, _technical2 = _invoke_hygiene_script(
+        text=dirty,
+        creative_patch_text=dirty,
+        technical_patch_text=dirty,
+    )
+    floor_target = next(
+        line for line in floor_result.lines if line.line_id == "l001"
+    )
+    assert floor_target.text == clean
+    assert (
+        "hygiene_repaired_after_reroll:stage_direction:deterministic_floor"
+        in floor_target.compose_flags
+    )
+
+
+def test_p5_structural_and_craft_reject_stays_on_fail_closed_artifact_path():
+    score, cast, fact_index, script = _hygiene_script(
+        "(lowering his voice) The receiver catches a quiet pulse."
+    )
+    broken = script.model_copy(deep=True)
+    broken.lines[-1].line_id = broken.lines[0].line_id
+    pack = SimpleNamespace(prompt_stages={
+        "codex_play_system": "Write a ScriptArtifactV4.",
+        "codex_coda_contract_system": "Keep the coda cautious.",
+    })
+    calls: list[dict[str, object]] = []
+
+    def creative(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        if "CRITICAL SPOKEN-LINE HYGIENE REPAIR" in messages[0]["content"]:
+            pytest.fail("a structural artifact must not enter line-only repair")
+        return broken.model_dump_json()
+
+    journal: dict[str, object] = {}
+    with pytest.raises(lane.CodexPassError):
+        lane.invoke_codex_structured(
+            pass_id="P5", slot="creative", slot_fn=creative, pack=pack,
+            seam_refs=("codex_play_system", "codex_coda_contract_system"),
+            artifact_inputs={"score": score.model_dump(mode="json")},
+            result_type=lane.ScriptArtifactV4,
+            post_validator=lambda candidate: lane._validate_script_post(
+                candidate, cast, score, fact_index,
+            ),
+            base_temperature=.78, structural_retry_temperature=.35,
+            max_new_tokens=2200, call_journal=journal, repair_score=score,
+            spoken_repair_cast=cast,
+            spoken_repair_fact_index=fact_index,
+        )
+    assert [call["temperature"] for call in calls] == [.78, .10]
+    assert "typed repair of the same ScriptArtifactV4" in (
+        calls[-1]["messages"][0]["content"]
+    )
+    assert "hygiene_repair" not in journal["calls"][-1]
+
+
+def test_p5_hygiene_floor_preserves_allowed_acronym_and_fixes_other_caps():
+    dirty = "NASA says STOP now."
+    result, _journal, _creative, _technical = _invoke_hygiene_script(
+        text=dirty,
+        creative_patch_text=dirty,
+        technical_patch_text=dirty,
+    )
+    target = next(line for line in result.lines if line.line_id == "l001")
+    # This test fact index does not source NASA, so both lexical caps normalize.
+    assert target.text == "Nasa says Stop now."
+    assert (
+        "hygiene_repaired_after_reroll:all_caps:deterministic_floor"
+        in target.compose_flags
+    )
+
+
+def test_p5_hygiene_repairs_delivery_projection_before_artifact_acceptance():
+    dirty = "Read 999999 999999 999999 999999."
+    score, cast, fact_index, script = _hygiene_script(dirty)
+    target = next(line for line in script.lines if line.line_id == "l001")
+    req = lane._codex_line_request(
+        target, score, fact_index, speaker_name="ANNOUNCER",
+    )
+    assert "one_breath" in lane._spoken_hygiene_gates(
+        dirty,
+        "ANNOUNCER",
+        lane._allowed_spoken_all_caps(fact_index, cast),
+        req=req,
+    )
+
+    result, _journal, _creative, _technical = _invoke_hygiene_script(
+        text=dirty,
+        creative_patch_text=dirty,
+        technical_patch_text=dirty,
+    )
+    repaired = next(line for line in result.lines if line.line_id == "l001")
+    delivery, _ = lane.normalize_for_delivery(repaired.text)
+    assert repaired.text != dirty
+    assert not flag_one_breath(delivery)[0]
+    assert any(
+        flag.startswith("hygiene_repaired_after_reroll:one_breath:")
+        for flag in repaired.compose_flags
+    )
+
+
+def test_p5_empty_mechanical_row_is_skipped_locally_not_filled_with_canned_speech():
+    score, cast, fact_index, script = _hygiene_script("")
+    pack = SimpleNamespace(prompt_stages={
+        "codex_play_system": "Write a ScriptArtifactV4.",
+        "codex_coda_contract_system": "Keep the coda cautious.",
+    })
+
+    def slot(messages, **kwargs):
+        if "CRITICAL SPOKEN-LINE HYGIENE REPAIR" in messages[0]["content"]:
+            return json.dumps({
+                "replacements": [{
+                    "line_id": "l001", "replacement_text": "",
+                }],
+            })
+        return script.model_dump_json()
+
+    result = lane.invoke_codex_structured(
+        pass_id="P5", slot="creative", slot_fn=slot, pack=pack,
+        seam_refs=("codex_play_system", "codex_coda_contract_system"),
+        artifact_inputs={"score": score.model_dump(mode="json")},
+        result_type=lane.ScriptArtifactV4,
+        post_validator=lambda candidate: lane._validate_script_post(
+            candidate, cast, score, fact_index,
+        ),
+        base_temperature=.78, structural_retry_temperature=.35,
+        max_new_tokens=2200, call_journal={}, repair_score=score,
+        spoken_repair_cast=cast,
+        spoken_repair_fact_index=fact_index,
+        spoken_repair_alternate_slot_fn=slot,
+        spoken_repair_alternate_slot="technical",
+    )
+    row = next(line for line in result.lines if line.line_id == "l001")
+    assert row.text == ""
+    assert row.skip is True
+    assert row.tts_skip_reason == "spoken_hygiene_unspeakable_row"
+    assert "hygiene_row_failed_mechanical" in row.compose_flags
+    assert not any(
+        flag.startswith("hygiene_repaired_after_reroll")
+        for flag in row.compose_flags
+    )

@@ -70,19 +70,17 @@ class TestComposeNewsCoda:
         assert sysmsg == _RESOLVE(None, "coda_system", _BANK)
         assert "Examples (tonight's tale -> your bridge clause):" in sysmsg
 
-    def test_generic_opener_retries_then_fails_loud(self):
-        # NO-FALLBACK (2026-07-03): both bridge attempts are rejected -> the coda
-        # RAISES; the deterministic NEWS_CODA_POOL / arc-bridge floor is retired.
-        # The retry still fires first (two attempts), then it fails loud.
-        import pytest
+    def test_generic_opener_exhaustion_uses_stamped_arc_floor(self):
         cap = []
         fn = _make_fn("And now, the real world calls out to us", cap)
-        with pytest.raises(RuntimeError, match="no-fallback"):
-            LC.compose_news_coda(
-                creative_fn=fn, news_close_brief="The dam held through the night",
-                premise=_PREMISE, cast_seed=7,
-            )
-        assert len(cap) == 2  # bridge + one reroll, both rejected, then loud fail
+        res = LC.compose_news_coda(
+            creative_fn=fn, news_close_brief="The dam held through the night",
+            premise=_PREMISE, cast_seed=7,
+        )
+        assert len(cap) == 3  # authored A1/A2, then lower-temperature B
+        assert res.text.endswith("The dam held through the night")
+        assert "news_coda_fallback" in res.compose_flags
+        assert "hygiene_repaired_after_reroll" in res.compose_flags
 
     # (test_fallback_floor_deterministic_by_cast_seed + _varies_by_seed retired
     #  with the NEWS_CODA_POOL floor -- no-fallback rip 2026-07-03.)
@@ -96,17 +94,16 @@ class TestComposeNewsCoda:
         assert res.compose_flags == ("news_coda_no_brief",)
 
     def test_reroll_prompt_differs_from_first(self):
-        # The retry still fires (Attempt 2 prompt differs from Attempt 1) BEFORE the
-        # loud fail -- the rip removed only the deterministic floor, not the reroll.
-        import pytest
+        # The authored retry prompt still differs before B/floor recovery.
         cap = []
-        with pytest.raises(RuntimeError, match="no-fallback"):
-            LC.compose_news_coda(
-                creative_fn=_make_fn("meanwhile back at the ranch tonight we see", cap),
-                news_close_brief="A fact", premise=_PREMISE, cast_seed=3,
-            )
+        res = LC.compose_news_coda(
+            creative_fn=_make_fn("meanwhile back at the ranch tonight we see", cap),
+            news_close_brief="A fact", premise=_PREMISE, cast_seed=3,
+        )
         assert "Attempt 2" in cap[1][1]["content"]
         assert "Attempt 2" not in cap[0][1]["content"]
+        assert res.text.endswith("A fact")
+        assert "hygiene_repaired_after_reroll" in res.compose_flags
 
 
 class TestValidateNewsCodaBridge:

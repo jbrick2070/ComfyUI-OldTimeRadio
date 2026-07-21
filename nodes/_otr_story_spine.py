@@ -190,16 +190,18 @@ def _recompose_announcer_tagline(
     led: Any,
     meta: dict,
     creative_generate_fn: Callable[..., str],
+    technical_generate_fn: Callable[..., str],
     resolved: Any,
     *,
     is_intro: bool,
     intro_text: str = "",
-) -> str:
+) -> Any:
     """Recompose a TRUNCATED announcer open/close tagline via the DEDICATED
     announcer composer (A6), never the character reroll path -- the critic
     excludes announcer lines as locked structural content, so a character
     reroll cannot act on them. Returns the new text, or "" on any failure
-    (the caller keeps the original). Never raises."""
+    (the caller keeps the original). Returns the LineResult so rung receipts can
+    be preserved on the row; returns None on failure. Never raises."""
     try:
         try:
             from . import _otr_line_composer as _LC
@@ -214,6 +216,7 @@ def _recompose_announcer_tagline(
         if is_intro:
             res = _LC.compose_announcer_intro(
                 creative_fn=creative_generate_fn,
+                repair_fn=technical_generate_fn,
                 script_brief=script_brief,
                 creative_repo_id=repo,
                 # QA F1 (2026-07-09): pack-routed intro seam (mirrors the
@@ -224,6 +227,7 @@ def _recompose_announcer_tagline(
         else:
             res = _LC.compose_announcer_outro(
                 creative_fn=creative_generate_fn,
+                repair_fn=technical_generate_fn,
                 script_brief=script_brief,
                 news_close_brief=news_close_brief,
                 intro_text=intro_text,
@@ -233,9 +237,9 @@ def _recompose_announcer_tagline(
                     meta.get("source_bank") or "media_archive"),
             )
         text = getattr(res, "text", None)
-        return str(text) if (text and str(text).strip()) else ""
+        return res if (text and str(text).strip()) else None
     except Exception:  # noqa: BLE001 -- never corrupt the tagline
-        return ""
+        return None
 
 
 def _map_arc_indices(outline: Any, led: Any):
@@ -587,16 +591,29 @@ def run_post_script_spine(
                 elif _hy_role == "announcer" and _hy_i in (
                         _hy_first_ann, _hy_last_ann):
                     if _HY.is_truncated(_hy_orig):
-                        _hy_fixed = _recompose_announcer_tagline(
-                            led, meta, creative_generate_fn, resolved,
+                        _hy_result = _recompose_announcer_tagline(
+                            led, meta, creative_generate_fn,
+                            technical_generate_fn, resolved,
                             is_intro=(_hy_i == _hy_first_ann),
                             intro_text=str(
                                 _hy_voiced[_hy_first_ann].get("text") or "")
                             if _hy_first_ann >= 0 else "",
                         )
+                        _hy_fixed = str(
+                            getattr(_hy_result, "text", "") or ""
+                        )
                         if (_hy_fixed and _hy_fixed.strip()
                                 and _hy_fixed != _hy_orig):
                             _hy_line["text"] = _hy_fixed
+                            _hy_flags = list(
+                                _hy_line.get("compose_flags") or []
+                            )
+                            _hy_flags.extend(
+                                getattr(_hy_result, "compose_flags", ()) or ()
+                            )
+                            _hy_line["compose_flags"] = list(
+                                dict.fromkeys(_hy_flags)
+                            )
                             _hy_report["announcer_recomposed"] += 1
         meta["delivery_hygiene_report"] = _hy_report
     except Exception as exc:  # noqa: BLE001 -- hygiene must never break a run

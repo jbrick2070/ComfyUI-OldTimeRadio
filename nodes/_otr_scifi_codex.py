@@ -1,7 +1,9 @@
 """Sci-Fi Codex v4 additive source-bank runner.
 
 The lane owns its schemas, prompt seams, provenance graph, and ledger assembly.
-It never fetches a source, loads a model, or edits LLM-authored dialogue.
+It never fetches a source or loads a model. Spoken craft repair remains authored
+through bounded model patches; only the final fact-neutral hygiene floor may
+apply a deterministic surface rewrite before the artifact is sealed.
 """
 from __future__ import annotations
 
@@ -25,6 +27,18 @@ try:
     from ._otr_json import parse_first_json_object
     from ._otr_rss_source_contract import meets_v4_rss_source_floor
     from ._otr_source_payload import validate_source_payload
+    from ._otr_line_hygiene import (
+        deterministic_hygiene_floor,
+        detect_stage_business_for_reroll,
+        flag_thesis_close,
+        is_stage_direction_only,
+    )
+    from ._otr_line_composer import (
+        LineRequest,
+        spoken_surface_flags_for_line,
+    )
+    from ._otr_readiness import normalize_for_delivery
+    from ._otr_story_rules import StoryRules
     from ._otr_scifi_p0_contract import (
         MAX_CLAIM_CHARS,
         MAX_ENTITY_NAME_CHARS,
@@ -56,6 +70,18 @@ except ImportError:  # pragma: no cover
     from _otr_json import parse_first_json_object  # type: ignore
     from _otr_rss_source_contract import meets_v4_rss_source_floor  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
+    from _otr_line_hygiene import (  # type: ignore
+        deterministic_hygiene_floor,
+        detect_stage_business_for_reroll,
+        flag_thesis_close,
+        is_stage_direction_only,
+    )
+    from _otr_line_composer import (  # type: ignore
+        LineRequest,
+        spoken_surface_flags_for_line,
+    )
+    from _otr_readiness import normalize_for_delivery  # type: ignore
+    from nodes._otr_story_rules import StoryRules  # type: ignore
     from _otr_scifi_p0_contract import (  # type: ignore
         MAX_CLAIM_CHARS,
         MAX_ENTITY_NAME_CHARS,
@@ -2522,7 +2548,11 @@ def _spoken_error(
     name: str = "",
     allowed_all_caps: frozenset[str] = frozenset(),
 ) -> str | None:
-    value = text or ""
+    # Score the exact words TTS will consume. Content-owned lanes preserve
+    # canonical text through freeze, then normalize digits/abbreviations into a
+    # separate delivery field; without this projection a compact numeric line
+    # can become an overlong breath only after every authoring gate has passed.
+    value = normalize_for_delivery(text or "")[0]
     if not value.strip():
         return "spoken text is empty"
     if _DECORATION_RE.search(value) or _LABEL_RE.match(value) or _QUOTED_RE.match(value):
@@ -2539,12 +2569,749 @@ def _spoken_error(
     return None
 
 
-def validate_spoken_text_and_roster(
+class _SpokenLineRepairRowV4(_Strict):
+    line_id: str = Field(min_length=1, max_length=16, pattern=r"^l\d{3}$")
+    replacement_text: str = Field(min_length=1, max_length=600)
+
+
+class _SpokenLineRepairPatchV4(_Strict):
+    replacements: list[_SpokenLineRepairRowV4] = Field(
+        min_length=1, max_length=64,
+    )
+
+
+class _SpokenLineRepairMessages(list[dict[str, str]]):
+    """Keep the bounded line-only repair complete on local/remote slots."""
+
+    _otr_prompt_must_fit = True
+    _otr_strict_remote_output_budget = True
+
+
+@dataclass(frozen=True)
+class _ScriptHygieneTarget:
+    line_id: str
+    gates: tuple[str, ...]
+    hints: tuple[str, ...]
+    original_sha256: str
+
+
+def _spoken_hygiene_gates(
+    text: str,
+    name: str = "",
+    allowed_all_caps: frozenset[str] = frozenset(),
+    *,
+    req: LineRequest | None = None,
+    story_rules: Any = None,
+    include_thesis: bool = False,
+) -> tuple[str, ...]:
+    """Enumerate every mechanical and craft spoken defect on one line."""
+    # This lane owns its content proof, so every repair decision must score the
+    # exact normalized surface that will later be sealed as ``text_for_tts``.
+    value = normalize_for_delivery(text or "")[0]
+    gates: list[str] = []
+    if not value.strip():
+        return ("empty",)
+    if (
+        _DECORATION_RE.search(value)
+        or _LABEL_RE.match(value)
+        or _QUOTED_RE.match(value)
+    ):
+        gates.append("spoken_format")
+        if (
+            is_stage_direction_only(value)
+            or detect_stage_business_for_reroll(value, name)[0]
+            or any(ch in value for ch in "[]()")
+        ):
+            gates.append("stage_direction")
+    if any(
+        match.group(0) not in allowed_all_caps
+        for match in _ALL_CAPS_RE.finditer(value)
+    ):
+        gates.append("all_caps")
+    if name and re.match(
+        r"^\s*" + re.escape(name.split()[0]) + r"\s*[,!:]",
+        value,
+        re.I,
+    ):
+        gates.append("self_vocative")
+    if any(not token.strip(".,!?;:'\u2019-") for token in value.split()):
+        gates.append("non_lexical")
+    if req is not None:
+        gates.extend(
+            code for code, _reason, _flag in spoken_surface_flags_for_line(
+                value,
+                req,
+                rules=story_rules,
+                include_thesis=include_thesis,
+                allowed_all_caps=allowed_all_caps,
+            )
+        )
+    if include_thesis and flag_thesis_close(value, rules=story_rules)[0]:
+        gates.append("thesis_close")
+    return tuple(dict.fromkeys(gates))
+
+
+def _codex_line_request(
+    line: ScriptLineV4,
+    score: RadioScoreV4 | None,
+    fact_index: FactIndexV4 | None,
+    *,
+    speaker_name: str,
+) -> LineRequest:
+    """Project a sealed script row into the shared craft scorer context."""
+    anchors = [
+        str(row.name or "").strip()
+        for row in (fact_index.entities if fact_index is not None else [])
+        if str(row.name or "").strip()
+    ][:6]
+    title = str(getattr(score, "title", "") or "")
+    premise = str(getattr(score, "premise", "") or "")
+    setting = str(getattr(score, "setting", "") or "")
+    header = "\n".join((
+        f"TITLE: {title}",
+        f"SETTING: {setting}",
+        "Specificity anchors (use selectively):",
+        *(f"- {anchor}" for anchor in anchors),
+        "",
+        f"PREMISE: {premise}",
+    ))
+    return LineRequest(
+        speaker=speaker_name or line.char_id,
+        intent=line.beat_intent,
+        mood=line.traits,
+        target_words=max(1, len(str(line.text or "").split())),
+        canon_header=header,
+        last_lines=[],
+        speaker_role=line.speaker_role,
+        arc_phase=line.arc_phase,
+        beat_objective=line.beat_intent,
+    )
+
+
+def _script_lines_in_score_order(
+    script: ScriptArtifactV4,
+    score: RadioScoreV4 | None,
+) -> tuple[ScriptLineV4, ...]:
+    """Project artifact rows into the executable score/assembly order."""
+    if score is None:
+        return tuple(script.lines)
+    metadata = _accepted_script_line_metadata(score)
+    if metadata is None:
+        raise CodexGraphError(
+            "accepted score has missing or ambiguous script-line mappings"
+        )
+    script_ids = [line.line_id for line in script.lines]
+    if len(script_ids) != len(set(script_ids)):
+        raise CodexGraphError(
+            "script artifact has a missing or duplicate line_id"
+        )
+    expected_ids = tuple(metadata)
+    if set(script_ids) != set(expected_ids):
+        raise CodexGraphError(
+            "script line IDs do not exactly match the accepted score graph"
+        )
+    by_id = {line.line_id: line for line in script.lines}
+    return tuple(by_id[line_id] for line_id in expected_ids)
+
+
+def _final_thesis_line_id(
+    script: ScriptArtifactV4,
+    score: RadioScoreV4 | None,
+) -> str:
+    """Last factual-neutral announcer row in actual assembly order."""
+    return next((
+        line.line_id
+        for line in reversed(_script_lines_in_score_order(script, score))
+        if not line.skip
+        and line.speaker_role == "announcer"
+        and not line.fact_ids
+        and str(line.text or "").strip()
+    ), "")
+
+
+def _script_hygiene_hint(gate: str) -> str:
+    return {
+        "empty": "write one nonempty sentence that serves the locked beat intent",
+        "spoken_format": (
+            "use plain spoken vocabulary only; remove labels, markup, wrappers, "
+            "and production notes"
+        ),
+        "stage_direction": (
+            "replace the action with something this speaker can actually say; "
+            "do not narrate or bracket the action"
+        ),
+        "all_caps": "use normal spoken casing except the supplied allowed acronyms",
+        "self_vocative": "do not begin by addressing the speaker's own name",
+        "non_lexical": "remove punctuation-only tokens and return lexical speech",
+        "cliche": "replace worn phrasing with specific in-character wording",
+        "stage_business": "turn flat action-planning language into spoken intent",
+        "on_the_nose": "show the feeling through concrete speech instead of naming it",
+        "anchor_stuffing": "keep at most one relevant specificity anchor",
+        "one_breath": "rewrite as one breathable spoken beat",
+        "personal_cost": "name a concrete loss instead of generic cost boilerplate",
+        "objective_literal": "serve the beat without repeating its instruction",
+        "thesis_close": "end on a concrete image or sound, never a stated lesson",
+    }.get(gate, "return clean plain spoken dialogue")
+
+
+def _collect_script_hygiene_targets(
+    script: ScriptArtifactV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4 | None,
+    score: RadioScoreV4 | None = None,
+    story_rules: Any = None,
+) -> tuple[_ScriptHygieneTarget, ...]:
+    locked = {row.char_id: row.name for row in cast.cast}
+    allowed = _allowed_spoken_all_caps(fact_index, cast)
+    thesis_line_id = _final_thesis_line_id(script, score)
+    targets: list[_ScriptHygieneTarget] = []
+    for line in _script_lines_in_score_order(script, score):
+        if line.char_id.startswith("music_") or line.skip:
+            continue
+        speaker_name = locked.get(line.char_id, "")
+        req = _codex_line_request(
+            line, score, fact_index, speaker_name=speaker_name,
+        )
+        gates = _spoken_hygiene_gates(
+            line.text,
+            speaker_name,
+            allowed,
+            req=req,
+            story_rules=story_rules,
+            include_thesis=(line.line_id == thesis_line_id),
+        )
+        if not gates:
+            continue
+        targets.append(_ScriptHygieneTarget(
+            line_id=line.line_id,
+            gates=gates,
+            hints=tuple(_script_hygiene_hint(gate) for gate in gates),
+            original_sha256=hashlib.sha256(
+                line.text.encode("utf-8"),
+            ).hexdigest(),
+        ))
+    return tuple(targets)
+
+
+def _spoken_repair_prompt(
+    script: ScriptArtifactV4,
+    targets: tuple[_ScriptHygieneTarget, ...],
+    cast: CastPlanV4,
+    fact_index: FactIndexV4 | None,
+    *,
+    sharpened: bool = False,
+) -> _SpokenLineRepairMessages:
+    by_line = {line.line_id: line for line in script.lines}
+    names = {row.char_id: row.name for row in cast.cast}
+    allowed = sorted(_allowed_spoken_all_caps(fact_index, cast))
+    payload = []
+    for target in targets:
+        line = by_line[target.line_id]
+        payload.append({
+            "line_id": target.line_id,
+            "speaker": names.get(line.char_id, line.char_id),
+            "beat_intent": line.beat_intent,
+            "current_text": line.text,
+            "gates": list(target.gates),
+            "directives": list(target.hints),
+        })
+    system = (
+        "CRITICAL SPOKEN-LINE HYGIENE REPAIR. Return exactly one JSON patch "
+        "row for every requested line_id and no other IDs. Scour each complete "
+        "line for anything that does not read like dialogue. Rewrite only its "
+        "replacement_text as natural, SFW vocabulary the named speaker can say "
+        "aloud. Preserve the same speaker, beat intent, facts, and meaning. A "
+        "stage action must become an in-character spoken line that serves that "
+        "beat, never a bracket, cue, label, narration, or production note. Do "
+        "not add, drop, or alter any metadata. Allowed all-caps acronyms: "
+        + (", ".join(allowed) if allowed else "none")
+        + (
+            " A prior line-only repair did not clear every named gate. Treat "
+            "each per-line directive as mandatory and return no unchanged "
+            "rejected text."
+            if sharpened else ""
+        )
+        + _schema_instruction(_SpokenLineRepairPatchV4)
+    )
+    return _SpokenLineRepairMessages([
+        {"role": "system", "content": system},
+        {
+            "role": "user",
+            "content": json.dumps(
+                {"repair_lines": payload},
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ),
+        },
+    ])
+
+
+def _call_spoken_repair_patch(
+    *,
+    slot_fn: GenerateFn,
+    messages: _SpokenLineRepairMessages,
+    temperature: float,
+    max_new_tokens: int,
+    rung: str,
+    slot: str,
+    receipts: list[dict[str, Any]],
+) -> _SpokenLineRepairPatchV4 | None:
+    receipt: dict[str, Any] = {
+        "rung": rung,
+        "slot": slot,
+        "temperature": temperature,
+        "status": "pending",
+    }
+    receipts.append(receipt)
+    try:
+        bound = _bind_local_slot_schema(slot_fn, _SpokenLineRepairPatchV4)
+        raw = invoke_structured_slot(
+            bound,
+            messages,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+        )
+        raw_text = str(raw or "")
+        receipt.update({
+            "raw_chars": len(raw_text),
+            "raw_sha256": hashlib.sha256(
+                raw_text.encode("utf-8"),
+            ).hexdigest(),
+        })
+        patch = _SpokenLineRepairPatchV4.model_validate(
+            parse_first_json_object(raw_text),
+        )
+        receipt["status"] = "decoded"
+        return patch
+    except Exception as exc:  # noqa: BLE001 -- the next rung owns recovery
+        receipt.update({
+            "status": "rejected",
+            "error_type": type(exc).__name__,
+        })
+        return None
+
+
+def _apply_spoken_repair_patch(
+    script: ScriptArtifactV4,
+    targets: tuple[_ScriptHygieneTarget, ...],
+    patch: _SpokenLineRepairPatchV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4 | None,
+    score: RadioScoreV4,
+    story_rules: Any,
+    *,
+    rung: str,
+    resolved_by: dict[str, dict[str, str]],
+) -> ScriptArtifactV4:
+    """Apply only fully clean target texts; reject an inexact patch contract."""
+    wanted = [target.line_id for target in targets]
+    got = [row.line_id for row in patch.replacements]
+    if len(got) != len(set(got)) or set(got) != set(wanted):
+        raise CodexPackContractError(
+            "spoken-line repair patch must cover every and only the target IDs"
+        )
+    replacements = {row.line_id: row.replacement_text for row in patch.replacements}
+    names = {row.char_id: row.name for row in cast.cast}
+    allowed = _allowed_spoken_all_caps(fact_index, cast)
+    out = script.model_copy(deep=True)
+    by_target = {target.line_id: target for target in targets}
+    thesis_line_id = _final_thesis_line_id(out, score)
+    mechanical_blockers = {
+        "empty", "spoken_format", "stage_direction", "all_caps",
+        "self_vocative", "non_lexical", "truncated",
+    }
+    for line in out.lines:
+        target = by_target.get(line.line_id)
+        if target is None:
+            continue
+        replacement = replacements[line.line_id]
+        req = _codex_line_request(
+            line, score, fact_index,
+            speaker_name=names.get(line.char_id, ""),
+        )
+        remaining = _spoken_hygiene_gates(
+            replacement,
+            names.get(line.char_id, ""),
+            allowed,
+            req=req,
+            story_rules=story_rules,
+            include_thesis=(line.line_id == thesis_line_id),
+        )
+        # Never replace one defect with malformed/unspeakable text. A craft-
+        # only partial improvement may advance to the next rung, but it is
+        # stamped only for the gates it actually cleared.
+        if mechanical_blockers.intersection(remaining):
+            continue
+        line.text = replacement
+        cleared = {
+            gate: rung for gate in target.gates if gate not in remaining
+        }
+        if cleared:
+            resolved_by.setdefault(line.line_id, {}).update(cleared)
+    return out
+
+
+def _repair_script_hygiene_after_exhaustion(
+    *,
+    script: ScriptArtifactV4,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4 | None,
+    story_rules: Any,
+    same_slot: str,
+    same_slot_fn: GenerateFn,
+    alternate_slot: str | None,
+    alternate_slot_fn: GenerateFn | None,
+    post_validator: Callable[[BaseModel], str | None],
+    max_new_tokens: int,
+    receipt: MutableMapping[str, Any],
+) -> ScriptArtifactV4 | None:
+    """A/B/C/floor recovery for schema-valid, craft-only script rejection."""
+    try:
+        _validate_script_graph(script, score)
+        _validate_script_roster_contract(script, cast, score)
+        targets = _collect_script_hygiene_targets(
+            script, cast, fact_index, score, story_rules,
+        )
+        if not targets:
+            return None
+
+        current = script.model_copy(deep=True)
+        original_targets = {target.line_id: target for target in targets}
+        resolved_by: dict[str, dict[str, str]] = {}
+        attempts: list[dict[str, Any]] = []
+        patch_budget = min(max_new_tokens, max(384, len(targets) * 180))
+
+        # A: the existing typed-repair temperature, but over a bounded line-only
+        # patch instead of regenerating the complete ScriptArtifactV4.
+        patch = _call_spoken_repair_patch(
+            slot_fn=same_slot_fn,
+            messages=_spoken_repair_prompt(
+                current, targets, cast, fact_index,
+            ),
+            temperature=0.10,
+            max_new_tokens=patch_budget,
+            rung="repair_a_same_slot",
+            slot=same_slot,
+            receipts=attempts,
+        )
+        if patch is not None:
+            try:
+                current = _apply_spoken_repair_patch(
+                    current, targets, patch, cast, fact_index, score,
+                    story_rules,
+                    rung="repair_a_same_slot", resolved_by=resolved_by,
+                )
+                attempts[-1]["status"] = "applied"
+            except CodexPackContractError:
+                attempts[-1]["status"] = "contract_rejected"
+
+        targets = _collect_script_hygiene_targets(
+            current, cast, fact_index, score, story_rules,
+        )
+        # B: same slot at lower temperature with a sharpened directive.
+        if targets:
+            patch_budget = min(
+                max_new_tokens, max(384, len(targets) * 180),
+            )
+            patch = _call_spoken_repair_patch(
+                slot_fn=same_slot_fn,
+                messages=_spoken_repair_prompt(
+                    current, targets, cast, fact_index, sharpened=True,
+                ),
+                temperature=0.05,
+                max_new_tokens=patch_budget,
+                rung="repair_b_same_slot",
+                slot=same_slot,
+                receipts=attempts,
+            )
+            if patch is not None:
+                try:
+                    current = _apply_spoken_repair_patch(
+                        current, targets, patch, cast, fact_index, score,
+                        story_rules,
+                        rung="repair_b_same_slot", resolved_by=resolved_by,
+                    )
+                    attempts[-1]["status"] = "applied"
+                except CodexPackContractError:
+                    attempts[-1]["status"] = "contract_rejected"
+
+        targets = _collect_script_hygiene_targets(
+            current, cast, fact_index, score, story_rules,
+        )
+        # C: other slot / stronger available writer, same sharp contract.
+        if targets and callable(alternate_slot_fn):
+            patch = _call_spoken_repair_patch(
+                slot_fn=alternate_slot_fn,
+                messages=_spoken_repair_prompt(
+                    current, targets, cast, fact_index, sharpened=True,
+                ),
+                temperature=0.05,
+                max_new_tokens=min(
+                    max_new_tokens, max(384, len(targets) * 180),
+                ),
+                rung="repair_c_alternate_slot",
+                slot=alternate_slot or "alternate",
+                receipts=attempts,
+            )
+            if patch is not None:
+                try:
+                    current = _apply_spoken_repair_patch(
+                        current, targets, patch, cast, fact_index, score,
+                        story_rules,
+                        rung="repair_c_alternate_slot", resolved_by=resolved_by,
+                    )
+                    attempts[-1]["status"] = "applied"
+                except CodexPackContractError:
+                    attempts[-1]["status"] = "contract_rejected"
+
+        by_line = {line.line_id: line for line in current.lines}
+        names = {row.char_id: row.name for row in cast.cast}
+        allowed = _allowed_spoken_all_caps(fact_index, cast)
+        anchors = tuple(
+            row.name for row in (
+                fact_index.entities if fact_index is not None else []
+            )
+        )
+        # A mechanically failed final announcer row can expose the preceding
+        # announcer row as the true thesis close. Re-scan to a bounded fixed
+        # point so score-order semantics stay correct after a row-local mute.
+        for _surface_pass in range(len(current.lines) + 1):
+            targets = _collect_script_hygiene_targets(
+                current, cast, fact_index, score, story_rules,
+            )
+            if not targets:
+                break
+            thesis_line_id = _final_thesis_line_id(current, score)
+            for target in targets:
+                original_targets.setdefault(target.line_id, target)
+                line = by_line[target.line_id]
+                deterministic_rung = "deterministic_floor"
+                req = _codex_line_request(
+                    line,
+                    score,
+                    fact_index,
+                    speaker_name=names.get(line.char_id, ""),
+                )
+                open_gates = tuple(target.gates)
+                row_failed = False
+                for _ in range(6):
+                    floor = deterministic_hygiene_floor(
+                        normalize_for_delivery(line.text)[0],
+                        open_gates,
+                        speaker_name=names.get(line.char_id, ""),
+                        allowed_all_caps=allowed,
+                        beat_objective=req.beat_objective,
+                        anchors=anchors,
+                        rules=story_rules,
+                    )
+                    # Empty remains a row-local mechanical failure. Never invent
+                    # canned dialogue merely to make a malformed artifact pass.
+                    if not floor.text:
+                        line.text = ""
+                        line.skip = True
+                        line.tts_skip_reason = (
+                            "spoken_hygiene_unspeakable_row"
+                        )
+                        failure_flags = [
+                            flag for flag in line.compose_flags
+                            if not str(flag).startswith(
+                                "hygiene_repaired_after_"
+                            )
+                            and not str(flag).startswith(
+                                "hygiene_floor_action:"
+                            )
+                        ]
+                        for failure_flag in (
+                            "hygiene_row_failed_mechanical",
+                            *(
+                                "hygiene_row_failed_mechanical:" + gate
+                                for gate in target.gates
+                            ),
+                        ):
+                            if failure_flag not in failure_flags:
+                                failure_flags.append(failure_flag)
+                        line.compose_flags = failure_flags
+                        failed_gates = tuple(dict.fromkeys((
+                            *original_targets.get(
+                                line.line_id, target,
+                            ).gates,
+                            *target.gates,
+                        )))
+                        # A row-local mechanical failure is the final status,
+                        # not a successful B/C repair plus a later failure.
+                        # Replace any provisional rung receipts so operators do
+                        # not see mutually contradictory success/failure claims.
+                        resolved_by[line.line_id] = {
+                            gate: "row_failed_mechanical"
+                            for gate in failed_gates
+                        }
+                        remaining = ()
+                        row_failed = True
+                        break
+                    line.text = floor.text
+                    remaining = _spoken_hygiene_gates(
+                        line.text,
+                        names.get(line.char_id, ""),
+                        allowed,
+                        req=req,
+                        story_rules=story_rules,
+                        include_thesis=(line.line_id == thesis_line_id),
+                    )
+                    if not remaining:
+                        break
+                    if tuple(remaining) == open_gates and not floor.actions:
+                        break
+                    open_gates = tuple(remaining)
+                else:  # pragma: no cover - fixed built-in packs converge sooner
+                    remaining = open_gates
+                if row_failed:
+                    continue
+                if remaining:
+                    # Total bounded floor for an unusual vocabulary collision.
+                    # Select the first complete utterance the SAME validator
+                    # accepts; empty mechanical rows never enter this branch.
+                    candidates = (
+                        "At dawn, one lamp still burns beside the empty chair.",
+                        "It moved.",
+                        "Go now.",
+                        "Yes.",
+                    )
+                    for candidate in candidates:
+                        if not _spoken_hygiene_gates(
+                            candidate,
+                            names.get(line.char_id, ""),
+                            allowed,
+                            req=req,
+                            story_rules=story_rules,
+                            include_thesis=(line.line_id == thesis_line_id),
+                        ):
+                            line.text = candidate
+                            remaining = ()
+                            deterministic_rung = (
+                                "deterministic_emergency_floor"
+                            )
+                            break
+                if remaining:
+                    # A future custom rules pack can theoretically reject every
+                    # curated utterance. Do not convert that craft collision
+                    # into an episode terminal: mute this one row with an exact
+                    # mechanical failure receipt. Shipped packs never reach the
+                    # branch (all candidates are validated above).
+                    line.text = ""
+                    line.skip = True
+                    line.tts_skip_reason = "spoken_hygiene_unspeakable_row"
+                    failure_flags = [
+                        flag for flag in line.compose_flags
+                        if not str(flag).startswith(
+                            "hygiene_repaired_after_"
+                        )
+                        and not str(flag).startswith(
+                            "hygiene_floor_action:"
+                        )
+                    ]
+                    for failure_flag in (
+                        "hygiene_row_failed_mechanical",
+                        *(
+                            "hygiene_row_failed_mechanical:" + gate
+                            for gate in target.gates
+                        ),
+                    ):
+                        if failure_flag not in failure_flags:
+                            failure_flags.append(failure_flag)
+                    line.compose_flags = failure_flags
+                    failed_gates = tuple(dict.fromkeys((
+                        *original_targets.get(
+                            line.line_id, target,
+                        ).gates,
+                        *target.gates,
+                    )))
+                    resolved_by[line.line_id] = {
+                        gate: "row_failed_mechanical"
+                        for gate in failed_gates
+                    }
+                    continue
+                resolved_by.setdefault(line.line_id, {}).update({
+                    gate: deterministic_rung for gate in target.gates
+                })
+        else:  # pragma: no cover - every pass resolves or row-mutes a target
+            return None
+
+        if _collect_script_hygiene_targets(
+            current, cast, fact_index, score, story_rules,
+        ):
+            return None
+        if post_validator(current) is not None:
+            return None
+
+        target_receipts: list[dict[str, Any]] = []
+        by_final = {line.line_id: line for line in current.lines}
+        for line_id, target in original_targets.items():
+            line = by_final[line_id]
+            # These receipts are code-owned. Drop exact or misspelled/stale
+            # model-authored variants before stamping the accepted rung; a live
+            # P5 artifact carried ``...after_rereroll`` and proved that simply
+            # appending would make observability ambiguous.
+            flags = [
+                flag for flag in line.compose_flags
+                if not str(flag).startswith("hygiene_repaired_after_")
+                and not str(flag).startswith("hygiene_floor_action:")
+            ]
+            row_failed = (
+                line.skip
+                and line.tts_skip_reason
+                == "spoken_hygiene_unspeakable_row"
+            )
+            if not row_failed and "hygiene_repaired_after_reroll" not in flags:
+                flags.append("hygiene_repaired_after_reroll")
+            for gate, rung in resolved_by.get(line_id, {}).items():
+                if rung == "row_failed_mechanical":
+                    continue
+                flag = f"hygiene_repaired_after_reroll:{gate}:{rung}"
+                if flag not in flags:
+                    flags.append(flag)
+            line.compose_flags = flags
+            target_receipts.append({
+                "line_id": line_id,
+                "status": (
+                    "row_failed_mechanical" if row_failed else "repaired"
+                ),
+                "gates": list(target.gates),
+                "resolved_by": dict(resolved_by.get(line_id, {})),
+                "original_sha256": target.original_sha256,
+                "final_sha256": hashlib.sha256(
+                    line.text.encode("utf-8"),
+                ).hexdigest(),
+            })
+        if post_validator(current) is not None:
+            return None
+        receipt.update({
+            "status": "accepted",
+            "attempts": attempts,
+            "targets": target_receipts,
+        })
+        return current
+    except Exception as exc:  # noqa: BLE001 -- structural path remains fatal
+        receipt.update({
+            "status": "declined",
+            "error_type": type(exc).__name__,
+        })
+        return None
+
+
+def _validate_script_roster_contract(
     script: ScriptArtifactV4,
     cast: CastPlanV4,
     score: RadioScoreV4,
-    allowed_all_caps: frozenset[str] = frozenset(),
 ) -> None:
+    """Validate non-prose ScriptArtifact roster and skip invariants.
+
+    This boundary deliberately excludes spoken craft. It lets a schema/graph-
+    valid artifact enter the bounded line repair cascade while cast identity,
+    legal roles, music rows, mechanical skip rows, and scheduled-speaker
+    coverage remain fail-closed.
+    """
     locked = {row.char_id: row.name for row in cast.cast}
     if locked.get("announcer") != "ANNOUNCER":
         raise CodexSpokenTextError("announcer must be named ANNOUNCER")
@@ -2560,12 +3327,21 @@ def validate_spoken_text_and_roster(
             raise CodexSpokenTextError(f"line {line.line_id} uses an unlocked cast id")
         if line.speaker_role not in ("character", "announcer"):
             raise CodexSpokenTextError(f"line {line.line_id} has an illegal spoken role")
-        err = _spoken_error(
-            line.text, locked[line.char_id], allowed_all_caps,
-        )
-        if err:
-            raise CodexSpokenTextError(f"{line.line_id}: {err}")
-    voiced = {line.char_id for line in script.lines if not line.skip}
+        if line.skip:
+            if (
+                line.text
+                or line.tts_skip_reason
+                != "spoken_hygiene_unspeakable_row"
+            ):
+                raise CodexSpokenTextError(
+                    f"spoken line {line.line_id} has an invalid mechanical "
+                    "skip contract"
+                )
+    represented = {
+        line.char_id
+        for line in script.lines
+        if not line.char_id.startswith("music_")
+    }
     # Coverage is measured against the speakers the ACCEPTED score actually
     # scheduled (its beat owners), not the full planned roster. Score-level cast
     # coverage is advisory: a reconciled short draft may leave a planned cast
@@ -2580,7 +3356,7 @@ def validate_spoken_text_and_roster(
         for beat in scene.beats
         if beat.char_id in locked
     }
-    missing = sorted(scheduled - voiced)
+    missing = sorted(scheduled - represented)
     if missing:
         raise CodexGraphError(
             "every cast row the score schedules must own a voiced line; "
@@ -2588,13 +3364,29 @@ def validate_spoken_text_and_roster(
         )
 
 
-# ScriptArtifactV4 typed-repair guidance.  The metadata rule leaves every line's
-# text byte-for-byte intact -- correct for the boundary/shot_id/closed-graph
-# defect family.  A self-vocative is instead a spoken-PROSE defect: a character
-# opens by addressing their own name.  Python may not rewrite spoken prose
-# (SOURCE_BANK_PREFLIGHT Gate 3 line 147), so the bounded repair returns the
-# defect to the model with a named line, evidence, and the allowed correction
-# (Gate 3 line 149-153); exhaustion still fails closed.
+def validate_spoken_text_and_roster(
+    script: ScriptArtifactV4,
+    cast: CastPlanV4,
+    score: RadioScoreV4,
+    allowed_all_caps: frozenset[str] = frozenset(),
+) -> None:
+    """Validate the structural roster contract plus exact spoken surfaces."""
+    _validate_script_roster_contract(script, cast, score)
+    locked = {row.char_id: row.name for row in cast.cast}
+    for line in script.lines:
+        if line.char_id.startswith("music_") or line.skip:
+            continue
+        err = _spoken_error(
+            line.text, locked[line.char_id], allowed_all_caps,
+        )
+        if err:
+            raise CodexSpokenTextError(f"{line.line_id}: {err}")
+
+
+# ScriptArtifactV4 whole-object typed-repair guidance is structural only. The
+# metadata rule leaves line text byte-for-byte intact for boundary/shot/closed-
+# graph defects. Spoken-prose defects are intercepted before this prompt and use
+# the bounded line-only A/B/C/deterministic-floor cascade instead.
 _SCRIPT_ARTIFACT_REPAIR_RULES = (
     "This is a typed repair of the same ScriptArtifactV4, not a new "
     "creative response. Return one JSON object only. Its schema_version "
@@ -2615,7 +3407,9 @@ _SCRIPT_ARTIFACT_SPOKEN_REWORD_REPAIR_RULES = (
     "validation_error names and locates by line id -- for example a "
     "self-vocative opening on the speaker's own name, an all-caps word, a "
     "stage direction / markup / role label, a punctuation-only non-lexical "
-    "token, or empty text. Rewrite ONLY the text of each rejected line named "
+    "token, empty text, cliche, flat stage business, stated emotion, anchor "
+    "stuffing, an overlong breath, generic personal cost, literal beat-objective "
+    "restatement, or a thesis close. Rewrite ONLY the text of each rejected line named "
     "in validation_error so it carries the same beat, intent, and speaker as "
     "clean plain spoken dialogue: a full sentence, no markup or stage "
     "directions, no all-caps words, no stray punctuation-only tokens, and "
@@ -2654,6 +3448,7 @@ _SPOKEN_PROSE_DEFECT_MARKERS = (
     "all-caps lexical word",
     "stage direction, markup, or a role label",
     "spoken text is empty",
+    "spoken hygiene defects:",
 )
 
 
@@ -2893,6 +3688,11 @@ def invoke_codex_structured(
     base_temperature: float, structural_retry_temperature: float,
     max_new_tokens: int, call_journal: MutableMapping[str, Any],
     repair_score: RadioScoreV4 | None = None,
+    spoken_repair_cast: CastPlanV4 | None = None,
+    spoken_repair_fact_index: FactIndexV4 | None = None,
+    spoken_repair_story_rules: Any = None,
+    spoken_repair_alternate_slot_fn: GenerateFn | None = None,
+    spoken_repair_alternate_slot: Literal["creative", "technical"] | None = None,
     prompt_must_fit: bool = False,
     clamp_overlong_strings: bool = True,
     include_result_json_schema: bool = True,
@@ -2945,6 +3745,10 @@ def invoke_codex_structured(
     # authored-text patch. Base, syntax-retry, and typed-repair attempts all use
     # the exact result schema bound here.
     result_slot_fn = _bind_local_slot_schema(slot_fn, result_type)
+    # Keep the latest schema-valid script rejected only by post-validation.
+    # A later typed-repair response may be malformed, so last raw alone is not a
+    # trustworthy recovery candidate after the shared ladder exhausts.
+    last_rejected_script: list[ScriptArtifactV4 | None] = [None]
 
     def mark_attempt_complete(
         attempt_index: int,
@@ -2952,6 +3756,14 @@ def invoke_codex_structured(
         error: BaseException | None,
     ) -> None:
         """Store bounded status beside the original-wire response receipt."""
+        if script_artifact_pass and isinstance(error, PostValidationError):
+            try:
+                parsed = ScriptArtifactV4.model_validate(
+                    parse_first_json_object(_validated_raw),
+                )
+                last_rejected_script[0] = parsed
+            except Exception:
+                pass
         if not 1 <= attempt_index <= len(calls):
             return
         receipt = calls[attempt_index - 1]
@@ -3112,6 +3924,78 @@ def invoke_codex_structured(
     def typed_repair_factory(*, original_prompt, failed_output, error):
         detail = " ".join(str(error).split())[:500] or "structured output rejected"
         if script_artifact_pass:
+            # A schema/graph/roster-valid ScriptArtifact rejected only for
+            # spoken craft must never enter the whole-artifact JSON repair
+            # ladder. The live 2026-07-20 P5 response proved why: one stage
+            # direction caused two 2,800-token complete-script repairs to hit
+            # OUTPUT_CAP before the late line floor could run. Intercept that
+            # exact class here and return a fully revalidated line-only
+            # A/B/C/floor repair instance to structured_call.
+            craft_candidate: ScriptArtifactV4 | None = None
+            if (
+                isinstance(error, PostValidationError)
+                and repair_score is not None
+                and spoken_repair_cast is not None
+            ):
+                try:
+                    craft_candidate = ScriptArtifactV4.model_validate(
+                        parse_first_json_object(failed_output),
+                    )
+                    _validate_script_graph(craft_candidate, repair_score)
+                    _validate_script_roster_contract(
+                        craft_candidate, spoken_repair_cast, repair_score,
+                    )
+                except Exception:
+                    craft_candidate = None
+            craft_targets = (
+                _collect_script_hygiene_targets(
+                    craft_candidate,
+                    spoken_repair_cast,
+                    spoken_repair_fact_index,
+                    repair_score,
+                    spoken_repair_story_rules,
+                )
+                if craft_candidate is not None
+                and spoken_repair_cast is not None
+                and repair_score is not None
+                else ()
+            )
+            if craft_candidate is not None and craft_targets:
+                hygiene_receipt: dict[str, Any] = {
+                    "status": "attempting",
+                    "trigger": "craft_only_post_validation",
+                    "shared_artifact_repair_bypassed": True,
+                }
+                journal_entry["hygiene_repair"] = hygiene_receipt
+                repaired_script = _repair_script_hygiene_after_exhaustion(
+                    script=craft_candidate,
+                    score=repair_score,
+                    cast=spoken_repair_cast,
+                    fact_index=spoken_repair_fact_index,
+                    story_rules=spoken_repair_story_rules,
+                    same_slot=slot,
+                    same_slot_fn=slot_fn,
+                    alternate_slot=spoken_repair_alternate_slot,
+                    alternate_slot_fn=spoken_repair_alternate_slot_fn,
+                    post_validator=post_validator,
+                    max_new_tokens=max_new_tokens,
+                    receipt=hygiene_receipt,
+                )
+                if repaired_script is None:
+                    # The deterministic floor is total for every shipped rules
+                    # pack. Reaching this branch indicates a code/contract
+                    # invariant, not permission to regenerate a whole script.
+                    raise CodexGraphError(
+                        "craft-only spoken repair invariant did not converge"
+                    )
+                log.warning(
+                    "[scifi_codex:%s] craft-only rejection resolved by the "
+                    "line-local A/B/C/floor cascade; whole-artifact repair "
+                    "bypassed",
+                    pass_id,
+                )
+                return repaired_script
+
             log.info(
                 "[scifi_codex:%s] attempting deterministic ScriptArtifactV4 metadata repair",
                 pass_id,
@@ -3492,6 +4376,58 @@ def invoke_codex_structured(
             )
             journal_entry["accepted"] = recovered.model_dump(mode="json")
             return recovered
+        late_craft_candidate: ScriptArtifactV4 | None = None
+        if (
+            script_artifact_pass
+            and isinstance(exc, StructuredCallFailedError)
+            and last_rejected_script[0] is not None
+            and repair_score is not None
+            and spoken_repair_cast is not None
+        ):
+            try:
+                _validate_script_graph(last_rejected_script[0], repair_score)
+                _validate_script_roster_contract(
+                    last_rejected_script[0], spoken_repair_cast, repair_score,
+                )
+                if _collect_script_hygiene_targets(
+                    last_rejected_script[0], spoken_repair_cast,
+                    spoken_repair_fact_index, repair_score,
+                    spoken_repair_story_rules,
+                ):
+                    late_craft_candidate = last_rejected_script[0]
+            except Exception:
+                # Structural states keep their fail-closed artifact repair path;
+                # never mislabel one as a declined spoken-quality recovery.
+                late_craft_candidate = None
+        if (
+            late_craft_candidate is not None
+            and repair_score is not None
+            and spoken_repair_cast is not None
+        ):
+            hygiene_receipt: dict[str, Any] = {"status": "attempting"}
+            journal_entry["hygiene_repair"] = hygiene_receipt
+            repaired_script = _repair_script_hygiene_after_exhaustion(
+                script=late_craft_candidate,
+                score=repair_score,
+                cast=spoken_repair_cast,
+                fact_index=spoken_repair_fact_index,
+                story_rules=spoken_repair_story_rules,
+                same_slot=slot,
+                same_slot_fn=slot_fn,
+                alternate_slot=spoken_repair_alternate_slot,
+                alternate_slot_fn=spoken_repair_alternate_slot_fn,
+                post_validator=post_validator,
+                max_new_tokens=max_new_tokens,
+                receipt=hygiene_receipt,
+            )
+            if repaired_script is not None:
+                log.warning(
+                    "[scifi_codex:%s] spoken hygiene cascade repaired the "
+                    "script after the shared ladder exhausted",
+                    pass_id,
+                )
+                journal_entry["accepted"] = repaired_script.model_dump(mode="json")
+                return repaired_script
         journal_entry["terminal_error"] = (
             f"{type(exc).__name__}: {' '.join(str(exc).split())[:500]}"
         )
@@ -3696,6 +4632,7 @@ def _validate_script_post(
     cast: CastPlanV4,
     score: RadioScoreV4,
     fact_index: FactIndexV4 | None = None,
+    story_rules: Any = None,
 ) -> str | None:
     try:
         _validate_script_graph(script, score)
@@ -3705,6 +4642,15 @@ def _validate_script_post(
             score,
             _allowed_spoken_all_caps(fact_index, cast),
         )
+        targets = _collect_script_hygiene_targets(
+            script, cast, fact_index, score, story_rules,
+        )
+        if targets:
+            detail = "; ".join(
+                f"{target.line_id}={','.join(target.gates)}"
+                for target in targets
+            )
+            return "spoken hygiene defects: " + detail
     except ScifiCodexError as exc:
         return str(exc)
     return None
@@ -3731,11 +4677,11 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
                 src = script_by_line.get(lid)
                 if src is None:
                     raise CodexGraphError(f"missing script line {lid}")
-                row = {"line_id": lid, "beat_id": b.beat_id, "shot_id": b.shot_id, "char_id": src.char_id, "speaker_role": src.speaker_role, "text": src.text, "traits": src.traits, "boundary": src.boundary, "arc_phase": src.arc_phase, "compose_flags": list(src.compose_flags), "beat_intent": src.beat_intent, "dialogue_slot_id": src.dialogue_slot_id}
+                row = {"line_id": lid, "beat_id": b.beat_id, "shot_id": b.shot_id, "char_id": src.char_id, "speaker_role": src.speaker_role, "text": src.text, "skip": src.skip, "tts_skip_reason": src.tts_skip_reason, "traits": src.traits, "boundary": src.boundary, "arc_phase": src.arc_phase, "compose_flags": list(src.compose_flags), "beat_intent": src.beat_intent, "dialogue_slot_id": src.dialogue_slot_id}
                 lines.append(row)
                 if src.char_id.startswith("music_"):
                     music_ids.append(lid)
-                else:
+                elif not src.skip:
                     expected[lid] = src.text
     led.set_cast(cast_rows)
     led.set_scenes(scenes)
@@ -3743,10 +4689,17 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
     led.set_beats(beats)
     led.set_lines(lines)
     for row in led.data.get("lines", []):
+        source_row = script_by_line.get(row.get("line_id"))
         if row.get("line_id") in music_ids:
             row["skip"] = True
             row["text"] = ""
             row["tts_skip_reason"] = "music_cue"
+        elif source_row is not None and source_row.skip:
+            row["skip"] = True
+            row["text"] = ""
+            row["char_count"] = 0
+            row["word_count"] = 0
+            row["tts_skip_reason"] = source_row.tts_skip_reason
     music = [{"cue_id": cue.cue_id, "description": cue.description, "generation_prompt": cue.generation_prompt, "placement": cue.placement, "anchor_line_id": cue.anchor_line_id} for cue in script.music_cues]
     led.set_music(music)
     led.data["clips"] = []
@@ -3792,12 +4745,12 @@ def _record_failsoft(
 def run_scifi_codex_episode(
     *, payload: dict[str, str], pack: Any, resolved: Mapping[str, Any], led: Any,
     meta: dict[str, Any], creative_fn: GenerateFn, technical_fn: GenerateFn,
-    slot_scheduler: Any, source_bank_row: Any, story_rules: Mapping[str, Any],
+    slot_scheduler: Any, source_bank_row: Any, story_rules: StoryRules,
     episode_root: Path, episode_id: str,
 ) -> CodexTailParts:
     # B1 (bake-off): source_bank_row provenance is threaded into owner_bank
     # below (never base-mapped) so scifi_codex_v2/v3 pass the authorship gate.
-    del slot_scheduler, story_rules, episode_root, episode_id
+    del slot_scheduler, episode_root, episode_id
     env, steer = validate_payload_envelope(payload, resolved)
     p0_inputs = _p0_artifact_inputs(env)
     p0_allowed_fields = frozenset(p0_inputs["allowed_source_fields"])
@@ -3962,7 +4915,7 @@ def run_scifi_codex_episode(
         raise CodexGraphError("accepted score has no line graph to budget for")
     script_token_budget = _script_output_token_budget(steer.requested_words, accepted_line_count)
     journal["script_token_budget"] = {"requested_words": steer.requested_words, "accepted_line_count": accepted_line_count, "max_new_tokens": script_token_budget}
-    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0, story_rules), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score, spoken_repair_cast=p2, spoken_repair_fact_index=p0, spoken_repair_story_rules=story_rules, spoken_repair_alternate_slot_fn=technical_fn, spoken_repair_alternate_slot="technical")
     # P6 AUDIT fail-soft: a non-converged listener review skips the P7 retake and
     # keeps the valid P5 script (THE LAW; the review writes no ledger content).
     try:
@@ -3975,7 +4928,7 @@ def run_scifi_codex_episode(
         # P7 RETAKE fail-soft: keep the prior (P5) script on non-convergence.
         script_before_p7 = script
         try:
-            script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+            script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0, story_rules), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score, spoken_repair_cast=p2, spoken_repair_fact_index=p0, spoken_repair_story_rules=story_rules, spoken_repair_alternate_slot_fn=technical_fn, spoken_repair_alternate_slot="technical")
         except CodexPassError as exc:
             if not _record_failsoft("P7", "retake", exc, meta):
                 raise
@@ -3992,11 +4945,52 @@ def run_scifi_codex_episode(
         # P9 RETAKE fail-soft: keep the prior (P7/P5) script on non-convergence.
         script_before_p9 = script
         try:
-            script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score)
+            script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0, story_rules), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score, spoken_repair_cast=p2, spoken_repair_fact_index=p0, spoken_repair_story_rules=story_rules, spoken_repair_alternate_slot_fn=technical_fn, spoken_repair_alternate_slot="technical")
         except CodexPassError as exc:
             if not _record_failsoft("P9", "retake", exc, meta):
                 raise
             script = script_before_p9
+    # Defense-in-depth final scour over the exact artifact that will be assembled.
+    # Every P5/P7/P9 route already validates through the same boundary; this
+    # catches any future bypass before it can become ledger text.
+    if _collect_script_hygiene_targets(
+        script, p2, p0, score, story_rules,
+    ):
+        final_receipt: dict[str, Any] = {"status": "attempting"}
+        journal["final_spoken_hygiene"] = final_receipt
+        final_repair = _repair_script_hygiene_after_exhaustion(
+            script=script,
+            score=score,
+            cast=p2,
+            fact_index=p0,
+            story_rules=story_rules,
+            same_slot="creative",
+            same_slot_fn=creative_fn,
+            alternate_slot="technical",
+            alternate_slot_fn=technical_fn,
+            post_validator=lambda x: _validate_script_post(
+                x, p2, score, p0, story_rules,
+            ),
+            max_new_tokens=script_token_budget,
+            receipt=final_receipt,
+        )
+        if final_repair is not None:
+            script = final_repair
+        remaining_targets = _collect_script_hygiene_targets(
+            script, p2, p0, score, story_rules,
+        )
+        if remaining_targets:
+            # Reaching this branch means the artifact also failed a structural
+            # post-condition (the bounded craft floor itself is total for every
+            # shipped rules pack). Never assemble an unscoured spoken surface
+            # or disguise the code/graph defect as a quality terminal-skip.
+            raise CodexGraphError(
+                "final spoken-hygiene invariant did not converge: "
+                + "; ".join(
+                    f"{target.line_id}={','.join(target.gates)}"
+                    for target in remaining_targets
+                )
+            )
     validate_spoken_text_and_roster(
         script, p2, score, _allowed_spoken_all_caps(p0, p2),
     )

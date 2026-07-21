@@ -46,7 +46,7 @@ Verdict mapping (ADR section 9, S33 B2 trim 2026-05-15):
     clean_no_edits + clean    -> frozen_clean
     clean_no_edits + warns    -> frozen_with_warns
     improved                  -> frozen_with_doctor_edits
-    too_many_edits            -> too_many_edits
+    too_many_edits            -> repair-then-freeze (quality exhaustion)
     needs_full_rerun          -> needs_full_rerun
     Phase 10 raises           -> needs_full_rerun        (gap audit forced)
 
@@ -106,7 +106,7 @@ REVIEWER_TO_FREEZE_VERDICT: dict[str, str] = {
 }
 
 
-# Reviewer verdicts that terminate the cascade WITHOUT running Phase 10.
+# Structural reviewer verdicts that terminate the cascade WITHOUT Phase 10.
 # review_ledger has already restored the ledger to its pre-review state
 # for these; running Phase 10 on the restored ledger would either
 # re-flag the same pre-existing gaps or stamp `frozen_clean` on an
@@ -116,7 +116,6 @@ REVIEWER_TO_FREEZE_VERDICT: dict[str, str] = {
 # removed -- their rollback gates were retired so neither verdict is
 # reachable anymore.
 FREEZE_TERMINAL_FAILURE_VERDICTS: frozenset[str] = frozenset({
-    "too_many_edits",
     "needs_full_rerun",
 })
 
@@ -775,8 +774,7 @@ def _persist_cascade_meta(led) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Terminal-skip disposition (shared by the reviewer-terminal and the
-# Sprint 5C reroll-exhaustion exits)
+# Terminal-skip disposition (structural reviewer/capability exits only)
 # ---------------------------------------------------------------------------
 
 
@@ -790,20 +788,17 @@ def _build_terminal_skip_disposition(
 ) -> FreezeDisposition:
     """Stamp the terminal-skip state and build the FreezeDisposition.
 
-    Shared by the two cascade exits that end WITHOUT running Phase 10:
-    the reviewer-terminal path (too_many_edits / needs_full_rerun from
-    review_ledger) and the Sprint 5C reroll-exhaustion path. Both leave
-    the ledger in a state Phase 10 must not freeze, so Phase 7 / 8 / 10
-    are stamped `terminal_skipped` and the audio / video readiness meta
-    keys carry the same reason. The freeze_verdict STRING, the full
-    freeze_disposition dict, and the compact per-phase telemetry are all
-    stamped here so both exits leave an identically shaped meta.
+    Used only when a structural reviewer/capability failure leaves the ledger
+    in a state Phase 10 must not freeze. Phase 7 / 8 / 10 are stamped
+    ``terminal_skipped`` and the audio/video readiness keys carry the same
+    reason. Craft/quality reroll exhaustion does not enter this helper: A2 and
+    the final spoken-row cascade repair then continue through the normal freeze.
     """
     meta = ledger_data.setdefault("meta", {})
     meta["freeze_verdict"] = verdict
-    # BUG-LOCAL-300 safety/quality split: record WHY this terminal verdict
-    # fired so BatchBarkGenerator can tell a genuinely unrenderable ledger
-    # ("structural") from a renderable-but-low-quality one ("quality").
+    # BUG-LOCAL-300 retains the explicit class for downstream compatibility.
+    # Current callers are structural-only: renderable craft defects are repaired
+    # and never reach a terminal disposition.
     meta["freeze_block_class"] = block_class
     # B5: stamp the remaining phases as terminal_skipped so
     # meta.cleanup_passes / readiness_passes stay contiguous. S30 B4:
@@ -893,7 +888,23 @@ def _run_legacy_content_chain(generate_fn, led, pre_report):
     interim_verdict = REVIEWER_TO_FREEZE_VERDICT.get(
         reviewer_disp.verdict, "needs_full_rerun",
     )
-    if interim_verdict in FREEZE_TERMINAL_FAILURE_VERDICTS:
+    if interim_verdict == "too_many_edits":
+        # The reviewer edit cap is a bounded QUALITY budget, not evidence that
+        # the ledger is structurally unrenderable. The reviewer already restored
+        # the pre-edit snapshot. Continue into critic/reroll/final hygiene and
+        # ship the best clean lines with an observability stamp.
+        meta["reviewer_quality_exhausted"] = {
+            "verdict": interim_verdict,
+            "doctor_edits_proposed": reviewer_disp.doctor_edits_proposed,
+            "doctor_edits_applied": reviewer_disp.doctor_edits_applied,
+            "disposition": "continue_to_repair_then_ship",
+        }
+        log.warning(
+            "[LFC] reviewer quality edit budget exhausted (%d proposed); "
+            "continuing to repair-then-ship -- quality may never terminal-skip",
+            reviewer_disp.doctor_edits_proposed,
+        )
+    elif interim_verdict in FREEZE_TERMINAL_FAILURE_VERDICTS:
         disp = _build_terminal_skip_disposition(
             ledger_data,
             verdict=interim_verdict,
@@ -1102,12 +1113,13 @@ def run_freeze_cascade(
         no-auditors rule). The composite phase_name string
         `phase_1_2_9_reviewer_composite` is retained for forensic
         continuity.
-      * If the reviewer verdict is a terminal failure
-        (too_many_edits / needs_full_rerun), the cascade stops there:
+      * If the reviewer verdict is the structural terminal failure
+        (needs_full_rerun), the cascade stops there:
         the ledger has already been restored to its pre-review state,
         and Phase 10 would either re-flag the same pre-existing gap
         or stamp frozen_clean on an unaltered ledger -- both
-        misleading. S33 B2 (2026-05-15) retired the two rollback-gate
+        misleading. ``too_many_edits`` is quality-budget exhaustion and
+        continues through repair-then-freeze. S33 B2 (2026-05-15) retired the two rollback-gate
         verdicts (cast_unrecoverable, post_audit_failed) per the
         refined no-auditors rule.
       * On reviewer success (clean_no_edits / improved), Phase 10
@@ -1428,6 +1440,36 @@ def run_freeze_cascade(
                     f"(line_id={_row.get('line_id')!r})"
                 )
 
+    # Final LEGACY content-authoring boundary. Reviewer/Script Doctor and the
+    # targeted reroll run after the writer's own final scan, so they must not be
+    # allowed to reintroduce a craft defect immediately before TTS. Re-scan the
+    # exact post-review rows with the resident technical writer (B), its polish
+    # closure (C when available), then the deterministic floor. Content-owned
+    # lanes are sealed/read-only and already own the same repair before sealing.
+    if policy.run_legacy_content_passes:
+        ledger_data = led.data
+        _freeze_hygiene = _OTRRR.repair_ledger_spoken_hygiene(
+            ledger_data,
+            creative_fn=generate_fn,
+            # Both resident closures resolve to the same technical cache/model;
+            # calling the polish closure would falsely stamp an alternate-slot C
+            # repair. The writer-side final scan already used the real alternate
+            # slot. This defense uses honest same-slot B then the total floor.
+            repair_fn=None,
+        )
+        if _freeze_hygiene.repaired or _freeze_hygiene.failed:
+            ledger_data.setdefault("meta", {})[
+                "freeze_hygiene_repaired_rows"
+            ] = _freeze_hygiene.repaired
+            ledger_data.setdefault("meta", {})[
+                "freeze_hygiene_failed_rows"
+            ] = _freeze_hygiene.failed
+            log.warning(
+                "[LFC] final spoken hygiene repaired %d post-review row(s) "
+                "and row-muted %d mechanical defect(s) before readiness/freeze",
+                _freeze_hygiene.repaired, _freeze_hygiene.failed,
+            )
+
     # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------
     # S30 B4: Phase 4 / 4.5 / 5 / 6 DELETED. The standalone
     # OTR_LFCPhase4Scene / 5Voice / 6Arc node classes were orphaned
@@ -1464,6 +1506,39 @@ def run_freeze_cascade(
             p7_report.lines_normalized if p7_report is not None else 0
         ),
     )
+    # Phase 7 expands abbreviations, symbols, and numerals in the exact legacy
+    # string TTS will consume. Re-score that delivery surface: a short canonical
+    # line can become an overlong breath only after expansion. This scan is still
+    # pre-freeze and uses the same honest same-slot-B + deterministic floor.
+    if _p7_enabled:
+        _p7_hygiene_started = _isoformat_utc_now()
+        _p7_hygiene_before = _hash_lines_text(ledger_data)
+        _p7_hygiene = _OTRRR.repair_ledger_spoken_hygiene(
+            ledger_data,
+            creative_fn=generate_fn,
+            repair_fn=None,
+        )
+        _p7_hygiene_after = _hash_lines_text(ledger_data)
+        _stamp_phase_record(
+            ledger_data,
+            phase_name="phase_7_spoken_hygiene",
+            text_hash_before=_p7_hygiene_before,
+            text_hash_after=_p7_hygiene_after,
+            started_at=_p7_hygiene_started,
+            finished_at=_isoformat_utc_now(),
+            edits_applied=_p7_hygiene.repaired,
+            failures=[
+                {
+                    "line_id": str(receipt.get("line_id") or ""),
+                    "reason": str(receipt.get("failure") or ""),
+                }
+                for receipt in _p7_hygiene.receipts
+                if receipt.get("failure")
+            ],
+        )
+        if _p7_hygiene.repaired or _p7_hygiene.failed:
+            meta["phase_7_hygiene_repaired_rows"] = _p7_hygiene.repaired
+            meta["phase_7_hygiene_failed_rows"] = _p7_hygiene.failed
     started_8 = _isoformat_utc_now()
     hash_before_8 = _hash_lines_text(ledger_data)
     _phase_8_video_readiness(

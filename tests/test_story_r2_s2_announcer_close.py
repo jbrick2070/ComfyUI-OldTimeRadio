@@ -61,7 +61,11 @@ class TestOutroRecompose:
         )
         assert calls["n"] == 2  # one recompose
         assert "lesson is" not in res.text
-        assert res.compose_flags == ("announcer_outro_image_recomposed",)
+        assert "announcer_outro_image_recomposed" in res.compose_flags
+        assert (
+            "hygiene_repaired_after_reroll:thesis_close:repair_a"
+            in res.compose_flags
+        )
 
     def test_image_close_not_recomposed(self):
         calls = {"n": 0}

@@ -245,7 +245,6 @@ class TestTerminalReviewerFailures:
     # S33 B2 (2026-05-15): `cast_unrecoverable` and `post_audit_failed`
     # retired with their rollback gates per refined no-auditors rule.
     @pytest.mark.parametrize("verdict", [
-        "too_many_edits",
         "needs_full_rerun",
     ])
     def test_terminal_verdict_skips_phase_10(self, verdict):
@@ -276,6 +275,33 @@ class TestTerminalReviewerFailures:
         assert "cleanup_locked" not in led.data["meta"]
         assert disp.gap_audit_post is None
 
+    def test_quality_edit_exhaustion_runs_phase_10_and_ships(self):
+        led = _ledger_obj(_clean_ledger_data())
+        called = {"phase_10": False}
+        original = _LFC.phase_10_gap_audit_post_and_freeze
+
+        def spy_phase_10(led_):
+            called["phase_10"] = True
+            return original(led_)
+
+        with patch.object(
+            _LFC_ORCH._OTRLR, "review_ledger",
+            side_effect=lambda *_a, **_k: _stub_reviewer_disposition(
+                "too_many_edits"
+            ),
+        ), patch.object(
+            _LFC_ORCH._LFC,
+            "phase_10_gap_audit_post_and_freeze",
+            side_effect=spy_phase_10,
+        ):
+            disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+
+        assert called["phase_10"] is True
+        assert disp.verdict.startswith("frozen")
+        assert led.data["meta"]["reviewer_quality_exhausted"][
+            "disposition"
+        ] == "continue_to_repair_then_ship"
+
 
 # ---------------------------------------------------------------------------
 # Phase 10 hard-fail -> needs_full_rerun
@@ -285,7 +311,7 @@ class TestTerminalReviewerFailures:
 class TestPhase10HardFailDownstream:
     def test_reviewer_clean_but_phase_10_rejects(self):
         # Build a ledger where the reviewer would return clean but
-        # Phase 10 finds a critical gap (synthetic: empty voiced text
+        # Phase 10 finds a critical gap (synthetic: duplicate line id
         # added between reviewer return and Phase 10).
         data = _clean_ledger_data()
         led = _ledger_obj(data)
@@ -293,9 +319,9 @@ class TestPhase10HardFailDownstream:
         def fake_review(_fn, _led):
             # Mutate the ledger AFTER reviewer would have returned --
             # simulating a downstream phase mucking up the state.
-            _led.data["lines"][1]["text"] = ""
-            _led.data["lines"][1]["word_count"] = 0
-            _led.data["lines"][1]["char_count"] = 0
+            _led.data["lines"][1]["line_id"] = (
+                _led.data["lines"][0]["line_id"]
+            )
             return _stub_reviewer_disposition("clean_no_edits")
 
         with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
@@ -306,6 +332,25 @@ class TestPhase10HardFailDownstream:
         assert led.data["meta"]["freeze_verdict"] == "needs_full_rerun"
         assert disp.gap_audit_post is not None
         assert disp.gap_audit_post.has_critical_gaps
+
+    def test_empty_voiced_row_is_muted_locally_then_episode_freezes(self):
+        led = _ledger_obj(_clean_ledger_data())
+
+        def fake_review(_fn, _led):
+            row = _led.data["lines"][1]
+            row.update({"text": "", "word_count": 0, "char_count": 0})
+            return _stub_reviewer_disposition("clean_no_edits")
+
+        with patch.object(
+            _LFC_ORCH._OTRLR, "review_ledger", side_effect=fake_review,
+        ):
+            disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+
+        row = led.data["lines"][1]
+        assert disp.verdict.startswith("frozen")
+        assert row["skip"] is True
+        assert row["tts_skip_reason"] == "spoken_hygiene_unspeakable_row"
+        assert "hygiene_row_failed_mechanical" in row["compose_flags"]
 
 
 # ---------------------------------------------------------------------------
@@ -340,10 +385,11 @@ class TestFreezeBlockClassSplit:
         led = _ledger_obj(data)
 
         def fake_review(_fn, _led):
-            # Empty a voiced line so Phase 10 finds a critical gap.
-            _led.data["lines"][1]["text"] = ""
-            _led.data["lines"][1]["word_count"] = 0
-            _led.data["lines"][1]["char_count"] = 0
+            # Duplicate IDs are structurally ambiguous and cannot be repaired
+            # by a spoken-line rephrase.
+            _led.data["lines"][1]["line_id"] = (
+                _led.data["lines"][0]["line_id"]
+            )
             return _stub_reviewer_disposition("clean_no_edits")
 
         with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
@@ -470,10 +516,7 @@ class TestFreezeDispositionDataclass:
         assert d["gap_audit_pre"]["errors"] == []
         assert d["gap_audit_post"] is not None
 
-    def test_terminal_verdict_to_dict_has_none_post(self):
-        # S33 B2 (2026-05-15): `cast_unrecoverable` retired; use
-        # `too_many_edits` -- still a terminal verdict, still drives
-        # the same gap_audit_post=None branch.
+    def test_quality_exhaustion_to_dict_has_post_freeze_report(self):
         led = _ledger_obj(_clean_ledger_data())
 
         def fake_review(_fn, _led):
@@ -483,7 +526,8 @@ class TestFreezeDispositionDataclass:
                           side_effect=fake_review):
             disp = _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
-        assert disp.to_dict()["gap_audit_post"] is None
+        assert disp.verdict.startswith("frozen")
+        assert disp.to_dict()["gap_audit_post"] is not None
 
 
 # ---------------------------------------------------------------------------
@@ -501,10 +545,7 @@ class TestVerdictMapping:
     def test_terminal_set_contents(self):
         # S33 B2 (2026-05-15): `cast_unrecoverable` and
         # `post_audit_failed` retired with their rollback gates.
-        expected = {
-            "too_many_edits",
-            "needs_full_rerun",
-        }
+        expected = {"needs_full_rerun"}
         assert _LFC_ORCH.FREEZE_TERMINAL_FAILURE_VERDICTS == expected
 
 

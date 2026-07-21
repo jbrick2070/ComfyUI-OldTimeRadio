@@ -672,17 +672,18 @@ def test_run_targeted_reroll_never_raises_on_raising_fn():
     led = _FakeLedger(data)
     original = data["lines"][0]["text"]
 
-    # Must not raise -- a failed re-composition keeps the original line,
-    # and the critic re-run degrades to clean() so the loop ends.
+    # Must not raise -- exhausted LLM rungs reach the row-local mechanical
+    # floor. Because the model supplied no nonempty surface, the reroll keeps
+    # the original line and records an empty result; the critic degrades clean.
     disp = run_targeted_reroll(_raising_generate_fn(), led)
 
     assert isinstance(disp, RerollDisposition)
     assert disp.verdict in ("reroll_resolved", "reroll_error", "no_reroll")
     assert disp.lines_rerolled == 0
     assert data["lines"][0]["text"] == original  # line kept intact
-    # the failed compose attempt is recorded.
+    # The row-local mechanical result is recorded without killing the episode.
     history = data["meta"].get("reroll_history", [])
-    assert any(h.get("status") == "compose_failed" for h in history)
+    assert any(h.get("status") == "empty_result" for h in history)
 
 
 # ---------------------------------------------------------------------------

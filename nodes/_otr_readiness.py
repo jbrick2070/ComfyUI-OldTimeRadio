@@ -338,6 +338,86 @@ def normalize_for_delivery(text: str) -> "tuple[str, dict]":
     return expanded_3, receipt
 
 
+def _delivery_hygiene_gates(
+    text: str, speaker_name: str = "",
+) -> "tuple[str, ...]":
+    """Small exact-surface backstop for post-normalization TTS text."""
+    try:
+        from ._otr_line_hygiene import (
+            detect_stage_business_for_reroll,
+            flag_one_breath,
+            is_non_dialogue_stage_line,
+            is_stage_direction_only,
+        )
+    except ImportError:  # pragma: no cover -- flat test import
+        from _otr_line_hygiene import (  # type: ignore
+            detect_stage_business_for_reroll,
+            flag_one_breath,
+            is_non_dialogue_stage_line,
+            is_stage_direction_only,
+        )
+    value = str(text or "")
+    gates: list[str] = []
+    if (
+        is_non_dialogue_stage_line(value, speaker_name)
+        or is_stage_direction_only(value)
+        or detect_stage_business_for_reroll(value, speaker_name)[0]
+    ):
+        gates.append("stage_direction")
+    if any(ch in value for ch in "[]{}<>()\n\r\t`*"):
+        gates.append("spoken_format")
+    if (
+        not re.search(r"[A-Za-z]", value)
+        or any(
+            not token.strip(".,!?;:'\u2019-")
+            for token in value.split()
+        )
+    ):
+        gates.append("non_lexical")
+    if flag_one_breath(value)[0]:
+        gates.append("one_breath")
+    return tuple(dict.fromkeys(gates))
+
+
+def _emergency_clean_delivery_surface(
+    text: str, speaker_name: str = "",
+) -> "tuple[str, tuple[str, ...], tuple[str, ...]]":
+    """Unreachable defense if a content-owned pre-seal scour was bypassed.
+
+    Normal content-owned execution repairs the normalized projection before it
+    seals canonical text. This total deterministic backstop exists so a future
+    missed call site still cannot put an overlong breath or production cue on
+    the microphone. Its use is stamped as an emergency proof divergence.
+    """
+    try:
+        from ._otr_line_hygiene import deterministic_hygiene_floor
+    except ImportError:  # pragma: no cover -- flat test import
+        from _otr_line_hygiene import deterministic_hygiene_floor  # type: ignore
+    current = str(text or "")
+    seen: list[str] = []
+    actions: list[str] = []
+    for _ in range(6):
+        gates = _delivery_hygiene_gates(current, speaker_name)
+        if not gates:
+            return current, tuple(seen), tuple(dict.fromkeys(actions))
+        for gate in gates:
+            if gate not in seen:
+                seen.append(gate)
+        floor = deterministic_hygiene_floor(
+            current, gates, speaker_name=speaker_name,
+        )
+        actions.extend(floor.actions)
+        if not floor.text or floor.text == current:
+            break
+        current = floor.text
+    if _delivery_hygiene_gates(current, speaker_name):
+        # Every shipped rules pack converges above. Keep a small SFW spoken
+        # totality floor for a future detector/normalizer interaction.
+        current = "Give me a moment."
+        actions.append("total_delivery_floor")
+    return current, tuple(seen), tuple(dict.fromkeys(actions))
+
+
 def stamp_text_for_tts_delivery(led) -> dict:
     """Content-owned Phase 7 (720-bakeoff C2 / S2 P1.3): stamp
     ``text_for_tts`` + ``text_for_tts_source_sha256`` + a normalization
@@ -350,6 +430,12 @@ def stamp_text_for_tts_delivery(led) -> dict:
     ledger_data = led.data if hasattr(led, "data") else led
     stamped = 0
     changed = 0
+    emergency_repaired = 0
+    cast_names = {
+        str(row.get("char_id") or ""): str(row.get("name") or "")
+        for row in (ledger_data.get("cast") or [])
+        if isinstance(row, dict) and row.get("char_id")
+    }
     for ln in ledger_data.get("lines") or []:
         if not isinstance(ln, dict):
             continue
@@ -361,7 +447,31 @@ def stamp_text_for_tts_delivery(led) -> dict:
         canonical = ln.get("text") or ""
         if not canonical.strip():
             continue
+        speaker_name = (
+            cast_names.get(str(ln.get("char_id") or ""))
+            or str(ln.get("speaker") or "")
+        )
         delivery, receipt = normalize_for_delivery(canonical)
+        delivery_gates = _delivery_hygiene_gates(delivery, speaker_name)
+        if delivery_gates:
+            before_delivery = delivery
+            delivery, seen_gates, actions = _emergency_clean_delivery_surface(
+                delivery, speaker_name,
+            )
+            receipt.update({
+                "delivery_hygiene_emergency": True,
+                "delivery_hygiene_rung": "deterministic_emergency_floor",
+                "delivery_hygiene_gates": list(seen_gates),
+                "delivery_hygiene_actions": list(actions),
+                "delivery_hygiene_pre_sha256": hashlib.sha256(
+                    before_delivery.encode("utf-8")
+                ).hexdigest(),
+                "delivery_hygiene_post_sha256": hashlib.sha256(
+                    delivery.encode("utf-8")
+                ).hexdigest(),
+            })
+            emergency_repaired += 1
+        receipt["changed"] = delivery != canonical
         ln["text_for_tts"] = delivery
         ln["text_for_tts_source_sha256"] = text_for_tts_source_sha256(canonical)
         ln["text_for_tts_receipt"] = receipt
@@ -372,6 +482,7 @@ def stamp_text_for_tts_delivery(led) -> dict:
         "mode": "content_owned_delivery_stamp",
         "lines_stamped": int(stamped),
         "lines_delivery_differs": int(changed),
+        "lines_emergency_hygiene_repaired": int(emergency_repaired),
     }
     ledger_data.setdefault("meta", {})["text_for_tts_delivery"] = summary
     log.info(

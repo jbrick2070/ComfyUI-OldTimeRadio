@@ -3,6 +3,62 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-20 late -- v2.0-alpha [CODER: spoken hygiene ships with a stamped repair]
+
+Closed PBUG-20260720-03: a CRAFT/quality rejection on one voiced row can no
+longer terminal-skip an otherwise renderable episode. The contract now applies
+to all six runnable banks (`media_archive`, `original`, `public_domain`,
+`shakespeare`, `scifi_news`, and `scifi_news_pro`).
+
+ROOT FIX:
+- Added a total per-line ladder: the existing same-slot repair, a sharpened
+  gate-specific CRITICAL repair at lower temperature, the other writer slot,
+  then an idempotent deterministic SFW floor. Every accepted repair is
+  rescored and stamps `hygiene_repaired_after_reroll:<gate>:<rung>`.
+- Extended the floor across the full spoken contract. Existing cliche and
+  stage-business scrubbers are now terminal rungs; whole-line action/cue text
+  becomes a short speakable utterance; one-breath, anchor-stuffing,
+  objective-literal, on-the-nose, and thesis findings receive bounded
+  sentence-preserving repairs. Speaker-aware detection catches a character
+  narrating their own action by name. Non-dialogue material is not moved into
+  SFX yet; that ledger layer remains future work.
+- Moved whole-script Codex P5/P7/P9 craft failures inside the typed-repair
+  factory, after graph/roster preflight, so a local wording defect never spends
+  or truncates a whole `ScriptArtifactV4` retry. Content-owned lanes repair the
+  exact TTS projection before rebuilding raw/parsed/proof/hash seals. Shared
+  lanes receive a final ledger scour plus a post-readiness guard.
+- Removed quality exhaustion from terminal freeze semantics. Empty output from
+  the mechanical floor is isolated to that row; genuinely invalid graph state
+  remains structural. The deterministic G9 SFW/content-safety ship-stop was not
+  softened and still sanitizes or fails closed.
+
+VALIDATION: focused cascade/Codex coverage **119 passed**; expanded six-bank
+surface **395 passed**; workflow/freeze surface **268 passed / 3 skipped**;
+whole Windows suite **8161 passed / 33 skipped / 1 expected xfail**. The clean
+survival-guide worktree passed **17 / 19 skipped / 3 expected xfails** and
+BUG-11.56's OTR executable regression passed; portable rule update
+`ef7e327ded9cf80b9f050a690b4e09cc33d8e8d7` is pushed to the guide's `main`.
+`workflows/otr_canonical.json` needed no node/input/widget/link change and stayed
+byte-identical (`222D19478A308C91171DFCBDCCBEC01C55DD639283E2550EBB59EB9842D0882D`);
+validator, JSON round-trip, 23-node/57-link audit, live input names, references,
+and widget-vector drift (`0`) are green.
+
+LIVE PROOF: an initial canonical episode, `signal_lost_the_price_of_wakefulness_20260720_210832`,
+published successfully through the late floor and exposed the remaining
+whole-artifact boundary and raw-token trim; both were root-fixed. Final
+canonical prompt `f3770246-2d6a-4302-90af-153120edddf2` then hit real defects at
+P5 (`one_breath`, four rows) and P7 (`spoken_format` / `stage_direction`). Each
+immediately logged `craft-only rejection resolved by the line-local A/B/C/floor
+cascade; whole-artifact repair bypassed`, and the ledger carries
+`shared_artifact_repair_bypassed=true` plus gate/rung stamps. The episode froze
+`frozen_with_warns` (only stale word-count telemetry), rendered all four clean
+lines / 45 words, completed TTS/video/captions/credits, and published the
+22,892,541-byte OBS asset:
+`output/otr/obs/signal_lost_the_weight_of_height_20260720_221418_silent_procgen_blended_captioned_with_credits_final.mp4`.
+Targeting 30 words already produced a clean 45-word episode, so no minimum-word
+widget change was needed; increasing the minimum would not fix the separate P9
+8K structured-artifact capacity limit.
+
 ## 2026-07-20 -- v2.0-alpha [CODER: Gemma 4 12B Transformers/HF writer restored]
 
 Restored `google/gemma-4-12b-it` as the saved creative + technical writer on

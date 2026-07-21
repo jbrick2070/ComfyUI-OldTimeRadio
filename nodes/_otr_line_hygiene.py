@@ -427,19 +427,99 @@ def _contains_undelimited_action_clause(text: str) -> bool:
     return False
 
 
+# Whole-line production cues and bare sound/action descriptions are lexical, so
+# the TTS cleaner can pronounce them, but they are not dialogue. Keep this list
+# deliberately bounded to common radio-script surface forms; ambiguous ordinary
+# sentences are left alone for the authored craft pass.
+_PRODUCTION_CUE_LABEL_RE = re.compile(
+    r"^\s*(?:SFX|FX|SOUND(?:\s+EFFECT)?|CUE|MUSIC|AUDIO)\s*:\s*",
+    re.IGNORECASE,
+)
+_ANGLE_STAGE_ONLY_RE = re.compile(r"^\s*<[^<>\r\n]{1,100}>\s*[.!?]?\s*$")
+_BARE_STAGE_LINE_RE = re.compile(
+    r"^\s*(?:"
+    r"(?:pause|beat|silence|laughs?|sighs?|gasps?|coughs?|sobs?|groans?)"
+    r"|(?:he|she|they|[A-Z][a-z]+)\s+"
+    r"(?:laughs?|sighs?|gasps?|coughs?|sobs?|groans?)"
+    r"|(?:the\s+)?(?:door|window|telephone|phone|bell|alarm|buzzer|clock|"
+    r"radio|static|music|footsteps?)\s+"
+    r"(?:slams?|creaks?|rings?|opens?|closes?|knocks?|buzzes?|chimes?|"
+    r"ticks?|rumbles?|crashes?|swells?|fades?|plays?|starts?|stops?|"
+    r"crackles?|approach(?:es)?|recedes?)"
+    r"|(?:thunder|wind|rain)\s+"
+    r"(?:rolls?|rumbles?|howls?|rises?|falls?|pounds?)"
+    r"|(?:a|the)\s+(?:knock|bang|crash|ring)\s+"
+    r"(?:at|on|from|inside|outside)\s+(?:the\s+)?"
+    r"(?:door|window|wall|hall|room|radio)"
+    r"|(?:the\s+)?sound\s+of\s+"
+    r"(?:thunder|rain|wind|static|footsteps?|a\s+door|a\s+bell)"
+    r")\s*[.!?]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_non_dialogue_stage_line(
+    text: Any, speaker_name: Any = "",
+) -> bool:
+    """True for a bounded whole-line cue/action surface, never ordinary speech.
+
+    Examples include ``<pause>``, ``SFX: door slams``, ``Door slams.``,
+    ``Music swells.``, ``He laughs.``, and own-name narration such as
+    ``Edna stares at the vial.`` when Edna is the speaker. Pure;
+    deterministic; never raises.
+    """
+    try:
+        value = " ".join(str(text or "").split())
+        if not value:
+            return False
+        return bool(
+            _PRODUCTION_CUE_LABEL_RE.match(value)
+            or _ANGLE_STAGE_ONLY_RE.match(value)
+            or re.fullmatch(r"[([{]\s*[)\]}][.!?]?", value)
+            or _BARE_STAGE_LINE_RE.match(value)
+            or is_whole_line_stage_action(value, max_words=12)
+            or detect_narration_self_address(value, speaker_name)
+        )
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def repair_non_dialogue_stage_line(text: Any) -> str:
+    """Return one small SFW spoken floor for a known whole-line cue/action."""
+    try:
+        value = " ".join(str(text or "").split()).lower()
+        if not value:
+            return ""
+        if any(word in value for word in ("pause", "beat", "silence")):
+            return "Give me a moment."
+        if re.search(r"\b(?:laugh|sigh|gasp|cough|sob|groan)", value):
+            return "You heard me."
+        return "Did you hear that?"
+    except Exception:  # noqa: BLE001
+        return "Did you hear that?"
+
+
 def detect_stage_business_for_reroll(
     text: Any, speaker_name: str = "",
 ) -> "tuple[bool, str, str]":
     """Tier-2 (composer reroll) detector -- BROAD on purpose (a false positive
     only costs one recompose). Returns ``(hit, hint, reason_code)`` with
     ``reason_code`` in {"leading", "trailing_after_quote",
-    "embedded_between_quotes", "undelimited_action_clause"}; ``("", "")`` parts
-    when no hit. Owns the malformed/undelimited cases (b015, b017) the freeze
-    floor deliberately leaves alone. Pure; never raises."""
+    "embedded_between_quotes", "undelimited_action_clause",
+    "whole_line_action", "whole_line_cue_or_action"}; ``("", "")`` parts when
+    no hit. Owns the malformed/undelimited cases (b015, b017) the freeze floor
+    deliberately leaves alone. Pure; never raises."""
     try:
         s = "" if text is None else str(text)
         if not s.strip():
             return (False, "", "")
+        if is_non_dialogue_stage_line(s, speaker_name):
+            reason = (
+                "whole_line_action"
+                if is_whole_line_stage_action(s)
+                else "whole_line_cue_or_action"
+            )
+            return (True, _BARE_STAGE_HINT, reason)
         # 1. bare LEADING direction (existing leading-only detector)
         lead_hit, _ = detect_leading_stage_business(s)
         if lead_hit:
@@ -1067,6 +1147,12 @@ _DIALOGUE_OPENER_ALLOW = (
     "feels like", "smells like", "looks ",
 )
 _THIRD_PERSON_SUBJECTS = frozenset({"he", "she", "they"})
+_THIRD_PERSON_PHYSICAL_ACTION_VERBS = frozenset({
+    "open", "opens", "opening", "close", "closes", "closing", "cross",
+    "crosses", "crossing", "switch", "switches", "switching", "flip",
+    "flips", "flipping", "enter", "enters", "entering", "exit", "exits",
+    "exiting", "turn", "walk", "step", "move", "reach", "stand", "sit",
+})
 
 
 def is_whole_line_stage_action(text: Any, *, max_words: int = 32) -> bool:
@@ -1111,6 +1197,9 @@ def is_whole_line_stage_action(text: Any, *, max_words: int = 32) -> bool:
         if verb in _COPULA_MODAL or verb in _DIALOGUE_STARTER:
             return False
         whitelisted = verb in _NARRATION_VERBS
+        subject_action = (
+            third_subject and verb in _THIRD_PERSON_PHYSICAL_ACTION_VERBS
+        )
         # A contraction lead ("it's", "that's", "here's") ends in -s but is
         # "<subject> is", not an action verb -> never verbish.
         verbish = bool(verb) and "'" not in verb and "’" not in verb and (
@@ -1118,13 +1207,13 @@ def is_whole_line_stage_action(text: Any, *, max_words: int = 32) -> bool:
             or verb.endswith("ed")
             or (verb.endswith("s") and len(verb) > 2)
         )
-        if not (whitelisted or verbish):
+        if not (whitelisted or verbish or subject_action):
             return False
         # BN-1: a non-whitelisted lead needs a comma-separated action chain (the
         # real heatwave-b008 "snaps..., jams..., turning..." signature), so a
         # short non-action 3rd-person line ("She knows the code.") -- subject +
         # cognition verb, no chain -- is never swept up.
-        if not whitelisted and "," not in norm:
+        if not whitelisted and not subject_action and "," not in norm:
             return False
         return True
     except Exception:  # noqa: BLE001
@@ -1169,6 +1258,419 @@ def flag_personal_cost_boilerplate(
         return False, ""
     except Exception:  # noqa: BLE001
         return False, ""
+
+
+# ---------------------------------------------------------------------------
+# Total craft-hygiene floor (2026-07-20).
+#
+# A quality gate is a rewrite request, not an episode terminal.  Callers spend
+# their bounded model repair ladder first, then hand only the still-flagged gate
+# names to this leaf.  The floor is deliberately small, SFW, period-neutral,
+# deterministic, and idempotent.  It never handles content safety; the ledger's
+# G9 safety stop remains downstream and fail-closed.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class HygieneFloorResult:
+    """Result of one deterministic spoken-line hygiene floor."""
+
+    text: str
+    requested_gates: "tuple[str, ...]" = ()
+    actions: "tuple[str, ...]" = ()
+
+
+_STAGE_BUSINESS_FLOOR_REPLACEMENTS = tuple(
+    (re.compile(pattern, re.IGNORECASE), replacement)
+    for pattern, replacement in (
+        (r"\bI['\u2019]ll go check\b", "I need the answer"),
+        (r"\bI['\u2019]ll double[ -]check\b", "I need to be certain"),
+        (r"\bI['\u2019]ll lock (?:it |everything |the \w+ )?down\b", "No one gets through"),
+        (r"\bI['\u2019]ve got this,? no need\b", "Stay back"),
+        (r"\blet me handle (?:it|this)\b", "Leave this to me"),
+    )
+)
+
+_ON_THE_NOSE_FLOOR_REPLACEMENTS = tuple(
+    (re.compile(pattern, re.IGNORECASE), replacement)
+    for pattern, replacement in (
+        (
+            r"\bI['\u2019]?m (?:so |really |very )?"
+            r"(?:scared|afraid|terrified|worried|nervous)\b",
+            "My hands will not keep still",
+        ),
+        (
+            r"\bI am (?:so |really |very )?"
+            r"(?:scared|afraid|terrified|worried|nervous)\b",
+            "My hands will not keep still",
+        ),
+        (
+            r"\bI feel (?:so |really |very )?"
+            r"(?:scared|afraid|terrified)\b",
+            "My hands will not keep still",
+        ),
+        (
+            r"\bthis is (?:so |really |very )?"
+            r"(?:dangerous|terrifying|scary|serious)\b",
+            "One wrong move will cost us",
+        ),
+        (
+            r"\bI['\u2019]?m feeling (?:scared|afraid|terrified)\b",
+            "My hands will not keep still",
+        ),
+    )
+)
+
+_ROLE_LABEL_FLOOR_RE = re.compile(
+    r"^\s*(?:ANNOUNCER|[A-Z][A-Z0-9_ ]{1,30}|"
+    r"[A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*){0,3})\s*:\s*",
+)
+_WRAPPED_QUOTE_FLOOR_RE = re.compile(r"^\s*([\"'])(.*)\1\s*$", re.DOTALL)
+_BRACKETED_FLOOR_RE = re.compile(
+    r"\[[^\]]*\]|\{[^}]*\}|<[^<>\r\n]{1,100}>"
+)
+_NON_LEXICAL_FLOOR_STRIP = ".,!?;:'\u2019-"
+
+
+def _floor_clean_spacing(text: Any) -> str:
+    """Collapse floor debris without manufacturing spoken content."""
+    try:
+        out = _WS.sub(" ", str(text or "")).strip()
+        out = re.sub(r"\s+([.,!?;:])", r"\1", out)
+        out = re.sub(r"([,;:])(?:\s*[,;:])+", r"\1", out)
+        return out.strip(" ,;:-")
+    except Exception:  # noqa: BLE001
+        return str(text or "")
+
+
+def _floor_terminate(text: Any) -> str:
+    """Make a nonempty floor result a complete, speakable sentence."""
+    out = _floor_clean_spacing(text)
+    if not out:
+        return ""
+    if out[-1] not in ".!?":
+        out += "."
+    return out
+
+
+def _replace_floor_patterns(
+    text: str,
+    rows: Any,
+) -> "tuple[str, bool]":
+    out = text
+    changed = False
+    for rx, replacement in rows:
+        newer = rx.sub(replacement, out)
+        if newer != out:
+            changed = True
+            out = newer
+    return _floor_clean_spacing(out), changed
+
+
+def _strip_extra_anchors(text: str, anchors: Any) -> "tuple[str, bool]":
+    """Keep the first present specificity anchor and remove later ones."""
+    try:
+        out = text
+        present: list[str] = []
+        seen: set[str] = set()
+        low = out.casefold()
+        for raw in anchors or ():
+            anchor = str(raw or "").strip()
+            key = anchor.casefold()
+            if not anchor or key in seen:
+                continue
+            seen.add(key)
+            if key in low:
+                present.append(anchor)
+        if len(present) < 2:
+            return out, False
+        # Rebuilding a compact spoken instruction is safer than deleting list
+        # items in place ("A, B, and C" otherwise becomes "A, and"). It keeps
+        # one story-specific anchor, so the floor remains contextual rather than
+        # a canned line, and deterministically clears the >=3-anchor gate.
+        return _floor_terminate(f"Keep {present[0]} in mind"), True
+    except Exception:  # noqa: BLE001
+        return text, False
+
+
+def _trim_to_one_breath(text: str, max_spoken_words: int = 20) -> str:
+    """Return complete sentences that fit one breath, never a cut fragment.
+
+    A raw token slice can manufacture an apparently punctuated truncation
+    (``your muscles will.`` / ``a body that feels like a.``). Prefer as many
+    already-complete sentences as fit the budget. If the first authored
+    sentence itself is over budget, use a small SFW spoken floor instead of
+    guessing where its grammar can be cut safely.
+    """
+    try:
+        normalized = _floor_clean_spacing(text)
+        if not normalized:
+            return ""
+        if len(re.findall(r"[A-Za-z']+", normalized)) <= max_spoken_words:
+            return _floor_terminate(normalized)
+
+        # Keep terminal punctuation with each sentence. A non-terminal tail is
+        # intentionally excluded: it is exactly the material a token slice
+        # used to turn into a plausible-looking fragment.
+        complete = re.findall(r"[^.!?]+[.!?]+(?:[\"')\]]+)?", normalized)
+        accepted: list[str] = []
+        accepted_words = 0
+        for sentence in complete:
+            sentence = _floor_clean_spacing(sentence)
+            sentence_words = len(re.findall(r"[A-Za-z']+", sentence))
+            if not sentence_words:
+                continue
+            if accepted_words + sentence_words > max_spoken_words:
+                break
+            accepted.append(sentence)
+            accepted_words += sentence_words
+        if accepted:
+            return _floor_clean_spacing(" ".join(accepted))
+
+        # No complete authored sentence fits. Semantic compression is an
+        # authoring decision; the deterministic last rung chooses guaranteed
+        # speakability over fabricating a grammatical edge.
+        return "That is enough."
+    except Exception:  # noqa: BLE001
+        return "That is enough." if str(text or "").strip() else ""
+
+
+def deterministic_hygiene_floor(
+    text: Any,
+    gates: Any,
+    *,
+    speaker_name: Any = "",
+    allowed_all_caps: Any = (),
+    beat_objective: Any = "",
+    anchors: Any = (),
+    rules: Any = None,
+) -> "HygieneFloorResult":
+    """Resolve named craft/spoken-form gates without another model call.
+
+    ``gates`` is supplied by the caller's authoritative validator.  Supported
+    names are ``cliche``, ``stage_business``, ``stage_direction``,
+    ``on_the_nose``, ``anchor_stuffing``, ``one_breath``, ``personal_cost``,
+    ``objective_literal``, ``thesis``/``thesis_close``, ``spoken_format``,
+    ``all_caps``, ``self_vocative``, ``non_lexical``, and
+    ``truncated``/``truncation``. Unknown names are a no-op. A truly empty input
+    remains empty: that is a mechanical row defect, not permission to invent
+    dialogue. Pure; deterministic; never raises.
+    """
+    try:
+        original = "" if text is None else str(text)
+        requested = tuple(dict.fromkeys(
+            str(g or "").strip() for g in (gates or ()) if str(g or "").strip()
+        ))
+        if not requested:
+            return HygieneFloorResult(text=original)
+        wanted = set(requested)
+        supported = {
+            "cliche", "stage_business", "stage_direction", "on_the_nose",
+            "anchor_stuffing", "one_breath", "personal_cost",
+            "objective_literal", "thesis", "thesis_close", "spoken_format",
+            "all_caps", "self_vocative", "non_lexical", "truncated",
+            "truncation",
+        }
+        if not wanted.intersection(supported):
+            return HygieneFloorResult(
+                text=original,
+                requested_gates=requested,
+            )
+        out = original
+        actions: list[str] = []
+        original_stage_only = (
+            is_stage_direction_only(original)
+            or is_non_dialogue_stage_line(original, speaker_name)
+        )
+
+        if "spoken_format" in wanted:
+            newer = out.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+            newer = _ROLE_LABEL_FLOOR_RE.sub("", newer)
+            wrapped = _WRAPPED_QUOTE_FLOOR_RE.match(newer)
+            if wrapped:
+                newer = wrapped.group(2)
+            newer = _BRACKETED_FLOOR_RE.sub(" ", newer)
+            newer = scrub_parentheticals(newer)
+            newer = newer.replace("`", "").replace("*", "")
+            newer = re.sub(r"^\s*-\s+", "", newer)
+            newer = _floor_clean_spacing(newer)
+            wrapped = _WRAPPED_QUOTE_FLOOR_RE.match(newer)
+            if wrapped:
+                newer = _floor_clean_spacing(wrapped.group(2))
+            if newer != out:
+                actions.append("spoken_format")
+                out = newer
+
+        if "self_vocative" in wanted:
+            newer = scrub_self_vocative(out, speaker_name)
+            if newer != out:
+                actions.append("self_vocative")
+                out = newer
+
+        if "all_caps" in wanted:
+            allowed = {str(v) for v in (allowed_all_caps or ())}
+
+            def _caps(mm: "re.Match") -> str:
+                token = mm.group(0)
+                return token if token in allowed else token.capitalize()
+
+            newer = re.sub(
+                r"(?<![A-Za-z0-9])[A-Z]{2,}(?![A-Za-z0-9])",
+                _caps, out,
+            )
+            if newer != out:
+                actions.append("all_caps")
+                out = newer
+
+        if "non_lexical" in wanted:
+            # Earlier spacing cleanup can attach a punctuation-only token to
+            # the preceding word ("STOP ... now" -> "STOP... now"). Remove
+            # that multi-mark run before the exact token filter below.
+            out = re.sub(
+                r"(?<=\w)[.,!?;:'\u2019-]{2,}(?=\s|$)", " ", out,
+            )
+            kept = [
+                token for token in _WS.sub(" ", out).strip().split(" ")
+                if token and token.strip(_NON_LEXICAL_FLOOR_STRIP)
+            ]
+            newer = _floor_clean_spacing(" ".join(kept))
+            if newer != out:
+                actions.append("non_lexical")
+                out = newer
+
+        if "stage_direction" in wanted:
+            if original_stage_only and original.strip():
+                out = repair_non_dialogue_stage_line(original)
+                actions.append("stage_business_spoken_rephrase")
+            dialogue, action, _reason = split_stage_business(out)
+            if action and dialogue:
+                out = dialogue
+                actions.append("stage_business_split")
+            newer, changed, _reason = strip_quote_anchored_stage_direction(out)
+            if changed:
+                out = newer
+                actions.append("stage_business_quote_strip")
+            newer = scrub_leading_stage_direction(out)
+            if newer != out:
+                out = newer
+                actions.append("stage_business_leading_strip")
+            still_stage = (
+                is_stage_direction_only(out)
+                or detect_stage_business_for_reroll(
+                    out, str(speaker_name or ""),
+                )[0]
+                or is_whole_line_stage_action(out)
+                or detect_narration_self_address(out, speaker_name)
+            )
+            if still_stage and original.strip():
+                out = "It moved."
+                actions.append("stage_business_spoken_rephrase")
+
+        if "stage_business" in wanted:
+            newer, changed = _replace_floor_patterns(
+                out, _STAGE_BUSINESS_FLOOR_REPLACEMENTS,
+            )
+            if changed:
+                actions.append("stage_business_rephrase")
+                out = newer
+            if flag_stage_business(out, rules=rules)[0]:
+                out = "I will do it."
+                actions.append("stage_business_floor")
+
+        if "cliche" in wanted:
+            for _ in range(16):
+                newer = repair_cliche_span(out, rules=rules)
+                if newer == out:
+                    break
+                out = newer
+                actions.append("cliche_span")
+            if flag_cliche(out, rules=rules)[0]:
+                out = "We need another way."
+                actions.append("cliche_floor")
+
+        if "on_the_nose" in wanted:
+            newer, changed = _replace_floor_patterns(
+                out, _ON_THE_NOSE_FLOOR_REPLACEMENTS,
+            )
+            if changed:
+                actions.append("on_the_nose_rephrase")
+                out = newer
+            if flag_on_the_nose(out, rules=rules)[0]:
+                out = "I can feel it."
+                actions.append("on_the_nose_floor")
+
+        if "personal_cost" in wanted:
+            patterns = (
+                rules.personal_cost if rules is not None
+                else _PERSONAL_COST_BOILERPLATE_RES
+            )
+            changed = False
+            for rx in patterns:
+                newer = rx.sub("the concrete loss", out)
+                if newer != out:
+                    changed = True
+                    out = newer
+            if changed:
+                actions.append("personal_cost_rephrase")
+                out = _floor_clean_spacing(out)
+            if flag_personal_cost_boilerplate(out, rules=rules)[0]:
+                out = "It is all at risk."
+                actions.append("personal_cost_floor")
+
+        if "anchor_stuffing" in wanted:
+            newer, changed = _strip_extra_anchors(out, anchors)
+            if changed:
+                actions.append("anchor_trim")
+                out = newer
+            if flag_anchor_stuffing(out, anchors)[0]:
+                out = "Keep it."
+                actions.append("anchor_floor")
+
+        # A phrase made entirely from short/function words cannot re-trip the
+        # objective-literal detector, whose content words are >=4 characters.
+        if "objective_literal" in wanted and flag_objective_literal(
+                out, beat_objective)[0]:
+            out = "Do it now."
+            actions.append("objective_rephrase")
+
+        if "thesis" in wanted or "thesis_close" in wanted:
+            if flag_thesis_close(out, rules=rules)[0]:
+                out = "At dawn, one lamp still burns beside the empty chair."
+                actions.append("thesis_image")
+
+        if "one_breath" in wanted:
+            newer = _trim_to_one_breath(out)
+            if newer != out:
+                actions.append("one_breath_trim")
+                out = newer
+
+        if "truncated" in wanted or "truncation" in wanted:
+            newer = re.sub(
+                r"\b(?:and|but|or|so|because|while|that|which|if|unless|"
+                r"although|though)\s*$",
+                "",
+                out,
+                flags=re.IGNORECASE,
+            ).rstrip(" ,;:-")
+            newer = _floor_terminate(newer)
+            if newer != out:
+                actions.append("truncation_close")
+                out = newer
+
+        # Formatting/phrase replacements can leave a bare fragment.  Finish a
+        # nonempty result, but never turn an empty mechanical row into dialogue.
+        out = _floor_terminate(out) if out.strip() else ""
+        return HygieneFloorResult(
+            text=out,
+            requested_gates=requested,
+            actions=tuple(dict.fromkeys(actions)),
+        )
+    except Exception:  # noqa: BLE001 -- the floor may never break a workflow
+        try:
+            fallback = "" if text is None else str(text)
+        except Exception:  # noqa: BLE001
+            fallback = ""
+        return HygieneFloorResult(text=fallback)
 
 
 def is_truncated(text: Any) -> bool:

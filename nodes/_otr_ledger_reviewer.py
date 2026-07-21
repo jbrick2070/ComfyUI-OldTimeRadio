@@ -1182,9 +1182,10 @@ def compute_edit_cap(voiced_beats: int) -> int:
     Story-Quality L5a (2026-06-23): the old `min(8, max(3, voiced_beats
     // 3))` capped a 18-beat episode at 6 edits. Dense, well-written
     prose (gemma-12b) routinely trips >6 plausible doctor edits, which
-    flips `too_many_edits` and HALTS the cascade BEFORE the story critic
-    (`_otr_freeze_cascade.py` terminal-skip at the reviewer composite) --
-    so the BEST writer's episodes were never arc-graded (verdict "?").
+    flips `too_many_edits`. That verdict used to halt the cascade before the
+    story critic; it is now quality-budget telemetry and continues through the
+    repair-then-ship path. A proportional cap still avoids discarding a useful
+    doctor batch and lets dense episodes reach arc grading.
     Scaling the cap to ~0.6 edits per voiced beat lets a dense episode
     absorb its rewrites and still reach the critic, while a short
     episode keeps a tight floor of 3.
@@ -1783,7 +1784,9 @@ def apply_doctor_edits(
     number of edits applied.
 
     Returns -1 if the doctor proposed MORE than `edit_cap` edits --
-    caller stamps `too_many_edits` and skips applying anything.
+    caller stamps `too_many_edits` and skips applying that doctor batch. The
+    freeze cascade treats this as quality-budget exhaustion and continues to
+    its repair-then-ship path.
 
     Wiring-review (2026-05-11): edits targeting a non-character beat
     are REJECTED, stamped on `meta.reviewer_doctor_rejected_edits[]`,

@@ -99,6 +99,9 @@ class TestWholeLineStageAction:
         "snaps off pen's tip, jams it into the decryption machine's port, "
         "turning it into scrap metal",
         "steps forward, revealing a keycard from the drawer",
+        "He opens the door.",
+        "She crosses the room.",
+        "They turn off the radio.",
     ])
     def test_action_chain_flagged(self, line):
         assert is_whole_line_stage_action(line) is True
@@ -231,12 +234,8 @@ class TestComposerQualityGate:
         assert "anchor_stuffing_retry" in res.compose_flags
 
     def test_reroll_not_better_keeps_original_and_stamps_degraded(self):
-        """3.4 re-verify: a reroll that swaps one cliche for another (same defect
-        count) is NOT kept -- the ORIGINAL draft is retained (not the worse
-        reroll), with quality_reroll_degraded. v2 baked in: the kept original's
-        cliche span is then deterministically repaired before shipping, so the
-        text is the cliche-repaired original (cliche_repaired) -- never the worse
-        reroll."""
+        """A same-defect reroll cannot ship; B runs, then the floor repairs the
+        stable best candidate (original wins the tie)."""
         draft = "You're playing with fire, Watson."
         worse = "Not on my watch, Watson."          # still one cliche
         calls = {"n": 0}
@@ -250,12 +249,14 @@ class TestComposerQualityGate:
         # whose rules do (pre-trim default behavior) to exercise the reroll.
         res = compose_line(creative_fn=mock, req=_req(),
                            source_bank_id="original")
-        assert calls["n"] == 2                       # one reroll attempted
+        assert calls["n"] == 3                       # A + lower-temp B
         assert res.text != worse                     # the worse reroll is rejected
         assert "Watson" in res.text                  # repaired original, not the reroll
-        assert "quality_reroll_degraded" in res.compose_flags
         assert "cliche_retry" in res.compose_flags
-        assert "cliche_repaired" in res.compose_flags
+        assert (
+            "hygiene_repaired_after_reroll:cliche:deterministic_floor"
+            in res.compose_flags
+        )
 
     def test_reroll_better_is_kept(self):
         draft = "You're playing with fire, Watson."
@@ -275,8 +276,7 @@ class TestComposerQualityGate:
         assert "quality_reroll_degraded" not in res.compose_flags
 
     def test_reroll_budget_bounded(self):
-        """A persistently stuffed draft rerolls at most once (the guard caps it);
-        the composer must not recurse without bound."""
+        """A persistently stuffed draft has a fixed A/B budget, then floors."""
         calls = {"n": 0}
 
         def mock(messages, *, temperature, max_new_tokens):
@@ -284,8 +284,13 @@ class TestComposerQualityGate:
             return _STUFFED                          # never improves
 
         res = compose_line(creative_fn=mock, req=_req())
-        assert calls["n"] == 2                       # initial + one quality reroll
-        assert res.text == _STUFFED
+        assert calls["n"] == 3                       # initial + A + B
+        assert not flag_anchor_stuffing(res.text, _ANCHORS)[0]
+        assert res.text
+        assert (
+            "hygiene_repaired_after_reroll:anchor_stuffing:deterministic_floor"
+            in res.compose_flags
+        )
 
 
 class TestCodaTruncationFlag:

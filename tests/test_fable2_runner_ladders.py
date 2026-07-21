@@ -13,6 +13,7 @@ the writer entry gates (r3/M4), and the pure-import pin (r4/M3).
 from __future__ import annotations
 
 import json
+import math
 import random
 import subprocess
 import sys
@@ -399,6 +400,10 @@ def _e2e_run(tmp_path, monkeypatch):
 def _budgeted_markup(target_words: int, *, revised: bool = False) -> str:
     """Exact-vector whole play used by compact/full boundary runs."""
     envelope = F2._build_envelope(target_words)
+    safe_words = (
+        "needle", "rises", "quietly", "beneath", "glass", "village",
+        "waits", "signal", "fades", "before", "dawn", "watcher",
+    )
     rows = [
         "TITLE: The Long Count",
         "MUSIC: slow theremin swell",
@@ -406,22 +411,28 @@ def _budgeted_markup(target_words: int, *, revised: bool = False) -> str:
     ]
     for scene_no, scene_target in enumerate(
             envelope.scene_word_targets, start=1):
-        sela_count = scene_target // 2 + scene_target % 2
-        darrow_count = scene_target - sela_count
-        opening = ["the", "record" if revised else "void"] \
-            if scene_no == 1 else [f"scene{scene_no}", "signal"]
-        sela_words = opening + [
-            f"s{scene_no}a{index}"
-            for index in range(sela_count - len(opening))
+        # Keep the exact scene vector while giving the real spoken-hygiene
+        # boundary realistic, alphabetic, one-breath rows.  The former
+        # alphanumeric filler (``s1a0`` etc.) counted as two spoken words and
+        # accidentally turned these routing fixtures into repair fixtures.
+        row_count = max(2, math.ceil(scene_target / 20))
+        quotient, remainder = divmod(scene_target, row_count)
+        row_targets = [
+            quotient + (1 if index < remainder else 0)
+            for index in range(row_count)
         ]
-        darrow_words = [
-            f"s{scene_no}d{index}" for index in range(darrow_count)
-        ]
-        rows.extend([
-            f"SCENE {scene_no}: instrument room {scene_no}",
-            "SELA: " + " ".join(sela_words),
-            "DARROW: " + " ".join(darrow_words),
-        ])
+        rows.append(f"SCENE {scene_no}: instrument room {scene_no}")
+        for row_index, row_target in enumerate(row_targets):
+            speaker = "SELA" if row_index % 2 == 0 else "DARROW"
+            opening = (
+                ["the", "record" if revised else "void"]
+                if scene_no == 1 and row_index == 0 else []
+            )
+            words = opening + [
+                safe_words[(scene_no + row_index + index) % len(safe_words)]
+                for index in range(row_target - len(opening))
+            ]
+            rows.append(f"{speaker}: " + " ".join(words))
         if scene_no < envelope.scene_count:
             rows.append(f"MUSIC: brief bridge after scene {scene_no}")
     rows.extend([
@@ -572,9 +583,9 @@ def _boundary_e2e_run(tmp_path, monkeypatch, *, target_words: int,
             return real_casting(
                 slot_fn, pack, final_draft, *args, **kwargs)
 
-        def _scan_spy(parsed):
+        def _scan_spy(parsed, treatment=None):
             captured["audit"].append(parsed)
-            return real_scan(parsed)
+            return real_scan(parsed, treatment)
 
         monkeypatch.setattr(F2, "choose_final_draft", _choose_spy)
         monkeypatch.setattr(F2, "_assemble", _assemble_spy)
@@ -774,12 +785,12 @@ class TestS2ModeExecution:
         winner = captured["selection"].winner
         assert len(captured["assemble"]) == 1
         assert len(captured["casting"]) == 1
-        assert len(captured["audit"]) == 1
+        assert len(captured["audit"]) == 2
         assert captured["assemble"][0] is winner
         assert captured["casting"][0] is winner
-        # P8 scans the WINNER's parsed script -- the same draft that was
-        # assembled, not a re-derived one.
-        assert captured["audit"][0] is winner.parsed
+        # Safety scans both immediately before assembly and again at P8; both
+        # inspect the exact winner surface, never a re-derived draft.
+        assert all(parsed is winner.parsed for parsed in captured["audit"])
         assert len(winner.p3_attempts) >= 1
         assert len(winner.p5_attempts) >= 1
         assert all(type(row) is F2.PassAttemptTrace

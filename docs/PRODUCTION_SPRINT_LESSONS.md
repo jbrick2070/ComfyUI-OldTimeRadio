@@ -55,9 +55,19 @@ IDs, ordering, references, exact enums, hashes, routing metadata, duplicate
 references with an unambiguous first owner, and relocation of values whose
 destination is uniquely declared.
 
-Python must not invent dialogue, motives, clues, story causality, visual taste,
-or sound-design decisions. If placement or meaning is ambiguous, return the
-defect to the owning model and fail closed when the bounded ladder exhausts.
+Python must not invent story ownership, grounding, or authoritative narrative
+decisions: motives, clues, causality, visual taste, sound-design decisions, or
+source claims. If placement or meaning is ambiguous, return the defect to the
+owning model and fail closed when the bounded ladder exhausts.
+
+The one narrow exception is a terminal spoken-surface hygiene floor after every
+bounded model repair rung has exhausted on a non-safety craft defect. It may
+strip action/markup, normalize speech-only tokens, trim a clause, or substitute
+a small generic SFW utterance whose value is delivery rather than story
+authority. It must not alter immutable evidence, grounding, graph ownership, or
+factual suffixes; it must validate the exact TTS projection, stamp the gate and
+resolving rung, and isolate an empty result to that row. Content safety and
+ambiguous structural defects remain fail-closed.
 
 A deterministic repair must validate the complete downstream contract before
 returning. A partially valid schema object can consume the repair rung and
@@ -363,6 +373,25 @@ rules that end the re-derivation: (1) removal DEPTH is set by whether a sibling 
 variant rip keeps the shared lane module, a full-family rip (the only version of its lane) deletes it;
 (2) retiring a bank that carried a live failure is a legitimate fix, but RECORD the PBUG -- ripping the
 lane must not rip the causal record. Gate on a green suite + retired-id absence, never a predicted count.
+
+## 26. Spoken craft gates repair and ship; they do not own episode liveness
+
+A craft or delivery-hygiene finding says that wording needs repair; it does not
+prove the ledger is structurally unrenderable. Spend the existing authored
+repair, then a lower-temperature gate-specific repair, then the alternate
+writer slot. If the model remains stubborn, apply a bounded deterministic SFW
+floor, re-run every applicable detector, and stamp the gate plus resolving rung.
+
+Validate the exact surface the voice engine will consume. Number and
+abbreviation expansion can make a canonical line fail one-breath or spoken-form
+checks only after delivery normalization. Content-owned lanes must repair that
+projection before rebuilding hashes, proofs, and seals; shared-ledger lanes need
+a final row scour before freeze and another guard after readiness normalization.
+
+Never route craft exhaustion to an episode terminal disposition. A deterministic
+floor that still yields empty or punctuation-only text creates a row-local
+mechanical failure. Genuine graph ambiguity and the G9 SFW/content-safety gate
+remain fail-closed.
 
 ## Sprint receipt
 

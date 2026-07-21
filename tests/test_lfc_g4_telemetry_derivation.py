@@ -147,13 +147,9 @@ class TestTelemetryDerivedFromBuckets:
                 f"{expected_bucket!r}"
             )
 
-    def test_terminal_run_telemetry_derives_correctly(self):
-        # On terminal-reviewer-verdict the cascade stamps
-        # terminal_skipped records for the downstream phases.
-        # Verify the telemetry derivation still matches.
-        # S33 B2 (2026-05-15): `cast_unrecoverable` retired; use
-        # `too_many_edits` -- still a terminal verdict, same
-        # telemetry-derivation path.
+    def test_quality_exhaustion_run_telemetry_derives_correctly(self):
+        # A reviewer quality-budget exhaustion now continues through the
+        # repair/freeze path; telemetry must remain purely re-derivable.
         led = _ledger([
             _line("l001", "c01", "character", "Hello."),
         ])
@@ -165,6 +161,7 @@ class TestTelemetryDerivedFromBuckets:
         stored = meta["freeze_phase_telemetry"]
         rederived = _LFC_ORCH.build_phase_telemetry(meta)
         assert stored == rederived
+        assert meta["freeze_verdict"].startswith("frozen")
 
     def test_idempotent_re_derivation(self):
         """build_phase_telemetry called twice on the same meta

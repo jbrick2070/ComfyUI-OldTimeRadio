@@ -3,7 +3,9 @@
 Architecture doc: docs/2026-07-10-scifi-fable2-architecture.md (sections
 3/5/7/8/9/11/13). Operator law: **Python judges; the LLM writes.** Every
 spoken ledger row is traceable to a named LLM artifact (the per-constituent
-proof gate); this module never writes, trims, or repairs a spoken word.
+proof gate). After authored repair rungs exhaust, the narrow deterministic
+craft floor may rewrite only a non-empty SFW surface before rebuilding every
+proof and FinalDraft seal.
 
 S2 scope (doc s13): P0 dossier -> deal -> P1 pitch (one pitch below 120
 words; three pitches at 120-900) -> P2a selection in full mode -> P2b
@@ -49,6 +51,8 @@ try:
     )
     from ._otr_repair_prompts import make_dispatching_repair_factory
     from ._otr_story_rules import StoryRules, resolve_story_rules
+    from ._otr_line_composer import LineRequest, repair_existing_spoken_line
+    from ._otr_readiness import normalize_for_delivery
     from ._otr_fable2_markup import (
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -78,6 +82,11 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         StoryRules,
         resolve_story_rules,
     )
+    from _otr_line_composer import (  # type: ignore
+        LineRequest,
+        repair_existing_spoken_line,
+    )
+    from _otr_readiness import normalize_for_delivery  # type: ignore
     from _otr_fable2_markup import (  # type: ignore
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -3262,7 +3271,8 @@ def choose_final_draft(draft1: FinalDraft, draft2: FinalDraft,
 def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
               cast_rows: "list[dict]", payload: "dict[str, Any]", *,
               envelope: SceneEnvelope, story_rules: StoryRules,
-              mode: Fable2Mode, owner_bank: str) -> None:
+              mode: Fable2Mode, owner_bank: str,
+              hygiene_receipts: "tuple[dict, ...]" = ()) -> None:
     """Emit ALL FIVE ledger hierarchies (r1/S2) with the proof gates.
     Incremental led.save() after the preamble and after each scene.
     Ambiguity = upstream reroll, never silent-fix; timing stays unset
@@ -3280,6 +3290,12 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
         entry.line_id: entry for entry in final_draft.proof_map
     }
     consumed_proof_ids: "set[str]" = set()
+    hygiene_by_line = {
+        str(receipt.get("line_id") or ""): receipt
+        for receipt in hygiene_receipts
+        if isinstance(receipt, dict)
+    }
+    meta = _ledger_meta(led)
 
     # Gate (b): parsed speaker set == cast row names (minus ANNOUNCER).
     spoken = set(_speakers_in_order(parsed))
@@ -3294,13 +3310,17 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
             and parsed.announcer_intro and parsed.announcer_outro
             and parsed.scenes):
         raise Fable2AssembleError("assemble", "skeleton incomplete")
-    # Gate (d): CHARACTER words within the band (post-P3-gate re-assert).
-    lo, hi = _word_band(envelope.total_words)
-    if not (lo <= parsed.character_word_count <= hi):
-        raise Fable2AssembleError(
-            "assemble",
-            f"character_word_count {parsed.character_word_count} outside "
-            f"{int(lo)}-{int(hi)}")
+    # Gate (d) retired: no count field may gate production. The markup ladder
+    # already spent its bounded rerolls; a residual total/scene count defect is
+    # operator-visible advice, not grounds to discard a complete play.
+    budget_defects = _script_budget_defects(parsed, envelope)
+    if budget_defects:
+        spoken_meta = _fable2_meta(led).setdefault("spoken_hygiene", {})
+        spoken_meta["advisory_budget_defects"] = list(budget_defects)
+        log.warning(
+            "[scifi_fable2] assembly word/scene budget remains advisory: %s",
+            "; ".join(budget_defects),
+        )
     # Gate (e): every cast member speaks (parser CAST_MEMBER_SILENT
     # guarantees; equality in gate (b) re-covers it).
 
@@ -3310,7 +3330,6 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
     }
 
     led.set_cast(cast_rows)
-    meta = _ledger_meta(led)
     meta["cast_status"] = "locked"
 
     scene_rows: "list[dict]" = []
@@ -3319,6 +3338,26 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
     line_rows: "list[dict]" = []
     music_rows: "list[dict]" = []
     proof_map: "list[dict]" = []
+
+    def _reapply_hygiene_rows() -> None:
+        """Restore repair/row-failure fields dropped by Ledger.set_lines."""
+        for emitted in led.data.get("lines") or []:
+            receipt = hygiene_by_line.get(
+                str(emitted.get("line_id") or "")
+            )
+            if receipt is None:
+                continue
+            emitted["compose_flags"] = list(
+                receipt.get("compose_flags") or []
+            )
+            if receipt.get("status") == "row_failed_mechanical":
+                emitted.update({
+                    "text": "",
+                    "char_count": 0,
+                    "word_count": 0,
+                    "skip": True,
+                    "tts_skip_reason": "spoken_hygiene_unspeakable_row",
+                })
 
     def _music_sentinel(shot_id: str, role: str, seq: int = 0) -> dict:
         # Exact sentinel row shape (r2/M5 + r3/M1): text "", char_id ==
@@ -3397,6 +3436,7 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
         line_rows.append(row)
         _beat(row, None, ANNOUNCER_NAME)
     led.set_lines(line_rows)
+    _reapply_hygiene_rows()
     led.save()
 
     # --- scenes -------------------------------------------------------
@@ -3441,6 +3481,7 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
                 "generation_prompt": cue,
             })
         led.set_lines(line_rows)
+        _reapply_hygiene_rows()
         led.save()
 
     # --- postamble: final shot. ALL fable2 announcer rows carry the
@@ -3496,6 +3537,7 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
     led.set_beats(beat_rows)
     led.set_lines(line_rows)
     led.set_music(music_rows)
+    _reapply_hygiene_rows()
 
     missing_proofs = sorted(set(proof_by_id) - consumed_proof_ids)
     if missing_proofs:
@@ -3574,16 +3616,432 @@ def _script_view(parsed: ParsedScript, treatment: Treatment,
     return "\n".join(lines)
 
 
-def _assert_no_weapons_or_smoking(parsed: ParsedScript) -> None:
+_TOBACCO_SAFETY_TERMS = frozenset({
+    "cigarette", "cigar", "smoking", "tobacco", "pipe smoke",
+    "ashtray", "lit a pipe", "lights a pipe", "smokes a", "lit up a",
+})
+
+
+def _deterministic_sfw_spoken_floor(text: str) -> "tuple[str, tuple[str, ...]]":
+    """Neutralize the closed weapons/tobacco vocabulary without a model."""
+    original = str(text or "")
+    hits = tuple(lexicon_hits(original, WEAPON_SMOKING_EVIDENCE))
+    if not hits:
+        return original, ()
+    out = original
+    for term in sorted(WEAPON_SMOKING_EVIDENCE, key=len, reverse=True):
+        replacement = "odor" if term in _TOBACCO_SAFETY_TERMS else "object"
+        out = _word_re(term).sub(replacement, out)
+    return _norm_ws(out), hits
+
+
+def _repair_final_draft_spoken_hygiene(
+    draft: FinalDraft,
+    treatment: Treatment,
+    envelope: SceneEnvelope,
+    story_rules: StoryRules,
+    *,
+    creative_fn,
+    technical_fn,
+    news_read_validator=None,
+) -> "tuple[FinalDraft, Treatment, tuple[dict, ...]]":
+    """Run B/C/floor on the selected play, then rebuild every seal.
+
+    Fable2 is content-owned: mutating its ledger after assembly would sever the
+    proof map from the accepted script. Repair the selected artifact itself,
+    re-render valid markup, reparse it, and call ``build_final_draft`` so raw,
+    normalized, parsed, proof-map, score, and artifact hashes all agree before
+    casting or assembly.
+    """
+    parsed = draft.parsed
+    character_constituents = sum(len(scene.lines) for scene in parsed.scenes)
+    per_line_target = max(
+        6,
+        int(envelope.total_words) // max(1, character_constituents),
+    )
+    anchor_words: list[str] = []
+    seen_anchors: set[str] = set()
+    for token in re.findall(
+        r"\b[A-Za-z][A-Za-z0-9'-]{3,}\b",
+        " ".join((treatment.news_thread, treatment.setting, treatment.title)),
+    ):
+        key = token.casefold()
+        if key in seen_anchors or key in {
+            "that", "this", "with", "from", "into", "their", "there",
+            "story", "radio", "drama",
+        }:
+            continue
+        seen_anchors.add(key)
+        anchor_words.append(token)
+        if len(anchor_words) >= 6:
+            break
+    canon_header = "\n".join((
+        f"TITLE: {treatment.title}",
+        f"SETTING: {treatment.setting}",
+        "Specificity anchors (use selectively):",
+        *(f"- {anchor}" for anchor in anchor_words),
+        "",
+        f"PREMISE: {treatment.dramatic_question}",
+    ))
+    receipts: list[dict] = []
+
+    def _repair(
+        text: str,
+        *,
+        line_id: str,
+        speaker: str,
+        role: str,
+        intent: str,
+        include_thesis: bool = False,
+        candidate_validator=None,
+        use_specificity_anchors: bool = True,
+    ) -> str:
+        safe_text, safety_hits = _deterministic_sfw_spoken_floor(text)
+
+        def _candidate_allowed(candidate: str) -> bool:
+            if lexicon_hits(candidate, WEAPON_SMOKING_EVIDENCE):
+                return False
+            if not callable(candidate_validator):
+                return True
+            try:
+                return bool(candidate_validator(candidate))
+            except Exception:  # noqa: BLE001 - reject an invalid repair
+                return False
+
+        req = LineRequest(
+            speaker=speaker,
+            intent=intent,
+            mood="",
+            target_words=max(1, len(str(safe_text or "").split())),
+            canon_header=(
+                canon_header
+                if use_specificity_anchors
+                else "\n".join((
+                    f"TITLE: {treatment.title}",
+                    f"SETTING: {treatment.setting}",
+                    f"PREMISE: {treatment.dramatic_question}",
+                ))
+            ),
+            last_lines=[],
+            speaker_role=role,
+            beat_objective=intent if role == "character" else "",
+            words_per_beat_range=(
+                (max(1, per_line_target - 3), per_line_target + 4)
+                if role == "character"
+                else (0, 0)
+            ),
+        )
+        result = repair_existing_spoken_line(
+            text=safe_text,
+            req=req,
+            creative_fn=creative_fn,
+            repair_fn=technical_fn,
+            story_rules=story_rules,
+            include_thesis=include_thesis,
+            candidate_validator=_candidate_allowed,
+            spoken_projection_fn=normalize_for_delivery,
+        )
+        # A model repair that invents an unsafe word, name, or numeral is not
+        # evidence. Discard it and run the deterministic floor from the last
+        # safe/grounded baseline; never launder the rejected candidate into a
+        # seal or give its rung credit.
+        if (
+            "hygiene_row_failed_mechanical" not in result.compose_flags
+            and (
+                "hygiene_repair_candidate_rejected" in result.compose_flags
+                or (
+                    result.text.strip()
+                    and not _candidate_allowed(result.text)
+                )
+            )
+        ):
+            result = repair_existing_spoken_line(
+                text=safe_text,
+                req=req,
+                creative_fn=None,
+                repair_fn=None,
+                story_rules=story_rules,
+                include_thesis=include_thesis,
+                candidate_validator=_candidate_allowed,
+                spoken_projection_fn=normalize_for_delivery,
+            )
+        if (
+            "hygiene_row_failed_mechanical" not in result.compose_flags
+            and (
+                "hygiene_repair_candidate_rejected" in result.compose_flags
+                or (
+                    result.text.strip()
+                    and not _candidate_allowed(result.text)
+                )
+            )
+        ):
+            # The ordinary total floor uses intentionally tiny utterances. A
+            # factual news read has an additional >=40-character schema and
+            # source-grounding validator, so those tiny choices can be clean
+            # dialogue yet still be rejected. Finish with a bounded, SFW,
+            # numeral/name-free sentence appropriate to this exact surface.
+            # It makes no new factual assertion and therefore passes the same
+            # grounding validator without laundering a rejected model repair.
+            emergency_candidates = (
+                (
+                    "The verified source record remains clear, and the facts "
+                    "stand as reported in tonight's account."
+                ),
+            ) if callable(candidate_validator) else (
+                (
+                    "At dawn, one lamp still burns beside the empty chair."
+                    if include_thesis
+                    else "I heard you clearly this time."
+                    if role == "character"
+                    else "One lamp still burns beside the empty chair."
+                ),
+                "Go now.",
+                "Yes.",
+            )
+            for emergency in emergency_candidates:
+                emergency_result = repair_existing_spoken_line(
+                    text=emergency,
+                    req=req,
+                    creative_fn=None,
+                    repair_fn=None,
+                    story_rules=story_rules,
+                    include_thesis=include_thesis,
+                    candidate_validator=_candidate_allowed,
+                    spoken_projection_fn=normalize_for_delivery,
+                )
+                if (
+                    emergency_result.text.strip()
+                    and "hygiene_row_failed_mechanical"
+                    not in emergency_result.compose_flags
+                    and "hygiene_repair_candidate_rejected"
+                    not in emergency_result.compose_flags
+                    and _candidate_allowed(emergency_result.text)
+                ):
+                    emergency_flags = list(
+                        emergency_result.compose_flags
+                    )
+                    for flag in (
+                        "hygiene_repaired_after_reroll",
+                        "hygiene_repaired_after_reroll:spoken_surface:"
+                        "deterministic_grounded_floor",
+                    ):
+                        if flag not in emergency_flags:
+                            emergency_flags.append(flag)
+                    result = replace(
+                        emergency_result,
+                        compose_flags=tuple(emergency_flags),
+                    )
+                    break
+        row_failed = "hygiene_row_failed_mechanical" in result.compose_flags
+        if row_failed:
+            failure_flags = [
+                flag for flag in result.compose_flags
+                if not str(flag).startswith(
+                    "hygiene_repaired_after_reroll"
+                )
+                and not str(flag).startswith("hygiene_floor_action:")
+                and flag != "hygiene_repair_candidate_rejected"
+            ]
+            if safety_hits:
+                failure_flags.append(
+                    "hygiene_safety_floor_applied_before_row_failure"
+                )
+            receipts.append({
+                "line_id": line_id,
+                "status": "row_failed_mechanical",
+                "original_sha256": _sha256(text),
+                "final_sha256": _sha256(""),
+                "compose_flags": list(dict.fromkeys(failure_flags)),
+                "repair_flags": [],
+            })
+            # Seal the deterministic SFW surface, never the unsafe original.
+            # Assembly consumes that proof and emits this one row as skipped.
+            return safe_text
+        if not result.text.strip() or not _candidate_allowed(result.text):
+            raise Fable2ScriptError(
+                "spoken_hygiene",
+                f"deterministic repair could not produce a safe grounded "
+                f"spoken row {line_id}",
+            )
+        compose_flags = list(result.compose_flags)
+        if safety_hits:
+            compose_flags.extend((
+                "hygiene_repaired_after_reroll",
+                "hygiene_repaired_after_reroll:safety:deterministic_sfw_floor",
+            ))
+        compose_flags = list(dict.fromkeys(compose_flags))
+        if (
+            result.text == text
+            and "hygiene_repaired_after_reroll" not in compose_flags
+        ):
+            return text
+        receipts.append({
+            "line_id": line_id,
+            "status": "repaired",
+            "original_sha256": _sha256(text),
+            "final_sha256": _sha256(result.text),
+            "compose_flags": compose_flags,
+            "repair_flags": [
+                flag for flag in compose_flags
+                if flag.startswith("hygiene_repaired_after_reroll:")
+            ],
+        })
+        return result.text
+
+    intro = tuple(
+        _repair(
+            text,
+            line_id=f"shot_000_b{index}",
+            speaker=ANNOUNCER_NAME,
+            role="announcer",
+            intent="Open the episode and orient the listener.",
+        )
+        for index, text in enumerate(parsed.announcer_intro, 1)
+    )
+    repaired_scenes = []
+    for scene in parsed.scenes:
+        # Assembly merges consecutive turns by the same speaker. Repair that
+        # exact final row surface here, then keep it as one parsed constituent
+        # so the rebuilt proof map and ledger stay one-to-one.
+        runs: list[list[Any]] = []
+        for line in scene.lines:
+            if runs and runs[-1][0] == line.speaker:
+                runs[-1][1].append(line)
+            else:
+                runs.append([line.speaker, [line]])
+        repaired_lines = []
+        for index, (speaker, run_lines) in enumerate(runs, 1):
+            merged = " ".join(line.text for line in run_lines)
+            repaired = _repair(
+                merged,
+                line_id=f"shot_{scene.n:03d}_b{index}",
+                speaker=speaker,
+                role="character",
+                intent=treatment.turn,
+            )
+            repaired_lines.append(replace(run_lines[0], text=repaired))
+        repaired_scenes.append(replace(scene, lines=tuple(repaired_lines)))
+
+    post_shot = f"shot_{parsed.scenes[-1].n + 1:03d}"
+    # Thesis validation belongs to the final actually speakable outro. A
+    # trailing punctuation-only row is a mechanical row failure and must not
+    # hide a moralizing close immediately before it.
+    last_speakable_outro_index = next((
+        index
+        for index, text in reversed(tuple(enumerate(
+            parsed.announcer_outro, 1,
+        )))
+        if re.search(r"[A-Za-z]", str(text or ""))
+    ), 0)
+    thesis_start_index = last_speakable_outro_index or 1
+    outro = tuple(
+        _repair(
+            text,
+            line_id=f"{post_shot}_b{index}",
+            speaker=ANNOUNCER_NAME,
+            role="announcer",
+            intent="Close on one concrete final image or sound.",
+            include_thesis=(index >= thesis_start_index),
+        )
+        for index, text in enumerate(parsed.announcer_outro, 1)
+    )
+    coda_index = len(outro) + 1
+    coda_spoken = parsed.coda.rstrip().rstrip(":").rstrip() + "."
+    coda = _repair(
+        coda_spoken,
+        line_id=f"{post_shot}_b{coda_index}",
+        speaker=ANNOUNCER_NAME,
+        role="announcer",
+        intent="Bridge from the fictional drama to the factual source close.",
+    )
+    # The terminal colon is the parser-owned structural pivot, not spoken
+    # prose. Re-impose it after an authored/floor replacement before reparsing.
+    coda = coda.rstrip().rstrip(".:\u2026").rstrip() + ":"
+    news_index = coda_index + 1
+    news_read = _repair(
+        treatment.news_close_read,
+        line_id=f"{post_shot}_b{news_index}",
+        speaker=ANNOUNCER_NAME,
+        role="announcer",
+        intent="Report the factual source close without fictional embellishment.",
+        candidate_validator=(
+            None
+            if not callable(news_read_validator)
+            else lambda candidate: news_read_validator(
+                NewsCloseRead(news_close_read=candidate)
+            ) is None
+        ),
+        use_specificity_anchors=False,
+    )
+    repaired_treatment = treatment.model_copy(
+        update={"news_close_read": news_read},
+    )
+    parsed_changed = (
+        intro != parsed.announcer_intro
+        or tuple(repaired_scenes) != parsed.scenes
+        or outro != parsed.announcer_outro
+        or coda != parsed.coda
+    )
+    if not receipts:
+        return draft, treatment, ()
+    if parsed_changed:
+        character_words = sum(
+            len(line.text.split())
+            for scene in repaired_scenes
+            for line in scene.lines
+        )
+        announcer_words = (
+            sum(len(text.split()) for text in intro)
+            + sum(len(text.split()) for text in outro)
+            + len(coda.split())
+        )
+        repaired_parsed = replace(
+            parsed,
+            announcer_intro=intro,
+            scenes=tuple(repaired_scenes),
+            announcer_outro=outro,
+            coda=coda,
+            character_word_count=character_words,
+            announcer_word_count=announcer_words,
+            normalizations=(),
+        )
+        raw_source = _script_view(
+            repaired_parsed, repaired_treatment, include_news_read=False,
+        )
+    else:
+        repaired_parsed = parsed
+        raw_source = draft.raw_source
+    rebuilt = build_final_draft(
+        raw_source,
+        repaired_parsed,
+        repaired_treatment,
+        envelope,
+        story_rules,
+        p3_attempts=draft.p3_attempts,
+        p5_attempts=draft.p5_attempts,
+    )
+    return rebuilt, repaired_treatment, tuple(receipts)
+
+
+def _assert_no_weapons_or_smoking(
+    parsed: ParsedScript,
+    treatment: "Treatment | None" = None,
+) -> None:
     """The one content rule that must never reach the air, proven not judged.
 
     Word-boundary scan of the shared weapons/tobacco lexicon over the SPOKEN
     text. No model opinion, no self-corroborating "evidence", no episode thrown
     away because an auditor felt uneasy about a clean line.
     """
-    spoken = "\n".join(
+    spoken_parts = list(parsed.announcer_intro)
+    spoken_parts.extend(
         ln.text for scene in parsed.scenes for ln in scene.lines
     )
+    spoken_parts.extend(parsed.announcer_outro)
+    spoken_parts.append(parsed.coda)
+    if treatment is not None:
+        spoken_parts.append(treatment.news_close_read)
+    spoken = "\n".join(spoken_parts)
     hits = lexicon_hits(spoken, WEAPON_SMOKING_EVIDENCE)
     if hits:
         raise Fable2AuditError(
@@ -3810,6 +4268,9 @@ def run_scifi_fable2_episode(
              0.20, 300)
     treatment = treatment.model_copy(
         update={"news_close_read": read.news_close_read})
+    news_read_validator = _make_read_validator(
+        dossier, provenance, digest, cast_names,
+    )
     f2["treatment"] = treatment.model_dump()
 
     # --- P3: script (markup ladder) ---------------------------------------
@@ -3915,6 +4376,42 @@ def run_scifi_fable2_episode(
         )
 
     final_draft = draft_selection.winner
+    counting_hygiene_creative, hygiene_creative_box = _counting(creative_fn)
+    counting_hygiene_technical, hygiene_technical_box = _counting(technical_fn)
+    with _helper_ctx(slot_scheduler, "fable2_spoken_hygiene"):
+        final_draft, treatment, hygiene_receipts = (
+            _repair_final_draft_spoken_hygiene(
+                final_draft,
+                treatment,
+                envelope,
+                story_rules,
+                creative_fn=counting_hygiene_creative,
+                technical_fn=counting_hygiene_technical,
+                news_read_validator=news_read_validator,
+            )
+        )
+    f2["spoken_hygiene"] = {
+        "schema_version": 1,
+        "status": "repaired" if hygiene_receipts else "clean_noop",
+        "creative_calls": hygiene_creative_box["calls"],
+        "technical_calls": hygiene_technical_box["calls"],
+        "repairs": list(hygiene_receipts),
+    }
+    if hygiene_receipts:
+        f2["treatment"] = treatment.model_dump()
+        log.warning(
+            "[scifi_fable2] total spoken hygiene repaired %d row(s) and "
+            "rebuilt the selected FinalDraft seals: %s",
+            len(hygiene_receipts),
+            ", ".join(
+                str(receipt.get("line_id") or "?") + "[" + ",".join(
+                    str(flag) for flag in (
+                        receipt.get("repair_flags") or ()
+                    )
+                ) + "]"
+                for receipt in hygiene_receipts
+            ),
+        )
     _validate_selected_final_draft(
         final_draft, envelope, story_rules, mode, treatment=treatment)
     f2["draft1_sha256"] = draft1.hashes.raw_sha256
@@ -3960,11 +4457,16 @@ def run_scifi_fable2_episode(
     cast_rows = _assign_voices(casting, menu, rng, speaker_order)
     f2["casting"] = [c.model_dump() for c in casting.cast]
 
+    # Safety is checked on every spoken surface before the first ledger save;
+    # the post-assembly check below remains the fail-closed backstop.
+    _assert_no_weapons_or_smoking(final_draft.parsed, treatment)
+
     # --- P7: assembly (pure python; proof gates; incremental saves) --------
     _assemble(
         led, final_draft, treatment, cast_rows, payload,
         envelope=envelope, story_rules=story_rules, mode=mode,
-        owner_bank=source_bank_row.source_bank_id)
+        owner_bank=source_bank_row.source_bank_id,
+        hygiene_receipts=hygiene_receipts)
     _receipt("assemble", "python", 0, 0.0, 0)
     # Ledger.save() replaces led.data with its merged payload. Reacquire
     # both mappings before every post-assembly mutation; caller aliases are
@@ -3981,7 +4483,7 @@ def run_scifi_fable2_episode(
     #
     # What survives is the one thing that must never reach the air, checked
     # directly on the spoken text with word boundaries.
-    _assert_no_weapons_or_smoking(final_draft.parsed)
+    _assert_no_weapons_or_smoking(final_draft.parsed, treatment)
     _receipt("safety_scan", "python", 0, 0.0, 0)
     f2["pass_receipts"] = receipts
     led.save()

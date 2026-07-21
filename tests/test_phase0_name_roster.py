@@ -26,7 +26,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes._otr_line_composer import (  # noqa: E402
     LineRequest,
     LineResult,
-    LineCompositionFailedError,
     aggregate_compose_flags,
     build_allowed_roster,
     compose_line,
@@ -368,12 +367,13 @@ class TestComposeLineLineResult:
         assert call_count["n"] == 2
         assert res.text == "Short reply."
 
-    def test_exhaustion_still_raises(self, roster):
+    def test_empty_exhaustion_is_a_row_local_mechanical_failure(self, roster):
         req = _req("ALICE", roster=roster)
         fn = _const_generate_fn("")
-        with pytest.raises(LineCompositionFailedError) as exc_info:
-            compose_line(creative_fn=fn, req=req)
-        assert exc_info.value.request.speaker == "ALICE"
+        result = compose_line(creative_fn=fn, req=req)
+        assert result.text == ""
+        assert "hygiene_row_failed_mechanical" in result.compose_flags
+        assert "hygiene_row_failed_mechanical:empty" in result.compose_flags
 
 
 # ---------------------------------------------------------------------------

@@ -46,8 +46,10 @@ UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 """
 from __future__ import annotations
 
+import hashlib
 import logging
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 
 log = logging.getLogger("OTR.reroll")
 
@@ -55,7 +57,9 @@ log = logging.getLogger("OTR.reroll")
 __all__ = [
     "MAX_REROLL_CYCLES",
     "RerollDisposition",
+    "SpokenHygieneRepairReport",
     "build_reroll_line_request",
+    "repair_ledger_spoken_hygiene",
     "run_targeted_reroll",
 ]
 
@@ -72,6 +76,7 @@ try:
         LineCompositionFailedError,
         build_voice_card,
         compose_line,
+        repair_existing_spoken_line,
     )
 except ImportError:  # pragma: no cover - standalone / test load
     from _otr_line_composer import (  # type: ignore
@@ -79,6 +84,7 @@ except ImportError:  # pragma: no cover - standalone / test load
         LineCompositionFailedError,
         build_voice_card,
         compose_line,
+        repair_existing_spoken_line,
     )
 
 try:
@@ -162,6 +168,16 @@ class RerollDisposition:
             "final_arc_verdict": self.final_report.arc_verdict,
             "final_reroll_targets": len(self.final_report.reroll_targets),
         }
+
+
+@dataclass(frozen=True)
+class SpokenHygieneRepairReport:
+    """Final ledger-surface craft repairs and their hash-only receipts."""
+
+    scanned: int
+    repaired: int
+    failed: int = 0
+    receipts: tuple[dict, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -379,7 +395,10 @@ def build_reroll_line_request(
         prev_speaker=prev_speaker,
         theme=str(meta.get("theme") or ""),
         all_voice_cards=all_voice_cards,
-        speaker_role="character",
+        speaker_role=(
+            str(line_row.get("speaker_role") or "character").strip()
+            or "character"
+        ),
         continuity_slice=continuity_slice,
         # STEP 6 -- the reconstructed dramatic frame.
         dramatic_question=str(_frame.get("dramatic_question") or ""),
@@ -468,6 +487,268 @@ def _rebuild_continuity_slice(
             speaker, beat_index, exc,
         )
         return ""
+
+
+def repair_ledger_spoken_hygiene(
+    ledger_data: dict,
+    *,
+    creative_fn,
+    repair_fn=None,
+    story_rules=None,
+    canon_header: str | None = None,
+) -> SpokenHygieneRepairReport:
+    """Scour the final voiced-row surface with B/C/floor total repair.
+
+    This is the common boundary for authoring paths that do not end inside
+    ``compose_line`` (grouped exchanges, announcer rewrites, the late radio
+    editor, and freeze-review edits). Clean rows are byte-identical and make no
+    model call. Content safety is deliberately absent; G9 remains fail-closed.
+    Empty/punctuation-only voiced rows are mechanical defects and are not filled
+    with canned speech.  If both model rungs and the deterministic floor cannot
+    make one speakable, that one row is muted with an observable row-local
+    failure stamp; the episode still proceeds.
+    """
+    if not isinstance(ledger_data, dict):
+        return SpokenHygieneRepairReport(scanned=0, repaired=0)
+    meta = ledger_data.setdefault("meta", {})
+    if story_rules is None:
+        try:
+            from ._otr_story_rules import DEFAULT_RULES_ID, get_story_rules, resolve_story_rules
+        except ImportError:  # pragma: no cover
+            from nodes._otr_story_rules import (  # type: ignore
+                DEFAULT_RULES_ID,
+                get_story_rules,
+                resolve_story_rules,
+            )
+        try:
+            story_rules = get_story_rules(meta)
+        except Exception as exc:  # noqa: BLE001 - the final scour is total
+            log.warning(
+                "[OTR_Reroll] could not resolve row-surface rules (%s); "
+                "using the content-neutral default pack",
+                exc,
+            )
+            story_rules = resolve_story_rules(DEFAULT_RULES_ID)
+    try:
+        from . import _otr_ledger as _OTRL
+        from ._otr_line_composer import aggregate_compose_flags
+    except ImportError:  # pragma: no cover
+        import _otr_ledger as _OTRL  # type: ignore
+        from _otr_line_composer import aggregate_compose_flags  # type: ignore
+
+    lines = ledger_data.get("lines") or []
+    cast_rows = ledger_data.get("cast") or []
+    def _is_news_coda_row(row: dict) -> bool:
+        return any(
+            str(flag).startswith("news_coda_")
+            for flag in (row.get("compose_flags") or ())
+        )
+
+    # Select the final craft-close in the *effective* surface. A trailing news
+    # coda has its own factual contract, and a punctuation-only row will be
+    # muted mechanically below; neither may mask the preceding thesis close.
+    last_announcer_id = next((
+        str(row.get("line_id") or row.get("beat_id") or "")
+        for row in reversed(lines)
+        if isinstance(row, dict)
+        and not row.get("skip")
+        and str(row.get("speaker_role") or "") == "announcer"
+        and str(row.get("text") or "").strip()
+        and re.search(r"[A-Za-z]", str(row.get("text") or ""))
+        and not _is_news_coda_row(row)
+    ), "")
+    receipts: list[dict] = []
+    failures: list[dict] = []
+    scanned = 0
+    for row in lines:
+        if not isinstance(row, dict) or row.get("skip"):
+            continue
+        role = str(row.get("speaker_role") or "").strip()
+        text = str(row.get("text") or "")
+        if role not in _VOICED_ROLES:
+            continue
+        scanned += 1
+        req = build_reroll_line_request(ledger_data, row, cast_rows)
+        req = replace(
+            req,
+            speaker_role=role,
+            canon_header=(
+                str(canon_header) if canon_header is not None
+                else req.canon_header
+            ),
+            beat_objective=(
+                req.beat_objective
+                or str(row.get("beat_intent") or "").strip()
+            ),
+        )
+        prior_flags = list(row.get("compose_flags") or [])
+        is_news_coda = _is_news_coda_row(row)
+        line_id = str(row.get("line_id") or row.get("beat_id") or "")
+        repair_text = text
+        protected_coda_suffix = ""
+        if is_news_coda:
+            bridge, separator, fact_tail = text.partition(":")
+            if separator and fact_tail.strip():
+                # The coda composer starves the model of this deterministic
+                # factual suffix. Later generic hygiene must preserve the same
+                # contract: repair only the bridge and reattach the suffix
+                # byte-for-byte after a clean result.
+                protected_coda_suffix = separator + fact_tail
+                repair_text = bridge.rstrip(" .!?;:") + "."
+        result = repair_existing_spoken_line(
+            text=repair_text,
+            req=req,
+            creative_fn=creative_fn,
+            repair_fn=repair_fn,
+            story_rules=story_rules,
+            include_thesis=(line_id == last_announcer_id and not is_news_coda),
+        )
+        row_failed = (
+            "hygiene_row_failed_mechanical" in result.compose_flags
+            or not result.text.strip()
+        )
+        if row_failed and protected_coda_suffix:
+            # A malformed bridge must not mute or rewrite the protected fact.
+            # This curated bridge passes the dedicated coda validator and keeps
+            # the factual suffix exact.
+            result = replace(
+                result,
+                text="Beyond tonight's tale.",
+                compose_flags=(
+                    "news_coda_fallback",
+                    "hygiene_repaired_after_reroll",
+                    "hygiene_repaired_after_reroll:news_coda_bridge:"
+                    "deterministic_floor",
+                ),
+            )
+            row_failed = False
+        if row_failed:
+            if line_id:
+                _OTRL.patch_line_text(ledger_data, line_id, "")
+                _OTRL.patch_line_fields(
+                    ledger_data,
+                    line_id,
+                    {
+                        "skip": True,
+                        "tts_skip_reason": "spoken_hygiene_unspeakable_row",
+                    },
+                )
+            else:
+                row.update({
+                    "text": "",
+                    "char_count": 0,
+                    "word_count": 0,
+                    "skip": True,
+                    "tts_skip_reason": "spoken_hygiene_unspeakable_row",
+                })
+            failure_flags = [
+                flag for flag in prior_flags
+                if not str(flag).startswith("hygiene_repaired_after_reroll")
+                and not str(flag).startswith("hygiene_floor_action:")
+            ]
+            for flag in result.compose_flags:
+                if flag not in failure_flags:
+                    failure_flags.append(flag)
+            row["compose_flags"] = failure_flags
+            failures.append({
+                "line_id": line_id,
+                "original_sha256": hashlib.sha256(
+                    text.encode("utf-8")
+                ).hexdigest(),
+                "failure": "spoken_hygiene_unspeakable_row",
+                "repair_flags": [
+                    flag for flag in result.compose_flags
+                    if flag.startswith("hygiene_row_failed_mechanical")
+                ],
+            })
+            continue
+        if "hygiene_repaired_after_reroll" not in result.compose_flags:
+            continue
+        final_text = result.text
+        if protected_coda_suffix:
+            final_text = (
+                result.text.rstrip(" .!?;:") + protected_coda_suffix
+            )
+        if not _OTRL.patch_line_text(ledger_data, line_id, final_text):
+            # A missing line id is a malformed-row condition, but the exact
+            # row object is already in hand.  Patch it locally so a craft
+            # repair can never escalate that unrelated defect to an episode
+            # terminal.
+            row.update({
+                "text": final_text,
+                "char_count": len(final_text),
+                "word_count": len(_OTRL._WORD_COUNT_RE.findall(final_text)),
+            })
+        merged_flags = list(prior_flags)
+        for flag in result.compose_flags:
+            if flag not in merged_flags:
+                merged_flags.append(flag)
+        _OTRL.patch_line_fields(
+            ledger_data, line_id, {"compose_flags": merged_flags},
+        )
+        receipts.append({
+            "line_id": line_id,
+            "original_sha256": hashlib.sha256(
+                text.encode("utf-8")
+            ).hexdigest(),
+            "final_sha256": hashlib.sha256(
+                final_text.encode("utf-8")
+            ).hexdigest(),
+            "repair_flags": [
+                flag for flag in result.compose_flags
+                if flag.startswith("hygiene_repaired_after_reroll:")
+            ],
+        })
+
+    if receipts:
+        existing = meta.get("hygiene_repaired_after_reroll")
+        combined = list(existing) if isinstance(existing, list) else []
+        combined.extend(receipts)
+        meta["hygiene_repaired_after_reroll"] = combined
+    if failures:
+        existing_failures = meta.get("hygiene_row_failures")
+        combined_failures = (
+            list(existing_failures)
+            if isinstance(existing_failures, list)
+            else []
+        )
+        combined_failures.extend(failures)
+        meta["hygiene_row_failures"] = combined_failures
+    if receipts or failures:
+        meta["compose_flag_summary"] = aggregate_compose_flags(ledger_data)
+        char_words = 0
+        announcer_words = 0
+        for row in lines:
+            if not isinstance(row, dict) or row.get("skip"):
+                continue
+            words = int(row.get("word_count") or 0)
+            if row.get("speaker_role") == "character":
+                char_words += words
+            elif row.get("speaker_role") == "announcer":
+                announcer_words += words
+        meta["character_word_count"] = char_words
+        meta["announcer_word_count"] = announcer_words
+        meta["total_word_count"] = char_words + announcer_words
+        ledger_data["total_word_count"] = char_words + announcer_words
+        word_budget = meta.get("word_budget")
+        if isinstance(word_budget, dict):
+            target_words = _coerce_positive_int(word_budget.get("target_words"))
+            if target_words:
+                ratio = char_words / target_words
+                band = word_budget.get("band")
+                try:
+                    low, high = float(band[0]), float(band[1])
+                except (TypeError, ValueError, IndexError):
+                    low, high = 0.7, 1.3
+                word_budget["actual_voiced_words"] = char_words
+                word_budget["actual_ratio"] = round(float(ratio), 3)
+                word_budget["actual_drift"] = not (low <= ratio <= high)
+    return SpokenHygieneRepairReport(
+        scanned=scanned,
+        repaired=len(receipts),
+        failed=len(failures),
+        receipts=tuple(receipts),
+    )
 
 
 def _coerce_report(raw) -> StoryCriticReport:

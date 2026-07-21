@@ -40,6 +40,7 @@ from typing import Iterable, Optional
 try:  # pragma: no cover - exercised by both import styles
     from ._otr_line_hygiene import (
         _hard_clauses,
+        deterministic_hygiene_floor,
         derive_one_breath_cap,
         detect_stage_business_for_reroll,
         extract_specificity_anchors_from_header,
@@ -52,15 +53,18 @@ try:  # pragma: no cover - exercised by both import styles
         flag_personal_cost_boilerplate,
         flag_stage_business,
         flag_thesis_close,
+        is_stage_direction_only,
         is_truncated,
         repair_cliche_span,
         scrub_roster_vocative,
+        scrub_self_vocative,
         strip_action_marker,
         verify_and_repair_line,
     )
 except ImportError:  # pragma: no cover
     from _otr_line_hygiene import (  # type: ignore
         _hard_clauses,
+        deterministic_hygiene_floor,
         derive_one_breath_cap,
         detect_stage_business_for_reroll,
         extract_specificity_anchors_from_header,
@@ -73,9 +77,11 @@ except ImportError:  # pragma: no cover
         flag_personal_cost_boilerplate,
         flag_stage_business,
         flag_thesis_close,
+        is_stage_direction_only,
         is_truncated,
         repair_cliche_span,
         scrub_roster_vocative,
+        scrub_self_vocative,
         strip_action_marker,
         verify_and_repair_line,
     )
@@ -105,6 +111,8 @@ __all__ = [
     "LineResult",
     "LineCompositionFailedError",
     "compose_line",
+    "repair_existing_spoken_line",
+    "spoken_surface_flags_for_line",
     "strip_line_formatting",
     "build_allowed_roster",
     "build_banned_source_proper_nouns",
@@ -137,6 +145,8 @@ __all__ = [
 _BASE_TEMPERATURE = 0.8
 _MAX_NEW_TOKENS_PER_LINE = 200  # ~150 words max, generous for any beat
 _MAX_OVERSIZE_RATIO = 3.0       # response > 3x target_words triggers retry
+_QUALITY_REPAIR_B_TEMPERATURE = 0.30
+_QUALITY_REPAIR_C_TEMPERATURE = 0.18
 
 # Format-strip regexes (applied in order in strip_line_formatting)
 _PREFIX_VOICE_TAG_RE = re.compile(
@@ -2330,7 +2340,7 @@ def compose_line_draft(
 # speaker_role == "character"). Returns [(code, reason, compose_flag), ...] in a
 # STABLE order. Pure; deterministic; never raises.
 _QUALITY_HINT_PRIORITY = (
-    "one_breath", "anchor_stuffing", "personal_cost", "cliche",
+    "stage_direction", "one_breath", "anchor_stuffing", "personal_cost", "cliche",
     "stage_business", "on_the_nose", "objective_literal",
 )
 #: one_breath + anchor_stuffing co-occur and share the rewrite -> one combined
@@ -2362,6 +2372,27 @@ def _quality_flags_for_line(cleaned, req, *, rules=None):
         _h, _r = flag_stage_business(cleaned, rules=rules)
         if _h:
             flags.append(("stage_business", _r, "stage_business"))
+        # The detector needs the locked speaker name to catch an otherwise
+        # lexical whole-line action such as "Edna stares at the sealed vial."
+        # as narration by Edna, while leaving references to other people alone.
+        _sd_hit, _sd_hint, _sd_reason = detect_stage_business_for_reroll(
+            cleaned, getattr(req, "speaker", ""),
+        )
+        if is_stage_direction_only(cleaned):
+            _sd_hit = True
+            _sd_reason = "whole_line_action"
+            _sd_hint = (
+                "the line contains only stage business; write words the "
+                "character can actually speak"
+            )
+        if _sd_hit:
+            flags.append((
+                "stage_direction",
+                _sd_hint or (
+                    "remove every stage direction and write only spoken dialogue"
+                ),
+                f"stage_direction:{_sd_reason or 'detected'}",
+            ))
         _h, _r = flag_on_the_nose(cleaned, rules=rules)
         if _h:
             flags.append(("on_the_nose", _r, "on_the_nose"))
@@ -2398,6 +2429,141 @@ def _quality_flags_for_line(cleaned, req, *, rules=None):
         return []
 
 
+def _surface_allowed_all_caps(req, explicit=()) -> frozenset[str]:
+    """Grounded acronyms/names that a final spoken surface may retain."""
+    allowed = {
+        str(value).strip()
+        for value in (explicit or ())
+        if str(value).strip()
+    }
+    allowed.update(
+        str(value).strip()
+        for value in (getattr(req, "allowed_roster", ()) or ())
+        if str(value).strip()
+    )
+    allowed.update(_COMMON_ALLCAPS_NON_NAMES)
+    header = str(getattr(req, "canon_header", "") or "")
+    allowed.update(match.group(0) for match in _ALL_CAPS_TOKEN_RE.finditer(header))
+    return frozenset(allowed)
+
+
+def spoken_surface_flags_for_line(
+    text,
+    req,
+    *,
+    rules=None,
+    include_thesis: bool = False,
+    allowed_all_caps=(),
+):
+    """Authoritative final-row spoken/craft scorer.
+
+    Ordinary ``compose_line`` keeps its role-sensitive creative scorer. Final
+    authoring boundaries need the wider contract: mechanical spoken form,
+    truncation, and the full craft suite apply to every voiced role, including
+    announcer rows written by whole-script lanes. Pure and never-raise.
+    """
+    try:
+        value = str(text or "")
+        if not value.strip():
+            return [("empty", "write one nonempty speakable line", "empty")]
+        flags = list(_quality_flags_for_line(value, req, rules=rules))
+        codes = {code for code, _reason, _flag in flags}
+
+        stripped = _strip_named_prefix(strip_line_formatting(value), req)
+        if (
+            stripped != value.strip()
+            or any(ch in value for ch in "[]{}<>()\n\r\t`*")
+        ):
+            flags.append((
+                "spoken_format",
+                "remove labels, wrappers, markup, and production notes",
+                "spoken_format",
+            ))
+            codes.add("spoken_format")
+
+        if scrub_self_vocative(value, getattr(req, "speaker", "")) != value:
+            flags.append((
+                "self_vocative",
+                "do not begin by addressing the speaker's own name",
+                "self_vocative",
+            ))
+            codes.add("self_vocative")
+
+        allowed = _surface_allowed_all_caps(req, allowed_all_caps)
+        if any(
+            match.group(0) not in allowed
+            for match in _ALL_CAPS_TOKEN_RE.finditer(value)
+        ):
+            flags.append((
+                "all_caps",
+                "use normal spoken casing except grounded acronyms",
+                "all_caps",
+            ))
+            codes.add("all_caps")
+
+        if (
+            not re.search(r"[A-Za-z]", value)
+            or any(
+                not token.strip(".,!?;:'\u2019-") for token in value.split()
+            )
+        ):
+            flags.append((
+                "non_lexical",
+                "remove punctuation-only tokens",
+                "non_lexical",
+            ))
+            codes.add("non_lexical")
+
+        if is_truncated(value):
+            flags.append((
+                "truncated",
+                "finish the thought as a complete spoken sentence",
+                "truncated",
+            ))
+            codes.add("truncated")
+
+        # Whole-script and announcer lanes bypass the character-only creative
+        # scorer, so add its context-dependent craft gates role-neutrally here.
+        if getattr(req, "speaker_role", "") != "character":
+            anchors = extract_specificity_anchors_from_header(
+                getattr(req, "canon_header", ""),
+            )
+            if "anchor_stuffing" not in codes:
+                hit, reason = flag_anchor_stuffing(value, anchors)
+                if hit:
+                    flags.append(("anchor_stuffing", reason, "anchor_stuffing"))
+            if "one_breath" not in codes:
+                cap = derive_one_breath_cap(
+                    getattr(req, "words_per_beat_range", (0, 0)),
+                )
+                hit, reason = flag_one_breath(
+                    value,
+                    max_words=cap,
+                    max_clause_markers=max(3, cap // 8),
+                )
+                if hit:
+                    flags.append(("one_breath", reason, "one_breath"))
+            if "personal_cost" not in codes:
+                hit, reason = flag_personal_cost_boilerplate(value, rules=rules)
+                if hit:
+                    flags.append(("personal_cost", reason, "personal_cost"))
+            objective = str(getattr(req, "beat_objective", "") or "").strip()
+            if objective and "objective_literal" not in codes:
+                hit, reason = flag_objective_literal(value, objective)
+                if hit:
+                    flags.append(("objective_literal", reason, "objective_literal"))
+
+        if include_thesis and flag_thesis_close(value, rules=rules)[0]:
+            flags.append((
+                "thesis_close",
+                flag_thesis_close(value, rules=rules)[1],
+                "thesis_close",
+            ))
+        return list(dict.fromkeys(flags))
+    except Exception:  # noqa: BLE001 -- final scorers never break a render
+        return []
+
+
 def _quality_reroll_hint(flags) -> str:
     """W-D hint composition: TOP-1 by priority, EXCEPT one_breath+anchor_stuffing
     collapse into one combined rewrite. 240-char cap. Pure. The collapse hint is
@@ -2428,9 +2594,287 @@ def line_quality_defect_score(text, req, *, rules=None) -> int:
         return 0
 
 
+def _quality_codes(flags) -> "tuple[str, ...]":
+    return tuple(dict.fromkeys(code for code, _reason, _flag in (flags or ())))
+
+
+def _quality_critical_hint(flags, existing: str = "") -> str:
+    """Sharpen every still-open gate for the post-budget repair rungs."""
+    details = "; ".join(
+        f"{code}: {reason}" for code, reason, _flag in (flags or ())
+    )
+    critical = (
+        "CRITICAL SPOKEN-LINE REPAIR. Rewrite only this line as clean, natural, "
+        "SFW words the character can say aloud. Preserve the beat and meaning. "
+        "Resolve EVERY named hygiene defect; no stage action, markup, labels, "
+        "cliches, stated emotion, objective restatement, crammed anchors, or "
+        f"overlong breath. Defects: {details}"
+    )[:900]
+    return f"{existing}; {critical}" if existing else critical
+
+
+def _quality_stamp(result: LineResult, gates, rung: str) -> LineResult:
+    extra = ["hygiene_repaired_after_reroll"]
+    extra.extend(
+        f"hygiene_repaired_after_reroll:{gate}:{rung}" for gate in gates
+    )
+    merged = list(result.compose_flags)
+    for flag in extra:
+        if flag not in merged:
+            merged.append(flag)
+    return replace(result, compose_flags=tuple(merged))
+
+
+def _quality_floor_text(text, req, flags, *, rules=None):
+    """Run the pure floor to a fixed point under the authoritative scorer."""
+    out = str(text or "")
+    seen: list[str] = []
+    actions: list[str] = []
+    current = list(flags or ())
+    anchors = extract_specificity_anchors_from_header(
+        getattr(req, "canon_header", ""))
+    for _ in range(6):
+        if not current:
+            return out, tuple(seen), tuple(actions)
+        codes = _quality_codes(current)
+        for code in codes:
+            if code not in seen:
+                seen.append(code)
+        floor = deterministic_hygiene_floor(
+            out,
+            codes,
+            speaker_name=getattr(req, "speaker", ""),
+            beat_objective=getattr(req, "beat_objective", ""),
+            anchors=anchors,
+            rules=rules,
+        )
+        actions.extend(floor.actions)
+        if not floor.text or floor.text == out:
+            break
+        out = floor.text
+        current = _quality_flags_for_line(out, req, rules=rules)
+    current = _quality_flags_for_line(out, req, rules=rules)
+    if current and out.strip():
+        # The named per-gate floors above should normally converge. This final
+        # two-word utterance is the bounded totality proof for an unusual custom
+        # StoryRules pack whose patterns have no curated span replacement.
+        for code in _quality_codes(current):
+            if code not in seen:
+                seen.append(code)
+        for fallback in ("It moved.", "Go now.", "Yes."):
+            if not _quality_flags_for_line(fallback, req, rules=rules):
+                out = fallback
+                break
+        actions.append("total_craft_floor")
+    return out, tuple(seen), tuple(dict.fromkeys(actions))
+
+
+def repair_existing_spoken_line(
+    *,
+    text: str,
+    req: LineRequest,
+    creative_fn,
+    repair_fn=None,
+    story_rules=None,
+    include_thesis: bool = False,
+    candidate_validator=None,
+    spoken_projection_fn=None,
+) -> LineResult:
+    """Final B/C/floor scour for a voiced line authored outside compose_line.
+
+    Grouped exchanges and dedicated announcer rewrites intentionally bypass the
+    per-beat composer. The writer calls this at the final shared row boundary so
+    all source banks still receive the same craft guarantee. Clean input is
+    returned byte-identically and makes no model call. Content safety is not
+    handled here; G9 remains the downstream fail-closed authority.
+    """
+    original = str(text or "")
+
+    def _candidate_allowed(candidate: str) -> bool:
+        if not callable(candidate_validator):
+            return True
+        try:
+            return bool(candidate_validator(candidate))
+        except Exception:  # noqa: BLE001 - a validator rejects, never crashes
+            return False
+
+    def _project(candidate: str) -> str:
+        if not callable(spoken_projection_fn):
+            return str(candidate or "")
+        try:
+            projected = spoken_projection_fn(str(candidate or ""))
+            if isinstance(projected, tuple):
+                projected = projected[0] if projected else ""
+            return str(projected or "")
+        except Exception as exc:  # noqa: BLE001 -- keep repair total
+            log.warning(
+                "[OTR_LineComposer] spoken projection raised %s: %s; "
+                "scoring the canonical surface",
+                type(exc).__name__, str(exc)[:160],
+            )
+            return str(candidate or "")
+
+    def _flags(candidate: str):
+        return spoken_surface_flags_for_line(
+            _project(candidate),
+            req,
+            rules=story_rules,
+            include_thesis=include_thesis,
+        )
+
+    initial = _flags(original)
+    if not initial:
+        return LineResult(text=original)
+    seen = list(_quality_codes(initial))
+    current = original
+
+    def _call(fn, temperature: float) -> str:
+        open_flags = _flags(current)
+        prompt = _quality_critical_hint(open_flags)
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Repair one radio line. Scour the complete line for anything "
+                    "that does not sound like actual dialogue. Return only clean, "
+                    "natural, SFW vocabulary the named speaker can say aloud. "
+                    "Replace stage action with an in-character line serving the "
+                    "same beat; never return a cue, label, markup, or narration."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Speaker: {req.speaker}\n"
+                    f"Beat intent: {req.intent}\n"
+                    f"Locked context:\n{str(req.canon_header or '')[-1800:]}\n"
+                    f"Current line: {current}\n"
+                    f"Required repair: {prompt}"
+                ),
+            },
+        ]
+        try:
+            try:
+                raw = fn(
+                    messages,
+                    temperature=temperature,
+                    max_new_tokens=_MAX_NEW_TOKENS_PER_LINE,
+                    stop=list(_DEFAULT_STOP_STRINGS),
+                )
+            except TypeError:
+                raw = fn(
+                    messages,
+                    temperature=temperature,
+                    max_new_tokens=_MAX_NEW_TOKENS_PER_LINE,
+                )
+            return strip_line_formatting(raw or "")
+        except Exception as exc:  # noqa: BLE001 -- next rung owns recovery
+            log.warning(
+                "[OTR_LineComposer] final spoken repair call raised %s: %s",
+                type(exc).__name__, str(exc)[:160],
+            )
+            return ""
+
+    for fn, temperature, rung in (
+        (creative_fn, _QUALITY_REPAIR_B_TEMPERATURE, "repair_b_same_slot"),
+        (repair_fn, _QUALITY_REPAIR_C_TEMPERATURE, "repair_c_alternate_slot"),
+    ):
+        if not callable(fn):
+            continue
+        candidate = _call(fn, temperature)
+        if not candidate:
+            continue
+        candidate_flags = _flags(candidate)
+        for code in _quality_codes(candidate_flags):
+            if code not in seen:
+                seen.append(code)
+        if not _candidate_allowed(candidate):
+            continue
+        current = candidate
+        if not candidate_flags:
+            return _quality_stamp(LineResult(text=current), seen, rung)
+
+    actions: list[str] = []
+    for _ in range(6):
+        open_flags = _flags(current)
+        if not open_flags:
+            break
+        codes = _quality_codes(open_flags)
+        for code in codes:
+            if code not in seen:
+                seen.append(code)
+        # A content-owned lane can preserve canonical spelling while its TTS
+        # delivery projection expands numbers/abbreviations. If that exact
+        # spoken projection is the failing surface, make it the deterministic
+        # floor input and return the clean result as canonical; the caller then
+        # rebuilds every proof/seal around the words that will actually air.
+        floor = deterministic_hygiene_floor(
+            _project(current),
+            codes,
+            speaker_name=req.speaker,
+            allowed_all_caps=_surface_allowed_all_caps(req),
+            beat_objective=req.beat_objective,
+            anchors=extract_specificity_anchors_from_header(req.canon_header),
+            rules=story_rules,
+        )
+        actions.extend(floor.actions)
+        if not floor.text:
+            current = ""
+            break
+        if not _candidate_allowed(floor.text):
+            break
+        if floor.text == current:
+            break
+        current = floor.text
+    if _flags(current):
+        if not re.search(r"[A-Za-z]", current):
+            failure_flags = ["hygiene_row_failed_mechanical"]
+            failure_flags.extend(
+                f"hygiene_row_failed_mechanical:{gate}" for gate in seen
+            )
+            return LineResult(text="", compose_flags=tuple(failure_flags))
+        # Fixed current packs always converge above. This bounded final choice
+        # keeps the totality promise even if a future custom vocabulary pack
+        # unexpectedly flags a curated floor phrase.
+        candidates = (
+            "At dawn, one lamp still burns beside the empty chair."
+            if include_thesis else "It moved.",
+            "Go now.",
+            "Yes.",
+        )
+        for candidate in candidates:
+            if not _flags(candidate) and _candidate_allowed(candidate):
+                current = candidate
+                actions.append("total_craft_floor")
+                break
+    if _flags(current):
+        return LineResult(
+            text=original,
+            compose_flags=("hygiene_repair_candidate_rejected",),
+        )
+    if current and not _candidate_allowed(current):
+        return LineResult(
+            text=original,
+            compose_flags=("hygiene_repair_candidate_rejected",),
+        )
+    result = _quality_stamp(
+        LineResult(
+            text=current,
+            compose_flags=tuple(
+                f"hygiene_floor_action:{action}"
+                for action in dict.fromkeys(actions)
+            ),
+        ),
+        seen,
+        "deterministic_floor",
+    )
+    return result
+
+
 def compose_line(
     *,
     creative_fn,                # the generation slot -- all sub-passes
+    repair_fn=None,             # optional alternate/stronger writer for rung C
     req: LineRequest,
     max_attempts: int = 2,
     base_temperature: float = _BASE_TEMPERATURE,
@@ -2457,6 +2901,7 @@ def compose_line(
     _stage_dir_repair_attempted: bool = False,  # bare-stage-direction reroll guard
     _leak_repair_attempted: bool = False,  # leak-floor-v2 recompose guard
     _quality_repair_attempted: bool = False,  # clean-quality (3.2) reroll guard
+    _quality_floor_allowed: bool = True,  # outer repair ladder owns the floor
     # Stage 4 (2026-07-06): the resolved StoryRules for this episode's
     # source_bank. None => resolved ONCE at entry from source_bank_id
     # (fail-loud, OUTSIDE any swallow); forwarded on every recursive call so
@@ -2517,41 +2962,57 @@ def compose_line(
 
     # Stage 1 -- draft. The one creative job. Raises
     # LineCompositionFailedError on exhaustion (propagated unchanged).
-    cleaned = compose_line_draft(
-        creative_fn=creative_fn,
-        req=req,
-        max_attempts=max_attempts,
-        base_temperature=base_temperature,
-        max_new_tokens_cap=max_new_tokens_cap,
-        stop_strings=stop_strings,
-        creative_repo_id=creative_repo_id,
-        # D1: the bare stage-direction reroll now lives INSIDE the draft (the
-        # only tier that can reroll). Thread the guard so a recursive repair
-        # cannot trigger a second stage-direction reroll.
-        _stage_dir_repair_attempted=_stage_dir_repair_attempted,
-        source_bank_id=source_bank_id,  # Stage 2C
-    )
+    _q_retry_flags: tuple[str, ...] = ()
+    try:
+        cleaned = compose_line_draft(
+            creative_fn=creative_fn,
+            req=req,
+            max_attempts=max_attempts,
+            base_temperature=base_temperature,
+            max_new_tokens_cap=max_new_tokens_cap,
+            stop_strings=stop_strings,
+            creative_repo_id=creative_repo_id,
+            # D1: the bare stage-direction reroll now lives INSIDE the draft (the
+            # only tier that can reroll). Thread the guard so a recursive repair
+            # cannot trigger a second stage-direction reroll.
+            _stage_dir_repair_attempted=_stage_dir_repair_attempted,
+            source_bank_id=source_bank_id,  # Stage 2C
+        )
+    except LineCompositionFailedError as exc:
+        if not _quality_floor_allowed:
+            raise
+        # Mechanical/stage-only exhaustion occurs before the ordinary quality
+        # block. Preserve the last nonempty authored surface and continue with
+        # B/C/floor instead of letting one line abort the episode.
+        last_surface = next((
+            str(raw) for raw, _reason in reversed(exc.attempts)
+            if str(raw or "").strip()
+        ), "")
+        recovered = repair_existing_spoken_line(
+            text=last_surface,
+            req=req,
+            creative_fn=creative_fn,
+            repair_fn=repair_fn,
+            story_rules=_story_rules,
+        )
+        if not recovered.text:
+            return recovered
+        cleaned = recovered.text
+        _q_retry_flags = recovered.compose_flags
     word_count = len(cleaned.split())
     word_cap, min_words, max_words = _word_bands(req.target_words)
 
-    # Post-draft QUALITY reroll (S3: cliche + flat stage-business + on-the-nose).
-    # The bare stage-direction reroll moved into compose_line_draft (D1,
-    # 2026-06-22) -- detected on the RAW draft before format-strip, where the
-    # malformed/undelimited shapes are still intact; the freeze floor is the
-    # deterministic backstop. These remaining S3 craft gates still recompose via
-    # the existing recursive-repair pattern; the guard caps it at one level.
-    # Story-quality clean-quality gate (3.2, 2026-06-27). The shared
-    # _quality_flags_for_line scorer (MF-5) is the SINGLE source of truth: always
-    # -on cliche/stage-business/on-the-nose + the v2+character subset (anchor
-    # -stuffing, one-breath, personal-cost boilerplate, objective-literal). On any
-    # hit it recomposes ONCE through the existing recursive-repair pattern. The
-    # _quality_repair_attempted guard (next to _stage_dir / _leak) caps it at one
-    # level, and MF-1 threads ALL FOUR guards on the recursive call so a
-    # quality-reroll cannot re-open draft/leak/stage-3. _q_retry_flags is declared
-    # in outer scope so the exhaustion fall-through still stamps the breadcrumb;
-    # () when the gate did not fire so the flag-OFF path is byte-identical.
-    _q_retry_flags: tuple[str, ...] = ()
-    if not _stage_dir_repair_attempted and not _quality_repair_attempted:
+    # Total craft-hygiene repair ladder (2026-07-20). A quality flag can never
+    # declare the episode unrenderable: A uses the established reroll path; B is
+    # a one-shot lower-temperature CRITICAL rewrite on the same writer; C uses
+    # the optional alternate/stronger writer; then the pure floor resolves any
+    # remaining named craft gate. Structural and content-safety gates do not
+    # enter this ladder.
+    if (
+        _quality_floor_allowed
+        and not _stage_dir_repair_attempted
+        and not _quality_repair_attempted
+    ):
         # L1 observability: a tense character beat with no objective frame is a
         # mis-wire -- warn once (the scorer itself skips objective-literal then).
         if (req.speaker_role == "character"
@@ -2571,116 +3032,164 @@ def compose_line(
             _q_codes = ", ".join(c for c, _r, _f in _q_flags)
             log.warning(
                 "[OTR_LineComposer] draft quality flag for %s (%s) -- "
-                "one reroll", req.speaker, _q_codes,
+                "entering total repair ladder", req.speaker, _q_codes,
             )
-            try:
-                _rr = compose_line(
-                    creative_fn=creative_fn,
-                    req=req,
-                    max_attempts=max_attempts,
-                    base_temperature=base_temperature,
-                    max_new_tokens_cap=max_new_tokens_cap,
-                    stop_strings=stop_strings,
-                    creative_repo_id=creative_repo_id,
-                    reroll_hint=_q_combined,
-                    source_bank_id=source_bank_id,  # Stage 2C
-                    enable_stage3_validators=enable_stage3_validators,
-                    stage3_plan=stage3_plan,
-                    stage3_beat=stage3_beat,
-                    stage3_banned_phrases=stage3_banned_phrases,
-                    # MF-1: thread ALL FOUR recursion guards. _stage_dir + the
-                    # new _quality close the draft + clean gate; _leak/_stage3 are
-                    # threaded (inherited) so the rerolled line still gets its one
-                    # leak-floor LLM pass (Q7 budget default <=4 -- NOT forced to
-                    # <=3 by setting _leak_repair_attempted True here).
-                    _stage3_repair_attempted=_stage3_repair_attempted,
-                    _stage_dir_repair_attempted=True,
-                    _leak_repair_attempted=_leak_repair_attempted,
-                    _quality_repair_attempted=True,
-                    _story_rules=_story_rules,  # Stage 4
-                )
-                # 3.4 (2026-06-27) re-verify: the gate used to ship the reroll
-                # UNCHECKED, so a reroll that swapped one cliche for another still
-                # shipped a cliche. Score BOTH drafts with the SAME scorer (MF-5)
-                # and keep the FEWER-defect one (original on a tie). _retry is one
-                # <code>_retry breadcrumb per ORIGINAL fired flag (MF-6: built
-                # once, appended once; the recursive call skips this gate).
-                _retry = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
-                _after_flags = _quality_flags_for_line(
+            _retry = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
+            _seen_codes = list(_quality_codes(_q_flags))
+            _candidates: list[tuple[LineResult, str]] = [
+                (LineResult(text=cleaned), "original"),
+            ]
+
+            def _attempt_quality_rung(
+                fn, *, hint: str, temperature: float, attempts: int, rung: str,
+            ) -> LineResult | None:
+                try:
+                    return compose_line(
+                        creative_fn=fn,
+                        repair_fn=repair_fn,
+                        req=req,
+                        max_attempts=attempts,
+                        base_temperature=temperature,
+                        max_new_tokens_cap=max_new_tokens_cap,
+                        stop_strings=stop_strings,
+                        creative_repo_id=creative_repo_id,
+                        reroll_hint=hint,
+                        source_bank_id=source_bank_id,
+                        enable_stage3_validators=enable_stage3_validators,
+                        stage3_plan=stage3_plan,
+                        stage3_beat=stage3_beat,
+                        stage3_banned_phrases=stage3_banned_phrases,
+                        _stage3_repair_attempted=_stage3_repair_attempted,
+                        _stage_dir_repair_attempted=True,
+                        _leak_repair_attempted=_leak_repair_attempted,
+                        _quality_repair_attempted=True,
+                        _quality_floor_allowed=False,
+                        _story_rules=_story_rules,
+                    )
+                except LineCompositionFailedError:
+                    log.warning(
+                        "[OTR_LineComposer] hygiene %s exhausted for %s",
+                        rung, req.speaker,
+                    )
+                    return None
+
+            # A: the established hinted recompose path.
+            _rr = _attempt_quality_rung(
+                creative_fn,
+                hint=_q_combined,
+                temperature=base_temperature,
+                attempts=max_attempts,
+                rung="repair_a",
+            )
+            if _rr is not None:
+                _candidates.append((_rr, "repair_a"))
+                _after = _quality_flags_for_line(
                     _rr.text, req, rules=_story_rules)
-                # G1 (2026-06-28): v2 scores BOTH drafts on ONE defect ordering
-                # (flags + 2*truncation + clause-nesting) so a clean ~35-word line
-                # beats a 20-word fragment; v2-OFF keeps the legacy flag-count
-                # comparison byte-identical. Lower wins; ORIGINAL keeps a tie.
-                _keep_reroll = (
-                    line_quality_defect_score(
-                        _rr.text, req, rules=_story_rules)
-                    < line_quality_defect_score(
-                        cleaned, req, rules=_story_rules))
-                if _keep_reroll:
-                    # the reroll genuinely reduced defects -> keep it. Any defect
-                    # that SURVIVED the reroll is stamped quality_residual:<code>
-                    # so the scan can count residual lines (W-C). MF-6: appended
-                    # once on the kept result.
-                    _resid = tuple(
-                        f"quality_residual:{c}" for c, _r, _f in _after_flags)
-                    _extra = _retry + _resid
-                    # C5 (S4): deterministic last-resort cliche span-replace on
-                    # the kept reroll -- it may have swapped one worn phrase for
-                    # another. Repair the FIRST span; if a cliche still ships
-                    # (unmapped / a second span), stamp cliche_shipped_after_reroll.
-                    _rr_fixed = repair_cliche_span(
-                        _rr.text, rules=_story_rules)
-                    if _rr_fixed != _rr.text:
-                        _rr = replace(_rr, text=_rr_fixed)
-                        _extra = _extra + ("cliche_repaired",)
-                    if find_cliche_phrase(_rr.text, rules=_story_rules):
-                        _extra = _extra + ("cliche_shipped_after_reroll",)
-                    if _extra:
-                        _rr = replace(
-                            _rr, compose_flags=_rr.compose_flags + _extra,
+                for _code in _quality_codes(_after):
+                    if _code not in _seen_codes:
+                        _seen_codes.append(_code)
+                if not _after:
+                    _rr = replace(
+                        _rr, compose_flags=_rr.compose_flags + _retry,
+                    )
+                    return _quality_stamp(_rr, _seen_codes, "repair_a")
+
+            _current_flags = _quality_flags_for_line(
+                _candidates[-1][0].text, req, rules=_story_rules)
+            _critical = _quality_critical_hint(_current_flags or _q_flags, _existing)
+
+            # B: one same-writer call, lower entropy, every open gate named.
+            _b = _attempt_quality_rung(
+                creative_fn,
+                hint=_critical,
+                temperature=max(
+                    0.01, min(_QUALITY_REPAIR_B_TEMPERATURE, base_temperature * 0.5),
+                ),
+                attempts=1,
+                rung="repair_b_same_slot",
+            )
+            if _b is not None:
+                _candidates.append((_b, "repair_b_same_slot"))
+                _after = _quality_flags_for_line(
+                    _b.text, req, rules=_story_rules)
+                for _code in _quality_codes(_after):
+                    if _code not in _seen_codes:
+                        _seen_codes.append(_code)
+                if not _after:
+                    _b = replace(_b, compose_flags=_b.compose_flags + _retry)
+                    return _quality_stamp(
+                        _b, _seen_codes, "repair_b_same_slot",
+                    )
+
+            # C: the other model slot / stronger writer when one is available.
+            if callable(repair_fn):
+                _current_flags = _quality_flags_for_line(
+                    _candidates[-1][0].text, req, rules=_story_rules)
+                _critical = _quality_critical_hint(
+                    _current_flags or _q_flags, _existing,
+                )
+                _c = _attempt_quality_rung(
+                    repair_fn,
+                    hint=_critical,
+                    temperature=max(
+                        0.01,
+                        min(_QUALITY_REPAIR_C_TEMPERATURE, base_temperature * 0.3),
+                    ),
+                    attempts=1,
+                    rung="repair_c_alternate_slot",
+                )
+                if _c is not None:
+                    _candidates.append((_c, "repair_c_alternate_slot"))
+                    _after = _quality_flags_for_line(
+                        _c.text, req, rules=_story_rules)
+                    for _code in _quality_codes(_after):
+                        if _code not in _seen_codes:
+                            _seen_codes.append(_code)
+                    if not _after:
+                        _c = replace(
+                            _c, compose_flags=_c.compose_flags + _retry,
                         )
-                    return _rr
-                # the reroll did NOT improve (>= original) -> keep the original
-                # draft and stamp quality_reroll_degraded so the scan can see the
-                # reroll was wasted. The original's own defects are the residuals.
-                # Fall through to the strip pipeline on the ORIGINAL cleaned text
-                # (the freeze floor is the backstop).
-                log.warning(
-                    "[OTR_LineComposer] quality reroll did not reduce defects "
-                    "for %s (%d -> %d) -- keeping original draft",
-                    req.speaker, len(_q_flags), len(_after_flags),
-                )
-                _q_retry_flags = (
-                    _retry + ("quality_reroll_degraded",)
-                    + tuple(f"quality_residual:{c}" for c, _r, _f in _q_flags))
-            except LineCompositionFailedError:
-                log.warning(
-                    "[OTR_LineComposer] quality reroll exhausted for "
-                    "%s -- keeping draft; freeze floor is the backstop",
-                    req.speaker,
-                )
-                _q_retry_flags = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
+                        return _quality_stamp(
+                            _c, _seen_codes, "repair_c_alternate_slot",
+                        )
+
+            # Floor: choose the lowest-defect authored candidate (stable tie:
+            # original), then resolve to a fixed point under the SAME scorer.
+            _best, _best_rung = min(
+                _candidates,
+                key=lambda item: line_quality_defect_score(
+                    item[0].text, req, rules=_story_rules,
+                ),
+            )
+            _best_flags = _quality_flags_for_line(
+                _best.text, req, rules=_story_rules)
+            _floor_text, _floor_codes, _floor_actions = _quality_floor_text(
+                _best.text, req, _best_flags, rules=_story_rules,
+            )
+            for _code in _floor_codes:
+                if _code not in _seen_codes:
+                    _seen_codes.append(_code)
+            cleaned = _floor_text
+            word_count = len(cleaned.split())
+            _q_retry_flags = _best.compose_flags + _retry
+            _q_retry_flags += tuple(
+                f"hygiene_floor_action:{action}" for action in _floor_actions
+            )
+            _stamped = _quality_stamp(
+                LineResult(text=cleaned, compose_flags=_q_retry_flags),
+                _seen_codes,
+                "deterministic_floor",
+            )
+            _q_retry_flags = _stamped.compose_flags
+            log.warning(
+                "[OTR_LineComposer] hygiene floor resolved %s after authored "
+                "candidate %s",
+                ",".join(_seen_codes), _best_rung,
+            )
 
     # Stage 3 -- deterministic strip pipeline. Every strip below runs
     # before this function returns, so the caller appends the corrected
     # line (not a raw hallucination) to its rolling window.
-    # Seed with the retry breadcrumbs when the gate fired but the reroll
-    # exhausted (fell through to keep the draft) -- () when the gate did not fire
-    # so the flag-OFF path is byte-identical.
-    # C5 (S4): deterministic last-resort cliche span-replace on the kept ORIGINAL
-    # draft when the quality reroll fired but did not shed the cliche (mirrors the
-    # kept-reroll repair). Only when the gate actually fired (_q_retry_flags
-    # non-empty); a no-gate line is untouched.
-    if _q_retry_flags:
-        _cl_fixed = repair_cliche_span(cleaned, rules=_story_rules)
-        if _cl_fixed != cleaned:
-            cleaned = _cl_fixed
-            word_count = len(cleaned.split())
-            _q_retry_flags = _q_retry_flags + ("cliche_repaired",)
-        if find_cliche_phrase(cleaned, rules=_story_rules):
-            _q_retry_flags = _q_retry_flags + ("cliche_shipped_after_reroll",)
-
     compose_flags: tuple[str, ...] = _q_retry_flags
 
     # 3a. cast_strip -- remap near-miss phantom names to the locked
@@ -2739,6 +3248,7 @@ def compose_line(
             try:
                 return compose_line(
                     creative_fn=creative_fn,
+                    repair_fn=repair_fn,
                     req=req,
                     max_attempts=max_attempts,
                     base_temperature=base_temperature,
@@ -2758,6 +3268,7 @@ def compose_line(
                     _stage_dir_repair_attempted=_stage_dir_repair_attempted,
                     _leak_repair_attempted=True,
                     _quality_repair_attempted=_quality_repair_attempted,
+                    _quality_floor_allowed=_quality_floor_allowed,
                     _story_rules=_story_rules,  # Stage 4
                 )
             except LineCompositionFailedError:
@@ -2839,6 +3350,7 @@ def compose_line(
                 # Section 4 Wave 1 Agent B: "do not loop").
                 repaired = compose_line(
                     creative_fn=creative_fn,
+                    repair_fn=repair_fn,
                     req=req,
                     max_attempts=max_attempts,
                     base_temperature=base_temperature,
@@ -2859,6 +3371,7 @@ def compose_line(
                     _stage_dir_repair_attempted=_stage_dir_repair_attempted,
                     _leak_repair_attempted=_leak_repair_attempted,
                     _quality_repair_attempted=_quality_repair_attempted,
+                    _quality_floor_allowed=_quality_floor_allowed,
                     _story_rules=_story_rules,  # Stage 4
                 )
                 cleaned = repaired.text
@@ -2968,17 +3481,18 @@ def compose_line(
 # broken-JSON failure mode. Each pass has a deterministic SIGNAL LOST
 # fallback so the narrative bookend can never be missing.
 
-# Generation params for the announcer passes. One creative call each,
-# no reroll ladder -- on any failure the deterministic fallback fires.
+# Generation params for the announcer passes. The authored attempts retain their
+# existing budget; validation exhaustion then escalates through the same-slot
+# low-temperature repair, the alternate writer slot, and a deterministic floor.
 _ANNOUNCER_MAX_NEW_TOKENS = 160
 _ANNOUNCER_INTRO_MIN_CHARS = 24
 _ANNOUNCER_INTRO_MAX_CHARS = 300
 _ANNOUNCER_OUTRO_MIN_CHARS = 28
 _ANNOUNCER_OUTRO_MAX_CHARS = 340
 
-# An announcer line that misses the length window is a REJECTION, not a death sentence:
-# the model is asked again, with the reason. Only when it will not comply does the
-# episode stop -- and it still never ships a line Python wrote.
+# An announcer line that misses the length window is a REJECTION, not a death
+# sentence. After the normal retries, repair B/C and a deterministic spoken floor
+# guarantee a bounded line. Missing upstream context remains a structural error.
 _ANNOUNCER_ATTEMPTS = 3
 
 
@@ -3212,7 +3726,9 @@ def _resolved_outro_fallback(ending_change: str, news_close_brief: str) -> str:
     return text
 
 
-def _announcer_generate(creative_fn, messages) -> Optional[str]:
+def _announcer_generate(
+    creative_fn, messages, *, temperature: float = _BASE_TEMPERATURE,
+) -> Optional[str]:
     """Run one creative-slot LLM call for an announcer pass.
 
     Mirrors `compose_line`'s call convention: try the `stop=` kwarg
@@ -3225,7 +3741,7 @@ def _announcer_generate(creative_fn, messages) -> Optional[str]:
         try:
             return creative_fn(
                 messages,
-                temperature=_BASE_TEMPERATURE,
+                temperature=temperature,
                 max_new_tokens=_ANNOUNCER_MAX_NEW_TOKENS,
                 stop=list(_DEFAULT_STOP_STRINGS),
             )
@@ -3233,7 +3749,7 @@ def _announcer_generate(creative_fn, messages) -> Optional[str]:
             # LLM slot: creative -- fallback (no stop= kwarg)
             return creative_fn(
                 messages,
-                temperature=_BASE_TEMPERATURE,
+                temperature=temperature,
                 max_new_tokens=_ANNOUNCER_MAX_NEW_TOKENS,
             )
     except Exception as exc:  # noqa: BLE001
@@ -3242,6 +3758,155 @@ def _announcer_generate(creative_fn, messages) -> Optional[str]:
             type(exc).__name__, exc,
         )
         return None
+
+
+def _repair_announcer_validation_exhaustion(
+    *,
+    creative_fn,
+    repair_fn,
+    base_messages,
+    last_raw,
+    min_chars: int,
+    max_chars: int,
+    success_flag: str,
+    floor_flags=(),
+    fallback_candidates=(),
+    candidate_validator=None,
+) -> LineResult:
+    """Total B/C/floor repair for a nonempty announcer surface.
+
+    This helper owns *quality/format* exhaustion only. Callers still reject
+    missing structural context before entering it. The deterministic rung never
+    invents speech from an empty ledger row: its curated candidates are supplied
+    by the announcer composer, where a bookend is structurally required.
+    """
+    original_messages = list(base_messages or ())[:2]
+    system_text = ""
+    user_text = ""
+    for message in original_messages:
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role") or "")
+        if role == "system" and not system_text:
+            system_text = str(message.get("content") or "")
+        elif role == "user" and not user_text:
+            user_text = str(message.get("content") or "")
+    critical_messages = [
+        {
+            "role": "system",
+            "content": (
+                system_text
+                + "\nCRITICAL SPOKEN-LINE REPAIR: scour the complete response for "
+                  "anything that is not vocabulary the announcer can say aloud. "
+                  "Replace stage action, cues, labels, markup, fragments, and "
+                  "non-dialogue with one natural SFW spoken line."
+            ).strip(),
+        },
+        {
+            "role": "user",
+            "content": (
+                user_text
+                + "\n\nThe prior output failed the spoken-line validation gate. "
+                  "Return ONLY one complete clean announcer line inside the "
+                  f"{min_chars}-{max_chars} character limit."
+            ).strip(),
+        },
+    ]
+
+    def _accepted(raw_text):
+        candidate = strip_line_formatting(raw_text or "")
+        ok, validated = validate_announcer_line(
+            candidate,
+            min_chars=min_chars,
+            max_chars=max_chars,
+        )
+        if not ok:
+            return ""
+        if callable(candidate_validator):
+            try:
+                if not candidate_validator(validated):
+                    return ""
+            except Exception:  # noqa: BLE001 -- reject; the next rung owns repair
+                return ""
+        return validated
+
+    for fn, temperature, rung in (
+        (creative_fn, _QUALITY_REPAIR_B_TEMPERATURE, "repair_b_same_slot"),
+        (repair_fn, _QUALITY_REPAIR_C_TEMPERATURE, "repair_c_alternate_slot"),
+    ):
+        if not callable(fn):
+            continue
+        validated = _accepted(
+            _announcer_generate(fn, critical_messages, temperature=temperature)
+        )
+        if validated:
+            return LineResult(
+                text=validated,
+                compose_flags=(
+                    success_flag,
+                    "hygiene_repaired_after_reroll",
+                    "hygiene_repaired_after_reroll:announcer_validation:"
+                    + rung,
+                ),
+            )
+
+    # The floor first attempts to salvage the last authored response, then uses
+    # caller-owned contextual/SFW bookends. Passing the named gates is safe here:
+    # every transform is conditional except bounded formatting normalization.
+    floor_actions: list[str] = []
+    candidates = (last_raw,) + tuple(fallback_candidates or ())
+    for raw_candidate in candidates:
+        cleaned = strip_line_formatting(raw_candidate or "")
+        floor = deterministic_hygiene_floor(
+            cleaned,
+            (
+                "spoken_format",
+                "stage_direction",
+                "non_lexical",
+                "all_caps",
+                "truncated",
+            ),
+            allowed_all_caps=("SIGNAL", "LOST"),
+        )
+        floor_actions.extend(floor.actions)
+        bounded = clean_one_line(floor.text, max_chars=max_chars)
+        validated = _accepted(bounded)
+        if not validated:
+            continue
+        flags = list(floor_flags or ())
+        flags.extend(
+            (
+                "hygiene_repaired_after_reroll",
+                "hygiene_repaired_after_reroll:announcer_validation:"
+                "deterministic_floor",
+            )
+        )
+        flags.extend(
+            "hygiene_floor_action:" + action
+            for action in dict.fromkeys(floor_actions)
+        )
+        return LineResult(
+            text=validated,
+            compose_flags=tuple(dict.fromkeys(flags)),
+        )
+
+    # Curated caller candidates always include a valid fixed phrase. Keep an
+    # explicit final totality proof in case a future fallback is edited badly.
+    fixed = (
+        "Good evening. This is SIGNAL LOST. Stay with us tonight."
+        if "intro" in success_flag
+        else "This has been SIGNAL LOST. One lamp remains. Good night."
+    )
+    flags = list(floor_flags or ())
+    flags.extend(
+        (
+            "hygiene_repaired_after_reroll",
+            "hygiene_repaired_after_reroll:announcer_validation:"
+            "deterministic_floor",
+            "hygiene_floor_action:total_announcer_floor",
+        )
+    )
+    return LineResult(text=fixed, compose_flags=tuple(dict.fromkeys(flags)))
 
 
 def compose_announcer_intro(
@@ -3255,6 +3920,7 @@ def compose_announcer_intro(
     # the intro system prompts resolve from its pack seams. Default keeps
     # every legacy caller byte-identical (science constants).
     source_bank_id: str = "media_archive",
+    repair_fn=None,
 ) -> LineResult:
     """Compose the episode's opening announcer line.
 
@@ -3329,13 +3995,7 @@ def compose_announcer_intro(
             {"role": "system", "content": _intro_system},
             {"role": "user", "content": "\n".join(user_parts)},
         ]
-        # The no-fallback rule is right: never ship a canned open line Python wrote.
-        # But "no fallback" had been implemented as "no second chance" -- ONE call, and a
-        # line four characters too long killed the episode (live: original_radio died on
-        # an announcer intro that ran past the 300-char cap). Every structured pass in
-        # this system gets a retry ladder; the announcer got none, and the model can
-        # comply -- it was simply never asked twice. Retry with the ACTUAL reason, then
-        # still fail closed. No template ever speaks.
+        # Keep the authored retry budget, then use the shared B/C/floor ladder.
         raw = None
         for attempt in range(1, _ANNOUNCER_ATTEMPTS + 1):
             raw = _announcer_generate(creative_fn, messages)
@@ -3366,12 +4026,20 @@ def compose_announcer_intro(
                         max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
                     )},
                 ]
-        raise RuntimeError(
-            "[OTR_AnnouncerPass] safe-open announcer intro LLM failed validation after "
-            "%d attempts (model=%s, raw=%r). NO deterministic-template fallback "
-            "(no-fallback rip 2026-07-03) -- a failed announcer-intro LLM stops the "
-            "episode; it never silently ships a canned open line."
-            % (_ANNOUNCER_ATTEMPTS, creative_repo_id, raw)
+        return _repair_announcer_validation_exhaustion(
+            creative_fn=creative_fn,
+            repair_fn=repair_fn,
+            base_messages=messages,
+            last_raw=raw,
+            min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
+            max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
+            success_flag="announcer_intro",
+            floor_flags=("announcer_intro_fallback", "open_safe_fallback"),
+            fallback_candidates=(
+                fallback_safe_open(safe_open_brief),
+                "Good evening. This is SIGNAL LOST. Tonight, a signal breaks "
+                "through the static. Stay with us.",
+            ),
         )
     # LLM slot: creative -- announcer intro is a narrative framing
     # pass; routed through the writer's creative_writing_model slot.
@@ -3392,8 +4060,8 @@ def compose_announcer_intro(
             ),
         },
     ]
-    # Same ladder as the safe-open path: a rejected line is asked again, with the reason.
-    # The episode still stops if the model will not comply, and no template ever speaks.
+    # Same ladder as the safe-open path: rejected authored lines are asked again,
+    # then quality exhaustion repairs rather than terminating the episode.
     raw = None
     for attempt in range(1, _ANNOUNCER_ATTEMPTS + 1):
         raw = _announcer_generate(creative_fn, messages)
@@ -3426,11 +4094,20 @@ def compose_announcer_intro(
                     max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
                 )},
             ]
-    raise RuntimeError(
-        "[OTR_AnnouncerPass] announcer intro LLM failed validation after %d attempts "
-        "(model=%s, raw=%r). NO deterministic-template fallback (no-fallback rip "
-        "2026-07-03) -- a failed announcer-intro LLM stops the episode."
-        % (_ANNOUNCER_ATTEMPTS, creative_repo_id, raw)
+    return _repair_announcer_validation_exhaustion(
+        creative_fn=creative_fn,
+        repair_fn=repair_fn,
+        base_messages=messages,
+        last_raw=raw,
+        min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
+        max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
+        success_flag="announcer_intro",
+        floor_flags=("announcer_intro_fallback",),
+        fallback_candidates=(
+            fallback_announcer_intro(brief),
+            "Good evening. This is SIGNAL LOST. Tonight, a signal breaks "
+            "through the static. Stay with us.",
+        ),
     )
 
 
@@ -3559,7 +4236,8 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
                       # Closing-layer routing (2026-07-09 QA F1): the bank
                       # whose pack seam supplies the coda system prompt.
                       # Default keeps legacy callers byte-identical.
-                      source_bank_id: str = "media_archive") -> LineResult:
+                      source_bank_id: str = "media_archive",
+                      repair_fn=None) -> LineResult:
     """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
     clause from the premise + the safe intro tone (NEVER the outcome / the news
     fact); the real ``news_close_brief`` is appended deterministically, so the
@@ -3620,21 +4298,86 @@ def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
             return LineResult(
                 text=_assemble(bridge), compose_flags=(flag,) + _coda_extra)
 
-    # 3) NO-FALLBACK (operator 2026-07-03): both LLM bridge attempts failed. The
-    # old deterministic floor (arc-keyed curated bridge, else a sha256(cast_seed)
-    # pick from NEWS_CODA_POOL) silently shipped a CANNED transition as the spoken
-    # news-coda. FAIL LOUD instead -- a failed writer LLM stops the episode; it
-    # never ships a pool-picked bridge as if the model wrote it.
-    raise RuntimeError(
-        "[OTR_AnnouncerPass] news-coda bridge LLM failed both attempts. NO "
-        "deterministic pool/arc-bridge fallback (no-fallback rip 2026-07-03) -- "
-        "fix the model/prompt; a canned bridge must not ship as spoken content."
+    # 3) Authored repair B/C: lower-temperature same slot, then the alternate
+    # writer. The real fact remains starved from both prompts and is appended
+    # byte-for-byte by _assemble only after a bridge validates.
+    critical_messages = _msgs(False)
+    critical_messages[1] = {
+        "role": "user",
+        "content": (
+            critical_messages[1]["content"]
+            + "\n\nCRITICAL SPOKEN-LINE REPAIR. Scour the complete bridge for "
+              "anything that is not natural vocabulary the announcer says aloud. "
+              "Replace stage action, labels, cues, markup, generic pivots, and "
+              "fragments. Return ONLY one tale-specific SFW bridge clause."
+        ),
+    }
+    for fn, temperature, rung in (
+        (creative_fn, _QUALITY_REPAIR_B_TEMPERATURE, "repair_b_same_slot"),
+        (repair_fn, _QUALITY_REPAIR_C_TEMPERATURE, "repair_c_alternate_slot"),
+    ):
+        if not callable(fn):
+            continue
+        repair_raw = _announcer_generate(
+            fn, critical_messages, temperature=temperature,
+        )
+        ok, bridge = validate_news_coda_bridge(
+            strip_line_formatting(repair_raw or "")
+        )
+        if ok:
+            return LineResult(
+                text=_assemble(bridge),
+                compose_flags=(
+                    "news_coda_bridge_repaired",
+                    "hygiene_repaired_after_reroll",
+                    "hygiene_repaired_after_reroll:news_coda_bridge:" + rung,
+                ) + _coda_extra,
+            )
+
+    # 4) Deterministic sanitize floor. Every chosen clause passes the same
+    # validator that rejected the authored attempts; NEWS_CODA_POOL is retained
+    # for compatibility/telemetry but is not a clean floor because its stock
+    # openers intentionally trip BRIDGE_GENERIC_OPENERS.
+    h = int(
+        hashlib.sha256(f"news-coda:{cast_seed}".encode("utf-8")).hexdigest(),
+        16,
+    )
+    arc_bridges = tuple(_NEWS_CODA_ARC_BRIDGES.get(arc_shape) or ())
+    valid_arc = tuple(
+        bridge for bridge in arc_bridges
+        if validate_news_coda_bridge(bridge)[0]
+    )
+    if valid_arc:
+        floor_bridge = valid_arc[h % len(valid_arc)]
+        floor_kind = "news_coda_arc_bridge"
+    else:
+        valid_curated = tuple(
+            bridge
+            for bridges in _NEWS_CODA_ARC_BRIDGES.values()
+            for bridge in bridges
+            if validate_news_coda_bridge(bridge)[0]
+        )
+        if not valid_curated:  # totality proof if a future edit empties the pools
+            valid_curated = ("Beyond tonight's tale",)
+        floor_bridge = valid_curated[h % len(valid_curated)]
+        floor_kind = "news_coda_curated_bridge"
+    return LineResult(
+        text=_assemble(floor_bridge),
+        compose_flags=(
+            "news_coda_fallback",
+            "news_coda_bridge_invalid",
+            floor_kind,
+        ) + _coda_extra + (
+            "hygiene_repaired_after_reroll",
+            "hygiene_repaired_after_reroll:news_coda_bridge:deterministic_floor",
+        ),
     )
 
 
 def compose_announcer_outro(
     *,
     creative_fn,
+    repair_fn=None,
     script_brief: str,
     news_close_brief: str,
     intro_text: str,
@@ -3779,9 +4522,21 @@ def compose_announcer_outro(
             )},
         ]
     if ok:
+        _outro_flags: list[str] = ["announcer_outro"]
+
+        def _finish_thesis(text: str, rung: str, legacy_flag: str) -> LineResult:
+            flags = list(_outro_flags)
+            if legacy_flag not in flags:
+                flags.append(legacy_flag)
+            flags.append("hygiene_repaired_after_reroll")
+            flags.append(
+                f"hygiene_repaired_after_reroll:thesis_close:{rung}"
+            )
+            return LineResult(text=text, compose_flags=tuple(dict.fromkeys(flags)))
+
         # F3 post-check: a resolved episode whose close still hedges is a
-        # contradiction -- recompose ONCE with a stronger directive; if it
-        # STILL hedges, emit the deterministic resolved fallback.
+        # contradiction -- recompose once with a stronger directive. Continue
+        # into the thesis gate afterward: an F3 repair can itself state a moral.
         if resolved and _hedges(validated):
             log.info(
                 "[OTR_AnnouncerPass] outro hedged on a RESOLVED ending; "
@@ -3808,28 +4563,17 @@ def compose_announcer_outro(
                     "[OTR_AnnouncerPass] outro recompose ok (model=%s).",
                     creative_repo_id,
                 )
-                return LineResult(
-                    text=validated2,
-                    compose_flags=("announcer_outro_resolved_recomposed",),
+                validated = validated2
+                _outro_flags = ["announcer_outro_resolved_recomposed"]
+            else:
+                log.warning(
+                    "[OTR_AnnouncerPass] outro still hedged after recompose; "
+                    "keeping the AI-written close with a residual stamp.",
                 )
-            # NO-FALLBACK (2026-07-03): the LLM produced a VALID line (it just
-            # hedges) -- that is a quality miss, NOT an LLM failure, so we keep the
-            # AI-written close rather than swapping in a canned deterministic
-            # template. Mirrors the S2 thesis path just below (keep the validated
-            # close, log the residual). No canned text ships.
-            log.warning(
-                "[OTR_AnnouncerPass] outro still hedged after recompose; keeping "
-                "the AI-written (hedging) close -- NO deterministic template.",
-            )
-            return LineResult(
-                text=validated,
-                compose_flags=("announcer_outro", "outro_residual_hedge"),
-            )
+                _outro_flags.append("outro_residual_hedge")
         # S2 (story-quality R2): a close that STATES a moral / lesson /
-        # news-summary instead of showing a concrete final image is flat.
-        # Recompose ONCE for an image (mirrors the F3 hedge recompose). If it
-        # still reads as thesis, keep the validated close (best-effort nudge --
-        # no deterministic image template exists).
+        # news-summary instead of showing a concrete final image is flat. It now
+        # gets the same total A/B/C/floor shape as character craft gates.
         _thesis_hit, _thesis_reason = flag_thesis_close(
             validated, rules=_story_rules)
         if _thesis_hit:
@@ -3861,25 +4605,131 @@ def compose_announcer_outro(
                     "[OTR_AnnouncerPass] outro image-recompose ok (model=%s).",
                     creative_repo_id,
                 )
-                return LineResult(
-                    text=validated3,
-                    compose_flags=("announcer_outro_image_recomposed",),
+                return _finish_thesis(
+                    validated3, "repair_a", "announcer_outro_image_recomposed",
                 )
-            log.warning(
-                "[OTR_AnnouncerPass] outro still thesis after recompose; "
-                "keeping the validated close (S2).",
+            _thesis_candidate = validated3 if ok3 else validated
+
+            critical_user = list(user_parts[:-1]) + [
+                "CRITICAL SPOKEN-LINE REPAIR. Scan the entire line for anything "
+                "that reads like commentary, a moral, a lesson, a stage note, "
+                "or non-dialogue. Replace it with one concrete final image in "
+                "plain SFW words the announcer can actually say. Preserve the "
+                "story outcome. Return only that clean spoken line.",
+                "Write the announcer's closing line now.",
+            ]
+            redo_b = _announcer_generate(
+                creative_fn,
+                [
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": "\n\n".join(critical_user)},
+                ],
+                temperature=_QUALITY_REPAIR_B_TEMPERATURE,
+            )
+            ok_b, validated_b = validate_announcer_line(
+                strip_line_formatting(redo_b or ""),
+                min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+                max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+            )
+            if ok_b:
+                _thesis_candidate = validated_b
+                if not flag_thesis_close(validated_b, rules=_story_rules)[0]:
+                    return _finish_thesis(
+                        validated_b,
+                        "repair_b_same_slot",
+                        "announcer_outro_image_recomposed",
+                    )
+
+            if callable(repair_fn):
+                redo_c = _announcer_generate(
+                    repair_fn,
+                    [
+                        {"role": "system", "content": system_content},
+                        {"role": "user", "content": "\n\n".join(critical_user)},
+                    ],
+                    temperature=_QUALITY_REPAIR_C_TEMPERATURE,
+                )
+                ok_c, validated_c = validate_announcer_line(
+                    strip_line_formatting(redo_c or ""),
+                    min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+                    max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+                )
+                if ok_c:
+                    _thesis_candidate = validated_c
+                    if not flag_thesis_close(
+                            validated_c, rules=_story_rules)[0]:
+                        return _finish_thesis(
+                            validated_c,
+                            "repair_c_alternate_slot",
+                            "announcer_outro_image_recomposed",
+                        )
+
+            floor = deterministic_hygiene_floor(
+                _thesis_candidate,
+                ("thesis_close",),
+                rules=_story_rules,
+            )
+            for floor_candidate in (
+                floor.text,
+                "Dawn finds the room quiet beneath one last lamp.",
+                "At one, it is as it was, and we go on.",
+            ):
+                floor_ok, floor_text = validate_announcer_line(
+                    floor_candidate,
+                    min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+                    max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+                )
+                if (
+                    floor_ok
+                    and not flag_thesis_close(
+                        floor_text, rules=_story_rules,
+                    )[0]
+                ):
+                    log.warning(
+                        "[OTR_AnnouncerPass] deterministic thesis floor resolved "
+                        "the close after authored repair exhaustion.",
+                    )
+                    return _finish_thesis(
+                        floor_text,
+                        "deterministic_floor",
+                        "announcer_outro_image_recomposed",
+                    )
+            # Current packs cannot reach this branch. Keep the totality contract
+            # explicit if a future pack bans every bounded floor phrase.
+            return _finish_thesis(
+                "At one, it is as it was, and we go on.",
+                "deterministic_floor",
+                "announcer_outro_image_recomposed",
             )
         log.info(
             "[OTR_AnnouncerPass] outro pass ok (model=%s, %d chars)",
             creative_repo_id, len(validated),
         )
         return LineResult(
-            text=validated, compose_flags=("announcer_outro",),
+            text=validated, compose_flags=tuple(dict.fromkeys(_outro_flags)),
         )
-    raise RuntimeError(
-        "[OTR_AnnouncerPass] announcer outro LLM failed validation (model=%s, "
-        "raw=%r). NO deterministic-template fallback (no-fallback rip 2026-07-03) "
-        "-- a failed announcer-outro LLM stops the episode." % (creative_repo_id, raw)
+    fallback = (
+        _resolved_outro_fallback(ending, close)
+        if resolved and ending
+        else fallback_announcer_outro(close or brief)
+    )
+    return _repair_announcer_validation_exhaustion(
+        creative_fn=creative_fn,
+        repair_fn=repair_fn,
+        base_messages=messages,
+        last_raw=raw,
+        min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+        max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+        success_flag="announcer_outro",
+        floor_flags=("announcer_outro_fallback",),
+        fallback_candidates=(
+            fallback,
+            "This has been SIGNAL LOST. One lamp remains. Good night.",
+        ),
+        candidate_validator=lambda text: (
+            (not resolved or not _hedges(text))
+            and not flag_thesis_close(text, rules=_story_rules)[0]
+        ),
     )
 
 

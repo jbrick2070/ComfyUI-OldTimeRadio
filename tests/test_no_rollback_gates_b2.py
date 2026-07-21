@@ -98,9 +98,8 @@ class TestFreezeTerminalFailureVerdictsTrim:
             f"set still contains {retired!r}"
         )
 
-    def test_terminal_set_size_is_2(self):
+    def test_terminal_set_is_structural_only(self):
         assert _LFC_ORCH.FREEZE_TERMINAL_FAILURE_VERDICTS == frozenset({
-            "too_many_edits",
             "needs_full_rerun",
         })
 

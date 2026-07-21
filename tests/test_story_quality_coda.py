@@ -34,13 +34,11 @@ def test_every_arc_bridge_validates():
             assert ok, f"{arc} bridge fails validate_news_coda_bridge: {b!r}"
 
 
-def test_coda_both_attempts_rejected_fails_loud():
-    # NO-FALLBACK (2026-07-03): when both bridge attempts are rejected the coda
-    # RAISES; the curated arc-bridge / NEWS_CODA_POOL floor is RETIRED -- it no
-    # longer silently ships a canned bridge as the spoken transition. (The bridge
-    # DATA + validators are still exercised by test_every_arc_bridge_validates.)
-    import pytest
-    with pytest.raises(RuntimeError, match="no-fallback"):
-        compose_news_coda(
-            creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
-            cast_seed=7, arc_shape="betrayal")
+def test_coda_both_attempts_rejected_ship_stamped_arc_floor():
+    result = compose_news_coda(
+        creative_fn=_bad_fn, news_close_brief=_BRIEF, premise=_PREMISE,
+        cast_seed=7, arc_shape="betrayal")
+    assert result.text.endswith(_BRIEF)
+    assert "news_coda_fallback" in result.compose_flags
+    assert "news_coda_arc_bridge" in result.compose_flags
+    assert "hygiene_repaired_after_reroll" in result.compose_flags

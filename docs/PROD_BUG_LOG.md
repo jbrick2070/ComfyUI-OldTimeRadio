@@ -1869,3 +1869,26 @@ out until they independently meet the same production-only admission rule.
 
 ## Regression watch (2026-07-20 -- NOT a new PBUG) -- Gemma P5 repeated a spoken-hygiene defect after bounded repair
 - prompt `ee0d4743-11bc-4367-9e19-5422afa2c95f` produced a complete constrained P5 artifact but line `l001` contained stage direction, markup, or a role label. The existing Axis-6 route from `docs/2026-07-18-codex-short-leg-convergence.md` correctly selected the spoken-reword repair rule; Gemma repeated the same defect and the lane failed closed after the bounded model repair. This is model non-compliance at an existing semantic gate, not a JSON/LMFE regression and not evidence for a new deterministic code defect. It blocks a full-episode promotion claim, so the handoff records runtime/grammar qualification only.
+
+## PBUG-20260720-03 -- a craft-only spoken-line reject could kill the episode
+- surfaced: canonical Gemma/HF requalification prompt `ee0d4743-11bc-4367-9e19-5422afa2c95f`, 2026-07-20, after P0-P4 had cleared and P5 had produced a complete schema-valid artifact
+- symptom: P5 line `l001` failed with `spoken text contains stage direction, markup, or a role label`; Gemma repeated the defect on typed repair and `_otr_structured_call` raised after two attempts, so no accepted/frozen ledger, TTS, video, or OBS asset was produced. Code grounding also found the shared freeze path could translate craft/quality exhaustion into a terminal-skip disposition with downstream readiness phases stamped `terminal_skipped`
+- admission note: this supersedes the preliminary "NOT a new PBUG" regression-watch classification immediately above. That note assessed only model noncompliance; grounding exposed the distinct deterministic workflow-liveness defect: a sanitizable quality reject controlled episode completion
+- root cause: spoken craft exhaustion had no total post-model repair boundary. Quality-budget exhaustion shared terminal liveness semantics with genuinely invalid structure, and content-owned lanes could validate authored text before delivery normalization rather than the exact TTS surface. One stubborn but sanitizable row could therefore kill the whole episode
+- fix: all six runnable banks now use a total spoken-hygiene ladder: existing repair/recompose, lower-temperature gate-specific CRITICAL repair, alternate writer slot, then an idempotent deterministic SFW floor. Every candidate is checked on the exact projected spoken surface; repaired rows stamp gate and resolving rung. Craft exhaustion continues through freeze/readiness, while a truly empty mechanical row is isolated locally. Structural ambiguity and the deterministic G9 SFW ship-stop remain fail-closed
+- verify idea: force every craft gate and whole-line stage cue to survive all model rungs; require a non-empty clean floor result plus `hygiene_repaired_after_reroll:<gate>:<rung>`, normal Phase 7/8/10 completion, and no quality verdict in `FREEZE_TERMINAL_FAILURE_VERDICTS`. Cover `media_archive`, `original`, `public_domain`, `shakespeare`, `scifi_news`, and `scifi_news_pro`; assert delivery projection is repaired before content-owned seals; retain an unsafe-line test that Phase 10 refuses to freeze
+- bible-worthy: yes -- generic rule: an LLM's refusal to satisfy a non-safety wording gate must not own workflow liveness when a bounded deterministic clean spoken projection exists
+- promotion: BUG-11.56
+- status: **ROOT-FIXED / LIVE-VERIFIED**. Final canonical prompt
+  `f3770246-2d6a-4302-90af-153120edddf2` exercised the new boundary twice:
+  P5 repaired four `one_breath` rows and P7 repaired a
+  `spoken_format` / `stage_direction` row; both receipts stamp
+  `trigger=craft_only_post_validation` and
+  `shared_artifact_repair_bypassed=true`. The ledger froze
+  `frozen_with_warns` (cosmetic word-count receipts only), all Phase 7/8/10
+  telemetry remained non-skipped, four clean lines / 45 words reached TTS and
+  video, and `obs_publish OK` wrote the 22,892,541-byte final asset at
+  `output/otr/obs/signal_lost_the_weight_of_height_20260720_221418_silent_procgen_blended_captioned_with_credits_final.mp4`.
+  A later P9 score-graph mismatch correctly stayed outside the craft-only
+  boundary; its full-artifact retries hit the separate 8K structured-capacity
+  limit and the already accepted clean script still completed normally.
