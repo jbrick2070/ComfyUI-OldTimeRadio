@@ -30,7 +30,11 @@ from typing import Literal
 # ---------------------------------------------------------------------------
 
 DEFAULT_LLM = "mistralai/Mistral-Nemo-Instruct-2407"
-"""Default for both writer slots. Audio C7 byte-identical baseline."""
+"""Fallback for empty/unsaved writer inputs; Audio C7 baseline.
+
+The saved canonical workflow intentionally overrides both slots with the
+runtime-qualified ``google/gemma-4-12b-it`` row.
+"""
 
 TEST_TECHNICAL_LLM = "google/gemma-4-E2B-it"
 """Used by B6 routing tests + the manual VRAM-profile script to drive
@@ -39,8 +43,6 @@ Slot 1 != Slot 2. Compact multimodal-text-only technical option."""
 TEST_OVERSIZED_LLM = "meta-llama/Llama-3.1-70B-Instruct"
 """Used by B1c VRAM-fit tests as a known-fails-on-16GB target. Not
 added to the dropdown."""
-
-_REMOVED_GEMMA4_12B_MODEL_IDS: frozenset[str] = frozenset({"google/gemma-4-12b-it"})
 
 # LEGACY dropdown state suffixes. As of 2026-07-16 the dropdown no longer
 # appends any download-state badge (a per-user HF cache layout makes the
@@ -165,6 +167,24 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         license_audit_status="mit_equivalent",
     ),
     CuratedModel(
+        repo_id="google/gemma-4-12b-it",
+        requires_auth=False,
+        loader_backend="transformers_multimodal_text_only",
+        vram_fit_tier="PASS",
+        approx_safetensors_gb=23.9,
+        notes="Official Gemma4Unified in-process Transformers text lane "
+        "(transformers>=5.10.4). Fully offline from the canonical HF cache; "
+        "NF4 measured at 7.15 GiB allocated / 7.29 GiB peak on the 16 GB "
+        "RTX 5080, including coherent prose and LMFE-constrained JSON. No "
+        "LoRA, Ollama, llama.cpp, sidecar, or port.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+    ),
+    CuratedModel(
         repo_id="google/gemma-2-2b-it",
         requires_auth=True,
         loader_backend="transformers_safetensors",
@@ -203,8 +223,8 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     ),
     # 2026-05-23: catalog pruned -- the two community WARN-tier 12B
     # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
-    # removed. The curated set is Mistral-Nemo + gemma-4-E2B +
-    # gemma-4-E4B + Qwen2.5-14B-Instruct.
+    # removed. The curated set now also includes the official Gemma 4 12B HF
+    # row restored in 2026-07; the optional GGUF peer remains a separate lane.
     # 2026-05-24: gemma-2-2b-it added as the smallest technical-slot
     # pick (BUG-LOCAL-262). Gemma-2's chat template rejects the system
     # role; the generate path normalizes system messages before
@@ -417,7 +437,7 @@ def _curated_with_gguf_native_peer() -> tuple[CuratedModel, ...]:
     inserted = False
     for row in CURATED_LLM_MODELS:
         out.append(row)
-        if row.repo_id == "google/gemma-4-E4B-it":
+        if row.repo_id == "google/gemma-4-12b-it":
             out.extend(gguf_rows)
             inserted = True
     if not inserted:
@@ -1222,17 +1242,6 @@ def validate_model_id(
     if reason is not None:
         raise UnknownModelError(_unknown_recovery_hint(normalized, reason, hub_root=hub_root))
 
-    if normalized in _REMOVED_GEMMA4_12B_MODEL_IDS:
-        raise UnknownModelError(
-            f"{normalized!r} was removed from OTR's writer catalog because "
-            "the old 11434 sidecar transport was removed and the installed "
-            "transformers stack cannot load its gemma4_unified architecture. "
-            "Use the GGUF row 'unsloth/gemma-4-12b-it-GGUF' with "
-            "gemma-4-12b-it-Q8_0.gguf under C:\\ComfyUI-Models, or choose "
-            "Mistral-Nemo / Gemma 4 E2B / "
-            "Gemma 4 E4B."
-        )
-
     # Path 1: curated
     if normalized in _by_repo_id():
         return normalized
@@ -1329,6 +1338,7 @@ CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
     "google/gemma-2-2b-it": 8192,
     "google/gemma-4-E2B-it": 8192,
     "google/gemma-4-E4B-it": 8192,
+    "google/gemma-4-12b-it": 8192,
     "Qwen/Qwen2.5-14B-Instruct": 8192,
     "Nitral-AI/Captain-Eris_Violet-V0.420-12B": 8192,
     "inflatebot/MN-12B-Mag-Mell-R1": 8192,

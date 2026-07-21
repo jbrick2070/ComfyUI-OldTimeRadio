@@ -53,6 +53,7 @@ def enabled_env(monkeypatch):
         "OPENROUTER_A_MAXTOK",
         "OPENROUTER_TIMEOUT_S",
         "OPENROUTER_MAX_RETRIES",
+        "OPENROUTER_REASONING_EFFORT",
     ):
         monkeypatch.delenv(k, raising=False)
 

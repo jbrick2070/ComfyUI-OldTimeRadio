@@ -1,4 +1,5 @@
 import pytest
+from pydantic import BaseModel
 
 from nodes import OTR_LedgerScriptWriter as writer
 from nodes import _otr_openrouter_backend as openrouter
@@ -100,6 +101,77 @@ def test_local_transport_clamps_output_without_left_truncating_prompt():
     assert result == "{}"
     assert model.kwargs["max_new_tokens"] == 1092
     assert model.kwargs["input_ids"].shape == (1, 7100)
+
+
+def test_local_structured_transport_adds_prefix_without_losing_sampling(
+    monkeypatch,
+):
+    class ResultSchema(BaseModel):
+        status: str
+
+    class Tensor:
+        shape = (1, 20)
+
+    class OutputTensor:
+        shape = (1, 5)
+
+        def __getitem__(self, _key):
+            return self
+
+    class Inputs(dict):
+        def to(self, _device):
+            return self
+
+    class Tokenizer:
+        eos_token_id = 0
+
+        def apply_chat_template(self, _messages, **_kwargs):
+            return "serialized prompt"
+
+        def __call__(self, _prompt, *, return_tensors):
+            assert return_tensors == "pt"
+            return Inputs(input_ids=Tensor())
+
+        def decode(self, _tokens, *, skip_special_tokens):
+            assert skip_special_tokens is True
+            return '{"status":"ready"}'
+
+    class Model:
+        device = "cpu"
+
+        def __init__(self):
+            self.kwargs = None
+
+        def generate(self, **kwargs):
+            self.kwargs = kwargs
+            return [OutputTensor()]
+
+    prefix = object()
+    parser = object()
+    monkeypatch.setattr(
+        "nodes._otr_constrained_generate.get_cached_transformers_schema_constraint",
+        lambda cache_entry, schema_model: (parser, prefix),
+    )
+    model = Model()
+    generate = writer._build_truncating_generate_fn(
+        {"model": model, "tokenizer": Tokenizer(), "context_cap": 8192},
+        top_p=.88,
+        min_p=.04,
+        repetition_penalty=1.03,
+        schema_model=ResultSchema,
+    )
+
+    assert generate(
+        [{"role": "user", "content": "structured"}],
+        temperature=.2,
+        max_new_tokens=100,
+    ) == '{"status":"ready"}'
+    assert model.kwargs["prefix_allowed_tokens_fn"] is prefix
+    assert model.kwargs["num_beams"] == 1
+    assert model.kwargs["top_p"] == pytest.approx(.88)
+    assert model.kwargs["min_p"] == pytest.approx(.04)
+    assert model.kwargs["repetition_penalty"] == pytest.approx(1.03)
+    assert generate.schema_model is ResultSchema
 
 
 def test_openrouter_transport_subtracts_prompt_from_remote_output_budget(

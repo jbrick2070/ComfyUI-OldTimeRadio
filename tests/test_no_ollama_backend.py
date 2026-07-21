@@ -3,11 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from nodes import _otr_model_catalog as catalog
 from nodes import _otr_model_runtime as runtime
-from nodes._otr_model_inputs import UnknownModelError
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -37,7 +34,7 @@ def test_generate_factories_have_no_removed_sidecar_branch():
         assert "ollama_local_http" not in src
 
 
-def test_stale_gemma_12b_pin_is_blocked_even_if_hf_shape_is_valid(tmp_path):
+def test_gemma_12b_hf_pin_is_accepted_without_a_sidecar(tmp_path):
     hub = tmp_path / "hub"
     snap = hub / "models--google--gemma-4-12b-it" / "snapshots" / "abc123"
     snap.mkdir(parents=True)
@@ -46,19 +43,24 @@ def test_stale_gemma_12b_pin_is_blocked_even_if_hf_shape_is_valid(tmp_path):
         encoding="utf-8",
     )
 
-    with pytest.raises(UnknownModelError, match="unsloth/gemma-4-12b-it-GGUF"):
-        catalog.validate_model_id(
-            "google/gemma-4-12b-it",
-            auto_download_enabled=True,
-            allow_remote=True,
-            hub_root=hub,
-        )
+    assert catalog.validate_model_id(
+        "google/gemma-4-12b-it",
+        auto_download_enabled=True,
+        allow_remote=True,
+        hub_root=hub,
+    ) == "google/gemma-4-12b-it"
 
 
-def test_gguf_handle_is_the_only_gemma_12b_catalog_route():
+def test_hf_and_gguf_gemma_12b_rows_are_explicit_peers():
     ids = catalog._by_repo_id()
     assert "unsloth/gemma-4-12b-it-GGUF" in ids
-    assert "google/gemma-4-12b-it" not in ids
-    row = ids["unsloth/gemma-4-12b-it-GGUF"]
-    assert row.loader_backend == "gguf_native"
-    assert row.provider == "gguf_native"
+    assert "google/gemma-4-12b-it" in ids
+    gguf_row = ids["unsloth/gemma-4-12b-it-GGUF"]
+    hf_row = ids["google/gemma-4-12b-it"]
+    assert gguf_row.loader_backend == "gguf_native"
+    assert gguf_row.provider == "gguf_native"
+    assert hf_row.loader_backend == "transformers_multimodal_text_only"
+    assert hf_row.provider == "local"
+    assert hf_row.requires_auth is False
+    assert hf_row.vram_fit_tier == "PASS"
+    assert hf_row.context_window == 8192

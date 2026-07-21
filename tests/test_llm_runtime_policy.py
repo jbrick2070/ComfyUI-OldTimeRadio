@@ -116,7 +116,9 @@ def test_request_slot_cache_is_policy_keyed(monkeypatch, clean_llm_cache):
         cat, "check_vram_fit",
         lambda mid, cap, **kw: types.SimpleNamespace(
             tier="PASS", estimated_gb=1.0, ceiling_gb=14.5, reason="stub"))
-    monkeypatch.setattr(cat, "auto_download_if_missing", lambda mid: None)
+    monkeypatch.setattr(
+        cat, "auto_download_if_missing", lambda mid, **_kwargs: None,
+    )
 
     loads = {"n": 0}
 

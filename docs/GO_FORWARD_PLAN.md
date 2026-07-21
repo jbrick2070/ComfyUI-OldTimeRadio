@@ -1,6 +1,16 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-19 -- **keep-6 bank RENAME COMPLETE (offline-green)** on `v2.0-alpha`.
+**Updated:** 2026-07-20 -- **Gemma 4 12B HF writer runtime-qualified; local quality matrix still open** on `v2.0-alpha`.
+The saved canonical workflow now selects `google/gemma-4-12b-it` for both writer
+slots on the offline, in-process Transformers lane (`cuda` / `sdpa` /
+`bnb_nf4`, OTR context 8192). The official Gemma4Unified model loads with a
+7.15 GiB VRAM delta and produces LMFE-constrained parseable JSON through P5.
+The latest canonical leg stopped only when the model repeated an existing P5
+spoken-hygiene defect after bounded semantic repair; this restoration is a
+runtime/grammar qualification, not a claim that the open local-model quality
+matrix has been won. No LoRA or auxiliary tensor artifact is required.
+
+Prior status -- 2026-07-19: **keep-6 bank RENAME COMPLETE (offline-green)**.
 The roster is now fully de-versioned: `scifi_news` (local default, was `scifi_codex_v4`),
 `scifi_news_pro` (cloud/quality, was `scifi_fable2`), `shakespeare` (was `_v3`), `public_domain`
 (was `_v3`), `original` (was `original_radio`), `media_archive`; shared pipeline
@@ -195,7 +205,7 @@ Then, in order:
    podium -- BUT codex_v4 is **production-fragile** (its full-media confirmation
    FAILED on a codex string-cap; the robust runner-up `scifi_fable2` confirmed
    full-media SUCCESS + obs asset), so the **shippable Sonnet pairing = `scifi_fable2`**. The crown SHIFTS from the aion baseline's `scifi_fable2`, so "best
-   bank" depends on the writer. Mistral-Nemo stays the free local DEFAULT --
+   bank" depends on the writer. Gemma 4 12B HF is now the saved, runtime-qualified free local default; Mistral-Nemo remains the empty-input API fallback --
    cloud is opt-in (cost + off-machine + trips the codex all-caps / original_radio
    framing gates + degrades the v3 lanes). Full record:
    `docs/2026-07-17-model-bakeoff-scoreboard.md`. STILL OPEN: the local
@@ -354,12 +364,10 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (`f58ed6e6`, 2026-07-16): **7,967 passed / 31
-  skipped / 1 xfailed**; Bug Bible **17 passed**; canonical workflow **23 nodes /
-  57 links**, delta = none. (Qwen3-8B GGUF writer row PROMOTED UNKNOWN->PASS this
-  session -- an orthogonal model-roster task per `docs/2026-07-16-gguf-row-registry.md`,
-  NOT a forward-order step; first GGUF build roster is now gemma-4-12b + Qwen3-8B.
-  Detail in HANDOFF_LOG.)
+- Current whole-tree receipt (2026-07-20): **8,123 passed / 33 skipped / 1
+  expected xfail** across all 488 test files; survival-guide suite **30 passed**
+  plus BUG-02.16/BUG-11.55 OTR regressions **2 passed**; canonical workflow
+  **23 nodes / 57 links**, JSON/widget/link audits green. Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible, AST/JSON/BOM/
   zero-byte checks, commit, push, and verify `HEAD == origin/v2.0-alpha`.
 - Every node/widget/link/schema change edits `workflows/otr_canonical.json` in

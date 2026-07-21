@@ -140,8 +140,8 @@ def _legacy_metadata_artifact() -> dict[str, object]:
         "scenes": [
             {
                 "scene_id": "scene_001",
+                "env": "Observatory",
                 "description": "A receiver clicks under a cold sky.",
-                "premise": "A signal forces a cautious choice.",
             }
         ],
         # Deliberately shuffled: accepted score order, not response order,
@@ -472,6 +472,63 @@ def test_p0_structured_prompt_receives_only_the_evidence_projection():
     assert '"date"' not in prompt_text
     assert '"link"' not in prompt_text
     assert "P0 COMPACT EXTRACTION CONTRACT" in calls[0]["messages"][0]["content"]
+
+
+def test_p0_local_slot_binds_exact_schema_for_base_and_typed_repair():
+    payload = _payload()
+    envelope, _ = lane.validate_payload_envelope(
+        payload, {"seed_source": "rss_fetch", "target_words": 30},
+    )
+    inputs = lane._p0_artifact_inputs(envelope)
+    field, evidence = next(iter(inputs["payload"]["payload"].items()))
+    quote = evidence[:20]
+    artifact = {
+        "facts": [{
+            "fact_id": "F01",
+            "claim": "The observatory records a signal.",
+            "source_spans": [{
+                "field": field, "start": 0, "end": len(quote), "quote": quote,
+            }],
+            "numeric_tokens": [],
+        }],
+        "entities": [],
+        "numbers": [],
+        "tone": [],
+        "payload_sha256": envelope.source_digest,
+    }
+    replies = iter((
+        json.dumps(artifact),
+        json.dumps({**artifact, "tone": "cautious"}),
+    ))
+    bound_schemas = []
+    bound_calls = []
+
+    def slot_fn(*_args, **_kwargs):
+        raise AssertionError("the unbound local slot must not generate")
+
+    def bind(schema_model):
+        bound_schemas.append(schema_model)
+
+        def bound(messages, **kwargs):
+            bound_calls.append({"messages": messages, **kwargs})
+            return next(replies)
+
+        return bound
+
+    slot_fn._otr_bind_schema = bind  # type: ignore[attr-defined]
+
+    result = lane.invoke_codex_structured(
+        pass_id="P0", slot="technical", slot_fn=slot_fn,
+        pack=SimpleNamespace(prompt_stages={"codex_fact_index_system": "Read A0."}),
+        seam_refs=("codex_fact_index_system",), artifact_inputs=inputs,
+        result_type=lane.FactIndexV4, post_validator=lambda _value: None,
+        base_temperature=.20, structural_retry_temperature=.10,
+        max_new_tokens=lane.p0_output_token_budget(), call_journal={},
+    )
+
+    assert result.tone == "cautious"
+    assert bound_schemas == [lane.FactIndexV4]
+    assert len(bound_calls) == 2
 
 
 def test_fact_index_contract_bounds_output_surface():
@@ -990,12 +1047,19 @@ def test_p3_late_recovery_text_patch_shortens_overcap_leaf_on_exhaustion():
             return str(exc)
         return None
 
+    bound_schemas = []
+
     def slot_fn(messages, **kwargs):
         return json.dumps({"replacements": [{
             "path": "scenes.0.description", "replacement_text": replacement,
         }]})
 
+    def bind(schema_model):
+        bound_schemas.append(schema_model)
+        return slot_fn
+
     slot_fn._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
+    slot_fn._otr_bind_schema = bind  # type: ignore[attr-defined]
 
     class _Exhausted(Exception):
         last_error = verr
@@ -1008,6 +1072,7 @@ def test_p3_late_recovery_text_patch_shortens_overcap_leaf_on_exhaustion():
     )
     assert isinstance(result, lane.RadioScoreDraftV4)
     assert result.scenes[0].description == replacement
+    assert bound_schemas == [lane._RadioScoreDraftTextPatchV4]
 
 
 def test_normalize_draft_cue_anchors_clamps_out_of_range_indices():
@@ -1658,11 +1723,18 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
     calls: list[dict[str, object]] = []
     journal: dict[str, object] = {}
 
+    bound_schemas = []
+
     def slot_fn(messages, **kwargs):
         calls.append({"messages": messages, **kwargs})
         return responses.pop(0)
 
+    def bind(schema_model):
+        bound_schemas.append(schema_model)
+        return slot_fn
+
     slot_fn._otr_p3_text_patch_transport = "exact_local"  # type: ignore[attr-defined]
+    slot_fn._otr_bind_schema = bind  # type: ignore[attr-defined]
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
@@ -1677,6 +1749,10 @@ def test_p3_local_text_patch_repairs_one_leaf_with_one_bounded_call():
 
     assert isinstance(result, lane.RadioScoreV4)
     assert len(calls) == 2
+    assert bound_schemas == [
+        lane.RadioScoreDraftV4,
+        lane._RadioScoreDraftTextPatchV4,
+    ]
     assert calls[1]["temperature"] == pytest.approx(lane.REPAIR_TEMPERATURE)
     assert calls[1]["max_new_tokens"] >= lane._P3_TEXT_PATCH_MIN_OUTPUT_TOKENS
     assert getattr(calls[1]["messages"], "_otr_prompt_must_fit", False) is True
@@ -2030,6 +2106,7 @@ def test_p3_scheduler_openrouter_uses_bounded_patch_and_forwards_json_mode(monke
     assert slot_fn._otr_openrouter is True  # type: ignore[attr-defined]
     assert slot_fn._otr_p3_text_patch_local is False  # type: ignore[attr-defined]
     assert slot_fn._otr_p3_text_patch_transport == "full_message_remote"  # type: ignore[attr-defined]
+    assert not hasattr(slot_fn, "_otr_bind_schema")
 
     result = lane._call_radio_score_draft(
         pass_id="P3", slot_fn=slot_fn,
@@ -2943,6 +3020,38 @@ def test_script_artifact_metadata_repair_normalizes_only_graph_metadata():
                 assert line[field] == original[field]
     assert dumped["music_cues"][0]["description"] == preserved["music_cues"][0]["description"]
     assert "speaker" not in dumped["music_cues"][0]
+
+
+def test_script_artifact_scene_schema_is_closed_for_lm_format_enforcer():
+    """P5 must not expose LMFE's unsupported boolean wildcard schema path."""
+    from lmformatenforcer import JsonSchemaParser
+
+    schema = lane.ScriptArtifactV4.model_json_schema()
+    scene_schema = schema["$defs"]["ScriptSceneV4"]
+
+    assert scene_schema["type"] == "object"
+    assert scene_schema["additionalProperties"] is False
+    assert set(scene_schema["properties"]) == {
+        "scene_id", "env", "description",
+    }
+    assert set(scene_schema["required"]) == {
+        "scene_id", "env", "description",
+    }
+
+    # Exercise the character-level parser through the exact production prefix
+    # that crashed at ``scenes[0].scene_id``.  A schema-shape assertion alone
+    # would not catch a future LMFE-incompatible Pydantic annotation.
+    artifact_json = json.dumps(
+        _script_voicing("announcer").model_dump(mode="json"),
+        separators=(",", ":"),
+    )
+    parser = JsonSchemaParser(schema)
+    for index, character in enumerate(artifact_json):
+        assert character in parser.get_allowed_characters(), (
+            index, character, artifact_json[max(0, index - 40):index + 1],
+        )
+        parser = parser.add_character(character)
+    assert parser.can_end()
 
 
 def test_codex_tail_canon_uses_the_complete_episode_canon_protocol(tmp_path):

@@ -13,8 +13,8 @@ The kept on-box canonical path is:
 
 | Slot | Canonical engine/model | Inputs | Output | Model assets / VRAM class | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| writer creative LLM | `unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]` | prompt/messages | story brief + ledger JSON | Gemma 4 12B Q8 GGUF, 16 GB PASS row in catalog | `tests/test_workflow_canonical_baseline.py`, canonical API dry-run tests |
-| writer technical LLM | `mistralai/Mistral-Nemo-Instruct-2407` | prompt/messages | repair/validation text | HF gated Mistral Nemo, curated 16 GB PASS | `tests/test_workflow_canonical_baseline.py`, catalog tests |
+| writer creative LLM | `google/gemma-4-12b-it` | prompt/messages | story brief + ledger JSON | Official HF Gemma4Unified, in-process Transformers, NF4; 7.15 GiB model-load delta, 8192 OTR context, LMFE schema grammar | `scripts/otr_gemma4_doctor.py`, `tests/test_workflow_canonical_baseline.py`, 2026-07-20 canonical live requalification |
+| writer technical LLM | `google/gemma-4-12b-it` | prompt/messages | repair/validation text | Same resident official HF/NF4 model reused by both slots; no LoRA, Ollama, llama.cpp, sidecar, or model-serving port | `tests/test_writer_slot_routing.py`, `tests/test_scifi_codex_lane.py`, 2026-07-20 canonical live requalification |
 | character TTS | `indextts2` | dialogue text + reference clip | per-line voice clips, 22050 Hz | sidecar/OOP venv, non-commercial warning | `tests/test_audio_engine_adapters.py`, `tests/test_voice_bank.py` |
 | announcer TTS | `kokoro` | announcer text + preset voice | announcer voice clips, 24000 Hz | CPU/in-graph, Apache-2.0 | `tests/test_audio_engine_adapters.py` |
 | music | `stable_audio_3` | OTR music prompt | open/close/interstitial music cues | local Stable Audio 3, GPU | `tests/test_audio_engine_adapters.py`, `tests/test_sa3_music_prompt_bug408.py` |
@@ -26,6 +26,10 @@ The kept on-box canonical path is:
 The saved canonical workflow is the lean 30-word local smoke canvas. Heavier
 local video lanes are opt-in profile/manual selections, not saved-workflow
 defaults.
+
+The GGUF Gemma row remains selectable as an optional peer, but it is not the
+canonical OTR writer because that lane does not provide the Transformers lane's
+token-level lm-format-enforcer schema constraint.
 
 ## Kept Selectable Local Candidates
 

@@ -48,15 +48,15 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
 
     writer = _widgets(_node(workflow, "OTR_LedgerScriptWriter"))
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
-    # 2026-07-10 live-smoke fix: creative slot moved to mistral-nemo
-    # (gemma-4-12b Q8 = 13 GB weights -> silent n_ctx 4096->2048
-    # downgrade on 16 GB -> truncated original_concept JSON).
+    # 2026-07-20: canonical uses the in-process Transformers safetensors row,
+    # measured in NF4 on the 16 GB card. The separate GGUF Q8 row retains its
+    # own context limitations and is not selected here.
     assert catalog.validate_model_id(
         writer["creative_writing_model"], hub_root=tmp_path
-    ) == "mistralai/Mistral-Nemo-Instruct-2407"
+    ) == "google/gemma-4-12b-it"
     assert catalog.validate_model_id(
         writer["technical_model"], hub_root=tmp_path
-    ) == "mistralai/Mistral-Nemo-Instruct-2407"
+    ) == "google/gemma-4-12b-it"
 
     audio_nodes = {
         "char_voice": _widgets(_node(workflow, "OTR_BatchCharacterVoices"))["engine"],

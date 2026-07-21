@@ -676,6 +676,8 @@ _LOCAL_ROW_CASES = [
     ("google/gemma-4-E2B-it", False),
     ("google/gemma-4-E4B-it", True),
     ("google/gemma-4-E4B-it", False),
+    ("google/gemma-4-12b-it", True),
+    ("google/gemma-4-12b-it", False),
     ("google/gemma-2-2b-it", True),
     ("google/gemma-2-2b-it", False),
     ("mistralai/Mistral-Nemo-Instruct-2407", True),

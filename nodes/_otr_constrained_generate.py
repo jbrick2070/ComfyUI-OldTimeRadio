@@ -153,6 +153,55 @@ closes.
 """
 
 
+def get_cached_transformers_schema_constraint(
+    cache_entry: dict[str, Any],
+    schema_model: Type[BaseModel],
+) -> tuple[Any, Any]:
+    """Return ``(JsonSchemaParser, prefix_fn)`` for one resident model.
+
+    LMFE's expensive step is tokenizer-wide and schema-independent: it
+    decodes/scans every token to build ``TokenEnforcerTokenizerData``. Gemma 4
+    has a roughly 256K-token vocabulary, so rebuilding that data for every
+    P0-P9 pass or retry is material. Cache it on the resident ``cache_entry``
+    and cache the cheap schema-specific prefix functions beside it. Unloading
+    the model drops the cache naturally with the tokenizer.
+    """
+    required = {"model", "tokenizer"}
+    missing = required - set(cache_entry)
+    if missing:
+        raise ModelLoaderError(
+            f"cache_entry missing required keys: {sorted(missing)}"
+        )
+    tokenizer = cache_entry["tokenizer"]
+
+    _otr_lmfe_compat.ensure_lmfe_transformers_compat()
+    from lmformatenforcer import JsonSchemaParser
+    from lmformatenforcer.integrations.transformers import (
+        build_token_enforcer_tokenizer_data,
+        build_transformers_prefix_allowed_tokens_fn,
+    )
+
+    cache = cache_entry.get("_otr_lmfe_constraint_cache")
+    if not isinstance(cache, dict) or cache.get("tokenizer") is not tokenizer:
+        cache = {
+            "tokenizer": tokenizer,
+            "tokenizer_data": build_token_enforcer_tokenizer_data(tokenizer),
+            "by_schema": {},
+        }
+        cache_entry["_otr_lmfe_constraint_cache"] = cache
+
+    by_schema = cache["by_schema"]
+    cached = by_schema.get(schema_model)
+    if cached is None:
+        parser = JsonSchemaParser(schema_model.model_json_schema())
+        prefix_fn = build_transformers_prefix_allowed_tokens_fn(
+            cache["tokenizer_data"], parser,
+        )
+        cached = (parser, prefix_fn)
+        by_schema[schema_model] = cached
+    return cached
+
+
 # ---------------------------------------------------------------------------
 # Public factory
 # ---------------------------------------------------------------------------
@@ -246,27 +295,10 @@ def make_constrained_generate_fn(
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
 
-    # Build the JsonSchemaParser + prefix_allowed_tokens_fn ONCE per
-    # closure. The parser is stateless across calls; the prefix-fn
-    # closes over the tokenizer + parser and is reusable across many
-    # generate() invocations with different messages but the same
-    # schema.
-    #
-    # Re-apply the lm-format-enforcer / transformers v5 compat shim
-    # at factory time. Some test fixtures elsewhere in the suite
-    # reload transformers.tokenization_utils and strip the v4 alias
-    # we wired at module-import time; this call re-establishes it
-    # before the lmformatenforcer import below. Cheap (single
-    # hasattr check) and idempotent.
-    _otr_lmfe_compat.ensure_lmfe_transformers_compat()
-    from lmformatenforcer import JsonSchemaParser
-    from lmformatenforcer.integrations.transformers import (
-        build_transformers_prefix_allowed_tokens_fn,
+    # Build once per resident tokenizer + schema; see the cache helper above.
+    parser, prefix_fn = get_cached_transformers_schema_constraint(
+        cache_entry, schema_model,
     )
-
-    schema_dict = schema_model.model_json_schema()
-    parser = JsonSchemaParser(schema_dict)
-    prefix_fn = build_transformers_prefix_allowed_tokens_fn(tokenizer, parser)
 
     def constrained_generate_fn(
         messages: List[dict],

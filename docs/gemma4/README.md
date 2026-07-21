@@ -1,6 +1,11 @@
 # Run Gemma 4 12B GGUF in OTR
 
-OTR's writer dropdown exposes Gemma 4 12B as:
+> **Optional peer, not the canonical OTR writer.** The saved workflow uses
+> `google/gemma-4-12b-it` through the offline Transformers/HF NF4 lane with
+> lm-format-enforcer. The instructions below apply only when a user explicitly
+> chooses the separate llama.cpp/GGUF backend.
+
+OTR's writer dropdown also exposes Gemma 4 12B as:
 
 ```text
 unsloth/gemma-4-12b-it-GGUF

@@ -1,6 +1,11 @@
 # Gemma 4 12B GGUF Native Writer Lane
 
-OTR exposes one Gemma 4 12B row in the writer dropdown:
+> **Optional peer, not the canonical OTR writer.** The saved workflow now uses
+> `google/gemma-4-12b-it` through the fully local Transformers/HF NF4 lane so
+> lm-format-enforcer can hard-constrain structured JSON. This page remains for
+> users who deliberately select the separate llama.cpp/GGUF backend.
+
+OTR also exposes this Gemma 4 12B GGUF row in the writer dropdown:
 
 - `unsloth/gemma-4-12b-it-GGUF`
 

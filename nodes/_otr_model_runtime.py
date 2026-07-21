@@ -100,7 +100,7 @@ class TransformersSafetensorsBackend(_LegacyTransformersBackendBase):
 class TransformersMultimodalTextOnlyBackend(_LegacyTransformersBackendBase):
     """Adapter for the `transformers_multimodal_text_only` backend literal.
 
-    Covers Gemma-4-E2B-it and Gemma-4-E4B-it at D1b. Delegates to the
+    Covers Gemma-4-E2B-it, Gemma-4-E4B-it, and Gemma-4-12B-it at D1b. Delegates to the
     legacy load_llm path which internally detects the Gemma-4 family
     via model_id and routes through the multimodal-text-only code
     branch in nodes/_otr_model_loader.py.

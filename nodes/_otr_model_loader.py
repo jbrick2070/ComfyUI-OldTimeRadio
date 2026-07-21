@@ -41,6 +41,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 try:
@@ -112,6 +113,40 @@ class ModelLoaderError(RuntimeError):
     Wraps lower-level exceptions from the legacy _load_llm path so
     callers get a stable exception type to catch.
     """
+
+
+_GEMMA4_UNIFIED_MODEL_IDS = frozenset({"google/gemma-4-12b-it"})
+_GEMMA4_UNIFIED_MIN_TRANSFORMERS = "5.10.4"
+
+
+def _require_transformers_model_support(
+    model_id: str,
+    installed_version: str | None = None,
+) -> None:
+    """Fail early when a selected model needs a newer Transformers build."""
+    normalized = str(model_id or "").split(" ", 1)[0].strip()
+    if normalized not in _GEMMA4_UNIFIED_MODEL_IDS:
+        return
+    if installed_version is None:
+        import transformers
+
+        installed_version = transformers.__version__
+    from packaging.version import InvalidVersion, Version
+
+    try:
+        supported = Version(str(installed_version)) >= Version(
+            _GEMMA4_UNIFIED_MIN_TRANSFORMERS
+        )
+    except InvalidVersion:
+        supported = False
+    if not supported:
+        raise ModelLoaderError(
+            f"{normalized!r} uses the gemma4_unified architecture and requires "
+            f"transformers>={_GEMMA4_UNIFIED_MIN_TRANSFORMERS}; this ComfyUI "
+            f"environment has transformers=={installed_version}. Upgrade the "
+            "shared ComfyUI venv before loading the model. The retired 5.5 "
+            "text-tower remap is not a valid inference path."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +287,12 @@ def load_llm(
 
         # Lazy import - only pay the cost when actually generating
         import torch
-        from transformers import AutoProcessor, AutoModelForCausalLM, AutoTokenizer
+        import transformers
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        _require_transformers_model_support(
+            _stripped_model_id, transformers.__version__,
+        )
 
         # -- Zero-Prime VRAM Hardening (v1.4) --
         # Detect hardware and purge memory BEFORE loading even the
@@ -326,16 +366,6 @@ def load_llm(
                 "the 'auto (use story model)' sentinel must be resolved "
                 "by the caller before load_llm is reached. See BUG-LOCAL-109."
             )
-
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(_stripped_model_id, local_files_only=True)
-        except OSError as local_err:
-            log.info("[StoryOrchestrator] local_files_only=True failed for tokenizer (%s)", local_err)
-            try:
-                tokenizer = AutoTokenizer.from_pretrained(_stripped_model_id)
-            except Exception as hub_err:
-                log.error("[StoryOrchestrator] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
-                raise RuntimeError(f"Failed to load Tokenizer '{_stripped_model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
         load_dtype = torch.bfloat16
 
@@ -423,14 +453,45 @@ def load_llm(
         try:
             tokenizer = AutoTokenizer.from_pretrained(
                 load_target,
-                local_files_only=(snapshot_path is None),
+                local_files_only=True,
                 trust_remote_code=False,
                 cache_dir=cache_dir_path,
             )
             _runtime_log("LLM tokenizer loaded from cache (no HTTP checks)")
         except Exception as local_err:
-            _runtime_log(f"[StoryOrchestrator] tokenizer load failed ({local_err}), attempting Hub fallback...")
-            tokenizer = AutoTokenizer.from_pretrained(_stripped_model_id, trust_remote_code=False, cache_dir=cache_dir_path)
+            raise ModelLoaderError(
+                f"Failed to load tokenizer for {_stripped_model_id!r} from "
+                f"the local HF cache at {cache_dir_path!r}; OTR does not use "
+                "a network fallback inside load_llm. Ensure the complete "
+                "snapshot is under C:\\ComfyUI-Models."
+            ) from local_err
+
+        # Gemma 4 12B is cached as two HF revisions on the production box:
+        # the complete weighted revision predates chat_template.jinja, while
+        # refs/main points at a newer metadata-only revision. Keep model/config
+        # coherent with the weighted snapshot and attach only the newer local
+        # template when the weighted tokenizer has none. No file is downloaded
+        # and no synthetic overlay/LoRA is required.
+        if not getattr(tokenizer, "chat_template", None) and _OTR_HF is not None:
+            try:
+                _template_path = _OTR_HF.resolve_snapshot_file(
+                    _stripped_model_id,
+                    "chat_template.jinja",
+                    hf_home=_hf_home_resolved,
+                )
+                if _template_path:
+                    tokenizer.chat_template = Path(_template_path).read_text(
+                        encoding="utf-8",
+                    )
+                    _runtime_log(
+                        "[StoryOrchestrator] Attached chat_template.jinja "
+                        f"from local cached metadata: {_template_path}"
+                    )
+            except Exception as _template_err:
+                raise ModelLoaderError(
+                    f"Failed to compose the local tokenizer metadata for "
+                    f"{_stripped_model_id!r}: {_template_err}"
+                ) from _template_err
 
         common_kwargs = dict(
             cache_dir=cache_dir_path,
@@ -469,7 +530,11 @@ def load_llm(
             model_config = None
             try:
                 from transformers import AutoConfig
-                _cfg_kwargs = {"trust_remote_code": False, "cache_dir": cache_dir_path}
+                _cfg_kwargs = {
+                    "trust_remote_code": False,
+                    "local_files_only": True,
+                    "cache_dir": cache_dir_path,
+                }
                 model_config = AutoConfig.from_pretrained(load_target, **_cfg_kwargs)
                 if hasattr(model_config, "max_position_embeddings") and model_config.max_position_embeddings > _cap:
                     _runtime_log(f"[StoryOrchestrator] Hardening: Capping 128k context to {_cap} (Saves ~6GB VRAM)")
@@ -485,7 +550,7 @@ def load_llm(
 
             model = AutoModelForCausalLM.from_pretrained(
                 load_target,
-                local_files_only=(snapshot_path is None),
+                local_files_only=True,
                 config=model_config,
                 **common_kwargs,
             )
@@ -556,16 +621,11 @@ def load_llm(
                         f"Desktop and re-queue. Tracked as BUG-LOCAL-098."
                     )
         except (OSError, ValueError) as local_err:
-            _runtime_log(f"[StoryOrchestrator] local_files_only=True failed for model ({local_err}), attempting Hub fallback...")
-            try:
-                model = AutoModelForCausalLM.from_pretrained(
-                    _stripped_model_id,
-                    config=model_config,
-                    **common_kwargs,
-                )
-            except Exception as hub_err:
-                log.error("[StoryOrchestrator] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
-                raise RuntimeError(f"Failed to load LLM model '{_stripped_model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
+            raise ModelLoaderError(
+                f"Failed to load LLM model {_stripped_model_id!r} from the "
+                f"local HF cache at {cache_dir_path!r}; OTR does not use a "
+                "network fallback inside load_llm."
+            ) from local_err
 
         if quant_config is None and max_memory is None:
             model = model.to(device)
@@ -953,6 +1013,11 @@ def request_slot(
         LLM_CACHE["gguf_load_key"] = _gguf_key
         return cache_entry
 
+    # Capability-gate architecture support before cache/download work. A stale
+    # ComfyUI venv must not spend time resolving a 23.9 GB model only to fail in
+    # AutoConfig with an opaque `gemma4_unified` error.
+    _require_transformers_model_support(normalized)
+
     # Step 2: cache hit on the same model id (regardless of slot) -- policy
     # keyed (S1): a mismatched policy_key is a MISS + teardown, never reuse.
     if LLM_CACHE.get("model_id") == normalized and LLM_CACHE.get("cache_entry") is not None:
@@ -1007,7 +1072,18 @@ def request_slot(
     # Step 7: ensure on-disk + handle gating / disk-space pre-flight.
     # Local-cache short-circuit (B1d) fires inside this helper when the
     # snapshot is already on disk.
-    _otr_catalog.auto_download_if_missing(normalized)
+    # Resolve the canonical HF root BEFORE the catalog's local-cache probe.
+    # ComfyUI Desktop can inherit a stale/malformed HF_HUB_CACHE; the helper
+    # repairs it to <HF_HOME>/hub so the already-present C:\ComfyUI-Models
+    # snapshot short-circuits without any network call.
+    from pathlib import Path as _Path
+    from . import _otr_hf_env as _otr_hf
+
+    _resolved_hf_home = _otr_hf.ensure_hf_home()
+    _otr_catalog.auto_download_if_missing(
+        normalized,
+        hub_root=_Path(_resolved_hf_home) / "hub",
+    )
 
     # Step 8: if a different model is resident, unload it. Then load.
     if LLM_CACHE.get("model_id") not in (None, normalized):

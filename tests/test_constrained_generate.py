@@ -30,6 +30,10 @@ class _TinySchema(BaseModel):
     count: int = Field(..., ge=0, le=99)
 
 
+class _OtherTinySchema(BaseModel):
+    status: Literal["ready"]
+
+
 # ---------------------------------------------------------------------------
 # Module import (smoke)
 # ---------------------------------------------------------------------------
@@ -43,6 +47,7 @@ class TestImport:
 
         assert hasattr(cg, "make_constrained_generate_fn")
         assert hasattr(cg, "ConstrainedGenerateFn")
+        assert hasattr(cg, "get_cached_transformers_schema_constraint")
 
     def test_compat_shim_alias_in_place(self):
         # After calling the public helper, the v4 alias must be on
@@ -97,6 +102,9 @@ class TestFactoryContract:
         tokenizer.get_vocab.return_value = vocab
         # vocab_size for any range-loop the integration might do
         tokenizer.vocab_size = len(vocab)
+        tokenizer.__len__.return_value = 203
+        tokenizer.all_special_ids = [200, 201, 202]
+        tokenizer.encode.return_value = [48]
         # decode + convert_ids_to_tokens for lmfe's introspection
         tokenizer.decode = lambda ids, **kw: "".join(
             chr(i) if 32 <= i < 127 else "?" for i in (ids if hasattr(ids, "__iter__") else [ids])
@@ -126,6 +134,31 @@ class TestFactoryContract:
         assert fn.json_schema_parser is not None
         assert fn.prefix_allowed_tokens_fn is not None
 
+    def test_constraint_cache_reuses_tokenizer_scan_and_schema_prefix(self):
+        pytest.importorskip("lmformatenforcer")
+        from nodes._otr_constrained_generate import (
+            get_cached_transformers_schema_constraint,
+        )
+
+        cache_entry = self._make_minimal_cache_entry()
+        parser_1, prefix_1 = get_cached_transformers_schema_constraint(
+            cache_entry, _TinySchema,
+        )
+        parser_1_again, prefix_1_again = (
+            get_cached_transformers_schema_constraint(cache_entry, _TinySchema)
+        )
+        parser_2, prefix_2 = get_cached_transformers_schema_constraint(
+            cache_entry, _OtherTinySchema,
+        )
+
+        assert parser_1_again is parser_1
+        assert prefix_1_again is prefix_1
+        assert parser_2 is not parser_1
+        assert prefix_2 is not prefix_1
+        internal = cache_entry["_otr_lmfe_constraint_cache"]
+        assert internal["tokenizer"] is cache_entry["tokenizer"]
+        assert len(internal["by_schema"]) == 2
+
 
 # ---------------------------------------------------------------------------
 # Closure passes prefix_allowed_tokens_fn into generate
@@ -144,6 +177,9 @@ class TestClosurePassesConstraint:
         tokenizer = MagicMock()
         tokenizer.get_vocab.return_value = {chr(c): c for c in range(32, 127)}
         tokenizer.vocab_size = 95
+        tokenizer.__len__.return_value = 201
+        tokenizer.all_special_ids = [200]
+        tokenizer.encode.return_value = [48]
         tokenizer.decode = lambda ids, **kw: "out"
         tokenizer.convert_ids_to_tokens = lambda ids: ["x"]
         tokenizer.eos_token_id = 200

@@ -108,6 +108,12 @@ def test_gemma_4_e4b_context_override_8192():
     )
 
 
+def test_gemma_4_12b_context_override_8192():
+    """Gemma4Unified 12B uses the measured 8K NF4 writer envelope."""
+    catalog = importlib.import_module("nodes._otr_model_catalog")
+    assert catalog.CURATED_CONTEXT_OVERRIDES["google/gemma-4-12b-it"] == 8192
+
+
 # ---------------------------------------------------------------------------
 # 5-6. _run_with_timeout non-blocking + cache invalidation (BUG-LOCAL-228)
 # ---------------------------------------------------------------------------

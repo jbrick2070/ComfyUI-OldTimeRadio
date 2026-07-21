@@ -17,6 +17,10 @@ question 1) has a native answer -- a PEFT LoRA on the NF4 base, no new
 loader, ~100-300 MB VRAM over the resident base, far inside the 14.5 GB
 ceiling.
 
+2026-07-20 runtime note: the canonical Gemma 4 12B writer needs no adapter at
+all. Its official HF checkpoint now runs directly in NF4; this annex describes
+only an optional future training experiment, not a runtime dependency.
+
 ## Per-base verdict (curated catalog, `nodes/_otr_model_catalog.py`)
 
 | Base (exact row) | Params | QLoRA train VRAM | Verdict on 16 GB |
@@ -24,9 +28,10 @@ ceiling.
 | google/gemma-4-E2B-it (matformer) | ~2B eff. | a few GB | EASY |
 | google/gemma-4-E4B-it (matformer) | ~4B eff. | <12 GB (Unsloth-documented) | EASY |
 | gemma-2-2b-it (technical slot) | 2B | a few GB | EASY |
-| mistralai/Mistral-Nemo-Instruct-2407 (DEFAULT_LLM, creative slot -> serves P5) | 12B | ~10-13 GB at 2-4k ctx | EASY-to-COMFORTABLE (its NF4 base already runs at 7.74 GiB on this exact GPU, `scripts/otr_gemma4_doctor.py:12`) |
+| mistralai/Mistral-Nemo-Instruct-2407 (legacy empty-input fallback) | 12B | ~10-13 GB at 2-4k ctx | EASY-to-COMFORTABLE (historical NF4 load delta 7.74 GiB on this GPU) |
 | Qwen2.5-14B-Instruct | 14B | ~13-15 GB, batch 1 + grad ckpt + short ctx | TIGHT BUT FITS |
-| Gemma-4-12B Q8_0 GGUF peer | 12B | train on the HF checkpoint (~10-13 GB), convert | FITS (see GGUF lane below) |
+| google/gemma-4-12b-it (canonical HF/NF4 writer) | 12B | ~10-13 GB at short training ctx | FITS; inference load delta 7.15 GiB / doctor peak 7.29 GiB (`scripts/otr_gemma4_doctor.py`) |
+| Gemma-4-12B Q8_0 GGUF peer | 12B | train on the HF checkpoint (~10-13 GB), convert | OPTIONAL PEER ONLY (see GGUF lane below) |
 
 Not "easily": 26-30B-MoE-class (e.g. Gemma-4 26B MoE, Qwen3-30B-A3B) sit at
 ~16-17.5 GB even with Unsloth -- over this card's real headroom once the

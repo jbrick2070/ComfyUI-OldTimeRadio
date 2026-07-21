@@ -740,10 +740,26 @@ class ScriptLineV4(_Strict):
     fact_ids: list[str] = []
 
 
+class ScriptSceneV4(_Strict):
+    """The lightweight scene projection authored by the P5 script pass.
+
+    This must stay closed and fully typed.  ``dict[str, Any]`` emitted an
+    ``additionalProperties: true`` JSON Schema.  LM Format Enforcer 0.11.3
+    treats that boolean as a schema object while walking an arbitrary scene
+    key and terminates token enforcement mid-object.  Besides being a better
+    contract, an explicit model keeps every P5 prefix on LMFE's supported,
+    hard-constrained path.
+    """
+
+    scene_id: str
+    env: str
+    description: str
+
+
 class ScriptArtifactV4(_Strict):
     schema_version: Literal["scifi_codex.script_artifact.v4"]
     title: str
-    scenes: list[dict[str, Any]] = Field(min_length=1)
+    scenes: list[ScriptSceneV4] = Field(min_length=1)
     lines: list[ScriptLineV4] = Field(min_length=1)
     music_cues: list[MusicCueV4] = Field(min_length=1)
 
@@ -793,11 +809,16 @@ def _has_forbidden_script_scene_keys(scenes: object) -> bool:
     """Reject score-shaped scene echoes without deleting story material."""
     if not isinstance(scenes, list):
         return True
-    return any(
-        not isinstance(scene, dict)
-        or bool(_SCRIPT_SCENE_FORBIDDEN_KEYS & set(scene))
-        for scene in scenes
-    )
+    for scene in scenes:
+        if isinstance(scene, ScriptSceneV4):
+            keys = set(type(scene).model_fields)
+        elif isinstance(scene, dict):
+            keys = set(scene)
+        else:
+            return True
+        if _SCRIPT_SCENE_FORBIDDEN_KEYS & keys:
+            return True
+    return False
 
 
 def _accepted_script_line_metadata(
@@ -2101,6 +2122,28 @@ def _merge_p3_text_patch(
     return merged
 
 
+def _bind_local_slot_schema(
+    slot_fn: GenerateFn,
+    schema_model: type[BaseModel],
+) -> GenerateFn:
+    """Bind a local Transformers scheduler closure to one exact schema.
+
+    Remote and GGUF closures expose no binder and keep their existing
+    response-format transport unchanged. The original marker-bearing closure
+    remains available to callers so P3 can bind its narrower authored-text
+    patch schema independently of the full draft schema.
+    """
+    binder = getattr(slot_fn, "_otr_bind_schema", None)
+    if not callable(binder):
+        return slot_fn
+    bound = binder(schema_model)
+    if not callable(bound):
+        raise CodexPackContractError(
+            "local structured slot returned a non-callable schema binding"
+        )
+    return bound
+
+
 def _run_p3_text_patch(
     *,
     slot_fn: GenerateFn,
@@ -2138,9 +2181,12 @@ def _run_p3_text_patch(
     if len(calls) != patch_attempt_index:
         raise CodexPackContractError("P3 text-patch receipt index drift")
 
+    patch_slot_fn = _bind_local_slot_schema(
+        slot_fn, _RadioScoreDraftTextPatchV4,
+    )
     try:
         raw_patch = str(invoke_structured_slot(
-            slot_fn,
+            patch_slot_fn,
             _P3TextPatchMessages(_p3_text_patch_messages(pack, targets)),
             temperature=REPAIR_TEMPERATURE,
             max_new_tokens=patch_output_tokens,
@@ -2895,6 +2941,10 @@ def invoke_codex_structured(
         schema_instruction += _STRUCTURE_REVIEW_CONTRACT_INSTRUCTION
     messages = [{"role": "system", "content": "\n".join(seams) + schema_instruction}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
     calls: list[dict[str, Any]] = []
+    # Preserve the original slot_fn for transport inspection and P3's narrower
+    # authored-text patch. Base, syntax-retry, and typed-repair attempts all use
+    # the exact result schema bound here.
+    result_slot_fn = _bind_local_slot_schema(slot_fn, result_type)
 
     def mark_attempt_complete(
         attempt_index: int,
@@ -3003,7 +3053,7 @@ def invoke_codex_structured(
             if prompt_must_fit and isinstance(messages_in, list)
             else messages_in
         )
-        raw = slot_fn(call_messages, **kwargs)
+        raw = result_slot_fn(call_messages, **kwargs)
         original_raw = str(raw)
         resolved_artifact_unwrapped = False
         # Live P3 proof 2026-07-12: the local creative model obeyed the typed
@@ -3056,8 +3106,8 @@ def invoke_codex_structured(
     # `structured_call` sees this wrapper rather than the original slot. Keep
     # OpenRouter's structured-output markers visible so base/full-repair P3
     # calls retain the same json_object transport as an unwrapped slot.
-    capture._otr_openrouter = getattr(slot_fn, "_otr_openrouter", False)  # type: ignore[attr-defined]
-    capture._otr_response_format = getattr(slot_fn, "_otr_response_format", None)  # type: ignore[attr-defined]
+    capture._otr_openrouter = getattr(result_slot_fn, "_otr_openrouter", False)  # type: ignore[attr-defined]
+    capture._otr_response_format = getattr(result_slot_fn, "_otr_response_format", None)  # type: ignore[attr-defined]
 
     def typed_repair_factory(*, original_prompt, failed_output, error):
         detail = " ".join(str(error).split())[:500] or "structured output rejected"

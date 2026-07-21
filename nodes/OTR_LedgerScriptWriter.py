@@ -648,8 +648,11 @@ class _SlotScheduler:
             # native GGUF (llama-cpp json_object). The local transformers lane
             # is excluded (it has no json_object mode).
             "_otr_supports_json_object": provider in ("openrouter", "gguf_native"),
-            # The scheduler does not bind a schema itself.  The common
-            # structured-call invoker may pass json_object for OpenRouter/GGUF.
+            # The plain scheduler closure does not bind a schema itself.
+            # Local-transformers closures expose `_otr_bind_schema`; the SciFi
+            # structured invoker uses it to bind each pass's exact Pydantic
+            # result type. OpenRouter/GGUF retain their existing json_object
+            # response-format behavior and are intentionally unchanged.
             "_otr_response_format": None,
         }
 
@@ -665,27 +668,38 @@ class _SlotScheduler:
 
         transport_markers = scheduler._slot_transport_markers(slot)
 
-        def generate_fn(
-            messages, *, temperature, max_new_tokens, stop=None,
-            response_format=None,
-        ):
-            cache_entry = scheduler._account_and_get_entry(slot)
-            base = _build_truncating_generate_fn(
-                cache_entry, **scheduler.sampling,
-            )
-            kwargs = {
-                "temperature": temperature,
-                "max_new_tokens": max_new_tokens,
-                "stop": stop,
-            }
-            if response_format is not None:
-                kwargs["response_format"] = response_format
-            return base(messages, **kwargs)
+        def _make_generate_fn(schema_model=None):
+            def generate_fn(
+                messages, *, temperature, max_new_tokens, stop=None,
+                response_format=None,
+            ):
+                cache_entry = scheduler._account_and_get_entry(slot)
+                base = _build_truncating_generate_fn(
+                    cache_entry,
+                    schema_model=schema_model,
+                    **scheduler.sampling,
+                )
+                kwargs = {
+                    "temperature": temperature,
+                    "max_new_tokens": max_new_tokens,
+                    "stop": stop,
+                }
+                if response_format is not None:
+                    kwargs["response_format"] = response_format
+                return base(messages, **kwargs)
 
-        for marker, value in transport_markers.items():
-            setattr(generate_fn, marker, value)
+            for marker, value in transport_markers.items():
+                setattr(generate_fn, marker, value)
+            if transport_markers["_otr_p3_text_patch_local"]:
+                # Lazy schema binding preserves slot accounting and model
+                # transitions while making invalid JSON un-sampleable on the
+                # local Transformers lane. The bound closure keeps every
+                # transport marker needed by the P3 repair path.
+                generate_fn._otr_bind_schema = _make_generate_fn  # type: ignore[attr-defined]
+                generate_fn._otr_bound_schema_model = schema_model  # type: ignore[attr-defined]
+            return generate_fn
 
-        return generate_fn
+        return _make_generate_fn()
 
     def for_polish(self):
         """Return a conservative-sampling generate_fn on the creative
@@ -717,6 +731,7 @@ def _build_truncating_generate_fn(
     top_p: float = 0.92,
     min_p: float = 0.0,
     repetition_penalty: float = 1.0,
+    schema_model: Any = None,
 ):
     """Return a generate_fn that NEVER truncates a prompt.
 
@@ -727,7 +742,7 @@ def _build_truncating_generate_fn(
     for an artifact raises ``PromptContextOverflowError`` instead of quietly
     losing its system/schema prefix.
 
-    Closure captures the four episode-level sampling knobs from the
+    Closure captures the episode-level sampling knobs from the
     writer widgets: top_p, min_p, repetition_penalty. The per-call
     args (`temperature`, `max_new_tokens`, optional `stop`) are
     whatever the line composer / outline / picker passes.
@@ -804,6 +819,18 @@ def _build_truncating_generate_fn(
     # normalize_messages_for_tokenizer folds system content into the
     # first user turn. Closure-cell idiom matches `_min_p_unsupported`.
     _system_role_supported = [None]
+    schema_parser = None
+    prefix_allowed_tokens_fn = None
+    if schema_model is not None:
+        from ._otr_constrained_generate import (
+            get_cached_transformers_schema_constraint,
+        )
+
+        schema_parser, prefix_allowed_tokens_fn = (
+            get_cached_transformers_schema_constraint(
+                cache_entry, schema_model,
+            )
+        )
 
     def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
         import torch  # local import; never load torch at module import
@@ -870,6 +897,13 @@ def _build_truncating_generate_fn(
             gen_kwargs["min_p"] = active_min_p
         if active_rep_penalty != 1.0:
             gen_kwargs["repetition_penalty"] = active_rep_penalty
+        if prefix_allowed_tokens_fn is not None:
+            # Local structured passes are constrained at token selection:
+            # tokens that cannot continue a schema-valid JSON document are
+            # never sampleable. Keep one beam; constrained sampling does not
+            # benefit from multiplying parser state across beams.
+            gen_kwargs["prefix_allowed_tokens_fn"] = prefix_allowed_tokens_fn
+            gen_kwargs["num_beams"] = 1
 
         # Stop-string support (Phase 4 v4). Tier 2 fix #16
         # (2026-05-11): the StoppingCriteria subclass is now defined
@@ -970,6 +1004,10 @@ def _build_truncating_generate_fn(
             decoded = decoded[:cut]
         return decoded
 
+    if schema_model is not None:
+        generate_fn.schema_model = schema_model  # type: ignore[attr-defined]
+        generate_fn.json_schema_parser = schema_parser  # type: ignore[attr-defined]
+        generate_fn.prefix_allowed_tokens_fn = prefix_allowed_tokens_fn  # type: ignore[attr-defined]
     return generate_fn
 
 

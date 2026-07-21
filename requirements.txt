@@ -2,8 +2,11 @@
 # IMPORTANT: Do NOT pin torch — ComfyUI manages its own torch version
 # Pin loosely to avoid conflicts with other node packs
 
-# Core TTS — Bark via transformers (Gemma 4 also lives here)
-transformers>=4.40,<6.0
+# Core TTS — Bark via transformers. Gemma4Unified (12B writer) requires the
+# official architecture implementation introduced in the 5.10 stable line.
+# Legacy parler-tts 0.2.2 hard-pins Transformers 4.46.1 and cannot share this
+# runtime; Parler is not an OTR dependency and must remain in an isolated env.
+transformers>=5.10.4,<6.0
 
 # Audio processing — WAV I/O and DSP
 soundfile>=0.12
@@ -20,8 +23,8 @@ feedparser>=6.0
 # failing runs with a message that blamed the feeds. Not optional.
 beautifulsoup4>=4.12
 
-# Tokenizers (required by transformers, listed for clarity)
-tokenizers>=0.15
+# Tokenizers (required by transformers 5.10.x, listed for clarity)
+tokenizers>=0.22,<=0.23
 sentencepiece>=0.1.99
 
 bitsandbytes>=0.42.0

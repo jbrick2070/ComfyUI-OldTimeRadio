@@ -3,6 +3,70 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-20 -- v2.0-alpha [CODER: Gemma 4 12B Transformers/HF writer restored]
+
+Restored `google/gemma-4-12b-it` as the saved creative + technical writer on
+the fully local, in-process Transformers/HF lane. OTR uses no Ollama,
+llama.cpp, model sidecar, or model-serving port for this path. The official HF
+weights remain under `C:\ComfyUI-Models\huggingface\hub`; both canonical slots
+select `cuda` / `sdpa` / `bnb_nf4`, OTR context 8192. No LoRA, adapter, or
+auxiliary tensor artifact is required.
+
+ROOT FIX:
+- Upgraded the runtime contract to native Gemma4Unified support
+  (`transformers>=5.10.4`), restored the curated HF row, removed its hard
+  reject, and made cache resolution pair the newest materialized-weight
+  snapshot with the newer local chat-template metadata revision.
+- Kept tokenizer/config/model loading fully offline with
+  `local_files_only=True`; there is no hidden Hub fallback in `load_llm`.
+- Bound each exact P0-P9 result schema into the real local scheduler calls,
+  including the narrower P3 authored-text patch, so lm-format-enforcer removes
+  invalid JSON continuations at token selection.
+- The first live leg found one grammar-compiler incompatibility in P5:
+  `list[dict[str, Any]]` emitted `additionalProperties:true`, which LMFE 0.11.3
+  treated as a schema object and crashed on. `ScriptSceneV4` now expresses the
+  actual closed `scene_id` / `env` / `description` contract. A complete P5
+  artifact is exercised character-by-character through the installed parser.
+- Updated the real `workflows/otr_canonical.json` and revalidated all 23 nodes,
+  57 links, positional widget vectors, live input names, references, and JSON
+  round-trip.
+- Added `scripts/otr_gemma4_doctor.py` for the official offline NF4 + coherent
+  prose + constrained-JSON contract. Bark/MusicGen compatibility tests stay
+  green under Transformers 5.10.4. The separately installed legacy
+  `parler-tts 0.2.2` pin is incompatible with Transformers 5 and must remain
+  isolated; Parler is not an OTR dependency.
+
+MEASURED: official `Gemma4UnifiedForConditionalGeneration`, 331 Linear4bit
+layers, `is_loaded_in_4bit=True`; 7.152 GiB allocated / 7.286 GiB doctor peak,
+and a 7.15 GiB live model-load delta. Canonical structured generation peaked
+around 13.9 GiB total GPU use including the desktop baseline and KV state,
+inside the 16 GB board.
+
+VALIDATION: exhaustive fresh-process inventory **8123 passed / 33 skipped / 1
+expected xfail across all 488 test files**. Focused post-fix compatibility
+surface: 291 passed / 2 skipped. Survival-guide suite: 30 passed; BUG-02.16 and
+BUG-11.55 OTR regressions: 2 passed. The Bible loader reports 205 entries and
+only its 12 pre-existing xref-tag format findings.
+
+LIVE PROOF: canonical prompt `ee0d4743-11bc-4367-9e19-5422afa2c95f` loaded the
+official checkpoint fully offline for both slots. P0 began with `{`, decoded,
+and reached semantic source-span validation; deterministic coordinate repair
+accepted it without another model call. P1-P4 and P3 rewrite cleared. P5 then
+produced a complete schema-valid JSON artifact, proving the LMFE crash fixed.
+The leg did **not** publish media: Gemma repeated an existing spoken-hygiene
+defect after its bounded P5 model repair, so the lane failed closed as designed.
+This is a runtime/grammar qualification through P5, not a full-episode or
+comparative quality-bakeoff verdict.
+
+LM STUDIO CONVENIENCE: imported the existing Q4_K_M GGUF as an NTFS hard link
+at `C:\ComfyUI-Models\LMStudio\unsloth\gemma-4-12b-it-GGUF\gemma-4-12b-it-Q4_K_M.gguf`.
+It consumes no second weight copy and is separate from OTR's HF runtime. LM
+Studio and its service/server were left stopped.
+
+STILL OPEN: the GGUF lane's structured-enforcement gap remains separate and
+the optional GGUF row was not presented as the canonical writer. The local
+Gemma-vs-Mistral quality matrix also remains open.
+
 ## 2026-07-18 evening -- HEAD `ed7b37de` (v2.0-alpha) [RENDER->CODER: short-episode structural COUNT gates -> advisory (Gate 3)]
 
 Started as the RENDER window for the local Mistral-Nemo bake-off (codex_v4 vs

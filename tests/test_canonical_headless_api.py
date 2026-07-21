@@ -266,13 +266,13 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")
     assert writer["inputs"]["target_words"] == 30
-    # 2026-07-10 live-smoke fix: creative slot moved to mistral-nemo
-    # (gemma-4-12b Q8 cannot hold n_ctx 4096 on the 16GB box; the
-    # silent 2048 downgrade truncated original_concept JSON).
+    # 2026-07-20: the canonical writer uses official Gemma4Unified on the
+    # in-process Transformers lane. NF4 is measured below 7.3 GiB and the
+    # lane binds LMFE schema constraints; this is not the Q8 GGUF path.
     assert writer["inputs"]["creative_writing_model"] == \
-        "mistralai/Mistral-Nemo-Instruct-2407"
+        "google/gemma-4-12b-it"
     assert writer["inputs"]["technical_model"] == \
-        "mistralai/Mistral-Nemo-Instruct-2407"
+        "google/gemma-4-12b-it"
     assert str(director["inputs"]["announcer_video_model"]).startswith("viz_")
 
 

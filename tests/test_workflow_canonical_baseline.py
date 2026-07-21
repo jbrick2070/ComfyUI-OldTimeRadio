@@ -7,7 +7,8 @@ stays unblocked.
 
 Per Sprint E E2 plan (W-1 + W-2):
 - Node 1 (OTR_LedgerScriptWriter): the `seed` widget was removed
-  (BUG-LOCAL-269/270); the model-slot widgets must ship the C7 models.
+  (BUG-LOCAL-269/270); the model-slot widgets ship the measured local HF
+  Gemma 4 12B writer while DEFAULT_LLM remains the C7 API fallback.
 - Node 51 (OTR_BatchHumoRender) widgets must ship seed=7, control="fixed".
 
 Node 63 (OTR_WorkflowValidator) path widget intentionally ships as
@@ -41,8 +42,7 @@ def _node_by_id(workflow: dict, node_id: int) -> dict:
 
 
 class TestWriterCanonicalModelSlots:
-    """W-1 drift guard. Writer Node 1 model-slot widgets must ship the
-    C7 baseline models.
+    """W-1 drift guard. Writer Node 1 ships the measured HF 12B writer.
 
     The writer's `seed` widget was REMOVED (BUG-LOCAL-269 / 270): the
     cast + style RNGs are decoupled and draw OS entropy, so there is no
@@ -67,11 +67,12 @@ class TestWriterCanonicalModelSlots:
         #   [3] creative_writing_model
         #   [4] technical_model
         assert widgets[1] == 30
-        # 2026-07-10 live-smoke fix: creative slot = mistral-nemo
-        # (gemma-4-12b Q8 cannot hold n_ctx 4096 on 16 GB; the silent
-        # 2048 downgrade truncated the original_concept JSON emission).
-        expected_creative = "mistralai/Mistral-Nemo-Instruct-2407"
-        expected_technical = "mistralai/Mistral-Nemo-Instruct-2407"
+        # 2026-07-20: official Gemma4Unified Transformers 5.10.4 + NF4
+        # measured ~7.15 GiB and hard-constrained JSON through LMFE. This is
+        # the safetensors/HF lane, not the independent GGUF Q8 row whose
+        # context downgrade motivated the earlier Mistral canvas pin.
+        expected_creative = "google/gemma-4-12b-it"
+        expected_technical = "google/gemma-4-12b-it"
         assert widgets[3] == expected_creative, (
             f"writer creative_writing_model must be {expected_creative!r}; "
             f"got {widgets[3]!r}."

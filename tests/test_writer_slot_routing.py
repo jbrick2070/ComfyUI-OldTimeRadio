@@ -304,6 +304,53 @@ def test_scheduler_declares_catalog_local_p3_patch_capability(monkeypatch):
     assert slot_fn._otr_p3_text_patch_transport == "exact_local"  # type: ignore[attr-defined]
     assert slot_fn._otr_openrouter is False  # type: ignore[attr-defined]
     assert slot_fn._otr_response_format is None  # type: ignore[attr-defined]
+    assert callable(slot_fn._otr_bind_schema)  # type: ignore[attr-defined]
+
+
+def test_scheduler_local_schema_binding_reaches_truncating_generator(monkeypatch):
+    import nodes.OTR_LedgerScriptWriter as W
+    import nodes._otr_model_catalog as catalog
+    import nodes._otr_model_loader as loader
+
+    local_id = "google/gemma-4-12b-it"
+    monkeypatch.setattr(
+        catalog, "_by_repo_id",
+        lambda: {local_id: type("LocalRow", (), {"provider": "local"})()},
+    )
+    monkeypatch.setattr(
+        loader,
+        "request_slot",
+        lambda *_args, **_kwargs: {"model": object(), "tokenizer": object()},
+    )
+    seen = {}
+
+    def fake_build(cache_entry, **kwargs):
+        seen.update(kwargs)
+        return lambda messages, **call_kwargs: call_kwargs["max_new_tokens"]
+
+    monkeypatch.setattr(W, "_build_truncating_generate_fn", fake_build)
+    scheduler = W._SlotScheduler(
+        creative_id=local_id,
+        technical_id=local_id,
+        top_p=.87,
+        min_p=.04,
+        repetition_penalty=1.03,
+    )
+    plain = scheduler.for_slot("technical")
+
+    class ExactSchema:
+        pass
+
+    bound = plain._otr_bind_schema(ExactSchema)  # type: ignore[attr-defined]
+    assert bound([], temperature=.2, max_new_tokens=77) == 77
+    assert seen == {
+        "schema_model": ExactSchema,
+        "top_p": .87,
+        "min_p": .04,
+        "repetition_penalty": 1.03,
+    }
+    assert bound._otr_bound_schema_model is ExactSchema  # type: ignore[attr-defined]
+    assert bound._otr_p3_text_patch_transport == "exact_local"  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------

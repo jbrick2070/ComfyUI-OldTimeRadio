@@ -15,11 +15,15 @@ Provides:
         path. Idempotent.
 
     resolve_snapshot_dir(model_id, hf_home=None) -> str | None
-        Return the absolute path to the model's snapshot directory in
-        the canonical cache, or None if the model is not cached. Useful
-        for passing directly to ``model_loader()`` as a path instead
-        of a Hub ID, bypassing transformers' Hub-resolution logic that
-        sometimes mis-handles Windows symlinks under local_files_only.
+        Return the newest MATERIALIZED snapshot (one containing a real
+        weight blob), or None if no complete snapshot is cached. Useful for
+        passing directly to ``model_loader()`` as a path instead of a Hub ID.
+
+    resolve_snapshot_file(model_id, filename, hf_home=None) -> str | None
+        Return the newest materialized copy of one metadata file across all
+        cached snapshots. This supports HF's split-snapshot layout where a
+        newer metadata revision (for example ``chat_template.jinja``) sits
+        beside an older, complete weight revision.
 
 Why this exists (BUG-LOCAL-085):
     Last night's full re-render OOM'd at Mistral-Nemo prefill with 24 GiB
@@ -43,6 +47,7 @@ log = logging.getLogger("OTR._otr_hf_env")
 _REG_KEY = "Environment"
 _REG_HF_HOME = "HF_HOME"
 _DEFAULT_HF_HOME = r"C:\ComfyUI-Models\huggingface"
+_WEIGHT_SUFFIXES = (".safetensors", ".bin")
 
 _CACHE: dict[str, str | None] = {"hf_home": None, "resolved": False}
 
@@ -89,7 +94,7 @@ def ensure_hf_home() -> str:
 
     Returns the absolute HF_HOME path. Also writes:
         os.environ['HF_HOME']      = resolved value
-        os.environ['HF_HUB_CACHE'] = resolved value (belt + suspenders)
+        os.environ['HF_HUB_CACHE'] = <resolved value> / 'hub'
     """
     if _CACHE["resolved"] and _CACHE["hf_home"]:
         return _CACHE["hf_home"]
@@ -112,12 +117,19 @@ def ensure_hf_home() -> str:
 
     # Export so downstream HF tooling picks it up automatically.
     os.environ["HF_HOME"] = resolved
-    os.environ["HF_HUB_CACHE"] = resolved
+    # HF_HOME is the cache *root*; HF_HUB_CACHE is the hub subdirectory.
+    # Pointing both variables at the same path makes huggingface_hub scan
+    # ``...\huggingface\models--*`` while OTR stores the weights under
+    # ``...\huggingface\hub\models--*``. That mismatch can turn a complete
+    # offline cache into a false miss and trigger an unwanted download.
+    hub_cache = str(Path(resolved) / "hub")
+    os.environ["HF_HUB_CACHE"] = hub_cache
     _CACHE["hf_home"] = resolved
     _CACHE["resolved"] = True
     log.info(
-        "[OTR_HF_ENV] HF_HOME=%r (source=%s); exported to os.environ",
-        resolved, source,
+        "[OTR_HF_ENV] HF_HOME=%r HF_HUB_CACHE=%r (source=%s); "
+        "exported to os.environ",
+        resolved, hub_cache, source,
     )
     return resolved
 
@@ -129,6 +141,42 @@ def _model_id_to_cache_dirname(model_id: str) -> str:
     return "models--" + model_id.replace("/", "--")
 
 
+def _snapshot_has_weights(snapshot_path: Path) -> bool:
+    """Return True only for a snapshot with a materialized weight blob."""
+    try:
+        for child in snapshot_path.iterdir():
+            if child.suffix.lower() not in _WEIGHT_SUFFIXES:
+                continue
+            try:
+                if child.stat().st_size > 0:  # follows HF snapshot symlinks
+                    return True
+            except OSError:
+                continue
+    except OSError:
+        return False
+    return False
+
+
+def _snapshot_candidates(model_id: str, hf_home: str) -> list[Path]:
+    snapshots_dir = (
+        Path(hf_home)
+        / "hub"
+        / _model_id_to_cache_dirname(model_id)
+        / "snapshots"
+    )
+    if not snapshots_dir.is_dir():
+        return []
+    try:
+        candidates = [p for p in snapshots_dir.iterdir() if p.is_dir()]
+    except OSError:
+        return []
+    candidates.sort(
+        key=lambda p: p.stat().st_mtime if p.exists() else 0.0,
+        reverse=True,
+    )
+    return candidates
+
+
 def resolve_snapshot_dir(model_id: str, hf_home: str | None = None) -> str | None:
     """Return the absolute path to the model's snapshot directory under
     the canonical HF cache, or None if the model is not cached.
@@ -136,8 +184,9 @@ def resolve_snapshot_dir(model_id: str, hf_home: str | None = None) -> str | Non
     Layout expected:
         <hf_home>/hub/models--<org>--<name>/snapshots/<commit_sha>/
 
-    Picks the most-recently-modified snapshot if multiple exist (HF
-    keeps prior snapshots until cleanup). Returns None when:
+    Picks the most-recently-modified snapshot that contains at least one
+    materialized ``.safetensors`` or ``.bin`` weight file. Metadata-only
+    snapshots are intentionally skipped. Returns None when:
         - hf_home directory missing
         - models--<...> directory missing
         - snapshots/ directory missing or empty
@@ -147,20 +196,22 @@ def resolve_snapshot_dir(model_id: str, hf_home: str | None = None) -> str | Non
     bypasses transformers' Hub-resolution layer entirely.
     """
     home = hf_home or ensure_hf_home()
-    cache_dirname = _model_id_to_cache_dirname(model_id)
-    snapshots_dir = Path(home) / "hub" / cache_dirname / "snapshots"
-    if not snapshots_dir.is_dir():
+    candidates = _snapshot_candidates(model_id, home)
+    if not candidates:
         log.debug(
             "[OTR_HF_ENV] no snapshot dir for %s under %s",
-            model_id, snapshots_dir,
+            model_id, Path(home) / "hub",
         )
         return None
-    candidates = [p for p in snapshots_dir.iterdir() if p.is_dir()]
-    if not candidates:
+    weighted = [p for p in candidates if _snapshot_has_weights(p)]
+    if not weighted:
+        log.warning(
+            "[OTR_HF_ENV] cached snapshots for %s contain no materialized "
+            "weight blob under %s",
+            model_id, Path(home) / "hub",
+        )
         return None
-    # Most recent wins (HF cleanup keeps prior snapshots until pruned).
-    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    chosen = candidates[0]
+    chosen = weighted[0]
     log.info(
         "[OTR_HF_ENV] snapshot resolved %s -> %s",
         model_id, chosen,
@@ -168,4 +219,36 @@ def resolve_snapshot_dir(model_id: str, hf_home: str | None = None) -> str | Non
     return str(chosen)
 
 
-__all__ = ["ensure_hf_home", "resolve_snapshot_dir"]
+def resolve_snapshot_file(
+    model_id: str,
+    filename: str,
+    hf_home: str | None = None,
+) -> str | None:
+    """Return the newest cached copy of ``filename`` across snapshots.
+
+    Only a simple basename is accepted; callers cannot escape the snapshot
+    directory. Files must resolve to a materialized, non-empty target.
+    """
+    name = str(filename or "").strip()
+    if not name or Path(name).name != name:
+        raise ValueError("filename must be one non-empty basename")
+    home = hf_home or ensure_hf_home()
+    for snapshot in _snapshot_candidates(model_id, home):
+        candidate = snapshot / name
+        try:
+            if candidate.is_file() and candidate.stat().st_size > 0:
+                log.info(
+                    "[OTR_HF_ENV] snapshot metadata resolved %s:%s -> %s",
+                    model_id, name, candidate,
+                )
+                return str(candidate)
+        except OSError:
+            continue
+    return None
+
+
+__all__ = [
+    "ensure_hf_home",
+    "resolve_snapshot_dir",
+    "resolve_snapshot_file",
+]

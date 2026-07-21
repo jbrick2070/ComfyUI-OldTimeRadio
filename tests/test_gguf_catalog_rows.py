@@ -44,7 +44,10 @@ def test_dropdown_gguf_row_is_bare_and_validates(tmp_path):
 
 def test_dropdown_orders_row_as_gemma_peer(tmp_path):
     ids = [entry.repo_id for entry in cat.build_dropdown_choices(hub_root=tmp_path)]
-    assert ids.index("google/gemma-4-E4B-it") + 1 == ids.index(gguf.ROW_ID)
+    assert ids.index("google/gemma-4-E4B-it") + 1 == ids.index(
+        "google/gemma-4-12b-it"
+    )
+    assert ids.index("google/gemma-4-12b-it") + 1 == ids.index(gguf.ROW_ID)
     assert ids.index(gguf.ROW_ID) < ids.index("google/gemma-2-2b-it")
 
 
