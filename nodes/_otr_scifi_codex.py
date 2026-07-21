@@ -35,6 +35,8 @@ try:
     )
     from ._otr_line_composer import (
         LineRequest,
+        _quality_dynamic_temperature,
+        _quality_model_repair_pass_budget,
         spoken_surface_flags_for_line,
     )
     from ._otr_readiness import normalize_for_delivery
@@ -78,6 +80,8 @@ except ImportError:  # pragma: no cover
     )
     from _otr_line_composer import (  # type: ignore
         LineRequest,
+        _quality_dynamic_temperature,
+        _quality_model_repair_pass_budget,
         spoken_surface_flags_for_line,
     )
     from _otr_readiness import normalize_for_delivery  # type: ignore
@@ -2967,7 +2971,14 @@ def _repair_script_hygiene_after_exhaustion(
     max_new_tokens: int,
     receipt: MutableMapping[str, Any],
 ) -> ScriptArtifactV4 | None:
-    """A/B/C/floor recovery for schema-valid, craft-only script rejection."""
+    """Dynamic cross-slot recovery for schema-valid craft-only rejection.
+
+    The established A/B/C patches run first.  Any still-open line chunk then
+    rotates through fresh same/alternate-slot patches, with every result
+    revalidated, until it clears or the backend-hang budget is reached.  Budget
+    exhaustion is not a quality failure: the deterministic ledger floor remains
+    the final totality boundary.
+    """
     try:
         _validate_script_graph(script, score)
         _validate_script_roster_contract(script, cast, score)
@@ -2979,6 +2990,7 @@ def _repair_script_hygiene_after_exhaustion(
 
         current = script.model_copy(deep=True)
         original_targets = {target.line_id: target for target in targets}
+        initial_gate_count = sum(len(target.gates) for target in targets)
         resolved_by: dict[str, dict[str, str]] = {}
         attempts: list[dict[str, Any]] = []
         patch_budget = min(max_new_tokens, max(384, len(targets) * 180))
@@ -3065,6 +3077,56 @@ def _repair_script_hygiene_after_exhaustion(
                     attempts[-1]["status"] = "applied"
                 except CodexPackContractError:
                     attempts[-1]["status"] = "contract_rejected"
+
+        # D+: quality rejection asks another writer; it never ends the story.
+        # Re-collect after every patch so already-clean rows leave the chunk and
+        # the next prompt contains only the unresolved row-local work.
+        targets = _collect_script_hygiene_targets(
+            current, cast, fact_index, score, story_rules,
+        )
+        dynamic_lanes = [(same_slot_fn, same_slot, "same_slot")]
+        if callable(alternate_slot_fn):
+            dynamic_lanes.append((
+                alternate_slot_fn,
+                alternate_slot or "alternate",
+                "alternate_slot",
+            ))
+        pass_budget = _quality_model_repair_pass_budget(
+            initial_gate_count, len(dynamic_lanes),
+        )
+        dynamic_index = 0
+        while targets and len(attempts) < pass_budget:
+            slot_fn, slot_name, lane_label = dynamic_lanes[
+                dynamic_index % len(dynamic_lanes)
+            ]
+            dynamic_index += 1
+            pass_number = len(attempts) + 1
+            rung = f"repair_dynamic_{pass_number:02d}_{lane_label}"
+            patch = _call_spoken_repair_patch(
+                slot_fn=slot_fn,
+                messages=_spoken_repair_prompt(
+                    current, targets, cast, fact_index, sharpened=True,
+                ),
+                temperature=_quality_dynamic_temperature(pass_number - 1),
+                max_new_tokens=min(
+                    max_new_tokens, max(384, len(targets) * 180),
+                ),
+                rung=rung,
+                slot=slot_name,
+                receipts=attempts,
+            )
+            if patch is not None:
+                try:
+                    current = _apply_spoken_repair_patch(
+                        current, targets, patch, cast, fact_index, score,
+                        story_rules, rung=rung, resolved_by=resolved_by,
+                    )
+                    attempts[-1]["status"] = "applied"
+                except CodexPackContractError:
+                    attempts[-1]["status"] = "contract_rejected"
+            targets = _collect_script_hygiene_targets(
+                current, cast, fact_index, score, story_rules,
+            )
 
         by_line = {line.line_id: line for line in current.lines}
         names = {row.char_id: row.name for row in cast.cast}
@@ -4742,6 +4804,263 @@ def _record_failsoft(
     return True
 
 
+_CODEX_QUALITY_RETAKE_TEMPERATURES = (0.68, 0.58, 0.48, 0.38, 0.32, 0.28)
+
+
+def _codex_quality_repair_cycle_budget(issue_count: int) -> int:
+    """Fresh whole-script retakes allowed before the valid-script floor."""
+    try:
+        issues = max(1, int(issue_count))
+    except (TypeError, ValueError):
+        issues = 1
+    # Shared spoken-loop arithmetic returns 6..12 model calls. A whole-script
+    # cycle costs one judge + one writer call, so halve that allowance.
+    return max(3, _quality_model_repair_pass_budget(issues, 2) // 2)
+
+
+def _codex_retake_temperature(repair_index: int) -> float:
+    index = max(0, min(
+        int(repair_index), len(_CODEX_QUALITY_RETAKE_TEMPERATURES) - 1,
+    ))
+    return _CODEX_QUALITY_RETAKE_TEMPERATURES[index]
+
+
+def _run_listener_quality_loop(
+    *,
+    script: ScriptArtifactV4,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    story_rules: StoryRules,
+    creative_fn: GenerateFn,
+    technical_fn: GenerateFn,
+    pack: Any,
+    script_token_budget: int,
+    journal: MutableMapping[str, Any],
+    meta: MutableMapping[str, Any],
+) -> ScriptArtifactV4:
+    """P6/P7 judge-repair loop; quality never owns liveness."""
+    current = script
+    audited: list[tuple[int, int, ScriptArtifactV4]] = []
+    receipts: list[dict[str, Any]] = []
+    repair_count = 0
+    repair_budget = 3
+    status = "audit_failed_soft"
+    while True:
+        try:
+            listener = invoke_codex_structured(
+                pass_id="P6",
+                slot="technical",
+                slot_fn=technical_fn,
+                pack=pack,
+                seam_refs=("codex_listening_room_system",),
+                artifact_inputs={
+                    "script": current.model_dump(mode="json"),
+                    "score": score.model_dump(mode="json"),
+                    "quality_cycle": repair_count,
+                },
+                result_type=ListenerReviewV4,
+                post_validator=lambda x: None,
+                base_temperature=.20,
+                structural_retry_temperature=.10,
+                max_new_tokens=2200,
+                call_journal=journal,
+            )
+        except CodexPassError as exc:
+            if not _record_failsoft("P6", "audit", exc, meta):
+                raise
+            break
+        issue_count = len(listener.issues)
+        audited.append((issue_count, repair_count, current))
+        receipts.append({
+            "cycle": repair_count,
+            "issue_count": issue_count,
+            "require_full_retake": bool(listener.require_full_retake),
+        })
+        if not listener.issues:
+            status = "pass"
+            break
+        repair_budget = max(
+            repair_budget,
+            _codex_quality_repair_cycle_budget(issue_count),
+        )
+        if repair_count >= repair_budget:
+            status = "quality_floor"
+            break
+        repair_count += 1
+        prior = current
+        try:
+            current = invoke_codex_structured(
+                pass_id="P7",
+                slot="creative",
+                slot_fn=creative_fn,
+                pack=pack,
+                seam_refs=(
+                    "codex_retake_system",
+                    "codex_coda_contract_system",
+                ),
+                artifact_inputs={
+                    **_script_artifact_context(score),
+                    "previous": current.model_dump(mode="json"),
+                    "review": listener.model_dump(mode="json"),
+                    "quality_cycle": repair_count,
+                },
+                result_type=ScriptArtifactV4,
+                post_validator=lambda x: _validate_script_post(
+                    x, cast, score, fact_index, story_rules,
+                ),
+                base_temperature=_codex_retake_temperature(repair_count - 1),
+                structural_retry_temperature=.30,
+                max_new_tokens=script_token_budget,
+                call_journal=journal,
+                repair_score=score,
+                spoken_repair_cast=cast,
+                spoken_repair_fact_index=fact_index,
+                spoken_repair_story_rules=story_rules,
+                spoken_repair_alternate_slot_fn=technical_fn,
+                spoken_repair_alternate_slot="technical",
+            )
+        except CodexPassError as exc:
+            if not _record_failsoft("P7", "retake", exc, meta):
+                raise
+            current = prior
+    if status == "quality_floor" and audited:
+        current = min(audited, key=lambda item: (item[0], item[1]))[2]
+    lane = meta.setdefault("scifi_codex", {})
+    lane["listener_quality_loop"] = {
+        "status": status,
+        "repair_count": repair_count,
+        "repair_budget": repair_budget,
+        "cycles": receipts,
+    }
+    return current
+
+
+def _final_audit_issue_score(audit: FinalAuditV4) -> int:
+    return sum(
+        10 if issue.severity == "critical" else 1
+        for issue in audit.issues
+    )
+
+
+def _run_final_audit_quality_loop(
+    *,
+    script: ScriptArtifactV4,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    story_rules: StoryRules,
+    creative_fn: GenerateFn,
+    technical_fn: GenerateFn,
+    pack: Any,
+    script_token_budget: int,
+    journal: MutableMapping[str, Any],
+    meta: MutableMapping[str, Any],
+) -> ScriptArtifactV4:
+    """P8/P9 factual/craft audit loop over structurally valid scripts."""
+    current = script
+    audited: list[tuple[int, int, ScriptArtifactV4]] = []
+    receipts: list[dict[str, Any]] = []
+    repair_count = 0
+    repair_budget = 3
+    status = "audit_failed_soft"
+    while True:
+        try:
+            audit = invoke_codex_structured(
+                pass_id="P8",
+                slot="technical",
+                slot_fn=technical_fn,
+                pack=pack,
+                seam_refs=(
+                    "codex_final_audit_system",
+                    "codex_coda_contract_system",
+                ),
+                artifact_inputs={
+                    "script": current.model_dump(mode="json"),
+                    "fact_index": fact_index.model_dump(mode="json"),
+                    "quality_cycle": repair_count,
+                },
+                result_type=FinalAuditV4,
+                post_validator=lambda x: None,
+                base_temperature=.20,
+                structural_retry_temperature=.10,
+                max_new_tokens=2400,
+                call_journal=journal,
+            )
+        except CodexPassError as exc:
+            if not _record_failsoft("P8", "audit", exc, meta):
+                raise
+            break
+        issue_score = _final_audit_issue_score(audit)
+        audited.append((issue_score, repair_count, current))
+        receipts.append({
+            "cycle": repair_count,
+            "verdict": audit.verdict,
+            "issue_count": len(audit.issues),
+            "critical_count": sum(
+                issue.severity == "critical" for issue in audit.issues
+            ),
+        })
+        if audit.verdict == "pass":
+            status = "pass"
+            break
+        repair_budget = max(
+            repair_budget,
+            _codex_quality_repair_cycle_budget(len(audit.issues)),
+        )
+        if repair_count >= repair_budget:
+            status = "quality_floor"
+            break
+        repair_count += 1
+        prior = current
+        try:
+            current = invoke_codex_structured(
+                pass_id="P9",
+                slot="creative",
+                slot_fn=creative_fn,
+                pack=pack,
+                seam_refs=(
+                    "codex_retake_system",
+                    "codex_play_system",
+                    "codex_coda_contract_system",
+                ),
+                artifact_inputs={
+                    **_script_artifact_context(score),
+                    "previous": current.model_dump(mode="json"),
+                    "audit": audit.model_dump(mode="json"),
+                    "quality_cycle": repair_count,
+                },
+                result_type=ScriptArtifactV4,
+                post_validator=lambda x: _validate_script_post(
+                    x, cast, score, fact_index, story_rules,
+                ),
+                base_temperature=_codex_retake_temperature(repair_count - 1),
+                structural_retry_temperature=.30,
+                max_new_tokens=script_token_budget,
+                call_journal=journal,
+                repair_score=score,
+                spoken_repair_cast=cast,
+                spoken_repair_fact_index=fact_index,
+                spoken_repair_story_rules=story_rules,
+                spoken_repair_alternate_slot_fn=technical_fn,
+                spoken_repair_alternate_slot="technical",
+            )
+        except CodexPassError as exc:
+            if not _record_failsoft("P9", "retake", exc, meta):
+                raise
+            current = prior
+    if status == "quality_floor" and audited:
+        current = min(audited, key=lambda item: (item[0], item[1]))[2]
+    lane = meta.setdefault("scifi_codex", {})
+    lane["final_audit_quality_loop"] = {
+        "status": status,
+        "repair_count": repair_count,
+        "repair_budget": repair_budget,
+        "cycles": receipts,
+    }
+    return current
+
+
 def run_scifi_codex_episode(
     *, payload: dict[str, str], pack: Any, resolved: Mapping[str, Any], led: Any,
     meta: dict[str, Any], creative_fn: GenerateFn, technical_fn: GenerateFn,
@@ -4916,40 +5235,36 @@ def run_scifi_codex_episode(
     script_token_budget = _script_output_token_budget(steer.requested_words, accepted_line_count)
     journal["script_token_budget"] = {"requested_words": steer.requested_words, "accepted_line_count": accepted_line_count, "max_new_tokens": script_token_budget}
     script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0, story_rules), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score, spoken_repair_cast=p2, spoken_repair_fact_index=p0, spoken_repair_story_rules=story_rules, spoken_repair_alternate_slot_fn=technical_fn, spoken_repair_alternate_slot="technical")
-    # P6 AUDIT fail-soft: a non-converged listener review skips the P7 retake and
-    # keeps the valid P5 script (THE LAW; the review writes no ledger content).
-    try:
-        listener = invoke_codex_structured(pass_id="P6", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_listening_room_system",), artifact_inputs={"script": script.model_dump(mode="json"), "score": score.model_dump(mode="json")}, result_type=ListenerReviewV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2200, call_journal=journal)
-    except CodexPassError as exc:
-        if not _record_failsoft("P6", "audit", exc, meta):
-            raise
-        listener = None
-    if listener is not None:
-        # P7 RETAKE fail-soft: keep the prior (P5) script on non-convergence.
-        script_before_p7 = script
-        try:
-            script = invoke_codex_structured(pass_id="P7", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "review": listener.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0, story_rules), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score, spoken_repair_cast=p2, spoken_repair_fact_index=p0, spoken_repair_story_rules=story_rules, spoken_repair_alternate_slot_fn=technical_fn, spoken_repair_alternate_slot="technical")
-        except CodexPassError as exc:
-            if not _record_failsoft("P7", "retake", exc, meta):
-                raise
-            script = script_before_p7
-    # P8 AUDIT fail-soft: a non-converged final audit skips the P9 retake and
-    # keeps the current valid script (THE LAW; the audit writes no ledger content).
-    try:
-        audit = invoke_codex_structured(pass_id="P8", slot="technical", slot_fn=technical_fn, pack=pack, seam_refs=("codex_final_audit_system", "codex_coda_contract_system"), artifact_inputs={"script": script.model_dump(mode="json"), "fact_index": p0.model_dump(mode="json")}, result_type=FinalAuditV4, post_validator=lambda x: None, base_temperature=.20, structural_retry_temperature=.10, max_new_tokens=2400, call_journal=journal)
-    except CodexPassError as exc:
-        if not _record_failsoft("P8", "audit", exc, meta):
-            raise
-        audit = None
-    if audit is not None and audit.verdict == "rewrite":
-        # P9 RETAKE fail-soft: keep the prior (P7/P5) script on non-convergence.
-        script_before_p9 = script
-        try:
-            script = invoke_codex_structured(pass_id="P9", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_retake_system", "codex_play_system", "codex_coda_contract_system"), artifact_inputs={**_script_artifact_context(score), "previous": script.model_dump(mode="json"), "audit": audit.model_dump(mode="json")}, result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0, story_rules), base_temperature=.68, structural_retry_temperature=.30, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score, spoken_repair_cast=p2, spoken_repair_fact_index=p0, spoken_repair_story_rules=story_rules, spoken_repair_alternate_slot_fn=technical_fn, spoken_repair_alternate_slot="technical")
-        except CodexPassError as exc:
-            if not _record_failsoft("P9", "retake", exc, meta):
-                raise
-            script = script_before_p9
+    # Quality passes are dynamic: each actionable P6/P8 verdict triggers a fresh
+    # creative retake and then an independent re-audit. They stop only on a clean
+    # verdict or the no-hang budget; exhaustion keeps the best structurally valid
+    # script with an explicit quality-floor receipt and never fails the episode.
+    script = _run_listener_quality_loop(
+        script=script,
+        score=score,
+        cast=p2,
+        fact_index=p0,
+        story_rules=story_rules,
+        creative_fn=creative_fn,
+        technical_fn=technical_fn,
+        pack=pack,
+        script_token_budget=script_token_budget,
+        journal=journal,
+        meta=meta,
+    )
+    script = _run_final_audit_quality_loop(
+        script=script,
+        score=score,
+        cast=p2,
+        fact_index=p0,
+        story_rules=story_rules,
+        creative_fn=creative_fn,
+        technical_fn=technical_fn,
+        pack=pack,
+        script_token_budget=script_token_budget,
+        journal=journal,
+        meta=meta,
+    )
     # Defense-in-depth final scour over the exact artifact that will be assembled.
     # Every P5/P7/P9 route already validates through the same boundary; this
     # catches any future bypass before it can become ledger text.

@@ -147,6 +147,14 @@ _MAX_NEW_TOKENS_PER_LINE = 200  # ~150 words max, generous for any beat
 _MAX_OVERSIZE_RATIO = 3.0       # response > 3x target_words triggers retry
 _QUALITY_REPAIR_B_TEMPERATURE = 0.30
 _QUALITY_REPAIR_C_TEMPERATURE = 0.18
+# Quality rejection means "repair again", never "end the episode".  The first
+# A/B/C rungs preserve their established prompts/temperatures; stubborn rows
+# then enter a dynamically sized cross-slot loop.  The cap is a backend-hang
+# guard, not a quality verdict: exhaustion falls through to the validated
+# deterministic ledger floor below.
+_QUALITY_DYNAMIC_MIN_MODEL_PASSES = 6
+_QUALITY_DYNAMIC_MAX_MODEL_PASSES = 12
+_QUALITY_DYNAMIC_TEMPERATURES = (0.22, 0.12, 0.18, 0.08)
 
 # Format-strip regexes (applied in order in strip_line_formatting)
 _PREFIX_VOICE_TAG_RE = re.compile(
@@ -2613,6 +2621,66 @@ def _quality_critical_hint(flags, existing: str = "") -> str:
     return f"{existing}; {critical}" if existing else critical
 
 
+def _quality_model_repair_pass_budget(
+    gate_count: int,
+    lane_count: int,
+) -> int:
+    """Dynamic model-pass allowance for one rejected spoken chunk.
+
+    Every available writer lane receives several chances, while chunks with
+    several independent open gates receive proportionally more feedback/retry
+    cycles.  This bound prevents an unavailable or stubborn backend from
+    hanging a render forever; reaching it is *not* a rejection and therefore
+    proceeds to the scorer-validated ledger floor.
+    """
+    try:
+        gates = max(1, int(gate_count))
+    except (TypeError, ValueError):
+        gates = 1
+    try:
+        lanes = max(1, int(lane_count))
+    except (TypeError, ValueError):
+        lanes = 1
+    return min(
+        _QUALITY_DYNAMIC_MAX_MODEL_PASSES,
+        max(
+            _QUALITY_DYNAMIC_MIN_MODEL_PASSES,
+            lanes * 3,
+            2 + (gates * 2),
+        ),
+    )
+
+
+def _quality_dynamic_temperature(pass_index: int) -> float:
+    """Fresh, low-entropy temperature for a post-C repair pass."""
+    try:
+        index = max(0, int(pass_index))
+    except (TypeError, ValueError):
+        index = 0
+    return _QUALITY_DYNAMIC_TEMPERATURES[
+        index % len(_QUALITY_DYNAMIC_TEMPERATURES)
+    ]
+
+
+def _quality_dynamic_hint(
+    flags,
+    *,
+    existing: str,
+    rejected_text: str,
+    pass_number: int,
+    pass_budget: int,
+) -> str:
+    """Feedback for a fresh repair call after the fixed A/B/C rungs."""
+    critical = _quality_critical_hint(flags, existing)
+    rejected = " ".join(str(rejected_text or "").split())[:600]
+    return (
+        f"{critical}; DYNAMIC REPAIR PASS {pass_number}/{pass_budget}. "
+        "The previous candidate was rejected by the named gates. Produce a "
+        "genuinely different complete spoken line, then internally check every "
+        f"gate before answering. Rejected candidate: {rejected!r}"
+    )
+
+
 def _quality_stamp(result: LineResult, gates, rung: str) -> LineResult:
     extra = ["hygiene_repaired_after_reroll"]
     extra.extend(
@@ -2728,7 +2796,14 @@ def repair_existing_spoken_line(
     seen = list(_quality_codes(initial))
     current = original
 
-    def _call(fn, temperature: float) -> str:
+    def _call(
+        fn,
+        temperature: float,
+        *,
+        rung: str,
+        pass_number: int,
+        pass_budget: int,
+    ) -> str:
         open_flags = _flags(current)
         prompt = _quality_critical_hint(open_flags)
         messages = [
@@ -2749,7 +2824,10 @@ def repair_existing_spoken_line(
                     f"Beat intent: {req.intent}\n"
                     f"Locked context:\n{str(req.canon_header or '')[-1800:]}\n"
                     f"Current line: {current}\n"
-                    f"Required repair: {prompt}"
+                    f"Required repair: {prompt}\n"
+                    f"Repair pass: {pass_number}/{pass_budget} ({rung}). "
+                    "A rejected answer will be rejudged and sent through a "
+                    "fresh writer pass."
                 ),
             },
         ]
@@ -2775,13 +2853,32 @@ def repair_existing_spoken_line(
             )
             return ""
 
+    lanes = [
+        (fn, label)
+        for fn, label in (
+            (creative_fn, "same_slot"),
+            (repair_fn, "alternate_slot"),
+        )
+        if callable(fn)
+    ]
+    pass_budget = _quality_model_repair_pass_budget(
+        len(_quality_codes(initial)), len(lanes),
+    )
+    model_passes = 0
     for fn, temperature, rung in (
         (creative_fn, _QUALITY_REPAIR_B_TEMPERATURE, "repair_b_same_slot"),
         (repair_fn, _QUALITY_REPAIR_C_TEMPERATURE, "repair_c_alternate_slot"),
     ):
         if not callable(fn):
             continue
-        candidate = _call(fn, temperature)
+        model_passes += 1
+        candidate = _call(
+            fn,
+            temperature,
+            rung=rung,
+            pass_number=model_passes,
+            pass_budget=pass_budget,
+        )
         if not candidate:
             continue
         candidate_flags = _flags(candidate)
@@ -2793,6 +2890,37 @@ def repair_existing_spoken_line(
         current = candidate
         if not candidate_flags:
             return _quality_stamp(LineResult(text=current), seen, rung)
+
+    # D+: keep issuing fresh, independently judged repair calls after A/B/C.
+    # Rotate every available slot and vary the low repair temperature so a
+    # stubborn model/output cache cannot turn one bad answer into an episode
+    # failure.  The current best admissible candidate is the next pass input.
+    dynamic_index = 0
+    while lanes and model_passes < pass_budget and _flags(current):
+        fn, lane_label = lanes[dynamic_index % len(lanes)]
+        model_passes += 1
+        dynamic_index += 1
+        rung = f"repair_dynamic_{model_passes:02d}_{lane_label}"
+        candidate = _call(
+            fn,
+            _quality_dynamic_temperature(model_passes - 1),
+            rung=rung,
+            pass_number=model_passes,
+            pass_budget=pass_budget,
+        )
+        if not candidate:
+            continue
+        candidate_flags = _flags(candidate)
+        for code in _quality_codes(candidate_flags):
+            if code not in seen:
+                seen.append(code)
+        if not _candidate_allowed(candidate):
+            continue
+        current_flags = _flags(current)
+        if not candidate_flags:
+            return _quality_stamp(LineResult(text=candidate), seen, rung)
+        if len(candidate_flags) <= len(current_flags):
+            current = candidate
 
     actions: list[str] = []
     for _ in range(6):
@@ -3002,12 +3130,13 @@ def compose_line(
     word_count = len(cleaned.split())
     word_cap, min_words, max_words = _word_bands(req.target_words)
 
-    # Total craft-hygiene repair ladder (2026-07-20). A quality flag can never
+    # Total craft-hygiene repair ladder (2026-07-20/21). A quality flag can never
     # declare the episode unrenderable: A uses the established reroll path; B is
-    # a one-shot lower-temperature CRITICAL rewrite on the same writer; C uses
-    # the optional alternate/stronger writer; then the pure floor resolves any
-    # remaining named craft gate. Structural and content-safety gates do not
-    # enter this ladder.
+    # a lower-temperature CRITICAL rewrite on the same writer; C uses the
+    # optional alternate/stronger writer; D+ dynamically rotates fresh calls
+    # across every available slot and re-scores each answer; then the pure floor
+    # resolves any remaining named craft gate. Structural and content-safety
+    # gates do not enter this ladder.
     if (
         _quality_floor_allowed
         and not _stage_dir_repair_attempted
@@ -3152,6 +3281,72 @@ def compose_line(
                         return _quality_stamp(
                             _c, _seen_codes, "repair_c_alternate_slot",
                         )
+
+            # D+: dynamically keep asking/rejudging after fixed A/B/C. The
+            # allowance scales with open-gate complexity and available lanes;
+            # its exhaustion is never a quality failure -- the validated floor
+            # below remains the total ledgerability terminus.
+            _lanes = [(creative_fn, "same_slot")]
+            if callable(repair_fn):
+                _lanes.append((repair_fn, "alternate_slot"))
+            _model_passes = 2 + int(callable(repair_fn))  # logical A + B + C
+            _pass_budget = _quality_model_repair_pass_budget(
+                len(_quality_codes(_q_flags)), len(_lanes),
+            )
+            _dynamic_index = 0
+            while _lanes and _model_passes < _pass_budget:
+                _best_so_far, _ = min(
+                    _candidates,
+                    key=lambda item: line_quality_defect_score(
+                        item[0].text, req, rules=_story_rules,
+                    ),
+                )
+                _open = _quality_flags_for_line(
+                    _best_so_far.text, req, rules=_story_rules,
+                )
+                if not _open:
+                    break
+                _fn, _lane_label = _lanes[
+                    _dynamic_index % len(_lanes)
+                ]
+                _model_passes += 1
+                _dynamic_index += 1
+                _rung = (
+                    f"repair_dynamic_{_model_passes:02d}_{_lane_label}"
+                )
+                _dynamic_hint = _quality_dynamic_hint(
+                    _open,
+                    existing=_existing,
+                    rejected_text=_best_so_far.text,
+                    pass_number=_model_passes,
+                    pass_budget=_pass_budget,
+                )
+                _candidate = _attempt_quality_rung(
+                    _fn,
+                    hint=_dynamic_hint,
+                    temperature=_quality_dynamic_temperature(
+                        _model_passes - 1,
+                    ),
+                    attempts=1,
+                    rung=_rung,
+                )
+                if _candidate is None:
+                    continue
+                _candidates.append((_candidate, _rung))
+                _after = _quality_flags_for_line(
+                    _candidate.text, req, rules=_story_rules,
+                )
+                for _code in _quality_codes(_after):
+                    if _code not in _seen_codes:
+                        _seen_codes.append(_code)
+                if not _after:
+                    _candidate = replace(
+                        _candidate,
+                        compose_flags=_candidate.compose_flags + _retry,
+                    )
+                    return _quality_stamp(
+                        _candidate, _seen_codes, _rung,
+                    )
 
             # Floor: choose the lowest-defect authored candidate (stable tie:
             # original), then resolve to a fixed point under the SAME scorer.

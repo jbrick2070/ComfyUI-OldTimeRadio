@@ -177,16 +177,6 @@ def color_for(char_id: str, role: str, style: dict, order_map: dict) -> str:
     return _NAME_COLORS_BBGGRR[idx % len(_NAME_COLORS_BBGGRR)]
 
 
-def _cast_names(ledger: dict) -> dict:
-    names = {}
-    for c in (ledger.get("cast") or []):
-        cid = str(c.get("char_id") or "")
-        nm = c.get("name") or c.get("display_name") or ""
-        if cid:
-            names[cid] = str(nm).strip()
-    return names
-
-
 def _ass_header(style: dict, margin_v: int) -> str:
     s = style
     style_line = (
@@ -239,14 +229,18 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         return (None, f"unknown style {style!r}; choices: {sorted(STYLES)}")
     mv = int(margin_v) if margin_v is not None else int(st["margin_v"])
 
-    names = _cast_names(ledger)
-    lines = ledger.get("lines") or []
+    try:
+        from . import _otr_ledger_consumers as _OTRLC  # type: ignore
+    except ImportError:  # pragma: no cover - direct CLI execution
+        import _otr_ledger_consumers as _OTRLC  # type: ignore
     events: list[str] = []
     lint: list[str] = []
     prev_char = None
 
-    # Sort by start time so clamping logic is correct even if unordered.
-    dlines = [ln for ln in lines if str(ln.get("speaker_role") or "") in _SPEECH_ROLES]
+    # The shared iterator owns the canonical mute contract. Filtering skipped
+    # rows BEFORE sorting/clamping prevents a muted row from both leaking into
+    # the ASS and shortening the preceding spoken cue.
+    dlines = list(_OTRLC.iter_lines(ledger, roles=_SPEECH_ROLES))
     dlines.sort(key=lambda ln: float(ln.get("start_s") or 0.0))
 
     for li, ln in enumerate(dlines):
@@ -266,7 +260,14 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
 
         is_turn_start = cid != prev_char
         prev_char = cid
-        nm = names.get(cid, "").strip()
+        # Resolve role-tag aliases (notably line char_id="announcer" against a
+        # canonical ANNOUNCER cast row whose id is c01) through the shared cast
+        # authority. Preserve the legacy display_name fallback on the resolved
+        # row rather than rebuilding another raw-id map here.
+        cast_row = _OTRLC.cast_lookup(ledger, cid)
+        nm = str(
+            cast_row.get("name") or cast_row.get("display_name") or ""
+        ).strip()
 
         # Prepend speaker label to the text of the FIRST cue of a turn so
         # wrapping accounts for its width; color is injected after wrapping.

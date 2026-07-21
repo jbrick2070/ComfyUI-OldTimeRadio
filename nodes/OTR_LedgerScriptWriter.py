@@ -1424,8 +1424,10 @@ def _resolve_inputs(
     max_new_tokens_cap: int = 200,
     # Sprint 10B Wave 1 Agent B: Stage 3 validators flag.
     enable_production_stage3_validators: bool = False,
-    # Sprint 2.2 (2026-05-28): when True, news_interpreter exhaustion
-    # halts the run rather than graceful-degrading to meta["news"]=None.
+    # Back-compat fail-loud lever. Model-quality exhaustion is now handled by
+    # the bounded cross-slot chain + validated source floor before this lever;
+    # True still prevents a typed non-quality interpreter failure from silently
+    # degrading to meta["news"]=None.
     news_briefs_required: bool = True,
     # Build 4 (2026-05-28): grouped-exchange dialogue path. When True the
     # render loop pre-passes voiced beat groups through compose_exchange.
@@ -2063,8 +2065,16 @@ def _stamp_final_slot_telemetry(
         return
     params = {}
     if meta.get("news") is not None:
+        _source_chain = meta.get("source_interpreter_chain")
+        _source_slot = "technical"
+        _source_model = resolved["technical_model"]
+        if isinstance(_source_chain, dict):
+            _source_slot = str(
+                _source_chain.get("accepted_slot") or _source_slot)
+            _source_model = str(
+                _source_chain.get("accepted_model") or _source_model)
         params["news_interpreter"] = {
-            "slot": "technical", "model": resolved["technical_model"],
+            "slot": _source_slot, "model": _source_model,
         }
     for phase in ("cast_lock", "outline", "dialogue_composer"):
         params[phase] = {
@@ -2168,6 +2178,158 @@ def _make_original_interpreter(*, creative_fn, resolved, meta):
     return _original_interpret
 
 
+_SOURCE_INTERPRETER_MAX_MODEL_CALLS = 12
+
+
+def _run_source_interpreter_quality_chain(
+    *, interpreter, bank, payload, source_meta,
+    technical_fn, creative_fn,
+    technical_model_id: str, creative_model_id: str,
+    slot_scheduler, meta,
+):
+    """Run a bank-specific source brain until accepted or its safe floor.
+
+    Each interpreter keeps its own prompt, schema, truth rules, and content
+    validator.  This helper owns only the shared liveness policy: a typed
+    structured-output/content exhaustion opens a fresh pass on the other model
+    slot with the exact rejection fed back, alternating until acceptance or the
+    finite 12-call ceiling.  The ceiling produces a deterministic, source-
+    derived BANK-SPECIFIC minimum brief.  Configuration/I/O/backend/contract
+    failures are not quality failures and propagate unchanged.
+    """
+    lanes = (
+        ("technical", technical_fn, str(technical_model_id)),
+        ("creative", creative_fn, str(creative_model_id)),
+    )
+    total_calls = 0
+    cycle = 0
+    failures: list[str] = []
+    journal: list[dict] = []
+
+    while total_calls < _SOURCE_INTERPRETER_MAX_MODEL_CALLS:
+        slot_name, slot_fn, model_name = lanes[cycle % len(lanes)]
+        prior_feedback = failures[-1] if failures else ""
+
+        def _fresh_slot_fn(messages, *, temperature, max_new_tokens):
+            patched = list(messages)
+            if prior_feedback:
+                patched.append({
+                    "role": "user",
+                    "content": (
+                        "A previous independent source-interpreter pass was "
+                        "rejected. Correct the exact issue below while "
+                        "preserving every bank-specific source-truth, rights, "
+                        "adaptation, and safety rule. Return only the required "
+                        "schema JSON.\n\nPREVIOUS REJECTION:\n"
+                        + prior_feedback[:700]
+                    ),
+                })
+            return slot_fn(
+                patched,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+            )
+
+        try:
+            with slot_scheduler.helper_context("build_news_briefs"):
+                briefs = interpreter(
+                    bank=bank,
+                    payload=payload,
+                    technical_fn=_fresh_slot_fn,
+                    model_id=model_name,
+                )
+        except _otr_source_payload.SourceInterpretError as exc:
+            used = _otr_source_payload.quality_interpret_failure_attempts(exc)
+            if used <= 0:
+                raise
+            total_calls += used
+            reason = " ".join(str(exc).split())[:700]
+            failures.append(reason)
+            journal.append({
+                "cycle": cycle + 1,
+                "slot": slot_name,
+                "model": model_name,
+                "status": "quality_rejected",
+                "model_calls": used,
+                "reason": reason,
+            })
+            log.warning(
+                "[OTR_LedgerScriptWriter] source interpreter quality reject "
+                "cycle=%d slot=%s calls=%d total=%d/%d: %s",
+                cycle + 1, slot_name, used, total_calls,
+                _SOURCE_INTERPRETER_MAX_MODEL_CALLS, reason,
+            )
+            cycle += 1
+            continue
+
+        used = max(1, int(getattr(briefs, "attempts", 1) or 1))
+        total_calls += used
+        journal.append({
+            "cycle": cycle + 1,
+            "slot": slot_name,
+            "model": model_name,
+            "status": "accepted",
+            "model_calls": used,
+            "reason": "",
+        })
+        meta["source_interpreter_chain"] = {
+            "schema_version": "source_interpreter_chain_v1",
+            "status": "accepted",
+            "max_model_calls": _SOURCE_INTERPRETER_MAX_MODEL_CALLS,
+            "model_calls": total_calls,
+            "cycles": len(journal),
+            "accepted_slot": slot_name,
+            "accepted_model": model_name,
+            "attempts": journal,
+        }
+        return briefs
+
+    failure_summary = " | ".join(failures[-3:])
+    floor = _otr_source_payload.build_source_interpreter_floor(
+        bank=bank,
+        payload=payload,
+        source_meta=source_meta,
+        attempts=total_calls,
+        failure_reason=failure_summary,
+    )
+    journal.append({
+        "cycle": len(journal) + 1,
+        "slot": "deterministic",
+        "model": floor.model_id,
+        "status": "quality_floor",
+        "model_calls": 0,
+        "reason": floor.quality_floor_reason,
+    })
+    meta["source_interpreter_chain"] = {
+        "schema_version": "source_interpreter_chain_v1",
+        "status": "quality_floor",
+        "max_model_calls": _SOURCE_INTERPRETER_MAX_MODEL_CALLS,
+        "model_calls": total_calls,
+        "cycles": len(journal),
+        "accepted_slot": "deterministic",
+        "accepted_model": floor.model_id,
+        "attempts": journal,
+    }
+    log.warning(
+        "[OTR_LedgerScriptWriter] source interpreter exhausted %d quality "
+        "model calls; continuing with validated bank-specific source floor",
+        total_calls,
+    )
+    return floor
+
+
+_ORIGINAL_QA_MIN_REPAIR_CYCLES = 3
+_ORIGINAL_QA_MAX_REPAIR_CYCLES = 6
+
+
+def _original_qa_repair_budget(issue_count: int) -> int:
+    """Return a dynamic, finite semantic-repair budget for the original lane."""
+    return min(
+        _ORIGINAL_QA_MAX_REPAIR_CYCLES,
+        max(_ORIGINAL_QA_MIN_REPAIR_CYCLES, 2 + max(1, int(issue_count))),
+    )
+
+
 def _run_original_qa_gate(
     led, meta, resolved, *,
     bank_row,
@@ -2178,24 +2340,22 @@ def _run_original_qa_gate(
     script_brief,
     nc_brief,
 ):
-    """original_radio whole-script QA + the ONE coalesced bounded repair.
+    """Original whole-script QA plus dynamic, non-veto semantic repair.
 
     Judge -> if dirty: a fail-class finding raises OriginalQAError ONLY when it
     clears the deterministic evidence bar (lexicon hit or a grounded verbatim
     quote -- see `_triage_or_raise`); unproven hard findings are discarded
-    loudly. Epilogue-class findings coalesce into ONE compose_announcer_outro
-    re-run (the same fictional-outro inputs the I.5 else-branch used), the outro
-    row is patched READ-EXTEND (news_coda_no_brief survives) -- then ONE
-    re-judge.
+    loudly. Epilogue-class findings coalesce into a dynamic sequence of
+    ``compose_announcer_outro`` repairs. Each authored candidate is independently
+    re-judged, repair ownership alternates across the creative and technical
+    slots, and the outro row is patched READ-EXTEND so existing flags survive.
 
-    A re-judge that is STILL unhappy about the SUBJECTIVE epilogue classes
-    ("moralizes" / "contradicts") no longer fails the episode. THE LAW
-    (operator, 2026-07-13): an audit may improve a story, it may never fail
-    one -- only deterministic validators may end an episode. The bounded
-    recompose is the improvement this audit is entitled to; the episode then
-    ships with the recomposed outro and the objection stamped in meta.
-    `epilogue_missing` remains deterministically refutable and is discarded when
-    the outro row demonstrably exists."""
+    A still-unhappy subjective verdict ("moralizes" / "contradicts") triggers
+    another fresh repair instead of ending the episode. Exhaustion keeps the
+    best structurally valid authored candidate and stamps a nonterminal
+    ``quality_floor`` receipt. Only deterministic validators may end an episode.
+    ``epilogue_missing`` remains deterministically refutable and is discarded
+    when the outro row demonstrably exists."""
     try:
         from . import _otr_original_radio as _OTROR
         from . import _otr_line_composer as _OTRLC
@@ -2297,10 +2457,13 @@ def _run_original_qa_gate(
         )
         return
 
-    # Epilogue classes only -> ONE coalesced outro re-compose (r4 P4).
+    # Epilogue classes are subjective semantic feedback. Keep asking fresh model
+    # passes to repair and independently re-judge instead of giving one critic a
+    # terminal veto. The finite ceiling is only a backend-hang guard; exhaustion
+    # ships the best structurally valid candidate with a quality-floor receipt.
     log.warning(
-        "[OTR_LedgerScriptWriter] original_qa dirty (%s) -- one bounded "
-        "outro re-compose", classes,
+        "[OTR_LedgerScriptWriter] original_qa dirty (%s) -- entering the "
+        "dynamic cross-slot outro repair loop", classes,
     )
     intro_text = ""
     _final_char_line = ""
@@ -2314,21 +2477,8 @@ def _run_original_qa_gate(
             if _t:
                 _final_char_line = _t
                 break
-    outro_res = _OTRLC.compose_announcer_outro(
-        creative_fn=creative_fn,
-        repair_fn=technical_fn,
-        script_brief=script_brief,
-        news_close_brief=nc_brief,
-        intro_text=intro_text,
-        creative_repo_id=resolved["creative_writing_model"],
-        ending_change=str(
-            (meta.get("dramatic_state") or {}).get("ending_change") or ""
-        ),
-        final_character_line=_final_char_line,
-        source_bank_id=resolved["source_bank"],
-    )
-    # READ-EXTEND the outro row (r4 P3): news_coda_no_brief + the in-place
-    # telemetry survive; QA repair appends its own marker.
+    # READ-EXTEND the outro row: news_coda_no_brief and existing in-place
+    # telemetry survive every semantic repair cycle.
     row = None
     for _ln in led.data.get("lines") or []:
         if _ln.get("line_id") == last_announcer_id:
@@ -2339,116 +2489,169 @@ def _run_original_qa_gate(
             f"[OTR_LedgerScriptWriter] original_qa repair: no outro row "
             f"line_id={last_announcer_id!r}"
         )
-    _flags = list(row.get("compose_flags") or [])
-    _flags.extend(outro_res.compose_flags)
-    _flags.append("original_qa_outro_recomposed")
-    _OTRL.patch_line_text(led.data, last_announcer_id, outro_res.text)
-    _OTRL.patch_line_fields(
-        led.data, last_announcer_id,
-        {"compose_flags": list(dict.fromkeys(_flags))},
-    )
-    led.save()
-
-    refindings = _judge()
     all_discarded: "list[str]" = list(discarded_classes)
-    if refindings.findings:
-        # Hard classes on the re-judge take the SAME evidence bar
-        # (kills raise inside the triage); epilogue classes still
-        # dirty after the ONE bounded repair raise per r4 P4.
-        all_discarded += _triage_or_raise(refindings, repaired=True)
+    repair_budget = _original_qa_repair_budget(len(epilogue_findings))
+    repair_count = 0
+    cycles: "list[dict[str, Any]]" = []
+    current_epilogue = list(epilogue_findings)
+    best_text = str(row.get("text") or "")
+    best_score = len(current_epilogue)
+    best_cycle = 0
+    best_objections = [
+        f"{f.finding_class}: {f.detail}" for f in current_epilogue
+    ]
+
+    while repair_count < repair_budget:
+        repair_count += 1
+        previous_text = str(row.get("text") or "").strip()
+        concerns = [
+            f"{f.finding_class}: {f.detail}" for f in current_epilogue
+        ]
+        repair_slot = "creative" if repair_count % 2 else "technical"
+        primary_fn = creative_fn if repair_slot == "creative" else technical_fn
+        alternate_fn = technical_fn if repair_slot == "creative" else creative_fn
+        primary_model = (
+            resolved["creative_writing_model"]
+            if repair_slot == "creative"
+            else resolved["technical_model"]
+        )
+        repair_brief = (
+            f"{script_brief}\n\n"
+            f"ORIGINAL QA REPAIR CYCLE {repair_count}. A fresh standards "
+            "judgment rejected the previous closing line. Rewrite only the "
+            "announcer close; do not repeat the rejected wording.\n"
+            f"PREVIOUS REJECTED CLOSE: {previous_text}\n"
+            f"EXACT QA CONCERNS: {'; '.join(concerns)}"
+        )
+        outro_res = _OTRLC.compose_announcer_outro(
+            creative_fn=primary_fn,
+            repair_fn=alternate_fn,
+            script_brief=repair_brief,
+            news_close_brief=nc_brief,
+            intro_text=intro_text,
+            creative_repo_id=primary_model,
+            ending_change=str(
+                (meta.get("dramatic_state") or {}).get("ending_change") or ""
+            ),
+            final_character_line=_final_char_line,
+            source_bank_id=resolved["source_bank"],
+        )
+        flags = list(row.get("compose_flags") or [])
+        flags.extend(outro_res.compose_flags)
+        flags.extend((
+            "original_qa_outro_recomposed",
+            f"original_qa_repair_cycle:{repair_count}:{repair_slot}",
+        ))
+        _OTRL.patch_line_text(led.data, last_announcer_id, outro_res.text)
+        _OTRL.patch_line_fields(
+            led.data, last_announcer_id,
+            {"compose_flags": list(dict.fromkeys(flags))},
+        )
+        led.save()
+
+        refindings = _judge()
+        discarded_this = _triage_or_raise(refindings, repaired=True)
+        all_discarded.extend(discarded_this)
         still_epilogue = [
             f for f in refindings.findings
             if _OTROR.REPAIR_ACTION_BY_CLASS.get(f.finding_class, "fail")
             == "recompose_outro"
         ]
-        # epilogue_missing is deterministically refutable (run-5 live
-        # catch 2026-07-10: the re-judge claimed "no closing announcer
-        # line" about the non-empty outro row it had just been shown,
-        # twice, and killed a survivable episode). The row we recomposed
-        # either exists non-empty or it does not -- Python checks that,
-        # not the judge. A refuted claim is discarded LOUDLY; the
-        # subjective epilogue classes (moralizes / contradicts) still
-        # raise per r4 P4.
-        if still_epilogue:
-            _outro_text = ""
-            for _ln in led.data.get("lines") or []:
-                if _ln.get("line_id") == last_announcer_id:
-                    _outro_text = str(_ln.get("text") or "").strip()
-                    break
-            _refuted = [
-                f for f in still_epilogue
-                if f.finding_class == "epilogue_missing" and _outro_text
-            ]
-            if _refuted:
-                log.warning(
-                    "[OTR_LedgerScriptWriter] original_qa: REFUTED "
-                    "'epilogue_missing' deterministically -- outro row "
-                    "%s exists with %d chars; discarding the judge "
-                    "claim", last_announcer_id, len(_outro_text),
-                )
-                all_discarded += [f.finding_class for f in _refuted]
-                still_epilogue = [
-                    f for f in still_epilogue if f not in _refuted
-                ]
-        if still_epilogue:
-            # THE LAW (operator, 2026-07-13): AN AUDIT MAY IMPROVE A STORY. IT
-            # MAY NEVER FAIL ONE. Only DETERMINISTIC validators may end an
-            # episode; an LLM verdict may trigger a bounded rewrite, never a
-            # raise.
-            #
-            # This raise was the last LLM veto left standing (live: 30-word
-            # `original_radio` Aion leg, prompt 030f73e6 -- "still dirty after
-            # the bounded repair (['epilogue_moralizes'])" killed the episode
-            # after every writer pass had already succeeded). The classes that
-            # reach here are the ones this module's own comments call the
-            # SUBJECTIVE epilogue classes: "moralizes" and "contradicts" are
-            # aesthetic opinions about an outro THE MODEL ITSELF JUST REWROTE at
-            # the audit's own request. They are not a contract, not a safety
-            # rule, and not deterministic -- there is no evidence bar behind
-            # them, unlike the hard classes, which still kill on lexicon
-            # evidence or a grounded verbatim quote (`_triage_or_raise` above),
-            # and unlike G9, the deterministic SFW ship-stop every lane crosses
-            # at Phase 10.
-            #
-            # So the audit has already done the only honest thing it is entitled
-            # to do: it IMPROVED the outro once, through the bounded recompose.
-            # A second opinion that the improved text is still not to its taste
-            # does not get to throw away a complete, frozen, otherwise-clean
-            # episode. Keep the recomposed outro, say so LOUDLY, stamp the
-            # disagreement in meta so a reader can find it, and SHIP.
-            reclasses = [f.finding_class for f in refindings.findings]
-            objections = [
-                f"{f.finding_class}: {f.detail}" for f in still_epilogue
-            ]
+
+        # ``epilogue_missing`` is an objective absence claim. Refute it with the
+        # real row, not another opinion, once a nonempty close demonstrably exists.
+        current_text = str(row.get("text") or "").strip()
+        refuted = [
+            f for f in still_epilogue
+            if f.finding_class == "epilogue_missing" and current_text
+        ]
+        if refuted:
             log.warning(
-                "[OTR_LedgerScriptWriter] original_qa: SHIPPING over a "
-                "subjective objection. The bounded outro recompose ran; the "
-                "re-judge still dislikes the result on %s. That is an aesthetic "
-                "verdict on text the model just wrote at this audit's request, "
-                "not a deterministic contract -- an audit may improve a story, "
-                "it may never fail one. Keeping the recomposed outro. "
-                "Objections: %s",
-                [f.finding_class for f in still_epilogue],
-                "; ".join(objections),
+                "[OTR_LedgerScriptWriter] original_qa: REFUTED "
+                "'epilogue_missing' deterministically -- outro row %s exists "
+                "with %d chars; discarding the judge claim",
+                last_announcer_id, len(current_text),
             )
-            meta["original_qa"] = {
-                "status": "shipped_over_subjective_objection",
-                "classes": reclasses,
+            refuted_classes = [f.finding_class for f in refuted]
+            all_discarded.extend(refuted_classes)
+            discarded_this.extend(refuted_classes)
+            still_epilogue = [f for f in still_epilogue if f not in refuted]
+
+        objections = [
+            f"{f.finding_class}: {f.detail}" for f in still_epilogue
+        ]
+        score = len(still_epilogue)
+        cycles.append({
+            "cycle": repair_count,
+            "repair_slot": repair_slot,
+            "judge_slot": "technical",
+            "finding_classes": [
+                f.finding_class for f in refindings.findings
+            ],
+            "remaining_objections": objections,
+            "discarded": sorted(set(discarded_this)),
+        })
+        # Prefer fewer surviving objections; on a tie keep the fresher authored
+        # candidate so the original rejected line can never win by inertia.
+        if score <= best_score:
+            best_text = current_text
+            best_score = score
+            best_cycle = repair_count
+            best_objections = objections
+
+        if not still_epilogue:
+            status = "clean_after_discard" if all_discarded else "clean"
+            receipt = {
+                "status": status,
                 "repaired": True,
-                "objections": objections,
-                "discarded": sorted(set(all_discarded)),
+                "repair_count": repair_count,
+                "repair_budget": repair_budget,
+                "cycles": cycles,
             }
+            if all_discarded:
+                receipt["discarded"] = sorted(set(all_discarded))
+            meta["original_qa"] = receipt
             led.save()
+            log.info(
+                "[OTR_LedgerScriptWriter] original_qa: clean after %d "
+                "dynamic repair cycle(s)", repair_count,
+            )
             return
-    if all_discarded:
-        meta["original_qa"] = {
-            "status": "clean_after_discard", "repaired": True,
-            "discarded": sorted(set(all_discarded)),
-        }
-    else:
-        meta["original_qa"] = {"status": "clean", "repaired": True}
+
+        current_epilogue = still_epilogue
+        repair_budget = max(
+            repair_budget,
+            _original_qa_repair_budget(len(current_epilogue)),
+        )
+
+    # No subjective verdict can kill a complete ledger. Keep the best valid
+    # authored candidate, stamp the finite floor, and continue to the shared
+    # deterministic safety/readiness gates.
+    if str(row.get("text") or "").strip() != best_text:
+        _OTRL.patch_line_text(led.data, last_announcer_id, best_text)
+    floor_flags = list(row.get("compose_flags") or [])
+    floor_flags.append("original_qa_quality_floor")
+    _OTRL.patch_line_fields(
+        led.data, last_announcer_id,
+        {"compose_flags": list(dict.fromkeys(floor_flags))},
+    )
+    meta["original_qa"] = {
+        "status": "quality_floor",
+        "repaired": True,
+        "repair_count": repair_count,
+        "repair_budget": repair_budget,
+        "best_cycle": best_cycle,
+        "objections": best_objections,
+        "discarded": sorted(set(all_discarded)),
+        "cycles": cycles,
+    }
     led.save()
-    log.info("[OTR_LedgerScriptWriter] original_qa: clean after repair")
+    log.warning(
+        "[OTR_LedgerScriptWriter] original_qa: subjective judge remained "
+        "unhappy after %d fresh repair/rejudge cycle(s); keeping best cycle %d "
+        "and continuing to deterministic ledger validation. Objections: %s",
+        repair_count, best_cycle, "; ".join(best_objections),
+    )
 
 
 def _build_news_payload(
@@ -3105,28 +3308,20 @@ class OTR_LedgerScriptWriter:
                 }),
                 # Sprint 2.2 (2026-05-28) -- Jeffrey 2026-05-27
                 # directive: when build_news_briefs exhausts its
-                # retry budget, HALT the run rather than silently
-                # falling back to raw news_seed with no key_terms
-                # enforcement. Defaults TRUE per the directive:
-                # "the whole workflow needs to stop and re-roll news
-                # until it works and stamps the ledger." The
-                # operator re-queues on red graph; news_interpreter
-                # pulls fresh from RSS each queue, so the re-queue
-                # IS the re-roll. Set FALSE for the back-compat
-                # graceful-degrade path (early-stage tests + the
-                # rare "we know the brief is bad but want a draft
-                # anyway" operator workflow).
+                # Keep the positional widget for workflow compatibility. The
+                # bounded quality chain now handles malformed/rejected model
+                # briefs and always stamps a validated source floor at its
+                # ceiling. This switch governs only the legacy non-quality
+                # SourceInterpretError branch.
                 "news_briefs_required": ("BOOLEAN", {
                     "default": True,
                     "tooltip": (
-                        "Sprint 2.2 (2026-05-28). ON (default): "
-                        "build_news_briefs exhaustion HALTS the "
-                        "writer with a red graph; operator re-"
-                        "queues to re-roll news from RSS. OFF: "
-                        "graceful-degrade -- meta['news']=None, "
-                        "downstream consumers fall back to raw "
-                        "news_seed with no key_terms enforcement. "
-                        "Production should ship ON."
+                        "ON (default): typed non-quality source-interpreter "
+                        "failures stay fail-loud. OFF: the legacy branch may "
+                        "degrade to raw news_seed. Rejected/malformed LLM "
+                        "briefs do not reach this switch: they rotate through "
+                        "fresh technical/creative repair passes and end at a "
+                        "validated bank-specific source floor."
                     ),
                 }),
                 # S2 (2026-06-01): the two OpenRouter slot-slug pickers,
@@ -4030,7 +4225,9 @@ class OTR_LedgerScriptWriter:
         #                          inventor -> creative, pass 2
         #                          chooser -> technical; pick_style
         #                          dispatches each pass internally.
-        #   News interpreter    -> technical (GBNF + pydantic + V0-V3)
+        #   Source interpreter  -> technical primary; a typed quality reject
+        #                          alternates fresh creative/technical passes
+        #                          before the bank-specific source floor.
         #
         # slot-interleave: when news_interpreter runs after the style
         # picker (creative -> technical) and before cast lock
@@ -4306,12 +4503,11 @@ class OTR_LedgerScriptWriter:
         # ADR docs/news_interpreter_adr.md section 5 -- commit 3 of
         # the news_interpreter sprint.
         #
-        # Graceful degrade (ADR section 9.2): if build_news_briefs
-        # exhausts its 3-attempt retry budget, stamp meta["news"] = None
-        # and fall back to raw news_seed on downstream consumers. The
-        # writer MUST produce a complete episode even when the brief
-        # LLM call fails; this is a "warn-and-continue" boundary, not
-        # a hard fail.
+        # Source interpretation is bank-specific; liveness is shared. A typed
+        # model-quality exhaustion alternates fresh technical/creative passes
+        # with exact rejection feedback, then emits a validated source-derived
+        # bank floor at the finite ceiling. Configuration, I/O, backend, and
+        # contract failures remain fail-loud.
         article = resolved["news_article"]
         # Chunk 3 (2026-07-05): the interpretation routes through the bank's
         # declared interpreter contract (science_news -> news_interpreter ->
@@ -4327,7 +4523,9 @@ class OTR_LedgerScriptWriter:
         # SourceInterpretError, so the science degrade/halt branch below
         # never catches them: this lane hard-fails, no degrade, and the
         # news_briefs_required lever does not apply.
-        if _bank_has_no_source_contract(_source_bank_row):
+        _source_contract_lane = not _bank_has_no_source_contract(
+            _source_bank_row)
+        if not _source_contract_lane:
             _interp = _make_original_interpreter(
                 creative_fn=creative_generate_fn,
                 resolved=resolved,
@@ -4337,24 +4535,30 @@ class OTR_LedgerScriptWriter:
             _interp = _otr_source_payload.resolve_interpreter(
                 _source_bank_row)
         try:
-            # LLM slot: technical -- news_interpreter emits GBNF +
-            # pydantic-validated briefs (V0-V2 schema). Structured-
-            # output pass; routes to the technical_model slot.
-            # build_news_briefs runs every V0-V2 sub-pass on the
-            # technical slot -- structured-output JSON. Style-engine
-            # consolidation (2026-07-05): this stage runs BEFORE the
-            # single style engine (build_story_contract needs
-            # script_brief, produced here) -- style-agnostic by design.
-            # S32 B6: helper_context attribution. Label string KEPT
-            # ("build_news_briefs") -- meta["slot_calls_by_helper"]
-            # telemetry stays byte-identical across the chunk-3 reroute.
-            with slot_scheduler.helper_context("build_news_briefs"):
-                briefs = _interp(
+            if _source_contract_lane:
+                briefs = _run_source_interpreter_quality_chain(
+                    interpreter=_interp,
                     bank=_source_bank_row,
                     payload=article,
+                    source_meta=meta.get("source_meta") or {},
                     technical_fn=technical_generate_fn,
-                    model_id=str(resolved["technical_model"]),
+                    creative_fn=creative_generate_fn,
+                    technical_model_id=str(resolved["technical_model"]),
+                    creative_model_id=str(
+                        resolved["creative_writing_model"]),
+                    slot_scheduler=slot_scheduler,
+                    meta=meta,
                 )
+            else:
+                # Original has a source-interpreter-shaped adapter, but its
+                # creative front owns a separate bank-specific repair policy.
+                with slot_scheduler.helper_context("build_news_briefs"):
+                    briefs = _interp(
+                        bank=_source_bank_row,
+                        payload=article,
+                        technical_fn=technical_generate_fn,
+                        model_id=str(resolved["technical_model"]),
+                    )
             # Contract enforcement: validates the direct attrs AND the dump
             # (single model_dump() call, inside the validator); a violation
             # raises SourcePayloadContractError which the except below does
@@ -4392,6 +4596,11 @@ class OTR_LedgerScriptWriter:
                 len(briefs.key_terms), briefs.attempts,
             )
         except _otr_source_payload.SourceInterpretError as exc:
+            # Quality/schema exhaustion never reaches this branch now: the
+            # bounded cross-slot chain above either accepts a bank-specific
+            # brief or builds a validated source floor. This legacy-required
+            # branch remains only for a typed NON-quality interpreter failure
+            # and for explicit back-compat callers using the widget/env escape.
             # Chunk 3: the contract wrapper chains the underlying failure as
             # __cause__ (science: NewsInterpreterError). Stamp AND re-raise
             # from the CAUSE so the science halt surface stays byte-identical
@@ -6667,8 +6876,9 @@ class OTR_LedgerScriptWriter:
             # lane, immediately after the outro write and BEFORE the
             # key_terms audit + J aggregates (r3 D5: flags/word counts
             # stay fresh; K.5.6 + news_used read post-repair text).
-            # Failure raises OriginalQAError: hard fail accepted --
-            # a dead episode is fine, a shipped bad one is not.
+            # OriginalQAError is reserved for corroborated deterministic
+            # ship-stops. Subjective findings stay inside the dynamic repair /
+            # quality-floor path and cannot end the episode.
             if _bank_has_no_source_contract(_source_bank_row):
                 with slot_scheduler.helper_context("original_qa"):
                     _run_original_qa_gate(
@@ -7361,20 +7571,23 @@ class OTR_LedgerScriptWriter:
                 import _otr_writer_vram as _OTRVRAM  # type: ignore
             meta["writer_llm_unload"] = _OTRVRAM.unload_writer_llm_after_script()
 
-        # REJECT gate (go-forward Sprint 3): the story-spine QA router can
-        # mark an episode structurally unshippable (a dead ending, a broken
-        # turn, an unclear premise -- defects a one-line edit cannot fix).
-        # The spine itself NEVER raises (PD1 -- it sets story_verdict=REJECT,
-        # unloads the writer LLM, and skips the scrub); the WRITER raises
-        # here at its boundary, matching the fail-loud cast-lock pattern
-        # above. An aborted run produces no node output, so the graph stops
-        # BEFORE the FLUX -> HuMo -> LTX -> Bark render -- no audio is ever
-        # produced for a rejected story. A QA crash fails open to PASS and
-        # never reaches here, so it stays fail-soft.
-        if meta.get("story_verdict") == "REJECT":
-            raise RuntimeError(
-                f"OTR reject gate: "
-                f"{meta.get('story_reject_reason') or 'story rejected'}"
+        # Quality/liveness split (operator 2026-07-21): a subjective Story-QA
+        # verdict may request more authored repair but may never abort a
+        # ledgerable episode. The dynamic spine now consumes REJECT internally;
+        # clear a stale pre-fix stamp defensively so an imported/legacy ledger
+        # cannot revive the removed writer-boundary failure. Structural gaps,
+        # unsafe speech, and broken ownership still fail closed downstream.
+        if meta.pop("story_verdict", None) == "REJECT":
+            meta["story_qa_disposition"] = "legacy_reject_ignored"
+            meta["story_quality_warning"] = {
+                "status": "legacy_reject_ignored",
+                "reason": str(
+                    meta.pop("story_reject_reason", "story rejected")
+                )[:1200],
+            }
+            log.warning(
+                "[OTR_LedgerScriptWriter] ignored stale Story-QA REJECT; "
+                "quality cannot own episode liveness"
             )
 
         # Final INLINE spoken-row authoring boundary. The story-spine length

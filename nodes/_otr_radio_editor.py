@@ -1715,6 +1715,7 @@ def _build_micro_repair_prompt(
     voiced: List[Dict[str, Any]],
     ledger: Dict[str, Any],
     flagged: List[int],
+    repair_context: str = "",
 ) -> str:
     """Beat-local micro-repair prompt: show every voiced unit for context,
     MARK the flagged beats, and instruct an edit ONLY on the marked ones.
@@ -1730,6 +1731,12 @@ def _build_micro_repair_prompt(
     listing = "\n".join(rows) if rows else "(no voiced beats)"
     flagged_str = ", ".join(str(i) for i in flagged) if flagged else "(none)"
     total = sum(_word_count(str(b.get("text") or "")) for b in voiced)
+    context = " ".join(str(repair_context or "").split())[:1200]
+    feedback = (
+        "\n\nQUALITY JUDGE FEEDBACK (resolve this exact concern):\n"
+        + context
+        if context else ""
+    )
     return (
         "You are a radio script editor doing a SINGLE round of small, "
         "beat-local repairs. Only the marked beats have a problem; leave "
@@ -1746,6 +1753,7 @@ def _build_micro_repair_prompt(
         "never reassign a speaker. Do not edit any unmarked beat. Set "
         "projected_word_total to your estimate of the new total (it should "
         f"stay near {total}). Output JSON only."
+        + feedback
     )
 
 
@@ -1852,6 +1860,7 @@ def micro_repair(
     button_beat_index: Optional[int] = None,
     apply: bool = True,
     structured_call_fn: Optional[Callable[..., Any]] = None,
+    repair_context: str = "",
 ) -> Tuple[Optional[RadioEditPlan], Dict[str, Any]]:
     """Beat-local micro-repair on the QA-flagged beats (go-forward Sprint 2,
     entry 2). ONE cycle, flagged beats ONLY -- a scoped validator rejects
@@ -1893,7 +1902,12 @@ def micro_repair(
         allowed_actions=MICRO_REPAIR_ACTIONS,
         allowed_beat_indices=flagged,
     )
-    prompt = _build_micro_repair_prompt(voiced, ledger, sorted(flagged))
+    prompt = _build_micro_repair_prompt(
+        voiced,
+        ledger,
+        sorted(flagged),
+        repair_context=repair_context,
+    )
 
     if structured_call_fn is None:
         try:

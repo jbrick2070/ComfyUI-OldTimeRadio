@@ -399,9 +399,6 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         flow.append(("spine", {"header": "[ STORY SPINE ]", "rows": spine}))
 
     # CLASSIFIED TRANSCRIPT (full)
-    ref_by_char = {str(e.get("char_id") or ""): (
-        e.get("voice_ref_id") or e.get("voice_preset") or "")
-        for e in cast if isinstance(e, dict)}
     dialog = []
     try:
         from . import _otr_ledger_consumers as _OTRLC
@@ -411,7 +408,17 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
             if not text or role not in ("character", "announcer"):
                 continue
             spk = _OTRLC.speaker_name(led, line)
-            voice = ref_by_char.get(str(line.get("char_id") or ""), "")
+            # Use the same alias-aware cast join as the display speaker. A
+            # content-owned announcer line may carry the role tag
+            # char_id="announcer" while the delivered cast row is keyed c01.
+            cast_row = _OTRLC.cast_lookup(
+                led, str(line.get("char_id") or "")
+            )
+            voice = (
+                cast_row.get("voice_ref_id")
+                or cast_row.get("voice_preset")
+                or ""
+            )
             dialog.append({"speaker": spk, "voice": voice, "text": text})
     except Exception as exc:  # noqa: BLE001 -- transcript is a durable-ledger read
         raise CreditsDataError(

@@ -1,8 +1,10 @@
 """Chunk 3 -- bare stage-direction reroll wiring in compose_line.
 
-A draft whose text leads with a bare stage direction triggers ONE reroll (the
-detector runs on the post-draft text); a clean draft does not; the guard caps it
-at one level (the freeze floor is the backstop). Pure / CPU (mock creative_fn).
+A draft whose text leads with a bare stage direction triggers ONE detector
+reroll (the detector runs on the post-draft text); a clean draft does not. If
+the repaired draft still fails spoken quality, the independent total-quality
+ladder may make more fresh model calls before its validated floor. Pure / CPU
+(mock creative_fn).
 UTF-8 no BOM, SFW.
 """
 from __future__ import annotations
@@ -64,7 +66,10 @@ def test_guard_caps_at_one_reroll():
         return _DIRTY
 
     res = compose_line(creative_fn=mock, req=_req())
-    assert calls["n"] == 4  # draft stage retry + quality A + lower-temp B
+    # Two draft calls (initial + the single detector reroll), then the
+    # one-lane dynamic quality allowance. The detector itself never recurses,
+    # while the quality model receives fresh chances before the clean floor.
+    assert calls["n"] == 8
     assert res.text.startswith("Look, Pinky")
     assert "twirls his pen" not in res.text
     assert (

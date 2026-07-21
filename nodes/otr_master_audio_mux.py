@@ -25,6 +25,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from pathlib import Path
 
 import logging
 
@@ -531,21 +532,51 @@ class OTRMasterAudioMux:
             root = folder_paths.get_output_directory()
         except Exception:  # noqa: BLE001
             root = "."
+        episodes_root = Path(root) / "otr" / "episodes"
+        stem = os.path.splitext(
+            os.path.basename(silent_video_path or "episode"))[0]
+
+        # The in-flight ledger is the path authority. Filename suffix peeling
+        # is necessarily incomplete whenever a new terminal enrichment lands
+        # (captions exposed this: `_captioned` created a fake sibling episode
+        # directory). Resolve the current ledger's parent first, but accept it
+        # only when it is a direct child of the configured episodes root AND
+        # the incoming video stem starts with that episode id. The prefix check
+        # rejects a stale singleton from a prior episode.
+        out_dir = None
+        try:
+            from . import _otr_ledger as _OTRL
+            ledger_path = _OTRL.in_flight_ledger_path()
+            if ledger_path is not None:
+                candidate = Path(ledger_path).resolve().parent.parent
+                expected_root = episodes_root.resolve()
+                if (candidate.parent == expected_root
+                        and candidate.name
+                        and not candidate.name.startswith("_")
+                        and stem.startswith(candidate.name)):
+                    out_dir = candidate
+        except Exception as exc:  # noqa: BLE001 -- safe suffix fallback below
+            log.info(
+                "[OTR_MasterAudioMux] in-flight episode path unavailable; "
+                "using suffix-derived path: %s", exc,
+            )
+
         # OUTPUT HYGIENE (operator directive 2026-06-09): the final lands in
         # the episode's OWN folder under otr/episodes/<ep>/ (the obs copy is
         # the only file outside it). <ep> = the input stem minus the known
-        # post-chain suffixes. The chain appends OUTERMOST-LAST, so peel in that
-        # order: OTR_CreditsRoll appends "_with_credits" (credits enrichment
-        # 2026-07-03), the blend stage "_procgen_blended", the composite
-        # "_silent". Order matters -- the loop strips each suffix once.
-        stem = os.path.splitext(os.path.basename(silent_video_path or "episode"))[0]
-        ep = stem
-        for suffix in ("_with_credits", "_procgen_blended", "_silent"):
-            if ep.endswith(suffix):
-                ep = ep[: -len(suffix)]
-        out_dir = os.path.join(root, "otr", "episodes", ep)
+        # post-chain suffixes only when no live ledger authority exists. The
+        # chain appends OUTERMOST-LAST, so peel in that order. `_captioned` is
+        # between credits and the procgen blend on the canonical graph.
+        if out_dir is None:
+            ep = stem
+            for suffix in (
+                "_with_credits", "_captioned", "_procgen_blended", "_silent",
+            ):
+                if ep.endswith(suffix):
+                    ep = ep[: -len(suffix)]
+            out_dir = episodes_root / ep
         os.makedirs(out_dir, exist_ok=True)
-        return os.path.join(out_dir, f"{stem}_final.mp4")
+        return os.path.join(str(out_dir), f"{stem}_final.mp4")
 
     def _default_sfx_bed_out(self, silent_video_path: str) -> str:
         final_out = self._default_out(silent_video_path)

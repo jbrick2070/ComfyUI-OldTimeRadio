@@ -29,6 +29,7 @@ from nodes._otr_line_composer import (  # noqa: E402
     _QUALITY_COLLAPSE_HINT_V2,
     LineRequest,
     _news_coda_fact_flags,
+    _quality_model_repair_pass_budget,
     _quality_flags_for_line,
     _quality_reroll_hint,
     compose_line,
@@ -249,7 +250,7 @@ class TestComposerQualityGate:
         # whose rules do (pre-trim default behavior) to exercise the reroll.
         res = compose_line(creative_fn=mock, req=_req(),
                            source_bank_id="original")
-        assert calls["n"] == 3                       # A + lower-temp B
+        assert calls["n"] == 1 + _quality_model_repair_pass_budget(1, 1)
         assert res.text != worse                     # the worse reroll is rejected
         assert "Watson" in res.text                  # repaired original, not the reroll
         assert "cliche_retry" in res.compose_flags
@@ -275,8 +276,8 @@ class TestComposerQualityGate:
         assert "cliche_retry" in res.compose_flags
         assert "quality_reroll_degraded" not in res.compose_flags
 
-    def test_reroll_budget_bounded(self):
-        """A persistently stuffed draft has a fixed A/B budget, then floors."""
+    def test_reroll_budget_is_dynamic_then_floors_without_failure(self):
+        """Persistent defects get fresh passes through the dynamic allowance."""
         calls = {"n": 0}
 
         def mock(messages, *, temperature, max_new_tokens):
@@ -284,7 +285,7 @@ class TestComposerQualityGate:
             return _STUFFED                          # never improves
 
         res = compose_line(creative_fn=mock, req=_req())
-        assert calls["n"] == 3                       # initial + A + B
+        assert calls["n"] == 1 + _quality_model_repair_pass_budget(1, 1)
         assert not flag_anchor_stuffing(res.text, _ANCHORS)[0]
         assert res.text
         assert (

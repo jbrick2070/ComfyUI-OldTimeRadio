@@ -683,6 +683,29 @@ def test_render_guard_passes_when_console_face(tmp_path, monkeypatch):
     assert req["observability"]["init_image"] == "announcer.png"
 
 
+@pytest.mark.parametrize("style", ["radio_object", None])
+def test_render_guard_rejects_stale_normalized_announcer_id(
+        tmp_path, monkeypatch, style):
+    """ShotLock's announcer alias normalization must not bypass the guard."""
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    led = _announcer_portrait_ledger(tmp_path, style=style)
+    led["images"]["images"][0]["object_id"] = "c01"
+    shot = _announcer_humo_shot()
+    shot["char_id"] = "c01"
+    with pytest.raises(rd.RenderError, match="RADIO FACE LOGIC"):
+        rd.build_request_from_shot(shot, led)
+
+
+def test_render_guard_does_not_treat_character_role_as_radio_host(
+        tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    led = _announcer_portrait_ledger(tmp_path, style="radio_object")
+    led["images"]["images"][0]["object_id"] = "c01"
+    shot = _announcer_humo_shot()
+    shot.update({"char_id": "c01", "role": "character_video"})
+    rd.build_request_from_shot(shot, led)  # role gate keeps this inert
+
+
 def test_render_guard_inert_when_humo_off(tmp_path, monkeypatch):
     # HUMO off: _enforce_radio_is_host redirects the announcer off HuMo before
     # the guard's family check, so a faceless radio_object never trips it.

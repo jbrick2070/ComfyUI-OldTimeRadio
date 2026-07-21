@@ -7,14 +7,13 @@ contract the source lanes produce (validate_interpreter_result duck
 contract; news_close_brief hardwired "" so the close routes to the
 announcer outro -- the Hitchcock epilogue seam). A post-composition
 whole-script QA pass (original_qa_system) judges the enumerated hard-rule
-classes; the WRITER owns the one bounded repair + fail-loud.
+classes; the WRITER owns dynamic cross-slot repair for subjective findings and
+keeps deterministic evidence-backed violations fail-closed.
 
 Posture: PURE module -- stdlib + pydantic + the shared structured_call
 ladder. No I/O beyond the deck file read, no GPU, no ComfyUI imports, no
-writer imports. Every failure RAISES (OriginalDeckError /
-OriginalBriefsError / OriginalQAError or StructuredCallFailedError from
-the ladder): this lane accepts hard fails and has NO degrade surface --
-the science news_briefs_required lever does not apply here.
+writer imports. Structural failures and corroborated deterministic violations
+raise; subjective QA dissatisfaction is repair feedback, never an episode veto.
 
 Pack seams are read DIRECTLY from pack.prompt_stages (kibitz r3 D1): the
 shared pack-prompt accessors hard-check the PRODUCTION seam allowlist
@@ -78,7 +77,7 @@ class OriginalBriefsError(OriginalRadioError):
 
 
 class OriginalQAError(OriginalRadioError):
-    """Whole-script QA still dirty after the bounded repair."""
+    """Whole-script QA found a corroborated deterministic ship-stop."""
 
 
 # ---------------------------------------------------------------------------
@@ -383,8 +382,8 @@ QA_CLASSES: frozenset = frozenset({
     "epilogue_contradicts", "anachronism_dependency",
 })
 
-# The bounded-repair interface is DATA. Epilogue classes coalesce into ONE
-# compose_announcer_outro re-run (writer-owned).
+# The repair interface is DATA. Epilogue classes coalesce into a dynamic
+# writer-owned compose_announcer_outro repair/rejudge loop.
 #
 # "fail" here means ELIGIBLE to end the episode -- NOT that the judge's word is
 # enough. A fail-class finding must still clear the deterministic evidence bar
@@ -393,12 +392,10 @@ QA_CLASSES: frozenset = frozenset({
 # evidence bar is what makes these classes lawful ship-stops.
 #
 # The epilogue classes have NO evidence bar, because "the outro moralizes" is an
-# aesthetic opinion and there is nothing to corroborate it against. So they get
-# the bounded recompose and nothing more: after that one improvement the episode
-# SHIPS, even if the re-judge still dislikes the result (THE LAW, operator
-# 2026-07-13 -- an audit may improve a story, it may never fail one). Live proof
-# that this mattered: prompt 030f73e6, a complete 30-word episode killed by
-# `epilogue_moralizes` after every writer pass had already succeeded.
+# aesthetic opinion and there is nothing to corroborate it against. They trigger
+# fresh cross-slot repairs and independent re-judges until clean or the finite
+# no-hang budget. Exhaustion keeps the best valid close with a quality-floor
+# receipt (THE LAW: an audit may improve a story, it may never fail one).
 REPAIR_ACTION_BY_CLASS: "dict[str, str]" = {
     "weapons_smoking": "fail",
     "news_source_framing": "fail",
@@ -756,10 +753,10 @@ def run_original_qa(
 ) -> QAFindings:
     """Judge the finished script against the enumerated hard-rule classes.
 
-    Returns the (possibly empty) findings; unknown classes are rejected by
+    Returns the (possibly empty) findings; unknown classes are discarded by
     the post-validator. The WRITER maps findings through
-    REPAIR_ACTION_BY_CLASS (coalesced single outro re-compose, kibitz r4
-    P4), re-judges ONCE, and raises OriginalQAError if still dirty."""
+    REPAIR_ACTION_BY_CLASS, dynamically repairs subjective outro findings, and
+    raises OriginalQAError only for corroborated deterministic ship-stops."""
     script = _script_excerpt(led)
     if not script.strip():
         raise OriginalQAError("original QA: empty script excerpt")

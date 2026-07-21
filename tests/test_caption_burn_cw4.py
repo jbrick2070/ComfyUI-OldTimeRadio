@@ -97,6 +97,40 @@ def test_ass_builds_from_timed_ledger(tmp_path):
     assert "[Events]" in text and "Dialogue:" in text and "leave now" in text
 
 
+def test_ass_uses_alias_aware_speaker_and_excludes_skipped_rows_from_clamp(tmp_path):
+    """A content-owned announcer sentinel resolves through the canonical cast,
+    while a muted row can neither render nor shorten the preceding cue."""
+    from nodes._otr_captions import build_ass_from_ledger
+
+    path = tmp_path / "alias_ledger.json"
+    path.write_text(json.dumps({
+        "episode_id": "alias",
+        "cast": [
+            {"char_id": "c01", "name": "ANNOUNCER"},
+            {"char_id": "c02", "name": "MARA"},
+        ],
+        "lines": [
+            {"line_id": "b001", "char_id": "announcer",
+             "speaker_role": "announcer", "text": "The signal holds.",
+             "start_s": 0.0, "dur_s": 4.0},
+            {"line_id": "b002", "char_id": "c02",
+             "speaker_role": "character", "text": "MUTED ROW MUST NOT SHIP",
+             "start_s": 1.0, "dur_s": 1.0, "skip": True},
+            {"line_id": "b003", "char_id": "c02",
+             "speaker_role": "character", "text": "I can hear it.",
+             "start_s": 4.0, "dur_s": 2.0},
+        ],
+    }), encoding="utf-8")
+
+    out, report = build_ass_from_ledger(path, style=_DEFAULT_CAPTION_STYLE)
+    assert out, report
+    ass = pathlib.Path(out).read_text(encoding="utf-8")
+    assert "ANNOUNCER:" in ass
+    assert "MUTED ROW MUST NOT SHIP" not in ass
+    assert "Dialogue: 0,0:00:00.00,0:00:04.00" in ass
+    assert "from 2 speech lines" in report
+
+
 def test_caption_burn_no_shortest_in_source():
     src = (pathlib.Path(__file__).resolve().parent.parent
            / "nodes" / "otr_caption_burn.py").read_text(encoding="utf-8")

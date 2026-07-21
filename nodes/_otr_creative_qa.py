@@ -1,8 +1,8 @@
 """nodes/_otr_creative_qa.py -- Story Spine Targeted Story QA router.
 
-Targeted Story QA is the one always-on judgment round in the story spine
+Targeted Story QA is the opt-in judgment round in the story spine
 (Narrative Draft -> conditional Radio Editor length pass -> Targeted Story
-QA -> [one beat-local micro-repair] -> Ledger Scrub -> TTS). It is a
+QA -> [dynamic scoped repair + re-judgment] -> Ledger Scrub -> TTS). It is a
 READ-ONLY DEFECT ROUTER, not a grader: it reads the JUST-COMPOSED ledger
 at beat granularity and returns a Pydantic-validated `StoryQAVerdict`
 whose `verdict` is exactly one of three gates:
@@ -11,10 +11,10 @@ whose `verdict` is exactly one of three gates:
   * MICRO_REPAIR_NEEDED -- a LOCALLY-FIXABLE defect (a chopped/stilted
                            line, a flabby or muddy beat) a one-line edit
                            can repair; `flagged_beats` names the beats.
-  * REJECT              -- a STRUCTURAL defect a one-line edit cannot fix
-                           (a dead ending, a broken logical turn, a
-                           premise left unclear). The run aborts at the
-                           writer boundary.
+  * REJECT              -- a broad story defect that scopes the guarded
+                           repair pass to the whole voiced script before the
+                           independent judge runs again. It is repair feedback,
+                           never an episode-liveness verdict.
 
 This is the go-forward refactor of the earlier PASS/REPAIR_ONCE/FAIL
 grader (docs/otr-go-forward-final.md, Sprint 1). The router answers ONE
@@ -26,7 +26,7 @@ leak / SFW / JSON / speaker-id checks: those are the deterministic Ledger
 Scrub's job (Sec 2 invariant; the scrub stays mechanical, fail-closed,
 last), so the router never duplicates them.
 
-Always runs, fully model-agnostic (go-forward Sec 2 rule 1). There is NO
+When enabled, it is fully model-agnostic. There is NO
 `critic_model != creative_model` auto-skip: a default single-model setup
 must still get QA. Same-model QA is a weaker second opinion (lower recall
 on the writer's own blind spots), but the fix is TASK DESIGN, not
@@ -34,7 +34,7 @@ disabling the gate: the call (a) sees only the FINAL script on a COLD
 CONTEXT (no generation history to rationalize from), (b) uses a
 SKEPTICAL / adversarial framing ("assume the writer was careless; find
 why it fails"), and (c) holds a HIGH REJECT BAR (only severe, concrete
-defects abort). A model spots a concrete missing turn or chopped line in
+defects request whole-script repair). A model spots a concrete missing turn or chopped line in
 its own output far better than it can judge overall quality, which is
 exactly why the router flags DEFECTS, not quality. A different technical
 model gives stronger recall and is recommended, not required.
@@ -162,21 +162,21 @@ class StoryQAVerdict(BaseModel):
 
     Field roles:
       verdict            -- the single gate value: PASS / MICRO_REPAIR_NEEDED
-                            / REJECT.
+                            / REJECT (whole-script repair scope).
       flagged_beats      -- the dialogue beats a micro-repair should fix
                             (MICRO_REPAIR_NEEDED only; empty otherwise).
       reason             -- one short phrase (about 15 words or fewer)
                             naming the defect behind the verdict.
       dead_ending        -- the episode stops without paying off its setup
-                            (a structural defect -> REJECT).
+                            (a broad defect -> REJECT repair scope).
       broken_turn        -- the central turn / reversal does not logically
-                            follow (structural -> REJECT).
+                            follow (broad -> REJECT repair scope).
       flat_contrast      -- the voices read as one narrator split in two,
                             with no distinct register (often locally
                             fixable -> MICRO_REPAIR_NEEDED).
       unclear_grounding  -- the premise is never made clear; the listener
                             cannot tell what is going on (structural ->
-                            REJECT).
+                            REJECT repair scope).
       chopped_dialogue   -- a line is chopped, stilted, or truncated mid
                             thought (locally fixable -> MICRO_REPAIR_NEEDED).
       pacing_failure     -- a beat is flabby / overlong / stalls the scene
@@ -340,14 +340,14 @@ numeric scale. Use the integer beat numbers exactly as shown in [beat N].
 
 Decide the verdict by routing the worst defect you find:
 
-REJECT -- a STRUCTURAL defect that NO single-line edit can fix:
+REJECT -- a broad defect that needs the whole voiced script in repair scope:
   - dead_ending: the episode stops without paying off what it set up.
   - broken_turn: the central reversal or decision does not logically
     follow from what came before.
   - unclear_grounding: the premise is never made clear; a listener cannot
     tell what is happening or why.
   Set the matching flag(s) true and verdict REJECT. Hold a HIGH BAR:
-  reject only a genuinely unshippable episode, not a merely imperfect one.
+  use this only for a concrete story-level defect, not a merely imperfect one.
 
 MICRO_REPAIR_NEEDED -- a LOCALLY-FIXABLE defect a one-line edit repairs:
   - chopped_dialogue: a line is chopped, stilted, or cut off mid thought.
@@ -442,8 +442,9 @@ def run_story_qa(
     slot plumbing, and fail-loud-then-fail-open handling. READ-ONLY -- it
     reads the ledger and returns a verdict; it NEVER mutates a ledger key.
     The spine consumes the verdict: PASS proceeds, MICRO_REPAIR_NEEDED
-    runs one beat-local repair on `flagged_beats`, REJECT aborts at the
-    writer boundary.
+    scopes repair to `flagged_beats`, and REJECT scopes repair to the whole
+    voiced script. Every repair is independently rejudged; no quality verdict
+    owns episode liveness.
 
     Parameters:
       led

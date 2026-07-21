@@ -13,9 +13,11 @@ Stage-2 "no fields without consumers" law. The simple_4 pipeline never touches
 this contract.
 
 Law: JSON owns content/config (banks.json carries the ids); Python owns
-validation/routing/execution (this module carries the callables); NO fallbacks;
-unknown/missing id = hard typed error -- a selected bank without a built lane
-FAILS THE EPISODE LOUD, never a silent slide into the science path.
+validation/routing/execution (this module carries the callables); NO ROUTING
+fallbacks. Unknown/missing id = hard typed error -- a selected bank without a
+built lane FAILS THE EPISODE LOUD, never a silent slide into the science path.
+The finite quality floor below is not routing: it preserves the selected bank,
+validated payload, source hash, and bank-specific truth/adaptation contract.
 
 Import posture: stdlib-only at import time. This module imports NEITHER the
 writer NOR news_interpreter NOR _otr_story_routing at module level (three-edge
@@ -33,6 +35,8 @@ Registry metadata vs execution errors:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import re
 
 # ---------------------------------------------------------------------------
 # typed errors (own hierarchy -- deliberately NOT StoryRoutingError subclasses:
@@ -70,6 +74,40 @@ class SourceInterpretError(SourcePayloadError):
     For the science lane this chains the underlying NewsInterpreterError as
     ``__cause__``; the writer's halt path stamps AND re-raises the cause so the
     science failure surface stays byte-identical."""
+
+
+_QUALITY_ATTEMPT_RE = re.compile(
+    r"(?:all\s+)?(?P<count>\d+)\s+attempt(?:\(s\)|s)?\s+(?:failed|exhausted)",
+    re.IGNORECASE,
+)
+
+
+def quality_interpret_failure_attempts(exc: BaseException) -> int:
+    """Return model calls consumed by a retryable interpreter-quality failure.
+
+    The source wrappers deliberately translate only their typed interpreter
+    exhaustion errors to :class:`SourceInterpretError`.  A few of those typed
+    errors also represent pre-model configuration failures (for example a
+    missing media-archive drama-seed deck), while the news wrapper can contain
+    a backend/slot exception.  Only actual structured-output/content exhaustion
+    may enter the liveness rescue chain; configuration, I/O, backend, and code
+    failures keep their existing fail-loud behavior.
+
+    ``0`` therefore means "not a quality exhaustion; do not retry or floor".
+    """
+    if not isinstance(exc, SourceInterpretError):
+        return 0
+    cause = exc.__cause__
+    if cause is None:
+        return 0
+    reason = str(getattr(cause, "reason", "") or cause)
+    if "slot fn raised" in reason.casefold():
+        return 0
+    attempts = getattr(cause, "attempts", None)
+    if isinstance(attempts, int) and not isinstance(attempts, bool):
+        return max(0, attempts)
+    match = _QUALITY_ATTEMPT_RE.search(reason)
+    return int(match.group("count")) if match else 0
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +293,260 @@ def validate_interpreter_result(result, origin: str) -> dict:
             f"attribute -- split-brain interpreter output"
         )
     return dump
+
+
+# ---------------------------------------------------------------------------
+# bounded source-interpreter quality floor
+# ---------------------------------------------------------------------------
+
+SOURCE_INTERPRETER_FLOOR_VERSION = "source_interpreter_floor_v1"
+
+_FLOOR_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9'-]{2,}")
+_FLOOR_STOPWORDS = frozenset({
+    "about", "after", "again", "against", "also", "among", "another",
+    "because", "before", "being", "between", "could", "from", "have",
+    "into", "more", "most", "other", "over", "same", "should", "some",
+    "such", "than", "that", "their", "them", "then", "there", "these",
+    "they", "this", "those", "through", "under", "very", "what", "when",
+    "where", "which", "while", "with", "would", "your", "body", "source",
+    "summary", "title", "http", "https", "www",
+})
+_FLOOR_UNSAFE_TERMS = frozenset({
+    "blood", "body count", "corpse", "cursed", "cigarette", "ghost",
+    "gun", "guns", "haunting", "knife", "knives", "murder", "ransom",
+    "serial killer", "smoking", "weapon", "weapons",
+})
+
+
+def _floor_one_line(value: object, *, max_chars: int) -> str:
+    clean = " ".join(str(value or "").split()).strip()
+    if len(clean) <= max_chars:
+        return clean
+    clipped = clean[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return clipped or clean[:max_chars]
+
+
+def _source_floor_terms(payload: dict) -> list[str]:
+    """Derive 2-5 safe, exact source tokens without asking a model."""
+    ordered_text = (
+        payload["headline"], payload["summary"], payload["full_text"],
+        payload["seed_text"],
+    )
+    terms: list[str] = []
+    seen: set[str] = set()
+
+    def _collect(*, keep_stopwords: bool) -> None:
+        for text in ordered_text:
+            for token in _FLOOR_TOKEN_RE.findall(text):
+                folded = token.casefold()
+                if folded in seen:
+                    continue
+                if not keep_stopwords and folded in _FLOOR_STOPWORDS:
+                    continue
+                if any(bad in folded for bad in _FLOOR_UNSAFE_TERMS):
+                    continue
+                seen.add(folded)
+                terms.append(token[:80])
+                if len(terms) >= 5:
+                    return
+
+    _collect(keep_stopwords=False)
+    if len(terms) < 2:
+        _collect(keep_stopwords=True)
+    if len(terms) < 2:
+        raise SourcePayloadContractError(
+            "source interpreter quality floor could not derive two safe, "
+            "grounded key terms from the validated source payload"
+        )
+    return terms
+
+
+def _source_floor_character_names(source_meta: dict) -> list[str]:
+    raw = source_meta.get("cast_hints") or source_meta.get("character_names")
+    if not isinstance(raw, (list, tuple)):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in raw:
+        name = _floor_one_line(value, max_chars=64)
+        folded = name.casefold()
+        if (not name or folded in seen
+                or any(bad in folded for bad in _FLOOR_UNSAFE_TERMS)):
+            continue
+        seen.add(folded)
+        out.append(name)
+        if len(out) >= 6:
+            break
+    return out
+
+
+@dataclass
+class SourceInterpreterFloor:
+    """Duck-typed briefs result for finite, truthful quality exhaustion.
+
+    This is not a generic story author.  ``build_source_interpreter_floor``
+    selects a bank-specific brief template and injects only exact safe tokens
+    and cast hints from the already validated payload/sidecar.  It therefore
+    preserves each bank's truth/adaptation rules while giving the shared writer
+    a ledgerable minimum when every model-authored brief was rejected.
+    """
+
+    casting_brief: str
+    script_brief: str
+    news_close_brief: str
+    key_terms: list[str]
+    attempts: int
+    source_hash: str
+    character_names: list[str]
+    quality_floor_reason: str
+    model_id: str = "deterministic"
+    prompt_version: str = SOURCE_INTERPRETER_FLOOR_VERSION
+    schema_version: str = SOURCE_INTERPRETER_FLOOR_VERSION
+    quality_floor: bool = True
+
+    def model_dump(self) -> dict:
+        return {
+            "casting_brief": self.casting_brief,
+            "script_brief": self.script_brief,
+            "news_close_brief": self.news_close_brief,
+            "key_terms": list(self.key_terms),
+            "attempts": self.attempts,
+            "source_hash": self.source_hash,
+            "character_names": list(self.character_names),
+            "quality_floor_reason": self.quality_floor_reason,
+            "model_id": self.model_id,
+            "prompt_version": self.prompt_version,
+            "schema_version": self.schema_version,
+            "quality_floor": self.quality_floor,
+        }
+
+
+def build_source_interpreter_floor(
+    *, bank, payload: dict, source_meta: dict | None,
+    attempts: int, failure_reason: str,
+) -> SourceInterpreterFloor:
+    """Build a validated, bank-specific minimum brief from source truth.
+
+    Only the four registered source-interpreter families are accepted.  Router
+    mistakes and malformed source payloads remain hard contract failures.
+    """
+    clean_payload = validate_source_payload(
+        payload, origin="build_source_interpreter_floor",
+    )
+    if (not isinstance(attempts, int) or isinstance(attempts, bool)
+            or attempts < 1):
+        raise SourcePayloadContractError(
+            "source interpreter quality floor attempts must be a positive int"
+        )
+    if source_meta is None:
+        clean_meta: dict = {}
+    elif isinstance(source_meta, dict):
+        clean_meta = dict(source_meta)
+    else:
+        raise SourcePayloadContractError(
+            "source interpreter quality floor source_meta must be dict or None"
+        )
+
+    interpreter_id = str(getattr(bank, "interpreter", "") or "").strip()
+    terms = _source_floor_terms(clean_payload)
+    anchors = ", ".join(terms[:3])
+    names = _source_floor_character_names(clean_meta)
+    names_clause = (
+        f" Use the source's named characters: {', '.join(names)}."
+        if names else " Use only people and roles supported by the source."
+    )
+
+    if interpreter_id == "media_archive_interpreter":
+        casting = (
+            "Cast an archivist, a preservation specialist, and a curious "
+            "research partner with distinct, natural radio voices."
+        )
+        script = (
+            "Create a compact SFW fictional archive drama grounded in the "
+            "selected media-history item. Make the conflict about identifying, "
+            "restoring, researching, or preserving that item, and resolve with "
+            f"credible preservation progress. Exact source anchors: {anchors}. "
+            "Treat the RSS payload as the only authority for factual claims."
+        )
+        close = (
+            "This fictional archive drama was inspired by the selected media "
+            f"source. Its factual anchors are {anchors}; all added dramatic "
+            "events are fictional."
+        )
+    elif interpreter_id == "public_domain_interpreter":
+        casting = (
+            "Preserve the configured public-domain unit's actual people, roles, "
+            "and relationships; give each speaker a distinct radio voice."
+            + names_clause
+        )
+        script = (
+            "Create a compact, faithful, SFW radio adaptation of the configured "
+            "public-domain unit. Preserve its central dramatic turn and ending; "
+            "do not add an unrelated framing story or change the resolution. "
+            f"Exact source anchors: {anchors}."
+        )
+        close = (
+            "This broadcast is a dramatization of the configured public-domain "
+            f"source unit, preserving the source anchors {anchors}."
+        )
+    elif interpreter_id == "shakespeare_interpreter":
+        casting = (
+            "Use the selected Shakespeare scene's actual characters and "
+            "play-world relationships with clear, distinct radio voices."
+            + names_clause
+        )
+        script = (
+            "Create a compact, faithful, SFW radio adaptation of the selected "
+            "Shakespeare scene. Preserve its characters, dramatic turn, "
+            "play-world stakes, and ending without an unrelated modern frame. "
+            f"Exact scene anchors: {anchors}."
+        )
+        close = (
+            "This noncommercial broadcast adapts the configured Shakespeare "
+            f"scene under its recorded source and rights terms. Scene anchors: "
+            f"{anchors}."
+        )
+    elif interpreter_id == "news_interpreter":
+        casting = (
+            "Cast credible people whose roles are supported by the supplied "
+            "article, with distinct and natural radio voices."
+        )
+        script = (
+            "Create a compact SFW dramatization grounded only in the supplied "
+            f"article. Preserve these exact reported anchors: {anchors}. "
+            "Clearly separate fictional dramatic events from reported facts."
+        )
+        close = (
+            "The preceding dramatization was inspired by the supplied report; "
+            f"its exact source anchors are {anchors}."
+        )
+    else:
+        raise UnknownInterpreterError(
+            f"source interpreter quality floor has no bank-specific builder "
+            f"for interpreter {interpreter_id!r}"
+        )
+
+    digest = hashlib.sha256()
+    for key in sorted(SOURCE_PAYLOAD_KEYS):
+        digest.update(clean_payload[key].encode("utf-8", "replace"))
+        digest.update(b"\0")
+    floor = SourceInterpreterFloor(
+        casting_brief=_floor_one_line(casting, max_chars=900),
+        script_brief=_floor_one_line(script, max_chars=1200),
+        news_close_brief=_floor_one_line(close, max_chars=500),
+        key_terms=terms,
+        attempts=attempts,
+        source_hash=digest.hexdigest()[:16],
+        character_names=names,
+        quality_floor_reason=_floor_one_line(failure_reason, max_chars=600),
+    )
+    # Exercise the exact writer/freeze contract here, at floor construction,
+    # rather than trusting a later consumer to discover a malformed floor.
+    validate_interpreter_result(
+        floor,
+        origin=f"source quality floor ({interpreter_id})",
+    )
+    return floor
 
 
 # ---------------------------------------------------------------------------
@@ -525,14 +817,18 @@ def resolve_interpreter(bank):
 __all__ = [
     "FetcherEntry",
     "SOURCE_PAYLOAD_KEYS",
+    "SOURCE_INTERPRETER_FLOOR_VERSION",
     "SourceFetchResult",
     "SourceContractMissingError",
     "SourceInterpretError",
+    "SourceInterpreterFloor",
     "SourcePayloadContractError",
     "SourcePayloadError",
     "UnknownFetcherError",
     "UnknownInterpreterError",
+    "build_source_interpreter_floor",
     "normalize_fetch_result",
+    "quality_interpret_failure_attempts",
     "registered_fetcher_ids",
     "registered_interpreter_ids",
     "resolve_fetcher",

@@ -1262,11 +1262,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # "radio_object"; if it is later RENDERED HUMO-ON (e.g. the visual-quicktest
     # harness REUSES a frozen ledger across runs), that faceless still would feed
     # HuMo -- the BUG-LOCAL-129 face-only failure. Guard on the POSITIVE: an
-    # announcer_visual + audio_driven_face + char_id=="announcer" init MUST carry
+    # any portrait-backed announcer_visual + audio_driven_face init MUST carry
     # radio_host_style=="console_face"; anything else (radio_object OR a missing
     # field on an old/frozen ledger) RAISES rather than hand HuMo a faceless init.
+    # ShotLock normalizes the role-tag id "announcer" onto the canonical cast-row
+    # id (often c01), so role + engine family are the authority here -- never the
+    # spelling of char_id.
     if (portrait
-            and char_id == "announcer"
             and _family == "audio_driven_face"
             and _role_of_shot(shot) == "announcer_visual"):
         _rh_style = _portrait_style_index(ledger).get(char_id, "")

@@ -246,6 +246,23 @@ def test_col3_flow_system_spine_full_transcript_intercept_diagnostic():
     assert "expose my sources" in _flat(transcript["lines"])
 
 
+def test_transcript_voice_resolves_announcer_role_tag_alias():
+    led = _led()
+    # Content-owned lanes preserve the role tag on the line while the cast row
+    # may use a canonical slot id. Display name and delivered voice must join
+    # through the same alias-aware cast authority.
+    led["cast"][0]["char_id"] = "host01"
+    led["lines"][0]["char_id"] = "announcer"
+    lay = cr.build_credits_layout(
+        led, w=1920, h=1080,
+        manifest={"clips": [{"shot_id": "s0", "path": "a.mp4",
+                             "exists": True, "start_s": 0.0}]},
+    )
+    transcript = dict(lay["col3_flow"])["transcript"]["lines"]
+    assert transcript[0]["speaker"] == "ANNOUNCER"
+    assert transcript[0]["voice"] == "bm_fable"
+
+
 def test_system_left_col1_static_dashboard():
     lay = _layout()
     # SYSTEM must NOT be duplicated in the static col 1 anymore.

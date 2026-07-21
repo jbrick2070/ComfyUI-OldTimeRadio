@@ -295,12 +295,51 @@ def test_master_audio_mux_default_out_peels_credits_suffix(monkeypatch, tmp_path
     monkeypatch.setitem(sys.modules, "folder_paths", types.SimpleNamespace(
         get_output_directory=lambda: str(tmp_path)))
     node = OTRMasterAudioMux()
-    got = node._default_out(str(tmp_path / "ep042_procgen_blended_with_credits.mp4"))
+    got = node._default_out(str(
+        tmp_path / "ep042_silent_procgen_blended_captioned_with_credits.mp4"))
     ep_dir = os.path.join(str(tmp_path), "otr", "episodes", "ep042")
     assert os.path.dirname(got) == ep_dir, got
     # legacy (no credits) input still resolves to the same episode folder
     got2 = node._default_out(str(tmp_path / "ep042_procgen_blended.mp4"))
     assert os.path.dirname(got2) == ep_dir, got2
+
+
+def test_master_audio_mux_default_out_uses_live_ledger_episode_authority(
+        monkeypatch, tmp_path):
+    """A live ledger owns the episode directory even when a future terminal
+    enrichment adds a suffix that the mux has never seen before.
+
+    The filename remains useful for the final asset name, but it must not be
+    reinterpreted as a sibling episode id. A mismatched stale singleton is
+    rejected by the episode-id prefix check.
+    """
+    import types
+    from nodes import _otr_ledger as otr_ledger
+
+    monkeypatch.setitem(sys.modules, "folder_paths", types.SimpleNamespace(
+        get_output_directory=lambda: str(tmp_path)))
+    episode_dir = tmp_path / "otr" / "episodes" / "ep042"
+    ledger_path = episode_dir / "audio" / "ep042_ledger.json"
+    ledger_path.parent.mkdir(parents=True)
+    ledger_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        otr_ledger, "in_flight_ledger_path", lambda: ledger_path)
+
+    node = OTRMasterAudioMux()
+    future_stem = (
+        "ep042_silent_procgen_blended_captioned_future_fx_with_credits.mp4")
+    got = pathlib.Path(node._default_out(str(tmp_path / future_stem)))
+    assert got.parent == episode_dir
+    assert got.name == future_stem[:-4] + "_final.mp4"
+
+    # A stale in-flight pointer from a prior episode cannot redirect this run.
+    stale_dir = tmp_path / "otr" / "episodes" / "ep_old"
+    stale_ledger = stale_dir / "audio" / "ep_old_ledger.json"
+    monkeypatch.setattr(
+        otr_ledger, "in_flight_ledger_path", lambda: stale_ledger)
+    got_stale = pathlib.Path(node._default_out(str(
+        tmp_path / "ep099_silent_procgen_blended_captioned_with_credits.mp4")))
+    assert got_stale.parent == tmp_path / "otr" / "episodes" / "ep099"
 
 
 @needs_ffmpeg

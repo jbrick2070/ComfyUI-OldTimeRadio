@@ -387,12 +387,22 @@ def _findings_fn(*payloads):
 
 
 class TestQAGate:
-    def _run(self, led, technical_fn, monkeypatch, compose_text=None):
+    def _run(self, led, technical_fn, monkeypatch, compose_text=None,
+             compose_calls=None):
         if compose_text is not None:
             import nodes._otr_line_composer as LC
 
+            texts = ([compose_text] if isinstance(compose_text, str)
+                     else list(compose_text))
+            compose_index = 0
+
             def _fake_outro(**kw):
-                return LC.LineResult(text=compose_text,
+                nonlocal compose_index
+                if compose_calls is not None:
+                    compose_calls.append(dict(kw))
+                text = texts[min(compose_index, len(texts) - 1)]
+                compose_index += 1
+                return LC.LineResult(text=text,
                                      compose_flags=("announcer_outro",))
             monkeypatch.setattr(LC, "compose_announcer_outro", _fake_outro)
         resolved = {"technical_model": "t", "creative_writing_model": "c",
@@ -438,13 +448,16 @@ class TestQAGate:
         )
         meta = self._run(led, fn, monkeypatch,
                          compose_text="A wry new closing line.")
-        assert meta["original_qa"] == {"status": "clean", "repaired": True}
+        assert meta["original_qa"]["status"] == "clean"
+        assert meta["original_qa"]["repaired"] is True
+        assert meta["original_qa"]["repair_count"] == 1
         row = led.data["lines"][2]
         assert row["text"] == "A wry new closing line."
         assert "news_coda_no_brief" in row["compose_flags"]       # r4 P3
         assert "original_qa_outro_recomposed" in row["compose_flags"]
 
-    def test_a_still_unhappy_re_judge_ships_instead_of_failing(self, monkeypatch):
+    def test_stubborn_subjective_judge_gets_dynamic_cross_slot_repairs(
+            self, monkeypatch):
         """THE LAW: an audit may improve a story. It may never fail one.
 
         Live proof this mattered: prompt `030f73e6`, a complete 30-word
@@ -452,25 +465,40 @@ class TestQAGate:
         writer pass had already succeeded. "Moralizes" is an aesthetic opinion
         about an outro the model itself just rewrote AT THIS AUDIT'S REQUEST --
         there is no evidence bar behind it, unlike the hard classes. The bounded
-        recompose is the improvement the audit is entitled to; it does not also
-        get to throw the episode away.
+        Each unhappy verdict now drives another fresh repair/rejudge cycle. A
+        finite no-hang floor still ships the best structurally valid close.
         """
         led = _qa_ledger()
         fn = _findings_fn(
             [{"class": "epilogue_moralizes", "detail": "the lesson is"}],
             [{"class": "epilogue_moralizes", "detail": "still moralizing"}],
+            [{"class": "epilogue_moralizes", "detail": "still moralizing"}],
+            [{"class": "epilogue_moralizes", "detail": "still moralizing"}],
         )
+        compose_calls = []
 
         meta = self._run(led, fn, monkeypatch,
-                         compose_text="Another closing line.")
+                         compose_text=[
+                             "First new closing line.",
+                             "Second new closing line.",
+                             "Third new closing line.",
+                         ], compose_calls=compose_calls)
 
-        assert meta["original_qa"]["status"] == "shipped_over_subjective_objection"
+        assert meta["original_qa"]["status"] == "quality_floor"
         assert meta["original_qa"]["repaired"] is True
+        assert meta["original_qa"]["repair_count"] == 3
+        assert meta["original_qa"]["repair_budget"] == 3
+        assert [c["repair_slot"] for c in meta["original_qa"]["cycles"]] == [
+            "creative", "technical", "creative",
+        ]
+        assert [c["creative_repo_id"] for c in compose_calls] == ["c", "t", "c"]
         assert meta["original_qa"]["objections"] == [
             "epilogue_moralizes: still moralizing"
         ]
-        # The recomposed outro is what ships -- the improvement is kept.
-        assert led.data["lines"][2]["text"] == "Another closing line."
+        # The latest equally-scored authored candidate wins; the rejected
+        # original line can never win by inertia.
+        assert led.data["lines"][2]["text"] == "Third new closing line."
+        assert "original_qa_quality_floor" in led.data["lines"][2]["compose_flags"]
 
     def test_a_corroborated_hard_class_still_ends_the_episode(self, monkeypatch):
         """The law frees SUBJECTIVE verdicts, not evidence-backed ship-stops.

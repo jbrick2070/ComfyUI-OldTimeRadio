@@ -4,11 +4,11 @@ This is the in-process WIRING that runs the story-spine post-script
 passes inside OTR_LedgerScriptWriter.run(), mirroring how
 run_story_brief_reflection is called (`_otr_story_brief.py:861`):
 Stage 2.5 (conditional Radio Editor length pass), Stage 3 (Targeted
-Story QA defect router), Stage 3.5 (beat-local micro-repair on the
-flagged beats), the writer-LLM unload, and Stage 4 (deterministic
-Ledger Scrub). A REJECT verdict aborts at the writer boundary: the spine
-sets meta["story_verdict"]="REJECT", unloads, skips the scrub, and
-returns -- the writer raises (the spine never does).
+Story QA defect router), Stage 3.5 (dynamically repeated, scoped creative
+repair + re-judgment), the writer-LLM unload, and Stage 4 (deterministic
+Ledger Scrub). A quality verdict can request more repair but can never abort
+an otherwise ledgerable episode; unresolved taste is recorded as a warning
+and the structural ledger gates remain authoritative.
 
 GATED, DEFAULT ON (opt-out). `enabled()` reads `OTR_ENABLE_STORY_SPINE`
 and is True unless it is exactly "0". Out of the box the four passes run
@@ -57,6 +57,35 @@ log = logging.getLogger("OTR_StorySpine")
 
 _ENV_FLAG = "OTR_ENABLE_STORY_SPINE"
 _QA_ENV_FLAG = "OTR_ENABLE_STORY_QA"
+_STORY_QA_MIN_REPAIR_CYCLES = 3
+_STORY_QA_MAX_REPAIR_CYCLES = 6
+_STORY_QA_DEFECT_FIELDS = (
+    "dead_ending",
+    "broken_turn",
+    "flat_contrast",
+    "unclear_grounding",
+    "chopped_dialogue",
+    "pacing_failure",
+)
+
+
+def _story_qa_repair_cycle_budget(verdict: Any) -> int:
+    """Scale quality repair cycles to the judge's actual defect surface."""
+    try:
+        defect_count = sum(
+            bool(getattr(verdict, field, False))
+            for field in _STORY_QA_DEFECT_FIELDS
+        )
+        flagged_count = len(getattr(verdict, "flagged_beats", None) or ())
+        return min(
+            _STORY_QA_MAX_REPAIR_CYCLES,
+            max(
+                _STORY_QA_MIN_REPAIR_CYCLES,
+                2 + max(defect_count, flagged_count),
+            ),
+        )
+    except Exception:  # noqa: BLE001 -- observability must never break a run
+        return _STORY_QA_MIN_REPAIR_CYCLES
 
 
 def enabled() -> bool:
@@ -78,11 +107,10 @@ def qa_enabled() -> bool:
     """True iff the post-script Story QA / reject pass may run.
 
     DEFAULT OFF (opt-in). BUG-LOCAL-302 (operator directive 2026-06-01): the
-    Story QA pass is a credit-billed LLM call whose only power is to REJECT --
-    aborting a fully-written, renderable episode and discarding the tokens
-    already spent writing it. So the QA LLM does NOT run out of the box: it is
-    gated off entirely (no call, no tokens, no reject) unless a power user sets
-    OTR_ENABLE_STORY_QA=1. Cheap, pure, never raises."""
+    Story QA remains opt-in because it is a credit-billed taste pass. When it is
+    enabled, its verdict can now drive dynamic repairs but can never reject the
+    episode; structural ledger validation remains separate and fail-closed.
+    Cheap, pure, never raises."""
     try:
         return os.environ.get(_QA_ENV_FLAG, "0").strip() == "1"
     except Exception:  # noqa: BLE001 -- env read must never break a run
@@ -303,8 +331,8 @@ def run_post_script_spine(
     slot_scheduler: Any = None,
 ) -> None:
     """Run the post-script spine in process, in flow order: Stage 2.5
-    (conditional length pass) -> Stage 3 (Story QA router) -> [REJECT
-    abort] / Stage 3.5 (micro-repair on flagged beats) -> writer-LLM
+    (conditional length pass) -> Stage 3 (Story QA router) -> Stage 3.5
+    (repair/rejudge until clean or the no-hang budget) -> writer-LLM
     unload -> Stage 4 (deterministic scrub).
 
     Called ONLY when `enabled()` is True. Mutates `led` (the editor
@@ -313,9 +341,11 @@ def run_post_script_spine(
     error on `meta` and continues, and it always performs the writer-LLM
     unload so VRAM is released before the cascade.
 
-    On a REJECT verdict it sets meta["story_verdict"]="REJECT" +
-    meta["story_reject_reason"], unloads, SKIPS the scrub, and returns
-    normally -- the writer raises at its boundary; the spine never does.
+    A quality REJECT is repair feedback, not a terminal disposition. The repair
+    loop scopes MICRO_REPAIR_NEEDED to the named beats and scopes a whole-story
+    REJECT to every voiced beat, then re-runs the independent technical judge.
+    If the judge remains unhappy after the dynamic budget, the last structurally
+    valid ledger continues with an explicit quality-floor receipt.
 
     Slot routing (D6): QA router -> technical slot; length pass +
     micro-repair -> creative slot.
@@ -366,12 +396,15 @@ def run_post_script_spine(
     # is a credit-billed LLM call whose only action is to REJECT -- aborting a
     # fully-written, renderable episode and wasting the tokens already spent
     # composing it. So the QA LLM is GATED OFF and does NOT even run out of the
-    # box: no call, no tokens, no reject. A power user sets OTR_ENABLE_STORY_QA=1
-    # to turn the critic + reject gate back on. When on it is model-agnostic:
+    # box: no call and no tokens. A power user sets OTR_ENABLE_STORY_QA=1
+    # to turn the critic + dynamic repair loop on. When on it is model-agnostic:
     # cold context (final script only), skeptical framing, high REJECT bar, and
     # fail-OPEN to PASS inside run_story_qa (a QA crash ships the episode as-is
     # rather than aborting it). LLM slot: technical -- structured verdict.
     verdict = None
+    qa_module = None
+    meta.pop("story_verdict", None)
+    meta.pop("story_reject_reason", None)
     if not qa_enabled():
         meta["story_qa_verdict"] = {
             "verdict": "SKIPPED",
@@ -380,9 +413,9 @@ def run_post_script_spine(
         }
     else:
         try:
-            from . import _otr_creative_qa as _QA
+            from . import _otr_creative_qa as qa_module
         except ImportError:  # pragma: no cover - standalone / test load
-            import _otr_creative_qa as _QA  # type: ignore
+            import _otr_creative_qa as qa_module  # type: ignore
         try:
             ctx = (
                 slot_scheduler.helper_context("creative_qa")
@@ -390,7 +423,7 @@ def run_post_script_spine(
                 else _nullcontext()
             )
             with ctx:
-                verdict = _QA.run_story_qa(
+                verdict = qa_module.run_story_qa(
                     led,
                     technical_generate_fn,
                     critic_model_id=resolved["technical_model"],
@@ -401,44 +434,55 @@ def run_post_script_spine(
                                         "error": type(exc).__name__}
             log.warning("[OTR_StorySpine] story QA failed: %r", exc)
 
+    # --- Stage 3.5: dynamic repair + independent re-judgment -----------
+    # Quality feedback can never become episode liveness. MICRO feedback stays
+    # beat-local; a whole-story REJECT scopes the guarded editor to every voiced
+    # beat. After each creative repair, the technical slot judges the new exact
+    # ledger surface. Backend exhaustion records a warning and continues.
+    qa_repairs: list[dict] = []
     _verdict_value = getattr(verdict, "verdict", None)
-
-    # --- REJECT abort (go-forward Sprint 3, spine side) ----------------
-    # A structural defect a one-line edit cannot fix. Set the signal on
-    # meta, unload the writer LLM, SKIP the scrub, and return NORMALLY --
-    # NEVER raise (PD1, the spine's never-raises contract). The writer
-    # raises at its boundary on this signal. A QA crash (verdict None or a
-    # fail-open PASS) does NOT reach here, so a crash stays fail-soft.
-    if _verdict_value == "REJECT":
-        meta["story_verdict"] = "REJECT"
-        meta["story_reject_reason"] = (
-            getattr(verdict, "reason", "") or "story rejected"
-        )
-        log.warning("[OTR_StorySpine] story QA REJECT: %s",
-                    meta["story_reject_reason"])
-        _unload_writer_llm(meta)
-        meta["story_spine_status"] = "ok_reject"
-        return
-
-    # --- Stage 3.5: beat-local micro-repair (creative slot) ------------
-    # Only on MICRO_REPAIR_NEEDED with flagged beats; ONE cycle, flagged
-    # beats only (spine invariant 5; the editor's scoped validator fences
-    # it). flagged_beats are voiced-view indices, the SAME space the editor
-    # uses (the QA router judges the voiced view). Arc indices + recompose
-    # are recomputed here because the Stage 2.5 length pass may have
-    # re-indexed beats. LLM slot: creative -- narrative editing.
-    flagged = list(getattr(verdict, "flagged_beats", None) or [])
-    if _verdict_value == "MICRO_REPAIR_NEEDED" and flagged:
+    cycle_budget = _story_qa_repair_cycle_budget(verdict)
+    cycle = 0
+    while (
+        qa_module is not None
+        and _verdict_value in ("MICRO_REPAIR_NEEDED", "REJECT")
+        and cycle < cycle_budget
+    ):
+        cycle += 1
         try:
             from . import _otr_radio_editor as _ED
         except ImportError:  # pragma: no cover - standalone / test load
             import _otr_radio_editor as _ED  # type: ignore
+        voiced_count = len(_voiced_lines(led))
+        flagged = [
+            int(index)
+            for index in (getattr(verdict, "flagged_beats", None) or ())
+            if isinstance(index, int) and 0 <= int(index) < voiced_count
+        ]
+        if _verdict_value == "REJECT":
+            flagged = list(range(voiced_count))
+        reason = str(
+            getattr(verdict, "reason", "")
+            or "the quality judge requested another authored repair"
+        )
+        repair_receipt = {
+            "cycle": cycle,
+            "incoming_verdict": _verdict_value,
+            "reason": reason[:1200],
+            "flagged_beats": list(flagged),
+        }
+        if not flagged:
+            repair_receipt["status"] = "NO_VOICED_SCOPE"
+            qa_repairs.append(repair_receipt)
+            break
         try:
             led_data = getattr(led, "data", led)
             _turn_idx, _button_idx = _map_arc_indices(outline, led)
             _recompose = _make_recompose_fn(led, creative_generate_fn)
             ctx = (
-                slot_scheduler.helper_context("radio_editor")
+                slot_scheduler.helper_context(
+                    f"radio_editor_quality_{cycle:02d}"
+                )
                 if slot_scheduler is not None
                 else _nullcontext()
             )
@@ -449,15 +493,85 @@ def run_post_script_spine(
                     editor_model=resolved["creative_writing_model"],
                     slot_fn=creative_generate_fn,
                     recompose_fn=_recompose,
+                    base_temperature=max(0.28, 0.62 - (0.07 * cycle)),
+                    structural_retry_temperature=max(
+                        0.12, 0.30 - (0.03 * cycle),
+                    ),
                     turn_beat_index=_turn_idx,
                     button_beat_index=_button_idx,
                     apply=True,
+                    repair_context=reason,
                 )
-            meta["micro_repair_report"] = _editor_summary(mr_report)
-        except Exception as exc:  # noqa: BLE001 -- micro-repair must never break a run
-            meta["micro_repair_report"] = {"status": "ERROR",
-                                           "error": type(exc).__name__}
-            log.warning("[OTR_StorySpine] micro-repair failed: %r", exc)
+            repair_receipt.update(_editor_summary(mr_report))
+            repair_receipt.setdefault("status", "APPLIED")
+        except Exception as exc:  # noqa: BLE001 -- quality never breaks a run
+            repair_receipt.update({
+                "status": "ERROR",
+                "error": type(exc).__name__,
+            })
+            log.warning(
+                "[OTR_StorySpine] quality repair cycle %d failed: %r",
+                cycle, exc,
+            )
+        qa_repairs.append(repair_receipt)
+
+        try:
+            ctx = (
+                slot_scheduler.helper_context(
+                    f"creative_qa_recheck_{cycle:02d}"
+                )
+                if slot_scheduler is not None
+                else _nullcontext()
+            )
+            with ctx:
+                verdict = qa_module.run_story_qa(
+                    led,
+                    technical_generate_fn,
+                    critic_model_id=resolved["technical_model"],
+                )
+            _verdict_value = getattr(verdict, "verdict", None)
+            repair_receipt["outgoing_verdict"] = _verdict_value
+            meta["story_qa_verdict"] = _verdict_summary(verdict)
+            cycle_budget = max(
+                cycle_budget,
+                _story_qa_repair_cycle_budget(verdict),
+            )
+        except Exception as exc:  # noqa: BLE001 -- quality fails open
+            _verdict_value = "PASS"
+            repair_receipt["outgoing_verdict"] = "ERROR_FAIL_OPEN"
+            meta["story_qa_verdict"] = {
+                "verdict": "ERROR",
+                "error": type(exc).__name__,
+            }
+            log.warning(
+                "[OTR_StorySpine] QA recheck cycle %d failed open: %r",
+                cycle, exc,
+            )
+
+    if qa_repairs:
+        meta["story_qa_repair_cycles"] = qa_repairs
+        meta["micro_repair_report"] = dict(qa_repairs[-1])
+    if _verdict_value in ("MICRO_REPAIR_NEEDED", "REJECT"):
+        warning = {
+            "status": "quality_floor",
+            "verdict": _verdict_value,
+            "reason": str(getattr(verdict, "reason", "") or "")[:1200],
+            "cycles": cycle,
+            "cycle_budget": cycle_budget,
+        }
+        meta["story_quality_warning"] = warning
+        meta["story_qa_disposition"] = "quality_floor"
+        log.warning(
+            "[OTR_StorySpine] quality judge remained %s after %d cycle(s); "
+            "continuing to structural ledger validation",
+            _verdict_value, cycle,
+        )
+    elif _verdict_value == "PASS":
+        meta["story_qa_disposition"] = (
+            "repaired_to_pass" if qa_repairs else "pass"
+        )
+    elif not qa_enabled():
+        meta["story_qa_disposition"] = "skipped"
 
     # --- Stage 3.6: deterministic mechanical anti-loop / dedupe (A4) -----
     # Story-quality Phase 1, UNCONDITIONAL repair-target source. The story
@@ -973,9 +1087,9 @@ def _selftest() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"  [FAIL] micro-repair path raised: {exc!r}")
 
-    # Test 10: REJECT verdict -> abort at the writer boundary. The spine
-    # sets the signal, unloads, SKIPS the scrub, returns ok_reject (never
-    # raises). The writer is what raises on this signal.
+    # Test 10: a persistent quality REJECT consumes the dynamic repair budget,
+    # records the quality floor, and still unloads + scrubs. It never stamps the
+    # removed writer-boundary abort signal.
     total += 1
     try:
         os.environ[_ENV_FLAG] = "1"
@@ -997,14 +1111,16 @@ def _selftest() -> int:
             technical_generate_fn=_stub_generate(qa_reject_json),
             resolved=resolved, slot_scheduler=None,
         )
-        if (meta10.get("story_verdict") == "REJECT"
-                and meta10.get("story_reject_reason")
-                and meta10.get("story_spine_status") == "ok_reject"
-                and "ledger_scrub_status" not in meta10
+        if (meta10.get("story_qa_disposition") == "quality_floor"
+                and len(meta10.get("story_qa_repair_cycles") or [])
+                >= _STORY_QA_MIN_REPAIR_CYCLES
+                and meta10.get("story_spine_status") == "ok"
+                and "story_verdict" not in meta10
+                and "ledger_scrub_status" in meta10
                 and "writer_llm_unload" in meta10):
             passed += 1
-            print("  [PASS] REJECT -> signal set, unloaded, scrub skipped, "
-                  "returned (no raise)")
+            print("  [PASS] REJECT -> dynamic repairs exhausted, quality "
+                  "floor recorded, scrub ran, no abort")
         else:
             print(f"  [FAIL] reject path meta = {meta10}")
     except Exception as exc:  # noqa: BLE001

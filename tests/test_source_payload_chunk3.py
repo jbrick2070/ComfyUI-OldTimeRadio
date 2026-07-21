@@ -24,6 +24,7 @@ Plan of record: docs/multimodal-story-schema/CHUNK3_SOURCE_PAYLOAD_SUBPLAN.md
 from __future__ import annotations
 
 import ast
+from contextlib import contextmanager
 import importlib
 import json
 from pathlib import Path
@@ -780,3 +781,243 @@ def test_real_news_briefs_model_satisfies_contract():
     )
     dump = osp.validate_interpreter_result(briefs, origin="t")
     assert dump == briefs.model_dump()
+
+
+# ---------------------------------------------------------------------------
+# (9) bounded source-interpreter quality chain + bank-specific floor
+# ---------------------------------------------------------------------------
+
+
+class _TypedInterpreterFailure(RuntimeError):
+    def __init__(self, *, attempts, reason):
+        self.attempts = attempts
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _source_interpret_error(*, attempts, reason="all attempts failed"):
+    cause = _TypedInterpreterFailure(attempts=attempts, reason=reason)
+    err = osp.SourceInterpretError(str(cause))
+    err.__cause__ = cause
+    return err
+
+
+def _rich_payload():
+    return _payload(
+        headline="Restored lunar television archive",
+        summary="Archivists preserve rare broadcast recordings",
+        full_text=(
+            "Researchers catalog the lunar broadcast collection and restore "
+            "the surviving television recordings for public study."
+        ),
+        seed_text="Restored lunar television archive recordings",
+    )
+
+
+def test_quality_interpret_failure_classifier_excludes_nonquality_failures():
+    assert osp.quality_interpret_failure_attempts(
+        _source_interpret_error(attempts=3)) == 3
+    assert osp.quality_interpret_failure_attempts(
+        _source_interpret_error(attempts=0, reason="missing seed deck")) == 0
+    assert osp.quality_interpret_failure_attempts(
+        _source_interpret_error(
+            attempts=[],
+            reason="all 3 attempt(s) failed; last error: schema reject",
+        )) == 3
+    assert osp.quality_interpret_failure_attempts(
+        _source_interpret_error(
+            attempts=[], reason="slot fn raised: RuntimeError: backend down",
+        )) == 0
+
+
+@pytest.mark.parametrize(
+    ("interpreter_id", "expected_phrase"),
+    [
+        ("media_archive_interpreter", "media-history item"),
+        ("public_domain_interpreter", "public-domain unit"),
+        ("shakespeare_interpreter", "Shakespeare scene"),
+        ("news_interpreter", "supplied article"),
+    ],
+)
+def test_source_interpreter_floor_is_bank_specific_and_source_grounded(
+        interpreter_id, expected_phrase):
+    bank = SimpleNamespace(interpreter=interpreter_id)
+    payload = _rich_payload()
+    floor = osp.build_source_interpreter_floor(
+        bank=bank,
+        payload=payload,
+        source_meta={"cast_hints": ["Archivist Ada", "Curator Lee"]},
+        attempts=12,
+        failure_reason="schema remained malformed",
+    )
+    dump = osp.validate_interpreter_result(floor, origin="floor-test")
+    assert dump["quality_floor"] is True
+    assert expected_phrase in floor.script_brief
+    assert len(floor.key_terms) >= 2
+    corpus = " ".join(payload.values()).casefold()
+    assert all(term.casefold() in corpus for term in floor.key_terms)
+    assert floor.character_names == ["Archivist Ada", "Curator Lee"]
+    assert floor.attempts == 12
+
+
+def test_source_interpreter_floor_rejects_unknown_interpreter():
+    with pytest.raises(osp.UnknownInterpreterError, match="no bank-specific"):
+        osp.build_source_interpreter_floor(
+            bank=SimpleNamespace(interpreter="not_registered"),
+            payload=_rich_payload(),
+            source_meta={},
+            attempts=12,
+            failure_reason="bad output",
+        )
+
+
+class _SlotSchedulerStub:
+    transitions = 0
+    calls_by_slot = {"creative": 0, "technical": 0}
+    slot_calls_by_helper = {}
+    slot_transitions_by_phase = []
+
+    @contextmanager
+    def helper_context(self, _name):
+        yield
+
+
+def test_writer_source_chain_alternates_slots_feeds_reject_and_accepts():
+    from nodes import OTR_LedgerScriptWriter as writer
+
+    calls = []
+    messages_seen = []
+
+    def _slot(name):
+        def _call(messages, *, temperature, max_new_tokens):
+            del temperature, max_new_tokens
+            calls.append(name)
+            messages_seen.append(list(messages))
+            return "{}"
+        return _call
+
+    cycle = {"n": 0}
+
+    def _interpreter(*, bank, payload, technical_fn, model_id):
+        del bank, payload
+        cycle["n"] += 1
+        technical_fn(
+            [{"role": "user", "content": "bank-specific prompt"}],
+            temperature=0.4,
+            max_new_tokens=100,
+        )
+        if cycle["n"] < 3:
+            raise _source_interpret_error(
+                attempts=3,
+                reason=f"all 3 attempts failed: exact defect {cycle['n']}",
+            )
+        brief = _GoodBriefs()
+        brief.attempts = 1
+        brief.model = model_id
+        return brief
+
+    meta = {}
+    brief = writer._run_source_interpreter_quality_chain(
+        interpreter=_interpreter,
+        bank=SimpleNamespace(interpreter="media_archive_interpreter"),
+        payload=_rich_payload(),
+        source_meta={},
+        technical_fn=_slot("technical"),
+        creative_fn=_slot("creative"),
+        technical_model_id="tech-model",
+        creative_model_id="creative-model",
+        slot_scheduler=_SlotSchedulerStub(),
+        meta=meta,
+    )
+    assert brief.model == "tech-model"
+    assert calls == ["technical", "creative", "technical"]
+    assert "PREVIOUS REJECTION" in messages_seen[1][-1]["content"]
+    receipt = meta["source_interpreter_chain"]
+    assert receipt["status"] == "accepted"
+    assert receipt["accepted_slot"] == "technical"
+    assert receipt["model_calls"] == 7
+
+
+def test_writer_source_chain_uses_validated_floor_after_twelve_calls():
+    from nodes import OTR_LedgerScriptWriter as writer
+
+    models = []
+
+    def _interpreter(*, bank, payload, technical_fn, model_id):
+        del bank, payload, technical_fn
+        models.append(model_id)
+        raise _source_interpret_error(
+            attempts=3, reason="all 3 attempts failed: malformed JSON",
+        )
+
+    meta = {}
+    floor = writer._run_source_interpreter_quality_chain(
+        interpreter=_interpreter,
+        bank=SimpleNamespace(interpreter="media_archive_interpreter"),
+        payload=_rich_payload(),
+        source_meta={},
+        technical_fn=lambda *a, **k: "{}",
+        creative_fn=lambda *a, **k: "{}",
+        technical_model_id="tech-model",
+        creative_model_id="creative-model",
+        slot_scheduler=_SlotSchedulerStub(),
+        meta=meta,
+    )
+    assert models == [
+        "tech-model", "creative-model", "tech-model", "creative-model",
+    ]
+    assert floor.quality_floor is True
+    assert osp.validate_interpreter_result(floor, origin="chain-floor")
+    receipt = meta["source_interpreter_chain"]
+    assert receipt["status"] == "quality_floor"
+    assert receipt["model_calls"] == 12
+    assert receipt["accepted_slot"] == "deterministic"
+
+
+def test_writer_source_chain_propagates_nonquality_interpreter_failure():
+    from nodes import OTR_LedgerScriptWriter as writer
+
+    def _interpreter(**_kwargs):
+        raise _source_interpret_error(
+            attempts=0, reason="media archive seed deck missing",
+        )
+
+    with pytest.raises(osp.SourceInterpretError, match="seed deck"):
+        writer._run_source_interpreter_quality_chain(
+            interpreter=_interpreter,
+            bank=SimpleNamespace(interpreter="media_archive_interpreter"),
+            payload=_rich_payload(),
+            source_meta={},
+            technical_fn=lambda *a, **k: "{}",
+            creative_fn=lambda *a, **k: "{}",
+            technical_model_id="tech-model",
+            creative_model_id="creative-model",
+            slot_scheduler=_SlotSchedulerStub(),
+            meta={},
+        )
+
+
+def test_final_slot_telemetry_owns_source_chain_acceptance():
+    from nodes import OTR_LedgerScriptWriter as writer
+
+    meta = {
+        "news": {"script_brief": "brief", "key_terms": ["archive"]},
+        "source_interpreter_chain": {
+            "accepted_slot": "deterministic",
+            "accepted_model": "deterministic",
+        },
+    }
+    writer._stamp_final_slot_telemetry(
+        meta=meta,
+        resolved={
+            "creative_writing_model": "creative-model",
+            "technical_model": "technical-model",
+        },
+        slot_scheduler=_SlotSchedulerStub(),
+        pipeline_id="legacy_many_pass",
+        title_source="outline_fallback",
+    )
+    assert meta["gen_params_by_phase"]["news_interpreter"] == {
+        "slot": "deterministic",
+        "model": "deterministic",
+    }

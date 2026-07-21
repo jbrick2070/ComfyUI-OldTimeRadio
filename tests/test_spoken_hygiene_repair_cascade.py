@@ -1,4 +1,4 @@
-"""Total spoken-line craft repair: A/B/C/floor and final-row scour."""
+"""Total spoken-line craft repair: A/B/C, dynamic LLM passes, and floor."""
 from __future__ import annotations
 
 from dataclasses import replace
@@ -191,6 +191,69 @@ def test_persistent_composer_defects_reach_nonempty_clean_floor():
         for flag in result.compose_flags
         if flag.startswith("hygiene_repaired_after_reroll:")
     )
+
+
+def test_composer_keeps_repairing_past_a_b_c_until_dynamic_pass_is_clean():
+    dirty = "You're playing with fire, Watson."
+    clean = "The seal cracked before midnight."
+    creative_calls = 0
+    alternate_calls = 0
+
+    def creative(messages, *, temperature, max_new_tokens, stop=None):
+        nonlocal creative_calls
+        creative_calls += 1
+        # Initial draft + A + B remain dirty; the first post-C fresh call wins.
+        return clean if creative_calls >= 4 else dirty
+
+    def alternate(messages, *, temperature, max_new_tokens, stop=None):
+        nonlocal alternate_calls
+        alternate_calls += 1
+        return dirty
+
+    result = compose_line(
+        creative_fn=creative,
+        repair_fn=alternate,
+        req=_req(),
+        source_bank_id="original",
+    )
+    assert result.text == clean
+    assert creative_calls == 4
+    assert alternate_calls == 1
+    assert (
+        "hygiene_repaired_after_reroll:cliche:"
+        "repair_dynamic_04_same_slot"
+    ) in result.compose_flags
+
+
+def test_final_row_scour_keeps_rotating_slots_until_dynamic_pass_is_clean():
+    dirty = "twirls his pen nervously We have one chance left."
+    clean = "The seal cracked before midnight."
+    creative_calls = 0
+    alternate_calls = 0
+
+    def creative(messages, *, temperature, max_new_tokens, stop=None):
+        nonlocal creative_calls
+        creative_calls += 1
+        return clean if creative_calls >= 2 else dirty
+
+    def alternate(messages, *, temperature, max_new_tokens, stop=None):
+        nonlocal alternate_calls
+        alternate_calls += 1
+        return dirty
+
+    result = repair_existing_spoken_line(
+        text=dirty,
+        req=_req(),
+        creative_fn=creative,
+        repair_fn=alternate,
+    )
+    assert result.text == clean
+    assert creative_calls == 2
+    assert alternate_calls == 1
+    assert (
+        "hygiene_repaired_after_reroll:stage_direction:"
+        "repair_dynamic_03_same_slot"
+    ) in result.compose_flags
 
 
 def test_final_row_scour_is_noop_on_clean_and_repairs_bypass_line():

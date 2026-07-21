@@ -2891,6 +2891,21 @@ def test_scifi_codex_prompt_seams_forbid_envelope_key():
     assert "previous_draft locks its structural choices" in radio_score_seam
     assert "RadioScoreV4" not in radio_score_seam
 
+    # The dynamic listener loop must be capable of converging. The retired
+    # prompt required a P7 retake unconditionally, so even a clean re-audit
+    # could only exhaust the quality budget.
+    listener_seam = pack.prompt_stages["codex_listening_room_system"]
+    assert "always require the P7" not in listener_seam
+    assert "issues=[]" in listener_seam
+    assert "require_full_retake=false" in listener_seam
+
+    pipeline = routing.get_pipeline("scifi_news_circuit")
+    p6 = next(row for row in pipeline.passes if row.pass_id == "P6_listening_room")
+    p9 = next(row for row in pipeline.passes if row.pass_id == "P9_closing_rewrite")
+    assert "repeats after each retake until clean" in p6.description
+    assert "returns to a fresh P8 audit" in p9.description
+    assert any("dynamic P6/P7" in note for note in pipeline.notes)
+
 
 def test_script_output_token_budget_receipts_and_bounds():
     # The reservation scales on BOTH drivers of the serialized artifact: the
@@ -3304,6 +3319,7 @@ def _invoke_hygiene_script(
     text: str,
     creative_patch_text: str,
     creative_patch_text_b: str | None = None,
+    creative_patch_text_dynamic: str | None = None,
     technical_patch_text: str | None = None,
 ):
     score, cast, fact_index, script = _hygiene_script(text)
@@ -3326,7 +3342,12 @@ def _invoke_hygiene_script(
         creative_calls.append({"messages": messages, **kwargs})
         if _is_patch(messages):
             replacement = creative_patch_text
-            if creative_patch_calls and creative_patch_text_b is not None:
+            if (
+                creative_patch_calls >= 2
+                and creative_patch_text_dynamic is not None
+            ):
+                replacement = creative_patch_text_dynamic
+            elif creative_patch_calls and creative_patch_text_b is not None:
                 replacement = creative_patch_text_b
             creative_patch_calls += 1
             return json.dumps({
@@ -3486,6 +3507,165 @@ def test_p5_hygiene_exhaustion_uses_alternate_slot_then_floor():
         "hygiene_repaired_after_reroll:stage_direction:deterministic_floor"
         in floor_target.compose_flags
     )
+
+
+def test_p5_hygiene_keeps_rotating_chunks_until_dynamic_patch_passes():
+    dirty = "(lowering his voice) The receiver catches a quiet pulse."
+    clean = "The receiver catches a quiet pulse."
+    result, journal, creative_calls, technical_calls = _invoke_hygiene_script(
+        text=dirty,
+        creative_patch_text=dirty,
+        creative_patch_text_dynamic=clean,
+        technical_patch_text=dirty,
+    )
+    target = next(line for line in result.lines if line.line_id == "l001")
+    assert target.text == clean
+    assert [call["temperature"] for call in creative_calls] == [
+        .78, .10, .05, .08,
+    ]
+    assert [call["temperature"] for call in technical_calls] == [.05]
+    assert (
+        "hygiene_repaired_after_reroll:stage_direction:"
+        "repair_dynamic_04_same_slot"
+    ) in target.compose_flags
+    attempts = journal["calls"][-1]["hygiene_repair"]["attempts"]
+    assert attempts[-1]["rung"] == "repair_dynamic_04_same_slot"
+    assert attempts[-1]["status"] == "applied"
+
+
+def test_scifi_news_listener_and_final_audit_repair_until_rejudged_clean(
+    monkeypatch,
+):
+    score, cast, fact_index, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+    calls: list[str] = []
+    listener_audits = 0
+    final_audits = 0
+
+    def invoke(**kwargs):
+        nonlocal listener_audits, final_audits
+        pass_id = kwargs["pass_id"]
+        calls.append(pass_id)
+        if pass_id == "P6":
+            listener_audits += 1
+            if listener_audits < 3:
+                return lane.ListenerReviewV4(
+                    strengths=[],
+                    issues=[lane.ListenerIssueV4(
+                        category="pacing",
+                        line_id="l001",
+                        direction="Make the turn land sooner.",
+                    )],
+                    require_full_retake=True,
+                )
+            return lane.ListenerReviewV4(
+                strengths=["The turn now lands."],
+                issues=[],
+                require_full_retake=False,
+            )
+        if pass_id == "P7":
+            return script.model_copy(deep=True)
+        if pass_id == "P8":
+            final_audits += 1
+            if final_audits == 1:
+                return lane.FinalAuditV4(
+                    schema_version="scifi_codex.final_audit.v4",
+                    script_digest="digest",
+                    verdict="rewrite",
+                    issues=[lane.FinalIssueV1(
+                        issue_id="q1",
+                        severity="advisory",
+                        line_id="l001",
+                        detail="Tighten the factual close.",
+                    )],
+                )
+            return lane.FinalAuditV4(
+                schema_version="scifi_codex.final_audit.v4",
+                script_digest="digest",
+                verdict="pass",
+            )
+        if pass_id == "P9":
+            return script.model_copy(deep=True)
+        raise AssertionError(pass_id)
+
+    monkeypatch.setattr(lane, "invoke_codex_structured", invoke)
+    meta: dict[str, object] = {"scifi_codex": {}}
+    listener_result = lane._run_listener_quality_loop(
+        script=script,
+        score=score,
+        cast=cast,
+        fact_index=fact_index,
+        story_rules=None,
+        creative_fn=lambda *args, **kwargs: "",
+        technical_fn=lambda *args, **kwargs: "",
+        pack=SimpleNamespace(),
+        script_token_budget=2200,
+        journal={},
+        meta=meta,
+    )
+    final_result = lane._run_final_audit_quality_loop(
+        script=listener_result,
+        score=score,
+        cast=cast,
+        fact_index=fact_index,
+        story_rules=None,
+        creative_fn=lambda *args, **kwargs: "",
+        technical_fn=lambda *args, **kwargs: "",
+        pack=SimpleNamespace(),
+        script_token_budget=2200,
+        journal={},
+        meta=meta,
+    )
+    assert isinstance(final_result, lane.ScriptArtifactV4)
+    assert calls == ["P6", "P7", "P6", "P7", "P6", "P8", "P9", "P8"]
+    assert meta["scifi_codex"]["listener_quality_loop"]["status"] == "pass"
+    assert meta["scifi_codex"]["listener_quality_loop"]["repair_count"] == 2
+    assert meta["scifi_codex"]["final_audit_quality_loop"]["status"] == "pass"
+    assert meta["scifi_codex"]["final_audit_quality_loop"]["repair_count"] == 1
+
+
+def test_scifi_news_stubborn_quality_judge_uses_valid_script_floor(monkeypatch):
+    score, cast, fact_index, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+    calls: list[str] = []
+
+    def invoke(**kwargs):
+        pass_id = kwargs["pass_id"]
+        calls.append(pass_id)
+        if pass_id == "P6":
+            return lane.ListenerReviewV4(
+                issues=[lane.ListenerIssueV4(
+                    category="taste",
+                    direction="Try a different cadence.",
+                )],
+                require_full_retake=True,
+            )
+        if pass_id == "P7":
+            return script.model_copy(deep=True)
+        raise AssertionError(pass_id)
+
+    monkeypatch.setattr(lane, "invoke_codex_structured", invoke)
+    meta: dict[str, object] = {"scifi_codex": {}}
+    result = lane._run_listener_quality_loop(
+        script=script,
+        score=score,
+        cast=cast,
+        fact_index=fact_index,
+        story_rules=None,
+        creative_fn=lambda *args, **kwargs: "",
+        technical_fn=lambda *args, **kwargs: "",
+        pack=SimpleNamespace(),
+        script_token_budget=2200,
+        journal={},
+        meta=meta,
+    )
+    receipt = meta["scifi_codex"]["listener_quality_loop"]
+    assert result.model_dump(mode="json") == script.model_dump(mode="json")
+    assert receipt["status"] == "quality_floor"
+    assert receipt["repair_count"] == receipt["repair_budget"] == 3
+    assert calls == ["P6", "P7", "P6", "P7", "P6", "P7", "P6"]
 
 
 def test_p5_structural_and_craft_reject_stays_on_fail_closed_artifact_path():

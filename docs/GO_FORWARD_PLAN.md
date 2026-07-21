@@ -1,10 +1,18 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-20 -- **spoken-hygiene ship guarantee LIVE-VERIFIED across
-the shared six-bank contract; local quality matrix still open** on
-`v2.0-alpha`. A CRAFT/quality reject now escalates through same-slot,
-lower-temperature CRITICAL, alternate-slot, and deterministic SFW-floor rungs;
-it stamps the gate/rung and cannot terminal-skip the episode. Structural graph
+**Updated:** 2026-07-20 -- **dynamic quality repair is ROOT-FIXED and focused-
+green across the shared six-bank contract; canonical six-bank live qualification
+is in progress** on `v2.0-alpha`. A CRAFT/quality reject now opens with the
+same-slot, lower-temperature CRITICAL, and alternate-slot rungs, then rotates
+fresh writer lanes with new defect feedback and rejudges every candidate until
+clean or the finite resource ceiling reaches a validated SFW floor. It stamps
+the gate/rung and cannot terminal-skip the episode. `scifi_news` (renamed Codex)
+also repeats P6/P7 and P8/P9 repair/rejudge cycles; `scifi_news_pro` (renamed
+Fable2) retains its content ownership and seal contract. Source-adapter banks
+keep their bank-specific interpreters, then alternate technical/creative repair
+passes to 12 calls and derive a validated payload-grounded bank floor instead
+of halting on model-quality exhaustion. Feed/config/backend/contract errors
+still fail loud. Structural graph
 ambiguity and G9 content safety remain fail-closed. Final canonical prompt
 `f3770246-2d6a-4302-90af-153120edddf2` exercised real P5/P7 defects, froze
 `frozen_with_warns`, rendered 4 clean lines / 45 words, and published the
@@ -45,14 +53,33 @@ Veto-rip record: HANDOFF_LOG + PROD_BUG_LOG (PBUG-20260713-15..18).
 
 ## CURRENT STEP -- local-writer quality matrix (spoken-hygiene blocker closed)
 
-PBUG-20260720-03 is complete: all six runnable banks share the total repair
-floor, the exact TTS surface is rechecked, content-owned seals are rebuilt, and
-quality exhaustion no longer owns episode liveness. Resume the local-writer
-quality matrix at ordinary episode lengths; keep the P9 8K structured-capacity
-follow-up and the GGUF structured-enforcement NEWBUG as independent work. Do
-not raise the minimum word target as a capacity workaround: the 30-word proof
-already shipped 45 words, while a larger target makes a whole-artifact retry
-larger.
+PBUG-20260720-03 is root-fixed: all six runnable banks share the dynamic total
+repair boundary, the `original` subjective-outro judge now drives alternating
+creative/technical repair plus independent re-judge cycles, the exact TTS
+surface is rechecked, content-owned seals are rebuilt, and quality exhaustion
+no longer owns episode liveness. `media_archive`'s RSS-specific path was also
+grounded through fetch -> archive interpreter -> shared writer: its archive
+prompt/schema stays distinct, while its old interpreter-exhaustion halt now
+uses the same bounded cross-slot liveness policy and a source-derived archive
+brief floor. Public-domain and Shakespeare received the confirmed sibling fix
+at the same shared boundary. PBUG-20260720-04
+closes the alias/skip consumer root in code. Complete the canonical live leg for
+each of `media_archive`, `original`, `public_domain`, `shakespeare`,
+`scifi_news`, and `scifi_news_pro`; after any live-discovered defect, stop and
+repeat a targeted cross-bank sibling audit before resuming. Then resume the
+local-writer quality matrix at ordinary episode lengths. Keep the P9 8K
+structured-capacity follow-up and the GGUF structured-enforcement NEWBUG as
+independent work. Do not raise the minimum word target as a capacity workaround:
+the 30-word proof already shipped 45 words, while a larger target makes a
+whole-artifact retry larger.
+
+The last pre-live output-tree blocker is also root-fixed as PBUG-20260720-05:
+the terminal mux now consumes the in-flight ledger's episode directory instead
+of reverse-parsing an open-ended caption/credits filename suffix chain. A real
+completed `media_archive` artifact proved the old code could publish a valid
+file beneath an invented sibling episode directory. Qualification must require
+the archival final's parent to equal the ledger-owned episode root, in addition
+to the OBS copy existing and `obs_publish OK`.
 
 The **roster trim LANDED @ `499386aa`** (2026-07-17); the **Sonnet-bake-off rip
 LANDED 2026-07-18** (this change) retired 4 more banks -- `media_archive_v3`,
@@ -184,11 +211,11 @@ Standing campaign notes (kibitz r4 fold, grounded):
   layer exists for exactly this), or is an explicit operator quality-judgment
   call. Say "pack-associated", not "pack-caused", outside the F2-style
   controlled triplets.
-- **Phase C is story-quality evidence first.** Known full-media consumer
-  defects (quick-win 6: captions exact `char_id` map, credits raw-ID voice
-  receipts, HuMo literal-`announcer` stale guard) ship after it -- so any
-  full-media promotion claim waits for quick-win 6 plus one canonical fable2
-  full-media qualification leg.
+- **Phase C is story-quality evidence first.** The known full-media consumer
+  defects (quick-win 6: captions exact `char_id` map + skip bypass, credits
+  raw-ID voice receipts, HuMo literal-`announcer` stale guard) are ROOT-FIXED
+  under PBUG-20260720-04; full-media promotion still waits for the canonical
+  six-bank qualification now in progress.
 - **Cost option (campaign call):** after the 30w structural smoke, the `_v2`
   arms duplicate `_v3` content (v3 = v2 seam text + read-only advisory);
   dropping `_v2` at the higher tiers roughly halves the remaining legs.
@@ -259,7 +286,7 @@ sequenced after them. Split the campaign; interleave nothing.
 | 3 | Announcer framing contract | `docs/2026-07-11-announcer-framing-defect.md` -- still fully OPEN, but the blast radius is narrower than the doc assumed (kibitz r4, grounded): fable2 already contracts "ANNOUNCER speaks ONLY in the intro and the outro" (`_otr_scifi_fable2.py:1741-1743`) and sonnet builds a cold open + sign-off; the structural gap is the CODEX lane (`CastPlanRowV4`/`ScriptLineV4`/`make_advisory_word_blueprint` live only in `_otr_scifi_codex.py`). Ship a codex structural-contract chunk (seam + score contract + fail-closed validator, lawful under THE LAW; `original_radio_v2`'s billboard/sign-off seam is prior art), then AUDIT the other lanes' existing frames before touching them. Fold into the same pass as quick-win 4 so packs are touched once. | 0.5-1 d |
 | 4 | 720-verdict IMPROVE passes | shakespeare: confirm which seam version produced judged leg `c42700e1`; second prompt pass if the fix didn't take. scifi_sonnet: seam consolidation (nine seams; owns the set's only outright FAIL). original_radio: clarity/throughline without losing the noir mood + the F2 weapons-steering finding. science_news: constrain the concept, keep the steady 18-beat template. Related standing consideration (2026-07-14): source-native dramatic framing modes for shakespeare/public_domain vs the shared adapter -- compare without changing frozen receipts; preserve source names/roles by default. Seam/prompt work, no Python authorship. | 1-3 d |
 | 5 | Canonical watchdog support | Runner heartbeats, watchdog recognizes canonical `RESULT`, pinned failure/stall paths -- plus the campaign follow-up: the launcher has TWO missing-log echoes, C7 at `scripts/_otr_soak_server_launch.cmd:38` and manifest at `:48`; redirect both to quoted `%~1` and prove both appear in the server log. Harness defect, not a PBUG. | 0.5 d |
-| 6 | Fable2 C5 consumers | Captions and credits use alias-aware cast lookup; HuMo stale guard uses role/source-family/ShotLock identity. Current gaps (kibitz r4, grounded): captions use an exact `char_id` map (`_otr_captions.py` ~:180), credits resolve display names alias-aware but voice receipts by raw ID (`otr_credits_roll.py` ~:402), HuMo guard requires literal `char_id == "announcer"` (`render_driver.py` ~:1262). PRECEDES any full-media promotion claim from phase C (see campaign notes). | 0.5-1 d |
+| 6 | Fable2 C5 consumers | **ROOT-FIXED / FOCUSED-GREEN under PBUG-20260720-04; live six-bank qualification pending.** Captions filter canonical skips and captions/credits share alias-aware cast lookup; HuMo's stale guard uses role/source-family/ShotLock portrait identity instead of a literal sentinel ID. No workflow surface changed. | CLOSED IN CODE |
 | 7 | Rip interstitial audio only | The exact surgery (kibitz r4; link endpoints re-derived at build): node 83's cue audio/manifest fans to SceneSequencer via links 280/281 and to EpisodeAssembler via 282/283; SceneSequencer inserts interstitials at `scene_sequencer.py` ~:794-951. Remove ONLY the SceneSequencer side (links 280/281, its two cue inputs, the insertion path, timing + mirrored-ledger fields being retired -- enumerate them); RETAIN 282/283 and opening/closing synthesis; RETAIN `music_inter` story/visual semantics. Canonical JSON updated + validated in the SAME commit. | 0.5-1 d |
 | 8 | `docs/ENGINE_MATRIX.md` | Emit the matrix from the three live CAPABILITIES registries following the existing generator pattern (`build_variants.py` ~:276-338): write during `--all`/an explicit emit mode; `--check` regenerates in memory and FAILS on drift without writing. Define columns + stable ordering; link from README. PRECONDITION for Lean-Mean W6. | 0.5-1 d |
 | 9 | Context/cap foundation | One provider-effective cap/count/reservation/must-fit authority feeding preflight, invocation, receipts; no silent truncation, no blind cap raise. The owner module must be CREATED -- none exists at HEAD (both r4 panelists cited `nodes/_otr_generation_budget.py` as existing; grounded: it does not -- cap logic is scattered across the writer + backends). Migrations to enumerate at build: `_otr_openrouter_backend.py`, `_otr_comfy_backend.py`, `_otr_google_api/llm.py`, `_otr_gguf_backend.py`, `_otr_model_loader.py`, writer preflight. Acceptance: preflight and invocation provably make the SAME decision; must-fit overflow fails loud; receipts show provider, resolved model, cap source, counts, reservation, effective output. Partially advanced by the static-row ctx fix (`32e680b2`, PBUG-20260713-20). Carries the diagnostic-gap class from SUPERSEDED PBUG-20260712-17: if attempt capture is needed, re-target the PARKED telemetry seam (generic `_otr_structured_call` callback; reconcile with the existing `on_attempt_complete` hook) at a surviving lane. | 1-3 d |

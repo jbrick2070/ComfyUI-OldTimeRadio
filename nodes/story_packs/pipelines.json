@@ -142,7 +142,7 @@
           "seam_refs": [
             "original_qa_system"
           ],
-          "description": "Post-composition whole-script hard-rule audit; writer owns one coalesced outro repair, then fail loud."
+          "description": "Post-composition whole-script audit; subjective outro findings drive dynamic cross-slot repair/rejudge cycles, while corroborated deterministic violations fail loud."
         }
       ],
       "notes": [
@@ -492,7 +492,7 @@
           "seam_refs": [
             "codex_listening_room_system"
           ],
-          "description": "Produces a listener-facing diagnosis of the whole first play and always sends it to full rewrite."
+          "description": "Judges the current whole script in a fresh context. Concrete issues trigger P7; an issue-free review accepts the current script. P6 repeats after each retake until clean or the finite quality-floor budget."
         },
         {
           "pass_id": "P7_full_retake",
@@ -501,7 +501,7 @@
             "codex_retake_system",
             "codex_coda_contract_system"
           ],
-          "description": "Writes a complete replacement ScriptArtifact from P5 and P6, never a line-level patch."
+          "description": "Writes a complete replacement ScriptArtifact from the current script and latest P6 review, never a line-level patch. Each accepted retake returns to a fresh P6 judgment."
         },
         {
           "pass_id": "P8_final_audit",
@@ -510,7 +510,7 @@
             "codex_final_audit_system",
             "codex_coda_contract_system"
           ],
-          "description": "Audits current full script, source mappings, word counts, and ledger-ready role references; it feeds P9 and repeats after P9."
+          "description": "Audits the current full script, source mappings, and ledger-ready role references. A rewrite verdict feeds P9; a pass accepts the script. P8 repeats after every P9 until clean or the finite quality-floor budget."
         },
         {
           "pass_id": "P9_closing_rewrite",
@@ -520,7 +520,7 @@
             "codex_play_system",
             "codex_coda_contract_system"
           ],
-          "description": "Writes a complete final replacement. One additional full P9 rewrite is allowed only when the repeated P8 audit requests it."
+          "description": "Writes a complete final replacement from the current script and latest P8 findings. Every accepted replacement returns to a fresh P8 audit; quality-budget exhaustion keeps the best structurally valid script."
         },
         {
           "pass_id": "P10_structured_repair",
@@ -546,7 +546,7 @@
       "notes": [
         "A0 is the first artifact and P0 is the first model call.",
         "P3 to P4 to P3 is bounded to one structural rewrite.",
-        "P5 to P6 to P7 to P8 to P9 to P8 is non-linear full-rewrite topology; P9 may run once more after a rewrite audit.",
+        "P5 enters dynamic P6/P7 listener-repair cycles, then dynamic P8/P9 final-audit cycles. Every repair is independently rejudged; a clean verdict accepts, while finite budget exhaustion records a quality floor and keeps the best structurally valid script.",
         "Every model invocation uses only the pass slot. P11 and P12 are deterministic orchestration stages.",
         "Proof-pressure campaign (renamed from scifi_codex_v4 2026-07-19): the delta lives entirely in the scifi_news pack seams; this pipeline reuses the dedicated _run_scifi_codex_lane runner DIRECTLY (no v3 advisory wrapper)."
       ]
