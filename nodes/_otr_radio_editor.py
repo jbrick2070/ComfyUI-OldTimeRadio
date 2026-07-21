@@ -90,8 +90,11 @@ never the forbidden filler word (project rule 5).
 # model_id widget.
 from __future__ import annotations
 
+import copy
 import logging
+import math
 import re
+from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, model_validator
@@ -123,15 +126,33 @@ MAX_WORDS_PER_LINE: int = 35
 # delivery.
 MAX_CHARS_PER_LINE: int = 240
 
-# Stream D post_validator: the episode word target and its tolerance
-# band. The editor owns total length; projected_word_total must land
-# within +/- 20% of 350, else the ladder repairs once toward range.
+# Historical fallback for ledgers/fixtures that predate the production
+# ``meta.word_budget`` receipt. A present production receipt always owns
+# the target; these constants are not a live-route policy.
 TARGET_WORD_TOTAL: int = 350
 WORD_TOTAL_TOLERANCE: float = 0.20
 
 # A SHORTEN/RECOMPOSE/SPLIT/MERGE line must not be empty -- an empty
 # spoken slot is a render defect, not an edit.
 MIN_WORDS_PER_LINE: int = 1
+
+
+@dataclass(frozen=True)
+class _WordBudgetSpec:
+    """Validated character-dialogue budget owned by the ledger receipt."""
+
+    target_words: int
+    min_ratio: float
+    max_ratio: float
+    source: str
+
+    @property
+    def lower_words(self) -> float:
+        return self.target_words * self.min_ratio
+
+    @property
+    def upper_words(self) -> float:
+        return self.target_words * self.max_ratio
 
 
 # ---------------------------------------------------------------------------
@@ -884,11 +905,90 @@ def guard3_visual_noun(
 # ---------------------------------------------------------------------------
 
 
-def word_total_in_band(total: int) -> bool:
-    """True when ``total`` is within TARGET_WORD_TOTAL +/- tolerance."""
-    lo = TARGET_WORD_TOTAL * (1.0 - WORD_TOTAL_TOLERANCE)
-    hi = TARGET_WORD_TOTAL * (1.0 + WORD_TOTAL_TOLERANCE)
-    return lo <= total <= hi
+def _fallback_word_budget() -> _WordBudgetSpec:
+    """Return the pre-receipt contract used only by old fixtures/ledgers."""
+    return _WordBudgetSpec(
+        target_words=TARGET_WORD_TOTAL,
+        min_ratio=1.0 - WORD_TOTAL_TOLERANCE,
+        max_ratio=1.0 + WORD_TOTAL_TOLERANCE,
+        source="historical_fallback",
+    )
+
+
+def _resolve_word_budget(
+    ledger: Dict[str, Any],
+) -> Tuple[Optional[_WordBudgetSpec], Optional[str]]:
+    """Resolve the one authoritative character-dialogue budget.
+
+    A ledger with no ``meta.word_budget`` predates the production receipt and
+    receives the historical 350-word fallback. Once the key is present it is
+    authoritative: malformed values return a typed error instead of silently
+    rewriting a requested short episode toward 350 words.
+    """
+    meta = ledger.get("meta") if isinstance(ledger, dict) else None
+    if not isinstance(meta, dict) or "word_budget" not in meta:
+        return _fallback_word_budget(), None
+
+    receipt = meta.get("word_budget")
+    if not isinstance(receipt, dict):
+        return None, "meta.word_budget must be an object"
+
+    raw_target = receipt.get("target_words")
+    try:
+        if isinstance(raw_target, bool):
+            raise ValueError("boolean is not a word target")
+        target_number = float(raw_target)
+        if not math.isfinite(target_number) or not target_number.is_integer():
+            raise ValueError("target must be a finite integer")
+        target_words = int(target_number)
+        if target_words <= 0:
+            raise ValueError("target must be positive")
+    except (TypeError, ValueError, OverflowError) as exc:
+        return None, f"meta.word_budget.target_words is invalid: {exc}"
+
+    band = receipt.get("band")
+    if not isinstance(band, (list, tuple)) or len(band) != 2:
+        return None, "meta.word_budget.band must contain two ratio multipliers"
+    try:
+        min_ratio = float(band[0])
+        max_ratio = float(band[1])
+    except (TypeError, ValueError, OverflowError) as exc:
+        return None, f"meta.word_budget.band is invalid: {exc}"
+    if not (math.isfinite(min_ratio) and math.isfinite(max_ratio)):
+        return None, "meta.word_budget.band ratios must be finite"
+    if not (0.0 < min_ratio <= 1.0 <= max_ratio):
+        return None, (
+            "meta.word_budget.band must be ordered positive ratios that "
+            "contain 1.0"
+        )
+    return _WordBudgetSpec(
+        target_words=target_words,
+        min_ratio=min_ratio,
+        max_ratio=max_ratio,
+        source="meta.word_budget",
+    ), None
+
+
+def _budgeted_word_total(ledger: Dict[str, Any]) -> int:
+    """Count the receipt-owned surface: non-skipped character dialogue."""
+    lines = ledger.get("lines") if isinstance(ledger, dict) else None
+    total = 0
+    for row in lines or []:
+        if not isinstance(row, dict) or row.get("skip"):
+            continue
+        if str(row.get("speaker_role") or "") != "character":
+            continue
+        total += _word_count(str(row.get("text") or ""))
+    return total
+
+
+def word_total_in_band(
+    total: int,
+    budget: Optional[_WordBudgetSpec] = None,
+) -> bool:
+    """True when a character-word total is inside the supplied budget."""
+    spec = budget or _fallback_word_budget()
+    return spec.lower_words <= total <= spec.upper_words
 
 
 def make_post_validator(
@@ -897,6 +997,7 @@ def make_post_validator(
     *,
     turn_beat_index: Optional[int] = None,
     button_beat_index: Optional[int] = None,
+    enforce_word_band: bool = True,
 ) -> Callable[[RadioEditPlan], Optional[str]]:
     """Build the deterministic gate over a RadioEditPlan, closed over the
     voiced-beat view + the ledger + the arc anchor indices.
@@ -911,6 +1012,8 @@ def make_post_validator(
     Tier-2 removal that would drop either is rejected so the editor can
     never delete the turn or the payoff.
     """
+
+    budget, budget_error = _resolve_word_budget(ledger)
 
     def _validate(plan: RadioEditPlan) -> Optional[str]:
         # 1. Every beat_index valid + unique (Guard 1 owns the closed-set
@@ -943,19 +1046,71 @@ def make_post_validator(
                 f"(voiced index {button_beat_index}); the payoff may never "
                 f"be cut"
             )
-        # 4. projected_word_total within 350 +/- 20% else repair once
-        #    toward range. (The ladder owns the single repair; this
-        #    rejection is what triggers it.)
-        if not word_total_in_band(plan.projected_word_total):
-            lo = int(TARGET_WORD_TOTAL * (1.0 - WORD_TOTAL_TOLERANCE))
-            hi = int(TARGET_WORD_TOTAL * (1.0 + WORD_TOTAL_TOLERANCE))
-            return (
-                f"post_validator: projected_word_total "
-                f"{plan.projected_word_total} outside band [{lo}, {hi}] "
-                f"(target {TARGET_WORD_TOTAL} +/- "
-                f"{int(WORD_TOTAL_TOLERANCE * 100)}%); revise the plan toward "
-                f"the band"
-            )
+        # 4. Length normalization gates on the deterministic result of the
+        #    proposed edit, never the model's arithmetic claim. Micro-repair
+        #    disables only this global episode-band gate; Guards 1/2/3 and the
+        #    anchor checks above remain active.
+        if enforce_word_band:
+            if not isinstance(budget, _WordBudgetSpec):
+                return (
+                    "post_validator: invalid production word-budget receipt; "
+                    f"refusing length mutation ({budget_error})"
+                )
+            try:
+                simulation_ledger = copy.deepcopy(ledger)
+                simulation_plan = plan
+                # A general radio-editor plan may defer RECOMPOSE prose to the
+                # injected composer, which runs after structured validation.
+                # Preserve the original row during this structural simulation;
+                # normalize_length itself never permits RECOMPOSE.
+                if any(
+                    e.action == "RECOMPOSE_BEAT_SAME_INTENT"
+                    and not str(e.new_line or "").strip()
+                    for e in plan.edits
+                ):
+                    simulated_edits: List[BeatEdit] = []
+                    for edit in plan.edits:
+                        if (
+                            edit.action == "RECOMPOSE_BEAT_SAME_INTENT"
+                            and not str(edit.new_line or "").strip()
+                        ):
+                            simulated_edits.append(edit.model_copy(update={
+                                "new_line": str(
+                                    voiced[edit.beat_index].get("text") or ""
+                                ),
+                            }))
+                        else:
+                            simulated_edits.append(edit)
+                    simulation_plan = plan.model_copy(
+                        update={"edits": simulated_edits}
+                    )
+                apply_plan(simulation_ledger, simulation_plan)
+                actual_total = _budgeted_word_total(simulation_ledger)
+            except Exception as exc:  # noqa: BLE001 - validator returns, never raises
+                return (
+                    "post_validator: could not simulate the proposed edit "
+                    f"safely ({type(exc).__name__}: {exc})"
+                )
+
+            for sim_index, row in enumerate(voiced_beats(simulation_ledger)):
+                reason = line_over_cap(str(row.get("text") or ""))
+                if reason is not None:
+                    return (
+                        "post_validator: simulated spoken row "
+                        f"{sim_index} remains over the one-breath cap "
+                        f"({reason}); split or shorten that row"
+                    )
+
+            if not word_total_in_band(actual_total, budget):
+                lo = math.ceil(budget.lower_words)
+                hi = math.floor(budget.upper_words)
+                return (
+                    "post_validator: simulated character-word total "
+                    f"{actual_total} outside requested band [{lo}, {hi}] "
+                    f"(target {budget.target_words}); the model claimed "
+                    f"projected_word_total={plan.projected_word_total}. "
+                    "Revise the edits toward the requested band"
+                )
         return None
 
     return _validate
@@ -970,6 +1125,7 @@ def post_validate_plan(
     *,
     turn_beat_index: Optional[int] = None,
     button_beat_index: Optional[int] = None,
+    enforce_word_band: bool = True,
 ) -> Optional[str]:
     """One-shot wrapper over ``make_post_validator``. Returns the error
     string or None."""
@@ -978,6 +1134,7 @@ def post_validate_plan(
         ledger,
         turn_beat_index=turn_beat_index,
         button_beat_index=button_beat_index,
+        enforce_word_band=enforce_word_band,
     )(plan)
 
 
@@ -1048,9 +1205,10 @@ def _clone_voiced_row(
     text: str,
 ) -> Dict[str, Any]:
     """Build a NEW voiced line row that inherits every binding from
-    ``src`` (so the split/merge child stays bound to the same speaker /
-    scene / slot family) with a fresh ``line_id`` / ``beat_id`` derived
-    from the source id + ``suffix``. The new row is stamped
+    ``src`` (so the split child stays bound to the same speaker / scene /
+    slot family) with a fresh ``line_id`` derived from the source line id
+    plus ``suffix`` while retaining the accepted parent ``beat_id``. The
+    new row is stamped
     needs_render_realign (it is brand-new to the segment set).
 
     Binding inheritance is the render-safety guarantee: a SPLIT child
@@ -1061,13 +1219,43 @@ def _clone_voiced_row(
     never invent a binding the cast contract has not seen.
     """
     new_row = dict(src)
-    base_id = str(src.get("beat_id") or src.get("line_id") or "beat")
-    new_id = f"{base_id}{suffix}"
+    parent_beat_id = str(src.get("beat_id") or src.get("line_id") or "beat")
+    parent_line_id = str(src.get("line_id") or parent_beat_id)
+    new_id = f"{parent_line_id}{suffix}"
     new_row["line_id"] = new_id
-    new_row["beat_id"] = new_id
+    new_row["beat_id"] = parent_beat_id
     _stamp_line_text(new_row, text)
     _mark_realign(new_row)
     return new_row
+
+
+def _sync_beat_line_ids(ledger: Dict[str, Any]) -> None:
+    """Rebuild retained accepted beats' exact final line membership.
+
+    Structural editing may cut, merge, or split line rows, but it never owns
+    the accepted outline beat set. Existing beat rows are therefore retained
+    verbatim and only their denormalized ``line_ids`` lists are refreshed.
+    A fully cut beat truthfully remains with ``line_ids=[]``.
+    """
+    beats = ledger.get("beats") if isinstance(ledger, dict) else None
+    if not isinstance(beats, list):
+        return
+    by_beat: Dict[str, List[str]] = {}
+    for row in ledger.get("lines") or []:
+        if not isinstance(row, dict):
+            continue
+        beat_id = str(row.get("beat_id") or "")
+        line_id = str(row.get("line_id") or "")
+        if not beat_id or not line_id:
+            continue
+        bucket = by_beat.setdefault(beat_id, [])
+        if line_id not in bucket:
+            bucket.append(line_id)
+    for beat in beats:
+        if not isinstance(beat, dict):
+            continue
+        beat_id = str(beat.get("beat_id") or "")
+        beat["line_ids"] = list(by_beat.get(beat_id, []))
 
 
 def apply_plan(
@@ -1101,11 +1289,15 @@ def apply_plan(
       {
         "tier1_edits": int,
         "tier2_edits": int,
-        "removed_beat_ids": [..],
-        "added_beat_ids": [..],
-        "realigned_beat_ids": [..],
+        "removed_line_ids": [..],
+        "added_line_ids": [..],
+        "realigned_line_ids": [..],
         "final_voiced_count": int,
       }
+
+    Deprecated ``*_beat_ids`` aliases are retained for compatibility; they
+    reference the same line-id lists and must not be interpreted as parent
+    beat identities.
     """
     if not isinstance(ledger, dict):
         raise GuardError("apply_plan: ledger must be a dict")
@@ -1113,13 +1305,26 @@ def apply_plan(
     voiced_positions = _voiced_index_map({"lines": lines})
     voiced = [lines[i] for i in voiced_positions]
     n = len(voiced)
+    used_line_ids = {
+        str(row.get("line_id") or "")
+        for row in lines
+        if isinstance(row, dict) and str(row.get("line_id") or "")
+    }
 
+    removed_line_ids: List[str] = []
+    added_line_ids: List[str] = []
+    realigned_line_ids: List[str] = []
     report: Dict[str, Any] = {
         "tier1_edits": 0,
         "tier2_edits": 0,
-        "removed_beat_ids": [],
-        "added_beat_ids": [],
-        "realigned_beat_ids": [],
+        "removed_line_ids": removed_line_ids,
+        "added_line_ids": added_line_ids,
+        "realigned_line_ids": realigned_line_ids,
+        # Backward-compatible aliases. These values have always identified
+        # editable line rows, despite the historical field names.
+        "removed_beat_ids": removed_line_ids,
+        "added_beat_ids": added_line_ids,
+        "realigned_beat_ids": realigned_line_ids,
         "final_voiced_count": 0,
     }
 
@@ -1164,8 +1369,8 @@ def apply_plan(
 
         if action in ("CUT_LINE", "REMOVE_REDUNDANT_BEAT"):
             report["tier2_edits"] += 1
-            bid = str(row.get("beat_id") or row.get("line_id") or "")
-            report["removed_beat_ids"].append(bid)
+            line_id = str(row.get("line_id") or "")
+            report["removed_line_ids"].append(line_id)
             # Stamp the NEIGHBOR(s) that survive as needing realign --
             # removing a unit re-times whatever now abuts the gap.
             # (Handled below after the new list is built; here we just
@@ -1182,8 +1387,8 @@ def apply_plan(
                 _stamp_line_text(row, units[0] if units else "")
                 _mark_realign(row)
                 new_voiced.append(row)
-                report["realigned_beat_ids"].append(
-                    str(row.get("beat_id") or row.get("line_id") or "")
+                report["realigned_line_ids"].append(
+                    str(row.get("line_id") or "")
                 )
                 continue
             for k, unit in enumerate(units):
@@ -1194,13 +1399,28 @@ def apply_plan(
                     _stamp_line_text(row, unit)
                     _mark_realign(row)
                     new_voiced.append(row)
-                    report["realigned_beat_ids"].append(
-                        str(row.get("beat_id") or row.get("line_id") or "")
+                    report["realigned_line_ids"].append(
+                        str(row.get("line_id") or "")
                     )
                 else:
-                    child = _clone_voiced_row(row, suffix=f"_s{k}", text=unit)
+                    # Repairs are deliberately multi-pass. If this parent was
+                    # split in an earlier pass, never reuse its existing child
+                    # id (for example b001_s1); advance deterministically to
+                    # the first free suffix in the whole ledger namespace.
+                    suffix_number = k
+                    parent_line_id = str(row.get("line_id") or "beat")
+                    candidate = f"{parent_line_id}_s{suffix_number}"
+                    while candidate in used_line_ids:
+                        suffix_number += 1
+                        candidate = f"{parent_line_id}_s{suffix_number}"
+                    child = _clone_voiced_row(
+                        row,
+                        suffix=f"_s{suffix_number}",
+                        text=unit,
+                    )
+                    used_line_ids.add(str(child.get("line_id") or ""))
                     new_voiced.append(child)
-                    report["added_beat_ids"].append(str(child.get("beat_id")))
+                    report["added_line_ids"].append(str(child.get("line_id") or ""))
             continue
 
         if action == "MERGE_SHORT_LINES":
@@ -1214,8 +1434,8 @@ def apply_plan(
                 _stamp_line_text(row, str(edit.new_line or row.get("text") or ""))
                 _mark_realign(row)
                 new_voiced.append(row)
-                report["realigned_beat_ids"].append(
-                    str(row.get("beat_id") or row.get("line_id") or "")
+                report["realigned_line_ids"].append(
+                    str(row.get("line_id") or "")
                 )
                 continue
             merged_text = str(edit.new_line or "").strip()
@@ -1229,12 +1449,11 @@ def apply_plan(
             _stamp_line_text(keep_row, merged_text)
             _mark_realign(keep_row)
             new_voiced.append(keep_row)
-            report["realigned_beat_ids"].append(
-                str(keep_row.get("beat_id") or keep_row.get("line_id") or "")
+            report["realigned_line_ids"].append(
+                str(keep_row.get("line_id") or "")
             )
-            report["removed_beat_ids"].append(
-                str(voiced[drop_index].get("beat_id")
-                    or voiced[drop_index].get("line_id") or "")
+            report["removed_line_ids"].append(
+                str(voiced[drop_index].get("line_id") or "")
             )
             consumed.add(j)
             continue
@@ -1246,23 +1465,24 @@ def apply_plan(
     # a deletion re-times whatever now abuts the gap. We detect this by
     # comparing the surviving voiced ids against the pre-edit neighbors
     # of removed indices.
-    removed_ids = set(report["removed_beat_ids"])
+    removed_ids = set(report["removed_line_ids"])
     if removed_ids:
         survivor_ids = [
-            str(r.get("beat_id") or r.get("line_id") or "") for r in new_voiced
+            str(r.get("line_id") or "") for r in new_voiced
         ]
         # Any survivor whose original neighbor was removed gets stamped.
         for idx, r in enumerate(new_voiced):
             rid = survivor_ids[idx]
-            if rid in report["realigned_beat_ids"]:
+            if rid in report["realigned_line_ids"]:
                 continue
             _mark_realign(r)
-            report["realigned_beat_ids"].append(rid)
+            report["realigned_line_ids"].append(rid)
 
     # --- Splice the new voiced list back into the full lines list,
     # preserving every non-voiced (music) row in its original slot.
     rebuilt = _splice_voiced(lines, voiced_positions, new_voiced)
     ledger["lines"] = rebuilt
+    _sync_beat_line_ids(ledger)
     report["final_voiced_count"] = len(new_voiced)
 
     # Keep the ledger's denormalized totals coherent if present.
@@ -1363,8 +1583,9 @@ def _default_repair_prompt(
         + "problem and changes nothing else. Do not introduce any new "
         + "visual noun (prop, place, weather, costume, machine, creature, "
         + "scenery) not already in the original beat or a cast portrait. "
-        + "Keep every spoken line within the word and character caps, keep "
-        + "the projected word total within the target band, and never cut "
+        + "Keep every spoken line within the word and character caps, make "
+        + "the edits' actual character-dialogue total land in the requested "
+        + "target band, and never cut "
         + "the turning-point or button beat.\n"
         + "Output JSON only, matching the RadioEditPlan schema."
     )
@@ -1544,9 +1765,11 @@ def _build_editor_prompt(
         text = str(beat.get("text") or "").replace("\n", " ").strip()
         rows.append(f"[{i}] ({spk}) {text}")
     listing = "\n".join(rows) if rows else "(no voiced beats)"
+    budget, _budget_error = _resolve_word_budget(ledger)
+    budget = budget or _fallback_word_budget()
     return (
-        "You are a radio script editor. Tighten the episode to about "
-        f"{TARGET_WORD_TOTAL} words total while keeping the story, the "
+        "You are a radio script editor. Tighten the episode character "
+        f"dialogue to about {budget.target_words} words while keeping the story, the "
         "speakers, and the order intact.\n\n"
         "DIALOGUE UNITS (edit by index; never reassign a speaker):\n"
         + listing
@@ -1557,8 +1780,10 @@ def _build_editor_prompt(
         "MERGE_SHORT_LINES). Keep every line to one breath "
         f"(<= {MAX_WORDS_PER_LINE} words). Do not introduce any new prop, "
         "place, weather, costume, machine, creature, or scenery. Never cut "
-        "the turning point or the final payoff. Set projected_word_total "
-        "to your estimate of the new total. Output JSON only."
+        "the turning point or the final payoff. Announcer and music overhead "
+        "do not count toward the requested character-dialogue budget. Set "
+        "projected_word_total to your estimate of the new character-dialogue "
+        "total. Output JSON only."
     )
 
 
@@ -1656,18 +1881,22 @@ def _make_scoped_validator(
 def needs_length_normalization(ledger: Dict[str, Any]) -> bool:
     """True when the draft is OUT OF SPEC, so the length pass should run.
 
-    Out of spec means the voiced word total is outside the
-    ``TARGET_WORD_TOTAL`` band (350 +/- 20%), OR any single voiced line
-    exceeds the per-line cap (word OR char). On an already-clean draft this
-    returns False and ``normalize_length`` is a no-op -- the editor LLM is
-    never paid for on a draft already in spec (go-forward Sec 0 / 4).
+    Out of spec means the non-skipped character-dialogue total is outside the
+    ledger's requested ``meta.word_budget`` ratio band, OR any single voiced
+    character/announcer line exceeds the per-line cap (word OR char). On an
+    already-clean draft this returns False and ``normalize_length`` is a no-op
+    -- the editor LLM is never paid for on a draft already in spec.
 
-    Never raises; a malformed ledger reads as 'does not need' (fail-safe --
-    the deterministic scrub still runs last to protect the ledger)."""
+    Never raises. A malformed present budget returns True only so the caller
+    enters ``normalize_length`` and receives its explicit non-mutating
+    ``SKIPPED_INVALID_BUDGET`` receipt."""
     try:
-        voiced = voiced_beats(ledger if isinstance(ledger, dict) else {})
-        total = sum(_word_count(str(b.get("text") or "")) for b in voiced)
-        if not word_total_in_band(total):
+        safe_ledger = ledger if isinstance(ledger, dict) else {}
+        budget, budget_error = _resolve_word_budget(safe_ledger)
+        if budget_error is not None or not isinstance(budget, _WordBudgetSpec):
+            return True
+        voiced = voiced_beats(safe_ledger)
+        if not word_total_in_band(_budgeted_word_total(safe_ledger), budget):
             return True
         for beat in voiced:
             if line_over_cap(str(beat.get("text") or "")) is not None:
@@ -1691,11 +1920,16 @@ def _build_length_prompt(
         text = str(beat.get("text") or "").replace("\n", " ").strip()
         rows.append(f"[{i}] ({spk}) {text}")
     listing = "\n".join(rows) if rows else "(no voiced beats)"
-    total = sum(_word_count(str(b.get("text") or "")) for b in voiced)
+    budget, _budget_error = _resolve_word_budget(ledger)
+    budget = budget or _fallback_word_budget()
+    total = _budgeted_word_total(ledger)
+    lo = math.ceil(budget.lower_words)
+    hi = math.floor(budget.upper_words)
     return (
         "You are a radio script editor. The episode is out of spec on "
-        f"length or pacing (current spoken total about {total} words; "
-        f"target about {TARGET_WORD_TOTAL}). Tighten it toward the target "
+        f"length or pacing (current character-dialogue total {total} words; "
+        f"requested target {budget.target_words}, accepted band [{lo}, {hi}]). "
+        "Tighten it toward the target "
         "while keeping the story, the speakers, and the order intact.\n\n"
         "DIALOGUE UNITS (edit by index; never reassign a speaker):\n"
         + listing
@@ -1705,8 +1939,10 @@ def _build_length_prompt(
         "(Tier 2, changes the beat count). Keep every line to one breath "
         f"(<= {MAX_WORDS_PER_LINE} words). Do not introduce any new prop, "
         "place, weather, costume, machine, creature, or scenery. Never cut "
-        "the turning point or the final payoff. Set projected_word_total to "
-        f"your estimate of the new total (aim for {TARGET_WORD_TOTAL}). "
+        "the turning point or the final payoff. Announcer and music overhead "
+        "are excluded from the requested budget. Set projected_word_total to "
+        f"your estimate of the new character-dialogue total (aim for "
+        f"{budget.target_words}). "
         "Output JSON only."
     )
 
@@ -1730,7 +1966,7 @@ def _build_micro_repair_prompt(
         rows.append(f"[{i}] ({spk}) {text}{mark}")
     listing = "\n".join(rows) if rows else "(no voiced beats)"
     flagged_str = ", ".join(str(i) for i in flagged) if flagged else "(none)"
-    total = sum(_word_count(str(b.get("text") or "")) for b in voiced)
+    total = _budgeted_word_total(ledger)
     context = " ".join(str(repair_context or "").split())[:1200]
     feedback = (
         "\n\nQUALITY JUDGE FEEDBACK (resolve this exact concern):\n"
@@ -1751,7 +1987,8 @@ def _build_micro_repair_prompt(
         f"breath (<= {MAX_WORDS_PER_LINE} words). Do NOT introduce any new "
         "prop, place, weather, costume, machine, creature, or scenery, and "
         "never reassign a speaker. Do not edit any unmarked beat. Set "
-        "projected_word_total to your estimate of the new total (it should "
+        "projected_word_total to your estimate of the new character-dialogue "
+        "total (it should "
         f"stay near {total}). Output JSON only."
         + feedback
     )
@@ -1774,8 +2011,8 @@ def normalize_length(
     """Conditional episode-length normalizer (go-forward Sprint 2, entry 1).
 
     Runs the editor ONLY when ``needs_length_normalization(ledger)`` is True
-    (total outside the 350 +/- 20% band OR any voiced line over the per-line
-    cap). On an in-spec draft it is a NO-OP: returns ``(None, {"status":
+    (character dialogue outside the requested receipt band OR any voiced line
+    over the per-line cap). On an in-spec draft it is a NO-OP: returns ``(None, {"status":
     "SKIPPED_IN_SPEC", ...})`` with no LLM call -- the editor is never paid
     for on a clean draft.
 
@@ -1797,6 +2034,19 @@ def normalize_length(
     if not isinstance(ledger, dict):
         raise GuardError("normalize_length: ledger must be a dict")
 
+    budget, budget_error = _resolve_word_budget(ledger)
+    if budget_error is not None or not isinstance(budget, _WordBudgetSpec):
+        log.warning(
+            "[OTR_RadioEditor] length mutation skipped: invalid word budget (%s)",
+            budget_error or "unknown error",
+        )
+        return None, {
+            "status": "SKIPPED_INVALID_BUDGET",
+            "error": budget_error or "invalid word budget",
+            "tier1_edits": 0,
+            "tier2_edits": 0,
+        }
+
     if not needs_length_normalization(ledger):
         return None, {
             "status": "SKIPPED_IN_SPEC",
@@ -1810,6 +2060,7 @@ def normalize_length(
         ledger,
         turn_beat_index=turn_beat_index,
         button_beat_index=button_beat_index,
+        enforce_word_band=True,
     )
     post_validator = _make_scoped_validator(
         base_validator, allowed_actions=NORMALIZE_LENGTH_ACTIONS
@@ -1843,6 +2094,11 @@ def normalize_length(
     if apply:
         report = apply_plan(ledger, plan)
         report["status"] = "APPLIED"
+        report["projected_word_total"] = plan.projected_word_total
+        report["actual_word_total"] = _budgeted_word_total(ledger)
+        report["target_word_total"] = budget.target_words
+        report["word_band"] = [budget.min_ratio, budget.max_ratio]
+        report["word_budget_source"] = budget.source
     return plan, report
 
 
@@ -1896,6 +2152,7 @@ def micro_repair(
         ledger,
         turn_beat_index=turn_beat_index,
         button_beat_index=button_beat_index,
+        enforce_word_band=False,
     )
     post_validator = _make_scoped_validator(
         base_validator,
@@ -2064,6 +2321,10 @@ if __name__ == "__main__":
                 line("b900", "music_close", "music_close", "[MUSIC] closing theme"),
             ],
             "meta": {
+                "word_budget": {
+                    "target_words": 35,
+                    "band": [0.7, 1.3],
+                },
                 "visual_plan": {
                     "characters": {
                         "EDNA": {"portrait_prompt": "older woman, wool shawl, lantern"},
@@ -2276,29 +2537,29 @@ if __name__ == "__main__":
            guard3_visual_noun(syn_plan, voiced0, led) is None,
            str(guard3_visual_noun(syn_plan, voiced0, led)))
 
-    # --- Test 5: projected_word_total band gate. ---------------------
-    print("[5] projected_word_total gate (350 +/- 20%)")
+    # --- Test 5: deterministic actual total owns the band; the model's
+    #     projection remains forensic only. ----------------------------
+    print("[5] simulated actual word-total gate")
     led = _make_ledger()
     voiced0 = voiced_beats(led)
     in_band = RadioEditPlan(
         edits=[BeatEdit(beat_index=2, action="KEEP")],
         projected_word_total=350,
     )
-    _check("350 is in band", post_validate_plan(in_band, voiced0, led) is None)
+    _check("good actual is accepted", post_validate_plan(in_band, voiced0, led) is None)
     too_long = RadioEditPlan(
         edits=[BeatEdit(beat_index=2, action="KEEP")],
         projected_word_total=800,
     )
     err = post_validate_plan(too_long, voiced0, led)
-    _check("800 is rejected (over band)", err is not None, str(err))
-    _check("rejection mentions projected_word_total",
-           err is not None and "projected_word_total" in err, str(err))
+    _check("false high projection does not reject a good actual",
+           err is None, str(err))
     too_short = RadioEditPlan(
         edits=[BeatEdit(beat_index=2, action="KEEP")],
         projected_word_total=100,
     )
-    _check("100 is rejected (under band)",
-           post_validate_plan(too_short, voiced0, led) is not None)
+    _check("false low projection does not reject a good actual",
+           post_validate_plan(too_short, voiced0, led) is None)
     _check("280 (lower edge) in band", word_total_in_band(280))
     _check("420 (upper edge) in band", word_total_in_band(420))
 
@@ -2390,7 +2651,7 @@ if __name__ == "__main__":
                 "lines": rows, "meta": {}}
 
     led_in = _ledger_with_total(12, 28)        # total 336 -> in band
-    led_short = _make_ledger()                  # total ~51 -> under band
+    led_short = _ledger_with_total(2, 10)       # total 20 -> under fallback band
     led_cap = _ledger_with_total(11, 28, cap_bust=True)  # in band, line over cap
     _check("in-spec draft does not need normalization",
            needs_length_normalization(led_in) is False)

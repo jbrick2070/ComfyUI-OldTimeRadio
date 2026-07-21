@@ -779,8 +779,9 @@ def _editor_summary(report: Any) -> dict:
     """Compact, JSON-safe view of the editor report for meta."""
     if isinstance(report, dict):
         keep = {}
-        for k in ("status", "applied", "projected_word_total",
-                  "actual_word_total", "needs_render_realign",
+        for k in ("status", "error", "applied", "projected_word_total",
+                  "actual_word_total", "target_word_total", "word_band",
+                  "word_budget_source", "needs_render_realign",
                   "tier1_edits", "tier2_edits", "repaired"):
             if k in report:
                 keep[k] = report[k]

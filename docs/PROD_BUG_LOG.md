@@ -2033,3 +2033,77 @@ out until they independently meet the same production-only admission rule.
   it a different freeze timestamp and require no field to cross the boundary
 - bible-worthy: yes -- BUG-12.57
 - status: **LIVE-ADMITTED / ROOT-FIXED; focused + full-suite + Bug Bible GREEN; live requalification pending**
+
+## PBUG-20260721-05 -- split dialogue rows replaced accepted beat identity with synthetic child ids
+- surfaced: canonical `media_archive` requalification prompt
+  `c96e268d-0b8a-4bb5-8e10-2aacb8459680`, episode
+  `signal_lost_soot_and_signature_20260721_025707`, 2026-07-21. The run was
+  stopped during video before publication when the final ledger's deterministic
+  consistency receipt reported nine beat-id defects
+- symptom: split rows had unique child ids such as `b003_s1`, but both
+  `line_id` and `beat_id` were set to that synthetic id. The accepted outline
+  owned only `b001` through `b009`, so every child appeared to reference a
+  nonexistent beat. The same legacy ledger had empty top-level `beats[]`,
+  leaving no durable parent-to-line membership even for unsplit rows
+- root cause: `_clone_voiced_row` treated line identity and narrative beat
+  identity as one namespace. `production_ledger.init_lines_from_outline`
+  initialized only `lines[]`, despite already owning the accepted outline beat
+  set, and structural apply never refreshed denormalized beat membership after
+  split/cut/merge operations. Downstream render stages correctly key shots by
+  unique `line_id`; changing those consumers to parent beat ids would collapse
+  sibling split rows and was rejected
+- fix: split children now mint only a unique `line_id` and retain the exact
+  parent `beat_id`. Outline initialization materializes the accepted top-level
+  beat collection with initial `line_ids`; every structural apply rebuilds
+  only those retained beats' final exact line membership, leaving a fully cut
+  accepted beat present with `line_ids=[]`. Repeated repair passes allocate the
+  first free child suffix across the ledger, so a second split cannot reuse an
+  existing child line id. Structural telemetry is line-named,
+  with deprecated beat-named aliases carrying the same unique line ids for
+  compatibility. ShotLock, TTS, timing, image/video, captions, credits,
+  readiness, hashes, and OBS retain their existing unique-line consumer keys
+- verify idea: split one accepted beat and cut another; require two unique
+  child line ids mapped to the first parent beat, the cut parent retained with
+  an empty list, a clean outline/ledger consistency result, and no collapse at
+  line-keyed consumers. Split the same parent again and require a new unique
+  child id. Initialize directly from an outline and require
+  `beats[].line_ids` to match the initial lines before any timing stage
+- bible-worthy: yes -- BUG-12.58
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + offline self-test + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**
+
+## PBUG-20260721-06 -- the radio editor overrode a requested 180-word story with a hard-coded 350-word target
+- surfaced: same stopped canonical `media_archive` run as
+  PBUG-20260721-05. The writer produced a good 148-character-word body plus 67
+  announcer words for the requested 180-word episode, but the editor declared
+  it short and expanded it. The final receipt reported 252 character words
+  (`actual_ratio=1.4`, advisory drift) and 316 total spoken words
+- symptom: a story already inside the live receipt's `[0.7, 1.3]` band was
+  needlessly sent through length normalization. The model claimed an in-range
+  `projected_word_total`, but deterministic application produced a different
+  total and still passed. Separately, a row-local quality repair could be
+  rejected solely because the whole episode carried advisory word drift
+- root cause: `_otr_radio_editor` hard-coded 350 +/-20%, counted announcer
+  overhead in the episode target despite the writer's character-only contract,
+  and validated the LLM's arithmetic claim rather than the plan's applied
+  result. Its shared validator also made global length conformance a
+  prerequisite for unrelated micro repair
+- fix: the live `meta.word_budget` receipt is now the single authority: a
+  positive target plus its two ratio multipliers. Only an absent pre-receipt
+  ledger uses the historical 350/[0.8,1.2] fallback; a malformed present
+  receipt records `SKIPPED_INVALID_BUDGET` without an LLM call or mutation.
+  Budget accounting counts non-skipped character rows only, while every
+  character and announcer row still owns the one-breath cap. Length-plan
+  validation deep-copies the ledger, applies the proposed edit
+  deterministically, and gates on the resulting character total; the model's
+  projection is retained as forensic evidence. Micro repair disables only the
+  global band check and retains structural, noun, line-cap, anchor, action, and
+  row-scope guards. The two content-owned sci-fi routes keep their independent
+  budget/seal contracts
+- verify idea: at target 180, require 148 character words plus 67 announcer
+  words to skip normalization, but an over-cap announcer row to trigger it.
+  Accept a good simulated result despite a false model projection and reject a
+  bad result despite a claimed 180. Permit a scoped repair during advisory
+  episode drift while still rejecting an over-cap replacement; prove malformed
+  present receipts make no mutation
+- bible-worthy: yes -- BUG-12.59
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + offline self-test + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**

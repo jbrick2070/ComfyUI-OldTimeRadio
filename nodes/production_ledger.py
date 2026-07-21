@@ -927,10 +927,11 @@ class Ledger:
         / target_words / arc_phase attributes). Plain dicts
         with the same fields also work for tests.
 
-        Each beat produces ONE line row:
-          * beat_id == line_id (1:1 today; the model can later
-            decimal-sub-beat without breaking, since renumbering is
-            explicitly banned per synthesis §3 Phase 3)
+        Each accepted outline beat produces one top-level ``beats[]`` row and
+        one initial ``lines[]`` row:
+          * beat_id == line_id at initialization. A later structural editor
+            may create multiple unique line_ids that retain this parent
+            beat_id; ``beats[].line_ids`` records that exact membership.
           * char_id looked up from `char_id_by_name` for character
             beats; "announcer" for announcer beats; the speaker_role
             string itself for music beats (matches existing writer
@@ -947,6 +948,7 @@ class Ledger:
         char_id_by_name = char_id_by_name or {}
         beats = list(getattr(outline, "beats", []) or [])
         rows: List[Dict[str, Any]] = []
+        beat_rows: List[Dict[str, Any]] = []
         for beat in beats:
             def _g(k: str, default=""):
                 if isinstance(beat, dict):
@@ -1034,7 +1036,21 @@ class Ledger:
                 # Sprint 1 keystone (2026-05-28): voiced slot id.
                 "dialogue_slot_id": dialogue_slot_id,
             })
+            beat_rows.append({
+                "beat_id":  beat_id,
+                "shot_id":  _g("shot_id", None),
+                "scene_id": _g("scene_id", None),
+                "speaker":  speaker or None,
+                "char_id":  cid or None,
+                "line_ids": [beat_id] if beat_id else [],
+                "start_s":  _g("start_s", None),
+                "dur_s":    _g("dur_s", None),
+            })
         self.data["lines"] = rows
+        # The accepted outline owns the durable beat set. Scene/timing stages
+        # may enrich or replace these rows later, but the writer must not emit
+        # a line hierarchy whose parent collection is empty.
+        self.set_beats(beat_rows)
         self._recompute_totals()
         return self
 
