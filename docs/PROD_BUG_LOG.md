@@ -2185,3 +2185,48 @@ out until they independently meet the same production-only admission rule.
   prompt
 - bible-worthy: yes -- BUG-12.61
 - status: **LIVE-ADMITTED / ROOT-FIXED; focused + cross-bank + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**
+
+## PBUG-20260721-09 -- quality retakes repeatedly requested an artifact that could not fit the real context
+- surfaced: canonical `scifi_news` qualification prompt
+  `e67869e2-6ed5-43d2-b522-094e96ea94c0`, source article
+  `3 Questions: Neural transparency and the future of AI design`, 2026-07-21.
+  The run was stopped before ledger assembly after the third identical P7
+  capacity cycle
+- symptom: P7 serialized the complete score, prior `ScriptArtifactV4`, review,
+  and complete result schema into an approximately 6,182-token prompt, then
+  requested 2,970 output tokens from an 8,192-token local context. The
+  transport reduced that output to approximately 2,010 tokens, truncating the
+  complete artifact. Typed repair expanded the prompt to approximately 7,501
+  tokens and left only 691 output tokens. The quality loop restored the
+  unchanged prior script, re-audited it, and repeated the same mathematically
+  impossible work. Roughly forty minutes elapsed with zero ledger rows; the
+  GPU was busy generating, not video-rendering or memory-thrashing
+- root cause: P7/P9 shared P5's whole-artifact schema, post-validator, retry
+  ladder, and dynamic script budget even though quality findings owned only
+  line text. Shared context fitting treated every output request as a
+  reducible ceiling and had no signal that a bounded patch must arrive whole.
+  Provider wrappers hid the capacity type behind backend errors, and the
+  quality loop continued after restoring an unchanged artifact
+- fix: P5 is now the only complete `ScriptArtifactV4` pass. P7/P9 derive a
+  closed write set from valid finding line IDs (null means all voiced rows;
+  invented IDs are discarded), request a compact typed line-text patch, merge
+  only `line.text`, and run the complete script validator. A successful merge
+  always returns to a fresh P6/P8 judgment. Malformed creative output gets one
+  colder technical-slot attempt; two failures keep the best valid script and
+  stop without rejudging unchanged input. A full-output marker is captured
+  before normalization and enforced by writer-local, model-loader/polish,
+  OpenRouter, Comfy Credits, Google, and GGUF transports, including provider
+  output caps. Proven capacity failure is a no-call quality floor. P6/P8 model
+  or transport failure is advisory and cannot kill an already valid story.
+  Final hashes, authorship receipt, ledger rows, readiness, media consumers,
+  and OBS paths are still built only after quality converges or floors
+- verify idea: replay the live `6182 + 2970 > 8192` arithmetic and require zero
+  generation/network calls when the complete patch cannot fit. Exercise every
+  backend and provider cap; prove unmarked calls retain ordinary clamping.
+  Require exact target coverage, immutable non-text fields, full merged-script
+  validation, creative-to-technical rotation, fresh rejudgment only after a
+  successful merge, and no second audit after a two-slot failure. Assert P5 is
+  the only complete-artifact pass and all six source-bank routes retain their
+  existing ledger/media/OBS ownership
+- bible-worthy: yes -- BUG-12.62
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused cross-backend + lane tests GREEN; full-suite, Bug Bible, workflow gates, and live requalification pending**

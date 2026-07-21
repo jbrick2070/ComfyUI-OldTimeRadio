@@ -465,6 +465,9 @@ class ComfyCreditsBackend:
         string. `model` is the cache_entry from load(). Enforces the token
         ceiling BEFORE the call, retries transient failures a bounded
         number of times, then aborts cleanly."""
+        require_full_output = bool(getattr(
+            messages, "_otr_require_full_output_budget", False,
+        ))
         cache_entry = model
         bearer = _bearer()
         if not bearer:
@@ -477,7 +480,18 @@ class ComfyCreditsBackend:
 
         cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_OUTPUT_TOKENS_CAP)
         floor = _int_env("OTR_COMFY_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
-        out_tokens = max(int(max_new_tokens or 0), floor)
+        requested_tokens = max(1, int(max_new_tokens or 0))
+        if require_full_output and requested_tokens > cap:
+            capacity = GenerationContextOverflowError(
+                f"Comfy Credits {slug} cannot fit the complete requested "
+                f"output: requested_output={requested_tokens}, "
+                f"provider_output_cap={cap}"
+            )
+            raise ComfyCreditsConfigError(str(capacity)) from capacity
+        if bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
+            out_tokens = requested_tokens
+        else:
+            out_tokens = max(requested_tokens, floor)
         if out_tokens > cap:
             out_tokens = cap
         try:
@@ -487,6 +501,7 @@ class ComfyCreditsBackend:
                 prompt_tokens=estimate_prompt_tokens(messages),
                 min_output_tokens=min(floor, cap),
                 label=f"Comfy Credits {slug}",
+                require_full=require_full_output,
             )
         except GenerationContextOverflowError as exc:
             raise ComfyCreditsConfigError(str(exc)) from exc

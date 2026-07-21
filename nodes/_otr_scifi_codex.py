@@ -40,6 +40,7 @@ try:
         spoken_surface_flags_for_line,
     )
     from ._otr_readiness import normalize_for_delivery
+    from ._otr_generation_budget import GenerationContextOverflowError
     from ._otr_story_rules import StoryRules
     from ._otr_scifi_p0_contract import (
         MAX_CLAIM_CHARS,
@@ -85,6 +86,9 @@ except ImportError:  # pragma: no cover
         spoken_surface_flags_for_line,
     )
     from _otr_readiness import normalize_for_delivery  # type: ignore
+    from _otr_generation_budget import (  # type: ignore
+        GenerationContextOverflowError,
+    )
     from nodes._otr_story_rules import StoryRules  # type: ignore
     from _otr_scifi_p0_contract import (  # type: ignore
         MAX_CLAIM_CHARS,
@@ -833,6 +837,7 @@ class _P3TextPatchMessages(list[dict[str, str]]):
 
     _otr_prompt_must_fit = True
     _otr_strict_remote_output_budget = True
+    _otr_require_full_output_budget = True
 
 
 def _has_forbidden_script_scene_keys(scenes: object) -> bool:
@@ -2589,6 +2594,7 @@ class _SpokenLineRepairMessages(list[dict[str, str]]):
 
     _otr_prompt_must_fit = True
     _otr_strict_remote_output_budget = True
+    _otr_require_full_output_budget = True
 
 
 @dataclass(frozen=True)
@@ -3586,9 +3592,10 @@ def _script_output_token_budget(
     strict per-line metadata graph (ids, boundary, arc phase, beat intent, flags)
     for every accepted line.  A 30-word script with 13 lines pays nearly all of
     that same metadata cost, so a budget derived from the word steer ALONE
-    under-reserves exactly when the accepted graph is wide -- the P7 live cap
-    (generated_tokens == max_new_tokens == 2800 -> truncated JSON -> "no
-    decodable top-level JSON object").  Scale on the line count too.
+    under-reserves exactly when the accepted graph is wide. The retired P7
+    whole-script path exposed this live (generated_tokens == max_new_tokens ==
+    2800 -> truncated JSON); P5 still needs the honest complete-artifact
+    reservation. Scale on the line count too.
     """
     if (
         not isinstance(requested_words, int)
@@ -3610,8 +3617,8 @@ def _script_output_token_budget(
     # THE 5,400 CEILING IS GONE. Its comment said it "keeps the reservation
     # inside the context cap alongside the pass input" -- that cap was the false
     # 8,192 every remote model was being budgeted against (PBUG-20260713-20).
-    # P5/P7/P9 all run on the CREATIVE slot, and the creative slot is where the
-    # frontier model lives: aion-3.0-mini advertises 131,072 tokens, and
+    # P5 runs on the CREATIVE slot, where the frontier model lives:
+    # aion-3.0-mini advertises 131,072 tokens, and
     # OpenRouter's own per-call output ceiling (DEFAULT_OUTPUT_TOKENS_CAP) is
     # 16,384. Nothing about 5,400 was ever a property of the artifact.
     #
@@ -3767,7 +3774,7 @@ def invoke_codex_structured(
         if not text:
             raise CodexPackContractError(f"missing Codex seam {seam!r}")
         seams.append(text)
-    script_artifact_pass = pass_id in {"P5", "P7", "P9"}
+    script_artifact_pass = pass_id == "P5"
     draft_score_pass = (
         pass_id in {"P3", "P3_rewrite"}
         and result_type is RadioScoreDraftV4
@@ -4771,6 +4778,405 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
     return expected
 
 
+class _ScriptQualityPatchRowV4(_Strict):
+    line_id: str = Field(min_length=1, max_length=16, pattern=r"^l\d{3}$")
+    replacement_text: str = Field(min_length=1, max_length=600)
+
+
+class _ScriptQualityPatchV4(_Strict):
+    replacements: list[_ScriptQualityPatchRowV4] = Field(
+        min_length=1, max_length=64,
+    )
+
+
+class _ScriptQualityPatchRejected(ValueError):
+    """A model-authored patch failed its closed merge contract."""
+
+
+class _ScriptQualityPatchMessages(list[dict[str, str]]):
+    """Require one complete, bounded P7/P9 line patch or no model call."""
+
+    _otr_prompt_must_fit = True
+    _otr_strict_remote_output_budget = True
+    _otr_require_full_output_budget = True
+
+
+@dataclass(frozen=True)
+class _ScriptQualityPatchPlan:
+    target_ids: tuple[str, ...]
+    required_change_ids: frozenset[str]
+    findings: tuple[dict[str, Any], ...]
+    ignored_line_ids: tuple[str, ...]
+    global_scope: bool
+
+
+def _derive_script_quality_patch_plan(
+    script: ScriptArtifactV4,
+    score: RadioScoreV4,
+    issues: Sequence[BaseModel],
+) -> _ScriptQualityPatchPlan:
+    """Turn P6/P8 findings into a closed row-local write set.
+
+    A null line ID is an explicit whole-play diagnosis and widens the write set
+    to every voiced row. An invented non-null ID is reviewer noise: it is
+    recorded and discarded, never allowed to widen ownership.
+    """
+    voiced = tuple(
+        line for line in _script_lines_in_score_order(script, score)
+        if not line.skip and line.speaker_role in {"character", "announcer"}
+    )
+    valid_ids = {line.line_id for line in voiced}
+    required: set[str] = set()
+    ignored: list[str] = []
+    findings: list[dict[str, Any]] = []
+    global_scope = False
+    for issue in issues:
+        raw_line_id = getattr(issue, "line_id", None)
+        line_id = (
+            str(raw_line_id).strip()
+            if raw_line_id is not None and str(raw_line_id).strip()
+            else None
+        )
+        direction = str(
+            getattr(issue, "direction", None)
+            or getattr(issue, "detail", None)
+            or ""
+        ).strip()
+        finding = {
+            "line_id": line_id,
+            "kind": str(
+                getattr(issue, "category", None)
+                or getattr(issue, "issue_id", None)
+                or "quality"
+            ).strip(),
+            "severity": str(getattr(issue, "severity", "advisory")),
+            "direction": direction,
+        }
+        if line_id is None:
+            global_scope = True
+            findings.append(finding)
+        elif line_id in valid_ids:
+            required.add(line_id)
+            findings.append(finding)
+        else:
+            ignored.append(line_id)
+    target_ids = tuple(
+        line.line_id for line in voiced
+        if global_scope or line.line_id in required
+    )
+    return _ScriptQualityPatchPlan(
+        target_ids=target_ids,
+        required_change_ids=frozenset(required),
+        findings=tuple(findings),
+        ignored_line_ids=tuple(dict.fromkeys(ignored)),
+        global_scope=global_scope,
+    )
+
+
+def _script_quality_patch_messages(
+    *,
+    pass_id: Literal["P7", "P9"],
+    script: ScriptArtifactV4,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    plan: _ScriptQualityPatchPlan,
+    pack: Any,
+) -> _ScriptQualityPatchMessages:
+    by_id = {line.line_id: line for line in script.lines}
+    names = {row.char_id: row.name for row in cast.cast}
+    voiced = tuple(
+        line for line in _script_lines_in_score_order(script, score)
+        if not line.skip and line.speaker_role in {"character", "announcer"}
+    )
+    target_fact_ids = {
+        fact_id
+        for line_id in plan.target_ids
+        for fact_id in by_id[line_id].fact_ids
+    }
+    for finding in plan.findings:
+        target_fact_ids.update(re.findall(
+            r"\bF0[1-6]\b", str(finding.get("direction") or ""),
+        ))
+    fact_rows = [
+        {
+            "fact_id": fact.fact_id,
+            "claim": fact.claim,
+            "source_quotes": [span.quote for span in fact.source_spans],
+            "numeric_tokens": list(fact.numeric_tokens),
+        }
+        for fact in fact_index.facts
+        if fact.fact_id in target_fact_ids
+    ]
+    prompt_stages = getattr(pack, "prompt_stages", {}) or {}
+    retake_contract = str(prompt_stages.get("codex_retake_system") or "").strip()
+    coda_contract = str(
+        prompt_stages.get("codex_coda_contract_system") or ""
+    ).strip()
+    if not retake_contract or not coda_contract:
+        raise CodexPackContractError(
+            f"{pass_id} quality patch is missing its retake/coda prompt seam"
+        )
+    system = "\n".join((
+        retake_contract,
+        coda_contract,
+        f"QUALITY STAGE {pass_id}: apply only the supplied findings.",
+        "LINE-TEXT PATCH OUTPUT CONTRACT: Return only one JSON patch object. "
+        "The patch must contain exactly one replacement row for every writable "
+        "target ID and no other ID. The prior artifact and every context-only "
+        "row are read-only. Change line.text only; do not emit title, scenes, "
+        "music, graph coordinates, speaker metadata, wrappers, deletions, or "
+        "explanations. Preserve source uncertainty and mapped facts. Use plain "
+        "SFW spoken dialogue with no role labels, stage directions, fake "
+        "commercials, or fake-product advertisements. Keep the coda concrete "
+        "and source-bound, never a stated moral. A specifically named target "
+        "must change; a row included only by a whole-play finding may remain "
+        "byte-identical when another target resolves that finding.",
+        _schema_instruction(_ScriptQualityPatchV4),
+    ))
+    payload = {
+        "story": {
+            "title": score.title,
+            "premise": score.premise,
+            "setting": score.setting,
+        },
+        "cast": [
+            {
+                "char_id": row.char_id,
+                "name": row.name,
+                "character_description": row.character_description,
+                "role_in_conflict": row.role_in_conflict,
+            }
+            for row in cast.cast
+        ],
+        "facts": fact_rows,
+        "findings": list(plan.findings),
+        "writable_target_ids": list(plan.target_ids),
+        "required_change_ids": sorted(plan.required_change_ids),
+        "voiced_context": [
+            {
+                "line_id": line.line_id,
+                "speaker": names.get(line.char_id, line.char_id),
+                "speaker_role": line.speaker_role,
+                "beat_intent": line.beat_intent,
+                "fact_ids": list(line.fact_ids),
+                "text": line.text,
+                "writable": line.line_id in plan.target_ids,
+            }
+            for line in voiced
+        ],
+    }
+    return _ScriptQualityPatchMessages([
+        {"role": "system", "content": system},
+        {
+            "role": "user",
+            "content": json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ),
+        },
+    ])
+
+
+def _script_quality_patch_output_budget(
+    script: ScriptArtifactV4,
+    plan: _ScriptQualityPatchPlan,
+    script_token_budget: int,
+) -> int:
+    by_id = {line.line_id: line for line in script.lines}
+    estimated = 128 + sum(
+        max(64, (len(by_id[line_id].text) + 1) // 2)
+        for line_id in plan.target_ids
+    )
+    return min(max(384, estimated), max(384, int(script_token_budget)))
+
+
+def _generation_capacity_cause(
+    exc: BaseException,
+) -> GenerationContextOverflowError | None:
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, GenerationContextOverflowError):
+            return current
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def _merge_script_quality_patch(
+    *,
+    script: ScriptArtifactV4,
+    patch: _ScriptQualityPatchV4,
+    plan: _ScriptQualityPatchPlan,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    story_rules: StoryRules,
+) -> ScriptArtifactV4:
+    wanted = set(plan.target_ids)
+    got = [row.line_id for row in patch.replacements]
+    if len(got) != len(set(got)) or set(got) != wanted:
+        raise _ScriptQualityPatchRejected(
+            "quality patch must cover every and only the writable target IDs"
+        )
+    replacements = {
+        row.line_id: row.replacement_text for row in patch.replacements
+    }
+    if any(not text.strip() for text in replacements.values()):
+        raise _ScriptQualityPatchRejected(
+            "quality patch contains a blank replacement"
+        )
+    prior_text = {line.line_id: line.text for line in script.lines}
+    changed = {
+        line_id for line_id, text in replacements.items()
+        if text != prior_text[line_id]
+    }
+    if not plan.required_change_ids.issubset(changed):
+        raise _ScriptQualityPatchRejected(
+            "quality patch left a specifically named target unchanged"
+        )
+    if not changed:
+        raise _ScriptQualityPatchRejected(
+            "quality patch changed no target text"
+        )
+    merged = script.model_copy(deep=True)
+    for line in merged.lines:
+        if line.line_id in replacements:
+            line.text = replacements[line.line_id]
+    validation_error = _validate_script_post(
+        merged, cast, score, fact_index, story_rules,
+    )
+    if validation_error is not None:
+        raise _ScriptQualityPatchRejected(
+            f"merged quality patch rejected: {validation_error}"
+        )
+    return merged
+
+
+def _run_script_quality_patch(
+    *,
+    pass_id: Literal["P7", "P9"],
+    script: ScriptArtifactV4,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    story_rules: StoryRules,
+    issues: Sequence[BaseModel],
+    creative_fn: GenerateFn,
+    technical_fn: GenerateFn,
+    pack: Any,
+    creative_temperature: float,
+    script_token_budget: int,
+    journal: MutableMapping[str, Any],
+    meta: MutableMapping[str, Any],
+) -> tuple[ScriptArtifactV4 | None, dict[str, Any]]:
+    """Try one compact creative patch, then one colder technical patch."""
+    plan = _derive_script_quality_patch_plan(script, score, issues)
+    attempts: list[dict[str, Any]] = []
+    entry: dict[str, Any] = {
+        "pass_id": pass_id,
+        "slot": "creative_then_technical",
+        "quality_patch": True,
+        "target_ids": list(plan.target_ids),
+        "required_change_ids": sorted(plan.required_change_ids),
+        "ignored_line_ids": list(plan.ignored_line_ids),
+        "global_scope": plan.global_scope,
+        "attempts": attempts,
+        "status": "pending",
+    }
+    journal.setdefault("calls", []).append(entry)
+    if not plan.target_ids:
+        entry["status"] = "no_actionable_targets_floor"
+        return None, entry
+    max_new_tokens = _script_quality_patch_output_budget(
+        script, plan, script_token_budget,
+    )
+    lanes = (
+        ("creative", creative_fn, float(creative_temperature)),
+        ("technical", technical_fn, 0.10),
+    )
+    for slot_name, slot_fn, temperature in lanes:
+        attempt: dict[str, Any] = {
+            "slot": slot_name,
+            "temperature": temperature,
+            "max_new_tokens": max_new_tokens,
+            "status": "pending",
+        }
+        attempts.append(attempt)
+        try:
+            bound = _bind_local_slot_schema(slot_fn, _ScriptQualityPatchV4)
+            raw = str(invoke_structured_slot(
+                bound,
+                _script_quality_patch_messages(
+                    pass_id=pass_id,
+                    script=script,
+                    score=score,
+                    cast=cast,
+                    fact_index=fact_index,
+                    plan=plan,
+                    pack=pack,
+                ),
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+            ))
+            attempt.update({
+                "raw_chars": len(raw),
+                "raw_sha256": hashlib.sha256(
+                    raw.encode("utf-8"),
+                ).hexdigest(),
+            })
+            patch = _ScriptQualityPatchV4.model_validate(
+                parse_first_json_object(raw),
+            )
+            merged = _merge_script_quality_patch(
+                script=script,
+                patch=patch,
+                plan=plan,
+                score=score,
+                cast=cast,
+                fact_index=fact_index,
+                story_rules=story_rules,
+            )
+        except CodexPackContractError:
+            raise
+        except Exception as exc:  # quality work never owns episode liveness
+            capacity = _generation_capacity_cause(exc)
+            if capacity is not None:
+                attempt.update({
+                    "status": "capacity_floor",
+                    "error_type": type(exc).__name__,
+                    "error": " ".join(str(capacity).split())[:300],
+                })
+                meta.setdefault("scifi_codex", {}).setdefault(
+                    "capacity_floors", [],
+                ).append({
+                    "pass_id": pass_id,
+                    "slot": slot_name,
+                    "requested_output_tokens": max_new_tokens,
+                    "error": attempt["error"],
+                })
+            else:
+                attempt.update({
+                    "status": "rejected",
+                    "error_type": type(exc).__name__,
+                    "error": " ".join(str(exc).split())[:300],
+                })
+            continue
+        attempt["status"] = "accepted"
+        entry.update({
+            "status": "accepted",
+            "accepted_slot": slot_name,
+            "accepted_patch": patch.model_dump(mode="json"),
+            "accepted": merged.model_dump(mode="json"),
+        })
+        return merged, entry
+    entry["status"] = "two_slot_quality_floor"
+    return None, entry
+
+
 def _record_failsoft(
     pass_id: str, kind: str, exc: CodexPassError, meta: MutableMapping[str, Any],
 ) -> bool:
@@ -4781,13 +5187,19 @@ def _record_failsoft(
     that a valid prior artifact does not already carry, so a pass that EXHAUSTS
     its bounded repair keeps the last valid artifact instead of aborting.
 
-    Returns True (record an advisory; the caller keeps the prior) ONLY when the
-    structured ladder actually exhausted -- the ``CodexPassError``'s cause is a
-    ``StructuredCallFailedError``. A setup / pack / transport / code defect (any
-    other cause) is a real bug: returns False so the caller RE-RAISES and it is
-    never silently swallowed.
+    P6/P8 are advisory judges, so any exhausted model/transport attempt keeps
+    the prior ledger-valid story. P4/P3-rewrite retain the narrower historical
+    rule: only structured exhaustion or proven capacity impossibility is soft.
+    Pack/setup errors raised before the structured call remain fail-loud.
     """
-    if not isinstance(exc.__cause__, StructuredCallFailedError):
+    capacity = _generation_capacity_cause(exc)
+    cause: BaseException | None = capacity or exc.__cause__
+    quality_judge = pass_id in {"P6", "P8"}
+    if (
+        not quality_judge
+        and capacity is None
+        and not isinstance(cause, StructuredCallFailedError)
+    ):
         return False
     detail = " ".join(str(exc).split())[:300]
     log.info(
@@ -4798,9 +5210,17 @@ def _record_failsoft(
     meta.setdefault("scifi_codex", {}).setdefault("fail_soft", []).append({
         "pass_id": pass_id,
         "kind": kind,
-        "error_type": type(exc.__cause__).__name__,
+        "error_type": type(cause).__name__ if cause is not None else "unknown",
         "error": detail,
     })
+    if capacity is not None:
+        meta.setdefault("scifi_codex", {}).setdefault(
+            "capacity_floors", [],
+        ).append({
+            "pass_id": pass_id,
+            "slot": "audit",
+            "error": " ".join(str(capacity).split())[:300],
+        })
     return True
 
 
@@ -4808,13 +5228,13 @@ _CODEX_QUALITY_RETAKE_TEMPERATURES = (0.68, 0.58, 0.48, 0.38, 0.32, 0.28)
 
 
 def _codex_quality_repair_cycle_budget(issue_count: int) -> int:
-    """Fresh whole-script retakes allowed before the valid-script floor."""
+    """Fresh line-patch/rejudgment cycles allowed before the valid floor."""
     try:
         issues = max(1, int(issue_count))
     except (TypeError, ValueError):
         issues = 1
-    # Shared spoken-loop arithmetic returns 6..12 model calls. A whole-script
-    # cycle costs one judge + one writer call, so halve that allowance.
+    # Shared spoken-loop arithmetic returns 6..12 model calls. A quality cycle
+    # costs one judge plus at least one patch call, so halve that allowance.
     return max(3, _quality_model_repair_pass_budget(issues, 2) // 2)
 
 
@@ -4889,42 +5309,34 @@ def _run_listener_quality_loop(
             break
         repair_count += 1
         prior = current
-        try:
-            current = invoke_codex_structured(
-                pass_id="P7",
-                slot="creative",
-                slot_fn=creative_fn,
-                pack=pack,
-                seam_refs=(
-                    "codex_retake_system",
-                    "codex_coda_contract_system",
-                ),
-                artifact_inputs={
-                    **_script_artifact_context(score),
-                    "previous": current.model_dump(mode="json"),
-                    "review": listener.model_dump(mode="json"),
-                    "quality_cycle": repair_count,
-                },
-                result_type=ScriptArtifactV4,
-                post_validator=lambda x: _validate_script_post(
-                    x, cast, score, fact_index, story_rules,
-                ),
-                base_temperature=_codex_retake_temperature(repair_count - 1),
-                structural_retry_temperature=.30,
-                max_new_tokens=script_token_budget,
-                call_journal=journal,
-                repair_score=score,
-                spoken_repair_cast=cast,
-                spoken_repair_fact_index=fact_index,
-                spoken_repair_story_rules=story_rules,
-                spoken_repair_alternate_slot_fn=technical_fn,
-                spoken_repair_alternate_slot="technical",
-            )
-        except CodexPassError as exc:
-            if not _record_failsoft("P7", "retake", exc, meta):
-                raise
+        current, patch_entry = _run_script_quality_patch(
+            pass_id="P7",
+            script=current,
+            score=score,
+            cast=cast,
+            fact_index=fact_index,
+            story_rules=story_rules,
+            issues=listener.issues,
+            creative_fn=creative_fn,
+            technical_fn=technical_fn,
+            pack=pack,
+            creative_temperature=_codex_retake_temperature(
+                repair_count - 1,
+            ),
+            script_token_budget=script_token_budget,
+            journal=journal,
+            meta=meta,
+        )
+        receipts[-1].update({
+            "patch_status": patch_entry["status"],
+            "patch_attempt_count": len(patch_entry["attempts"]),
+            "ignored_line_ids": list(patch_entry["ignored_line_ids"]),
+        })
+        if current is None:
             current = prior
-    if status == "quality_floor" and audited:
+            status = str(patch_entry["status"])
+            break
+    if status.endswith("floor") and audited:
         current = min(audited, key=lambda item: (item[0], item[1]))[2]
     lane = meta.setdefault("scifi_codex", {})
     lane["listener_quality_loop"] = {
@@ -5013,43 +5425,34 @@ def _run_final_audit_quality_loop(
             break
         repair_count += 1
         prior = current
-        try:
-            current = invoke_codex_structured(
-                pass_id="P9",
-                slot="creative",
-                slot_fn=creative_fn,
-                pack=pack,
-                seam_refs=(
-                    "codex_retake_system",
-                    "codex_play_system",
-                    "codex_coda_contract_system",
-                ),
-                artifact_inputs={
-                    **_script_artifact_context(score),
-                    "previous": current.model_dump(mode="json"),
-                    "audit": audit.model_dump(mode="json"),
-                    "quality_cycle": repair_count,
-                },
-                result_type=ScriptArtifactV4,
-                post_validator=lambda x: _validate_script_post(
-                    x, cast, score, fact_index, story_rules,
-                ),
-                base_temperature=_codex_retake_temperature(repair_count - 1),
-                structural_retry_temperature=.30,
-                max_new_tokens=script_token_budget,
-                call_journal=journal,
-                repair_score=score,
-                spoken_repair_cast=cast,
-                spoken_repair_fact_index=fact_index,
-                spoken_repair_story_rules=story_rules,
-                spoken_repair_alternate_slot_fn=technical_fn,
-                spoken_repair_alternate_slot="technical",
-            )
-        except CodexPassError as exc:
-            if not _record_failsoft("P9", "retake", exc, meta):
-                raise
+        current, patch_entry = _run_script_quality_patch(
+            pass_id="P9",
+            script=current,
+            score=score,
+            cast=cast,
+            fact_index=fact_index,
+            story_rules=story_rules,
+            issues=audit.issues,
+            creative_fn=creative_fn,
+            technical_fn=technical_fn,
+            pack=pack,
+            creative_temperature=_codex_retake_temperature(
+                repair_count - 1,
+            ),
+            script_token_budget=script_token_budget,
+            journal=journal,
+            meta=meta,
+        )
+        receipts[-1].update({
+            "patch_status": patch_entry["status"],
+            "patch_attempt_count": len(patch_entry["attempts"]),
+            "ignored_line_ids": list(patch_entry["ignored_line_ids"]),
+        })
+        if current is None:
             current = prior
-    if status == "quality_floor" and audited:
+            status = str(patch_entry["status"])
+            break
+    if status.endswith("floor") and audited:
         current = min(audited, key=lambda item: (item[0], item[1]))[2]
     lane = meta.setdefault("scifi_codex", {})
     lane["final_audit_quality_loop"] = {
@@ -5236,7 +5639,7 @@ def run_scifi_codex_episode(
     journal["script_token_budget"] = {"requested_words": steer.requested_words, "accepted_line_count": accepted_line_count, "max_new_tokens": script_token_budget}
     script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0, story_rules), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score, spoken_repair_cast=p2, spoken_repair_fact_index=p0, spoken_repair_story_rules=story_rules, spoken_repair_alternate_slot_fn=technical_fn, spoken_repair_alternate_slot="technical")
     # Quality passes are dynamic: each actionable P6/P8 verdict triggers a fresh
-    # creative retake and then an independent re-audit. They stop only on a clean
+    # creative line patch and then an independent re-audit. They stop on a clean
     # verdict or the no-hang budget; exhaustion keeps the best structurally valid
     # script with an explicit quality-floor receipt and never fails the episode.
     script = _run_listener_quality_loop(
@@ -5266,8 +5669,8 @@ def run_scifi_codex_episode(
         meta=meta,
     )
     # Defense-in-depth final scour over the exact artifact that will be assembled.
-    # Every P5/P7/P9 route already validates through the same boundary; this
-    # catches any future bypass before it can become ledger text.
+    # P5 and every merged P7/P9 patch already validate through the same complete
+    # boundary; this catches any future bypass before it can become ledger text.
     if _collect_script_hygiene_targets(
         script, p2, p0, score, story_rules,
     ):

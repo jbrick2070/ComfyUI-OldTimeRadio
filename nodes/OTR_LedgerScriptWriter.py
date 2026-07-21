@@ -835,6 +835,9 @@ def _build_truncating_generate_fn(
     def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
         import torch  # local import; never load torch at module import
         from . import _otr_loader_backends as _OTRLB
+        require_full_output = bool(getattr(
+            messages, "_otr_require_full_output_budget", False,
+        ))
         if _system_role_supported[0] is None:
             _system_role_supported[0] = (
                 _OTRLB.tokenizer_supports_system_role(tokenizer)
@@ -856,6 +859,7 @@ def _build_truncating_generate_fn(
                 context_cap=context_cap,
                 prompt_tokens=input_len,
                 label="prompt",
+                require_full=require_full_output,
             )
         except GenerationContextOverflowError as exc:
             # A prompt that leaves no honest room for a usable artifact is a

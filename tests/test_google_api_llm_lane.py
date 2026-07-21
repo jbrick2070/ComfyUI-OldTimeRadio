@@ -14,6 +14,10 @@ from nodes._otr_google_api import llm as gllm
 from nodes._otr_google_api import models as gmodels
 
 
+class _RequireFullMessages(list):
+    _otr_require_full_output_budget = True
+
+
 @pytest.fixture(autouse=True)
 def _clean_google(monkeypatch, tmp_path):
     for key in ("OTR_GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
@@ -126,6 +130,32 @@ def test_generate_rejects_wrong_message_shape_before_network(monkeypatch):
     fn = gllm.make_google_api_generate_fn(entry)
     with pytest.raises(gclient.GoogleAPIRequestShapeError):
         fn([{"role": "tool", "content": "bad"}], temperature=0.1, max_new_tokens=8)
+    assert calls == []
+
+
+def test_complete_patch_capacity_refuses_before_google_request(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        gllm, "create_interaction", lambda payload: calls.append(payload),
+    )
+    entry = {
+        "provider": "google_api",
+        "model_id": gmodels.GOOGLE_API_SLOT_A_ID,
+        "google_model": gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT,
+        "context_cap": 8192,
+    }
+    fn = gllm.make_google_api_generate_fn(entry)
+    with pytest.raises(
+        gclient.GoogleAPIRequestShapeError,
+        match="complete requested output",
+    ):
+        fn(
+            _RequireFullMessages([
+                {"role": "user", "content": "x" * 28000},
+            ]),
+            temperature=.2,
+            max_new_tokens=2000,
+        )
     assert calls == []
 
 

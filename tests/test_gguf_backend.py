@@ -30,6 +30,10 @@ class FakeLlama:
         self.closed = True
 
 
+class _RequireFullMessages(list):
+    _otr_require_full_output_budget = True
+
+
 def test_constants_are_sidecar_free():
     assert GGF.GGUF_BACKEND_KEY == "gguf_native"
     assert GGF.PROVIDER == "gguf_native"
@@ -110,6 +114,51 @@ def test_generate_calls_llama_cpp_and_logs_token_cap(monkeypatch, caplog):
     assert call["temperature"] == 0.2
     assert call["max_tokens"] == 512
     assert "requested=999 effective=512" in caplog.text
+
+
+def test_complete_patch_capacity_refuses_before_llama_call(monkeypatch):
+    fake = FakeLlama()
+    monkeypatch.setenv("GEMMA4_12B_MAX_NEW_TOKENS", "8192")
+    entry = {
+        "provider": "gguf_native",
+        "model": fake,
+        "context_cap": 8192,
+    }
+    with pytest.raises(
+        GGF.GGUFNativeConfigError,
+        match="complete requested output",
+    ):
+        GGF.GGUFNativeBackend().generate(
+            entry,
+            _RequireFullMessages([
+                {"role": "user", "content": "x" * 28000},
+            ]),
+            temperature=.2,
+            max_new_tokens=2000,
+        )
+    assert fake.calls == []
+
+
+def test_complete_patch_refuses_gguf_provider_cap(monkeypatch):
+    fake = FakeLlama()
+    monkeypatch.setenv("GEMMA4_12B_MAX_NEW_TOKENS", "1000")
+    with pytest.raises(
+        GGF.GGUFNativeConfigError,
+        match="provider_output_cap=1000",
+    ):
+        GGF.GGUFNativeBackend().generate(
+            {
+                "provider": "gguf_native",
+                "model": fake,
+                "context_cap": 8192,
+            },
+            _RequireFullMessages([
+                {"role": "user", "content": "compact"},
+            ]),
+            temperature=.2,
+            max_new_tokens=2000,
+        )
+    assert fake.calls == []
 
 
 def test_generate_translates_openai_json_schema_response_format():

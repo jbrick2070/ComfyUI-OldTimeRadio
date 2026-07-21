@@ -2,6 +2,31 @@
 
 Status: specification only. This document is the only changed artifact. It proposes a new additive lane; it does not claim that the lane is presently registered or executable.
 
+## 2026-07-21 production amendment -- authoritative over older pass prose
+
+The lane is now implemented as `scifi_news`. P5 is the only pass that emits a
+complete `ScriptArtifactV4`. P7 and P9 emit a private typed line-text patch:
+`{"replacements":[{"line_id":"l001","replacement_text":"..."}]}`. A
+non-null valid finding ID limits ownership to that row; a null finding ID
+widens ownership to all voiced rows; an invented non-null ID is discarded as
+reviewer noise. The merge changes only `line.text`, requires exact target
+coverage and a real change, then runs the complete script validator.
+
+Each successful P7 patch returns to a fresh P6 judgment and each successful P9
+patch returns to a fresh P8 audit. A malformed creative patch gets one colder
+technical-slot attempt. If both fail, or if the complete bounded patch cannot
+fit the real model context/provider output cap, the best already-valid script
+is the quality floor and ledger assembly continues. The loop never rejudges an
+unchanged script after a failed patch. P6/P8 model or transport failure is also
+advisory and cannot kill an already ledger-valid story.
+
+Patch messages carry an opt-in full-output-capacity marker through every local
+and remote transport. Unmarked callers retain ordinary output clamping. Final
+authorship receipts, text hashes, ledger rows, media consumers, readiness, and
+OBS publication are built only after the final accepted/floored artifact, so a
+quality patch cannot leave a stale seal. No canonical workflow wiring changes
+are required for this amendment.
+
 ## Historical v3 revision log — superseded by v4
 
 - **v3 — technical-only code-ready rewrite:** Re-verified registry, writer, ledger, freeze, and structured-call contracts. Corrected the stored voice namespaces, structured-call validator and repair signatures, music/beat topology, exact split-versus-regex word gate, prompt/message construction, receipt identity, source-span provenance, and post-tail persistence proof. Removed no story philosophy, pass topology, pack prompt text, or examples. All v2 technical prose that conflicts with the authoritative v3 control plane below is superseded.
@@ -778,25 +803,25 @@ Implementation placement: insert immediately before custom_source_bank, as reque
       "pass_id": "P6_listening_room",
       "slot": "technical",
       "seam_refs": ["codex_listening_room_system"],
-      "description": "Produces a listener-facing diagnosis of the whole first play and always sends it to full rewrite."
+      "description": "Judges the current whole script; concrete issues feed a bounded P7 line patch and an issue-free review accepts the current script."
     },
     {
       "pass_id": "P7_full_retake",
       "slot": "creative",
       "seam_refs": ["codex_retake_system", "codex_coda_contract_system"],
-      "description": "Writes a complete replacement ScriptArtifact from P5 and P6, never a line-level patch."
+      "description": "Writes a bounded target-line text patch from the latest P6 findings, merges only line.text, and returns every accepted patch to a fresh P6 judgment."
     },
     {
       "pass_id": "P8_final_audit",
       "slot": "technical",
       "seam_refs": ["codex_final_audit_system", "codex_coda_contract_system"],
-      "description": "Audits current full script, source mappings, word counts, and ledger-ready role references; it feeds P9 and repeats after P9."
+      "description": "Audits the current full script, source mappings, and ledger-ready role references; it feeds P9 and repeats after every accepted P9 patch."
     },
     {
       "pass_id": "P9_closing_rewrite",
       "slot": "creative",
-      "seam_refs": ["codex_retake_system", "codex_play_system", "codex_coda_contract_system"],
-      "description": "Writes a complete final replacement. One additional full P9 rewrite is allowed only when the repeated P8 audit requests it."
+      "seam_refs": ["codex_retake_system", "codex_coda_contract_system"],
+      "description": "Writes a bounded target-line text patch from the latest P8 findings. Every accepted patch returns to a fresh P8 audit; quality exhaustion keeps the best valid script."
     },
     {
       "pass_id": "P10_structured_repair",
@@ -820,7 +845,7 @@ Implementation placement: insert immediately before custom_source_bank, as reque
   "notes": [
     "A0 is the first artifact and P0 is the first model call.",
     "P3 to P4 to P3 is bounded to one structural rewrite.",
-    "P5 to P6 to P7 to P8 to P9 to P8 is non-linear full-rewrite topology; P9 may run once more after a rewrite audit.",
+    "P5 to P6/P7 and P8/P9 are bounded judge/line-patch loops; every accepted patch is independently rejudged and quality exhaustion keeps the best valid script.",
     "Every model invocation uses only the pass slot. P11 and P12 are deterministic orchestration stages."
   ]
 }
@@ -1117,10 +1142,9 @@ _fetch_rss_seed_or_die builds the seven-key RSS payload at nodes/OTR_LedgerScrip
 | P3b/P4b | only when P4a says rewrite | creative/technical | one complete rewrite and recheck | CodexStructureExhaustedError if P4b still says rewrite |
 | P5 | P0-P3 plus one advisory word steer -> ScriptArtifactV4 | creative | one full draft | StructuredCallFailedError |
 | P6 | P5 -> ListenerReviewV1 | technical | one diagnosis | StructuredCallFailedError |
-| P7 | P0-P3,P5,P6 -> ScriptArtifactV1 | creative | one required full rewrite | StructuredCallFailedError |
+| P7 | current script + P6 findings -> typed line-text patch -> validated merged ScriptArtifactV4 | creative, then technical on rejection | bounded dynamic repair cycle | best-valid quality floor |
 | P8a | P0,P3,P7 -> FinalAuditV1 | technical | one audit | StructuredCallFailedError |
-| P9a/P8b | P7,P8a -> full ScriptArtifact then audit | creative/technical | one required full rewrite and recheck | StructuredCallFailedError |
-| P9b/P8c | only when P8b says rewrite | creative/technical | one additional full rewrite and recheck | CodexFinalAuditExhaustedError if P8c says rewrite |
+| P9/P8 repeat | current script + P8 findings -> typed line-text patch, then fresh audit | creative, then technical on rejection | bounded dynamic repair cycles | best-valid quality floor |
 | P11 | P9 final -> canonical ledger and Phase 0 | none | one deterministic assembly | CodexPreTailAuditError, CodexLedgerReferenceError, or CodexProvenanceError |
 | P12 | tail-mutated ledger -> Phase 10 | none | one final callback | FreezeAssertionError, CodexFreezeWarningError, or CodexTailFinalizerMissingError |
 
@@ -1161,10 +1185,10 @@ Before P11, the runner explicitly requires every top-level list to exist, assign
 | P3 scenes | set_scenes | Each row is exactly scene_id, description, env, line_count 0, and word_count 0. The live setter field is env, not environment. |
 | P3 shots | set_shots | Each row is exactly shot_id, scene_id, description, visual_prompt, png_path None, start_s None, and dur_s None. |
 | P3 beats | set_beats | Each row is exactly beat_id, shot_id, scene_id, speaker, char_id, line_ids, start_s None, and dur_s None. P3 preplans line IDs, so this remains complete before P9 text arrives. |
-| P9 lines | set_lines | Each row is exactly line_id, shot_id, beat_id, char_id, text copied unchanged, traits, boundary, bark_wav_path None, start_s None, dur_s None, speaker_role, arc_phase, compose_flags, beat_intent, target_words, and dialogue_slot_id. The setter computes char_count and word_count. |
-| P3 music plus P9 anchors | set_music | Each row is exactly cue_id, description, generation_prompt, anchor_line_id, placement, target_duration_s, wav_path None, start_s None, and dur_s None. set_music has no text field at nodes/production_ledger.py:1179-1207. |
+| Final validated script lines | set_lines | Each row is exactly line_id, shot_id, beat_id, char_id, final text, traits, boundary, bark_wav_path None, start_s None, dur_s None, speaker_role, arc_phase, compose_flags, beat_intent, target_words, and dialogue_slot_id. The setter computes char_count and word_count. |
+| P3 music plus final script anchors | set_music | Each row is exactly cue_id, description, generation_prompt, anchor_line_id, placement, target_duration_s, wav_path None, start_s None, and dur_s None. set_music has no text field at nodes/production_ledger.py:1179-1207. |
 
-The only legal speaker roles are character, announcer, music_open, music_close, and music_inter at nodes/_otr_ledger_freeze.py:85-96. P9 uses announcer for announcer rows and the matching music sentinel names for music rows. Cast rows exist before set_lines, which allows the live role-coercion guard to confirm character IDs at nodes/production_ledger.py:91-157,1158-1166. The runner independently rejects any mismatch rather than relying on coercion.
+The only legal speaker roles are character, announcer, music_open, music_close, and music_inter at nodes/_otr_ledger_freeze.py:85-96. The final validated script uses announcer for announcer rows and the matching music sentinel names for music rows. Cast rows exist before set_lines, which allows the live role-coercion guard to confirm character IDs at nodes/production_ledger.py:91-157,1158-1166. The runner independently rejects any mismatch rather than relying on coercion.
 
 ### Verbatim authorship proof
 
@@ -1270,9 +1294,9 @@ counts are receipt fields only.
    cast/scenes/shots/beats/lines/music/clips graph. Run Phase 0 and Phase 10
    with zero errors and warnings.
 7. Corrupt one source span, fact ID, source slice, or final-line hash. Assert
-   a P8 fact defect invokes at most two scoped P9 complete-artifact repairs,
-   only the flagged beat may differ, then either re-audits clean or raises
-   `CodexFactTraceExhaustedError`.
+   a P8 fact defect invokes bounded scoped P9 line patches, only targeted text
+   may differ, every accepted merge is freshly audited, and two failed patch
+   slots keep the best already-valid script with an explicit quality receipt.
 8. Run the shared TailFinalizer around the real tail. Assert receipt identity
    survives tail and saved JSON, UTF-8/no-BOM is preserved, and no output
    returns on a warning/error/missing callback/save-path failure.
@@ -1285,8 +1309,8 @@ counts are receipt fields only.
 | Payload first + pinned support | PASS | The exact seven-key RSS/custom-pinned payload reaches the map runner before P0; malformed/thin inputs stop typed. |
 | Two slot callables only | PASS | Every model call receives the writer-injected creative or technical closure through `structured_call`. |
 | Complete ledger / legal roles / freeze | PASS | v4 validates all five hierarchy tables, music skip stamps/anchors, and warning-free Phase 0/10 plus saved JSON. |
-| Verbatim LLM dialogue | PASS | Reject-only pre-tail sanitation prevents writer-tail mutation; receipt/hash proof compares P9, in-memory, and saved text. |
-| News traceability | PASS | Exact P0 slices plus scoped P9 fact repair and final fact graph cover every audible source fact. |
+| Verbatim LLM dialogue | PASS | P5 and accepted P7/P9 text patches are model-authored; final receipt/hash proof covers the post-quality artifact, in-memory rows, and saved text. |
+| News traceability | PASS | Exact P0 slices plus scoped P9 fact patches and the final fact graph cover every audible source fact. |
 | 720 strategy | PASS | 720 is P5-only advisory steering; actual split/ledger counts are recorded and never gate acceptance. |
 | No Python text surgery / fail loud / SFW / UTF-8 no BOM | PASS | Improvement is LLM repair only; failures are typed; the unchanged pack keeps SFW instructions; encoding is tested. |
 ## 11. Open questions for the operator

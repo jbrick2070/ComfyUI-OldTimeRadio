@@ -1218,6 +1218,9 @@ def make_generate_fn(cache_entry: dict[str, Any]):
         except ImportError as exc:
             raise ModelLoaderError("torch not available") from exc
 
+        require_full_output = bool(getattr(
+            messages, "_otr_require_full_output_budget", False,
+        ))
         messages = _normalize_messages_for_cache_entry(cache_entry, messages)
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
@@ -1229,6 +1232,7 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 context_cap=int(cache_entry.get("context_cap") or 8192),
                 prompt_tokens=inputs["input_ids"].shape[1],
                 label=f"local model {cache_entry.get('model_id', '<unknown>')}",
+                require_full=require_full_output,
             )
         except GenerationContextOverflowError as exc:
             raise ModelLoaderError(str(exc)) from exc
@@ -1323,6 +1327,9 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
         except ImportError as exc:
             raise ModelLoaderError("torch not available") from exc
 
+        require_full_output = bool(getattr(
+            messages, "_otr_require_full_output_budget", False,
+        ))
         messages = _normalize_messages_for_cache_entry(cache_entry, messages)
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
@@ -1334,6 +1341,7 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 context_cap=int(cache_entry.get("context_cap") or 8192),
                 prompt_tokens=inputs["input_ids"].shape[1],
                 label=f"local polish {cache_entry.get('model_id', '<unknown>')}",
+                require_full=require_full_output,
             )
         except GenerationContextOverflowError as exc:
             raise ModelLoaderError(str(exc)) from exc

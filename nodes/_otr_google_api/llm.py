@@ -136,6 +136,9 @@ class GoogleAPIBackend:
         response_format: dict | None = None,
         **_ignored: Any,
     ) -> str:
+        require_full_output = bool(getattr(
+            messages, "_otr_require_full_output_budget", False,
+        ))
         cache_entry = model
         google_model = str(cache_entry.get("google_model") or "")
         if not google_model:
@@ -160,6 +163,7 @@ class GoogleAPIBackend:
                     ),
                     prompt_tokens=estimate_prompt_tokens(messages),
                     label=f"Google API {google_model}",
+                    require_full=require_full_output,
                 )
             except GenerationContextOverflowError as exc:
                 raise GoogleAPIRequestShapeError(str(exc)) from exc

@@ -42,15 +42,16 @@ def fit_output_tokens(
     prompt_tokens: int,
     min_output_tokens: int = MIN_OUTPUT_TOKENS,
     label: str = "generation",
+    require_full: bool = False,
 ) -> int:
     """Clamp output to the room left by the measured prompt.
 
     A prompt that cannot leave the minimum output room fails before the
-    provider call.  A larger requested ceiling is safely reduced to the
+    provider call.  A larger requested ceiling is normally reduced to the
     remaining room; this prevents the old ``context_cap - requested`` math
-    from deleting prompt context.  The structured parser or downstream
-    artifact validator remains responsible for rejecting an artifact that
-    actually needs more output than the effective ceiling.
+    from deleting prompt context.  ``require_full`` is the opt-in contract for
+    bounded patches whose complete requested output must fit or make no call.
+    Unmarked callers preserve the historical clamping behavior.
     """
     cap = int(context_cap)
     prompt = int(prompt_tokens)
@@ -62,5 +63,11 @@ def fit_output_tokens(
             f"{label} cannot fit: prompt requires {prompt} input tokens, "
             f"context_cap={cap} leaves {max(0, available)} output tokens "
             f"but at least {minimum} are required"
+        )
+    if require_full and requested_tokens > available:
+        raise GenerationContextOverflowError(
+            f"{label} cannot fit the complete requested output: prompt requires "
+            f"{prompt} input tokens, requested_output={requested_tokens}, "
+            f"context_cap={cap} leaves only {available} output tokens"
         )
     return min(requested_tokens, available)

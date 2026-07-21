@@ -2921,8 +2921,9 @@ def test_script_output_token_budget_receipts_and_bounds():
     #
     # The ceiling's comment claimed it "keeps the reservation inside the context
     # cap" -- the false 8,192 cap every remote model was budgeted against
-    # (PBUG-20260713-20). P5/P7/P9 run on the CREATIVE slot: aion-3.0-mini has
-    # 131,072 tokens. The artifact needs what the artifact needs.
+    # (PBUG-20260713-20). P5 runs on the CREATIVE slot: aion-3.0-mini has
+    # 131,072 tokens. The complete initial artifact needs what it needs; P7/P9
+    # now use bounded line-text patches instead of this whole-artifact budget.
     assert lane._script_output_token_budget(720, 13) == 5530   # 3240 + 1690 + 600
     assert lane._script_output_token_budget(720, 24) == 6960   # 3240 + 3120 + 600
     assert lane._script_output_token_budget(900, 40) == 9850   # 4050 + 5200 + 600
@@ -2972,6 +2973,7 @@ def test_p3_uses_draft_helper_while_script_passes_keep_dynamic_budget():
     tree = ast.parse(source)
     p3_helpers = []
     script_passes: dict[str, ast.AST | None] = {}
+    quality_patch_passes: dict[str, ast.AST | None] = {}
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
             continue
@@ -2983,6 +2985,10 @@ def test_p3_uses_draft_helper_while_script_passes_keep_dynamic_budget():
             p3_helpers.append((pass_node.value, keywords))
         elif node.func.id == "invoke_codex_structured":
             script_passes[pass_node.value] = keywords.get("max_new_tokens")
+        elif node.func.id == "_run_script_quality_patch":
+            quality_patch_passes[pass_node.value] = keywords.get(
+                "script_token_budget"
+            )
 
     assert {pass_id for pass_id, _keywords in p3_helpers} == {"P3", "P3_rewrite"}
     for pass_id, keywords in p3_helpers:
@@ -2992,8 +2998,13 @@ def test_p3_uses_draft_helper_while_script_passes_keep_dynamic_budget():
         assert isinstance(keywords["advisory"], ast.Name)
         assert isinstance(keywords["cast"], ast.Name)
         assert isinstance(keywords["fact_index"], ast.Name)
-    for pass_id in ("P5", "P7", "P9"):
-        budget = script_passes[pass_id]
+    budget = script_passes["P5"]
+    assert isinstance(budget, ast.Name)
+    assert budget.id == "script_token_budget"
+    assert "P7" not in script_passes
+    assert "P9" not in script_passes
+    for pass_id in ("P7", "P9"):
+        budget = quality_patch_passes[pass_id]
         assert isinstance(budget, ast.Name)
         assert budget.id == "script_token_budget"
     assert "_score_graph_contract" not in source
@@ -3314,6 +3325,299 @@ def _hygiene_script(text: str) -> tuple[
     return score, cast, fact_index, changed
 
 
+def test_quality_patch_targets_are_row_local_and_invalid_ids_do_not_widen():
+    score, _cast, _facts, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+    local = lane._derive_script_quality_patch_plan(
+        script,
+        score,
+        [
+            lane.ListenerIssueV4(
+                category="pacing", line_id="l001", direction="Tighten it.",
+            ),
+            lane.ListenerIssueV4(
+                category="noise", line_id="l999", direction="Invented ID.",
+            ),
+        ],
+    )
+    assert local.target_ids == ("l001",)
+    assert local.required_change_ids == frozenset({"l001"})
+    assert local.ignored_line_ids == ("l999",)
+    assert local.global_scope is False
+
+    global_plan = lane._derive_script_quality_patch_plan(
+        script,
+        score,
+        [lane.ListenerIssueV4(
+            category="arc", line_id=None, direction="Clarify the whole turn.",
+        )],
+    )
+    assert global_plan.global_scope is True
+    assert global_plan.target_ids == ("l001", "l002", "l003", "l004")
+    assert global_plan.required_change_ids == frozenset()
+
+
+def test_quality_patch_prompt_is_compact_complete_and_fact_grounded():
+    score, cast, facts, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+    plan = lane._derive_script_quality_patch_plan(
+        script,
+        score,
+        [lane.FinalIssueV1(
+            issue_id="fact-F01",
+            severity="critical",
+            line_id="l001",
+            detail="Keep F01 cautious and source-bound.",
+        )],
+    )
+    messages = lane._script_quality_patch_messages(
+        pass_id="P9",
+        script=script,
+        score=score,
+        cast=cast,
+        fact_index=facts,
+        plan=plan,
+        pack=routing.resolve_story_pack("scifi_news"),
+    )
+    assert getattr(messages, "_otr_require_full_output_budget", False) is True
+    payload = json.loads(messages[1]["content"])
+    assert set(payload) == {
+        "story", "cast", "facts", "findings",
+        "writable_target_ids", "required_change_ids", "voiced_context",
+    }
+    assert payload["writable_target_ids"] == ["l001"]
+    assert payload["required_change_ids"] == ["l001"]
+    assert payload["facts"][0]["fact_id"] == "F01"
+    assert "previous" not in messages[1]["content"]
+    assert "result_json_schema" not in messages[1]["content"]
+    assert "music_cues" not in messages[1]["content"]
+
+
+def test_quality_patch_merge_changes_only_target_text_and_validates_whole_script():
+    score, cast, facts, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+    plan = lane._derive_script_quality_patch_plan(
+        script,
+        score,
+        [lane.ListenerIssueV4(
+            category="pacing", line_id="l001", direction="Land sooner.",
+        )],
+    )
+    before = script.model_dump(mode="json")
+    merged = lane._merge_script_quality_patch(
+        script=script,
+        patch=lane._ScriptQualityPatchV4(replacements=[
+            lane._ScriptQualityPatchRowV4(
+                line_id="l001",
+                replacement_text="The receiver catches one quiet pulse.",
+            ),
+        ]),
+        plan=plan,
+        score=score,
+        cast=cast,
+        fact_index=facts,
+        story_rules=None,
+    )
+    assert next(
+        row.text for row in merged.lines if row.line_id == "l001"
+    ) == "The receiver catches one quiet pulse."
+    after = merged.model_dump(mode="json")
+    for artifact in (before, after):
+        for row in artifact["lines"]:
+            row["text"] = "<TEXT>"
+    assert after == before
+
+    with pytest.raises(
+        lane._ScriptQualityPatchRejected,
+        match="specifically named",
+    ):
+        lane._merge_script_quality_patch(
+            script=script,
+            patch=lane._ScriptQualityPatchV4(replacements=[
+                lane._ScriptQualityPatchRowV4(
+                    line_id="l001",
+                    replacement_text=next(
+                        row.text for row in script.lines if row.line_id == "l001"
+                    ),
+                ),
+            ]),
+            plan=plan,
+            score=score,
+            cast=cast,
+            fact_index=facts,
+            story_rules=None,
+        )
+
+
+def test_quality_patch_rotates_to_technical_slot_after_malformed_creative():
+    score, cast, facts, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+    calls: list[str] = []
+
+    def creative(_messages, **_kwargs):
+        calls.append("creative")
+        return "not json"
+
+    def technical(_messages, **_kwargs):
+        calls.append("technical")
+        return json.dumps({"replacements": [{
+            "line_id": "l001",
+            "replacement_text": "The receiver catches one quiet pulse.",
+        }]})
+
+    journal: dict[str, object] = {}
+    merged, entry = lane._run_script_quality_patch(
+        pass_id="P7",
+        script=script,
+        score=score,
+        cast=cast,
+        fact_index=facts,
+        story_rules=None,
+        issues=[lane.ListenerIssueV4(
+            category="pacing", line_id="l001", direction="Land sooner.",
+        )],
+        creative_fn=creative,
+        technical_fn=technical,
+        pack=routing.resolve_story_pack("scifi_news"),
+        creative_temperature=.68,
+        script_token_budget=2200,
+        journal=journal,
+        meta={"scifi_codex": {}},
+    )
+    assert isinstance(merged, lane.ScriptArtifactV4)
+    assert calls == ["creative", "technical"]
+    assert entry["status"] == "accepted"
+    assert entry["accepted_slot"] == "technical"
+    assert [row["status"] for row in entry["attempts"]] == [
+        "rejected", "accepted",
+    ]
+
+
+def test_quality_patch_capacity_floor_records_both_slots():
+    score, cast, facts, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+
+    def capacity(_messages, **_kwargs):
+        try:
+            raise lane.GenerationContextOverflowError(
+                "patch cannot fit the complete requested output"
+            )
+        except lane.GenerationContextOverflowError as exc:
+            raise RuntimeError("provider wrapper") from exc
+
+    meta: dict[str, object] = {"scifi_codex": {}}
+    merged, entry = lane._run_script_quality_patch(
+        pass_id="P7",
+        script=script,
+        score=score,
+        cast=cast,
+        fact_index=facts,
+        story_rules=None,
+        issues=[lane.ListenerIssueV4(
+            category="pacing", line_id="l001", direction="Land sooner.",
+        )],
+        creative_fn=capacity,
+        technical_fn=capacity,
+        pack=routing.resolve_story_pack("scifi_news"),
+        creative_temperature=.68,
+        script_token_budget=2200,
+        journal={},
+        meta=meta,
+    )
+    assert merged is None
+    assert entry["status"] == "two_slot_quality_floor"
+    assert [row["status"] for row in entry["attempts"]] == [
+        "capacity_floor", "capacity_floor",
+    ]
+    assert len(meta["scifi_codex"]["capacity_floors"]) == 2
+
+
+def test_two_failed_quality_slots_stop_without_rejudging_unchanged_script(
+    monkeypatch,
+):
+    score, cast, facts, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+    audits = 0
+
+    def invoke(**kwargs):
+        nonlocal audits
+        assert kwargs["pass_id"] == "P6"
+        audits += 1
+        return lane.ListenerReviewV4(
+            issues=[lane.ListenerIssueV4(
+                category="pacing", line_id="l001", direction="Land sooner.",
+            )],
+            require_full_retake=True,
+        )
+
+    patch_calls: list[str] = []
+
+    def malformed(_messages, **_kwargs):
+        patch_calls.append("attempt")
+        return "not json"
+
+    monkeypatch.setattr(lane, "invoke_codex_structured", invoke)
+    meta: dict[str, object] = {"scifi_codex": {}}
+    result = lane._run_listener_quality_loop(
+        script=script,
+        score=score,
+        cast=cast,
+        fact_index=facts,
+        story_rules=None,
+        creative_fn=malformed,
+        technical_fn=malformed,
+        pack=routing.resolve_story_pack("scifi_news"),
+        script_token_budget=2200,
+        journal={},
+        meta=meta,
+    )
+    assert result.model_dump(mode="json") == script.model_dump(mode="json")
+    assert audits == 1
+    assert patch_calls == ["attempt", "attempt"]
+    receipt = meta["scifi_codex"]["listener_quality_loop"]
+    assert receipt["status"] == "two_slot_quality_floor"
+    assert receipt["repair_count"] == 1
+
+
+def test_quality_judge_transport_failure_keeps_prior_valid_story(monkeypatch):
+    score, cast, facts, script = _hygiene_script(
+        "The receiver catches a quiet pulse."
+    )
+
+    def invoke(**_kwargs):
+        try:
+            raise RuntimeError("quality provider unavailable")
+        except RuntimeError as exc:
+            raise lane.CodexPassError("P6 failed") from exc
+
+    monkeypatch.setattr(lane, "invoke_codex_structured", invoke)
+    meta: dict[str, object] = {"scifi_codex": {}}
+    result = lane._run_listener_quality_loop(
+        script=script,
+        score=score,
+        cast=cast,
+        fact_index=facts,
+        story_rules=None,
+        creative_fn=lambda *_args, **_kwargs: "",
+        technical_fn=lambda *_args, **_kwargs: "",
+        pack=routing.resolve_story_pack("scifi_news"),
+        script_token_budget=2200,
+        journal={},
+        meta=meta,
+    )
+    assert result.model_dump(mode="json") == script.model_dump(mode="json")
+    assert meta["scifi_codex"]["listener_quality_loop"]["status"] == (
+        "audit_failed_soft"
+    )
+    assert meta["scifi_codex"]["fail_soft"][0]["error_type"] == "RuntimeError"
+
+
 def _invoke_hygiene_script(
     *,
     text: str,
@@ -3564,8 +3868,6 @@ def test_scifi_news_listener_and_final_audit_repair_until_rejudged_clean(
                 issues=[],
                 require_full_retake=False,
             )
-        if pass_id == "P7":
-            return script.model_copy(deep=True)
         if pass_id == "P8":
             final_audits += 1
             if final_audits == 1:
@@ -3585,9 +3887,35 @@ def test_scifi_news_listener_and_final_audit_repair_until_rejudged_clean(
                 script_digest="digest",
                 verdict="pass",
             )
-        if pass_id == "P9":
-            return script.model_copy(deep=True)
         raise AssertionError(pass_id)
+
+    patch_count = 0
+
+    def creative(messages, **_kwargs):
+        nonlocal patch_count
+        payload = json.loads(messages[1]["content"])
+        pass_id = "P9" if "QUALITY STAGE P9" in messages[0]["content"] else "P7"
+        calls.append(pass_id)
+        patch_count += 1
+        variants = (
+            "The receiver catches the first quiet pulse.",
+            "The receiver catches the quiet pulse sooner.",
+            "The receiver catches one quiet pulse.",
+        )
+        context = {row["line_id"]: row for row in payload["voiced_context"]}
+        return json.dumps({
+            "replacements": [
+                {
+                    "line_id": line_id,
+                    "replacement_text": (
+                        variants[min(patch_count - 1, len(variants) - 1)]
+                        if line_id == "l001"
+                        else context[line_id]["text"]
+                    ),
+                }
+                for line_id in payload["writable_target_ids"]
+            ],
+        })
 
     monkeypatch.setattr(lane, "invoke_codex_structured", invoke)
     meta: dict[str, object] = {"scifi_codex": {}}
@@ -3597,9 +3925,9 @@ def test_scifi_news_listener_and_final_audit_repair_until_rejudged_clean(
         cast=cast,
         fact_index=fact_index,
         story_rules=None,
-        creative_fn=lambda *args, **kwargs: "",
+        creative_fn=creative,
         technical_fn=lambda *args, **kwargs: "",
-        pack=SimpleNamespace(),
+        pack=routing.resolve_story_pack("scifi_news"),
         script_token_budget=2200,
         journal={},
         meta=meta,
@@ -3610,9 +3938,9 @@ def test_scifi_news_listener_and_final_audit_repair_until_rejudged_clean(
         cast=cast,
         fact_index=fact_index,
         story_rules=None,
-        creative_fn=lambda *args, **kwargs: "",
+        creative_fn=creative,
         technical_fn=lambda *args, **kwargs: "",
-        pack=SimpleNamespace(),
+        pack=routing.resolve_story_pack("scifi_news"),
         script_token_budget=2200,
         journal={},
         meta=meta,
@@ -3642,9 +3970,36 @@ def test_scifi_news_stubborn_quality_judge_uses_valid_script_floor(monkeypatch):
                 )],
                 require_full_retake=True,
             )
-        if pass_id == "P7":
-            return script.model_copy(deep=True)
         raise AssertionError(pass_id)
+
+    patch_count = 0
+
+    def creative(messages, **_kwargs):
+        nonlocal patch_count
+        payload = json.loads(messages[1]["content"])
+        calls.append(
+            "P9" if "QUALITY STAGE P9" in messages[0]["content"] else "P7"
+        )
+        patch_count += 1
+        variants = (
+            "The receiver catches the first quiet pulse.",
+            "The receiver catches the next quiet pulse.",
+            "The receiver catches one last quiet pulse.",
+        )
+        context = {row["line_id"]: row for row in payload["voiced_context"]}
+        return json.dumps({
+            "replacements": [
+                {
+                    "line_id": line_id,
+                    "replacement_text": (
+                        variants[min(patch_count - 1, len(variants) - 1)]
+                        if line_id == "l001"
+                        else context[line_id]["text"]
+                    ),
+                }
+                for line_id in payload["writable_target_ids"]
+            ],
+        })
 
     monkeypatch.setattr(lane, "invoke_codex_structured", invoke)
     meta: dict[str, object] = {"scifi_codex": {}}
@@ -3654,9 +4009,9 @@ def test_scifi_news_stubborn_quality_judge_uses_valid_script_floor(monkeypatch):
         cast=cast,
         fact_index=fact_index,
         story_rules=None,
-        creative_fn=lambda *args, **kwargs: "",
+        creative_fn=creative,
         technical_fn=lambda *args, **kwargs: "",
-        pack=SimpleNamespace(),
+        pack=routing.resolve_story_pack("scifi_news"),
         script_token_budget=2200,
         journal={},
         meta=meta,

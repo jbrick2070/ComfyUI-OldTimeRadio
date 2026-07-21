@@ -1139,6 +1139,9 @@ class GGUFNativeBackend:
         seed: int | None = None,
         **_ignored: Any,
     ) -> str:
+        require_full_output = bool(getattr(
+            messages, "_otr_require_full_output_budget", False,
+        ))
         if grammar:
             raise GGUFNativeConfigError(
                 "The native GGUF lane does not accept raw GBNF `grammar`; "
@@ -1148,7 +1151,14 @@ class GGUFNativeBackend:
         if llm is None:
             raise GGUFNativeConfigError("cache_entry is missing the GGUF model.")
         cap = _int_env("GEMMA4_12B_MAX_NEW_TOKENS", DEFAULT_OUTPUT_TOKENS_CAP)
-        out_tokens = int(max_new_tokens or cap)
+        requested_tokens = int(max_new_tokens or cap)
+        if require_full_output and requested_tokens > cap:
+            capacity = GenerationContextOverflowError(
+                f"GGUF {ROW_ID} cannot fit the complete requested output: "
+                f"requested_output={requested_tokens}, provider_output_cap={cap}"
+            )
+            raise GGUFNativeConfigError(str(capacity)) from capacity
+        out_tokens = requested_tokens
         if out_tokens > cap:
             log.warning(
                 "[GGUFNative] output token request capped: requested=%d "
@@ -1166,6 +1176,7 @@ class GGUFNativeBackend:
                 prompt_tokens=estimate_prompt_tokens(messages),
                 min_output_tokens=min(64, cap),
                 label=f"GGUF {ROW_ID}",
+                require_full=require_full_output,
             )
         except GenerationContextOverflowError as exc:
             raise GGUFNativeConfigError(str(exc)) from exc

@@ -412,6 +412,30 @@ of guessing. If all bounded repairs genuinely fail, retain the explicit failed
 sentinel and deterministic non-authoring consumer defaults; do not silently
 invent episode content.
 
+## 28. Capacity is part of a bounded artifact contract
+
+An output-token request is normally a ceiling, so reducing it to the room left
+by the measured prompt is honest for an artifact that can be shorter. It is
+not honest for a closed patch or complete typed artifact whose required rows
+must all arrive. Mark that call explicitly as requiring the full requested
+output, capture the marker before any message normalization, and reject before
+model generation or network I/O when either the real context window or a
+provider output cap is smaller.
+
+Do not solve a row-local quality finding by re-emitting a complete script.
+Derive a closed target set, give the writer all voiced rows as read-only
+context, request only target-line replacements, merge only the owned text
+field, and run the complete artifact validator. A null reviewer coordinate may
+widen to all voiced rows; an invented non-null coordinate is noise and must not
+widen ownership.
+
+Quality work never owns episode liveness. Rejudge every successful patch, but
+after both available writer slots fail, keep the best already-valid script and
+stop that loop. Never restore an unchanged artifact and immediately ask the
+same judge for the same repair again. Build hashes, seals, ledger rows,
+readiness state, and media/publication pointers only after the final accepted or
+floored artifact so no downstream consumer can inherit a stale identity.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

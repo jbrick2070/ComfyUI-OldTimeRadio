@@ -501,7 +501,7 @@
             "codex_retake_system",
             "codex_coda_contract_system"
           ],
-          "description": "Writes a complete replacement ScriptArtifact from the current script and latest P6 review, never a line-level patch. Each accepted retake returns to a fresh P6 judgment."
+          "description": "Writes a bounded line-text patch from the current script and latest P6 review, merges only target line text, and returns every accepted patch to a fresh P6 judgment."
         },
         {
           "pass_id": "P8_final_audit",
@@ -517,10 +517,9 @@
           "slot": "creative",
           "seam_refs": [
             "codex_retake_system",
-            "codex_play_system",
             "codex_coda_contract_system"
           ],
-          "description": "Writes a complete final replacement from the current script and latest P8 findings. Every accepted replacement returns to a fresh P8 audit; quality-budget exhaustion keeps the best structurally valid script."
+          "description": "Writes a bounded line-text patch from the current script and latest P8 findings. Every accepted patch returns to a fresh P8 audit; quality-budget exhaustion keeps the best structurally valid script."
         },
         {
           "pass_id": "P10_structured_repair",

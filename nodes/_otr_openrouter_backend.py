@@ -1112,6 +1112,9 @@ class OpenRouterBackend:
         `model` is the cache_entry returned by `load()`. Enforces the
         cost ceiling BEFORE the call (C6), retries transient failures a
         bounded number of times, then aborts cleanly (C5)."""
+        require_full_output = bool(getattr(
+            messages, "_otr_require_full_output_budget", False,
+        ))
         cache_entry = model
         api_key = _env("OPENROUTER_API_KEY")
         if not api_key:
@@ -1152,6 +1155,12 @@ class OpenRouterBackend:
             ))
 
         requested_tokens = max(1, int(max_new_tokens or 0))
+        if require_full_output and requested_tokens > cap:
+            capacity = GenerationContextOverflowError(
+                f"OpenRouter {slug} cannot fit the complete requested output: "
+                f"requested_output={requested_tokens}, provider_output_cap={cap}"
+            )
+            raise OpenRouterConfigError(str(capacity)) from capacity
         if bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
             out_tokens = requested_tokens
         else:
@@ -1173,6 +1182,7 @@ class OpenRouterBackend:
                 # the reasoning floor would abort it.
                 min_output_tokens=min(base_floor, cap),
                 label=f"OpenRouter {slug}",
+                require_full=require_full_output,
             )
         except GenerationContextOverflowError as exc:
             raise OpenRouterConfigError(str(exc)) from exc
