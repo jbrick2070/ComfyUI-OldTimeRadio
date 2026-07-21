@@ -432,8 +432,9 @@ def _reresolve_master_audio(master_audio_path: str) -> str:
     ``pending_<ts>``; the ledger then renames that dir to its final slug. The
     captured absolute path becomes stale (its ``pending_<ts>`` directory no
     longer exists) even though the FILE moved into the renamed dir keeping the
-    SAME basename. Re-resolve to that same file via the newest on-disk ledger
-    (the same durable-ledger contract OTR_ShotLock uses for audio timing).
+    SAME basename. Re-resolve to that same file via the active in-flight ledger
+    (the same durable-ledger contract OTR_ShotLock uses for audio timing), never
+    a newest-mtime sibling guess.
 
     Returns the original path unchanged when it already exists, when disk state
     is disabled (``OTR_TEST_MODE``), or when no exact-basename match is found --
@@ -450,15 +451,21 @@ def _reresolve_master_audio(master_audio_path: str) -> str:
     try:
         from pathlib import Path
         from . import _otr_ledger as _OL
-        roots = []
-        try:
-            from . import _otr_paths as _OP
-            roots.append(Path(_OP.otr_episodes_root()))
-        except Exception:  # noqa: BLE001
-            base = os.environ.get("OTR_OUTPUT_DIR") or "."
-            roots.append(Path(base) / "otr" / "episodes")
-        p = _OL.find_most_recent_ledger(roots)
+        p = _OL.in_flight_ledger_path()
         if not p:
+            return master_audio_path
+        p = Path(p)
+        disk = _OL.load_ledger_safe(p)
+        episode_dir = p.parent.parent
+        if (
+            not isinstance(disk, dict)
+            or str(disk.get("episode_id") or "").strip()
+                != episode_dir.name
+        ):
+            log.warning(
+                "[OTR_MasterAudioMux] master audio re-resolve REJECTED: "
+                "active ledger identity does not match its episode directory"
+            )
             return master_audio_path
         cand = Path(p).parent / want          # <episode>/audio/<same-basename>
         if cand.is_file():

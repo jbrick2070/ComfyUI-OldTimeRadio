@@ -4,13 +4,69 @@ from __future__ import annotations
 import json
 import pathlib
 
-from nodes.otr_master_audio_mux import OTRMasterAudioMux
+from nodes.otr_master_audio_mux import OTRMasterAudioMux, _reresolve_master_audio
 
 WF = pathlib.Path(__file__).resolve().parent.parent / "workflows" / "otr_canonical.json"
 
 
 def _workflow():
     return json.loads(WF.read_text(encoding="utf-8"))
+
+
+def test_master_audio_reresolve_uses_active_ledger_not_newest_sibling(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    episodes = tmp_path / "otr" / "episodes"
+    active_audio = episodes / "signal_lost_active" / "audio"
+    sibling_audio = episodes / "signal_lost_newer_sibling" / "audio"
+    active_audio.mkdir(parents=True)
+    sibling_audio.mkdir(parents=True)
+    basename = "pending_123_master.wav"
+    active_master = active_audio / basename
+    sibling_master = sibling_audio / basename
+    active_master.write_bytes(b"active")
+    sibling_master.write_bytes(b"sibling")
+    active_ledger = active_audio / "signal_lost_active_ledger.json"
+    active_ledger.write_text('{"episode_id":"signal_lost_active"}', encoding="utf-8")
+    stale = str(episodes / "pending_123" / "audio" / basename)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: active_ledger,
+    )
+
+    assert _reresolve_master_audio(stale) == str(active_master)
+
+
+def test_master_audio_reresolve_fails_closed_without_active_ledger(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    stale = str(tmp_path / "pending" / "audio" / "master.wav")
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: None,
+    )
+
+    assert _reresolve_master_audio(stale) == stale
+
+
+def test_master_audio_reresolve_rejects_ledger_directory_identity_mismatch(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    audio = tmp_path / "otr" / "episodes" / "signal_lost_active" / "audio"
+    audio.mkdir(parents=True)
+    basename = "pending_123_master.wav"
+    (audio / basename).write_bytes(b"active")
+    active_ledger = audio / "signal_lost_active_ledger.json"
+    active_ledger.write_text(
+        '{"episode_id":"signal_lost_different"}', encoding="utf-8",
+    )
+    stale = str(tmp_path / "episodes" / "pending_123" / "audio" / basename)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: active_ledger,
+    )
+
+    assert _reresolve_master_audio(stale) == stale
 
 
 def test_master_audio_mux_declares_connector_only_clip_manifest_input():
@@ -36,9 +92,10 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # 279 = OTR_WorkflowValidator.validation_report -> node-1 gate_in; this
     # file's link IDs 85/92-side are unaffected, only the vector's ceiling).
     # 720-bakeoff C3 (2026-07-11): music cue fanout added links 280-283 (node
-    # 83 -> nodes 3/7), so the ceiling is now 283; the 85/92 SFX-manifest link
-    # IDs below are untouched.
-    assert wf["last_link_id"] == 283
+    # 83 -> nodes 3/7). PBUG-20260721-14 adds link 284, the post-rename
+    # SignalLostVideo completion gate into ShotLock; the 85/92 SFX-manifest
+    # link IDs below are untouched.
+    assert wf["last_link_id"] == 284
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",

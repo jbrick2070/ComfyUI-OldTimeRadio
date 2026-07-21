@@ -2350,3 +2350,49 @@ out until they independently meet the same production-only admission rule.
   mirrors while rejecting a changed cue and its mirror
 - bible-worthy: yes -- BUG-12.65
 - status: **LIVE-ADMITTED / ROOT-FIXED; focused + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**
+
+## PBUG-20260721-14 -- title rename moved assets but stranded their ledger identity
+- surfaced: canonical `scifi_news` episode
+  `signal_lost_the_chemical_throne_20260721_121728`, 2026-07-21. The audio
+  assembler rendered and timed three canonical cues, persisted three music
+  mirrors, and produced a byte-sealed master before SignalLostVideo renamed
+  `pending_20260721_112330` to the final title
+- symptom: the final ledger lived under the correct renamed directory, but all
+  three `music[].wav_path` values still pointed into the deleted pending
+  directory. The cue files themselves had moved and existed under the final
+  directory. A later singleton save reduced the durable line set from twelve
+  authored rows plus three assembler mirrors back to twelve rows. ShotLock
+  retained the stale wire episode id and path block, while image dispatch and
+  master mux escaped only through newest-ledger rescues. The video rendered,
+  but the ledger was not a truthful map of the assets that produced it
+- root cause: `Ledger.rename_episode` treated directory movement and identity
+  movement as different operations: it renamed bytes and the ledger filename
+  without recursively rebasing episode-local absolute JSON values. The
+  singleton merge iterated only rows already present in memory, so
+  assembler-owned disk-only mirrors had no join. The post-audio wire join did
+  not let a same-freeze durable final id and path block replace stale pending
+  values. ShotLock had no graph dependency on rename completion, and consumer
+  recovery chose the newest sibling ledger instead of the active owner
+- fix: rename now recursively rebuilds every absolute JSON string contained by
+  the old episode root, for both the durable ledger and singleton, and atomically
+  saves durable truth before advancing in-memory identity. External paths and
+  prefix siblings remain unchanged; retry after a partial move is idempotent
+  and durable-save failure is loud. Singleton saves preserve only validated
+  EpisodeAssembler music mirrors: same immutable freeze, unique matching cue,
+  recomputed cue-spec hash, legal role, master-timeline coordinates, and unique
+  line id. One-sided, mismatched, reauthored, malformed, and ordinary disk-only
+  rows are rejected. ShotLock lets the proven durable final episode id,
+  `meta.paths`, media sections, and terminal paths win. Canonical link 284 gates
+  ShotLock on SignalLostVideo rename completion. Image, clip, and master-audio
+  recovery use the active in-flight ledger with available freeze/directory
+  identity checks; no newest-mtime sibling selection remains
+- verify idea: parameterize the rename over all six source banks. Move real cue,
+  clip, master, path-block, and nested receipt values; require every episode
+  pointer to resolve under the final root while an external path stays exact.
+  Require freeze/readiness/authorship/master/cue hashes to remain unchanged and
+  assembler mirrors to survive a later singleton save. Reject foreign or
+  one-sided freezes, reauthored cues, malformed mirrors, ordinary disk-only
+  dialogue, and mismatched consumer directory identities. Validate canonical
+  link 284 and live-qualify both sci-fi banks through terminal OBS publication
+- bible-worthy: yes -- BUG-12.66
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused cross-bank + consumer tests, full-suite (8,297 passed), Bug Bible, and canonical workflow gates GREEN; live `scifi_news` + `scifi_news_pro` requalification pending**

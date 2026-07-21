@@ -171,16 +171,17 @@ def _same_frozen_episode(wire: dict, disk: dict) -> tuple[bool, str]:
 
     ``meta.freeze_timestamp`` is minted once by Phase 10 and survives the normal
     pending-id -> final-title rename, so it is the strongest identity receipt at
-    this join. Older ledgers without both receipts may fall back to an exact,
-    non-empty episode id. A mismatch is never guessed through title/slug
+    this join. If either side has one, both sides must have the same value.
+    Older ledgers may fall back to an exact, non-empty episode id only when
+    neither carries a receipt. A mismatch is never guessed through title/slug
     similarity: that would let a stale sibling episode donate audio truth.
     """
     wire_meta = wire.get("meta") if isinstance(wire.get("meta"), dict) else {}
     disk_meta = disk.get("meta") if isinstance(disk.get("meta"), dict) else {}
     wire_freeze = str(wire_meta.get("freeze_timestamp") or "").strip()
     disk_freeze = str(disk_meta.get("freeze_timestamp") or "").strip()
-    if wire_freeze and disk_freeze:
-        if wire_freeze == disk_freeze:
+    if wire_freeze or disk_freeze:
+        if wire_freeze and disk_freeze and wire_freeze == disk_freeze:
             return True, f"freeze_timestamp={wire_freeze}"
         return False, (
             "freeze_timestamp mismatch "
@@ -230,11 +231,22 @@ def overlay_audio_timing(ledger: dict) -> dict:
             )
             return ledger
 
+        # The durable ledger owns the legitimate pending-id -> final-title
+        # transition.  ``freeze_timestamp`` proves this is the same authored
+        # run, so downstream image/video consumers must receive the final id
+        # rather than the stale frozen-wire placeholder.
+        disk_episode_id = str(disk.get("episode_id") or "").strip()
+        if disk_episode_id:
+            ledger["episode_id"] = disk_episode_id
+
         # EpisodeAssembler is the producer/owner of this entire section. Disk
         # wins even when the pre-audio wire contains a stale non-empty hash.
         if "audio" in disk:
             ledger["audio"] = disk["audio"]
-        for key in ("audio_gates", "transitions", "radio_bookend_path"):
+        for key in (
+            "audio_gates", "transitions", "radio_bookend_path",
+            "final_audio_path", "final_video_path",
+        ):
             if key in disk:
                 ledger[key] = disk[key]
 
@@ -243,7 +255,12 @@ def overlay_audio_timing(ledger: dict) -> dict:
         if not isinstance(wire_meta, dict):
             wire_meta = {}
         for key, value in disk_meta.items():
-            if key not in wire_meta or wire_meta.get(key) in (None, "", [], {}):
+            # ``meta.paths`` is rename-owned durable truth.  It must replace a
+            # non-empty pending-root block on the frozen wire.  All other
+            # writer metadata retains missing-only merge semantics.
+            if key == "paths":
+                wire_meta[key] = value
+            elif key not in wire_meta or wire_meta.get(key) in (None, "", [], {}):
                 wire_meta[key] = value
         ledger["meta"] = wire_meta
 

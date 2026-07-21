@@ -253,7 +253,7 @@ def apply_fresh_cap(n_requested: int, fresh_cap: int, beat_budget: int) -> int:
     return max(0, min(int(n_requested), cap))
 
 
-def _reresolve_episode_stills_dir(ep, ep_dir, warnings):
+def _reresolve_episode_stills_dir(ep, ep_dir, warnings, ledger=None):
     """Rename-proof the EPISODE stills dir (operator ticket 2026-06-11; the
     OTR_MasterAudioMux ``_reresolve_master_audio`` contract applied to the
     dispatcher).
@@ -262,13 +262,14 @@ def _reresolve_episode_stills_dir(ep, ep_dir, warnings):
     renames it to the final title slug once the audio title is finalized. The
     dispatcher's wired ``episode_id`` was captured BEFORE that rename, so a
     post-rename dispatch would re-CREATE the stale ``pending_*`` dir and strand
-    every still outside the real episode folder. Re-resolve via the newest
-    on-disk ledger (the same durable-ledger contract the mux + ShotLock use):
+    every still outside the real episode folder. Re-resolve via the active
+    in-flight ledger (the same durable-ledger contract ShotLock uses), never a
+    newest-mtime sibling guess:
 
     * non-``pending_*`` id, or the pending dir still exists (rename has not
       happened yet) -> unchanged;
-    * pending dir GONE -> the newest ledger's episode dir is the rename target;
-      re-key there with a LOUD log + warning. Never silent;
+    * pending dir GONE -> the active durable ledger's episode dir is accepted
+      only after immutable freeze identity matches the wire ledger;
     * any probe failure -> unchanged (the shipped behavior).
 
     Returns ``(ep_dir, ep)``. ``OTR_TEST_MODE=1`` skips the disk scan (mirrors
@@ -283,18 +284,47 @@ def _reresolve_episode_stills_dir(ep, ep_dir, warnings):
         if os.path.isdir(episode_dir):
             return ep_dir, ep                               # rename not yet happened
         from pathlib import Path
-        from ._otr_ledger import find_most_recent_ledger
+        from . import _otr_ledger as _OTRL
         episodes_root = os.path.dirname(episode_dir)        # .../episodes
-        p = find_most_recent_ledger([Path(episodes_root)])
+        p = _OTRL.in_flight_ledger_path()
         if not p:
             return ep_dir, ep
+        p = Path(p)
         new_episode_dir = Path(p).parent.parent             # <root>/<ep>/audio/x_ledger.json
-        if new_episode_dir.is_dir() and new_episode_dir.parent == Path(episodes_root):
+        if not (
+            new_episode_dir.is_dir()
+            and new_episode_dir.parent == Path(episodes_root)
+        ):
+            return ep_dir, ep
+
+        disk = _OTRL.load_ledger_safe(p)
+        wire_meta = (
+            ledger.get("meta") if isinstance(ledger, dict)
+            and isinstance(ledger.get("meta"), dict) else {}
+        )
+        disk_meta = (
+            disk.get("meta") if isinstance(disk, dict)
+            and isinstance(disk.get("meta"), dict) else {}
+        )
+        wire_freeze = str(wire_meta.get("freeze_timestamp") or "").strip()
+        disk_freeze = str(disk_meta.get("freeze_timestamp") or "").strip()
+        if not wire_freeze or not disk_freeze or wire_freeze != disk_freeze:
+            message = (
+                "episode stills re-resolve REJECTED: active durable ledger "
+                "does not share the wire freeze receipt"
+            )
+            log.warning("[OTR_ImageGenDispatcher] %s", message)
+            warnings.append(message)
+            return ep_dir, ep
+
+        if isinstance(disk, dict):
             new_ep = new_episode_dir.name
+            if str(disk.get("episode_id") or "").strip() != new_ep:
+                return ep_dir, ep
             log.warning(
                 "[OTR_ImageGenDispatcher] LOUD re-resolve: episode_id %r is a "
                 "stale pending id (its dir was renamed after capture); stills "
-                "re-keyed to the newest ledger's episode dir %r (same episode, "
+                "re-keyed to the active ledger's episode dir %r (same episode, "
                 "post-rename name).", ep, new_ep)
             warnings.append(
                 f"episode stills dir re-resolved: stale {ep!r} -> {new_ep!r} "
@@ -557,8 +587,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     ep_dir = str(_pl.episode_stills_dir(ep, output_dir=output_dir))
     # Operator ticket 2026-06-11: the title rename (pending_* -> final slug)
     # can land BEFORE image dispatch; re-key the stills dir to the renamed
-    # episode dir via the newest on-disk ledger (mux-style re-resolve, LOUD).
-    ep_dir, ep = _reresolve_episode_stills_dir(ep, ep_dir, warnings)
+    # episode dir via the active in-flight ledger (mux-style re-resolve, LOUD).
+    ep_dir, ep = _reresolve_episode_stills_dir(
+        ep, ep_dir, warnings, ledger=ledger,
+    )
+    # A successful same-freeze re-key is durable identity truth, not merely an
+    # output-directory hint.  Carry it through the wire so VideoRenderBatch
+    # never recreates the retired pending workspace.
+    ledger["episode_id"] = ep
     ep_rows: list = []
 
     rev = int(images_section.get("image_revision") or 0) + 1

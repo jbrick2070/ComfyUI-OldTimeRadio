@@ -161,3 +161,12 @@ def test_production_workflow_visual_structure_pinned():
         "dispatcher episode_id input missing or unwired (ST-6)")
     assert links[268][1:3] == [90, 4], (
         "episode_id must come from OTR_ShotLock out 4")
+
+    # -- 6. pending-to-final rename gate ------------------------------------
+    # ShotLock must read the durable ledger only after SignalLostVideo has
+    # moved/rebased it, so image/video consumers receive the final episode id
+    # and paths rather than activating newest-ledger rescue logic.
+    n90 = nodes[90]
+    rename_gate = [i for i in n90["inputs"] if i.get("name") == "gate_in"]
+    assert rename_gate and rename_gate[0].get("link") == 284
+    assert links[284] == [284, 12, 0, 90, 4, "STRING"]

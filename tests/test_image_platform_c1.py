@@ -1540,22 +1540,32 @@ def test_dispatch_persists_still_word_provenance(clean_image_registry, tmp_path)
 # Operator ticket 2026-06-11: stale pending_* stills dir -- mux-style re-resolve
 # --------------------------------------------------------------------------- #
 def _episodes_fixture(tmp_path, final_slug="signal_lost_rapid_roots_x"):
-    """A renamed-episode disk layout: the final dir holds the newest ledger;
+    """A renamed-episode disk layout: the final dir holds the active ledger;
     the pending dir is GONE (the rename already happened)."""
     root = tmp_path / "otr" / "episodes"
     audio = root / final_slug / "audio"
     audio.mkdir(parents=True)
-    (audio / f"{final_slug}_ledger.json").write_text("{}", encoding="utf-8")
-    return root
+    ledger_path = audio / f"{final_slug}_ledger.json"
+    ledger_path.write_text(json.dumps({
+        "episode_id": final_slug,
+        "meta": {"freeze_timestamp": "freeze-image-reresolve"},
+    }), encoding="utf-8")
+    return root, ledger_path
 
 
 def test_reresolve_stale_pending_rekeys_to_renamed_episode(tmp_path, monkeypatch):
     from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)
-    root = _episodes_fixture(tmp_path)
+    root, ledger_path = _episodes_fixture(tmp_path)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: ledger_path,
+    )
     warns = []
     stale = str(root / "pending_20260611_010101" / "stills")
-    new_dir, new_ep = _reresolve_episode_stills_dir("pending_20260611_010101", stale, warns)
+    new_dir, new_ep = _reresolve_episode_stills_dir(
+        "pending_20260611_010101", stale, warns,
+        ledger={"meta": {"freeze_timestamp": "freeze-image-reresolve"}},
+    )
     assert new_ep == "signal_lost_rapid_roots_x"
     assert new_dir == str(root / "signal_lost_rapid_roots_x" / "stills")
     assert warns and "re-resolved" in warns[0]
@@ -1564,7 +1574,7 @@ def test_reresolve_stale_pending_rekeys_to_renamed_episode(tmp_path, monkeypatch
 def test_reresolve_pending_dir_still_live_is_untouched(tmp_path, monkeypatch):
     from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)
-    root = _episodes_fixture(tmp_path)
+    root, _ledger_path = _episodes_fixture(tmp_path)
     live = root / "pending_20260611_020202"
     (live / "stills").mkdir(parents=True)   # rename has NOT happened yet
     warns = []
@@ -1577,7 +1587,7 @@ def test_reresolve_pending_dir_still_live_is_untouched(tmp_path, monkeypatch):
 def test_reresolve_non_pending_id_untouched(tmp_path, monkeypatch):
     from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)
-    root = _episodes_fixture(tmp_path)
+    root, _ledger_path = _episodes_fixture(tmp_path)
     target = str(root / "my_final_episode" / "stills")
     warns = []
     assert _reresolve_episode_stills_dir("my_final_episode", target, warns) == \
@@ -1588,9 +1598,29 @@ def test_reresolve_non_pending_id_untouched(tmp_path, monkeypatch):
 def test_reresolve_skipped_in_test_mode(tmp_path, monkeypatch):
     from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
     monkeypatch.setenv("OTR_TEST_MODE", "1")
-    root = _episodes_fixture(tmp_path)
+    root, _ledger_path = _episodes_fixture(tmp_path)
     stale = str(root / "pending_20260611_030303" / "stills")
     warns = []
     assert _reresolve_episode_stills_dir("pending_20260611_030303", stale, warns) == \
         (stale, "pending_20260611_030303")
     assert not warns
+
+
+def test_reresolve_rejects_active_sibling_with_different_freeze(tmp_path, monkeypatch):
+    from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
+
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root, ledger_path = _episodes_fixture(tmp_path)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: ledger_path,
+    )
+    warns = []
+    stale = str(root / "pending_20260611_040404" / "stills")
+
+    resolved = _reresolve_episode_stills_dir(
+        "pending_20260611_040404", stale, warns,
+        ledger={"meta": {"freeze_timestamp": "freeze-other-run"}},
+    )
+
+    assert resolved == (stale, "pending_20260611_040404")
+    assert warns and "REJECTED" in warns[0]

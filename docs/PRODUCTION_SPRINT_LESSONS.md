@@ -461,6 +461,33 @@ fields only on cue identity, and forward only mirrors whose cue passed that
 join. Music may remain an optional creative bus, but when it renders its ledger
 accounting cannot be optional.
 
+## 30. Move serialized identity with a renamed artifact tree
+
+Renaming a directory moves bytes, not the absolute paths serialized inside its
+ledger. Treat a pending-to-final rename as one transaction: move the directory,
+canonicalize the ledger filename, recursively rebase only absolute string
+values contained by the old root, atomically persist the durable ledger, and
+only then advance in-memory identity. Use path-component containment rather than
+text prefixing, and leave external models, shared caches, source media, and OBS
+destinations untouched. Make the transformation idempotent so a retry can
+resume after the directory moved but before the ledger save completed.
+
+A keyed merge does not preserve producer-owned rows that exist only on disk.
+Add a narrow row join for each such producer instead of copying arbitrary stale
+content. Prove the immutable run receipt first; then prove the parent object,
+recompute its authored hash on both sides, validate producer-specific timing
+and role fields, and reject duplicates. If either side has a freeze receipt,
+both must carry the same value; episode-name fallback belongs only to two truly
+legacy records with no receipt.
+
+Post-rename consumers must join through the active durable owner, never through
+the newest sibling by modification time. Where a stale pre-rename value is
+already on a wire, add an explicit graph dependency on rename completion and
+let same-receipt durable identity replace stale episode/path fields. Consumer
+rescues should validate the durable episode against its directory and use the
+freeze receipt whenever the caller carries it. A render is not qualified until
+the final ledger can locate every asset without referring to the retired root.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

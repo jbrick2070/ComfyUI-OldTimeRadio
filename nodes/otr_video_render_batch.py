@@ -318,7 +318,11 @@ class OTRVideoRenderBatch:
         # manifest (and the composite) reference stable paths the sweep won't
         # delete. Best-effort + LOUD; never aborts the render.
         manifest_episode_id = _rd.resolve_episode_id_for_clip_persistence(
-            episode_id)
+            episode_id,
+            freeze_timestamp=str(
+                ((ledger.get("meta") or {}).get("freeze_timestamp") or "")
+            ),
+        )
         _rd.persist_episode_clips(ep, manifest_episode_id)
         manifest = _rd.build_clip_manifest(ep, episode_id=manifest_episode_id)
         # Round 5 F2 (warn-only): the per-beat brief-composed prompts must

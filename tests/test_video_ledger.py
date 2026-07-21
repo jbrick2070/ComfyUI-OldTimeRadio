@@ -39,6 +39,22 @@ from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
 # Helper-level tests (module-level functions, no class instantiation)
 # ---------------------------------------------------------------------------
 
+def test_shot_lock_identity_rejects_one_sided_freeze():
+    from nodes.otr_shot_lock import _same_frozen_episode
+
+    current = {
+        "episode_id": "same_name",
+        "meta": {"freeze_timestamp": "freeze-current"},
+    }
+    legacy_or_stale = {"episode_id": "same_name", "meta": {}}
+
+    assert not _same_frozen_episode(current, legacy_or_stale)[0]
+    assert not _same_frozen_episode(legacy_or_stale, current)[0]
+    assert _same_frozen_episode(
+        legacy_or_stale,
+        {"episode_id": "same_name", "meta": {}},
+    )[0]
+
 def test_in_flight_ledger_test_mode_never_mtime_walks_live_outputs(monkeypatch):
     """Tests must not fall through to the live ComfyUI output tree.
 
@@ -564,7 +580,10 @@ def test_post_audio_overlay_rehydrates_owned_sections_despite_existing_timing(
     wire = {
         "episode_id": "pending_20260721_014156",
         "audio": {"master_audio_sha256": "stale-wire-hash"},
-        "meta": {"freeze_timestamp": freeze, "writer_owned": "keep"},
+        "meta": {
+            "freeze_timestamp": freeze, "writer_owned": "keep",
+            "paths": {"episode_root": "C:/episode/pending"},
+        },
         "lines": [{"line_id": "b001", "dur_s": 1.0}],
     }
     disk = {
@@ -576,9 +595,12 @@ def test_post_audio_overlay_rehydrates_owned_sections_despite_existing_timing(
         "audio_gates": {"episode_assembler": {"ok": True}},
         "transitions": [{"at_s": 9.5}],
         "radio_bookend_path": "C:/episode/radio.wav",
+        "final_audio_path": "C:/episode/final/master.wav",
+        "final_video_path": "C:/episode/final/procgen.mp4",
         "meta": {
             "freeze_timestamp": freeze,
             "writer_owned": "must-not-overwrite",
+            "paths": {"episode_root": "C:/episode/final"},
             "phase_ms": {"episode_assembler": 136},
             "char_voice_engine": "kokoro",
         },
@@ -596,12 +618,15 @@ def test_post_audio_overlay_rehydrates_owned_sections_despite_existing_timing(
 
     out = sl.overlay_audio_timing(wire)
 
-    assert out["episode_id"] == "pending_20260721_014156"
+    assert out["episode_id"] == "signal_lost_final_20260721_020231"
     assert out["audio"] == disk["audio"]
     assert out["audio_gates"] == disk["audio_gates"]
     assert out["transitions"] == disk["transitions"]
     assert out["radio_bookend_path"] == disk["radio_bookend_path"]
+    assert out["final_audio_path"] == disk["final_audio_path"]
+    assert out["final_video_path"] == disk["final_video_path"]
     assert out["meta"]["writer_owned"] == "keep"
+    assert out["meta"]["paths"] == {"episode_root": "C:/episode/final"}
     assert out["meta"]["phase_ms"] == {"episode_assembler": 136}
     assert out["meta"]["char_voice_engine"] == "kokoro"
     assert out["lines"][0]["dur_s"] == 1.0  # populated wire timing remains owned

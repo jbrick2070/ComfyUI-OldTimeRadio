@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import json
 
 import pytest
 
@@ -214,12 +215,20 @@ def test_resolve_stale_pending_clip_episode_to_renamed_dir(monkeypatch, tmp_path
     final = root / "signal_lost_final"
     audio = final / "audio"
     audio.mkdir(parents=True)
-    (audio / "signal_lost_final_ledger.json").write_text(
-        '{"episode_id":"signal_lost_final"}', encoding="utf-8")
+    ledger_path = audio / "signal_lost_final_ledger.json"
+    ledger_path.write_text(json.dumps({
+        "episode_id": "signal_lost_final",
+        "meta": {"freeze_timestamp": "freeze-clips"},
+    }), encoding="utf-8")
     monkeypatch.setattr(paths, "otr_episodes_root", lambda: root)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: ledger_path,
+    )
 
     assert rd.resolve_episode_id_for_clip_persistence(
-        "pending_20260708_010101") == "signal_lost_final"
+        "pending_20260708_010101",
+        freeze_timestamp="freeze-clips",
+    ) == "signal_lost_final"
 
 
 def test_persist_rekeys_sfx_to_renamed_episode_clips(monkeypatch, tmp_path):
@@ -231,9 +240,15 @@ def test_persist_rekeys_sfx_to_renamed_episode_clips(monkeypatch, tmp_path):
     final = root / "signal_lost_final"
     audio = final / "audio"
     audio.mkdir(parents=True)
-    (audio / "signal_lost_final_ledger.json").write_text(
-        '{"episode_id":"signal_lost_final"}', encoding="utf-8")
+    ledger_path = audio / "signal_lost_final_ledger.json"
+    ledger_path.write_text(json.dumps({
+        "episode_id": "signal_lost_final",
+        "meta": {"freeze_timestamp": "freeze-clips"},
+    }), encoding="utf-8")
     monkeypatch.setattr(paths, "otr_episodes_root", lambda: root)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: ledger_path,
+    )
     monkeypatch.setattr(
         paths, "otr_clips_dir",
         lambda eid: root / eid / "clips")
@@ -269,6 +284,31 @@ def test_persist_rekeys_sfx_to_renamed_episode_clips(monkeypatch, tmp_path):
     assert not (root / "pending_20260708_010101").exists()
     assert not clip_src.exists()
     assert not sfx_src.exists()
+
+
+def test_resolve_stale_pending_clip_rejects_foreign_freeze(monkeypatch, tmp_path):
+    from nodes._otr_video_engines import render_driver as rd
+    import nodes._otr_paths as paths
+
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root = tmp_path / "otr" / "episodes"
+    final = root / "signal_lost_foreign"
+    audio = final / "audio"
+    audio.mkdir(parents=True)
+    ledger_path = audio / "signal_lost_foreign_ledger.json"
+    ledger_path.write_text(json.dumps({
+        "episode_id": "signal_lost_foreign",
+        "meta": {"freeze_timestamp": "freeze-foreign"},
+    }), encoding="utf-8")
+    monkeypatch.setattr(paths, "otr_episodes_root", lambda: root)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: ledger_path,
+    )
+
+    assert rd.resolve_episode_id_for_clip_persistence(
+        "pending_20260708_020202",
+        freeze_timestamp="freeze-current",
+    ) == "pending_20260708_020202"
 
 
 # --------------------------------------------------------------------------- #

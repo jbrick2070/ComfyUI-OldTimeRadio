@@ -19,9 +19,12 @@ from nodes.production_ledger import (  # noqa: E402
     Ledger,
     get_ledger,
     new_ledger,
+    _rebase_episode_local_paths,
+    _same_durable_run,
     _slugify,
     _word_count,
     _char_count,
+    music_cue_spec_sha256,
 )
 
 
@@ -39,6 +42,20 @@ def tmp_out(tmp_path) -> Path:
 # ---------------------------------------------------------------------------
 
 class TestUtilities:
+    def test_durable_identity_rejects_one_sided_freeze(self):
+        current = {
+            "episode_id": "same_name",
+            "meta": {"freeze_timestamp": "freeze-current"},
+        }
+        legacy_or_stale = {"episode_id": "same_name", "meta": {}}
+
+        assert not _same_durable_run(current, legacy_or_stale)
+        assert not _same_durable_run(legacy_or_stale, current)
+        assert _same_durable_run(
+            legacy_or_stale,
+            {"episode_id": "same_name", "meta": {}},
+        )
+
     def test_slugify_basic(self):
         assert _slugify("Black Sphere") == "black_sphere"
 
@@ -245,6 +262,177 @@ class TestDualLedgerFix:
         led.rename_episode("pending_test")  # same id
         assert Path(led.path) == path1
         assert path1.exists()
+
+    def test_path_rebase_handles_windows_slashes_and_component_boundaries(self):
+        old = r"C:\output\otr\episodes\pending_1"
+        new = r"C:\output\otr\episodes\signal_lost_final"
+        payload = {
+            "backslash": old + r"\audio\cue.wav",
+            "forward": "C:/output/otr/episodes/pending_1/clips/shot.mp4",
+            "external": r"C:\models\voice.wav",
+            "prefix_sibling": old + r"_other\audio\not_this_run.wav",
+            "prose": "the pending_1 directory moved",
+        }
+
+        rebased, count = _rebase_episode_local_paths(payload, old, new)
+
+        assert count == 2
+        assert rebased["backslash"] == new + r"\audio\cue.wav"
+        assert rebased["forward"] == new + r"\clips\shot.mp4"
+        assert rebased["external"] == payload["external"]
+        assert rebased["prefix_sibling"] == payload["prefix_sibling"]
+        assert rebased["prose"] == payload["prose"]
+
+    @pytest.mark.parametrize("bank", [
+        "media_archive", "original", "public_domain", "shakespeare",
+        "scifi_news", "scifi_news_pro",
+    ])
+    def test_rename_rebases_shared_six_bank_episode_paths(self, tmp_out, bank):
+        old_id = f"pending_{bank}"
+        new_id = f"signal_lost_{bank}_final"
+        old_root = tmp_out / bank / "episodes" / old_id
+        old_audio = old_root / "audio"
+        old_audio.mkdir(parents=True)
+        cue_path = old_audio / "music_cue_opening.wav"
+        cue_path.write_bytes(b"cue")
+        clip_path = old_root / "clips" / "shot.mp4"
+        clip_path.parent.mkdir()
+        clip_path.write_bytes(b"clip")
+        master_path = old_audio / f"{old_id}_master.wav"
+        master_path.write_bytes(b"master")
+        external_ref = tmp_out / "shared" / "voice.wav"
+        external_ref.parent.mkdir(exist_ok=True)
+        external_ref.write_bytes(b"voice")
+
+        led = Ledger(old_id, str(old_audio))
+        led.data["meta"] = {
+            "source_bank": bank,
+            "freeze_timestamp": f"freeze-{bank}",
+            "audio_readiness": {"ok": True},
+            "readiness_passes": [{"text_hash_before": 11, "text_hash_after": 11}],
+            "content_authorship": {"sha256": "ab" * 32},
+            "external_voice_ref": str(external_ref),
+        }
+        led.set_lines([{
+            "line_id": "l001", "text": "A clean line.",
+            "char_id": "c01", "speaker_role": "character",
+        }])
+        led.set_music([{
+            "cue_id": "opening", "generation_prompt": "low radio pulse",
+            "target_duration_s": 1.0, "placement": "opening",
+            "anchor_line_id": "l001",
+        }])
+        led.data["clips"] = [{
+            "line_id": "l001", "video_clip_path": str(clip_path),
+        }]
+        led.data["audio"] = {
+            "master_audio_sha256": "cd" * 32,
+            "master_audio_path": str(master_path),
+            "ledger_frozen": True,
+        }
+        led.data["renderer_receipts"] = {
+            "nested_assets": [str(cue_path), str(clip_path), str(external_ref)],
+        }
+        led.save()
+
+        pending_path = Path(led.path)
+        disk = json.loads(pending_path.read_text(encoding="utf-8"))
+        disk_cue = disk["music"][0]
+        disk_cue.update({
+            "wav_path": str(cue_path), "start_s": 0.0, "dur_s": 1.0,
+            "start_s_space": "master_mix",
+        })
+        disk_cue["cue_spec_sha256"] = music_cue_spec_sha256(disk_cue)
+        disk["lines"].append({
+            "line_id": "music_opening_001", "speaker_role": "music_open",
+            "mirrored_from": "music", "music_cue_id": "opening",
+            "start_s": 0.0, "dur_s": 1.0,
+            "start_s_space": "master_mix",
+        })
+        pending_path.write_text(json.dumps(disk, indent=2), encoding="utf-8")
+
+        sealed_before = {
+            "freeze_timestamp": disk["meta"]["freeze_timestamp"],
+            "audio_readiness": disk["meta"]["audio_readiness"],
+            "readiness_passes": disk["meta"]["readiness_passes"],
+            "content_authorship": disk["meta"]["content_authorship"],
+            "master_audio_sha256": disk["audio"]["master_audio_sha256"],
+            "cue_spec_sha256": disk_cue["cue_spec_sha256"],
+        }
+
+        led.rename_episode(new_id)
+        led.save()
+
+        final_path = Path(led.path)
+        final = json.loads(final_path.read_text(encoding="utf-8"))
+        final_root = old_root.parent / new_id
+        assert not old_root.exists()
+        assert final_path.exists()
+        assert Path(final["music"][0]["wav_path"]).is_file()
+        assert Path(final["clips"][0]["video_clip_path"]).is_file()
+        assert Path(final["audio"]["master_audio_path"]).is_file()
+        _unused, stale_path_count = _rebase_episode_local_paths(
+            final, str(old_root), str(final_root),
+        )
+        assert stale_path_count == 0
+        assert Path(final["meta"]["paths"]["episode_root"]) == final_root
+        assert Path(final["meta"]["paths"]["audio_dir"]) == final_root / "audio"
+        assert Path(final["renderer_receipts"]["nested_assets"][0]).is_file()
+        assert Path(final["renderer_receipts"]["nested_assets"][1]).is_file()
+        assert final["renderer_receipts"]["nested_assets"][2] == str(external_ref)
+        assert final["meta"]["external_voice_ref"] == str(external_ref)
+        mirrors = [
+            row for row in final["lines"]
+            if row.get("mirrored_from") == "music"
+        ]
+        assert [row["line_id"] for row in mirrors] == ["music_opening_001"]
+        assert final["meta"]["freeze_timestamp"] == sealed_before["freeze_timestamp"]
+        assert final["meta"]["audio_readiness"] == sealed_before["audio_readiness"]
+        assert final["meta"]["readiness_passes"] == sealed_before["readiness_passes"]
+        assert final["meta"]["content_authorship"] == sealed_before["content_authorship"]
+        assert final["audio"]["master_audio_sha256"] == sealed_before["master_audio_sha256"]
+        assert final["music"][0]["cue_spec_sha256"] == sealed_before["cue_spec_sha256"]
+        assert Path(final["music"][0]["wav_path"]).is_relative_to(final_root)
+
+    def test_merge_rejects_foreign_or_reauthored_disk_only_music_mirrors(self, tmp_out):
+        led = Ledger("ep_mirror_gate", str(tmp_out))
+        led.data["meta"] = {"freeze_timestamp": "freeze-current"}
+        led.set_lines([{
+            "line_id": "l001", "text": "Current line.",
+            "char_id": "c01", "speaker_role": "character",
+        }])
+        led.set_music([{
+            "cue_id": "opening", "generation_prompt": "current pulse",
+            "target_duration_s": 1.0, "placement": "opening",
+            "anchor_line_id": "l001",
+        }])
+        led.save()
+        path = Path(led.path)
+        disk = json.loads(path.read_text(encoding="utf-8"))
+        disk["meta"]["freeze_timestamp"] = "freeze-foreign"
+        disk["music"][0]["generation_prompt"] = "stale pulse"
+        disk["music"][0]["cue_spec_sha256"] = music_cue_spec_sha256(
+            disk["music"][0]
+        )
+        disk["lines"].extend([
+            {
+                "line_id": "music_opening_001", "speaker_role": "music_open",
+                "mirrored_from": "music", "music_cue_id": "opening",
+                "start_s": 0.0, "dur_s": 1.0,
+                "start_s_space": "master_mix",
+            },
+            {"line_id": "l999", "text": "stale ordinary disk content"},
+        ])
+        path.write_text(json.dumps(disk, indent=2), encoding="utf-8")
+
+        led.save()
+        merged = json.loads(path.read_text(encoding="utf-8"))
+
+        assert not any(
+            row.get("mirrored_from") == "music" for row in merged["lines"]
+        )
+        assert not any(row.get("line_id") == "l999" for row in merged["lines"])
+        assert merged["meta"]["freeze_timestamp"] == "freeze-current"
 
     def test_save_merges_schema_l3_fields_from_disk(self, tmp_out):
         """Audio nodes write schema-l3 fields directly via

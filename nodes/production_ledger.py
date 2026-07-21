@@ -54,7 +54,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import ntpath
 import os
+import posixpath
 import re
 import subprocess
 import threading
@@ -358,6 +360,104 @@ def music_cue_spec_sha256(row: Dict[str, Any]) -> Optional[str]:
     return _row_identity("music", row)
 
 
+def _rebase_episode_local_paths(
+    value: Any,
+    old_episode_root: str,
+    new_episode_root: str,
+) -> "tuple[Any, int]":
+    """Purely rebase absolute JSON paths inside a moved episode directory.
+
+    ``Ledger.rename_episode`` moves the whole per-episode directory.  Every
+    absolute ledger pointer below that directory must move with it, including
+    nested renderer receipts that this module does not otherwise understand.
+    A field-name allow-list is therefore the wrong ownership boundary.  This
+    walker changes only absolute string *values* whose normalized path is
+    contained by ``old_episode_root`` on a component boundary; external model,
+    source, shared-cache, and OBS paths remain byte-identical.
+
+    Both Windows and POSIX path spellings are handled deterministically even
+    when tests run on the other platform.  The returned count makes the rename
+    receipt auditable.  Input containers are not mutated.
+    """
+    old_root = str(old_episode_root or "")
+    new_root = str(new_episode_root or "")
+    if not old_root or not new_root:
+        return value, 0
+
+    # ``ntpath`` recognizes both C:\\x and C:/x on every host.  Use POSIX
+    # semantics only when the root is genuinely POSIX-absolute.
+    pathmod = ntpath if ntpath.isabs(old_root) else posixpath
+    old_norm = pathmod.normcase(pathmod.normpath(old_root))
+    new_norm = pathmod.normpath(new_root)
+
+    def _walk(current: Any) -> "tuple[Any, int]":
+        if isinstance(current, str):
+            if not pathmod.isabs(current):
+                return current, 0
+            candidate_norm = pathmod.normcase(pathmod.normpath(current))
+            try:
+                inside = pathmod.commonpath((old_norm, candidate_norm)) == old_norm
+            except (ValueError, OSError):
+                inside = False
+            if not inside:
+                return current, 0
+            relative = pathmod.relpath(pathmod.normpath(current), old_root)
+            rebased = pathmod.normpath(pathmod.join(new_norm, relative))
+            return rebased, int(rebased != current)
+        if isinstance(current, dict):
+            changed = 0
+            rebuilt: Dict[Any, Any] = {}
+            for key, item in current.items():
+                rebuilt_item, item_count = _walk(item)
+                rebuilt[key] = rebuilt_item
+                changed += item_count
+            return rebuilt, changed
+        if isinstance(current, list):
+            changed = 0
+            rebuilt_list = []
+            for item in current:
+                rebuilt_item, item_count = _walk(item)
+                rebuilt_list.append(rebuilt_item)
+                changed += item_count
+            return rebuilt_list, changed
+        if isinstance(current, tuple):
+            changed = 0
+            rebuilt_tuple = []
+            for item in current:
+                rebuilt_item, item_count = _walk(item)
+                rebuilt_tuple.append(rebuilt_item)
+                changed += item_count
+            return tuple(rebuilt_tuple), changed
+        return current, 0
+
+    return _walk(value)
+
+
+def _same_durable_run(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
+    """Identity proof for a disk-to-singleton merge.
+
+    The immutable freeze receipt survives the legitimate pending-to-title
+    rename. If either side has one, both sides must have the same value.
+    Older/pre-freeze records may fall back to an exact non-empty episode id
+    only when neither side has a receipt. A stale or partially stripped record
+    is never allowed to exchange producer-owned rows merely because a filename
+    or episode id collides.
+    """
+    left_meta = left.get("meta") if isinstance(left.get("meta"), dict) else {}
+    right_meta = right.get("meta") if isinstance(right.get("meta"), dict) else {}
+    left_freeze = str(left_meta.get("freeze_timestamp") or "").strip()
+    right_freeze = str(right_meta.get("freeze_timestamp") or "").strip()
+    if left_freeze or right_freeze:
+        return bool(
+            left_freeze
+            and right_freeze
+            and left_freeze == right_freeze
+        )
+    left_episode = str(left.get("episode_id") or "").strip()
+    right_episode = str(right.get("episode_id") or "").strip()
+    return bool(left_episode and right_episode and left_episode == right_episode)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -610,13 +710,14 @@ class Ledger:
 
         Order of operations after dir is in final position:
           1) Move dir (with retry)
-          2) Update in-memory state (episode_id, out_dir)
-          3) Rename ledger file to canonical name
-          4) Rename treatment + sidecar (<old>_*.txt -> <new>_*.txt)
+          2) Rename ledger file to canonical name
+          3) Rebase every episode-local durable path and atomically save
+          4) Rebase/update in-memory state (episode_id, out_dir)
+          5) Rename treatment + sidecar (<old>_*.txt -> <new>_*.txt)
 
-        Steps 3 + 4 log warnings on individual file failures but do not
-        raise; the dir-move success has already established the
-        invariant that downstream nodes need.
+        The durable path rewrite is required and fails loudly: continuing with
+        pointers into the deleted pending directory creates a mechanically
+        successful but false ledger. Sidecar renames remain best-effort.
 
         BUG-LOCAL-108 history (2026-04-29 morning): prior implementation
         only changed in-memory ``self.episode_id``. On-disk
@@ -722,20 +823,16 @@ class Ledger:
             )
             moved_dir = True
 
-        # Step 2: update in-memory state. Only past this point if dir
-        # is in its final on-disk position (or was already there).
-        self.episode_id = new_id
-        self.data["episode_id"] = new_id
-        self.out_dir = new_audio_dir
-
-        # Step 3: rename the ledger file inside the (now-moved) audio dir
-        # to the new canonical filename. Best-effort: warn on failure
-        # but do not raise (the dir invariant is already satisfied; the
-        # next save() will write to self.path which uses new_id).
+        # Step 2: rename the ledger file inside the (now-moved) audio dir to
+        # the canonical filename.  This used to be best-effort, but a failure
+        # here would make the required durable path rewrite impossible and the
+        # next singleton save would silently drop out-of-band producer rows.
         old_ledger_path = os.path.join(
             new_audio_dir, f"{_slugify(old, limit=120)}_ledger.json"
         )
-        new_ledger_path = self.path
+        new_ledger_path = os.path.join(
+            new_audio_dir, f"{_slugify(new_id, limit=120)}_ledger.json"
+        )
         if (old_ledger_path != new_ledger_path
                 and os.path.exists(old_ledger_path)):
             try:
@@ -746,13 +843,64 @@ class Ledger:
                     os.path.basename(new_ledger_path),
                 )
             except OSError as exc:
-                log.warning(
-                    "[Ledger] ledger file rename failed (%s -> %s): %s; "
-                    "next save() will reconcile",
-                    old_ledger_path, new_ledger_path, exc,
-                )
+                raise RuntimeError(
+                    f"[Ledger] ledger file rename failed "
+                    f"({old_ledger_path} -> {new_ledger_path}): {exc}. "
+                    "Durable episode-local paths were NOT rewritten; retry "
+                    "the idempotent rename after the file lock clears."
+                ) from exc
 
-        # Step 4: rename treatment + any other owned txt sidecars from
+        # Step 3: rebase the durable JSON itself before any later singleton
+        # merge can copy stale pending-root paths back into memory.  This is a
+        # recursive path-ownership rule, not a field allow-list: future nested
+        # media receipts move safely while external refs remain untouched.
+        disk_rebased = 0
+        if os.path.exists(new_ledger_path):
+            try:
+                from pathlib import Path as _Path
+                from . import _otr_ledger as _OTRL  # type: ignore
+
+                with open(new_ledger_path, "r", encoding="utf-8") as _fh:
+                    _disk_ledger = json.load(_fh)
+                if not isinstance(_disk_ledger, dict):
+                    raise TypeError(
+                        "durable ledger root is "
+                        f"{type(_disk_ledger).__name__}, expected object"
+                    )
+                _disk_ledger, disk_rebased = _rebase_episode_local_paths(
+                    _disk_ledger, old_ep_dir, new_ep_dir,
+                )
+                _disk_ledger["episode_id"] = new_id
+                if not _OTRL.save_ledger_safe(
+                    _Path(new_ledger_path), _disk_ledger,
+                ):
+                    raise OSError("atomic save_ledger_safe returned False")
+            except Exception as exc:  # noqa: BLE001 - required boundary
+                raise RuntimeError(
+                    "[Ledger] rename_episode: durable episode-local path "
+                    f"rewrite failed for {new_ledger_path}: {exc}. "
+                    "Pipeline stopped before consumers could observe stale "
+                    "pending-root pointers; retry is idempotent."
+                ) from exc
+
+        # Step 4: only advance the singleton after the directory, canonical
+        # ledger name, and required durable rewrite are all established.  If a
+        # failure above occurs, the singleton keeps the old pending identity;
+        # a retry sees old-missing/new-present and resumes safely.
+        rebased_data, memory_rebased = _rebase_episode_local_paths(
+            self.data, old_ep_dir, new_ep_dir,
+        )
+        if not isinstance(rebased_data, dict):  # defensive; ledger is a dict
+            raise RuntimeError(
+                "[Ledger] rename_episode: in-memory path rebase returned "
+                f"{type(rebased_data).__name__}, expected object"
+            )
+        self.data = rebased_data
+        self.episode_id = new_id
+        self.data["episode_id"] = new_id
+        self.out_dir = new_audio_dir
+
+        # Step 5: rename treatment + any other owned txt sidecars from
         # <old>_*.txt to <new>_*.txt. Uses the SAME _slugify(..., limit=120)
         # as the ledger filename to keep prefixes consistent. Per consult
         # 2026-05-02 (all 3 reviewers): use the precise old-id prefix
@@ -787,8 +935,11 @@ class Ledger:
                 new_audio_dir, exc,
             )
 
-        log.info("[Ledger] renamed %s -> %s (dir_moved=%s)",
-                 old, new_id, moved_dir)
+        log.info(
+            "[Ledger] renamed %s -> %s (dir_moved=%s, "
+            "durable_paths_rebased=%d, memory_paths_rebased=%d)",
+            old, new_id, moved_dir, disk_rebased, memory_rebased,
+        )
 
     @property
     def path(self) -> str:
@@ -1421,6 +1572,11 @@ class Ledger:
             log.warning("[Ledger] BUG-108 merge: on-disk read failed: %s", exc)
             return in_mem
 
+        # Capture identity BEFORE any missing metadata is copied from disk.
+        # Otherwise a stale sibling could donate its own freeze receipt into an
+        # empty wire object and then appear to match itself.
+        same_durable_run = _same_durable_run(in_mem, on_disk)
+
         # Top-level fields the Ledger class doesn't manage but must
         # not destroy. final_audio_path is on the kept-list because
         # SignalLostVideo overwrites it via set_final_paths -- that's
@@ -1559,6 +1715,111 @@ class Ledger:
                         continue
                     if k not in row or row.get(k) in (None, "", [], {}):
                         row[k] = v
+
+        # EpisodeAssembler is the sole producer of ``mirrored_from=music``
+        # timeline rows.  It persists them out-of-band through
+        # ``save_ledger_safe`` while the singleton still owns only authored
+        # dialogue.  A later singleton save must preserve those disk-only rows,
+        # but must never generalize into resurrecting arbitrary disk content.
+        disk_lines = on_disk.get("lines") or []
+        disk_mirrors = [
+            row for row in disk_lines
+            if isinstance(row, dict) and row.get("mirrored_from") == "music"
+        ] if isinstance(disk_lines, list) else []
+        if disk_mirrors and not same_durable_run:
+            log.warning(
+                "[Ledger] disk-only music mirrors rejected: durable run "
+                "identity mismatch (count=%d)", len(disk_mirrors),
+            )
+        elif disk_mirrors:
+            mem_music_rows = in_mem.get("music") or []
+            disk_music_rows = on_disk.get("music") or []
+            if not isinstance(mem_music_rows, list):
+                mem_music_rows = []
+            if not isinstance(disk_music_rows, list):
+                disk_music_rows = []
+
+            def _unique_cue_map(rows: List[Any]) -> "tuple[Dict[str, Dict[str, Any]], set[str]]":
+                mapped: Dict[str, Dict[str, Any]] = {}
+                duplicates: "set[str]" = set()
+                for candidate in rows:
+                    if not isinstance(candidate, dict):
+                        continue
+                    cue_id = str(candidate.get("cue_id") or "").strip()
+                    if not cue_id:
+                        continue
+                    if cue_id in mapped:
+                        duplicates.add(cue_id)
+                    else:
+                        mapped[cue_id] = candidate
+                return mapped, duplicates
+
+            mem_music_by_id, mem_duplicate_cues = _unique_cue_map(mem_music_rows)
+            disk_music_by_id, disk_duplicate_cues = _unique_cue_map(disk_music_rows)
+            invalid_cues = mem_duplicate_cues | disk_duplicate_cues
+            mem_lines = in_mem.get("lines") or []
+            if not isinstance(mem_lines, list):
+                mem_lines = []
+            existing_line_ids = {
+                str(row.get("line_id")) for row in mem_lines
+                if isinstance(row, dict) and row.get("line_id")
+            }
+            preserved = 0
+            rejected = 0
+            for mirror in disk_mirrors:
+                line_id = str(mirror.get("line_id") or "").strip()
+                cue_id = str(mirror.get("music_cue_id") or "").strip()
+                role = str(mirror.get("speaker_role") or "").strip()
+                start_s = mirror.get("start_s")
+                dur_s = mirror.get("dur_s")
+                if (
+                    not line_id
+                    or not cue_id
+                    or cue_id in invalid_cues
+                    or role not in {"music_open", "music_inter", "music_close"}
+                    or mirror.get("start_s_space") != "master_mix"
+                    or not isinstance(start_s, (int, float))
+                    or not isinstance(dur_s, (int, float))
+                    or float(start_s) < 0.0
+                    or float(dur_s) <= 0.0
+                ):
+                    rejected += 1
+                    continue
+                mem_cue = mem_music_by_id.get(cue_id)
+                disk_cue = disk_music_by_id.get(cue_id)
+                mem_hash = music_cue_spec_sha256(mem_cue or {})
+                disk_hash = music_cue_spec_sha256(disk_cue or {})
+                mem_stored = (mem_cue or {}).get("cue_spec_sha256")
+                disk_stored = (disk_cue or {}).get("cue_spec_sha256")
+                if (
+                    mem_hash is None
+                    or disk_hash is None
+                    or mem_hash != disk_hash
+                    or disk_stored != disk_hash
+                    or (mem_stored not in (None, "") and mem_stored != mem_hash)
+                ):
+                    rejected += 1
+                    continue
+                if line_id in existing_line_ids:
+                    # Idempotent: an existing row is already the singleton's
+                    # copy of this producer receipt; never append twice.
+                    continue
+                mem_lines.append(dict(mirror))
+                existing_line_ids.add(line_id)
+                preserved += 1
+            if preserved:
+                mem_lines.sort(key=lambda row: (
+                    float(row.get("start_s"))
+                    if isinstance(row, dict)
+                    and isinstance(row.get("start_s"), (int, float))
+                    else 1e18
+                ))
+                in_mem["lines"] = mem_lines
+            log.info(
+                "[Ledger] disk-only assembler mirrors: preserved=%d "
+                "rejected=%d existing=%d",
+                preserved, rejected, len(disk_mirrors) - preserved - rejected,
+            )
         return in_mem
 
 

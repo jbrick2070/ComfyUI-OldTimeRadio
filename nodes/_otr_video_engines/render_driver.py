@@ -2621,7 +2621,7 @@ def _safe_clip_basename(text):
     return re.sub(r"[^A-Za-z0-9_.-]", "_", str(text or ""))[:80]
 
 
-def resolve_episode_id_for_clip_persistence(episode_id):
+def resolve_episode_id_for_clip_persistence(episode_id, freeze_timestamp=""):
     """Rename-proof the episode id used for durable clip/SFX persistence.
 
     VideoRenderBatch receives the ShotLock ledger while the episode is still
@@ -2629,9 +2629,10 @@ def resolve_episode_id_for_clip_persistence(episode_id):
     the title slug before clips are rendered, so writing to
     ``episodes/pending_<ts>/clips`` can re-create a stale folder and strand the
     provider clips/SFX away from the real episode. Mirror the stills/master-audio
-    rename contract: if the pending dir is gone, re-key to the newest ledger's
-    episode dir and log loudly. Test mode leaves the id untouched unless tests
-    call the helper directly with the env cleared.
+    rename contract: if the pending dir is gone, re-key only to the active
+    in-flight ledger and, when supplied, require its immutable freeze receipt
+    to match. Never choose a newest-mtime sibling. Test mode leaves the id
+    untouched unless tests call the helper directly with the env cleared.
     """
     eid = str(episode_id or "").strip()
     if not eid or not eid.startswith("pending_"):
@@ -2640,26 +2641,44 @@ def resolve_episode_id_for_clip_persistence(episode_id):
         return eid
     try:
         from pathlib import Path
-        from .._otr_ledger import find_most_recent_ledger
+        from .. import _otr_ledger as _OTRL
         from .._otr_paths import otr_episodes_root
 
         episodes_root = Path(otr_episodes_root())
         pending_dir = episodes_root / eid
         if pending_dir.is_dir():
             return eid
-        ledger_path = find_most_recent_ledger([episodes_root])
+        ledger_path = _OTRL.in_flight_ledger_path()
         if not ledger_path:
             return eid
+        ledger_path = Path(ledger_path)
         new_episode_dir = Path(ledger_path).parent.parent
+        disk_ledger = _OTRL.load_ledger_safe(ledger_path)
+        expected_freeze = str(freeze_timestamp or "").strip()
+        disk_meta = (
+            disk_ledger.get("meta") if isinstance(disk_ledger, dict)
+            and isinstance(disk_ledger.get("meta"), dict) else {}
+        )
+        disk_freeze = str(disk_meta.get("freeze_timestamp") or "").strip()
+        if expected_freeze and disk_freeze != expected_freeze:
+            _LOG.warning(
+                "[OTR video] clip episode-id re-resolve REJECTED: "
+                "freeze_timestamp mismatch wire=%r disk=%r",
+                expected_freeze, disk_freeze,
+            )
+            return eid
         if (
             new_episode_dir.is_dir()
             and new_episode_dir.parent == episodes_root
             and new_episode_dir.name != eid
+            and isinstance(disk_ledger, dict)
+            and str(disk_ledger.get("episode_id") or "").strip()
+                == new_episode_dir.name
         ):
             _LOG.warning(
                 "[OTR video] LOUD re-resolve: episode_id %r is a stale pending "
                 "id (dir renamed before clip persistence); clips/SFX re-keyed "
-                "to newest ledger episode dir %r.",
+                "to active ledger episode dir %r.",
                 eid, new_episode_dir.name)
             return new_episode_dir.name
     except Exception as exc:  # noqa: BLE001 -- never block render on probe
