@@ -474,6 +474,30 @@ class TestDualLedgerFix:
         }])
         assert led.data["music"][0]["cue_spec_sha256"] != h
 
+    def test_identity_match_preserves_render_owned_music_shot_id(self, tmp_out):
+        """A later Ledger.save must not erase SceneSequencer's anchor-derived
+        music shot_id while line/clip shot ownership stays authoritative."""
+        import json as _json
+
+        led = Ledger("music_shot_receipt", str(tmp_out))
+        led.set_music([{
+            "cue_id": "inter_01", "generation_prompt": "brief bridge",
+            "placement": "interstitial", "anchor_line_id": "l002",
+        }])
+        led.save()
+        path = Path(led.path)
+        on_disk = _json.loads(path.read_text(encoding="utf-8"))
+        on_disk["music"][0].update({
+            "shot_id": "shot_002", "start_s": 3.0, "dur_s": 1.0,
+            "start_s_space": "master_mix",
+        })
+        path.write_text(_json.dumps(on_disk, indent=2), encoding="utf-8")
+
+        led.save()
+        row = _json.loads(path.read_text(encoding="utf-8"))["music"][0]
+        assert row["shot_id"] == "shot_002"
+        assert row["start_s_space"] == "master_mix"
+
 
 # ---------------------------------------------------------------------------
 # Setters

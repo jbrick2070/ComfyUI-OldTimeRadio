@@ -3422,11 +3422,14 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
     shot_rows.append({
         "shot_id": "shot_000", "scene_id": None, "description": "preamble",
     })
-    line_rows.append(_music_sentinel("shot_000", "music_open"))
+    opening_sentinel = _music_sentinel("shot_000", "music_open")
+    line_rows.append(opening_sentinel)
     music_rows.append({
         "cue_id": "opening",
         "description": parsed.music_open,
         "generation_prompt": parsed.music_open,
+        "placement": "opening",
+        "anchor_line_id": opening_sentinel["line_id"],
     })
     for k, text in enumerate(parsed.announcer_intro):
         row = _spoken_row(
@@ -3474,11 +3477,16 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
             _beat(row, scene_id, speaker)
         for k, cue in enumerate(inter_by_scene.get(scene.n, [])):
             inter_seq += 1
-            line_rows.append(_music_sentinel(shot_id, "music_inter", k))
+            inter_sentinel = _music_sentinel(
+                shot_id, "music_inter", k,
+            )
+            line_rows.append(inter_sentinel)
             music_rows.append({
                 "cue_id": f"inter_{inter_seq:02d}",
                 "description": cue,
                 "generation_prompt": cue,
+                "placement": "interstitial",
+                "anchor_line_id": inter_sentinel["line_id"],
             })
         led.set_lines(line_rows)
         _reapply_hygiene_rows()
@@ -3525,11 +3533,14 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
         news_read_norm)
     line_rows.append(row)
     _beat(row, None, ANNOUNCER_NAME)
-    line_rows.append(_music_sentinel(post_shot, "music_close"))
+    closing_sentinel = _music_sentinel(post_shot, "music_close")
+    line_rows.append(closing_sentinel)
     music_rows.append({
         "cue_id": "closing",
         "description": parsed.music_close,
         "generation_prompt": parsed.music_close,
+        "placement": "closing",
+        "anchor_line_id": closing_sentinel["line_id"],
     })
 
     led.set_scenes(scene_rows)

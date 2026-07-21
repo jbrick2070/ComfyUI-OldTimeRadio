@@ -436,6 +436,31 @@ same judge for the same repair again. Build hashes, seals, ledger rows,
 readiness state, and media/publication pointers only after the final accepted or
 floored artifact so no downstream consumer can inherit a stale identity.
 
+## 29. Reconcile rendered manifests before timeline ownership
+
+A bank may author cues in its own compact vocabulary, but every renderer and
+consumer needs one durable ledger contract. Translate producer-local IDs and
+placements at the producer boundary. Legacy banks that author only sentinel
+rows still need real `music[]` rows once a renderer has produced a manifest;
+materialize those rows before the first timeline writer, not in a later
+assembler that can no longer recover an interstitial's position.
+
+Treat the manifest as rendered evidence, not permission to overwrite authored
+intent. Recompute cue-spec identity from the ledger's authored prompt,
+duration, placement, and anchor; only then may manifest paths and downstream
+timing attach. A mismatch must stop that join loudly. For synthesized cues,
+derive the same deterministic identity from the manifest-owned spec and bind
+available ordered sentinels so the new row is equally auditable.
+
+Anchors describe insertion order, not line type. Insert an interstitial before
+either a dedicated music sentinel or an ordinary dialogue row, then continue
+normal dialogue dispatch so voice-bus counts remain exact. Let the final audio
+assembler alone mint visual mirror lines from canonical placement. At the
+post-audio wire join, prove episode identity again, merge render-owned music
+fields only on cue identity, and forward only mirrors whose cue passed that
+join. Music may remain an optional creative bus, but when it renders its ledger
+accounting cannot be optional.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

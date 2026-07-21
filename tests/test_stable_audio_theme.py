@@ -37,12 +37,12 @@ def _stub_musicgen_generate_clip(monkeypatch, recorder):
     return musicgen
 
 
-def _ledger(meta=None):
+def _ledger(meta=None, lines=None):
     import json
 
     return json.dumps({
         "schema_version": "l3-2026-05-14",
-        "cast": [], "lines": [], "meta": meta or {},
+        "cast": [], "lines": lines or [], "meta": meta or {},
     })
 
 
@@ -145,11 +145,55 @@ def test_musicgen_clip_renders_three_cues(monkeypatch):
     for r in manifest["cues"]:
         assert 0 <= r["batch_index"] < 3
         assert r["sample_count"] > 0
-        assert r["cue_spec_sha256"] is None       # synth cue, no ledger row
+        assert re.fullmatch(r"[0-9a-f]{64}", r["cue_spec_sha256"])
         assert r["anchor_line_id"] is None
     assert isinstance(render_log, str)
     assert done.startswith("music:done")
     assert "cues=3" in done
+
+
+def test_legacy_synth_binds_ordered_music_sentinels(monkeypatch):
+    """A legacy bank's synthesized manifest is enough to materialize a timed
+    ledger: every available sentinel becomes the cue's durable anchor."""
+    from nodes import _otr_cue_manifest as CM
+    from nodes.stable_audio_theme import StableAudioTheme
+
+    calls = []
+    _stub_musicgen_generate_clip(monkeypatch, calls)
+    lines = [
+        {"line_id": "b000", "speaker_role": "music_open"},
+        {"line_id": "b005", "speaker_role": "music_inter"},
+        {"line_id": "b900", "speaker_role": "music_close"},
+    ]
+    out = StableAudioTheme().generate(
+        script_json=_ledger(lines=lines), engine="musicgen",
+    )
+    by_cue = CM.index_by_cue_id(CM.parse_manifest(out[1], batch_size=3))
+
+    assert by_cue["opening"]["anchor_line_id"] == "b000"
+    assert by_cue["interstitial"]["anchor_line_id"] == "b005"
+    assert by_cue["closing"]["anchor_line_id"] == "b900"
+    assert all(row["cue_spec_sha256"] for row in by_cue.values())
+
+
+@pytest.mark.parametrize(
+    ("placement", "cue_id", "expected"),
+    [
+        ("open", "music_open", "opening"),
+        ("music_open", "legacy", "opening"),
+        ("close", "music_close", "closing"),
+        ("music_close", "legacy", "closing"),
+        ("inter", "music_inter", "interstitial"),
+        ("music_inter", "legacy", "interstitial"),
+        (None, "inter_07", "interstitial"),
+    ],
+)
+def test_canonical_placement_accepts_historical_aliases(
+    placement, cue_id, expected,
+):
+    from nodes.stable_audio_theme import StableAudioTheme
+
+    assert StableAudioTheme._canonical_placement(placement, cue_id) == expected
 
 
 def test_fable2_music_rows_render_by_cue_id(monkeypatch):

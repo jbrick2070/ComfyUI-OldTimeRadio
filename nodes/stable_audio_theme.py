@@ -260,11 +260,12 @@ class StableAudioTheme:
         led = self._load_ledger(ledger_json, script_json)
         meta = (led.get("meta") or {}) if isinstance(led, dict) else {}
         music_rows = (led.get("music") or []) if isinstance(led, dict) else []
+        ledger_lines = (led.get("lines") or []) if isinstance(led, dict) else []
         music_seed_base = _seed_to_int64(
             "music_rng_seed_v1", coerce_int_seed(meta.get("episode_seed")),
         )
 
-        cue_specs = self._resolve_cue_specs(meta, music_rows)
+        cue_specs = self._resolve_cue_specs(meta, music_rows, ledger_lines)
         cue_rows = []
         log_lines = [
             f"music: rendering {len(cue_specs)} cue(s) on '{engine}' "
@@ -294,10 +295,11 @@ class StableAudioTheme:
         return cue_rows, sr, log_lines
 
     # ------------------------------------------------------------------ #
-    def _resolve_cue_specs(self, meta, music_rows):
+    def _resolve_cue_specs(self, meta, music_rows, ledger_lines=None):
         """Build the ordered cue-spec list. fable2 (authored music[]) vs legacy
         (synthesize the 3 fixed cues, byte-parity slot seed keys)."""
         from ._otr_music_prompt import CUE_DURATIONS, compose_music_prompt
+        from .production_ledger import music_cue_spec_sha256
 
         specs: list = []
         if music_rows:
@@ -326,19 +328,53 @@ class StableAudioTheme:
                     "requested_duration_s": float(duration_s),
                     "seed_key": cue_id,
                     "anchor_line_id": row.get("anchor_line_id"),
-                    "cue_spec_sha256": row.get("cue_spec_sha256"),
+                    "cue_spec_sha256": (
+                        row.get("cue_spec_sha256")
+                        or music_cue_spec_sha256(row)
+                    ),
                 })
         else:
+            role_lines: dict[str, list[str]] = {
+                "music_open": [], "music_inter": [], "music_close": [],
+            }
+            for line in ledger_lines or []:
+                if not isinstance(line, dict):
+                    continue
+                role = str(line.get("speaker_role") or "")
+                line_id = str(line.get("line_id") or "")
+                if role in role_lines and line_id:
+                    role_lines[role].append(line_id)
+            anchor_by_slot = {
+                "opening": (
+                    role_lines["music_open"][0]
+                    if role_lines["music_open"] else None
+                ),
+                "interstitial": (
+                    role_lines["music_inter"][0]
+                    if role_lines["music_inter"] else None
+                ),
+                "closing": (
+                    role_lines["music_close"][-1]
+                    if role_lines["music_close"] else None
+                ),
+            }
             for slot in _CUE_SLOTS:
                 prompt, duration_s = compose_music_prompt(meta, slot)
+                anchor_line_id = anchor_by_slot[slot]
+                cue_spec_sha256 = music_cue_spec_sha256({
+                    "generation_prompt": prompt,
+                    "target_duration_s": float(duration_s),
+                    "placement": slot,
+                    "anchor_line_id": anchor_line_id,
+                })
                 specs.append({
                     "cue_id": slot,
                     "placement": slot,
                     "prompt": prompt,
                     "requested_duration_s": float(duration_s),
                     "seed_key": slot,
-                    "anchor_line_id": None,
-                    "cue_spec_sha256": None,
+                    "anchor_line_id": anchor_line_id,
+                    "cue_spec_sha256": cue_spec_sha256,
                 })
         return specs
 
@@ -347,15 +383,8 @@ class StableAudioTheme:
         """Map an authored placement / cue_id to one of opening/closing/
         interstitial (MF-B: the composer + CUE_DURATIONS tables are keyed on
         these, so inter_NN must resolve to 'interstitial')."""
-        p = (placement or "").strip().lower()
-        if p in ("opening", "closing", "interstitial"):
-            return p
-        cid = (cue_id or "").strip().lower()
-        if cid in ("opening", "closing", "interstitial"):
-            return cid
-        if cid.startswith("inter"):
-            return "interstitial"
-        return "interstitial"
+        from ._otr_cue_manifest import canonical_placement
+        return canonical_placement(placement, cue_id)
 
     # ------------------------------------------------------------------ #
     def _load_ledger(self, *sources):

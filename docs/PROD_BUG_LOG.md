@@ -2304,3 +2304,49 @@ out until they independently meet the same production-only admission rule.
   existing positive-head-gap test and missing-timing fallback
 - bible-worthy: yes -- BUG-12.64
 - status: **LIVE-ADMITTED / ROOT-FIXED; focused + full-suite + Bug Bible GREEN; live requalification pending**
+
+## PBUG-20260721-13 -- rendered music had no durable ledger timeline or downstream mirrors
+- surfaced: canonical `scifi_news` artifact
+  `signal_lost_the_fortress_of_reason_20260721_095038`, followed by a
+  cross-bank inspection of the four already-qualified inline ledgers. The
+  scifi ledger carried `music_open/music_inter/music_close` rows with
+  `open/inter/close` placements and null path/timing. Each inline bank rendered
+  three cue WAVs and audibly mixed its opening/closing bookends, but retained
+  zero `music[]` rows, dropped the interstitial, and minted zero
+  `mirrored_from=music` timeline rows
+- symptom: the audio renderer could produce valid cue bytes while the durable
+  ledger, video/title consumers, and OBS-bound wire ledger had no coherent
+  account of which cue played where. A dialogue-anchored scifi interstitial was
+  never inserted because SceneSequencer only resolved dedicated
+  `music_inter` sentinel rows. Legacy manifest materialization in
+  EpisodeAssembler would have been too late for SceneSequencer timing even if
+  it had existed
+- root cause: banks exposed different cue ID/placement dialects; four legacy
+  producers authored only sentinel lines; the rendered cue manifest was not
+  reconciled into the ledger before timeline mutation; SceneSequencer keyed
+  interstitial timing only by sentinel anchor; EpisodeAssembler recognized
+  bookends by cue ID instead of canonical placement; and ShotLock rehydrated
+  lines/audio sections but not identity-gated music rows or assembler-owned
+  mirrors
+- fix: all content producers now cross the durable boundary using
+  `opening/inter_NN/closing`, canonical placements, and explicit anchors.
+  StableAudioTheme accepts historical aliases and gives synthesized legacy
+  cues deterministic cue-spec identities plus ordered sentinel anchors. A
+  shared manifest reconciler materializes or path-refreshes `music[]` before
+  SceneSequencer writes timing and rejects any authored identity mismatch.
+  SceneSequencer inserts interstitials before either a sentinel or ordinary
+  dialogue anchor without consuming the dialogue's voice slot, then writes by
+  cue ID. EpisodeAssembler idempotently reconciles, promotes even zero-offset
+  scene timing, places bookends and chooses mirror roles by placement, and
+  remains the sole mirror minter. ShotLock proves same-episode identity, lets
+  disk win render-owned music fields only on a recomputed cue-spec match,
+  appends valid legacy rows, and replaces only mirrors belonging to matched
+  cues
+- verify idea: cover canonical producer mappings and aliases; materialize a
+  legacy manifest twice and require idempotence; reject a stale authored cue
+  hash; insert an interstitial before ordinary dialogue while consuming every
+  voice clip; position a sentinel cue; materialize/place/mirror all three cues
+  in EpisodeAssembler; and require ShotLock to append valid legacy music and
+  mirrors while rejecting a changed cue and its mirror
+- bible-worthy: yes -- BUG-12.65
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**

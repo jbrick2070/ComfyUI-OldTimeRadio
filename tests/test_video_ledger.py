@@ -609,6 +609,123 @@ def test_post_audio_overlay_rehydrates_owned_sections_despite_existing_timing(
     assert out["lines"][0]["bark_wav_path"] == "C:/episode/b001.wav"
 
 
+def test_post_audio_overlay_identity_merges_music_and_assembler_mirrors(
+    tmp_path, monkeypatch,
+):
+    from nodes import otr_shot_lock as sl
+    from nodes.production_ledger import music_cue_spec_sha256
+
+    freeze = "freeze-music-join"
+
+    def _cue(cue_id, prompt, placement, anchor):
+        row = {
+            "cue_id": cue_id, "description": prompt,
+            "generation_prompt": prompt, "target_duration_s": 1.0,
+            "placement": placement, "anchor_line_id": anchor,
+        }
+        row["cue_spec_sha256"] = music_cue_spec_sha256(row)
+        return row
+
+    opening = _cue("opening", "Opening pulse.", "opening", "b000")
+    inter = _cue("interstitial", "Brief bridge.", "interstitial", "b005")
+    wire = {
+        "episode_id": "ep_music", "meta": {"freeze_timestamp": freeze},
+        "lines": [{"line_id": "l001", "speaker_role": "character"}],
+        "music": [dict(opening)],
+    }
+    disk_opening = {
+        **opening, "wav_path": "C:/episode/opening.wav",
+        "start_s": 0.0, "dur_s": 1.0, "start_s_space": "master_mix",
+    }
+    disk_inter = {
+        **inter, "wav_path": "C:/episode/inter.wav",
+        "start_s": 4.0, "dur_s": 1.0, "start_s_space": "master_mix",
+        "shot_id": "shot_001",
+    }
+    disk = {
+        "episode_id": "ep_music", "meta": {"freeze_timestamp": freeze},
+        "lines": [
+            {"line_id": "l001", "start_s": 1.0, "dur_s": 3.0},
+            {"line_id": "music_opening_001", "speaker_role": "music_open",
+             "mirrored_from": "music", "music_cue_id": "opening",
+             "start_s": 0.0, "dur_s": 1.0},
+            {"line_id": "music_interstitial_001",
+             "speaker_role": "music_inter", "mirrored_from": "music",
+             "music_cue_id": "interstitial", "start_s": 4.0, "dur_s": 1.0},
+        ],
+        "music": [disk_opening, disk_inter],
+    }
+    path = tmp_path / "music_ledger.json"
+    path.write_text(json.dumps(disk), encoding="utf-8")
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    monkeypatch.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: path)
+
+    out = sl.overlay_audio_timing(wire)
+
+    by_cue = {row["cue_id"]: row for row in out["music"]}
+    assert set(by_cue) == {"opening", "interstitial"}
+    assert by_cue["opening"]["wav_path"] == "C:/episode/opening.wav"
+    assert by_cue["interstitial"]["shot_id"] == "shot_001"
+    mirrors = [
+        row for row in out["lines"] if row.get("mirrored_from") == "music"
+    ]
+    assert {row["music_cue_id"] for row in mirrors} == {
+        "opening", "interstitial",
+    }
+
+
+def test_post_audio_overlay_rejects_stale_music_identity_and_mirror(
+    tmp_path, monkeypatch, caplog,
+):
+    from nodes import otr_shot_lock as sl
+    from nodes.production_ledger import music_cue_spec_sha256
+
+    freeze = "freeze-stale-music"
+    wire_row = {
+        "cue_id": "opening", "generation_prompt": "New opening.",
+        "target_duration_s": 1.0, "placement": "opening",
+        "anchor_line_id": "b000",
+    }
+    wire_row["cue_spec_sha256"] = music_cue_spec_sha256(wire_row)
+    disk_row = {
+        "cue_id": "opening", "generation_prompt": "Old opening.",
+        "target_duration_s": 1.0, "placement": "opening",
+        "anchor_line_id": "b000", "wav_path": "C:/episode/stale.wav",
+        "start_s": 0.0, "dur_s": 1.0, "start_s_space": "master_mix",
+    }
+    disk_row["cue_spec_sha256"] = music_cue_spec_sha256(disk_row)
+    wire = {
+        "episode_id": "ep_stale_music",
+        "meta": {"freeze_timestamp": freeze},
+        "lines": [{"line_id": "l001", "speaker_role": "character"}],
+        "music": [wire_row],
+    }
+    disk = {
+        "episode_id": "ep_stale_music",
+        "meta": {"freeze_timestamp": freeze},
+        "lines": [
+            {"line_id": "l001", "start_s": 0.0, "dur_s": 2.0},
+            {"line_id": "music_opening_001", "mirrored_from": "music",
+             "music_cue_id": "opening", "speaker_role": "music_open",
+             "start_s": 0.0, "dur_s": 1.0},
+        ],
+        "music": [disk_row],
+    }
+    path = tmp_path / "stale_music_ledger.json"
+    path.write_text(json.dumps(disk), encoding="utf-8")
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    monkeypatch.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: path)
+
+    with caplog.at_level("WARNING", logger="OTR"):
+        out = sl.overlay_audio_timing(wire)
+
+    assert out["music"][0].get("wav_path") in (None, "")
+    assert not any(
+        row.get("mirrored_from") == "music" for row in out["lines"]
+    )
+    assert "music overlay REJECTED" in caplog.text
+
+
 def test_post_audio_overlay_rejects_cross_episode_freeze(tmp_path, monkeypatch, caplog):
     """A newest/stale sibling ledger cannot donate audio to this wire episode."""
     from nodes import otr_shot_lock as sl

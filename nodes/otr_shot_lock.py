@@ -267,10 +267,151 @@ def overlay_audio_timing(ledger: dict) -> dict:
                     ln[k] = v
                     changed = True
             rows_overlaid += int(changed)
+
+        # Music is a separate keyed ownership surface.  Disk owns rendered
+        # path/timing, but only while a fresh cue-spec identity matches.  This
+        # is deliberately stricter than the empty-slot line overlay: a stale
+        # pre-audio music row must never keep or receive audio for a re-authored
+        # cue.  Legacy banks have no wire music rows, so validated disk rows are
+        # appended after same-episode proof.
+        from .production_ledger import music_cue_spec_sha256
+
+        wire_music = ledger.get("music")
+        if not isinstance(wire_music, list):
+            wire_music = []
+        disk_music = disk.get("music")
+        if not isinstance(disk_music, list):
+            disk_music = []
+
+        disk_music_by_id = {}
+        invalid_disk_cues = set()
+        for row in disk_music:
+            if not isinstance(row, dict):
+                continue
+            cue_id = str(row.get("cue_id") or "")
+            if not cue_id:
+                continue
+            if cue_id in disk_music_by_id:
+                invalid_disk_cues.add(cue_id)
+                continue
+            disk_music_by_id[cue_id] = row
+
+        wire_music_by_id = {
+            str(row.get("cue_id")): row for row in wire_music
+            if isinstance(row, dict) and row.get("cue_id")
+        }
+        matched_cue_ids = set()
+        music_rows_overlaid = 0
+        music_render_fields = (
+            "wav_path", "start_s", "dur_s", "start_s_space", "shot_id",
+        )
+        music_fill_fields = ("placement", "anchor_line_id")
+
+        for cue_id, wire_row in list(wire_music_by_id.items()):
+            disk_row = disk_music_by_id.get(cue_id)
+            if disk_row is None or cue_id in invalid_disk_cues:
+                continue
+            wire_hash = music_cue_spec_sha256(wire_row)
+            disk_hash = music_cue_spec_sha256(disk_row)
+            disk_stored_hash = disk_row.get("cue_spec_sha256")
+            if (
+                wire_hash is None
+                or disk_hash is None
+                or disk_stored_hash != disk_hash
+                or wire_hash != disk_hash
+            ):
+                log.warning(
+                    "[OTR_ShotLock] music overlay REJECTED cue=%s "
+                    "wire=%s disk=%s stored=%s",
+                    cue_id,
+                    str(wire_hash or "missing")[:12],
+                    str(disk_hash or "missing")[:12],
+                    str(disk_stored_hash or "missing")[:12],
+                )
+                continue
+            changed = False
+            for key in music_render_fields:
+                value = disk_row.get(key)
+                if value not in (None, "") and wire_row.get(key) != value:
+                    wire_row[key] = value
+                    changed = True
+            for key in music_fill_fields:
+                if wire_row.get(key) in (None, "") and disk_row.get(key) not in (None, ""):
+                    wire_row[key] = disk_row[key]
+                    changed = True
+            wire_row["cue_spec_sha256"] = wire_hash
+            matched_cue_ids.add(cue_id)
+            music_rows_overlaid += int(changed)
+
+        for cue_id, disk_row in disk_music_by_id.items():
+            if cue_id in wire_music_by_id or cue_id in invalid_disk_cues:
+                continue
+            disk_hash = music_cue_spec_sha256(disk_row)
+            if disk_hash is None or disk_row.get("cue_spec_sha256") != disk_hash:
+                log.warning(
+                    "[OTR_ShotLock] legacy music append REJECTED cue=%s: "
+                    "missing/stale cue identity",
+                    cue_id,
+                )
+                continue
+            appended = dict(disk_row)
+            appended["cue_spec_sha256"] = disk_hash
+            wire_music.append(appended)
+            wire_music_by_id[cue_id] = appended
+            matched_cue_ids.add(cue_id)
+            music_rows_overlaid += 1
+        ledger["music"] = wire_music
+
+        # EpisodeAssembler alone mints mirrored music lines.  Replace any stale
+        # wire mirrors with same-episode disk mirrors whose cue successfully
+        # passed the identity join above; ordinary authored lines remain owned
+        # by the wire ledger.
+        base_lines = [
+            row for row in lines
+            if not (
+                isinstance(row, dict)
+                and row.get("mirrored_from") == "music"
+            )
+        ]
+        line_index = {
+            str(row.get("line_id")): index
+            for index, row in enumerate(base_lines)
+            if isinstance(row, dict) and row.get("line_id")
+        }
+        mirrors_overlaid = 0
+        for disk_line in disk.get("lines") or []:
+            if not isinstance(disk_line, dict):
+                continue
+            if disk_line.get("mirrored_from") != "music":
+                continue
+            cue_id = str(disk_line.get("music_cue_id") or "")
+            if cue_id not in matched_cue_ids:
+                continue
+            mirror = dict(disk_line)
+            line_id = str(mirror.get("line_id") or "")
+            if not line_id:
+                continue
+            if line_id in line_index:
+                base_lines[line_index[line_id]] = mirror
+            else:
+                line_index[line_id] = len(base_lines)
+                base_lines.append(mirror)
+            mirrors_overlaid += 1
+        if mirrors_overlaid or len(base_lines) != len(lines):
+            base_lines.sort(key=lambda row: (
+                float(row.get("start_s"))
+                if isinstance(row, dict)
+                and isinstance(row.get("start_s"), (int, float))
+                else 1e18
+            ))
+            ledger["lines"] = base_lines
+            lines = base_lines
         master_hash = str((ledger.get("audio") or {}).get("master_audio_sha256") or "")
         log.info(
-            "[OTR_ShotLock] post-audio ledger overlay from %s (%s, rows=%d, master_sha=%s)",
-            p.name, identity, rows_overlaid, master_hash[:12] or "missing",
+            "[OTR_ShotLock] post-audio ledger overlay from %s "
+            "(%s, rows=%d, music=%d, mirrors=%d, master_sha=%s)",
+            p.name, identity, rows_overlaid, music_rows_overlaid,
+            mirrors_overlaid, master_hash[:12] or "missing",
         )
     except Exception as exc:                 # noqa: BLE001 - never block the lock
         log.warning("[OTR_ShotLock] post-audio ledger overlay skipped: %s", exc)

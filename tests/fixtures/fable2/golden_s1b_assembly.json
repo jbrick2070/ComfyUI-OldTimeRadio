@@ -493,37 +493,37 @@
       "cue_id": "opening",
       "description": "slow theremin swell, distant telegraph clicks",
       "generation_prompt": "slow theremin swell, distant telegraph clicks",
-      "anchor_line_id": null,
-      "placement": null,
+      "anchor_line_id": "shot_000_music",
+      "placement": "opening",
       "target_duration_s": null,
       "wav_path": null,
       "start_s": null,
       "dur_s": null,
-      "cue_spec_sha256": "4aa9e6dc322e8d538b38dd23d540df975627424437d83ce0fb58e8440249d967"
+      "cue_spec_sha256": "84c83acd444fd14cf88d78703217bee9fc3adb3fc2030806d1b3441dca0fc85e"
     },
     {
       "cue_id": "inter_01",
       "description": "single sustained violin note, rising",
       "generation_prompt": "single sustained violin note, rising",
-      "anchor_line_id": null,
-      "placement": null,
+      "anchor_line_id": "shot_001_music",
+      "placement": "interstitial",
       "target_duration_s": null,
       "wav_path": null,
       "start_s": null,
       "dur_s": null,
-      "cue_spec_sha256": "29c24f038a855dade5824d7b177e1dc55e642416f14223d8a0a97462f95c6ec6"
+      "cue_spec_sha256": "b51d4d68c45db4497d223ae8489a6c9076816bf39c961d509fc8ba11166e3988"
     },
     {
       "cue_id": "closing",
       "description": "closing theme, warm brass, resolving",
       "generation_prompt": "closing theme, warm brass, resolving",
-      "anchor_line_id": null,
-      "placement": null,
+      "anchor_line_id": "shot_003_music",
+      "placement": "closing",
       "target_duration_s": null,
       "wav_path": null,
       "start_s": null,
       "dur_s": null,
-      "cue_spec_sha256": "202c569a3d90e317466ea0fc8ceccf6d8fa579ddd82964539d20bb03cee2d42e"
+      "cue_spec_sha256": "fbd147f739492814372b41f28f7c62de188ba694e0aa558494a90af90b87e71a"
     }
   ]
 }

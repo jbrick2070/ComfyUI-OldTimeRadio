@@ -347,6 +347,17 @@ def _row_identity(arr_name: str, row: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def music_cue_spec_sha256(row: Dict[str, Any]) -> Optional[str]:
+    """Return the canonical authored identity for one ``music[]`` row.
+
+    Music producers, the cue manifest, and post-audio consumers must use the
+    exact same identity function.  Keeping this public wrapper beside the
+    ledger merge gate prevents a second implementation from silently hashing
+    a different field set or JSON encoding.
+    """
+    return _row_identity("music", row)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -1229,7 +1240,7 @@ class Ledger:
             # Stamp the authored-spec identity with the SAME function the
             # merge gate uses, so the persisted value and the gate agree
             # by construction.
-            row["cue_spec_sha256"] = _row_identity("music", row)
+            row["cue_spec_sha256"] = music_cue_spec_sha256(row)
             rows.append(row)
         self.data["music"] = rows
         return self
@@ -1536,7 +1547,15 @@ class Ledger:
                 # bark_wav_path, timings, render stamps) -- those still
                 # copy forward.
                 for k, v in disk_row.items():
-                    if k in _MERGE_OWNED_ROW_FIELDS:
+                    # ``shot_id`` is authored ownership for lines/clips, but
+                    # renderer ownership for music: SceneSequencer derives it
+                    # from the cue's resolved anchor.  Preserve that durable
+                    # music receipt on an identity match without weakening the
+                    # stale-row protection for any spoken or clip row.
+                    if (
+                        k in _MERGE_OWNED_ROW_FIELDS
+                        and not (arr_name == "music" and k == "shot_id")
+                    ):
                         continue
                     if k not in row or row.get(k) in (None, "", [], {}):
                         row[k] = v

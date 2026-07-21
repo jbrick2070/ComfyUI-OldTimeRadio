@@ -44,6 +44,36 @@ def _make_audio(n_clips: int, samples_per: int = 24000, sr: int = 24000):
         waveform[b, 0, :] = 0.1 * (b + 1)
     return {"waveform": waveform, "sample_rate": sr}
 
+
+def _music_bus(cue_id: str, anchor_line_id: str, *, samples: int = 12000):
+    from nodes import _otr_cue_manifest as CM
+    from nodes.production_ledger import music_cue_spec_sha256
+
+    prompt = "A brief instrumental bridge."
+    duration = float(samples) / 48000.0
+    cue_hash = music_cue_spec_sha256({
+        "generation_prompt": prompt,
+        "target_duration_s": duration,
+        "placement": "interstitial",
+        "anchor_line_id": anchor_line_id,
+    })
+    manifest = CM.build_manifest(48000, [{
+        "cue_id": cue_id,
+        "batch_index": 0,
+        "sample_count": samples,
+        "sample_rate": 48000,
+        "prompt": prompt,
+        "prompt_sha256": CM.prompt_sha256(prompt),
+        "cue_spec_sha256": cue_hash,
+        "placement": "interstitial",
+        "anchor_line_id": anchor_line_id,
+        "seed": 7,
+        "requested_duration_s": duration,
+        "actual_duration_s": duration,
+        "output_path": f"C:/episode/{cue_id}.wav",
+    }])
+    return _make_audio(1, samples_per=samples, sr=48000), CM.dumps(manifest)
+
 @pytest.fixture
 def patched_sequencer_env(tmp_path):
     """Patch the GPU + ledger I/O surfaces so sequence() is hermetic.
@@ -173,6 +203,169 @@ def test_sequencer_processes_dialogue_skips_music(patched_sequencer_env):
     assert "start_s_space" not in by_id["b006"], (
         "music_close should not have start_s_space stamped by Sequencer"
     )
+
+
+def test_interstitial_on_dialogue_anchor_keeps_voice_clip_and_timing(
+    patched_sequencer_env,
+):
+    """Scifi cues anchor ordinary speech: insert the music first, then still
+    consume and position that row's character clip."""
+    from nodes.scene_sequencer import SceneSequencer
+
+    led_in = {
+        "meta": {"title": "DIALOGUE-ANCHOR"},
+        "cast": [{"char_id": "c01", "name": "ALPHA"}],
+        "lines": [
+            {"line_id": "l001", "shot_id": "shot_001", "char_id": "c01",
+             "speaker_role": "character", "text": "First line."},
+            {"line_id": "l002", "shot_id": "shot_001", "char_id": "c01",
+             "speaker_role": "character", "text": "Second line."},
+        ],
+        "music": [],
+    }
+    patched_sequencer_env["led_disk"] = json.loads(json.dumps(led_in))
+    music_audio, manifest_json = _music_bus("inter_01", "l001")
+
+    SceneSequencer().sequence(
+        script_json=json.dumps(led_in),
+        tts_audio_clips=_make_audio(2),
+        music_cue_audio=music_audio,
+        music_cue_manifest_json=manifest_json,
+    )
+
+    saved = patched_sequencer_env["led_disk"]
+    by_line = {row["line_id"]: row for row in saved["lines"]}
+    assert by_line["l001"]["start_s"] == pytest.approx(0.25)
+    assert by_line["l002"]["start_s"] > by_line["l001"]["start_s"]
+    assert [row["cue_id"] for row in saved["music"]] == ["inter_01"]
+    cue = saved["music"][0]
+    assert cue["start_s"] == 0.0
+    assert cue["dur_s"] == pytest.approx(0.25)
+    assert cue["start_s_space"] == "scene_audio"
+    assert cue["shot_id"] == "shot_001"
+    assert cue["wav_path"] == "C:/episode/inter_01.wav"
+
+
+def test_legacy_sentinel_materializes_and_positions_music(
+    patched_sequencer_env,
+):
+    from nodes.scene_sequencer import SceneSequencer
+
+    led_in = {
+        "meta": {"title": "SENTINEL-ANCHOR"},
+        "cast": [{"char_id": "c01", "name": "ALPHA"}],
+        "lines": [
+            {"line_id": "l001", "shot_id": "shot_001", "char_id": "c01",
+             "speaker_role": "character", "text": "Before."},
+            {"line_id": "b005", "shot_id": "shot_001",
+             "char_id": "music_inter", "speaker_role": "music_inter",
+             "text": ""},
+            {"line_id": "l002", "shot_id": "shot_002", "char_id": "c01",
+             "speaker_role": "character", "text": "After."},
+        ],
+    }
+    patched_sequencer_env["led_disk"] = json.loads(json.dumps(led_in))
+    music_audio, manifest_json = _music_bus("interstitial", "b005")
+
+    SceneSequencer().sequence(
+        script_json=json.dumps(led_in),
+        tts_audio_clips=_make_audio(2),
+        music_cue_audio=music_audio,
+        music_cue_manifest_json=manifest_json,
+    )
+
+    saved = patched_sequencer_env["led_disk"]
+    cue = saved["music"][0]
+    by_line = {row["line_id"]: row for row in saved["lines"]}
+    assert cue["anchor_line_id"] == "b005"
+    assert cue["start_s"] == pytest.approx(by_line["l001"]["dur_s"])
+    assert by_line["l002"]["start_s"] == pytest.approx(
+        cue["start_s"] + cue["dur_s"],
+    )
+
+
+def test_episode_assembler_materializes_bookends_and_mirrors_by_placement(
+    patched_sequencer_env,
+):
+    from nodes import _otr_cue_manifest as CM
+    from nodes.production_ledger import music_cue_spec_sha256
+    from nodes.scene_sequencer import EpisodeAssembler
+
+    prompts = {
+        "opening": "Opening pulse.",
+        "interstitial": "Brief bridge.",
+        "closing": "Closing resolve.",
+    }
+    anchors = {
+        "opening": "b000", "interstitial": "b005", "closing": "b900",
+    }
+    rows = []
+    for batch_index, cue_id in enumerate(
+        ("opening", "interstitial", "closing")
+    ):
+        cue_hash = music_cue_spec_sha256({
+            "generation_prompt": prompts[cue_id],
+            "target_duration_s": 0.1,
+            "placement": cue_id,
+            "anchor_line_id": anchors[cue_id],
+        })
+        rows.append({
+            "cue_id": cue_id, "batch_index": batch_index,
+            "sample_count": 4800, "sample_rate": 48000,
+            "prompt": prompts[cue_id],
+            "prompt_sha256": CM.prompt_sha256(prompts[cue_id]),
+            "cue_spec_sha256": cue_hash,
+            "placement": cue_id, "anchor_line_id": anchors[cue_id],
+            "seed": batch_index + 1,
+            "requested_duration_s": 0.1, "actual_duration_s": 0.1,
+            "output_path": f"C:/episode/{cue_id}.wav",
+        })
+    manifest = CM.build_manifest(48000, rows)
+    inter = {
+        "cue_id": "interstitial", "description": prompts["interstitial"],
+        "generation_prompt": prompts["interstitial"],
+        "target_duration_s": 0.1, "placement": "interstitial",
+        "anchor_line_id": "b005", "wav_path": None,
+        "start_s": 0.4, "dur_s": 0.1,
+        "start_s_space": "scene_audio", "shot_id": "shot_001",
+    }
+    inter["cue_spec_sha256"] = music_cue_spec_sha256(inter)
+    patched_sequencer_env["led_disk"] = {
+        "episode_id": "assembler_music",
+        "meta": {"title": "ASSEMBLER-MUSIC"},
+        "lines": [{
+            "line_id": "l001", "speaker_role": "character",
+            "char_id": "c01", "text": "A line.",
+            "start_s": 0.0, "dur_s": 1.0,
+            "start_s_space": "scene_audio",
+        }],
+        "music": [inter],
+    }
+
+    EpisodeAssembler().assemble(
+        scene_audio=_make_audio(1, samples_per=48000, sr=48000),
+        episode_title="Assembler Music",
+        music_cue_audio=_make_audio(3, samples_per=4800, sr=48000),
+        music_cue_manifest_json=CM.dumps(manifest),
+    )
+
+    saved = patched_sequencer_env["led_disk"]
+    by_cue = {row["cue_id"]: row for row in saved["music"]}
+    assert set(by_cue) == {"opening", "interstitial", "closing"}
+    assert by_cue["opening"]["start_s"] == 0.0
+    assert by_cue["closing"]["start_s_space"] == "master_mix"
+    assert by_cue["interstitial"]["start_s_space"] == "master_mix"
+    assert by_cue["interstitial"]["start_s"] == pytest.approx(0.4)
+    assert all(row["wav_path"] for row in by_cue.values())
+
+    mirrors = [
+        row for row in saved["lines"]
+        if row.get("mirrored_from") == "music"
+    ]
+    assert {row["speaker_role"] for row in mirrors} == {
+        "music_open", "music_inter", "music_close",
+    }
+    assert {row["music_cue_id"] for row in mirrors} == set(by_cue)
 
 
 def test_sequencer_rejects_sfx_row_loud(patched_sequencer_env):

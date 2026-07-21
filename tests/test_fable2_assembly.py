@@ -213,6 +213,19 @@ def test_all_five_hierarchies_emitted(tmp_path):
         "opening", "inter_01", "closing"]
 
 
+def test_music_rows_own_canonical_placement_and_sentinel_anchor(tmp_path):
+    led, _parsed, _meta = _assembled(tmp_path)
+    rows = led.data["music"]
+
+    assert [row["placement"] for row in rows] == [
+        "opening", "interstitial", "closing",
+    ]
+    assert [row["anchor_line_id"] for row in rows] == [
+        "shot_000_music", "shot_001_music", "shot_003_music",
+    ]
+    assert all(row["cue_spec_sha256"] for row in rows)
+
+
 def test_music_sentinel_rows_exact_shape(tmp_path):
     # r2/M5 + r3/M1: sentinel text "", char_id == speaker_role == the
     # role string, NO line-level cue_id (music[] is the cue authority).

@@ -4773,7 +4773,31 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
             row["char_count"] = 0
             row["word_count"] = 0
             row["tts_skip_reason"] = source_row.tts_skip_reason
-    music = [{"cue_id": cue.cue_id, "description": cue.description, "generation_prompt": cue.generation_prompt, "placement": cue.placement, "anchor_line_id": cue.anchor_line_id} for cue in script.music_cues]
+    # The compact authoring schema deliberately speaks in score-local IDs
+    # (music_open/music_inter/music_close and open/inter/close).  The durable
+    # ledger contract is shared with fable2 and every legacy bank, so translate
+    # once at the producer boundary instead of teaching each consumer another
+    # alias dialect.
+    ledger_cue_ids = {
+        "music_open": "opening",
+        "music_inter": "inter_01",
+        "music_close": "closing",
+    }
+    ledger_placements = {
+        "music_open": "opening",
+        "music_inter": "interstitial",
+        "music_close": "closing",
+    }
+    music = [
+        {
+            "cue_id": ledger_cue_ids[cue.cue_id],
+            "description": cue.description,
+            "generation_prompt": cue.generation_prompt,
+            "placement": ledger_placements[cue.cue_id],
+            "anchor_line_id": cue.anchor_line_id,
+        }
+        for cue in script.music_cues
+    ]
     led.set_music(music)
     led.data["clips"] = []
     stamp_word_counts(led)

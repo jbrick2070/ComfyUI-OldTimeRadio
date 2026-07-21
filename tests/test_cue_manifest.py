@@ -127,6 +127,76 @@ def test_index_helpers():
     assert CM.index_by_anchor_line_id(m2) == {}
 
 
+def test_index_all_preserves_multiple_cues_at_one_anchor():
+    m = CM.build_manifest(32000, [
+        _row("inter_01", 0, anchor_line_id="L1"),
+        _row("inter_02", 1, anchor_line_id="L1"),
+    ])
+    assert [
+        row["cue_id"] for row in CM.index_all_by_anchor_line_id(m)["L1"]
+    ] == ["inter_01", "inter_02"]
+
+
+def test_prompt_hash_mismatch_raises():
+    row = _row("inter_01", 0)
+    row["prompt_sha256"] = "0" * 64
+    with pytest.raises(CM.CueManifestError, match="prompt_sha256"):
+        CM.build_manifest(32000, [row])
+
+
+def test_reconcile_materializes_legacy_music_and_is_idempotent():
+    from nodes.production_ledger import music_cue_spec_sha256
+
+    manifest_row = _row(
+        "interstitial", 0, sample_count=32000,
+        anchor_line_id="b005", output_path="C:/episode/interstitial.wav",
+        requested_duration_s=1.0, actual_duration_s=1.0,
+    )
+    projected = {
+        "generation_prompt": manifest_row["prompt"],
+        "target_duration_s": manifest_row["requested_duration_s"],
+        "placement": manifest_row["placement"],
+        "anchor_line_id": manifest_row["anchor_line_id"],
+    }
+    manifest_row["cue_spec_sha256"] = music_cue_spec_sha256(projected)
+    manifest = CM.build_manifest(32000, [manifest_row])
+    ledger = {"lines": [{"line_id": "b005"}], "music": []}
+
+    first = CM.reconcile_ledger_music(ledger, manifest)
+    second = CM.reconcile_ledger_music(ledger, manifest)
+
+    assert first == {"matched": 0, "created": 1, "paths_updated": 1, "total": 1}
+    assert second == {"matched": 1, "created": 0, "paths_updated": 0, "total": 1}
+    row = ledger["music"][0]
+    assert row["anchor_line_id"] == "b005"
+    assert row["placement"] == "interstitial"
+    assert row["wav_path"] == "C:/episode/interstitial.wav"
+    assert row["cue_spec_sha256"] == manifest_row["cue_spec_sha256"]
+
+
+def test_reconcile_rejects_authored_identity_mismatch():
+    from nodes.production_ledger import music_cue_spec_sha256
+
+    authored = {
+        "cue_id": "inter_01",
+        "generation_prompt": "authored bridge",
+        "target_duration_s": None,
+        "placement": "interstitial",
+        "anchor_line_id": "l002",
+    }
+    authored["cue_spec_sha256"] = music_cue_spec_sha256(authored)
+    manifest_row = _row(
+        "inter_01", 0, anchor_line_id="l002", prompt="authored bridge",
+        prompt_sha256=CM.prompt_sha256("authored bridge"),
+        cue_spec_sha256=authored["cue_spec_sha256"],
+    )
+    manifest = CM.build_manifest(32000, [manifest_row])
+    ledger = {"music": [{**authored, "generation_prompt": "changed bridge"}]}
+
+    with pytest.raises(CM.CueManifestError, match="identity mismatch"):
+        CM.reconcile_ledger_music(ledger, manifest)
+
+
 # --------------------------------------------------------------------------- #
 # sample_count direct-slice recovery (MF-G)
 # --------------------------------------------------------------------------- #

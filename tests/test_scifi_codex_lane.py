@@ -942,6 +942,48 @@ def _script_voicing(*char_ids: str) -> lane.ScriptArtifactV4:
     )
 
 
+def test_assemble_ledger_translates_score_local_music_contract(tmp_path):
+    from nodes import production_ledger as PL
+
+    score = _metadata_repair_score()
+    cues = [
+        score.music_cues[0],
+        lane.MusicCueV4(
+            cue_id="music_inter", placement="inter",
+            description="A narrow bridge.", generation_prompt="Narrow bridge.",
+            anchor_line_id="l003", anchor_beat_id="b002",
+        ),
+        lane.MusicCueV4(
+            cue_id="music_close", placement="close",
+            description="A resolved signal.", generation_prompt="Resolved signal.",
+            anchor_line_id="l004", anchor_beat_id="b003",
+        ),
+    ]
+    score = score.model_copy(update={"music_cues": cues})
+    script = _script_voicing(
+        "announcer", "announcer", "announcer", "announcer",
+    ).model_copy(update={"music_cues": cues})
+    led = PL.new_ledger(
+        episode_id="scifi_music_contract", out_dir=str(tmp_path),
+    )
+    meta = led.data.setdefault("meta", {})
+    meta["scifi_codex"] = {}
+
+    lane._assemble_ledger(
+        led, score, _metadata_repair_cast(), script, meta,
+    )
+
+    assert [row["cue_id"] for row in led.data["music"]] == [
+        "opening", "inter_01", "closing",
+    ]
+    assert [row["placement"] for row in led.data["music"]] == [
+        "opening", "interstitial", "closing",
+    ]
+    assert [row["anchor_line_id"] for row in led.data["music"]] == [
+        "l001", "l003", "l004",
+    ]
+
+
 def test_p5_coverage_uses_score_scheduled_speakers_not_full_roster():
     # The systematic short-leg blocker: P3 makes coverage advisory (a cast row
     # may own no beat) but P5 used to fatally require EVERY locked row voiced.
