@@ -510,6 +510,32 @@ receipts, or seals. Enforce the boundary mechanically: scan production modules
 for direct ledger-text assignments so a new sibling writer cannot silently
 reintroduce split ownership.
 
+## 32. Transport only model-owned fields across a bounded LLM context
+
+An LLM should not reserialize a compiler-owned graph merely to author its leaf
+text. Every repeated ID, parent, speaker, boundary, cue, neutral default, and
+scene field spends output tokens, creates a fresh drift opportunity, and is
+usually echoed again beside the failed artifact during typed repair. A response
+can therefore be semantically small yet impossible to complete inside the
+model's real context and output limits.
+
+Define the wire artifact at the authoring boundary, not at the downstream
+storage boundary. Give the model a closed list of stable IDs and only the prose
+fields it owns. Require exact unique ID coverage, map by ID rather than response
+order or fuzzy matching, and compile every mechanically derivable field from
+the already accepted graph. Then run the complete downstream validator against
+the compiled artifact; a compact transport must not become a validation bypass.
+
+Repairs need the same discipline. Reinject a complete failed compact draft only
+when it parsed, plus the smallest trusted authority needed to correct it. Drop a
+malformed prefix instead of paying context to repeat truncation. Require both
+the prompt and the full output reservation to fit before inference. A liveness
+ladder should be finite and flat: a bounded same-slot ladder, then at most one
+fresh independent slot, followed by an explicit deterministic floor only for
+advisory craft defects. Record every attempt and terminal exhaustion truthfully.
+Prove the maximum supported input and repair envelopes with the exact production
+tokenizer, not a character estimate or a smaller surrogate prompt.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

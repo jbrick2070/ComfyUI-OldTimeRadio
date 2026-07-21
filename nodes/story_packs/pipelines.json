@@ -484,7 +484,7 @@
             "codex_play_system",
             "codex_coda_contract_system"
           ],
-          "description": "Writes a complete first ScriptArtifact, including every announcer and music line."
+          "description": "Writes the compact closed {line_id,text} spoken draft. Python compiles score-owned ScriptArtifact metadata, validates the complete artifact, and runs at most one fresh technical-slot ladder if the creative ladder exhausts."
         },
         {
           "pass_id": "P6_listening_room",

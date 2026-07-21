@@ -804,6 +804,27 @@ class ScriptArtifactV4(_Strict):
     music_cues: list[MusicCueV4] = Field(min_length=1)
 
 
+_SCRIPT_TEXT_DRAFT_MAX_LINES = (
+    _RADIO_SCORE_MAX_BEATS * _RADIO_SCORE_MAX_LINES_PER_BEAT
+)
+
+
+class ScriptTextDraftLineV4(_Strict):
+    """The only P5 fields the model actually authors."""
+
+    line_id: str = Field(pattern=r"^l\d{3}$")
+    text: str = Field(min_length=1)
+
+
+class ScriptTextDraftV4(_Strict):
+    """Compact P5 wire artifact; Python compiles score-owned mechanics."""
+
+    lines: list[ScriptTextDraftLineV4] = Field(
+        min_length=1,
+        max_length=_SCRIPT_TEXT_DRAFT_MAX_LINES,
+    )
+
+
 _SCRIPT_ARTIFACT_FIELDS = frozenset(ScriptArtifactV4.model_fields)
 _SCRIPT_LINE_FIELDS = frozenset(ScriptLineV4.model_fields)
 _MUSIC_CUE_FIELDS = frozenset(MusicCueV4.model_fields)
@@ -831,6 +852,16 @@ _SCRIPT_ARTIFACT_ROOT_INSTRUCTION = (
     "(scene_id, env, description); never nest shots or beats inside them."
 )
 
+_SCRIPT_TEXT_DRAFT_ROOT_INSTRUCTION = (
+    "\nSCRIPT TEXT DRAFT ROOT CONTRACT: Return one JSON object with exactly one "
+    "root key, lines. Each lines item has exactly line_id and text. Treat the "
+    "accepted_line_graph as a closed manifest: emit every and only its line_id "
+    "once, preferably in listed order. Write final spoken text for each row. "
+    "Do not echo title, scenes, shots, beats, music cues, score-owned metadata, "
+    "request wrappers, pass_id, artifact_inputs, or result_json_schema. Python "
+    "compiles those mechanical fields from the already accepted score."
+)
+
 
 class _PromptMustFitMessages(list[dict[str, str]]):
     """Tell the local slot wrapper to fail before it slices this prompt."""
@@ -840,6 +871,14 @@ class _PromptMustFitMessages(list[dict[str, str]]):
 
 class _P3TextPatchMessages(list[dict[str, str]]):
     """Keep the authored-text repair complete and output-bounded."""
+
+    _otr_prompt_must_fit = True
+    _otr_strict_remote_output_budget = True
+    _otr_require_full_output_budget = True
+
+
+class _P5TextDraftMessages(list[dict[str, str]]):
+    """Keep compact P5 prompt and output reservations complete."""
 
     _otr_prompt_must_fit = True
     _otr_strict_remote_output_budget = True
@@ -3594,16 +3633,13 @@ def _radio_score_draft_output_token_budget(
 def _script_output_token_budget(
     requested_words: int, accepted_line_count: int,
 ) -> int:
-    """Reserve whole-script JSON output from BOTH drivers of its serialized size.
+    """Reserve the compact P5 ``{line_id, text}`` wire artifact.
 
-    A ScriptArtifactV4 is not sized by its dialogue alone: it serializes the
-    strict per-line metadata graph (ids, boundary, arc phase, beat intent, flags)
-    for every accepted line.  A 30-word script with 13 lines pays nearly all of
-    that same metadata cost, so a budget derived from the word steer ALONE
-    under-reserves exactly when the accepted graph is wide. The retired P7
-    whole-script path exposed this live (generated_tokens == max_new_tokens ==
-    2800 -> truncated JSON); P5 still needs the honest complete-artifact
-    reservation. Scale on the line count too.
+    The accepted score now owns every mechanical ScriptArtifactV4 field.  P5
+    serializes only spoken text plus one short ID per accepted row, so its two
+    honest size drivers are spoken words and row-envelope overhead.  Keeping the
+    old whole-artifact reservation would waste most of an 8k local window and
+    recreate the repair clamp this compact transport removes.
     """
     if (
         not isinstance(requested_words, int)
@@ -3614,36 +3650,19 @@ def _script_output_token_budget(
     if (
         not isinstance(accepted_line_count, int)
         or isinstance(accepted_line_count, bool)
-        or accepted_line_count < 1
+        or not 1 <= accepted_line_count <= _SCRIPT_TEXT_DRAFT_MAX_LINES
     ):
-        raise CodexTargetRangeError("accepted_line_count must be a positive int")
-    # ~4.5 tokens per requested word of dialogue, ~130 tokens of strict metadata
-    # per accepted line, plus the artifact envelope (title, scenes, music cues).
-    # The 2,800 floor is the observed complete-artifact floor for the canonical
-    # 30-word graph.
-    #
-    # THE 5,400 CEILING IS GONE. Its comment said it "keeps the reservation
-    # inside the context cap alongside the pass input" -- that cap was the false
-    # 8,192 every remote model was being budgeted against (PBUG-20260713-20).
-    # P5 runs on the CREATIVE slot, where the frontier model lives:
-    # aion-3.0-mini advertises 131,072 tokens, and
-    # OpenRouter's own per-call output ceiling (DEFAULT_OUTPUT_TOKENS_CAP) is
-    # 16,384. Nothing about 5,400 was ever a property of the artifact.
-    #
-    # It was a real 720-word killer: at 720 words with 24 accepted lines the
-    # formula asks for 720*4.5 + 130*24 + 600 = 6,960, and the ceiling handed it
-    # 5,400 -- 1,560 tokens short of the script it had to write. The ScriptArtifactV4
-    # would have come back cut off mid-JSON, the ladder would have exhausted, and
-    # the leg would have died blaming the model. The clamp bites at ANY line count
-    # >= 13 at 720 words; at 420 words it needed >= 23, which is why 420 was green
-    # and 720 would not have been.
-    #
-    # The transport still owns the final say: fit_output_tokens clamps the request
-    # to the slot's REAL window, so a small local model is protected without a
-    # constant here pretending to know its window.
+        raise CodexTargetRangeError(
+            "accepted_line_count must be an int in "
+            f"1..{_SCRIPT_TEXT_DRAFT_MAX_LINES}"
+        )
+    # Two tokens per requested spoken word is intentionally conservative for
+    # punctuation-heavy dialogue; 48 tokens per row covers the tiny JSON object,
+    # and 256 covers the root/framing contract. The 768 floor keeps short plays
+    # roomy without approaching the old 2,800-token metadata tax.
     return max(
-        2800,
-        int(requested_words * 4.5) + 130 * int(accepted_line_count) + 600,
+        768,
+        int(requested_words * 2.0) + 48 * int(accepted_line_count) + 256,
     )
 
 
@@ -3705,6 +3724,75 @@ def _script_artifact_inputs(
         },
         "initial_draft_word_steer": word_steer.model_dump(mode="json"),
     }
+
+
+def compile_script_text_draft(
+    draft: ScriptTextDraftV4,
+    score: RadioScoreV4,
+) -> ScriptArtifactV4:
+    """Compile model-authored P5 text into the accepted score graph.
+
+    IDs must cover the closed graph exactly and uniquely.  Python maps by ID,
+    never by list position or fuzzy similarity, and creates only score-owned
+    mechanical metadata.  The model's text is copied byte for byte.
+    """
+    expected = _accepted_script_line_metadata(score)
+    if expected is None:
+        raise CodexGraphError(
+            "P5 compact draft cannot compile an ambiguous accepted score graph"
+        )
+    observed_ids = [row.line_id for row in draft.lines]
+    if len(observed_ids) != len(set(observed_ids)):
+        raise CodexGraphError("P5 compact draft has duplicate line IDs")
+    if set(observed_ids) != set(expected):
+        missing = sorted(set(expected) - set(observed_ids))
+        unknown = sorted(set(observed_ids) - set(expected))
+        raise CodexGraphError(
+            "P5 compact draft line IDs do not exactly cover the accepted graph "
+            f"(missing={missing}, unknown={unknown})"
+        )
+    text_by_id = {row.line_id: row.text for row in draft.lines}
+    compiled_lines: list[ScriptLineV4] = []
+    for scene in score.scenes:
+        for beat in scene.beats:
+            for line_id in beat.line_ids:
+                beat_id, shot_id, boundary = expected[line_id]
+                compiled_lines.append(ScriptLineV4(
+                    line_id=line_id,
+                    beat_id=beat_id,
+                    shot_id=shot_id,
+                    char_id=beat.char_id,
+                    speaker_role=beat.speaker_role,
+                    text=text_by_id[line_id],
+                    skip=False,
+                    tts_skip_reason=None,
+                    traits="",
+                    boundary=boundary,
+                    arc_phase=beat.arc_phase,
+                    compose_flags=[],
+                    beat_intent=beat.intent,
+                    dialogue_slot_id=None,
+                    fact_ids=list(beat.fact_ids),
+                ))
+    try:
+        return ScriptArtifactV4(
+            schema_version="scifi_codex.script_artifact.v4",
+            title=score.title,
+            scenes=[
+                ScriptSceneV4(
+                    scene_id=scene.scene_id,
+                    env=scene.env,
+                    description=scene.description,
+                )
+                for scene in score.scenes
+            ],
+            lines=compiled_lines,
+            music_cues=[cue.model_copy(deep=True) for cue in score.music_cues],
+        )
+    except ValidationError as exc:
+        raise CodexGraphError(
+            f"P5 compact draft compiled to an invalid ScriptArtifactV4: {exc}"
+        ) from exc
 
 
 def _p3_late_recovery_text_patch(
@@ -3782,7 +3870,12 @@ def invoke_codex_structured(
         if not text:
             raise CodexPackContractError(f"missing Codex seam {seam!r}")
         seams.append(text)
-    script_artifact_pass = pass_id == "P5"
+    script_artifact_pass = (
+        pass_id == "P5" and result_type is ScriptArtifactV4
+    )
+    script_text_draft_pass = (
+        pass_id == "P5" and result_type is ScriptTextDraftV4
+    )
     draft_score_pass = (
         pass_id in {"P3", "P3_rewrite"}
         and result_type is RadioScoreDraftV4
@@ -3814,6 +3907,8 @@ def invoke_codex_structured(
             )
     if script_artifact_pass:
         schema_instruction += _SCRIPT_ARTIFACT_ROOT_INSTRUCTION
+    if script_text_draft_pass:
+        schema_instruction += _SCRIPT_TEXT_DRAFT_ROOT_INSTRUCTION
     if result_type is StructureReviewV4:
         schema_instruction += _STRUCTURE_REVIEW_CONTRACT_INSTRUCTION
     messages = [{"role": "system", "content": "\n".join(seams) + schema_instruction}, {"role": "user", "content": json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)}]
@@ -3937,11 +4032,12 @@ def invoke_codex_structured(
     )
 
     def capture(messages_in, **kwargs):
-        call_messages = (
-            _PromptMustFitMessages(messages_in)
-            if prompt_must_fit and isinstance(messages_in, list)
-            else messages_in
-        )
+        if script_text_draft_pass and isinstance(messages_in, list):
+            call_messages = _P5TextDraftMessages(messages_in)
+        elif prompt_must_fit and isinstance(messages_in, list):
+            call_messages = _PromptMustFitMessages(messages_in)
+        else:
+            call_messages = messages_in
         raw = result_slot_fn(call_messages, **kwargs)
         original_raw = str(raw)
         resolved_artifact_unwrapped = False
@@ -4000,6 +4096,61 @@ def invoke_codex_structured(
 
     def typed_repair_factory(*, original_prompt, failed_output, error):
         detail = " ".join(str(error).split())[:500] or "structured output rejected"
+        if script_text_draft_pass:
+            # P5 no longer repairs a whole ScriptArtifact beside its whole input.
+            # Keep only the authored text draft plus the compact authority needed
+            # to write it again. If syntax is incomplete, omit the unusable raw
+            # fragment entirely; re-injecting it only spends context teaching the
+            # model to repeat a truncated prefix.
+            try:
+                parsed_failed_draft = parse_first_json_object(failed_output)
+            except Exception:
+                parsed_failed_draft = None
+            repair_context = {
+                key: artifact_inputs[key]
+                for key in (
+                    "story_context",
+                    "accepted_line_graph",
+                    "fact_index",
+                    "initial_draft_word_steer",
+                )
+                if key in artifact_inputs
+            }
+            repair_payload: dict[str, Any] = {
+                "rejection": detail,
+                "script_context": repair_context,
+            }
+            if isinstance(parsed_failed_draft, dict):
+                repair_payload["failed_text_draft"] = parsed_failed_draft
+            repair_rules = (
+                "This is a typed repair of the same compact ScriptTextDraftV4, "
+                "not a new score and not a whole ScriptArtifact. Return exactly "
+                "one root key, lines. Each row has exactly line_id and text. "
+                "Cover every and only accepted_line_graph line_id exactly once. "
+                "Preserve every already-valid text byte for byte when a complete "
+                "failed_text_draft is supplied; change only rejected or missing "
+                "rows. If it is absent, write a complete fresh text draft from "
+                "script_context. Never emit title, scenes, music cues, metadata, "
+                "request wrappers, or validation diagnostics."
+            )
+            return [
+                {
+                    "role": "system",
+                    "content": (
+                        "\n".join(seams) + schema_instruction
+                        + "\n" + repair_rules
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        repair_payload,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                    ),
+                },
+            ]
         if script_artifact_pass:
             # A schema/graph/roster-valid ScriptArtifact rejected only for
             # spoken craft must never enter the whole-artifact JSON repair
@@ -4603,6 +4754,250 @@ def _call_radio_score_draft(
             }
             journal_entry["accepted"] = compiled.model_dump(mode="json")
     return compiled
+
+
+def _call_script_text_draft(
+    *,
+    slot: Literal["creative", "technical"],
+    slot_fn: GenerateFn,
+    alternate_slot: Literal["creative", "technical"],
+    alternate_slot_fn: GenerateFn,
+    pack: Any,
+    artifact_inputs: Mapping[str, Any],
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    story_rules: StoryRules,
+    base_temperature: float,
+    structural_retry_temperature: float,
+    max_new_tokens: int,
+    call_journal: MutableMapping[str, Any],
+) -> ScriptArtifactV4:
+    """Compile and fully validate one compact P5 structured ladder."""
+    compiled_by_draft_identity: dict[int, ScriptArtifactV4] = {}
+    rejected_candidates: list[tuple[ScriptTextDraftV4, ScriptArtifactV4]] = []
+
+    def validate_draft(candidate: BaseModel) -> str | None:
+        if not isinstance(candidate, ScriptTextDraftV4):
+            return "P5 compact result is not a ScriptTextDraftV4"
+        try:
+            compiled = compile_script_text_draft(candidate, score)
+        except ScifiCodexError as exc:
+            return str(exc)
+        validation_error = _validate_script_post(
+            compiled, cast, score, fact_index, story_rules,
+        )
+        if validation_error is not None:
+            rejected_candidates.append((candidate, compiled))
+            return validation_error
+        compiled_by_draft_identity[id(candidate)] = compiled
+        return None
+
+    try:
+        result = invoke_codex_structured(
+            pass_id="P5",
+            slot=slot,
+            slot_fn=slot_fn,
+            pack=pack,
+            seam_refs=("codex_play_system", "codex_coda_contract_system"),
+            artifact_inputs=artifact_inputs,
+            result_type=ScriptTextDraftV4,
+            post_validator=validate_draft,
+            base_temperature=base_temperature,
+            structural_retry_temperature=structural_retry_temperature,
+            max_new_tokens=max_new_tokens,
+            call_journal=call_journal,
+            prompt_must_fit=True,
+            clamp_overlong_strings=False,
+            include_result_json_schema=False,
+        )
+    except CodexPassError as exc:
+        # Preserve the former P5 liveness contract: a schema/graph/roster-valid
+        # draft rejected only for spoken craft still gets the bounded row-local
+        # A/B/C/deterministic-floor cascade before a full fresh-slot restart.
+        if rejected_candidates:
+            rejected_draft, rejected_script = rejected_candidates[-1]
+            try:
+                _validate_script_graph(rejected_script, score)
+                _validate_script_roster_contract(rejected_script, cast, score)
+                targets = _collect_script_hygiene_targets(
+                    rejected_script, cast, fact_index, score, story_rules,
+                )
+            except Exception:
+                targets = ()
+            if targets:
+                receipt: dict[str, Any] = {
+                    "status": "attempting",
+                    "trigger": "compact_p5_ladder_exhausted_on_craft",
+                }
+                repaired = _repair_script_hygiene_after_exhaustion(
+                    script=rejected_script,
+                    score=score,
+                    cast=cast,
+                    fact_index=fact_index,
+                    story_rules=story_rules,
+                    same_slot=slot,
+                    same_slot_fn=slot_fn,
+                    alternate_slot=alternate_slot,
+                    alternate_slot_fn=alternate_slot_fn,
+                    post_validator=lambda value: _validate_script_post(
+                        value, cast, score, fact_index, story_rules,
+                    ),
+                    max_new_tokens=max_new_tokens,
+                    receipt=receipt,
+                )
+                if repaired is not None:
+                    calls = call_journal.get("calls")
+                    if (
+                        isinstance(calls, list)
+                        and calls
+                        and isinstance(calls[-1], dict)
+                    ):
+                        entry = calls[-1]
+                        terminal = entry.pop("terminal_error", None)
+                        entry["recovered_terminal_error"] = terminal
+                        entry["hygiene_repair"] = receipt
+                        wire = rejected_draft.model_dump(mode="json")
+                        serialized = json.dumps(
+                            wire,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            ensure_ascii=False,
+                        )
+                        entry["accepted_transport"] = {
+                            "schema": "ScriptTextDraftV4",
+                            "chars": len(serialized),
+                            "sha256": hashlib.sha256(
+                                serialized.encode("utf-8")
+                            ).hexdigest(),
+                            "recovered_after_ladder": True,
+                        }
+                        entry["accepted"] = repaired.model_dump(mode="json")
+                    return repaired
+        raise
+
+    if not isinstance(result, ScriptTextDraftV4):
+        raise CodexPassError("P5 returned a non-draft structured result")
+    compiled = compiled_by_draft_identity.get(id(result))
+    if compiled is None:
+        compiled = compile_script_text_draft(result, score)
+        validation_error = _validate_script_post(
+            compiled, cast, score, fact_index, story_rules,
+        )
+        if validation_error is not None:
+            raise CodexPassError(
+                "P5 accepted compact draft failed defensive validation: "
+                + validation_error
+            )
+
+    calls = call_journal.get("calls")
+    if isinstance(calls, list) and calls and isinstance(calls[-1], dict):
+        entry = calls[-1]
+        if entry.get("pass_id") == "P5":
+            wire = entry.get("accepted")
+            serialized = json.dumps(
+                wire,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+            entry["accepted_transport"] = {
+                "schema": "ScriptTextDraftV4",
+                "chars": len(serialized),
+                "sha256": hashlib.sha256(
+                    serialized.encode("utf-8")
+                ).hexdigest(),
+            }
+            entry["accepted"] = compiled.model_dump(mode="json")
+    return compiled
+
+
+def _run_initial_script_generation(
+    *,
+    creative_fn: GenerateFn,
+    technical_fn: GenerateFn,
+    pack: Any,
+    artifact_inputs: Mapping[str, Any],
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    story_rules: StoryRules,
+    max_new_tokens: int,
+    call_journal: MutableMapping[str, Any],
+) -> ScriptArtifactV4:
+    """Run at most two flat P5 ladders: creative, then fresh technical."""
+    attempts: list[dict[str, Any]] = []
+    receipt: dict[str, Any] = {
+        "transport": "ScriptTextDraftV4",
+        "max_ladders": 2,
+        "attempts": attempts,
+        "status": "pending",
+    }
+    call_journal["initial_script_generation"] = receipt
+    lanes = (
+        ("creative", creative_fn, "technical", technical_fn, 0.78, 0.35),
+        ("technical", technical_fn, "creative", creative_fn, 0.55, 0.20),
+    )
+    last_error: CodexPassError | None = None
+    for (
+        slot,
+        slot_fn,
+        alternate_slot,
+        alternate_slot_fn,
+        base_temperature,
+        structural_retry_temperature,
+    ) in lanes:
+        calls_before = len(call_journal.get("calls") or [])
+        attempt: dict[str, Any] = {
+            "slot": slot,
+            "status": "pending",
+            "calls_before": calls_before,
+        }
+        attempts.append(attempt)
+        try:
+            script = _call_script_text_draft(
+                slot=slot,
+                slot_fn=slot_fn,
+                alternate_slot=alternate_slot,
+                alternate_slot_fn=alternate_slot_fn,
+                pack=pack,
+                artifact_inputs=artifact_inputs,
+                score=score,
+                cast=cast,
+                fact_index=fact_index,
+                story_rules=story_rules,
+                base_temperature=base_temperature,
+                structural_retry_temperature=structural_retry_temperature,
+                max_new_tokens=max_new_tokens,
+                call_journal=call_journal,
+            )
+        except CodexPassError as exc:
+            last_error = exc
+            attempt.update({
+                "status": "failed",
+                "calls_after": len(call_journal.get("calls") or []),
+                "error_type": type(exc).__name__,
+                "error": " ".join(str(exc).split())[:500],
+            })
+            continue
+        attempt.update({
+            "status": "accepted",
+            "calls_after": len(call_journal.get("calls") or []),
+        })
+        receipt.update({
+            "status": "accepted",
+            "selected_slot": slot,
+            "ladders_run": len(attempts),
+        })
+        return script
+    receipt.update({
+        "status": "exhausted",
+        "selected_slot": None,
+        "ladders_run": len(attempts),
+    })
+    raise CodexPassError(
+        "P5 compact script generation exhausted creative and technical ladders"
+    ) from last_error
 
 
 def _script_digest(script: ScriptArtifactV4) -> str:
@@ -5889,16 +6284,31 @@ def run_scifi_codex_episode(
             if not _record_failsoft("P3_rewrite", "retake", exc, meta):
                 raise
             score = p3
-    # The whole-script reservation is only knowable once the score's accepted
-    # line graph is final (P3, or P3_rewrite): the artifact serializes strict
-    # metadata for every accepted line, so the line count -- not the word steer
-    # alone -- drives its size.
+    # The compact text-draft reservation is only knowable once the accepted P3
+    # graph is final: spoken words plus one tiny {line_id,text} envelope per row
+    # are the only P5 wire fields. Python compiles the final ScriptArtifactV4.
     accepted_line_count = len(_accepted_script_line_metadata(score) or ())
     if not accepted_line_count:
         raise CodexGraphError("accepted score has no line graph to budget for")
     script_token_budget = _script_output_token_budget(steer.requested_words, accepted_line_count)
-    journal["script_token_budget"] = {"requested_words": steer.requested_words, "accepted_line_count": accepted_line_count, "max_new_tokens": script_token_budget}
-    script = invoke_codex_structured(pass_id="P5", slot="creative", slot_fn=creative_fn, pack=pack, seam_refs=("codex_play_system", "codex_coda_contract_system"), artifact_inputs=_script_artifact_inputs(score, p0, steer), result_type=ScriptArtifactV4, post_validator=lambda x: _validate_script_post(x, p2, score, p0, story_rules), base_temperature=.78, structural_retry_temperature=.35, max_new_tokens=script_token_budget, call_journal=journal, repair_score=score, spoken_repair_cast=p2, spoken_repair_fact_index=p0, spoken_repair_story_rules=story_rules, spoken_repair_alternate_slot_fn=technical_fn, spoken_repair_alternate_slot="technical")
+    journal["script_token_budget"] = {
+        "transport_schema": "ScriptTextDraftV4",
+        "requested_words": steer.requested_words,
+        "accepted_line_count": accepted_line_count,
+        "max_new_tokens": script_token_budget,
+    }
+    script = _run_initial_script_generation(
+        creative_fn=creative_fn,
+        technical_fn=technical_fn,
+        pack=pack,
+        artifact_inputs=_script_artifact_inputs(score, p0, steer),
+        score=score,
+        cast=p2,
+        fact_index=p0,
+        story_rules=story_rules,
+        max_new_tokens=script_token_budget,
+        call_journal=journal,
+    )
     # Quality passes are dynamic: each actionable P6/P8 verdict triggers a fresh
     # creative line patch and then an independent re-audit. They stop on a clean
     # verdict or the no-hang budget; exhaustion keeps the best structurally valid

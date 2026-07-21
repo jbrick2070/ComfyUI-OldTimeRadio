@@ -2432,3 +2432,44 @@ out until they independently meet the same production-only admission rule.
   so direct `row['text']` writes cannot bypass the atomic owner
 - bible-worthy: yes -- BUG-12.67
 - status: **LIVE-ADMITTED / ROOT-FIXED; exact six-bank + writer/freeze focused tests, full suite (8,315 passed), Bug Bible, and canonical workflow gates GREEN; live six-bank requalification pending**
+
+## PBUG-20260721-16 -- whole-artifact P5 transport exhausted an otherwise healthy local writer
+- surfaced: canonical `scifi_news` qualification prompt
+  `569b20e5-0e28-4472-a04d-637ab019f19f`, pending artifact
+  `pending_20260721_144919`, 2026-07-21. The source was the NASA NISAR /
+  Hummingbird Antarctica item. The episode stopped in P5 before ledger or media
+  production after 39 minutes of active local inference
+- symptom: P5 attempt one reached its 2,970-token caller cap and returned
+  truncated JSON. Attempt two returned a complete `ScriptArtifactV4` but
+  invented line ID `l013`. The full typed-repair prompt then occupied 5,807
+  tokens; the 8,192-token local context could reserve only 2,385 of the required
+  2,970 output tokens, so the repair truncated and the three-attempt ladder
+  exhausted. No OOM or idle GPU thrash occurred, but a structurally repairable
+  story killed the episode
+- root cause: the initial script pass made the model reserialize the accepted
+  score's title, scene, cue, speaker, graph, boundary, fact, and neutral delivery
+  metadata beside the only fields it actually authored: line IDs and spoken
+  text. Its repair turn then reinjected the failed whole artifact plus almost
+  the whole original request and duplicate schema authority. Output and context
+  budgets therefore scaled with compiler-owned metadata, and a fresh LLM ladder
+  could only retry the same oversized transport
+- fix: P5 now transports a strict compact `ScriptTextDraftV4` containing only
+  `{line_id,text}` rows. Python requires an exact unique bijection to the
+  accepted line graph, maps by ID rather than response position, and compiles
+  every mechanical `ScriptArtifactV4` field from the accepted score before the
+  unchanged full graph, roster, fact, spoken-hygiene, and craft validation.
+  Typed repair carries only the compact draft plus story, line-graph, fact, and
+  word-steer authority; malformed prefixes are omitted. Every P5 call requires
+  the complete prompt and full dynamic output reservation to fit. Exhaustion is
+  a flat, truthful creative ladder followed by at most one fresh technical
+  ladder, never recursion; the existing row-local A/B/C/deterministic spoken
+  floor remains the final craft-liveness boundary
+- verify idea: at the full supported 900-word, 24-row surface, tokenize the real
+  base and semantic-repair chats with the exact on-disk Gemma 4 12B tokenizer
+  and require prompt plus the full 3,208-token output reservation to fit its
+  8,192-token context. Require byte-preserved text and compiler-owned graph
+  fields; reject missing, unknown, and duplicate IDs; prove typed repair omits
+  whole-request/schema echo and malformed raw prefixes; and prove the restart
+  runs creative then technical exactly once before truthful exhaustion
+- bible-worthy: yes -- BUG-12.68
+- status: **LIVE-ADMITTED / ROOT-FIXED; exact-tokenizer maximum envelope, 165 focused lane/route tests, full suite (8,325 passed), Bug Bible, and canonical workflow gates GREEN; live six-bank requalification pending**

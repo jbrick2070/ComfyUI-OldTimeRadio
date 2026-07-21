@@ -5,6 +5,7 @@ import copy
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -98,6 +99,11 @@ def _metadata_repair_score() -> lane.RadioScoreV4:
 _GEMMA_E4B_TOKENIZER_SNAPSHOT = Path(
     r"C:\ComfyUI-Models\huggingface\hub\models--google--gemma-4-E4B-it"
     r"\snapshots\c53e9d33178b12afbad4a48334d21e19b8c29761"
+)
+
+_GEMMA_12B_TOKENIZER_SNAPSHOT = Path(
+    r"C:\ComfyUI-Models\huggingface\models--google--gemma-4-12b-it"
+    r"\snapshots\5926caa4ec0cac5cbfadaf4077420520de1d5205"
 )
 
 
@@ -1469,6 +1475,146 @@ def test_max_width_p3_draft_envelopes_fit_the_local_gemma_context():
     assert (
         patch_prompt_tokens + patch_budget <= 8192
     ), f"P3 text patch prompt tokens {patch_prompt_tokens} exceed the 8192 context cap"
+
+
+def test_max_width_p5_text_envelopes_fit_the_live_gemma_12b_context():
+    """Prove compact P5 base and typed repair at the full supported surface."""
+    if not _GEMMA_12B_TOKENIZER_SNAPSHOT.is_dir():
+        pytest.skip("local Gemma 4 12B tokenizer snapshot is unavailable")
+    transformers = pytest.importorskip("transformers")
+    tokenizer = transformers.AutoTokenizer.from_pretrained(
+        _GEMMA_12B_TOKENIZER_SNAPSHOT, local_files_only=True,
+    )
+
+    requested_words = 900
+    advisory = lane.make_advisory_word_blueprint(
+        requested_words, [f"b{index:03d}" for index in range(12)],
+    )
+    cast = _metadata_repair_cast()
+    fact_index = _metadata_repair_fact_index()
+    score = lane.compile_radio_score_draft(
+        _draft_for_advisory(advisory, max_width=True),
+        advisory,
+        cast,
+        fact_index,
+    )
+    expected_ids = [
+        line_id
+        for scene in score.scenes
+        for beat in scene.beats
+        for line_id in beat.line_ids
+    ]
+    assert len(expected_ids) == lane._SCRIPT_TEXT_DRAFT_MAX_LINES == 24
+
+    vocabulary = ("signal", "relay", "orbit", "winter", "quiet", "proof")
+    quotient, remainder = divmod(requested_words, len(expected_ids))
+    cursor = 0
+    rows: list[dict[str, str]] = []
+    for index, line_id in enumerate(expected_ids):
+        line_word_count = quotient + (1 if index < remainder else 0)
+        words = [
+            vocabulary[(cursor + offset) % len(vocabulary)]
+            for offset in range(line_word_count)
+        ]
+        cursor += line_word_count
+        rows.append({"line_id": line_id, "text": " ".join(words) + "."})
+    assert sum(len(row["text"].split()) for row in rows) == requested_words
+
+    valid = lane.ScriptTextDraftV4(lines=rows)
+    invalid_wire = valid.model_dump(mode="json")
+    invalid_wire["lines"][-1]["line_id"] = "l999"
+    valid_json = json.dumps(
+        valid.model_dump(mode="json"),
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    )
+    invalid_json = json.dumps(
+        invalid_wire,
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    )
+    artifact_inputs = lane._script_artifact_inputs(
+        score,
+        fact_index,
+        lane.WordSteerV4(requested_words=requested_words),
+    )
+    pack = routing.resolve_story_pack("scifi_news")
+    budget = lane._script_output_token_budget(
+        requested_words, len(expected_ids),
+    )
+
+    def validate(candidate):
+        observed_ids = [row.line_id for row in candidate.lines]
+        if (
+            len(observed_ids) != len(set(observed_ids))
+            or set(observed_ids) != set(expected_ids)
+        ):
+            return "P5 compact draft line IDs do not cover the accepted graph"
+        return None
+
+    def run_call(responses: list[str]) -> list[object]:
+        calls: list[object] = []
+
+        def slot(messages, **_kwargs):
+            calls.append(messages)
+            return responses.pop(0)
+
+        result = lane.invoke_codex_structured(
+            pass_id="P5",
+            slot="creative",
+            slot_fn=slot,
+            pack=pack,
+            seam_refs=("codex_play_system", "codex_coda_contract_system"),
+            artifact_inputs=artifact_inputs,
+            result_type=lane.ScriptTextDraftV4,
+            post_validator=validate,
+            base_temperature=.78,
+            structural_retry_temperature=.35,
+            max_new_tokens=budget,
+            call_journal={},
+            prompt_must_fit=True,
+            clamp_overlong_strings=False,
+            include_result_json_schema=False,
+        )
+        assert isinstance(result, lane.ScriptTextDraftV4)
+        assert not responses
+        return calls
+
+    base = run_call([valid_json])
+    typed_repair = run_call([invalid_json, valid_json])
+    assert len(base) == 1
+    assert len(typed_repair) == 2
+    all_calls = [*base, *typed_repair]
+    assert all(
+        getattr(messages, "_otr_prompt_must_fit", False)
+        and getattr(messages, "_otr_strict_remote_output_budget", False)
+        and getattr(messages, "_otr_require_full_output_budget", False)
+        for messages in all_calls
+    )
+    assert all(
+        "result_json_schema" not in messages[1]["content"]
+        for messages in all_calls
+    )
+    repair_payload = json.loads(typed_repair[1][1]["content"])
+    assert set(repair_payload) == {
+        "failed_text_draft", "rejection", "script_context",
+    }
+    assert "original_request" not in repair_payload
+
+    def token_count(messages) -> int:
+        prompt = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+        )
+        return len(tokenizer(prompt, add_special_tokens=False)["input_ids"])
+
+    output_tokens = len(
+        tokenizer(valid_json, add_special_tokens=False)["input_ids"]
+    )
+    prompt_tokens = [token_count(messages) for messages in all_calls]
+    assert budget == 3208
+    assert output_tokens <= budget
+    assert all(
+        prompt_token_count + budget <= 8192
+        for prompt_token_count in prompt_tokens
+    ), f"compact P5 prompt tokens {prompt_tokens} exceed the 8192 context cap"
 
 
 class TestP3TextPatchOutputBudget:
@@ -2951,44 +3097,25 @@ def test_scifi_codex_prompt_seams_forbid_envelope_key():
 
 
 def test_script_output_token_budget_receipts_and_bounds():
-    # The reservation scales on BOTH drivers of the serialized artifact: the
-    # dialogue word steer AND the accepted line count (every accepted line pays
-    # the strict per-line metadata cost, even in a 30-word script).
-    assert lane._script_output_token_budget(30, 13) == 2800    # floor holds
-    assert lane._script_output_token_budget(300, 13) == 3640   # 1350 + 1690 + 600
+    # Compact P5 serializes only spoken words and one {line_id,text} envelope per
+    # accepted row. The score-owned metadata tax that caused the live 2,970-token
+    # cap and 5,807-token repair prompt is gone.
+    assert lane._script_output_token_budget(30, 13) == 940
+    assert lane._script_output_token_budget(300, 13) == 1480
+    assert lane._script_output_token_budget(720, 13) == 2320
+    assert lane._script_output_token_budget(720, 24) == 2848
+    assert lane._script_output_token_budget(900, 24) == 3208
 
-    # THE 5,400 CEILING IS GONE, and this test used to enshrine it: it asserted
-    # `_script_output_token_budget(720, 13) == 5400  # ceiling holds`. Somebody
-    # evaluated the clamp AT 720 WORDS, saw it bite, and wrote down the bitten
-    # value as the contract. That is the whole bug, preserved in a green test.
-    #
-    # The ceiling's comment claimed it "keeps the reservation inside the context
-    # cap" -- the false 8,192 cap every remote model was budgeted against
-    # (PBUG-20260713-20). P5 runs on the CREATIVE slot: aion-3.0-mini has
-    # 131,072 tokens. The complete initial artifact needs what it needs; P7/P9
-    # now use bounded line-text patches instead of this whole-artifact budget.
-    assert lane._script_output_token_budget(720, 13) == 5530   # 3240 + 1690 + 600
-    assert lane._script_output_token_budget(720, 24) == 6960   # 3240 + 3120 + 600
-    assert lane._script_output_token_budget(900, 40) == 9850   # 4050 + 5200 + 600
-
-    # The budget must never be capped by a constant that pretends to know the
-    # slot's window. The transport owns that: fit_output_tokens clamps the
-    # request against the slot's REAL context cap.
-    assert lane._script_output_token_budget(720, 24) > 5400, (
-        "a constant ceiling under the artifact's real size is how a 720-word "
-        "script comes back cut off mid-JSON"
-    )
-
-    # A wider accepted graph reserves more output at the SAME word steer --
-    # this is the P7 live truncation (generated == max_new_tokens == 2800).
+    # Both real size drivers remain monotonic without a false whole-artifact
+    # floor or ceiling.
     assert (
-        lane._script_output_token_budget(300, 30)
+        lane._script_output_token_budget(300, 24)
         > lane._script_output_token_budget(300, 13)
     )
     for invalid in (True, 29, 901, 30.0):
         with pytest.raises(lane.CodexTargetRangeError):
             lane._script_output_token_budget(invalid, 13)
-    for bad_count in (True, 0, -1, 13.0):
+    for bad_count in (True, 0, -1, 13.0, 25):
         with pytest.raises(lane.CodexTargetRangeError):
             lane._script_output_token_budget(30, bad_count)
 
@@ -3010,17 +3137,25 @@ def test_radio_score_draft_output_budget_preserves_the_live_p3_repair_window():
             lane._radio_score_draft_output_token_budget(120, invalid_beats)
 
 
-def test_p3_uses_draft_helper_while_script_passes_keep_dynamic_budget():
+def test_p3_and_p5_use_compiler_owned_drafts_with_dynamic_text_budget():
     source_path = Path(__file__).parents[1] / "nodes" / "_otr_scifi_codex.py"
     source = source_path.read_text(encoding="utf-8")
     tree = ast.parse(source)
     p3_helpers = []
+    p5_helpers: list[dict[str, ast.AST]] = []
+    initial_p5_calls: list[dict[str, ast.AST]] = []
     script_passes: dict[str, ast.AST | None] = {}
     quality_patch_passes: dict[str, ast.AST | None] = {}
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
             continue
         keywords = {keyword.arg: keyword.value for keyword in node.keywords if keyword.arg}
+        if node.func.id == "_call_script_text_draft":
+            p5_helpers.append(keywords)
+            continue
+        if node.func.id == "_run_initial_script_generation":
+            initial_p5_calls.append(keywords)
+            continue
         pass_node = keywords.get("pass_id")
         if not isinstance(pass_node, ast.Constant) or not isinstance(pass_node.value, str):
             continue
@@ -3032,7 +3167,6 @@ def test_p3_uses_draft_helper_while_script_passes_keep_dynamic_budget():
             quality_patch_passes[pass_node.value] = keywords.get(
                 "script_token_budget"
             )
-
     assert {pass_id for pass_id, _keywords in p3_helpers} == {"P3", "P3_rewrite"}
     for pass_id, keywords in p3_helpers:
         budget = keywords["max_new_tokens"]
@@ -3041,9 +3175,15 @@ def test_p3_uses_draft_helper_while_script_passes_keep_dynamic_budget():
         assert isinstance(keywords["advisory"], ast.Name)
         assert isinstance(keywords["cast"], ast.Name)
         assert isinstance(keywords["fact_index"], ast.Name)
-    budget = script_passes["P5"]
+    assert len(p5_helpers) == 1
+    assert len(initial_p5_calls) == 1
+    budget = initial_p5_calls[0]["max_new_tokens"]
     assert isinstance(budget, ast.Name)
     assert budget.id == "script_token_budget"
+    assert isinstance(p5_helpers[0]["max_new_tokens"], ast.Name)
+    assert p5_helpers[0]["max_new_tokens"].id == "max_new_tokens"
+    assert isinstance(script_passes["P5"], ast.Name)
+    assert script_passes["P5"].id == "max_new_tokens"
     assert "P7" not in script_passes
     assert "P9" not in script_passes
     for pass_id in ("P7", "P9"):
@@ -3392,6 +3532,303 @@ def test_script_artifact_inputs_flatten_the_score_without_losing_line_constraint
         "tone": "cautious",
     }
     assert inputs["initial_draft_word_steer"] == {"requested_words": 30}
+
+
+def test_compact_p5_compiler_preserves_text_and_owns_every_mechanical_field():
+    score = _metadata_repair_score()
+    authored = {
+        "l001": "The first pulse arrives under the winter sky.",
+        "l002": "Its timing gives the night staff no easy answer.",
+        "l003": "They wait for proof before they risk a reply.",
+        "l004": "At dawn the careful report keeps its uncertainty.",
+    }
+    # Response order is not an identity source; the accepted score order is.
+    draft = lane.ScriptTextDraftV4(lines=[
+        {"line_id": line_id, "text": authored[line_id]}
+        for line_id in reversed(tuple(authored))
+    ])
+
+    compiled = lane.compile_script_text_draft(draft, score)
+
+    assert compiled.title == score.title
+    assert [scene.model_dump(mode="json") for scene in compiled.scenes] == [
+        {
+            "scene_id": scene.scene_id,
+            "env": scene.env,
+            "description": scene.description,
+        }
+        for scene in score.scenes
+    ]
+    assert compiled.music_cues == score.music_cues
+    assert [line.line_id for line in compiled.lines] == [
+        "l001", "l002", "l003", "l004",
+    ]
+    expected = lane._accepted_script_line_metadata(score)
+    assert expected is not None
+    beat_by_line = {
+        line_id: beat
+        for scene in score.scenes
+        for beat in scene.beats
+        for line_id in beat.line_ids
+    }
+    for line in compiled.lines:
+        beat = beat_by_line[line.line_id]
+        assert line.text == authored[line.line_id]
+        assert (line.beat_id, line.shot_id, line.boundary) == expected[line.line_id]
+        assert line.char_id == beat.char_id
+        assert line.speaker_role == beat.speaker_role
+        assert line.arc_phase == beat.arc_phase
+        assert line.beat_intent == beat.intent
+        assert line.fact_ids == beat.fact_ids
+        assert line.skip is False
+        assert line.tts_skip_reason is None
+        assert line.traits == ""
+        assert line.compose_flags == []
+        assert line.dialogue_slot_id is None
+
+
+@pytest.mark.parametrize(
+    "line_ids,marker",
+    [
+        (("l001", "l002", "l003", "l013"), "unknown=['l013']"),
+        (("l001", "l002", "l003"), "missing=['l004']"),
+        (("l001", "l002", "l003", "l003"), "duplicate"),
+    ],
+)
+def test_compact_p5_compiler_fails_closed_on_non_bijective_line_ids(
+    line_ids, marker,
+):
+    draft = lane.ScriptTextDraftV4(lines=[
+        {"line_id": line_id, "text": f"Spoken row {index} remains authored."}
+        for index, line_id in enumerate(line_ids)
+    ])
+    with pytest.raises(lane.CodexGraphError, match=re.escape(marker)):
+        lane.compile_script_text_draft(draft, _metadata_repair_score())
+
+
+def _valid_compact_p5_draft() -> lane.ScriptTextDraftV4:
+    return lane.ScriptTextDraftV4(lines=[
+        {
+            "line_id": "l001",
+            "text": "A quiet pulse reaches the receiver before midnight.",
+        },
+        {
+            "line_id": "l002",
+            "text": "Its timing unsettles every watcher in the room.",
+        },
+        {
+            "line_id": "l003",
+            "text": "We will wait for a second reading before we answer.",
+        },
+        {
+            "line_id": "l004",
+            "text": "At dawn, one relay clicks, and the blue trace disappears.",
+        },
+    ])
+
+
+def _compact_p5_test_pack() -> SimpleNamespace:
+    return SimpleNamespace(prompt_stages={
+        "codex_play_system": "Write a compact ScriptTextDraftV4.",
+        "codex_coda_contract_system": "Keep the coda cautious.",
+    })
+
+
+def test_compact_p5_call_uses_full_fit_without_raw_schema_or_metadata_echo():
+    score = _metadata_repair_score()
+    fact_index = _metadata_repair_fact_index()
+    draft = _valid_compact_p5_draft()
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return json.dumps(draft.model_dump(mode="json"))
+
+    journal: dict[str, object] = {}
+    compiled = lane._call_script_text_draft(
+        slot="creative",
+        slot_fn=slot_fn,
+        alternate_slot="technical",
+        alternate_slot_fn=slot_fn,
+        pack=_compact_p5_test_pack(),
+        artifact_inputs=lane._script_artifact_inputs(
+            score, fact_index, lane.WordSteerV4(requested_words=30),
+        ),
+        score=score,
+        cast=_metadata_repair_cast(),
+        fact_index=fact_index,
+        story_rules=resolve_story_rules("scifi_news"),
+        base_temperature=.78,
+        structural_retry_temperature=.35,
+        max_new_tokens=940,
+        call_journal=journal,
+    )
+
+    assert isinstance(compiled, lane.ScriptArtifactV4)
+    assert len(calls) == 1
+    messages = calls[0]["messages"]
+    assert getattr(messages, "_otr_require_full_output_budget", False) is True
+    assert getattr(messages, "_otr_prompt_must_fit", False) is True
+    assert "SCRIPT TEXT DRAFT ROOT CONTRACT" in messages[0]["content"]
+    user_payload = json.loads(messages[1]["content"])
+    assert set(user_payload) == {"pass_id", "artifact_inputs"}
+    assert "result_json_schema" not in user_payload
+    entry = journal["calls"][-1]
+    assert entry["accepted_transport"]["schema"] == "ScriptTextDraftV4"
+    assert entry["accepted"]["schema_version"] == "scifi_codex.script_artifact.v4"
+
+
+def test_compact_p5_typed_repair_carries_small_authority_not_whole_request():
+    score = _metadata_repair_score()
+    fact_index = _metadata_repair_fact_index()
+    invalid = _valid_compact_p5_draft().model_dump(mode="json")
+    invalid["lines"][-1]["line_id"] = "l013"
+    valid = _valid_compact_p5_draft().model_dump(mode="json")
+    outputs = iter((json.dumps(invalid), json.dumps(valid)))
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return next(outputs)
+
+    compiled = lane._call_script_text_draft(
+        slot="creative",
+        slot_fn=slot_fn,
+        alternate_slot="technical",
+        alternate_slot_fn=slot_fn,
+        pack=_compact_p5_test_pack(),
+        artifact_inputs=lane._script_artifact_inputs(
+            score, fact_index, lane.WordSteerV4(requested_words=30),
+        ),
+        score=score,
+        cast=_metadata_repair_cast(),
+        fact_index=fact_index,
+        story_rules=resolve_story_rules("scifi_news"),
+        base_temperature=.78,
+        structural_retry_temperature=.35,
+        max_new_tokens=940,
+        call_journal={},
+    )
+
+    assert isinstance(compiled, lane.ScriptArtifactV4)
+    assert len(calls) == 2
+    repair_messages = calls[1]["messages"]
+    assert getattr(
+        repair_messages, "_otr_require_full_output_budget", False,
+    ) is True
+    payload = json.loads(repair_messages[1]["content"])
+    assert set(payload) == {
+        "failed_text_draft", "rejection", "script_context",
+    }
+    assert set(payload["script_context"]) == {
+        "story_context",
+        "accepted_line_graph",
+        "fact_index",
+        "initial_draft_word_steer",
+    }
+    assert "original_request" not in payload
+    assert "music_cues" not in payload["script_context"]
+    assert "result_json_schema" not in repair_messages[1]["content"]
+
+
+def test_compact_p5_malformed_retry_omits_unusable_failed_prefix():
+    score = _metadata_repair_score()
+    fact_index = _metadata_repair_fact_index()
+    valid = json.dumps(_valid_compact_p5_draft().model_dump(mode="json"))
+    outputs = iter(("{", "{", valid))
+    calls: list[dict[str, object]] = []
+
+    def slot_fn(messages, **kwargs):
+        calls.append({"messages": messages, **kwargs})
+        return next(outputs)
+
+    compiled = lane._call_script_text_draft(
+        slot="creative",
+        slot_fn=slot_fn,
+        alternate_slot="technical",
+        alternate_slot_fn=slot_fn,
+        pack=_compact_p5_test_pack(),
+        artifact_inputs=lane._script_artifact_inputs(
+            score, fact_index, lane.WordSteerV4(requested_words=30),
+        ),
+        score=score,
+        cast=_metadata_repair_cast(),
+        fact_index=fact_index,
+        story_rules=resolve_story_rules("scifi_news"),
+        base_temperature=.78,
+        structural_retry_temperature=.35,
+        max_new_tokens=940,
+        call_journal={},
+    )
+
+    assert isinstance(compiled, lane.ScriptArtifactV4)
+    assert len(calls) == 3
+    repair_payload = json.loads(calls[2]["messages"][1]["content"])
+    assert "failed_text_draft" not in repair_payload
+    assert set(repair_payload) == {"rejection", "script_context"}
+
+
+def test_initial_compact_p5_restart_is_flat_creative_then_technical(monkeypatch):
+    seen: list[str] = []
+    accepted = _script_voicing("announcer", "announcer", "announcer", "announcer")
+
+    def fake_call(**kwargs):
+        seen.append(kwargs["slot"])
+        if kwargs["slot"] == "creative":
+            raise lane.CodexPassError("creative ladder exhausted")
+        return accepted
+
+    monkeypatch.setattr(lane, "_call_script_text_draft", fake_call)
+    journal: dict[str, object] = {}
+    result = lane._run_initial_script_generation(
+        creative_fn=lambda *_args, **_kwargs: "",
+        technical_fn=lambda *_args, **_kwargs: "",
+        pack=_compact_p5_test_pack(),
+        artifact_inputs={},
+        score=_metadata_repair_score(),
+        cast=_metadata_repair_cast(),
+        fact_index=_metadata_repair_fact_index(),
+        story_rules=resolve_story_rules("scifi_news"),
+        max_new_tokens=940,
+        call_journal=journal,
+    )
+
+    assert result is accepted
+    assert seen == ["creative", "technical"]
+    receipt = journal["initial_script_generation"]
+    assert receipt["max_ladders"] == 2
+    assert receipt["ladders_run"] == 2
+    assert receipt["selected_slot"] == "technical"
+    assert [row["status"] for row in receipt["attempts"]] == [
+        "failed", "accepted",
+    ]
+
+
+def test_initial_compact_p5_restart_exhausts_after_exactly_two_ladders(monkeypatch):
+    seen: list[str] = []
+
+    def fail_call(**kwargs):
+        seen.append(kwargs["slot"])
+        raise lane.CodexPassError(f"{kwargs['slot']} ladder exhausted")
+
+    monkeypatch.setattr(lane, "_call_script_text_draft", fail_call)
+    journal: dict[str, object] = {}
+    with pytest.raises(lane.CodexPassError, match="exhausted creative and technical"):
+        lane._run_initial_script_generation(
+            creative_fn=lambda *_args, **_kwargs: "",
+            technical_fn=lambda *_args, **_kwargs: "",
+            pack=_compact_p5_test_pack(),
+            artifact_inputs={},
+            score=_metadata_repair_score(),
+            cast=_metadata_repair_cast(),
+            fact_index=_metadata_repair_fact_index(),
+            story_rules=resolve_story_rules("scifi_news"),
+            max_new_tokens=940,
+            call_journal=journal,
+        )
+    assert seen == ["creative", "technical"]
+    assert journal["initial_script_generation"]["status"] == "exhausted"
+    assert journal["initial_script_generation"]["ladders_run"] == 2
 
 
 # ---------------------------------------------------------------------------
