@@ -24,6 +24,7 @@ v2.0  2026-05-13  voice-path-cleanbreak S23.4 (docstring scrub)
 """
 
 import json
+import hashlib
 import logging
 import math
 import os
@@ -35,6 +36,36 @@ import torch
 from .story_orchestrator import _runtime_log
 
 log = logging.getLogger("OTR")
+
+
+def _sha256_file(path, *, chunk_bytes: int = 1024 * 1024) -> str:
+    """Return a streaming SHA-256 for an on-disk asset.
+
+    Master WAVs can be hundreds of megabytes; byte identity must not require a
+    second full-file allocation. The file is read only after ``wave.close`` has
+    finalized its header, so this digest names the exact bytes video slicing
+    and the terminal mux consume.
+    """
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        while True:
+            chunk = fh.read(max(1, int(chunk_bytes)))
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _stamp_master_audio_identity(ledger: dict, master_sha256: str) -> None:
+    """Stamp the frozen master-byte identity into its owned ledger section."""
+    sha = str(master_sha256 or "").strip().lower()
+    if re.fullmatch(r"[0-9a-f]{64}", sha) is None:
+        raise ValueError("master audio sha256 must be 64 lowercase hex chars")
+    audio = ledger.setdefault("audio", {})
+    if not isinstance(audio, dict):
+        raise TypeError("ledger.audio must be a dict")
+    audio["master_audio_sha256"] = sha
+    audio["ledger_frozen"] = True
 
 
 def _move_to_device(obj, device):
@@ -1366,6 +1397,7 @@ class EpisodeAssembler:
         # renders (SignalLostVideo + procgen path act as fallback until
         # the operator re-runs with a clean ledger).
         output_path = "(video-only - master WAV save failed)"
+        _master_wav_sha256 = ""
         try:
             import wave as _wave_mod
             import pathlib as _pathlib
@@ -1414,7 +1446,23 @@ class EpisodeAssembler:
                 _wf.writeframes(_pcm16_interleaved.tobytes())
 
             output_path = _master_wav
-            log.info("[EpisodeAssembler] master WAV saved -> %s", _master_wav)
+            try:
+                _master_wav_sha256 = _sha256_file(_master_wav)
+            except Exception as _hash_exc:  # noqa: BLE001 -- nonterminal receipt
+                # The already-closed WAV remains a valid deliverable and the
+                # existing render-driver path fallback stays available. A
+                # receipt failure is LOUD, but must not relabel good audio as
+                # "video-only" or erase the asset path.
+                log.warning(
+                    "[EpisodeAssembler] master WAV identity receipt failed "
+                    "(audio remains usable): %s",
+                    _hash_exc,
+                )
+            log.info(
+                "[EpisodeAssembler] master WAV saved -> %s (sha256=%s)",
+                _master_wav,
+                _master_wav_sha256[:12],
+            )
         except Exception as _wav_exc:  # noqa: BLE001
             log.warning(
                 "[EpisodeAssembler] master WAV save failed (non-fatal): %s", _wav_exc
@@ -1453,6 +1501,9 @@ class EpisodeAssembler:
             if _ledger_p is not None:
                 _led = _OTRL.load_ledger_safe(_ledger_p)
                 if _led is not None:
+                    if _master_wav_sha256:
+                        _stamp_master_audio_identity(
+                            _led, _master_wav_sha256)
                     _OTRL.record_phase_ms(_led, "episode_assembler", _phase_ms)
                     # post_episode_assembler audio gate.
                     _ew_cpu = (

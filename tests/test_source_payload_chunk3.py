@@ -371,7 +371,21 @@ def test_science_rss_wrapper_forwards_exact_args_and_ignores_source_ref(monkeypa
         "load_config": _lc,
         "policy": _pol,
     }
-    assert out == _payload()
+    payload, meta, rights = osp.normalize_fetch_result(
+        out, origin="science wrapper test")
+    assert payload == _payload()
+    assert meta == {
+        "kind": "science_rss",
+        "source_ref": "l",
+        "source_url": "l",
+        "source_label": "src",
+        "source_date": "2026-07-05",
+    }
+    assert rights == {
+        "license_status": "unknown",
+        "source_url": "l",
+        "source_label": "src",
+    }
 
 
 def test_scifi_rss_wrapper_requests_v4_source_floor(monkeypatch):
@@ -387,15 +401,17 @@ def test_scifi_rss_wrapper_requests_v4_source_floor(monkeypatch):
     entry = osp.resolve_fetcher(bank)
     _lc = object()
     _pol = object()
-    entry.fetch(bank=bank, technical_model="tm-id",
-                source_ref="ignored://source",
-                load_config=_lc, policy=_pol)
+    out = entry.fetch(bank=bank, technical_model="tm-id",
+                      source_ref="ignored://source",
+                      load_config=_lc, policy=_pol)
     # strict-v4 (scifi) branch: require_science_floor=True AND the threaded
     # load_config + policy forwarded (GGUF row registry, 2026-07-16).
     assert calls["args"] == (
         "tm-id",
         {"require_science_floor": True, "load_config": _lc, "policy": _pol},
     )
+    assert osp.normalize_fetch_result(
+        out, origin="strict science wrapper test")[1]["source_ref"] == "l"
 
 
 def test_media_archive_wrapper_forwards_source_ref_keyword(monkeypatch):
@@ -412,7 +428,16 @@ def test_media_archive_wrapper_forwards_source_ref_keyword(monkeypatch):
     out = entry.fetch(bank=bank, technical_model="tm-id",
                       source_ref="archive://item")
 
-    assert out["source"] == "Media History Archive"
+    payload, meta, rights = osp.normalize_fetch_result(
+        out, origin="media archive wrapper test")
+    assert payload["source"] == "Media History Archive"
+    assert meta["kind"] == "media_archive_rss"
+    assert meta["source_ref"] == payload["link"] == "l"
+    assert rights == {
+        "license_status": "unknown",
+        "source_url": "l",
+        "source_label": "Media History Archive",
+    }
     assert seen == {
         "bank": bank,
         "technical_model": "tm-id",
@@ -536,6 +561,33 @@ def test_resolve_inputs_custom_premise_returns_empty_sidecars():
     assert out["source_ref"] == ""
     assert out["source_meta"] == {}
     assert out["source_rights"] == {}
+
+
+def test_resolve_inputs_uses_selected_link_not_differing_request(monkeypatch):
+    """The fetcher's selected item owns provenance; the widget is a request."""
+    import nodes.OTR_LedgerScriptWriter as writer
+
+    def _fake_fetch(**_kw):
+        return osp.SourceFetchResult(
+            payload=_payload(link="https://selected.example/item"),
+            source_meta={"source_ref": "https://selected.example/item"},
+            source_rights={"license_status": "unknown"},
+        )
+
+    monkeypatch.setitem(
+        osp._FETCHERS,
+        "science_rss",
+        osp.FetcherEntry(fetch=_fake_fetch, seed_source="rss_fetch"),
+    )
+    out = writer._resolve_inputs(
+        custom_premise="",
+        source_bank="scifi_news_pro",
+        source_ref="https://requested.example/feed",
+    )
+
+    assert out["source_ref"] == "https://selected.example/item"
+    assert out["source_meta"]["requested_source_ref"] == (
+        "https://requested.example/feed")
 
 
 def test_writer_stamps_source_sidecars_into_meta():

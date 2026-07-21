@@ -571,6 +571,7 @@ class Ledger:
             "lines": [],
             "music": [],
             "clips": [],
+            "audio": {},
             "final_audio_path": None,
             "final_video_path": None,
         }
@@ -1329,7 +1330,9 @@ class Ledger:
                 from . import _otr_ledger as _OTRL_PATHS  # type: ignore
                 _meta = merged.setdefault("meta", {})
                 _meta["paths"] = _OTRL_PATHS._build_meta_paths(
-                    _Path(path), str(self.episode_id)
+                    _Path(path),
+                    str(self.episode_id),
+                    published_obs_path=_meta.get("obs_final_path"),
                 )
                 _meta["schema_version"] = _OTRL_PATHS.CURRENT_SCHEMA_VERSION
                 merged["schema_version"] = _OTRL_PATHS.CURRENT_SCHEMA_VERSION
@@ -1372,7 +1375,7 @@ class Ledger:
         error returns ``in_mem`` unchanged (best-effort).
 
         Top-level fields preserved from disk:
-          schema_version, meta, audio_gates, transitions,
+          schema_version, meta, audio, audio_gates, transitions,
           radio_bookend_path, final_audio_path
 
         Per-row fields preserved (keyed by line_id / cue_id):
@@ -1396,7 +1399,7 @@ class Ledger:
         # SignalLostVideo overwrites it via set_final_paths -- that's
         # an explicit overwrite, not a merge concern.
         TOP_PRESERVE = (
-            "schema_version", "audio_gates", "transitions",
+            "schema_version", "audio", "audio_gates", "transitions",
             "radio_bookend_path",
         )
         for k in TOP_PRESERVE:

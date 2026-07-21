@@ -86,6 +86,7 @@ class TestLedgerBasics:
                     "music", "clips"):
             assert led.data[key] == []
         assert "sfx" not in led.data
+        assert led.data["audio"] == {}
         assert led.data["final_audio_path"] is None
         assert led.data["final_video_path"] is None
         assert led.data["total_episode_dur_s"] is None
@@ -264,6 +265,10 @@ class TestDualLedgerFix:
             {"gate": "post_bark", "sha256_first_kb": "abc123",
              "dur_s": 10.0, "sample_count": 240000, "sample_rate": 24000},
         ]
+        on_disk["audio"] = {
+            "master_audio_sha256": "ab" * 32,
+            "ledger_frozen": True,
+        }
         on_disk["meta"] = {"phase_ms": {"bark": 145000}, "git_commit": "deadbee"}
         on_disk["transitions"] = [
             {"from_line_id": "opening_theme", "to_line_id": "scene_audio",
@@ -282,6 +287,10 @@ class TestDualLedgerFix:
         led.save()
         merged = _json.loads(path.read_text(encoding="utf-8"))
         assert "audio_gates" in merged and len(merged["audio_gates"]) == 1
+        assert merged["audio"] == {
+            "master_audio_sha256": "ab" * 32,
+            "ledger_frozen": True,
+        }
         assert merged["audio_gates"][0]["gate"] == "post_bark"
         assert merged["meta"]["phase_ms"]["bark"] == 145000
         assert merged["meta"]["git_commit"] == "deadbee"

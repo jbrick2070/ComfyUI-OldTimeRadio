@@ -554,9 +554,44 @@ def build_source_interpreter_floor(
 # ---------------------------------------------------------------------------
 
 
+def _rss_source_fetch_result(
+    payload: dict,
+    *,
+    fetcher_kind: str,
+) -> SourceFetchResult:
+    """Wrap a selected RSS item without changing the seven-key payload.
+
+    RSS fetchers historically returned the raw payload dict, so their selected
+    article URL and outlet disappeared at ``normalize_fetch_result`` while the
+    manifest-backed banks carried typed provenance sidecars.  The selected item
+    -- not the blank/ignored widget request -- owns RSS provenance.  Rights stay
+    explicitly unknown; selecting an item is not evidence of a license.
+    """
+    clean_payload = validate_source_payload(
+        payload, origin=f"{fetcher_kind} selected RSS item")
+    link = str(clean_payload.get("link") or "").strip()
+    label = str(clean_payload.get("source") or "").strip()
+    date = str(clean_payload.get("date") or "").strip()
+    return SourceFetchResult(
+        payload=clean_payload,
+        source_meta={
+            "kind": str(fetcher_kind),
+            "source_ref": link,
+            "source_url": link,
+            "source_label": label,
+            "source_date": date,
+        },
+        source_rights={
+            "license_status": "unknown",
+            "source_url": link,
+            "source_label": label,
+        },
+    )
+
+
 def _fetch_science_rss(*, bank, technical_model: str,
                        source_ref: str = "",
-                       load_config=None, policy=None) -> dict:
+                       load_config=None, policy=None) -> SourceFetchResult:
     """science_rss: verbatim wrapper around the writer's RSS fetcher.
 
     Forwards technical_model POSITIONALLY -- the S31 B6 slot-label/id
@@ -580,13 +615,15 @@ def _fetch_science_rss(*, bank, technical_model: str,
     # independent _v4 bank opts in by its own row. (Source FEED axis: science_rss
     # eligibility, distinct from the visual-style pool.)
     if bool((getattr(bank, "defaults", None) or {}).get("require_science_floor")):
-        return _writer._fetch_rss_seed_or_die(
+        payload = _writer._fetch_rss_seed_or_die(
             technical_model, require_science_floor=True,
             load_config=load_config, policy=policy,
         )
-    return _writer._fetch_rss_seed_or_die(
-        technical_model, load_config=load_config, policy=policy,
-    )
+    else:
+        payload = _writer._fetch_rss_seed_or_die(
+            technical_model, load_config=load_config, policy=policy,
+        )
+    return _rss_source_fetch_result(payload, fetcher_kind="science_rss")
 
 
 def _interpret_news(*, bank, payload: dict, technical_fn,
@@ -626,7 +663,7 @@ def _interpret_news(*, bank, payload: dict, technical_fn,
 
 def _fetch_media_archive_rss(*, bank, technical_model: str,
                              source_ref: str = "",
-                             load_config=None, policy=None) -> dict:
+                             load_config=None, policy=None) -> SourceFetchResult:
     """media_archive_rss: RSS/Atom media-history feed normalizer."""
     # load_config/policy accepted for uniform fetch dispatch; the media
     # archive lane has no in-fetch LLM rerank chain to thread them into.
@@ -635,8 +672,10 @@ def _fetch_media_archive_rss(*, bank, technical_model: str,
         from . import _otr_media_archive_sources as _mas
     except ImportError:  # pragma: no cover -- flat-import test harnesses
         import _otr_media_archive_sources as _mas  # type: ignore
-    return _mas.fetch_media_archive_rss(
+    payload = _mas.fetch_media_archive_rss(
         bank=bank, technical_model=technical_model, source_ref=source_ref)
+    return _rss_source_fetch_result(
+        payload, fetcher_kind="media_archive_rss")
 
 
 def _fetch_public_domain_source(*, bank, technical_model: str,

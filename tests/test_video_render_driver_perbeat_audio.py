@@ -17,6 +17,7 @@ ASCII-only, SFW.
 from __future__ import annotations
 
 import os
+import hashlib
 import sys
 import tempfile
 import types
@@ -32,6 +33,10 @@ if _REPO not in sys.path:
 from nodes._otr_video_engines import cheap_families  # noqa: F401 (register floor)
 from nodes._otr_video_engines import eng_cloud_video  # noqa: F401 (register cloud video)
 from nodes._otr_video_engines import render_driver as rd
+from nodes.scene_sequencer import (
+    _sha256_file,
+    _stamp_master_audio_identity,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -77,6 +82,25 @@ def _shot(beat_id, *, engine="humo"):
 # --------------------------------------------------------------------------- #
 # _slice_master_audio
 # --------------------------------------------------------------------------- #
+
+def test_episode_assembler_stamps_full_master_byte_identity(tmp_path):
+    master = tmp_path / "master.wav"
+    master.write_bytes((b"RIFF-frozen-master-bytes" * 17) + b"tail")
+    expected = hashlib.sha256(master.read_bytes()).hexdigest()
+
+    # Tiny chunks prove the helper is independent of a one-read allocation.
+    assert _sha256_file(master, chunk_bytes=7) == expected
+    ledger = {"audio": {}}
+    _stamp_master_audio_identity(ledger, expected.upper())
+    assert ledger["audio"] == {
+        "master_audio_sha256": expected,
+        "ledger_frozen": True,
+    }
+
+
+def test_master_audio_identity_rejects_non_sha_receipt():
+    with pytest.raises(ValueError, match="64 lowercase hex"):
+        _stamp_master_audio_identity({}, "short")
 
 class TestSliceMasterAudio:
     def test_returns_empty_for_missing_master(self, tmp_path):

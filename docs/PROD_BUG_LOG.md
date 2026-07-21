@@ -1911,3 +1911,87 @@ out until they independently meet the same production-only admission rule.
 - verify idea: point the in-flight ledger at `otr/episodes/ep042/audio/ep042_ledger.json`, feed an input with an unknown future terminal-enrichment suffix, and require the final parent to remain exactly `otr/episodes/ep042`; require a mismatched stale ledger to be rejected and the caption/credits fallback chain to peel to the correct episode root
 - bible-worthy: yes -- portable rule: when an accepted manifest/ledger already owns an artifact directory, downstream enrichments must consume that authority rather than reverse-engineering identity from an open-ended filename suffix grammar
 - status: **ROOT-FIXED / FOCUSED-GREEN; canonical six-bank live qualification pending**
+
+## PBUG-20260721-01 -- selected RSS provenance disappeared behind a blank request widget
+- surfaced: first canonical six-bank qualification leg, `media_archive` prompt
+  `12f3df7f-298e-411c-9fe2-59ef3ac62ae2`, published episode
+  `signal_lost_the_casting_reels_20260721_010623`, 2026-07-21
+- symptom: the fetched media payload carried a real selected article link,
+  outlet, date, and embedded source hash, but the final ledger stamped a blank
+  `meta.source_ref` and empty source sidecars. The story and media rendered, so
+  an output-only check could not detect that the ledger no longer identified
+  the item it had adapted
+- root cause: the RSS fetchers returned the strict seven-key payload as a raw
+  dict. `normalize_fetch_result` intentionally treats a legacy raw dict as
+  having no provenance sidecars, and `_resolve_inputs` then wrote the optional
+  request widget as `source_ref`. Both RSS families ignore that widget and
+  choose an item dynamically, so the request coordinate could never name the
+  selected source. The sibling defect covered `media_archive`, `scifi_news`,
+  and `scifi_news_pro`; manifest-backed and synthetic banks already owned their
+  provenance explicitly
+- fix: the two known RSS wrappers now preserve the exact seven-key payload but
+  return `SourceFetchResult` with selected URL/label/date metadata and explicit
+  unknown rights. The writer resolves the canonical ledger `source_ref` in
+  owner order (fetcher-selected ref, selected payload link, requested widget)
+  and stores a differing request separately as `requested_source_ref`. It does
+  not invent a license or fair-use claim
+- verify idea: make each RSS wrapper select a link different from the supplied
+  request; require the selected link at `meta.source_ref`, in source metadata,
+  and in rights provenance, with the request retained only as a request. Keep
+  raw-dict legacy normalization and both manifest-backed banks unchanged
+- bible-worthy: yes -- BUG-12.54
+- status: **ROOT-FIXED / FOCUSED-GREEN; live requalification pending**
+
+## PBUG-20260721-02 -- the frozen master WAV had no durable byte identity or final pointer
+- surfaced: same completed `media_archive` qualification artifact as
+  PBUG-20260721-01. During video generation every per-beat slice logged that
+  `ledger.audio.master_audio_sha256` was absent
+- symptom: the master WAV existed and the final archival MP4 was proven
+  byte-identical to it, but the final ledger had no top-level `audio` section,
+  no full master hash, and a blank `final_audio_path`. The video slice cache
+  therefore fell back to path identity and would reuse stale slices if new WAV
+  bytes later landed at the same path
+- root cause: EpisodeAssembler wrote and closed the authoritative master but
+  recorded only a first-kilobyte waveform tripwire in `audio_gates`.
+  `render_driver` already consumed a full-file hash that no production owner
+  produced, and a later `Ledger.save()` did not preserve an externally stamped
+  `audio` section. The terminal mux owned the final video pointer but never
+  stamped the re-resolved master path
+- fix: EpisodeAssembler computes a streaming SHA-256 after the WAV header is
+  closed and stamps it with `ledger_frozen=true` in the owned `audio` section.
+  ProductionLedger now initializes and preserves that section. Hash receipt
+  failure remains loud but nonterminal. The terminal mux stamps the resolved
+  master path together with the final video and OBS pointers after successful
+  publication
+- verify idea: hash a multi-chunk closed WAV and require the full digest to
+  survive a later ProductionLedger merge; require per-beat slice keys to bind
+  that digest, and require the final ledger's audio path to exist. A simulated
+  hash failure must not erase or relabel an otherwise usable master asset
+- bible-worthy: yes -- BUG-12.55
+- status: **ROOT-FIXED / FOCUSED-GREEN; live requalification pending**
+
+## PBUG-20260721-03 -- ledger save rebuilt the exact OBS deliverable into a nonexistent alias
+- surfaced: same completed `media_archive` qualification artifact as
+  PBUG-20260721-01
+- symptom: `final_video_path` named the existing archival final and
+  `meta.obs_final_path` named the existing playable OBS copy, but
+  `meta.paths.obs_final` named a shorter nonexistent
+  `<episode_id>.mp4`. Two official ledger surfaces therefore disagreed after a
+  successful publish
+- root cause: the terminal mux stamped the exact OBS path and then called the
+  shared ledger owner. Every save unconditionally rebuilt `meta.paths` from a
+  pre-publication filename plan, discarding the terminal publisher's enriched
+  caption/credits/final filename. The planned alias outranked the observed
+  artifact
+- fix: the ledger owner accepts a terminal published OBS path only when it is
+  an existing MP4 for the current episode under the inferred canonical OBS
+  root or the explicit `OTR_OBS_DIR`. That validated exact path drives both
+  `meta.obs_final_path` and `meta.paths.obs_final`; before publication the
+  historical planned path remains only a plan. The mux stamps all terminal
+  asset pointers in one owner-layer save
+- verify idea: publish an enriched filename and require every final path
+  surface to name an existing asset after save. Reject a missing path, wrong
+  episode prefix, wrong extension, or path outside authorized OBS roots, then
+  verify a later ProductionLedger save cannot regress the accepted filename
+- bible-worthy: yes -- BUG-12.56
+- status: **ROOT-FIXED / FOCUSED-GREEN; live requalification pending**

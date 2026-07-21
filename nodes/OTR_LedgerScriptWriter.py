@@ -1676,6 +1676,22 @@ def _resolve_inputs(
         news_seed = news_article["seed_text"]
         seed_source = _fetch_entry.seed_source
 
+    # Source identity is selected-source truth, not merely the requested
+    # widget value. RSS lanes ignore/leave that widget blank and choose a real
+    # item at fetch time; manifest lanes already return the resolved ref in
+    # their sidecar. Preserve a differing operator request separately for
+    # forensics, then expose the selected ref as the canonical ledger field.
+    _requested_source_ref = str(source_ref or "").strip()
+    _selected_source_ref = str(
+        (source_meta or {}).get("source_ref")
+        or (news_article or {}).get("link")
+        or _requested_source_ref
+        or ""
+    ).strip()
+    if _requested_source_ref and _requested_source_ref != _selected_source_ref:
+        source_meta = dict(source_meta or {})
+        source_meta.setdefault("requested_source_ref", _requested_source_ref)
+
     return {
         "news_seed":            news_seed,
         "news_article":         news_article,
@@ -1738,7 +1754,7 @@ def _resolve_inputs(
         "visual_style": str(visual_style or "sci_fi_radio"),
         "google_api_slot_a_model": str(google_api_slot_a_model or ""),
         "google_api_slot_b_model": str(google_api_slot_b_model or ""),
-        "source_ref": str(source_ref or ""),
+        "source_ref": _selected_source_ref,
         "source_meta": dict(source_meta),
         "source_rights": dict(source_rights),
     }

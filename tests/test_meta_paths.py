@@ -68,6 +68,41 @@ class TestBuildMetaPathsPerEpisode:
         assert Path(paths["obs_final"]) == otr / "obs" / f"{workspace['ep_id']}.mp4"
         assert Path(paths["obs_dir"]) == otr / "obs"
 
+    def test_published_obs_filename_replaces_planned_alias(self, workspace):
+        published = (
+            workspace["otr_root"] / "obs" /
+            f"{workspace['ep_id']}_captioned_with_credits_final.mp4"
+        )
+        published.write_bytes(b"published")
+        paths = OTRL._build_meta_paths(
+            workspace["ledger_path"],
+            workspace["ep_id"],
+            published_obs_path=published,
+        )
+        assert Path(paths["obs_final"]) == published.resolve()
+        assert Path(paths["obs_dir"]) == published.parent.resolve()
+
+    @pytest.mark.parametrize("candidate_name", [
+        "another_episode_final.mp4",
+        "the_test_episode_final.mov",
+        "the_test_episode_missing.mp4",
+    ])
+    def test_invalid_published_obs_path_cannot_redirect_owner(
+            self, workspace, candidate_name):
+        candidate = workspace["otr_root"] / "obs" / candidate_name
+        if "missing" not in candidate_name:
+            candidate.write_bytes(b"not accepted")
+        paths = OTRL._build_meta_paths(
+            workspace["ledger_path"],
+            workspace["ep_id"],
+            published_obs_path=candidate,
+        )
+        expected = (
+            workspace["otr_root"] / "obs" /
+            f"{workspace['ep_id']}.mp4"
+        )
+        assert Path(paths["obs_final"]) == expected.resolve()
+
     def test_ledger_path_stamped_as_absolute(self, workspace):
         paths = OTRL._build_meta_paths(workspace["ledger_path"], workspace["ep_id"])
         assert Path(paths["ledger_path"]) == workspace["ledger_path"].resolve()
@@ -163,6 +198,26 @@ def test_save_ledger_safe_does_not_corrupt_existing_meta(tmp_path):
     # New stamping happened too
     assert "paths" in saved["meta"]
     assert saved["meta"]["schema_version"] == OTRL.CURRENT_SCHEMA_VERSION
+
+
+def test_save_ledger_safe_synchronizes_terminal_obs_surfaces(tmp_path):
+    ep_id = "terminal_truth"
+    otr_root = tmp_path / "output" / "otr"
+    audio_dir = otr_root / "episodes" / ep_id / "audio"
+    audio_dir.mkdir(parents=True)
+    obs_path = otr_root / "obs" / f"{ep_id}_with_credits_final.mp4"
+    obs_path.parent.mkdir(parents=True)
+    obs_path.write_bytes(b"published")
+    ledger_path = audio_dir / f"{ep_id}_ledger.json"
+    led = {
+        "episode_id": ep_id,
+        "meta": {"obs_final_path": str(obs_path)},
+    }
+
+    assert OTRL.save_ledger_safe(ledger_path, led)
+    saved = json.loads(ledger_path.read_text(encoding="utf-8"))
+    assert saved["meta"]["obs_final_path"] == str(obs_path.resolve())
+    assert saved["meta"]["paths"]["obs_final"] == str(obs_path.resolve())
 
 
 # ---------------------------------------------------------------------------

@@ -135,7 +135,48 @@ def load_ledger_safe(path: Path) -> Optional[dict]:
         return None
 
 
-def _build_meta_paths(ledger_path: Path, episode_id: str) -> dict:
+def _published_obs_path(
+    published_obs_path: Any,
+    *,
+    inferred_obs_root: Path,
+    episode_id: str,
+) -> Optional[Path]:
+    """Validate a terminal publisher's OBS path against authorized roots.
+
+    The sibling ``otr/obs`` directory is the normal root. ``OTR_OBS_DIR`` is
+    also authorized because the headless launcher may publish to the operator's
+    watched Windows tree while ComfyUI writes episode intermediates elsewhere.
+    A candidate must already exist, be an MP4, and belong to this episode; an
+    arbitrary metadata string can never redirect ``meta.paths``.
+    """
+    raw = str(published_obs_path or "").strip()
+    if not raw:
+        return None
+    try:
+        candidate = Path(raw).expanduser().resolve()
+        roots = [inferred_obs_root.resolve()]
+        explicit_root = os.environ.get("OTR_OBS_DIR", "").strip()
+        if explicit_root:
+            roots.append(Path(explicit_root).expanduser().resolve())
+        if not any(candidate.parent == root for root in roots):
+            return None
+        ep = str(episode_id or "").strip().casefold()
+        stem = candidate.stem.casefold()
+        if not ep or not (stem == ep or stem.startswith(ep + "_")):
+            return None
+        if candidate.suffix.casefold() != ".mp4" or not candidate.is_file():
+            return None
+        return candidate
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
+def _build_meta_paths(
+    ledger_path: Path,
+    episode_id: str,
+    *,
+    published_obs_path: Any = "",
+) -> dict:
     """Resolve the canonical absolute paths for this episode's per-dir
     workspace, derived from the on-disk ledger location.
 
@@ -185,15 +226,22 @@ def _build_meta_paths(ledger_path: Path, episode_id: str) -> dict:
         paths["portraits_dir"] = str(ep_dir / "portraits")
         paths["videos_dir"] = str(ep_dir / "videos")
         paths["composited_dir"] = str(ep_dir / "composited")
-        # OBS final lives at output/otr/obs/<ep>.mp4 -- a sibling of
-        # episodes/, NOT a child. Only stamp it if the grandparent of
-        # ep_dir has a sibling named "obs"; otherwise omit (we don't
-        # fabricate a path that may not exist).
+        # OBS final lives in the sibling output/otr/obs directory (or the
+        # explicitly configured OTR_OBS_DIR split tree). Before publication,
+        # keep the historical planned <episode_id>.mp4 pointer. Once the
+        # terminal mux publishes, its validated exact filename wins so
+        # meta.paths cannot regress to a shorter nonexistent alias on save.
         otr_root = parent_of_ep.parent
         obs_root = otr_root / "obs"
         if otr_root.name.lower() == "otr":
-            paths["obs_final"] = str(obs_root / f"{episode_id}.mp4")
-            paths["obs_dir"] = str(obs_root)
+            published = _published_obs_path(
+                published_obs_path,
+                inferred_obs_root=obs_root,
+                episode_id=episode_id,
+            )
+            chosen_obs = published or (obs_root / f"{episode_id}.mp4")
+            paths["obs_final"] = str(chosen_obs)
+            paths["obs_dir"] = str(chosen_obs.parent)
         paths["layout"] = "per-episode-workspace"
     else:
         paths["layout"] = "legacy-flat"
@@ -233,7 +281,23 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
         meta = ledger.setdefault("meta", {})
         meta["schema_version"] = CURRENT_SCHEMA_VERSION
         episode_id = ledger.get("episode_id") or ""
-        meta["paths"] = _build_meta_paths(Path(path), str(episode_id))
+        meta["paths"] = _build_meta_paths(
+            Path(path),
+            str(episode_id),
+            published_obs_path=meta.get("obs_final_path"),
+        )
+        # A validated terminal publication has one canonical spelling at both
+        # metadata surfaces. Pre-publication ledgers intentionally have no
+        # obs_final_path claim and retain only the historical planned path.
+        if meta.get("obs_final_path"):
+            chosen_obs = str(meta["paths"].get("obs_final") or "")
+            candidate = _published_obs_path(
+                meta.get("obs_final_path"),
+                inferred_obs_root=Path(meta["paths"].get("obs_dir") or "."),
+                episode_id=str(episode_id),
+            )
+            if candidate is not None and str(candidate) == chosen_obs:
+                meta["obs_final_path"] = chosen_obs
         payload = json.dumps(ledger, indent=2, ensure_ascii=False)
         target = Path(path)
         # tempfile.mkstemp in the SAME dir as the target so os.replace

@@ -342,6 +342,44 @@ def test_master_audio_mux_default_out_uses_live_ledger_episode_authority(
     assert got_stale.parent == tmp_path / "otr" / "episodes" / "ep099"
 
 
+def test_master_audio_mux_terminal_stamp_owns_all_final_paths(
+        monkeypatch, tmp_path):
+    from nodes import _otr_ledger as otr_ledger
+
+    ep_id = "ep_terminal"
+    otr_root = tmp_path / "output" / "otr"
+    episode_root = otr_root / "episodes" / ep_id
+    ledger_path = episode_root / "audio" / f"{ep_id}_ledger.json"
+    ledger_path.parent.mkdir(parents=True)
+    final_audio = ledger_path.parent / f"{ep_id}_master.wav"
+    final_video = episode_root / f"{ep_id}_with_credits_final.mp4"
+    obs_video = otr_root / "obs" / final_video.name
+    obs_video.parent.mkdir(parents=True)
+    for path in (final_audio, final_video, obs_video):
+        path.write_bytes(b"asset")
+    ledger_path.write_text(json.dumps({
+        "episode_id": ep_id,
+        "final_audio_path": "",
+        "final_video_path": "old-intermediate.mp4",
+        "meta": {"paths": {"obs_final": str(otr_root / "obs" / f"{ep_id}.mp4")}},
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        otr_ledger, "in_flight_ledger_path", lambda: ledger_path)
+
+    status = OTRMasterAudioMux()._stamp_terminal_paths(
+        str(final_video), str(obs_video), str(final_audio))
+    saved = json.loads(ledger_path.read_text(encoding="utf-8"))
+
+    assert "stamped ledger" in status
+    assert saved["final_audio_path"] == str(final_audio)
+    assert saved["final_video_path"] == str(final_video)
+    assert saved["meta"]["obs_final_path"] == str(obs_video.resolve())
+    assert saved["meta"]["paths"]["obs_final"] == str(obs_video.resolve())
+    for key in ("final_audio_path", "final_video_path"):
+        assert pathlib.Path(saved[key]).is_file()
+    assert pathlib.Path(saved["meta"]["paths"]["obs_final"]).is_file()
+
+
 @needs_ffmpeg
 def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
     """OUTPUT HYGIENE (2026-06-09): the muxed FINAL episode mp4 is the
