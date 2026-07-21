@@ -393,6 +393,25 @@ floor that still yields empty or punctuation-only text creates a row-local
 mechanical failure. Genuine graph ambiguity and the G9 SFW/content-safety gate
 remain fail-closed.
 
+## 27. Classify cast identity, not lexical parts
+
+A cast label is an identity declaration, not a bag of forbidden words. Generic
+roles such as `THE TRAVELER`, `First Witch`, or `MEDICAL DOCTOR` must remain
+usable as visual nouns, while a personal label such as `Doctor Aris Thorne`
+must still keep its meaningful name components out of an anonymous visual
+brief. Articles, ordinals, and honorifics are grammar, not identities.
+
+Use two complementary projections from one bounded role classifier. Input
+anonymization maps a generic full label and its meaningful role noun to one
+stable placeholder, but never maps an article. Output validation permits those
+generic role forms. For personal labels, protect the full surface and meaningful
+personal components while excluding titles and articles as standalone tokens.
+Keep the external reason code stable, but carry the exact matched surface
+privately into typed repair so the model can correct the actual defect instead
+of guessing. If all bounded repairs genuinely fail, retain the explicit failed
+sentinel and deterministic non-authoring consumer defaults; do not silently
+invent episode content.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

@@ -39,6 +39,20 @@ def test_era_tail_default_when_brief_absent():
         == sbh.ERA_TAIL_DEFAULT
 
 
+def test_failed_brief_still_finishes_a_valid_non_authoring_visual_prompt():
+    failed = {
+        "story_brief_status": "failed",
+        "story_brief": "",
+        "story_brief_terms": {
+            "setting": [], "lighting": [], "atmosphere": [],
+        },
+    }
+    out = sbh.finish_visual_prompt(failed, "cinematic establishing shot")
+    assert out.startswith("cinematic establishing shot")
+    assert sbh.ERA_TAIL_DEFAULT in out
+    assert sbh.STYLE_TAIL_DEFAULT in out
+
+
 def test_era_tail_uses_v1_lighting_when_ok():
     tail = sbh.get_era_tail(_OK_META)
     assert "lantern glow" in tail and "uneasy" in tail

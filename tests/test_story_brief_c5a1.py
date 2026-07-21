@@ -881,3 +881,162 @@ class TestV2ProducerFields:
             assert field in prompt, (
                 f"_REFLECTION_PROMPT does not mention field {field!r}"
             )
+
+
+# ---------------------------------------------------------------------------
+# PBUG-20260721-08: generic cast roles are not personal-name leaks
+# ---------------------------------------------------------------------------
+
+
+class TestCastRoleIdentityProjection:
+
+    @pytest.mark.parametrize(
+        ("name", "brief"),
+        [
+            ("THE TRAVELER", "a weary traveler beneath cold laboratory light"),
+            ("THE WITNESSES", "skeptical witnesses in a storm-dark chamber"),
+            ("THE TIME TRAVELER", "a time traveler beside a brass machine"),
+            ("THE PSYCHOLOGIST", "a psychologist under a flickering lamp"),
+            ("THE SCIENTIST", "a scientist amid ruined instruments"),
+            ("First Witch", "a witch on a rain-dark heath"),
+            ("ANNOUNCER", "an announcer booth under an amber dial glow"),
+            ("WITNESS", "a witness beside a shadowed table"),
+        ],
+    )
+    def test_generic_role_labels_are_legal_visual_nouns(self, name, brief):
+        led = {"cast": [{"char_id": "c01", "name": name}], "lines": []}
+        assert sb._cast_output_forbidden_forms(name) == set()
+        assert sb.REJECT_NAMED_CHARACTER not in sb._validate_brief(brief, led)
+
+    @pytest.mark.parametrize(
+        ("bank", "name", "leaked_surface"),
+        [
+            ("media_archive", "JOEL PIERCE", "Pierce"),
+            ("original", "BOB FLANDERS", "Flanders"),
+            ("public_domain", "FILBY", "Filby"),
+            ("shakespeare", "MACBETH", "Macbeth"),
+            ("scifi_news", "Dr. Aris Thorne", "Thorne"),
+            ("scifi_news_pro", "LARKIN", "Larkin"),
+        ],
+    )
+    def test_all_six_bank_personal_name_shapes_stay_forbidden(
+        self, bank, name, leaked_surface,
+    ):
+        led = {
+            "cast": [{"char_id": "c01", "name": name}],
+            "lines": [],
+            "meta": {"source_bank": bank},
+        }
+        leaked = f"a lamp-lit room where {leaked_surface} waits by the console"
+        assert sb._validate_brief(leaked, led) == [sb.REJECT_NAMED_CHARACTER]
+        assert sb._validate_brief(
+            "a lamp-lit room with rain on the windows", led,
+        ) == []
+
+    def test_role_input_forms_preserve_one_identity_without_mapping_articles(self):
+        cast = [
+            {"char_id": "announcer", "name": "ANNOUNCER"},
+            {"char_id": "traveler", "name": "THE TRAVELER"},
+            {"char_id": "witnesses", "name": "THE WITNESSES"},
+        ]
+        mapping = sb._build_cast_substitution(cast)
+        assert mapping["the traveler"] == "character_b"
+        assert mapping["traveler"] == "character_b"
+        assert mapping["the witnesses"] == "character_c"
+        assert mapping["witnesses"] == "character_c"
+        assert "the" not in mapping
+
+        led = {
+            "cast": cast,
+            "lines": [{
+                "speaker_role": "character",
+                "char_id": "traveler",
+                "text": "The weary Traveler enters as the Witnesses wait.",
+            }],
+            "meta": {"episode_title": "", "style": ""},
+        }
+        text = sb._build_reflection_input(led)
+        assert "The weary character_b" in text
+        assert "character_c wait" in text
+        assert "source_entity" not in text
+
+    def test_ordinal_role_maps_full_label_and_role_noun_to_same_identity(self):
+        mapping = sb._build_cast_substitution([
+            {"char_id": "witch", "name": "First Witch"},
+        ])
+        assert mapping["first witch"] == "character_a"
+        assert mapping["witch"] == "character_a"
+        assert "first" not in mapping
+        assert sb._cast_output_forbidden_forms("First Witch") == set()
+
+    def test_titles_do_not_make_generic_words_forbidden_or_drop_real_names(self):
+        led = {
+            "cast": [{"char_id": "c01", "name": "Doctor Aris Thorne"}],
+            "lines": [],
+        }
+        forms = sb._cast_output_forbidden_forms("Doctor Aris Thorne")
+        assert "doctor aris thorne" in forms
+        assert "aris" in forms and "thorne" in forms
+        assert "doctor" not in forms
+        assert sb._validate_brief(
+            "a doctor beside a cold instrument panel", led,
+        ) == []
+        assert sb._validate_brief(
+            "a cold instrument panel beside Thorne", led,
+        ) == [sb.REJECT_NAMED_CHARACTER]
+
+    def test_hyphen_apostrophe_and_common_word_mononym_remain_protected(self):
+        assert {"jean-luc picard", "jean", "luc", "picard"}.issubset(
+            sb._cast_output_forbidden_forms("Jean-Luc Picard")
+        )
+        assert {"o'connor", "connor"}.issubset(
+            sb._cast_output_forbidden_forms("O'Connor")
+        )
+        # Shakespeare's Bottom is a real proper mononym despite also being an
+        # ordinary English word; dictionary-word heuristics must not erase it.
+        assert sb._cast_output_forbidden_forms("Bottom") == {"bottom"}
+
+    def test_article_does_not_hide_a_non_role_personal_name(self):
+        forms = sb._cast_output_forbidden_forms("The Count of Monte Cristo")
+        assert "the count of monte cristo" in forms
+        assert "monte" in forms and "cristo" in forms
+
+    def test_live_role_brief_succeeds_without_spending_a_repair_turn(self):
+        led = {
+            "cast": [
+                {"char_id": "c01", "name": "ANNOUNCER"},
+                {"char_id": "c02", "name": "THE TRAVELER"},
+                {"char_id": "c03", "name": "THE WITNESSES"},
+            ],
+            "lines": [],
+            "meta": {},
+        }
+        response = (
+            '{"story_brief": "A weary traveler faces a skeptical assembly '
+            'over the wreckage of a collapsed world", '
+            '"setting_terms": ["smoldering ruins"], '
+            '"lighting_terms": ["dying embers"], '
+            '"atmosphere_terms": ["somber"]}'
+        )
+        spy = _make_spy_fn(responses=[response])
+        result = sb.run_story_brief_reflection(led, spy)
+        assert result["story_brief_status"] == "ok"
+        assert len(spy.calls) == 1
+
+    def test_private_repair_detail_names_surface_but_public_code_stays_stable(self):
+        led = _mk_ledger()
+        leaked = (
+            '{"story_brief": "a dim room where Jones waits by a table", '
+            '"setting_terms": ["room"], "lighting_terms": ["dim"], '
+            '"atmosphere_terms": ["tense"]}'
+        )
+        assert sb._validate_brief("a dim room beside Jones", led) == [
+            sb.REJECT_NAMED_CHARACTER,
+        ]
+        spy = _make_spy_fn(responses=[leaked, _valid_brief_json()])
+        result = sb.run_story_brief_reflection(led, spy)
+        assert result["story_brief_status"] == "ok"
+        repair_message = spy.calls[1]["messages"][0]["content"]
+        assert 'blocked personal-name surface is "jones"' in repair_message
+        assert "PostValidationError" not in repair_message
+        assert "environment, light, color, texture" in repair_message

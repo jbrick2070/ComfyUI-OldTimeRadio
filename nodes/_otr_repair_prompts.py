@@ -275,12 +275,29 @@ def forbidden_name_repair(
     error: BaseException,
 ) -> list[dict[str, str]]:
     """Repair prompt for a character name where naming is forbidden."""
+    marker = "named_character:"
+    raw_error = str(error)
+    marker_at = raw_error.lower().find(marker)
+    surface = ""
+    if marker_at >= 0:
+        surface = raw_error[marker_at + len(marker):].split(",", 1)[0]
+        surface = " ".join(surface.split())[:120]
+    if surface:
+        blocked = json.dumps(surface, ensure_ascii=False)
+        detail = (
+            f"The blocked personal-name surface is {blocked}. Remove that "
+            "exact surface entirely. "
+        )
+    else:
+        detail = "Remove every personal name entirely. "
     directive = (
         "CRITICAL: Your previous response named a character, but this "
-        f"pass must not name anyone: {_error_text(error)}. Remove the "
-        "name entirely. Refer to any person only with a generic noun -- "
-        "a figure, a man, a woman, a child, a passer-by. Return ONE "
-        "valid JSON object, no Markdown, no prose."
+        "pass must not name anyone. " + detail +
+        "If a person reference is uncertain, omit people and rewrite the "
+        "story_brief around environment, light, color, texture, space, "
+        "material, weather, and concrete objects. Preserve the required JSON "
+        "schema and sidecar fields. Return ONE valid JSON object, no Markdown, "
+        "no prose."
     )
     return _compose_repair(
         directive, failed_output=failed_output, original_prompt=original_prompt,

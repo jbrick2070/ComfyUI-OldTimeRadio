@@ -213,7 +213,19 @@ def test_forbidden_name_repair_directive():
     ))
     assert text.startswith("CRITICAL:")
     assert "must not name anyone" in text
-    assert "generic noun" in text
+    assert "environment, light, color, texture" in text
+    assert "generic noun" not in text
+
+
+def test_forbidden_name_repair_renders_matched_surface_without_exception_noise():
+    text = _content(rp.forbidden_name_repair(
+        original_prompt=_ORIGINAL_PROMPT,
+        failed_output=_FAILED_OUTPUT,
+        error=PostValidationError("named_character:Jones"),
+    ))
+    assert 'blocked personal-name surface is "Jones"' in text
+    assert "PostValidationError" not in text
+    assert "Remove that exact surface entirely" in text
 
 
 def test_payload_null_repair_directive():

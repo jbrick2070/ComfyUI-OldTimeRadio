@@ -351,6 +351,111 @@ _PROPER_NOUN_STOPWORDS: frozenset[str] = frozenset({
     "ok", "okay",
 })
 
+# Live PBUG-20260721-08: source-backed adaptations can use role designations
+# where a personal name does not exist ("the Time Traveller", "First Witch").
+# Those labels need two different projections: their exact identity is
+# anonymized in the LLM input, while their ordinary role nouns remain legal in
+# the output brief. Keep this vocabulary bounded to the role surfaces supported
+# by the active source packs; a new source pack with a new generic cast label
+# extends this set and its matrix tests in the same change.
+_CAST_ROLE_NOUNS: frozenset[str] = frozenset({
+    "announcer", "narrator", "host",
+    "traveler", "traveller", "witness", "witnesses",
+    "psychologist", "scientist", "witch", "witches",
+    "doctor", "physician", "man", "men", "woman", "women",
+    "child", "children", "figure", "stranger", "voice",
+    "guard", "guards", "servant", "servants",
+    "messenger", "messengers", "captain", "detective", "officer",
+})
+_CAST_ROLE_ARTICLES: frozenset[str] = frozenset({"a", "an", "the"})
+_CAST_ROLE_ORDINALS: frozenset[str] = frozenset({
+    "first", "second", "third", "fourth", "fifth", "sixth",
+})
+_CAST_ROLE_MODIFIERS: frozenset[str] = frozenset({
+    "time", "medical", "skeptical", "old", "young",
+})
+# Titles are excluded only as COMPONENTS of a multiword personal name. The full
+# label stays protected, and a one-word personal name such as "Don" therefore
+# remains a protected mononym.
+_CAST_NAME_TITLES: frozenset[str] = frozenset({
+    "dr", "doctor", "mr", "mrs", "ms", "miss", "prof", "professor",
+    "sir", "dame", "lady", "lord", "captain", "detective", "officer",
+    "agent", "inspector", "chief", "reverend", "rev", "don",
+})
+
+
+def _normalize_cast_label(name: str) -> str:
+    """Return one lower-case cast label with whitespace runs collapsed."""
+    return " ".join(str(name or "").strip().lower().split())
+
+
+def _cast_label_words(name: str) -> list[str]:
+    """Extract Unicode letter runs from a cast label.
+
+    This deliberately splits hyphens and straight/curly apostrophes so
+    Jean-Luc and O'Connor retain useful personal-name components without an
+    ASCII-only name grammar.
+    """
+    return [
+        match.group(0).lower()
+        for match in re.finditer(r"[^\W\d_]+", str(name or ""), re.UNICODE)
+    ]
+
+
+def _is_generic_role_label(name: str) -> bool:
+    """True only when the complete label satisfies the bounded role grammar."""
+    words = _cast_label_words(name)
+    if not words or not any(word in _CAST_ROLE_NOUNS for word in words):
+        return False
+    allowed = (
+        _CAST_ROLE_NOUNS
+        | _CAST_ROLE_ARTICLES
+        | _CAST_ROLE_ORDINALS
+        | _CAST_ROLE_MODIFIERS
+    )
+    return all(word in allowed for word in words)
+
+
+def _personal_cast_components(name: str) -> set[str]:
+    """Meaningful component forms for one personal (not role-only) label."""
+    words = _cast_label_words(name)
+    out: set[str] = set()
+    for word in words:
+        if len(word) < 3:
+            continue
+        if word in _CAST_ROLE_ARTICLES or word in _CAST_ROLE_ORDINALS:
+            continue
+        if len(words) > 1 and word in _CAST_NAME_TITLES:
+            continue
+        out.add(word)
+    return out
+
+
+def _cast_input_substitution_forms(name: str) -> set[str]:
+    """Identity forms to anonymize before the reflection model sees them."""
+    full = _normalize_cast_label(name)
+    if not full:
+        return set()
+    forms = {full}
+    if _is_generic_role_label(name):
+        # Preserve one identity for a later standalone "Traveler"/"Witch"
+        # mention, but never map articles or generic modifiers such as "time".
+        forms.update(
+            word for word in _cast_label_words(name)
+            if len(word) >= 3 and word in _CAST_ROLE_NOUNS
+        )
+    else:
+        forms.update(_personal_cast_components(name))
+    return forms
+
+
+def _cast_output_forbidden_forms(name: str) -> set[str]:
+    """Personal-name forms forbidden in the model's visual brief output."""
+    full = _normalize_cast_label(name)
+    if not full or _is_generic_role_label(name):
+        return set()
+    return {full, *_personal_cast_components(name)}
+
 # A multi-word Title Case run (2+ adjacent capitalized words). A run
 # like "Halloran Tower" or "The Bulkhead Closes" is a proper-noun
 # phrase with high confidence regardless of where it sits in a line.
@@ -390,13 +495,8 @@ def _build_cast_substitution(cast: Sequence[dict]) -> dict[str, str]:
     ):
         token = _neutral_token("character", char_index)
         name = (row.get("name") or "").strip()
-        forms = [name]
-        for part in re.split(r"\s+|[-_]", name):
-            part = part.strip()
-            if len(part) >= 3:
-                forms.append(part)
-        for form in forms:
-            mapping.setdefault(form.lower(), token)
+        for form in _cast_input_substitution_forms(name):
+            mapping.setdefault(form, token)
     return mapping
 
 
@@ -632,7 +732,7 @@ def _build_reflection_input(led: Any) -> str:
 
 
 def _cast_name_tokens(ledger: dict) -> set[str]:
-    """Return lowercase tokens for every cast name (full + parts)."""
+    """Return personal-name output tokens, excluding generic role labels."""
     tokens: set[str] = set()
     for row in ledger.get("cast") or []:
         if not isinstance(row, dict):
@@ -640,12 +740,21 @@ def _cast_name_tokens(ledger: dict) -> set[str]:
         name = (row.get("name") or "").strip()
         if not name:
             continue
-        full = name.lower()
-        tokens.add(full)
-        for part in re.split(r"\s+|[-_]", full):
-            if len(part) >= 3:
-                tokens.add(part)
+        tokens.update(_cast_output_forbidden_forms(name))
     return tokens
+
+
+def _matched_cast_name_token(brief: str, ledger: dict) -> str | None:
+    """Return the longest deterministic personal-name match, if any."""
+    if not isinstance(brief, str):
+        return None
+    for token in sorted(_cast_name_tokens(ledger), key=lambda x: (-len(x), x)):
+        if re.search(
+            rf"(?<!\w){re.escape(token)}(?!\w)", brief,
+            flags=re.IGNORECASE,
+        ):
+            return token
+    return None
 
 
 def _existing_period_tokens(ledger: dict) -> set[str]:
@@ -699,14 +808,8 @@ def _validate_brief(brief: str, ledger: dict) -> list[str]:
         reasons.append(REJECT_QUOTES_OR_MARKUP)
 
     # Named characters.
-    cast_tokens = _cast_name_tokens(ledger)
-    if cast_tokens:
-        brief_lower = brief.lower()
-        for token in cast_tokens:
-            # Word-boundary match to avoid "ed" appearing inside other words.
-            if re.search(rf"\b{re.escape(token)}\b", brief_lower):
-                reasons.append(REJECT_NAMED_CHARACTER)
-                break
+    if _matched_cast_name_token(brief, ledger) is not None:
+        reasons.append(REJECT_NAMED_CHARACTER)
 
     # Dialogue verbs.
     brief_words = set(re.findall(r"[A-Za-z][A-Za-z'\-]*", brief.lower()))
@@ -913,7 +1016,18 @@ def run_story_brief_reflection(
     def _content_validator(model: StoryBriefModel) -> str | None:
         reasons = _validate_brief(model.story_brief, ledger)
         if reasons:
-            return ", ".join(reasons)
+            # Keep `_validate_brief`'s public reason-code list stable while
+            # giving the private typed-repair turn the exact surface it must
+            # remove. The dispatcher already routes by the
+            # "named_character" prefix.
+            matched = _matched_cast_name_token(model.story_brief, ledger)
+            detailed = [
+                f"{reason}:{matched}"
+                if reason == REJECT_NAMED_CHARACTER and matched
+                else reason
+                for reason in reasons
+            ]
+            return ", ".join(detailed)
         return None
 
     # LLM slot: technical -- structured JSON validation pass, not

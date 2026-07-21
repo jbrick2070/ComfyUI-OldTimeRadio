@@ -262,6 +262,14 @@ Creative quality remains a taste decision, not a runtime validator.
   and warnings remain notes.
 - [ ] **Hard:** Validators are role-aware. They do not reject a role for
   following its declared authority.
+- [ ] **Hard:** Cast-identity guards distinguish generic role labels from
+  personal names through the shared bounded classifier. A newly introduced
+  generic cast label either fits the declared role grammar or extends that
+  grammar and its all-bank regression matrix in the same change.
+- [ ] **Hard:** Story-brief input anonymization and output name validation use
+  complementary projections of the same cast classification: articles and
+  honorifics never become identities, generic roles remain legal visual nouns,
+  and meaningful personal-name components remain protected.
 - [ ] **Hard:** Tests cover registry loading, pack/seam schema parity, source
   success and failure, rights/provenance, prompt fit, retry exhaustion,
   authorship, ledger graph closure, tail handoff, import safety, and

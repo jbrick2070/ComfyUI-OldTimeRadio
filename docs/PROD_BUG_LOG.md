@@ -2144,3 +2144,44 @@ out until they independently meet the same production-only admission rule.
   row-local failure must appear in the Phase 7 receipt
 - bible-worthy: yes -- BUG-12.60
 - status: **LIVE-ADMITTED / ROOT-FIXED; focused + cross-bank + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**
+
+## PBUG-20260721-08 -- generic cast roles were mistaken for forbidden character names
+- surfaced: canonical `public_domain` qualification episode
+  `signal_lost_inheritance_of_desolation_20260721_060315`, 2026-07-21. The
+  cast contained `THE TRAVELER` and `THE WITNESSES`; the technical story-brief
+  model returned `A weary traveler faces a skeptical assembly...`. An older
+  canonical public-domain 720-word production log reproduced the same class
+  with `THE SCIENTIST` and `A scientist...`
+- symptom: the story-brief content gate reported `named_character`, sent a
+  repair that rejected the ordinary role noun, received the same truthful role
+  again, and exhausted to the explicit failed sentinel. `ShotLock` and the LTX
+  scene opener then received blank story-brief metadata (`status=failed`,
+  `0/0/0`) and used only their non-authoring visual defaults. The episode could
+  continue mechanically, but it was not a clean configured image/video brief
+- root cause: one lexical splitter served two incompatible jobs. It treated
+  every word in a cast label as both an input-anonymization alias and a
+  forbidden output name. Thus generic identity labels such as `THE TRAVELER`
+  made `traveler` illegal and even mapped the article `the` as if it were a
+  person. The validator could identify only the broad reason code, so repair
+  was not told which surface triggered the rejection
+- fix: a bounded shared cast-identity grammar now distinguishes generic roles
+  from personal names. Input anonymization maps a generic full label and its
+  role noun to one stable identity, never an article; output validation permits
+  those generic role forms. Personal labels still protect the full name plus
+  meaningful components while excluding articles and honorifics as standalone
+  tokens. The public reason code remains stable, while the private repair seam
+  receives the exact matched surface and asks for environment, light, color,
+  texture, space, material, weather, or objects. Genuine exhaustion still
+  returns the observable failed sentinel, and downstream deterministic visual
+  defaults remain non-authoring
+- verify idea: replay the live `THE TRAVELER`/`A weary traveler...` case in one
+  call and require a successful brief. Exercise article-bearing, ordinal, and
+  multiword roles such as `First Witch`; Unicode, hyphenated, apostrophe, and
+  honorific-bearing personal names; and representative personal-name shapes
+  from all six banks. Assert that input substitution preserves one identity,
+  ordinary `the` survives, real names remain forbidden, private repair names
+  the exact surface while the public code stays `named_character`, and a
+  genuine failed brief still produces a valid non-authoring downstream visual
+  prompt
+- bible-worthy: yes -- BUG-12.61
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + cross-bank + full-suite + Bug Bible + workflow gates GREEN; live requalification pending**
