@@ -1995,3 +1995,41 @@ out until they independently meet the same production-only admission rule.
   verify a later ProductionLedger save cannot regress the accepted filename
 - bible-worthy: yes -- BUG-12.56
 - status: **ROOT-FIXED / FOCUSED-GREEN; live requalification pending**
+
+## PBUG-20260721-04 -- the post-audio ledger owner never reached the video wire
+- surfaced: canonical `media_archive` requalification prompt
+  `7a6618ec-dd00-4711-93c6-43573d5e9580`, episode renamed to
+  `signal_lost_the_municipal_ledger_20260721_020231`, 2026-07-21. The run was
+  stopped before publication at the first repeated render warning, per the
+  cross-bank qualification protocol
+- symptom: the closed master WAV and its disk ledger carried full SHA-256
+  `2f8f4a196c28343d28904f4381ca1632c66f6ff00fef79307ef2c564dc217e93`,
+  but the exact `VideoRenderBatch` input capture had `audio={}`. Every shot
+  therefore warned that `_slice_master_audio` had been called without the
+  master content hash and built an under-invalidated slice identity. The same
+  capture omitted disk-only `audio_gates` and `transitions`
+- root cause: `OTR_ShotLock` is the graph's intended post-audio join, but
+  `overlay_audio_timing` copied only missing row-local timing/WAV fields from
+  the newest ledger. It returned before reading disk whenever any wire row
+  already had a timing hint, never copied the producer-owned top-level audio
+  state, and selected by newest mtime without proving episode identity. The
+  freeze-cascade wire is intentionally pre-audio, so the canonical graph could
+  be correctly gated yet still deliver an empty audio section to every image
+  and video consumer
+- fix: ShotLock now resolves the active ledger through
+  `in_flight_ledger_path`, proves same-episode identity with the immutable Phase
+  10 `meta.freeze_timestamp` (which survives pending-to-final rename) or an
+  exact non-empty episode id for older ledgers, and rejects mismatches loudly.
+  It always visits the post-audio owner despite existing row timing. Matching
+  disk truth replaces the complete producer-owned `audio` section, carries
+  `audio_gates`, `transitions`, and `radio_bookend_path`, additively fills empty
+  metadata, then performs the established missing-only row merge. The image
+  dispatcher remains a wire-preserving consumer; no workflow link/widget/node
+  change is required
+- verify idea: give ShotLock a pending-id wire with existing timing and a
+  renamed disk ledger sharing the same freeze timestamp; require disk's full
+  master hash and post-audio sections to survive ShotLock and ImageDispatcher
+  JSON serialization while populated writer metadata remains unchanged. Give
+  it a different freeze timestamp and require no field to cross the boundary
+- bible-worthy: yes -- BUG-12.57
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + full-suite + Bug Bible GREEN; live requalification pending**

@@ -166,58 +166,114 @@ def _content_hash(obj) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _same_frozen_episode(wire: dict, disk: dict) -> tuple[bool, str]:
+    """Prove that a post-audio disk ledger belongs to ``wire``.
+
+    ``meta.freeze_timestamp`` is minted once by Phase 10 and survives the normal
+    pending-id -> final-title rename, so it is the strongest identity receipt at
+    this join. Older ledgers without both receipts may fall back to an exact,
+    non-empty episode id. A mismatch is never guessed through title/slug
+    similarity: that would let a stale sibling episode donate audio truth.
+    """
+    wire_meta = wire.get("meta") if isinstance(wire.get("meta"), dict) else {}
+    disk_meta = disk.get("meta") if isinstance(disk.get("meta"), dict) else {}
+    wire_freeze = str(wire_meta.get("freeze_timestamp") or "").strip()
+    disk_freeze = str(disk_meta.get("freeze_timestamp") or "").strip()
+    if wire_freeze and disk_freeze:
+        if wire_freeze == disk_freeze:
+            return True, f"freeze_timestamp={wire_freeze}"
+        return False, (
+            "freeze_timestamp mismatch "
+            f"wire={wire_freeze!r} disk={disk_freeze!r}"
+        )
+
+    wire_episode = str(wire.get("episode_id") or "").strip()
+    disk_episode = str(disk.get("episode_id") or "").strip()
+    if wire_episode and disk_episode and wire_episode == disk_episode:
+        return True, f"episode_id={wire_episode}"
+    return False, (
+        "no matching immutable identity receipt "
+        f"wire_episode={wire_episode!r} disk_episode={disk_episode!r}"
+    )
+
+
 def overlay_audio_timing(ledger: dict) -> dict:
-    """When the (pre-audio frozen) input ledger's lines carry NO audio timing,
-    overlay per-line ``dur_s``/``start_s``/``samples``/``sample_rate`` (+ any
-    ``*_wav_path``) from the NEWEST on-disk OTR ledger. The audio path persists
-    the real timing there while the ledger is still ``pending_*`` (the same disk
-    contract SceneSequencer/AudioEnhance/EpisodeAssembler use). ShotLock is gated
-    on ``audio_done`` so the timing exists by the time this runs. Fail-soft +
-    test-mode-skipped: no disk ledger -> the input ledger is returned unchanged.
-    Without this the audio-derived clip budget is all-zeros (the frozen
-    ``script_json`` from the freeze cascade is pre-audio)."""
+    """Rehydrate the pre-audio wire ledger from the active post-audio ledger.
+
+    ShotLock is the canonical graph join gated by ``audio_done``. The freeze
+    cascade supplies authored content on the wire while SceneSequencer,
+    AudioEnhance, and EpisodeAssembler persist their producer-owned truth to the
+    in-flight disk ledger. Once episode identity is proven, disk owns the full
+    ``audio`` section and the other post-audio top-level sections; metadata and
+    row-local timing/WAV fields merge only into empty wire slots. No disk ledger
+    or an identity mismatch leaves the wire unchanged and logs the latter LOUD.
+    """
     import os
     if os.environ.get("OTR_TEST_MODE") == "1":
         return ledger                       # CPU tests never read disk state
     lines = ledger.get("lines") or []
-    if not lines:
-        return ledger
-    if any(isinstance(ln, dict) and (ln.get("dur_s") or ln.get("duration_s")
-           or ln.get("samples") or ln.get("audio_samples")) for ln in lines):
-        return ledger                       # input already carries timing
     try:
-        import json
         from pathlib import Path
         from . import _otr_ledger as _OL
-        roots = []
-        try:
-            from . import _otr_paths as _OP
-            roots.append(Path(_OP.otr_episodes_root()))
-        except Exception:                    # noqa: BLE001
-            base = os.environ.get("OTR_OUTPUT_DIR") or "."
-            roots.append(Path(base) / "otr" / "episodes")
-        p = _OL.find_most_recent_ledger(roots)
+        p = _OL.in_flight_ledger_path()
         if not p:
             return ledger
-        disk = json.loads(Path(p).read_text(encoding="utf-8"))
+        p = Path(p)
+        disk = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(disk, dict):
+            raise ValueError(f"post-audio ledger is {type(disk).__name__}, expected object")
+        same_episode, identity = _same_frozen_episode(ledger, disk)
+        if not same_episode:
+            log.warning(
+                "[OTR_ShotLock] post-audio ledger overlay REJECTED from %s: %s",
+                p.name, identity,
+            )
+            return ledger
+
+        # EpisodeAssembler is the producer/owner of this entire section. Disk
+        # wins even when the pre-audio wire contains a stale non-empty hash.
+        if "audio" in disk:
+            ledger["audio"] = disk["audio"]
+        for key in ("audio_gates", "transitions", "radio_bookend_path"):
+            if key in disk:
+                ledger[key] = disk[key]
+
+        disk_meta = disk.get("meta") if isinstance(disk.get("meta"), dict) else {}
+        wire_meta = ledger.get("meta")
+        if not isinstance(wire_meta, dict):
+            wire_meta = {}
+        for key, value in disk_meta.items():
+            if key not in wire_meta or wire_meta.get(key) in (None, "", [], {}):
+                wire_meta[key] = value
+        ledger["meta"] = wire_meta
+
         dmap = {str(dl.get("line_id")): dl for dl in (disk.get("lines") or [])
                 if isinstance(dl, dict) and dl.get("line_id")}
         tkeys = ("dur_s", "duration_s", "start_s", "samples", "audio_samples", "sample_rate")
+        rows_overlaid = 0
         for ln in lines:
             if not isinstance(ln, dict):
                 continue
             d = dmap.get(str(ln.get("line_id") or ""))
             if not d:
                 continue
+            changed = False
             for k in tkeys:
                 if ln.get(k) in (None, "") and d.get(k) not in (None, ""):
                     ln[k] = d[k]
+                    changed = True
             for k, v in d.items():
                 if str(k).endswith("wav_path") and v and not ln.get(k):
                     ln[k] = v
-        log.info("[OTR_ShotLock] audio-timing overlay from %s", p.name)
+                    changed = True
+            rows_overlaid += int(changed)
+        master_hash = str((ledger.get("audio") or {}).get("master_audio_sha256") or "")
+        log.info(
+            "[OTR_ShotLock] post-audio ledger overlay from %s (%s, rows=%d, master_sha=%s)",
+            p.name, identity, rows_overlaid, master_hash[:12] or "missing",
+        )
     except Exception as exc:                 # noqa: BLE001 - never block the lock
-        log.warning("[OTR_ShotLock] audio-timing overlay skipped: %s", exc)
+        log.warning("[OTR_ShotLock] post-audio ledger overlay skipped: %s", exc)
     return ledger
 
 

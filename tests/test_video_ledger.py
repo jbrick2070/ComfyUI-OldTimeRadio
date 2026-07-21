@@ -509,27 +509,151 @@ def test_resolve_title_timing_spans_head_gap_not_1s_bug404():
 
 def test_overlay_audio_timing_stamps_start_s_from_disk_bug404(tmp_path, monkeypatch):
     """BUG-LOCAL-404: overlay_audio_timing stamps per-line start_s/dur_s from the
-    newest on-disk ledger onto a pre-audio (timing-less) in-memory ledger, so
+    active on-disk ledger onto a pre-audio (timing-less) in-memory ledger, so
     render_video's _resolve_title_timing sees real onsets. TEST_MODE skips the
-    disk read, so the test unsets it and points the finder at a temp ledger."""
+    disk read, so the test unsets it and points the resolver at a temp ledger."""
     import json as _json
     from nodes import otr_shot_lock as sl
 
-    led = {"lines": [
+    led = {"episode_id": "ep_probe", "meta": {"freeze_timestamp": "freeze-1"}, "lines": [
         {"line_id": "b001", "speaker_role": "announcer"},
         {"line_id": "b002", "speaker_role": "character"},
     ]}
-    disk = {"lines": [
+    disk = {"episode_id": "ep_probe", "meta": {"freeze_timestamp": "freeze-1"}, "lines": [
         {"line_id": "b001", "start_s": 9.5, "dur_s": 8.87},
         {"line_id": "b002", "start_s": 18.37, "dur_s": 6.86},
     ]}
     p = tmp_path / "signal_lost_probe_ledger.json"
     p.write_text(_json.dumps(disk), encoding="utf-8")
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)
-    monkeypatch.setattr("nodes._otr_ledger.find_most_recent_ledger",
-                        lambda roots: p)
+    monkeypatch.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: p)
 
     out = sl.overlay_audio_timing(led)
     assert out["lines"][0]["start_s"] == 9.5
     assert out["lines"][0]["dur_s"] == 8.87
     assert out["lines"][1]["start_s"] == 18.37
+
+
+def test_post_audio_overlay_rehydrates_owned_sections_despite_existing_timing(
+    tmp_path, monkeypatch
+):
+    """PBUG-20260721-04: timing hints must not bypass post-audio ownership."""
+    from nodes import otr_shot_lock as sl
+
+    freeze = "2026-07-21T08:59:35.991567+00:00"
+    wire = {
+        "episode_id": "pending_20260721_014156",
+        "audio": {"master_audio_sha256": "stale-wire-hash"},
+        "meta": {"freeze_timestamp": freeze, "writer_owned": "keep"},
+        "lines": [{"line_id": "b001", "dur_s": 1.0}],
+    }
+    disk = {
+        "episode_id": "signal_lost_final_20260721_020231",
+        "audio": {
+            "master_audio_sha256": "a" * 64,
+            "ledger_frozen": True,
+        },
+        "audio_gates": {"episode_assembler": {"ok": True}},
+        "transitions": [{"at_s": 9.5}],
+        "radio_bookend_path": "C:/episode/radio.wav",
+        "meta": {
+            "freeze_timestamp": freeze,
+            "writer_owned": "must-not-overwrite",
+            "phase_ms": {"episode_assembler": 136},
+            "char_voice_engine": "kokoro",
+        },
+        "lines": [{
+            "line_id": "b001",
+            "dur_s": 8.87,
+            "start_s": 9.5,
+            "bark_wav_path": "C:/episode/b001.wav",
+        }],
+    }
+    path = tmp_path / "final_ledger.json"
+    path.write_text(json.dumps(disk), encoding="utf-8")
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    monkeypatch.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: path)
+
+    out = sl.overlay_audio_timing(wire)
+
+    assert out["episode_id"] == "pending_20260721_014156"
+    assert out["audio"] == disk["audio"]
+    assert out["audio_gates"] == disk["audio_gates"]
+    assert out["transitions"] == disk["transitions"]
+    assert out["radio_bookend_path"] == disk["radio_bookend_path"]
+    assert out["meta"]["writer_owned"] == "keep"
+    assert out["meta"]["phase_ms"] == {"episode_assembler": 136}
+    assert out["meta"]["char_voice_engine"] == "kokoro"
+    assert out["lines"][0]["dur_s"] == 1.0  # populated wire timing remains owned
+    assert out["lines"][0]["start_s"] == 9.5
+    assert out["lines"][0]["bark_wav_path"] == "C:/episode/b001.wav"
+
+
+def test_post_audio_overlay_rejects_cross_episode_freeze(tmp_path, monkeypatch, caplog):
+    """A newest/stale sibling ledger cannot donate audio to this wire episode."""
+    from nodes import otr_shot_lock as sl
+
+    wire = {
+        "episode_id": "ep_current",
+        "audio": {"master_audio_sha256": "wire"},
+        "meta": {"freeze_timestamp": "freeze-current"},
+        "lines": [{"line_id": "b001"}],
+    }
+    disk = {
+        "episode_id": "ep_stale",
+        "audio": {"master_audio_sha256": "b" * 64},
+        "meta": {"freeze_timestamp": "freeze-stale"},
+        "lines": [{"line_id": "b001", "start_s": 99.0}],
+    }
+    path = tmp_path / "stale_ledger.json"
+    path.write_text(json.dumps(disk), encoding="utf-8")
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    monkeypatch.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: path)
+
+    with caplog.at_level("WARNING", logger="OTR"):
+        out = sl.overlay_audio_timing(wire)
+
+    assert out is wire
+    assert out["audio"]["master_audio_sha256"] == "wire"
+    assert "start_s" not in out["lines"][0]
+    assert "overlay REJECTED" in caplog.text
+
+
+def test_post_audio_hash_survives_image_dispatcher_wire_serialization(
+    tmp_path, monkeypatch
+):
+    """The ShotLock-owned wire hash must reach the VideoRenderBatch consumer."""
+    from nodes import otr_image_gen_dispatcher as image_dispatcher
+    from nodes import otr_shot_lock as sl
+
+    freeze = "freeze-wire-consumer"
+    wire = {
+        "episode_id": "ep_wire",
+        "audio": {},
+        "meta": {"freeze_timestamp": freeze},
+        "lines": [{"line_id": "b001"}],
+    }
+    disk = {
+        "episode_id": "ep_wire",
+        "audio": {"master_audio_sha256": "c" * 64, "ledger_frozen": True},
+        "meta": {"freeze_timestamp": freeze},
+        "lines": [{"line_id": "b001", "start_s": 9.5, "dur_s": 4.0}],
+    }
+    path = tmp_path / "wire_ledger.json"
+    path.write_text(json.dumps(disk), encoding="utf-8")
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    monkeypatch.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: path)
+    monkeypatch.setattr(
+        image_dispatcher,
+        "dispatch_images",
+        lambda led, policy, prompts, gen_fn, episode_id: (
+            led, "image:done", "ok", []
+        ),
+    )
+
+    locked = sl.overlay_audio_timing(wire)
+    patched_json, _done, _report = image_dispatcher.OTRImageGenDispatcher().dispatch(
+        json.dumps(locked), "{}", "{}", episode_id="ep_wire"
+    )
+
+    assert json.loads(patched_json)["audio"]["master_audio_sha256"] == "c" * 64
