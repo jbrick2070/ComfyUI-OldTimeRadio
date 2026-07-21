@@ -2230,3 +2230,77 @@ out until they independently meet the same production-only admission rule.
   existing ledger/media/OBS ownership
 - bible-worthy: yes -- BUG-12.62
 - status: **LIVE-ADMITTED / ROOT-FIXED; focused cross-backend + lane tests GREEN; full-suite, Bug Bible, workflow gates, and live requalification pending**
+
+## PBUG-20260721-10 -- redundant JSON-schema constraints disabled every compact local repair
+- surfaced: canonical `scifi_news` qualification prompt
+  `c8277cf6-dbb8-41ec-bcc4-ac5671080022`, episode
+  `signal_lost_the_fortress_of_reason_20260721_095038`, 2026-07-21
+- symptom: the P5 spoken-hygiene repair and every P7/P9 quality patch failed
+  before emitting one token with `LMFormatEnforcerException: String schema
+  contains both a pattern and a min/max length`. Reusing the technical slot
+  then failed through `NoneType.allowed_tokens`; the run fell to deterministic
+  hygiene/quality floors even though both local models were available
+- root cause: both compact patch row schemas declared `line_id` with exact regex
+  `^l\d{3}$` and redundant `min_length=1,max_length=16`. LM Format Enforcer
+  explicitly rejects that JSON-Schema combination. Its token enforcer caches
+  an output state before allowed-token calculation, so the first schema
+  exception can leave an incomplete cached state for the reused prefix
+- fix: retain the exact regex as the sole line-id constraint in both patch
+  schemas. Do not catch or suppress the formatter exception. Character-feed
+  the production JSON for each complete patch schema through LMFE and retain
+  Pydantic rejection coverage for wrong-prefix and wrong-length ids
+- verify idea: drive valid P5-hygiene and P7/P9/P10 patch JSON one character at
+  a time through `JsonSchemaParser`, require `can_end()`, assert neither line-id
+  schema contains `minLength/maxLength`, and reject `l1000`/`a100`
+- bible-worthy: yes -- BUG-12.63
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + full-suite + Bug Bible GREEN; live requalification pending**
+
+## PBUG-20260721-11 -- content-owned sci-fi omitted and then ignored its real character-word contract
+- surfaced: same canonical `scifi_news` artifact as PBUG-20260721-10
+- symptom: a requested 180-word episode sealed only 143 character-story words
+  (146 including announcer). `meta.word_budget` lacked the target and band, and
+  the shared final stamp marked `actual_drift=false` under its broad global
+  `0.7..1.3` tolerance. The other qualified banks landed at 166--184 character
+  words, inside the operator's approximately 163--200 campaign window
+- root cause: Scifi Codex treated its advisory P3 word blueprint as sufficient
+  and had no deterministic post-hygiene word-fit owner. Its final hygiene floor
+  could shorten rows after the taste/factual loops. Separately, the shared tail
+  read a producer target but always judged actual drift against global
+  constants, ignoring a producer-stamped band even when one existed
+- fix: Scifi Codex stamps an inclusive target-relative character-word contract
+  before mutation. After every quality pass and the final hygiene scour, a
+  bounded P10 compact line patch extends or compresses only selected character
+  rows, runs the full merged-script graph/hygiene validator, and gets a fresh
+  deterministic recount. Creative then technical attempts continue under a
+  finite dynamic budget; exhaustion keeps the closest valid artifact with a
+  truthful floor/drift receipt. Only then are ledger rows, counts, authorship
+  hashes, and seals minted. The shared final stamp honors a valid producer band
+  and uses `0.7..1.3` only as the legacy fallback. Announcer overhead remains
+  separate
+- verify idea: require target 180 to resolve to the relative 163--200 integer
+  window, repair a 15-word character artifact into the 30-word window with a
+  compact patch and fresh recount, then exhaust both slots and require the
+  original valid story plus explicit drift. Prove the shared receipt consumes
+  valid producer ratios and rejects malformed/reversed bands to legacy fallback
+- bible-worthy: extends BUG-12.59
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + full-suite + Bug Bible GREEN; live requalification pending**
+
+## PBUG-20260721-12 -- a real zero-second dialogue onset was reported as missing timing
+- surfaced: same canonical `scifi_news` artifact as PBUG-20260721-10. ShotLock
+  successfully overlaid eleven timed rows; the first spoken row had
+  `start_s=0.0` and positive duration
+- symptom: video logged the BUG-404 missing-overlay warning and ran the volume
+  envelope fallback even though timing was present. That could manufacture an
+  opening title window over immediate dialogue
+- root cause: `_resolve_title_timing` correctly converted the onset to frame
+  zero, then accepted it only when `first_dialogue_f > 0`. The valid zero
+  sentinel shared the same branch as `None`
+- fix: any non-`None` first-dialogue frame is known timing. Clamp a known onset
+  to the nonnegative title window; zero yields no opening-card gap, preserves
+  the zero receipt, and emits no missing-timing warning. Only `None` reaches the
+  envelope fallback and BUG-404 diagnostic
+- verify idea: pass a character row with `start_s=0.0` and require
+  `first_dialogue_f=0`, no opening bounds, and no BUG-404 warning; retain the
+  existing positive-head-gap test and missing-timing fallback
+- bible-worthy: yes -- BUG-12.64
+- status: **LIVE-ADMITTED / ROOT-FIXED; focused + full-suite + Bug Bible GREEN; live requalification pending**

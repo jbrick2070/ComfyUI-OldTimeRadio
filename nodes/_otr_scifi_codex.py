@@ -11,6 +11,7 @@ import copy
 import hashlib
 import json
 import logging
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -2579,7 +2580,10 @@ def _spoken_error(
 
 
 class _SpokenLineRepairRowV4(_Strict):
-    line_id: str = Field(min_length=1, max_length=16, pattern=r"^l\d{3}$")
+    # LM Format Enforcer rejects a JSON string schema that combines ``pattern``
+    # with min/max length. The regex already fixes this field to exactly four
+    # characters, so separate length constraints are redundant and harmful.
+    line_id: str = Field(pattern=r"^l\d{3}$")
     replacement_text: str = Field(min_length=1, max_length=600)
 
 
@@ -4779,7 +4783,9 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
 
 
 class _ScriptQualityPatchRowV4(_Strict):
-    line_id: str = Field(min_length=1, max_length=16, pattern=r"^l\d{3}$")
+    # Keep this schema on the same LMFE-compatible exact-ID contract as the
+    # final spoken-hygiene patch above.
+    line_id: str = Field(pattern=r"^l\d{3}$")
     replacement_text: str = Field(min_length=1, max_length=600)
 
 
@@ -4875,7 +4881,7 @@ def _derive_script_quality_patch_plan(
 
 def _script_quality_patch_messages(
     *,
-    pass_id: Literal["P7", "P9"],
+    pass_id: Literal["P7", "P9", "P10"],
     script: ScriptArtifactV4,
     score: RadioScoreV4,
     cast: CastPlanV4,
@@ -5058,7 +5064,7 @@ def _merge_script_quality_patch(
 
 def _run_script_quality_patch(
     *,
-    pass_id: Literal["P7", "P9"],
+    pass_id: Literal["P7", "P9", "P10"],
     script: ScriptArtifactV4,
     score: RadioScoreV4,
     cast: CastPlanV4,
@@ -5464,6 +5470,217 @@ def _run_final_audit_quality_loop(
     return current
 
 
+# The requested story budget covers CHARACTER speech only. Announcer framing is
+# fixed overhead and is stamped separately by production_ledger.stamp_word_counts.
+# Integer bounds use an open 90% lower tolerance and a closed 111% upper
+# tolerance. This is target-relative at every supported size; for the current
+# 180-word campaign it resolves to the operator's 163..200 acceptance window.
+_CODEX_CHARACTER_WORD_LO_EXCLUSIVE = 0.90
+_CODEX_CHARACTER_WORD_HI_INCLUSIVE = 1.11
+_CODEX_WORD_FIT_MAX_CYCLES = 6
+
+
+def _scifi_character_word_bounds(target_words: int) -> tuple[int, int]:
+    target = int(target_words)
+    if not 30 <= target <= 900:
+        raise CodexTargetRangeError("requested_words must be 30..900")
+    lower = int(math.floor(
+        target * _CODEX_CHARACTER_WORD_LO_EXCLUSIVE
+    )) + 1
+    upper = int(math.ceil(
+        target * _CODEX_CHARACTER_WORD_HI_INCLUSIVE
+    ))
+    return max(1, lower), max(lower, upper)
+
+
+def _script_character_word_count(script: ScriptArtifactV4) -> int:
+    return sum(
+        _words(line.text)
+        for line in script.lines
+        if line.speaker_role == "character" and not line.skip
+    )
+
+
+def _word_band_distance(actual: int, lower: int, upper: int) -> int:
+    if actual < lower:
+        return lower - actual
+    if actual > upper:
+        return actual - upper
+    return 0
+
+
+def _word_fit_issues(
+    *,
+    script: ScriptArtifactV4,
+    score: RadioScoreV4,
+    target_words: int,
+    lower: int,
+    upper: int,
+) -> tuple[ListenerIssueV4, ...]:
+    """Choose a bounded row-local write set for one word-fit cycle."""
+    actual = _script_character_word_count(script)
+    if lower <= actual <= upper:
+        return ()
+    rows = [
+        line for line in _script_lines_in_score_order(script, score)
+        if line.speaker_role == "character" and not line.skip
+    ]
+    if not rows:
+        return ()
+    distance = lower - actual if actual < lower else actual - upper
+    # Spread a large correction over several breaths. At 180 words this asks
+    # for roughly nine words per target and therefore selects three rows for a
+    # 20-word live undershoot. Never widen to the complete artifact.
+    per_row = max(5, min(18, int(round(target_words * 0.05))))
+    target_count = min(len(rows), max(1, int(math.ceil(distance / per_row))))
+    ranked = sorted(
+        rows,
+        key=(
+            (lambda line: (_words(line.text), line.line_id))
+            if actual < lower
+            else (lambda line: (-_words(line.text), line.line_id))
+        ),
+    )[:target_count]
+    base, remainder = divmod(distance, target_count)
+    verb = "Add" if actual < lower else "Remove"
+    direction_tail = (
+        "Deepen the locked beat with concrete in-character speech; preserve "
+        "every mapped fact and do not add a new factual claim."
+        if actual < lower
+        else
+        "Tighten repetition while preserving the locked beat and every mapped "
+        "fact."
+    )
+    return tuple(
+        ListenerIssueV4(
+            category="word_budget",
+            line_id=line.line_id,
+            direction=(
+                f"{verb} about {base + int(index < remainder)} spoken words. "
+                f"The character story is {actual} words and must land in "
+                f"{lower}..{upper} around target {target_words}. "
+                f"{direction_tail}"
+            ),
+        )
+        for index, line in enumerate(ranked)
+    )
+
+
+def _run_character_word_fit_loop(
+    *,
+    script: ScriptArtifactV4,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    story_rules: StoryRules,
+    target_words: int,
+    creative_fn: GenerateFn,
+    technical_fn: GenerateFn,
+    pack: Any,
+    script_token_budget: int,
+    journal: MutableMapping[str, Any],
+    meta: MutableMapping[str, Any],
+) -> ScriptArtifactV4:
+    """Fit character speech with bounded authored patches; never kill liveness."""
+    lower, upper = _scifi_character_word_bounds(target_words)
+    current = script
+    actual = _script_character_word_count(current)
+    initial_actual = actual
+    initial_distance = _word_band_distance(actual, lower, upper)
+    repair_budget = min(
+        _CODEX_WORD_FIT_MAX_CYCLES,
+        max(
+            3,
+            int(math.ceil(
+                initial_distance / max(1, int(round(target_words * 0.05)))
+            )),
+        ),
+    )
+    candidates: list[tuple[int, int, int, ScriptArtifactV4]] = [
+        (initial_distance, abs(actual - target_words), 0, current)
+    ]
+    cycles: list[dict[str, Any]] = []
+    status = "pass" if initial_distance == 0 else "quality_floor"
+    for cycle in range(1, repair_budget + 1):
+        if lower <= actual <= upper:
+            status = "pass"
+            break
+        issues = _word_fit_issues(
+            script=current,
+            score=score,
+            target_words=target_words,
+            lower=lower,
+            upper=upper,
+        )
+        if not issues:
+            status = "no_actionable_targets_floor"
+            break
+        prior = current
+        patched, entry = _run_script_quality_patch(
+            pass_id="P10",
+            script=current,
+            score=score,
+            cast=cast,
+            fact_index=fact_index,
+            story_rules=story_rules,
+            issues=issues,
+            creative_fn=creative_fn,
+            technical_fn=technical_fn,
+            pack=pack,
+            creative_temperature=_codex_retake_temperature(cycle - 1),
+            script_token_budget=script_token_budget,
+            journal=journal,
+            meta=meta,
+        )
+        receipt = {
+            "cycle": cycle,
+            "before_character_words": actual,
+            "target_ids": list(entry["target_ids"]),
+            "patch_status": entry["status"],
+            "patch_attempt_count": len(entry["attempts"]),
+        }
+        if patched is None:
+            current = prior
+            status = str(entry["status"])
+            receipt["after_character_words"] = actual
+            cycles.append(receipt)
+            break
+        current = patched
+        actual = _script_character_word_count(current)
+        receipt["after_character_words"] = actual
+        receipt["distance_to_band"] = _word_band_distance(
+            actual, lower, upper,
+        )
+        cycles.append(receipt)
+        candidates.append((
+            receipt["distance_to_band"],
+            abs(actual - target_words),
+            cycle,
+            current,
+        ))
+        if lower <= actual <= upper:
+            status = "pass"
+            break
+    else:
+        status = "quality_floor"
+
+    best = min(candidates, key=lambda row: row[:3])
+    current = best[3]
+    actual = _script_character_word_count(current)
+    lane = meta.setdefault("scifi_codex", {})
+    lane["character_word_fit_loop"] = {
+        "status": status,
+        "target_words": int(target_words),
+        "acceptance_words": [lower, upper],
+        "initial_character_words": initial_actual,
+        "final_character_words": actual,
+        "repair_budget": repair_budget,
+        "cycles": cycles,
+        "actual_drift": not (lower <= actual <= upper),
+    }
+    return current
+
+
 def run_scifi_codex_episode(
     *, payload: dict[str, str], pack: Any, resolved: Mapping[str, Any], led: Any,
     meta: dict[str, Any], creative_fn: GenerateFn, technical_fn: GenerateFn,
@@ -5483,6 +5700,24 @@ def run_scifi_codex_episode(
     a0_payload = env.payload.model_dump(mode="json")
     lane_meta: dict[str, Any] = {"source_digest": env.source_digest, "source_mode": env.source_mode, "call_journal": {}}
     meta["scifi_codex"] = lane_meta
+    word_lower, word_upper = _scifi_character_word_bounds(
+        steer.requested_words,
+    )
+    meta["word_budget"] = {
+        "target_words": int(steer.requested_words),
+        "planned_voiced_words": int(steer.requested_words),
+        "planned_ratio": 1.0,
+        # The shared tail consumes this producer-stamped band. Ratios are
+        # derived from the actual inclusive integer contract so its receipt and
+        # this lane's deterministic judge cannot disagree at a boundary.
+        "band": [
+            word_lower / float(steer.requested_words),
+            word_upper / float(steer.requested_words),
+        ],
+        "acceptance_words": [word_lower, word_upper],
+        "planned_drift": False,
+        "owner": "scifi_codex",
+    }
     journal = lane_meta["call_journal"]
     p0_token_budget = p0_output_token_budget()
     journal["fact_index_token_budget"] = {
@@ -5709,6 +5944,35 @@ def run_scifi_codex_episode(
                     for target in remaining_targets
                 )
             )
+    # P10 runs after every taste/factual pass and after the final hygiene scour,
+    # because the live undershoot was created by those shortening repairs. Its
+    # row merge calls _validate_script_post over the complete candidate, so an
+    # accepted length patch cannot bypass spoken hygiene or graph validation.
+    script = _run_character_word_fit_loop(
+        script=script,
+        score=score,
+        cast=p2,
+        fact_index=p0,
+        story_rules=story_rules,
+        target_words=steer.requested_words,
+        creative_fn=creative_fn,
+        technical_fn=technical_fn,
+        pack=pack,
+        script_token_budget=script_token_budget,
+        journal=journal,
+        meta=meta,
+    )
+    remaining_after_word_fit = _collect_script_hygiene_targets(
+        script, p2, p0, score, story_rules,
+    )
+    if remaining_after_word_fit:
+        raise CodexGraphError(
+            "word-fit accepted a spoken-hygiene defect: "
+            + "; ".join(
+                f"{target.line_id}={','.join(target.gates)}"
+                for target in remaining_after_word_fit
+            )
+        )
     validate_spoken_text_and_roster(
         script, p2, score, _allowed_spoken_all_caps(p0, p2),
     )
@@ -5719,7 +5983,20 @@ def run_scifi_codex_episode(
         accepted_artifacts={"final_script": script},
     )
     actual = sum(_words(v) for v in expected.values())
-    meta["scifi_codex"]["word_receipt"] = {"requested_words": steer.requested_words, "actual_split_words": actual, "actual_ledger_word_count": int(led.data.get("total_word_count") or 0)}
+    meta["scifi_codex"]["word_receipt"] = {
+        "requested_words": steer.requested_words,
+        "actual_split_words": actual,
+        "actual_character_words": int(
+            meta.get("character_word_count") or 0
+        ),
+        "actual_announcer_words": int(
+            meta.get("announcer_word_count") or 0
+        ),
+        "acceptance_words": [word_lower, word_upper],
+        "actual_ledger_word_count": int(
+            led.data.get("total_word_count") or 0
+        ),
+    }
     meta["scifi_codex"]["fact_index"] = p0.model_dump(mode="json")
     meta["scifi_codex"]["script_digest"] = _script_digest(script)
     canon = _build_codex_episode_canon(score, script, premise=p1.question)

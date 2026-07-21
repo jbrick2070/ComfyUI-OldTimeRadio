@@ -507,6 +507,26 @@ def test_resolve_title_timing_spans_head_gap_not_1s_bug404():
     assert out["music_open_end_f"] > fps       # not the ~1s collapse
 
 
+def test_resolve_title_timing_known_zero_onset_has_no_fake_gap(caplog):
+    """A real t=0 dialogue onset is known timing, not a missing overlay."""
+    import numpy as np
+    from nodes.video_engine import _resolve_title_timing
+
+    fps = 25
+    led = {"lines": [{
+        "line_id": "l001", "speaker_role": "character",
+        "start_s": 0.0, "dur_s": 4.0,
+    }]}
+    out = _resolve_title_timing(
+        led, np.zeros(fps * 20, dtype="float32"), fps, fps * 20,
+    )
+
+    assert out["first_dialogue_f"] == 0
+    assert "music_open_start_f" not in out
+    assert "music_open_end_f" not in out
+    assert "BUG-404 guard" not in caplog.text
+
+
 def test_overlay_audio_timing_stamps_start_s_from_disk_bug404(tmp_path, monkeypatch):
     """BUG-LOCAL-404: overlay_audio_timing stamps per-line start_s/dur_s from the
     active on-disk ledger onto a pre-audio (timing-less) in-memory ledger, so

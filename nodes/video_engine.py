@@ -271,8 +271,11 @@ def _resolve_title_timing(led, volume, fps, total_frames):
     if not resolved_open:
         # Fallback: volume-envelope intro window (wire start_s unavailable).
         cap = min(total, int(fps * 12))  # <=12s intro ceiling
-        if first_dialogue_f is not None and first_dialogue_f > 0:
-            end_f = min(first_dialogue_f, cap)
+        if first_dialogue_f is not None:
+            # A real onset at frame zero means there is no head gap for an
+            # opening card. It is known timing, not a missing-overlay sentinel.
+            end_f = min(max(0, first_dialogue_f), cap)
+            out["first_dialogue_f"] = first_dialogue_f
         else:
             # FIX3 / BUG-LOCAL-404 guard: reaching the volume-envelope heuristic
             # means NO music_open line resolved AND no first-dialogue onset --

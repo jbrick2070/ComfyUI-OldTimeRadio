@@ -110,6 +110,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -214,6 +215,24 @@ prior 3-line window often dropped one speaker's last beat)."""
 
 WORD_BUDGET_RATIO_LO = 0.7
 WORD_BUDGET_RATIO_HI = 1.3
+
+
+def _producer_word_budget_band(receipt) -> tuple[float, float]:
+    """Return a valid producer-owned ratio band or the legacy defaults."""
+    band = receipt.get("band") if isinstance(receipt, dict) else None
+    if isinstance(band, (list, tuple)) and len(band) == 2:
+        try:
+            low, high = float(band[0]), float(band[1])
+        except (TypeError, ValueError):
+            pass
+        else:
+            if (
+                math.isfinite(low)
+                and math.isfinite(high)
+                and 0.0 < low <= high
+            ):
+                return low, high
+    return WORD_BUDGET_RATIO_LO, WORD_BUDGET_RATIO_HI
 """Acceptable band for sum(beat.target_words) / target_words. Outside
 this band logs WARNING but does not fail the run."""
 
@@ -7409,6 +7428,7 @@ class OTR_LedgerScriptWriter:
             _wb = meta.setdefault("word_budget", {})
             _target_wb = int(_wb.get("target_words")
                              or resolved["target_words"] or 1)
+            _band_lo, _band_hi = _producer_word_budget_band(_wb)
             _actual_words = 0
             for _row in (led.data.get("lines") or []):
                 if not isinstance(_row, dict):
@@ -7420,7 +7440,7 @@ class OTR_LedgerScriptWriter:
                 _actual_words += len(str(_row.get("text") or "").split())
             _actual_ratio = _actual_words / max(1, _target_wb)
             _actual_drift = not (
-                WORD_BUDGET_RATIO_LO <= _actual_ratio <= WORD_BUDGET_RATIO_HI
+                _band_lo <= _actual_ratio <= _band_hi
             )
             _wb["actual_voiced_words"] = int(_actual_words)
             _wb["actual_ratio"] = round(float(_actual_ratio), 3)
@@ -7429,9 +7449,10 @@ class OTR_LedgerScriptWriter:
                 log.warning(
                     "[OTR_LedgerScriptWriter] WORD_BUDGET_ACTUAL_DRIFT: "
                     "composed voiced lines total %d words, target %d "
-                    "(ratio=%.2f); ADVISORY ONLY, proceeding "
+                    "(ratio=%.2f, band=%.3f..%.3f); ADVISORY ONLY, proceeding "
                     "(stamped on meta.word_budget)",
                     _actual_words, _target_wb, _actual_ratio,
+                    _band_lo, _band_hi,
                 )
             else:
                 log.info(

@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from nodes import _otr_scifi_codex as lane
 from nodes import _otr_story_routing as routing
 from nodes._otr_line_hygiene import flag_one_breath
+from nodes._otr_story_rules import resolve_story_rules
 
 
 def _payload(words: int = 90) -> dict[str, str]:
@@ -3081,6 +3082,56 @@ def test_script_artifact_scene_schema_is_closed_for_lm_format_enforcer():
     assert parser.can_end()
 
 
+@pytest.mark.parametrize(
+    "patch_type, valid_payload",
+    [
+        (
+            lane._SpokenLineRepairPatchV4,
+            {"replacements": [{
+                "line_id": "l001",
+                "replacement_text": "The receiver holds a quiet pulse.",
+            }]},
+        ),
+        (
+            lane._ScriptQualityPatchV4,
+            {"replacements": [{
+                "line_id": "l001",
+                "replacement_text": "The receiver holds a quiet pulse.",
+            }]},
+        ),
+    ],
+)
+def test_compact_patch_line_ids_are_lmfe_compatible(patch_type, valid_payload):
+    """P5/P7/P9/P10 must survive the real LMFE character parser."""
+    from lmformatenforcer import JsonSchemaParser
+
+    schema = patch_type.model_json_schema()
+    row_name = next(
+        name for name in schema["$defs"]
+        if name.endswith("PatchRowV4") or name.endswith("RepairRowV4")
+    )
+    line_schema = schema["$defs"][row_name]["properties"]["line_id"]
+    assert line_schema["pattern"] == r"^l\d{3}$"
+    assert "minLength" not in line_schema
+    assert "maxLength" not in line_schema
+
+    encoded = json.dumps(valid_payload, separators=(",", ":"))
+    parser = JsonSchemaParser(schema)
+    for index, character in enumerate(encoded):
+        assert character in parser.get_allowed_characters(), (
+            index, character, encoded[max(0, index - 40):index + 1],
+        )
+        parser = parser.add_character(character)
+    assert parser.can_end()
+    with pytest.raises(ValidationError):
+        patch_type.model_validate({
+            "replacements": [{
+                "line_id": "l1000",
+                "replacement_text": "Invalid five-character line ID.",
+            }],
+        })
+
+
 def test_codex_tail_canon_uses_the_complete_episode_canon_protocol(tmp_path):
     from nodes import _otr_canon
 
@@ -3535,6 +3586,101 @@ def test_quality_patch_capacity_floor_records_both_slots():
         "capacity_floor", "capacity_floor",
     ]
     assert len(meta["scifi_codex"]["capacity_floors"]) == 2
+
+
+def test_scifi_character_word_bounds_are_target_relative():
+    assert lane._scifi_character_word_bounds(180) == (163, 200)
+    assert lane._scifi_character_word_bounds(30) == (28, 34)
+    with pytest.raises(lane.CodexTargetRangeError):
+        lane._scifi_character_word_bounds(29)
+
+
+def _word_fit_story():
+    score = _score_with_beat_owners("c01", "c02", "c03")
+    scene = score.scenes[0]
+    score = score.model_copy(update={
+        "scenes": [scene.model_copy(update={"shots": scene.shots[:1]})],
+    })
+    script = _script_voicing("c01", "c02", "c03")
+    metadata = lane._accepted_script_line_metadata(score)
+    assert metadata is not None
+    for line in script.lines:
+        beat_id, shot_id, boundary = metadata[line.line_id]
+        line.beat_id = beat_id
+        line.shot_id = shot_id
+        line.boundary = boundary
+    return score, script
+
+
+def test_character_word_fit_uses_compact_patch_and_fresh_recount():
+    score, script = _word_fit_story()
+    cast = _coverage_cast()
+    facts = _metadata_repair_fact_index()
+    calls: list[str] = []
+
+    def creative(_messages, **_kwargs):
+        calls.append("creative")
+        return json.dumps({"replacements": [
+            {"line_id": "l001", "replacement_text":
+             "The receiver keeps a measured pulse beneath the frost tonight."},
+            {"line_id": "l002", "replacement_text":
+             "I can trace its quiet rhythm across the glass console."},
+            {"line_id": "l003", "replacement_text":
+             "Then we wait beside the dial until dawn answers softly."},
+        ]})
+
+    meta: dict[str, object] = {"scifi_codex": {}}
+    result = lane._run_character_word_fit_loop(
+        script=script,
+        score=score,
+        cast=cast,
+        fact_index=facts,
+        story_rules=resolve_story_rules("scifi_news"),
+        target_words=30,
+        creative_fn=creative,
+        technical_fn=lambda *_args, **_kwargs: pytest.fail(
+            "technical slot should not run after an accepted creative patch"
+        ),
+        pack=routing.resolve_story_pack("scifi_news"),
+        script_token_budget=2200,
+        journal={},
+        meta=meta,
+    )
+
+    assert calls == ["creative"]
+    assert lane._script_character_word_count(result) == 30
+    receipt = meta["scifi_codex"]["character_word_fit_loop"]
+    assert receipt["status"] == "pass"
+    assert receipt["initial_character_words"] == 15
+    assert receipt["final_character_words"] == 30
+    assert receipt["cycles"][0]["after_character_words"] == 30
+    assert receipt["actual_drift"] is False
+
+
+def test_character_word_fit_exhaustion_keeps_closest_valid_story():
+    score, script = _word_fit_story()
+    meta: dict[str, object] = {"scifi_codex": {}}
+
+    result = lane._run_character_word_fit_loop(
+        script=script,
+        score=score,
+        cast=_coverage_cast(),
+        fact_index=_metadata_repair_fact_index(),
+        story_rules=resolve_story_rules("scifi_news"),
+        target_words=30,
+        creative_fn=lambda *_args, **_kwargs: "not json",
+        technical_fn=lambda *_args, **_kwargs: "still not json",
+        pack=routing.resolve_story_pack("scifi_news"),
+        script_token_budget=2200,
+        journal={},
+        meta=meta,
+    )
+
+    assert result.model_dump(mode="json") == script.model_dump(mode="json")
+    receipt = meta["scifi_codex"]["character_word_fit_loop"]
+    assert receipt["status"] == "two_slot_quality_floor"
+    assert receipt["final_character_words"] == 15
+    assert receipt["actual_drift"] is True
 
 
 def test_two_failed_quality_slots_stop_without_rejudging_unchanged_script(

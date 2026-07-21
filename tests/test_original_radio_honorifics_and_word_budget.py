@@ -168,6 +168,16 @@ def test_length_steering_is_advisory_only_no_gate():
     assert WORD_BUDGET_RATIO_HI == 1.3
 
 
+def test_actual_word_receipt_honors_valid_producer_band():
+    from nodes.OTR_LedgerScriptWriter import _producer_word_budget_band
+
+    assert _producer_word_budget_band({"band": [0.905, 1.112]}) == (
+        0.905, 1.112,
+    )
+    assert _producer_word_budget_band({"band": "bad"}) == (0.7, 1.3)
+    assert _producer_word_budget_band({"band": [1.2, 0.8]}) == (0.7, 1.3)
+
+
 def _req(target_words: int, **kw) -> "LC.LineRequest":
     return LC.LineRequest(
         speaker="ELI CROSS", intent="reveal", mood="tense",
