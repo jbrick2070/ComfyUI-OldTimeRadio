@@ -39,7 +39,7 @@ _LEGACY_FIRST_FALLBACK = ("musicgen", "stable_audio_music")
 # single-source Meta-brief composer (nodes/_otr_music_prompt.compose_music_prompt),
 # so music pulls period/setting/mood from the same propagating creative brief as
 # every other downstream creative call -- not a local template.
-_CUE_SLOTS = ("opening", "closing", "interstitial")
+_CUE_SLOTS = ("opening", "closing")
 
 
 def _load_meta(*sources) -> dict:

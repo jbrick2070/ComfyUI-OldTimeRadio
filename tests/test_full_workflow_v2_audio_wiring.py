@@ -253,11 +253,11 @@ def test_music_cue_fanout_by_name(by_id, links_by_id):
     assert names == ["cue_audio_clips", "cue_manifest_json", "render_log", "done"]
     audio = sorted(
         _dst(links_by_id, by_id, i) for i in _out_links(theme, "cue_audio_clips"))
-    assert audio == [(3, "music_cue_audio"), (7, "music_cue_audio")]
+    assert audio == [(7, "music_cue_audio")]
     manifest = sorted(
         _dst(links_by_id, by_id, i) for i in _out_links(theme, "cue_manifest_json"))
     assert manifest == [
-        (3, "music_cue_manifest_json"), (7, "music_cue_manifest_json")]
+        (7, "music_cue_manifest_json")]
     # Legacy theme links retired; declarations kept + unlinked.
     assert 241 not in links_by_id
     assert 242 not in links_by_id
