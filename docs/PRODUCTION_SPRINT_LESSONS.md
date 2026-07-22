@@ -536,6 +536,30 @@ advisory craft defects. Record every attempt and terminal exhaustion truthfully.
 Prove the maximum supported input and repair envelopes with the exact production
 tokenizer, not a character estimate or a smaller surrogate prompt.
 
+## 33. Separate render work from positioned timeline ownership
+
+Full per-shot frame requests describe render work, not necessarily final video
+duration. Once a post-audio ledger positions rows, opening, interstitial, and
+closing cues may intentionally overlap dialogue at crossfades. Summing those
+requests counts the overlap twice and creates body drift that a strict terminal
+mux should reject.
+
+Carry two explicit quantities: the sum of full render requests for workload and
+the authoritative positioned timeline boundary for output. Quantize the accepted
+audio-ledger duration upward to a complete CFR frame. In the planner, sort rows
+stably by position and give a row only the visible interval before the next row
+owns the boundary. End that interval at the earliest of its requested end, the
+next start, or the timeline end. This trims overlap without stretching a short
+clip across a genuine gap; equal-start collisions must be loud.
+
+Quality telemetry must compare rendered frames with the planned visible slot,
+not blindly with the original render request. Preserve requested, rendered,
+visible, and overlap-trimmed counts so intentional edits do not masquerade as
+engine underruns. A filesystem master probe is a cross-check and fallback: it
+may shrink or grow a positioned timeline, while an unpositioned legacy sequence
+keeps its historical grow-only behavior. Never widen mux tolerance or charge
+body drift to a valid credits declaration.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

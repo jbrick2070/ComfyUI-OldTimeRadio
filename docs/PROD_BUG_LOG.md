@@ -2473,3 +2473,53 @@ out until they independently meet the same production-only admission rule.
   runs creative then technical exactly once before truthful exhaustion
 - bible-worthy: yes -- BUG-12.68
 - status: **LIVE-ADMITTED / ROOT-FIXED; exact-tokenizer maximum envelope, 165 focused lane/route tests, full suite (8,325 passed), Bug Bible, and canonical workflow gates GREEN; live six-bank requalification pending**
+
+## PBUG-20260721-17 -- positioned video double-counted two audio crossfades at terminal mux
+- surfaced: canonical `scifi_news` qualification prompt
+  `a5e6e996-8f1e-4eb4-aff2-29486d4fd28c`, episode
+  `signal_lost_the_fire_ant_bridge_20260721_163825`, 2026-07-21. The compact P5
+  path passed on its first attempt and the run completed story, TTS, music,
+  fifteen shots, silent composition, captions, and credits before the terminal
+  master-audio mux rejected the body video. No OBS artifact was published
+- symptom: the master audio was 114.5433 seconds / 5,498,077 samples at 48 kHz,
+  while the silent body was 115.5600 seconds / 2,889 frames at 25 fps. With the
+  valid 53.517-second credits declaration, video exceeded the allowed
+  audio-plus-credits duration by 0.8997 seconds. The GPU remained around
+  4.1--4.4 GB during the tail; this was deterministic timeline arithmetic, not
+  VRAM thrashing
+- root cause: the durable post-audio ledger correctly positioned the first
+  drama row 0.5 seconds before the opening music ended and the closing music
+  0.5 seconds before the last drama row ended. The render driver nevertheless
+  defined final video length as the sum of every full per-shot render request,
+  and the positioned planner emitted each full request even after a later row
+  owned an earlier start boundary. The two intentional audio crossfades were
+  therefore duplicated as one extra second / 25 visual frames. The filesystem
+  master probe could grow the bad total but was forbidden to shrink it. The mux
+  and credits declaration correctly refused to misclassify body drift as a
+  credits tail
+- fix: the clip manifest now separates full `render_target_frames` from the
+  authoritative positioned `timeline_total_frames`. When every row has a
+  position and the post-audio ledger owns `total_episode_dur_s`, the output
+  boundary is `ceil(duration * fps)`; sparse legacy manifests retain their
+  sequential sum. Positioned planning is stable by `(start_s, manifest order)`
+  and gives each row only the visible interval ending at its requested end, the
+  next row's start, or the timeline boundary, whichever comes first. This trims
+  overlaps without stretching real gaps. QA reports requested, rendered,
+  planned-visible, and overlap-trimmed frames separately. The actual master
+  probe may reconcile a positioned total downward or upward, while sequential
+  behavior remains grow-only. Terminal mux tolerance and credits ownership are
+  unchanged
+- sibling audit: exact Antigravity `gemini-3.5-flash-high` R2/R3 review in a
+  clean detached worktree confirmed the shared tail affects all six banks.
+  Sol grounded every claim against the real Windows files, discarded incorrect
+  bank-specific and file-path claims, and retained sole coding/judgment
+  authority. No workflow wiring change was required
+- verify idea: build a positioned manifest whose full requests sum to 563
+  frames but whose two crossfades and authoritative boundary yield 538 visible
+  frames. Require stable slot ownership, no duplicated frames or stretched
+  gaps, truthful overlap-trim telemetry, and a green visible-frame QA result.
+  With real ffmpeg media, give a positioned 80-frame manifest a 2.1-second
+  master and require exactly `ceil(2.1 * 25) = 53` output frames. Retain a
+  legacy no-position manifest that preserves full sequential requests
+- bible-worthy: yes -- BUG-12.69
+- status: **LIVE-ADMITTED / ROOT-FIXED; exact failed-ledger replay, 96 focused CPU/ffmpeg tests, full suite (8,328 passed), Bug Bible, and canonical workflow gates GREEN; push and live six-bank 320-word requalification pending**

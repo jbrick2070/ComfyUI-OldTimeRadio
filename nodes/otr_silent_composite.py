@@ -17,6 +17,7 @@ Pure ffmpeg, cold-import clean (stdlib only) -- no torch, no CUDA residency.
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -308,13 +309,17 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
     """Pure: the frame-accurate per-beat segment plan from a clip manifest.
 
     POSITION mode (every beat carries ``start_s`` AND a ``target_total_frames``
-    master length is given): place each beat at ``round(start_s*fps)`` and
-    floor/black gap-fill the head (the +intro shift), the inter-beat silences,
-    and the tail (the closing theme) so the assembled length == the master length
-    (the pre-mux A/V-sync guard). SEQUENTIAL mode (no start_s): concat the beats,
-    then tail-fill to ``target_total_frames`` when given. Each beat is EXACTLY
-    ``target_frame_count`` frames; a real on-disk clip is used, else the floor
-    (timeline-aligned slice in sequential mode) or black. Returns ``(segments,
+    master length is given): place each beat at ``round(start_s*fps)`` and give
+    the later beat ownership at its start. A visible slot ends at the earliest
+    of its requested end, the next positioned start, or the master boundary.
+    This preserves real gaps while removing duplicated video frames from audio
+    crossfades. Floor/black fills head, inter-beat gaps, and tail so the assembled
+    length == the master length (the pre-mux A/V-sync guard).
+
+    SEQUENTIAL mode (no complete start_s set) retains the legacy behavior:
+    concatenate full ``target_frame_count`` requests, then tail-fill when the
+    target is longer. A real on-disk clip is used, else the floor (timeline-
+    aligned slice in sequential mode) or black. Returns ``(segments,
     total_frames)``; each segment is ``{order, shot_id, source, path,
     src_start_frame, n_frames, engine_id}``. Frame counts only."""
     rows = [r for r in ((manifest or {}).get("clips") or [])
@@ -353,13 +358,37 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
     positioned = (target_total_frames is not None and rows
                   and all(r.get("start_s") is not None for r in rows))
     if positioned:
-        for r in sorted(rows, key=lambda x: float(x.get("start_s") or 0)):
-            n = int(r.get("target_frame_count") or 0)
-            start_frame = int(round(float(r.get("start_s") or 0) * fps))
+        # Stable manifest order breaks equal-start ties. The earlier row gets a
+        # zero-width visible slot and the later row owns that frame boundary;
+        # make the collapse loud below rather than silently serializing two
+        # simultaneous audio rows into duplicate video time.
+        ordered = sorted(
+            enumerate(rows),
+            key=lambda pair: (float(pair[1].get("start_s") or 0), pair[0]),
+        )
+        starts = [max(0, int(round(float(r.get("start_s") or 0) * fps)))
+                  for _, r in ordered]
+        timeline_end = max(0, int(target_total_frames))
+        for index, (_, r) in enumerate(ordered):
+            requested_n = int(r.get("target_frame_count") or 0)
+            start_frame = min(starts[index], timeline_end)
+            requested_end = start_frame + requested_n
+            next_start = (min(starts[index + 1], timeline_end)
+                          if index + 1 < len(starts) else timeline_end)
+            slot_end = min(requested_end, next_start, timeline_end)
+            n = max(0, slot_end - start_frame)
             if start_frame > cursor:                       # head / inter-beat gap
                 gap_n = start_frame - cursor
                 emit(gap_src, "", gap_n, _floor_aligned(cursor, gap_n))
                 cursor = start_frame
+            if n <= 0:
+                log.warning(
+                    "[OTR.composite] positioned beat %s has zero visible "
+                    "frames at start=%d (next=%d requested=%d timeline=%d); "
+                    "later/equal-start row owns the boundary",
+                    r.get("shot_id") or r.get("beat_id"), start_frame,
+                    next_start, requested_n, timeline_end)
+                continue
             if r.get("exists") and r.get("path"):
                 _fill = _should_loop_fill(r, n)
                 _warn_clip_underrun(r, n, will_loop=_fill)
@@ -369,7 +398,7 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
             else:
                 emit(gap_src, "", n, _floor_aligned(cursor, n),
                      r.get("shot_id"), r.get("engine_id"))
-            cursor += n
+            cursor = slot_end
     else:                                                  # SEQUENTIAL (legacy)
         for r in rows:
             n = int(r.get("target_frame_count") or 0)
@@ -414,21 +443,24 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
 
 def timeline_quality_report(manifest, segments):
     """S-A legibility floor (staged commit 1): a SEPARATE post-plan view that
-    asserts each real-clip beat DELIVERS its full target span and flags any beat
-    that would freeze. PURE -- never overwrites the raw manifest ``frame_count``
-    (which stays engine-produced); it only reads the planned segments.
+    asserts each real-clip beat DELIVERS its planned visible span and flags any
+    beat that would freeze. PURE -- never overwrites the raw manifest
+    ``frame_count`` (which stays engine-produced); it only reads the planned
+    segments.
 
-    Per clip beat: ``frame_count`` (raw engine output), ``target_frame_count``,
-    ``delivered_frame_count`` (sum of its clip segments), ``looped`` (clip-fill
-    engaged), and ``quality_status`` one of: ``ok`` (clip already >= target),
-    ``looped_fill`` (underran, now loop-filled to target), ``held_last_frame``
-    (underran with fill OFF -> the murk), ``no_clip_segment`` (fell to the
-    still/floor spine -- not a clip-fill failure). ``delivered_frames_ok`` is
-    True when NO beat is held_last_frame and every clip beat delivered ==
-    target."""
+    In positioned mode, a later beat owns its start boundary, so intentional
+    crossfade overlap frames are trimmed from the earlier beat's visible slot.
+    ``target_frame_count`` remains the full render request; the added
+    ``planned_visible_frame_count`` and ``overlap_trimmed_frame_count`` make the
+    distinction explicit. ``delivered_frames_ok`` is True when NO visible slot
+    is held on an under-length clip. Sequential manifests retain their strict
+    delivered == requested contract."""
     clips = {str(r.get("shot_id")): r
              for r in ((manifest or {}).get("clips") or [])
              if r.get("shot_id") and int((r or {}).get("target_frame_count") or 0) > 0}
+    positioned = (bool(clips)
+                  and int((manifest or {}).get("total_target_frames") or 0) > 0
+                  and all(r.get("start_s") is not None for r in clips.values()))
     seg_by_shot = {}
     for s in (segments or []):
         if s.get("source") == "clip" and s.get("shot_id"):
@@ -440,21 +472,27 @@ def timeline_quality_report(manifest, segments):
         raw = int(r.get("frame_count") or 0)
         segs = seg_by_shot.get(sid, [])
         delivered = sum(int(s.get("n_frames") or 0) for s in segs)
+        planned_visible = delivered
         looped = any(s.get("loop") for s in segs)
         if not segs:
             status = "no_clip_segment"
-        elif raw > 0 and raw < tgt:
+        elif raw > 0 and raw < planned_visible:
             status = "looped_fill" if looped else "held_last_frame"
         else:
             status = "ok"
         beats.append({
             "shot_id": sid, "beat_id": r.get("beat_id"),
             "engine_id": r.get("engine_id"), "target_frame_count": tgt,
-            "frame_count": raw, "delivered_frame_count": delivered,
+            "requested_frame_count": tgt, "frame_count": raw,
+            "rendered_frame_count": raw,
+            "delivered_frame_count": delivered,
+            "planned_visible_frame_count": planned_visible,
+            "overlap_trimmed_frame_count": (
+                max(0, tgt - planned_visible) if positioned else 0),
             "looped": bool(looped), "quality_status": status})
         if status == "held_last_frame":
             ok_all = False
-        elif segs and delivered != tgt:
+        elif not positioned and segs and delivered != tgt:
             ok_all = False
     return {"delivered_frames_ok": ok_all, "beats": beats,
             "underran": [b for b in beats
@@ -663,11 +701,11 @@ def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
 def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                              h=832, fps=25, ffmpeg="ffmpeg"):
     """Assemble a beat-ordered clip manifest into ONE always-silent canonical
-    CFR video; FAIL CLOSED. Each beat is conformed to EXACTLY its
-    ``target_frame_count`` (truncate if long, hold last frame if short); a
-    missing clip is gap-filled from the floor (``base_video_path``) or black. The
-    assembled frame count is asserted == the audio-derived budget total (the
-    pre-mux A/V sync guard). Returns ``(out_path, report)``."""
+    CFR video; FAIL CLOSED. Sequential beats retain their full requested spans;
+    positioned beats are conformed to their non-overlapping visible slots. A
+    missing clip is gap-filled from the floor (``base_video_path``) or black.
+    The assembled frame count is asserted == the audio-derived timeline boundary
+    (the pre-mux A/V sync guard). Returns ``(out_path, report)``."""
     report: list = []
     fb = _ffmpeg_bin(ffmpeg)
     if not fb:
@@ -675,23 +713,24 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     w, h, fps = _even(w), _even(h), max(1, int(fps))
     floor_ok = bool(base_video_path) and os.path.isfile(base_video_path)
     floor_frames = count_video_frames(base_video_path) if floor_ok else 0
-    # Derive target_total from the manifest's audio-derived frame budget first
-    # (the sum of target_frame_count across all shots, set by the render driver
-    # from the ledger's per-beat durations). This is the correct master length
-    # regardless of what the base video's container duration reports.
-    # Fall back to base video duration only when the manifest carries no budget
-    # (legacy / non-assemble path).
-    mft_total = int((manifest or {}).get("total_target_frames") or 0)
+    # The post-audio ledger's accepted timeline boundary is primary. Positioned
+    # manifests may overlap full render requests at audio crossfades, so their
+    # render-work sum is deliberately NOT the output length. Legacy/sequential
+    # manifests still carry their old requested-frame sum here.
+    mft_total = int((manifest or {}).get("timeline_total_frames")
+                    or (manifest or {}).get("total_target_frames") or 0)
     target_total = mft_total if mft_total > 0 else None
+    _rows = [r for r in ((manifest or {}).get("clips") or [])
+             if int((r or {}).get("target_frame_count") or 0) > 0]
+    manifest_positioned = (bool(_rows)
+                           and all(r.get("start_s") is not None for r in _rows))
     if floor_ok:
-        # A/V-SYNC fill (production restore 2026-06-10): the composite is built
-        # to the MASTER MIX length so the beats line up under the master audio
-        # (opening theme pad + drama + closing theme). The tail segment holds the
-        # last drama clip as the closing-theme backdrop (planner, below). The cap
-        # is the MASTER MIX duration -- NOT the base's video length nor its
-        # embedded (silence-padded) audio. Probe the LONGEST *_master.wav in the
-        # base's sibling audio dir; fall back to the base audio stream, then the
-        # container. -1 frame headroom absorbs rounding.
+        # Cross-check/fallback against the actual MASTER MIX. A positioned
+        # manifest may reconcile downward as well as upward: refusing to shrink
+        # here was the terminal live failure when two 0.5 s crossfades were
+        # counted twice. Sequential/legacy manifests preserve the historical
+        # grow-only behavior. Ceil covers the final fractional audio frame; the
+        # mux keeps its independent, narrow terminal tolerance.
         master_dur = 0.0
         try:
             import glob as _glob
@@ -706,10 +745,18 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
         if master_dur <= 0:
             master_dur = _probe_duration(base_video_path)
         if master_dur > 0:
-            base_total = max(0, int(round(master_dur * fps)) - 1)
-            if base_total > 0 and (target_total is None
-                                   or base_total > target_total):
-                if target_total is not None:
+            base_total = max(1, int(math.ceil(master_dur * fps)))
+            reconcile = (base_total > 0 and (
+                target_total is None
+                or (manifest_positioned and base_total != target_total)
+                or (not manifest_positioned and base_total > target_total)))
+            if reconcile:
+                if target_total is not None and manifest_positioned:
+                    report.append(
+                        "A/V-sync master reconcile: %d -> %d frames "
+                        "(positioned ledger cross-check)"
+                        % (target_total, base_total))
+                elif target_total is not None:
                     report.append(
                         "A/V-sync tail to master: %d -> %d frames "
                         "(closing-theme backdrop)"
@@ -739,13 +786,14 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
             % (len(qa["underran"]),
                ", ".join("%s %s(%d/%d)"
                          % (b["shot_id"], b["quality_status"],
-                            b["frame_count"], b["target_frame_count"])
+                            b["rendered_frame_count"],
+                            b["planned_visible_frame_count"])
                          for b in qa["underran"])))
     if not qa["delivered_frames_ok"]:
         _held = sum(1 for b in qa["beats"]
                     if b["quality_status"] == "held_last_frame")
         report.append(
-            "LEGIBILITY (LOUD): %d beat(s) did NOT deliver full target frames "
+            "LEGIBILITY (LOUD): %d beat(s) did NOT deliver planned visible frames "
             "(held_last_frame -> static murk); clip-fill is OFF "
             "(OTR_CLIP_FILL=0)" % _held)
     workdir = tempfile.mkdtemp(prefix="otr_assemble_")

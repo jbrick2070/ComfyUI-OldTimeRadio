@@ -25,6 +25,7 @@ from nodes.otr_master_audio_mux import (
 from nodes.otr_silent_composite import (
     normalize_to_silent_canonical, count_audio_streams, probe_video, OTRSilentComposite,
     plan_timeline_segments, assemble_silent_timeline, count_video_frames,
+    timeline_quality_report,
 )
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_shared import role_compat as rc
@@ -627,6 +628,65 @@ def test_plan_timeline_segments_positions_by_start_s_and_fills_to_master():
     segs2, total2 = plan_timeline_segments(
         manifest, floor_available=False, target_total_frames=1543, fps=25)
     assert total2 == 1543 and segs2[0]["source"] == "black"
+
+
+def test_positioned_crossfades_partition_visible_timeline_without_duplication():
+    """PBUG-20260721-17: render-work frames may overlap; output frames may not."""
+    manifest = {"fps": 25, "total_target_frames": 538, "clips": [
+        {"shot_id": "open", "target_frame_count": 250,
+         "frame_count": 250, "path": "/x/open.mp4", "exists": True,
+         "start_s": 0.0, "engine_id": "abstract"},
+        {"shot_id": "body", "target_frame_count": 138,
+         "frame_count": 138, "path": "/x/body.mp4", "exists": True,
+         "start_s": 9.5, "engine_id": "humo",
+         "family": "audio_driven_face"},
+        {"shot_id": "close", "target_frame_count": 175,
+         "frame_count": 175, "path": "/x/close.mp4", "exists": True,
+         "start_s": 14.5, "engine_id": "abstract"},
+    ]}
+
+    segments, total = plan_timeline_segments(
+        manifest, target_total_frames=538, fps=25)
+
+    by_shot = {}
+    for segment in segments:
+        by_shot.setdefault(segment.get("shot_id"), 0)
+        by_shot[segment.get("shot_id")] += segment["n_frames"]
+    assert total == 538
+    assert sum(segment["n_frames"] for segment in segments) == 538
+    assert by_shot == {"open": 238, "body": 124, "close": 176}
+    assert sum(row["target_frame_count"] for row in manifest["clips"]) == 563
+
+    qa = timeline_quality_report(manifest, segments)
+    beats = {beat["shot_id"]: beat for beat in qa["beats"]}
+    assert qa["delivered_frames_ok"] is True
+    assert beats["open"]["overlap_trimmed_frame_count"] == 12
+    assert beats["body"]["overlap_trimmed_frame_count"] == 14
+    assert beats["close"]["overlap_trimmed_frame_count"] == 0
+    assert beats["close"]["planned_visible_frame_count"] == 176
+    assert beats["close"]["quality_status"] == "looped_fill"
+
+
+@needs_ffmpeg
+def test_positioned_assemble_reconciles_oversized_manifest_down_to_master(tmp_path):
+    """The filesystem master cross-check may shrink a positioned timeline."""
+    floor = tmp_path / "floor.mp4"
+    master = tmp_path / "episode_master.wav"
+    _silent_video(floor, 3.2)
+    _sine(master, 2.1)
+    manifest = {"fps": 25, "total_target_frames": 80,
+                "timeline_total_frames": 80, "clips": [
+        {"shot_id": "only", "target_frame_count": 80,
+         "frame_count": 80, "path": str(floor), "exists": True,
+         "start_s": 0.0, "engine_id": "abstract"},
+    ]}
+    out = tmp_path / "positioned.mp4"
+
+    _, report = assemble_silent_timeline(
+        manifest, str(floor), str(out), w=320, h=240, fps=25)
+
+    assert count_video_frames(str(out)) == 53  # ceil(2.1 * 25)
+    assert any("A/V-sync master reconcile: 80 -> 53" in row for row in report)
 
 
 def test_title_reveal_resolves_early_and_holds_bug409():

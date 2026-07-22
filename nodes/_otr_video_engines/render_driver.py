@@ -24,6 +24,7 @@ import copy
 import functools
 import hashlib
 import logging
+import math
 import os
 import re
 import subprocess
@@ -2772,9 +2773,18 @@ def build_clip_manifest(result, *, episode_id=""):
     """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
     result -- the STRING contract OTR_SilentComposite assembles. Shot order is
     the OUTPUT ledger's shots (already in beat order). Each row carries the clip
-    path + the audio-derived frame counts; ``engine_histogram`` counts the
+    path + its full render-request frame count; ``engine_histogram`` counts the
     on-disk clips per engine so the keystone can assert HuMo ran on the talking
-    beats and the episode is NOT all-procgen. The frozen audio is never read."""
+    beats and the episode is NOT all-procgen.
+
+    ``total_target_frames`` is the ONE positioned output-timeline boundary. A
+    post-audio ledger may contain overlapping rows at opening/body and
+    body/closing crossfades, so summing the full per-shot render requests is not
+    the episode length. When every row is positioned and the durable ledger owns
+    ``total_episode_dur_s``, quantize that accepted duration upward to a complete
+    CFR frame. ``render_target_frames`` retains the old sum as truthful work
+    telemetry. Sparse/legacy manifests keep the old sequential-sum behavior.
+    The frozen audio bytes are never read or mutated here."""
     led = result.get("ledger") or {}
     section = led.get("video") or {}
     shots = section.get("shots") or []
@@ -2874,6 +2884,25 @@ def build_clip_manifest(result, *, episode_id=""):
         rows.append(row)
         if exists:
             hist[eid] = hist.get(eid, 0) + 1
+    render_rows = [r for r in rows if int(r.get("target_frame_count") or 0) > 0]
+    positioned = (bool(render_rows)
+                  and all(r.get("start_s") is not None for r in render_rows))
+    timeline_total = total
+    timeline_source = "render_target_sum"
+    timeline_duration_s = None
+    if positioned:
+        try:
+            timeline_duration_s = float(led.get("total_episode_dur_s"))
+        except (TypeError, ValueError):
+            timeline_duration_s = None
+        if timeline_duration_s is not None and timeline_duration_s > 0:
+            # A CFR video must cover the final fractional frame of the accepted
+            # master timeline. The terminal mux retains its own small
+            # quantization tolerance; this does not widen it.
+            timeline_total = max(1, int(math.ceil(
+                timeline_duration_s * int(section.get("fps") or 25))))
+            timeline_source = "ledger.total_episode_dur_s"
+
     manifest = {
         "episode_id": str(episode_id or ""),
         "video_revision": int(section.get("video_revision") or 1),
@@ -2881,7 +2910,13 @@ def build_clip_manifest(result, *, episode_id=""):
         "canvas": {"w": int(canvas.get("w") or 0), "h": int(canvas.get("h") or 0)},
         "n_beats": len(rows),
         "clip_count": sum(1 for r in rows if r["exists"]),
-        "total_target_frames": total,
+        # Existing consumers read total_target_frames. Its intended contract is
+        # the final output timeline, now corrected for positioned overlaps.
+        "total_target_frames": timeline_total,
+        "timeline_total_frames": timeline_total,
+        "render_target_frames": total,
+        "timeline_frame_source": timeline_source,
+        "timeline_duration_s": timeline_duration_s,
         "engine_histogram": hist,
         "clips": rows,
     }

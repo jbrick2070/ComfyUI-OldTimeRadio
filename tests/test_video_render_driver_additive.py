@@ -509,10 +509,52 @@ def test_build_clip_manifest_beat_order_histogram_and_existence():
     assert [c["shot_id"] for c in m["clips"]] == ["shot_b001", "shot_b002"]
     assert [c["order"] for c in m["clips"]] == [0, 1]
     assert m["n_beats"] == 2 and m["total_target_frames"] == 80
+    assert m["timeline_total_frames"] == 80
+    assert m["render_target_frames"] == 80
+    assert m["timeline_frame_source"] == "render_target_sum"
     assert m["canvas"] == {"w": 1472, "h": 832} and m["fps"] == 25
     assert m["clip_count"] == 1                  # only the on-disk clip counts
     assert m["engine_histogram"] == {"humo": 1}  # empty-path clip excluded
     assert m["clips"][0]["exists"] is True and m["clips"][1]["exists"] is False
+
+
+def test_build_clip_manifest_positioned_timeline_uses_ledger_boundary():
+    result = {
+        "ledger": {
+            "total_episode_dur_s": 3.1,
+            "lines": [
+                {"line_id": "music_opening_001", "start_s": 0.0},
+                {"line_id": "l001", "start_s": 1.9},
+            ],
+            "video": {
+                "video_revision": 1, "fps": 25,
+                "canonical_canvas": {"w": 1472, "h": 832},
+                "shots": [
+                    {"shot_id": "shot_music_opening_001",
+                     "source_line_ids": ["music_opening_001"],
+                     "engine_id": "abstract", "target_frame_count": 50},
+                    {"shot_id": "shot_l001", "source_line_ids": ["l001"],
+                     "engine_id": "humo", "target_frame_count": 30},
+                ],
+            },
+        },
+        "clips": {
+            "shot_music_opening_001": {
+                "engine_id": "abstract", "frame_count": 50, "path": __file__},
+            "shot_l001": {
+                "engine_id": "humo", "frame_count": 30, "path": __file__},
+        },
+    }
+
+    manifest = rd.build_clip_manifest(result, episode_id="positioned")
+
+    # The two full render requests are 80 frames of work, but the accepted
+    # positioned episode boundary is ceil(3.1 * 25) == 78 CFR frames.
+    assert manifest["render_target_frames"] == 80
+    assert manifest["total_target_frames"] == 78
+    assert manifest["timeline_total_frames"] == 78
+    assert manifest["timeline_frame_source"] == "ledger.total_episode_dur_s"
+    assert manifest["timeline_duration_s"] == 3.1
 
 
 def test_video_render_batch_episode_mode_emits_manifest(record_registry, tmp_path,
