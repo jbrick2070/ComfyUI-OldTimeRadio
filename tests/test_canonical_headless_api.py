@@ -376,6 +376,31 @@ def test_canonical_runner_emits_poll_heartbeats(tmp_path, monkeypatch):
     assert "RESULT SUCCESS prompt_id=prompt-live" in out
 
 
+def test_poll_history_zero_timeout_waits_for_terminal_result(monkeypatch):
+    import otr_api
+
+    responses = iter([
+        {"prompt-live": {"status": {"status_str": "running"}}},
+        {"prompt-live": {"status": {"status_str": "success", "completed": True}}},
+    ])
+
+    class _Response:
+        def json(self):
+            return next(responses)
+
+    monkeypatch.setattr(
+        otr_api.requests, "get", lambda *_args, **_kwargs: _Response()
+    )
+    monkeypatch.setattr(otr_api.time, "sleep", lambda _seconds: None)
+
+    status, error = otr_api.poll_history(
+        "prompt-live", timeout_s=0, poll_s=1
+    )
+
+    assert status == "SUCCESS"
+    assert error == ""
+
+
 @pytest.mark.skipif(os.name != "nt", reason="PowerShell selector module is Windows-only")
 def test_headless_process_selectors_never_claim_the_interactive_gui():
     module = SCRIPTS / "otr_headless_process.psm1"

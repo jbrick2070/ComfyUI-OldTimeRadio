@@ -2562,6 +2562,15 @@ out until they independently meet the same production-only admission rule.
   canon claims, and Python-authored story padding. Subjective quality remains
   fail-open. No readiness or media consumer receives the candidate until the
   assembled ledger passes stamp_actual(require_in_band=True)
+- live qualification continuation: prompt
+  32b374e2-7c89-4d4a-bb8c-42e180571ecc remained queue-running beyond the
+  temporary observer's two-hour wall clock and retired more than a dozen P5
+  candidates without leaking a partial ledger downstream. It also proved that
+  producer-priority alternation was not sufficient when both logical slots
+  resolved to the same seeded Gemma backend: the two fixed P5 prompts replayed
+  the same failures. Each complete reroll now carries a model-visible,
+  monotonically unique candidate prompt nonce. The canonical observer accepts
+  timeout zero as wait-until-terminal so monitoring cannot kill qualification
 - sibling audit: exact Antigravity gemini-3.6-flash-high R2/R3 review covered all
   six banks in a clean worktree. Sol grounded the findings against the real
   Windows checkout, retained the candidate/episode liveness, canonical Fable

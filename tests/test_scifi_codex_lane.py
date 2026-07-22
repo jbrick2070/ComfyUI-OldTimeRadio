@@ -4936,10 +4936,12 @@ def test_p5_empty_mechanical_row_is_skipped_locally_not_filled_with_canned_speec
 
 def test_initial_compact_p5_alternates_complete_candidate_producer(monkeypatch):
     seen: list[str] = []
+    seen_inputs: list[dict[str, object]] = []
     accepted = _script_voicing("announcer", "announcer", "announcer", "announcer")
 
     def fake_call(**kwargs):
         seen.append(kwargs["slot"])
+        seen_inputs.append(kwargs["artifact_inputs"])
         return accepted
 
     monkeypatch.setattr(lane, "_call_script_text_draft", fake_call)
@@ -4960,8 +4962,18 @@ def test_initial_compact_p5_alternates_complete_candidate_producer(monkeypatch):
 
     assert result is accepted
     assert seen == ["technical"]
+    reroll = seen_inputs[0]["complete_candidate_reroll"]
+    assert reroll == {
+        "candidate_index": 1,
+        "prompt_nonce": "complete_candidate_1",
+        "instruction": (
+            "Author a fresh complete producer candidate; do not repeat a "
+            "discarded candidate."
+        ),
+    }
     receipt = journal["initial_script_generation_candidate_1"]
     assert receipt["candidate_index"] == 1
+    assert receipt["prompt_nonce"] == "complete_candidate_1"
     assert receipt["selected_slot"] == "technical"
 
 

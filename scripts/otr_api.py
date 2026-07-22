@@ -710,11 +710,15 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
 
 def poll_history(
     prompt_id: str,
-    timeout_s: int = DEFAULT_TIMEOUT_S,
+    timeout_s: int | None = DEFAULT_TIMEOUT_S,
     poll_s: int = DEFAULT_POLL_S,
     on_tick: Callable[[float, dict], None] | None = None,
 ) -> tuple[str, str]:
     """Poll /history/<prompt_id> until completed/error/timeout.
+
+    ``timeout_s <= 0`` (or ``None``) waits for a terminal ComfyUI result. This
+    is an explicit operator-mode choice for campaigns whose own deterministic
+    liveness controller, rather than an observation wall clock, owns progress.
 
     Returns (status, error_message). status is "SUCCESS", "FAIL", or
     "TIMEOUT". error_message is non-empty only on FAIL.
@@ -722,7 +726,11 @@ def poll_history(
     want to interleave their own log tail.
     """
     start = time.time()
-    while time.time() - start < timeout_s:
+    while (
+        timeout_s is None
+        or timeout_s <= 0
+        or time.time() - start < timeout_s
+    ):
         try:
             r = requests.get(
                 f"{COMFYUI_URL}/history/{prompt_id}", timeout=10

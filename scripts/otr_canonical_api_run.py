@@ -198,7 +198,12 @@ def main(argv: list[str] | None = None) -> int:
                              "canonical graph). Used for the story-only scoring "
                              "graph (writer+freeze, no media).")
     parser.add_argument("--dump-prompt", default=str(DEFAULT_PROMPT_DUMP))
-    parser.add_argument("--timeout", type=int, default=5400)
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=5400,
+        help="history observation timeout in seconds; 0 waits until terminal",
+    )
     parser.add_argument("--poll-s", type=int, default=5)
     args = parser.parse_args(argv)
 

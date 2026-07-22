@@ -4244,6 +4244,7 @@ def invoke_codex_structured(
                 for key in (
                     "story_context",
                     "accepted_line_graph",
+                    "complete_candidate_reroll",
                     "fact_index",
                     "initial_draft_word_steer",
                 )
@@ -5073,6 +5074,18 @@ def _run_initial_script_generation(
     )
     call_journal[candidate_key] = receipt
     call_journal["initial_script_generation"] = receipt
+    candidate_inputs = dict(artifact_inputs)
+    if int(candidate_index) > 0:
+        prompt_nonce = f"complete_candidate_{int(candidate_index)}"
+        candidate_inputs["complete_candidate_reroll"] = {
+            "candidate_index": int(candidate_index),
+            "prompt_nonce": prompt_nonce,
+            "instruction": (
+                "Author a fresh complete producer candidate; do not repeat a "
+                "discarded candidate."
+            ),
+        }
+        receipt["prompt_nonce"] = prompt_nonce
     lane_pairs = (
         ("creative", creative_fn, "technical", technical_fn, 0.78, 0.35),
         ("technical", technical_fn, "creative", creative_fn, 0.55, 0.20),
@@ -5101,7 +5114,7 @@ def _run_initial_script_generation(
                 alternate_slot=alternate_slot,
                 alternate_slot_fn=alternate_slot_fn,
                 pack=pack,
-                artifact_inputs=artifact_inputs,
+                artifact_inputs=candidate_inputs,
                 score=score,
                 cast=cast,
                 fact_index=fact_index,

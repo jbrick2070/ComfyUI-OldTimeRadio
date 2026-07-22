@@ -597,8 +597,12 @@ the requested episode impossible, and an LLM verdict never acquires that power.
 
 Escalation is explicit: repair one owned row, try the alternate writer slot, then
 discard the whole candidate and ask one producer to author a fresh complete
-candidate. Alternate the producer priority on successive rerolls. Preserve only
-candidate-local diagnostics from discarded work; never let its text, seal, hash,
+candidate. Alternate the producer priority on successive rerolls.
+Freshness must be model-observable: when two logical slots resolve to one seeded
+backend, vary a producer-owned prompt nonce or another validated generation input
+so Candidate N cannot replay Candidate N-2 byte for byte forever.
+Preserve only candidate-local diagnostics from discarded work; never let its text,
+seal, hash,
 readiness, or subjective score become authoritative. There is no fixed outer
 model-output ceiling. Temporary provider failure stays pending, retryable, and
 non-ready until a legal candidate arrives or the operator cancels.
