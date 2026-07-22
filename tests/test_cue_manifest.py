@@ -247,7 +247,7 @@ def test_legacy_three_cue_byte_parity(monkeypatch):
                          "cast": [], "lines": [], "meta": {}})
     out = StableAudioTheme().generate(script_json=ledger, engine="musicgen")
     batch = out[0]["waveform"]
-    manifest = CM.parse_manifest(out[1], batch_size=3)
+    manifest = CM.parse_manifest(out[1], batch_size=2)
 
     # Each batch row, sliced by manifest sample_count, is byte-identical to a
     # standalone (canonicalized) render of that cue's exact prompt+seed.

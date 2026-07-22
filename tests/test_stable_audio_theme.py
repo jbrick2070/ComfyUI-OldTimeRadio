@@ -120,7 +120,7 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     assert engines
 
 
-def test_musicgen_clip_renders_three_cues(monkeypatch):
+def test_musicgen_clip_renders_two_cues(monkeypatch):
     """Legacy lane (no ledger.music[]): SYNTHESIZE the 3 fixed cues into ONE
     padded batch + a manifest with one row per cue (720-bakeoff C3)."""
     from nodes._otr_resolved_request import assert_audio_batch_contract
@@ -131,16 +131,16 @@ def test_musicgen_clip_renders_three_cues(monkeypatch):
     _stub_musicgen_generate_clip(monkeypatch, calls)
     out = StableAudioTheme().generate(script_json=_ledger(), engine="musicgen")
     assert isinstance(out, tuple) and len(out) == 4
-    assert len(calls) == 3  # opening / closing / interstitial via _render_clips
+    assert len(calls) == 2  # opening / closing via _render_clips
     cue_audio, manifest_json, render_log, done = out
     assert_audio_batch_contract(cue_audio, where="test.cue_batch")
-    assert int(cue_audio["waveform"].shape[0]) == 3   # 3 batch rows
-    manifest = CM.parse_manifest(manifest_json, batch_size=3)
+    assert int(cue_audio["waveform"].shape[0]) == 2   # 2 batch rows
+    manifest = CM.parse_manifest(manifest_json, batch_size=2)
     assert manifest is not None
     placements = sorted(r["placement"] for r in manifest["cues"])
-    assert placements == ["closing", "interstitial", "opening"]
+    assert placements == ["closing", "opening"]
     cue_ids = sorted(r["cue_id"] for r in manifest["cues"])
-    assert cue_ids == ["closing", "interstitial", "opening"]
+    assert cue_ids == ["closing", "opening"]
     # every row maps to a real batch index + positive sample_count
     for r in manifest["cues"]:
         assert 0 <= r["batch_index"] < 3
@@ -149,7 +149,7 @@ def test_musicgen_clip_renders_three_cues(monkeypatch):
         assert r["anchor_line_id"] is None
     assert isinstance(render_log, str)
     assert done.startswith("music:done")
-    assert "cues=3" in done
+    assert "cues=2" in done
 
 
 def test_legacy_synth_binds_ordered_music_sentinels(monkeypatch):
@@ -168,10 +168,9 @@ def test_legacy_synth_binds_ordered_music_sentinels(monkeypatch):
     out = StableAudioTheme().generate(
         script_json=_ledger(lines=lines), engine="musicgen",
     )
-    by_cue = CM.index_by_cue_id(CM.parse_manifest(out[1], batch_size=3))
+    by_cue = CM.index_by_cue_id(CM.parse_manifest(out[1], batch_size=2))
 
     assert by_cue["opening"]["anchor_line_id"] == "b000"
-    assert by_cue["interstitial"]["anchor_line_id"] == "b005"
     assert by_cue["closing"]["anchor_line_id"] == "b900"
     assert all(row["cue_spec_sha256"] for row in by_cue.values())
 

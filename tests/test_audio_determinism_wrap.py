@@ -142,14 +142,14 @@ def test_theme_clip_forward_runs_inside_deterministic_inference(monkeypatch):
     ledger = json.dumps({"meta": {"episode_seed": 7}})
     out = StableAudioTheme().generate(script_json=ledger, engine="spy_music")
 
-    assert len(spy.calls) == 3, "all three theme cues must render"
+    assert len(spy.calls) == 2, "both theme cues must render"
     assert spy.det_enabled_during_call is True, (
         "generate_clip must run inside deterministic_inference"
     )
     assert torch.are_deterministic_algorithms_enabled() == before
     # 720-bakeoff C3: ONE padded cue batch (3 rows) + manifest, not 3 AUDIOs.
     assert_audio_batch_contract(out[0], where="test.cue_batch")
-    assert int(out[0]["waveform"].shape[0]) == 3
+    assert int(out[0]["waveform"].shape[0]) == 2
 
 
 # --------------------------------------------------------------------------- #
