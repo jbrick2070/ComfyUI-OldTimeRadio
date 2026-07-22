@@ -1,23 +1,35 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-21 -- **PBUG-20260721-18 candidate/episode liveness
-is ROOT-FIXED and OFFLINE-GREEN IN WORKTREE; do not render until the green
-chunk is pushed.** The deterministic ledger is the only delivery judge. Four
-consecutive no-progress calls retire Candidate N, not the episode. Row repair
-escalates to the alternate LLM and then to a fresh producer-owned complete
-candidate; successive complete rerolls alternate producer priority and have no
-fixed outer model-output ceiling. Temporary provider exhaustion remains pending,
-retryable, and non-ready. Subjective quality stays fail-open.
+**Updated:** 2026-07-22 -- **PBUG-20260721-18 candidate/episode liveness
+and its live-discovered fresh-reroll follow-up are PUSHED; pass-gated six-bank
+320-word OBS qualification is running.** The deterministic ledger is the only
+delivery judge. Four consecutive no-progress calls retire Candidate N, not the
+episode. Row repair escalates to the alternate LLM and then to a complete
+producer-owned reroll. If both logical slots resolve to one seeded backend, each
+reroll carries a model-visible candidate nonce so it cannot replay two fixed
+prompts forever. There is no outer model-output ceiling. Provider exhaustion
+remains pending/retryable/non-ready, and an LLM verdict never ends the episode.
 
-Canonical counting, current-by-line hygiene receipts, Fable proof resealing,
-Codex fresh-P5 rerolls, and complete inline candidate staging are implemented.
-No filler, fake commercial/product, unsupported claim, or Python-authored story
-padding is permitted. The hard assembled stamp_actual(require_in_band=True)
-precedes every media/readiness consumer. The 177 focused tests, 8,382-test full
-suite, BUG-12.70 gate, workflow audits, and hygiene checks are green. Remaining:
-commit and push to v2.0-alpha, then reset and run all six banks at 320 words
-through OBS.
-The canonical workflow remains intentionally byte-identical.
+The base liveness fix is pushed at `67996907`; the live follow-up is pushed at
+`81ee21df`. The observer now supports explicit timeout zero (wait until a
+terminal ComfyUI result), so a monitoring wall clock cannot detach a healthy
+candidate campaign. No filler, fake product/commercial, unsupported claim, or
+program-authored story padding is permitted. Every readiness/media consumer
+remains downstream of `stamp_actual(require_in_band=True)`.
+
+Validation is green: 8,349 passed / 33 skipped / 1 expected xfail; Bug Bible
+12.70 is 17 passed / 23 skipped / 3 expected xfails; AST, BOM, zero-byte, JSON,
+link/widget, and workflow validator gates pass. The canonical workflow remains
+byte-identical at SHA-256
+`f9d9c2c3a101ec607c9658456f6e191a164d8214be7b6d560bc68975d0511e9a`
+(23 nodes / 58 links).
+
+Active run tag: `qual320_nonce_20260722`. Prompt
+`3fdf7349-7b2e-46f5-8182-982f72e5e261` is the corrected `scifi_news` canary.
+The pass-gated overnight chain audits ledger ownership, exact word receipt,
+assets, captions, credits, mux, and `obs_publish OK` before launching the next
+bank. It stops on any real leg or audit failure; five banks remain behind the
+current canary.
 
 Prior status -- 2026-07-19: **keep-6 bank RENAME COMPLETE (offline-green)**.
 The roster is now fully de-versioned: `scifi_news` (local default, was `scifi_codex_v4`),

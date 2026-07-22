@@ -3,6 +3,47 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-22 early -- v2.0-alpha [CODER: live candidates stay fresh]
+
+PBUG-20260721-18's episode-liveness root fix is pushed at `67996907`; the
+live qualification follow-up is pushed at `81ee21df`. The deterministic
+in-band ledger remains the only delivery judge. Four consecutive no-progress
+calls retire only the current producer candidate. Row repair escalates to the
+alternate LLM and then to another complete producer-owned candidate without an
+outer model-output ceiling.
+
+ROOT FOLLOW-UP:
+- Canonical prompt `32b374e2-7c89-4d4a-bb8c-42e180571ecc` stayed alive for
+  more than two hours and retired more than a dozen candidates, proving that
+  no LLM miss or observer exit killed the episode. It also exposed a real
+  convergence defect: both logical slots resolved to the same seeded Gemma
+  backend, so two fixed P5 prompt shapes replayed the same drafts.
+- Every complete reroll after Candidate 0 now carries a model-visible,
+  monotonically unique candidate nonce and explicit fresh-candidate
+  instruction. The compact typed-repair context preserves that identity.
+  Corrected prompt `3fdf7349-7b2e-46f5-8182-982f72e5e261` has already
+  produced visibly distinct Phase One/Phase Three P5 candidates and continued
+  through P6/P8 without a terminal episode failure.
+- `poll_history(timeout_s=0)` is now explicit wait-until-terminal operator
+  mode. Default callers retain the 5,400-second timeout; only the overnight
+  qualification harness opts into no observation wall clock.
+
+VALIDATION: whole Windows suite **8,349 passed / 33 skipped / 1 expected
+xfail** in 205.28 seconds. Bug Bible 12.70 passed **17 / 23 skipped / 3
+expected xfails**. AST, UTF-8/no-BOM, nonzero-file, JSON round-trip, link/input,
+live widget-vector, and OTR workflow validator coverage are green. The
+canonical workflow stayed byte-identical at
+`f9d9c2c3a101ec607c9658456f6e191a164d8214be7b6d560bc68975d0511e9a`
+(23 nodes / 58 links). `HEAD == origin/v2.0-alpha == 81ee21df`.
+
+LIVE QUALIFICATION: run tag `qual320_nonce_20260722` is active. A hidden
+pass-gated chain adopted the corrected `scifi_news` canary and will launch
+`scifi_news_pro`, `original`, `media_archive`, `public_domain`, and
+`shakespeare` sequentially only after each prior leg records RESULT SUCCESS
+and passes the strict ledger, exact word receipt, caption, credits, asset, mux,
+and OBS publication audit. Any real leg or audit failure stops the chain.
+
+
 ## 2026-07-20 late -- v2.0-alpha [CODER: spoken hygiene ships with a stamped repair]
 
 Closed PBUG-20260720-03: a CRAFT/quality rejection on one voiced row can no
