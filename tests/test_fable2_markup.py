@@ -144,113 +144,111 @@ class TestDefectClasses:
         hits = [d for d in defects if d.code is D.UNKNOWN_SPEAKER]
         assert hits and hits[0].detail == "IVOR"
 
-    def test_speaker_line_delivery_tag_is_stripped_not_a_defect(self):
-        # S1b live-smoke hardening (2026-07-10): short parenthetical
-        # delivery tags on SPEAKER lines are delete-only NORMALIZED
-        # (legacy stage_dir_stripped precedent) and COLLECTED, never a
-        # reroll defect. The spoken words survive untouched.
+    def test_preserves_leading_parentheses_brackets_quotes_and_colon_in_speech(self):
+        # Preserve authored punctuation/markup tokens in spoken text.
         text = GOLDEN.replace(
             "MARA: Then we have until nine.",
-            "MARA: (checks the clock) Then we have until nine.")
+            "MARA: The sample (A17) moved. [signal] Status: \"ready\" and "
+            "steady for now.")
         script, defects = _parse(text)
-        assert script is not None, defects
-        spoken = [ln.text for sc in script.scenes for ln in sc.lines]
-        assert "Then we have until nine." in spoken
-        assert not any("checks the clock" in t for t in spoken)
-        assert any("stage_direction_stripped" in n
-                   for n in script.normalizations)
+        assert defects == ()
+        spoken = [ln.text for scene in script.scenes for ln in scene.lines]
+        assert (
+            "The sample (A17) moved. [signal] Status: \"ready\" and "
+            "steady for now."
+            in spoken
+        )
 
-    def test_markdown_bold_labels_are_stripped_not_a_defect(self):
-        text = GOLDEN.replace("TITLE: The Glass Meridian",
-                              "**TITLE: The Glass Meridian**")
+    def test_case_variant_and_unicode_speaker_labels_return_canonical_display(self):
+        cast = (
+            "\u00C9lodie Vancourt",
+            "DR. ORION NINE, SENIOR SIGNAL ANALYST",
+        )
+        text = "\n".join([
+            "TITLE: Relay Notes",
+            "MUSIC: warm fan hum, dry tape",
+            "ANNOUNCER: Calibration complete.",
+            "SCENE 1: Night shift, long glass room",
+            "\u00E9lodie vancourt: Night logs remain stable.",
+            "dr. orion nine, senior signal analyst: Keep [signal] open: "
+            "line one.",
+            "ANNOUNCER: Final signal checks.",
+            "CODA: The relay waits for dawn.",
+            "MUSIC: closing tone, resolving",
+            "END.",
+        ])
+        script, defects = _parse(text, cast=cast)
+        assert defects == ()
+        spoken = [ln.speaker for scene in script.scenes for ln in scene.lines]
+        assert spoken == [
+            "\u00C9lodie Vancourt",
+            "DR. ORION NINE, SENIOR SIGNAL ANALYST",
+        ]
+
+    def test_announcer_blocks_allow_three_plus_lines(self):
+        text = "\n".join([
+            "TITLE: The Glass Meridian",
+            "MUSIC: low theremin, patient tape hiss",
+            "ANNOUNCER: Tonight, a story of a lens that would not lie.",
+            "ANNOUNCER: Listen for the hill. Hold your breath.",
+            "ANNOUNCER: Two more seconds, then begin.",
+            "SCENE 1: A hillside observatory, past midnight",
+            "MARA: The plate is dry. Read it to me.",
+            "IVO: You already know the number.",
+            "MARA: I know my number. I want yours.",
+            "ANNOUNCER: The coda will close this, then we pause.",
+            "ANNOUNCER: After pause, check for the station's return.",
+            "ANNOUNCER: Signal steady.",
+            "CODA: Beyond tonight's quiet hillside, a real measurement waits:",
+            "MUSIC: closing brass, resolving",
+            "END.",
+        ])
         script, defects = _parse(text)
-        assert script is not None, defects
-        assert script.title == "The Glass Meridian"
-        assert any("markdown_emphasis_stripped" in n
-                   for n in script.normalizations)
+        assert defects == ()
+        assert len(script.announcer_intro) == 3
+        assert len(script.announcer_outro) == 3
+
+    def test_multi_sentence_coda_text_is_preserved(self):
+        text = GOLDEN.replace(
+            "CODA: Beyond tonight's quiet hillside, a real measurement waits:",
+            "CODA: Beyond tonight's quiet hillside, a real measurement waits. "
+            "Tonight will decide. Keep the line to zero.")
+        script, defects = _parse(text)
+        assert defects == ()
+        assert (
+            "Beyond tonight's quiet hillside, a real measurement waits. Tonight "
+            "will decide. Keep the line to zero."
+            == script.coda
+        )
 
     def test_clean_parse_records_no_normalizations(self):
         script, defects = _parse(GOLDEN)
         assert script is not None, defects
         assert script.normalizations == ()
 
-    def test_paren_on_labeled_line_stays_a_defect(self):
-        text = GOLDEN.replace(
-            "MUSIC: closing brass, resolving",
-            "MUSIC: closing brass (fade slowly), resolving")
-        _, defects = _parse(text)
-        assert D.PAREN_OR_BRACKET in _codes(defects)
-
-    def test_embedded_paren_group_stays_a_defect(self):
-        # kibitz r2 M1: an EMBEDDED group can be spoken/source content
-        # ("The sample (A17) moved.") -- only LINE-LEADING delivery tags
-        # normalize; anything embedded stays a hard defect.
-        text = GOLDEN.replace(
-            "MARA: Then we have until nine.",
-            "MARA: The sample (A17) moved before nine.")
-        _, defects = _parse(text)
-        assert D.PAREN_OR_BRACKET in _codes(defects)
-
-    def test_digit_bearing_leading_group_stays_a_defect(self):
-        text = GOLDEN.replace(
-            "MARA: Then we have until nine.",
-            "MARA: (at 9:15) Then we have until nine.")
-        _, defects = _parse(text)
-        assert D.PAREN_OR_BRACKET in _codes(defects)
-
-    def test_all_stage_direction_line_stays_a_defect(self):
-        # A speaker line that is NOTHING but a delivery tag has no spoken
-        # words to keep -- that is a real defect, not a normalization.
-        text = GOLDEN.replace(
-            "MARA: Then we have until nine.",
-            "MARA: (long pause)")
-        _, defects = _parse(text)
-        assert D.BAD_LINE_SHAPE in _codes(defects)
-
-    def test_coda_terminal_period_normalizes_to_pivot_colon(self):
-        # 15th live smoke (2026-07-10): the pivot colon is a STRUCTURAL
-        # seam marker, not a spoken word -- terminal '.' normalizes,
-        # flagged; the words stay untouched.
-        text = GOLDEN.replace(
-            "CODA: Beyond tonight's quiet hillside, a real measurement "
-            "waits:",
-            "CODA: Beyond tonight's quiet hillside, a real measurement "
-            "waits.")
-        script, defects = _parse(text)
-        assert script is not None, defects
-        assert script.coda.endswith(":")
-        assert any("coda_pivot_colon_normalized" in n
-                   for n in script.normalizations)
-
     def test_normalize_helper_matches_parser_view(self):
         from nodes._otr_fable2_markup import normalize_fable2_markup_text
         text = GOLDEN.replace(
             "MARA: Then we have until nine.",
-            "**MARA:** (dryly) Then we have until nine.")
+            "  MARA: Then we have until nine.  ")
         norm = normalize_fable2_markup_text(text)
         assert "MARA: Then we have until nine." in norm
-        assert "**" not in norm and "(dryly)" not in norm
         script, defects = _parse(text)
-        assert script is not None, defects
-        # every parsed constituent is a substring of the normalized draft
-        # (the proof-gate property the runner relies on)
+        assert script is not None and defects == ()
+        # Every parsed spoken constituent appears in the transport-normalized
+        # input the runner stores as proof evidence.
         for sc in script.scenes:
             for ln in sc.lines:
                 assert ln.text in norm
+        assert normalize_fable2_markup_text(norm) == norm
 
-    def test_bracket_flagged_on_any_line_shape(self):
+    def test_scene_setting_brackets_are_preserved(self):
         text = GOLDEN.replace(
             "SCENE 2: The observatory stairwell, minutes later",
             "SCENE 2: The observatory stairwell [interior]")
-        _, defects = _parse(text)
-        assert D.PAREN_OR_BRACKET in _codes(defects)
-
-    def test_quoted_dialogue(self):
-        text = GOLDEN.replace(
-            "IVO: The committee meets at nine.",
-            'IVO: The committee meets at "nine sharp".')
-        _, defects = _parse(text)
-        assert D.QUOTED_DIALOGUE in _codes(defects)
+        script, defects = _parse(text)
+        assert defects == ()
+        assert script.scenes[1].setting == "The observatory stairwell [interior]"
 
     def test_scene_order(self):
         text = GOLDEN.replace("SCENE 2:", "SCENE 3:")
@@ -285,16 +283,6 @@ class TestDefectClasses:
         hits = [d for d in defects if d.code is D.CAST_MEMBER_SILENT]
         assert hits and hits[0].detail == "NOOR"
 
-    def test_coda_shape(self):
-        # 15th live smoke (2026-07-10): a terminal '.' NORMALIZES to the
-        # pivot colon (structural seam marker, not a spoken word); the
-        # defect-worthy coda shape is an INNER sentence break.
-        text = GOLDEN.replace(
-            "CODA: Beyond tonight's quiet hillside, a real measurement waits:",
-            "CODA: The hillside sleeps. A real measurement waits:")
-        _, defects = _parse(text)
-        assert D.CODA_SHAPE in _codes(defects)
-
     def test_multiple_coda(self):
         text = GOLDEN.replace(
             "MUSIC: closing brass, resolving",
@@ -309,9 +297,8 @@ class TestDefectClasses:
         covered = {
             D.MISSING_TITLE, D.DUPLICATE_TITLE, D.MISSING_END,
             D.CONTENT_AFTER_END, D.BAD_LINE_SHAPE, D.UNKNOWN_SPEAKER,
-            D.PAREN_OR_BRACKET, D.QUOTED_DIALOGUE, D.SCENE_ORDER,
-            D.EMPTY_SCENE, D.SKELETON_BREAK, D.CAST_MEMBER_SILENT,
-            D.CODA_SHAPE, D.MULTIPLE_CODA,
+            D.SCENE_ORDER, D.EMPTY_SCENE, D.SKELETON_BREAK,
+            D.CAST_MEMBER_SILENT, D.MULTIPLE_CODA,
         }
         assert covered == set(D)
 
@@ -447,11 +434,8 @@ class TestProperties:
             (lambda t: t.split("\n", 1)[1], D.MISSING_TITLE),
             (lambda t: t + "ANNOUNCER: encore.\n", D.CONTENT_AFTER_END),
             (lambda t: t.replace("SCENE 1:", "SCENE 7:", 1), D.SCENE_ORDER),
-            # A terminal '.' now NORMALIZES to the pivot colon (15th live
-            # smoke); the defect-worthy shape is an inner sentence break.
-            (lambda t: t.replace("report waits:",
-                                 "report ends. It waits:", 1),
-             D.CODA_SHAPE),
+            (lambda t: t.replace("CODA: ", "CODA: duplicate coda line\nCODA: ", 1),
+             D.MULTIPLE_CODA),
         )
         for _ in range(10):
             text, cast, *_rest = _gen_script(rng)

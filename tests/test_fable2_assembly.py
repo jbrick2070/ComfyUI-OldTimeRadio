@@ -29,11 +29,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes import _otr_scifi_fable2 as F2  # noqa: E402
 from nodes import production_ledger as _PL  # noqa: E402
 from nodes._otr_fable2_markup import parse_fable2_markup  # noqa: E402
-from nodes._otr_line_hygiene import (  # noqa: E402
-    flag_one_breath,
-    flag_thesis_close,
-)
-from nodes._otr_text_metrics import canonical_word_count  # noqa: E402
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures" / "fable2"
 _LEGACY = _FIXTURES / "legacy_reference_ledger.json"
@@ -151,22 +146,21 @@ def _sealed_draft(markup: str, *, target_words: int = 50,
     treatment = treatment or _treatment()
     parsed, defects = parse_fable2_markup(markup, _CAST_NAMES)
     assert parsed is not None, defects
-    envelope = F2._build_envelope(target_words)
     trace = F2.PassAttemptTrace(
         attempt=1,
         temperature=F2._TEMP["script"],
-        requested_max_new_tokens=F2._script_token_budget(target_words),
         outcome="accepted",
         selected=True,
         character_words=parsed.character_word_count,
         scene_character_words=F2._scene_character_word_counts(parsed),
     )
     draft = F2.build_final_draft(
-        markup, parsed, treatment, envelope,
-        F2.resolve_story_rules("scifi_news_pro"),
+        markup,
+        parsed,
+        treatment,
         p3_attempts=(trace,),
     )
-    return parsed, draft, envelope
+    return parsed, draft, F2._build_envelope(target_words)
 
 
 def _assembled(tmp_path: Path):
@@ -178,8 +172,7 @@ def _assembled(tmp_path: Path):
     # the golden play carries 51 character words -> target 50 (band 46-56)
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
-        envelope=envelope, story_rules=F2.resolve_story_rules("scifi_news_pro"),
-        mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
+        owner_bank="scifi_news_pro")
     return led, parsed, led.data["meta"]
 
 
@@ -291,9 +284,7 @@ def test_verbatim_proof_gate_fails_loud_on_foreign_text(tmp_path):
     with pytest.raises(F2.Fable2ScriptError, match="seal"):
         F2._assemble(
             led, forged, _treatment(), _CAST_ROWS, _PAYLOAD,
-            envelope=envelope,
-            story_rules=F2.resolve_story_rules("scifi_news_pro"),
-            mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
+            owner_bank="scifi_news_pro")
 
 
 def test_no_double_append_of_the_news_read(tmp_path):
@@ -318,9 +309,7 @@ def test_multiple_inter_cues_after_one_scene_all_survive(tmp_path):
     led.data.setdefault("meta", {})["fable2"] = {}
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
-        envelope=envelope,
-        story_rules=F2.resolve_story_rules("scifi_news_pro"),
-        mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
+        owner_bank="scifi_news_pro")
     assert [r["cue_id"] for r in led.data["music"]] == [
         "opening", "inter_01", "inter_02", "closing"]
     inter_rows = [r for r in led.data["lines"]
@@ -420,9 +409,7 @@ def test_incremental_saves_after_preamble_and_each_scene(tmp_path,
                         lambda: saves.append(1) or real_save())
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
-        envelope=envelope,
-        story_rules=F2.resolve_story_rules("scifi_news_pro"),
-        mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
+        owner_bank="scifi_news_pro")
     # preamble + 2 scenes + final = 4 saves minimum
     assert len(saves) >= 4
 
@@ -436,310 +423,7 @@ def test_speaker_set_gate_fails_loud(tmp_path):
     with pytest.raises(F2.Fable2AssembleError, match="speaker set"):
         F2._assemble(
             led, draft, _treatment(), missing_doku, _PAYLOAD,
-            envelope=envelope,
-            story_rules=F2.resolve_story_rules("scifi_news_pro"),
-            mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
-
-
-def test_word_band_defect_fails_before_assembly_mutates_ledger(tmp_path):
-    _parsed, draft, envelope = _sealed_draft(
-        _MARKUP, target_words=100)
-    led = _PL.new_ledger(episode_id="fable2_bandgate",
-                         out_dir=str(tmp_path / "ep5"))
-    led.data.setdefault("meta", {})["fable2"] = {}
-    with pytest.raises(
-        F2.Fable2AssembleError, match="final word delivery was not repaired"
-    ):
-        F2._assemble(
-            led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
-            envelope=envelope,
-            story_rules=F2.resolve_story_rules("scifi_news_pro"),
-            mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
-    assert led.data["lines"] == []
-
-
-def _word_fit_patch_from_messages(messages) -> str:
-    payload = next(
-        json.loads(row["content"])
-        for row in messages
-        if row.get("role") == "user"
-        and str(row.get("content") or "").lstrip().startswith("{")
-    )
-    writable = payload["writable_coordinate"]
-    words = writable["current_text"].split()
-    desired = writable["desired_line_words"]
-    additions = (
-        "quietly beneath glass while the patient signal turns toward dawn "
-        "and every watcher listens beside the console"
-    ).split()
-    if len(words) < desired:
-        words.extend(additions[:desired - len(words)])
-    else:
-        words = words[:desired]
-    words[-1] = words[-1].rstrip(".,;:!?") + "."
-    return json.dumps({
-        "scene_n": writable["scene_n"],
-        "line_index": writable["line_index"],
-        "replacement_text": " ".join(words),
-    })
-
-
-def test_final_word_fit_retries_failed_slots_and_reseals_one_row():
-    _parsed, draft, envelope = _sealed_draft(_MARKUP, target_words=60)
-    calls: list[str] = []
-
-    def creative(messages, **_kwargs):
-        calls.append("creative")
-        if calls == ["creative"]:
-            return "not json"
-        return _word_fit_patch_from_messages(messages)
-
-    def technical(_messages, **_kwargs):
-        calls.append("technical")
-        return "still not json"
-
-    fitted, fitted_treatment, hygiene, receipt = F2._run_final_word_fit(
-        draft,
-        _treatment(),
-        envelope,
-        F2.resolve_story_rules("scifi_news_pro"),
-        creative_fn=creative,
-        technical_fn=technical,
-        mode=F2._COMPACT_MODE,
-    )
-
-    assert calls == ["creative", "technical", "creative"]
-    assert fitted_treatment == _treatment()
-    assert hygiene == ()
-    assert receipt["status"] == "pass"
-    assert receipt["initial_character_words"] == 51
-    assert 55 <= receipt["final_character_words"] <= 67
-    assert receipt["cycles"][0]["status"] == "two_slot_rejected"
-    assert receipt["cycles"][1]["adopted"] is True
-    assert len(receipt["cycles"][1]["target"]) == 3
-    assert fitted.hashes.raw_sha256 != draft.hashes.raw_sha256
-    assert fitted.p3_attempts == draft.p3_attempts
-    F2._validate_selected_final_draft(
-        fitted,
-        envelope,
-        F2.resolve_story_rules("scifi_news_pro"),
-        F2._COMPACT_MODE,
-        treatment=fitted_treatment,
-    )
-
-
-def test_final_word_fit_rejects_no_progress_until_typed_exhaustion():
-    _parsed, draft, envelope = _sealed_draft(_MARKUP, target_words=60)
-    calls = 0
-    safe_words = (
-        "Quiet signals move beneath glass while patient watchers listen "
-        "through dawn beside the console"
-    ).split()
-
-    def same_size(messages, **_kwargs):
-        nonlocal calls
-        calls += 1
-        payload = next(
-            json.loads(row["content"])
-            for row in messages
-            if row.get("role") == "user"
-            and str(row.get("content") or "").lstrip().startswith("{")
-        )
-        writable = payload["writable_coordinate"]
-        count = writable["current_line_words"]
-        words = (safe_words * 3)[:count]
-        words[-1] = words[-1].rstrip(".,;:!?") + "."
-        return json.dumps({
-            "scene_n": writable["scene_n"],
-            "line_index": writable["line_index"],
-            "replacement_text": " ".join(words),
-        })
-
-    with pytest.raises(
-        F2.Fable2WordDeliveryError,
-        match="required 55..67",
-    ) as exc_info:
-        F2._run_final_word_fit(
-            draft,
-            _treatment(),
-            envelope,
-            F2.resolve_story_rules("scifi_news_pro"),
-            creative_fn=same_size,
-            technical_fn=same_size,
-            mode=F2._COMPACT_MODE,
-        )
-    receipt = exc_info.value.receipt
-    assert calls == 8
-    assert receipt["status"] == "consecutive_stalls_exhausted"
-    assert len(receipt["cycles"]) == 4
-    assert receipt["liveness"]["consecutive_stalls"] == 4
-    assert receipt["repair_budget"] == 16
-
-
-def test_fable_capacity_uses_post_merge_rows_and_the_exact_hygiene_cap():
-    parsed, defects = parse_fable2_markup(_MARKUP, _CAST_NAMES)
-    assert parsed is not None, defects
-    assert sum(len(scene.lines) for scene in parsed.scenes) == 5
-    assert F2._merged_character_run_count(parsed) == 4
-
-    envelope_320 = F2._build_envelope(320)
-    assert F2._minimum_character_run_count(envelope_320) == 5
-    capacity_defects = F2._script_capacity_defects(parsed, envelope_320)
-    assert len(capacity_defects) == 1
-    assert "post-merge alternating character rows 4 below required 5" in (
-        capacity_defects[0]
-    )
-
-    per_line_target, line_cap = F2._fable_character_line_policy(
-        parsed,
-        F2._build_envelope(180),
-    )
-    assert per_line_target == 45
-    assert line_cap == 49
-
-
-def test_word_fit_patch_rejects_fake_commercial_and_new_number():
-    patch = F2._Fable2WordFitPatch(
-        scene_n=1,
-        line_index=1,
-        replacement_text="Buy now from our sponsor for 99 credits.",
-    )
-    error = F2._word_fit_patch_error(
-        patch,
-        target=(1, 1),
-        current_text="The signal stays quiet.",
-        legal_speakers=("VERA", "DOKU"),
-    )
-    assert "fake commercial" in error
-
-
-def _echo_line(value):
-    def _fn(messages, *, temperature, max_new_tokens, stop=None):
-        return value
-    return _fn
-
-
-def test_fable_content_owned_projection_repairs_and_reseals_tts_surface():
-    treatment = _treatment().model_copy(update={
-        "news_close_read": (
-            "The report records 999999 999999 999999 signal cycles tonight."
-        ),
-    })
-    _parsed, draft, envelope = _sealed_draft(
-        _MARKUP, treatment=treatment,
-    )
-    dirty = treatment.news_close_read
-    repaired, repaired_treatment, receipts = (
-        F2._repair_final_draft_spoken_hygiene(
-            draft,
-            treatment,
-            envelope,
-            F2.resolve_story_rules("scifi_news_pro"),
-            creative_fn=_echo_line(dirty),
-            technical_fn=_echo_line(dirty),
-        )
-    )
-    delivery, _ = F2.normalize_for_delivery(
-        repaired_treatment.news_close_read
-    )
-    assert repaired_treatment.news_close_read != dirty
-    assert not flag_one_breath(delivery)[0]
-    assert repaired.hashes.raw_sha256 != draft.hashes.raw_sha256
-    assert any(
-        any(
-            flag.startswith("hygiene_repaired_after_reroll:one_breath:")
-            for flag in receipt["compose_flags"]
-        )
-        for receipt in receipts
-    )
-
-
-def test_news_candidate_rejection_reaches_grounded_nonterminal_floor():
-    dirty = (
-        "(checks notes) Tonight the source record remains under review."
-    )
-    treatment = _treatment().model_copy(
-        update={"news_close_read": dirty},
-    )
-    _parsed, draft, envelope = _sealed_draft(
-        _MARKUP, treatment=treatment,
-    )
-    emergency = (
-        "The verified source record remains clear, and the facts stand as "
-        "reported in tonight's account."
-    )
-
-    def news_validator(model):
-        return None if model.news_close_read == emergency else "reject"
-
-    repaired, repaired_treatment, receipts = (
-        F2._repair_final_draft_spoken_hygiene(
-            draft,
-            treatment,
-            envelope,
-            F2.resolve_story_rules("scifi_news_pro"),
-            creative_fn=_echo_line("Invented 42 Observatory report."),
-            technical_fn=_echo_line("Invented 42 Observatory report."),
-            news_read_validator=news_validator,
-        )
-    )
-    assert repaired_treatment.news_close_read == emergency
-    news_receipt = receipts[-1]
-    assert news_receipt["status"] == "repaired"
-    assert (
-        "hygiene_repaired_after_reroll:spoken_surface:"
-        "deterministic_grounded_floor"
-    ) in news_receipt["compose_flags"]
-    assert repaired.hashes.raw_sha256 != draft.hashes.raw_sha256
-
-
-def test_trailing_mechanical_outro_cannot_hide_or_create_thesis():
-    treatment = _treatment()
-    parsed, draft, envelope = _sealed_draft(_MARKUP, treatment=treatment)
-    dirty_outro = (
-        "The moral is that patience always matters.",
-        "...",
-    )
-    dirty_parsed = replace(
-        parsed,
-        announcer_outro=dirty_outro,
-        announcer_word_count=(
-            parsed.announcer_word_count
-            - sum(canonical_word_count(text) for text in parsed.announcer_outro)
-            + sum(canonical_word_count(text) for text in dirty_outro)
-        ),
-    )
-    raw_source = F2._script_view(
-        dirty_parsed, treatment, include_news_read=False,
-    )
-    dirty_draft = F2.build_final_draft(
-        raw_source,
-        dirty_parsed,
-        treatment,
-        envelope,
-        F2.resolve_story_rules("scifi_news_pro"),
-        p3_attempts=draft.p3_attempts,
-    )
-    repaired, _treatment_out, receipts = (
-        F2._repair_final_draft_spoken_hygiene(
-            dirty_draft,
-            treatment,
-            envelope,
-            F2.resolve_story_rules("scifi_news_pro"),
-            creative_fn=_echo_line("The moral is that patience matters."),
-            technical_fn=_echo_line("The moral is that patience matters."),
-        )
-    )
-    assert repaired.parsed.announcer_outro
-    assert all(
-        not flag_thesis_close(text)[0]
-        for text in repaired.parsed.announcer_outro
-        if any(ch.isalpha() for ch in text)
-    )
-    assert any(
-        any("thesis_close" in flag for flag in receipt["compose_flags"])
-        for receipt in receipts
-    )
+            owner_bank="scifi_news_pro")
 
 
 # ---------------------------------------------------------------------------
