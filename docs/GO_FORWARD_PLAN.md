@@ -1,24 +1,23 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-20 -- **dynamic quality repair is ROOT-FIXED and focused-
-green across the shared six-bank contract; canonical six-bank live qualification
-is in progress** on `v2.0-alpha`. A CRAFT/quality reject now opens with the
-same-slot, lower-temperature CRITICAL, and alternate-slot rungs, then rotates
-fresh writer lanes with new defect feedback and rejudges every candidate until
-clean or the finite resource ceiling reaches a validated SFW floor. It stamps
-the gate/rung and cannot terminal-skip the episode. `scifi_news` (renamed Codex)
-also repeats P6/P7 and P8/P9 repair/rejudge cycles; `scifi_news_pro` (renamed
-Fable2) retains its content ownership and seal contract. Source-adapter banks
-keep their bank-specific interpreters, then alternate technical/creative repair
-passes to 12 calls and derive a validated payload-grounded bank floor instead
-of halting on model-quality exhaustion. Feed/config/backend/contract errors
-still fail loud. Structural graph
-ambiguity and G9 content safety remain fail-closed. Final canonical prompt
-`f3770246-2d6a-4302-90af-153120edddf2` exercised real P5/P7 defects, froze
-`frozen_with_warns`, rendered 4 clean lines / 45 words, and published the
-22,892,541-byte OBS asset. No workflow or minimum-word widget change was
-needed. The P9 8K whole-artifact capacity issue and the GGUF structured-
-enforcement bug remain separate from this completed fix.
+**Updated:** 2026-07-21 -- **PBUG-20260721-18 candidate/episode liveness
+is ROOT-FIXED and OFFLINE-GREEN IN WORKTREE; do not render until the green
+chunk is pushed.** The deterministic ledger is the only delivery judge. Four
+consecutive no-progress calls retire Candidate N, not the episode. Row repair
+escalates to the alternate LLM and then to a fresh producer-owned complete
+candidate; successive complete rerolls alternate producer priority and have no
+fixed outer model-output ceiling. Temporary provider exhaustion remains pending,
+retryable, and non-ready. Subjective quality stays fail-open.
+
+Canonical counting, current-by-line hygiene receipts, Fable proof resealing,
+Codex fresh-P5 rerolls, and complete inline candidate staging are implemented.
+No filler, fake commercial/product, unsupported claim, or Python-authored story
+padding is permitted. The hard assembled stamp_actual(require_in_band=True)
+precedes every media/readiness consumer. The 177 focused tests, 8,382-test full
+suite, BUG-12.70 gate, workflow audits, and hygiene checks are green. Remaining:
+commit and push to v2.0-alpha, then reset and run all six banks at 320 words
+through OBS.
+The canonical workflow remains intentionally byte-identical.
 
 Prior status -- 2026-07-19: **keep-6 bank RENAME COMPLETE (offline-green)**.
 The roster is now fully de-versioned: `scifi_news` (local default, was `scifi_codex_v4`),
@@ -51,7 +50,15 @@ Standing enforcement: the deterministic G9 SFW gate in
 `_otr_ledger_freeze.run_gap_audit` (Phase 10, the one path every lane crosses).
 Veto-rip record: HANDOFF_LOG + PROD_BUG_LOG (PBUG-20260713-15..18).
 
-## CURRENT STEP -- local-writer quality matrix (spoken-hygiene blocker closed)
+## CURRENT STEP -- ledger-liveness gates, push, then six-bank 320 OBS qualification
+
+PBUG-20260721-18 is the only active ship blocker. Finish the offline gates and
+push the green liveness chunk before booting ComfyUI. Then run media_archive,
+original, public_domain, shakespeare, scifi_news, and scifi_news_pro at 320
+words through their canonical episode directories and OBS. Any new live defect
+stops the sweep for the required grounded cross-bank sibling audit.
+
+The quality-matrix work below is prior completed context.
 
 PBUG-20260720-03 is root-fixed: all six runnable banks share the dynamic total
 repair boundary, the `original` subjective-outro judge now drives alternating

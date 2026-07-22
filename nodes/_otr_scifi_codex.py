@@ -29,6 +29,7 @@ try:
     from ._otr_rss_source_contract import meets_v4_rss_source_floor
     from ._otr_source_payload import validate_source_payload
     from ._otr_line_hygiene import (
+        derive_one_breath_cap,
         deterministic_hygiene_floor,
         detect_stage_business_for_reroll,
         flag_thesis_close,
@@ -77,6 +78,7 @@ except ImportError:  # pragma: no cover
     from _otr_rss_source_contract import meets_v4_rss_source_floor  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_line_hygiene import (  # type: ignore
+        derive_one_breath_cap,
         deterministic_hygiene_floor,
         detect_stage_business_for_reroll,
         flag_thesis_close,
@@ -137,6 +139,7 @@ class CodexPayloadOversizeError(ScifiCodexError): pass
 class CodexTargetRangeError(ScifiCodexError): pass
 class CodexPackContractError(ScifiCodexError): pass
 class CodexPassError(ScifiCodexError): pass
+class CodexCandidateGenerationError(CodexPassError): pass
 class CodexSpokenTextError(ScifiCodexError): pass
 class CodexGraphError(ScifiCodexError): pass
 class CodexFactTraceExhaustedError(ScifiCodexError): pass
@@ -441,6 +444,7 @@ _RADIO_SCORE_MAX_BEATS = (
 _RADIO_SCORE_MAX_LINES_PER_BEAT = 2
 _RADIO_SCORE_MAX_MUSIC_CUES = 3
 _RADIO_SCORE_MAX_FACT_IDS_PER_BEAT = 2
+_CODEX_MAX_CHARACTER_LINE_WORDS = derive_one_breath_cap((1, 60))
 
 
 class AdvisoryBeatV4(_Strict):
@@ -631,7 +635,7 @@ class _P3TextPatchTarget:
 _DRAFT_ERROR_CODES = frozenset({
     "invalid_advisory", "beat_count", "shot_index", "unused_shot",
     "cast_id", "cast_coverage", "fact_id", "cue_id", "cue_anchor",
-    "score_schema", "graph",
+    "score_schema", "graph", "delivery_capacity",
 })
 
 
@@ -1007,6 +1011,23 @@ def _validate_radio_score_graph(
     if line_ids != canonical_line_ids:
         return "score line IDs must be contiguous canonical IDs in assembly order"
 
+    lower_words, _upper_words = _OTRWD.delivery_word_bounds(
+        advisory.advisory_total_center,
+    )
+    character_line_count = sum(
+        len(beat.line_ids)
+        for scene in score.scenes
+        for beat in scene.beats
+        if beat.speaker_role == "character"
+    )
+    if character_line_count * _CODEX_MAX_CHARACTER_LINE_WORDS < lower_words:
+        return (
+            "score character-line capacity is insufficient: "
+            f"{character_line_count} lines x "
+            f"{_CODEX_MAX_CHARACTER_LINE_WORDS} words cannot reach "
+            f"lower bound {lower_words}"
+        )
+
     seen_cue_ids: set[str] = set()
     for cue in score.music_cues:
         if cue.cue_id in seen_cue_ids:
@@ -1096,6 +1117,68 @@ def compile_radio_score_draft(
         )
     accepted_fact_id_set = set(accepted_fact_ids)
 
+    # Word delivery owns a mechanical minimum number of writable character
+    # rows. The P3 author chooses beats, speakers, and a preferred one/two-line
+    # shape; Python already owns canonical IDs/order/parents, so it may floor an
+    # existing character beat from one line to two without inventing prose.
+    # P5 must author every resulting slot. If even every available character
+    # beat at the schema maximum cannot carry the lower bound, the P3 graph is
+    # genuinely incapable and returns through the structured repair ladder.
+    lower_words, _upper_words = _OTRWD.delivery_word_bounds(
+        advisory.advisory_total_center,
+    )
+    minimum_character_lines = int(math.ceil(
+        lower_words / _CODEX_MAX_CHARACTER_LINE_WORDS,
+    ))
+    effective_line_counts = {
+        (scene_index, beat_index): int(beat.line_count)
+        for scene_index, scene in enumerate(draft.scenes)
+        for beat_index, beat in enumerate(scene.beats)
+    }
+    current_character_lines = sum(
+        effective_line_counts[(scene_index, beat_index)]
+        for scene_index, scene in enumerate(draft.scenes)
+        for beat_index, beat in enumerate(scene.beats)
+        if beat.char_id != "announcer"
+    )
+    floored_line_slots = 0
+    if current_character_lines < minimum_character_lines:
+        for scene_index, scene in enumerate(draft.scenes):
+            for beat_index, beat in enumerate(scene.beats):
+                key = (scene_index, beat_index)
+                if (
+                    beat.char_id == "announcer"
+                    or effective_line_counts[key]
+                    >= _RADIO_SCORE_MAX_LINES_PER_BEAT
+                ):
+                    continue
+                effective_line_counts[key] += 1
+                current_character_lines += 1
+                floored_line_slots += 1
+                if current_character_lines >= minimum_character_lines:
+                    break
+            if current_character_lines >= minimum_character_lines:
+                break
+    if current_character_lines < minimum_character_lines:
+        raise RadioScoreDraftCompileError(
+            code="delivery_capacity",
+            path="scenes[*].beats[*].line_count",
+            detail=(
+                f"character topology can expose only "
+                f"{current_character_lines} lines after flooring, but target "
+                f"{advisory.advisory_total_center} requires at least "
+                f"{minimum_character_lines} lines at the "
+                f"{_CODEX_MAX_CHARACTER_LINE_WORDS}-word breath ceiling"
+            ),
+        )
+    if floored_line_slots:
+        log.info(
+            "[scifi_codex] P3 delivery-capacity compiler added %d "
+            "continuation line slot(s): character lines=%d required=%d",
+            floored_line_slots, current_character_lines,
+            minimum_character_lines,
+        )
+
     compiled_scenes: list[ScenePlanV4] = []
     line_manifest: list[tuple[str, tuple[str, ...]]] = []
     used_cast_ids: set[str] = set()
@@ -1146,14 +1229,17 @@ def compile_radio_score_draft(
                     )
 
             advisory_row = advisory_rows[global_beat_number]
+            effective_line_count = effective_line_counts[
+                (scene_index, beat_index)
+            ]
             line_ids = tuple(
                 f"l{line_number:03d}"
                 for line_number in range(
                     global_line_number,
-                    global_line_number + draft_beat.line_count,
+                    global_line_number + effective_line_count,
                 )
             )
-            global_line_number += draft_beat.line_count
+            global_line_number += effective_line_count
             cast_row = cast_by_id[draft_beat.char_id]
             speaker_role: Literal["character", "announcer"] = (
                 "announcer" if draft_beat.char_id == "announcer" else "character"
@@ -2655,6 +2741,31 @@ class _ScriptHygieneTarget:
     original_sha256: str
 
 
+def _codex_character_line_word_range(
+    score: RadioScoreV4 | None,
+) -> tuple[int, int]:
+    """Return the score-owned breath range used by every spoken validator."""
+    if score is None:
+        return (0, 0)
+    character_lines = sum(
+        len(beat.line_ids)
+        for scene in score.scenes
+        for beat in scene.beats
+        if beat.speaker_role == "character"
+    )
+    if character_lines < 1:
+        return (0, 0)
+    lower_words, _upper_words = _OTRWD.delivery_word_bounds(
+        score.advisory_word_plan.advisory_total_center,
+    )
+    required_per_line = int(math.ceil(lower_words / character_lines))
+    cap = min(
+        _CODEX_MAX_CHARACTER_LINE_WORDS,
+        max(28, required_per_line),
+    )
+    return (max(1, cap - 4), cap)
+
+
 def _spoken_hygiene_gates(
     text: str,
     name: str = "",
@@ -2745,6 +2856,7 @@ def _codex_line_request(
         speaker_role=line.speaker_role,
         arc_phase=line.arc_phase,
         beat_objective=line.beat_intent,
+        words_per_beat_range=_codex_character_line_word_range(score),
     )
 
 
@@ -3583,6 +3695,24 @@ def _script_artifact_repair_rules(detail: str) -> str:
     if "must own a voiced line" in detail:
         return _SCRIPT_ARTIFACT_COVERAGE_REPAIR_RULES
     return _SCRIPT_ARTIFACT_REPAIR_RULES
+
+
+def _codex_target_beat_count(requested_words: int, cast_count: int) -> int:
+    """Size P3 topology from delivery demand, bounded by the score schema."""
+    if (
+        not isinstance(requested_words, int)
+        or isinstance(requested_words, bool)
+        or not 30 <= requested_words <= 900
+    ):
+        raise CodexTargetRangeError("requested_words must be 30..900")
+    if (
+        not isinstance(cast_count, int)
+        or isinstance(cast_count, bool)
+        or cast_count < 1
+    ):
+        raise CodexGraphError("cast_count must be a positive integer")
+    word_driven = max(3, int(math.ceil(requested_words / 15)))
+    return max(cast_count, 3, min(_RADIO_SCORE_MAX_BEATS, word_driven))
 
 
 def make_advisory_word_blueprint(requested_words: int, locked_beats: Sequence[str]) -> AdvisoryWordPlanV4:
@@ -4927,20 +5057,27 @@ def _run_initial_script_generation(
     story_rules: StoryRules,
     max_new_tokens: int,
     call_journal: MutableMapping[str, Any],
+    candidate_index: int = 0,
 ) -> ScriptArtifactV4:
-    """Run at most two flat P5 ladders: creative, then fresh technical."""
+    """Author one complete P5 candidate, alternating its producer by index."""
     attempts: list[dict[str, Any]] = []
     receipt: dict[str, Any] = {
         "transport": "ScriptTextDraftV4",
+        "candidate_index": int(candidate_index),
         "max_ladders": 2,
         "attempts": attempts,
         "status": "pending",
     }
+    candidate_key = (
+        f"initial_script_generation_candidate_{int(candidate_index)}"
+    )
+    call_journal[candidate_key] = receipt
     call_journal["initial_script_generation"] = receipt
-    lanes = (
+    lane_pairs = (
         ("creative", creative_fn, "technical", technical_fn, 0.78, 0.35),
         ("technical", technical_fn, "creative", creative_fn, 0.55, 0.20),
     )
+    lanes = lane_pairs if int(candidate_index) % 2 == 0 else lane_pairs[::-1]
     last_error: CodexPassError | None = None
     for (
         slot,
@@ -4998,7 +5135,7 @@ def _run_initial_script_generation(
         "selected_slot": None,
         "ladders_run": len(attempts),
     })
-    raise CodexPassError(
+    raise CodexCandidateGenerationError(
         "P5 compact script generation exhausted creative and technical ladders"
     ) from last_error
 
@@ -5502,6 +5639,7 @@ def _run_script_quality_patch(
     script_token_budget: int,
     journal: MutableMapping[str, Any],
     meta: MutableMapping[str, Any],
+    candidate_validator: Callable[[ScriptArtifactV4], str | None] | None = None,
 ) -> tuple[ScriptArtifactV4 | None, dict[str, Any]]:
     """Try one compact creative patch, then one colder technical patch."""
     plan = _derive_script_quality_patch_plan(script, score, issues)
@@ -5570,6 +5708,10 @@ def _run_script_quality_patch(
                 fact_index=fact_index,
                 story_rules=story_rules,
             )
+            if candidate_validator is not None:
+                candidate_error = candidate_validator(merged)
+                if candidate_error is not None:
+                    raise _ScriptQualityPatchRejected(candidate_error)
         except CodexPackContractError:
             raise
         except Exception as exc:  # quality work never owns episode liveness
@@ -5901,7 +6043,6 @@ def _run_final_audit_quality_loop(
 # 180-word campaign it resolves to the operator's 163..200 acceptance window.
 _CODEX_CHARACTER_WORD_LO_EXCLUSIVE = _OTRWD.LOW_RATIO_EXCLUSIVE
 _CODEX_CHARACTER_WORD_HI_INCLUSIVE = _OTRWD.HIGH_RATIO_INCLUSIVE
-_CODEX_WORD_FIT_MAX_CYCLES = _OTRWD.MAX_REPAIR_CYCLES
 
 
 def _scifi_character_word_bounds(target_words: int) -> tuple[int, int]:
@@ -5938,12 +6079,19 @@ def _word_fit_issues(
         return ()
     rows = [
         line for line in _script_lines_in_score_order(script, score)
-        if line.speaker_role == "character" and not line.skip
+        if line.speaker_role == "character"
+        and not line.skip
     ]
     if not rows:
         return ()
+    line_cap = _codex_character_line_word_range(score)[1] or 28
+    if actual < lower:
+        rows = [line for line in rows if _words(line.text) < line_cap]
+    else:
+        rows = [line for line in rows if _words(line.text) > 1]
+    if not rows:
+        return ()
     distance = lower - actual if actual < lower else actual - upper
-    per_row = min(distance, _OTRWD.delivery_step_words(target_words))
     ranked = sorted(
         rows,
         key=(
@@ -5953,6 +6101,12 @@ def _word_fit_issues(
         ),
     )
     line = ranked[int(target_cursor) % len(ranked)]
+    current_line_words = _words(line.text)
+    per_row = min(
+        distance,
+        line_cap - current_line_words
+        if actual < lower else current_line_words - 1,
+    )
     verb = "Add" if actual < lower else "Remove"
     direction_tail = (
         "Deepen the locked beat with concrete in-character speech; preserve "
@@ -5997,18 +6151,59 @@ def _run_character_word_fit_loop(
     actual = _script_character_word_count(current)
     initial_actual = actual
     initial_distance = _word_band_distance(actual, lower, upper)
-    repair_budget = _OTRWD.delivery_repair_cycle_budget(
-        actual_words=actual,
-        target_words=target_words,
+    line_range = _codex_character_line_word_range(score)
+    line_cap = line_range[1] or 28
+    active_rows = [
+        line for line in _script_lines_in_score_order(current, score)
+        if line.speaker_role == "character" and not line.skip
+    ]
+    max_reachable_words = len(active_rows) * line_cap
+    min_reachable_words = len(active_rows)
+    capacity = {
+        "active_character_rows": len(active_rows),
+        "words_per_line_range": list(line_range),
+        "min_reachable_words": min_reachable_words,
+        "max_reachable_words": max_reachable_words,
+    }
+    lane = meta.setdefault("scifi_codex", {})
+    if (
+        actual < lower and max_reachable_words < lower
+    ) or (
+        actual > upper and min_reachable_words > upper
+    ):
+        capacity_receipt = {
+            "status": "insufficient_active_rows_capacity",
+            "target_words": int(target_words),
+            "acceptance_words": [lower, upper],
+            "initial_character_words": initial_actual,
+            "final_character_words": actual,
+            "capacity": capacity,
+            "cycles": [],
+            "actual_drift": True,
+        }
+        lane["character_word_fit_loop"] = capacity_receipt
+        error = CodexWordDeliveryError(
+            "scifi_codex word delivery has insufficient active-row "
+            f"capacity: {len(active_rows)} rows x {line_cap} words cannot "
+            f"reach {lower}..{upper} from actual {actual}"
+        )
+        error.receipt = capacity_receipt
+        raise error
+    liveness = _OTRWD.WordFitLivenessController(
         lower_words=lower,
         upper_words=upper,
+        initial_words=actual,
+        initial_fingerprint=_script_digest(current),
     )
+    repair_budget = liveness.cycle_ceiling
     cycles: list[dict[str, Any]] = []
-    status = "pass" if initial_distance == 0 else "repair_exhausted"
-    for cycle in range(1, repair_budget + 1):
-        if lower <= actual <= upper:
-            status = "pass"
-            break
+    candidate_fingerprints = {_script_digest(current)}
+    status = (
+        "pass" if initial_distance == 0
+        else "consecutive_stalls_exhausted"
+    )
+    while liveness.can_continue:
+        cycle = liveness.total_cycles + 1
         issues = _word_fit_issues(
             script=current,
             score=score,
@@ -6021,6 +6216,26 @@ def _run_character_word_fit_loop(
             status = "no_actionable_targets_floor"
             break
         prior = current
+        prior_distance = _word_band_distance(actual, lower, upper)
+        candidate_digest_by_identity: dict[int, str] = {}
+
+        def _require_word_progress(candidate: ScriptArtifactV4) -> str | None:
+            digest = _script_digest(candidate)
+            candidate_digest_by_identity[id(candidate)] = digest
+            if digest in candidate_fingerprints:
+                return "word-fit candidate repeated a prior script state"
+            candidate_fingerprints.add(digest)
+            candidate_actual = _script_character_word_count(candidate)
+            candidate_distance = _word_band_distance(
+                candidate_actual, lower, upper,
+            )
+            if candidate_distance >= prior_distance:
+                return (
+                    "word-fit candidate made no strict delivery progress: "
+                    f"distance {candidate_distance} >= {prior_distance}"
+                )
+            return None
+
         patched, entry = _run_script_quality_patch(
             pass_id="P10",
             script=current,
@@ -6036,6 +6251,7 @@ def _run_character_word_fit_loop(
             script_token_budget=script_token_budget,
             journal=journal,
             meta=meta,
+            candidate_validator=_require_word_progress,
         )
         receipt = {
             "cycle": cycle,
@@ -6046,19 +6262,24 @@ def _run_character_word_fit_loop(
         }
         if patched is None:
             current = prior
+            observation = liveness.observe(None)
             receipt["after_character_words"] = actual
             receipt["distance_to_band"] = _word_band_distance(
                 actual, lower, upper,
             )
             receipt["adopted"] = False
+            receipt["liveness"] = observation
             cycles.append(receipt)
             continue
         candidate_actual = _script_character_word_count(patched)
-        candidate_distance = _word_band_distance(
-            candidate_actual, lower, upper,
+        candidate_digest = candidate_digest_by_identity.get(
+            id(patched), _script_digest(patched),
         )
-        prior_distance = _word_band_distance(actual, lower, upper)
-        adopted = candidate_distance < prior_distance
+        observation = liveness.observe(
+            candidate_actual,
+            fingerprint=candidate_digest,
+        )
+        adopted = bool(observation["strict_progress"])
         if adopted:
             current = patched
             actual = candidate_actual
@@ -6066,6 +6287,8 @@ def _run_character_word_fit_loop(
         receipt["after_character_words"] = actual
         receipt["distance_to_band"] = _word_band_distance(actual, lower, upper)
         receipt["adopted"] = adopted
+        receipt["candidate_sha256"] = candidate_digest
+        receipt["liveness"] = observation
         if not adopted:
             receipt["patch_status"] = "no_progress_rejected"
         cycles.append(receipt)
@@ -6074,24 +6297,260 @@ def _run_character_word_fit_loop(
             break
 
     actual = _script_character_word_count(current)
-    lane = meta.setdefault("scifi_codex", {})
-    lane["character_word_fit_loop"] = {
+    if liveness.exhausted and not lower <= actual <= upper:
+        status = "consecutive_stalls_exhausted"
+    final_receipt = {
         "status": status,
         "target_words": int(target_words),
         "acceptance_words": [lower, upper],
         "initial_character_words": initial_actual,
         "final_character_words": actual,
         "repair_budget": repair_budget,
+        "capacity": capacity,
+        "liveness": liveness.receipt(),
         "cycles": cycles,
         "actual_drift": not (lower <= actual <= upper),
     }
+    lane["character_word_fit_loop"] = final_receipt
     if not lower <= actual <= upper:
-        raise CodexWordDeliveryError(
-            "scifi_codex word delivery exhausted "
-            f"{repair_budget} row-local cycles: required {lower}..{upper}, "
-            f"actual {actual}"
+        error = CodexWordDeliveryError(
+            f"scifi_codex word delivery {status} after {len(cycles)} "
+            f"row-local cycles: required {lower}..{upper}, actual {actual}"
         )
+        error.receipt = final_receipt
+        raise error
     return current
+
+
+def _run_complete_script_campaign(
+    *,
+    creative_fn: GenerateFn,
+    technical_fn: GenerateFn,
+    pack: Any,
+    artifact_inputs: Mapping[str, Any],
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    fact_index: FactIndexV4,
+    story_rules: StoryRules,
+    target_words: int,
+    script_token_budget: int,
+    journal: MutableMapping[str, Any],
+    meta: MutableMapping[str, Any],
+) -> ScriptArtifactV4:
+    """Keep authoring complete P5 candidates until the ledger math is legal."""
+    candidate_index = 0
+    candidate_runs = journal.setdefault("complete_script_candidates", [])
+    if not isinstance(candidate_runs, list):
+        raise CodexGraphError(
+            "call_journal.complete_script_candidates must be a list"
+        )
+
+    while True:
+        try:
+            script = _run_initial_script_generation(
+                creative_fn=creative_fn,
+                technical_fn=technical_fn,
+                pack=pack,
+                artifact_inputs=artifact_inputs,
+                score=score,
+                cast=cast,
+                fact_index=fact_index,
+                story_rules=story_rules,
+                max_new_tokens=script_token_budget,
+                call_journal=journal,
+                candidate_index=candidate_index,
+            )
+        except CodexCandidateGenerationError as exc:
+            generation_receipt = journal.get("initial_script_generation")
+            receipt = (
+                generation_receipt
+                if isinstance(generation_receipt, Mapping)
+                else {"status": "candidate_generation_exhausted"}
+            )
+            _OTRWD.retire_word_fit_candidate(
+                meta,
+                owner="scifi_codex",
+                boundary="P5_complete_script",
+                reason=f"candidate_generation_exhausted: {exc}",
+                receipt=receipt,
+            )
+            candidate_runs.append({
+                "candidate_index": candidate_index,
+                "status": "candidate_generation_exhausted",
+                "error_type": type(exc).__name__,
+                "error": " ".join(str(exc).split())[:500],
+            })
+            candidate_index += 1
+            continue
+
+        # These audits may improve a candidate but can never veto it.
+        script = _run_listener_quality_loop(
+            script=script,
+            score=score,
+            cast=cast,
+            fact_index=fact_index,
+            story_rules=story_rules,
+            creative_fn=creative_fn,
+            technical_fn=technical_fn,
+            pack=pack,
+            script_token_budget=script_token_budget,
+            journal=journal,
+            meta=meta,
+        )
+        script = _run_final_audit_quality_loop(
+            script=script,
+            score=score,
+            cast=cast,
+            fact_index=fact_index,
+            story_rules=story_rules,
+            creative_fn=creative_fn,
+            technical_fn=technical_fn,
+            pack=pack,
+            script_token_budget=script_token_budget,
+            journal=journal,
+            meta=meta,
+        )
+
+        hygiene_targets = _collect_script_hygiene_targets(
+            script, cast, fact_index, score, story_rules,
+        )
+        if hygiene_targets:
+            final_receipt: dict[str, Any] = {
+                "status": "attempting",
+                "candidate_index": candidate_index,
+            }
+            journal[
+                f"final_spoken_hygiene_candidate_{candidate_index}"
+            ] = final_receipt
+            journal["final_spoken_hygiene"] = final_receipt
+            final_repair = _repair_script_hygiene_after_exhaustion(
+                script=script,
+                score=score,
+                cast=cast,
+                fact_index=fact_index,
+                story_rules=story_rules,
+                same_slot="creative",
+                same_slot_fn=creative_fn,
+                alternate_slot="technical",
+                alternate_slot_fn=technical_fn,
+                post_validator=lambda value: _validate_script_post(
+                    value, cast, score, fact_index, story_rules,
+                ),
+                max_new_tokens=script_token_budget,
+                receipt=final_receipt,
+            )
+            if final_repair is not None:
+                script = final_repair
+            hygiene_targets = _collect_script_hygiene_targets(
+                script, cast, fact_index, score, story_rules,
+            )
+        if hygiene_targets:
+            hygiene_receipt = {
+                "status": "spoken_hygiene_exhausted",
+                "target_words": int(target_words),
+                "cycles": [],
+            }
+            _OTRWD.retire_word_fit_candidate(
+                meta,
+                owner="scifi_codex",
+                boundary="P5_complete_script",
+                reason=(
+                    "spoken_hygiene_exhausted: "
+                    + "; ".join(
+                        f"{target.line_id}={','.join(target.gates)}"
+                        for target in hygiene_targets
+                    )
+                ),
+                fingerprint=_script_digest(script),
+                receipt=hygiene_receipt,
+            )
+            candidate_runs.append({
+                "candidate_index": candidate_index,
+                "status": "spoken_hygiene_exhausted",
+                "fingerprint": _script_digest(script),
+            })
+            candidate_index += 1
+            continue
+
+        try:
+            script = _run_character_word_fit_loop(
+                script=script,
+                score=score,
+                cast=cast,
+                fact_index=fact_index,
+                story_rules=story_rules,
+                target_words=target_words,
+                creative_fn=creative_fn,
+                technical_fn=technical_fn,
+                pack=pack,
+                script_token_budget=script_token_budget,
+                journal=journal,
+                meta=meta,
+            )
+        except CodexWordDeliveryError as exc:
+            failed_receipt = getattr(exc, "receipt", None)
+            if not isinstance(failed_receipt, Mapping):
+                raise
+            if failed_receipt.get("status") == (
+                "insufficient_active_rows_capacity"
+            ):
+                raise
+            _OTRWD.retire_word_fit_candidate(
+                meta,
+                owner="scifi_codex",
+                boundary="P5_complete_script",
+                reason=str(exc),
+                fingerprint=_script_digest(script),
+                receipt=failed_receipt,
+            )
+            candidate_runs.append({
+                "candidate_index": candidate_index,
+                "status": "word_fit_candidate_retired",
+                "word_fit": dict(failed_receipt),
+            })
+            candidate_index += 1
+            continue
+
+        remaining_hygiene = _collect_script_hygiene_targets(
+            script, cast, fact_index, score, story_rules,
+        )
+        if remaining_hygiene:
+            raise CodexGraphError(
+                "word-fit accepted a spoken-hygiene defect: "
+                + "; ".join(
+                    f"{target.line_id}={','.join(target.gates)}"
+                    for target in remaining_hygiene
+                )
+            )
+        try:
+            validate_spoken_text_and_roster(
+                script, cast, score,
+                _allowed_spoken_all_caps(fact_index, cast),
+            )
+        except CodexSpokenTextError as exc:
+            _OTRWD.retire_word_fit_candidate(
+                meta,
+                owner="scifi_codex",
+                boundary="P5_complete_script",
+                reason=f"spoken_text_rejected: {exc}",
+                fingerprint=_script_digest(script),
+                receipt={"status": "spoken_text_rejected"},
+            )
+            candidate_runs.append({
+                "candidate_index": candidate_index,
+                "status": "spoken_text_rejected",
+                "error": " ".join(str(exc).split())[:500],
+            })
+            candidate_index += 1
+            continue
+
+        candidate_runs.append({
+            "candidate_index": candidate_index,
+            "status": "ready_for_ledger_stamp",
+            "fingerprint": _script_digest(script),
+            "character_words": _script_character_word_count(script),
+        })
+        return script
 
 
 def run_scifi_codex_episode(
@@ -6164,15 +6623,15 @@ def run_scifi_codex_episode(
         # 2026-06-18). Trim it at a word boundary and get on with the story.
         clamp_overlong_strings=True,
     )
-    # Gate 3 (SOURCE_BANK_PREFLIGHT): structure scales from the real size driver,
-    # not a fixed cast-derived count. A short episode cannot carry 12 beats;
-    # demanding them is what made P3 fail below ~480 words (the cast*3 count
-    # ignored the word budget entirely). Scale the beat count by the word budget
-    # (~15 words/beat floor) while keeping it >= cast size so every cast member
-    # can still own a beat, capped at the original ceiling of 12.
-    _cast_n = max(1, len(p2.cast))
-    _words_cap = max(3, steer.requested_words // 15)
-    _beat_n = max(_cast_n, 3, min(12, _cast_n * 3, _words_cap))
+    # Delivery-capable P3 topology scales from the real size driver. The former
+    # min(..., cast*3, ...) expression silently capped every two-character play
+    # at six beats even at 320/900 words. Use ~15 words per requested beat,
+    # bounded by the schema's 12-beat ceiling and the accepted cast floor. The
+    # compiler separately floors one-line character beats to two as needed and
+    # rejects a graph whose speaker choices still cannot carry the word band.
+    _beat_n = _codex_target_beat_count(
+        steer.requested_words, len(p2.cast),
+    )
     beat_ids = [f"b{i:03d}" for i in range(_beat_n)]
     advisory = make_advisory_word_blueprint(steer.requested_words, beat_ids)
     score_token_budget = _radio_score_draft_output_token_budget(
@@ -6188,6 +6647,18 @@ def run_scifi_codex_episode(
         "cast": p2.model_dump(mode="json"),
         "fact_index": _compact_p0_fact_context(p0),
         "advisory_word_plan": advisory.model_dump(mode="json"),
+        "delivery_capacity": {
+            "target_character_words": steer.requested_words,
+            "acceptance_words": [word_lower, word_upper],
+            "max_character_line_words": _CODEX_MAX_CHARACTER_LINE_WORDS,
+            "minimum_character_lines": int(math.ceil(
+                word_lower / _CODEX_MAX_CHARACTER_LINE_WORDS,
+            )),
+            "rule": (
+                "character beats must expose enough one/two-line slots; "
+                "announcer lines do not count"
+            ),
+        },
     }
     p3 = _call_radio_score_draft(
         pass_id="P3", slot_fn=creative_fn, pack=pack,
@@ -6280,7 +6751,7 @@ def run_scifi_codex_episode(
         "accepted_line_count": accepted_line_count,
         "max_new_tokens": script_token_budget,
     }
-    script = _run_initial_script_generation(
+    script = _run_complete_script_campaign(
         creative_fn=creative_fn,
         technical_fn=technical_fn,
         pack=pack,
@@ -6289,111 +6760,10 @@ def run_scifi_codex_episode(
         cast=p2,
         fact_index=p0,
         story_rules=story_rules,
-        max_new_tokens=script_token_budget,
-        call_journal=journal,
-    )
-    # Quality passes are dynamic: each actionable P6/P8 verdict triggers a fresh
-    # creative line patch and then an independent re-audit. They stop on a clean
-    # verdict or the no-hang budget; exhaustion keeps the best structurally valid
-    # script with an explicit quality-floor receipt and never fails the episode.
-    script = _run_listener_quality_loop(
-        script=script,
-        score=score,
-        cast=p2,
-        fact_index=p0,
-        story_rules=story_rules,
-        creative_fn=creative_fn,
-        technical_fn=technical_fn,
-        pack=pack,
-        script_token_budget=script_token_budget,
-        journal=journal,
-        meta=meta,
-    )
-    script = _run_final_audit_quality_loop(
-        script=script,
-        score=score,
-        cast=p2,
-        fact_index=p0,
-        story_rules=story_rules,
-        creative_fn=creative_fn,
-        technical_fn=technical_fn,
-        pack=pack,
-        script_token_budget=script_token_budget,
-        journal=journal,
-        meta=meta,
-    )
-    # Defense-in-depth final scour over the exact artifact that will be assembled.
-    # P5 and every merged P7/P9 patch already validate through the same complete
-    # boundary; this catches any future bypass before it can become ledger text.
-    if _collect_script_hygiene_targets(
-        script, p2, p0, score, story_rules,
-    ):
-        final_receipt: dict[str, Any] = {"status": "attempting"}
-        journal["final_spoken_hygiene"] = final_receipt
-        final_repair = _repair_script_hygiene_after_exhaustion(
-            script=script,
-            score=score,
-            cast=p2,
-            fact_index=p0,
-            story_rules=story_rules,
-            same_slot="creative",
-            same_slot_fn=creative_fn,
-            alternate_slot="technical",
-            alternate_slot_fn=technical_fn,
-            post_validator=lambda x: _validate_script_post(
-                x, p2, score, p0, story_rules,
-            ),
-            max_new_tokens=script_token_budget,
-            receipt=final_receipt,
-        )
-        if final_repair is not None:
-            script = final_repair
-        remaining_targets = _collect_script_hygiene_targets(
-            script, p2, p0, score, story_rules,
-        )
-        if remaining_targets:
-            # Reaching this branch means the artifact also failed a structural
-            # post-condition (the bounded craft floor itself is total for every
-            # shipped rules pack). Never assemble an unscoured spoken surface
-            # or disguise the code/graph defect as a quality terminal-skip.
-            raise CodexGraphError(
-                "final spoken-hygiene invariant did not converge: "
-                + "; ".join(
-                    f"{target.line_id}={','.join(target.gates)}"
-                    for target in remaining_targets
-                )
-            )
-    # P10 runs after every taste/factual pass and after the final hygiene scour,
-    # because the live undershoot was created by those shortening repairs. Its
-    # row merge calls _validate_script_post over the complete candidate, so an
-    # accepted length patch cannot bypass spoken hygiene or graph validation.
-    script = _run_character_word_fit_loop(
-        script=script,
-        score=score,
-        cast=p2,
-        fact_index=p0,
-        story_rules=story_rules,
         target_words=steer.requested_words,
-        creative_fn=creative_fn,
-        technical_fn=technical_fn,
-        pack=pack,
         script_token_budget=script_token_budget,
         journal=journal,
         meta=meta,
-    )
-    remaining_after_word_fit = _collect_script_hygiene_targets(
-        script, p2, p0, score, story_rules,
-    )
-    if remaining_after_word_fit:
-        raise CodexGraphError(
-            "word-fit accepted a spoken-hygiene defect: "
-            + "; ".join(
-                f"{target.line_id}={','.join(target.gates)}"
-                for target in remaining_after_word_fit
-            )
-        )
-    validate_spoken_text_and_roster(
-        script, p2, score, _allowed_spoken_all_caps(p0, p2),
     )
     expected = _assemble_ledger(led, score, p2, script, meta)
     try:
@@ -6404,6 +6774,22 @@ def run_scifi_codex_episode(
         )
     except _OTRWD.WordDeliveryError as exc:
         raise CodexWordDeliveryError(str(exc)) from exc
+    accepted_candidate = _OTRWD.accept_word_fit_candidate(
+        led.data.setdefault("meta", {}),
+        owner="scifi_codex",
+        boundary="P5_complete_script",
+        fingerprint=_script_digest(script),
+        actual_words=int(delivery_receipt["actual_voiced_words"]),
+        acceptance_words=delivery_receipt["acceptance_words"],
+    )
+    candidate_runs = journal.get("complete_script_candidates")
+    if (
+        isinstance(candidate_runs, list)
+        and candidate_runs
+        and isinstance(candidate_runs[-1], dict)
+    ):
+        candidate_runs[-1]["status"] = "accepted_by_ledger_stamp"
+        candidate_runs[-1]["accepted_candidate"] = accepted_candidate
     from ._otr_content_authorship import stamp_receipt
     stamp_receipt(
         led.data, owner_bank=source_bank_row.source_bank_id,

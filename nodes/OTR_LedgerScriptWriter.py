@@ -7623,41 +7623,32 @@ class OTR_LedgerScriptWriter:
 
             if _word_owner:
                 from . import _otr_radio_editor as _OTR_WORD_FIT
-                with slot_scheduler.helper_context("final_word_delivery"):
-                    _OTR_WORD_FIT.fit_final_word_delivery(
-                        led.data,
-                        creative_fn=creative_generate_fn,
-                        technical_fn=technical_generate_fn,
-                        creative_model=resolved["creative_writing_model"],
-                        technical_model=resolved["technical_model"],
-                        source_bank_id=resolved["source_bank"],
-                        canon_header=_final_scour_canon_header,
-                    )
-
-                # The accepted fitter candidate already passed exact spoken
-                # hygiene. Re-run the complete ledger scour as a read-only
-                # proof that no bypassed row or future pack rule can sneak past
-                # the final authored mutation. Any repair is recounted below.
                 with slot_scheduler.helper_context(
-                    "spoken_hygiene_after_word_delivery"
+                    "final_word_delivery_campaign"
                 ):
-                    _word_fit_hygiene = (
-                        _OTRRR_FINAL.repair_ledger_spoken_hygiene(
+                    _word_campaign = (
+                        _OTR_WORD_FIT.fit_final_word_delivery_campaign(
                             led.data,
                             creative_fn=creative_generate_fn,
-                            repair_fn=technical_generate_fn,
+                            technical_fn=technical_generate_fn,
+                            creative_model=resolved["creative_writing_model"],
+                            technical_model=resolved["technical_model"],
+                            source_bank_id=resolved["source_bank"],
                             canon_header=_final_scour_canon_header,
                         )
                     )
-                if _word_fit_hygiene.repaired or _word_fit_hygiene.failed:
+                _word_fit_hygiene = _word_campaign["post_fit_hygiene"]
+                if (
+                    _word_fit_hygiene["repaired"]
+                    or _word_fit_hygiene["failed"]
+                ):
                     log.warning(
                         "[OTR_LedgerScriptWriter] post-word-fit hygiene "
-                        "changed %d row(s) and row-muted %d; strict delivery "
-                        "recount follows",
-                        _word_fit_hygiene.repaired,
-                        _word_fit_hygiene.failed,
+                        "changed %d row(s) and row-muted %d; the campaign "
+                        "accepted only after its strict delivery recount",
+                        _word_fit_hygiene["repaired"],
+                        _word_fit_hygiene["failed"],
                     )
-
         # Production producers stamp an explicit owner. Synthetic historical
         # tail fixtures without that declaration retain their compatibility
         # path, while every real six-bank run is recounted from the exact final

@@ -118,6 +118,11 @@ try:  # pragma: no cover - package and standalone import styles
 except ImportError:  # pragma: no cover
     import _otr_word_delivery as _OTRWD  # type: ignore
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_line_hygiene import derive_one_breath_cap
+except ImportError:  # pragma: no cover
+    from _otr_line_hygiene import derive_one_breath_cap  # type: ignore
+
 
 log = logging.getLogger("OTR")
 
@@ -2130,11 +2135,16 @@ _FINAL_WORD_FIT_NUMERAL_RE = re.compile(
     re.IGNORECASE,
 )
 _FINAL_WORD_FIT_TEMPERATURES = (0.38, 0.30, 0.24, 0.18, 0.14)
-# The final spoken-hygiene authority uses the composer's one-breath law. Keep
-# the fitter's target honest so it does not pay for candidates that the next
-# deterministic scan must reject (the broader Radio Editor structural cap is
-# intentionally not the spoken craft cap).
-_FINAL_WORD_FIT_MAX_LINE_WORDS = 24
+
+
+def _final_word_fit_max_line_words(ledger: Dict[str, Any]) -> int:
+    """Use the exact one-breath ceiling the final scorer will enforce."""
+    meta = ledger.get("meta") if isinstance(ledger, dict) else None
+    word_range = (
+        meta.get("words_per_beat_range")
+        if isinstance(meta, dict) else ()
+    )
+    return derive_one_breath_cap(word_range)
 
 
 def _word_fit_sha256(value: Any) -> str:
@@ -2274,19 +2284,63 @@ def fit_final_word_delivery(
     story_rules = get_story_rules(meta)
     actual = _OTRWD.character_word_count(ledger)
     initial_actual = actual
-    repair_budget = _OTRWD.delivery_repair_cycle_budget(
-        actual_words=actual,
-        target_words=spec.target_words,
+    max_line_words = _final_word_fit_max_line_words(ledger)
+    active_rows = [
+        row for row in ledger.get("lines") or ()
+        if isinstance(row, dict)
+        and not row.get("skip")
+        and str(row.get("speaker_role") or "") == "character"
+    ]
+    max_reachable_words = len(active_rows) * max_line_words
+    min_reachable_words = len(active_rows)
+    capacity = {
+        "active_character_rows": len(active_rows),
+        "max_line_words": max_line_words,
+        "min_reachable_words": min_reachable_words,
+        "max_reachable_words": max_reachable_words,
+    }
+    if (
+        actual < spec.lower_words
+        and max_reachable_words < spec.lower_words
+    ) or (
+        actual > spec.upper_words
+        and min_reachable_words > spec.upper_words
+    ):
+        receipt = {
+            "status": "insufficient_active_rows_capacity",
+            "owner": spec.owner,
+            "source_bank": str(source_bank_id or ""),
+            "target_words": spec.target_words,
+            "acceptance_words": [spec.lower_words, spec.upper_words],
+            "initial_character_words": initial_actual,
+            "final_character_words": actual,
+            "capacity": capacity,
+            "cycles": [],
+            "actual_drift": True,
+        }
+        meta["inline_word_fit"] = receipt
+        raise FinalWordDeliveryError(
+            f"{spec.owner} word delivery has insufficient active-row "
+            f"capacity: {len(active_rows)} rows x {max_line_words} words "
+            f"cannot reach {spec.lower_words}..{spec.upper_words} from "
+            f"actual {actual}"
+        )
+    liveness = _OTRWD.WordFitLivenessController(
         lower_words=spec.lower_words,
         upper_words=spec.upper_words,
+        initial_words=actual,
+        initial_fingerprint=_OTRWD.character_text_sha256(ledger),
     )
+    repair_budget = liveness.cycle_ceiling
     cycles: list[dict[str, Any]] = []
-    terminal_status = "pass" if spec.contains(actual) else "repair_exhausted"
+    candidate_fingerprints: set[str] = set()
+    terminal_status = (
+        "pass" if spec.contains(actual)
+        else "consecutive_stalls_exhausted"
+    )
 
-    for cycle in range(1, repair_budget + 1):
-        if spec.contains(actual):
-            terminal_status = "pass"
-            break
+    while liveness.can_continue:
+        cycle = liveness.total_cycles + 1
         under = actual < spec.lower_words
         rows = [
             row for row in ledger.get("lines") or ()
@@ -2295,7 +2349,7 @@ def fit_final_word_delivery(
             and str(row.get("speaker_role") or "") == "character"
             and (
                 canonical_word_count(row.get("text"))
-                < _FINAL_WORD_FIT_MAX_LINE_WORDS
+                < max_line_words
                 if under else canonical_word_count(row.get("text")) > 1
             )
         ]
@@ -2323,10 +2377,12 @@ def fit_final_word_delivery(
             spec.lower_words - actual if under else actual - spec.upper_words
         )
         correction = min(
-            distance, _OTRWD.delivery_step_words(spec.target_words),
+            distance,
+            max_line_words - current_line_words
+            if under else current_line_words - 1,
         )
         desired_line_words = (
-            min(_FINAL_WORD_FIT_MAX_LINE_WORDS, current_line_words + correction)
+            min(max_line_words, current_line_words + correction)
             if under else max(1, current_line_words - correction)
         )
         req = _OTRRR_WORD_FIT.build_reroll_line_request(
@@ -2381,7 +2437,7 @@ def fit_final_word_delivery(
                     f"Direction: {direction}\n"
                     f"Current line words: {current_line_words}\n"
                     f"Desired line words: about {desired_line_words}, maximum "
-                    f"{_FINAL_WORD_FIT_MAX_LINE_WORDS}\n"
+                    f"{max_line_words}\n"
                     f"Episode character words: {actual}; required band: "
                     f"{spec.lower_words}..{spec.upper_words}\n"
                     f"Locked canon:\n{str(req.canon_header or '')[-1200:]}\n"
@@ -2422,6 +2478,16 @@ def fit_final_word_delivery(
                 attempt["raw_sha256"] = _word_fit_sha256(raw)
                 candidate = strip_line_formatting(raw or "").strip()
                 attempt["candidate_words"] = canonical_word_count(candidate)
+                candidate_fingerprint = _word_fit_sha256(
+                    f"{line_id}\0{candidate}"
+                )
+                attempt["candidate_sha256"] = candidate_fingerprint
+                if candidate_fingerprint in candidate_fingerprints:
+                    attempt["error"] = "duplicate candidate state"
+                    attempt["duplicate_fingerprint"] = True
+                    cycle_receipt["attempts"].append(attempt)
+                    continue
+                candidate_fingerprints.add(candidate_fingerprint)
                 error = _word_fit_candidate_error(
                     raw=raw,
                     candidate=candidate,
@@ -2470,10 +2536,21 @@ def fit_final_word_delivery(
         cycle_receipt["distance_to_band"] = _OTRWD.word_band_distance(
             actual, spec.lower_words, spec.upper_words,
         )
+        observation = liveness.observe(
+            actual if cycle_receipt["adopted"] else None,
+            fingerprint=(
+                _OTRWD.character_text_sha256(ledger)
+                if cycle_receipt["adopted"] else ""
+            ),
+        )
+        cycle_receipt["liveness"] = observation
         cycles.append(cycle_receipt)
         if spec.contains(actual):
             terminal_status = "pass"
             break
+
+    if liveness.exhausted and not spec.contains(actual):
+        terminal_status = "consecutive_stalls_exhausted"
 
     actual = _OTRWD.character_word_count(ledger)
     receipt = {
@@ -2485,6 +2562,8 @@ def fit_final_word_delivery(
         "initial_character_words": initial_actual,
         "final_character_words": actual,
         "repair_budget": repair_budget,
+        "capacity": capacity,
+        "liveness": liveness.receipt(),
         "cycles": cycles,
         "actual_drift": not spec.contains(actual),
     }
@@ -2501,12 +2580,344 @@ def fit_final_word_delivery(
     except _OTRWD.WordDeliveryError as exc:
         raise FinalWordDeliveryError(str(exc)) from exc
     if not spec.contains(actual):
-        raise FinalWordDeliveryError(
-            f"{spec.owner} word delivery exhausted {repair_budget} row-local "
-            f"cycles: required {spec.lower_words}..{spec.upper_words}, "
-            f"actual {actual}"
+        error = FinalWordDeliveryError(
+            f"{spec.owner} word delivery {terminal_status} after "
+            f"{len(cycles)} row-local cycles: required "
+            f"{spec.lower_words}..{spec.upper_words}, actual {actual}"
         )
+        error.receipt = receipt
+        raise error
     return receipt
+
+
+class _InlineCandidateGenerationError(RuntimeError):
+    """One complete inline candidate could not be authored by its owner slot."""
+
+    def __init__(self, message: str, receipt: Dict[str, Any]) -> None:
+        super().__init__(message)
+        self.receipt = dict(receipt)
+
+
+def _author_complete_inline_candidate(
+    ledger: Dict[str, Any],
+    *,
+    creative_fn: Callable[..., str],
+    technical_fn: Callable[..., str],
+    creative_model: str,
+    technical_model: str,
+    source_bank_id: str,
+    canon_header: str,
+    candidate_index: int,
+) -> Dict[str, Any]:
+    """Re-author every writable character row as one fresh candidate.
+
+    The selected writer slot owns the whole candidate. A single invalid or
+    unavailable row rejects the staged copy without mutating the authoritative
+    ledger; the outer campaign then retires that candidate and alternates slots.
+    """
+    try:
+        from . import _otr_reroll as _OTRRR_WORD_FIT
+        from ._otr_line_composer import strip_line_formatting
+        from ._otr_story_rules import get_story_rules
+    except ImportError:  # pragma: no cover - standalone / test load
+        import _otr_reroll as _OTRRR_WORD_FIT  # type: ignore
+        from _otr_line_composer import strip_line_formatting  # type: ignore
+        from _otr_story_rules import get_story_rules  # type: ignore
+
+    spec = _OTRWD.resolve_spec(ledger)
+    staged = copy.deepcopy(ledger)
+    rows = [
+        row for row in staged.get("lines") or ()
+        if isinstance(row, dict)
+        and not row.get("skip")
+        and str(row.get("speaker_role") or "") == "character"
+    ]
+    if not rows:
+        raise FinalWordDeliveryError(
+            "complete inline candidate has no writable character rows"
+        )
+    max_line_words = _final_word_fit_max_line_words(staged)
+    if len(rows) * max_line_words < spec.lower_words:
+        raise FinalWordDeliveryError(
+            "complete inline candidate topology cannot carry the delivery band"
+        )
+
+    author_slot = "technical" if int(candidate_index) % 2 else "creative"
+    author_fn = technical_fn if author_slot == "technical" else creative_fn
+    author_model = (
+        technical_model if author_slot == "technical" else creative_model
+    )
+    base_words, extra_rows = divmod(spec.target_words, len(rows))
+    story_rules = get_story_rules(staged.setdefault("meta", {}))
+    attempts: list[dict[str, Any]] = []
+
+    for row_index, row in enumerate(rows):
+        line_id = str(row.get("line_id") or row.get("beat_id") or "")
+        current_text = str(row.get("text") or "").strip()
+        desired_words = min(
+            max_line_words,
+            max(1, base_words + (1 if row_index < extra_rows else 0)),
+        )
+        req = _OTRRR_WORD_FIT.build_reroll_line_request(
+            staged, row, staged.get("cast") or [],
+        )
+        req = replace(
+            req,
+            canon_header=str(canon_header or req.canon_header or ""),
+            target_words=desired_words,
+            beat_objective=(
+                req.beat_objective
+                or str(row.get("beat_intent") or "").strip()
+            ),
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Re-author one row of a complete SFW radio-play candidate. "
+                    "Return only replacement dialogue: no label, cue, markup, "
+                    "stage direction, explanation, filler, fake commercial, "
+                    "product, sponsor copy, moral summary, or unsupported fact. "
+                    "Preserve the locked speaker, beat intent, conflict, numeric "
+                    "claims, and visual world. Use only story vocabulary already "
+                    "present in the locked canon and episode."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Candidate index: {candidate_index}\n"
+                    f"Source bank: {source_bank_id}\n"
+                    f"Writable line_id: {line_id}\n"
+                    f"Speaker: {req.speaker}\n"
+                    f"Beat intent: {req.intent}\n"
+                    f"Desired spoken words: about {desired_words}; maximum "
+                    f"{max_line_words}\n"
+                    f"Locked canon:\n{str(req.canon_header or '')[-1600:]}\n"
+                    f"Current complete candidate:\n"
+                    f"{' '.join(str(item.get('text') or '') for item in rows)}\n"
+                    f"Current writable line:\n{current_text}"
+                ),
+            },
+        ]
+        attempt: Dict[str, Any] = {
+            "line_id": line_id,
+            "slot": author_slot,
+            "model_id": str(author_model or ""),
+            "desired_line_words": desired_words,
+            "status": "rejected",
+        }
+        try:
+            raw = _word_fit_call(
+                author_fn,
+                messages=messages,
+                temperature=0.18 if author_slot == "technical" else 0.42,
+            )
+            candidate = strip_line_formatting(raw or "").strip()
+            attempt["raw_sha256"] = _word_fit_sha256(raw)
+            attempt["candidate_words"] = canonical_word_count(candidate)
+            error = _word_fit_candidate_error(
+                raw=raw,
+                candidate=candidate,
+                current_text=current_text,
+                req=req,
+                ledger=staged,
+                story_rules=story_rules,
+            )
+            if error is not None:
+                raise ValueError(error)
+            if canonical_word_count(candidate) > max_line_words:
+                raise ValueError(
+                    f"candidate exceeds the {max_line_words}-word breath cap"
+                )
+            flags = list(row.get("compose_flags") or [])
+            if "full_word_delivery_reroll" not in flags:
+                flags.append("full_word_delivery_reroll")
+            set_line_text_metrics(row, candidate)
+            row["compose_flags"] = flags
+            attempt["status"] = "accepted"
+            attempts.append(attempt)
+        except Exception as exc:  # one bad row rejects the staged candidate
+            attempt["error_type"] = type(exc).__name__
+            attempt["error"] = " ".join(str(exc).split())[:300]
+            attempts.append(attempt)
+            receipt = {
+                "status": "candidate_generation_exhausted",
+                "candidate_index": int(candidate_index),
+                "author_slot": author_slot,
+                "model_id": str(author_model or ""),
+                "target_words": spec.target_words,
+                "acceptance_words": [spec.lower_words, spec.upper_words],
+                "rows_attempted": len(attempts),
+                "row_count": len(rows),
+                "attempts": attempts,
+            }
+            raise _InlineCandidateGenerationError(
+                "complete inline candidate generation failed at "
+                f"{line_id}: {attempt['error']}",
+                receipt,
+            ) from exc
+
+    receipt = {
+        "status": "authored",
+        "candidate_index": int(candidate_index),
+        "author_slot": author_slot,
+        "model_id": str(author_model or ""),
+        "target_words": spec.target_words,
+        "acceptance_words": [spec.lower_words, spec.upper_words],
+        "row_count": len(rows),
+        "actual_character_words": _OTRWD.character_word_count(staged),
+        "fingerprint": _OTRWD.character_text_sha256(staged),
+        "attempts": attempts,
+    }
+    ledger["lines"] = staged["lines"]
+    ledger.setdefault("meta", {})["inline_complete_candidate"] = receipt
+    return receipt
+
+
+def fit_final_word_delivery_campaign(
+    ledger: Dict[str, Any],
+    *,
+    creative_fn: Callable[..., str],
+    technical_fn: Callable[..., str],
+    creative_model: str,
+    technical_model: str,
+    source_bank_id: str,
+    canon_header: str = "",
+) -> Dict[str, Any]:
+    """Run the unbounded outer campaign until the final ledger stamp passes.
+
+    Row-local fitting remains bounded by four consecutive stalls. Exhaustion
+    retires only that candidate, alternates the writer slot, authors a fresh
+    complete row set, and retries. There is intentionally no outer model-output
+    ceiling; configuration/capacity errors remain fail-closed.
+    """
+    if not isinstance(ledger, dict):
+        raise FinalWordDeliveryError(
+            "fit_final_word_delivery_campaign: ledger must be a dict"
+        )
+    spec = _OTRWD.resolve_spec(ledger)
+    meta = ledger.setdefault("meta", {})
+
+    def _author_next_candidate() -> Dict[str, Any]:
+        while True:
+            state = meta.get("outer_liveness_retry")
+            candidate_index = int(
+                state.get("active_candidate_index") or 0
+                if isinstance(state, dict) else 0
+            )
+            try:
+                return _author_complete_inline_candidate(
+                    ledger,
+                    creative_fn=creative_fn,
+                    technical_fn=technical_fn,
+                    creative_model=creative_model,
+                    technical_model=technical_model,
+                    source_bank_id=source_bank_id,
+                    canon_header=canon_header,
+                    candidate_index=candidate_index,
+                )
+            except _InlineCandidateGenerationError as exc:
+                _OTRWD.retire_word_fit_candidate(
+                    meta,
+                    owner=spec.owner,
+                    boundary="inline_complete_script",
+                    reason=str(exc),
+                    receipt=exc.receipt,
+                )
+
+    while True:
+        try:
+            fit_receipt = fit_final_word_delivery(
+                ledger,
+                creative_fn=creative_fn,
+                technical_fn=technical_fn,
+                creative_model=creative_model,
+                technical_model=technical_model,
+                source_bank_id=source_bank_id,
+                canon_header=canon_header,
+            )
+        except FinalWordDeliveryError as exc:
+            failed_receipt = getattr(exc, "receipt", None)
+            if not isinstance(failed_receipt, dict):
+                raise
+            if (
+                failed_receipt.get("status")
+                == "insufficient_active_rows_capacity"
+            ):
+                raise
+            _OTRWD.retire_word_fit_candidate(
+                meta,
+                owner=spec.owner,
+                boundary="inline_complete_script",
+                reason=str(exc),
+                fingerprint=_OTRWD.character_text_sha256(ledger),
+                receipt=failed_receipt,
+            )
+            _author_next_candidate()
+            continue
+
+        try:
+            from . import _otr_reroll as _OTRRR_FINAL
+        except ImportError:  # pragma: no cover - standalone / test load
+            import _otr_reroll as _OTRRR_FINAL  # type: ignore
+        hygiene = _OTRRR_FINAL.repair_ledger_spoken_hygiene(
+            ledger,
+            creative_fn=creative_fn,
+            repair_fn=technical_fn,
+            canon_header=canon_header,
+        )
+        hygiene_receipt = {
+            "scanned": hygiene.scanned,
+            "repaired": hygiene.repaired,
+            "failed": hygiene.failed,
+            "receipts": list(hygiene.receipts),
+            "failures": list(hygiene.failures),
+        }
+        try:
+            final_receipt = _OTRWD.stamp_actual(
+                ledger,
+                stage="writer_final_rows",
+                require_in_band=True,
+            )
+        except _OTRWD.WordDeliveryError as exc:
+            failed_receipt = {
+                "status": "post_fit_hygiene_delivery_drift",
+                "target_words": spec.target_words,
+                "acceptance_words": [spec.lower_words, spec.upper_words],
+                "final_character_words": _OTRWD.character_word_count(ledger),
+                "post_fit_hygiene": hygiene_receipt,
+            }
+            _OTRWD.retire_word_fit_candidate(
+                meta,
+                owner=spec.owner,
+                boundary="inline_complete_script",
+                reason=str(exc),
+                fingerprint=_OTRWD.character_text_sha256(ledger),
+                receipt=failed_receipt,
+            )
+            _author_next_candidate()
+            continue
+
+        accepted = _OTRWD.accept_word_fit_candidate(
+            meta,
+            owner=spec.owner,
+            boundary="inline_complete_script",
+            fingerprint=_OTRWD.character_text_sha256(ledger),
+            actual_words=int(final_receipt["actual_voiced_words"]),
+            acceptance_words=final_receipt["acceptance_words"],
+        )
+        campaign_receipt = dict(fit_receipt)
+        campaign_receipt.update({
+            "post_fit_hygiene": hygiene_receipt,
+            "final_receipt": final_receipt,
+            "accepted_candidate": accepted,
+            "outer_liveness": copy.deepcopy(
+                meta.get("outer_liveness_retry") or {}
+            ),
+        })
+        meta["inline_word_fit_campaign"] = campaign_receipt
+        return campaign_receipt
 
 
 def micro_repair(
@@ -2644,6 +3055,7 @@ __all__ = [
     "run_radio_editor",
     "normalize_length",
     "fit_final_word_delivery",
+    "fit_final_word_delivery_campaign",
     "micro_repair",
     # exception
     "FinalWordDeliveryError",

@@ -1235,8 +1235,77 @@ def test_advisory_centers_do_not_require_requested_count():
     assert [row.beat_id for row in plan.per_beat] == ["b001", "b002", "b003"]
 
 
+def test_target_driven_p3_beat_count_reaches_the_schema_ceiling_for_long_plays():
+    assert lane._codex_target_beat_count(30, 2) == 3
+    assert lane._codex_target_beat_count(180, 2) == 12
+    assert lane._codex_target_beat_count(320, 2) == 12
+    assert lane._codex_target_beat_count(900, 2) == 12
+    assert lane._codex_target_beat_count(30, 4) == 4
+
+
+@pytest.mark.parametrize(
+    ("requested_words", "beat_count", "expected_character_lines"),
+    ((320, 4, 5), (900, 12, 14)),
+)
+def test_score_compiler_floors_existing_character_beats_to_delivery_capacity(
+    requested_words,
+    beat_count,
+    expected_character_lines,
+):
+    advisory = lane.make_advisory_word_blueprint(
+        requested_words,
+        [f"b{index:03d}" for index in range(beat_count)],
+    )
+    cast_ids = ("announcer",) + ("c01",) * (beat_count - 1)
+    score = lane.compile_radio_score_draft(
+        _draft_for_advisory(advisory, cast_ids=cast_ids),
+        advisory,
+        _metadata_repair_cast(),
+        _metadata_repair_fact_index(),
+    )
+    character_lines = sum(
+        len(beat.line_ids)
+        for scene in score.scenes
+        for beat in scene.beats
+        if beat.speaker_role == "character"
+    )
+    assert character_lines == expected_character_lines
+    assert lane._validate_radio_score_graph(score, advisory) is None
+    assert lane._codex_character_line_word_range(score) == (54, 58)
+
+
+def test_score_compiler_rejects_a_graph_that_cannot_expose_enough_lines():
+    advisory = lane.make_advisory_word_blueprint(
+        900,
+        [f"b{index:03d}" for index in range(6)],
+    )
+    with pytest.raises(lane.RadioScoreDraftCompileError) as exc_info:
+        lane.compile_radio_score_draft(
+            _draft_for_advisory(
+                advisory,
+                max_width=True,
+                cast_ids=("announcer",) + ("c01",) * 5,
+            ),
+            advisory,
+            _metadata_repair_cast(),
+            _metadata_repair_fact_index(),
+        )
+    assert exc_info.value.code == "delivery_capacity"
+
+
 def test_score_contract_closes_advisory_beats_lines_and_cue_anchors_before_p5():
     score = _metadata_repair_score()
+    scene = score.scenes[0]
+    character_beat = scene.beats[1].model_copy(update={
+        "speaker": "Iona",
+        "char_id": "c01",
+        "speaker_role": "character",
+    })
+    score = score.model_copy(update={
+        "scenes": [scene.model_copy(update={
+            "beats": [scene.beats[0], character_beat, scene.beats[2]],
+        })],
+    })
     advisory = score.advisory_word_plan
     assert lane._validate_radio_score_graph(score, advisory) is None
 
@@ -1493,7 +1562,11 @@ def test_max_width_p5_text_envelopes_fit_the_live_gemma_12b_context():
     cast = _metadata_repair_cast()
     fact_index = _metadata_repair_fact_index()
     score = lane.compile_radio_score_draft(
-        _draft_for_advisory(advisory, max_width=True),
+        _draft_for_advisory(
+            advisory,
+            max_width=True,
+            cast_ids=("announcer",) + ("c01",) * 11,
+        ),
         advisory,
         cast,
         fact_index,
@@ -4204,18 +4277,22 @@ def test_character_word_fit_exhaustion_fails_before_assembly():
         )
 
     receipt = meta["scifi_codex"]["character_word_fit_loop"]
-    assert receipt["status"] == "repair_exhausted"
+    assert receipt["status"] == "consecutive_stalls_exhausted"
     assert receipt["final_character_words"] == 15
     assert receipt["actual_drift"] is True
-    assert len(receipt["cycles"]) == receipt["repair_budget"]
+    assert len(receipt["cycles"]) == 4
+    assert receipt["liveness"]["consecutive_stalls"] == 4
+    assert receipt["repair_budget"] == 52
     assert all(not row["adopted"] for row in receipt["cycles"])
 
 
 def test_character_word_fit_rejects_valid_no_progress_patches():
     score, script = _word_fit_story()
     meta: dict[str, object] = {"scifi_codex": {}}
+    calls: list[str] = []
 
     def same_size(messages, **_kwargs):
+        calls.append("slot")
         request = json.loads(messages[1]["content"])
         return json.dumps({"replacements": [{
             "line_id": request["writable_target_ids"][0],
@@ -4231,9 +4308,7 @@ def test_character_word_fit_rejects_valid_no_progress_patches():
             story_rules=resolve_story_rules("scifi_news"),
             target_words=30,
             creative_fn=same_size,
-            technical_fn=lambda *_args, **_kwargs: pytest.fail(
-                "technical slot must not retry a structurally valid patch"
-            ),
+            technical_fn=same_size,
             pack=routing.resolve_story_pack("scifi_news"),
             script_token_budget=2200,
             journal={},
@@ -4241,7 +4316,9 @@ def test_character_word_fit_rejects_valid_no_progress_patches():
         )
 
     cycles = meta["scifi_codex"]["character_word_fit_loop"]["cycles"]
-    assert all(row["patch_status"] == "no_progress_rejected" for row in cycles)
+    assert calls == ["slot"] * 8
+    assert len(cycles) == 4
+    assert all(row["patch_status"] == "two_slot_quality_floor" for row in cycles)
     assert all(row["after_character_words"] == 15 for row in cycles)
 
 
@@ -4855,4 +4932,123 @@ def test_p5_empty_mechanical_row_is_skipped_locally_not_filled_with_canned_speec
     assert not any(
         flag.startswith("hygiene_repaired_after_reroll")
         for flag in row.compose_flags
+    )
+
+def test_initial_compact_p5_alternates_complete_candidate_producer(monkeypatch):
+    seen: list[str] = []
+    accepted = _script_voicing("announcer", "announcer", "announcer", "announcer")
+
+    def fake_call(**kwargs):
+        seen.append(kwargs["slot"])
+        return accepted
+
+    monkeypatch.setattr(lane, "_call_script_text_draft", fake_call)
+    journal: dict[str, object] = {}
+    result = lane._run_initial_script_generation(
+        creative_fn=lambda *_args, **_kwargs: "",
+        technical_fn=lambda *_args, **_kwargs: "",
+        pack=_compact_p5_test_pack(),
+        artifact_inputs={},
+        score=_metadata_repair_score(),
+        cast=_metadata_repair_cast(),
+        fact_index=_metadata_repair_fact_index(),
+        story_rules=resolve_story_rules("scifi_news"),
+        max_new_tokens=940,
+        call_journal=journal,
+        candidate_index=1,
+    )
+
+    assert result is accepted
+    assert seen == ["technical"]
+    receipt = journal["initial_script_generation_candidate_1"]
+    assert receipt["candidate_index"] == 1
+    assert receipt["selected_slot"] == "technical"
+
+
+def test_complete_script_campaign_retires_candidate_not_episode(monkeypatch):
+    score, script = _word_fit_story()
+    generated_indexes: list[int] = []
+    fit_calls = 0
+
+    def generate_candidate(**kwargs):
+        candidate_index = kwargs["candidate_index"]
+        generated_indexes.append(candidate_index)
+        if 1 <= candidate_index <= 5:
+            raise lane.CodexCandidateGenerationError(
+                "provider temporarily unavailable"
+            )
+        return script.model_copy(deep=True)
+
+    def fit_candidate(**kwargs):
+        nonlocal fit_calls
+        fit_calls += 1
+        if fit_calls == 1:
+            error = lane.CodexWordDeliveryError(
+                "four consecutive stalls retire candidate zero"
+            )
+            error.receipt = {
+                "status": "consecutive_stalls_exhausted",
+                "target_words": 30,
+                "acceptance_words": [28, 34],
+                "initial_character_words": 15,
+                "final_character_words": 15,
+                "repair_budget": 52,
+                "liveness": {"consecutive_stalls": 4},
+                "cycles": [{"adopted": False}] * 4,
+            }
+            raise error
+        return kwargs["script"]
+
+    monkeypatch.setattr(
+        lane, "_run_initial_script_generation", generate_candidate,
+    )
+    monkeypatch.setattr(
+        lane, "_run_listener_quality_loop",
+        lambda **kwargs: kwargs["script"],
+    )
+    monkeypatch.setattr(
+        lane, "_run_final_audit_quality_loop",
+        lambda **kwargs: kwargs["script"],
+    )
+    monkeypatch.setattr(
+        lane, "_collect_script_hygiene_targets",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        lane, "_run_character_word_fit_loop", fit_candidate,
+    )
+    monkeypatch.setattr(
+        lane, "validate_spoken_text_and_roster",
+        lambda *_args, **_kwargs: None,
+    )
+
+    meta: dict[str, object] = {"scifi_codex": {}}
+    journal: dict[str, object] = {}
+    result = lane._run_complete_script_campaign(
+        creative_fn=lambda *_args, **_kwargs: "",
+        technical_fn=lambda *_args, **_kwargs: "",
+        pack=routing.resolve_story_pack("scifi_news"),
+        artifact_inputs={},
+        score=score,
+        cast=_coverage_cast(),
+        fact_index=_metadata_repair_fact_index(),
+        story_rules=resolve_story_rules("scifi_news"),
+        target_words=30,
+        script_token_budget=2200,
+        journal=journal,
+        meta=meta,
+    )
+
+    assert isinstance(result, lane.ScriptArtifactV4)
+    assert generated_indexes == [0, 1, 2, 3, 4, 5, 6]
+    assert fit_calls == 2
+    outer = meta["outer_liveness_retry"]
+    assert outer["active_candidate_index"] == 6
+    assert [row["candidate_index"] for row in outer["discarded_candidates"]] == [
+        0, 1, 2, 3, 4, 5,
+    ]
+    assert outer["discarded_candidates"][0]["cycles_attempted"] == 4
+    assert outer["status"] == "authoring_candidate"
+    assert journal["complete_script_candidates"][-1]["status"] == (
+        "ready_for_ledger_stamp"
     )

@@ -33,6 +33,7 @@ from nodes._otr_line_hygiene import (  # noqa: E402
     flag_one_breath,
     flag_thesis_close,
 )
+from nodes._otr_text_metrics import canonical_word_count  # noqa: E402
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures" / "fable2"
 _LEGACY = _FIXTURES / "legacy_reference_ledger.json"
@@ -554,24 +555,47 @@ def test_final_word_fit_rejects_no_progress_until_typed_exhaustion():
             "replacement_text": " ".join(words),
         })
 
-    with pytest.raises(F2.Fable2WordDeliveryError, match="required 55..67"):
+    with pytest.raises(
+        F2.Fable2WordDeliveryError,
+        match="required 55..67",
+    ) as exc_info:
         F2._run_final_word_fit(
             draft,
             _treatment(),
             envelope,
             F2.resolve_story_rules("scifi_news_pro"),
             creative_fn=same_size,
-            technical_fn=lambda *_args, **_kwargs: pytest.fail(
-                "technical slot should not run after a schema-valid patch"
-            ),
+            technical_fn=same_size,
             mode=F2._COMPACT_MODE,
         )
-    assert calls == F2._OTRWD.delivery_repair_cycle_budget(
-        actual_words=51,
-        target_words=60,
-        lower_words=55,
-        upper_words=67,
+    receipt = exc_info.value.receipt
+    assert calls == 8
+    assert receipt["status"] == "consecutive_stalls_exhausted"
+    assert len(receipt["cycles"]) == 4
+    assert receipt["liveness"]["consecutive_stalls"] == 4
+    assert receipt["repair_budget"] == 16
+
+
+def test_fable_capacity_uses_post_merge_rows_and_the_exact_hygiene_cap():
+    parsed, defects = parse_fable2_markup(_MARKUP, _CAST_NAMES)
+    assert parsed is not None, defects
+    assert sum(len(scene.lines) for scene in parsed.scenes) == 5
+    assert F2._merged_character_run_count(parsed) == 4
+
+    envelope_320 = F2._build_envelope(320)
+    assert F2._minimum_character_run_count(envelope_320) == 5
+    capacity_defects = F2._script_capacity_defects(parsed, envelope_320)
+    assert len(capacity_defects) == 1
+    assert "post-merge alternating character rows 4 below required 5" in (
+        capacity_defects[0]
     )
+
+    per_line_target, line_cap = F2._fable_character_line_policy(
+        parsed,
+        F2._build_envelope(180),
+    )
+    assert per_line_target == 45
+    assert line_cap == 49
 
 
 def test_word_fit_patch_rejects_fake_commercial_and_new_number():
@@ -681,8 +705,8 @@ def test_trailing_mechanical_outro_cannot_hide_or_create_thesis():
         announcer_outro=dirty_outro,
         announcer_word_count=(
             parsed.announcer_word_count
-            - sum(len(text.split()) for text in parsed.announcer_outro)
-            + sum(len(text.split()) for text in dirty_outro)
+            - sum(canonical_word_count(text) for text in parsed.announcer_outro)
+            + sum(canonical_word_count(text) for text in dirty_outro)
         ),
     )
     raw_source = F2._script_view(

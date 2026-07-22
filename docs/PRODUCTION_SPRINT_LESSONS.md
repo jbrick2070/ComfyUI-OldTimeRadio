@@ -587,6 +587,31 @@ After the final readiness normalization, freeze performs a read-only hash-bound
 recount before video readiness. A miss becomes `needs_full_rerun`; freeze never
 authors prose or mutates a content-owned seal.
 
+## 35. Candidate exhaustion is not episode exhaustion
+
+A bounded model call is healthy; a bounded episode-wide output ladder is not.
+Keep each repair attempt and each producer candidate finite, but separate that
+local liveness from the episode's acceptance state. Four consecutive calls that
+make no strict distance progress retire the current candidate. They do not make
+the requested episode impossible, and an LLM verdict never acquires that power.
+
+Escalation is explicit: repair one owned row, try the alternate writer slot, then
+discard the whole candidate and ask one producer to author a fresh complete
+candidate. Alternate the producer priority on successive rerolls. Preserve only
+candidate-local diagnostics from discarded work; never let its text, seal, hash,
+readiness, or subjective score become authoritative. There is no fixed outer
+model-output ceiling. Temporary provider failure stays pending, retryable, and
+non-ready until a legal candidate arrives or the operator cancels.
+
+Only deterministic impossibility may fail loud: invalid configuration, a graph
+whose declared capacity cannot reach the band, corrupt schema ownership, or a
+mechanical safety violation. The final in-band ledger recount and text hash are
+the acceptance judge. Subjective quality remains fail-open, and audio, video,
+captions, credits, mux, and publication stay downstream of the hard final stamp.
+Never manufacture prose, facts, products, advertisements, or numeric claims to
+satisfy the counter.
+
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

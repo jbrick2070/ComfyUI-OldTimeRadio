@@ -51,6 +51,11 @@ import enum
 import re
 from dataclasses import dataclass
 
+try:
+    from ._otr_text_metrics import canonical_word_count
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    from _otr_text_metrics import canonical_word_count  # type: ignore
+
 __all__ = [
     "Fable2ParseDefect",
     "ParseDefect",
@@ -224,7 +229,7 @@ def render_defects(defects: "tuple[ParseDefect, ...]") -> str:
 
 
 def _wc(text: str) -> int:
-    return len(text.split())
+    return canonical_word_count(text)
 
 
 # --- state machine states ----------------------------------------------------

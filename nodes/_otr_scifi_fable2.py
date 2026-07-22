@@ -58,7 +58,9 @@ try:
     from ._otr_repair_prompts import make_dispatching_repair_factory
     from ._otr_story_rules import StoryRules, resolve_story_rules
     from ._otr_line_composer import LineRequest, repair_existing_spoken_line
+    from ._otr_line_hygiene import derive_one_breath_cap
     from ._otr_readiness import normalize_for_delivery
+    from ._otr_text_metrics import canonical_word_count
     from ._otr_fable2_markup import (
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -93,7 +95,9 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         LineRequest,
         repair_existing_spoken_line,
     )
+    from _otr_line_hygiene import derive_one_breath_cap  # type: ignore
     from _otr_readiness import normalize_for_delivery  # type: ignore
+    from _otr_text_metrics import canonical_word_count  # type: ignore
     from _otr_fable2_markup import (  # type: ignore
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -209,6 +213,7 @@ def _MARKUP_LADDER_TEMPS(t: float) -> "tuple[float, ...]":
 
 
 _MAX_BUDGET_REROLLS = 2
+_MAX_CAPACITY_REROLLS = 4
 _TOTAL_WORD_BAND = 0.20      # +/-20% band on CHARACTER words (r4/M4)
 _SCENE_WORD_BAND = 0.30      # prompt-stated per-scene tolerance (ADVISORY:
 #                              prompt vector + _draft_score steer, NOT fatal)
@@ -224,6 +229,7 @@ _SCENE_WORD_GROSS_BAND = 0.50
 _ONE_DRAFT_THRESHOLD = 120   # below this: one-pitch + one-draft mode
 _SUPPORTED_WORD_CEILING = 900  # act-chunk mode deferred post-S3
 _DIGEST_CHAR_CAP = 3600
+_FABLE_MAX_CHARACTER_LINE_WORDS = derive_one_breath_cap((1, 60))
 
 _COMPACT_MODE = "one_pitch_one_draft"
 _FULL_MODE = "three_pitch_two_draft"
@@ -1709,6 +1715,56 @@ def _micro_episode_line_cap(target_words: int) -> int:
     return max(4, int(target_words) // 7)
 
 
+def _merged_character_run_count(parsed: ParsedScript) -> int:
+    """Count the actual writable rows after same-speaker run merging."""
+    total = 0
+    for scene in parsed.scenes:
+        previous = object()
+        for line in scene.lines:
+            if line.speaker != previous:
+                total += 1
+            previous = line.speaker
+    return total
+
+
+def _minimum_character_run_count(envelope: SceneEnvelope) -> int:
+    lower, _upper = _word_band(envelope.total_words)
+    return int(math.ceil(lower / _FABLE_MAX_CHARACTER_LINE_WORDS))
+
+
+def _script_capacity_defects(
+    parsed: ParsedScript,
+    envelope: SceneEnvelope,
+) -> "tuple[str, ...]":
+    actual_runs = _merged_character_run_count(parsed)
+    minimum_runs = _minimum_character_run_count(envelope)
+    if actual_runs >= minimum_runs:
+        return ()
+    return (
+        "CHARACTER_ROW_CAPACITY: post-merge alternating character rows "
+        f"{actual_runs} below required {minimum_runs} for target "
+        f"{envelope.total_words} at the "
+        f"{_FABLE_MAX_CHARACTER_LINE_WORDS}-word breath ceiling",
+    )
+
+
+def _fable_character_line_policy(
+    parsed: ParsedScript,
+    envelope: SceneEnvelope,
+) -> "tuple[int, int]":
+    """Return the hygiene target and exact enforced cap per merged row."""
+    row_count = max(1, _merged_character_run_count(parsed))
+    per_line_target = max(
+        6,
+        int(envelope.total_words) // row_count,
+    )
+    line_cap = derive_one_breath_cap((
+        max(1, per_line_target - 3),
+        per_line_target + 4,
+    ))
+    return per_line_target, line_cap
+
+
 def _script_user_prompt(treatment: Treatment, digest: str,
                         envelope: SceneEnvelope,
                         cast_names: "list[str]") -> str:
@@ -1731,6 +1787,7 @@ def _script_user_prompt(treatment: Treatment, digest: str,
             envelope.scene_word_targets,
             envelope.scene_word_bands), start=1)
     )
+    minimum_runs = _minimum_character_run_count(envelope)
     return (
         f"TREATMENT:\n"
         f"{json.dumps(treatment.model_dump(), ensure_ascii=False, indent=2)}"
@@ -1740,7 +1797,10 @@ def _script_user_prompt(treatment: Treatment, digest: str,
         f"SCENE ENVELOPE: exactly {envelope.scene_count} scene(s); exact "
         f"ordered target/band vector [{vector}]; total CHARACTER dialogue "
         f"target {envelope.total_words} words (announcer lines are metered "
-        f"separately and stay lean: 1-2 intro lines, 1-2 outro lines)."
+        f"separately and stay lean: 1-2 intro lines, 1-2 outro lines). "
+        f"Write at least {minimum_runs} alternating CHARACTER dialogue turns "
+        f"across the scenes; consecutive lines by the same speaker merge into "
+        f"one writable row and therefore count only once."
         f"{micro}\n\n"
         # Recency anchor (first S1b live smokes, 2026-07-10): the local
         # 12B model reverts to screenplay habits unless the LAST thing it
@@ -1881,6 +1941,7 @@ def _run_markup_ladder(
     defects_by_attempt: "list[list[str]]" = []
     traces: "list[PassAttemptTrace]" = []
     budget_rerolls = 0
+    capacity_rerolls = 0
     truncation_retry_used = False
     extra_user: "str | None" = None
     last_defect_text = ""
@@ -1949,6 +2010,41 @@ def _run_markup_ladder(
 
             scene_counts = _scene_character_word_counts(parsed)
             budget_defects = _script_budget_defects(parsed, envelope)
+            capacity_defects = _script_capacity_defects(parsed, envelope)
+            if capacity_defects:
+                defect_rows = tuple(capacity_defects) + tuple(budget_defects)
+                traces.append(PassAttemptTrace(
+                    attempt=attempt,
+                    temperature=float(temp),
+                    requested_max_new_tokens=requested_tokens,
+                    outcome="budget_rejected",
+                    parse_defects=defect_rows,
+                    character_words=parsed.character_word_count,
+                    scene_character_words=scene_counts,
+                ))
+                defects_by_attempt.append(list(defect_rows))
+                last_defect_text = "; ".join(defect_rows)
+                capacity_rerolls += 1
+                if capacity_rerolls >= _MAX_CAPACITY_REROLLS:
+                    raise Fable2ScriptError(
+                        pass_id,
+                        "character-row capacity repair exhausted; last "
+                        f"defects:\n{last_defect_text}",
+                        len(traces),
+                    )
+                minimum_runs = _minimum_character_run_count(envelope)
+                extra_user = (
+                    "Your complete draft cannot be repaired safely at the "
+                    "row-local boundary because it has too few alternating "
+                    "character turns. Rewrite the COMPLETE episode with at "
+                    f"least {minimum_runs} alternating CHARACTER dialogue "
+                    "turns across the locked scene count. Consecutive lines "
+                    "by the same speaker merge and count only once. Preserve "
+                    "the treatment, SFW story, source grounding, announcer "
+                    "skeleton, and strict markup.\nDEFECTS: "
+                    f"{last_defect_text}"
+                )
+                continue
             # Whole-play retries are intentionally bounded. Once spent, retain
             # the complete parse as an INTERMEDIATE candidate and defer any
             # residual total-word miss to the row-local final fitter. A count
@@ -2013,6 +2109,7 @@ def _run_markup_ladder(
                 "rerolls": len(traces) - 1,
                 "attempts": len(traces),
                 "budget_rerolls": budget_rerolls,
+                "capacity_rerolls": capacity_rerolls,
                 "truncation_retry": truncation_retry_used,
                 "attempt_trace": trace_tuple,
                 "actual_max_new_tokens": max(
@@ -2250,7 +2347,7 @@ def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
 
 def _scene_character_word_counts(parsed: ParsedScript) -> "tuple[int, ...]":
     return tuple(
-        sum(len(line.text.split()) for line in scene.lines)
+        sum(canonical_word_count(line.text) for line in scene.lines)
         for scene in parsed.scenes
     )
 
@@ -3676,10 +3773,11 @@ def _repair_final_draft_spoken_hygiene(
     casting or assembly.
     """
     parsed = draft.parsed
-    character_constituents = sum(len(scene.lines) for scene in parsed.scenes)
-    per_line_target = max(
-        6,
-        int(envelope.total_words) // max(1, character_constituents),
+    # Assembly and this hygiene pass merge consecutive same-speaker turns.
+    # Dimension the authored line request from that exact final row topology,
+    # never from pre-merge constituents that cease to be independently writable.
+    per_line_target, _line_cap = _fable_character_line_policy(
+        parsed, envelope,
     )
     anchor_words: list[str] = []
     seen_anchors: set[str] = set()
@@ -3734,7 +3832,7 @@ def _repair_final_draft_spoken_hygiene(
             speaker=speaker,
             intent=intent,
             mood="",
-            target_words=max(1, len(str(safe_text or "").split())),
+            target_words=max(1, canonical_word_count(safe_text)),
             canon_header=(
                 canon_header
                 if use_specificity_anchors
@@ -4008,14 +4106,14 @@ def _repair_final_draft_spoken_hygiene(
         return draft, treatment, ()
     if parsed_changed:
         character_words = sum(
-            len(line.text.split())
+            canonical_word_count(line.text)
             for scene in repaired_scenes
             for line in scene.lines
         )
         announcer_words = (
-            sum(len(text.split()) for text in intro)
-            + sum(len(text.split()) for text in outro)
-            + len(coda.split())
+            sum(canonical_word_count(text) for text in intro)
+            + sum(canonical_word_count(text) for text in outro)
+            + canonical_word_count(coda)
         )
         repaired_parsed = replace(
             parsed,
@@ -4104,7 +4202,7 @@ def _replace_fable_character_line(
             "word_fit", f"scene coordinate {scene_n} does not exist",
         )
     character_words = sum(
-        len(line.text.split())
+        canonical_word_count(line.text)
         for scene in scenes
         for line in scene.lines
     )
@@ -4141,6 +4239,7 @@ def _word_fit_patch_error(
     target: "tuple[int, int]",
     current_text: str,
     legal_speakers: "tuple[str, ...]",
+    max_line_words: "int | None" = None,
 ) -> "str | None":
     if (patch.scene_n, patch.line_index) != target:
         return (
@@ -4152,6 +4251,14 @@ def _word_fit_patch_error(
         return "replacement_text must contain spoken words"
     if text == _norm_ws(current_text):
         return "replacement_text must change the target line"
+    if (
+        max_line_words is not None
+        and canonical_word_count(text) > int(max_line_words)
+    ):
+        return (
+            "replacement_text exceeds the enforced one-breath cap of "
+            f"{int(max_line_words)} words"
+        )
     if re.search(r"[\[\]*]", text) or "(" in text or ")" in text:
         return "replacement_text cannot contain markup or stage directions"
     labels = (ANNOUNCER_NAME,) + tuple(legal_speakers)
@@ -4178,47 +4285,136 @@ def _run_final_word_fit(
     creative_fn,
     technical_fn,
     mode: Fable2Mode,
+    hygiene_receipts: "tuple[dict, ...]" = (),
 ) -> "tuple[FinalDraft, Treatment, tuple[dict, ...], dict]":
-    """Repair one character row per cycle, retaining only strict progress."""
+    """Repair one row per cycle until delivery passes or four cycles stall.
+
+    Each creative or technical proposal must survive the complete producer
+    boundary -- patch validation, source rebuild, total spoken hygiene, seal
+    reconstruction, locked-surface checks, and strict integer distance
+    progress -- before its slot is accepted. A valid-but-unhelpful creative
+    proposal therefore falls through to the technical author in the same
+    cycle. No deterministic story prose is synthesized here.
+    """
     lower, upper = _word_band(envelope.total_words)
     current = draft
     current_treatment = treatment
     actual = current.parsed.character_word_count
     initial_actual = actual
-    repair_budget = _OTRWD.delivery_repair_cycle_budget(
-        actual_words=actual,
-        target_words=envelope.total_words,
+    rows = list(_fable_character_rows(current.parsed))
+    per_line_target, max_line_words = _fable_character_line_policy(
+        current.parsed, envelope,
+    )
+    min_reachable_words = len(rows)
+    max_reachable_words = len(rows) * max_line_words
+    capacity = {
+        "post_merge_character_rows": _merged_character_run_count(
+            current.parsed
+        ),
+        "active_character_rows": len(rows),
+        "per_line_target": per_line_target,
+        "max_line_words": max_line_words,
+        "min_reachable_words": min_reachable_words,
+        "max_reachable_words": max_reachable_words,
+    }
+    if (
+        actual < lower and max_reachable_words < lower
+    ) or (
+        actual > upper and min_reachable_words > upper
+    ):
+        receipt = {
+            "schema_version": 1,
+            "status": "insufficient_active_rows_capacity",
+            "target_words": envelope.total_words,
+            "acceptance_words": [lower, upper],
+            "initial_character_words": initial_actual,
+            "final_character_words": actual,
+            "capacity": capacity,
+            "cycles": [],
+            "actual_drift": True,
+            "final_sha256": current.hashes.raw_sha256,
+        }
+        error = Fable2WordDeliveryError(
+            "word_fit",
+            "insufficient post-merge character-row capacity: "
+            f"{len(rows)} rows x {max_line_words} words cannot reach "
+            f"{lower}..{upper} from actual {actual}",
+        )
+        error.receipt = receipt
+        raise error
+
+    liveness = _OTRWD.WordFitLivenessController(
         lower_words=lower,
         upper_words=upper,
+        initial_words=actual,
+        initial_fingerprint=current.hashes.raw_sha256,
     )
+    repair_budget = liveness.cycle_ceiling
     cycles: list[dict[str, Any]] = []
-    accepted_hygiene: list[dict] = []
+    current_hygiene_by_id = {
+        str(receipt.get("line_id") or ""): dict(receipt)
+        for receipt in hygiene_receipts
+        if isinstance(receipt, dict) and str(receipt.get("line_id") or "")
+    }
     legal_speakers = tuple(_speakers_in_order(current.parsed))
+    candidate_fingerprints = {current.hashes.raw_sha256}
+    terminal_status = (
+        "pass" if lower <= actual <= upper
+        else "consecutive_stalls_exhausted"
+    )
 
-    for cycle in range(1, repair_budget + 1):
-        if lower <= actual <= upper:
-            break
-        rows = list(_fable_character_rows(current.parsed))
-        if not rows:
-            break
+    while liveness.can_continue:
+        cycle = liveness.total_cycles + 1
         under = actual < lower
+        rows = [
+            row for row in _fable_character_rows(current.parsed)
+            if (
+                canonical_word_count(row[2].text) < max_line_words
+                if under else canonical_word_count(row[2].text) > 1
+            )
+        ]
+        if not rows:
+            observation = liveness.observe(None)
+            cycles.append({
+                "cycle": cycle,
+                "before_character_words": actual,
+                "after_character_words": actual,
+                "distance_to_band": _OTRWD.word_band_distance(
+                    actual, lower, upper,
+                ),
+                "attempts": [],
+                "adopted": False,
+                "status": "no_actionable_rows",
+                "liveness": observation,
+            })
+            continue
+
         ranked = sorted(
             rows,
             key=(
-                (lambda row: (len(row[2].text.split()), row[0], row[1]))
+                (lambda row: (
+                    canonical_word_count(row[2].text), row[0], row[1],
+                ))
                 if under else
-                (lambda row: (-len(row[2].text.split()), row[0], row[1]))
+                (lambda row: (
+                    -canonical_word_count(row[2].text), row[0], row[1],
+                ))
             ),
         )
         scene_n, line_index, target_line = ranked[(cycle - 1) % len(ranked)]
         target_coord = (scene_n, line_index)
+        target_line_id = f"shot_{scene_n:03d}_b{line_index}"
+        current_line_words = canonical_word_count(target_line.text)
         distance = (lower - actual) if under else (actual - upper)
         correction = min(
-            distance, _OTRWD.delivery_step_words(envelope.total_words),
+            distance,
+            (
+                max_line_words - current_line_words
+                if under else current_line_words - 1
+            ),
         )
-        current_line_words = len(target_line.text.split())
         desired_line_words = (
-            current_line_words + correction
+            min(max_line_words, current_line_words + correction)
             if under else max(1, current_line_words - correction)
         )
         payload = {
@@ -4229,6 +4425,7 @@ def _run_final_word_fit(
                 "current_text": target_line.text,
                 "current_line_words": current_line_words,
                 "desired_line_words": desired_line_words,
+                "maximum_line_words": max_line_words,
             },
             "delivery": {
                 "current_character_words": actual,
@@ -4254,22 +4451,28 @@ def _run_final_word_fit(
             "Use natural spoken dialogue: no labels, stage directions, markup, "
             "filler, invented named or numeric facts, fake commercials, fake "
             "products, sponsor copy, or moral summary. Aim for the requested "
-            "line length, but make the line dramatically coherent."
+            "line length without exceeding the stated maximum, and keep the "
+            "line dramatically coherent."
         )
         cycle_receipt: dict[str, Any] = {
             "cycle": cycle,
             "before_character_words": actual,
+            "target_line_id": target_line_id,
             "target": {
                 "scene_n": scene_n,
                 "line_index": line_index,
                 "speaker": target_line.speaker,
             },
             "desired_line_words": desired_line_words,
+            "maximum_line_words": max_line_words,
             "attempts": [],
             "adopted": False,
         }
-        candidate_patch: _Fable2WordFitPatch | None = None
+        accepted_bundle: (
+            "tuple[FinalDraft, Treatment, dict[str, dict], int, bool] | None"
+        ) = None
         accepted_slot = ""
+
         for slot_name, slot_fn in (
             ("creative", creative_fn),
             ("technical", technical_fn),
@@ -4289,6 +4492,11 @@ def _run_final_word_fit(
                     ),
                 })
 
+            slot_receipt: dict[str, Any] = {
+                "slot": slot_name,
+                "status": "rejected",
+                "calls": attempt_rows,
+            }
             try:
                 # LLM slot: per-sub-pass -- creative first, technical fallback.
                 candidate_patch = structured_call(
@@ -4318,6 +4526,7 @@ def _run_final_word_fit(
                         target=target_coord,
                         current_text=target_line.text,
                         legal_speakers=legal_speakers,
+                        max_line_words=max_line_words,
                     ),
                     clamp_overlong_strings=False,
                     max_new_tokens=512,
@@ -4325,115 +4534,162 @@ def _run_final_word_fit(
                     helper_name=f"fable2_word_fit_{slot_name}",
                     on_attempt_complete=_attempt_complete,
                 )
-            except Exception as exc:  # next slot/cycle owns recovery
-                cycle_receipt["attempts"].append({
-                    "slot": slot_name,
-                    "status": "rejected",
-                    "calls": attempt_rows,
+                candidate_parsed = _replace_fable_character_line(
+                    current.parsed,
+                    scene_n=scene_n,
+                    line_index=line_index,
+                    replacement_text=candidate_patch.replacement_text,
+                )
+                raw_source = _script_view(
+                    candidate_parsed,
+                    current_treatment,
+                    include_news_read=False,
+                )
+                candidate = build_final_draft(
+                    raw_source,
+                    candidate_parsed,
+                    current_treatment,
+                    envelope,
+                    story_rules,
+                    p3_attempts=current.p3_attempts,
+                    p5_attempts=current.p5_attempts,
+                )
+                candidate, candidate_treatment, hygiene_receipts = (
+                    _repair_final_draft_spoken_hygiene(
+                        candidate,
+                        current_treatment,
+                        envelope,
+                        story_rules,
+                        creative_fn=creative_fn,
+                        technical_fn=technical_fn,
+                    )
+                )
+                if candidate_treatment != current_treatment:
+                    raise ValueError("word fit changed the locked treatment")
+                if any(
+                    receipt.get("status") == "row_failed_mechanical"
+                    and str(receipt.get("line_id") or "") == target_line_id
+                    for receipt in hygiene_receipts
+                ):
+                    raise ValueError(
+                        "word fit candidate left its target row unspeakable"
+                    )
+                if _word_fit_non_target_signature(
+                    candidate.parsed, target_coord,
+                ) != _word_fit_non_target_signature(
+                    current.parsed, target_coord,
+                ):
+                    raise ValueError(
+                        "word fit changed a non-target play surface"
+                    )
+                final_target = next(
+                    line
+                    for sn, li, line in _fable_character_rows(
+                        candidate.parsed
+                    )
+                    if (sn, li) == target_coord
+                )
+                final_error = _word_fit_patch_error(
+                    _Fable2WordFitPatch(
+                        scene_n=scene_n,
+                        line_index=line_index,
+                        replacement_text=final_target.text,
+                    ),
+                    target=target_coord,
+                    current_text=target_line.text,
+                    legal_speakers=legal_speakers,
+                    max_line_words=max_line_words,
+                )
+                if final_error is not None:
+                    raise ValueError(final_error)
+                _validate_selected_final_draft(
+                    candidate,
+                    envelope,
+                    story_rules,
+                    mode,
+                    treatment=current_treatment,
+                )
+                candidate_actual = candidate.parsed.character_word_count
+                candidate_sha256 = candidate.hashes.raw_sha256
+                slot_receipt.update({
+                    "candidate_character_words": candidate_actual,
+                    "candidate_sha256": candidate_sha256,
+                })
+                if candidate_sha256 in candidate_fingerprints:
+                    slot_receipt["duplicate_fingerprint"] = True
+                    raise ValueError("duplicate candidate state")
+                candidate_fingerprints.add(candidate_sha256)
+                prior_distance = _OTRWD.word_band_distance(
+                    actual, lower, upper,
+                )
+                candidate_distance = _OTRWD.word_band_distance(
+                    candidate_actual, lower, upper,
+                )
+                if candidate_distance >= prior_distance:
+                    raise ValueError("candidate made no strict progress")
+            except Exception as exc:  # the next authored slot owns recovery
+                slot_receipt.update({
                     "error_type": type(exc).__name__,
                     "error": " ".join(str(exc).split())[:300],
                 })
-                candidate_patch = None
+                cycle_receipt["attempts"].append(slot_receipt)
                 continue
-            cycle_receipt["attempts"].append({
-                "slot": slot_name,
-                "status": "accepted",
-                "calls": attempt_rows,
-            })
+
+            slot_receipt["status"] = "accepted"
+            cycle_receipt["attempts"].append(slot_receipt)
+            candidate_hygiene_by_id = dict(current_hygiene_by_id)
+            cleared_prior_receipt = candidate_hygiene_by_id.pop(
+                target_line_id, None,
+            )
+            for receipt in hygiene_receipts:
+                if not isinstance(receipt, dict):
+                    continue
+                receipt_line_id = str(receipt.get("line_id") or "")
+                if receipt_line_id:
+                    candidate_hygiene_by_id[receipt_line_id] = dict(receipt)
+            accepted_bundle = (
+                candidate,
+                candidate_treatment,
+                candidate_hygiene_by_id,
+                candidate_actual,
+                cleared_prior_receipt is not None,
+            )
             accepted_slot = slot_name
             break
-        if candidate_patch is None:
+
+        if accepted_bundle is None:
+            observation = liveness.observe(None)
             cycle_receipt.update({
                 "after_character_words": actual,
                 "distance_to_band": _OTRWD.word_band_distance(
                     actual, lower, upper,
                 ),
                 "status": "two_slot_rejected",
+                "liveness": observation,
             })
             cycles.append(cycle_receipt)
             continue
 
-        candidate_parsed = _replace_fable_character_line(
-            current.parsed,
-            scene_n=scene_n,
-            line_index=line_index,
-            replacement_text=candidate_patch.replacement_text,
+        (
+            candidate,
+            candidate_treatment,
+            candidate_hygiene_by_id,
+            candidate_actual,
+            cleared_prior_receipt,
+        ) = accepted_bundle
+        current = candidate
+        current_treatment = candidate_treatment
+        current_hygiene_by_id = candidate_hygiene_by_id
+        actual = candidate_actual
+        observation = liveness.observe(
+            actual,
+            fingerprint=candidate.hashes.raw_sha256,
         )
-        raw_source = _script_view(
-            candidate_parsed, current_treatment, include_news_read=False,
-        )
-        try:
-            candidate = build_final_draft(
-                raw_source,
-                candidate_parsed,
-                current_treatment,
-                envelope,
-                story_rules,
-                p3_attempts=current.p3_attempts,
-                p5_attempts=current.p5_attempts,
+        if not observation["strict_progress"]:
+            raise Fable2WordDeliveryError(
+                "word_fit",
+                "validated candidate lost strict progress at liveness commit",
             )
-            candidate, candidate_treatment, hygiene_receipts = (
-                _repair_final_draft_spoken_hygiene(
-                    candidate,
-                    current_treatment,
-                    envelope,
-                    story_rules,
-                    creative_fn=creative_fn,
-                    technical_fn=technical_fn,
-                )
-            )
-            if candidate_treatment != current_treatment:
-                raise ValueError("word fit changed the locked treatment")
-            if _word_fit_non_target_signature(
-                candidate.parsed, target_coord,
-            ) != _word_fit_non_target_signature(current.parsed, target_coord):
-                raise ValueError("word fit changed a non-target play surface")
-            final_target = next(
-                line for sn, li, line in _fable_character_rows(candidate.parsed)
-                if (sn, li) == target_coord
-            )
-            final_error = _word_fit_patch_error(
-                _Fable2WordFitPatch(
-                    scene_n=scene_n,
-                    line_index=line_index,
-                    replacement_text=final_target.text,
-                ),
-                target=target_coord,
-                current_text=target_line.text,
-                legal_speakers=legal_speakers,
-            )
-            if final_error is not None:
-                raise ValueError(final_error)
-            _validate_selected_final_draft(
-                candidate,
-                envelope,
-                story_rules,
-                mode,
-                treatment=current_treatment,
-            )
-        except Exception as exc:  # invalid candidate cannot erase prior work
-            cycle_receipt.update({
-                "after_character_words": actual,
-                "distance_to_band": _OTRWD.word_band_distance(
-                    actual, lower, upper,
-                ),
-                "status": "candidate_rejected",
-                "candidate_error": " ".join(str(exc).split())[:300],
-            })
-            cycles.append(cycle_receipt)
-            continue
-
-        candidate_actual = candidate.parsed.character_word_count
-        prior_distance = _OTRWD.word_band_distance(actual, lower, upper)
-        candidate_distance = _OTRWD.word_band_distance(
-            candidate_actual, lower, upper,
-        )
-        adopted = candidate_distance < prior_distance
-        if adopted:
-            current = candidate
-            current_treatment = candidate_treatment
-            actual = candidate_actual
-            accepted_hygiene.extend(hygiene_receipts)
         cycle_receipt.update({
             "accepted_slot": accepted_slot,
             "candidate_character_words": candidate_actual,
@@ -4441,38 +4697,48 @@ def _run_final_word_fit(
             "distance_to_band": _OTRWD.word_band_distance(
                 actual, lower, upper,
             ),
-            "adopted": adopted,
-            "status": "progress" if adopted else "no_progress_rejected",
+            "adopted": True,
+            "status": "progress",
             "candidate_sha256": candidate.hashes.raw_sha256,
+            "cleared_prior_hygiene_receipt": cleared_prior_receipt,
+            "liveness": observation,
         })
         cycles.append(cycle_receipt)
+        if lower <= actual <= upper:
+            terminal_status = "pass"
+            break
+
+    if liveness.exhausted and not lower <= actual <= upper:
+        terminal_status = "consecutive_stalls_exhausted"
 
     actual = current.parsed.character_word_count
     receipt = {
         "schema_version": 1,
-        "status": "pass" if lower <= actual <= upper else "repair_exhausted",
+        "status": "pass" if lower <= actual <= upper else terminal_status,
         "target_words": envelope.total_words,
         "acceptance_words": [lower, upper],
         "initial_character_words": initial_actual,
         "final_character_words": actual,
         "repair_budget": repair_budget,
+        "capacity": capacity,
+        "liveness": liveness.receipt(),
         "cycles": cycles,
         "actual_drift": not (lower <= actual <= upper),
         "final_sha256": current.hashes.raw_sha256,
     }
     if not lower <= actual <= upper:
-        raise Fable2WordDeliveryError(
+        error = Fable2WordDeliveryError(
             "word_fit",
-            f"exhausted {repair_budget} row-local cycles; required "
-            f"{lower}..{upper}, actual {actual}",
-            sum(
-                len(row.get("attempts") or ()) for row in cycles
-            ),
+            f"{terminal_status} after {len(cycles)} row-local cycles; "
+            f"required {lower}..{upper}, actual {actual}",
+            sum(len(row.get("attempts") or ()) for row in cycles),
         )
+        error.receipt = receipt
+        raise error
     return (
         current,
         current_treatment,
-        tuple(accepted_hygiene),
+        tuple(current_hygiene_by_id.values()),
         receipt,
     )
 
@@ -4836,67 +5102,312 @@ def run_scifi_fable2_episode(
         )
 
     final_draft = draft_selection.winner
-    counting_hygiene_creative, hygiene_creative_box = _counting(creative_fn)
-    counting_hygiene_technical, hygiene_technical_box = _counting(technical_fn)
-    with _helper_ctx(slot_scheduler, "fable2_spoken_hygiene"):
-        final_draft, treatment, hygiene_receipts = (
-            _repair_final_draft_spoken_hygiene(
-                final_draft,
-                treatment,
+    locked_delivery_treatment = treatment
+
+    def _author_delivery_reroll(candidate_index: int) -> dict[str, Any]:
+        """Author one fresh complete play under the locked treatment.
+
+        This is the producer-owned last resort after a row-fit candidate
+        reaches four consecutive stalls.  Full mode repeats its complete
+        P3/P4/P5 contract; compact mode repeats P3.  The alternate writer slot
+        is used on every other candidate, so one model cannot own liveness.
+        """
+        author_slot = "technical" if candidate_index % 2 else "creative"
+        author_fn = technical_fn if author_slot == "technical" else creative_fn
+        critic_slot = "creative" if author_slot == "technical" else "technical"
+        critic_fn = creative_fn if critic_slot == "creative" else technical_fn
+
+        counting_script, script_box = _counting(author_fn)
+        with _helper_ctx(
+            slot_scheduler,
+            f"fable2_delivery_reroll_{candidate_index}_script",
+        ):
+            fresh_text, fresh_parsed, fresh_p3_meta = _pass_script(
+                counting_script,
+                pack,
+                locked_delivery_treatment,
+                digest,
                 envelope,
-                story_rules,
-                creative_fn=counting_hygiene_creative,
-                technical_fn=counting_hygiene_technical,
-                news_read_validator=news_read_validator,
+                cast_names,
             )
+        fresh_p3_attempts = tuple(fresh_p3_meta["attempt_trace"])
+        if script_box["calls"] != len(fresh_p3_attempts):
+            raise Fable2ScriptError(
+                "script", "delivery reroll P3 attempt/call count drift",
+            )
+        fresh_draft1_pre = build_final_draft(
+            fresh_text,
+            fresh_parsed,
+            locked_delivery_treatment,
+            envelope,
+            story_rules,
+            p3_attempts=fresh_p3_attempts,
         )
-    f2["spoken_hygiene"] = {
-        "schema_version": 1,
-        "status": "repaired" if hygiene_receipts else "clean_noop",
-        "creative_calls": hygiene_creative_box["calls"],
-        "technical_calls": hygiene_technical_box["calls"],
-        "repairs": list(hygiene_receipts),
-    }
-    if hygiene_receipts:
-        f2["treatment"] = treatment.model_dump()
-        log.warning(
-            "[scifi_fable2] total spoken hygiene repaired %d row(s) and "
-            "rebuilt the selected FinalDraft seals: %s",
-            len(hygiene_receipts),
-            ", ".join(
-                str(receipt.get("line_id") or "?") + "[" + ",".join(
-                    str(flag) for flag in (
-                        receipt.get("repair_flags") or ()
-                    )
-                ) + "]"
-                for receipt in hygiene_receipts
+        result: dict[str, Any] = {
+            "candidate_index": candidate_index,
+            "author_slot": author_slot,
+            "critic_slot": critic_slot if mode == _FULL_MODE else "skipped",
+            "p3_meta": fresh_p3_meta,
+            "p3_attempts": fresh_p3_attempts,
+            "p3_calls": script_box["calls"],
+            "draft1": fresh_draft1_pre,
+            "selected_draft_name": (
+                f"delivery_reroll_{candidate_index}_draft1"
             ),
-        )
-    counting_word_fit_creative, word_fit_creative_box = _counting(creative_fn)
-    counting_word_fit_technical, word_fit_technical_box = _counting(technical_fn)
-    with _helper_ctx(slot_scheduler, "fable2_word_fit"):
-        final_draft, treatment, fit_hygiene_receipts, word_fit_receipt = (
-            _run_final_word_fit(
-                final_draft,
-                treatment,
-                envelope,
-                story_rules,
-                creative_fn=counting_word_fit_creative,
-                technical_fn=counting_word_fit_technical,
-                mode=mode,
+        }
+        if mode == _COMPACT_MODE:
+            result["final_draft"] = fresh_draft1_pre
+            return result
+
+        counting_critic, critic_box = _counting(critic_fn)
+        with _helper_ctx(
+            slot_scheduler,
+            f"fable2_delivery_reroll_{candidate_index}_critic",
+        ):
+            fresh_critic = _pass_critic(
+                counting_critic,
+                pack,
+                draft1=fresh_draft1_pre,
+                treatment=locked_delivery_treatment,
+                selected_pitch=pitch,
+                envelope=envelope,
+                story_rules=story_rules,
             )
+        counting_revision, revision_box = _counting(author_fn)
+        with _helper_ctx(
+            slot_scheduler,
+            f"fable2_delivery_reroll_{candidate_index}_revision",
+        ):
+            fresh_draft2_text, fresh_parsed2, fresh_p5_meta = _pass_revision(
+                counting_revision,
+                pack,
+                draft1=fresh_draft1_pre,
+                treatment=locked_delivery_treatment,
+                critic_notes=fresh_critic,
+                selected_pitch=pitch,
+                envelope=envelope,
+                story_rules=story_rules,
+                cast_names=cast_names,
+            )
+        fresh_p5_attempts = tuple(fresh_p5_meta["attempt_trace"])
+        if revision_box["calls"] != len(fresh_p5_attempts):
+            raise Fable2ScriptError(
+                "revision", "delivery reroll P5 attempt/call count drift",
+            )
+        fresh_contract = validate_revision_contract(
+            fresh_draft1_pre.normalized_source,
+            fresh_parsed,
+            normalize_fable2_markup_text(fresh_draft2_text),
+            fresh_parsed2,
+            fresh_critic,
+            envelope,
+            story_rules,
         )
-    word_fit_receipt.update({
-        "creative_calls": word_fit_creative_box["calls"],
-        "technical_calls": word_fit_technical_box["calls"],
-    })
-    f2["word_fit"] = word_fit_receipt
-    if fit_hygiene_receipts:
-        hygiene_receipts = tuple(hygiene_receipts) + tuple(
-            fit_hygiene_receipts
+        fresh_draft1 = build_final_draft(
+            fresh_text,
+            fresh_parsed,
+            locked_delivery_treatment,
+            envelope,
+            story_rules,
+            p3_attempts=fresh_p3_attempts,
+            p5_attempts=fresh_p5_attempts,
         )
-        f2["spoken_hygiene"]["status"] = "repaired"
+        fresh_draft2 = build_final_draft(
+            fresh_draft2_text,
+            fresh_parsed2,
+            locked_delivery_treatment,
+            envelope,
+            story_rules,
+            p3_attempts=fresh_p3_attempts,
+            p5_attempts=fresh_p5_attempts,
+        )
+        fresh_selection = choose_final_draft(
+            fresh_draft1, fresh_draft2, fresh_contract,
+        )
+        result.update({
+            "critic": fresh_critic,
+            "critic_calls": critic_box["calls"],
+            "p5_meta": fresh_p5_meta,
+            "p5_attempts": fresh_p5_attempts,
+            "p5_calls": revision_box["calls"],
+            "revision_contract": fresh_contract,
+            "draft1": fresh_draft1,
+            "draft2": fresh_draft2,
+            "final_draft": fresh_selection.winner,
+            "selected_draft_name": (
+                f"delivery_reroll_{candidate_index}_draft2"
+                if fresh_selection.winner is fresh_draft2
+                else f"delivery_reroll_{candidate_index}_draft1"
+            ),
+            "selection_reason": fresh_selection.reason,
+        })
+        return result
+
+    delivery_candidate_index = 0
+    needs_fresh_candidate = False
+    f2["delivery_candidate_runs"] = []
+    while True:
+        # Candidate-local spoken hygiene may repair the factual close.  A
+        # retired candidate cannot lend that mutation to its successor, so
+        # every complete play begins from the same locked P2c treatment.
+        treatment = locked_delivery_treatment
+        if needs_fresh_candidate:
+            try:
+                reroll = _author_delivery_reroll(delivery_candidate_index)
+            except Fable2ScriptError as exc:
+                # Only an observed LLM-output ladder is retryable here. Pack,
+                # schema, seal, and code invariants have attempts==0 and still
+                # fail closed rather than spinning forever on bad configuration.
+                if int(getattr(exc, "attempts", 0) or 0) <= 0:
+                    raise
+                _OTRWD.retire_word_fit_candidate(
+                    meta,
+                    owner="scifi_news_pro",
+                    boundary="P3_P5_complete_play",
+                    reason=f"candidate_generation_exhausted: {exc}",
+                    receipt={"status": "candidate_generation_exhausted"},
+                )
+                f2["delivery_candidate_runs"].append({
+                    "candidate_index": delivery_candidate_index,
+                    "status": "candidate_generation_exhausted",
+                    "error_type": type(exc).__name__,
+                    "error": " ".join(str(exc).split())[:500],
+                })
+                delivery_candidate_index += 1
+                continue
+
+            final_draft = reroll["final_draft"]
+            draft1 = reroll["draft1"]
+            p3_meta = reroll["p3_meta"]
+            p3_attempts = reroll["p3_attempts"]
+            selected_draft_name = reroll["selected_draft_name"]
+            if mode == _FULL_MODE:
+                draft2 = reroll["draft2"]
+                critic_notes = reroll["critic"]
+                revision_contract = reroll["revision_contract"]
+                p5_meta = reroll["p5_meta"]
+                p5_attempts = reroll["p5_attempts"]
+                f2["critic"] = critic_notes.model_dump(mode="json")
+                revision_receipt = _revision_contract_payload(
+                    revision_contract,
+                )
+                revision_receipt["contract_sha256"] = (
+                    revision_contract.contract_sha256
+                )
+                f2["revision_contract"] = revision_receipt
+                f2["draft2_sha256"] = draft2.hashes.raw_sha256
+                f2["parse_p5"] = {
+                    "defects_by_attempt": p5_meta["defects_by_attempt"],
+                    "rerolls": p5_meta["rerolls"],
+                    "normalizations": list(draft2.parsed.normalizations),
+                    "attempt_trace": [
+                        _attempt_payload(row) for row in p5_attempts
+                    ],
+                    "deferred_budget_defects": p5_meta.get(
+                        "deferred_budget_defects", [],
+                    ),
+                }
+            f2["delivery_candidate_runs"].append({
+                key: value
+                for key, value in reroll.items()
+                if key in {
+                    "candidate_index", "author_slot", "critic_slot",
+                    "p3_calls", "critic_calls", "p5_calls",
+                    "selected_draft_name", "selection_reason",
+                }
+            } | {"status": "authored"})
+
+        counting_hygiene_creative, hygiene_creative_box = _counting(creative_fn)
+        counting_hygiene_technical, hygiene_technical_box = _counting(technical_fn)
+        with _helper_ctx(
+            slot_scheduler,
+            f"fable2_spoken_hygiene_candidate_{delivery_candidate_index}",
+        ):
+            final_draft, treatment, hygiene_receipts = (
+                _repair_final_draft_spoken_hygiene(
+                    final_draft,
+                    treatment,
+                    envelope,
+                    story_rules,
+                    creative_fn=counting_hygiene_creative,
+                    technical_fn=counting_hygiene_technical,
+                    news_read_validator=news_read_validator,
+                )
+            )
+        f2["spoken_hygiene"] = {
+            "schema_version": 1,
+            "status": "repaired" if hygiene_receipts else "clean_noop",
+            "creative_calls": hygiene_creative_box["calls"],
+            "technical_calls": hygiene_technical_box["calls"],
+            "repairs": list(hygiene_receipts),
+        }
+        if hygiene_receipts:
+            f2["treatment"] = treatment.model_dump()
+            log.warning(
+                "[scifi_fable2] candidate %d spoken hygiene resolved %d "
+                "row(s) and rebuilt its FinalDraft seals",
+                delivery_candidate_index,
+                len(hygiene_receipts),
+            )
+        counting_word_fit_creative, word_fit_creative_box = _counting(
+            creative_fn,
+        )
+        counting_word_fit_technical, word_fit_technical_box = _counting(
+            technical_fn,
+        )
+        try:
+            with _helper_ctx(
+                slot_scheduler,
+                f"fable2_word_fit_candidate_{delivery_candidate_index}",
+            ):
+                (
+                    final_draft,
+                    treatment,
+                    fit_hygiene_receipts,
+                    word_fit_receipt,
+                ) = _run_final_word_fit(
+                    final_draft,
+                    treatment,
+                    envelope,
+                    story_rules,
+                    creative_fn=counting_word_fit_creative,
+                    technical_fn=counting_word_fit_technical,
+                    mode=mode,
+                    hygiene_receipts=tuple(hygiene_receipts),
+                )
+        except Fable2WordDeliveryError as exc:
+            failed_receipt = getattr(exc, "receipt", None)
+            if not isinstance(failed_receipt, dict):
+                raise
+            _OTRWD.retire_word_fit_candidate(
+                meta,
+                owner="scifi_news_pro",
+                boundary="P3_P5_complete_play",
+                reason=str(exc),
+                fingerprint=final_draft.hashes.raw_sha256,
+                receipt=failed_receipt,
+            )
+            f2["delivery_candidate_runs"].append({
+                "candidate_index": delivery_candidate_index,
+                "status": "word_fit_candidate_retired",
+                "word_fit": failed_receipt,
+            })
+            delivery_candidate_index += 1
+            needs_fresh_candidate = True
+            continue
+
+        word_fit_receipt.update({
+            "creative_calls": word_fit_creative_box["calls"],
+            "technical_calls": word_fit_technical_box["calls"],
+            "candidate_index": delivery_candidate_index,
+        })
+        f2["word_fit"] = word_fit_receipt
+        hygiene_receipts = tuple(fit_hygiene_receipts)
+        f2["spoken_hygiene"]["status"] = (
+            "repaired" if hygiene_receipts else "clean_noop"
+        )
         f2["spoken_hygiene"]["repairs"] = list(hygiene_receipts)
+        break
     _validate_selected_final_draft(
         final_draft, envelope, story_rules, mode, treatment=treatment)
     f2["draft1_sha256"] = draft1.hashes.raw_sha256
@@ -4961,6 +5472,14 @@ def run_scifi_fable2_episode(
         )
     except _OTRWD.WordDeliveryError as exc:
         raise Fable2WordDeliveryError("word_fit", str(exc)) from exc
+    _OTRWD.accept_word_fit_candidate(
+        led.data.setdefault("meta", {}),
+        owner="scifi_news_pro",
+        boundary="P3_P5_complete_play",
+        fingerprint=final_draft.hashes.raw_sha256,
+        actual_words=int(delivery_receipt["actual_voiced_words"]),
+        acceptance_words=delivery_receipt["acceptance_words"],
+    )
     _fable2_meta(led)["word_fit"]["assembled_receipt"] = delivery_receipt
     _receipt("assemble", "python", 0, 0.0, 0)
     # Ledger.save() replaces led.data with its merged payload. Reacquire

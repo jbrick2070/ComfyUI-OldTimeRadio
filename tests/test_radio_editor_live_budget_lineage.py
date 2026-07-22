@@ -18,6 +18,7 @@ from nodes._otr_radio_editor import (
     RadioEditPlan,
     apply_plan,
     fit_final_word_delivery,
+    fit_final_word_delivery_campaign,
     make_post_validator,
     needs_length_normalization,
     normalize_length,
@@ -25,6 +26,7 @@ from nodes._otr_radio_editor import (
 )
 from nodes._otr_text_metrics import set_line_text_metrics
 from nodes._otr_word_delivery import (
+    WordFitLivenessController,
     character_text_sha256,
     delivery_word_bounds,
     stamp_contract,
@@ -338,6 +340,28 @@ def test_common_integer_delivery_law_covers_180_and_320_words():
     assert delivery_word_bounds(320) == (289, 356)
 
 
+def test_word_fit_liveness_allows_more_than_eighteen_strict_progress_cycles():
+    controller = WordFitLivenessController(
+        lower_words=25,
+        upper_words=30,
+        initial_words=1,
+        initial_fingerprint="state-1",
+    )
+
+    for words in range(2, 26):
+        observation = controller.observe(
+            words,
+            fingerprint=f"state-{words}",
+        )
+        assert observation["strict_progress"] is True
+        assert observation["consecutive_stalls"] == 0
+
+    assert controller.total_cycles == 24
+    assert controller.progress_cycles == 24
+    assert controller.in_band is True
+    assert controller.exhausted is False
+
+
 def test_inline_fit_survives_failed_pair_then_repairs_one_row_only():
     ledger = _fit_ledger()
     before = copy.deepcopy(ledger["lines"])
@@ -386,7 +410,61 @@ def test_inline_fit_rejects_no_progress_until_typed_exhaustion():
 
     assert ledger["lines"] == before
     receipt = ledger["meta"]["inline_word_fit"]
-    assert receipt["status"] == "repair_exhausted"
+    assert receipt["status"] == "consecutive_stalls_exhausted"
     assert receipt["actual_drift"] is True
     assert receipt["final_character_words"] == 158
-    assert len(receipt["cycles"]) == receipt["repair_budget"]
+    assert len(receipt["cycles"]) == 4
+    assert receipt["liveness"]["consecutive_stalls"] == 4
+    assert receipt["repair_budget"] == 20
+
+
+_COMPLETE_REROLL_LINE = _FIT_EXPANDED + " We stay until tonight."
+
+
+def test_inline_campaign_retires_candidates_and_alternates_complete_reroll():
+    ledger = _fit_ledger()
+    creative_calls: list[str] = []
+    technical_calls: list[str] = []
+
+    def creative(messages, **_kwargs):
+        system = messages[0]["content"]
+        creative_calls.append(system)
+        if system.startswith("Re-author one row"):
+            return _COMPLETE_REROLL_LINE
+        return ""
+
+    def technical(messages, **_kwargs):
+        technical_calls.append(messages[0]["content"])
+        return ""
+
+    receipt = fit_final_word_delivery_campaign(
+        ledger,
+        creative_fn=creative,
+        technical_fn=technical,
+        creative_model="test/creative",
+        technical_model="test/technical",
+        source_bank_id="original",
+        canon_header="SETTING: a signal room\nCAST: ALICE",
+    )
+
+    outer = ledger["meta"]["outer_liveness_retry"]
+    assert [row["candidate_index"] for row in outer["discarded_candidates"]] == [
+        0, 1,
+    ]
+    assert outer["authoritative_candidate"]["candidate_index"] == 2
+    assert receipt["accepted_candidate"]["status"] == "pass"
+    assert receipt["final_receipt"]["actual_voiced_words"] == 168
+    assert ledger["meta"]["inline_complete_candidate"]["author_slot"] == (
+        "creative"
+    )
+    assert all(
+        "full_word_delivery_reroll" in row["compose_flags"]
+        for row in ledger["lines"]
+        if row["speaker_role"] == "character"
+    )
+    assert sum(
+        text.startswith("Re-author one row") for text in technical_calls
+    ) == 1
+    assert sum(
+        text.startswith("Re-author one row") for text in creative_calls
+    ) == 6

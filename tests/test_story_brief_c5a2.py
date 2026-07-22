@@ -256,7 +256,9 @@ def test_call_site_before_led_save(execute_fn):
 def test_reflections_describe_the_final_word_fitted_rows(execute_fn):
     """PBUG-20260721-18: metadata reflection follows the final row gate."""
     refl = _reflection_call(execute_fn)
-    fit_calls = _find_call_site(execute_fn, "fit_final_word_delivery")
+    fit_calls = _find_call_site(
+        execute_fn, "fit_final_word_delivery_campaign",
+    )
     actual_calls = _find_call_site(execute_fn, "stamp_actual")
     produced_calls = _find_call_site(execute_fn, "run_produced_story_summary")
 
