@@ -2522,4 +2522,57 @@ out until they independently meet the same production-only admission rule.
   master and require exactly `ceil(2.1 * 25) = 53` output frames. Retain a
   legacy no-position manifest that preserves full sequential requests
 - bible-worthy: yes -- BUG-12.69
-- status: **LIVE-ADMITTED / ROOT-FIXED; exact failed-ledger replay, 96 focused CPU/ffmpeg tests, full suite (8,328 passed), Bug Bible, and canonical workflow gates GREEN; push and live six-bank 320-word requalification pending**
+- status: **LIVE-ADMITTED / ROOT-FIXED / PUSHED at `651118ef`; exact failed-ledger replay, 96 focused CPU/ffmpeg tests, full suite (8,328 passed), Bug Bible, and canonical workflow gates GREEN; resumed qualification surfaced PBUG-20260721-18 before media**
+
+## PBUG-20260721-18 -- requested story length escaped every producer as advisory drift
+- surfaced: canonical `scifi_news` qualification prompt
+  `f62c1177-a40a-4f9e-a9ac-f9c3bcfad717`, pending episode
+  `pending_20260721_172001`, 2026-07-21. The selected Ars Technica source was
+  `Let Tom Hiddleston be your guide to Pompeii's final day`. The run completed
+  the P0/P3/P4/P3-rewrite/P5 and dynamic story-quality passes, then was stopped
+  before TTS/media when the writer logged the measurable delivery miss
+- symptom: the final composed character rows contained only 190 words for the
+  explicit 320-word request. The shared acceptance law is 289..356, so the
+  delivered body was 99 words below its minimum (ratio 0.59). The writer
+  labeled the defect `ADVISORY ONLY`, stamped drift, and proceeded into story
+  reflection. No downstream asset was allowed to render during diagnosis
+- root cause: every producer family had a different escape. Scifi Codex P10
+  broke after the first failed creative/technical patch pair, targeted several
+  rows all-or-nothing, and returned its closest artifact with
+  `actual_drift=True`. Fable2 treated residual P3/P5 and assembly budget defects
+  as advisory and declared no producer-owned `meta.word_budget`. The four
+  inline banks shared a length editor that could tighten/cut but could not
+  expand underflow. Their actual receipt and story reflections were also
+  stamped before story-spine/final-hygiene mutations. Freeze had no final
+  requested-length backstop before media readiness
+- fix: a dependency-light shared contract now owns the integer law (180 ->
+  163..200; 320 -> 289..356), producer declaration, canonical character count,
+  text hash, progress distance, finite dynamic repair budget, and final receipt.
+  Codex uses one-row P10 cycles, continues after failed slot pairs, accepts only
+  strict progress, and raises before assembly on truthful exhaustion. Fable2
+  declares ownership, performs a separate one-coordinate final fit after winner
+  selection/hygiene, rebuilds its complete draft/proof/hash surface on every
+  accepted change, and makes total assembly drift fatal. Inline banks run a
+  creative-then-technical one-row fitter after story QA/final hygiene, reject
+  non-progress, markup, spoken defects, new numeric/visual claims, and fake
+  commercials/products, then scour and recount again. Story brief and produced-
+  story reflection now read those final rows. Freeze performs a read-only,
+  hash-bound recount after Phase 7/metric refresh and returns
+  `needs_full_rerun` before Phase 8 on any declared drift
+- sibling audit: exact Antigravity `gemini-3.5-flash-high` R2 and R3 reviews ran
+  review-only in the clean detached worktree
+  `otr-kibitz-livebug13-wordfit320-20260721-flash-high` at committed HEAD
+  `651118ef2a16d99812eaa34a6e6d14adb0a7b218`. Sol grounded every claim against
+  the real Windows checkout, discarded caption/TTS, generic-tail mutation,
+  skeleton-state, dramatic-question, and nonexistent-validator misreads, and
+  remained sole driver, coder, and judge. No Claude lane or credit was used and
+  no canonical workflow wiring change was required
+- verify idea: pin both integer bands; prove creative+technical failure does not
+  end a dynamic loop; prove one-row/non-target immutability, strict-progress
+  adoption, fake-commercial/new-number rejection, typed exhaustion, and fresh
+  recounts. For Fable2 require proof/hash resealing; for inline require final
+  reflection ordering; for freeze require a declared miss to stop before video
+  readiness without changing content hashes. Then live-qualify all six banks at
+  320 words through audio, video, captions, credits, mux, and OBS publication
+- bible-worthy: yes -- BUG-12.70
+- status: **LIVE-ADMITTED / ROOT-FIXED; exact Flash High R2/R3 sibling audit, producer/inline/freeze focused tests, full suite (8,339 passed), BUG-12.70 standard Bible gate (17 passed, 23 route-local skips, 3 expected failures) plus direct OTR guard GREEN, and canonical workflow gates (48 passed; 23 nodes / 58 links; unchanged SHA-256 `f9d9c2c3a101ec607c9658456f6e191a164d8214be7b6d560bc68975d0511e9a`) GREEN; commit/push/live six-bank requalification pending**

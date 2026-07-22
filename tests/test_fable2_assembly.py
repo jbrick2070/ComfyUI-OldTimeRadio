@@ -174,7 +174,7 @@ def _assembled(tmp_path: Path):
     led = _PL.new_ledger(episode_id="fable2_golden_ep",
                          out_dir=str(tmp_path / "ep"))
     led.data.setdefault("meta", {})["fable2"] = {}
-    # the golden play carries 51 character words -> target 50 (band 40-60)
+    # the golden play carries 51 character words -> target 50 (band 46-56)
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
         envelope=envelope, story_rules=F2.resolve_story_rules("scifi_news_pro"),
@@ -440,22 +440,153 @@ def test_speaker_set_gate_fails_loud(tmp_path):
             mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
 
 
-def test_word_band_defect_is_advisory_at_assembly(tmp_path):
+def test_word_band_defect_fails_before_assembly_mutates_ledger(tmp_path):
     _parsed, draft, envelope = _sealed_draft(
         _MARKUP, target_words=100)
     led = _PL.new_ledger(episode_id="fable2_bandgate",
                          out_dir=str(tmp_path / "ep5"))
     led.data.setdefault("meta", {})["fable2"] = {}
-    F2._assemble(
-        led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
-        envelope=envelope,
-        story_rules=F2.resolve_story_rules("scifi_news_pro"),
-        mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
-    defects = led.data["meta"]["fable2"]["spoken_hygiene"][
-        "advisory_budget_defects"
-    ]
-    assert defects
-    assert any("character words 51" in defect for defect in defects)
+    with pytest.raises(
+        F2.Fable2AssembleError, match="final word delivery was not repaired"
+    ):
+        F2._assemble(
+            led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
+            envelope=envelope,
+            story_rules=F2.resolve_story_rules("scifi_news_pro"),
+            mode=F2._COMPACT_MODE, owner_bank="scifi_news_pro")
+    assert led.data["lines"] == []
+
+
+def _word_fit_patch_from_messages(messages) -> str:
+    payload = next(
+        json.loads(row["content"])
+        for row in messages
+        if row.get("role") == "user"
+        and str(row.get("content") or "").lstrip().startswith("{")
+    )
+    writable = payload["writable_coordinate"]
+    words = writable["current_text"].split()
+    desired = writable["desired_line_words"]
+    additions = (
+        "quietly beneath glass while the patient signal turns toward dawn "
+        "and every watcher listens beside the console"
+    ).split()
+    if len(words) < desired:
+        words.extend(additions[:desired - len(words)])
+    else:
+        words = words[:desired]
+    words[-1] = words[-1].rstrip(".,;:!?") + "."
+    return json.dumps({
+        "scene_n": writable["scene_n"],
+        "line_index": writable["line_index"],
+        "replacement_text": " ".join(words),
+    })
+
+
+def test_final_word_fit_retries_failed_slots_and_reseals_one_row():
+    _parsed, draft, envelope = _sealed_draft(_MARKUP, target_words=60)
+    calls: list[str] = []
+
+    def creative(messages, **_kwargs):
+        calls.append("creative")
+        if calls == ["creative"]:
+            return "not json"
+        return _word_fit_patch_from_messages(messages)
+
+    def technical(_messages, **_kwargs):
+        calls.append("technical")
+        return "still not json"
+
+    fitted, fitted_treatment, hygiene, receipt = F2._run_final_word_fit(
+        draft,
+        _treatment(),
+        envelope,
+        F2.resolve_story_rules("scifi_news_pro"),
+        creative_fn=creative,
+        technical_fn=technical,
+        mode=F2._COMPACT_MODE,
+    )
+
+    assert calls == ["creative", "technical", "creative"]
+    assert fitted_treatment == _treatment()
+    assert hygiene == ()
+    assert receipt["status"] == "pass"
+    assert receipt["initial_character_words"] == 51
+    assert 55 <= receipt["final_character_words"] <= 67
+    assert receipt["cycles"][0]["status"] == "two_slot_rejected"
+    assert receipt["cycles"][1]["adopted"] is True
+    assert len(receipt["cycles"][1]["target"]) == 3
+    assert fitted.hashes.raw_sha256 != draft.hashes.raw_sha256
+    assert fitted.p3_attempts == draft.p3_attempts
+    F2._validate_selected_final_draft(
+        fitted,
+        envelope,
+        F2.resolve_story_rules("scifi_news_pro"),
+        F2._COMPACT_MODE,
+        treatment=fitted_treatment,
+    )
+
+
+def test_final_word_fit_rejects_no_progress_until_typed_exhaustion():
+    _parsed, draft, envelope = _sealed_draft(_MARKUP, target_words=60)
+    calls = 0
+    safe_words = (
+        "Quiet signals move beneath glass while patient watchers listen "
+        "through dawn beside the console"
+    ).split()
+
+    def same_size(messages, **_kwargs):
+        nonlocal calls
+        calls += 1
+        payload = next(
+            json.loads(row["content"])
+            for row in messages
+            if row.get("role") == "user"
+            and str(row.get("content") or "").lstrip().startswith("{")
+        )
+        writable = payload["writable_coordinate"]
+        count = writable["current_line_words"]
+        words = (safe_words * 3)[:count]
+        words[-1] = words[-1].rstrip(".,;:!?") + "."
+        return json.dumps({
+            "scene_n": writable["scene_n"],
+            "line_index": writable["line_index"],
+            "replacement_text": " ".join(words),
+        })
+
+    with pytest.raises(F2.Fable2WordDeliveryError, match="required 55..67"):
+        F2._run_final_word_fit(
+            draft,
+            _treatment(),
+            envelope,
+            F2.resolve_story_rules("scifi_news_pro"),
+            creative_fn=same_size,
+            technical_fn=lambda *_args, **_kwargs: pytest.fail(
+                "technical slot should not run after a schema-valid patch"
+            ),
+            mode=F2._COMPACT_MODE,
+        )
+    assert calls == F2._OTRWD.delivery_repair_cycle_budget(
+        actual_words=51,
+        target_words=60,
+        lower_words=55,
+        upper_words=67,
+    )
+
+
+def test_word_fit_patch_rejects_fake_commercial_and_new_number():
+    patch = F2._Fable2WordFitPatch(
+        scene_n=1,
+        line_index=1,
+        replacement_text="Buy now from our sponsor for 99 credits.",
+    )
+    error = F2._word_fit_patch_error(
+        patch,
+        target=(1, 1),
+        current_text="The signal stays quiet.",
+        legal_speakers=("VERA", "DOKU"),
+    )
+    assert "fake commercial" in error
 
 
 def _echo_line(value):

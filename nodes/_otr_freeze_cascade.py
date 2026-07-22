@@ -71,6 +71,7 @@ from . import _otr_ledger_reviewer as _OTRLR
 from . import _otr_story_critic as _OTRSC
 from . import _otr_reroll as _OTRRR
 from . import _otr_render_plan as _OTRRP
+from . import _otr_word_delivery as _OTRWD
 
 log = logging.getLogger("OTR.freeze_cascade")
 
@@ -785,6 +786,11 @@ def _build_terminal_skip_disposition(
     reviewer_disp: Optional[_OTRLR.ReviewerDisposition],
     pre_report: _LFC.GapAuditReport,
     block_class: str = "structural",
+    remaining_phase_names: tuple[str, ...] = (
+        "phase_7_audio_readiness",
+        "phase_8_video_readiness",
+        "phase_10_gap_audit_post_and_freeze",
+    ),
 ) -> FreezeDisposition:
     """Stamp the terminal-skip state and build the FreezeDisposition.
 
@@ -803,11 +809,7 @@ def _build_terminal_skip_disposition(
     # B5: stamp the remaining phases as terminal_skipped so
     # meta.cleanup_passes / readiness_passes stay contiguous. S30 B4:
     # phase 4 / 4.5 / 5 / 6 names removed -- those phases no longer exist.
-    for skipped_name in (
-        "phase_7_audio_readiness",
-        "phase_8_video_readiness",
-        "phase_10_gap_audit_post_and_freeze",
-    ):
+    for skipped_name in remaining_phase_names:
         _stamp_stub_or_skipped_phase(
             ledger_data,
             phase_name=skipped_name,
@@ -815,12 +817,14 @@ def _build_terminal_skip_disposition(
         )
     # Stamp the skipped-phase status on their respective meta keys so
     # downstream readers see a consistent shape.
-    meta.setdefault("audio_readiness", {
-        "skipped": True, "skipped_reason": "terminal_skipped",
-    })
-    meta.setdefault("video_readiness", {
-        "skipped": True, "skipped_reason": "terminal_skipped",
-    })
+    if "phase_7_audio_readiness" in remaining_phase_names:
+        meta.setdefault("audio_readiness", {
+            "skipped": True, "skipped_reason": "terminal_skipped",
+        })
+    if "phase_8_video_readiness" in remaining_phase_names:
+        meta.setdefault("video_readiness", {
+            "skipped": True, "skipped_reason": "terminal_skipped",
+        })
     disp = FreezeDisposition(
         verdict=verdict,
         reviewer_disposition=reviewer_disp,
@@ -1309,6 +1313,7 @@ def run_freeze_cascade(
             "sprint_5c_targeted_reroll",
             "d3_role_sweep_mutation",
             "phase_7_audio_readiness",
+            "word_delivery_backstop",
             "phase_8_video_readiness",
             "phase_10_gap_audit_post_and_freeze",
         )
@@ -1316,6 +1321,7 @@ def run_freeze_cascade(
         else (
             "phase_0_gap_audit_pre",
             "readonly_structural_validation",
+            "word_delivery_backstop",
             "phase_8_video_readiness",
             "phase_10_gap_audit_post_and_freeze",
         )
@@ -1547,6 +1553,71 @@ def run_freeze_cascade(
     _PL.refresh_ledger_text_metrics(led)
     ledger_data = led.data
     meta = ledger_data.setdefault("meta", {})
+
+    # PBUG-20260721-18: final read-only requested-length backstop. Every current
+    # six-bank producer declares meta.word_budget.owner and proves its exact
+    # character rows before this point. Recount once after every permitted
+    # legacy Phase-7/hygiene mutation and before Phase 8/media; the receipt is
+    # meta-only, so sealed canonical text and content-authorship hashes remain
+    # byte-identical. Historical synthetic/loaded ledgers without an owner keep
+    # their compatibility path, explicitly recorded rather than guessed.
+    _declared_word_budget = meta.get("word_budget")
+    _declared_word_owner = str(
+        _declared_word_budget.get("owner")
+        if isinstance(_declared_word_budget, dict) else ""
+    ).strip()
+    if _declared_word_owner:
+        try:
+            _freeze_word_receipt = _OTRWD.stamp_actual(
+                ledger_data,
+                stage="freeze_pre_media",
+                require_in_band=True,
+            )
+        except _OTRWD.WordDeliveryError as exc:
+            _word_err = f"word_delivery: {exc}"
+            meta["word_delivery_backstop"] = {
+                "status": "failed",
+                "owner": _declared_word_owner,
+                "error": str(exc),
+            }
+            log.error("[LFC] %s", _word_err)
+            disp = _build_terminal_skip_disposition(
+                ledger_data,
+                verdict="needs_full_rerun",
+                reviewer_disp=reviewer_disp,
+                pre_report=pre_report,
+                block_class="structural",
+                remaining_phase_names=(
+                    "phase_8_video_readiness",
+                    "phase_10_gap_audit_post_and_freeze",
+                ),
+            )
+            _terminal_remaining = (
+                "phase_8_video_readiness",
+                "phase_10_gap_audit_post_and_freeze",
+            )
+            _stamp_capability_receipt(
+                led, policy,
+                entry_text_sha=_cap_entry_text_sha,
+                entry_authorship_sha=_cap_entry_authorship_sha,
+                skipped_phases=tuple(_cap_skipped) + _terminal_remaining,
+                executed_phases=tuple(
+                    phase for phase in _cap_executed_tail
+                    if phase not in _terminal_remaining
+                ),
+                structural_errors=(_word_err,),
+            )
+            _persist_cascade_meta(led)
+            return disp
+        meta["word_delivery_backstop"] = {
+            "status": "pass",
+            "owner": _declared_word_owner,
+            **_freeze_word_receipt,
+        }
+    else:
+        meta["word_delivery_backstop"] = {
+            "status": "not_declared_compatibility",
+        }
 
     started_8 = _isoformat_utc_now()
     hash_before_8 = _hash_lines_text(ledger_data)

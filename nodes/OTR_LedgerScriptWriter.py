@@ -155,6 +155,7 @@ from . import _otr_bank_variants as _otr_bank_variants
 # only variable. Stdlib-only leaf (imports only _otr_bank_variants) -- safe at
 # module-import time, same posture as the routing/source-payload imports.
 from . import _otr_source_snapshot as _otr_source_snapshot
+from . import _otr_word_delivery as _OTRWD
 
 # Sprint C C5a2 (2026-05-15) module-level import per E-22 / RR-B4. The
 # reflection pure module is wired into execute() at K.5.5 -- see the
@@ -214,12 +215,12 @@ composer prompt budget, and the extra context smooths line-to-line
 voice consistency (especially in multi-character scenes where the
 prior 3-line window often dropped one speaker's last beat)."""
 
-WORD_BUDGET_RATIO_LO = 0.7
-WORD_BUDGET_RATIO_HI = 1.3
+WORD_BUDGET_RATIO_LO = _OTRWD.LOW_RATIO_EXCLUSIVE
+WORD_BUDGET_RATIO_HI = _OTRWD.HIGH_RATIO_INCLUSIVE
 
 
 def _producer_word_budget_band(receipt) -> tuple[float, float]:
-    """Return a valid producer-owned ratio band or the legacy defaults."""
+    """Return a valid persisted ratio band or the common delivery ratios."""
     band = receipt.get("band") if isinstance(receipt, dict) else None
     if isinstance(band, (list, tuple)) and len(band) == 2:
         try:
@@ -234,8 +235,7 @@ def _producer_word_budget_band(receipt) -> tuple[float, float]:
             ):
                 return low, high
     return WORD_BUDGET_RATIO_LO, WORD_BUDGET_RATIO_HI
-"""Acceptable band for sum(beat.target_words) / target_words. Outside
-this band logs WARNING but does not fail the run."""
+"""Common planning ratios; final integer delivery uses _otr_word_delivery."""
 
 WORDS_PER_MINUTE_ESTIMATE = 140
 """Word-per-minute estimate for the est_minutes output socket only.
@@ -5082,7 +5082,7 @@ class OTR_LedgerScriptWriter:
                     source_bank_id=resolved["source_bank"],  # lane chunk 1
                 )
 
-        # --- E. Word-budget integration check (WARN, do not fail) -----
+        # --- E. Word-budget integration check -------------------------
         # Sum VOICED (character) beats only. `resolved["target_words"]`
         # is a voiced-dialogue-only budget; announcer / music_inter
         # beats carry a fixed, non-scaling overhead (announcer beats are
@@ -5096,30 +5096,26 @@ class OTR_LedgerScriptWriter:
             if getattr(b, "speaker_role", "") == "character"
         ]
         beat_word_sum = sum(b.target_words for b in voiced_beats)
-        ratio = beat_word_sum / max(1, resolved["target_words"])
-        if not (WORD_BUDGET_RATIO_LO <= ratio <= WORD_BUDGET_RATIO_HI):
+        _word_target = int(resolved["target_words"])
+        _word_lower, _word_upper = _OTRWD.delivery_word_bounds(_word_target)
+        ratio = beat_word_sum / max(1, _word_target)
+        if not (_word_lower <= beat_word_sum <= _word_upper):
             log.warning(
                 "[OTR_LedgerScriptWriter] WORD_BUDGET_DRIFT: outline "
-                "voiced beats sum to %d words, target %d (ratio=%.2f); "
-                "proceeding anyway",
-                beat_word_sum, resolved["target_words"], ratio,
+                "voiced beats sum to %d words, target %d (ratio=%.2f, "
+                "delivery=%d..%d); final row-local fit will reconcile",
+                beat_word_sum, _word_target, ratio, _word_lower, _word_upper,
             )
-        # Undershoot visibility (2026-07-11, 26-roll review P1-1): the drift
-        # check above is WARN-only and always will be -- word counts are
-        # ADVISORY (operator law: never reject, reroll, or trim on word count).
-        # But it only ever lived in a log line, so the operator eyeball could
-        # not see an episode's actual undershoot without re-deriving it from
-        # the ledger. Stamp the PLANNED budget here; section K adds the ACTUAL
-        # composed word count + ratio once the lines are final.
-        meta["word_budget"] = {
-            "target_words":         int(resolved["target_words"]),
-            "planned_voiced_words": int(beat_word_sum),
-            "planned_ratio":        round(float(ratio), 3),
-            "band":                 [WORD_BUDGET_RATIO_LO, WORD_BUDGET_RATIO_HI],
-            "planned_drift":        bool(
-                not (WORD_BUDGET_RATIO_LO <= ratio <= WORD_BUDGET_RATIO_HI)
-            ),
-        }
+        # Planning can miss without killing authorship, but the persisted
+        # contract is explicit and common to all four inline banks. The final
+        # row boundary below must author its way into this integer band before
+        # any reflection/readiness/freeze/media consumer runs.
+        _OTRWD.stamp_contract(
+            meta,
+            target_words=_word_target,
+            planned_voiced_words=beat_word_sum,
+            owner=f"inline:{resolved['source_bank']}",
+        )
 
         # KILL 2 / announcer OPEN (2026-06-24): capture the no-spoiler open brief
         # NOW -- after the outline is final but BEFORE build_sq_data (below)
@@ -7414,55 +7410,11 @@ class OTR_LedgerScriptWriter:
             "seed_source":           resolved["seed_source"],
             "source_ref":            resolved["source_ref"],
         }
-        # Undershoot visibility, part 2 (2026-07-11, 26-roll review P1-1):
-        # stamp the ACTUAL composed voiced word count + drift ratio next to the
-        # planned budget, so the operator eyeball reads the real undershoot
-        # straight off meta.word_budget instead of re-deriving it from the
-        # lines. Counts VOICED (character) lines only -- the same population the
-        # planned budget covers (announcer beats carry fixed, non-scaling
-        # overhead). ADVISORY ONLY: nothing here rejects, rerolls, or trims;
-        # a drift logs WARN and the run proceeds, per operator law.
-        try:
-            _wb = meta.setdefault("word_budget", {})
-            _target_wb = int(_wb.get("target_words")
-                             or resolved["target_words"] or 1)
-            _band_lo, _band_hi = _producer_word_budget_band(_wb)
-            _actual_words = 0
-            for _row in (led.data.get("lines") or []):
-                if not isinstance(_row, dict):
-                    continue
-                if (_row.get("speaker_role") or "") != "character":
-                    continue
-                if _row.get("skip"):
-                    continue
-                _actual_words += canonical_word_count(_row.get("text"))
-            _actual_ratio = _actual_words / max(1, _target_wb)
-            _actual_drift = not (
-                _band_lo <= _actual_ratio <= _band_hi
-            )
-            _wb["actual_voiced_words"] = int(_actual_words)
-            _wb["actual_ratio"] = round(float(_actual_ratio), 3)
-            _wb["actual_drift"] = bool(_actual_drift)
-            if _actual_drift:
-                log.warning(
-                    "[OTR_LedgerScriptWriter] WORD_BUDGET_ACTUAL_DRIFT: "
-                    "composed voiced lines total %d words, target %d "
-                    "(ratio=%.2f, band=%.3f..%.3f); ADVISORY ONLY, proceeding "
-                    "(stamped on meta.word_budget)",
-                    _actual_words, _target_wb, _actual_ratio,
-                    _band_lo, _band_hi,
-                )
-            else:
-                log.info(
-                    "[OTR_LedgerScriptWriter] word budget: composed %d voiced "
-                    "words, target %d (ratio=%.2f)",
-                    _actual_words, _target_wb, _actual_ratio,
-                )
-        except Exception as _wb_exc:  # noqa: BLE001 -- never break a render
-            log.warning(
-                "[OTR_LedgerScriptWriter] word_budget actual stamp failed "
-                "(non-fatal): %s", _wb_exc,
-            )
+        # Actual word delivery is intentionally NOT stamped here. Story-spine,
+        # final hygiene, and producer-owned lane work may still change rows.
+        # The exact current surface is fitted and hash-stamped at the final
+        # inline/content boundary below, immediately before reflections and
+        # readiness consumers.
         # Post-ship audit fix (2026-07-10): stamp the resolved runtime
         # policy into the ledger so DOWNSTREAM LLM consumers (freeze
         # cascade reviewer, shot-lock derivation) run under the SAME
@@ -7565,49 +7517,6 @@ class OTR_LedgerScriptWriter:
         _stamp_story_style_receipt(
             meta, contract=contract, scaffold_enabled=_style_grammar_on)
 
-        # --- K.5.5. meta.story_brief reflection pass ------------------
-        # Per Sprint C final plan Q1 lock (K.5.5, E-01). Writes to meta
-        # only; lines untouched; runs on technical_model slot per L-2.
-        # Failure path stamps story_brief_status per L-6 fail-loud
-        # sentinel pattern. Refinement section 3.6 sync-barrier wording
-        # was amended at C0b -- this call inherits the non-blocking
-        # BUG-LOCAL-228 timeout contract via technical_generate_fn.
-        #
-        # Dual-slot OOM analysis (E-15 revised at C1 audit per RR-A1):
-        # the loader is single-slot by architecture. request_slot(
-        # technical_model) inside technical_generate_fn calls
-        # unload_llm() to evict any prior resident model BEFORE loading
-        # the next. Peak transient VRAM during the swap is max(
-        # creative_size, technical_size), not their sum. No explicit
-        # pre-eviction call is needed; regression tests in C5a2 prove
-        # the no-OOM property.
-        # LLM slot: technical
-        # Sprint 0 (v4 plan): helper_context attribution.
-        with slot_scheduler.helper_context("story_brief_reflection"):
-            _brief_delta = run_story_brief_reflection(
-                led,
-                technical_generate_fn,
-                technical_model_id=resolved["technical_model"],
-            )
-        meta.update(_brief_delta)
-
-        # --- K.5.6. produced-story summary pass (meta split 2026-07-09) --
-        # Operator directive: `meta` carries a brief of the ACTUAL produced
-        # story for downstream consumers; the interpreter digest stays in
-        # meta["news"] as SOURCE provenance only. K.5.5 above is the mood
-        # board (content gate bans plot/names); this second reflection
-        # summarizes the composed episode itself -- real names + plot +
-        # stated ending -- under the distinct key meta["produced_story"].
-        # Same technical slot + never-raise sentinel posture as K.5.5.
-        # LLM slot: technical
-        with slot_scheduler.helper_context("produced_story_summary"):
-            _story_delta = run_produced_story_summary(
-                led,
-                technical_generate_fn,
-                technical_model_id=resolved["technical_model"],
-            )
-        meta.update(_story_delta)
-
         # --- Story-spine Wave 2: the post-script passes (Stage 2.5 length
         # pass / Stage 3 QA router / Stage 3.5 micro-repair / unload /
         # Stage 4 scrub), in-process + env-gated, DEFAULT ON (opt-out). The
@@ -7637,10 +7546,9 @@ class OTR_LedgerScriptWriter:
                 slot_scheduler=slot_scheduler,
             )
         else:
-            # S3 (VRAM): the writer is done with the LLM after
-            # story_brief_reflection (the last LLM phase) -- evict it here,
-            # after the script and BEFORE the downstream TTS / render phase,
-            # so it is not co-resident with Bark / Kokoro / HuMo / FLUX.
+            # S3 (VRAM): reclaim the runner's current model before the final
+            # word-fit/reflection boundary. Those later passes may reload a
+            # slot; a second final eviction follows the reflections below.
             # Never raises (PD1, audio is king); gated by
             # OTR_WRITER_UNLOAD_AFTER_SCRIPT (default on). VRAM-envelope
             # benefit needs an operator GPU smoke to confirm.
@@ -7676,7 +7584,13 @@ class OTR_LedgerScriptWriter:
         # script lanes repair before sealing inside their own runners, so their
         # canonical/proof contract remains read-only in this shared tail.
         from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
-        if delivery_mode_for_meta(meta) != CONTENT_OWNED:
+        _delivery_mode = delivery_mode_for_meta(meta)
+        _word_receipt = meta.get("word_budget")
+        _word_owner = str(
+            _word_receipt.get("owner")
+            if isinstance(_word_receipt, dict) else ""
+        ).strip()
+        if _delivery_mode != CONTENT_OWNED:
             from . import _otr_reroll as _OTRRR_FINAL
             # The extracted tail consumes ctx/meta only. In the normal writer
             # run, meta.canon_header is the exact injected header (including
@@ -7700,20 +7614,90 @@ class OTR_LedgerScriptWriter:
                     canon_header=_final_scour_canon_header,
                 )
             if _final_hygiene.repaired or _final_hygiene.failed:
-                # Story Spine unloads before returning. A dirty late row can
-                # reload either writer slot for B/C, so reclaim once more before
-                # TTS. The helper is best-effort and never turns craft into an
-                # episode stop.
-                from . import _otr_writer_vram as _OTRVRAM_FINAL
-                meta["writer_llm_unload"] = (
-                    _OTRVRAM_FINAL.unload_writer_llm_after_script()
-                )
                 log.warning(
                     "[OTR_LedgerScriptWriter] final spoken hygiene resolved "
                     "%d row(s), with %d row-local mechanical failure(s), "
                     "after all inline authoring passes",
                     _final_hygiene.repaired, _final_hygiene.failed,
                 )
+
+            if _word_owner:
+                from . import _otr_radio_editor as _OTR_WORD_FIT
+                with slot_scheduler.helper_context("final_word_delivery"):
+                    _OTR_WORD_FIT.fit_final_word_delivery(
+                        led.data,
+                        creative_fn=creative_generate_fn,
+                        technical_fn=technical_generate_fn,
+                        creative_model=resolved["creative_writing_model"],
+                        technical_model=resolved["technical_model"],
+                        source_bank_id=resolved["source_bank"],
+                        canon_header=_final_scour_canon_header,
+                    )
+
+                # The accepted fitter candidate already passed exact spoken
+                # hygiene. Re-run the complete ledger scour as a read-only
+                # proof that no bypassed row or future pack rule can sneak past
+                # the final authored mutation. Any repair is recounted below.
+                with slot_scheduler.helper_context(
+                    "spoken_hygiene_after_word_delivery"
+                ):
+                    _word_fit_hygiene = (
+                        _OTRRR_FINAL.repair_ledger_spoken_hygiene(
+                            led.data,
+                            creative_fn=creative_generate_fn,
+                            repair_fn=technical_generate_fn,
+                            canon_header=_final_scour_canon_header,
+                        )
+                    )
+                if _word_fit_hygiene.repaired or _word_fit_hygiene.failed:
+                    log.warning(
+                        "[OTR_LedgerScriptWriter] post-word-fit hygiene "
+                        "changed %d row(s) and row-muted %d; strict delivery "
+                        "recount follows",
+                        _word_fit_hygiene.repaired,
+                        _word_fit_hygiene.failed,
+                    )
+
+        # Production producers stamp an explicit owner. Synthetic historical
+        # tail fixtures without that declaration retain their compatibility
+        # path, while every real six-bank run is recounted from the exact final
+        # character rows and fails before reflections/readiness on any drift.
+        if _word_owner:
+            _OTRWD.stamp_actual(
+                led.data,
+                stage="writer_final_rows",
+                require_in_band=True,
+            )
+
+        # --- K.5.5/K.5.6 final-row reflections ------------------------
+        # Both reflections must describe the exact delivered story, not the
+        # pre-spine/pre-fit draft. They mutate meta only and use the technical
+        # slot; failures retain the established non-raising sentinel contract.
+        # LLM slot: technical
+        with slot_scheduler.helper_context("story_brief_reflection"):
+            _brief_delta = run_story_brief_reflection(
+                led,
+                technical_generate_fn,
+                technical_model_id=resolved["technical_model"],
+            )
+        meta.update(_brief_delta)
+
+        # LLM slot: technical
+        with slot_scheduler.helper_context("produced_story_summary"):
+            _story_delta = run_produced_story_summary(
+                led,
+                technical_generate_fn,
+                technical_model_id=resolved["technical_model"],
+            )
+        meta.update(_story_delta)
+
+        # Word fitting, its hygiene proof, or the final reflections may have
+        # reloaded either writer slot after Story Spine's earlier eviction.
+        # Reclaim it unconditionally before TTS/image/video consumers.
+        from . import _otr_writer_vram as _OTRVRAM_FINAL
+        meta["writer_llm_unload"] = (
+            _OTRVRAM_FINAL.unload_writer_llm_after_script()
+        )
 
         # Sprint D D2b: stamp creative slot identity into meta so
         # FreezeCascade preserves it via the existing script_json

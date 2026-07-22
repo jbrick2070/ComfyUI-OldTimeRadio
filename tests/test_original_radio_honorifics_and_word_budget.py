@@ -156,16 +156,14 @@ def test_length_steering_threshold_boundary():
 
 
 def test_length_steering_is_advisory_only_no_gate():
-    """The steering is PROMPT TEXT only. It must not introduce any reject /
-    reroll / trim surface: the composer's word bands are unchanged, and the
-    rider is a plain string."""
+    """Per-line steering stays prompt-only; final episode delivery is common."""
     assert isinstance(LC._length_steering(50), str)
-    # the WARN-only band constants are untouched
+    # Final delivery uses the common >90% / <=111% contract.
     from nodes.OTR_LedgerScriptWriter import (
         WORD_BUDGET_RATIO_HI, WORD_BUDGET_RATIO_LO,
     )
-    assert WORD_BUDGET_RATIO_LO == 0.7
-    assert WORD_BUDGET_RATIO_HI == 1.3
+    assert WORD_BUDGET_RATIO_LO == 0.90
+    assert WORD_BUDGET_RATIO_HI == 1.11
 
 
 def test_actual_word_receipt_honors_valid_producer_band():
@@ -174,8 +172,8 @@ def test_actual_word_receipt_honors_valid_producer_band():
     assert _producer_word_budget_band({"band": [0.905, 1.112]}) == (
         0.905, 1.112,
     )
-    assert _producer_word_budget_band({"band": "bad"}) == (0.7, 1.3)
-    assert _producer_word_budget_band({"band": [1.2, 0.8]}) == (0.7, 1.3)
+    assert _producer_word_budget_band({"band": "bad"}) == (0.90, 1.11)
+    assert _producer_word_budget_band({"band": [1.2, 0.8]}) == (0.90, 1.11)
 
 
 def _req(target_words: int, **kw) -> "LC.LineRequest":

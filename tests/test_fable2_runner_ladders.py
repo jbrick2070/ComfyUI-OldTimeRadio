@@ -61,7 +61,7 @@ _GOOD_MARKUP = "\n".join([
     "CODA: Beyond tonight's cliff-top signal, a real transmission waits:",
     "MUSIC: closing theme, warm brass",
     "END.",
-])  # 31 character words -> inside the 24-36 band for target 30
+])  # 31 character words -> inside the shared 28-34 band for target 30
 
 _TRUNCATED_MARKUP = _GOOD_MARKUP.rsplit("\nEND.", 1)[0]  # no END.
 
@@ -223,17 +223,16 @@ class TestScriptLadder:
         assert trace[0].character_words is not None
         assert trace[0].scene_character_words
 
-    def test_budget_exhaustion_accepts_as_advisory(self):
-        # Gate 3 (SOURCE_BANK_PREFLIGHT): word/scene COUNT defects are advisory
-        # and recorded, never a fatal quota gate. Once the bounded reroll budget
-        # is spent, the cleanly-parsed draft is ACCEPTED and the residual defects
-        # are recorded in meta -- the pass no longer raises on a budget miss.
+    def test_budget_exhaustion_defers_complete_candidate_to_final_fit(self):
+        # Whole-play retries are bounded. The complete parse survives as an
+        # intermediate candidate, but its miss is explicitly handed to the
+        # mandatory row-local fitter before casting/assembly.
         fn = _ScriptedFn([_FAT_MARKUP, _FAT_MARKUP, _FAT_MARKUP])
         raw, parsed, meta = _run_script_pass(fn)
         assert parsed is not None
         assert any(
             "WORD_BUDGET" in defect
-            for defect in meta["advisory_budget_defects"]
+            for defect in meta["deferred_budget_defects"]
         )
 
     def test_ladder_exhaustion_fails_loud_naming_the_pass(self):
@@ -974,7 +973,7 @@ def _parse_counts(counts):
 
 class TestPerSceneGrossBudget:
     # 720 -> 7 scenes -> targets (103*6, 102). advisory[103]=[73,133];
-    # gross[103]=[52,154]. _word_band(720) total = [576, 864].
+    # gross[103]=[52,154]. Shared _word_band(720) total = [649, 800].
     def _env(self):
         return F2._build_envelope(720)
 

@@ -94,6 +94,11 @@ try:  # pragma: no cover - package and standalone import styles
 except ImportError:  # pragma: no cover
     from _otr_text_metrics import set_line_text_metrics  # type: ignore
 
+try:  # pragma: no cover - package and standalone import styles
+    from . import _otr_word_delivery as _OTRWD
+except ImportError:  # pragma: no cover
+    import _otr_word_delivery as _OTRWD  # type: ignore
+
 try:
     from ._otr_story_critic import StoryCriticReport, run_story_critic
 except ImportError:  # pragma: no cover - standalone / test load
@@ -821,15 +826,31 @@ def repair_ledger_spoken_hygiene(
         if isinstance(word_budget, dict):
             target_words = _coerce_positive_int(word_budget.get("target_words"))
             if target_words:
-                ratio = char_words / target_words
-                band = word_budget.get("band")
-                try:
-                    low, high = float(band[0]), float(band[1])
-                except (TypeError, ValueError, IndexError):
-                    low, high = 0.7, 1.3
-                word_budget["actual_voiced_words"] = char_words
-                word_budget["actual_ratio"] = round(float(ratio), 3)
-                word_budget["actual_drift"] = not (low <= ratio <= high)
+                if str(word_budget.get("owner") or "").strip():
+                    try:
+                        _OTRWD.stamp_actual(
+                            ledger_data,
+                            stage="spoken_hygiene",
+                            require_in_band=False,
+                        )
+                    except _OTRWD.WordDeliveryError as exc:
+                        log.warning(
+                            "[OTR_Reroll] declared word receipt could not be "
+                            "refreshed after hygiene: %s", exc,
+                        )
+                else:
+                    # Compatibility for historical ledgers without the new
+                    # explicit producer owner. New six-bank runs use the
+                    # hash-bound shared receipt above.
+                    ratio = char_words / target_words
+                    band = word_budget.get("band")
+                    try:
+                        low, high = float(band[0]), float(band[1])
+                    except (TypeError, ValueError, IndexError):
+                        low, high = 0.7, 1.3
+                    word_budget["actual_voiced_words"] = char_words
+                    word_budget["actual_ratio"] = round(float(ratio), 3)
+                    word_budget["actual_drift"] = not (low <= ratio <= high)
     return SpokenHygieneRepairReport(
         scanned=scanned,
         repaired=len(receipts),

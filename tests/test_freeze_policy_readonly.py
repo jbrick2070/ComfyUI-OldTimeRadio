@@ -32,6 +32,7 @@ from nodes import _otr_freeze_cascade as LFC  # noqa: E402
 from nodes import _otr_story_routing as ROUTING  # noqa: E402
 from nodes import production_ledger as _PL  # noqa: E402
 from nodes._otr_ledger_reviewer import ReviewerDisposition  # noqa: E402
+from nodes._otr_word_delivery import stamp_contract  # noqa: E402
 
 import test_fable2_assembly as _F2A  # noqa: E402  (golden-chain helpers)
 
@@ -166,6 +167,61 @@ def test_readonly_cascade_proof_divergence_is_terminal(
     receipt = meta["freeze_capability_receipt"]
     assert receipt["structural_errors"], "proof divergence must be recorded"
     assert any("content_authorship" in e for e in receipt["structural_errors"])
+
+
+def test_declared_word_delivery_passes_readonly_freeze_without_content_mutation(
+        tmp_path, monkeypatch):
+    _forbid_legacy_passes(monkeypatch)
+    led = _golden_fable2_ledger(tmp_path)
+    stamp_contract(
+        led.data["meta"],
+        target_words=50,
+        planned_voiced_words=50,
+        owner="scifi_news_pro",
+    )
+    before = [row.get("text") for row in led.data["lines"]]
+
+    disp = LFC.run_freeze_cascade(_fail_generate, led)
+
+    assert disp.verdict in ("frozen_clean", "frozen_with_warns")
+    assert [row.get("text") for row in led.data["lines"]] == before
+    backstop = led.data["meta"]["word_delivery_backstop"]
+    assert backstop["status"] == "pass"
+    assert backstop["stage"] == "freeze_pre_media"
+    assert backstop["actual_voiced_words"] == 51
+    assert backstop["actual_drift"] is False
+
+
+def test_declared_word_drift_halts_before_video_readiness(
+        tmp_path, monkeypatch):
+    _forbid_legacy_passes(monkeypatch)
+    led = _golden_fable2_ledger(tmp_path)
+    stamp_contract(
+        led.data["meta"],
+        target_words=180,
+        planned_voiced_words=180,
+        owner="scifi_news_pro",
+    )
+    before = [row.get("text") for row in led.data["lines"]]
+
+    def _phase8_must_not_run(*_args, **_kwargs):
+        raise AssertionError("video readiness must not run after word drift")
+
+    monkeypatch.setattr(LFC, "_phase_8_video_readiness", _phase8_must_not_run)
+
+    disp = LFC.run_freeze_cascade(_fail_generate, led)
+
+    assert disp.verdict == "needs_full_rerun"
+    meta = led.data["meta"]
+    assert [row.get("text") for row in led.data["lines"]] == before
+    assert meta["freeze_block_class"] == "structural"
+    assert meta["word_delivery_backstop"]["status"] == "failed"
+    assert meta["word_budget"]["actual_drift"] is True
+    receipt = meta["freeze_capability_receipt"]
+    assert any("word_delivery" in err for err in receipt["structural_errors"])
+    assert "phase_8_video_readiness" in receipt["skipped_phases"]
+    assert "phase_10_gap_audit_post_and_freeze" in receipt["skipped_phases"]
+    assert meta["video_readiness"]["skipped_reason"] == "terminal_skipped"
 
 
 def test_unresolvable_tagged_bank_cascade_halts_before_any_pass(

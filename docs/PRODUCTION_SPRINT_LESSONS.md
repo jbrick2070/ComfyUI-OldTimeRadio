@@ -560,6 +560,33 @@ may shrink or grow a positioned timeline, while an unpositioned legacy sequence
 keeps its historical grow-only behavior. Never widen mux tolerance or charge
 body drift to a valid credits declaration.
 
+## 34. Explicit delivery length is a producer contract, not a quality opinion
+
+A requested word count can allow an inclusive tolerance without becoming
+optional. Express the tolerance once as integer bounds, persist the target,
+bounds, owner, canonical count, and exact character-text hash, and require every
+producer family to finish inside that same contract before its final artifact is
+sealed. A 180-word request accepts 163..200 words; the same law accepts 289..356
+for 320. Floating ratios are planning aids, not the final delivery authority.
+
+Length repair must be small, fresh, and progressive. Target one owned spoken row
+at a time, alternate creative and technical writer slots, validate the complete
+candidate, and retain only a strict move toward the band. A malformed call, an
+unchanged valid response, or one bad sibling row must not discard prior accepted
+progress or consume the remaining dynamic budget. Reject padding, repetition,
+fake commercials or products, invented numeric claims, markup, stage directions,
+and new visual/canon claims. Subjective taste remains fail-open; measurable
+delivery exhaustion raises a typed error before hashes, readiness, or media.
+
+Place each adapter at its last safe authoring boundary. Content-owned lanes fit
+and rebuild their own proofs and hashes before assembly. Shared inline lanes fit
+after story QA and spoken hygiene, re-scour the accepted rows, then stamp the
+actual receipt and build reflections from those exact final rows. Preserve older
+pass receipts as history instead of relabeling a later repair as an earlier pass.
+After the final readiness normalization, freeze performs a read-only hash-bound
+recount before video readiness. A miss becomes `needs_full_rerun`; freeze never
+authors prose or mutates a content-owned seal.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

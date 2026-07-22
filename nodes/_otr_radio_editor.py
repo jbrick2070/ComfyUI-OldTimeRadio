@@ -91,10 +91,11 @@ never the forbidden filler word (project rule 5).
 from __future__ import annotations
 
 import copy
+import hashlib
 import logging
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, model_validator
@@ -111,6 +112,11 @@ except ImportError:  # pragma: no cover
         canonical_word_count,
         set_line_text_metrics,
     )
+
+try:  # pragma: no cover - package and standalone import styles
+    from . import _otr_word_delivery as _OTRWD
+except ImportError:  # pragma: no cover
+    import _otr_word_delivery as _OTRWD  # type: ignore
 
 
 log = logging.getLogger("OTR")
@@ -2101,6 +2107,408 @@ def normalize_length(
     return plan, report
 
 
+# ---------------------------------------------------------------------------
+# Final inline-producer word delivery
+# ---------------------------------------------------------------------------
+
+
+class FinalWordDeliveryError(GuardError):
+    """Inline story rows could not satisfy the explicit delivery contract."""
+
+
+_FINAL_WORD_FIT_FAKE_AD_RE = re.compile(
+    r"\b(?:commercial break|sponsored by|our sponsor|buy now|call now|"
+    r"order now|limited[- ]time offer|available wherever|available now|"
+    r"new product|try the new|brought to you by)\b",
+    re.IGNORECASE,
+)
+_FINAL_WORD_FIT_NUMERAL_RE = re.compile(
+    r"\b(?:\d[\d,.]*|zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|"
+    r"nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|"
+    r"hundred|thousand|million|billion)\b",
+    re.IGNORECASE,
+)
+_FINAL_WORD_FIT_TEMPERATURES = (0.38, 0.30, 0.24, 0.18, 0.14)
+# The final spoken-hygiene authority uses the composer's one-breath law. Keep
+# the fitter's target honest so it does not pay for candidates that the next
+# deterministic scan must reject (the broader Radio Editor structural cap is
+# intentionally not the spoken craft cap).
+_FINAL_WORD_FIT_MAX_LINE_WORDS = 24
+
+
+def _word_fit_sha256(value: Any) -> str:
+    return hashlib.sha256(str(value or "").encode("utf-8")).hexdigest()
+
+
+def _word_fit_number_tokens(text: str) -> set[str]:
+    return {
+        token.casefold()
+        for token in _FINAL_WORD_FIT_NUMERAL_RE.findall(str(text or ""))
+    }
+
+
+def _word_fit_speaker_labels(ledger: Dict[str, Any]) -> tuple[str, ...]:
+    labels = {"ANNOUNCER"}
+    for row in ledger.get("cast") or ():
+        if not isinstance(row, dict):
+            continue
+        for key in ("name", "char_id"):
+            value = str(row.get(key) or "").strip()
+            if value:
+                labels.add(value)
+    return tuple(sorted(labels, key=lambda item: (-len(item), item)))
+
+
+def _word_fit_candidate_error(
+    *,
+    raw: str,
+    candidate: str,
+    current_text: str,
+    req: Any,
+    ledger: Dict[str, Any],
+    story_rules: Any,
+) -> Optional[str]:
+    """Validate one proposed line without granting it any ledger authority."""
+    if not candidate or not re.search(r"[A-Za-z]", candidate):
+        return "replacement must contain spoken words"
+    if candidate == str(current_text or "").strip():
+        return "replacement must change the target line"
+    if re.search(r"[\[\]{}*]", raw) or "(" in raw or ")" in raw:
+        return "replacement cannot contain markup or stage directions"
+    for label in _word_fit_speaker_labels(ledger):
+        if re.match(rf"^\s*{re.escape(label)}\s*:", raw, re.IGNORECASE):
+            return "replacement cannot contain a speaker label"
+    if _FINAL_WORD_FIT_FAKE_AD_RE.search(candidate):
+        return "replacement cannot introduce a fake commercial or product"
+    prior_numbers = _word_fit_number_tokens(current_text)
+    new_numbers = _word_fit_number_tokens(candidate)
+    if not new_numbers.issubset(prior_numbers):
+        return "replacement cannot introduce a new numeric claim"
+    locked_story_corpus = " ".join(
+        str(row.get("text") or "") + " " + str(row.get("beat_intent") or "")
+        for row in ledger.get("lines") or ()
+        if isinstance(row, dict)
+    ) + " " + str(getattr(req, "canon_header", "") or "")
+    visual_nouns = new_visual_nouns(candidate, locked_story_corpus, ledger)
+    if visual_nouns:
+        return "replacement cannot introduce new visual nouns: " + ", ".join(
+            visual_nouns[:8]
+        )
+    try:
+        from ._otr_line_composer import spoken_surface_flags_for_line
+    except ImportError:  # pragma: no cover - standalone / test load
+        from _otr_line_composer import (  # type: ignore
+            spoken_surface_flags_for_line,
+        )
+    flags = spoken_surface_flags_for_line(
+        candidate, req, rules=story_rules, include_thesis=False,
+    )
+    if flags:
+        return "replacement failed spoken hygiene: " + ", ".join(
+            str(flag) for flag in flags[:8]
+        )
+    return None
+
+
+def _word_fit_call(
+    slot_fn: Callable[..., str],
+    *,
+    messages: list[dict[str, str]],
+    temperature: float,
+) -> str:
+    try:
+        return str(slot_fn(
+            messages,
+            temperature=temperature,
+            max_new_tokens=256,
+            stop=["\n\n", "```"],
+        ) or "")
+    except TypeError:
+        return str(slot_fn(
+            messages,
+            temperature=temperature,
+            max_new_tokens=256,
+        ) or "")
+
+
+def fit_final_word_delivery(
+    ledger: Dict[str, Any],
+    *,
+    creative_fn: Callable[..., str],
+    technical_fn: Callable[..., str],
+    creative_model: str,
+    technical_model: str,
+    source_bank_id: str,
+    canon_header: str = "",
+) -> Dict[str, Any]:
+    """Fit final inline character speech via finite one-row authored repairs.
+
+    Python selects exactly one writable row per cycle. A creative pass and then
+    a technical fallback may propose replacement prose, but only a candidate
+    that preserves every binding, passes spoken/visual/fact hygiene, and makes
+    strict progress toward the persisted common word band is adopted. No
+    deterministic filler is ever added.
+    """
+    if not isinstance(ledger, dict):
+        raise FinalWordDeliveryError("fit_final_word_delivery: ledger must be a dict")
+    try:
+        spec = _OTRWD.resolve_spec(ledger)
+    except _OTRWD.WordDeliveryError as exc:
+        raise FinalWordDeliveryError(str(exc)) from exc
+    if not spec.owner.startswith("inline:"):
+        raise FinalWordDeliveryError(
+            f"inline word fitter cannot mutate producer-owned receipt {spec.owner!r}"
+        )
+
+    try:
+        from . import _otr_reroll as _OTRRR_WORD_FIT
+        from ._otr_line_composer import strip_line_formatting
+        from ._otr_story_rules import get_story_rules
+    except ImportError:  # pragma: no cover - standalone / test load
+        import _otr_reroll as _OTRRR_WORD_FIT  # type: ignore
+        from _otr_line_composer import strip_line_formatting  # type: ignore
+        from _otr_story_rules import get_story_rules  # type: ignore
+
+    meta = ledger.setdefault("meta", {})
+    story_rules = get_story_rules(meta)
+    actual = _OTRWD.character_word_count(ledger)
+    initial_actual = actual
+    repair_budget = _OTRWD.delivery_repair_cycle_budget(
+        actual_words=actual,
+        target_words=spec.target_words,
+        lower_words=spec.lower_words,
+        upper_words=spec.upper_words,
+    )
+    cycles: list[dict[str, Any]] = []
+    terminal_status = "pass" if spec.contains(actual) else "repair_exhausted"
+
+    for cycle in range(1, repair_budget + 1):
+        if spec.contains(actual):
+            terminal_status = "pass"
+            break
+        under = actual < spec.lower_words
+        rows = [
+            row for row in ledger.get("lines") or ()
+            if isinstance(row, dict)
+            and not row.get("skip")
+            and str(row.get("speaker_role") or "") == "character"
+            and (
+                canonical_word_count(row.get("text"))
+                < _FINAL_WORD_FIT_MAX_LINE_WORDS
+                if under else canonical_word_count(row.get("text")) > 1
+            )
+        ]
+        if not rows:
+            terminal_status = "no_actionable_rows"
+            break
+        ranked = sorted(
+            rows,
+            key=(
+                lambda row: (
+                    canonical_word_count(row.get("text")),
+                    str(row.get("line_id") or ""),
+                )
+                if under else (
+                    -canonical_word_count(row.get("text")),
+                    str(row.get("line_id") or ""),
+                )
+            ),
+        )
+        row = ranked[(cycle - 1) % len(ranked)]
+        line_id = str(row.get("line_id") or row.get("beat_id") or "")
+        current_text = str(row.get("text") or "").strip()
+        current_line_words = canonical_word_count(current_text)
+        distance = (
+            spec.lower_words - actual if under else actual - spec.upper_words
+        )
+        correction = min(
+            distance, _OTRWD.delivery_step_words(spec.target_words),
+        )
+        desired_line_words = (
+            min(_FINAL_WORD_FIT_MAX_LINE_WORDS, current_line_words + correction)
+            if under else max(1, current_line_words - correction)
+        )
+        req = _OTRRR_WORD_FIT.build_reroll_line_request(
+            ledger, row, ledger.get("cast") or [],
+        )
+        req = replace(
+            req,
+            canon_header=str(canon_header or req.canon_header or ""),
+            target_words=desired_line_words,
+            beat_objective=(
+                req.beat_objective
+                or str(row.get("beat_intent") or "").strip()
+            ),
+        )
+        all_character_rows = [
+            item for item in ledger.get("lines") or ()
+            if isinstance(item, dict)
+            and not item.get("skip")
+            and str(item.get("speaker_role") or "") == "character"
+        ]
+        row_pos = next(
+            (i for i, item in enumerate(all_character_rows) if item is row), 0,
+        )
+        context_rows = all_character_rows[max(0, row_pos - 1):row_pos + 2]
+        context = "\n".join(
+            f"{str(item.get('char_id') or item.get('speaker_role') or '?')}: "
+            f"{str(item.get('text') or '').strip()}"
+            for item in context_rows
+        )
+        direction = "expand" if under else "tighten"
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Repair exactly one SFW radio-play line. Return only the "
+                    "replacement dialogue, with no label, cue, markup, or "
+                    "explanation. Preserve the speaker, beat intent, locked "
+                    "facts, conflict, and visual world. Use natural spoken "
+                    "dialogue; never add filler, a named or numeric claim, a "
+                    "fake commercial, product, sponsor message, or moral summary. "
+                    "Reuse content vocabulary already present in the locked "
+                    "canon and context."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Source bank: {source_bank_id}\n"
+                    f"Writable line_id: {line_id}\n"
+                    f"Speaker: {req.speaker}\n"
+                    f"Beat intent: {req.intent}\n"
+                    f"Direction: {direction}\n"
+                    f"Current line words: {current_line_words}\n"
+                    f"Desired line words: about {desired_line_words}, maximum "
+                    f"{_FINAL_WORD_FIT_MAX_LINE_WORDS}\n"
+                    f"Episode character words: {actual}; required band: "
+                    f"{spec.lower_words}..{spec.upper_words}\n"
+                    f"Locked canon:\n{str(req.canon_header or '')[-1200:]}\n"
+                    f"Locked local context:\n{context}\n"
+                    f"Current writable line:\n{current_text}"
+                ),
+            },
+        ]
+        cycle_receipt: Dict[str, Any] = {
+            "cycle": cycle,
+            "line_id": line_id,
+            "direction": direction,
+            "before_character_words": actual,
+            "current_line_words": current_line_words,
+            "desired_line_words": desired_line_words,
+            "attempts": [],
+            "adopted": False,
+        }
+        for slot_name, slot_fn, model_id, temperature in (
+            (
+                "creative", creative_fn, creative_model,
+                _FINAL_WORD_FIT_TEMPERATURES[
+                    (cycle - 1) % len(_FINAL_WORD_FIT_TEMPERATURES)
+                ],
+            ),
+            ("technical", technical_fn, technical_model, 0.16),
+        ):
+            attempt: Dict[str, Any] = {
+                "slot": slot_name,
+                "model_id": str(model_id or ""),
+                "status": "rejected",
+            }
+            try:
+                # LLM slot: per-sub-pass -- creative author, technical fallback.
+                raw = _word_fit_call(
+                    slot_fn, messages=messages, temperature=temperature,
+                )
+                attempt["raw_sha256"] = _word_fit_sha256(raw)
+                candidate = strip_line_formatting(raw or "").strip()
+                attempt["candidate_words"] = canonical_word_count(candidate)
+                error = _word_fit_candidate_error(
+                    raw=raw,
+                    candidate=candidate,
+                    current_text=current_text,
+                    req=req,
+                    ledger=ledger,
+                    story_rules=story_rules,
+                )
+                if error is not None:
+                    attempt["error"] = error
+                    cycle_receipt["attempts"].append(attempt)
+                    continue
+                candidate_actual = (
+                    actual - current_line_words
+                    + canonical_word_count(candidate)
+                )
+                prior_distance = _OTRWD.word_band_distance(
+                    actual, spec.lower_words, spec.upper_words,
+                )
+                candidate_distance = _OTRWD.word_band_distance(
+                    candidate_actual, spec.lower_words, spec.upper_words,
+                )
+                if candidate_distance >= prior_distance:
+                    attempt["error"] = "candidate made no strict progress"
+                    attempt["candidate_character_words"] = candidate_actual
+                    cycle_receipt["attempts"].append(attempt)
+                    continue
+                flags = list(row.get("compose_flags") or [])
+                if "final_word_fit" not in flags:
+                    flags.append("final_word_fit")
+                set_line_text_metrics(row, candidate)
+                row["compose_flags"] = flags
+                actual = candidate_actual
+                attempt["status"] = "accepted"
+                attempt["candidate_character_words"] = candidate_actual
+                cycle_receipt["attempts"].append(attempt)
+                cycle_receipt["adopted"] = True
+                cycle_receipt["accepted_slot"] = slot_name
+                break
+            except Exception as exc:  # noqa: BLE001 -- alternate slot continues
+                attempt["error"] = (
+                    f"{type(exc).__name__}: {' '.join(str(exc).split())[:240]}"
+                )
+                cycle_receipt["attempts"].append(attempt)
+        cycle_receipt["after_character_words"] = actual
+        cycle_receipt["distance_to_band"] = _OTRWD.word_band_distance(
+            actual, spec.lower_words, spec.upper_words,
+        )
+        cycles.append(cycle_receipt)
+        if spec.contains(actual):
+            terminal_status = "pass"
+            break
+
+    actual = _OTRWD.character_word_count(ledger)
+    receipt = {
+        "status": terminal_status if spec.contains(actual) else terminal_status,
+        "owner": spec.owner,
+        "source_bank": str(source_bank_id or ""),
+        "target_words": spec.target_words,
+        "acceptance_words": [spec.lower_words, spec.upper_words],
+        "initial_character_words": initial_actual,
+        "final_character_words": actual,
+        "repair_budget": repair_budget,
+        "cycles": cycles,
+        "actual_drift": not spec.contains(actual),
+    }
+    meta["inline_word_fit"] = receipt
+    try:
+        _OTRWD.stamp_actual(
+            ledger,
+            stage=(
+                "inline_word_fit" if spec.contains(actual)
+                else "inline_word_fit_exhausted"
+            ),
+            require_in_band=spec.contains(actual),
+        )
+    except _OTRWD.WordDeliveryError as exc:
+        raise FinalWordDeliveryError(str(exc)) from exc
+    if not spec.contains(actual):
+        raise FinalWordDeliveryError(
+            f"{spec.owner} word delivery exhausted {repair_budget} row-local "
+            f"cycles: required {spec.lower_words}..{spec.upper_words}, "
+            f"actual {actual}"
+        )
+    return receipt
+
+
 def micro_repair(
     ledger: Dict[str, Any],
     flagged_beats: List[int],
@@ -2235,8 +2643,10 @@ __all__ = [
     # entrypoints
     "run_radio_editor",
     "normalize_length",
+    "fit_final_word_delivery",
     "micro_repair",
     # exception
+    "FinalWordDeliveryError",
     "GuardError",
 ]
 

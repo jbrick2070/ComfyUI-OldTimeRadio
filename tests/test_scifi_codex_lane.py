@@ -4097,15 +4097,15 @@ def test_character_word_fit_uses_compact_patch_and_fresh_recount():
     facts = _metadata_repair_fact_index()
     calls: list[str] = []
 
-    def creative(_messages, **_kwargs):
+    def creative(messages, **_kwargs):
         calls.append("creative")
+        request = json.loads(messages[1]["content"])
+        assert len(request["writable_target_ids"]) == 1
+        line_id = request["writable_target_ids"][0]
         return json.dumps({"replacements": [
-            {"line_id": "l001", "replacement_text":
-             "The receiver keeps a measured pulse beneath the frost tonight."},
-            {"line_id": "l002", "replacement_text":
-             "I can trace its quiet rhythm across the glass console."},
-            {"line_id": "l003", "replacement_text":
-             "Then we wait beside the dial until dawn answers softly."},
+            {"line_id": line_id, "replacement_text":
+             "The signal holds steady tonight while its rhythm crosses the "
+             "console and guides our careful watch through dawn."},
         ]})
 
     meta: dict[str, object] = {"scifi_codex": {}}
@@ -4127,18 +4127,38 @@ def test_character_word_fit_uses_compact_patch_and_fresh_recount():
     )
 
     assert calls == ["creative"]
-    assert lane._script_character_word_count(result) == 30
+    assert lane._script_character_word_count(result) == 28
     receipt = meta["scifi_codex"]["character_word_fit_loop"]
     assert receipt["status"] == "pass"
     assert receipt["initial_character_words"] == 15
-    assert receipt["final_character_words"] == 30
-    assert receipt["cycles"][0]["after_character_words"] == 30
+    assert receipt["final_character_words"] == 28
+    assert receipt["cycles"][0]["after_character_words"] == 28
+    assert receipt["cycles"][0]["adopted"] is True
     assert receipt["actual_drift"] is False
 
 
-def test_character_word_fit_exhaustion_keeps_closest_valid_story():
+def test_character_word_fit_retries_a_failed_pair_then_recovers():
     score, script = _word_fit_story()
     meta: dict[str, object] = {"scifi_codex": {}}
+    calls: list[str] = []
+
+    def creative(messages, **_kwargs):
+        calls.append("creative")
+        if len(calls) == 1:
+            return "not json"
+        request = json.loads(messages[1]["content"])
+        line_id = request["writable_target_ids"][0]
+        return json.dumps({"replacements": [{
+            "line_id": line_id,
+            "replacement_text": (
+                "The signal holds steady tonight while its rhythm crosses the "
+                "console and guides our careful watch through dawn."
+            ),
+        }]})
+
+    def technical(_messages, **_kwargs):
+        calls.append("technical")
+        return "still not json"
 
     result = lane._run_character_word_fit_loop(
         script=script,
@@ -4147,19 +4167,82 @@ def test_character_word_fit_exhaustion_keeps_closest_valid_story():
         fact_index=_metadata_repair_fact_index(),
         story_rules=resolve_story_rules("scifi_news"),
         target_words=30,
-        creative_fn=lambda *_args, **_kwargs: "not json",
-        technical_fn=lambda *_args, **_kwargs: "still not json",
+        creative_fn=creative,
+        technical_fn=technical,
         pack=routing.resolve_story_pack("scifi_news"),
         script_token_budget=2200,
         journal={},
         meta=meta,
     )
 
-    assert result.model_dump(mode="json") == script.model_dump(mode="json")
+    assert calls == ["creative", "technical", "creative"]
+    assert lane._script_character_word_count(result) == 28
     receipt = meta["scifi_codex"]["character_word_fit_loop"]
-    assert receipt["status"] == "two_slot_quality_floor"
+    assert receipt["status"] == "pass"
+    assert receipt["cycles"][0]["adopted"] is False
+    assert receipt["cycles"][1]["adopted"] is True
+
+
+def test_character_word_fit_exhaustion_fails_before_assembly():
+    score, script = _word_fit_story()
+    meta: dict[str, object] = {"scifi_codex": {}}
+
+    with pytest.raises(lane.CodexWordDeliveryError, match="required 28..34"):
+        lane._run_character_word_fit_loop(
+            script=script,
+            score=score,
+            cast=_coverage_cast(),
+            fact_index=_metadata_repair_fact_index(),
+            story_rules=resolve_story_rules("scifi_news"),
+            target_words=30,
+            creative_fn=lambda *_args, **_kwargs: "not json",
+            technical_fn=lambda *_args, **_kwargs: "still not json",
+            pack=routing.resolve_story_pack("scifi_news"),
+            script_token_budget=2200,
+            journal={},
+            meta=meta,
+        )
+
+    receipt = meta["scifi_codex"]["character_word_fit_loop"]
+    assert receipt["status"] == "repair_exhausted"
     assert receipt["final_character_words"] == 15
     assert receipt["actual_drift"] is True
+    assert len(receipt["cycles"]) == receipt["repair_budget"]
+    assert all(not row["adopted"] for row in receipt["cycles"])
+
+
+def test_character_word_fit_rejects_valid_no_progress_patches():
+    score, script = _word_fit_story()
+    meta: dict[str, object] = {"scifi_codex": {}}
+
+    def same_size(messages, **_kwargs):
+        request = json.loads(messages[1]["content"])
+        return json.dumps({"replacements": [{
+            "line_id": request["writable_target_ids"][0],
+            "replacement_text": "A quiet beacon endures tonight.",
+        }]})
+
+    with pytest.raises(lane.CodexWordDeliveryError):
+        lane._run_character_word_fit_loop(
+            script=script,
+            score=score,
+            cast=_coverage_cast(),
+            fact_index=_metadata_repair_fact_index(),
+            story_rules=resolve_story_rules("scifi_news"),
+            target_words=30,
+            creative_fn=same_size,
+            technical_fn=lambda *_args, **_kwargs: pytest.fail(
+                "technical slot must not retry a structurally valid patch"
+            ),
+            pack=routing.resolve_story_pack("scifi_news"),
+            script_token_budget=2200,
+            journal={},
+            meta=meta,
+        )
+
+    cycles = meta["scifi_codex"]["character_word_fit_loop"]["cycles"]
+    assert all(row["patch_status"] == "no_progress_rejected" for row in cycles)
+    assert all(row["after_character_words"] == 15 for row in cycles)
 
 
 def test_two_failed_quality_slots_stop_without_rejudging_unchanged_script(

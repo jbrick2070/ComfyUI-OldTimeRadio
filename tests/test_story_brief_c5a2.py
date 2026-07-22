@@ -253,6 +253,20 @@ def test_call_site_before_led_save(execute_fn):
     )
 
 
+def test_reflections_describe_the_final_word_fitted_rows(execute_fn):
+    """PBUG-20260721-18: metadata reflection follows the final row gate."""
+    refl = _reflection_call(execute_fn)
+    fit_calls = _find_call_site(execute_fn, "fit_final_word_delivery")
+    actual_calls = _find_call_site(execute_fn, "stamp_actual")
+    produced_calls = _find_call_site(execute_fn, "run_produced_story_summary")
+
+    assert len(fit_calls) == 1
+    assert len(actual_calls) == 1
+    assert len(produced_calls) == 1
+    assert _line_of(fit_calls[0]) < _line_of(actual_calls[0]) < _line_of(refl)
+    assert _line_of(refl) < _line_of(produced_calls[0])
+
+
 # ---------------------------------------------------------------------------
 # 4. Call site uses technical_generate_fn, not creative (E-03)
 # ---------------------------------------------------------------------------

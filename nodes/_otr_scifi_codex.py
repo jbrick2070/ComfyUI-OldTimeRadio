@@ -69,6 +69,7 @@ try:
         StructuredCallFailedError,
     )
     from . import _otr_ledger_freeze
+    from . import _otr_word_delivery as _OTRWD
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
     from _otr_canon import EpisodeCanon  # type: ignore
@@ -121,6 +122,7 @@ except ImportError:  # pragma: no cover
         StructuredCallFailedError,
     )
     import _otr_ledger_freeze  # type: ignore
+    import _otr_word_delivery as _OTRWD  # type: ignore
     from production_ledger import stamp_word_counts  # type: ignore
 
 
@@ -142,6 +144,7 @@ class CodexPreTailAuditError(ScifiCodexError): pass
 class CodexTailFinalizerMissingError(ScifiCodexError): pass
 class CodexLedgerSaveError(ScifiCodexError): pass
 class CodexSavedLedgerAuditError(ScifiCodexError): pass
+class CodexWordDeliveryError(ScifiCodexError): pass
 
 
 class _Strict(BaseModel):
@@ -5896,22 +5899,16 @@ def _run_final_audit_quality_loop(
 # Integer bounds use an open 90% lower tolerance and a closed 111% upper
 # tolerance. This is target-relative at every supported size; for the current
 # 180-word campaign it resolves to the operator's 163..200 acceptance window.
-_CODEX_CHARACTER_WORD_LO_EXCLUSIVE = 0.90
-_CODEX_CHARACTER_WORD_HI_INCLUSIVE = 1.11
-_CODEX_WORD_FIT_MAX_CYCLES = 6
+_CODEX_CHARACTER_WORD_LO_EXCLUSIVE = _OTRWD.LOW_RATIO_EXCLUSIVE
+_CODEX_CHARACTER_WORD_HI_INCLUSIVE = _OTRWD.HIGH_RATIO_INCLUSIVE
+_CODEX_WORD_FIT_MAX_CYCLES = _OTRWD.MAX_REPAIR_CYCLES
 
 
 def _scifi_character_word_bounds(target_words: int) -> tuple[int, int]:
     target = int(target_words)
     if not 30 <= target <= 900:
         raise CodexTargetRangeError("requested_words must be 30..900")
-    lower = int(math.floor(
-        target * _CODEX_CHARACTER_WORD_LO_EXCLUSIVE
-    )) + 1
-    upper = int(math.ceil(
-        target * _CODEX_CHARACTER_WORD_HI_INCLUSIVE
-    ))
-    return max(1, lower), max(lower, upper)
+    return _OTRWD.delivery_word_bounds(target)
 
 
 def _script_character_word_count(script: ScriptArtifactV4) -> int:
@@ -5923,11 +5920,7 @@ def _script_character_word_count(script: ScriptArtifactV4) -> int:
 
 
 def _word_band_distance(actual: int, lower: int, upper: int) -> int:
-    if actual < lower:
-        return lower - actual
-    if actual > upper:
-        return actual - upper
-    return 0
+    return _OTRWD.word_band_distance(actual, lower, upper)
 
 
 def _word_fit_issues(
@@ -5937,8 +5930,9 @@ def _word_fit_issues(
     target_words: int,
     lower: int,
     upper: int,
+    target_cursor: int = 0,
 ) -> tuple[ListenerIssueV4, ...]:
-    """Choose a bounded row-local write set for one word-fit cycle."""
+    """Choose exactly one row-local write target for one word-fit cycle."""
     actual = _script_character_word_count(script)
     if lower <= actual <= upper:
         return ()
@@ -5949,11 +5943,7 @@ def _word_fit_issues(
     if not rows:
         return ()
     distance = lower - actual if actual < lower else actual - upper
-    # Spread a large correction over several breaths. At 180 words this asks
-    # for roughly nine words per target and therefore selects three rows for a
-    # 20-word live undershoot. Never widen to the complete artifact.
-    per_row = max(5, min(18, int(round(target_words * 0.05))))
-    target_count = min(len(rows), max(1, int(math.ceil(distance / per_row))))
+    per_row = min(distance, _OTRWD.delivery_step_words(target_words))
     ranked = sorted(
         rows,
         key=(
@@ -5961,8 +5951,8 @@ def _word_fit_issues(
             if actual < lower
             else (lambda line: (-_words(line.text), line.line_id))
         ),
-    )[:target_count]
-    base, remainder = divmod(distance, target_count)
+    )
+    line = ranked[int(target_cursor) % len(ranked)]
     verb = "Add" if actual < lower else "Remove"
     direction_tail = (
         "Deepen the locked beat with concrete in-character speech; preserve "
@@ -5972,18 +5962,17 @@ def _word_fit_issues(
         "Tighten repetition while preserving the locked beat and every mapped "
         "fact."
     )
-    return tuple(
+    return (
         ListenerIssueV4(
             category="word_budget",
             line_id=line.line_id,
             direction=(
-                f"{verb} about {base + int(index < remainder)} spoken words. "
+                f"{verb} about {per_row} spoken words in this line only. "
                 f"The character story is {actual} words and must land in "
                 f"{lower}..{upper} around target {target_words}. "
                 f"{direction_tail}"
             ),
-        )
-        for index, line in enumerate(ranked)
+        ),
     )
 
 
@@ -6002,26 +5991,20 @@ def _run_character_word_fit_loop(
     journal: MutableMapping[str, Any],
     meta: MutableMapping[str, Any],
 ) -> ScriptArtifactV4:
-    """Fit character speech with bounded authored patches; never kill liveness."""
+    """Fit character speech with finite row-local authored repair cycles."""
     lower, upper = _scifi_character_word_bounds(target_words)
     current = script
     actual = _script_character_word_count(current)
     initial_actual = actual
     initial_distance = _word_band_distance(actual, lower, upper)
-    repair_budget = min(
-        _CODEX_WORD_FIT_MAX_CYCLES,
-        max(
-            3,
-            int(math.ceil(
-                initial_distance / max(1, int(round(target_words * 0.05)))
-            )),
-        ),
+    repair_budget = _OTRWD.delivery_repair_cycle_budget(
+        actual_words=actual,
+        target_words=target_words,
+        lower_words=lower,
+        upper_words=upper,
     )
-    candidates: list[tuple[int, int, int, ScriptArtifactV4]] = [
-        (initial_distance, abs(actual - target_words), 0, current)
-    ]
     cycles: list[dict[str, Any]] = []
-    status = "pass" if initial_distance == 0 else "quality_floor"
+    status = "pass" if initial_distance == 0 else "repair_exhausted"
     for cycle in range(1, repair_budget + 1):
         if lower <= actual <= upper:
             status = "pass"
@@ -6032,6 +6015,7 @@ def _run_character_word_fit_loop(
             target_words=target_words,
             lower=lower,
             upper=upper,
+            target_cursor=cycle - 1,
         )
         if not issues:
             status = "no_actionable_targets_floor"
@@ -6062,31 +6046,33 @@ def _run_character_word_fit_loop(
         }
         if patched is None:
             current = prior
-            status = str(entry["status"])
             receipt["after_character_words"] = actual
+            receipt["distance_to_band"] = _word_band_distance(
+                actual, lower, upper,
+            )
+            receipt["adopted"] = False
             cycles.append(receipt)
-            break
-        current = patched
-        actual = _script_character_word_count(current)
-        receipt["after_character_words"] = actual
-        receipt["distance_to_band"] = _word_band_distance(
-            actual, lower, upper,
+            continue
+        candidate_actual = _script_character_word_count(patched)
+        candidate_distance = _word_band_distance(
+            candidate_actual, lower, upper,
         )
+        prior_distance = _word_band_distance(actual, lower, upper)
+        adopted = candidate_distance < prior_distance
+        if adopted:
+            current = patched
+            actual = candidate_actual
+        receipt["candidate_character_words"] = candidate_actual
+        receipt["after_character_words"] = actual
+        receipt["distance_to_band"] = _word_band_distance(actual, lower, upper)
+        receipt["adopted"] = adopted
+        if not adopted:
+            receipt["patch_status"] = "no_progress_rejected"
         cycles.append(receipt)
-        candidates.append((
-            receipt["distance_to_band"],
-            abs(actual - target_words),
-            cycle,
-            current,
-        ))
         if lower <= actual <= upper:
             status = "pass"
             break
-    else:
-        status = "quality_floor"
 
-    best = min(candidates, key=lambda row: row[:3])
-    current = best[3]
     actual = _script_character_word_count(current)
     lane = meta.setdefault("scifi_codex", {})
     lane["character_word_fit_loop"] = {
@@ -6099,6 +6085,12 @@ def _run_character_word_fit_loop(
         "cycles": cycles,
         "actual_drift": not (lower <= actual <= upper),
     }
+    if not lower <= actual <= upper:
+        raise CodexWordDeliveryError(
+            "scifi_codex word delivery exhausted "
+            f"{repair_budget} row-local cycles: required {lower}..{upper}, "
+            f"actual {actual}"
+        )
     return current
 
 
@@ -6124,21 +6116,12 @@ def run_scifi_codex_episode(
     word_lower, word_upper = _scifi_character_word_bounds(
         steer.requested_words,
     )
-    meta["word_budget"] = {
-        "target_words": int(steer.requested_words),
-        "planned_voiced_words": int(steer.requested_words),
-        "planned_ratio": 1.0,
-        # The shared tail consumes this producer-stamped band. Ratios are
-        # derived from the actual inclusive integer contract so its receipt and
-        # this lane's deterministic judge cannot disagree at a boundary.
-        "band": [
-            word_lower / float(steer.requested_words),
-            word_upper / float(steer.requested_words),
-        ],
-        "acceptance_words": [word_lower, word_upper],
-        "planned_drift": False,
-        "owner": "scifi_codex",
-    }
+    _OTRWD.stamp_contract(
+        meta,
+        target_words=steer.requested_words,
+        planned_voiced_words=steer.requested_words,
+        owner="scifi_codex",
+    )
     journal = lane_meta["call_journal"]
     p0_token_budget = p0_output_token_budget()
     journal["fact_index_token_budget"] = {
@@ -6413,6 +6396,14 @@ def run_scifi_codex_episode(
         script, p2, score, _allowed_spoken_all_caps(p0, p2),
     )
     expected = _assemble_ledger(led, score, p2, script, meta)
+    try:
+        delivery_receipt = _OTRWD.stamp_actual(
+            led.data,
+            stage="scifi_codex_assembled",
+            require_in_band=True,
+        )
+    except _OTRWD.WordDeliveryError as exc:
+        raise CodexWordDeliveryError(str(exc)) from exc
     from ._otr_content_authorship import stamp_receipt
     stamp_receipt(
         led.data, owner_bank=source_bank_row.source_bank_id,
@@ -6423,7 +6414,7 @@ def run_scifi_codex_episode(
         "requested_words": steer.requested_words,
         "actual_split_words": actual,
         "actual_character_words": int(
-            meta.get("character_word_count") or 0
+            delivery_receipt["actual_voiced_words"]
         ),
         "actual_announcer_words": int(
             meta.get("announcer_word_count") or 0
