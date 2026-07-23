@@ -496,6 +496,25 @@ def _mesh_fodder_index(ledger):
     return out
 
 
+def _mesh_fodder_row_index(ledger):
+    """Index the newest fodder row by its subject and beat keys."""
+    out = {}
+    imgs = ((ledger or {}).get("images") or {}).get("images") or []
+    for im in imgs:
+        if not isinstance(im, dict):
+            continue
+        if str(im.get("kind") or "") != "mesh_fodder":
+            continue
+        if not str(im.get("path") or ""):
+            continue
+        for key in (im.get("mesh_subject_id"), im.get("object_id"),
+                    im.get("char_id"), im.get("beat_id")):
+            k = str(key or "")
+            if k:
+                out[k] = im
+    return out
+
+
 #: Engine FAMILIES whose render is conditioned on a SCENE still (still-spine
 #: ST-4 / W6): image_to_video (wan_i2v) + static_motion (still_motion) take
 #: asset_refs.init_image from the beat's scene still. Engines in other families
@@ -552,6 +571,19 @@ def _beat_id_for_shot(shot):
 #: constant (round 5): importing the ShotLock node module from the driver would
 #: drag node-registration side effects into the engine package.
 _OPENING_MUSIC_SUFFIX = "b000_music_open"
+
+
+def _canonical_visual_beat_id(beat_id, line=None):
+    """Map the positioned music opener to its synthetic visual beat."""
+    bid = str(beat_id or "")
+    if bid == "music_opening_001":
+        return _OPENING_MUSIC_SUFFIX
+    if (isinstance(line, dict)
+            and str(line.get("speaker_role") or "") == "music_open"
+            and str(line.get("mirrored_from") or "") == "music"):
+        return _OPENING_MUSIC_SUFFIX
+    return bid
+
 
 #: 6/5 motion-centric LTX prompts (BUG-LOCAL-112, restored 2026-06-12 from the
 #: legacy ``batch_ltx_render._PROMPT_BY_ROLE``). The i2v anchor carries the LOOK
@@ -1247,7 +1279,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_visual_styles import get_visual_style  # type: ignore
     _vstyle = get_visual_style((ledger or {}).get("meta") or {})
-    line = _line_index(ledger).get(_beat_id_for_shot(shot), {})
+    _line_beat_id = _beat_id_for_shot(shot)
+    line = _line_index(ledger).get(_line_beat_id, {})
+    # Audio keeps the positioned line id; visual assets use the producer key.
+    _visual_beat_id = _canonical_visual_beat_id(_line_beat_id, line)
     # Round 5 F5: the SHOT row carries the ShotLock-normalized char_id (the
     # announcer 'announcer'->cast-row-id join); prefer it, fall back to the
     # raw line value for pre-round-5 planned ledgers.
@@ -1297,8 +1332,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _mesh_fodder_missing = False
     _mesh_subject_id = ""
     if _requires_fodder:
-        _bid = _beat_id_for_shot(shot)
+        _bid = _visual_beat_id
         _fidx = _mesh_fodder_index(ledger)
+        _frows = _mesh_fodder_row_index(ledger)
         _subj = char_id or str(shot.get("mesh_subject_id") or "")
         # SUBJECT POLICY (chunk 6): (a) a beat with a char_id -- INCLUDING the
         # announcer (char_id "announcer") -- meshes that character; (b) a beat
@@ -1307,7 +1343,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # object's mesh_subject_id; (c) if no fodder was minted at all, the
         # missing-fodder branch below degrades LOUD (never meshes the
         # environment as "uncast"). Mirror the prompt-gen id convention exactly.
-        _mesh_subject_id = _subj or ("obj_%s" % _bid)
+        _fodder_row = (_frows.get(_subj) if _subj else None) or _frows.get(_bid)
+        _mesh_subject_id = (
+            _subj
+            or str((_fodder_row or {}).get("mesh_subject_id") or "")
+            or str((_fodder_row or {}).get("object_id") or "")
+            or ("obj_%s" % _bid)
+        )
         _fodder = (_fidx.get(_subj, "") if _subj else "") or _fidx.get(_bid, "")
         if _fodder:
             init_image = _fodder
@@ -1357,7 +1399,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # NB: mesh_stage is family=image_to_video (IN _SCENE_INIT_FAMILIES), so
         # without the not-_requires_fodder guard this override would clobber the
         # clean fodder with the scene still and re-introduce the clay blob.
-        _bid = _beat_id_for_shot(shot)
+        _bid = _visual_beat_id
         # (still_pool_key read removed 2026-07-01 with the pooling rip --
         # every shot resolves its own per-beat still.)
         _still = _still_index(ledger).get(str(_bid), "")
@@ -1397,7 +1439,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # its render_clip (_require_still), never a silent black card (no fallbacks).
     if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "still_word", "ltx_audio_in"):
         _eng = str(shot.get("engine_id") or "")
-        _bid = _beat_id_for_shot(shot)
+        _bid = _visual_beat_id
         _still = _still_index(ledger).get(str(_bid), "")
         # BUG 1 (2026-06-20 operator directive): still_pan / still_flat are
         # LANDSCAPE engines (render_aspect="wide") -- they NEVER condition on the

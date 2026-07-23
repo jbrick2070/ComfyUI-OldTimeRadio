@@ -1,20 +1,10 @@
-"""scifi_fable2 runner -- S2 full loop (LLM-first multipass sci-fi lane).
+"""Fixed-topology scifi_news_pro story producer.
 
-Architecture doc: docs/2026-07-10-scifi-fable2-architecture.md (sections
-3/5/7/8/9/11/13). Operator law: **Python judges; the LLM writes.** Every
-spoken ledger row is traceable to a named LLM artifact (the per-constituent
-proof gate). After authored repair rungs exhaust, the narrow deterministic
-craft floor may rewrite only a non-empty SFW surface before rebuilding every
-proof and FinalDraft seal.
-
-S2 scope (doc s13): P0 dossier -> deal -> P1 pitch (one pitch below 120
-words; three pitches at 120-900) -> P2a selection in full mode -> P2b
-treatment -> P3 script (markup ladder + budget gate + truncation retry) ->
-P4 critic + P5 revision in full mode -> deterministic keep-better judge ->
-P6 casting/voices -> P7 pure-python assembly (proof gates, incremental
-saves) -> P8 ledger audit (audit-only, fail loud). Compact mode stamps
-P2a/P4/P5 as explicit skips. Requests above 900 fail LOUD before any
-creative call; no supported request silently degrades to compact mode.
+Every requested length follows the same path: source dossier, one pitch,
+treatment, factual close, first structurally clean script, narrow same-story
+safety cleanup, casting, and proof-backed assembly. Requested and actual word
+counts are telemetry only. Prose style, visual vocabulary, and word drift
+never replace the accepted story or fail the episode.
 
 Posture: PURE module -- stdlib + pydantic + the shared structured_call
 ladder + the fable2 markup parser + config.cast_pools + _otr_canon. No
@@ -38,13 +28,12 @@ import random
 import re
 import warnings
 from contextlib import nullcontext
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
 
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     field_validator,
     model_validator,
@@ -56,11 +45,13 @@ try:
         structured_call,
     )
     from ._otr_repair_prompts import make_dispatching_repair_factory
-    from ._otr_story_rules import StoryRules, resolve_story_rules
-    from ._otr_line_composer import LineRequest, repair_existing_spoken_line
-    from ._otr_line_hygiene import derive_one_breath_cap
-    from ._otr_readiness import normalize_for_delivery
-    from ._otr_text_metrics import canonical_word_count
+    from ._otr_content_safety import (
+        format_safety_hits,
+        propose_safety_patches,
+        scan_spoken_ledger,
+    )
+    from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
+    from ._otr_generation_budget import ProviderCapacityMessages
     from ._otr_fable2_markup import (
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -71,33 +62,22 @@ try:
     )
     from . import _otr_canon as _OTRC
     from . import _otr_word_delivery as _OTRWD
-    # Shared operator kill-lexicons (lexicon-only kill policy, ratified
-    # 2026-07-10 on the original_radio lane: a judge flag for a
-    # closed-vocabulary class kills the episode ONLY when the lexicon
-    # corroborates it in the script -- judge hallucinations are
-    # discarded LOUDLY). One source of truth across lanes: extend the
-    # lists there, not code here.
-    from ._otr_original_radio import (
-        WEAPON_SMOKING_EVIDENCE,
-        lexicon_hits,
-    )
 except ImportError:  # pragma: no cover -- flat test/standalone load
     from _otr_structured_call import (  # type: ignore
         StructuredCallFailedError,
         structured_call,
     )
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
-    from _otr_story_rules import (  # type: ignore
-        StoryRules,
-        resolve_story_rules,
+    from _otr_content_safety import (  # type: ignore
+        format_safety_hits,
+        propose_safety_patches,
+        scan_spoken_ledger,
     )
-    from _otr_line_composer import (  # type: ignore
-        LineRequest,
-        repair_existing_spoken_line,
+    from _otr_text_metrics import (  # type: ignore
+        canonical_word_count,
+        set_line_text_metrics,
     )
-    from _otr_line_hygiene import derive_one_breath_cap  # type: ignore
-    from _otr_readiness import normalize_for_delivery  # type: ignore
-    from _otr_text_metrics import canonical_word_count  # type: ignore
+    from _otr_generation_budget import ProviderCapacityMessages  # type: ignore
     from _otr_fable2_markup import (  # type: ignore
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -108,10 +88,6 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
     )
     import _otr_canon as _OTRC  # type: ignore
     import _otr_word_delivery as _OTRWD  # type: ignore
-    from _otr_original_radio import (  # type: ignore
-        WEAPON_SMOKING_EVIDENCE,
-        lexicon_hits,
-    )
 
 # Cast pools: relative in production (package load), absolute under test.
 try:
@@ -160,10 +136,6 @@ class Fable2PitchError(Fable2Error):
     pass
 
 
-class Fable2SelectError(Fable2Error):
-    pass
-
-
 class Fable2TreatmentError(Fable2Error):
     pass
 
@@ -188,17 +160,15 @@ class Fable2AuditError(Fable2Error):
     pass
 
 
-class Fable2WordDeliveryError(Fable2Error):
-    pass
-
-
 # ---------------------------------------------------------------------------
 # Constants (doc s3/s8)
 # ---------------------------------------------------------------------------
 
 _TEMP = {
-    "dossier": 0.30, "pitch_room": 0.90, "pitch_select": 0.30,
-    "treatment": 0.40, "script": 0.75, "critic": 0.30, "revision": 0.60,
+    "dossier": 0.30,
+    "pitch": 0.90,
+    "treatment": 0.40,
+    "script": 0.75,
     "casting_voices": 0.40,
 }
 
@@ -212,32 +182,9 @@ def _MARKUP_LADDER_TEMPS(t: float) -> "tuple[float, ...]":
     return (t, round(t * 0.66, 2), 0.30, 0.30)
 
 
-_MAX_BUDGET_REROLLS = 2
-_MAX_CAPACITY_REROLLS = 4
-_TOTAL_WORD_BAND = 0.20      # +/-20% band on CHARACTER words (r4/M4)
-_SCENE_WORD_BAND = 0.30      # prompt-stated per-scene tolerance (ADVISORY:
-#                              prompt vector + _draft_score steer, NOT fatal)
-# Per-scene FATAL guard (kibitz 2026-07-14, refined-C). The +/-30% advisory band is
-# tighter than a 12B/mini model's per-scene word-count precision at high scene counts
-# (720 -> 7 scenes -> 103-word targets -> band [73,133]; a live leg died on scene 1 =
-# 137, a 4-word overage). Making an ordinary +/-30% miss FATAL killed a complete,
-# correct-total episode. So per-scene FATAL now guards only GROSS imbalance -- a scene
-# structurally out of proportion (half / one-and-a-half its target). +/-50% is a
-# principled pacing bound, NOT reverse-engineered from the 137 sample; the ordinary
-# +/-30% band survives as the prompt vector and the _draft_score soft steer.
-_SCENE_WORD_GROSS_BAND = 0.50
-_ONE_DRAFT_THRESHOLD = 120   # below this: one-pitch + one-draft mode
-_SUPPORTED_WORD_CEILING = 900  # act-chunk mode deferred post-S3
 _DIGEST_CHAR_CAP = 3600
-_FABLE_MAX_CHARACTER_LINE_WORDS = derive_one_breath_cap((1, 60))
 
-_COMPACT_MODE = "one_pitch_one_draft"
-_FULL_MODE = "three_pitch_two_draft"
-Fable2Mode = Literal["one_pitch_one_draft", "three_pitch_two_draft"]
-
-# S2 pins scene count as an explicit word-band table. Do not recover the old
-# `round(words / 110)` formula: its half-boundaries depend on Python banker's
-# rounding and were never an auditable production contract.
+# Advisory scene-count guidance. It never participates in acceptance.
 _SCENE_COUNT_TABLE: "tuple[tuple[int, int], ...]" = (
     (164, 1),
     (274, 2),
@@ -246,22 +193,12 @@ _SCENE_COUNT_TABLE: "tuple[tuple[int, int], ...]" = (
     (604, 5),
     (714, 6),
     (824, 7),
-    (_SUPPORTED_WORD_CEILING, 8),
+    (2_147_483_647, 8),
 )
 
-# Fixed passes: plain ints (r2 anchor: no lambdas in a dict). P3/P5 use
-# _script_token_budget instead.
-_MAX_NEW_TOKENS = {
-    "dossier": 700, "pitch_room": 900, "pitch_select": 300,
-    "treatment": 1100, "critic": 800,
-    # 18th live smoke 2026-07-10: 1000 truncated a verbose 2-cast JSON
-    # mid-object -> the extractor salvaged an inner entry -> schema fail.
-    "casting_voices": 1400,
-}
-
-# Named overlap thresholds (unit-fixtured both directions, r2 anchor).
-_REGISTER_OVERLAP_MAX = 0.5
-_LOGLINE_OVERLAP_MAX = 0.6
+# The finite P0 source dossier may retain a source-proof reservation. Every
+# prose-bearing pass below uses the provider's remaining output capacity.
+_MAX_NEW_TOKENS = {"dossier": 700}
 
 _SCHEMA_VERSION = "fable2_v1"
 
@@ -269,61 +206,6 @@ _DECK_PATH = (
     Path(__file__).resolve().parent / "story_packs" / "scifi_news_pro"
     / "frame_deck.json"
 )
-
-
-def _script_token_budget(target_words: int) -> int:
-    """P3/P5 output budget: markup overhead ~1.5x words, ~1.35 tok/word,
-    +200 skeleton overhead; floor 1200, cap 4200.
-
-    The 4,200 cap is NOT the strangling kind removed from scifi_codex on
-    2026-07-14 (that one asked for 6,960 at 720 words and was handed 5,400, so
-    the script came back cut off mid-JSON). This one never binds at any length we
-    run -- 720 words asks for 1,784 -- and it bounds a lane whose truncation
-    retry already re-asks at +25%. Left alone deliberately: a ceiling that is not
-    touching the artifact is not the bug, and pulling a guard that costs nothing
-    is how a green lane breaks overnight.
-    """
-    return min(4200, max(1200, int(target_words * 2.2) + 200))
-
-
-def _word_band(target_words: int) -> "tuple[int, int]":
-    """Shared final CHARACTER-word delivery band (320 -> 289..356)."""
-    return _OTRWD.delivery_word_bounds(int(target_words))
-
-
-def assert_supported_target_words(target_words: int) -> None:
-    """The lane's word-budget entry gate (r3/M4: runs in the WRITER at
-    run() ENTRY, before the RSS fetch and the D.1 skeleton save; the
-    runner re-asserts it defensively).
-
-    Requests above the supported ceiling fail LOUD. The full S2 path owns
-    120-900 words; compact mode owns only requests below 120. The caller
-    must resolve the mode explicitly and never fall back between them.
-    """
-    tw = int(target_words)
-    if tw > _SUPPORTED_WORD_CEILING:
-        raise Fable2ScriptError(
-            "script",
-            f"target_words {tw} above supported ceiling "
-            f"{_SUPPORTED_WORD_CEILING} (act-chunked long-episode mode is "
-            f"deferred post-S3; lower target_words)",
-        )
-
-
-def _resolve_mode(target_words: int) -> Fable2Mode:
-    """Return the executable S2 mode for a requested word count."""
-    tw = int(target_words)
-    if tw > _SUPPORTED_WORD_CEILING:
-        raise Fable2ScriptError(
-            "script",
-            f"target_words {tw} above supported ceiling "
-            f"{_SUPPORTED_WORD_CEILING}",
-        )
-    return (
-        _COMPACT_MODE
-        if tw < _ONE_DRAFT_THRESHOLD
-        else _FULL_MODE
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -337,251 +219,90 @@ class NamedEntities(BaseModel):
 
 
 class DossierLLM(BaseModel):
-    """The LLM-facing dossier contract (r2/M2+CUT2). Provenance
-    (headline/source/date/link) is PYTHON-STAMPED into
-    meta.fable2.dossier after validation -- never in the LLM JSON."""
+    """Source-grounding artifact; prose length is never judged."""
 
-    facts_to_keep: list[str] = Field(min_length=3, max_length=10)
-    allowed_numbers: list[str] = Field(default_factory=list, max_length=10)
+    facts_to_keep: list[str] = Field(min_length=1, max_length=20)
+    allowed_numbers: list[str] = Field(default_factory=list, max_length=20)
     named_entities: NamedEntities
-    dramatizable_vectors: list[str] = Field(min_length=3, max_length=5)
-
-    @field_validator("facts_to_keep")
-    @classmethod
-    def _fact_lengths(cls, v: list[str]) -> list[str]:
-        for f in v:
-            if not 8 <= len(f) <= 200:
-                raise ValueError(f"fact length {len(f)} outside 8-200: {f!r}")
-        return v
-
-    @field_validator("dramatizable_vectors")
-    @classmethod
-    def _vector_lengths(cls, v: list[str]) -> list[str]:
-        for x in v:
-            if not 10 <= len(x) <= 160:
-                raise ValueError(f"vector length {len(x)} outside 10-160")
-        return v
+    dramatizable_vectors: list[str] = Field(default_factory=list, max_length=10)
 
 
 class Pitch(BaseModel):
-    pitch_id: int = Field(ge=1, le=3, strict=True)
     frame_card: str
-    logline: str = Field(min_length=15, max_length=240)
-    hook: str = Field(min_length=10, max_length=200)
-    scifi_device: str = Field(min_length=10, max_length=160)
+    logline: str
+    hook: str
+    scifi_device: str
     cast_size: int = Field(ge=1, le=8)
     ending_shape: Literal[
-        "paid_victory", "quiet_loss", "ironic_turn", "open_question"]
-
-
-class PitchSlate(BaseModel):
-    """Exactly 3 pitches in full mode; exactly 1 in one-pitch (low-budget)
-    mode -- the expectation is a post_validator parameter (r2/M3)."""
-
-    pitches: list[Pitch] = Field(min_length=1, max_length=3)
-
-
-class PitchSelect(BaseModel):
-    chosen_pitch_id: int = Field(ge=1, le=3, strict=True)
-    selection_rationale: str = Field(min_length=20, max_length=300)
+        "paid_victory", "quiet_loss", "ironic_turn", "open_question"
+    ]
 
 
 class CastShape(BaseModel):
-    """THE canonical cast-name source (r2/M1): names are born HERE so the
-    script pass has legal cast names BEFORE P3 and the parser can gate
-    speakers. P6 is voices/portraits only."""
+    """Canonical structural cast-name source."""
 
     name: str
-    role: str = Field(min_length=3, max_length=60)
-    want: str = Field(min_length=5, max_length=120)
-    pressure: str = Field(min_length=5, max_length=120)
-    register: str = Field(min_length=5, max_length=90)
-
-    @field_validator("name", mode="before")
-    @classmethod
-    def _normalize_name_label(cls, v):
-        """Deterministic LABEL normalization (19th live smoke
-        2026-07-10: the model titles its scientists reflexively --
-        'DR. HARRIS' -- and the repair rung would not converge). The
-        surname IS the LLM's chosen name; python strips the banned
-        title tokens and keeps the LAST word (radio-billing surname
-        convention -- the doc's own example is VOSS). Never invents a
-        character; only normalizes the label shape."""
-        if not isinstance(v, str):
-            return v
-        tokens = [t for t in v.strip().upper().split()
-                  if t.rstrip(".") not in _HONORIFIC_TOKENS]
-        if tokens:
-            return tokens[-1].replace(".", "")
-        return v
+    role: str
+    want: str
+    pressure: str
+    register: str
 
     @field_validator("name")
     @classmethod
-    def _name_all_caps_one_word_not_announcer(cls, v: str) -> str:
-        v = v.strip()
-        if not v or v != v.upper():
-            raise ValueError(f"cast name must be ALL CAPS, got {v!r}")
-        if v == ANNOUNCER_NAME:
-            raise ValueError("cast name must never be ANNOUNCER")
-        # kibitz r2 S1 + 12th live smoke ("DR. VERONICA VOSS" shortened
-        # to "VOSS" mid-script -> UNKNOWN_SPEAKER): one word, no titles,
-        # no initials -- normalized above; anything still multiword here
-        # is unrecoverable.
-        if " " in v or "." in v:
-            raise ValueError(
-                f"cast name must be ONE invented word with no titles or "
-                f"initials, got {v!r}")
-        return v
+    def _legal_speaker_label(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("cast name must not be blank")
+        if value.strip().casefold() == ANNOUNCER_NAME.casefold():
+            raise ValueError("cast name must never collide with ANNOUNCER")
+        return value.strip()
 
 
 class Treatment(BaseModel):
-    title: str = Field(min_length=3, max_length=80)
-    dramatic_question: str = Field(min_length=10, max_length=200)
-    setting: str = Field(min_length=4, max_length=120)
+    title: str
+    dramatic_question: str
+    setting: str
     cast_shapes: list[CastShape] = Field(min_length=1, max_length=8)
-    turn: str = Field(min_length=10, max_length=250)
+    turn: str
     priced_ending: dict[str, str]
-    news_thread: str = Field(min_length=10, max_length=200)
-    # S1b read-split (kibitz r2 Q1 ruling, pulled forward 2026-07-10
-    # after 13 live rolls: 7 died in the combined pass's read gates and
-    # the typed repair could not converge): the factual close is now
-    # authored by its OWN low-temp technical pass (P2c, seam
-    # fable2_news_read_system) and stamped onto the treatment by the
-    # runner -- so the field is optional at P2b and the downstream
-    # contract (assembly + proof artifact name) is unchanged.
-    news_close_read: str = Field(default="", max_length=420)
-
-    @field_validator("dramatic_question")
-    @classmethod
-    def _has_question_mark(cls, v: str) -> str:
-        if "?" not in v:
-            raise ValueError("dramatic_question must contain '?'")
-        return v
+    news_thread: str
+    news_close_read: str = ""
 
     @model_validator(mode="after")
-    def _names_unique_registers_distinct_ending_priced(self) -> "Treatment":
-        names = [c.name for c in self.cast_shapes]
-        if len(set(names)) != len(names):
-            raise ValueError(f"cast names must be unique, got {names}")
-        regs = [c.register for c in self.cast_shapes]
-        for i in range(len(regs)):
-            for j in range(i + 1, len(regs)):
-                ov = _token_overlap(regs[i], regs[j])
-                if ov >= _REGISTER_OVERLAP_MAX:
-                    raise ValueError(
-                        f"registers {i} and {j} overlap {ov:.2f} >= "
-                        f"{_REGISTER_OVERLAP_MAX} -- registers must differ "
-                        f"in mechanism: {regs[i]!r} vs {regs[j]!r}"
-                    )
+    def _structural_contract(self) -> "Treatment":
+        names = [shape.name for shape in self.cast_shapes]
+        identity_keys = [" ".join(name.split()).casefold() for name in names]
+        if len(set(identity_keys)) != len(identity_keys):
+            raise ValueError(
+                "cast names must be unique under case-insensitive identity, "
+                f"got {names}"
+            )
         for key in ("choice", "cost_paid"):
-            val = str(self.priced_ending.get(key) or "")
-            if not 10 <= len(val) <= 200:
-                raise ValueError(
-                    f"priced_ending.{key} length {len(val)} outside 10-200")
-        return self
-
-
-class CriticNote(BaseModel):
-    scene: int = Field(ge=0, strict=True)
-    # DEFAULTS TO EMPTY, and empty is a real value: "this note is about the scene,
-    # not about one character". `_note_scope_error` -- the ONLY consumer -- already
-    # says so on both branches: a scene-zero note accepts speaker in ("", ANNOUNCER),
-    # and a scene note guards with `if note.speaker and ...`, so empty short-circuits
-    # past the membership check. The schema was nonetheless demanding the KEY be
-    # present, so a critic with nothing to pin on one speaker had no legal way to say
-    # so -- it omitted the key and pydantic raised `notes.0.speaker Field required`.
-    #
-    # Live 2026-07-14, 420w scifi_fable2 leg: the critic wrote a scene-wide note
-    # ("...something more enigmatic."), left `speaker` out, the typed repair left it
-    # out again, and the episode DIED. THE LAW: an audit may improve a story, it may
-    # never fail one -- and this audit failed one over a key its own validator says
-    # may be empty.
-    #
-    # The unstated-contract class: `schema_shape_instruction` emits key NAMES only,
-    # so "required vs optional" is invisible to the model. A field that is
-    # semantically optional must BE optional, not merely tolerated once it arrives.
-    # No ledger hole: the field is always present, owned by this default.
-    speaker: str = ""
-    frame_scope: "Literal['intro', 'outro'] | None" = None
-    problem: Literal[
-        "register_bleed", "on_the_nose", "stakes_sag", "ending_unearned",
-        "continuity_break", "cast_unused", "announcer_contract",
-        "word_budget", "subtext_flat"]
-    note: str = Field(min_length=15, max_length=200)
-
-    @field_validator("note")
-    @classmethod
-    def _never_replacement_dialogue(cls, v: str) -> str:
-        if re.search(r"(?:^|[.!?]\s+)[A-Z][A-Z0-9 .'\-]{1,24}:\s", v):
-            raise ValueError(
-                "a note is never replacement dialogue (NAME-colon shape)")
-        return v
-
-    @model_validator(mode="after")
-    def _frame_scope_is_explicit(self) -> "CriticNote":
-        if self.scene == 0 and self.frame_scope is None:
-            raise ValueError(
-                "scene 0 requires frame_scope='intro' or 'outro'")
-        if self.scene > 0 and self.frame_scope is not None:
-            raise ValueError("frame_scope is only legal for scene 0 notes")
-        return self
-
-
-class CriticNotes(BaseModel):
-    verdict: Literal["ship", "revise"]
-    notes: list[CriticNote] = Field(default_factory=list, max_length=8)
-
-    @model_validator(mode="after")
-    def _revise_needs_notes(self) -> "CriticNotes":
-        if self.verdict == "revise" and not self.notes:
-            raise ValueError('"revise" requires >= 1 note')
-        if self.verdict == "ship" and self.notes:
-            raise ValueError('"ship" requires an empty notes array')
+            if not str(self.priced_ending.get(key) or "").strip():
+                raise ValueError(f"priced_ending.{key} is required")
         return self
 
 
 class CastVoice(BaseModel):
     name: str
-    role: str = Field(min_length=3, max_length=60)
-    character_description: str = Field(min_length=40, max_length=240)
+    role: str
+    character_description: str
     gender: Literal["male", "female"]
-    # "n/a" IS A REAL ANSWER. age_band is a casting HINT, and some characters
-    # genuinely have no age -- a ship's computer, a machine, a chorus, a voice.
-    # The schema offered only decades, so a model casting an ageless character had
-    # no legal way to be honest. Live 2026-07-14, 420w scifi_fable2: it wrote
-    # `age_band: "N/A"` for cast.1 and the episode DIED on a literal_error.
-    #
-    # Nothing downstream needs a decade. `assign_voice_for_slot` takes
-    # `age_band: str = ""` and its match ladder is explicitly
-    # (gender+timbre+role+age -> DROP AGE -> drop role -> gender-only), so an
-    # unmatched age simply degrades to the next tier. The voice bank's own
-    # vocabulary is "adult"/"elder" -- a decade never exact-matches anyway; the
-    # scoring is fuzzy. No ledger hole: the field is always present, and "n/a" is
-    # a truthful value with a defined consequence (cast on gender/timbre instead).
-    #
-    # This is the lesson the sibling fields below ALREADY learned four lines down
-    # ("a casting that omitted them schema-aborted a run -- paperwork tolerance,
-    # defaults allowed"). age_band was simply never given the same treatment.
     age_band: Literal["20s", "30s", "40s", "50s", "60s", "n/a"] = "n/a"
 
     @field_validator("age_band", mode="before")
     @classmethod
-    def _normalize_ageless(cls, v):
-        """Accept the many ways a model spells "no age" -- N/A, NA, none, unknown."""
-        if v is None:
+    def _normalize_ageless(cls, value):
+        if value is None:
             return "n/a"
-        text = str(v).strip().lower().replace("\\", "/")
+        text = str(value).strip().lower().replace("\\", "/")
         if text in {"", "n/a", "na", "none", "null", "unknown", "n.a.", "-"}:
             return "n/a"
         return text
-    # register/want/pressure are descriptive PAPERWORK (r1/A3: register
-    # authority stays with the treatment; these never drive the voice or
-    # the portrait). 31st live smoke 2026-07-10: a casting that omitted
-    # them schema-aborted a run -- paperwork tolerance, defaults allowed.
-    register: str = Field(default="", max_length=90)
+
+    register: str = ""
     timbre: str
-    want: str = Field(default="", max_length=120)
-    pressure: str = Field(default="", max_length=120)
+    want: str = ""
+    pressure: str = ""
 
 
 class NewsCloseRead(BaseModel):
@@ -590,7 +311,7 @@ class NewsCloseRead(BaseModel):
     78-char read; brevity is a style preference, never a correctness
     gate (the seam still asks for 1-2 wire-desk sentences)."""
 
-    news_close_read: str = Field(min_length=40, max_length=420)
+    news_close_read: str = Field(min_length=1)
 
 
 class CastingVoices(BaseModel):
@@ -619,18 +340,6 @@ def _norm_ws(text: str) -> str:
     """Whitespace-collapsed form for verbatim proof matching (exact words,
     exact order; ignores how a phrase wrapped)."""
     return " ".join(str(text).split())
-
-
-def _token_overlap(a: str, b: str) -> float:
-    """Normalized token overlap: |A & B| / min(|A|, |B|); 0.0 when either
-    side is empty. Casefolded, punctuation-stripped word sets."""
-    ta = {t.strip(".,;:!?'\"()").casefold() for t in str(a).split()}
-    tb = {t.strip(".,;:!?'\"()").casefold() for t in str(b).split()}
-    ta.discard("")
-    tb.discard("")
-    if not ta or not tb:
-        return 0.0
-    return len(ta & tb) / min(len(ta), len(tb))
 
 
 def _sha256(text: str) -> str:
@@ -698,55 +407,10 @@ def _resolve_seed() -> int:
 
 
 _RE_NUMERAL = re.compile(r"\d[\d,.]*")
-_RE_PROPER = re.compile(r"\b[A-Z][a-zA-Z'\-]+\b")
-_PROPER_STOPWORDS = frozenset({
-    "The", "A", "An", "In", "On", "At", "It", "Its", "This", "That",
-    "These", "Those", "They", "We", "But", "And", "Or", "For", "From",
-    "With", "When", "Where", "While", "After", "Before", "Tonight",
-    "Scientists", "Researchers", "Astronomers", "Engineers", "Doctors",
-    # Calendar vocabulary is era-neutral factual date language, not an
-    # invented entity (first live smoke 2026-07-10: a legitimate read
-    # died on 'June').
-    "January", "February", "March", "April", "May", "June", "July",
-    "August", "September", "October", "November", "December",
-    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
-    "Sunday", "Spring", "Summer", "Autumn", "Fall", "Winter",
-    # Honorifics are titles, not entities (sixth live smoke 2026-07-10:
-    # a legitimate read died on 'Dr' before 'Raman', which WAS in the
-    # dossier). The surname beside them still faces the corpus check.
-    "Dr", "Doctor", "Mr", "Mrs", "Ms", "Miss", "Professor", "Prof",
-    "Sir", "Madam", "Captain", "Commander", "Colonel", "Lieutenant",
-    "Sergeant", "Reverend",
-    # Sentence-opening discourse words (kibitz r2 M2, 2026-07-10: the
-    # blanket sentence-initial skip was an INVENTION HOLE -- an invented
-    # source name at sentence start sailed through -- so every capital
-    # now faces the corpus and only genuinely generic words are exempt).
-    "However", "Meanwhile", "Across", "Together", "Still", "Yet",
-    "According", "Since", "Because", "Despite", "Beyond", "Inside",
-    "Outside", "Under", "Over", "Near", "Now", "Then", "Here", "There",
-    "Every", "Each", "Some", "Many", "Most", "More", "One", "Two",
-    "Three", "First", "Second", "Third", "Last", "Next", "New", "Old",
-    "Today", "Yesterday", "Tomorrow", "Earlier", "Later", "Recently",
-    "Soon", "Instruments", "Teams", "Officials",
-})
 
 
 def _word_re(term: str) -> "re.Pattern[str]":
     return re.compile(r"\b" + re.escape(term) + r"\b", re.IGNORECASE)
-
-
-def _scan_lexicon(text: str, lexicon) -> "str | None":
-    """First word-boundary lexicon hit in text, or None. Word-boundary by
-    design: 'gun' must never hit 'begun'."""
-    for term in lexicon:
-        if _word_re(term).search(text):
-            return term
-    return None
-
-
-# SFW early gates on pitch/treatment prose (weapons/smoking only -- the
-# audit's other kill classes need the performed script to exist).
-_EARLY_SFW_LEXICON = WEAPON_SMOKING_EVIDENCE
 
 
 # Spelled-number equivalence (16th live smoke 2026-07-10: the story said
@@ -762,20 +426,6 @@ _ORDINALS = ("zeroth", "first", "second", "third", "fourth", "fifth",
              "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh",
              "twelfth", "thirteenth", "fourteenth", "fifteenth",
              "sixteenth", "seventeenth", "eighteenth", "nineteenth")
-
-# Title tokens stripped from cast-name LABELS (19th live smoke).
-_HONORIFIC_TOKENS = frozenset({
-    "DR", "DOCTOR", "MR", "MRS", "MS", "MISS", "PROF", "PROFESSOR",
-    "CAPTAIN", "CAPT", "COMMANDER", "CMDR", "COLONEL", "COL",
-    "LIEUTENANT", "LT", "SERGEANT", "SGT", "REVEREND", "REV", "SIR",
-    "MADAM", "MAJOR", "MAJ", "GENERAL", "GEN",
-})
-
-# Names that appear in the pack's FORMAT/schema EXAMPLES (kibitz r4 M1:
-# roll 22 aired a VERA/DOKU cast copied from the few-shot example). A
-# generated cast may not reuse them unless the SOURCE story itself
-# carries the name.
-_RESERVED_EXAMPLE_NAMES = frozenset({"VERA", "DOKU", "BRANNIGAN", "VOSS"})
 
 
 def _spelled_forms(tok: str) -> "tuple[str, ...]":
@@ -814,10 +464,10 @@ def _load_frame_deck(path: "Path | None" = None) -> dict:
         deck = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise Fable2PitchError(
-            "pitch_room", f"frame deck unreadable at {p}: {exc}") from exc
+            "pitch", f"frame deck unreadable at {p}: {exc}") from exc
     if deck.get("schema_version") != "fable2_deck_v1":
         raise Fable2PitchError(
-            "pitch_room",
+            "pitch",
             f"frame deck schema_version "
             f"{deck.get('schema_version')!r} != 'fable2_deck_v1'")
     cards = deck.get("cards") or []
@@ -825,25 +475,19 @@ def _load_frame_deck(path: "Path | None" = None) -> dict:
     names = [c.get("name") for c in cards]
     if len(cards) < 3 or len(set(names)) != len(names):
         raise Fable2PitchError(
-            "pitch_room",
+            "pitch",
             f"frame deck needs >= 3 uniquely-named cards, got {len(cards)}")
     if not stances:
-        raise Fable2PitchError("pitch_room", "frame deck has no stances")
+        raise Fable2PitchError("pitch", "frame deck has no stances")
     return deck
 
 
-def _deal(rng: random.Random, deck: dict, *, mode: Fable2Mode):
-    """Deal (frame_cards, stance). one_pitch mode deals 1 card; full mode
-    deals 3 distinct cards (pitch i uses card i)."""
-    if mode == _COMPACT_MODE:
-        count = 1
-    elif mode == _FULL_MODE:
-        count = 3
-    else:  # pragma: no cover - Literal plus runtime fail-loud boundary
-        raise Fable2PitchError("pitch_room", f"unknown fable2 mode {mode!r}")
-    cards = tuple(rng.sample(list(deck["cards"]), count))
-    stance = rng.choice(list(deck["stances"]))
-    return cards, stance
+def _deal(rng: random.Random, deck: dict):
+    """Deal one frame card and one stance for every requested length."""
+    return (
+        (rng.choice(list(deck["cards"])),),
+        rng.choice(list(deck["stances"])),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -852,80 +496,37 @@ def _deal(rng: random.Random, deck: dict, *, mode: Fable2Mode):
 
 @dataclass(frozen=True)
 class SceneEnvelope:
+    """Advisory scene plan derived before generation; never a delivery gate."""
+
     scene_count: int
     scene_word_targets: "tuple[int, ...]"
     total_words: int
-    band_frac: float = _TOTAL_WORD_BAND
 
     def __post_init__(self) -> None:
-        if type(self.scene_count) is not int or type(self.total_words) is not int:
-            raise TypeError("scene_count and total_words must be strict ints")
-        if self.total_words < 1 or self.total_words > _SUPPORTED_WORD_CEILING:
-            raise ValueError(
-                f"total_words must be 1-{_SUPPORTED_WORD_CEILING}, got "
-                f"{self.total_words}")
-        if (not isinstance(self.scene_word_targets, tuple)
-                or any(type(value) is not int or value < 1
-                       for value in self.scene_word_targets)):
+        if type(self.scene_count) is not int or self.scene_count < 1:
+            raise TypeError("scene_count must be a positive strict int")
+        if type(self.total_words) is not int or self.total_words < 1:
+            raise TypeError("total_words must be a positive strict int")
+        if (
+            not isinstance(self.scene_word_targets, tuple)
+            or len(self.scene_word_targets) != self.scene_count
+            or any(type(value) is not int or value < 1
+                   for value in self.scene_word_targets)
+        ):
             raise TypeError(
-                "scene_word_targets must be an immutable tuple of positive "
-                "strict ints")
-        if type(self.band_frac) is not float or self.band_frac != _TOTAL_WORD_BAND:
-            raise ValueError(
-                f"band_frac must equal the canonical {_TOTAL_WORD_BAND}")
-        expected_scenes = next(
-            scene_count for upper_bound, scene_count in _SCENE_COUNT_TABLE
-            if self.total_words <= upper_bound
-        )
-        quotient, remainder = divmod(self.total_words, expected_scenes)
-        expected_targets = tuple(
-            quotient + (1 if index < remainder else 0)
-            for index in range(expected_scenes)
-        )
-        if self.scene_count != expected_scenes:
-            raise ValueError(
-                f"scene_count {self.scene_count} does not match canonical "
-                f"table value {expected_scenes} for {self.total_words} words")
-        if self.scene_word_targets != expected_targets:
-            raise ValueError(
-                "scene_word_targets do not match the canonical "
-                "quotient/remainder vector")
+                "scene_word_targets must contain one positive strict int "
+                "per scene"
+            )
+        if sum(self.scene_word_targets) != self.total_words:
+            raise ValueError("scene_word_targets must sum to total_words")
 
     @property
     def per_scene_words(self) -> int:
-        """Compatibility view for compact callers; exact code uses vector."""
         return max(1, round(self.total_words / self.scene_count))
-
-    @property
-    def scene_word_bands(self) -> "tuple[tuple[int, int], ...]":
-        """ADVISORY +/-30% band: the prompt vector + the _draft_score steer.
-        NOT the fatal gate -- see scene_word_gross_bands."""
-        return tuple(
-            (
-                math.ceil(target * (1.0 - _SCENE_WORD_BAND)),
-                math.floor(target * (1.0 + _SCENE_WORD_BAND)),
-            )
-            for target in self.scene_word_targets
-        )
-
-    @property
-    def scene_word_gross_bands(self) -> "tuple[tuple[int, int], ...]":
-        """FATAL +/-50% guard: a scene outside this is structurally out of
-        proportion (half / one-and-a-half its target) -- the only per-scene
-        condition that fails the episode. An ordinary +/-30% miss is advisory
-        (kibitz 2026-07-14, refined-C: render the correct-total episode, fail
-        only gross imbalance)."""
-        return tuple(
-            (
-                math.ceil(target * (1.0 - _SCENE_WORD_GROSS_BAND)),
-                math.floor(target * (1.0 + _SCENE_WORD_GROSS_BAND)),
-            )
-            for target in self.scene_word_targets
-        )
 
 
 def _scene_count_for_words(target_words: int) -> int:
-    tw = int(target_words)
+    tw = max(1, int(target_words))
     for upper_bound, scene_count in _SCENE_COUNT_TABLE:
         if tw <= upper_bound:
             return scene_count
@@ -933,23 +534,20 @@ def _scene_count_for_words(target_words: int) -> int:
 
 
 def _build_envelope(target_words: int) -> SceneEnvelope:
-    """Build the pinned scene table plus exact quotient/remainder vector."""
+    """Build advisory scene-count and quotient/remainder guidance."""
     tw = int(target_words)
-    if tw > _SUPPORTED_WORD_CEILING:
+    if tw < 1:
         raise Fable2ScriptError(
-            "script",
-            f"target_words {tw} above supported ceiling "
-            f"{_SUPPORTED_WORD_CEILING}",
+            "script", f"target_words must be positive, got {tw}"
         )
     scenes = _scene_count_for_words(tw)
     quotient, remainder = divmod(tw, scenes)
-    targets = tuple(
-        quotient + (1 if i < remainder else 0)
-        for i in range(scenes)
-    )
     return SceneEnvelope(
         scene_count=scenes,
-        scene_word_targets=targets,
+        scene_word_targets=tuple(
+            quotient + (1 if index < remainder else 0)
+            for index in range(scenes)
+        ),
         total_words=tw,
     )
 
@@ -957,14 +555,13 @@ def _build_envelope(target_words: int) -> SceneEnvelope:
 def _validate_scene_envelope(envelope: Any) -> None:
     if type(envelope) is not SceneEnvelope:
         raise Fable2ScriptError(
-            "revision_contract",
-            "envelope must be an exact canonical SceneEnvelope artifact",
+            "final_draft",
+            "envelope must be an exact SceneEnvelope artifact",
         )
-    canonical = _build_envelope(envelope.total_words)
-    if envelope != canonical:
+    if envelope != _build_envelope(envelope.total_words):
         raise Fable2ScriptError(
-            "revision_contract",
-            "envelope does not match the pinned scene-count/vector contract",
+            "final_draft",
+            "envelope does not match its advisory scene plan",
         )
 
 
@@ -974,26 +571,19 @@ class PassAttemptTrace:
 
     attempt: int
     temperature: float
-    requested_max_new_tokens: int
-    outcome: Literal[
-        "parse_rejected", "budget_rejected", "truncated", "accepted"
-    ]
-    truncation: bool = False
+    outcome: Literal["parse_rejected", "accepted"]
+    output_budget_mode: Literal["provider_capacity"] = "provider_capacity"
     selected: bool = False
     parse_defects: "tuple[str, ...]" = ()
     character_words: "int | None" = None
     scene_character_words: "tuple[int, ...]" = ()
 
     def __post_init__(self) -> None:
-        valid_outcomes = {
-            "parse_rejected", "budget_rejected", "truncated", "accepted",
-        }
-        if type(self.attempt) is not int or type(
-                self.requested_max_new_tokens) is not int:
-            raise TypeError(
-                "attempt and requested_max_new_tokens must be strict ints")
-        if self.attempt < 1 or self.requested_max_new_tokens < 1:
-            raise ValueError("attempt and requested_max_new_tokens must be positive")
+        valid_outcomes = {"parse_rejected", "accepted"}
+        if type(self.attempt) is not int:
+            raise TypeError("attempt must be a strict int")
+        if self.attempt < 1:
+            raise ValueError("attempt must be positive")
         if (isinstance(self.temperature, bool)
                 or not isinstance(self.temperature, (int, float))
                 or not math.isfinite(float(self.temperature))):
@@ -1002,8 +592,10 @@ class PassAttemptTrace:
             raise ValueError(
                 f"outcome must be one of {sorted(valid_outcomes)}, got "
                 f"{self.outcome!r}")
-        if type(self.truncation) is not bool or type(self.selected) is not bool:
-            raise TypeError("truncation and selected must be strict booleans")
+        if self.output_budget_mode != "provider_capacity":
+            raise ValueError("output_budget_mode must be provider_capacity")
+        if type(self.selected) is not bool:
+            raise TypeError("selected must be a strict boolean")
         if (not isinstance(self.parse_defects, tuple)
                 or any(not isinstance(value, str)
                        for value in self.parse_defects)):
@@ -1020,8 +612,6 @@ class PassAttemptTrace:
                 "non-negative strict ints")
         if self.selected != (self.outcome == "accepted"):
             raise ValueError("selected must be true exactly for an accepted attempt")
-        if self.truncation != (self.outcome == "truncated"):
-            raise ValueError("truncation must be true exactly for a truncated attempt")
 
 
 @dataclass(frozen=True)
@@ -1046,46 +636,16 @@ class FinalDraftHashes:
     artifact_sha256: str
 
 
-DraftScore = tuple[int, int, int, int, int]
-
-
 @dataclass(frozen=True)
 class FinalDraft:
-    """One atomic script authority selected before any ledger mutation."""
+    """The first structurally clean, safety-cleaned script authority."""
 
     raw_source: str
     normalized_source: str
     parsed: ParsedScript
     proof_map: "tuple[ProofMapEntry, ...]"
     p3_attempts: "tuple[PassAttemptTrace, ...]"
-    p5_attempts: "tuple[PassAttemptTrace, ...]"
-    score: DraftScore
-    scoring_context_sha256: str
     hashes: FinalDraftHashes
-
-
-@dataclass(frozen=True)
-class RevisionContractResult:
-    eligible: bool
-    reasons: "tuple[str, ...]"
-    addressed_problem_classes: "tuple[str, ...]"
-    changed_scopes: "tuple[str, ...]"
-    protected_field_differences: "tuple[str, ...]"
-    total_word_count: int
-    total_word_band: "tuple[int, int]"
-    scene_word_counts: "tuple[int, ...]"
-    scene_word_bands: "tuple[tuple[int, int], ...]"
-    draft1_sha256: str
-    draft2_sha256: str
-    scoring_context_sha256: str
-    contract_sha256: str
-
-
-@dataclass(frozen=True)
-class DraftSelection:
-    winner: FinalDraft
-    reason: str
-    scoring_context_sha256: str
 
 
 # ---------------------------------------------------------------------------
@@ -1158,10 +718,10 @@ def _make_dossier_validator(digest: str):
     hay = _norm_ws(digest).casefold().replace("’", "'")
 
     def _check(m: DossierLLM) -> "str | None":
-        # Neither entities NOR numbers are rerolled here: unverifiable
+        # Neither entities nor numbers open a retry here: unverifiable
         # ones are DROPPED by _filter_dossier_entities after the call
         # (28th + 30th live smokes 2026-07-10: world-knowledge
-        # expansions and converted figures are unbounded; no reroll can
+        # expansions and converted figures are unbounded; no structural retry can
         # fix knowledge). Delete-only filtering keeps the anti-invention
         # property -- dropping an allowed number only SHRINKS what the
         # factual read may speak.
@@ -1193,7 +753,7 @@ def _filter_dossier_entities(dossier: DossierLLM,
                              digest: str) -> "tuple[DossierLLM, list[str]]":
     """Delete-only entity filtering (python judges): entities the source
     text cannot corroborate are DROPPED from the extraction and reported
-    -- never rerolled (world-knowledge expansions like CMU -> Carnegie
+    -- never retried (world-knowledge expansions like CMU -> Carnegie
     Mellon are unbounded) and never allowed to widen the READ gate's
     legality corpus."""
     hay = _norm_ws(digest).casefold().replace("’", "'")
@@ -1227,228 +787,31 @@ def _filter_dossier_entities(dossier: DossierLLM,
         "allowed_numbers": kept_numbers}), dropped
 
 
-def _make_pitch_validator(cards, mode: Fable2Mode, n_max: int):
-    """Dealt-card + divergence + SFW gates. `cards` is the dealt tuple;
-    the count expectation is a parameter (r2/M3)."""
-    if mode == _COMPACT_MODE:
-        expected = 1
-    elif mode == _FULL_MODE:
-        expected = 3
-    else:
-        raise Fable2PitchError("pitch_room", f"unknown fable2 mode {mode!r}")
-    card_names = [c["name"] for c in cards]
+def _make_pitch_validator(cards, n_max: int):
+    """Restore the dealt card identity and enforce the structural cast ceiling."""
+    card_name = cards[0]["name"]
 
-    def _check(m: PitchSlate) -> "str | None":
-        if len(m.pitches) != expected:
-            return f"need exactly {expected} pitch(es), got {len(m.pitches)}"
-        expected_ids = list(range(1, expected + 1))
-        actual_ids = [p.pitch_id for p in m.pitches]
-        if actual_ids != expected_ids:
-            return (
-                f"pitch ids must be exactly {expected_ids} in dealt-card "
-                f"order, got {actual_ids}"
-            )
-        # `frame_card` is not authored: PYTHON dealt the cards, in this order,
-        # and pitch i uses card i. The model is only echoing back which card it
-        # was given -- so when the count and order are right, restore the label
-        # instead of killing the first creative pass of the run over a re-worded
-        # copy of our own input.
-        for i, p in enumerate(m.pitches):
-            if p.frame_card != card_names[i]:
-                p.frame_card = card_names[i]
-            if p.cast_size > n_max:
-                return f"pitch {i + 1} cast_size {p.cast_size} > N_MAX {n_max}"
-            hit = _scan_lexicon(
-                " ".join([p.logline, p.hook, p.scifi_device]),
-                _EARLY_SFW_LEXICON)
-            if hit:
-                return f"pitch {i + 1} carries forbidden term {hit!r} (SFW)"
-        if expected == 3:
-            shapes = {(p.cast_size, p.ending_shape) for p in m.pitches}
-            if len(shapes) == 1:
-                return ("all three pitches share cast_size AND ending_shape "
-                        "-- they must diverge")
-            for i in range(3):
-                for j in range(i + 1, 3):
-                    ov = _token_overlap(
-                        m.pitches[i].logline, m.pitches[j].logline)
-                    if ov >= _LOGLINE_OVERLAP_MAX:
-                        return (f"loglines {i + 1}/{j + 1} overlap "
-                                f"{ov:.2f} >= {_LOGLINE_OVERLAP_MAX}")
+    def _check(pitch: Pitch) -> "str | None":
+        pitch.frame_card = card_name
+        if pitch.cast_size > n_max:
+            return f"pitch cast_size {pitch.cast_size} > N_MAX {n_max}"
         return None
 
     return _check
 
 
-def _make_select_validator(slate: PitchSlate):
-    expected_ids = [1, 2, 3]
-    actual_ids = [pitch.pitch_id for pitch in slate.pitches]
-    if actual_ids != expected_ids:
-        raise Fable2SelectError(
-            "pitch_select",
-            f"selection requires exact pitch slate {expected_ids}, got "
-            f"{actual_ids}",
-        )
-    allowed = frozenset(actual_ids)
+def _make_treatment_validator(
+    dossier: DossierLLM,
+    n_max: int,
+    provenance: "dict[str, str]",
+    digest: str = "",
+):
+    """Validate only the structural cast ceiling."""
+    del dossier, provenance, digest
 
-    def _check(selection: PitchSelect) -> "str | None":
-        if selection.chosen_pitch_id not in allowed:
-            return (
-                f"chosen_pitch_id {selection.chosen_pitch_id} is not an "
-                f"existing slate member {sorted(allowed)}"
-            )
-        return None
-
-    return _check
-
-
-def _make_critic_validator(parsed: ParsedScript):
-    """Every P4 note must name a real, explicitly-owned draft scope."""
-    if type(parsed) is not ParsedScript:
-        raise Fable2ScriptError(
-            "critic", "critic input must be an exact ParsedScript artifact")
-
-    def _check(notes: CriticNotes) -> "str | None":
-        errors = []
-        for index, note in enumerate(notes.notes, start=1):
-            error = _note_scope_error(note, parsed)
-            if error:
-                errors.append(f"note {index}: {error}")
-        return "; ".join(errors) if errors else None
-
-    return _check
-
-
-def _make_treatment_validator(dossier: DossierLLM, n_max: int,
-                              provenance: "dict[str, str]",
-                              digest: str = ""):
-    """Grounding gates for P2b: cast ceiling, news_thread grounded in the
-    dossier, SFW. The factual-read subset laws moved to
-    ``_make_read_validator`` with the P2c read-split (S1b, 2026-07-10)."""
-    ents = (dossier.named_entities.people + dossier.named_entities.places
-            + dossier.named_entities.things)
-    # Thread grounding corpus includes the SOURCE DIGEST (29th live
-    # smoke 2026-07-10: a thread naming the story's own subject failed
-    # because the filtered dossier alone was the corpus -- the source is
-    # the legality authority everywhere).
-    dossier_corpus = _norm_ws(" ".join(
-        dossier.facts_to_keep + dossier.dramatizable_vectors + ents
-        + dossier.allowed_numbers + [str(digest)])).casefold()
-
-    example_hay = _norm_ws(str(digest)).casefold()
-
-    def _check(m: Treatment) -> "str | None":
-        # kibitz r2 S3: ACCUMULATE every content failure so the single
-        # typed-repair attempt sees the whole target.
-        errs: "list[str]" = []
-        if len(m.cast_shapes) > n_max:
-            errs.append(f"cast_shapes {len(m.cast_shapes)} > N_MAX {n_max}")
-        # kibitz r4 M1 (roll 22 aired the few-shot example's cast): the
-        # FORMAT-example names are reserved unless the source story
-        # itself carries the name.
-        for shape in m.cast_shapes:
-            if (shape.name in _RESERVED_EXAMPLE_NAMES
-                    and not _word_re(shape.name).search(example_hay)):
-                errs.append(
-                    f"cast name {shape.name!r} copies a FORMAT-example "
-                    f"name -- invent a period-plausible name of your own")
-        thread_tokens = [
-            t.strip(".,;:!?'\"()").casefold()
-            for t in m.news_thread.split() if len(t) > 3
-        ]
-        if not any(t and t in dossier_corpus for t in thread_tokens):
-            errs.append(
-                "news_thread shares no content noun with the dossier "
-                "-- it must extrapolate the real science")
-        hit = _scan_lexicon(
-            " ".join([m.title, m.setting, m.turn,
-                      m.priced_ending.get("choice", ""),
-                      m.priced_ending.get("cost_paid", "")]
-                     + [f"{c.role} {c.want} {c.pressure}"
-                        for c in m.cast_shapes]),
-            _EARLY_SFW_LEXICON)
-        if hit:
-            errs.append(f"treatment carries forbidden term {hit!r} (SFW)")
-        if errs:
-            return "; ".join(errs[:6])
-        return None
-
-    return _check
-
-
-def _make_read_validator(dossier: DossierLLM,
-                         provenance: "dict[str, str]",
-                         digest: str,
-                         cast_names: "list[str]"):
-    """P2c factual-read subset laws (r4/S2 anti-invention direction).
-
-    LEGALITY AUTHORITY = THE SOURCE (S1b live-smoke hardening 2026-07-10,
-    rolls 1/6/7/8): the noun + numeral corpora are the WHOLE dossier +
-    the python-stamped provenance + the python-capped SOURCE DIGEST.
-    Nothing outside the source can pass; invented numerals and names die
-    here. Word-boundary matching (never substring); numerals token-exact
-    (kibitz r2 M3); NO sentence-initial skip (kibitz r2 M2 -- it was an
-    invention hole); possessives are grammar; the drama's characters are
-    hard-banned CASE-SENSITIVELY (a cast named HOPE must not outlaw the
-    word 'hope'). All failures accumulate into ONE teaching message."""
-    ents = (dossier.named_entities.people + dossier.named_entities.places
-            + dossier.named_entities.things)
-    noun_corpus = _norm_ws(" ".join(
-        dossier.facts_to_keep + dossier.dramatizable_vectors + ents
-        + list(provenance.values()) + [str(digest)]))
-    legal_numerals = {
-        t.rstrip(".,")
-        for src in (list(dossier.allowed_numbers) + [str(digest)])
-        for t in _RE_NUMERAL.findall(src)
-    }
-    source_hay = _norm_ws(
-        " ".join(dossier.facts_to_keep + [str(digest)])).casefold()
-
-    def _check(m: NewsCloseRead) -> "str | None":
-        errs: "list[str]" = []
-        text = m.news_close_read
-        for name in cast_names:
-            # SOURCE LEGALITY BEATS THE FICTIONAL BAN (14th live smoke
-            # 2026-07-10: the drama named its character after the REAL
-            # person in the story -- 'JIM' for NASA's Jim Ross -- and the
-            # ban outlawed factual reporting of the real name).
-            if _word_re(name).search(noun_corpus):
-                continue
-            name_re = re.compile(
-                r"\b(?:" + re.escape(name) + r"|"
-                + re.escape(name.title()) + r")\b")
-            if name_re.search(text):
-                errs.append(
-                    f"the read names the fictional character {name!r} -- "
-                    f"this is REAL NEWS about the source story: use only "
-                    f"real names from the source, never the drama's "
-                    f"characters")
-        for tok in _RE_NUMERAL.findall(text):
-            tok = tok.rstrip(".,")
-            if tok in legal_numerals:
-                continue
-            # spelled-number equivalence, same as the dossier gate (23rd
-            # live smoke 2026-07-10: the story spelled 'twenty')
-            if any(_word_re(f).search(source_hay)
-                   for f in _spelled_forms(tok)):
-                continue
-            errs.append(
-                f"numeral {tok!r} not in allowed_numbers "
-                f"{dossier.allowed_numbers} or the source text -- "
-                f"never compute or invent a number")
-        for match in _RE_PROPER.finditer(text):
-            word = match.group(0)
-            if word.endswith("'s"):
-                word = word[:-2]
-            if word in _PROPER_STOPWORDS:
-                continue
-            if not _word_re(word).search(noun_corpus):
-                errs.append(
-                    f"proper noun {word!r} not in the dossier or "
-                    f"provenance -- use only real names from the source "
-                    f"story")
-        if errs:
-            return "; ".join(errs[:6])
+    def _check(model: Treatment) -> "str | None":
+        if len(model.cast_shapes) > n_max:
+            return f"cast_shapes {len(model.cast_shapes)} > N_MAX {n_max}"
         return None
 
     return _check
@@ -1456,7 +819,7 @@ def _make_read_validator(dossier: DossierLLM,
 
 def _make_casting_validator(menu: VoiceMenu, speakers: "list[str]"):
     """Speaker-set equality + menu-id legality + gender/timbre feasibility
-    (r4/S1 stage 2: validated AFTER P6, rerolled via the ladder)."""
+    (validated after the script seal; malformed casting data alone retries)."""
     by_id = menu.by_id()
     want = set(speakers)
 
@@ -1535,80 +898,37 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
             "dossier", str(exc.last_error), exc.attempts) from exc
 
 
-def _pass_pitch(creative_fn, pack, dossier: DossierLLM, cards, stance,
-                *, n_max: int, mode: Fable2Mode) -> PitchSlate:
-    if mode == _COMPACT_MODE:
-        count = 1
-    elif mode == _FULL_MODE:
-        count = 3
-    else:
-        raise Fable2PitchError("pitch_room", f"unknown fable2 mode {mode!r}")
-    cards_text = "\n".join(
-        f"CARD {i + 1}: {c['name']} -- {c['shape']}"
-        for i, c in enumerate(cards))
+def _pass_pitch(
+    creative_fn, pack, dossier: DossierLLM, cards, stance, *, n_max: int,
+) -> Pitch:
+    card = cards[0]
     user = (
-        f"SOURCE DOSSIER:\n"
+        "SOURCE DOSSIER:\n"
         f"{json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)}\n\n"
-        f"FRAME CARD(S) DEALT (pitch i uses card i):\n{cards_text}\n\n"
+        f"FRAME CARD DEALT: {card['name']} -- {card['shape']}\n\n"
         f"EDITORIAL STANCE: {stance['name']} -- {stance['note']}\n\n"
-        f"REQUESTED NUMBER OF PITCHES: {count}\n"
-        f"N_MAX (speaking-character ceiling): {n_max}\n"
-        f"Pitch now."
+        f"N_MAX (speaking-character ceiling): {n_max}\nWrite the pitch now."
     )
     try:
-        # LLM slot: creative -- P1 pitch room (CREATIVE 1).
+        # LLM slot: creative -- P1 pitch.
         return structured_call(
-            prompt=[
-                {"role": "system",
-                 "content": _seam(pack, "fable2_pitch_system")},
+            prompt=ProviderCapacityMessages([
+                {"role": "system", "content": _seam(pack, "fable2_pitch_system")},
                 {"role": "user", "content": user},
-            ],
-            schema=PitchSlate,
+            ]),
+            schema=Pitch,
             slot_fn=creative_fn,
-            base_temperature=_TEMP["pitch_room"],
-            structural_retry_temperature=round(_TEMP["pitch_room"] / 2, 2),
+            base_temperature=_TEMP["pitch"],
+            structural_retry_temperature=round(_TEMP["pitch"] / 2, 2),
             repair_prompt_factory=make_dispatching_repair_factory(),
-            post_validator=_make_pitch_validator(cards, mode, n_max),
-            max_new_tokens=_MAX_NEW_TOKENS["pitch_room"],
-            helper_name="fable2_pitch_room",
+            post_validator=_make_pitch_validator(cards, n_max),
+            max_new_tokens=None,
+            helper_name="fable2_pitch",
         )
     except StructuredCallFailedError as exc:
         raise Fable2PitchError(
-            "pitch_room", str(exc.last_error), exc.attempts) from exc
-
-
-def _pass_select(technical_fn, pack, dossier: DossierLLM,
-                 slate: PitchSlate, stance) -> PitchSelect:
-    """P2a: select one existing member of the exact three-pitch slate."""
-    user = (
-        "SOURCE DOSSIER:\n"
-        f"{json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)}"
-        "\n\nEDITORIAL STANCE:\n"
-        f"{json.dumps(stance, ensure_ascii=False, indent=2)}"
-        "\n\nTHREE-PITCH SLATE:\n"
-        f"{json.dumps(slate.model_dump(), ensure_ascii=False, indent=2)}"
-        "\n\nSelect one existing pitch now."
-    )
-    try:
-        # LLM slot: technical -- P2a pitch selection.
-        return structured_call(
-            prompt=[
-                {"role": "system",
-                 "content": _seam(pack, "fable2_select_system")},
-                {"role": "user", "content": user},
-            ],
-            schema=PitchSelect,
-            slot_fn=technical_fn,
-            base_temperature=_TEMP["pitch_select"],
-            structural_retry_temperature=_TEMP["pitch_select"] / 2.0,
-            repair_prompt_factory=make_dispatching_repair_factory(),
-            post_validator=_make_select_validator(slate),
-            max_new_tokens=_MAX_NEW_TOKENS["pitch_select"],
-            helper_name="fable2_pitch_select",
-        )
-    except StructuredCallFailedError as exc:
-        raise Fable2SelectError(
-            "pitch_select", str(exc.last_error), exc.attempts) from exc
+            "pitch", str(exc.last_error), exc.attempts,
+        ) from exc
 
 
 def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
@@ -1627,11 +947,11 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
     try:
         # LLM slot: creative -- P2b treatment (cast names born here).
         return structured_call(
-            prompt=[
+            prompt=ProviderCapacityMessages([
                 {"role": "system",
                  "content": _seam(pack, "fable2_treatment_system")},
                 {"role": "user", "content": user},
-            ],
+            ]),
             schema=Treatment,
             slot_fn=creative_fn,
             base_temperature=_TEMP["treatment"],
@@ -1639,7 +959,7 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_treatment_validator(
                 dossier, n_max, provenance, digest),
-            max_new_tokens=_MAX_NEW_TOKENS["treatment"],
+            max_new_tokens=None,
             helper_name="fable2_treatment",
         )
     except StructuredCallFailedError as exc:
@@ -1647,224 +967,81 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
             "treatment", str(exc.last_error), exc.attempts) from exc
 
 
-def _pass_news_read(technical_fn, pack, dossier: DossierLLM,
-                    provenance: "dict[str, str]", digest: str,
-                    cast_names: "list[str]") -> NewsCloseRead:
-    """P2c (read-split, S1b 2026-07-10): the factual close gets its own
-    single-purpose low-temp technical pass -- 7 of the first 13 live
-    rolls died when one combined P2b call had to satisfy the whole
-    treatment AND a subset-law-compliant read."""
+def _pass_news_read(
+    technical_fn,
+    pack,
+    dossier: DossierLLM,
+    provenance: "dict[str, str]",
+    digest: str,
+    cast_names: "list[str]",
+) -> NewsCloseRead:
+    """Author one source-grounded factual close through a typed ladder."""
     user = (
-        f"SOURCE DOSSIER:\n"
-        f"{json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)}\n\n"
-        f"PROVENANCE: {json.dumps(provenance, ensure_ascii=False)}\n\n"
-        # kibitz r3 M1: the validator authorizes source-digest facts, so
-        # the model must SEE the digest it may quote from.
-        f"SOURCE STORY TEXT (you may use its names and numbers "
-        f"verbatim):\n{digest}\n\n"
-        f"FORBIDDEN NAMES (the drama's fictional characters -- never use "
-        f"them here): {', '.join(cast_names) or '(none)'}\n\n"
-        f"Write the closing news read now."
+        "SOURCE DOSSIER:\n"
+        + json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)
+        + "\n\nPROVENANCE: "
+        + json.dumps(provenance, ensure_ascii=False)
+        + "\n\nSOURCE STORY TEXT (names and numbers may be quoted):\n"
+        + digest
+        + "\n\nFICTIONAL CAST NAMES (never use these in the factual read): "
+        + (", ".join(cast_names) or "(none)")
+        + "\n\nWrite the closing news read now."
     )
-    validator = _make_read_validator(dossier, provenance, digest, cast_names)
-    # Bounded outer retry (32nd live smoke 2026-07-10: on a thin source
-    # the model keeps reaching for a figure; the SECOND outer attempt
-    # demands a NUMERAL-FREE read, which cannot fail the numeral gate).
-    last_exc: "Exception | None" = None
-    for outer in range(2):
-        prompt_user = user if outer == 0 else (
-            user + "\n\nHARD CONSTRAINT for this attempt: write the read "
-            "with NO numerals at all -- no figures, no dates; state the "
-            "finding in plain words only."
+    try:
+        # LLM slot: technical -- source-grounded factual close.
+        return structured_call(
+            prompt=ProviderCapacityMessages([
+                {
+                    "role": "system",
+                    "content": _seam(pack, "fable2_news_read_system"),
+                },
+                {"role": "user", "content": user},
+            ]),
+            schema=NewsCloseRead,
+            slot_fn=technical_fn,
+            base_temperature=0.20,
+            structural_retry_temperature=0.10,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            max_new_tokens=None,
+            helper_name="fable2_news_read",
         )
-        try:
-            # LLM slot: technical -- P2c factual close (read-split).
-            return structured_call(
-                prompt=[
-                    {"role": "system",
-                     "content": _seam(pack, "fable2_news_read_system")},
-                    {"role": "user", "content": prompt_user},
-                ],
-                schema=NewsCloseRead,
-                slot_fn=technical_fn,
-                base_temperature=0.20,
-                structural_retry_temperature=0.10,
-                repair_prompt_factory=make_dispatching_repair_factory(),
-                post_validator=validator,
-                max_new_tokens=300,
-                helper_name="fable2_news_read",
-            )
-        except StructuredCallFailedError as exc:
-            last_exc = exc
-            log.warning(
-                "[scifi_fable2] news_read outer attempt %d exhausted "
-                "(%s)%s", outer + 1, exc.last_error,
-                "; retrying with the numeral-free hard constraint"
-                if outer == 0 else "",
-            )
-    raise Fable2TreatmentError(
-        "news_read", str(getattr(last_exc, "last_error", last_exc)),
-        getattr(last_exc, "attempts", 0)) from last_exc
+    except StructuredCallFailedError as exc:
+        raise Fable2TreatmentError(
+            "news_read", str(exc.last_error), exc.attempts
+        ) from exc
 
 
-def _micro_episode_line_cap(target_words: int) -> int:
-    """Tiny-budget structural cap: dialogue LINES, not word arithmetic
-    (20th live smoke 2026-07-10: the model wrote 107 character words for
-    target 30 through every numeric hint -- small models follow concrete
-    line counts, not word counts)."""
-    return max(4, int(target_words) // 7)
-
-
-def _merged_character_run_count(parsed: ParsedScript) -> int:
-    """Count the actual writable rows after same-speaker run merging."""
-    total = 0
-    for scene in parsed.scenes:
-        previous = object()
-        for line in scene.lines:
-            if line.speaker != previous:
-                total += 1
-            previous = line.speaker
-    return total
-
-
-def _minimum_character_run_count(envelope: SceneEnvelope) -> int:
-    lower, _upper = _word_band(envelope.total_words)
-    return int(math.ceil(lower / _FABLE_MAX_CHARACTER_LINE_WORDS))
-
-
-def _script_capacity_defects(
-    parsed: ParsedScript,
+def _script_user_prompt(
+    treatment: Treatment,
+    digest: str,
     envelope: SceneEnvelope,
-) -> "tuple[str, ...]":
-    actual_runs = _merged_character_run_count(parsed)
-    minimum_runs = _minimum_character_run_count(envelope)
-    if actual_runs >= minimum_runs:
-        return ()
-    return (
-        "CHARACTER_ROW_CAPACITY: post-merge alternating character rows "
-        f"{actual_runs} below required {minimum_runs} for target "
-        f"{envelope.total_words} at the "
-        f"{_FABLE_MAX_CHARACTER_LINE_WORDS}-word breath ceiling",
-    )
-
-
-def _fable_character_line_policy(
-    parsed: ParsedScript,
-    envelope: SceneEnvelope,
-) -> "tuple[int, int]":
-    """Return the hygiene target and exact enforced cap per merged row."""
-    row_count = max(1, _merged_character_run_count(parsed))
-    per_line_target = max(
-        6,
-        int(envelope.total_words) // row_count,
-    )
-    line_cap = derive_one_breath_cap((
-        max(1, per_line_target - 3),
-        per_line_target + 4,
-    ))
-    return per_line_target, line_cap
-
-
-def _script_user_prompt(treatment: Treatment, digest: str,
-                        envelope: SceneEnvelope,
-                        cast_names: "list[str]") -> str:
+    cast_names: "list[str]",
+) -> str:
     cast_block = "\n".join(
-        f"- {c.name} ({c.role}): wants {c.want}; pressure {c.pressure}; "
-        f"register: {c.register}"
-        for c in treatment.cast_shapes)
-    micro = ""
-    if envelope.total_words < 60:
-        cap = _micro_episode_line_cap(envelope.total_words)
-        micro = (
-            f" MICRO-EPISODE (hard): this is under a minute of air -- "
-            f"write AT MOST {cap} character dialogue lines TOTAL across "
-            f"all scenes, each line under 10 words; every line must "
-            f"carry the whole turn."
-        )
-    vector = ", ".join(
-        f"scene {index}: target {target}, accepted {band[0]}-{band[1]}"
-        for index, (target, band) in enumerate(zip(
-            envelope.scene_word_targets,
-            envelope.scene_word_bands), start=1)
+        f"- {shape.name} ({shape.role}): wants {shape.want}; "
+        f"pressure {shape.pressure}; register: {shape.register}"
+        for shape in treatment.cast_shapes
     )
-    minimum_runs = _minimum_character_run_count(envelope)
     return (
-        f"TREATMENT:\n"
-        f"{json.dumps(treatment.model_dump(), ensure_ascii=False, indent=2)}"
-        f"\n\nCAST (the ONLY legal speakers besides ANNOUNCER; copy names "
-        f"EXACTLY):\n{cast_block}\n\n"
-        f"SOURCE DIGEST (fiction fuel, never quoted as news):\n{digest}\n\n"
-        f"SCENE ENVELOPE: exactly {envelope.scene_count} scene(s); exact "
-        f"ordered target/band vector [{vector}]; total CHARACTER dialogue "
-        f"target {envelope.total_words} words (announcer lines are metered "
-        f"separately and stay lean: 1-2 intro lines, 1-2 outro lines). "
-        f"Write at least {minimum_runs} alternating CHARACTER dialogue turns "
-        f"across the scenes; consecutive lines by the same speaker merge into "
-        f"one writable row and therefore count only once."
-        f"{micro}\n\n"
-        # Recency anchor (first S1b live smokes, 2026-07-10): the local
-        # 12B model reverts to screenplay habits unless the LAST thing it
-        # reads re-states the format law.
-        f"FORMAT REMINDER (hard): every line is exactly LABEL: spoken "
-        f"words. PLAIN TEXT ONLY -- no markdown, no asterisks. NO "
-        f"parentheses or performance notes anywhere: never (pauses), "
-        f"never (raspy), never (over radio); delivery lives in the words "
-        f"themselves. The ANNOUNCER speaks ONLY in the intro and the "
-        f"outro -- never inside or between scenes (a MUSIC line may sit "
-        f"between scenes instead). End with ANNOUNCER outro -> CODA -> "
-        f"MUSIC (closing) -> END.\n\n"
-        f"Write the complete episode now."
+        "TREATMENT:\n"
+        + json.dumps(
+            treatment.model_dump(), ensure_ascii=False, indent=2
+        )
+        + "\n\nCAST (the only legal speakers besides ANNOUNCER; use these "
+        + f"canonical roster labels):\n{cast_block}\n\n"
+        + f"SOURCE DIGEST (fiction fuel, never quoted as news):\n{digest}\n\n"
+        + "DURATION GUIDANCE: the request is approximately "
+        + f"{envelope.total_words} character-spoken words. Treat that only as "
+        + "creative pacing guidance; never count, pad, compress, or mention a "
+        + "word quota. Use a natural number of scenes for this story.\n\n"
+        + "FORMAT REMINDER: every nonblank row uses one structural label: "
+        + "TITLE, MUSIC, SCENE, ANNOUNCER, a cast roster label, CODA, or END. "
+        + "Spoken text may use ordinary punctuation, including quotation marks, "
+        + "parentheses, brackets, and internal colons. Add no unlabelled stage-"
+        + "direction rows. ANNOUNCER speaks only in the intro and outro. End in "
+        + "this order: ANNOUNCER outro, CODA, closing MUSIC, END.\n\n"
+        + "Write the complete episode now."
     )
-
-
-def _extract_format_example(seam_text: str) -> str:
-    """Pull the seam's FORMAT example play (TITLE: The Long Count .. END.)
-    for the few-shot assistant turn. The seam remains the single source
-    of truth; extraction failing = the pack drifted = fail loud."""
-    start = seam_text.find("TITLE: The Long Count")
-    end = seam_text.find("\nEND.", start)
-    if start < 0 or end < 0:
-        raise Fable2ScriptError(
-            "script",
-            "fable2_script_system seam lost its FORMAT example play -- "
-            "the few-shot anchor cannot be built")
-    return seam_text[start:end + len("\nEND.")]
-
-
-def _script_budget_defects(parsed: ParsedScript,
-                           envelope: SceneEnvelope) -> "tuple[str, ...]":
-    """Return exact total, scene-count, and per-scene vector defects."""
-    _validate_scene_envelope(envelope)
-    errors = []
-    lo, hi = _word_band(envelope.total_words)
-    if not (lo <= parsed.character_word_count <= hi):
-        errors.append(
-            f"WORD_BUDGET: character words {parsed.character_word_count} "
-            f"outside {int(lo)}-{int(hi)} (target {envelope.total_words})"
-        )
-    counts = _scene_character_word_counts(parsed)
-    if len(counts) != envelope.scene_count:
-        errors.append(
-            f"SCENE_COUNT: parsed {len(counts)} scene(s), expected "
-            f"{envelope.scene_count}"
-        )
-    # Per-scene check = the GROSS band (+/-50%), not the advisory +/-30% (kibitz
-    # 2026-07-14, refined-C). An ordinary +/-30% miss is steered by the prompt
-    # vector and penalized by _draft_score; the GROSS band still drives a reroll
-    # for a scene structurally out of proportion. NOTE (Gate 3, 2026-07-18): these
-    # word/scene COUNT defects (total-word band, scene-count, per-scene gross) now
-    # drive BOUNDED REROLLS only -- once the reroll budget is spent, _run_markup_ladder
-    # ACCEPTS the cleanly-parsed draft and records the residuals as advisory. They
-    # are no longer a fatal quota gate ("no count field can gate production").
-    for index, (count, target, gross) in enumerate(zip(
-            counts, envelope.scene_word_targets,
-            envelope.scene_word_gross_bands), start=1):
-        if not (gross[0] <= count <= gross[1]):
-            errors.append(
-                f"SCENE_WORD_GROSS: scene {index} character words {count} "
-                f"grossly outside {gross[0]}-{gross[1]} (target {target})"
-            )
-    return tuple(errors)
 
 
 _TITLE_LINE_RE = re.compile(r"^\s*TITLE\s*:", re.IGNORECASE)
@@ -1878,9 +1055,8 @@ def _strip_conversational_wrapper(raw: str) -> str:
     BEFORE the first TITLE: line, or AFTER the END. line, is by definition not
     part of the episode: it is the model talking to us about the episode.
 
-    Live 2026-07-14, 420w scifi_fable2: aion-3.0-mini opened the revision with
-        "I will now produce the complete revised radio play episode, applying
-         all critic notes..."
+    A live 420-word run showed a chatty model opening its otherwise valid
+    episode with a sentence announcing that it would now write the script.
     -> BAD_LINE_SHAPE (line 1) + SKELETON_BREAK (TITLE is not the first line).
     The markup ladder is a RAW-TEXT pass -- there is no schema to constrain the
     shape -- so it simply re-asked, five times, and the model politely announced
@@ -1924,10 +1100,29 @@ def _strip_conversational_wrapper(raw: str) -> str:
     return trimmed
 
 
+def _standalone_stage_direction_repair_note(defect_rows):
+    """Give the repair rung an explicit rule for illegal parenthetical rows."""
+    for defect in defect_rows:
+        row = str(defect)
+        if not row.startswith("BAD_LINE_SHAPE"):
+            continue
+        _, _, detail = row.partition(":")
+        if detail.lstrip().startswith(("(", "[")):
+            return (
+                "\nFORMAT REPAIR RULE: a standalone parenthetical or bracketed "
+                "row is an illegal stage direction. Do not return it as its own "
+                "line. Preserve a necessary event only by folding it into the "
+                "nearest legal labelled spoken line as natural words, or omit "
+                "it when nonessential. Every nonblank row must begin with a "
+                "legal label; do not invent an unlabeled narration row."
+            )
+    return ""
+
+
 def _run_markup_ladder(
     creative_fn,
     *,
-    pass_id: Literal["script", "revision"],
+    pass_id: Literal["script"],
     system: str,
     base_user: str,
     envelope: SceneEnvelope,
@@ -1935,192 +1130,94 @@ def _run_markup_ladder(
     initial_temperature: float,
     format_example: "str | None" = None,
 ) -> "tuple[str, ParsedScript, dict]":
-    """Shared P3/P5 whole-play ladder with observed immutable traces."""
+    """Return the first structurally clean whole-play parse.
+
+    Every attempt receives the provider's full remaining output capacity.
+    Malformed markup may consume another rung; authored prose, punctuation,
+    casing, and word count never do.
+    """
+    del envelope
     temps = _MARKUP_LADDER_TEMPS(initial_temperature)
-    tokens = _script_token_budget(envelope.total_words)
     defects_by_attempt: "list[list[str]]" = []
     traces: "list[PassAttemptTrace]" = []
-    budget_rerolls = 0
-    capacity_rerolls = 0
-    truncation_retry_used = False
     extra_user: "str | None" = None
     last_defect_text = ""
 
     for temp in temps:
-        while True:
-            attempt = len(traces) + 1
-            requested_tokens = tokens
-            user_content = (
-                f"{base_user}\n\n{extra_user}" if extra_user else base_user)
-            if format_example is None:
-                msgs = [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user_content},
-                ]
-            else:
-                msgs = [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": (
+        attempt = len(traces) + 1
+        user_content = (
+            f"{base_user}\n\n{extra_user}" if extra_user else base_user
+        )
+        if format_example is None:
+            messages = ProviderCapacityMessages([
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_content},
+            ])
+        else:
+            messages = ProviderCapacityMessages([
+                {"role": "system", "content": system},
+                {
+                    "role": "user",
+                    "content": (
                         "Before the real assignment: show the exact output "
-                        "FORMAT once, as a tiny example episode.")},
-                    {"role": "assistant", "content": format_example},
-                    {"role": "user", "content": user_content},
-                ]
-            # LLM slot: creative -- P3/P5 whole-play markup ladder.
-            raw = creative_fn(
-                msgs, temperature=temp, max_new_tokens=requested_tokens)
-            raw = _strip_conversational_wrapper(raw)
-            parsed, defects = parse_fable2_markup(raw, cast_names)
-            if parsed is None:
-                defect_rows = tuple(str(defect) for defect in defects)
-                rendered = render_defects(defects)
-                codes = {defect.code for defect in defects}
-                missing_end = Fable2ParseDefect.MISSING_END in codes
-                traces.append(PassAttemptTrace(
-                    attempt=attempt,
-                    temperature=float(temp),
-                    requested_max_new_tokens=requested_tokens,
-                    outcome="truncated" if missing_end else "parse_rejected",
-                    truncation=missing_end,
-                    parse_defects=defect_rows,
-                ))
-                defects_by_attempt.append(list(defect_rows))
-                last_defect_text = rendered
-                if missing_end and not truncation_retry_used:
-                    truncation_retry_used = True
-                    tokens = int(tokens * 1.25)
-                    extra_user = (
-                        "Your previous draft was TRUNCATED (no END. line). "
-                        "Write the COMPLETE episode again, top to bottom, "
-                        "slightly tighter, and stop after END."
-                    )
-                    continue
-                extra_user = (
-                    "Your previous draft violated the FORMAT. Fix EVERY "
-                    "defect below and output the COMPLETE episode again "
-                    "(top to bottom, TITLE: first, END. last). PLAIN TEXT "
-                    "ONLY: never asterisks, never markdown, never bold "
-                    "labels, no parenthetical stage directions. The "
-                    "REQUIRED SKELETON, in order: TITLE -> MUSIC (opening) "
-                    "-> ANNOUNCER intro -> SCENE 1..N -> ANNOUNCER outro "
-                    "-> CODA -> MUSIC (closing) -> END.\n"
-                    f"{rendered}"
-                )
-                break
-
-            scene_counts = _scene_character_word_counts(parsed)
-            budget_defects = _script_budget_defects(parsed, envelope)
-            capacity_defects = _script_capacity_defects(parsed, envelope)
-            if capacity_defects:
-                defect_rows = tuple(capacity_defects) + tuple(budget_defects)
-                traces.append(PassAttemptTrace(
-                    attempt=attempt,
-                    temperature=float(temp),
-                    requested_max_new_tokens=requested_tokens,
-                    outcome="budget_rejected",
-                    parse_defects=defect_rows,
-                    character_words=parsed.character_word_count,
-                    scene_character_words=scene_counts,
-                ))
-                defects_by_attempt.append(list(defect_rows))
-                last_defect_text = "; ".join(defect_rows)
-                capacity_rerolls += 1
-                if capacity_rerolls >= _MAX_CAPACITY_REROLLS:
-                    raise Fable2ScriptError(
-                        pass_id,
-                        "character-row capacity repair exhausted; last "
-                        f"defects:\n{last_defect_text}",
-                        len(traces),
-                    )
-                minimum_runs = _minimum_character_run_count(envelope)
-                extra_user = (
-                    "Your complete draft cannot be repaired safely at the "
-                    "row-local boundary because it has too few alternating "
-                    "character turns. Rewrite the COMPLETE episode with at "
-                    f"least {minimum_runs} alternating CHARACTER dialogue "
-                    "turns across the locked scene count. Consecutive lines "
-                    "by the same speaker merge and count only once. Preserve "
-                    "the treatment, SFW story, source grounding, announcer "
-                    "skeleton, and strict markup.\nDEFECTS: "
-                    f"{last_defect_text}"
-                )
-                continue
-            # Whole-play retries are intentionally bounded. Once spent, retain
-            # the complete parse as an INTERMEDIATE candidate and defer any
-            # residual total-word miss to the row-local final fitter. A count
-            # miss may survive P3/P5 selection, but can never survive casting,
-            # proof sealing, or assembly.
-            if budget_defects and budget_rerolls < _MAX_BUDGET_REROLLS:
-                traces.append(PassAttemptTrace(
-                    attempt=attempt,
-                    temperature=float(temp),
-                    requested_max_new_tokens=requested_tokens,
-                    outcome="budget_rejected",
-                    parse_defects=budget_defects,
-                    character_words=parsed.character_word_count,
-                    scene_character_words=scene_counts,
-                ))
-                defects_by_attempt.append(list(budget_defects))
-                last_defect_text = "; ".join(budget_defects)
-                budget_rerolls += 1
-                lo, hi = _word_band(envelope.total_words)
-                verb = (
-                    "EXPAND the dialogue"
-                    if parsed.character_word_count < lo
-                    else "TIGHTEN the dialogue"
-                )
-                structural = ""
-                if (parsed.character_word_count > hi
-                        and envelope.total_words < 60):
-                    cap = _micro_episode_line_cap(envelope.total_words)
-                    structural = (
-                        f" Cut LINES, not words: at most {cap} character "
-                        f"dialogue lines total, each under 10 words.")
-                vector = ", ".join(
-                    f"scene {index}={target} words "
-                    f"({band[0]}-{band[1]})"
-                    for index, (target, band) in enumerate(zip(
-                        envelope.scene_word_targets,
-                        envelope.scene_word_bands), start=1)
-                )
-                extra_user = (
-                    f"Your draft's CHARACTER dialogue totals "
-                    f"{parsed.character_word_count} words; the target is "
-                    f"{envelope.total_words} (acceptable {int(lo)} to "
-                    f"{int(hi)}). {verb} and satisfy the exact scene "
-                    f"vector [{vector}]. Output the COMPLETE episode "
-                    f"again.{structural}\nDEFECTS: {last_defect_text}"
-                )
-                continue
-
+                        "FORMAT once, as a tiny example episode."
+                    ),
+                },
+                {"role": "assistant", "content": format_example},
+                {"role": "user", "content": user_content},
+            ])
+        # LLM slot: creative -- whole-play markup authoring/repair.
+        raw = creative_fn(
+            messages,
+            temperature=temp,
+            max_new_tokens=None,
+        )
+        raw = _strip_conversational_wrapper(raw)
+        parsed, defects = parse_fable2_markup(raw, cast_names)
+        if parsed is not None:
             traces.append(PassAttemptTrace(
                 attempt=attempt,
                 temperature=float(temp),
-                requested_max_new_tokens=requested_tokens,
                 outcome="accepted",
                 selected=True,
                 character_words=parsed.character_word_count,
-                scene_character_words=scene_counts,
+                scene_character_words=_scene_character_word_counts(parsed),
             ))
             trace_tuple = tuple(traces)
             _validate_attempt_sequence(pass_id, trace_tuple)
             return raw, parsed, {
                 "defects_by_attempt": defects_by_attempt,
-                "rerolls": len(traces) - 1,
+                "structural_retries": len(traces) - 1,
                 "attempts": len(traces),
-                "budget_rerolls": budget_rerolls,
-                "capacity_rerolls": capacity_rerolls,
-                "truncation_retry": truncation_retry_used,
+                "output_budget_mode": "provider_capacity",
+                "requested_max_new_tokens": None,
                 "attempt_trace": trace_tuple,
-                "actual_max_new_tokens": max(
-                    row.requested_max_new_tokens for row in trace_tuple),
-                "deferred_budget_defects": list(budget_defects),
             }
+
+        defect_rows = tuple(str(defect) for defect in defects)
+        rendered = render_defects(defects)
+        traces.append(PassAttemptTrace(
+            attempt=attempt,
+            temperature=float(temp),
+            outcome="parse_rejected",
+            parse_defects=defect_rows,
+        ))
+        defects_by_attempt.append(list(defect_rows))
+        last_defect_text = rendered
+        extra_user = (
+            "Repair only the malformed FORMAT defects below. Return the "
+            "complete episode from TITLE through END as plain text. Keep "
+            "the same story, cast, events, and wording wherever the format "
+            "is already valid."
+            + _standalone_stage_direction_repair_note(defect_rows)
+            + "\n" + rendered
+        )
 
     raise Fable2ScriptError(
         pass_id,
         f"markup ladder exhausted; last defects:\n{last_defect_text}",
-        len(traces))
+        len(traces),
+    )
 
 
 def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
@@ -2137,114 +1234,6 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
         envelope=envelope,
         cast_names=cast_names,
         initial_temperature=_TEMP["script"],
-        format_example=_extract_format_example(system),
-    )
-
-
-def _pass_critic(technical_fn, pack, *, draft1: FinalDraft,
-                 treatment: Treatment, selected_pitch: Pitch,
-                 envelope: SceneEnvelope,
-                 story_rules: StoryRules) -> CriticNotes:
-    """P4: critique the exact sealed first draft without rewriting it."""
-    _validate_final_draft_integrity("P4 draft1", draft1)
-    user_payload = {
-        "selected_pitch": selected_pitch.model_dump(mode="json"),
-        "treatment": treatment.model_dump(mode="json"),
-        "scene_envelope": _envelope_payload(envelope),
-        "resolved_story_rules": _story_rules_payload(story_rules),
-        "normalized_full_draft": draft1.normalized_source,
-        "parsed_full_draft": _parsed_payload(draft1.parsed),
-    }
-    try:
-        # LLM slot: technical -- P4 scoped critic.
-        return structured_call(
-            prompt=[
-                {"role": "system",
-                 "content": _seam(pack, "fable2_critic_system")},
-                {"role": "user", "content": (
-                    "AUTHORITATIVE P4 INPUTS:\n"
-                    + json.dumps(
-                        user_payload, ensure_ascii=False, indent=2)
-                    + "\n\nReturn the CriticNotes object now.")},
-            ],
-            schema=CriticNotes,
-            slot_fn=technical_fn,
-            base_temperature=_TEMP["critic"],
-            structural_retry_temperature=_TEMP["critic"] / 2.0,
-            repair_prompt_factory=make_dispatching_repair_factory(),
-            post_validator=_make_critic_validator(draft1.parsed),
-            max_new_tokens=_MAX_NEW_TOKENS["critic"],
-            helper_name="fable2_critic",
-        )
-    except StructuredCallFailedError as exc:
-        raise Fable2ScriptError(
-            "critic", str(exc.last_error), exc.attempts) from exc
-
-
-def _revision_protected_payload(parsed: ParsedScript,
-                                treatment: Treatment) -> dict:
-    """The exact P5 fields Python protects after the model writes."""
-    return {
-        "title": parsed.title,
-        "cast_shapes": [
-            shape.model_dump(mode="json") for shape in treatment.cast_shapes
-        ],
-        "scene_order": [scene.n for scene in parsed.scenes],
-        "scene_settings": [scene.setting for scene in parsed.scenes],
-        "speaker_topology": [
-            [line.speaker for line in scene.lines]
-            for scene in parsed.scenes
-        ],
-        "announcer_skeleton": {
-            "intro_lines": len(parsed.announcer_intro),
-            "outro_lines": len(parsed.announcer_outro),
-        },
-        "music_queue": {
-            "opening": parsed.music_open,
-            "interstitials": [list(row) for row in parsed.music_inter],
-            "closing": parsed.music_close,
-        },
-        "coda_news_boundary": {
-            "coda": parsed.coda,
-            "news_close_read": treatment.news_close_read,
-        },
-    }
-
-
-def _pass_revision(creative_fn, pack, *, draft1: FinalDraft,
-                   treatment: Treatment, critic_notes: CriticNotes,
-                   selected_pitch: Pitch, envelope: SceneEnvelope,
-                   story_rules: StoryRules,
-                   cast_names: "list[str]") -> "tuple[str, ParsedScript, dict]":
-    """P5: rewrite the complete play, then let Python judge the result."""
-    _validate_final_draft_integrity("P5 draft1", draft1)
-    payload = {
-        "selected_pitch": selected_pitch.model_dump(mode="json"),
-        "treatment": treatment.model_dump(mode="json"),
-        "scene_envelope": _envelope_payload(envelope),
-        "resolved_story_rules": _story_rules_payload(story_rules),
-        "critic_notes": critic_notes.model_dump(mode="json"),
-        "protected_artifacts": _revision_protected_payload(
-            draft1.parsed, treatment),
-        "normalized_full_draft": draft1.normalized_source,
-        "parsed_full_draft": _parsed_payload(draft1.parsed),
-    }
-    base_user = (
-        "AUTHORITATIVE P5 INPUTS:\n"
-        + json.dumps(payload, ensure_ascii=False, indent=2)
-        + "\n\nRewrite the COMPLETE episode now. Only critic-authorized "
-          "intro/outro or scene/speaker scopes may change. If the verdict "
-          "is ship with no notes, reproduce normalized_full_draft "
-          "byte-for-byte."
-    )
-    return _run_markup_ladder(
-        creative_fn,
-        pass_id="revision",
-        system=_seam(pack, "fable2_revision_system"),
-        base_user=base_user,
-        envelope=envelope,
-        cast_names=cast_names,
-        initial_temperature=_TEMP["revision"],
     )
 
 
@@ -2257,49 +1246,52 @@ def _speakers_in_order(parsed: ParsedScript) -> "list[str]":
     return seen
 
 
-def _pass_casting(slot_fn, pack, final_draft: FinalDraft,
-                  treatment: Treatment, menu: VoiceMenu, *,
-                  envelope: SceneEnvelope, story_rules: StoryRules,
-                  mode: Fable2Mode) -> CastingVoices:
-    """P6 (registry slot: technical; temp 0.40): voices + portraits ONLY --
-    register authority stays with the treatment (r1/A3)."""
-    _validate_selected_final_draft(
-        final_draft, envelope, story_rules, mode, treatment=treatment)
+def _pass_casting(
+    slot_fn,
+    pack,
+    final_draft: FinalDraft,
+    treatment: Treatment,
+    menu: VoiceMenu,
+) -> CastingVoices:
+    """Assign one legal voice-stock entry to each finished-script speaker."""
+    _validate_selected_final_draft(final_draft, treatment=treatment)
     parsed = final_draft.parsed
     speakers = _speakers_in_order(parsed)
     script_view = _script_view(parsed, treatment, include_news_read=False)
     shapes = json.dumps(
-        [c.model_dump() for c in treatment.cast_shapes],
-        ensure_ascii=False, indent=2)
+        [shape.model_dump() for shape in treatment.cast_shapes],
+        ensure_ascii=False,
+        indent=2,
+    )
     user = (
         f"THE FINISHED SCRIPT:\n{script_view}\n\n"
         f"TREATMENT CAST SHAPES:\n{shapes}\n\n"
-        f"AVAILABLE VOICE STOCK (order by menu id; ids only):\n"
-        f"{menu.prompt_lines()}\n\n"
-        f"Cast now: exactly one entry per distinct script speaker "
-        f"({', '.join(speakers)})."
+        f"AVAILABLE VOICE STOCK (menu ids only):\n{menu.prompt_lines()}\n\n"
+        f"Return exactly one entry per script speaker: {', '.join(speakers)}."
     )
     try:
-        # LLM slot: technical -- P6 casting/voices (registry-legal slot;
-        # register authority stays with the treatment).
+        # LLM slot: technical -- voice-stock assignment only.
         return structured_call(
-            prompt=[
-                {"role": "system",
-                 "content": _seam(pack, "fable2_casting_system")},
+            prompt=ProviderCapacityMessages([
+                {
+                    "role": "system",
+                    "content": _seam(pack, "fable2_casting_system"),
+                },
                 {"role": "user", "content": user},
-            ],
+            ]),
             schema=CastingVoices,
             slot_fn=slot_fn,
             base_temperature=_TEMP["casting_voices"],
             structural_retry_temperature=_TEMP["casting_voices"] / 2.0,
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_casting_validator(menu, speakers),
-            max_new_tokens=_MAX_NEW_TOKENS["casting_voices"],
+            max_new_tokens=None,
             helper_name="fable2_casting_voices",
         )
     except StructuredCallFailedError as exc:
         raise Fable2CastError(
-            "casting_voices", str(exc.last_error), exc.attempts) from exc
+            "casting_voices", str(exc.last_error), exc.attempts
+        ) from exc
 
 
 def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
@@ -2383,198 +1375,6 @@ def _parsed_payload(parsed: ParsedScript, *, normalizations: bool = True) -> dic
 def _canonical_sha256(value: Any) -> str:
     return _sha256(json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
-
-
-def _story_rules_signature(story_rules: StoryRules) -> tuple:
-    """Immutable content fingerprint for an already shape-checked pack."""
-    pattern_fields = (
-        "cliche", "stage_business", "on_the_nose", "banned_thesis",
-        "personal_cost",
-    )
-    return (
-        story_rules.rules_id,
-        story_rules.label,
-        story_rules.schema_version,
-        tuple(
-            (name, tuple((rx.pattern, int(rx.flags))
-                         for rx in getattr(story_rules, name)))
-            for name in pattern_fields
-        ),
-        tuple(
-            (rx.pattern, int(rx.flags), replacement)
-            for rx, replacement in story_rules.cliche_replacements
-        ),
-        tuple(story_rules.banned_phrases),
-    )
-
-
-def _validate_fable2_story_rules(story_rules: Any) -> None:
-    """Fail loud if the caller did not resolve the exact Fable2 rules pack."""
-    if not isinstance(story_rules, StoryRules):
-        raise Fable2ScriptError(
-            "revision_contract",
-            "story_rules must be the resolved StoryRules artifact, got "
-            f"{type(story_rules).__name__}",
-        )
-    if getattr(story_rules, "rules_id", None) != "scifi_news_pro":
-        raise Fable2ScriptError(
-            "revision_contract",
-            "story_rules.rules_id must be 'scifi_news_pro', got "
-            f"{getattr(story_rules, 'rules_id', None)!r}",
-        )
-    if getattr(story_rules, "schema_version", None) != "v1":
-        raise Fable2ScriptError(
-            "revision_contract",
-            "story_rules.schema_version must be 'v1', got "
-            f"{getattr(story_rules, 'schema_version', None)!r}",
-        )
-    if not isinstance(story_rules.label, str) or not story_rules.label:
-        raise Fable2ScriptError(
-            "revision_contract", "story_rules.label must be non-empty")
-    for name in (
-        "cliche", "stage_business", "on_the_nose", "banned_thesis",
-        "personal_cost", "cliche_replacements",
-    ):
-        value = getattr(story_rules, name, None)
-        if not isinstance(value, tuple):
-            raise Fable2ScriptError(
-                "revision_contract",
-                f"story_rules.{name} must be a resolved tuple",
-            )
-    for name in (
-        "cliche", "stage_business", "on_the_nose", "banned_thesis",
-        "personal_cost",
-    ):
-        if any(not isinstance(rx, re.Pattern)
-               for rx in getattr(story_rules, name)):
-            raise Fable2ScriptError(
-                "revision_contract",
-                f"story_rules.{name} contains a non-re.Pattern entry",
-            )
-    replacements = story_rules.cliche_replacements
-    if any(
-        not isinstance(row, tuple)
-        or len(row) != 2
-        or not isinstance(row[0], re.Pattern)
-        or not isinstance(row[1], str)
-        for row in replacements
-    ):
-        raise Fable2ScriptError(
-            "revision_contract",
-            "story_rules.cliche_replacements must contain compiled-pattern "
-            "and string tuples",
-        )
-    phrases = getattr(story_rules, "banned_phrases", None)
-    if (not isinstance(phrases, tuple)
-            or any(not isinstance(p, str) or not p for p in phrases)):
-        raise Fable2ScriptError(
-            "revision_contract",
-            "story_rules.banned_phrases must be a resolved string tuple",
-        )
-    canonical = resolve_story_rules("scifi_news_pro")
-    if _story_rules_signature(story_rules) != _story_rules_signature(canonical):
-        raise Fable2ScriptError(
-            "revision_contract",
-            "story_rules content does not match the canonical resolved "
-            "scifi_news_pro pack",
-        )
-
-
-def _story_rules_payload(story_rules: StoryRules) -> dict:
-    _validate_fable2_story_rules(story_rules)
-    pattern_fields = (
-        "cliche", "stage_business", "on_the_nose", "banned_thesis",
-        "personal_cost",
-    )
-    return {
-        "rules_id": story_rules.rules_id,
-        "label": story_rules.label,
-        "schema_version": story_rules.schema_version,
-        **{
-            name: [
-                {"pattern": rx.pattern, "flags": int(rx.flags)}
-                for rx in getattr(story_rules, name)
-            ]
-            for name in pattern_fields
-        },
-        "cliche_replacements": [
-            {"pattern": rx.pattern, "flags": int(rx.flags),
-             "replacement": replacement}
-            for rx, replacement in story_rules.cliche_replacements
-        ],
-        "banned_phrases": list(story_rules.banned_phrases),
-    }
-
-
-def _envelope_payload(envelope: SceneEnvelope) -> dict:
-    _validate_scene_envelope(envelope)
-    return {
-        "scene_count": envelope.scene_count,
-        "scene_word_targets": list(envelope.scene_word_targets),
-        "scene_word_bands": [list(band) for band in envelope.scene_word_bands],
-        "total_words": envelope.total_words,
-        "total_band_frac": envelope.band_frac,
-        "scene_band_frac": _SCENE_WORD_BAND,
-    }
-
-
-def _scoring_context_sha256(envelope: SceneEnvelope,
-                            story_rules: StoryRules) -> str:
-    return _canonical_sha256({
-        "envelope": _envelope_payload(envelope),
-        "story_rules": _story_rules_payload(story_rules),
-    })
-
-
-def _spoken_script_text(parsed: ParsedScript) -> str:
-    parts = list(parsed.announcer_intro)
-    parts.extend(
-        line.text for scene in parsed.scenes for line in scene.lines)
-    parts.extend(parsed.announcer_outro)
-    parts.append(parsed.coda)
-    return "\n".join(parts)
-
-
-def _rule_pattern_hits(parsed: ParsedScript, story_rules: Any) -> int:
-    _validate_fable2_story_rules(story_rules)
-    text = _spoken_script_text(parsed)
-    hits = sum(
-        len(tuple(rx.finditer(text)))
-        for name in ("cliche", "stage_business", "on_the_nose",
-                     "banned_thesis")
-        for rx in getattr(story_rules, name)
-    )
-    folded = text.casefold()
-    hits += sum(
-        folded.count(phrase.casefold())
-        for phrase in story_rules.banned_phrases
-    )
-    return hits
-
-
-def _draft_score(parsed: ParsedScript, envelope: SceneEnvelope,
-                 story_rules: Any) -> DraftScore:
-    _validate_scene_envelope(envelope)
-    counts = _scene_character_word_counts(parsed)
-    bands = envelope.scene_word_bands
-    paired = min(len(counts), len(bands))
-    violations = abs(len(counts) - len(bands)) + sum(
-        not (bands[i][0] <= counts[i] <= bands[i][1])
-        for i in range(paired)
-    )
-    distance = sum(
-        abs(counts[i] - envelope.scene_word_targets[i])
-        for i in range(paired)
-    )
-    distance += sum(counts[paired:])
-    distance += sum(envelope.scene_word_targets[paired:])
-    return (
-        _rule_pattern_hits(parsed, story_rules),
-        int(violations),
-        int(distance),
-        abs(parsed.character_word_count - envelope.total_words),
-        len(parsed.normalizations),
-    )
 
 
 def _proof_entry_payload(entry: ProofMapEntry) -> dict:
@@ -2697,9 +1497,9 @@ def _attempt_payload(trace: PassAttemptTrace) -> dict:
     return {
         "attempt": trace.attempt,
         "temperature": trace.temperature,
-        "requested_max_new_tokens": trace.requested_max_new_tokens,
+        "output_budget_mode": trace.output_budget_mode,
+        "requested_max_new_tokens": None,
         "outcome": trace.outcome,
-        "truncation": trace.truncation,
         "selected": trace.selected,
         "parse_defects": list(trace.parse_defects),
         "character_words": trace.character_words,
@@ -2713,25 +1513,21 @@ def _final_draft_seal_payload(
     normalized_sha256: str,
     parsed_sha256: str,
     proof_map_sha256: str,
-    score: DraftScore,
-    scoring_context_sha256: str,
     p3_attempts: "tuple[PassAttemptTrace, ...]",
-    p5_attempts: "tuple[PassAttemptTrace, ...]",
 ) -> dict:
     return {
         "raw_sha256": raw_sha256,
         "normalized_sha256": normalized_sha256,
         "parsed_sha256": parsed_sha256,
         "proof_map_sha256": proof_map_sha256,
-        "score": list(score),
-        "scoring_context_sha256": scoring_context_sha256,
         "p3_attempts": [_attempt_payload(row) for row in p3_attempts],
-        "p5_attempts": [_attempt_payload(row) for row in p5_attempts],
     }
 
 
-def _validate_attempt_sequence(label: str,
-                               rows: "tuple[PassAttemptTrace, ...]") -> None:
+def _validate_attempt_sequence(
+    label: str,
+    rows: "tuple[PassAttemptTrace, ...]",
+) -> None:
     if not rows:
         return
     if any(type(row) is not PassAttemptTrace for row in rows):
@@ -2741,7 +1537,8 @@ def _validate_attempt_sequence(label: str,
         )
     if tuple(row.attempt for row in rows) != tuple(range(1, len(rows) + 1)):
         raise Fable2ScriptError(
-            "final_draft", f"{label} attempts must be contiguous from 1")
+            "final_draft", f"{label} attempts must be contiguous from 1"
+        )
     selected = [row for row in rows if row.selected]
     if len(selected) != 1 or selected[0] is not rows[-1]:
         raise Fable2ScriptError(
@@ -2754,19 +1551,12 @@ def build_final_draft(
     raw_source: str,
     parsed: ParsedScript,
     treatment: Treatment,
-    envelope: SceneEnvelope,
-    story_rules: Any,
     *,
     p3_attempts: "tuple[PassAttemptTrace, ...]" = (),
-    p5_attempts: "tuple[PassAttemptTrace, ...]" = (),
 ) -> FinalDraft:
-    """Pure parse/proof/score constructor for one candidate whole play."""
-    _validate_scene_envelope(envelope)
-    _validate_fable2_story_rules(story_rules)
+    """Build proof and hash seals for the sole accepted P3 artifact."""
     p3_attempts = tuple(p3_attempts)
-    p5_attempts = tuple(p5_attempts)
     _validate_attempt_sequence("P3", p3_attempts)
-    _validate_attempt_sequence("P5", p5_attempts)
     normalized = normalize_fable2_markup_text(raw_source)
     cast_names = [shape.name for shape in treatment.cast_shapes]
     authoritative, defects = parse_fable2_markup(raw_source, cast_names)
@@ -2781,23 +1571,18 @@ def build_final_draft(
             "provided ParsedScript does not match the authoritative raw parse",
         )
     proof_map = _build_proof_map(authoritative, treatment, normalized)
-    score = _draft_score(authoritative, envelope, story_rules)
-    parsed_payload = _parsed_payload(authoritative)
-    proof_payload = [_proof_entry_payload(entry) for entry in proof_map]
-    context_hash = _scoring_context_sha256(envelope, story_rules)
     raw_hash = _sha256(raw_source)
     normalized_hash = _sha256(normalized)
-    parsed_hash = _canonical_sha256(parsed_payload)
-    proof_hash = _canonical_sha256(proof_payload)
+    parsed_hash = _canonical_sha256(_parsed_payload(authoritative))
+    proof_hash = _canonical_sha256([
+        _proof_entry_payload(entry) for entry in proof_map
+    ])
     artifact_hash = _canonical_sha256(_final_draft_seal_payload(
         raw_sha256=raw_hash,
         normalized_sha256=normalized_hash,
         parsed_sha256=parsed_hash,
         proof_map_sha256=proof_hash,
-        score=score,
-        scoring_context_sha256=context_hash,
         p3_attempts=p3_attempts,
-        p5_attempts=p5_attempts,
     ))
     return FinalDraft(
         raw_source=raw_source,
@@ -2805,9 +1590,6 @@ def build_final_draft(
         parsed=authoritative,
         proof_map=proof_map,
         p3_attempts=p3_attempts,
-        p5_attempts=p5_attempts,
-        score=score,
-        scoring_context_sha256=context_hash,
         hashes=FinalDraftHashes(
             raw_sha256=raw_hash,
             normalized_sha256=normalized_hash,
@@ -2818,63 +1600,40 @@ def build_final_draft(
     )
 
 
-def _assert_source_matches_parsed(
-    normalized_source: str,
-    parsed: ParsedScript,
-    cast_names: "list[str]",
-    label: str,
-) -> None:
-    reparsed, defects = parse_fable2_markup(normalized_source, cast_names)
-    if reparsed is None:
-        raise Fable2ScriptError(
-            "revision_contract",
-            f"{label} normalized source does not parse: "
-            + render_defects(defects),
-        )
-    if (_parsed_payload(reparsed, normalizations=False)
-            != _parsed_payload(parsed, normalizations=False)):
-        raise Fable2ScriptError(
-            "revision_contract",
-            f"{label} ParsedScript does not match its normalized source",
-        )
-
-
 def _validate_final_draft_integrity(label: str, draft: Any) -> None:
-    """Recompute every FinalDraft seal before it can influence selection."""
+    """Recompute every structural/proof seal on the accepted artifact."""
     if type(draft) is not FinalDraft:
         raise Fable2ScriptError(
-            "final_draft", f"{label} must be an exact FinalDraft artifact")
+            "final_draft", f"{label} must be an exact FinalDraft artifact"
+        )
     if type(draft.hashes) is not FinalDraftHashes:
         raise Fable2ScriptError(
-            "final_draft", f"{label}.hashes must be FinalDraftHashes")
+            "final_draft", f"{label}.hashes must be FinalDraftHashes"
+        )
     if type(draft.parsed) is not ParsedScript:
         raise Fable2ScriptError(
-            "final_draft", f"{label}.parsed must be ParsedScript")
-    if (type(draft.score) is not tuple or len(draft.score) != 5
-            or any(type(value) is not int or value < 0
-                   for value in draft.score)):
-        raise Fable2ScriptError(
-            "final_draft", f"{label}.score must be five non-negative ints")
+            "final_draft", f"{label}.parsed must be ParsedScript"
+        )
     if not isinstance(draft.raw_source, str) or not isinstance(
-            draft.normalized_source, str):
+        draft.normalized_source, str
+    ):
         raise Fable2ScriptError(
-            "final_draft", f"{label} source fields must be strings")
-    if not re.fullmatch(r"[0-9a-f]{64}", draft.scoring_context_sha256):
+            "final_draft", f"{label} source fields must be strings"
+        )
+    if type(draft.p3_attempts) is not tuple:
         raise Fable2ScriptError(
-            "final_draft", f"{label} scoring context hash is malformed")
-    if type(draft.p3_attempts) is not tuple or type(
-            draft.p5_attempts) is not tuple:
-        raise Fable2ScriptError(
-            "final_draft", f"{label} attempt receipts must be tuples")
+            "final_draft", f"{label} attempt receipts must be a tuple"
+        )
     _validate_attempt_sequence(f"{label} P3", draft.p3_attempts)
-    _validate_attempt_sequence(f"{label} P5", draft.p5_attempts)
 
     normalized = normalize_fable2_markup_text(draft.raw_source)
     if normalized != draft.normalized_source:
         raise Fable2ScriptError(
-            "final_draft", f"{label} normalized source seal is stale")
+            "final_draft", f"{label} normalized source seal is stale"
+        )
     authoritative, defects = parse_fable2_markup(
-        draft.raw_source, _speakers_in_order(draft.parsed))
+        draft.raw_source, _speakers_in_order(draft.parsed)
+    )
     if authoritative is None:
         raise Fable2ScriptError(
             "final_draft",
@@ -2882,42 +1641,52 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
         )
     if _parsed_payload(authoritative) != _parsed_payload(draft.parsed):
         raise Fable2ScriptError(
-            "final_draft", f"{label} parsed artifact seal is stale")
+            "final_draft", f"{label} parsed artifact seal is stale"
+        )
 
     if type(draft.proof_map) is not tuple:
         raise Fable2ScriptError(
-            "final_draft", f"{label}.proof_map must be an immutable tuple")
-    line_ids = []
+            "final_draft", f"{label}.proof_map must be an immutable tuple"
+        )
+    line_ids: list[str] = []
     source_norm = _norm_ws(draft.normalized_source)
     for entry in draft.proof_map:
         if type(entry) is not ProofMapEntry or type(
-                entry.constituents) is not tuple:
+            entry.constituents
+        ) is not tuple:
             raise Fable2ScriptError(
-                "final_draft", f"{label} proof map contains a forged row")
+                "final_draft", f"{label} proof map contains a forged row"
+            )
         if not isinstance(entry.line_id, str) or not entry.line_id:
             raise Fable2ScriptError(
-                "final_draft", f"{label} proof line id is invalid")
+                "final_draft", f"{label} proof line id is invalid"
+            )
         line_ids.append(entry.line_id)
         for proof in entry.constituents:
-            if (type(proof) is not ConstituentProof
-                    or type(proof.span) is not tuple
-                    or len(proof.span) != 2
-                    or any(type(value) is not int for value in proof.span)
-                    or proof.span[0] < 0
-                    or proof.span[1] < proof.span[0]
-                    or not isinstance(proof.text, str)
-                    or not isinstance(proof.artifact, str)):
+            if (
+                type(proof) is not ConstituentProof
+                or type(proof.span) is not tuple
+                or len(proof.span) != 2
+                or any(type(value) is not int for value in proof.span)
+                or proof.span[0] < 0
+                or proof.span[1] < proof.span[0]
+                or not isinstance(proof.text, str)
+                or not isinstance(proof.artifact, str)
+            ):
                 raise Fable2ScriptError(
-                    "final_draft", f"{label} contains a forged proof")
+                    "final_draft", f"{label} contains a forged proof"
+                )
             if proof.artifact == "winning_draft" and (
                 proof.span[1] > len(source_norm)
                 or source_norm[proof.span[0]:proof.span[1]] != proof.text
             ):
                 raise Fable2ScriptError(
-                    "final_draft", f"{label} proof span no longer resolves")
+                    "final_draft", f"{label} proof span no longer resolves"
+                )
     if len(line_ids) != len(set(line_ids)):
         raise Fable2ScriptError(
-            "final_draft", f"{label} proof line ids are not unique")
+            "final_draft", f"{label} proof line ids are not unique"
+        )
 
     raw_hash = _sha256(draft.raw_source)
     normalized_hash = _sha256(draft.normalized_source)
@@ -2930,10 +1699,7 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
         normalized_sha256=normalized_hash,
         parsed_sha256=parsed_hash,
         proof_map_sha256=proof_hash,
-        score=draft.score,
-        scoring_context_sha256=draft.scoring_context_sha256,
         p3_attempts=draft.p3_attempts,
-        p5_attempts=draft.p5_attempts,
     ))
     expected = FinalDraftHashes(
         raw_sha256=raw_hash,
@@ -2944,44 +1710,24 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
     )
     if draft.hashes != expected:
         raise Fable2ScriptError(
-            "final_draft", f"{label} hash seal does not match its content")
+            "final_draft", f"{label} hash seal does not match its content"
+        )
 
 
 def _validate_selected_final_draft(
     draft: FinalDraft,
-    envelope: SceneEnvelope,
-    story_rules: StoryRules,
-    mode: Fable2Mode,
     *,
     treatment: "Treatment | None" = None,
 ) -> None:
-    """Validate the one script authority before every downstream seam."""
     _validate_final_draft_integrity("selected final draft", draft)
-    _validate_scene_envelope(envelope)
-    _validate_fable2_story_rules(story_rules)
-    expected_context = _scoring_context_sha256(envelope, story_rules)
-    if draft.scoring_context_sha256 != expected_context:
-        raise Fable2ScriptError(
-            "final_draft", "selected draft scoring context is stale")
-    expected_score = _draft_score(draft.parsed, envelope, story_rules)
-    if draft.score != expected_score:
-        raise Fable2ScriptError(
-            "final_draft", "selected draft score does not match its content")
     if not draft.p3_attempts:
         raise Fable2ScriptError(
-            "final_draft", "selected draft has no observed P3 attempts")
-    if mode == _FULL_MODE and not draft.p5_attempts:
-        raise Fable2ScriptError(
-            "final_draft", "full-mode selected draft has no P5 attempts")
-    if mode == _COMPACT_MODE and draft.p5_attempts:
-        raise Fable2ScriptError(
-            "final_draft", "compact selected draft cannot carry P5 attempts")
-    if mode not in (_COMPACT_MODE, _FULL_MODE):
-        raise Fable2ScriptError(
-            "final_draft", f"unknown fable2 mode {mode!r}")
+            "final_draft", "selected draft has no observed P3 attempts"
+        )
     if treatment is not None:
         expected_proof = _build_proof_map(
-            draft.parsed, treatment, draft.normalized_source)
+            draft.parsed, treatment, draft.normalized_source
+        )
         if draft.proof_map != expected_proof:
             raise Fable2ScriptError(
                 "final_draft",
@@ -2990,7 +1736,6 @@ def _validate_selected_final_draft(
 
 
 def _final_draft_ledger_payload(draft: FinalDraft) -> dict:
-    """Durable, content-free receipt for the selected sealed artifact."""
     _validate_final_draft_integrity("ledger final draft", draft)
     return {
         "raw_sha256": draft.hashes.raw_sha256,
@@ -2998,381 +1743,26 @@ def _final_draft_ledger_payload(draft: FinalDraft) -> dict:
         "parsed_sha256": draft.hashes.parsed_sha256,
         "proof_map_sha256": draft.hashes.proof_map_sha256,
         "artifact_sha256": draft.hashes.artifact_sha256,
-        "score": list(draft.score),
-        "scoring_context_sha256": draft.scoring_context_sha256,
         "p3_attempts": [
             _attempt_payload(row) for row in draft.p3_attempts
         ],
-        "p5_attempts": [
-            _attempt_payload(row) for row in draft.p5_attempts
-        ],
     }
 
 
-def _normalized_line_scopes(normalized_source: str):
-    """Return exact nonblank source bytes with explicit revision ownership."""
-    rows = []
-    blank_positions = []
-    current_scene = 0
-    seen_scene = False
-    for source_index, line in enumerate(normalized_source.splitlines()):
-        if not line.strip():
-            blank_positions.append(source_index)
-            continue
-        scene_match = re.match(r"^SCENE\s+(\d+):", line)
-        if scene_match:
-            current_scene = int(scene_match.group(1))
-            seen_scene = True
-            scope = ("protected", 0, "", "")
-        elif line.startswith(("TITLE:", "MUSIC:", "CODA:", "END.")):
-            scope = ("protected", 0, "", "")
-        elif ":" not in line:
-            scope = ("protected", 0, "", "")
-        else:
-            speaker = line.split(":", 1)[0]
-            if speaker == ANNOUNCER_NAME:
-                frame = "outro" if seen_scene else "intro"
-                scope = ("frame", 0, ANNOUNCER_NAME, frame)
-            else:
-                scope = ("scene", current_scene, speaker, "")
-        rows.append((source_index, line, scope))
-    return tuple(rows), tuple(blank_positions)
-
-
-def _note_scope_error(note: CriticNote, parsed: ParsedScript) -> "str | None":
-    scenes = {scene.n: scene for scene in parsed.scenes}
-    if note.scene == 0:
-        if note.speaker not in ("", ANNOUNCER_NAME):
-            return (
-                f"scene-zero note speaker must be empty or {ANNOUNCER_NAME}, "
-                f"got {note.speaker!r}"
-            )
-        if note.frame_scope not in ("intro", "outro"):
-            return "scene-zero note requires explicit intro/outro frame_scope"
-        return None
-    scene = scenes.get(note.scene)
-    if scene is None:
-        return f"critic note names missing scene {note.scene}"
-    speakers = {line.speaker for line in scene.lines}
-    if note.speaker and note.speaker not in speakers:
-        return (
-            f"critic note scene {note.scene} names speaker "
-            f"{note.speaker!r} outside that scene"
-        )
-    return None
-
-
-def _revision_contract_payload(contract: RevisionContractResult) -> dict:
-    return {
-        "eligible": contract.eligible,
-        "reasons": list(contract.reasons),
-        "addressed_problem_classes": list(
-            contract.addressed_problem_classes),
-        "changed_scopes": list(contract.changed_scopes),
-        "protected_field_differences": list(
-            contract.protected_field_differences),
-        "total_word_count": contract.total_word_count,
-        "total_word_band": list(contract.total_word_band),
-        "scene_word_counts": list(contract.scene_word_counts),
-        "scene_word_bands": [list(row) for row in contract.scene_word_bands],
-        "draft1_sha256": contract.draft1_sha256,
-        "draft2_sha256": contract.draft2_sha256,
-        "scoring_context_sha256": contract.scoring_context_sha256,
-    }
-
-
-def validate_revision_contract(
-    draft1_normalized: str,
-    parsed1: ParsedScript,
-    draft2_normalized: str,
-    parsed2: ParsedScript,
-    critic_notes: CriticNotes,
-    envelope: SceneEnvelope,
-    resolved_rules: Any,
-) -> RevisionContractResult:
-    """Pure S2 revision-law validator; it never repairs or rewrites text."""
-    _validate_scene_envelope(envelope)
-    _validate_fable2_story_rules(resolved_rules)
-    if not isinstance(critic_notes, CriticNotes):
-        raise Fable2ScriptError(
-            "revision_contract", "critic_notes must be a CriticNotes artifact")
-    if normalize_fable2_markup_text(draft1_normalized) != draft1_normalized:
-        raise Fable2ScriptError(
-            "revision_contract", "draft1 source is not normalized markup")
-    if normalize_fable2_markup_text(draft2_normalized) != draft2_normalized:
-        raise Fable2ScriptError(
-            "revision_contract", "draft2 source is not normalized markup")
-    cast_names = sorted(set(
-        _speakers_in_order(parsed1) + _speakers_in_order(parsed2)
-    ))
-    _assert_source_matches_parsed(
-        draft1_normalized, parsed1, cast_names, "draft1")
-    _assert_source_matches_parsed(
-        draft2_normalized, parsed2, cast_names, "draft2")
-
-    reasons: "list[str]" = []
-    protected: "list[str]" = []
-
-    def _protect(name: str, left: Any, right: Any) -> None:
-        if left != right:
-            protected.append(name)
-            reasons.append(f"protected field changed: {name}")
-
-    _protect("title", parsed1.title, parsed2.title)
-    _protect("cast_speaker_set", tuple(_speakers_in_order(parsed1)),
-             tuple(_speakers_in_order(parsed2)))
-    _protect("scene_count", len(parsed1.scenes), len(parsed2.scenes))
-    _protect("scene_order", tuple(s.n for s in parsed1.scenes),
-             tuple(s.n for s in parsed2.scenes))
-    _protect("scene_settings", tuple(s.setting for s in parsed1.scenes),
-             tuple(s.setting for s in parsed2.scenes))
-    _protect(
-        "speaker_topology",
-        tuple(tuple(line.speaker for line in scene.lines)
-              for scene in parsed1.scenes),
-        tuple(tuple(line.speaker for line in scene.lines)
-              for scene in parsed2.scenes),
-    )
-    _protect(
-        "music_queue",
-        (parsed1.music_open, parsed1.music_inter, parsed1.music_close),
-        (parsed2.music_open, parsed2.music_inter, parsed2.music_close),
-    )
-    _protect("coda_news_boundary", parsed1.coda, parsed2.coda)
-    _protect(
-        "announcer_skeleton",
-        (len(parsed1.announcer_intro), len(parsed1.announcer_outro)),
-        (len(parsed2.announcer_intro), len(parsed2.announcer_outro)),
-    )
-
-    scope_errors = []
-    for index, note in enumerate(critic_notes.notes):
-        error = _note_scope_error(note, parsed1)
-        if error:
-            scope_errors.append(f"critic note {index + 1}: {error}")
-    reasons.extend(scope_errors)
-
-    left_lines, left_blanks = _normalized_line_scopes(draft1_normalized)
-    right_lines, right_blanks = _normalized_line_scopes(draft2_normalized)
-    if left_blanks != right_blanks:
-        reasons.append(
-            "normalized-source blank-line layout changed outside authored "
-            "revision scopes"
-        )
-    if len(left_lines) != len(right_lines):
-        reasons.append(
-            "normalized-source nonblank line count changed outside the "
-            "protected skeleton"
-        )
-    changed: "list[tuple[str, int, str, str]]" = []
-    for left, right in zip(left_lines, right_lines):
-        left_index, left_bytes, left_scope = left
-        right_index, right_bytes, right_scope = right
-        if left_bytes == right_bytes:
-            continue
-        if left_scope != right_scope:
-            reasons.append(
-                f"normalized-source ownership changed at lines "
-                f"{left_index + 1}/{right_index + 1}"
-            )
-            continue
-        kind, scene_no, speaker, frame_scope = left_scope
-        if kind == "protected":
-            reasons.append(
-                f"protected normalized-source bytes changed at line "
-                f"{left_index + 1}"
-            )
-            continue
-        label = (
-            f"frame:{frame_scope}:line:{left_index}"
-            if kind == "frame"
-            else f"scene:{scene_no}:speaker:{speaker}:line:{left_index}"
-        )
-        changed.append((label, scene_no, speaker, frame_scope))
-
-    note_changed: "list[bool]" = [False] * len(critic_notes.notes)
-    for scope, scene_no, speaker, frame_scope in changed:
-        authorized = False
-        for index, note in enumerate(critic_notes.notes):
-            applies = (
-                (scene_no == 0 and note.scene == 0
-                 and note.frame_scope == frame_scope
-                 and note.speaker in ("", ANNOUNCER_NAME))
-                or
-                (scene_no > 0 and note.scene == scene_no
-                 and note.speaker in ("", speaker))
-            )
-            if applies:
-                authorized = True
-                note_changed[index] = True
-        if not authorized:
-            reasons.append(f"unnoted change outside critic scope: {scope}")
-
-    addressed: "list[str]" = []
-    for index, note in enumerate(critic_notes.notes):
-        if note_changed[index]:
-            if note.problem not in addressed:
-                addressed.append(note.problem)
-        else:
-            reasons.append(
-                f"critic note {index + 1} ({note.problem}) produced no "
-                "change in its authorized scope"
-            )
-
-    counts = _scene_character_word_counts(parsed2)
-    bands = envelope.scene_word_bands
-    lo_float, hi_float = _word_band(envelope.total_words)
-    total_band = (math.ceil(lo_float), math.floor(hi_float))
-    if not (total_band[0] <= parsed2.character_word_count <= total_band[1]):
-        reasons.append(
-            f"total character words {parsed2.character_word_count} outside "
-            f"{total_band[0]}-{total_band[1]}"
-        )
-    if len(counts) != len(bands):
-        reasons.append(
-            f"scene count {len(counts)} does not match envelope "
-            f"{len(bands)}"
-        )
-    for index, (count, band) in enumerate(zip(counts, bands), start=1):
-        if not (band[0] <= count <= band[1]):
-            reasons.append(
-                f"scene {index} character words {count} outside "
-                f"{band[0]}-{band[1]}"
-            )
-
-    # Keep the receipt concise and deterministic when one defect produces
-    # more than one comparison symptom.
-    reasons = list(dict.fromkeys(reasons))
-    result = RevisionContractResult(
-        eligible=not reasons,
-        reasons=tuple(reasons),
-        addressed_problem_classes=tuple(addressed),
-        changed_scopes=tuple(
-            scope for scope, _scene, _speaker, _frame in changed),
-        protected_field_differences=tuple(protected),
-        total_word_count=parsed2.character_word_count,
-        total_word_band=total_band,
-        scene_word_counts=counts,
-        scene_word_bands=bands,
-        draft1_sha256=_sha256(draft1_normalized),
-        draft2_sha256=_sha256(draft2_normalized),
-        scoring_context_sha256=_scoring_context_sha256(
-            envelope, resolved_rules),
-        contract_sha256="",
-    )
-    return replace(
-        result,
-        contract_sha256=_canonical_sha256(
-            _revision_contract_payload(result)),
-    )
-
-
-def _validate_revision_contract_integrity(contract: Any) -> None:
-    if type(contract) is not RevisionContractResult:
-        raise Fable2ScriptError(
-            "revision_contract",
-            "contract must be an exact RevisionContractResult artifact",
-        )
-    tuple_fields = (
-        "reasons", "addressed_problem_classes", "changed_scopes",
-        "protected_field_differences", "total_word_band",
-        "scene_word_counts", "scene_word_bands",
-    )
-    if any(type(getattr(contract, name)) is not tuple for name in tuple_fields):
-        raise Fable2ScriptError(
-            "revision_contract", "contract tuple fields are not immutable")
-    if type(contract.eligible) is not bool or contract.eligible != (
-            not contract.reasons):
-        raise Fable2ScriptError(
-            "revision_contract",
-            "contract eligibility does not match its reasons",
-        )
-    if (type(contract.total_word_count) is not int
-            or contract.total_word_count < 0
-            or len(contract.total_word_band) != 2
-            or any(type(value) is not int
-                   for value in contract.total_word_band)
-            or any(type(value) is not int or value < 0
-                   for value in contract.scene_word_counts)
-            or any(type(row) is not tuple or len(row) != 2
-                   or any(type(value) is not int for value in row)
-                   for row in contract.scene_word_bands)):
-        raise Fable2ScriptError(
-            "revision_contract", "contract word-budget receipt is malformed")
-    for name in (
-        "draft1_sha256", "draft2_sha256", "scoring_context_sha256",
-        "contract_sha256",
-    ):
-        if not re.fullmatch(r"[0-9a-f]{64}", getattr(contract, name)):
-            raise Fable2ScriptError(
-                "revision_contract", f"contract {name} is malformed")
-    expected_hash = _canonical_sha256(_revision_contract_payload(contract))
-    if contract.contract_sha256 != expected_hash:
-        raise Fable2ScriptError(
-            "revision_contract", "revision contract hash seal is stale")
-
-
-def choose_final_draft(draft1: FinalDraft, draft2: FinalDraft,
-                       contract: RevisionContractResult) -> DraftSelection:
-    """Keep draft 2 only when the revision is eligible and strictly better."""
-    _validate_final_draft_integrity("draft1", draft1)
-    _validate_final_draft_integrity("draft2", draft2)
-    _validate_revision_contract_integrity(contract)
-    if contract.draft1_sha256 != draft1.hashes.normalized_sha256:
-        raise Fable2ScriptError(
-            "revision_contract", "draft1 hash does not match contract")
-    if contract.draft2_sha256 != draft2.hashes.normalized_sha256:
-        raise Fable2ScriptError(
-            "revision_contract", "draft2 hash does not match contract")
-    if not (
-        contract.scoring_context_sha256
-        == draft1.scoring_context_sha256
-        == draft2.scoring_context_sha256
-    ):
-        raise Fable2ScriptError(
-            "revision_contract",
-            "revision contract and drafts use different envelope/rules "
-            "scoring contexts",
-        )
-    if not contract.eligible:
-        detail = "; ".join(contract.reasons[:4]) or "unspecified defect"
-        return DraftSelection(
-            winner=draft1,
-            reason=f"draft1 retained: revision ineligible ({detail})",
-            scoring_context_sha256=contract.scoring_context_sha256,
-        )
-    if draft2.score < draft1.score:
-        return DraftSelection(
-            winner=draft2,
-            reason=(f"draft2 selected: score {draft2.score} strictly lower "
-                    f"than {draft1.score}"),
-            scoring_context_sha256=contract.scoring_context_sha256,
-        )
-    if draft2.score == draft1.score:
-        return DraftSelection(
-            winner=draft1,
-            reason=f"draft1 retained: score tie {draft1.score}",
-            scoring_context_sha256=contract.scoring_context_sha256,
-        )
-    return DraftSelection(
-        winner=draft1,
-        reason=(f"draft1 retained: revision score {draft2.score} is worse "
-                f"than {draft1.score}"),
-        scoring_context_sha256=contract.scoring_context_sha256,
-    )
-
-
-def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
-              cast_rows: "list[dict]", payload: "dict[str, Any]", *,
-              envelope: SceneEnvelope, story_rules: StoryRules,
-              mode: Fable2Mode, owner_bank: str,
-              hygiene_receipts: "tuple[dict, ...]" = ()) -> None:
+def _assemble(
+    led: Any,
+    final_draft: FinalDraft,
+    treatment: Treatment,
+    cast_rows: "list[dict]",
+    payload: "dict[str, Any]",
+    *,
+    owner_bank: str,
+) -> None:
     """Emit ALL FIVE ledger hierarchies (r1/S2) with the proof gates.
     Incremental led.save() after the preamble and after each scene.
-    Ambiguity = upstream reroll, never silent-fix; timing stays unset
+    Ambiguity is a structural upstream failure, never a silent fix; timing stays unset
     (SceneSequencer owns it downstream)."""
-    _validate_selected_final_draft(
-        final_draft, envelope, story_rules, mode, treatment=treatment)
+    _validate_selected_final_draft(final_draft, treatment=treatment)
     parsed = final_draft.parsed
     winning_draft_text = final_draft.normalized_source
     draft_norm = _norm_ws(winning_draft_text)
@@ -3384,11 +1774,6 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
         entry.line_id: entry for entry in final_draft.proof_map
     }
     consumed_proof_ids: "set[str]" = set()
-    hygiene_by_line = {
-        str(receipt.get("line_id") or ""): receipt
-        for receipt in hygiene_receipts
-        if isinstance(receipt, dict)
-    }
     meta = _ledger_meta(led)
 
     # Gate (b): parsed speaker set == cast row names (minus ANNOUNCER).
@@ -3404,31 +1789,6 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
             and parsed.announcer_intro and parsed.announcer_outro
             and parsed.scenes):
         raise Fable2AssembleError("assemble", "skeleton incomplete")
-    # Final total delivery is measurable and fail-closed. Scene balance remains
-    # pacing advice: a complete play may be uneven, but it may not claim a
-    # requested total it did not deliver.
-    budget_defects = _script_budget_defects(parsed, envelope)
-    total_defects = tuple(
-        defect for defect in budget_defects
-        if defect.startswith("WORD_BUDGET:")
-    )
-    if total_defects:
-        raise Fable2AssembleError(
-            "assemble",
-            "final word delivery was not repaired before assembly: "
-            + "; ".join(total_defects),
-        )
-    scene_defects = tuple(
-        defect for defect in budget_defects
-        if not defect.startswith("WORD_BUDGET:")
-    )
-    if scene_defects:
-        spoken_meta = _fable2_meta(led).setdefault("spoken_hygiene", {})
-        spoken_meta["advisory_scene_budget_defects"] = list(scene_defects)
-        log.warning(
-            "[scifi_fable2] assembly scene pacing remains advisory: %s",
-            "; ".join(scene_defects),
-        )
     # Gate (e): every cast member speaks (parser CAST_MEMBER_SILENT
     # guarantees; equality in gate (b) re-covers it).
 
@@ -3446,26 +1806,6 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
     line_rows: "list[dict]" = []
     music_rows: "list[dict]" = []
     proof_map: "list[dict]" = []
-
-    def _reapply_hygiene_rows() -> None:
-        """Restore repair/row-failure fields dropped by Ledger.set_lines."""
-        for emitted in led.data.get("lines") or []:
-            receipt = hygiene_by_line.get(
-                str(emitted.get("line_id") or "")
-            )
-            if receipt is None:
-                continue
-            emitted["compose_flags"] = list(
-                receipt.get("compose_flags") or []
-            )
-            if receipt.get("status") == "row_failed_mechanical":
-                emitted.update({
-                    "text": "",
-                    "char_count": 0,
-                    "word_count": 0,
-                    "skip": True,
-                    "tts_skip_reason": "spoken_hygiene_unspeakable_row",
-                })
 
     def _music_sentinel(shot_id: str, role: str, seq: int = 0) -> dict:
         # Exact sentinel row shape (r2/M5 + r3/M1): text "", char_id ==
@@ -3547,7 +1887,6 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
         line_rows.append(row)
         _beat(row, None, ANNOUNCER_NAME)
     led.set_lines(line_rows)
-    _reapply_hygiene_rows()
     led.save()
 
     # --- scenes -------------------------------------------------------
@@ -3597,7 +1936,6 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
                 "anchor_line_id": inter_sentinel["line_id"],
             })
         led.set_lines(line_rows)
-        _reapply_hygiene_rows()
         led.save()
 
     # --- postamble: final shot. ALL fable2 announcer rows carry the
@@ -3656,7 +1994,6 @@ def _assemble(led: Any, final_draft: FinalDraft, treatment: Treatment,
     led.set_beats(beat_rows)
     led.set_lines(line_rows)
     led.set_music(music_rows)
-    _reapply_hygiene_rows()
 
     missing_proofs = sorted(set(proof_by_id) - consumed_proof_ids)
     if missing_proofs:
@@ -3735,1040 +2072,105 @@ def _script_view(parsed: ParsedScript, treatment: Treatment,
     return "\n".join(lines)
 
 
-_TOBACCO_SAFETY_TERMS = frozenset({
-    "cigarette", "cigar", "smoking", "tobacco", "pipe smoke",
-    "ashtray", "lit a pipe", "lights a pipe", "smokes a", "lit up a",
-})
-
-
-def _deterministic_sfw_spoken_floor(text: str) -> "tuple[str, tuple[str, ...]]":
-    """Neutralize the closed weapons/tobacco vocabulary without a model."""
-    original = str(text or "")
-    hits = tuple(lexicon_hits(original, WEAPON_SMOKING_EVIDENCE))
-    if not hits:
-        return original, ()
-    out = original
-    for term in sorted(WEAPON_SMOKING_EVIDENCE, key=len, reverse=True):
-        replacement = "odor" if term in _TOBACCO_SAFETY_TERMS else "object"
-        out = _word_re(term).sub(replacement, out)
-    return _norm_ws(out), hits
-
-
-def _repair_final_draft_spoken_hygiene(
-    draft: FinalDraft,
+def _apply_fable_safety_cleanup(
+    raw_source: str,
+    parsed: ParsedScript,
     treatment: Treatment,
-    envelope: SceneEnvelope,
-    story_rules: StoryRules,
     *,
-    creative_fn,
     technical_fn,
-    news_read_validator=None,
-) -> "tuple[FinalDraft, Treatment, tuple[dict, ...]]":
-    """Run B/C/floor on the selected play, then rebuild every seal.
+) -> "tuple[str, ParsedScript, Treatment, dict[str, Any]]":
+    """Patch only unsafe spoken constituents before proof/authorship seals."""
+    projection: "dict[str, Any]" = {"lines": []}
 
-    Fable2 is content-owned: mutating its ledger after assembly would sever the
-    proof map from the accepted script. Repair the selected artifact itself,
-    re-render valid markup, reparse it, and call ``build_final_draft`` so raw,
-    normalized, parsed, proof-map, score, and artifact hashes all agree before
-    casting or assembly.
-    """
-    parsed = draft.parsed
-    # Assembly and this hygiene pass merge consecutive same-speaker turns.
-    # Dimension the authored line request from that exact final row topology,
-    # never from pre-merge constituents that cease to be independently writable.
-    per_line_target, _line_cap = _fable_character_line_policy(
-        parsed, envelope,
-    )
-    anchor_words: list[str] = []
-    seen_anchors: set[str] = set()
-    for token in re.findall(
-        r"\b[A-Za-z][A-Za-z0-9'-]{3,}\b",
-        " ".join((treatment.news_thread, treatment.setting, treatment.title)),
-    ):
-        key = token.casefold()
-        if key in seen_anchors or key in {
-            "that", "this", "with", "from", "into", "their", "there",
-            "story", "radio", "drama",
-        }:
-            continue
-        seen_anchors.add(key)
-        anchor_words.append(token)
-        if len(anchor_words) >= 6:
-            break
-    canon_header = "\n".join((
-        f"TITLE: {treatment.title}",
-        f"SETTING: {treatment.setting}",
-        "Specificity anchors (use selectively):",
-        *(f"- {anchor}" for anchor in anchor_words),
-        "",
-        f"PREMISE: {treatment.dramatic_question}",
-    ))
-    receipts: list[dict] = []
-
-    def _repair(
-        text: str,
-        *,
-        line_id: str,
-        speaker: str,
-        role: str,
-        intent: str,
-        include_thesis: bool = False,
-        candidate_validator=None,
-        use_specificity_anchors: bool = True,
-    ) -> str:
-        safe_text, safety_hits = _deterministic_sfw_spoken_floor(text)
-
-        def _candidate_allowed(candidate: str) -> bool:
-            if lexicon_hits(candidate, WEAPON_SMOKING_EVIDENCE):
-                return False
-            if not callable(candidate_validator):
-                return True
-            try:
-                return bool(candidate_validator(candidate))
-            except Exception:  # noqa: BLE001 - reject an invalid repair
-                return False
-
-        req = LineRequest(
-            speaker=speaker,
-            intent=intent,
-            mood="",
-            target_words=max(1, canonical_word_count(safe_text)),
-            canon_header=(
-                canon_header
-                if use_specificity_anchors
-                else "\n".join((
-                    f"TITLE: {treatment.title}",
-                    f"SETTING: {treatment.setting}",
-                    f"PREMISE: {treatment.dramatic_question}",
-                ))
-            ),
-            last_lines=[],
-            speaker_role=role,
-            beat_objective=intent if role == "character" else "",
-            words_per_beat_range=(
-                (max(1, per_line_target - 3), per_line_target + 4)
-                if role == "character"
-                else (0, 0)
-            ),
-        )
-        result = repair_existing_spoken_line(
-            text=safe_text,
-            req=req,
-            creative_fn=creative_fn,
-            repair_fn=technical_fn,
-            story_rules=story_rules,
-            include_thesis=include_thesis,
-            candidate_validator=_candidate_allowed,
-            spoken_projection_fn=normalize_for_delivery,
-        )
-        # A model repair that invents an unsafe word, name, or numeral is not
-        # evidence. Discard it and run the deterministic floor from the last
-        # safe/grounded baseline; never launder the rejected candidate into a
-        # seal or give its rung credit.
-        if (
-            "hygiene_row_failed_mechanical" not in result.compose_flags
-            and (
-                "hygiene_repair_candidate_rejected" in result.compose_flags
-                or (
-                    result.text.strip()
-                    and not _candidate_allowed(result.text)
-                )
-            )
-        ):
-            result = repair_existing_spoken_line(
-                text=safe_text,
-                req=req,
-                creative_fn=None,
-                repair_fn=None,
-                story_rules=story_rules,
-                include_thesis=include_thesis,
-                candidate_validator=_candidate_allowed,
-                spoken_projection_fn=normalize_for_delivery,
-            )
-        if (
-            "hygiene_row_failed_mechanical" not in result.compose_flags
-            and (
-                "hygiene_repair_candidate_rejected" in result.compose_flags
-                or (
-                    result.text.strip()
-                    and not _candidate_allowed(result.text)
-                )
-            )
-        ):
-            # The ordinary total floor uses intentionally tiny utterances. A
-            # factual news read has an additional >=40-character schema and
-            # source-grounding validator, so those tiny choices can be clean
-            # dialogue yet still be rejected. Finish with a bounded, SFW,
-            # numeral/name-free sentence appropriate to this exact surface.
-            # It makes no new factual assertion and therefore passes the same
-            # grounding validator without laundering a rejected model repair.
-            emergency_candidates = (
-                (
-                    "The verified source record remains clear, and the facts "
-                    "stand as reported in tonight's account."
-                ),
-            ) if callable(candidate_validator) else (
-                (
-                    "At dawn, one lamp still burns beside the empty chair."
-                    if include_thesis
-                    else "I heard you clearly this time."
-                    if role == "character"
-                    else "One lamp still burns beside the empty chair."
-                ),
-                "Go now.",
-                "Yes.",
-            )
-            for emergency in emergency_candidates:
-                emergency_result = repair_existing_spoken_line(
-                    text=emergency,
-                    req=req,
-                    creative_fn=None,
-                    repair_fn=None,
-                    story_rules=story_rules,
-                    include_thesis=include_thesis,
-                    candidate_validator=_candidate_allowed,
-                    spoken_projection_fn=normalize_for_delivery,
-                )
-                if (
-                    emergency_result.text.strip()
-                    and "hygiene_row_failed_mechanical"
-                    not in emergency_result.compose_flags
-                    and "hygiene_repair_candidate_rejected"
-                    not in emergency_result.compose_flags
-                    and _candidate_allowed(emergency_result.text)
-                ):
-                    emergency_flags = list(
-                        emergency_result.compose_flags
-                    )
-                    for flag in (
-                        "hygiene_repaired_after_reroll",
-                        "hygiene_repaired_after_reroll:spoken_surface:"
-                        "deterministic_grounded_floor",
-                    ):
-                        if flag not in emergency_flags:
-                            emergency_flags.append(flag)
-                    result = replace(
-                        emergency_result,
-                        compose_flags=tuple(emergency_flags),
-                    )
-                    break
-        row_failed = "hygiene_row_failed_mechanical" in result.compose_flags
-        if row_failed:
-            failure_flags = [
-                flag for flag in result.compose_flags
-                if not str(flag).startswith(
-                    "hygiene_repaired_after_reroll"
-                )
-                and not str(flag).startswith("hygiene_floor_action:")
-                and flag != "hygiene_repair_candidate_rejected"
-            ]
-            if safety_hits:
-                failure_flags.append(
-                    "hygiene_safety_floor_applied_before_row_failure"
-                )
-            receipts.append({
-                "line_id": line_id,
-                "status": "row_failed_mechanical",
-                "original_sha256": _sha256(text),
-                "final_sha256": _sha256(""),
-                "compose_flags": list(dict.fromkeys(failure_flags)),
-                "repair_flags": [],
-            })
-            # Seal the deterministic SFW surface, never the unsafe original.
-            # Assembly consumes that proof and emits this one row as skipped.
-            return safe_text
-        if not result.text.strip() or not _candidate_allowed(result.text):
-            raise Fable2ScriptError(
-                "spoken_hygiene",
-                f"deterministic repair could not produce a safe grounded "
-                f"spoken row {line_id}",
-            )
-        compose_flags = list(result.compose_flags)
-        if safety_hits:
-            compose_flags.extend((
-                "hygiene_repaired_after_reroll",
-                "hygiene_repaired_after_reroll:safety:deterministic_sfw_floor",
-            ))
-        compose_flags = list(dict.fromkeys(compose_flags))
-        if (
-            result.text == text
-            and "hygiene_repaired_after_reroll" not in compose_flags
-        ):
-            return text
-        receipts.append({
+    def add(line_id: str, role: str, text: str) -> None:
+        projection["lines"].append({
             "line_id": line_id,
-            "status": "repaired",
-            "original_sha256": _sha256(text),
-            "final_sha256": _sha256(result.text),
-            "compose_flags": compose_flags,
-            "repair_flags": [
-                flag for flag in compose_flags
-                if flag.startswith("hygiene_repaired_after_reroll:")
-            ],
+            "speaker_role": role,
+            "skip": False,
+            "text": text,
         })
-        return result.text
 
-    intro = tuple(
-        _repair(
-            text,
-            line_id=f"shot_000_b{index}",
-            speaker=ANNOUNCER_NAME,
-            role="announcer",
-            intent="Open the episode and orient the listener.",
-        )
-        for index, text in enumerate(parsed.announcer_intro, 1)
-    )
-    repaired_scenes = []
+    for index, text in enumerate(parsed.announcer_intro):
+        add(f"intro_{index}", "announcer", text)
     for scene in parsed.scenes:
-        # Assembly merges consecutive turns by the same speaker. Repair that
-        # exact final row surface here, then keep it as one parsed constituent
-        # so the rebuilt proof map and ledger stay one-to-one.
-        runs: list[list[Any]] = []
-        for line in scene.lines:
-            if runs and runs[-1][0] == line.speaker:
-                runs[-1][1].append(line)
-            else:
-                runs.append([line.speaker, [line]])
-        repaired_lines = []
-        for index, (speaker, run_lines) in enumerate(runs, 1):
-            merged = " ".join(line.text for line in run_lines)
-            repaired = _repair(
-                merged,
-                line_id=f"shot_{scene.n:03d}_b{index}",
-                speaker=speaker,
-                role="character",
-                intent=treatment.turn,
-            )
-            repaired_lines.append(replace(run_lines[0], text=repaired))
-        repaired_scenes.append(replace(scene, lines=tuple(repaired_lines)))
+        for index, line in enumerate(scene.lines):
+            add(f"scene_{scene.n}_{index}", "character", line.text)
+    for index, text in enumerate(parsed.announcer_outro):
+        add(f"outro_{index}", "announcer", text)
+    add("coda", "announcer", parsed.coda)
+    add("news_read", "announcer", treatment.news_close_read)
 
-    post_shot = f"shot_{parsed.scenes[-1].n + 1:03d}"
-    # Thesis validation belongs to the final actually speakable outro. A
-    # trailing punctuation-only row is a mechanical row failure and must not
-    # hide a moralizing close immediately before it.
-    last_speakable_outro_index = next((
-        index
-        for index, text in reversed(tuple(enumerate(
-            parsed.announcer_outro, 1,
-        )))
-        if re.search(r"[A-Za-z]", str(text or ""))
-    ), 0)
-    thesis_start_index = last_speakable_outro_index or 1
-    outro = tuple(
-        _repair(
-            text,
-            line_id=f"{post_shot}_b{index}",
-            speaker=ANNOUNCER_NAME,
-            role="announcer",
-            intent="Close on one concrete final image or sound.",
-            include_thesis=(index >= thesis_start_index),
-        )
-        for index, text in enumerate(parsed.announcer_outro, 1)
-    )
-    coda_index = len(outro) + 1
-    coda_spoken = parsed.coda.rstrip().rstrip(":").rstrip() + "."
-    coda = _repair(
-        coda_spoken,
-        line_id=f"{post_shot}_b{coda_index}",
-        speaker=ANNOUNCER_NAME,
-        role="announcer",
-        intent="Bridge from the fictional drama to the factual source close.",
-    )
-    # The terminal colon is the parser-owned structural pivot, not spoken
-    # prose. Re-impose it after an authored/floor replacement before reparsing.
-    coda = coda.rstrip().rstrip(".:\u2026").rstrip() + ":"
-    news_index = coda_index + 1
-    news_read = _repair(
-        treatment.news_close_read,
-        line_id=f"{post_shot}_b{news_index}",
-        speaker=ANNOUNCER_NAME,
-        role="announcer",
-        intent="Report the factual source close without fictional embellishment.",
-        candidate_validator=(
-            None
-            if not callable(news_read_validator)
-            else lambda candidate: news_read_validator(
-                NewsCloseRead(news_close_read=candidate)
-            ) is None
-        ),
-        use_specificity_anchors=False,
-    )
-    repaired_treatment = treatment.model_copy(
-        update={"news_close_read": news_read},
-    )
-    parsed_changed = (
-        intro != parsed.announcer_intro
-        or tuple(repaired_scenes) != parsed.scenes
-        or outro != parsed.announcer_outro
-        or coda != parsed.coda
-    )
-    if not receipts:
-        return draft, treatment, ()
-    if parsed_changed:
-        character_words = sum(
-            canonical_word_count(line.text)
-            for scene in repaired_scenes
-            for line in scene.lines
-        )
-        announcer_words = (
-            sum(canonical_word_count(text) for text in intro)
-            + sum(canonical_word_count(text) for text in outro)
-            + canonical_word_count(coda)
-        )
-        repaired_parsed = replace(
-            parsed,
-            announcer_intro=intro,
-            scenes=tuple(repaired_scenes),
-            announcer_outro=outro,
-            coda=coda,
-            character_word_count=character_words,
-            announcer_word_count=announcer_words,
-            normalizations=(),
-        )
-        raw_source = _script_view(
-            repaired_parsed, repaired_treatment, include_news_read=False,
-        )
-    else:
-        repaired_parsed = parsed
-        raw_source = draft.raw_source
-    rebuilt = build_final_draft(
-        raw_source,
-        repaired_parsed,
-        repaired_treatment,
-        envelope,
-        story_rules,
-        p3_attempts=draft.p3_attempts,
-        p5_attempts=draft.p5_attempts,
-    )
-    return rebuilt, repaired_treatment, tuple(receipts)
-
-
-class _Fable2WordFitPatch(BaseModel):
-    """One exact character-line replacement; every other field is locked."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    scene_n: int = Field(ge=1)
-    line_index: int = Field(ge=1)
-    replacement_text: str = Field(min_length=1, max_length=1200)
-
-
-_WORD_FIT_FAKE_AD_RE = re.compile(
-    r"\b(?:commercial break|sponsored by|our sponsor|buy now|call now|"
-    r"order now|limited[- ]time offer|available wherever|new product)\b",
-    re.IGNORECASE,
-)
-_WORD_FIT_TEMPERATURES = (0.38, 0.30, 0.24, 0.18, 0.14)
-
-
-def _fable_character_rows(
-    parsed: ParsedScript,
-) -> "tuple[tuple[int, int, Any], ...]":
-    return tuple(
-        (scene.n, line_index, line)
-        for scene in parsed.scenes
-        for line_index, line in enumerate(scene.lines, start=1)
-    )
-
-
-def _replace_fable_character_line(
-    parsed: ParsedScript,
-    *,
-    scene_n: int,
-    line_index: int,
-    replacement_text: str,
-) -> ParsedScript:
-    """Replace one constituent and rederive the parser-owned counters."""
-    scenes = list(parsed.scenes)
-    changed = False
-    for scene_pos, scene in enumerate(scenes):
-        if scene.n != int(scene_n):
-            continue
-        if not 1 <= int(line_index) <= len(scene.lines):
-            raise Fable2WordDeliveryError(
-                "word_fit",
-                f"line coordinate {scene_n}:{line_index} is out of range",
-            )
-        lines = list(scene.lines)
-        lines[int(line_index) - 1] = replace(
-            lines[int(line_index) - 1],
-            text=_norm_ws(replacement_text),
-        )
-        scenes[scene_pos] = replace(scene, lines=tuple(lines))
-        changed = True
-        break
-    if not changed:
-        raise Fable2WordDeliveryError(
-            "word_fit", f"scene coordinate {scene_n} does not exist",
-        )
-    character_words = sum(
-        canonical_word_count(line.text)
-        for scene in scenes
-        for line in scene.lines
-    )
-    return replace(
-        parsed,
-        scenes=tuple(scenes),
-        character_word_count=character_words,
-        normalizations=(),
-    )
-
-
-def _word_fit_non_target_signature(
-    parsed: ParsedScript, target: "tuple[int, int]",
-) -> tuple:
-    return (
-        parsed.title,
-        parsed.music_open,
-        parsed.music_inter,
-        parsed.music_close,
-        parsed.announcer_intro,
-        parsed.announcer_outro,
-        parsed.coda,
-        tuple(
-            (scene_n, line_index, line.speaker, line.text)
-            for scene_n, line_index, line in _fable_character_rows(parsed)
-            if (scene_n, line_index) != target
-        ),
-    )
-
-
-def _word_fit_patch_error(
-    patch: _Fable2WordFitPatch,
-    *,
-    target: "tuple[int, int]",
-    current_text: str,
-    legal_speakers: "tuple[str, ...]",
-    max_line_words: "int | None" = None,
-) -> "str | None":
-    if (patch.scene_n, patch.line_index) != target:
-        return (
-            "patch coordinate must equal the single writable coordinate "
-            f"{target[0]}:{target[1]}"
-        )
-    text = _norm_ws(patch.replacement_text)
-    if not text:
-        return "replacement_text must contain spoken words"
-    if text == _norm_ws(current_text):
-        return "replacement_text must change the target line"
-    if (
-        max_line_words is not None
-        and canonical_word_count(text) > int(max_line_words)
-    ):
-        return (
-            "replacement_text exceeds the enforced one-breath cap of "
-            f"{int(max_line_words)} words"
-        )
-    if re.search(r"[\[\]*]", text) or "(" in text or ")" in text:
-        return "replacement_text cannot contain markup or stage directions"
-    labels = (ANNOUNCER_NAME,) + tuple(legal_speakers)
-    if any(re.search(rf"(?:^|\s){re.escape(label)}\s*:", text)
-           for label in labels):
-        return "replacement_text cannot contain a speaker label"
-    if _WORD_FIT_FAKE_AD_RE.search(text):
-        return "replacement_text cannot introduce a fake commercial/product"
-    prior_numbers = set(_RE_NUMERAL.findall(current_text))
-    new_numbers = set(_RE_NUMERAL.findall(text))
-    if not new_numbers.issubset(prior_numbers):
-        return "replacement_text cannot introduce a new numeric claim"
-    if lexicon_hits(text, WEAPON_SMOKING_EVIDENCE):
-        return "replacement_text cannot introduce weapons or smoking"
-    return None
-
-
-def _run_final_word_fit(
-    draft: FinalDraft,
-    treatment: Treatment,
-    envelope: SceneEnvelope,
-    story_rules: StoryRules,
-    *,
-    creative_fn,
-    technical_fn,
-    mode: Fable2Mode,
-    hygiene_receipts: "tuple[dict, ...]" = (),
-) -> "tuple[FinalDraft, Treatment, tuple[dict, ...], dict]":
-    """Repair one row per cycle until delivery passes or four cycles stall.
-
-    Each creative or technical proposal must survive the complete producer
-    boundary -- patch validation, source rebuild, total spoken hygiene, seal
-    reconstruction, locked-surface checks, and strict integer distance
-    progress -- before its slot is accepted. A valid-but-unhelpful creative
-    proposal therefore falls through to the technical author in the same
-    cycle. No deterministic story prose is synthesized here.
-    """
-    lower, upper = _word_band(envelope.total_words)
-    current = draft
-    current_treatment = treatment
-    actual = current.parsed.character_word_count
-    initial_actual = actual
-    rows = list(_fable_character_rows(current.parsed))
-    per_line_target, max_line_words = _fable_character_line_policy(
-        current.parsed, envelope,
-    )
-    min_reachable_words = len(rows)
-    max_reachable_words = len(rows) * max_line_words
-    capacity = {
-        "post_merge_character_rows": _merged_character_run_count(
-            current.parsed
-        ),
-        "active_character_rows": len(rows),
-        "per_line_target": per_line_target,
-        "max_line_words": max_line_words,
-        "min_reachable_words": min_reachable_words,
-        "max_reachable_words": max_reachable_words,
-    }
-    if (
-        actual < lower and max_reachable_words < lower
-    ) or (
-        actual > upper and min_reachable_words > upper
-    ):
-        receipt = {
-            "schema_version": 1,
-            "status": "insufficient_active_rows_capacity",
-            "target_words": envelope.total_words,
-            "acceptance_words": [lower, upper],
-            "initial_character_words": initial_actual,
-            "final_character_words": actual,
-            "capacity": capacity,
-            "cycles": [],
-            "actual_drift": True,
-            "final_sha256": current.hashes.raw_sha256,
+    initial_hits = scan_spoken_ledger(projection)
+    if not initial_hits:
+        return raw_source, parsed, treatment, {
+            "status": "clean", "hits": [], "patch_count": 0,
         }
-        error = Fable2WordDeliveryError(
-            "word_fit",
-            "insufficient post-merge character-row capacity: "
-            f"{len(rows)} rows x {max_line_words} words cannot reach "
-            f"{lower}..{upper} from actual {actual}",
-        )
-        error.receipt = receipt
-        raise error
-
-    liveness = _OTRWD.WordFitLivenessController(
-        lower_words=lower,
-        upper_words=upper,
-        initial_words=actual,
-        initial_fingerprint=current.hashes.raw_sha256,
-    )
-    repair_budget = liveness.cycle_ceiling
-    cycles: list[dict[str, Any]] = []
-    current_hygiene_by_id = {
-        str(receipt.get("line_id") or ""): dict(receipt)
-        for receipt in hygiene_receipts
-        if isinstance(receipt, dict) and str(receipt.get("line_id") or "")
-    }
-    legal_speakers = tuple(_speakers_in_order(current.parsed))
-    candidate_fingerprints = {current.hashes.raw_sha256}
-    terminal_status = (
-        "pass" if lower <= actual <= upper
-        else "consecutive_stalls_exhausted"
-    )
-
-    while liveness.can_continue:
-        cycle = liveness.total_cycles + 1
-        under = actual < lower
-        rows = [
-            row for row in _fable_character_rows(current.parsed)
-            if (
-                canonical_word_count(row[2].text) < max_line_words
-                if under else canonical_word_count(row[2].text) > 1
-            )
-        ]
-        if not rows:
-            observation = liveness.observe(None)
-            cycles.append({
-                "cycle": cycle,
-                "before_character_words": actual,
-                "after_character_words": actual,
-                "distance_to_band": _OTRWD.word_band_distance(
-                    actual, lower, upper,
-                ),
-                "attempts": [],
-                "adopted": False,
-                "status": "no_actionable_rows",
-                "liveness": observation,
-            })
-            continue
-
-        ranked = sorted(
-            rows,
-            key=(
-                (lambda row: (
-                    canonical_word_count(row[2].text), row[0], row[1],
-                ))
-                if under else
-                (lambda row: (
-                    -canonical_word_count(row[2].text), row[0], row[1],
-                ))
-            ),
-        )
-        scene_n, line_index, target_line = ranked[(cycle - 1) % len(ranked)]
-        target_coord = (scene_n, line_index)
-        target_line_id = f"shot_{scene_n:03d}_b{line_index}"
-        current_line_words = canonical_word_count(target_line.text)
-        distance = (lower - actual) if under else (actual - upper)
-        correction = min(
-            distance,
-            (
-                max_line_words - current_line_words
-                if under else current_line_words - 1
-            ),
-        )
-        desired_line_words = (
-            min(max_line_words, current_line_words + correction)
-            if under else max(1, current_line_words - correction)
-        )
-        payload = {
-            "writable_coordinate": {
-                "scene_n": scene_n,
-                "line_index": line_index,
-                "speaker": target_line.speaker,
-                "current_text": target_line.text,
-                "current_line_words": current_line_words,
-                "desired_line_words": desired_line_words,
-                "maximum_line_words": max_line_words,
-            },
-            "delivery": {
-                "current_character_words": actual,
-                "target_words": envelope.total_words,
-                "acceptance_words": [lower, upper],
-                "direction": "expand" if under else "tighten",
-            },
-            "locked_treatment": {
-                "title": current_treatment.title,
-                "dramatic_question": current_treatment.dramatic_question,
-                "setting": current_treatment.setting,
-                "turn": current_treatment.turn,
-                "priced_ending": current_treatment.priced_ending,
-            },
-            "read_only_play": _script_view(
-                current.parsed, current_treatment, include_news_read=False,
-            ),
-        }
-        system = (
-            "Repair exactly one character line in a sealed SFW radio play. "
-            "Return only the requested JSON patch. Preserve its speaker, beat, "
-            "story facts, conflict, and intent. Change no other coordinate. "
-            "Use natural spoken dialogue: no labels, stage directions, markup, "
-            "filler, invented named or numeric facts, fake commercials, fake "
-            "products, sponsor copy, or moral summary. Aim for the requested "
-            "line length without exceeding the stated maximum, and keep the "
-            "line dramatically coherent."
-        )
-        cycle_receipt: dict[str, Any] = {
-            "cycle": cycle,
-            "before_character_words": actual,
-            "target_line_id": target_line_id,
-            "target": {
-                "scene_n": scene_n,
-                "line_index": line_index,
-                "speaker": target_line.speaker,
-            },
-            "desired_line_words": desired_line_words,
-            "maximum_line_words": max_line_words,
-            "attempts": [],
-            "adopted": False,
-        }
-        accepted_bundle: (
-            "tuple[FinalDraft, Treatment, dict[str, dict], int, bool] | None"
-        ) = None
-        accepted_slot = ""
-
-        for slot_name, slot_fn in (
-            ("creative", creative_fn),
-            ("technical", technical_fn),
-        ):
-            attempt_rows: list[dict[str, Any]] = []
-
-            def _attempt_complete(
-                attempt: int, raw: str, error: "BaseException | None",
-            ) -> None:
-                attempt_rows.append({
-                    "attempt": attempt,
-                    "raw_sha256": _sha256(raw or ""),
-                    "status": "accepted" if error is None else "rejected",
-                    "error": (
-                        "" if error is None
-                        else " ".join(str(error).split())[:240]
-                    ),
-                })
-
-            slot_receipt: dict[str, Any] = {
-                "slot": slot_name,
-                "status": "rejected",
-                "calls": attempt_rows,
-            }
-            try:
-                # LLM slot: per-sub-pass -- creative first, technical fallback.
-                candidate_patch = structured_call(
-                    prompt=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": json.dumps(
-                            payload,
-                            sort_keys=True,
-                            separators=(",", ":"),
-                            ensure_ascii=False,
-                        )},
-                    ],
-                    schema=_Fable2WordFitPatch,
-                    slot_fn=slot_fn,
-                    base_temperature=(
-                        _WORD_FIT_TEMPERATURES[
-                            (cycle - 1) % len(_WORD_FIT_TEMPERATURES)
-                        ]
-                        if slot_name == "creative" else 0.16
-                    ),
-                    structural_retry_temperature=(
-                        0.10 if slot_name == "technical" else 0.08
-                    ),
-                    repair_prompt_factory=make_dispatching_repair_factory(),
-                    post_validator=lambda patch: _word_fit_patch_error(
-                        patch,
-                        target=target_coord,
-                        current_text=target_line.text,
-                        legal_speakers=legal_speakers,
-                        max_line_words=max_line_words,
-                    ),
-                    clamp_overlong_strings=False,
-                    max_new_tokens=512,
-                    max_attempts=1,
-                    helper_name=f"fable2_word_fit_{slot_name}",
-                    on_attempt_complete=_attempt_complete,
-                )
-                candidate_parsed = _replace_fable_character_line(
-                    current.parsed,
-                    scene_n=scene_n,
-                    line_index=line_index,
-                    replacement_text=candidate_patch.replacement_text,
-                )
-                raw_source = _script_view(
-                    candidate_parsed,
-                    current_treatment,
-                    include_news_read=False,
-                )
-                candidate = build_final_draft(
-                    raw_source,
-                    candidate_parsed,
-                    current_treatment,
-                    envelope,
-                    story_rules,
-                    p3_attempts=current.p3_attempts,
-                    p5_attempts=current.p5_attempts,
-                )
-                candidate, candidate_treatment, hygiene_receipts = (
-                    _repair_final_draft_spoken_hygiene(
-                        candidate,
-                        current_treatment,
-                        envelope,
-                        story_rules,
-                        creative_fn=creative_fn,
-                        technical_fn=technical_fn,
-                    )
-                )
-                if candidate_treatment != current_treatment:
-                    raise ValueError("word fit changed the locked treatment")
-                if any(
-                    receipt.get("status") == "row_failed_mechanical"
-                    and str(receipt.get("line_id") or "") == target_line_id
-                    for receipt in hygiene_receipts
-                ):
-                    raise ValueError(
-                        "word fit candidate left its target row unspeakable"
-                    )
-                if _word_fit_non_target_signature(
-                    candidate.parsed, target_coord,
-                ) != _word_fit_non_target_signature(
-                    current.parsed, target_coord,
-                ):
-                    raise ValueError(
-                        "word fit changed a non-target play surface"
-                    )
-                final_target = next(
-                    line
-                    for sn, li, line in _fable_character_rows(
-                        candidate.parsed
-                    )
-                    if (sn, li) == target_coord
-                )
-                final_error = _word_fit_patch_error(
-                    _Fable2WordFitPatch(
-                        scene_n=scene_n,
-                        line_index=line_index,
-                        replacement_text=final_target.text,
-                    ),
-                    target=target_coord,
-                    current_text=target_line.text,
-                    legal_speakers=legal_speakers,
-                    max_line_words=max_line_words,
-                )
-                if final_error is not None:
-                    raise ValueError(final_error)
-                _validate_selected_final_draft(
-                    candidate,
-                    envelope,
-                    story_rules,
-                    mode,
-                    treatment=current_treatment,
-                )
-                candidate_actual = candidate.parsed.character_word_count
-                candidate_sha256 = candidate.hashes.raw_sha256
-                slot_receipt.update({
-                    "candidate_character_words": candidate_actual,
-                    "candidate_sha256": candidate_sha256,
-                })
-                if candidate_sha256 in candidate_fingerprints:
-                    slot_receipt["duplicate_fingerprint"] = True
-                    raise ValueError("duplicate candidate state")
-                candidate_fingerprints.add(candidate_sha256)
-                prior_distance = _OTRWD.word_band_distance(
-                    actual, lower, upper,
-                )
-                candidate_distance = _OTRWD.word_band_distance(
-                    candidate_actual, lower, upper,
-                )
-                if candidate_distance >= prior_distance:
-                    raise ValueError("candidate made no strict progress")
-            except Exception as exc:  # the next authored slot owns recovery
-                slot_receipt.update({
-                    "error_type": type(exc).__name__,
-                    "error": " ".join(str(exc).split())[:300],
-                })
-                cycle_receipt["attempts"].append(slot_receipt)
-                continue
-
-            slot_receipt["status"] = "accepted"
-            cycle_receipt["attempts"].append(slot_receipt)
-            candidate_hygiene_by_id = dict(current_hygiene_by_id)
-            cleared_prior_receipt = candidate_hygiene_by_id.pop(
-                target_line_id, None,
-            )
-            for receipt in hygiene_receipts:
-                if not isinstance(receipt, dict):
-                    continue
-                receipt_line_id = str(receipt.get("line_id") or "")
-                if receipt_line_id:
-                    candidate_hygiene_by_id[receipt_line_id] = dict(receipt)
-            accepted_bundle = (
-                candidate,
-                candidate_treatment,
-                candidate_hygiene_by_id,
-                candidate_actual,
-                cleared_prior_receipt is not None,
-            )
-            accepted_slot = slot_name
-            break
-
-        if accepted_bundle is None:
-            observation = liveness.observe(None)
-            cycle_receipt.update({
-                "after_character_words": actual,
-                "distance_to_band": _OTRWD.word_band_distance(
-                    actual, lower, upper,
-                ),
-                "status": "two_slot_rejected",
-                "liveness": observation,
-            })
-            cycles.append(cycle_receipt)
-            continue
-
-        (
-            candidate,
-            candidate_treatment,
-            candidate_hygiene_by_id,
-            candidate_actual,
-            cleared_prior_receipt,
-        ) = accepted_bundle
-        current = candidate
-        current_treatment = candidate_treatment
-        current_hygiene_by_id = candidate_hygiene_by_id
-        actual = candidate_actual
-        observation = liveness.observe(
-            actual,
-            fingerprint=candidate.hashes.raw_sha256,
-        )
-        if not observation["strict_progress"]:
-            raise Fable2WordDeliveryError(
-                "word_fit",
-                "validated candidate lost strict progress at liveness commit",
-            )
-        cycle_receipt.update({
-            "accepted_slot": accepted_slot,
-            "candidate_character_words": candidate_actual,
-            "after_character_words": actual,
-            "distance_to_band": _OTRWD.word_band_distance(
-                actual, lower, upper,
-            ),
-            "adopted": True,
-            "status": "progress",
-            "candidate_sha256": candidate.hashes.raw_sha256,
-            "cleared_prior_hygiene_receipt": cleared_prior_receipt,
-            "liveness": observation,
-        })
-        cycles.append(cycle_receipt)
-        if lower <= actual <= upper:
-            terminal_status = "pass"
-            break
-
-    if liveness.exhausted and not lower <= actual <= upper:
-        terminal_status = "consecutive_stalls_exhausted"
-
-    actual = current.parsed.character_word_count
-    receipt = {
-        "schema_version": 1,
-        "status": "pass" if lower <= actual <= upper else terminal_status,
-        "target_words": envelope.total_words,
-        "acceptance_words": [lower, upper],
-        "initial_character_words": initial_actual,
-        "final_character_words": actual,
-        "repair_budget": repair_budget,
-        "capacity": capacity,
-        "liveness": liveness.receipt(),
-        "cycles": cycles,
-        "actual_drift": not (lower <= actual <= upper),
-        "final_sha256": current.hashes.raw_sha256,
-    }
-    if not lower <= actual <= upper:
-        error = Fable2WordDeliveryError(
-            "word_fit",
-            f"{terminal_status} after {len(cycles)} row-local cycles; "
-            f"required {lower}..{upper}, actual {actual}",
-            sum(len(row.get("attempts") or ()) for row in cycles),
-        )
-        error.receipt = receipt
-        raise error
-    return (
-        current,
-        current_treatment,
-        tuple(current_hygiene_by_id.values()),
-        receipt,
-    )
-
-
-def _assert_no_weapons_or_smoking(
-    parsed: ParsedScript,
-    treatment: "Treatment | None" = None,
-) -> None:
-    """The one content rule that must never reach the air, proven not judged.
-
-    Word-boundary scan of the shared weapons/tobacco lexicon over the SPOKEN
-    text. No model opinion, no self-corroborating "evidence", no episode thrown
-    away because an auditor felt uneasy about a clean line.
-    """
-    spoken_parts = list(parsed.announcer_intro)
-    spoken_parts.extend(
-        ln.text for scene in parsed.scenes for ln in scene.lines
-    )
-    spoken_parts.extend(parsed.announcer_outro)
-    spoken_parts.append(parsed.coda)
-    if treatment is not None:
-        spoken_parts.append(treatment.news_close_read)
-    spoken = "\n".join(spoken_parts)
-    hits = lexicon_hits(spoken, WEAPON_SMOKING_EVIDENCE)
-    if hits:
+    patches, receipt = propose_safety_patches(projection, technical_fn)
+    if not patches:
         raise Fable2AuditError(
-            "safety_scan",
-            "spoken text names weapons or smoking: " + ", ".join(hits),
-            0,
+            "safety_cleanup",
+            "same-story cleanup could not resolve: "
+            + format_safety_hits(initial_hits),
         )
+    for row in projection["lines"]:
+        if row["line_id"] in patches:
+            set_line_text_metrics(row, patches[row["line_id"]])
+    residual = scan_spoken_ledger(projection)
+    if residual:
+        raise Fable2AuditError(
+            "safety_cleanup",
+            "explicit spoken-safety terms remain: "
+            + format_safety_hits(residual),
+        )
+    text_by_id = {
+        str(row["line_id"]): str(row["text"])
+        for row in projection["lines"]
+    }
+
+    patched_news = text_by_id["news_read"]
+    patched_treatment = treatment
+    if patched_news != treatment.news_close_read:
+        patched_treatment = treatment.model_copy(
+            update={"news_close_read": patched_news}
+        )
+
+    rendered = [f"TITLE: {parsed.title}", f"MUSIC: {parsed.music_open}"]
+    rendered.extend(
+        f"{ANNOUNCER_NAME}: {text_by_id[f'intro_{index}']}"
+        for index, _text in enumerate(parsed.announcer_intro)
+    )
+    inter_by_scene: "dict[int, list[str]]" = {}
+    for scene_after, cue in parsed.music_inter:
+        inter_by_scene.setdefault(scene_after, []).append(cue)
+    for scene in parsed.scenes:
+        rendered.append(f"SCENE {scene.n}: {scene.setting}")
+        rendered.extend(
+            f"{line.speaker}: {text_by_id[f'scene_{scene.n}_{index}']}"
+            for index, line in enumerate(scene.lines)
+        )
+        rendered.extend(
+            f"MUSIC: {cue}" for cue in inter_by_scene.get(scene.n, [])
+        )
+    rendered.extend(
+        f"{ANNOUNCER_NAME}: {text_by_id[f'outro_{index}']}"
+        for index, _text in enumerate(parsed.announcer_outro)
+    )
+    rendered.extend([
+        f"CODA: {text_by_id['coda']}",
+        f"MUSIC: {parsed.music_close}",
+        "END.",
+    ])
+    patched_source = "\n".join(rendered)
+    patched_parsed, defects = parse_fable2_markup(
+        patched_source,
+        [shape.name for shape in patched_treatment.cast_shapes],
+    )
+    if patched_parsed is None:
+        raise Fable2AuditError(
+            "safety_cleanup",
+            "same-story safety patch broke markup: " + render_defects(defects),
+        )
+    return patched_source, patched_parsed, patched_treatment, receipt
 
 
 # ---------------------------------------------------------------------------
@@ -4831,700 +2233,195 @@ def run_scifi_fable2_episode(
     technical_fn: Callable[..., str],
     slot_scheduler: Any,
     source_bank_row: Any,
-    story_rules: Any,
     episode_root: Any,
     episode_id: str,
 ) -> Fable2TailParts:
-    """Fill led + meta to the legacy writer's endpoint; return
-    Fable2TailParts. `resolved` is consumed AS-IS (never rebuilt). The
-    runner builds the episode-canon OBJECT only -- the tail remains the
-    ONLY canon WRITER (single-writer rule; the tail's J.5 block re-titles
-    and writes it). Raises Fable2Error subclasses; NO fallback."""
+    """Produce one proof-backed story with target-independent topology."""
+    del episode_root, episode_id
     target = int(resolved["target_words"])
-    assert_supported_target_words(target)  # defensive re-assert (r3/M4)
-    mode = _resolve_mode(target)
-    _validate_fable2_story_rules(story_rules)
+    if target < 1:
+        raise Fable2ScriptError("script", f"invalid target_words {target}")
     n_max = max(1, int(resolved["num_characters"]))
     creative_model = str(resolved["creative_writing_model"])
     technical_model = str(resolved["technical_model"])
-
     seed = _resolve_seed()
     rng = random.Random(seed)
-    # Credits receipt (25th live smoke 2026-07-10: OTR_CreditsRoll
-    # requires meta.cast_contract.cast_seed OR meta.episode_seed; the
-    # legacy cast-lock stamps the former, fable2 has no cast lock). The
-    # fable2 seed GOVERNS the deal + the voice draw -- it IS this
-    # episode's seed receipt.
     meta["episode_seed"] = seed
     _OTRWD.stamp_contract(
-        meta,
-        target_words=target,
-        planned_voiced_words=target,
+        meta, target_words=target, planned_voiced_words=target,
         owner="scifi_news_pro",
     )
+    receipts: "list[dict[str, Any]]" = []
 
-    receipts: "list[dict]" = []
-
-    def _receipt(pass_id: str, model_id: str, attempts: int, temp: float,
-                 max_new_tokens: int, *, status: str = "completed",
-                 reason: str = "",
-                 attempt_trace: "tuple[PassAttemptTrace, ...]" = ()) -> None:
+    def receipt(pass_id, model_id, attempts, temp, tokens, *, trace=()):
         row = {
-            "pass_id": pass_id, "model_id": model_id, "attempts": attempts,
-            "temp": temp, "max_new_tokens": max_new_tokens, "mode": mode,
-            "status": status,
+            "pass_id": pass_id, "model_id": model_id,
+            "attempts": attempts, "temp": temp,
+            "status": "completed",
         }
-        if reason:
-            row["reason"] = reason
-        if attempt_trace:
-            _validate_attempt_sequence(pass_id, attempt_trace)
-            row["attempt_trace"] = [
-                _attempt_payload(trace) for trace in attempt_trace
-            ]
+        if tokens is None:
+            row["output_budget_mode"] = "provider_capacity"
+            row["requested_max_new_tokens"] = None
+        else:
+            row["max_new_tokens"] = tokens
+        if trace:
+            _validate_attempt_sequence(pass_id, trace)
+            row["attempt_trace"] = [_attempt_payload(value) for value in trace]
         receipts.append(row)
 
-    f2: dict = {
+    f2: "dict[str, Any]" = {
         "schema_version": _SCHEMA_VERSION,
-        "mode": mode,
         "seed": seed,
         "notes": [
-            "news_briefs_required is a documented NO-OP for this lane "
-            "(interpreter empty by design; the treatment IS the "
-            "interpretation).",
-            "S2 full mode executes P2a/P4/P5 at 120-900 words; compact "
-            "mode stamps those passes skipped below 120; P8 is audit-only.",
+            "Every target uses one fixed story-construction topology.",
+            "Requested and actual words are telemetry only.",
         ],
     }
     meta["fable2"] = f2
-    # The treatment IS the interpretation: no interpreter briefs exist for
-    # this lane. None is the production-proven degrade-lane value every
-    # downstream meta['news'] reader already tolerates.
     meta["news"] = None
 
-    # --- P0: dossier ----------------------------------------------------
     digest = _build_digest(payload)
-    counting_tech, tech_box = _counting(technical_fn)
+    fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "fable2_dossier"):
-        dossier = _pass_dossier(counting_tech, pack, digest)
-    _receipt("dossier", technical_model, tech_box["calls"],
-             _TEMP["dossier"], _MAX_NEW_TOKENS["dossier"])
-    dossier, dropped_entities = _filter_dossier_entities(dossier, digest)
-    if dropped_entities:
-        log.warning(
-            "[scifi_fable2] dossier: DROPPED %d entity(ies) the source "
-            "text cannot corroborate (delete-only; world-knowledge "
-            "expansions never widen the read corpus): %s",
-            len(dropped_entities), "; ".join(dropped_entities))
+        dossier = _pass_dossier(fn, pack, digest)
+    receipt("dossier", technical_model, box["calls"],
+            _TEMP["dossier"], _MAX_NEW_TOKENS["dossier"])
+    dossier, dropped = _filter_dossier_entities(dossier, digest)
     provenance = {
-        "headline": str(payload.get("headline") or ""),
-        "source": str(payload.get("source") or ""),
-        "date": str(payload.get("date") or ""),
-        "link": str(payload.get("link") or ""),
+        key: str(payload.get(key) or "")
+        for key in ("headline", "source", "date", "link")
     }
-    f2["dossier"] = {**dossier.model_dump(), "provenance": provenance,
-                     "dropped_entities": dropped_entities}
+    f2["dossier"] = {
+        **dossier.model_dump(), "provenance": provenance,
+        "dropped_entities": dropped,
+    }
 
-    # --- deal + P1: pitch room --------------------------------------------
-    deck = _load_frame_deck()
-    cards, stance = _deal(rng, deck, mode=mode)
-    f2["cards_dealt"] = [dict(c) for c in cards]
+    cards, stance = _deal(rng, _load_frame_deck())
+    f2["cards_dealt"] = [dict(card) for card in cards]
     f2["stance"] = dict(stance)
-    counting_cre, cre_box = _counting(creative_fn)
-    with _helper_ctx(slot_scheduler, "fable2_pitch_room"):
-        slate = _pass_pitch(
-            counting_cre, pack, dossier, cards, stance,
-            n_max=n_max, mode=mode)
-    _receipt("pitch_room", creative_model, cre_box["calls"],
-             _TEMP["pitch_room"], _MAX_NEW_TOKENS["pitch_room"])
-    f2["pitches"] = [p.model_dump() for p in slate.pitches]
-    if mode == _FULL_MODE:
-        counting_select, select_box = _counting(technical_fn)
-        with _helper_ctx(slot_scheduler, "fable2_pitch_select"):
-            pitch_selection = _pass_select(
-                counting_select, pack, dossier, slate, stance)
-        _receipt(
-            "pitch_select", technical_model, select_box["calls"],
-            _TEMP["pitch_select"], _MAX_NEW_TOKENS["pitch_select"])
-        pitch = next(
-            candidate for candidate in slate.pitches
-            if candidate.pitch_id == pitch_selection.chosen_pitch_id)
-        f2["selection"] = {
-            **pitch_selection.model_dump(),
-            "rationale": pitch_selection.selection_rationale,
-            "selected_pitch_sha256": _canonical_sha256(
-                pitch.model_dump(mode="json")),
-        }
-    else:
-        pitch = slate.pitches[0]
-        rationale = (
-            "one-pitch mode: the sole dealt pitch wins "
-            "(P2a skipped by design)"
-        )
-        f2["selection"] = {
-            "chosen_pitch_id": pitch.pitch_id,
-            "selection_rationale": rationale,
-            "rationale": rationale,
-            "selected_pitch_sha256": _canonical_sha256(
-                pitch.model_dump(mode="json")),
-        }
-        _receipt(
-            "pitch_select", "skipped", 0, _TEMP["pitch_select"],
-            _MAX_NEW_TOKENS["pitch_select"], status="skipped",
-            reason="compact mode: the sole dealt pitch wins",
-        )
+    fn, box = _counting(creative_fn)
+    with _helper_ctx(slot_scheduler, "fable2_pitch"):
+        pitch = _pass_pitch(fn, pack, dossier, cards, stance, n_max=n_max)
+    receipt("pitch", creative_model, box["calls"],
+            _TEMP["pitch"], None)
+    f2["pitch"] = pitch.model_dump()
 
-    # --- P2b: treatment (cast names are BORN here, r2/M1) ----------------
-    counting_cre2, cre2_box = _counting(creative_fn)
+    fn, box = _counting(creative_fn)
     with _helper_ctx(slot_scheduler, "fable2_treatment"):
         treatment = _pass_treatment(
-            counting_cre2, pack, dossier, pitch, stance,
-            n_max=n_max, provenance=provenance, digest=digest)
-    _receipt("treatment", creative_model, cre2_box["calls"],
-             _TEMP["treatment"], _MAX_NEW_TOKENS["treatment"])
-    cast_names = [c.name for c in treatment.cast_shapes]
+            fn, pack, dossier, pitch, stance, n_max=n_max,
+            provenance=provenance, digest=digest,
+        )
+    receipt("treatment", creative_model, box["calls"],
+            _TEMP["treatment"], None)
+    cast_names = [shape.name for shape in treatment.cast_shapes]
     meta["num_characters_locked"] = len(cast_names)
 
-    # --- P2c: factual close (read-split; S1b deviation, kibitz r2 Q1) ----
-    counting_tech_read, tech_read_box = _counting(technical_fn)
+    fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "fable2_news_read"):
         read = _pass_news_read(
-            counting_tech_read, pack, dossier, provenance, digest,
-            cast_names)
-    _receipt("news_read", technical_model, tech_read_box["calls"],
-             0.20, 300)
+            fn, pack, dossier, provenance, digest, cast_names
+        )
+    receipt("news_read", technical_model, box["calls"], 0.20, None)
     treatment = treatment.model_copy(
-        update={"news_close_read": read.news_close_read})
-    news_read_validator = _make_read_validator(
-        dossier, provenance, digest, cast_names,
+        update={"news_close_read": read.news_close_read}
     )
-    f2["treatment"] = treatment.model_dump()
-
-    # --- P3: script (markup ladder) ---------------------------------------
     envelope = _build_envelope(target)
-    counting_cre3, cre3_box = _counting(creative_fn)
+    f2["duration_guidance"] = {
+        "requested_words": target,
+        "suggested_scenes": envelope.scene_count,
+        "suggested_scene_words": list(envelope.scene_word_targets),
+        "gating": False,
+    }
+    fn, box = _counting(creative_fn)
     with _helper_ctx(slot_scheduler, "fable2_script"):
-        draft1_text, parsed1, p3_meta = _pass_script(
-            counting_cre3, pack, treatment, digest, envelope, cast_names)
+        script_text, parsed, p3_meta = _pass_script(
+            fn, pack, treatment, digest, envelope, cast_names
+        )
     p3_attempts = tuple(p3_meta["attempt_trace"])
-    if cre3_box["calls"] != len(p3_attempts):
-        raise Fable2ScriptError(
-            "script", "P3 observed attempt trace/call count drift")
-    _receipt(
-        "script", creative_model, len(p3_attempts), _TEMP["script"],
-        p3_meta["actual_max_new_tokens"], attempt_trace=p3_attempts)
-    draft1_pre = build_final_draft(
-        draft1_text, parsed1, treatment, envelope, story_rules,
-        p3_attempts=p3_attempts)
+    if box["calls"] != len(p3_attempts):
+        raise Fable2ScriptError("script", "P3 attempt/call count drift")
+    receipt(
+        "script", creative_model, box["calls"], _TEMP["script"],
+        None, trace=p3_attempts,
+    )
 
-    if mode == _FULL_MODE:
-        # --- P4: critic ----------------------------------------------------
-        counting_critic, critic_box = _counting(technical_fn)
-        with _helper_ctx(slot_scheduler, "fable2_critic"):
-            critic_notes = _pass_critic(
-                counting_critic, pack, draft1=draft1_pre,
-                treatment=treatment, selected_pitch=pitch,
-                envelope=envelope, story_rules=story_rules)
-        _receipt(
-            "critic", technical_model, critic_box["calls"],
-            _TEMP["critic"], _MAX_NEW_TOKENS["critic"])
-        f2["critic"] = critic_notes.model_dump(mode="json")
-
-        # --- P5: revision --------------------------------------------------
-        counting_revision, revision_box = _counting(creative_fn)
-        with _helper_ctx(slot_scheduler, "fable2_revision"):
-            draft2_text, parsed2, p5_meta = _pass_revision(
-                counting_revision, pack, draft1=draft1_pre,
-                treatment=treatment, critic_notes=critic_notes,
-                selected_pitch=pitch, envelope=envelope,
-                story_rules=story_rules, cast_names=cast_names)
-        p5_attempts = tuple(p5_meta["attempt_trace"])
-        if revision_box["calls"] != len(p5_attempts):
-            raise Fable2ScriptError(
-                "revision", "P5 observed attempt trace/call count drift")
-        _receipt(
-            "revision", creative_model, len(p5_attempts),
-            _TEMP["revision"], p5_meta["actual_max_new_tokens"],
-            attempt_trace=p5_attempts)
-
-        revision_contract = validate_revision_contract(
-            draft1_pre.normalized_source, parsed1,
-            normalize_fable2_markup_text(draft2_text), parsed2,
-            critic_notes, envelope, story_rules)
-        # Both candidates carry the whole observed P3/P5 history. A tied,
-        # worse, or ineligible revision that retains draft1 therefore never
-        # drops the real P5 attempt record from the selected artifact.
-        draft1 = build_final_draft(
-            draft1_text, parsed1, treatment, envelope, story_rules,
-            p3_attempts=p3_attempts, p5_attempts=p5_attempts)
-        draft2 = build_final_draft(
-            draft2_text, parsed2, treatment, envelope, story_rules,
-            p3_attempts=p3_attempts, p5_attempts=p5_attempts)
-        draft_selection = choose_final_draft(
-            draft1, draft2, revision_contract)
-        selected_draft_name = (
-            "draft2" if draft_selection.winner is draft2 else "draft1")
-        revision_receipt = _revision_contract_payload(revision_contract)
-        revision_receipt["contract_sha256"] = (
-            revision_contract.contract_sha256)
-        f2["revision_contract"] = revision_receipt
-        f2["draft2_sha256"] = draft2.hashes.raw_sha256
-        f2["parse_p5"] = {
-            "defects_by_attempt": p5_meta["defects_by_attempt"],
-            "rerolls": p5_meta["rerolls"],
-            "normalizations": list(parsed2.normalizations),
-            "attempt_trace": [
-                _attempt_payload(row) for row in p5_attempts
-            ],
-            # Historical P5 candidate diagnostics. Any residual total miss is
-            # owned by final row-local word fit before casting/assembly.
-            "deferred_budget_defects": p5_meta.get(
-                "deferred_budget_defects", []),
-        }
-    else:
-        draft1 = draft1_pre
-        draft_selection = DraftSelection(
-            winner=draft1,
-            reason="draft1 selected: compact one-draft mode",
-            scoring_context_sha256=draft1.scoring_context_sha256,
-        )
-        selected_draft_name = "draft1"
-        f2["critic"] = None
-        f2["revision_contract"] = None
-        _receipt(
-            "critic", "skipped", 0, _TEMP["critic"],
-            _MAX_NEW_TOKENS["critic"], status="skipped",
-            reason="compact mode uses one accepted draft",
-        )
-        _receipt(
-            "revision", "skipped", 0, _TEMP["revision"],
-            _script_token_budget(target), status="skipped",
-            reason="compact mode uses one accepted draft",
-        )
-
-    final_draft = draft_selection.winner
-    locked_delivery_treatment = treatment
-
-    def _author_delivery_reroll(candidate_index: int) -> dict[str, Any]:
-        """Author one fresh complete play under the locked treatment.
-
-        This is the producer-owned last resort after a row-fit candidate
-        reaches four consecutive stalls.  Full mode repeats its complete
-        P3/P4/P5 contract; compact mode repeats P3.  The alternate writer slot
-        is used on every other candidate, so one model cannot own liveness.
-        """
-        author_slot = "technical" if candidate_index % 2 else "creative"
-        author_fn = technical_fn if author_slot == "technical" else creative_fn
-        critic_slot = "creative" if author_slot == "technical" else "technical"
-        critic_fn = creative_fn if critic_slot == "creative" else technical_fn
-
-        counting_script, script_box = _counting(author_fn)
-        with _helper_ctx(
-            slot_scheduler,
-            f"fable2_delivery_reroll_{candidate_index}_script",
-        ):
-            fresh_text, fresh_parsed, fresh_p3_meta = _pass_script(
-                counting_script,
-                pack,
-                locked_delivery_treatment,
-                digest,
-                envelope,
-                cast_names,
+    with _helper_ctx(slot_scheduler, "fable2_same_story_safety"):
+        script_text, parsed, treatment, safety = (
+            _apply_fable_safety_cleanup(
+                script_text, parsed, treatment,
+                technical_fn=technical_fn,
             )
-        fresh_p3_attempts = tuple(fresh_p3_meta["attempt_trace"])
-        if script_box["calls"] != len(fresh_p3_attempts):
-            raise Fable2ScriptError(
-                "script", "delivery reroll P3 attempt/call count drift",
-            )
-        fresh_draft1_pre = build_final_draft(
-            fresh_text,
-            fresh_parsed,
-            locked_delivery_treatment,
-            envelope,
-            story_rules,
-            p3_attempts=fresh_p3_attempts,
         )
-        result: dict[str, Any] = {
-            "candidate_index": candidate_index,
-            "author_slot": author_slot,
-            "critic_slot": critic_slot if mode == _FULL_MODE else "skipped",
-            "p3_meta": fresh_p3_meta,
-            "p3_attempts": fresh_p3_attempts,
-            "p3_calls": script_box["calls"],
-            "draft1": fresh_draft1_pre,
-            "selected_draft_name": (
-                f"delivery_reroll_{candidate_index}_draft1"
-            ),
-        }
-        if mode == _COMPACT_MODE:
-            result["final_draft"] = fresh_draft1_pre
-            return result
-
-        counting_critic, critic_box = _counting(critic_fn)
-        with _helper_ctx(
-            slot_scheduler,
-            f"fable2_delivery_reroll_{candidate_index}_critic",
-        ):
-            fresh_critic = _pass_critic(
-                counting_critic,
-                pack,
-                draft1=fresh_draft1_pre,
-                treatment=locked_delivery_treatment,
-                selected_pitch=pitch,
-                envelope=envelope,
-                story_rules=story_rules,
-            )
-        counting_revision, revision_box = _counting(author_fn)
-        with _helper_ctx(
-            slot_scheduler,
-            f"fable2_delivery_reroll_{candidate_index}_revision",
-        ):
-            fresh_draft2_text, fresh_parsed2, fresh_p5_meta = _pass_revision(
-                counting_revision,
-                pack,
-                draft1=fresh_draft1_pre,
-                treatment=locked_delivery_treatment,
-                critic_notes=fresh_critic,
-                selected_pitch=pitch,
-                envelope=envelope,
-                story_rules=story_rules,
-                cast_names=cast_names,
-            )
-        fresh_p5_attempts = tuple(fresh_p5_meta["attempt_trace"])
-        if revision_box["calls"] != len(fresh_p5_attempts):
-            raise Fable2ScriptError(
-                "revision", "delivery reroll P5 attempt/call count drift",
-            )
-        fresh_contract = validate_revision_contract(
-            fresh_draft1_pre.normalized_source,
-            fresh_parsed,
-            normalize_fable2_markup_text(fresh_draft2_text),
-            fresh_parsed2,
-            fresh_critic,
-            envelope,
-            story_rules,
-        )
-        fresh_draft1 = build_final_draft(
-            fresh_text,
-            fresh_parsed,
-            locked_delivery_treatment,
-            envelope,
-            story_rules,
-            p3_attempts=fresh_p3_attempts,
-            p5_attempts=fresh_p5_attempts,
-        )
-        fresh_draft2 = build_final_draft(
-            fresh_draft2_text,
-            fresh_parsed2,
-            locked_delivery_treatment,
-            envelope,
-            story_rules,
-            p3_attempts=fresh_p3_attempts,
-            p5_attempts=fresh_p5_attempts,
-        )
-        fresh_selection = choose_final_draft(
-            fresh_draft1, fresh_draft2, fresh_contract,
-        )
-        result.update({
-            "critic": fresh_critic,
-            "critic_calls": critic_box["calls"],
-            "p5_meta": fresh_p5_meta,
-            "p5_attempts": fresh_p5_attempts,
-            "p5_calls": revision_box["calls"],
-            "revision_contract": fresh_contract,
-            "draft1": fresh_draft1,
-            "draft2": fresh_draft2,
-            "final_draft": fresh_selection.winner,
-            "selected_draft_name": (
-                f"delivery_reroll_{candidate_index}_draft2"
-                if fresh_selection.winner is fresh_draft2
-                else f"delivery_reroll_{candidate_index}_draft1"
-            ),
-            "selection_reason": fresh_selection.reason,
-        })
-        return result
-
-    delivery_candidate_index = 0
-    needs_fresh_candidate = False
-    f2["delivery_candidate_runs"] = []
-    while True:
-        # Candidate-local spoken hygiene may repair the factual close.  A
-        # retired candidate cannot lend that mutation to its successor, so
-        # every complete play begins from the same locked P2c treatment.
-        treatment = locked_delivery_treatment
-        if needs_fresh_candidate:
-            try:
-                reroll = _author_delivery_reroll(delivery_candidate_index)
-            except Fable2ScriptError as exc:
-                # Only an observed LLM-output ladder is retryable here. Pack,
-                # schema, seal, and code invariants have attempts==0 and still
-                # fail closed rather than spinning forever on bad configuration.
-                if int(getattr(exc, "attempts", 0) or 0) <= 0:
-                    raise
-                _OTRWD.retire_word_fit_candidate(
-                    meta,
-                    owner="scifi_news_pro",
-                    boundary="P3_P5_complete_play",
-                    reason=f"candidate_generation_exhausted: {exc}",
-                    receipt={"status": "candidate_generation_exhausted"},
-                )
-                f2["delivery_candidate_runs"].append({
-                    "candidate_index": delivery_candidate_index,
-                    "status": "candidate_generation_exhausted",
-                    "error_type": type(exc).__name__,
-                    "error": " ".join(str(exc).split())[:500],
-                })
-                delivery_candidate_index += 1
-                continue
-
-            final_draft = reroll["final_draft"]
-            draft1 = reroll["draft1"]
-            p3_meta = reroll["p3_meta"]
-            p3_attempts = reroll["p3_attempts"]
-            selected_draft_name = reroll["selected_draft_name"]
-            if mode == _FULL_MODE:
-                draft2 = reroll["draft2"]
-                critic_notes = reroll["critic"]
-                revision_contract = reroll["revision_contract"]
-                p5_meta = reroll["p5_meta"]
-                p5_attempts = reroll["p5_attempts"]
-                f2["critic"] = critic_notes.model_dump(mode="json")
-                revision_receipt = _revision_contract_payload(
-                    revision_contract,
-                )
-                revision_receipt["contract_sha256"] = (
-                    revision_contract.contract_sha256
-                )
-                f2["revision_contract"] = revision_receipt
-                f2["draft2_sha256"] = draft2.hashes.raw_sha256
-                f2["parse_p5"] = {
-                    "defects_by_attempt": p5_meta["defects_by_attempt"],
-                    "rerolls": p5_meta["rerolls"],
-                    "normalizations": list(draft2.parsed.normalizations),
-                    "attempt_trace": [
-                        _attempt_payload(row) for row in p5_attempts
-                    ],
-                    "deferred_budget_defects": p5_meta.get(
-                        "deferred_budget_defects", [],
-                    ),
-                }
-            f2["delivery_candidate_runs"].append({
-                key: value
-                for key, value in reroll.items()
-                if key in {
-                    "candidate_index", "author_slot", "critic_slot",
-                    "p3_calls", "critic_calls", "p5_calls",
-                    "selected_draft_name", "selection_reason",
-                }
-            } | {"status": "authored"})
-
-        counting_hygiene_creative, hygiene_creative_box = _counting(creative_fn)
-        counting_hygiene_technical, hygiene_technical_box = _counting(technical_fn)
-        with _helper_ctx(
-            slot_scheduler,
-            f"fable2_spoken_hygiene_candidate_{delivery_candidate_index}",
-        ):
-            final_draft, treatment, hygiene_receipts = (
-                _repair_final_draft_spoken_hygiene(
-                    final_draft,
-                    treatment,
-                    envelope,
-                    story_rules,
-                    creative_fn=counting_hygiene_creative,
-                    technical_fn=counting_hygiene_technical,
-                    news_read_validator=news_read_validator,
-                )
-            )
-        f2["spoken_hygiene"] = {
-            "schema_version": 1,
-            "status": "repaired" if hygiene_receipts else "clean_noop",
-            "creative_calls": hygiene_creative_box["calls"],
-            "technical_calls": hygiene_technical_box["calls"],
-            "repairs": list(hygiene_receipts),
-        }
-        if hygiene_receipts:
-            f2["treatment"] = treatment.model_dump()
-            log.warning(
-                "[scifi_fable2] candidate %d spoken hygiene resolved %d "
-                "row(s) and rebuilt its FinalDraft seals",
-                delivery_candidate_index,
-                len(hygiene_receipts),
-            )
-        counting_word_fit_creative, word_fit_creative_box = _counting(
-            creative_fn,
-        )
-        counting_word_fit_technical, word_fit_technical_box = _counting(
-            technical_fn,
-        )
-        try:
-            with _helper_ctx(
-                slot_scheduler,
-                f"fable2_word_fit_candidate_{delivery_candidate_index}",
-            ):
-                (
-                    final_draft,
-                    treatment,
-                    fit_hygiene_receipts,
-                    word_fit_receipt,
-                ) = _run_final_word_fit(
-                    final_draft,
-                    treatment,
-                    envelope,
-                    story_rules,
-                    creative_fn=counting_word_fit_creative,
-                    technical_fn=counting_word_fit_technical,
-                    mode=mode,
-                    hygiene_receipts=tuple(hygiene_receipts),
-                )
-        except Fable2WordDeliveryError as exc:
-            failed_receipt = getattr(exc, "receipt", None)
-            if not isinstance(failed_receipt, dict):
-                raise
-            _OTRWD.retire_word_fit_candidate(
-                meta,
-                owner="scifi_news_pro",
-                boundary="P3_P5_complete_play",
-                reason=str(exc),
-                fingerprint=final_draft.hashes.raw_sha256,
-                receipt=failed_receipt,
-            )
-            f2["delivery_candidate_runs"].append({
-                "candidate_index": delivery_candidate_index,
-                "status": "word_fit_candidate_retired",
-                "word_fit": failed_receipt,
-            })
-            delivery_candidate_index += 1
-            needs_fresh_candidate = True
-            continue
-
-        word_fit_receipt.update({
-            "creative_calls": word_fit_creative_box["calls"],
-            "technical_calls": word_fit_technical_box["calls"],
-            "candidate_index": delivery_candidate_index,
-        })
-        f2["word_fit"] = word_fit_receipt
-        hygiene_receipts = tuple(fit_hygiene_receipts)
-        f2["spoken_hygiene"]["status"] = (
-            "repaired" if hygiene_receipts else "clean_noop"
-        )
-        f2["spoken_hygiene"]["repairs"] = list(hygiene_receipts)
-        break
-    _validate_selected_final_draft(
-        final_draft, envelope, story_rules, mode, treatment=treatment)
-    f2["draft1_sha256"] = draft1.hashes.raw_sha256
-    f2["final_sha256"] = final_draft.hashes.raw_sha256
-    f2["selected_draft"] = selected_draft_name
-    f2["better_draft_choice"] = draft_selection.reason
+    f2["safety_cleanup"] = safety
+    f2["treatment"] = treatment.model_dump()
+    final_draft = build_final_draft(
+        script_text, parsed, treatment, p3_attempts=p3_attempts
+    )
+    _validate_selected_final_draft(final_draft, treatment=treatment)
     f2["final_draft"] = _final_draft_ledger_payload(final_draft)
     f2["parse"] = {
         "defects_by_attempt": p3_meta["defects_by_attempt"],
-        "rerolls": p3_meta["rerolls"],
+        "structural_retries": p3_meta["structural_retries"],
         "normalizations": list(final_draft.parsed.normalizations),
-        "attempt_trace": [
-            _attempt_payload(row) for row in p3_attempts
-        ],
-        # Historical P3 candidate diagnostics; final delivery is stamped by
-        # the producer-owned word_fit receipt above.
-        "deferred_budget_defects": p3_meta.get(
-            "deferred_budget_defects", []),
+        "attempt_trace": [_attempt_payload(value) for value in p3_attempts],
     }
-    if final_draft.parsed.normalizations:
-        log.warning(
-            "[scifi_fable2] parser stripped %d decoration(s) from the "
-            "winning draft (delete-only; stamped at "
-            "meta.fable2.parse.normalizations for the operator eyeball): %s",
-            len(final_draft.parsed.normalizations),
-            "; ".join(final_draft.parsed.normalizations[:12]),
-        )
 
-    # --- P6: casting/voices ------------------------------------------------
     menu = _deal_voice_menu(len(cast_names))
     f2["casting_stock_dealt"] = [
-        {"menu_id": e.menu_id, "gender": e.gender,
-         "description": e.description}
-        for e in menu.entries
+        {"menu_id": item.menu_id, "gender": item.gender,
+         "description": item.description}
+        for item in menu.entries
     ]
-    counting_tech2, tech2_box = _counting(technical_fn)
+    fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "fable2_casting_voices"):
-        casting = _pass_casting(
-            counting_tech2, pack, final_draft, treatment, menu,
-            envelope=envelope, story_rules=story_rules, mode=mode)
-    _receipt("casting_voices", technical_model, tech2_box["calls"],
-             _TEMP["casting_voices"], _MAX_NEW_TOKENS["casting_voices"])
-    speaker_order = _speakers_in_order(final_draft.parsed)
-    cast_rows = _assign_voices(casting, menu, rng, speaker_order)
-    f2["casting"] = [c.model_dump() for c in casting.cast]
+        casting = _pass_casting(fn, pack, final_draft, treatment, menu)
+    receipt("casting", technical_model, box["calls"],
+            _TEMP["casting_voices"], None)
+    cast_rows = _assign_voices(
+        casting, menu, rng, _speakers_in_order(final_draft.parsed)
+    )
+    f2["casting"] = [item.model_dump() for item in casting.cast]
 
-    # Safety is checked on every spoken surface before the first ledger save;
-    # the post-assembly check below remains the fail-closed backstop.
-    _assert_no_weapons_or_smoking(final_draft.parsed, treatment)
-
-    # --- P7: assembly (pure python; proof gates; incremental saves) --------
     _assemble(
         led, final_draft, treatment, cast_rows, payload,
-        envelope=envelope, story_rules=story_rules, mode=mode,
         owner_bank=source_bank_row.source_bank_id,
-        hygiene_receipts=hygiene_receipts)
-    try:
-        delivery_receipt = _OTRWD.stamp_actual(
-            led.data,
-            stage="scifi_news_pro_assembled",
-            require_in_band=True,
-        )
-    except _OTRWD.WordDeliveryError as exc:
-        raise Fable2WordDeliveryError("word_fit", str(exc)) from exc
-    _OTRWD.accept_word_fit_candidate(
-        led.data.setdefault("meta", {}),
-        owner="scifi_news_pro",
-        boundary="P3_P5_complete_play",
-        fingerprint=final_draft.hashes.raw_sha256,
-        actual_words=int(delivery_receipt["actual_voiced_words"]),
-        acceptance_words=delivery_receipt["acceptance_words"],
     )
-    _fable2_meta(led)["word_fit"]["assembled_receipt"] = delivery_receipt
-    _receipt("assemble", "python", 0, 0.0, 0)
-    # Ledger.save() replaces led.data with its merged payload. Reacquire
-    # both mappings before every post-assembly mutation; caller aliases are
-    # intentionally not trusted across the incremental save boundary.
-    meta = _ledger_meta(led)
+    delivery = _OTRWD.stamp_actual(
+        led.data, stage="scifi_news_pro_assembled"
+    )
     f2 = _fable2_meta(led)
-
-    # --- P8: deterministic safety scan on the spoken drama ------------------
-    # The LLM ledger audit is gone. It could only ever kill on a lexicon hit, so
-    # the lexicon was always the real authority -- and asking a model first meant
-    # a complete, twice-persisted ledger was thrown away on its opinion. Worse,
-    # its corroboration lexicons were the PERIOD lane's: ordinary sci-fi words
-    # ("machine", "computer", "report") "proved" a hallucinated flag.
-    #
-    # What survives is the one thing that must never reach the air, checked
-    # directly on the spoken text with word boundaries.
-    _assert_no_weapons_or_smoking(final_draft.parsed, treatment)
-    _receipt("safety_scan", "python", 0, 0.0, 0)
+    f2["delivery_telemetry"] = delivery
+    residual = scan_spoken_ledger(led.data)
+    if residual:
+        raise Fable2AuditError(
+            "safety_scan",
+            "explicit spoken-safety terms remain: "
+            + format_safety_hits(residual),
+        )
     f2["pass_receipts"] = receipts
     led.save()
-    meta = _ledger_meta(led)
     f2 = _fable2_meta(led)
 
-    # --- tail parts ---------------------------------------------------------
     canon = _OTRC.episode_canon_from_outline_dict({
         "title": treatment.title,
         "premise": treatment.dramatic_question,
         "setting": treatment.setting,
         "time_of_day": _derive_time_of_day(treatment, final_draft.parsed),
-        "sound_palette": [],  # no style contract on this lane
+        "sound_palette": [],
     })
-    outline_view = Fable2OutlineView(
-        premise=treatment.dramatic_question,
-        title=treatment.title,
-        setting=treatment.setting,
-    )
     log.info(
-        "[scifi_fable2] spine complete: mode=%s seed=%d cast=%d scenes=%d "
-        "character_words=%d receipts=%d",
-        mode, seed, len(cast_names), len(final_draft.parsed.scenes),
-        final_draft.parsed.character_word_count, len(receipts),
+        "[scifi_fable2] fixed story complete: seed=%d cast=%d scenes=%d "
+        "character_words=%d", seed, len(cast_names),
+        len(final_draft.parsed.scenes),
+        final_draft.parsed.character_word_count,
     )
     return Fable2TailParts(
-        outline_view=outline_view,
+        outline_view=Fable2OutlineView(
+            premise=treatment.dramatic_question,
+            title=treatment.title,
+            setting=treatment.setting,
+        ),
         canon=canon,
         final_title_override=final_draft.parsed.title,
         run_story_spine=False,
