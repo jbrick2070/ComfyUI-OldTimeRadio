@@ -734,6 +734,34 @@ def test_still_needed_honors_force_engine_map(monkeypatch):
     assert disp._still_needed_for_role(policy, "character_video") is True
 
 
+def test_dispatcher_rejects_unmaterialized_required_scene_target(tmp_path):
+    """The image phase cannot hand video an incomplete still spine."""
+    policy = {
+        "policy_version": 2,
+        "video_models": _complete_video_models(character="still_word"),
+        "seed": {"request_seed": 0},
+    }
+    payload = {
+        "version": 1,
+        "objects": [],
+        "required_scene_targets": [{
+            "object_id": "still_b000_music_open",
+            "kind": "scene_open",
+            "role": "music_visual",
+            "beat_id": "b000_music_open",
+        }],
+    }
+    import pytest
+    from nodes import otr_image_gen_dispatcher as disp
+    with pytest.raises(disp.ImageRenderError, match="required scene image targets"):
+        disp.dispatch_images(
+            {"episode_id": "ep_missing_target", "cast": []},
+            policy, payload, gen_fn=lambda _req: None,
+            output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
+
+
+
+
 def test_still_needed_honors_radio_is_host_redirect(monkeypatch):
     """A HuMo-family announcer pick renders as ltx_audio_in when HuMo hosts are
     off, so image planning must keep the stills required by that effective lane."""

@@ -401,7 +401,7 @@ def test_i2v_candidates_and_graph_topology(monkeypatch):
 
 def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):
     """DEFAULT-ON (LK-1a) + a scene still in the ledger -> the ltx request
-    shows init_source=scene_still; no still -> LOUD text-path fallback."""
+    shows init_source=scene_still; no still -> LOUD structural failure."""
     from nodes._otr_video_engines import render_driver as rd
     monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)   # the default
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
@@ -423,10 +423,10 @@ def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):
     req = rd.build_request_from_shot(shot, ledger)
     assert req["observability"]["init_source"] == "scene_still"
     assert req["asset_refs"]["init_image"] == str(still)
-    # missing still -> LOUD text path (init_source stays pre-i2v)
+    # missing still -> structural failure; no hidden text-only degradation
     ledger2 = dict(ledger, images={"images": []})
-    req2 = rd.build_request_from_shot(shot, ledger2)
-    assert req2["observability"]["init_source"] != "scene_still"
+    with pytest.raises(rd.RenderError, match="LTX-I2V requires"):
+        rd.build_request_from_shot(shot, ledger2)
 
 
 def test_i2v_flag_off_driver_behavior_unchanged(monkeypatch, tmp_path):

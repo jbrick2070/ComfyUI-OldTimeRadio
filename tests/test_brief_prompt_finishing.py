@@ -33,6 +33,18 @@ _OK_META = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _prompt_only_lanes_disable_i2v(monkeypatch):
+    """Prompt-finishing tests do not mint image assets.
+
+    The production LTX path is fail-closed when I2V is enabled and the
+    required scene still is absent. These tests exercise only prompt
+    composition, so they explicitly select the documented text-only lane.
+    The default-on missing-still contract is covered in test_video_motion.
+    """
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
+
+
 def test_era_tail_default_when_brief_absent():
     assert sbh.get_era_tail({}) == sbh.ERA_TAIL_DEFAULT
     assert sbh.get_era_tail({"story_brief_status": "failed"}) \

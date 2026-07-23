@@ -281,6 +281,9 @@ class TestSceneStillObjects:
         assert opn["beat_id"] == "b000_music_open"
         assert opn["role"] == "music_visual"
         assert opn["source"] == "scene_timed"
+        assert "still_b000_music_open" in {
+            row["object_id"] for row in payload["required_scene_targets"]
+        }
 
     def test_every_beat_gets_a_scene_still_target(self):
         # operator 2026-06-18: EVERY beat carries its OWN scene still regardless of
@@ -673,7 +676,11 @@ class TestDispatcherStillSpine:
                 "role": "music_visual", "beat_id": "b000_music_open",
                 "w": 1472, "h": 832,
                 "prompt": "a vintage radio set warming up, no on-screen text",
-                "prompt_hash": "ph-open", "source": "scene_timed"}]}
+                "prompt_hash": "ph-open", "source": "scene_timed"}],
+                "required_scene_targets": [{
+                    "object_id": "still_b000_music_open",
+                    "kind": "scene_open", "role": "music_visual",
+                    "beat_id": "b000_music_open"}]}
             seen = {}
 
             def gen_fn(req):
@@ -694,6 +701,7 @@ class TestDispatcherStillSpine:
             assert "otr/episodes/ep_scene/stills/" in \
                 row["path"].replace("\\", "/")
             import os, json as _json
+            assert led["images"]["required_scene_targets"][0]["path"] == row["path"]
             assert os.path.exists(row["path"])
             man = _json.loads(open(
                 os.path.join(os.path.dirname(row["path"]),

@@ -113,6 +113,10 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     keeps the full 1472x832 landscape canvas. Both env-overridable."""
     monkeypatch.delenv("OTR_LTX_RENDER_CANVAS", raising=False)
     monkeypatch.delenv("OTR_VIDEO_LANDSCAPE_CANVAS", raising=False)
+    # This test isolates canvas selection. Explicitly exercise LTX's documented
+    # text-only opt-out so the required-still contract is covered by its own
+    # regression rather than by an unrelated canvas fixture.
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     ledger = {"video": {"video_revision": 1, "shots": []},
               "lines": [{"line_id": "b001", "start_s": 0.0, "dur_s": 2.0}],
               "images": {"images": []}}

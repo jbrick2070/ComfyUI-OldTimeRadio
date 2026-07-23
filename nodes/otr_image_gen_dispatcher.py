@@ -555,6 +555,26 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     warnings: list = []
     report: list = []
     objects = (image_prompts or {}).get("objects") or []
+    required_scene_targets = (image_prompts or {}).get(
+        "required_scene_targets")
+    if required_scene_targets is None:
+        required_scene_targets = []
+    if not isinstance(required_scene_targets, list):
+        raise ImageRenderError(
+            "OTR_ImageGenDispatcher received a malformed required_scene_targets "
+            "receipt; refusing video dispatch without a target contract.")
+    _required_ids = []
+    for _target in required_scene_targets:
+        if not isinstance(_target, dict) or not str(
+                _target.get("object_id") or ""):
+            raise ImageRenderError(
+                "OTR_ImageGenDispatcher received a required scene target "
+                "without an object_id; refusing an unverifiable image phase.")
+        _required_ids.append(str(_target["object_id"]))
+    if len(_required_ids) != len(set(_required_ids)):
+        raise ImageRenderError(
+            "OTR_ImageGenDispatcher received duplicate required scene target "
+            "ids; refusing an ambiguous image receipt.")
     still_capabilities = still_consumer_capabilities(image_policy)
     if objects and still_capabilities is None:
         raise ImageRenderError(
@@ -883,6 +903,38 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         made += 1
         report.append(f"{oid}: generated -> {os.path.basename(ep_path)}")
 
+    # ST-3 completion contract: the producer-owned target manifest is the
+    # boundary between image generation and video. A generated object that was
+    # skipped, failed to materialize, or points at a missing file cannot become
+    # a text-only/dark-floor video by accident.
+    required_target_receipt = []
+    if required_scene_targets:
+        rows_by_object = {
+            str(row.get("object_id") or ""): row
+            for row in images if isinstance(row, dict)
+        }
+        missing_targets = []
+        for target in required_scene_targets:
+            oid = str(target["object_id"])
+            row = rows_by_object.get(oid)
+            path = str((row or {}).get("path") or "")
+            if not row or not path or not os.path.isfile(path):
+                missing_targets.append(oid)
+                continue
+            required_target_receipt.append({
+                "object_id": oid,
+                "kind": str(target.get("kind") or ""),
+                "role": str(target.get("role") or ""),
+                "beat_id": str(target.get("beat_id") or ""),
+                "path": path,
+                "content_hash": row.get("content_hash") or row.get(
+                    "portrait_content_hash"),
+            })
+        if missing_targets:
+            raise ImageRenderError(
+                "required scene image targets missing or unmaterialized before "
+                "video dispatch: " + ", ".join(missing_targets))
+
     ledger["images"] = {
         "image_revision": rev,
         "episode_id": ep,
@@ -891,6 +943,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         "cache_index": cache_index,
         "warnings": warnings,
     }
+    if required_scene_targets:
+        ledger["images"]["required_scene_targets"] = required_target_receipt
     # Credits: stamp the per-role image-engine histogram into meta (which DOES
     # persist to the on-disk ledger the credits dossier reads) so the dossier
     # shows the image model used for each slot. Additive; never overwrites.

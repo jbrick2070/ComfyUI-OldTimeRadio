@@ -67,7 +67,7 @@
     "composite_res": "1920x1080",
     "composite_w": 1920,
     "composite_h": 1080,
-    "frame_budget": 21,
+    "frame_budget": 17,
     "beats": 40
   },
   "preflight": {
@@ -77,6 +77,9 @@
   "launch": {
     "sage_attention": false,
     "extra_args": [],
-    "env": {}
+    "env": {
+      "OTR_VIDEO_LANDSCAPE_CANVAS": "832x480",
+      "OTR_WAN_TI2V_MAX_FRAMES": "17"
+    }
   }
 }

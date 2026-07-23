@@ -1952,9 +1952,13 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             # speaker_role (e.g. an old "sfx" ledger) is a hard error,
             # never downgraded to a missing-stills warning.
             raise
-        except Exception as exc:  # noqa: BLE001 -- stills never kill prompts
-            warnings.append(f"scene-still derivation failed ({exc}); "
-                            "episode renders without scene stills (LOUD)")
+        except Exception as exc:  # noqa: BLE001 -- deterministic target failure
+            # A missing target is an image/video contract failure, not a prose
+            # quality decision. Do not let the prompt node hand the dispatcher
+            # an apparently valid payload with no scene-still spine.
+            raise ValueError(
+                f"scene-still derivation failed ({exc}); refusing an image "
+                "payload without deterministic scene targets") from exc
     warnings.extend(scene_warns)
     if scene_targets:
         try:
@@ -2121,7 +2125,37 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             if _cid:
                 _obj["char_id"] = _cid     # traceability; engine resolves by role
             objects.append(_obj)
-    return {"version": 1, "objects": objects}, warnings
+    required_scene_targets = []
+    _required_fodder_roles = set(mesh_fodder_roles or ())
+    for target in scene_targets:
+        role = str(target.get("role") or "")
+        if not _still_required(role):
+            continue
+        beat_id = str(target.get("beat_id") or "")
+        if not beat_id:
+            continue
+        if role in _required_fodder_roles:
+            required_scene_targets.extend((
+                {"object_id": f"meshfodder_{beat_id}",
+                 "kind": "mesh_fodder", "role": role, "beat_id": beat_id},
+                {"object_id": f"plate_{beat_id}",
+                 "kind": "scene_background_plate", "role": role,
+                 "beat_id": beat_id},
+            ))
+        else:
+            required_scene_targets.append({
+                "object_id": f"still_{beat_id}",
+                "kind": str(target.get("kind") or "scene_beat"),
+                "role": role,
+                "beat_id": beat_id,
+            })
+    payload = {"version": 1, "objects": objects}
+    if required_scene_targets:
+        # This is an additive, producer-owned receipt. The object list remains
+        # the version-1 wire payload; this manifest states which scene targets
+        # must be materialized before a video consumer may run.
+        payload["required_scene_targets"] = required_scene_targets
+    return payload, warnings
 
 
 def _resolve_writer_llm(meta, warnings):

@@ -1555,10 +1555,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # the music open b000 included (its text-only render was the murk
     # cause). A missing still falls back LOUD to the round-5 text path --
     # never silent. Set OTR_ENABLE_LTX_I2V=0 to restore text-only LTX.
-    _i2v_still_missing = False
     if (str(shot.get("engine_id") or "") == "ltx_video"
             and os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"):
-        _bid = _beat_id_for_shot(shot)
+        _bid = _visual_beat_id
         _still = _still_index(ledger).get(str(_bid), "")
         if _still:
             init_image = _still
@@ -1568,18 +1567,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "still %s (default since LK-1a)", _bid,
                 os.path.basename(_still))
         else:
-            # Operator 2026-06-12: every i2v beat MUST have its still. The
-            # derive_scene_still_targets coverage fix should make this
-            # unreachable; if a still is STILL absent the degrade must be LOUD
-            # IN THE TRACE (stamped below), never a silent text-only render.
-            _i2v_still_missing = True
-            _LOG.warning(
-                "[OTR.render_driver] LTX-I2V MISSING-STILL (LOUD): i2v is "
-                "enabled but beat %s has NO scene still in the ledger -- "
-                "rendering text-only and STAMPING the trace as a degrade "
-                "(init_source=missing_scene_still). This should not happen "
-                "after the still-spine coverage fix; investigate the image "
-                "phase for beat %s.", _bid, _bid)
+            raise RenderError(
+                "LTX-I2V requires a minted scene still for beat %s; the image "
+                "phase produced no usable path. NO FALLBACK to text-only "
+                "rendering. Fix the image target receipt before video dispatch."
+                % _bid)
     # Route-A's local HuMo-radio-face music-bookend workaround (2026-06-28) is
     # RETIRED 2026-06-30 (see _enforce_radio_is_host above): a local HuMo
     # music_visual beat redirects to ltx_audio_in before _family is computed.
@@ -1703,11 +1695,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # observability dict (the round-5 pattern, schema-real since the W7-pre
     # builder migration); run_episode copies them to trace rows so the W7
     # acceptance check is mechanical.
-    if _i2v_still_missing:
-        # LOUD trace degrade: an i2v beat that rendered with no scene still.
-        req["observability"]["init_source"] = "missing_scene_still"
-        req["observability"]["i2v_still_missing"] = True
-    elif _mesh_fodder_missing:
+    if _mesh_fodder_missing:
         # LOUD trace degrade: a 3D mesh beat with no clean fodder minted -- the
         # default "none" stamp (init_image is empty) would HIDE that we refused
         # to mesh the scene still; surface it explicitly (mirrors i2v above).

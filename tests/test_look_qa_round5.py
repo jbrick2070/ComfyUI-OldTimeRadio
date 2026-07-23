@@ -22,6 +22,16 @@ from nodes._otr_video_engines import render_driver as _rd           # noqa: E402
 from nodes import otr_shot_lock as _sl                               # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _prompt_only_lanes_disable_i2v(monkeypatch):
+    """This module tests prompt composition without minted scene stills.
+
+    Real LTX dispatch is default-on I2V and fails closed when its still is
+    missing; prompt-only tests select the documented text-only opt-out.
+    """
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
+
+
 # --------------------------------------------------------------------------- #
 # F1 -- the LTX frame cap (pure helper)
 # --------------------------------------------------------------------------- #

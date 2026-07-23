@@ -166,7 +166,6 @@ workflows/*.json.bak
 # _otr_single_engine_smoke.py): drive the engine recipe via /prompt + measure the
 # resident peak. Keep versioned by exception.
 !scripts/_otr_lumina_image_smoke.py
-!scripts/_otr_qwen_image_smoke.py
 
 # --- 2026-05-04 BUG-LOCAL-090: news_history.json moved to
 # <output>/otr/state/ ---
