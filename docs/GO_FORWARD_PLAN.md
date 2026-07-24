@@ -1,8 +1,11 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-24 -- **LEANED TO OPEN WORK ONLY (completed strata live in
+**Updated:** 2026-07-24 (planner handoff @ docs HEAD `ed8d5a6d`; code HEAD
+`f150213f`) -- **LEANED TO OPEN WORK ONLY (completed strata live in
 `docs/HANDOFF_LOG.md` + git history of this file); MODEL & CREDIT BUDGET
-ADDED. CANONICAL MEDIA QUALIFICATION MONITORED; 45-WORD SCENE MATRIX NEXT.**
+ADDED; otr-handoff SKILL v2 LIVE (baton now enforces model-rung-first +
+commit-AND-push). CANONICAL MEDIA QUALIFICATION MONITORED; 45-WORD SCENE
+MATRIX NEXT.**
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to

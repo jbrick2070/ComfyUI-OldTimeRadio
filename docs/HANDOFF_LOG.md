@@ -3,6 +3,21 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 07:35 -- HEAD ed8d5a6d (v2.0-alpha) -- WINDOW PLANNER (Fable)
+
+Did: leaned GO_FORWARD_PLAN.md to open work + bugs only (665->398 lines; done
+strata retired to git history + this log; stale refs re-grounded: retired
+banks pruned, phase-C gating -> "no code mid-sweep"); added the MODEL & CREDIT
+BUDGET section + per-window model rungs; authored + delivered otr-handoff
+SKILL v2 (commit-AND-push policy, tracker/audio-freeze staleness removed).
+Current step: land the dirty-tree six-bank no-prose-gate chunk (active coder
+window); PLANNER next = sec-16 ratification + r5 extensibility kibitz.
+Next: fresh Opus PLANNER window takes this baton; run the sec-16/r5 kibitz
+(codex gpt-5.6-sol high + agy Gemini 3.5 Flash (High)) while both pools fresh.
+Models: Claude Fable, docs-only session; no panels or roundtable spent.
+Commits: ed8d5a6d + this handoff commit.
+
+
 ## 2026-07-22 early -- v2.0-alpha [CODER: live candidates stay fresh]
 
 PBUG-20260721-18's episode-liveness root fix is pushed at `67996907`; the
