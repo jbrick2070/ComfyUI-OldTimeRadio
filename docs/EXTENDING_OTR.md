@@ -81,16 +81,30 @@ table plus the consumer list above IS the complete-ledger contract.
 
 ```
 user_packs/source_banks/<bank_id>/
-  bank.json          # the independent bank row: id, label, source_kind,
-                     #   fetcher/interpreter entry points, default pipeline
-                     #   (shared writer), default story model, defaults,
-                     #   required_seams
+  bank.json          # {"schema_version": "v2.0", "bank": { ...the row... }}
+                     #   the row is EXACTLY a shipped banks.json row: id,
+                     #   label, source_kind, fetcher/interpreter entry points,
+                     #   default_story_pipeline, default_story_model,
+                     #   defaults, required_seams, runnable, guide_ref.
+                     #   Every key is required; unknown keys are rejected.
   <bank_id>.py       # single file: fetch_source + interpret_source +
                      #   check_compatibility (keyword-only, typed contracts)
   story_packs/
-    default.json     # >=1 story pack (prompt seams; content-pack laws apply)
+    <model_id>.json  # >=1 story pack, filename == its story_model_id
   fixtures/          # deterministic samples for activation preflight
+  .otr_receipt.json  # WRITTEN BY --activate; never hand-edit
 ```
+
+- `<bank_id>` is the folder name, the row's `source_bank_id`, and the dropdown
+  value -- all three must match. Use lowercase letters, digits and underscores,
+  starting with a letter. The six shipped ids (and `custom_source_bank`) are
+  protected: a bundle that tries to shadow one is quarantined, and the shipped
+  bank is untouched.
+- Your bank row is parsed by the SAME parser that validates the shipped six and
+  held to the same cross-reference contracts: the default pipeline must be
+  registered, the default pack must exist under your own `story_packs/` and
+  declare that pipeline, every `required_seams` entry must be present in it,
+  and a `runnable` bank must have a real execution lane.
 
 - **`fetch_source`** returns the exact seven-key payload envelope --
   `headline`, `summary`, `full_text`, `source`, `date`, `link`, `seed_text`
@@ -118,7 +132,16 @@ user_packs/source_banks/<bank_id>/
   your JSON and contracts, imports your Python in a bounded child process, and
   runs your fixtures. A broken bundle is QUARANTINED with a named, actionable
   issue -- it never appears in the dropdown and never breaks ComfyUI boot.
-  Editing your bundle after activation flips it STALE until you re-activate.
+  Activation writes a content-addressed snapshot plus `.otr_receipt.json`; boot
+  admits your bank only when the bundle's authoring bytes still hash to that
+  receipt AND the snapshot is present. Edit anything and the bank goes STALE
+  (quarantined, named) until you re-activate. The digest covers every authored
+  file's path, size and content and ignores timestamps, so re-activating
+  unchanged bytes is a no-op.
+- **One quarantine never spreads.** Each bundle is judged alone: a broken bank
+  costs its own dropdown row and nothing else. Every shipped bank and every
+  healthy client bank still loads. The refusals print at load and are readable
+  programmatically from the routing layer's validation-issue list.
 - **Bounded fetch.** Network access goes through one bounded fetch seam
   (timeouts, redirect cap, size cap, https-only, loopback/private reject).
   A tripped bound fails loudly; there is no silent retry-forever.

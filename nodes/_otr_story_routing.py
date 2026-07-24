@@ -12,6 +12,13 @@ LAZY: importing this module performs ZERO file I/O (ComfyUI custom-node import
 isolation). The registries load + the pack-directory sweep runs on the first
 get_bank / get_pipeline / resolve_story_pack call, then cache.
 
+Client banks (independent source banks v1): bundles under
+user_packs/source_banks/ are admitted ALONGSIDE the shipped rows in this one
+authority, held to the same row/pack/pipeline contracts. The asymmetry is
+deliberate -- a broken SHIPPED seed fails node registration LOUD; a broken
+CLIENT bundle is QUARANTINED (absent from every dropdown, boot survives) and
+reported via list_validation_issues().
+
 Run gating: `bank.runnable` is the ONLY runtime gate (require_runnable_bank).
 `pipeline.executable` is metadata -- it documents whether a JSON-directed pass
 runner exists and is NEVER consulted at run time (kibitz r2 M2).
@@ -34,6 +41,11 @@ from . import _otr_story_pack as _sp
 # Chunk 3 (source-payload contracts): stdlib-only at import, zero I/O -- safe
 # top-level (the lazy posture is test-pinned on both edges).
 from . import _otr_source_payload as _osp
+# Independent source banks v1: client bundle discovery/integrity/quarantine.
+# Stdlib-only leaf, zero I/O at import -- same lazy posture. It owns bundle
+# INTEGRITY; this module stays the ONE bank-row parser (injected below), so a
+# client row can never drift from a shipped one.
+from . import _otr_user_banks as _oub
 
 _STORY_PACKS_ROOT = Path(__file__).resolve().parent / "story_packs"
 _BANKS_FILENAME = "banks.json"
@@ -119,10 +131,23 @@ class SourceBank:
 class _Registry:
     banks: "dict[str, SourceBank]"
     pipelines: "dict[str, StoryPipeline]"
+    # bank_id -> the directory that owns its story packs. Shipped banks own a
+    # subdirectory of nodes/story_packs; a client bank owns its own bundle's
+    # story_packs/ folder. Resolution routes by OWNER, never by guessing.
+    pack_dirs: "dict[str, Path]"
+    # Admitted client bundles, keyed by bank id (empty on a stock install).
+    user_bundles: "dict[str, object]"
+    # Quarantined client bundles: reported, never raised.
+    issues: "tuple[object, ...]"
 
 
 # Lazy singleton -- built on first access, never at import time.
 _REGISTRY: "_Registry | None" = None
+# Atomic-publish guard: the registry is assigned in ONE statement once fully
+# built, so no consumer can ever observe a half-loaded authority. This flag
+# only catches RE-ENTRY (a consumer importing back into the load), which would
+# otherwise recurse until the stack died with an unreadable traceback.
+_LOADING = False
 
 
 # --------------------------------------------------------------------------
@@ -342,8 +367,14 @@ def _parse_id_list(items, parse_fn, id_attr: str, origin: str) -> dict:
 # sweep + cross-ref validation
 # --------------------------------------------------------------------------
 
-def _pack_path(bank_id: str, model_id: str) -> Path:
-    return _STORY_PACKS_ROOT / bank_id / f"{model_id}.json"
+def _shipped_pack_dirs(bank_ids) -> "dict[str, Path]":
+    """The shipped owner map: every bank owns nodes/story_packs/<bank_id>."""
+    return {bank_id: _STORY_PACKS_ROOT / bank_id for bank_id in bank_ids}
+
+
+def _pack_path(pack_dirs: "dict[str, Path]", bank_id: str, model_id: str) -> Path:
+    """Resolve a pack by OWNER -- shipped root or the client's own bundle."""
+    return pack_dirs[bank_id] / f"{model_id}.json"
 
 
 def _is_pack_sidecar(bank_id: str, filename: str) -> bool:
@@ -364,8 +395,28 @@ def _load_routed_pack(path: Path, pipelines: "dict[str, StoryPipeline]") -> Stor
     return load_pack_with_seams(path, pipelines[pipe_id].declared_seams)
 
 
+def _sweep_pack_dir(bank_id: str, pack_dir: Path,
+                    pipelines: "dict[str, StoryPipeline]") -> None:
+    """Every pack in a bank's own directory validates + matches its path
+    coordinates. Same rule for a shipped bank and a client bundle."""
+    for pack_file in sorted(pack_dir.glob("*.json")):
+        if _is_pack_sidecar(bank_id, pack_file.name):
+            continue
+        pack = _load_routed_pack(pack_file, pipelines)
+        model_id = pack_file.stem
+        if pack.source_bank_id != bank_id or pack.story_model_id != model_id:
+            raise RegistryValidationError(
+                f"{pack_file}: header triple ({pack.source_bank_id!r}, "
+                f"{pack.story_model_id!r}) does not match path coordinates "
+                f"({bank_id!r}, {model_id!r})"
+            )
+
+
 def _sweep_and_crossref(banks: "dict[str, SourceBank]",
-                        pipelines: "dict[str, StoryPipeline]") -> None:
+                        pipelines: "dict[str, StoryPipeline]",
+                        pack_dirs: "dict[str, Path] | None" = None) -> None:
+    if pack_dirs is None:
+        pack_dirs = _shipped_pack_dirs(banks)
     # Every immediate SUBDIRECTORY of story_packs/ must be a registered bank.
     for entry in sorted(_STORY_PACKS_ROOT.iterdir()):
         if entry.is_file():
@@ -381,108 +432,159 @@ def _sweep_and_crossref(banks: "dict[str, SourceBank]",
                 f"pack directory {entry} is not a registered source_bank_id "
                 f"(known: {sorted(banks)})"
             )
-        # Every pack inside must validate + match its path coordinates.
-        for pack_file in sorted(entry.glob("*.json")):
-            if _is_pack_sidecar(bank_id, pack_file.name):
-                continue
-            pack = _load_routed_pack(pack_file, pipelines)
-            model_id = pack_file.stem
-            if pack.source_bank_id != bank_id or pack.story_model_id != model_id:
-                raise RegistryValidationError(
-                    f"{pack_file}: header triple ({pack.source_bank_id!r}, "
-                    f"{pack.story_model_id!r}) does not match path coordinates "
-                    f"({bank_id!r}, {model_id!r})"
-                )
+        _sweep_pack_dir(bank_id, entry, pipelines)
     # Cross-refs per bank.
     for bank in banks.values():
+        _crossref_bank(bank, pipelines, pack_dirs)
+
+
+def _crossref_bank(bank: SourceBank, pipelines: "dict[str, StoryPipeline]",
+                   pack_dirs: "dict[str, Path]",
+                   origin: "str | None" = None) -> None:
+    """Every contract a bank row owes its pipeline + default pack.
+
+    Identical for a shipped bank and a client bundle -- only the ORIGIN label
+    and the pack OWNER differ, so a client bank is held to exactly the same
+    standard as the shipped six."""
+    if origin is None:
         origin = f"banks.json bank {bank.source_bank_id!r}"
-        if bank.default_story_pipeline not in pipelines:
-            raise UnknownPipelineError(
-                f"{origin}: default_story_pipeline "
-                f"{bank.default_story_pipeline!r} not in pipelines.json"
-            )
-        default_path = _pack_path(bank.source_bank_id, bank.default_story_model)
-        if not default_path.is_file():
-            raise RegistryValidationError(
-                f"{origin}: default_story_model {bank.default_story_model!r} "
-                f"has no pack at {default_path}"
-            )
-        pack = _load_routed_pack(default_path, pipelines)
-        # Precedence equality (kibitz r2 M4): no "which wins" ambiguity.
-        if pack.story_pipeline_id != bank.default_story_pipeline:
-            raise RegistryValidationError(
-                f"{origin}: default pack pipeline {pack.story_pipeline_id!r} "
-                f"!= bank default_story_pipeline {bank.default_story_pipeline!r}"
-            )
-        missing = sorted(set(bank.required_seams) - set(pack.prompt_stages))
-        if missing:
-            raise RegistryValidationError(
-                f"{origin}: required_seams {missing} absent from default pack "
-                f"{default_path.name}"
-            )
-        pipe = pipelines[bank.default_story_pipeline]
-        pass_refs = {
-            seam for pass_row in pipe.passes for seam in pass_row.seam_refs
-        }
-        absent_refs = sorted(pass_refs - set(pack.prompt_stages))
-        if absent_refs:
-            raise RegistryValidationError(
-                f"{origin}: pipeline pass seam_refs {absent_refs} absent from "
-                f"default pack {default_path.name}"
-            )
-        custom_pack_keys = set(pack.prompt_stages) - PRODUCTION_SEAM_ALLOWLIST
-        custom_pass_refs = pass_refs - PRODUCTION_SEAM_ALLOWLIST
-        if (custom_pack_keys != set(pipe.declared_seams)
-                or custom_pass_refs != set(pipe.declared_seams)):
-            raise RegistryValidationError(
-                f"{origin}: custom seam three-way parity failed: "
-                f"pack={sorted(custom_pack_keys)} "
-                f"declared={sorted(pipe.declared_seams)} "
-                f"pass_refs={sorted(custom_pass_refs)}"
-            )
-        # Chunk 3 source-payload contract rules (after the precedence check so
-        # bank.default_story_pipeline is already proven consistent). IDS ONLY
-        # -- never executes wrapper bodies (lazy law).
-        # (a) Dangling non-empty ids are typos -- loud, on EVERY bank.
-        if bank.fetcher and bank.fetcher not in _osp.registered_fetcher_ids():
-            raise RegistryValidationError(
-                f"{origin}: fetcher {bank.fetcher!r} is not registered in "
-                f"_otr_source_payload (registered: "
-                f"{sorted(_osp.registered_fetcher_ids())})"
-            )
-        if (bank.interpreter
-                and bank.interpreter not in _osp.registered_interpreter_ids()):
-            raise RegistryValidationError(
-                f"{origin}: interpreter {bank.interpreter!r} is not registered "
-                f"in _otr_source_payload (registered: "
-                f"{sorted(_osp.registered_interpreter_ids())})"
-            )
-        # (b) A runnable bank must have a REAL execution lane: either its
-        # pipeline consumes the source-payload contract and both ids are
-        # declared (registered per (a)), or the pipeline brings its own runner
-        # (executable=true -- a validation-time read; the "executable is never
-        # a RUNTIME gate" law stands).
-        if bank.runnable:
-            if pipe.requires_source_contract:
-                if not bank.fetcher or not bank.interpreter:
-                    raise RegistryValidationError(
-                        f"{origin}: runnable bank on source-contract pipeline "
-                        f"{pipe.story_pipeline_id!r} must declare BOTH fetcher "
-                        f"and interpreter (lane-enablement checklist 4b item 3)"
-                    )
-            elif not pipe.executable:
+    if bank.default_story_pipeline not in pipelines:
+        raise UnknownPipelineError(
+            f"{origin}: default_story_pipeline "
+            f"{bank.default_story_pipeline!r} not in pipelines.json"
+        )
+    default_path = _pack_path(pack_dirs, bank.source_bank_id,
+                              bank.default_story_model)
+    if not default_path.is_file():
+        raise RegistryValidationError(
+            f"{origin}: default_story_model {bank.default_story_model!r} "
+            f"has no pack at {default_path}"
+        )
+    pack = _load_routed_pack(default_path, pipelines)
+    # Precedence equality (kibitz r2 M4): no "which wins" ambiguity.
+    if pack.story_pipeline_id != bank.default_story_pipeline:
+        raise RegistryValidationError(
+            f"{origin}: default pack pipeline {pack.story_pipeline_id!r} "
+            f"!= bank default_story_pipeline {bank.default_story_pipeline!r}"
+        )
+    missing = sorted(set(bank.required_seams) - set(pack.prompt_stages))
+    if missing:
+        raise RegistryValidationError(
+            f"{origin}: required_seams {missing} absent from default pack "
+            f"{default_path.name}"
+        )
+    pipe = pipelines[bank.default_story_pipeline]
+    pass_refs = {
+        seam for pass_row in pipe.passes for seam in pass_row.seam_refs
+    }
+    absent_refs = sorted(pass_refs - set(pack.prompt_stages))
+    if absent_refs:
+        raise RegistryValidationError(
+            f"{origin}: pipeline pass seam_refs {absent_refs} absent from "
+            f"default pack {default_path.name}"
+        )
+    custom_pack_keys = set(pack.prompt_stages) - PRODUCTION_SEAM_ALLOWLIST
+    custom_pass_refs = pass_refs - PRODUCTION_SEAM_ALLOWLIST
+    if (custom_pack_keys != set(pipe.declared_seams)
+            or custom_pass_refs != set(pipe.declared_seams)):
+        raise RegistryValidationError(
+            f"{origin}: custom seam three-way parity failed: "
+            f"pack={sorted(custom_pack_keys)} "
+            f"declared={sorted(pipe.declared_seams)} "
+            f"pass_refs={sorted(custom_pass_refs)}"
+        )
+    # Chunk 3 source-payload contract rules (after the precedence check so
+    # bank.default_story_pipeline is already proven consistent). IDS ONLY
+    # -- never executes wrapper bodies (lazy law).
+    # (a) Dangling non-empty ids are typos -- loud, on EVERY bank.
+    if bank.fetcher and bank.fetcher not in _osp.registered_fetcher_ids():
+        raise RegistryValidationError(
+            f"{origin}: fetcher {bank.fetcher!r} is not registered in "
+            f"_otr_source_payload (registered: "
+            f"{sorted(_osp.registered_fetcher_ids())})"
+        )
+    if (bank.interpreter
+            and bank.interpreter not in _osp.registered_interpreter_ids()):
+        raise RegistryValidationError(
+            f"{origin}: interpreter {bank.interpreter!r} is not registered "
+            f"in _otr_source_payload (registered: "
+            f"{sorted(_osp.registered_interpreter_ids())})"
+        )
+    # (b) A runnable bank must have a REAL execution lane: either its
+    # pipeline consumes the source-payload contract and both ids are
+    # declared (registered per (a)), or the pipeline brings its own runner
+    # (executable=true -- a validation-time read; the "executable is never
+    # a RUNTIME gate" law stands).
+    if bank.runnable:
+        if pipe.requires_source_contract:
+            if not bank.fetcher or not bank.interpreter:
                 raise RegistryValidationError(
-                    f"{origin}: runnable bank on non-source-contract pipeline "
-                    f"{pipe.story_pipeline_id!r} requires that pipeline's "
-                    f"runner to exist (executable=true); flipping runnable "
-                    f"without a lane is forbidden"
+                    f"{origin}: runnable bank on source-contract pipeline "
+                    f"{pipe.story_pipeline_id!r} must declare BOTH fetcher "
+                    f"and interpreter (lane-enablement checklist 4b item 3)"
                 )
+        elif not pipe.executable:
+            raise RegistryValidationError(
+                f"{origin}: runnable bank on non-source-contract pipeline "
+                f"{pipe.story_pipeline_id!r} requires that pipeline's "
+                f"runner to exist (executable=true); flipping runnable "
+                f"without a lane is forbidden"
+            )
+
+
+def _admit_user_banks(banks: "dict[str, SourceBank]",
+                      pipelines: "dict[str, StoryPipeline]",
+                      pack_dirs: "dict[str, Path]"
+                      ) -> "tuple[dict[str, object], tuple]":
+    """Fold client bundles into the authority ALONGSIDE the shipped rows.
+
+    Asymmetry by law: a shipped-seed problem already raised above (node
+    registration dies loud); a CLIENT problem quarantines that bundle only and
+    every other bank -- shipped or client -- still loads."""
+    bundles, issues = _oub.discover(parse_row=_parse_bank,
+                                    protected_ids=frozenset(banks))
+    admitted: "dict[str, object]" = {}
+    quarantined = list(issues)
+    for bundle in bundles:
+        origin = f"{bundle.root}/{_oub.BANK_JSON_FILENAME}"
+        try:
+            _sweep_pack_dir(bundle.bank_id, bundle.story_packs_dir, pipelines)
+            _crossref_bank(bundle.row, pipelines,
+                           {**pack_dirs, bundle.bank_id: bundle.story_packs_dir},
+                           origin=origin)
+        except Exception as exc:  # any contract failure -> quarantine, not boot death
+            quarantined.append(_oub.ValidationIssue(
+                bank_id=bundle.bank_id, path=str(bundle.root),
+                code="bad_bundle_contract",
+                detail=f"{type(exc).__name__}: {exc}"))
+            continue
+        banks[bundle.bank_id] = bundle.row
+        pack_dirs[bundle.bank_id] = bundle.story_packs_dir
+        admitted[bundle.bank_id] = bundle
+    for issue in quarantined:
+        print(issue.render())
+    return admitted, tuple(quarantined)
 
 
 def _ensure_loaded() -> _Registry:
-    global _REGISTRY
+    global _REGISTRY, _LOADING
     if _REGISTRY is not None:
         return _REGISTRY
+    if _LOADING:
+        raise RegistryValidationError(
+            "story-routing registry re-entered while loading: a consumer "
+            "imported back into the authority mid-build. Move that import "
+            "inside the function that needs it."
+        )
+    _LOADING = True
+    try:
+        return _build_registry()
+    finally:
+        _LOADING = False
+
+
+def _build_registry() -> _Registry:
+    global _REGISTRY
     banks_data = _read_registry_json(_STORY_PACKS_ROOT / _BANKS_FILENAME)
     _check_unknown_keys(banks_data, frozenset({"schema_version", "banks"}), _BANKS_FILENAME)
     _check_schema_version(banks_data, _BANKS_FILENAME)
@@ -494,8 +596,15 @@ def _ensure_loaded() -> _Registry:
     pipelines = _parse_id_list(
         pipes_data.get("pipelines"), _parse_pipeline, "story_pipeline_id",
         "pipelines.json pipelines")
-    _sweep_and_crossref(banks, pipelines)
-    _REGISTRY = _Registry(banks=banks, pipelines=pipelines)
+    pack_dirs = _shipped_pack_dirs(banks)
+    # Shipped seed: fail LOUD (node registration dies rather than boot wrong).
+    _sweep_and_crossref(banks, pipelines, pack_dirs)
+    # Client bundles: admitted alongside, quarantined individually.
+    user_bundles, issues = _admit_user_banks(banks, pipelines, pack_dirs)
+    # Atomic publish: one assignment, fully built.
+    _REGISTRY = _Registry(banks=banks, pipelines=pipelines,
+                          pack_dirs=pack_dirs, user_bundles=user_bundles,
+                          issues=issues)
     return _REGISTRY
 
 
@@ -537,7 +646,7 @@ def resolve_story_pack(source_bank_id: str, story_model_id: str | None = None) -
     reg = _ensure_loaded()
     bank = get_bank(source_bank_id)
     model_id = story_model_id if story_model_id is not None else bank.default_story_model
-    path = _pack_path(bank.source_bank_id, model_id)
+    path = _pack_path(reg.pack_dirs, bank.source_bank_id, model_id)
     if (not path.is_file()
             or _is_pack_sidecar(bank.source_bank_id, path.name)):
         raise UnknownStoryModelError(
@@ -561,10 +670,24 @@ def require_runnable_bank(source_bank_id: str) -> SourceBank:
     return bank
 
 
+def list_validation_issues() -> "tuple[object, ...]":
+    """Quarantined CLIENT bundles: what was refused and why.
+
+    Empty on a stock install. These are reported, never raised -- a broken
+    client bundle costs its own dropdown row and nothing else."""
+    return _ensure_loaded().issues
+
+
+def user_bank_bundle(source_bank_id: str):
+    """The admitted client bundle behind a bank id, or None if it is shipped."""
+    return _ensure_loaded().user_bundles.get(source_bank_id)
+
+
 def _clear_caches() -> None:
     """Test hook: reset the routing registry AND both pack caches."""
-    global _REGISTRY
+    global _REGISTRY, _LOADING
     _REGISTRY = None
+    _LOADING = False
     _sp._PACK_CACHE.clear()
     _sp._PACK_CACHE_WITH_SEAMS.clear()
 
@@ -582,6 +705,8 @@ __all__ = [
     "get_bank",
     "get_pipeline",
     "list_bank_ids",
+    "list_validation_issues",
     "require_runnable_bank",
     "resolve_story_pack",
+    "user_bank_bundle",
 ]
