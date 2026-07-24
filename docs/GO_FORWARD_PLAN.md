@@ -1,11 +1,12 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-2
-LANDED @ `66e214ec`.** Client bundles are discovered, integrity-checked and
-admitted ALONGSIDE the shipped six in the one routing authority; a broken
-client bundle QUARANTINES while the shipped seed keeps its fail-loud posture.
-Suite 6235 / Bible 17; canonical byte-identical. NEXT for CODER E = wave 3
-(client-owned `fetch_source` / `interpret_source` execution). SIX-BANK
+**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-3
+LANDED @ `cc69e683`.** Client bundles are discovered, integrity-checked,
+admitted ALONGSIDE the shipped six in the one routing authority, and may now
+OWN their `fetch_source` / `interpret_source` via the reserved `"self"` entry
+point (client rows only, owner-identity checked, execution loud while discovery
+still quarantines). Suite 6264 / Bible 17; canonical byte-identical. NEXT for
+CODER E = wave 4 (`otr_check bank <path> --activate` CLI). SIX-BANK
 REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the render track;
 bug-first items still open for CODER A.
 
@@ -20,31 +21,35 @@ This block is the current source of truth for the overnight qualification.
 Nothing in this file is an instruction to reset, stash, delete, or overwrite
 user changes.
 
-- Branch: `v2.0-alpha`; HEAD and origin are `66e214ec` (CODER E waves 1-2; the
+- Branch: `v2.0-alpha`; HEAD and origin are `cc69e683` (CODER E waves 1-3; the
   six-bank no-prose-gate retirement chunk is `314dd481` below). The worktree is
-  CLEAN of task-owned changes -- what remains is `tmp/` scratch and untracked
-  campaign receipts (plus `config/profiles/otr_sbcov_1..6.json`, intentionally
-  untracked coverage-campaign scratch; nothing in-repo references them, and
-  untracked `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier
-  window).
-- LANDED @ `66e214ec` (2026-07-24; suite 6235 passed / 27 skipped / 1 xfailed;
-  Bible 17; AST/BOM/zero-byte/canonical-hash gates passed; pushed, HEAD ==
-  origin): independent source banks waves 1-2. `nodes/_otr_user_banks.py` =
-  client bundle discovery + integrity (timestamp-free content-addressed digest,
-  activation receipt + snapshot, path/symlink containment, protected/duplicate
-  id refusal); it NEVER raises for a bundle problem. `_otr_story_routing.py`
-  admits client rows alongside shipped via the SAME `_parse_bank` and the same
-  pack/pipeline/seam cross-refs; pack resolution routes by OWNER (`pack_dirs`);
-  atomic publish + re-entrancy guard; new `list_validation_issues()` /
-  `user_bank_bundle()`. `docs/EXTENDING_OTR.md` updated to the landed contract.
+  CLEAN of task-owned changes -- what remains is `tmp/` scratch (including
+  another window's modified `tmp/_chain_720.ps1`, `tmp/_rearm_gate.ps1`,
+  `tmp/_status_bake.ps1` -- PRESERVE) and untracked campaign receipts (plus
+  `config/profiles/otr_sbcov_1..6.json`, intentionally untracked
+  coverage-campaign scratch; nothing in-repo references them, and untracked
+  `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier window).
+- LANDED @ `66e214ec` + `cc69e683` (2026-07-24; suite 6264 passed / 27 skipped
+  / 1 xfailed; Bible 17; AST/BOM/zero-byte/canonical-hash gates passed; pushed,
+  HEAD == origin): independent source banks waves 1-3. `nodes/_otr_user_banks.py`
+  owns client bundle integrity (content-addressed digest, activation receipt +
+  snapshot, path/symlink containment, protected/duplicate id refusal) and NEVER
+  raises for a bundle problem -- plus the wave-3 EXECUTION seam, which is loud
+  by design (`UserBankExecutionError`) because discovery already quarantined the
+  broken bundles. `_otr_story_routing.py` admits client rows alongside shipped
+  via the SAME `_parse_bank` and cross-refs, routes packs by OWNER
+  (`pack_dirs`), and unlocks the reserved `"self"` entry point on an explicit
+  `is_client` flag. `_otr_source_payload.resolve_fetcher/resolve_interpreter`
+  take an owner bundle and verify owner IDENTITY; client results still cross
+  `normalize_fetch_result` / `validate_interpreter_result` unchanged.
+  `docs/EXTENDING_OTR.md` carries the landed contract.
 - Prior root fix at `f150213f`: `nodes/_otr_video_engines/render_driver.py` requires
   an authoritative scene-target manifest only for scene/mesh-consuming shots;
   visualizer-only `viz_mxc_cpu`, `viz_mxc_mandala`, and `viz_camera` lanes may
   execute without one. Regression coverage:
   `tests/test_ledger_cleanup_contracts.py`.
-- Verification: focused ledger/image/still-spine tests `143 passed, 1 skipped`;
-  full Windows OTR suite `6182 passed, 27 skipped, 1 xfailed`; Bug Bible
-  `17 passed, 24 skipped, 3 xfailed`.
+- Verification: full Windows OTR suite `6264 passed, 27 skipped, 1 xfailed`;
+  Bug Bible `17 passed, 24 skipped, 3 xfailed`.
 - Canonical workflow byte-identical at SHA-256
   `A66A416BFBCAD127356047043C8C07637BC50CACE2CD7D4E0436C7CD80B09CB4`.
 - Live media proof: isolated `media_archive@120w` passed with `RESULT SUCCESS`,
@@ -233,8 +238,8 @@ six-bank requalification (chunk landed @ 314dd481)
   -> 45w scene matrix + 54-case visual-style qualification
   -> quick-wins block (coder windows A/B/C)
   -> LEAN-MEAN FRONT (W0->W1->W2->W3->W4a->W4b->W7->W6->W5+SW4->C1-C5)
-  -> independent client-authored source banks (lean v1; w1-w2 landed @ 66e214ec,
-       CODER E owns w3..w6 -- runs PARALLEL to the lean-mean front)
+  -> independent client-authored source banks (lean v1; w1-w2 @ 66e214ec,
+       w3 @ cc69e683; CODER E owns w4..w7 -- runs PARALLEL to the lean-mean front)
   -> Randomizer A -> dynamic_story
   -> LEAN-MEAN TAIL (SW1/SW2/SW3 -> C6 -> C7 -> W8)
   -> ROADMAP (SFX campaign after Timeline Cue Ledger gate)
@@ -279,20 +284,19 @@ by the campaign queue.)
    r5 simplification DONE + CONVERGED (codex gpt-5.6-sol high + agy Gemini 3.6
    Flash High; Claude judge; `kibitz-runs/2026-07-24-user-source-lanes-r6*/`).
    `docs/EXTENDING_OTR.md` DRAFTED; waves 1-2 (bundle integrity + admission in
-   the one authority) LANDED @ `66e214ec`. REMAINING WAVES, in order:
-   **w3** client-owned `fetch_source`/`interpret_source` execution -- the bank
-   row declares `fetcher`/`interpreter` = `"self"`, `_otr_user_banks` loads the
-   bundle module (function-local `importlib`, loud on ImportError/missing
-   attr), `_otr_source_payload.resolve_fetcher/resolve_interpreter` accept an
-   owner bundle, `_crossref_bank` accepts `"self"` for client rows ONLY;
-   results still go through `normalize_fetch_result` /
-   `validate_interpreter_result` (re-derive the writer call sites first);
+   the one authority) LANDED @ `66e214ec`; wave 3 (client-owned
+   `fetch_source`/`interpret_source` via the reserved `"self"` entry point)
+   LANDED @ `cc69e683`. REMAINING WAVES, in order:
    **w4** `otr_check bank <path> --activate` CLI writing the snapshot + receipt
    (`_otr_user_banks` already owns the format: `RECEIPT_KEYS`,
-   `bundle_digest`, `snapshot_dirname`); **w5** the bounded `_otr_feed_fetch`
-   seam, BOTH hops (feed + article scrape); **w6** the ledger-cleanup pass in
-   the shared tail; **w7** story_pack widget / canonical JSON if a surface
-   changes. Re-estimate at each wave boundary.
+   `bundle_digest`, `snapshot_dirname`; it is ALSO the planned caller for the
+   still-unwired `check_compatibility` entry point, which `EXTENDING_OTR.md`
+   currently marks NOT YET WIRED -- either wire it here or keep that label
+   honest); **w5** the bounded `_otr_feed_fetch` seam, BOTH hops (feed +
+   article scrape); **w6** the ledger-cleanup pass in the shared tail -- ALSO
+   the right home for the client-interpreter fallback gap below; **w7**
+   story_pack widget / canonical JSON if a surface changes. Re-estimate at each
+   wave boundary.
 3. **Randomizer Rolls Design A** --
    `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`, AFTER extensibility
    (its `_otr_lane_specs` authority is ABSORBED by the extensibility build;
@@ -327,7 +331,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
 | CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |
 | PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out; plan upkeep | rungs 2-4 | parallel with D | docs |
-| CODER E | independent client-authored source banks (lean v1); waves 1-2 LANDED @ `66e214ec`; NEXT = **wave 3** (client-owned fetch/interpret), then w4 `otr_check --activate`, w5 bounded fetch, w6 ledger cleanup | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
+| CODER E | independent client-authored source banks (lean v1); waves 1-3 LANDED @ `cc69e683`; NEXT = **wave 4** (`otr_check bank --activate` CLI), then w5 bounded fetch, w6 ledger cleanup, w7 surfaces | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
 | CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | after E | ~6-11 d |
 | CODER G "lean-mean tail" | SW1-SW3, C6, C7, W8 | Claude; Fable single final epoch gate | after F | multi-day |
 
@@ -378,10 +382,9 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-24): full Windows suite `6182 passed /
-  27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`;
-  focused ledger/image/still-spine `143 passed / 1 skipped`. Detail in
-  HANDOFF_LOG.
+- Current whole-tree receipt (2026-07-24): full Windows suite `6264 passed /
+  27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`.
+  Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
   AST/JSON/BOM/zero-byte checks, commit, push, verify
   `HEAD == origin/v2.0-alpha`.
@@ -401,12 +404,22 @@ fixture creates a row.
   drafted, so CODER E is executing. Materially smaller than the retired
   ~21-31-day A/B scope; it still constrains randomizer + dynamic_story
   sequencing. Deferred power-user tiers (client own-runner + staging, deps,
-  story_rules) are explicitly out of v1, not forgotten. Waves 1-2 are LANDED
-  (@ `66e214ec`); the remaining waves still touch the writer hot path.
-- CODER E wave 3 executes CLIENT-AUTHORED PYTHON in-process. The trust posture
-  (`--activate` is the consent act) is settled by the plan of record, but the
-  seam must still fail loud and must never let client code touch the canonical
-  ledger. Do not weaken the shipped fetcher/interpreter registries to admit it.
+  story_rules) are explicitly out of v1, not forgotten. Waves 1-3 are LANDED
+  (@ `cc69e683`); the remaining waves still touch the writer hot path.
+- CLIENT-AUTHORED PYTHON now executes in-process (wave 3). The posture that
+  must hold in every later wave: `--activate` is the consent act; the seam
+  fails LOUD (`UserBankExecutionError`) and never substitutes; client code
+  never touches the canonical ledger; owner IDENTITY is verified so a bank can
+  only run its OWN bundle; the shipped fetcher/interpreter registries are never
+  widened to admit a client id. Do not relax any of these to make a later wave
+  easier.
+- **Client-interpreter fallback gap (known, deliberate, w6):**
+  `_otr_source_payload.build_source_interpreter_fallback` switches on the four
+  SHIPPED interpreter ids and raises `UnknownInterpreterError` otherwise, so a
+  client interpreter that raises `SourceInterpretError` with an
+  `.attempts`-carrying cause reaches it and gets a confusing message. Failing
+  loud is correct meanwhile; inventing a generic client fallback belongs to the
+  w6 ledger-cleanup pass, not to a patch.
 - Lean-mean front/tail drift: the tail's SW-1 re-survey is mandatory against
   the then-current writer. Never interleave the two campaigns in one window.
 - No code lands mid-sweep of an active qualification campaign (uniform-code

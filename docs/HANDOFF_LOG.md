@@ -3,6 +3,55 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 11:12 -- HEAD cc69e683 (v2.0-alpha) -- WINDOW CODER E (Opus)
+Did: independent source banks WAVE 3, one green pushed chunk @ cc69e683 --
+client bundles may now OWN their fetch/interpret lanes. A CLIENT row routes an
+entry point to its bundle with the reserved id "self"; the shipped registries
+never learn that value, so a SHIPPED row declaring it is still an unregistered
+typo and a client can neither shadow nor extend a shipped entry point (a client
+may instead REUSE a shipped id, or mix). `_otr_user_banks` gained the execution
+seam: function-local importlib loads the bundle module under a DIGEST-STAMPED
+sys.modules name (edited bytes can never be served from the stale entry; a
+half-executed module is popped on failure), `bundle_entry_point` returns one
+declared callable, and both raise the new `UserBankExecutionError` -- loud on
+purpose, because discovery already quarantined the broken bundles, so by
+execution time the operator has SELECTED this bank and a fallback would be a
+silent substitution. `resolve_fetcher`/`resolve_interpreter` take `owner=` and
+verify owner IDENTITY (owner.bank_id == bank.source_bank_id), not mere presence
+-- otherwise bank A could run bank B's code. Client results still cross
+`normalize_fetch_result` / `validate_interpreter_result` unchanged; client lanes
+stamp `seed_source = "user_bank:<bank_id>"`. `_crossref_bank` unlocks the self
+id on an explicit `is_client=True` param rather than sniffing the `origin`
+label, so no future caller widens the exemption by relabelling. Writer wired at
+both call sites, resolution still outside any try, AST-pinned. 29 new tests
+(`tests/test_user_bank_execution.py`); `docs/EXTENDING_OTR.md` documents the
+"self" rule + exact keyword signatures and marks `check_compatibility` NOT YET
+WIRED rather than promising a contract with no consumer.
+Gates: suite 6264 passed / 27 skipped / 1 xfailed (was 6235); Bible 17/24/3;
+AST/BOM/zero-byte/UTF-8 clean on all six touched files; canonical byte-identical
+A66A416B... Committed by pathspec -- another window's three modified tmp/*.ps1
+and 828 untracked scratch paths preserved.
+Known gap left OPEN on purpose (recorded in GO_FORWARD Open risks, owner = w6):
+`build_source_interpreter_fallback` switches on the four SHIPPED interpreter ids
+and raises UnknownInterpreterError otherwise, so a client interpreter raising
+SourceInterpretError with an .attempts-carrying cause lands there with a
+confusing message. Loud is correct; a generic client fallback is w6 ledger-
+cleanup work, not a patch.
+Third harness gotcha for the next window: the full suite takes ~100 s, past the
+~60 s MCP ceiling -- launch it from a temp .ps1 via `Start-Process
+-WindowStyle Hidden` writing to a log, then poll the log.
+Current step: CODER E wave 4 -- `otr_check bank <path> --activate` CLI writing
+the content-addressed snapshot + `.otr_receipt.json`. `_otr_user_banks` already
+owns the format (RECEIPT_KEYS, RECEIPT_SCHEMA_VERSION "v2.0", bundle_digest,
+snapshot_dirname), so w4 is the CLI + fixture preflight, not a new format.
+Next: fresh Opus CODER E window takes wave 4. CODER A (bug-first items) and the
+RENDER track remain open in parallel.
+Models: Claude Opus (rung 4) only. No panels, no Codex, no roundtable spent --
+the one red test was a bad assertion in my own new test, confirmed by temp probe
+and fixed first try; no strike against the two-strikes law.
+Commits: cc69e683 (wave 3) + this handoff commit.
+
+
 ## 2026-07-24 ~12:00 -- HEAD 66e214ec (v2.0-alpha) -- WINDOW CODER E (Opus)
 Did: independent source banks waves 1-2, one green pushed chunk @ 66e214ec.
 New `nodes/_otr_user_banks.py` -- client bundle discovery + integrity
