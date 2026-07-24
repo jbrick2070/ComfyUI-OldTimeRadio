@@ -107,6 +107,12 @@ source override on the article lanes. Every lane is fail-closed: a bad source, c
 overflow, or contract violation stops loudly instead of shipping a degraded story, and
 the LLM writes all story text — Python validates, it never rewrites prose.
 
+**Add your own source bank:** every bank is independent, and you can author a seventh
+peer to the shipped six — your own feed, archive, or source strategy — running through
+the same trusted writer. The requirements contract (above all: the episode ledger must
+be COMPLETE for every downstream consumer) lives in
+[`docs/EXTENDING_OTR.md`](docs/EXTENDING_OTR.md); read it before authoring.
+
 ---
 
 ## v2.0-alpha — the Open Video Model Platform

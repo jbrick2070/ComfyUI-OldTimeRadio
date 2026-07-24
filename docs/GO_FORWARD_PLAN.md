@@ -304,7 +304,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
 | CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |
 | PLANNER | extensibility hardening (r1-r4 arc + r5 simplify) DONE 2026-07-24 -> independent-banks lean plan of record; NEXT = draft `docs/EXTENDING_OTR.md`; Bug Bible operator fan-out; plan upkeep | rungs 2-4 | parallel with D | docs |
-| CODER E | independent client-authored source banks (lean v1) per `docs/2026-07-24-independent-source-banks-v1-plan.md`; docs-first (`EXTENDING_OTR.md`) then code | Claude; codex via two-strikes | after the requirements doc | lean (re-est after docs) |
+| CODER E | independent client-authored source banks (lean v1) per `docs/2026-07-24-independent-source-banks-v1-plan.md`; requirements doc `EXTENDING_OTR.md` DONE -> code | Claude; codex via two-strikes | UNGATED (re-pin at HEAD first) | lean (re-est at slot) |
 | CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | after E | ~6-11 d |
 | CODER G "lean-mean tail" | SW1-SW3, C6, C7, W8 | Claude; Fable single final epoch gate | after F | multi-day |
 
@@ -319,9 +319,12 @@ Kickoff lines (paste as the FIRST message of the new window; swap the letter):
 - **Extensibility hardening -- DONE 2026-07-24 (planner window).** The r1-r4
   kibitz arc + an r5 simplification pass ran and CONVERGED; the operator
   reframed to N independent client-authored banks (lean v1, docs-first). Plan of
-  record: `docs/2026-07-24-independent-source-banks-v1-plan.md`. NEXT owner
-  action = draft `docs/EXTENDING_OTR.md` (the complete-ledger requirements), then
-  a coder slot. (The old sec-16 nine-flags gate is retired with the A/B doc.)
+  record: `docs/2026-07-24-independent-source-banks-v1-plan.md`.
+  **`docs/EXTENDING_OTR.md` DRAFTED + linked from README (same session):** the
+  complete-ledger requirements contract, grounded per-consumer (TTS / slicing /
+  shot direction / captions / credits / mux+publish) against the live code.
+  CODER E is now UNGATED. (The old sec-16 nine-flags gate is retired with the
+  A/B doc.)
 - **Bug Bible operator fan-out** -- 9+ closed candidates + the
   duplicate-legacy_id cleanup waiting on one fan-out session.
 - **Render-window fillers:** cpu-tier smoke (needs the google image lane or

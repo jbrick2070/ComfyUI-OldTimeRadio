@@ -19,11 +19,13 @@ story_rules. Wrote the lean plan of record
 `docs/2026-07-24-independent-source-banks-v1-plan.md` + the r6 rebase brief;
 retired the 1265-line A/B doc to decision-log status; leaned GO_FORWARD (agy
 panel lane -> Gemini 3.6). Decision log: `kibitz-runs/2026-07-24-user-source-lanes-r6*/`.
-Current step: extensibility hardening DONE; NEXT = draft `docs/EXTENDING_OTR.md`
-(the complete-ledger requirements), then a coder slot. Coder/render track
-unchanged (six-bank requalification + bug-first items).
-Next: draft `EXTENDING_OTR.md` (docs-first) -> CODER E; parallel CODER A
-(bug-first) still open.
+Current step: extensibility hardening DONE, AND `docs/EXTENDING_OTR.md` DRAFTED
+same session (complete-ledger contract grounded per-consumer via a DC fan-out:
+voice loop / scene_sequencer / shot_lock / captions / credits roll /
+master mux+obs_publish, with SOURCE_BANK_GUIDE s5+s7 as the authored-inputs
+base) + linked from README's source-banks section. CODER E UNGATED.
+Next: CODER E (independent-banks lean v1 code, re-pin at HEAD) or CODER A
+(bug-first); both open.
 Models: Claude Opus (planner/judge) + 10 kibitz calls (codex gpt-5.6-sol high +
 agy Gemini 3.6 Flash High). $0 local panel + Codex weekly credits.
 Commits: docs handoff (this session's docs by pathspec).
