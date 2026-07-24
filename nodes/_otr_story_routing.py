@@ -659,6 +659,58 @@ def list_bank_ids() -> "tuple[str, ...]":
     return tuple(_ensure_loaded().banks)
 
 
+def _parse_shipped_seed() -> "tuple[dict, dict]":
+    """The shipped banks + pipelines, parsed fresh, with NO client admission.
+
+    Deliberately not `_ensure_loaded()`: the checker calls this while judging a
+    bundle that has not earned admission yet, so going through the registry
+    would be circular."""
+    banks_data = _read_registry_json(_STORY_PACKS_ROOT / _BANKS_FILENAME)
+    _check_unknown_keys(banks_data, frozenset({"schema_version", "banks"}),
+                        _BANKS_FILENAME)
+    _check_schema_version(banks_data, _BANKS_FILENAME)
+    banks = _parse_id_list(
+        banks_data.get("banks"), _parse_bank, "source_bank_id", "banks.json banks")
+    pipes_data = _read_registry_json(_STORY_PACKS_ROOT / _PIPELINES_FILENAME)
+    _check_unknown_keys(pipes_data, frozenset({"schema_version", "pipelines"}),
+                        _PIPELINES_FILENAME)
+    _check_schema_version(pipes_data, _PIPELINES_FILENAME)
+    pipelines = _parse_id_list(
+        pipes_data.get("pipelines"), _parse_pipeline, "story_pipeline_id",
+        "pipelines.json pipelines")
+    return banks, pipelines
+
+
+def shipped_bank_seed() -> "tuple[object, frozenset]":
+    """The ONE bank-row parser plus the SHIPPED bank ids.
+
+    `otr_check bank --activate` needs exactly this pair: the parser this
+    authority uses -- so the checker can never approve a row boot would refuse,
+    nor refuse one it would admit -- and the id set a client bundle may not
+    collide with."""
+    banks, _ = _parse_shipped_seed()
+    return _parse_bank, frozenset(banks)
+
+
+def validate_client_bundle_contract(bundle) -> None:
+    """The REST of what admission demands of a client bundle: its story packs
+    validate against their path coordinates, and its row's cross-references
+    (pipeline, default pack, required seams, execution lane) resolve.
+
+    `_admit_user_banks` runs exactly these two functions after `discover`, so
+    without this the checker would publish a receipt for a bundle that then
+    quarantines at boot as `bad_bundle_contract` -- an activation that says yes
+    to a bank the operator can never select. Raises the authority's own error;
+    the caller reports it under that same stable code."""
+    banks, pipelines = _parse_shipped_seed()
+    pack_dirs = _shipped_pack_dirs(banks)
+    _sweep_pack_dir(bundle.bank_id, bundle.story_packs_dir, pipelines)
+    _crossref_bank(bundle.row, pipelines,
+                   {**pack_dirs, bundle.bank_id: bundle.story_packs_dir},
+                   origin=f"{bundle.root}/{_oub.BANK_JSON_FILENAME}",
+                   is_client=True)
+
+
 def resolve_story_pack(source_bank_id: str, story_model_id: str | None = None) -> StoryPack:
     """Resolve (bank, model) -> the validated StoryPack. Model defaults from
     the bank. Unknown bank/model = hard error; no fallback."""
@@ -727,5 +779,7 @@ __all__ = [
     "list_validation_issues",
     "require_runnable_bank",
     "resolve_story_pack",
+    "shipped_bank_seed",
     "user_bank_bundle",
+    "validate_client_bundle_contract",
 ]

@@ -87,11 +87,13 @@ user_packs/source_banks/<bank_id>/
                      #   default_story_pipeline, default_story_model,
                      #   defaults, required_seams, runnable, guide_ref.
                      #   Every key is required; unknown keys are rejected.
-  <bank_id>.py       # single file: fetch_source + interpret_source +
-                     #   check_compatibility (keyword-only, typed contracts)
+  <bank_id>.py       # single file: fetch_source + interpret_source
+                     #   (keyword-only; check_compatibility is a RESERVED
+                     #   name with no consumer yet -- see section 2)
   story_packs/
     <model_id>.json  # >=1 story pack, filename == its story_model_id
-  fixtures/          # deterministic samples for activation preflight
+  fixtures/          # optional: recorded fetch payloads, one JSON each,
+                     #   validated at --activate by normalize_fetch_result
   .otr_receipt.json  # WRITTEN BY --activate; never hand-edit
 ```
 
@@ -133,11 +135,19 @@ user_packs/source_banks/<bank_id>/
   (with `news_close_brief` in the dump). The same
   `validate_interpreter_result` that judges the shipped interpreters judges
   yours, and the writer -- not you -- writes the result into the ledger.
-- **`check_compatibility`** accepts or refuses a request (word target, refine,
-  source_ref, custom premise) with a structured reason. NOT YET WIRED: the
-  activation CLI is the planned caller, so define it now if you like, but no
-  code path invokes it today. It is listed here as the bundle's third entry
-  point, not as a live contract.
+- **`check_compatibility`** is a RESERVED NAME with no contract. Nothing calls
+  it, and `otr_check bank --activate` deliberately does not inspect it -- not
+  even for callability. There is no request type, no decision type, and no
+  runtime consumer, so there is nothing about it that activation could check
+  honestly; enforcing a shape now would freeze an interface with nobody to keep
+  it true. Define it if you like and it will be ignored. If a wave ever gives
+  it a real consumer, that wave defines its types and its checks together.
+- **Activation binds your lanes' signatures.** For every entry point your row
+  routes to `"self"`, `--activate` checks that the function can ACCEPT the
+  keywords listed above -- by binding them, never by calling anything. A
+  `**kwargs` catch-all satisfies this. A function that imports cleanly but
+  takes the wrong keywords is refused at activation rather than minutes into
+  your first render.
 - Python discipline: single file, stdlib + the OTR contracts leaf at import
   time, heavy imports lazy inside functions. If your code needs a third-party
   library that is not installed, the run HARD-FAILS with the ImportError --
@@ -152,9 +162,17 @@ user_packs/source_banks/<bank_id>/
   and runs the shared tail. Your code never touches the canonical ledger, so a
   buggy bank cannot corrupt an episode's durable state.
 - **Validation + quarantine.** `otr_check bank <path> --activate` validates
-  your JSON and contracts, imports your Python in a bounded child process, and
-  runs your fixtures. A broken bundle is QUARANTINED with a named, actionable
-  issue -- it never appears in the dropdown and never breaks ComfyUI boot.
+  your JSON, your bank row, your story packs and every cross-reference boot
+  enforces; imports your Python in a child process bounded by wall time and
+  killed as a process tree; binds your lanes' signatures; and validates each
+  `fixtures/*.json` as a recorded fetch payload through the very
+  `normalize_fetch_result` your live `fetch_source` output will meet. (It does
+  not CALL your functions -- fixtures are checked as data, not replayed as
+  cases.) A broken bundle is QUARANTINED with a named, actionable issue -- it
+  never appears in the dropdown and never breaks ComfyUI boot.
+  Run `otr_check bank <path>` with no `--activate` for the same report without
+  executing a single line of your code, and `otr_check bank --all` for every
+  client bank at once.
   Activation writes a content-addressed snapshot plus `.otr_receipt.json`; boot
   admits your bank only when the bundle's authoring bytes still hash to that
   receipt AND the snapshot is present. Edit anything and the bank goes STALE

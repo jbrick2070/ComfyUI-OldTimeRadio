@@ -62,6 +62,11 @@ RECEIPT_SCHEMA_VERSION = "v2.0"
 SELF_ENTRY_POINT = "self"
 FETCH_ENTRY_ATTR = "fetch_source"
 INTERPRET_ENTRY_ATTR = "interpret_source"
+# RESERVED, wired to nothing (wave 4 decision). No request type, no decision
+# type, no runtime consumer exists, so `otr_check bank --activate` does not
+# inspect it -- not even for callability. Giving it a shape now would freeze an
+# interface with nobody to keep it true. The wave that gives it a real consumer
+# defines its types and its checks in the same change.
 COMPAT_ENTRY_ATTR = "check_compatibility"
 BUNDLE_ENTRY_ATTRS = frozenset({
     FETCH_ENTRY_ATTR, INTERPRET_ENTRY_ATTR, COMPAT_ENTRY_ATTR,
@@ -286,9 +291,28 @@ def snapshot_dirname(bank_id: str, digest: str) -> str:
     return f"{bank_id}-{digest[:16]}"
 
 
-def _validate_bundle(root: Path, *, parse_row, protected_ids, snapshots: Path
-                     ) -> UserBankBundle:
-    """One bundle, fully checked. Raises _Quarantine on ANY problem."""
+@dataclass(frozen=True)
+class _Authoring:
+    """What a bundle's AUTHORED bytes say, judged before any receipt exists.
+
+    This is the half of validation `otr_check bank --activate` can run on a
+    bundle it is about to activate -- and the identical half boot runs before
+    it looks at the receipt. One implementation, so the CLI can never approve a
+    layout the authority would refuse, or refuse one it would admit."""
+    bank_id: str
+    row_data: dict
+    module_path: Path
+    story_packs_dir: Path
+    digest: str
+
+
+def _validate_authoring(root: Path, *, protected_ids) -> _Authoring:
+    """Layout + id + bank.json + digest. Raises _Quarantine on ANY problem.
+
+    Deliberately stops BEFORE the receipt: at activation time there is no
+    receipt yet, and at boot the receipt checks must still run in exactly the
+    position they always did, so a doubly-broken bundle reports the same code
+    it always reported."""
     bank_id = root.name
     _check_bank_id(bank_id)
     if bank_id in protected_ids:
@@ -334,9 +358,23 @@ def _validate_bundle(root: Path, *, parse_row, protected_ids, snapshots: Path
             "missing_story_pack",
             f"{STORY_PACKS_DIRNAME}/ must contain at least one story pack JSON",
         )
+    digest = bundle_digest(root)
+    return _Authoring(bank_id=bank_id, row_data=row_data,
+                      module_path=module_path,
+                      story_packs_dir=story_packs_dir, digest=digest)
+
+
+def _validate_bundle(root: Path, *, parse_row, protected_ids, snapshots: Path
+                     ) -> UserBankBundle:
+    """One bundle, fully checked. Raises _Quarantine on ANY problem."""
     # Integrity BEFORE semantics: prove the bytes are the activated bytes,
     # then let the one authority judge the row.
-    digest = bundle_digest(root)
+    authoring = _validate_authoring(root, protected_ids=protected_ids)
+    bank_id = authoring.bank_id
+    row_data = authoring.row_data
+    module_path = authoring.module_path
+    story_packs_dir = authoring.story_packs_dir
+    digest = authoring.digest
     receipt = read_receipt(root)
     if receipt["source_bank_id"] != bank_id:
         raise _Quarantine(
@@ -409,6 +447,218 @@ def discover(*, parse_row, protected_ids, root: "Path | None" = None
                 bank_id=entry.name, path=str(entry), code=exc.code,
                 detail=exc.detail))
     return tuple(admitted), tuple(issues)
+
+
+# ---------------------------------------------------------------------------
+# activation (wave 4)
+#
+# `otr_check bank <path> --activate` is the CONSENT ACT -- the moment a
+# client's Python becomes something this repo will import. Everything that act
+# writes is defined HERE so there is exactly one owner of the receipt and
+# snapshot format. The checker never hand-rolls a second copy, because a second
+# copy is a second thing that can drift from what boot reads.
+# ---------------------------------------------------------------------------
+
+UNCHECKED = "UNCHECKED"
+ACTIVATED = "ACTIVATED"
+STALE = "STALE"
+BROKEN = "BROKEN"
+
+
+class UserBankActivationError(Exception):
+    """Activation could not be WRITTEN (I/O, or the bundle changed mid-flight).
+
+    Distinct from a quarantine: nothing is wrong with the client's bundle as
+    such, the publish itself failed. The operator asked for a write and did not
+    get one, so this is loud -- a half-published activation reported as success
+    is how a receipt ends up pointing at a snapshot that never existed."""
+
+
+@dataclass(frozen=True)
+class BundlePreflight:
+    """A bundle judged WITHOUT its receipt: what the CLI knows before it writes
+    one. `issue` is None iff the bundle's authored bytes are sound."""
+    root: Path
+    bank_id: str
+    ok: bool
+    digest: "str | None" = None
+    module_path: "Path | None" = None
+    story_packs_dir: "Path | None" = None
+    fixtures_dir: "Path | None" = None
+    row: object = None
+    issue: "ValidationIssue | None" = None
+
+
+def _preflight_issue(root: Path, bank_id: str, exc: "_Quarantine"
+                     ) -> BundlePreflight:
+    return BundlePreflight(
+        root=root, bank_id=bank_id, ok=False,
+        issue=ValidationIssue(bank_id=bank_id, path=str(root),
+                              code=exc.code, detail=exc.detail))
+
+
+def preflight_bundle(bundle_root: Path, *, parse_row, protected_ids,
+                     base: "Path | None" = None) -> BundlePreflight:
+    """Judge a bundle's authored bytes exactly the way boot will, minus the
+    receipt that activation is about to write.
+
+    Same law as `discover`: this NEVER raises for a bundle problem. The CLI
+    turns the returned issue into an exit code and a sentence the client can
+    act on, and a refusal here costs that bundle alone."""
+    if not callable(parse_row):
+        raise UserBankLayoutError("parse_row must be callable")
+    bundle_root = Path(bundle_root)
+    bank_id = bundle_root.name
+    if not bundle_root.is_dir() or bundle_root.is_symlink():
+        return _preflight_issue(bundle_root, bank_id, _Quarantine(
+            "not_a_bundle_dir",
+            "only a plain directory can be activated as a source bank"))
+    # A bundle boot will never look at is not activatable. Saying so here beats
+    # handing back a receipt for a folder that can never reach a dropdown.
+    banks_root = user_banks_root(base)
+    if bundle_root.parent.resolve() != banks_root.resolve():
+        return _preflight_issue(bundle_root, bank_id, _Quarantine(
+            "outside_bank_root",
+            f"a client bank must live directly under {banks_root}; "
+            f"move the bundle there and re-run"))
+    try:
+        authoring = _validate_authoring(
+            bundle_root, protected_ids=frozenset(protected_ids))
+    except _Quarantine as exc:
+        return _preflight_issue(bundle_root, bank_id, exc)
+    try:
+        row = parse_row(authoring.row_data,
+                        f"{BANK_JSON_FILENAME} ({authoring.bank_id})")
+    except Exception as exc:  # the authority's own validation error
+        return _preflight_issue(bundle_root, authoring.bank_id, _Quarantine(
+            "bad_row", f"{type(exc).__name__}: {exc}"))
+    return BundlePreflight(
+        root=bundle_root, bank_id=authoring.bank_id, ok=True,
+        digest=authoring.digest, module_path=authoring.module_path,
+        story_packs_dir=authoring.story_packs_dir,
+        fixtures_dir=bundle_root / FIXTURES_DIRNAME, row=row)
+
+
+def preflight_bundle_record(pre: BundlePreflight) -> UserBankBundle:
+    """The admitted-shape record for a bundle that PASSED preflight but is not
+    activated yet.
+
+    Exists so `--activate` can probe a bundle through the EXACT loader the
+    writer will later use (`load_bundle_module` / `bundle_entry_point`) instead
+    of a second import path that could quietly disagree with it."""
+    if not isinstance(pre, BundlePreflight) or not pre.ok:
+        raise UserBankLayoutError(
+            "preflight_bundle_record requires a passing BundlePreflight")
+    return UserBankBundle(
+        bank_id=pre.bank_id, root=pre.root, module_path=pre.module_path,
+        story_packs_dir=pre.story_packs_dir, fixtures_dir=pre.fixtures_dir,
+        digest=pre.digest, row=pre.row)
+
+
+def write_activation(bundle_root: Path, *, digest: str,
+                     base: "Path | None" = None) -> dict:
+    """Publish an activation: content-addressed snapshot FIRST, receipt SECOND.
+
+    The ORDER is the whole safety property. A crash between the two leaves the
+    bundle UNCHECKED -- honest, and one more `--activate` fixes it. The reverse
+    order would leave a receipt naming a snapshot that never existed, which
+    reads at boot as a bundle the client broke.
+
+    Re-activating unchanged bytes is a real no-op: the snapshot NAME is the
+    content, so an existing directory already holds exactly these bytes."""
+    import os
+    import shutil
+
+    bundle_root = Path(bundle_root)
+    bank_id = bundle_root.name
+    snapshots = snapshots_root(base)
+    name = snapshot_dirname(bank_id, digest)
+    target = snapshots / name
+    if not target.is_dir():
+        staging = snapshots / f".staging-{name}-{os.getpid()}"
+        try:
+            snapshots.mkdir(parents=True, exist_ok=True)
+            if staging.exists():
+                shutil.rmtree(staging)
+            for relpath, path in _authoring_files(bundle_root):
+                dest = staging / relpath
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, dest)
+            # The COPY is hashed, not the original. A snapshot published under
+            # a name derived from bytes it does not actually contain is a lie
+            # the receipt would then certify -- and the copy is exactly where a
+            # truncated write or a file changing mid-copy would show up.
+            staged_digest = bundle_digest(staging)
+            if staged_digest != digest:
+                raise UserBankActivationError(
+                    f"source bank {bank_id!r}: the snapshot copy hashes to "
+                    f"{staged_digest[:16]} but the bundle validated as "
+                    f"{digest[:16]}; the bundle changed while it was being "
+                    f"copied -- re-run --activate")
+            os.replace(staging, target)
+        except (_Quarantine, OSError) as exc:
+            raise UserBankActivationError(
+                f"source bank {bank_id!r}: could not write the activation "
+                f"snapshot ({type(exc).__name__}: {exc})") from exc
+        finally:
+            # Covers EVERY exit from the block, including the digest mismatch
+            # raised above -- a leaked `.staging-*` directory would otherwise
+            # sit in the snapshots root looking like a real snapshot.
+            shutil.rmtree(staging, ignore_errors=True)
+    receipt = {"schema_version": RECEIPT_SCHEMA_VERSION,
+               "source_bank_id": bank_id, "digest": digest, "snapshot": name}
+    # Staged OUTSIDE the bundle: a temp file inside it would join the authoring
+    # bytes and change the very digest this receipt is recording.
+    staged_receipt = snapshots / f".receipt-{name}-{os.getpid()}.tmp"
+    try:
+        staged_receipt.write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8")
+        os.replace(staged_receipt, bundle_root / RECEIPT_FILENAME)
+    except OSError as exc:
+        try:
+            staged_receipt.unlink()
+        except OSError:
+            pass
+        raise UserBankActivationError(
+            f"source bank {bank_id!r}: snapshot published but the receipt "
+            f"could not be written ({type(exc).__name__}: {exc}); the bundle "
+            f"stays UNCHECKED until --activate succeeds") from exc
+    return receipt
+
+
+def activation_status(bundle_root: Path, *, base: "Path | None" = None
+                      ) -> "tuple[str, str]":
+    """(status, detail) for the RECEIPT half of admission: digest freshness,
+    receipt well-formedness, and the snapshot's presence.
+
+    Scope is deliberately narrow and the caller must not widen it by wishing:
+    this says nothing about layout, ids, row semantics, packs, or
+    cross-references. `otr_check` pairs it with `preflight_bundle` and the
+    authority's `validate_client_bundle_contract` precisely because ACTIVATED
+    from this function alone would not mean a bank boot will admit."""
+    bundle_root = Path(bundle_root)
+    try:
+        digest = bundle_digest(bundle_root)
+    except _Quarantine as exc:
+        return BROKEN, exc.detail
+    if not (bundle_root / RECEIPT_FILENAME).exists():
+        return UNCHECKED, (
+            "no activation receipt; run "
+            f"`otr_check bank {bundle_root} --activate`")
+    try:
+        receipt = read_receipt(bundle_root)
+    except _Quarantine as exc:
+        return BROKEN, exc.detail
+    if receipt["source_bank_id"] != bundle_root.name:
+        return BROKEN, (f"receipt names {receipt['source_bank_id']!r}, "
+                        f"folder is {bundle_root.name!r}")
+    if receipt["digest"] != digest:
+        return STALE, "the bundle changed since activation; re-activate it"
+    if not (snapshots_root(base) / receipt["snapshot"]).is_dir():
+        return STALE, (f"activation snapshot {receipt['snapshot']!r} is "
+                       f"absent; re-activate it")
+    return ACTIVATED, f"digest {digest[:16]}, snapshot {receipt['snapshot']}"
 
 
 # ---------------------------------------------------------------------------
@@ -500,27 +750,39 @@ def bundle_entry_point(bundle: UserBankBundle, attr: str):
 
 
 __all__ = [
+    "ACTIVATED",
     "BANK_JSON_FILENAME",
+    "BROKEN",
     "BUNDLE_ENTRY_ATTRS",
     "COMPAT_ENTRY_ATTR",
     "FETCH_ENTRY_ATTR",
+    "FIXTURES_DIRNAME",
     "INTERPRET_ENTRY_ATTR",
     "RECEIPT_FILENAME",
     "RECEIPT_SCHEMA_VERSION",
     "RECEIPT_KEYS",
     "SELF_ENTRY_POINT",
+    "STALE",
+    "STORY_PACKS_DIRNAME",
+    "UNCHECKED",
+    "BundlePreflight",
+    "UserBankActivationError",
     "UserBankBundle",
     "UserBankExecutionError",
     "UserBankLayoutError",
     "ValidationIssue",
+    "activation_status",
     "bundle_digest",
     "bundle_entry_point",
     "bundle_module_name",
     "discover",
     "load_bundle_module",
+    "preflight_bundle",
+    "preflight_bundle_record",
     "read_receipt",
     "repo_root",
     "snapshot_dirname",
     "snapshots_root",
     "user_banks_root",
+    "write_activation",
 ]
