@@ -2804,7 +2804,14 @@ class OTR_LedgerScriptWriter:
                             "Each lane is an INDEPENDENT bank (own pack + "
                             "bank metadata). The only non-runnable row is '+ Add "
                             "Your Own' (custom_source_bank) -- picking it "
-                            "FAILS LOUD before any story work (no fallback)."
+                            "FAILS LOUD before any story work (no fallback), "
+                            "with its guide_ref naming the real path: author a "
+                            "bundle under user_packs/source_banks/, run "
+                            "'otr_check bank <path> --activate', restart, and "
+                            "your bank joins this list as its own entry "
+                            "(contract: docs/EXTENDING_OTR.md). A bank's own "
+                            "default_story_model picks its story pack -- there "
+                            "is no separate pack widget."
                         ),
                     },
                 ),

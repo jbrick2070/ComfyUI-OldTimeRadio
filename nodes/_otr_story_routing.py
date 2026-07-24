@@ -729,15 +729,28 @@ def resolve_story_pack(source_bank_id: str, story_model_id: str | None = None) -
 
 def require_runnable_bank(source_bank_id: str) -> SourceBank:
     """Run-intent gate: raise LOUD if the bank's execution lane is not built.
-    bank.runnable is the ONLY runtime gate (pipeline.executable is metadata)."""
+    bank.runnable is the ONLY runtime gate (pipeline.executable is metadata).
+
+    The row's own `guide_ref` is appended when it has one. That field had no
+    runtime consumer at all before this: every word telling an operator what to
+    DO about a non-runnable row lived in JSON that nothing ever read, so the
+    one row shipped expressly to advertise "+ Add Your Own" answered a click
+    with a dead end. JSON owns the words, Python owns the raising -- the same
+    split the rest of this module keeps."""
     bank = get_bank(source_bank_id)
     if not bank.runnable:
-        raise StoryBankNotRunnableError(
+        # "its bank row", not "banks.json": a client bundle's row lives in its
+        # own bank.json, and a message that misnames where the client must
+        # look is the defect class 8c45172d closed.
+        message = (
             f"source_bank {bank.source_bank_id!r} is not runnable: its "
             f"interpreter/fetcher/pass-runner lane is not built yet "
-            f"(runnable=false in banks.json). Pick a runnable bank; there is "
-            f"no fallback."
+            f"(runnable=false in its bank row). Pick a runnable bank; there "
+            f"is no fallback."
         )
+        if bank.guide_ref:
+            message = f"{message} {bank.guide_ref}"
+        raise StoryBankNotRunnableError(message)
     return bank
 
 

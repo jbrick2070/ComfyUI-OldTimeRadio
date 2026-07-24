@@ -266,3 +266,141 @@ class TestHeadlessSurface:
         assert node1["widgets_values"][27] == ""
         assert node1["widgets_values"][28] == "cuda"
         assert node1["widgets_values"][33] == "Q8_0"
+
+
+# ---------------------------------------------------------------------------
+# 8. Independent source banks v1, WAVE 7 -- a client bank reaches THIS widget
+#
+# Waves 1-6 proved a client bundle joins the routing registry
+# (test_user_bank_admission). That is one hop short of the operator: the
+# registry only matters if its rows reach the COMBO the Story Writer publishes
+# to ComfyUI. The wave-7 question was whether that last hop needed a new
+# widget, a new node, or a canonical-JSON change; these pins are the answer --
+# it needs NONE, because the choices are read live from the registry and the
+# pack comes from the row's own default_story_model. The surface was already
+# right; what was missing was the proof and the signpost.
+# ---------------------------------------------------------------------------
+class TestClientBankReachesTheWidget:
+    _CLIENT_ID = "client_widget_probe"
+    _CLIENT_MODEL = "client_widget_probe_drama"
+    _DONOR_PACK = (_REPO / "nodes" / "story_packs" / "media_archive"
+                   / "media_restoration_adventure.json")
+
+    @pytest.fixture(autouse=True)
+    def _fresh_registry(self):
+        routing._clear_caches()
+        yield
+        routing._clear_caches()
+
+    @pytest.fixture
+    def client_bank(self, tmp_path, monkeypatch):
+        """An ACTIVATED client bundle, discovered from a temp repo base."""
+        from nodes import _otr_user_banks as ub
+        monkeypatch.setattr(
+            ub, "user_banks_root",
+            lambda root=None: tmp_path / "user_packs" / "source_banks")
+        monkeypatch.setattr(
+            ub, "snapshots_root",
+            lambda root=None: tmp_path / "user_packs" / ".snapshots")
+        root = ub.user_banks_root() / self._CLIENT_ID
+        (root / ub.STORY_PACKS_DIRNAME).mkdir(parents=True)
+        (root / ub.BANK_JSON_FILENAME).write_text(
+            json.dumps({
+                "schema_version": ub.RECEIPT_SCHEMA_VERSION,
+                "bank": {
+                    "source_bank_id": self._CLIENT_ID,
+                    "label": "Client Widget Probe",
+                    "source_kind": "archive_item",
+                    "interpreter": "media_archive_interpreter",
+                    "fetcher": "media_archive_rss",
+                    "default_story_model": self._CLIENT_MODEL,
+                    "default_story_pipeline": "legacy_many_pass",
+                    "defaults": {"style_pool_class": "media"},
+                    "required_seams": [],
+                    "runnable": True,
+                    "guide_ref": "",
+                },
+            }, indent=2),
+            encoding="utf-8")
+        (root / f"{self._CLIENT_ID}.py").write_text(
+            "def fetch_source(**kwargs):\n    raise NotImplementedError\n",
+            encoding="utf-8")
+        pack = json.loads(self._DONOR_PACK.read_text(encoding="utf-8"))
+        pack["source_bank_id"] = self._CLIENT_ID
+        pack["story_model_id"] = self._CLIENT_MODEL
+        (root / ub.STORY_PACKS_DIRNAME / f"{self._CLIENT_MODEL}.json").write_text(
+            json.dumps(pack, indent=2), encoding="utf-8")
+        digest = ub.bundle_digest(root)
+        snapshot = ub.snapshot_dirname(self._CLIENT_ID, digest)
+        (ub.snapshots_root() / snapshot).mkdir(parents=True, exist_ok=True)
+        (root / ub.RECEIPT_FILENAME).write_text(
+            json.dumps({"schema_version": ub.RECEIPT_SCHEMA_VERSION,
+                        "source_bank_id": self._CLIENT_ID, "digest": digest,
+                        "snapshot": snapshot}), encoding="utf-8")
+        return root
+
+    def test_client_bank_is_a_choice_on_the_published_widget(self, client_bank):
+        """The wave-7 pin: the operator can SELECT an activated client bank."""
+        choices, meta = OTR_LedgerScriptWriter.INPUT_TYPES()["optional"][
+            "source_bank"]
+        assert self._CLIENT_ID in choices
+        # It joins as a peer -- the shipped rows and the default are untouched.
+        assert _PUBLIC_DOMAIN_BANK in choices
+        assert _NON_RUNNABLE_BANK in choices
+        assert meta["default"] == "scifi_news"
+        assert choices == list(routing.list_bank_ids())
+
+    def test_widget_value_routes_to_the_clients_own_pack(self, client_bank):
+        """No pack widget exists or is needed: the row's default resolves,
+        inside the client's own bundle rather than any shipped directory."""
+        resolved = _resolve_inputs(custom_premise="test premise",
+                                   source_bank=self._CLIENT_ID)
+        assert resolved["source_bank"] == self._CLIENT_ID
+        pack = routing.resolve_story_pack(resolved["source_bank"])
+        assert pack.source_bank_id == self._CLIENT_ID
+        assert pack.story_model_id == self._CLIENT_MODEL
+        bundle_root = routing.user_bank_bundle(self._CLIENT_ID).root
+        assert bundle_root == client_bank
+
+    def test_adding_a_bank_changes_no_canonical_widget_vector(self, client_bank):
+        """Admitting a bank must not disturb the stored workflow: the canonical
+        widget vector is positional (BUG-LOCAL-097) and a client bank adds a
+        legal VALUE, never a slot."""
+        workflow = json.loads(
+            _CANONICAL_WORKFLOW.read_text(encoding="utf-8"))
+        node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
+        assert len(node1["widgets_values"]) == 34
+        assert node1["widgets_values"][23] == "scifi_news"
+        spec = OTR_LedgerScriptWriter.INPUT_TYPES()
+        order = list(spec["required"].keys()) + list(spec["optional"].keys())
+        assert order[23] == "source_bank"
+        assert order[24] == "visual_style"
+
+
+# ---------------------------------------------------------------------------
+# 9. The signpost row answers with the path, not a dead end (wave 7)
+# ---------------------------------------------------------------------------
+class TestAddYourOwnSignpost:
+    def test_non_runnable_error_carries_the_rows_guide_ref(self):
+        """`guide_ref` had no runtime consumer before wave 7. The one row that
+        exists to advertise extensibility must not answer a click with a dead
+        end -- JSON owns the words, require_runnable_bank raises them."""
+        bank = routing.get_bank(_NON_RUNNABLE_BANK)
+        assert bank.guide_ref, "the signpost row must carry a guide_ref"
+        with pytest.raises(routing.StoryBankNotRunnableError) as ei:
+            routing.require_runnable_bank(_NON_RUNNABLE_BANK)
+        message = str(ei.value)
+        assert bank.guide_ref in message
+        # It names the landed path, not a runner that never shipped.
+        assert "otr_check bank" in message
+        assert "docs/EXTENDING_OTR.md" in message
+        assert "user_packs/source_banks/" in message
+
+    def test_runnable_bank_message_does_not_misname_the_client_row_location(
+            self):
+        """A client bundle's row lives in its own bank.json, so the error may
+        not tell every operator to edit banks.json (the 8c45172d defect)."""
+        with pytest.raises(routing.StoryBankNotRunnableError) as ei:
+            routing.require_runnable_bank(_NON_RUNNABLE_BANK)
+        assert "banks.json" not in str(ei.value)
+        assert "its bank row" in str(ei.value)

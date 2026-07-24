@@ -191,7 +191,7 @@
       "defaults": {},
       "required_seams": [],
       "runnable": false,
-      "guide_ref": "Create and validate a custom source packet and story pack first; the simple_4 pass runner does not exist yet."
+      "guide_ref": "This row is a signpost, not a lane. To add your own bank: author a folder under user_packs/source_banks/<your_bank_id>/ (bank row, fetch/interpret module, at least one story pack), run 'otr_check bank <path> --activate', and restart ComfyUI -- your bank then appears in this dropdown as its own entry, equal to the shipped six. The full contract is docs/EXTENDING_OTR.md."
     }
   ]
 }

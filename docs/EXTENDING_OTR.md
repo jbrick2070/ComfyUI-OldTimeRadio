@@ -285,6 +285,38 @@ then safety repair, then a bounded LLM fill -- and stamps its receipt at
 6. Change one thing at a time and re-run; a bank is qualified by artifacts
    (ledger + episode asset + publish receipt), nothing softer.
 
-*Sections 2-3 describe the v1 authoring surface being built under the plan of
-record; the ledger contract in section 1 is live today and applies to every
-bank, shipped or client-authored.*
+---
+
+## 6. Selecting your bank in ComfyUI
+
+There is nothing to wire. The workflow already carries the surface your bank
+arrives on, and adding a bank changes no node, no widget and no link.
+
+- **Your bank is a row in the `source_bank` dropdown** on node 1, the Story
+  Writer (`OTR_LedgerScriptWriter`). That dropdown is not a stored list: its
+  choices are read LIVE from the routing registry every time ComfyUI asks the
+  node for its inputs, and activated client banks are folded into that registry
+  beside the shipped six. Activate, restart ComfyUI, and your `<bank_id>` is
+  simply there.
+- **Restart is the refresh.** The registry is built once per process and cached,
+  so a bank activated while ComfyUI is running does not appear until you restart
+  it. The same is true in reverse: edit your bundle without re-activating and
+  the bank goes STALE and drops out of the list at the next start.
+- **Your story pack needs no widget.** The pack comes from your own row's
+  `default_story_model`, resolved inside your own bundle's `story_packs/`
+  folder. There is no pack selector to set and no shipped directory your pack
+  has to be copied into -- ship more than one pack if you like, the row's
+  default is the one that runs.
+- **`+ Add Your Own` is a signpost, not your bank.** That row ships
+  non-runnable on purpose (its id is `custom_source_bank`). Picking it fails
+  loud before any story work, and the error repeats the path in this document.
+  Your bank is its own row; you never select this one.
+- **A quarantined bank is simply absent.** If your bundle fails validation it
+  does not appear in the dropdown at all -- it does not appear greyed out, and
+  it never blocks boot. Run `otr_check bank <path>` to see the named reason.
+
+*The ledger contract in section 1 applies to every bank, shipped or
+client-authored. Sections 2-6 describe the v1 authoring surface as it is
+LANDED: bundle integrity and admission, the self-owned entry points, the
+`otr_check bank --activate` CLI, the bounded fetch seam, the ledger-cleanup
+pass, and the dropdown surface above.*
