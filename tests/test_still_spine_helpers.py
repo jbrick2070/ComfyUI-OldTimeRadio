@@ -305,6 +305,25 @@ class TestSceneStillObjects:
         assert targets[2]["char_id"] == "c01"            # carried for the wide shot
         assert targets[3]["role"] == "music_visual"
 
+    def test_image_producer_reserves_future_closing_music_target(self):
+        """EpisodeAssembler mirrors the closing cue after this node runs;
+        the image producer must reserve its exact future beat id up front."""
+        from nodes import otr_meta_brief_image_prompt as mbp
+        payload, _w = mbp.derive_image_prompts(
+            [], _meta_ok(), llm_fn=None, lines=_lines_timed()[:-1])
+        targets = payload["required_scene_targets"]
+        close = next(row for row in targets
+                     if row["beat_id"] == "music_closing_001")
+        assert close["object_id"] == "still_music_closing_001"
+        assert close["kind"] == "scene_beat"
+        assert close["role"] == "music_visual"
+
+    def test_existing_close_line_is_not_duplicated(self):
+        from nodes import otr_meta_brief_image_prompt as mbp
+        targets, _w = mbp.derive_scene_still_targets(
+            _lines_timed(), include_synthetic_closing=True)
+        assert [row["beat_id"] for row in targets].count("music_closing_001") == 0
+
     def test_canonical_character_speaker_role_maps_to_scene_character(self):
         """BUG 1 (2026-06-20): the writer's CANONICAL dialogue speaker_role is
         'character' (not 'char_voice') -- it must resolve to character_video and

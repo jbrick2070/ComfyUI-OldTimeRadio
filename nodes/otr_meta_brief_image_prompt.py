@@ -1039,7 +1039,8 @@ def _iter_beat_lines(lines):
         yield str(ln.get("line_id") or f"beat_{i:04d}"), ln
 
 
-def derive_scene_still_targets(lines, fps: int = 25):
+def derive_scene_still_targets(lines, fps: int = 25,
+                               *, include_synthetic_closing: bool = False):
     """Still-spine ST-2: the SCENE-STILL targets derived from the LINES via pure
     helpers, never from ``video.shots`` (graph order: image gen runs BEFORE
     ShotLock). Returns ``(targets, warnings)``; each target is
@@ -1940,13 +1941,15 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     # SCENE-STILL objects (ST-2): open/announcer/outro from pure helpers on
     # the LINES -- never video.shots (image gen runs BEFORE ShotLock). The
     # prompt comes from the shared 5-layer composer (subject parity with the
-    # driver's text prompts is locked in tests); no LLM call, no person
-    # guard, no gear scrub -- guards branch by kind BEFORE running.
+    # driver's text prompts is locked in tests); no LLM call is needed.
     scene_targets, scene_warns = ([], [])
     if lines:
         try:
             scene_targets, scene_warns = derive_scene_still_targets(
-                lines, fps=fps)
+                lines, fps=fps,
+                include_synthetic_closing=bool(
+                    still_capabilities is None
+                    or still_capabilities.get("music_visual") is not False))
         except ValueError:
             # NO FALLBACKS (rip-sfx-broll 2026-07-01): an unmapped
             # speaker_role (e.g. an old "sfx" ledger) is a hard error,
