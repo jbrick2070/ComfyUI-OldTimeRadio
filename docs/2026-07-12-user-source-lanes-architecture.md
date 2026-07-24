@@ -1,5 +1,14 @@
 # User Source Lanes -- Replacement Architecture & Coding Plan (v1 DRAFT)
 
+> **SUPERSEDED 2026-07-24 -- DECISION LOG ONLY.** The Path-A/B model in this doc
+> is RETIRED. Operator reframe: N INDEPENDENT source banks (no Path A/B, no
+> family), client adds one from a folder, trusted shared writer builds the
+> complete ledger, content by repair, own-runner/staging + dependency subsystem
+> + standalone story_rules DEFERRED. The plan of record is
+> `docs/2026-07-24-independent-source-banks-v1-plan.md`. This file is kept for
+> its grounded detail + the r1-r5 adjudication history
+> (`kibitz-runs/2026-07-24-user-source-lanes-r6*/`); do not build from it.
+
 - **Date:** 2026-07-12 (late). **Status:** DRAFT FOR ARCHITECTURE APPROVAL -- no code,
   no GO_FORWARD_PLAN change until this converges (operator directive).
 - **Kibitz arc COMPLETE (r1-r4), but NOT CONVERGED.** r1 @ `d724e08a`, r2 @ `f7c6902c`,

@@ -1,10 +1,14 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-24 -- **SIX-BANK NO-PROSE-GATE CHUNK LANDED @
-`314dd481` (312 files, +8,085/-74,529; suite 6182 green / Bible 17;
-canonical byte-identical; WORKTREE CLEAN). Plan leaned to open work only;
-MODEL & CREDIT BUDGET + otr-handoff SKILL v2 LIVE. SIX-BANK REQUALIFICATION
-+ 45-WORD SCENE MATRIX NEXT.**
+**Updated:** 2026-07-24 -- **EXTENSIBILITY HARDENED + REFRAMED (planner window).**
+The r1-r4 kibitz arc + an r5 simplification pass ran and CONVERGED (codex
+gpt-5.6-sol high + agy Gemini 3.6 Flash High; Claude judge). Operator reframe:
+N INDEPENDENT client-authored source banks (no Path A/B), trusted shared writer
+builds the COMPLETE ledger, content by repair, own-runner/staging + deps +
+story_rules DEFERRED. Plan of record: `docs/2026-07-24-independent-source-banks-v1-plan.md`
+(old A/B doc retired to decision log). Code HEAD unchanged @ `314dd481` (six-bank
+no-prose-gate chunk; suite 6182 / Bible 17; canonical byte-identical). SIX-BANK
+REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the coder/render track.**
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to
@@ -86,7 +90,7 @@ rungs instead of grinding a paid pool dry.**
 | Rung | Model / tool | Cost | Use for | Never for |
 |---:|---|---|---|---|
 | 1 | Local Qwen on the 4060 (`10.55.0.2:1234`, LM Studio/ACPX): `qwen3-coder-30b-a3b-instruct` now; `Qwen2.5-Coder-14B Q4_K_M` as the fast tier once installed | $0 | Read-only FIRST-PASS triage of failures, logs, diffs before any credit spend | Final diagnosis, patches, tests, live qualification (Codex/Claude own those); NEVER loaded on the 5080 (ComfyUI renders only) |
-| 2 | agy / Antigravity, `KIBITZ_AGY_MODEL="Gemini 3.5 Flash (High)"` (DISPLAY name exactly -- a wrong id silently kills agy and the arc runs codex-only; check antigravity.log per round) | $0 | Default grounded reviewer for ALL mechanical review; second panelist on every kibitz | -- |
+| 2 | agy / Antigravity, `KIBITZ_AGY_MODEL="Gemini 3.6 Flash (High)"` (operator 2026-07-24: 3.6 > 3.5; DISPLAY name exactly -- a wrong id silently kills agy and the arc runs codex-only; check antigravity.log per round) | $0 | Default grounded reviewer for ALL mechanical review; second panelist on every kibitz | -- |
 | 3 | Codex CLI `gpt-5.6-sol` (high) | weekly credits | The second opinion of record: two-strikes law (mandatory 3rd-attempt panel), sec-16 + r5 extensibility confirm, pre-execution grounding of big blocks, live-failure kibitz, HANDOFF_CODEX grind delegation | Mechanical review agy can do alone. Verify `codex_model_selected.txt` every arc (stale skill cache once drifted to gpt-5.5 mid-arc unnoticed) |
 | 4 | Claude (Cowork, this) | weekly credits | The actual work: planner + coder windows, anchor/judge on every panel, live-run drive | Babysitting renders (the Codex-app overnight monitor owns that); single-small-item windows (batch per the Window packing rules) |
 | 5 | Cloud roundtable (OpenRouter) | real $ | Genuine R1 ideas passes only; <$20 autonomy rule applies | Mechanical/grounding review (that is rungs 2-3) |
@@ -219,8 +223,8 @@ six-bank requalification (chunk landed @ 314dd481)
   -> 45w scene matrix + 54-case visual-style qualification
   -> quick-wins block (coder windows A/B/C)
   -> LEAN-MEAN FRONT (W0->W1->W2->W3->W4a->W4b->W7->W6->W5+SW4->C1-C5)
-       [sec-16 ratification + r5 kibitz in PARALLEL, planner window]
-  -> user source lanes / extensibility
+       [extensibility hardening DONE 2026-07-24; next = draft EXTENDING_OTR.md]
+  -> independent client-authored source banks (lean v1; docs-first)
   -> Randomizer A -> dynamic_story
   -> LEAN-MEAN TAIL (SW1/SW2/SW3 -> C6 -> C7 -> W8)
   -> ROADMAP (SFX campaign after Timeline Cue Ledger gate)
@@ -252,11 +256,20 @@ by the campaign queue.)
    (SW-3 news_ingest re-survey, W6 keep-list adds + ENGINE_MATRIX
    precondition = quick-win 8, W7 tombstone re-triage, R-7 re-grep; SW-1
    writer re-survey waits for the TAIL). Dedicated window; multi-day.
-2. **User source lanes / extensibility** --
-   `docs/2026-07-12-user-source-lanes-architecture.md`. GATED: operator
-   ratifies section 16 (nine flags) + one r5 confirmation kibitz pass
-   (planner window, runs in parallel with block 1); THEN fold into this plan
-   and claim the coder slot. ~21-31 coder-days.
+2. **Independent source banks (client-authored)** --
+   `docs/2026-07-24-independent-source-banks-v1-plan.md` (PLAN OF RECORD;
+   supersedes the retired Path-A/B `docs/2026-07-12-user-source-lanes-architecture.md`).
+   Operator reframe 2026-07-24: N INDEPENDENT banks (no Path A/B, no family);
+   client adds one from a folder equal to the shipped six; TRUSTED shared writer
+   builds the COMPLETE ledger (the #1 key); a ledger-cleanup LLM pass fills/cleans
+   it; content by REPAIR never a story-fail (SFW dropped as a gate); broken
+   bundle QUARANTINES. DEFERRED past v1: client own-runner + staging, dependency
+   subsystem, standalone story_rules. DOCS-FIRST: `docs/EXTENDING_OTR.md`
+   (complete-ledger field contract) is the primary deliverable. Full r1-r4 arc +
+   r5 simplification DONE + CONVERGED (codex gpt-5.6-sol high + agy Gemini 3.6
+   Flash High; Claude judge; `kibitz-runs/2026-07-24-user-source-lanes-r6*/`).
+   NEXT: draft the requirements doc, then claim the coder slot (re-pin at HEAD).
+   Materially smaller than the retired ~21-31 d; re-estimate after the docs.
 3. **Randomizer Rolls Design A** --
    `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`, AFTER extensibility
    (its `_otr_lane_specs` authority is ABSORBED by the extensibility build;
@@ -290,8 +303,8 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | CODER B "harness" | quick-wins 5 + 10, then one canonical `scifi_news_pro` full-media qualification leg | same | after A | ~1-2 d |
 | CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
 | CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |
-| PLANNER (this window) | sec-16 ratification + r5 kibitz (codex gpt-5.6-sol high + agy -- THIS WEEK while Codex is fresh), Bug Bible operator fan-out, plan upkeep | rungs 2-4 | parallel with D | docs |
-| CODER E | extensibility (user source lanes) | Claude; codex via two-strikes; plan waves at weekly resets | after sec-16 + r5 | 21-31 d |
+| PLANNER | extensibility hardening (r1-r4 arc + r5 simplify) DONE 2026-07-24 -> independent-banks lean plan of record; NEXT = draft `docs/EXTENDING_OTR.md`; Bug Bible operator fan-out; plan upkeep | rungs 2-4 | parallel with D | docs |
+| CODER E | independent client-authored source banks (lean v1) per `docs/2026-07-24-independent-source-banks-v1-plan.md`; docs-first (`EXTENDING_OTR.md`) then code | Claude; codex via two-strikes | after the requirements doc | lean (re-est after docs) |
 | CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | after E | ~6-11 d |
 | CODER G "lean-mean tail" | SW1-SW3, C6, C7, W8 | Claude; Fable single final epoch gate | after F | multi-day |
 
@@ -303,9 +316,12 @@ Kickoff lines (paste as the FIRST message of the new window; swap the letter):
 
 ## Parallel lane -- no coder slot required
 
-- **sec-16 ratification + r5 confirm** on the extensibility architecture --
-  the operator bottleneck on the critical path; planner window; Codex is
-  fresh, schedule THIS WEEK.
+- **Extensibility hardening -- DONE 2026-07-24 (planner window).** The r1-r4
+  kibitz arc + an r5 simplification pass ran and CONVERGED; the operator
+  reframed to N independent client-authored banks (lean v1, docs-first). Plan of
+  record: `docs/2026-07-24-independent-source-banks-v1-plan.md`. NEXT owner
+  action = draft `docs/EXTENDING_OTR.md` (the complete-ledger requirements), then
+  a coder slot. (The old sec-16 nine-flags gate is retired with the A/B doc.)
 - **Bug Bible operator fan-out** -- 9+ closed candidates + the
   duplicate-legacy_id cleanup waiting on one fan-out session.
 - **Render-window fillers:** cpu-tier smoke (needs the google image lane or
@@ -355,9 +371,12 @@ fixture creates a row.
 
 ## Open risks
 
-- Extensibility is gated on operator section-16 ratification + the r5 pass;
-  its ~21-31-day estimate is latent scope, not creep. Until ratified it holds
-  no slot and only constrains randomizer + dynamic_story sequencing.
+- Extensibility hardening is DONE + CONVERGED (independent-banks lean plan of
+  record); it now gates on drafting `docs/EXTENDING_OTR.md` (the complete-ledger
+  requirements) before a coder slot. Materially smaller than the retired
+  ~21-31-day A/B scope; it still constrains randomizer + dynamic_story
+  sequencing. Deferred power-user tiers (client own-runner + staging, deps,
+  story_rules) are explicitly out of v1, not forgotten.
 - Lean-mean front/tail drift: the tail's SW-1 re-survey is mandatory against
   the then-current writer. Never interleave the two campaigns in one window.
 - No code lands mid-sweep of an active qualification campaign (uniform-code
@@ -391,7 +410,8 @@ artifact -- `tencent/hy3:free` panel seat (expired 2026-07-21).
 - `docs/2026-07-23-video-failure-inventory.md` (campaign staging record)
 - `docs/2026-07-15-720-bakeoff-verdict.md` (KEEP/IMPROVE + open items)
 - `docs/2026-07-17-model-bakeoff-scoreboard.md` (writer-model verdict)
-- `docs/2026-07-12-user-source-lanes-architecture.md` (extensibility)
+- `docs/2026-07-24-independent-source-banks-v1-plan.md` (extensibility PLAN OF RECORD)
+- `docs/2026-07-12-user-source-lanes-architecture.md` (SUPERSEDED -- Path-A/B decision log)
 - `docs/2026-07-10-lean-mean-rip-final.md` (drift-check header 2026-07-15)
 - `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`
 - `docs/2026-07-12-dynamic-story-visual-scope.md`

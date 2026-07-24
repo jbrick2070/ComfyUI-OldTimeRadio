@@ -3,6 +3,32 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 ~09:55 -- HEAD 314dd481 (v2.0-alpha) -- WINDOW PLANNER (Opus)
+Did: ran extensibility hardening. Full r1-r4 `/kibitz` arc + an r5
+simplification pass on the user-source-lanes architecture (codex gpt-5.6-sol
+high + agy Gemini 3.6 Flash High; Claude anchor+grounding+judge; 10 panel
+calls). Grounded every claim vs the real Windows files at `d550aff8`. Caught the
+stale base: NO `science_news` bank; six INDEPENDENT banks; `_RUNNER_BY_PIPELINE`
+= 2 + `_LEGACY_INLINE_PIPELINES` = 3 (legacy_many_pass / legacy_many_pass_adapt
+/ original_multi_pass); `_otr_story_rules.py` deleted. Operator reframed LIVE: N
+independent client-authored banks (NO Path A/B, no family), trusted shared
+writer builds the COMPLETE ledger (the #1 key), a ledger-cleanup LLM pass,
+content by REPAIR never a story-fail (SFW dropped as a gate), broken bundle
+quarantines; DEFERRED client own-runner+staging + deps subsystem + standalone
+story_rules. Wrote the lean plan of record
+`docs/2026-07-24-independent-source-banks-v1-plan.md` + the r6 rebase brief;
+retired the 1265-line A/B doc to decision-log status; leaned GO_FORWARD (agy
+panel lane -> Gemini 3.6). Decision log: `kibitz-runs/2026-07-24-user-source-lanes-r6*/`.
+Current step: extensibility hardening DONE; NEXT = draft `docs/EXTENDING_OTR.md`
+(the complete-ledger requirements), then a coder slot. Coder/render track
+unchanged (six-bank requalification + bug-first items).
+Next: draft `EXTENDING_OTR.md` (docs-first) -> CODER E; parallel CODER A
+(bug-first) still open.
+Models: Claude Opus (planner/judge) + 10 kibitz calls (codex gpt-5.6-sol high +
+agy Gemini 3.6 Flash High). $0 local panel + Codex weekly credits.
+Commits: docs handoff (this session's docs by pathspec).
+
+
 ## 2026-07-24 08:00 -- HEAD 314dd481 (v2.0-alpha) -- WINDOW PLANNER->CODER (Fable)
 
 Did: LANDED the six-bank no-prose-gate retirement chunk @ 314dd481 (312
