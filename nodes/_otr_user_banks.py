@@ -349,8 +349,10 @@ def _validate_authoring(root: Path, *, protected_ids) -> _Authoring:
     if not module_path.is_file():
         raise _Quarantine(
             "missing_module",
-            f"{bank_id}.py not found; the bundle must ship one module with "
-            f"fetch_source + interpret_source + check_compatibility",
+            f"{bank_id}.py not found; the bundle must ship one module holding "
+            f"the entry points {BANK_JSON_FILENAME} routes to "
+            f"{SELF_ENTRY_POINT!r} ({FETCH_ENTRY_ATTR} and/or "
+            f"{INTERPRET_ENTRY_ATTR})",
         )
     story_packs_dir = root / STORY_PACKS_DIRNAME
     if not story_packs_dir.is_dir() or not sorted(story_packs_dir.glob("*.json")):

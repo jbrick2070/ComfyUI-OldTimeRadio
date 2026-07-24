@@ -199,6 +199,25 @@ def test_missing_module_quarantines(tmp_path):
     assert _only_issue(tmp_path).code == "missing_module"
 
 
+def test_missing_module_message_names_only_real_requirements(tmp_path):
+    """The message a client reads must be TRUE.
+
+    It used to say the module "must ship one module with fetch_source +
+    interpret_source + check_compatibility". A bundle that defines no
+    `check_compatibility` at all activates cleanly -- nothing inspects that
+    name, not even for callability -- so the sentence demanded something the
+    code has never required. Naming a reserved-but-unwired entry point in a
+    contract-bearing string is how a placeholder becomes a phantom rule that
+    clients write code to satisfy."""
+    root = _make_bundle(tmp_path, "client_noir", activate=False)
+    (root / "client_noir.py").unlink()
+    _activate(tmp_path, root, "client_noir")
+    detail = _only_issue(tmp_path).detail
+    assert ub.COMPAT_ENTRY_ATTR not in detail
+    assert ub.FETCH_ENTRY_ATTR in detail
+    assert ub.INTERPRET_ENTRY_ATTR in detail
+
+
 def test_missing_story_pack_quarantines(tmp_path):
     root = _make_bundle(tmp_path, "client_noir", activate=False)
     (root / ub.STORY_PACKS_DIRNAME / "default.json").unlink()
