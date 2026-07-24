@@ -3,6 +3,58 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 16:45 -- HEAD 36da1f9f (v2.0-alpha) -- OPERATOR RE-GROUND GATE (Opus)
+Did: added a STANDING RE-GROUND GATE to GO_FORWARD. No code touched.
+THE OPERATOR'S CALL: every remaining big block gets a kibitz arc before it
+executes, because "the code has changed" and "it's been a while since many of
+these plans were done" -- and then, unprompted, the sharper half: "if in doubt
+restart with r2", and on a follow-up, "lean mean deserves an r2-r4 as well".
+THE RULE AS LANDED. Default entry is r3 (wiring), since these docs already have
+r1 + r2 on record -- the cheap re-ground is the wiring round against CURRENT
+code plus r4 convergence. DROP TO r2 when r3 shows the CODING PLAN is wrong
+rather than just its line numbers: a seam that no longer exists, an authority
+that moved, a precondition another build already satisfied or destroyed.
+Patching an r2 from inside an r3 produces a plan nobody reviewed. If in doubt,
+start at r2 -- a wasted r2 costs one panel round, executing a stale coding plan
+costs a day of rips against the wrong file list, and rips are the hard kind to
+unwind. No block executes without an r4 convergence at current HEAD; runs go
+under `kibitz-runs/<date>-<block>-r<N>/` and get cited in the block entry.
+PER-BLOCK, and the reasoning is worth keeping because it is not uniform:
+BOTH LEAN-MEAN BLOCKS ARE PINNED TO A FULL r2->r3->r4 by operator decision --
+not the r3 default, and a later window may not re-argue them down to save a
+round. The justification I would have reached anyway: lean-mean is a DELETION
+campaign whose entire value IS its file-and-line kill inventory, the most
+perishable thing a plan can carry; its own header already declares five stale
+areas; and the question is no longer "do these line numbers still point at the
+right code" but "is this still the right code to delete", which is an r2
+question by definition.
+Randomizer: r3+r4, and note the doc's own filename admits it --
+`...-randomizer-rolls-r2-coding-plan.md` never got an r3 or r4, so this is the
+arc COMPLETING, not repeating.
+`dynamic_story`: r3+r4, and the standing "rev-5 FINAL, do not rerun panels"
+rule is NOT in conflict with it. That rule protects the DESIGN (the r1 arc,
+settled over five revisions); r3 asks whether the design still WIRES to code
+that exists today, and the roster, routing authority and writer tail have all
+moved. Re-litigating the design is forbidden; re-grounding the wiring is
+mandatory. Worth stating explicitly in the doc because the next window would
+otherwise read "do not rerun panels" as "skip the arc".
+LEAN-MEAN TAIL: full arc, but run WHEN THE TAIL OPENS, not now -- every block
+ahead of it edits the very writer this block splits, so an arc run today
+grounds against a writer that will not exist at execution time. Running it
+early is WORSE than not running it: it produces a confident stale plan.
+SFX: no new arc scheduled -- the already-required R4.1 refit IS its re-ground.
+Credit shape, since this is rung 2-3 spend: ~10 panel rounds total across the
+remaining blocks. Front-load early in a credit week and run each block's arc
+when that block opens rather than batching them all now (batching would
+recreate the exact staleness the gate exists to prevent).
+Current step: unchanged -- WAN 8-GB low-VRAM launch contract, CODER A, ungated.
+That one needs NO re-ground: it is a live 2026-07-23 defect, not an old plan.
+Next: CODER A takes the WAN contract. CODER D's first job is now the lean-mean
+r2, not a rip.
+Models: Claude Opus (rung 4) only; a plan edit, not a build.
+Commits: this one.
+
+
 ## 2026-07-24 16:20 -- HEAD d036931b (v2.0-alpha) -- OPERATOR RESCOPE (Opus)
 Did: recorded an operator scope decision in GO_FORWARD. No code touched.
 CUT, on the operator's call ("i need to get coding done", "we will triage more
