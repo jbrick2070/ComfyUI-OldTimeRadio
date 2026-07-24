@@ -1,16 +1,18 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-5
-LANDED @ `8c45172d`.** Client bundles are discovered, integrity-checked,
+**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-6
+LANDED @ `3d97a130`.** Client bundles are discovered, integrity-checked,
 admitted ALONGSIDE the shipped six in the one routing authority, may OWN their
 `fetch_source` / `interpret_source` via the reserved `"self"` entry point, are
-VALIDATED AND ACTIVATED by `scripts/otr_check.py bank <path> --activate`, and
-every network hop -- shipped or client-authored -- now goes through ONE bounded
-seam (`nodes/_otr_feed_fetch.py`). Suite 6365 / Bible 17; canonical
-byte-identical. NEXT for CODER E = **wave 6** (the ledger-cleanup pass in the
-shared tail, which also owns the client-interpreter fallback gap). SIX-BANK
-REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the render track;
-bug-first items still open for CODER A.
+VALIDATED AND ACTIVATED by `scripts/otr_check.py bank <path> --activate`, reach
+the network only through ONE bounded seam (`nodes/_otr_feed_fetch.py`), and now
+hand every downstream consumer a COMPLETE ledger via the shared tail's cleanup
+pass (`nodes/_otr_ledger_cleanup.py`) -- content repaired, structure named.
+Suite 6398 / Bible 17; canonical byte-identical. NEXT for CODER E = **wave 7**
+(story_pack widget / canonical JSON -- ASSESS FIRST: waves 1-6 changed no node,
+widget or link, so w7 may already be satisfied; if so, close the block).
+SIX-BANK REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the render
+track; bug-first items still open for CODER A.
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to
@@ -23,65 +25,54 @@ This block is the current source of truth for the overnight qualification.
 Nothing in this file is an instruction to reset, stash, delete, or overwrite
 user changes.
 
-- Branch: `v2.0-alpha`; HEAD and origin are `8c45172d` (CODER E wave 5 is
-  `c97a0e91`; wave 4 is `84945bc4`; waves 1-3 are `66e214ec` + `cc69e683`; the
-  six-bank no-prose-gate retirement chunk is `314dd481` below). The worktree is
+- Branch: `v2.0-alpha`; HEAD and origin are `3d97a130` (CODER E wave 6 is
+  `1504bb4c` + `3d97a130`; wave 5 is `c97a0e91` + `8c45172d`; wave 4 is
+  `84945bc4`; waves 1-3 are `66e214ec` + `cc69e683`; the six-bank
+  no-prose-gate retirement chunk is `314dd481` below). The worktree is
   CLEAN of task-owned changes -- what remains is `tmp/` scratch (including
   another window's modified `tmp/_chain_720.ps1`, `tmp/_rearm_gate.ps1`,
   `tmp/_status_bake.ps1` -- PRESERVE) and untracked campaign receipts (plus
   `config/profiles/otr_sbcov_1..6.json`, intentionally untracked
   coverage-campaign scratch; nothing in-repo references them, and untracked
   `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier window).
-- LANDED @ `c97a0e91` + `8c45172d` (2026-07-24; suite 6365 passed / 27 skipped
+- LANDED @ `1504bb4c` + `3d97a130` (2026-07-24; suite 6398 passed / 27 skipped
   / 1 xfailed; Bible 17; AST/BOM/zero-byte/UTF-8 clean; canonical
-  byte-identical; pushed, HEAD == origin): wave 5, the bounded
-  `nodes/_otr_feed_fetch.py` seam. ONE way to the network for source text --
-  https-only (no silent upgrade), connect 5s / read 10s, 3 redirects, a 2 MiB
-  DECODED cap enforced during the read and again after content-encoding, 2
-  retries, loopback/private/link-local/multicast/reserved reject on EVERY hop
-  (a name resolving to a public+private mix is refused outright), MIME
-  media-type parse, one ~25s monotonic deadline, UA + charset. Stdlib-only so a
-  client bundle imports it with no dependency. THE CONTRACT IS THE SPLIT:
-  `FeedFetchRefused` = our bound tripped (loud, never retried, never swallowed)
-  vs `FeedFetchUnavailable` = the remote did not deliver (an ordinary per-URL
-  miss a caller with other candidates may catch). Re-pinning at HEAD found
-  THREE unhardened hops, not the two the plan named -- the third being
-  `_otr_media_archive_sources.parse_media_archive_feed`. The `8c45172d` chunk
-  is separate and small: the `missing_module` quarantine message demanded a
-  `check_compatibility` the code has never required.
-- LANDED @ `84945bc4` (2026-07-24; suite 6294 passed / 27 skipped / 1 xfailed;
-  Bible 17; canonical byte-identical; pushed, HEAD == origin): wave 4, the
-  `otr_check bank <path> [--activate]` CLI (`scripts/otr_check.py` +
-  `otr_check.bat`). It owns no format -- `_otr_user_banks` gained
-  `preflight_bundle` / `write_activation` / `activation_status` (and
-  `_validate_bundle` split so the authoring half runs on a bundle with no
-  receipt, boot's check ORDER unchanged), and `_otr_story_routing` gained
-  `shipped_bank_seed()` + `validate_client_bundle_contract()`. The last one is
-  the wave's real find: `_admit_user_banks` runs `_sweep_pack_dir` +
-  `_crossref_bank` AFTER `discover`, so validating with the row parser alone
-  would have handed receipts to banks that quarantine at boot.
-  `check_compatibility` stays UNWIRED by decision (see the note under Open
-  risks).
-- LANDED @ `66e214ec` + `cc69e683` (2026-07-24; suite 6264 passed / 27 skipped
-  / 1 xfailed; Bible 17; AST/BOM/zero-byte/canonical-hash gates passed; pushed,
-  HEAD == origin): independent source banks waves 1-3. `nodes/_otr_user_banks.py`
-  owns client bundle integrity (content-addressed digest, activation receipt +
-  snapshot, path/symlink containment, protected/duplicate id refusal) and NEVER
-  raises for a bundle problem -- plus the wave-3 EXECUTION seam, which is loud
-  by design (`UserBankExecutionError`) because discovery already quarantined the
-  broken bundles. `_otr_story_routing.py` admits client rows alongside shipped
-  via the SAME `_parse_bank` and cross-refs, routes packs by OWNER
-  (`pack_dirs`), and unlocks the reserved `"self"` entry point on an explicit
-  `is_client` flag. `_otr_source_payload.resolve_fetcher/resolve_interpreter`
-  take an owner bundle and verify owner IDENTITY; client results still cross
-  `normalize_fetch_result` / `validate_interpreter_result` unchanged.
-  `docs/EXTENDING_OTR.md` carries the landed contract.
+  byte-identical; pushed, HEAD == origin): wave 6, the LEDGER CLEANUP PASS
+  (`nodes/_otr_ledger_cleanup.py`), wired at the one shared producer boundary
+  in `_run_writer_tail` -- after every writer-side text mutation, before the
+  TTS delivery stamp and the freeze cascade. Deterministic completion (mint
+  `line_id`, rename a duplicate rather than drop the row, resolve a blank
+  `speaker_role` from a real cast `char_id`, turn an unsayable row into an
+  EXPLICIT skip with its reason, re-derive counts through the canonical
+  `set_line_text_metrics` owner) -> safety repair IN PLACE -> one bounded LLM
+  `meta.episode_title` fill with a source-derived backstop -> `LedgerIncomplete
+  Error` naming every remaining hole at once. THE LAW HOLDS BOTH WAYS: residual
+  unsafe hits are REPORTED, never escalated (a second terminal content policy
+  is exactly what the law forbids), so the freeze gate's G9 stays the
+  last-resort backstop -- it should now rarely fire, because
+  `content_owned_readonly` SKIPS the cascade's inline safety cleanup on the
+  assumption the producer already cleaned, and for a client bank the shared
+  writer IS that producer. `1504bb4c` is the same wave's smaller half: the
+  reserved `"self"` interpreter now gets its own fallback-brief branch instead
+  of `UnknownInterpreterError`. TWO FINDINGS, both from failures this pass
+  caused, are in the log: the ANNOUNCER (a voiced `char_id` with no cast row is
+  LEGAL), and the episode seed (NOT this pass's to own -- minting one broke
+  tail byte-identity).
+- LANDED earlier the same day (detail in `docs/HANDOFF_LOG.md`): wave 5, the
+  bounded `nodes/_otr_feed_fetch.py` network seam and its
+  `FeedFetchRefused` / `FeedFetchUnavailable` split, @ `c97a0e91` + `8c45172d`;
+  wave 4, the `otr_check bank <path> [--activate]` CLI and the
+  `validate_client_bundle_contract()` routing seam, @ `84945bc4`; waves 1-3,
+  client-bundle integrity + admission in the one routing authority + the
+  client-owned `fetch_source` / `interpret_source` execution seam, @ `66e214ec`
+  + `cc69e683`. `docs/EXTENDING_OTR.md` carries the landed contract for all
+  six waves.
 - Prior root fix at `f150213f`: `nodes/_otr_video_engines/render_driver.py` requires
   an authoritative scene-target manifest only for scene/mesh-consuming shots;
   visualizer-only `viz_mxc_cpu`, `viz_mxc_mandala`, and `viz_camera` lanes may
   execute without one. Regression coverage:
   `tests/test_ledger_cleanup_contracts.py`.
-- Verification: full Windows OTR suite `6264 passed, 27 skipped, 1 xfailed`;
+- Verification: full Windows OTR suite `6398 passed, 27 skipped, 1 xfailed`;
   Bug Bible `17 passed, 24 skipped, 3 xfailed`.
 - Canonical workflow byte-identical at SHA-256
   `A66A416BFBCAD127356047043C8C07637BC50CACE2CD7D4E0436C7CD80B09CB4`.
@@ -323,11 +314,14 @@ by the campaign queue.)
    wave 4 (the `otr_check bank --activate` CLI) LANDED @ `84945bc4`;
    `check_compatibility` was NOT wired -- `EXTENDING_OTR.md` now calls it a
    reserved name with no contract. Wave 5 (the bounded `_otr_feed_fetch` seam,
-   ALL THREE hops -- the plan said two) LANDED @ `c97a0e91`;
-   `EXTENDING_OTR.md` carries the seam as the client contract. REMAINING:
-   **w6** the ledger-cleanup pass in the shared tail -- ALSO the right home for
-   the client-interpreter fallback gap below; **w7** story_pack widget /
-   canonical JSON if a surface changes. Re-estimate at each wave boundary.
+   ALL THREE hops -- the plan said two) LANDED @ `c97a0e91`. Wave 6 (the
+   ledger-cleanup pass in the shared tail + the client-interpreter fallback
+   gap) LANDED @ `1504bb4c` + `3d97a130`; `EXTENDING_OTR.md` section 4 now
+   describes what actually landed. REMAINING: **w7** story_pack widget /
+   canonical JSON -- ASSESS FIRST, because waves 1-6 changed no node, widget or
+   link and the canonical hash never moved; if no surface needs to change, w7
+   closes as satisfied and the whole block is DONE for v1. Re-estimate at the
+   wave boundary.
 3. **Randomizer Rolls Design A** --
    `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`, AFTER extensibility
    (its `_otr_lane_specs` authority is ABSORBED by the extensibility build;
@@ -362,7 +356,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
 | CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |
 | PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out; plan upkeep | rungs 2-4 | parallel with D | docs |
-| CODER E | independent client-authored source banks (lean v1); waves 1-5 LANDED @ `8c45172d`; NEXT = **wave 6** (ledger-cleanup pass in the shared tail + the client-interpreter fallback gap), then w7 surfaces | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
+| CODER E | independent client-authored source banks (lean v1); waves 1-6 LANDED @ `3d97a130`; NEXT = **wave 7** (story_pack widget / canonical JSON) -- ASSESS FIRST, it may already be satisfied and close the block | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
 | CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | after E | ~6-11 d |
 | CODER G "lean-mean tail" | SW1-SW3, C6, C7, W8 | Claude; Fable single final epoch gate | after F | multi-day |
 
@@ -413,7 +407,7 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-24): full Windows suite `6365 passed /
+- Current whole-tree receipt (2026-07-24): full Windows suite `6398 passed /
   27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`.
   Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
@@ -477,13 +471,15 @@ fixture creates a row.
   client-facing DOC as "reserved, no contract, ignored if defined" and nowhere
   in executable code, because code that names an interface is read as
   enforcing it.)
-- **Client-interpreter fallback gap (known, deliberate, w6):**
-  `_otr_source_payload.build_source_interpreter_fallback` switches on the four
-  SHIPPED interpreter ids and raises `UnknownInterpreterError` otherwise, so a
-  client interpreter that raises `SourceInterpretError` with an
-  `.attempts`-carrying cause reaches it and gets a confusing message. Failing
-  loud is correct meanwhile; inventing a generic client fallback belongs to the
-  w6 ledger-cleanup pass, not to a patch.
+- **The ledger-cleanup pass now runs on EVERY bank, not just client banks**
+  (wave 6, `3d97a130`). It is a no-op on a complete ledger and costs no LLM
+  call there, but two shipped-lane behaviours did change and are worth watching
+  on the next live legs: (a) unsafe spoken language on a
+  `content_owned_readonly` bank is now REPAIRED at the writer tail instead of
+  reaching G9 untouched, so a leg that used to die at freeze may now ship a
+  sanitized line; (b) a blank `meta.episode_title` is now filled at the tail
+  instead of exploding later in `otr_credits_roll`. Both are the intended
+  direction under THE LAW; neither has a live receipt yet.
 - Lean-mean front/tail drift: the tail's SW-1 re-survey is mandatory against
   the then-current writer. Never interleave the two campaigns in one window.
 - No code lands mid-sweep of an active qualification campaign (uniform-code

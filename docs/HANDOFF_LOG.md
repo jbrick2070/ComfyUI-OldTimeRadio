@@ -3,6 +3,71 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 14:15 -- HEAD 3d97a130 (v2.0-alpha) -- WINDOW CODER E (Opus)
+Did: independent source banks WAVE 6, two green pushed chunks.
+`1504bb4c` = the client-interpreter fallback gap. `build_source_interpreter_
+fallback` switched on the four SHIPPED interpreter ids, so a client bundle --
+which routes its lane through the reserved `"self"` entry point -- exhausted
+its own structured-output ladder and then died on `UnknownInterpreterError`
+naming an interpreter id of 'self': OUR router complaining about THEIR failure.
+`"self"` now has its own branch, building the brief from the bank's own label
+(or its id when unlabeled) plus the validated payload, asserting nothing about
+genre or form. Routing unlocks `"self"` only on an is_client row and never
+teaches it to the shipped registry, so reaching the branch PROVES the bank is
+client-owned -- no extra ownership lookup needed.
+`3d97a130` = the wave proper: `nodes/_otr_ledger_cleanup.py`, wired at the one
+shared producer boundary in `_run_writer_tail` (after every writer-side text
+mutation, before the TTS delivery stamp and the freeze cascade). Deterministic
+completion -> safety repair IN PLACE -> one bounded LLM `meta.episode_title`
+fill with a source-derived backstop -> `LedgerIncompleteError` naming every
+remaining hole at once. The hole it closes: `content_owned_readonly` SKIPS the
+cascade's inline safety cleanup because it assumes the producer already
+cleaned, and for a client bank the shared writer IS the producer -- so nothing
+cleaned, and the first unsafe word went straight to G9 and killed the episode.
+Residual hits are now REPORTED, never escalated; G9 stays the last-resort
+backstop, because a cleanup pass that raised on content would be a SECOND
+terminal content policy, which is precisely what THE LAW forbids.
+TWO FINDINGS, both bought with a failing suite, both worth carrying forward:
+(1) THE ANNOUNCER IS THE COUNTER-EXAMPLE. I required every voiced `char_id` to
+name a cast row. It does not: the announcer speaks on nearly every episode with
+char_id="announcer", lives in the Kokoro voice namespace rather than the cast's
+Bark one, and legitimately has NO cast[] entry -- which is exactly why the
+freeze gate's own per-line invariant requires a non-empty char_id and stops
+there. The class: a completion pass must never be STRICTER than the authority
+it completes for; being stricter invents a structural failure that authority
+does not recognize. An unlabeled caption is a quality cost, not a hole.
+(2) THE SEED WAS NOT MINE TO OWN. Stamping `meta.episode_seed` wherever both
+receipts were absent read as completion and was really a second owner -- a
+legacy lane's cast picker stamps `cast_contract.cast_seed` upstream, a
+content-owned lane's seed is stamped by the tail right after the call. It also
+broke `test_tail_byte_identity_same_inputs`, and the reason generalizes: a
+freshly minted seed is BY CONSTRUCTION not derivable from the inputs, so any
+pass that mints one cannot be byte-identical across two runs of the same
+inputs. The writer's original content-owned stamp is restored verbatim.
+Also caught by an existing guard and worth the reminder: `row["text"] = ...`
+anywhere under `nodes/` is forbidden (`test_text_metric_ownership`) -- text and
+its counts have ONE atomic owner, `set_line_text_metrics`.
+Gates: suite 6398 passed / 27 skipped / 1 xfailed (was 6365; +33); Bible
+17/24/3; AST/BOM/zero-byte/UTF-8 clean; canonical byte-identical A66A416B (no
+node, widget or link touched). Pathspec commits -- the other window's three
+modified tmp/*.ps1 and all untracked scratch preserved. `git commit -F` used
+throughout per the last window's note.
+Current step: CODER E wave 7 -- story_pack widget / canonical JSON. ASSESS
+FIRST: waves 1-6 changed no node, widget or link and the canonical hash never
+moved, so w7 may already be satisfied; if it is, close the extensibility block
+as DONE for v1 rather than inventing a surface change.
+Next: fresh CODER E window assesses w7. CODER A (bug-first) and RENDER remain
+open in parallel. Operator/planner still owns the `check_compatibility` fork.
+Watch on the next live legs: the cleanup pass now runs on EVERY bank (no-op and
+zero LLM cost on a complete ledger), so a content-owned leg that used to die at
+G9 may now ship a sanitized line, and a blank episode_title is filled at the
+tail instead of exploding later in otr_credits_roll. Neither has a live receipt.
+Models: Claude Opus (rung 4) only. Two strikes used and spent on the two
+findings above, both fixed at root on the second swing; no third attempt, so no
+kibitz was owed.
+Commits: 1504bb4c (client fallback) + 3d97a130 (ledger cleanup) + this handoff.
+
+
 ## 2026-07-24 12:22 -- HEAD 8c45172d (v2.0-alpha) -- WINDOW CODER E (Opus)
 (Clock note: the entry below it reads 14:05 but its commit `eba8da25` is
 stamped 11:45 local. This entry's time is the real local time; the log is
