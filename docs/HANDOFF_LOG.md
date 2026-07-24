@@ -3,6 +3,66 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 14:05 -- HEAD 84945bc4 (v2.0-alpha) -- WINDOW CODER E (Opus)
+Did: independent source banks WAVE 4, one green pushed chunk @ 84945bc4 -- the
+`otr_check bank <path> [--activate] [--all] [--json]` CLI (`scripts/otr_check.py`
++ `otr_check.bat`, OTR_PYTHON -> venv -> py -3 resolution, PYTHONUTF8 set).
+The CLI owns NO format: `_otr_user_banks` gained `preflight_bundle`,
+`preflight_bundle_record`, `write_activation`, `activation_status`,
+`UserBankActivationError` and the status constants, and `_validate_bundle` was
+split into `_validate_authoring` + the receipt half so the authoring checks can
+run on a bundle that has no receipt yet -- boot's check ORDER is unchanged, so a
+doubly-broken bundle still reports the code it always reported.
+THE FIND, and the reason wave 4 was not just a file writer: `discover()` is NOT
+all of admission. `_admit_user_banks` runs `_sweep_pack_dir` + `_crossref_bank`
+AFTER it, so a checker that validated with the row parser alone would hand a
+receipt to a bank that quarantines at boot as `bad_bundle_contract` -- an
+activation that says yes to a bank the operator can never select. New routing
+seam `validate_client_bundle_contract()` runs exactly those two, and the CLI
+runs it BEFORE any write and also without `--activate`. Surfaced by the kibitz
+r3 panel, grounded against `_admit_user_banks` before accepting.
+Publication order is the safety property: staging copy -> hash the COPY against
+the validated digest -> `os.replace` the snapshot -> THEN the receipt (staged
+outside the bundle, because a temp file inside it would join the authoring bytes
+and change the digest being recorded). A crash between the two leaves the bundle
+UNCHECKED, which is honest; the reverse leaves a receipt naming a snapshot that
+never existed. Probe runs in a bounded child killed as a process TREE
+(`taskkill /F /T`) and binds each self-owned lane against the writer's real
+keyword sets -- `fetch_source(bank, technical_model, source_ref, load_config,
+policy)` and `interpret_source(bank, payload, technical_fn, model_id)`, read off
+the live call sites -- without calling anything. `fixtures/*.json` are validated
+as recorded fetch payloads by `normalize_fetch_result`, the same validator the
+live lane output meets; documented exactly that narrowly rather than as "runs
+your fixtures".
+DECISION -- `check_compatibility` NOT wired (Option A). No request type, no
+decision type, no runtime consumer, so activation does not inspect it, not even
+for callability; `EXTENDING_OTR.md` now calls it a reserved name instead of
+"NOT YET WIRED". `COMPAT_ENTRY_ATTR` left inert with a comment. Codex argued for
+deleting it outright; that touches landed wave-3 code and the plan of record, so
+it is FLAGGED in GO_FORWARD Open risks for the operator/planner, not done here.
+Gates: suite 6294 passed / 27 skipped / 1 xfailed (was 6264, +30 new tests in
+`tests/test_otr_check_cli.py`); Bible 17/24/3; AST/BOM/zero-byte/UTF-8 clean on
+all six touched files; canonical byte-identical A66A416B (no node/widget/link
+touched). Committed by pathspec -- the other window's three modified tmp/*.ps1
+and all untracked scratch preserved.
+Self-correction worth keeping: I wrote a code comment claiming
+`EXTENDING_OTR.md` had the wrong `fetch_source` signature. It did not -- I had
+misread a wrapped line in a partial file read. Fixed before commit. Read the
+whole declaration, not the line the offset happened to land on.
+Current step: CODER E wave 5 -- the bounded `_otr_feed_fetch` seam, BOTH hops
+(feed + article scrape): https-only, connect 5s / read 10s, 3 redirects, 2 MiB
+decoded cap, 2 retries, loopback/private/link-local reject, MIME media-type
+parse, one ~25s monotonic deadline, UA + charset. The r3 finding that network
+hardening is NOT inherited still stands -- re-pin it at HEAD first.
+Next: fresh CODER E window takes wave 5. CODER A (bug-first) and RENDER remain
+open in parallel.
+Models: Claude Opus (rung 4) + one kibitz arc -- r3 codex `gpt-5.6-sol` high
+(model pin verified in `codex_model_selected.txt`), r4 agy `gemini-3.6-flash-high`
+QA, which converged with no must-fix. Panel spent on a genuine design fork
+(operator-directed), not on a failure; no strike against the two-strikes law.
+Commits: 84945bc4 (wave 4) + this handoff commit.
+
+
 ## 2026-07-24 11:12 -- HEAD cc69e683 (v2.0-alpha) -- WINDOW CODER E (Opus)
 Did: independent source banks WAVE 3, one green pushed chunk @ cc69e683 --
 client bundles may now OWN their fetch/interpret lanes. A CLIENT row routes an

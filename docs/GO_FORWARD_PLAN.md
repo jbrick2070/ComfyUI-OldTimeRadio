@@ -1,14 +1,16 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-3
-LANDED @ `cc69e683`.** Client bundles are discovered, integrity-checked,
-admitted ALONGSIDE the shipped six in the one routing authority, and may now
-OWN their `fetch_source` / `interpret_source` via the reserved `"self"` entry
-point (client rows only, owner-identity checked, execution loud while discovery
-still quarantines). Suite 6264 / Bible 17; canonical byte-identical. NEXT for
-CODER E = wave 4 (`otr_check bank <path> --activate` CLI). SIX-BANK
-REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the render track;
-bug-first items still open for CODER A.
+**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-4
+LANDED @ `84945bc4`.** Client bundles are discovered, integrity-checked,
+admitted ALONGSIDE the shipped six in the one routing authority, may OWN their
+`fetch_source` / `interpret_source` via the reserved `"self"` entry point, and
+are now VALIDATED AND ACTIVATED by `scripts/otr_check.py bank <path>
+--activate` -- which runs the same admission contracts boot runs, imports the
+bundle in a bounded child process, binds the writer's keyword sets, and
+publishes the snapshot before the receipt. Suite 6294 / Bible 17; canonical
+byte-identical. NEXT for CODER E = wave 5 (the bounded `_otr_feed_fetch` seam,
+BOTH hops). SIX-BANK REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the
+render track; bug-first items still open for CODER A.
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to
@@ -21,7 +23,8 @@ This block is the current source of truth for the overnight qualification.
 Nothing in this file is an instruction to reset, stash, delete, or overwrite
 user changes.
 
-- Branch: `v2.0-alpha`; HEAD and origin are `cc69e683` (CODER E waves 1-3; the
+- Branch: `v2.0-alpha`; HEAD and origin are `84945bc4` (CODER E wave 4; waves
+  1-3 are `66e214ec` + `cc69e683`; the
   six-bank no-prose-gate retirement chunk is `314dd481` below). The worktree is
   CLEAN of task-owned changes -- what remains is `tmp/` scratch (including
   another window's modified `tmp/_chain_720.ps1`, `tmp/_rearm_gate.ps1`,
@@ -29,6 +32,19 @@ user changes.
   `config/profiles/otr_sbcov_1..6.json`, intentionally untracked
   coverage-campaign scratch; nothing in-repo references them, and untracked
   `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier window).
+- LANDED @ `84945bc4` (2026-07-24; suite 6294 passed / 27 skipped / 1 xfailed;
+  Bible 17; canonical byte-identical; pushed, HEAD == origin): wave 4, the
+  `otr_check bank <path> [--activate]` CLI (`scripts/otr_check.py` +
+  `otr_check.bat`). It owns no format -- `_otr_user_banks` gained
+  `preflight_bundle` / `write_activation` / `activation_status` (and
+  `_validate_bundle` split so the authoring half runs on a bundle with no
+  receipt, boot's check ORDER unchanged), and `_otr_story_routing` gained
+  `shipped_bank_seed()` + `validate_client_bundle_contract()`. The last one is
+  the wave's real find: `_admit_user_banks` runs `_sweep_pack_dir` +
+  `_crossref_bank` AFTER `discover`, so validating with the row parser alone
+  would have handed receipts to banks that quarantine at boot.
+  `check_compatibility` stays UNWIRED by decision (see the note under Open
+  risks).
 - LANDED @ `66e214ec` + `cc69e683` (2026-07-24; suite 6264 passed / 27 skipped
   / 1 xfailed; Bible 17; AST/BOM/zero-byte/canonical-hash gates passed; pushed,
   HEAD == origin): independent source banks waves 1-3. `nodes/_otr_user_banks.py`
@@ -287,16 +303,13 @@ by the campaign queue.)
    the one authority) LANDED @ `66e214ec`; wave 3 (client-owned
    `fetch_source`/`interpret_source` via the reserved `"self"` entry point)
    LANDED @ `cc69e683`. REMAINING WAVES, in order:
-   **w4** `otr_check bank <path> --activate` CLI writing the snapshot + receipt
-   (`_otr_user_banks` already owns the format: `RECEIPT_KEYS`,
-   `bundle_digest`, `snapshot_dirname`; it is ALSO the planned caller for the
-   still-unwired `check_compatibility` entry point, which `EXTENDING_OTR.md`
-   currently marks NOT YET WIRED -- either wire it here or keep that label
-   honest); **w5** the bounded `_otr_feed_fetch` seam, BOTH hops (feed +
-   article scrape); **w6** the ledger-cleanup pass in the shared tail -- ALSO
-   the right home for the client-interpreter fallback gap below; **w7**
-   story_pack widget / canonical JSON if a surface changes. Re-estimate at each
-   wave boundary.
+   wave 4 (the `otr_check bank --activate` CLI) LANDED @ `84945bc4`;
+   `check_compatibility` was NOT wired -- `EXTENDING_OTR.md` now calls it a
+   reserved name with no contract. REMAINING: **w5** the bounded
+   `_otr_feed_fetch` seam, BOTH hops (feed + article scrape); **w6** the
+   ledger-cleanup pass in the shared tail -- ALSO the right home for the
+   client-interpreter fallback gap below; **w7** story_pack widget / canonical
+   JSON if a surface changes. Re-estimate at each wave boundary.
 3. **Randomizer Rolls Design A** --
    `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`, AFTER extensibility
    (its `_otr_lane_specs` authority is ABSORBED by the extensibility build;
@@ -331,7 +344,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
 | CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |
 | PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out; plan upkeep | rungs 2-4 | parallel with D | docs |
-| CODER E | independent client-authored source banks (lean v1); waves 1-3 LANDED @ `cc69e683`; NEXT = **wave 4** (`otr_check bank --activate` CLI), then w5 bounded fetch, w6 ledger cleanup, w7 surfaces | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
+| CODER E | independent client-authored source banks (lean v1); waves 1-4 LANDED @ `84945bc4`; NEXT = **wave 5** (bounded `_otr_feed_fetch` seam, BOTH hops), then w6 ledger cleanup, w7 surfaces | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
 | CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | after E | ~6-11 d |
 | CODER G "lean-mean tail" | SW1-SW3, C6, C7, W8 | Claude; Fable single final epoch gate | after F | multi-day |
 
@@ -382,7 +395,7 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-24): full Windows suite `6264 passed /
+- Current whole-tree receipt (2026-07-24): full Windows suite `6294 passed /
   27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`.
   Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
@@ -404,8 +417,8 @@ fixture creates a row.
   drafted, so CODER E is executing. Materially smaller than the retired
   ~21-31-day A/B scope; it still constrains randomizer + dynamic_story
   sequencing. Deferred power-user tiers (client own-runner + staging, deps,
-  story_rules) are explicitly out of v1, not forgotten. Waves 1-3 are LANDED
-  (@ `cc69e683`); the remaining waves still touch the writer hot path.
+  story_rules) are explicitly out of v1, not forgotten. Waves 1-4 are LANDED
+  (@ `84945bc4`); the remaining waves still touch the writer hot path.
 - CLIENT-AUTHORED PYTHON now executes in-process (wave 3). The posture that
   must hold in every later wave: `--activate` is the consent act; the seam
   fails LOUD (`UserBankExecutionError`) and never substitutes; client code
@@ -413,6 +426,17 @@ fixture creates a row.
   only run its OWN bundle; the shipped fetcher/interpreter registries are never
   widened to admit a client id. Do not relax any of these to make a later wave
   easier.
+- **`check_compatibility` is RESERVED, not wired (wave-4 decision, kibitz
+  r3 codex `gpt-5.6-sol` high + r4 agy Gemini 3.6 Flash High, Claude judge).**
+  No request type, no decision type, no runtime consumer exists, so activation
+  does not inspect it -- not even for callability -- and `EXTENDING_OTR.md`
+  now calls it a reserved name instead of "NOT YET WIRED". `COMPAT_ENTRY_ATTR`
+  is left INERT in `BUNDLE_ENTRY_ATTRS` with a comment saying so. **Operator /
+  planner decision flagged:** codex argued for deleting the constant outright
+  (it names a pseudo-ABI in executable code); that edit touches landed wave-3
+  code AND the plan of record's "fetch_source + interpret_source +
+  check_compatibility" line, which a coder window does not own. Either ratify
+  the inert constant or schedule the rip as a planner chunk.
 - **Client-interpreter fallback gap (known, deliberate, w6):**
   `_otr_source_payload.build_source_interpreter_fallback` switches on the four
   SHIPPED interpreter ids and raises `UnknownInterpreterError` otherwise, so a
