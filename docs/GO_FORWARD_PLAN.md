@@ -1,11 +1,10 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-24 (planner handoff @ docs HEAD `ed8d5a6d`; code HEAD
-`f150213f`) -- **LEANED TO OPEN WORK ONLY (completed strata live in
-`docs/HANDOFF_LOG.md` + git history of this file); MODEL & CREDIT BUDGET
-ADDED; otr-handoff SKILL v2 LIVE (baton now enforces model-rung-first +
-commit-AND-push). CANONICAL MEDIA QUALIFICATION MONITORED; 45-WORD SCENE
-MATRIX NEXT.**
+**Updated:** 2026-07-24 -- **SIX-BANK NO-PROSE-GATE CHUNK LANDED @
+`314dd481` (312 files, +8,085/-74,529; suite 6182 green / Bible 17;
+canonical byte-identical; WORKTREE CLEAN). Plan leaned to open work only;
+MODEL & CREDIT BUDGET + otr-handoff SKILL v2 LIVE. SIX-BANK REQUALIFICATION
++ 45-WORD SCENE MATRIX NEXT.**
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to
@@ -18,10 +17,13 @@ This block is the current source of truth for the overnight qualification.
 Nothing in this file is an instruction to reset, stash, delete, or overwrite
 user changes.
 
-- Branch: `v2.0-alpha`; code HEAD and origin are `f150213f` (`Fix no-still
-  visualizer spine handoff`). The dirty worktree remains intentional and must
-  be preserved.
-- Root fix in that HEAD: `nodes/_otr_video_engines/render_driver.py` requires
+- Branch: `v2.0-alpha`; code HEAD and origin are `314dd481` (the landed
+  six-bank no-prose-gate retirement chunk; see the LANDED bullet below). The
+  worktree is CLEAN of task-owned changes -- what remains is `tmp/` scratch
+  and untracked campaign receipts (plus `config/profiles/otr_sbcov_1..6.json`,
+  intentionally untracked coverage-campaign scratch; nothing in-repo
+  references them).
+- Prior root fix at `f150213f`: `nodes/_otr_video_engines/render_driver.py` requires
   an authoritative scene-target manifest only for scene/mesh-consuming shots;
   visualizer-only `viz_mxc_cpu`, `viz_mxc_mandala`, and `viz_camera` lanes may
   execute without one. Regression coverage:
@@ -43,8 +45,9 @@ user changes.
 - Overnight monitoring automation is active in the Codex app as
   `otr-overnight-qualification-monitor`. It must continue from the live logs,
   preserve canonical assets, and report terminal receipts or reproduced bugs.
-- The dirty worktree holds the six-bank no-prose-gate retirement chunk (owned
-  by the active coder window; no other coder touches it): word-fit ceilings /
+- LANDED @ `314dd481` (2026-07-24; suite 6182 passed / 27 skipped / 1
+  xfailed; Bible 17; AST/BOM/zero-byte/canonical-hash gates passed; pushed,
+  HEAD == origin): word-fit ceilings /
   candidate ownership retired (length = non-gating telemetry on all six
   routes); provider-capacity whole-artifact output contracts with preserved
   list-subclass markers; `scifi_news` P1/P2/P3/P5 + `scifi_news_pro`
@@ -124,22 +127,19 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- finish the six-bank no-prose-gate retirement
+## CURRENT STEP -- six-bank requalification + bug-first fixes
 
-The active coder window owns the uncommitted refactor described in the
-handoff block above. In order:
+The retirement chunk is LANDED (`314dd481`); the coder slot is FREE. In
+order:
 
-1. Land the working-tree chunk: focused tests, full Windows suite, Bug Bible,
-   stage ONLY task-owned paths (the tree also holds unrelated user files),
-   commit and push green to `v2.0-alpha`, verify `HEAD == origin`.
-2. Keep the RTX 5080 free for ComfyUI; the 4060 Qwen endpoint is a read-only
+1. Requalify the captured six-bank leg against the landed code: require
+   canonical `RESULT SUCCESS`, `obs_publish OK`, exact episode/OBS assets,
+   AND the archival final's parent equal to the ledger-owned episode root
+   (PBUG-20260720-05 acceptance).
+2. Close the remaining bug-first items below, one green pushed chunk each.
+3. Keep the RTX 5080 free for ComfyUI; the 4060 Qwen endpoint is a read-only
    QA reviewer, not a production ComfyUI slot.
-3. Requalify the captured six-bank leg only after the next bug-fix chunk;
-   require canonical `RESULT SUCCESS`, `obs_publish OK`, exact episode/OBS
-   assets, AND the archival final's parent equal to the ledger-owned episode
-   root (PBUG-20260720-05 acceptance).
-4. Keep GPU media qualification paused until the remaining bug-first items
-   below are closed.
+4. Keep GPU media qualification paused until the bug-first items are closed.
 
 ## OPERATOR CAMPAIGN QUEUE -- 2026-07-23 (PAUSED)
 
@@ -151,8 +151,8 @@ confirmed bugs are being closed. Failure inventory / staging record:
 Bug-first order before resuming:
 
 1. Requalify receipt truth against the captured six-bank stdout and confirm
-   the old false PASS is now a terminal FAIL (fix is in the dirty tree;
-   needs the landed commit + live confirmation).
+   the old false PASS is now a terminal FAIL (fix LANDED @ `314dd481`;
+   needs live confirmation only).
 2. Make the image phase own every required scene-still, mesh-fodder, and
    opening-still target, with a complete target/path receipt before video
    dispatch; no text-only or dark-floor degradation for a missing required
@@ -192,8 +192,8 @@ receipt under `tmp/`.
   convergence, extends BUG-11.35. NOT a word/length gate. Blocks the last 120w
   receipt and quick-win 1.
 - **`scifi_news_pro` provider capacity** -- `requested_output=2800` vs
-  provider cap `512`; whole-artifact retry contract work in the dirty tree is
-  the base; residual fix after it lands. Related independent items: the P9 8K
+  provider cap `512`; the whole-artifact retry contracts LANDED @ `314dd481`
+  are the base; the residual fix is now unblocked. Related independent items: the P9 8K
   structured-capacity follow-up + the GGUF structured-enforcement NEWBUG. Do
   not raise the minimum word target as a capacity workaround.
 - **WAN 8-GB low-VRAM launch contract** -- bug-first item 3 above.
@@ -214,7 +214,7 @@ One coder window at a time; every chunk = focused tests + full suite + Bug
 Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
 
 ```text
-land the dirty-tree no-prose-gate chunk -> six-bank requalification
+six-bank requalification (chunk landed @ 314dd481)
   -> bug-first items (receipt truth live, still ownership, WAN contract)
   -> 45w scene matrix + 54-case visual-style qualification
   -> quick-wins block (coder windows A/B/C)
@@ -286,7 +286,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER (running now) | finish six-bank wrap -> 45w scene matrix -> 54-case style sweep; fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | bug-first items closed per campaign queue | GPU days |
-| CODER A "seams" | land dirty-tree chunk if unowned, then quick-wins 1 + 2 + 3 + 4 | Claude codes, Qwen triages, codex on 3rd strike | no code mid-sweep | ~2-4 d |
+| CODER A "seams" | bug-first items 1-3 (receipt-truth live confirm, still ownership, WAN contract), then quick-wins 1 + 2 + 3 + 4 | Claude codes, Qwen triages, codex on 3rd strike | no code mid-sweep | ~2-4 d |
 | CODER B "harness" | quick-wins 5 + 10, then one canonical `scifi_news_pro` full-media qualification leg | same | after A | ~1-2 d |
 | CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
 | CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |

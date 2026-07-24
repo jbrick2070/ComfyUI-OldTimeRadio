@@ -3,6 +3,24 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 08:00 -- HEAD 314dd481 (v2.0-alpha) -- WINDOW PLANNER->CODER (Fable)
+
+Did: LANDED the six-bank no-prose-gate retirement chunk @ 314dd481 (312
+files, +8,085/-74,529: provider-capacity whole-artifact contracts, word-fit
+ceiling rip, structural markup acceptance, G13 retirement, receipt-truth
+hardening, repair-first P0, Qwen-Image removal; incl. 5 new tests + 8 dated
+docs; canonical json byte-identical A66A416B...). Gates: suite 6182/27/1,
+Bible 17/24/3, AST/BOM/zero-byte clean, pushed, HEAD==origin. tmp/ scratch +
+otr_sbcov profiles intentionally left untracked. GO_FORWARD refreshed:
+worktree CLEAN, current step -> six-bank requalification + bug-first fixes.
+Current step: requalify the captured six-bank leg on landed code, then
+bug-first items (receipt-truth live confirm, still ownership, WAN contract).
+Next: fresh Opus window -- PLANNER (sec-16 + r5 kibitz, codex fresh) and/or
+CODER A (bug-first items); coder slot is FREE.
+Models: Claude Fable only; suite/Bible local; no panels spent.
+Commits: 314dd481 (chunk) + this handoff commit.
+
+
 ## 2026-07-24 07:35 -- HEAD ed8d5a6d (v2.0-alpha) -- WINDOW PLANNER (Fable)
 
 Did: leaned GO_FORWARD_PLAN.md to open work + bugs only (665->398 lines; done
