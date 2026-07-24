@@ -135,6 +135,15 @@ user_packs/source_banks/<bank_id>/
   (with `news_close_brief` in the dump). The same
   `validate_interpreter_result` that judges the shipped interpreters judges
   yours, and the writer -- not you -- writes the result into the ledger.
+  If your interpreter exhausts its own structured-output repair ladder and
+  raises `SourceInterpretError`, the writer does NOT abort: it derives a
+  deterministic same-source brief from your bank's label and the validated
+  payload, exactly as it does for the shipped four, and stamps
+  `meta.source_interpreter.status = "deterministic_same_source_fallback"`.
+  That brief carries your source forward verbatim and invents no genre --
+  it keeps the episode alive, it is not a substitute for a working
+  interpreter. Any other failure (bad config, backend down, a contract
+  violation in your return value) still propagates loudly.
 - **`check_compatibility`** is a RESERVED NAME with no contract. Nothing calls
   it, and `otr_check bank --activate` deliberately does not inspect it -- not
   even for callability. There is no request type, no decision type, and no

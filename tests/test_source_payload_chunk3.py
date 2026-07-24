@@ -892,6 +892,58 @@ def test_source_interpreter_fallback_rejects_unknown_route():
         )
 
 
+def test_source_interpreter_fallback_serves_a_client_owned_lane():
+    """The reserved client lane gets a brief, not a router-error message.
+
+    A client interpreter that exhausts its structured-output ladder used to
+    reach `UnknownInterpreterError` naming 'self' -- OUR router complaining
+    about THEIR failure. The brief is built from the client's own bank
+    identity plus the validated payload; it borrows no shipped dramaturgy.
+    """
+    bank = SimpleNamespace(
+        interpreter=osp.client_entry_point_id(),
+        label="Lighthouse Logs",
+        source_bank_id="lighthouse_logs",
+    )
+    payload = _rich_payload()
+    fallback = osp.build_source_interpreter_fallback(
+        bank=bank,
+        payload=payload,
+        source_meta={"cast_hints": ["Keeper Nan"]},
+        attempts=2,
+        failure_reason="client interpreter schema remained malformed",
+    )
+    dump = osp.validate_interpreter_result(
+        fallback, origin="client-fallback-test")
+    assert dump["deterministic_fallback"] is True
+    assert fallback.model_id == "deterministic"
+    assert fallback.attempts == 2
+    assert fallback.key_terms == []
+    assert fallback.character_names == ["Keeper Nan"]
+    assert "Lighthouse Logs" in fallback.script_brief
+    assert "Lighthouse Logs" in fallback.news_close_brief
+    assert payload["headline"] in fallback.script_brief
+    assert payload["summary"] in fallback.script_brief
+
+
+def test_client_fallback_names_the_bank_id_when_the_row_has_no_label():
+    bank = SimpleNamespace(
+        interpreter=osp.client_entry_point_id(),
+        label="",
+        source_bank_id="lighthouse_logs",
+    )
+    fallback = osp.build_source_interpreter_fallback(
+        bank=bank,
+        payload=_rich_payload(),
+        source_meta=None,
+        attempts=1,
+        failure_reason="exhausted",
+    )
+    osp.validate_interpreter_result(fallback, origin="client-fallback-unlabeled")
+    assert "lighthouse_logs" in fallback.script_brief
+    assert fallback.character_names == []
+
+
 class _SlotSchedulerStub:
     transitions = 0
     calls_by_slot = {"creative": 0, "technical": 0}

@@ -387,8 +387,13 @@ def build_source_interpreter_fallback(
 ) -> SourceInterpreterFallback:
     """Build a validated, bank-specific minimum brief from source truth.
 
-    Only the four registered source-interpreter families are accepted.  Router
-    mistakes and malformed source payloads remain hard contract failures.
+    The four registered source-interpreter families each get their own
+    template.  A CLIENT-owned lane (the reserved ``self`` entry point) gets a
+    source-grounded brief built from the bank's own identity, because there is
+    no shipped dramaturgy to borrow and guessing one would author a genre the
+    client never asked for.  Router mistakes -- an interpreter id that is
+    neither registered nor the reserved client value -- and malformed source
+    payloads remain hard contract failures.
     """
     clean_payload = validate_source_payload(
         payload, origin="build_source_interpreter_fallback",
@@ -490,6 +495,35 @@ def build_source_interpreter_fallback(
         close = (
             "The preceding dramatization was inspired by the supplied report; "
             f"the reported source was {headline or 'the selected article'}."
+        )
+    elif interpreter_id == _user_banks().SELF_ENTRY_POINT:
+        # A CLIENT bundle owns this lane.  `_otr_story_routing` unlocks the
+        # reserved id only on an `is_client` row and never teaches it to the
+        # shipped registry, so reaching this branch proves the bank is
+        # client-owned.  There is no shipped template to borrow: the brief is
+        # built from the bank's OWN identity plus the validated payload, and
+        # asserts nothing about genre, period, or form that the client did not
+        # supply.  Without this branch a client interpreter that exhausted its
+        # structured-output ladder died on `UnknownInterpreterError` naming
+        # 'self' -- a message about OUR router for a failure that was theirs.
+        bank_label = (
+            str(getattr(bank, "label", "") or "").strip()
+            or str(getattr(bank, "source_bank_id", "") or "").strip()
+            or "this source bank"
+        )
+        casting = (
+            "Cast speakers whose roles are supported by the supplied source "
+            "material, with distinct, natural radio voices." + names_clause
+        )
+        script = (
+            "Create a compact SFW radio drama grounded only in the supplied "
+            f"source material from {bank_label}. Treat that source as the "
+            "only authority for factual claims, keep the dramatic turn it "
+            f"supports, and resolve it there. {source_context}"
+        )
+        close = (
+            f"This broadcast was drawn from {bank_label}{headline_suffix}; "
+            "all added dramatic events are fictional."
         )
     else:
         raise UnknownInterpreterError(
