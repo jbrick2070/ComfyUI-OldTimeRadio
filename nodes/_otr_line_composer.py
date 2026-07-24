@@ -1,107 +1,23 @@
-"""nodes/_otr_line_composer.py
+"""Per-beat dialogue construction for the shared inline writer.
 
-Per-beat dialogue line generation for the v2.0 LedgerScriptWriter path.
-
-Takes one Beat + EpisodeCanon header + last N ledger lines, generates ONE
-raw dialogue string from the LLM, strips any leaked formatting (speaker
-prefixes, brackets, markdown, wrapping quotes), returns the cleaned text
-plus any compose-time flags (e.g. phantom-name detections).
-
-The LLM is told to output only the spoken line. Python attaches the
-[VOICE: NAME, traits] format tag deterministically at ledger-stamp time
-(in OTR_LedgerScriptWriter, not here). This module never produces or
-expects format markup.
-
-Status: Phase 2 of v2.0 sprint, extended with Phase 0 name-roster gate
-(2026-05-11). Companion to _otr_outline.py.
-
-Public surface:
-    LineRequest                   -- frozen dataclass: per-line input
-    LineResult                    -- frozen dataclass: (text, compose_flags)
-    LineCompositionFailedError    -- raised after 2 failed attempts
-    compose_line(...)             -- orchestrator: draft -> polish -> strips
-    compose_line_draft(...)       -- Sprint 3A: the creative job, returns str
-    cast_strip(...)               -- Sprint 3A: near-miss phantom remap
-    strip_line_formatting(...)    -- public for testing / one-shot use
-    build_allowed_roster(...)     -- assemble UPPERCASE roster for the gate
-    detect_phantom_names(...)     -- proper-noun extractor + roster check
-    aggregate_compose_flags(...)  -- post-loop helper, stamps meta summary
+The model authors one spoken line. Python removes only transport markup such as
+speaker labels, markdown wrappers, and explicit ACTION markers. Requested word
+length and prose quality never cause retry, replacement, trimming, or failure;
+the only retries are bounded empty/malformed transport retries. Episode-level
+same-story safety cleanup and structural freeze run after the first whole
+ledger exists.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
-from dataclasses import dataclass, field, replace
-from typing import Iterable, Optional
+from dataclasses import dataclass, field
+from typing import Optional
 
-# Bare leading stage-direction detector (2026-06-22). _otr_line_hygiene is a
-# stdlib-only leaf -> no import cycle. Dual import (package / standalone).
-try:  # pragma: no cover - exercised by both import styles
-    from ._otr_line_hygiene import (
-        _hard_clauses,
-        deterministic_hygiene_floor,
-        derive_one_breath_cap,
-        detect_stage_business_for_reroll,
-        extract_specificity_anchors_from_header,
-        find_cliche_phrase,
-        flag_anchor_stuffing,
-        flag_cliche,
-        flag_objective_literal,
-        flag_on_the_nose,
-        flag_one_breath,
-        flag_personal_cost_boilerplate,
-        flag_stage_business,
-        flag_thesis_close,
-        is_stage_direction_only,
-        is_truncated,
-        repair_cliche_span,
-        scrub_roster_vocative,
-        scrub_self_vocative,
-        strip_action_marker,
-        verify_and_repair_line,
-    )
+try:  # pragma: no cover - package / standalone import styles
+    from ._otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN
 except ImportError:  # pragma: no cover
-    from _otr_line_hygiene import (  # type: ignore
-        _hard_clauses,
-        deterministic_hygiene_floor,
-        derive_one_breath_cap,
-        detect_stage_business_for_reroll,
-        extract_specificity_anchors_from_header,
-        find_cliche_phrase,
-        flag_anchor_stuffing,
-        flag_cliche,
-        flag_objective_literal,
-        flag_on_the_nose,
-        flag_one_breath,
-        flag_personal_cost_boilerplate,
-        flag_stage_business,
-        flag_thesis_close,
-        is_stage_direction_only,
-        is_truncated,
-        repair_cliche_span,
-        scrub_roster_vocative,
-        scrub_self_vocative,
-        strip_action_marker,
-        verify_and_repair_line,
-    )
-
-# Story-quality v2 (R3) tunables. _otr_config is a stdlib-only leaf -> safe to
-# import at module load (keeps the composer's import surface stdlib-only).
-try:  # pragma: no cover - exercised by both import styles
-    from ._otr_config import (
-        OBJECTIVE_DEFLECTION_TENSION_MIN,
-        composer_action_strip_enabled,
-        leak_floor_v2_enabled,
-        strict_local_clean_enabled,
-    )
-except ImportError:  # pragma: no cover
-    from _otr_config import (  # type: ignore
-        OBJECTIVE_DEFLECTION_TENSION_MIN,
-        composer_action_strip_enabled,
-        leak_floor_v2_enabled,
-        strict_local_clean_enabled,
-    )
+    from _otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -111,30 +27,19 @@ __all__ = [
     "LineResult",
     "LineCompositionFailedError",
     "compose_line",
-    "repair_existing_spoken_line",
-    "spoken_surface_flags_for_line",
-    "finalize_news_coda_surface",
-    "strip_line_formatting",
-    "build_allowed_roster",
-    "build_banned_source_proper_nouns",
-    "detect_phantom_names",
-    "strip_announcer_vocative",
-    "aggregate_compose_flags",
-    # Sprint 3A (2026-05-25) -- compose_line split into single-job stages
     "compose_line_draft",
-    "cast_strip",
-    # Phase 1 (2026-05-11)
+    "strip_line_formatting",
+    "aggregate_compose_flags",
     "render_outline_spine",
-    "build_voice_card",
-    # Phase 4 v4 (2026-05-11)
     "render_current_beat",
-    # Announcer dedicated passes (2026-05-22, BUG-LOCAL-255)
+    "build_voice_card",
     "clean_one_line",
     "validate_announcer_line",
     "fallback_announcer_intro",
     "fallback_announcer_outro",
     "compose_announcer_intro",
     "compose_announcer_outro",
+    "finalize_news_coda_surface",
 ]
 
 
@@ -144,35 +49,38 @@ __all__ = [
 
 # Generation params
 _BASE_TEMPERATURE = 0.8
-_MAX_NEW_TOKENS_PER_LINE = 200  # ~150 words max, generous for any beat
-_MAX_OVERSIZE_RATIO = 3.0       # response > 3x target_words triggers retry
-_QUALITY_REPAIR_B_TEMPERATURE = 0.30
-_QUALITY_REPAIR_C_TEMPERATURE = 0.18
-# Quality rejection means "repair again", never "end the episode".  The first
-# A/B/C rungs preserve their established prompts/temperatures; stubborn rows
-# then enter a dynamically sized cross-slot loop.  The cap is a backend-hang
-# guard, not a quality verdict: exhaustion falls through to the validated
-# deterministic ledger floor below.
-_QUALITY_DYNAMIC_MIN_MODEL_PASSES = 6
-_QUALITY_DYNAMIC_MAX_MODEL_PASSES = 12
-_QUALITY_DYNAMIC_TEMPERATURES = (0.22, 0.12, 0.18, 0.08)
+_MAX_NEW_TOKENS_PER_LINE = 200
 
-# Format-strip regexes (applied in order in strip_line_formatting)
+# Exact response-transport marker; this is syntax, not prose classification.
+_ACTION_MARKER_RE = re.compile(
+    r"(?im)(?:^|(?<=[.!?\"'\)\]\s]))ACTION:\s*[^\n]*"
+)
+
+
+def strip_action_marker(text: object) -> tuple[str, str, int]:
+    """Remove explicitly labelled ACTION transport from a model response."""
+    surface = str(text or "")
+    if "action:" not in surface.casefold():
+        return surface, "", 0
+    removed: list[str] = []
+
+    def _take(match: re.Match) -> str:
+        removed.append(match.group(0))
+        return " "
+
+    cleaned = _ACTION_MARKER_RE.sub(_take, surface)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"\s+([.,!?;:])", r"\1", cleaned)
+    return cleaned, " ".join(item.strip() for item in removed), len(removed)
+
+# Explicit response-transport syntax. A bare bracketed word or uppercase
+# WORD: prefix can be authored prose, so those forms are removed only when
+# WORD is an exact locked speaker label.
 _PREFIX_VOICE_TAG_RE = re.compile(
-    r"^\s*\[\s*(?:VOICE\s*:\s*)?[A-Z][A-Z0-9_ .]{0,30}(?:\s*,\s*[^\]]+)?\s*\]\s*",
+    r"^\s*\[\s*VOICE\s*:\s*[^\]]+\]\s*",
     re.IGNORECASE,
 )
-_PREFIX_SPEAKER_COLON_RE = re.compile(
-    r"^\s*[A-Z][A-Z0-9_ .]{0,30}\s*[:\-—]\s*",
-)
-# Tier 1 fix #6 (2026-05-11): Mistral-Nemo / Gemma emit mixed-case
-# speaker prefixes ("Alice:", "Bob -") in ~5-10% of attempts. The
-# uppercase-anchored regex above won't catch those. Build a dynamic
-# secondary stripper from the actual cast names + ANNOUNCER, case-
-# insensitive, in compose_line via `_build_named_prefix_re(names)`.
-# The uppercase regex stays as the fallback for cases where the
-# composer is invoked without a roster.
-_MD_BOLD_ITALIC_RE = re.compile(r"(\*\*|__|\*|_|`)")
+_MD_BOLD_ITALIC_RE = re.compile(r"(\*\*|__|\*|_|\x60)")
 _QUOTES_WRAP_RE = re.compile(
     r'^\s*[“”‘’"\']\s*(.*?)\s*[“”‘’"\']\s*$',
     re.DOTALL,
@@ -185,547 +93,69 @@ _QUOTES_WRAP_RE = re.compile(
 
 
 def _build_named_prefix_re(names) -> Optional[re.Pattern]:
-    """Build a case-insensitive regex that strips a leading
-    `<name><sep>` prefix where `<name>` is any string from `names`
-    and `<sep>` is `:`, `-`, or `—` (em dash) with optional
-    surrounding whitespace.
+    """Build a regex for exact locked-speaker response transport.
 
-    Returns ``None`` when `names` is empty / all-blank so callers
-    can `if pat is not None:` without an extra falsy check.
+    Accepted forms are NAME:, NAME -, NAME em-dash, [NAME], and
+    [NAME, voice traits]. Names come only from the authoritative roster;
+    arbitrary uppercase prose is never classified as transport.
 
-    Tier 1 fix #6 (2026-05-11): the uppercase-anchored
-    `_PREFIX_SPEAKER_COLON_RE` misses mixed-case speaker prefixes
-    ("Alice:", "Bob -") that small instruct-tuned LLMs emit in
-    ~5-10% of attempts. A dynamic regex built from the actual
-    locked cast names handles those — and is safe against
-    false-positives because we only strip prefixes that literally
-    match a name from the roster (vs the static uppercase regex
-    which would strip "Hello world:" if applied case-insensitively).
+    Returns None when names is empty or all blank. Matching is
+    case-insensitive because response labels need not copy roster casing.
     """
     if not names:
         return None
     cleaned: list[str] = []
-    for n in names:
-        s = (str(n) or "").strip()
-        if s:
-            cleaned.append(re.escape(s))
+    for name in names:
+        surface = str(name or "").strip()
+        if surface:
+            cleaned.append(re.escape(surface))
     if not cleaned:
         return None
-    # Longer names first so "ALICE B" wins over "ALICE" when both
-    # are in the roster.
     cleaned.sort(key=len, reverse=True)
     alts = "|".join(cleaned)
     return re.compile(
-        rf"^\s*(?:{alts})\s*[:\-—]\s*",
+        rf"^\s*(?:"
+        rf"\[\s*(?:{alts})(?:\s*,\s*[^\]]+)?\s*\]"
+        rf"|(?:{alts})\s*[:\-—]"
+        rf")\s*",
         re.IGNORECASE,
     )
 
 
-def strip_line_formatting(raw: str) -> str:
-    """Remove leaked formatting from a raw LLM line response.
+def strip_line_formatting(raw: str, speaker_names=()) -> str:
+    """Remove only explicit response transport from one model-authored line.
 
-    Applies in order:
-      1. Trim outer whitespace.
-      2. Strip wrapping quotes (smart or straight, single or double).
-      3. Strip leading [VOICE: NAME, traits] or [NAME, traits] tag.
-      4. Strip leading SPEAKER: / SPEAKER - / SPEAKER -- prefix.
-      5. Strip markdown bold/italic/code markers.
-      6. Trim outer whitespace again.
-
-    Returns the cleaned dialogue text. May return empty string if the
-    response was nothing but formatting. Never raises.
+    Bare bracketed words and uppercase-leading prose are preserved unless the
+    prefix exactly matches a supplied locked speaker name. The function never
+    judges word count, vocabulary, style, or story quality.
     """
     if not raw:
         return ""
     s = raw.strip()
-    # Step 2: wrapping quotes
-    m = _QUOTES_WRAP_RE.match(s)
-    if m:
-        s = m.group(1).strip()
-    # Step 3: leading bracket tag
+    wrapped = _QUOTES_WRAP_RE.match(s)
+    if wrapped:
+        s = wrapped.group(1).strip()
+
+    named_re = _build_named_prefix_re(speaker_names)
     s = _PREFIX_VOICE_TAG_RE.sub("", s, count=1).strip()
-    # Step 4: leading speaker colon/dash prefix
-    s = _PREFIX_SPEAKER_COLON_RE.sub("", s, count=1).strip()
-    # Step 5: markdown markers
+    if named_re is not None:
+        s = named_re.sub("", s, count=1).strip()
+
+    # Markdown removal can expose transport that was wrapped in emphasis.
     s = _MD_BOLD_ITALIC_RE.sub("", s).strip()
-    # Second pass: markdown removal can expose previously-hidden speaker
-    # tags (e.g. "**[ALICE]**" -> "[ALICE]" after step 5). Re-run the
-    # bracket and colon-prefix strips to catch markdown-wrapped tags.
     s = _PREFIX_VOICE_TAG_RE.sub("", s, count=1).strip()
-    s = _PREFIX_SPEAKER_COLON_RE.sub("", s, count=1).strip()
+    if named_re is not None:
+        s = named_re.sub("", s, count=1).strip()
     return s
 
 
 # ---------------------------------------------------------------------------
-# Name-roster gate (Phase 0, 2026-05-11)
+# Structural compose-flag telemetry
 # ---------------------------------------------------------------------------
-#
-# The composer prompt tells Mistral-Nemo the speaker by name but does
-# NOT (in v2.0-alpha) list the full cast. When a beat intent has ALICE
-# reference another character or organization, the model invents one.
-# Phantom names propagate silently to the ledger.
-#
-# Phase 0 fix: pass an UPPERCASE allowed_roster on every LineRequest,
-# extract proper-noun candidates from each composed line via heuristic
-# regex, flag any candidate not in the roster on the line row's
-# compose_flags field. The composer does NOT reroll on a name violation
-# (cast is locked; an LLM reroll cannot invent a different correct
-# name). Phase 3's reviewer + Step 2.5 deterministic phantom-skip
-# fallback handle repair downstream.
-#
-# Roster composition per §6.A (Option 1, strict):
-#   - cast names (UPPERCASE from cast_rows)
-#   - "ANNOUNCER" (always)
-#   - key_terms from news_interpreter (uppercased)
-# News-seed proper nouns are NOT widened in. The strict roster makes
-# every undeclared name visible to the reviewer.
-
-# ALL-CAPS tokens, ≥2 chars (catches "ALICE", "CERN", "JPL", "USA-CERN").
-_ALL_CAPS_TOKEN_RE = re.compile(r"\b[A-Z]{2,}(?:[-_][A-Z0-9]+)*\b")
-
-# Titled names ("Dr. Patel", "Sgt. Howard"). Captures the canonical
-# title list the synthesis spec calls out plus a handful of common
-# military / civic titles we've seen in soak output.
-_TITLED_NAME_RE = re.compile(
-    r"\b(?:Dr|Mr|Ms|Mrs|Prof|Lt|Capt|Cmdr|Adm|Sen|Sgt|Col|Gen)"
-    r"\.\s+[A-Z][a-z]+\b"
-)
-
-# Title-Case bigrams ("Joe Smith", "New York"). Only flagged mid-
-# sentence — sentence-start capitalization is orthography, not a
-# proper-noun signal. _detect_phantom_names strips the first word
-# of each sentence before scanning with this regex.
-_TITLE_CASE_BIGRAM_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b")
-
-# Sentence boundary. Naive but sufficient for audio-drama dialogue
-# (which doesn't carry initials like "Mr. J. R. R. Tolkien").
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
-_LEADING_WORD_RE = re.compile(r"^\W*\w+[\W]*")
-
-# Common ALL-CAPS English tokens that are not names. Keep the list
-# short and conservative — anything in news content (CERN, JPL, NASA,
-# etc.) must be threaded via key_terms, not allowlisted here.
-_COMMON_ALLCAPS_NON_NAMES: frozenset[str] = frozenset({
-    "OK", "TV", "AI", "USA", "UK", "EU", "UN", "DNA", "RNA",
-    "AM", "PM",
-})
-
-# Tier 1 fix #7 (2026-05-11): single Title-Case mid-sentence words
-# that legitimately get capitalized but should not be flagged as
-# phantom names. Days of week, months, common titles / kin terms,
-# holidays, deity references, planetary bodies. Keep conservative —
-# anything ambiguous (e.g. "Mom" might be a real character name in
-# some scripts) errs on the side of NOT flagging.
-_COMMON_TITLE_CASE_WORDS: frozenset[str] = frozenset({
-    # Days
-    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
-    "Saturday", "Sunday",
-    # Months
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-    # Titles / kin terms (full forms + abbreviated; abbreviated
-    # variants are also the leading word of a _TITLED_NAME_RE hit
-    # like "Dr. Patel" — skip them as single-word phantoms so the
-    # bigram pass / titled-name pass own those entries cleanly).
-    "Mom", "Dad", "Mother", "Father", "Sir", "Madam", "Maam",
-    "Mister", "Misses", "Miss",
-    "Mr", "Mrs", "Ms", "Dr", "Prof", "Lt", "Capt", "Cmdr", "Adm",
-    "Sen", "Sgt", "Col", "Gen",
-    # Deities / cosmology
-    "God", "Lord", "Heaven", "Hell", "Earth", "Mars", "Moon", "Sun",
-    # Holidays
-    "Christmas", "Easter", "Halloween", "Thanksgiving", "Hanukkah",
-    # English first-words / common Title-Case mid-sentence
-    "English", "American", "British", "European",
-})
-
-# Single Title-Case word, mid-sentence (used by detect_phantom_names'
-# Tier-1-#7 single-word pass — bigrams are already covered by
-# _TITLE_CASE_BIGRAM_RE).
-_TITLE_CASE_WORD_RE = re.compile(r"\b[A-Z][a-z]+\b")
-
-
-def build_allowed_roster(
-    cast_rows: Iterable[object] = (),
-    key_terms: Iterable[str] = (),
-    *,
-    include_announcer: bool = True,
-    banned_terms: Iterable[str] = (),
-) -> frozenset[str]:
-    """Build the UPPERCASE allowed_roster for the Phase 0 name gate.
-
-    Inputs:
-      cast_rows         iterable of cast row dicts (each with "name")
-                        OR (name, ...) tuples. Both shapes accepted so
-                        unit tests can pass minimal fixtures without
-                        constructing full ledger rows. Empty / falsy
-                        rows are skipped.
-      key_terms         iterable of journalistic terms from
-                        news_interpreter's briefs. Uppercased and
-                        merged into the roster so dialogue that
-                        surfaces CERN / JPL / Voyager (etc.) does not
-                        trigger phantom-name flags.
-      include_announcer keep "ANNOUNCER" in the roster (default True).
-                        Set False only in pure-test contexts.
-      banned_terms      leak-floor-v2 (2026-06-25): UPPERCASE real-person /
-                        political-figure source entities to EXCLUDE from the
-                        roster even if they arrived via key_terms (so the
-                        existing phantom gate REJECTS "President Trump" -> a
-                        reroll). Empty (the default) is a no-op => byte-identical
-                        to the pre-leak-floor roster. Excluded last so it wins
-                        over a cast/key_term collision.
-
-    Returns a frozenset of UPPERCASE strings. Whitespace trimmed on
-    each entry; empty entries dropped. Stable across calls — no RNG,
-    no time, no os.
-
-    Per §6.A (Option 1, strict): the roster does NOT widen with
-    arbitrary proper nouns from news_seed. Names that legitimately
-    belong in dialogue must arrive via key_terms.
-    """
-    roster: set[str] = set()
-    if include_announcer:
-        roster.add("ANNOUNCER")
-    for row in cast_rows or ():
-        name = ""
-        if isinstance(row, dict):
-            name = str(row.get("name") or "").strip()
-        elif isinstance(row, (list, tuple)) and row:
-            name = str(row[0] or "").strip()
-        elif isinstance(row, str):
-            name = row.strip()
-        if name:
-            roster.add(name.upper())
-    for term in key_terms or ():
-        term_s = str(term or "").strip()
-        if term_s:
-            roster.add(term_s.upper())
-    banned_u = {str(b or "").strip().upper() for b in (banned_terms or ()) if str(b or "").strip()}
-    if banned_u:
-        roster -= banned_u
-    return frozenset(roster)
-
-
-# ---------------------------------------------------------------------------
-# leak-floor-v2 rule 4 (2026-06-25, docs/2026-06-25-leaking-words/) -- news-bleed.
-# Real-person / political-figure source entities ("President Trump") ship today
-# because the comments mandate that news terms arrive via key_terms, and
-# build_allowed_roster ALLOWLISTS every key_term -> the phantom gate passes the
-# name. The fix is at the roster, not a new detector: classify the real-person /
-# political class OUT of key_terms (honorific + surname, a small living-figure
-# stoplist) and route them to banned_terms; org / place / mission terms
-# (NASA / CERN / JPL / Voyager) STAY in key_terms (legit in sci-fi). Conservative
-# (favours false NEGATIVES over false positives, like the rest of the gates): the
-# bare Firstname-Lastname person heuristic is NOT applied (it would wrongly ban
-# "New York"); a name is banned only on a strong signal (honorific or stoplist).
-# ---------------------------------------------------------------------------
-
-#: Honorific / civic-title prefix + a Capitalized surname = a real public figure
-#: ("President Trump", "Senator Warren", "Governor Newsom", "Dr. Fauci").
-_BANNED_HONORIFIC_RE = re.compile(
-    r"\b(?:President|Vice[- ]President|Senator|Governor|Mayor|Chancellor|"
-    r"Premier|Prime\s+Minister|PM|Representative|Rep|Congress(?:man|woman|member)|"
-    r"Secretary|Minister|Ambassador|President[- ]elect|Sen|Gov|Pres)\.?\s+"
-    r"[A-Z][a-z]+\b"
-)
-
-#: A small, conservative stoplist of living political / public figures whose
-#: bare SURNAME (or full name) is a real-person source entity, not fiction. Kept
-#: short + SFW; extend deliberately. UPPERCASE for case-insensitive membership.
-_BANNED_FIGURE_STOPLIST: frozenset = frozenset({
-    "TRUMP", "BIDEN", "HARRIS", "OBAMA", "CLINTON", "BUSH", "PENCE",
-    "PUTIN", "ZELENSKY", "ZELENSKYY", "XI JINPING", "NETANYAHU", "MODI",
-    "MACRON", "SCHOLZ", "SUNAK", "STARMER", "TRUDEAU", "ERDOGAN",
-    "KIM JONG UN", "KIM JONG-UN", "MUSK", "BEZOS", "ZUCKERBERG",
-    "DESANTIS", "NEWSOM", "PELOSI", "MCCONNELL", "FAUCI",
-})
-
-#: Org / place / mission terms that look proper-noun-ish but are LEGIT in
-#: sci-fi dialogue and must NEVER be banned (they stay in key_terms). Belt for
-#: the honorific/stoplist paths; UPPERCASE.
-_LEGIT_SOURCE_ORGS: frozenset = frozenset({
-    "NASA", "CERN", "JPL", "ESA", "NOAA", "SPACEX", "BOEING", "TESLA",
-    "VOYAGER", "HUBBLE", "ISS", "MIT", "CALTECH", "DARPA", "FAA", "FDA",
-    "WHO", "UN", "EU", "NATO", "GOOGLE", "APPLE", "MICROSOFT", "IBM",
-    "INTEL", "NVIDIA", "AMAZON", "BLUE ORIGIN", "ROSCOSMOS", "JAXA",
-})
-
-
-def build_banned_source_proper_nouns(
-    terms: Iterable[str] = (),
-    raw_text: str = "",
-) -> frozenset[str]:
-    """leak-floor-v2 rule 4: extract the real-person / political-figure source
-    entities (UPPERCASE) to ban from the allowed_roster.
-
-    Scans both the curated ``terms`` (key_terms) and an optional ``raw_text``
-    (the news script brief). A term/phrase is banned when it matches the
-    honorific+surname pattern OR is a known living-figure stoplist entry. Org /
-    place / mission acronyms (NASA, CERN, ...) are NEVER banned. Conservative by
-    design: a bare Title-Case "Firstname Lastname" is NOT banned (it would catch
-    "New York"). Returns a frozenset of UPPERCASE banned surface forms (the
-    honorific phrase AND its surname, plus any matched stoplist name). Pure;
-    deterministic; never raises."""
-    try:
-        banned: set[str] = set()
-
-        def _consider(s: str) -> None:
-            s = str(s or "").strip()
-            if not s:
-                return
-            su = s.upper()
-            if su in _LEGIT_SOURCE_ORGS:
-                return
-            # honorific + surname anywhere in the chunk
-            for m in _BANNED_HONORIFIC_RE.finditer(s):
-                phrase = m.group(0).strip()
-                banned.add(phrase.upper())
-                surname = phrase.split()[-1].strip(".")
-                if surname:
-                    banned.add(surname.upper())
-            # whole term IS a stoplist figure (bare surname / full name)
-            if su in _BANNED_FIGURE_STOPLIST:
-                banned.add(su)
-            else:
-                # any stoplist surname as a whole word inside the term
-                for fig in _BANNED_FIGURE_STOPLIST:
-                    if " " in fig:
-                        if fig in su:
-                            banned.add(fig)
-                    elif re.search(rf"(?<![\w]){re.escape(fig)}(?![\w])", su):
-                        banned.add(fig)
-
-        for t in terms or ():
-            _consider(t)
-        if raw_text:
-            # scan the brief sentence-by-sentence so the honorific regex anchors
-            for chunk in re.split(r"[.!?\n]+", str(raw_text)):
-                _consider(chunk)
-        # never ban a legit org that slipped in via a multi-word match
-        banned -= _LEGIT_SOURCE_ORGS
-        return frozenset(b for b in banned if b)
-    except Exception:  # noqa: BLE001 -- never break the roster build
-        return frozenset()
-
-
-def _strip_sentence_lead_word(sentence: str) -> str:
-    """Drop the first word of a sentence (and any leading punctuation).
-
-    Used to skip sentence-start capitalization when scanning for
-    Title-Case bigrams. Returns the remainder of the sentence (may be
-    empty if the sentence was one word).
-    """
-    if not sentence:
-        return ""
-    m = _LEADING_WORD_RE.match(sentence)
-    if not m:
-        return sentence
-    return sentence[m.end():]
-
-
-def detect_phantom_names(
-    text: str,
-    speaker: str,
-    allowed_roster: frozenset[str],
-) -> list[str]:
-    """Return proper-noun candidates in `text` that are NOT in the roster.
-
-    Run after `strip_line_formatting`. Three heuristics, in order:
-      1. ALL-CAPS tokens (length ≥ 2)
-      2. Titled names (Dr./Mr./Sgt./etc. + Capitalized word)
-      3. Title-Case bigrams (mid-sentence only — sentence-start skipped)
-
-    A candidate is a phantom iff its UPPERCASE form is NOT in
-    `allowed_roster`, NOT a whole-word component of a multi-word
-    roster entry ("Gulliver" clears when "GULLIVER REEVES" is cast,
-    "Big" / "Bang" clear when "Big Bang" is a key_term -- BUG-LOCAL-256),
-    and NOT the speaker's own name (the composer is told not to say
-    its own name, but if it slips through, `strip_line_formatting`
-    already removes it; flagging it as a phantom would be a false
-    positive).
-
-    Returns a list of phantoms in first-seen order, de-duplicated.
-    Never raises.
-    """
-    if not text:
-        return []
-    speaker_u = (speaker or "").strip().upper()
-    found: dict[str, None] = {}
-
-    # BUG-LOCAL-256: a candidate is allowed when its uppercase form is
-    # a roster entry OR a whole-word component of a multi-word roster
-    # entry. Full cast names ("GULLIVER REEVES") and multi-word
-    # key_terms ("BIG BANG") otherwise leave their individual words
-    # ("Gulliver", "Big", "Bang") unrecognized, so the single-word and
-    # bigram passes flag them as phantoms even though the entity is on
-    # the roster. Component words are low-risk to allow: the gate is
-    # detect-and-flag-only, and a word that belongs to a known entity
-    # is by definition not an invented name.
-    allowed: set[str] = set(allowed_roster)
-    for _entry in allowed_roster:
-        for _word in str(_entry).split():
-            if _word:
-                allowed.add(_word)
-
-    # 1. ALL-CAPS tokens — anywhere in text.
-    for m in _ALL_CAPS_TOKEN_RE.finditer(text):
-        tok = m.group(0).strip()
-        if not tok:
-            continue
-        tok_u = tok.upper()
-        if tok_u == speaker_u:
-            continue
-        if tok_u in allowed:
-            continue
-        if tok_u in _COMMON_ALLCAPS_NON_NAMES:
-            continue
-        found.setdefault(tok, None)
-
-    # 2. Titled names — anywhere.
-    for m in _TITLED_NAME_RE.finditer(text):
-        tok = m.group(0).strip()
-        if not tok:
-            continue
-        tok_u = tok.upper()
-        if tok_u == speaker_u:
-            continue
-        if tok_u in allowed:
-            continue
-        found.setdefault(tok, None)
-
-    # 3. Title-Case bigrams — mid-sentence only.
-    sentences = _SENTENCE_SPLIT_RE.split(text.strip())
-    for sentence in sentences:
-        body = _strip_sentence_lead_word(sentence)
-        for m in _TITLE_CASE_BIGRAM_RE.finditer(body):
-            tok = m.group(0).strip()
-            if not tok:
-                continue
-            tok_u = tok.upper()
-            if tok_u == speaker_u:
-                continue
-            if tok_u in allowed:
-                continue
-            # Skip if the bigram is itself a titled name already
-            # caught by pass 2 (avoid double-reporting "Dr. Patel"
-            # if its trailing surname happens to be Title-Case).
-            if _TITLED_NAME_RE.fullmatch(tok):
-                continue
-            found.setdefault(tok, None)
-
-    # 4. Single Title-Case mid-sentence words. Tier 1 fix #7
-    # (2026-05-11): catches invented one-word names like "Maya" /
-    # "Carlos" that previously slipped through the bigram-only
-    # pass. Sentence-start words are stripped (Title-Case at line
-    # start is orthography, not signal); a stoplist of common
-    # Title-Case English non-names (days, months, "Mom", "God",
-    # "Earth", etc.) suppresses false positives.
-    for sentence in sentences:
-        body = _strip_sentence_lead_word(sentence)
-        for m in _TITLE_CASE_WORD_RE.finditer(body):
-            tok = m.group(0).strip()
-            if not tok:
-                continue
-            tok_u = tok.upper()
-            if tok_u == speaker_u:
-                continue
-            if tok_u in allowed:
-                continue
-            if tok in _COMMON_TITLE_CASE_WORDS:
-                continue
-            # Skip if this single token is part of a previously-
-            # flagged multi-word entry (avoid double-flagging "Maya"
-            # when "Maya Smith" is already on the list, or the
-            # surname inside a "Dr. Patel" hit).
-            if any(
-                existing != tok and (
-                    f" {tok} " in f" {existing} "
-                    or existing.startswith(tok + " ")
-                    or existing.endswith(" " + tok)
-                )
-                for existing in found
-            ):
-                continue
-            found.setdefault(tok, None)
-
-    return list(found.keys())
-
-
-# ---------------------------------------------------------------------------
-# Vocative-drift strip (BUG-LOCAL-233)
-# ---------------------------------------------------------------------------
-#
-# detect_phantom_names whitelists every roster name, so "ANNOUNCER" --
-# the narration role label, always on the roster -- is never flagged
-# even when a CHARACTER line addresses it ("It wasn't just geology,
-# ANNOUNCER."). A character never speaks the narrator's production
-# label aloud; treat it as drift, detect it, and strip it.
-#
-# The three direct-address shapes below are each anchored on a comma
-# or a sentence boundary, so a plain noun reference ("the announcer")
-# -- which carries no such delimiter -- is never matched. Only the
-# label "ANNOUNCER" is targeted; real cast names are left untouched,
-# because characters addressing each other by name is normal dialogue.
-_ANNOUNCER_NAME = "ANNOUNCER"
-_VOCATIVE_MID_RE = re.compile(r",\s*announcer\s*([,;:])", re.IGNORECASE)
-_VOCATIVE_TRAILING_RE = re.compile(
-    r",\s*announcer\b\s*(?=[.!?]|$)", re.IGNORECASE,
-)
-_VOCATIVE_LEADING_RE = re.compile(
-    r"(^|(?<=[.!?])\s+)announcer\s*[,!]+\s*([a-zA-Z])", re.IGNORECASE,
-)
-
-
-def strip_announcer_vocative(text: str) -> tuple[str, int]:
-    """Remove vocative addresses of the narration label "ANNOUNCER".
-
-    Returns ``(cleaned_text, n_removed)``. Only direct-address shapes
-    are removed -- the label set off by a comma or sitting at a
-    sentence boundary:
-
-      * mid-sentence   "..., ANNOUNCER, ..."  -> "..., ..."
-                       (closing delimiter , ; or : is preserved;
-                       BUG-LOCAL-233 b003)
-      * trailing       "..., ANNOUNCER."      -> "..."
-      * leading        "ANNOUNCER, ..."       -> "..." (next word
-                                                 re-capitalized)
-
-    A noun reference such as "the announcer" carries no comma/boundary
-    delimiter and is left untouched. Never raises; never returns an
-    empty string from stripping alone. See BUG-LOCAL-233.
-    """
-    if not text or "announcer" not in text.lower():
-        return text, 0
-    removed = 0
-    out, n = _VOCATIVE_MID_RE.subn(r"\1 ", text)
-    removed += n
-    out, n = _VOCATIVE_TRAILING_RE.subn("", out)
-    removed += n
-    out, n = _VOCATIVE_LEADING_RE.subn(
-        lambda m: f"{m.group(1)}{m.group(2).upper()}", out,
-    )
-    removed += n
-    if not removed:
-        return text, 0
-    out = re.sub(r"\s+", " ", out).strip()
-    if not out:
-        # Stripping consumed the whole line -- keep the original and
-        # let the compose_flags marker carry the drift signal.
-        return text, 0
-    return out, removed
 
 
 def aggregate_compose_flags(ledger_data: dict) -> dict[str, int]:
-    """Count compose_flags by kind across every line in the ledger.
-
-    Walks `ledger_data["lines"]`, splits each flag at the first ":"
-    to extract its kind, and returns the count map. Stamped to
-    `meta.compose_flag_summary` by the orchestrator at end of run so
-    Jeffrey can skim "did this run have 0 phantom flags or 12?"
-    without grep-walking every line.
-
-    Pure Python; no LLM cost. Never raises. Empty ledger → {}.
-    """
+    """Roll up structural compose flags into ``{kind: count}``."""
     summary: dict[str, int] = {}
     if not isinstance(ledger_data, dict):
         return summary
@@ -768,49 +198,14 @@ class LineRequest:
     to keep this module's import surface stdlib-only at module load. The
     caller maps Beat fields into LineRequest.
 
-    Phase 0 (2026-05-11): `allowed_roster` field added for the name-
-    gate check. Orchestrator MUST populate it on every call — built
-    once via build_allowed_roster after cast lock + news_interpreter.
-    The empty-frozenset default is retained ONLY as a dataclass-
-    ordering artifact (non-defaulted fields can't follow defaulted
-    ones).
-
-    Phase 1 (2026-05-11): three new context fields replace the
-    composer's previous "speaker + intent + mood + canon header +
-    last 3 lines" diet:
-
-      style_descriptor          the episode's style label (from the
-                                style engine's StoryContract). Empty
-                                string skips the STYLE block entirely.
-      outline_spine             one-line-per-beat compact rendering
-                                of the whole outline so the composer
-                                can see the arc it is participating
-                                in. Empty string skips the OUTLINE
-                                block entirely. Renderer ships in this
-                                module (`render_outline_spine`).
-      character_voice_card      one-line `name (gender, traits)` blurb
-                                for the speaker of this beat. Empty
-                                string skips the CHARACTER block. Built
-                                from cast_rows via `build_voice_card`.
-
-    Prompt placement is static-first / variable-second (style +
-    canon_header + outline_spine + allowed_roster are stable across
-    every composer call in the episode; voice_card + last_lines +
-    speaker + intent change per call). Once KV-cache reuse lands in
-    the loader (deferred; tracked in the ADR), the cached prefix
-    covers everything up to the CHARACTER block.
-
-    All Phase 1 fields default to empty strings so unit tests and
-    early-stage callers that don't have them yet keep working.
+    Prompt context is generation guidance only; output acceptance never scans prose vocabulary or length.
     """
 
     speaker: str
     intent: str
     mood: str
-    target_words: int
     canon_header: str               # from render_episode_canon_header()
     last_lines: list[tuple[str, str]]  # [(speaker, text), ...] most recent last; empty for first beat
-    allowed_roster: frozenset[str] = field(default_factory=frozenset)
     # Phase 1 (2026-05-11) -- composer prompt enrichment + sliding window.
     style_descriptor: str = ""
     outline_spine: str = ""
@@ -820,42 +215,8 @@ class LineRequest:
     # ARC_PHASE_GUIDANCE one-liner for the current phase so the
     # composer steers by narrative phase, not just mood.
     arc_phase: str = ""
-    # Phase 4 v4 (2026-05-11) -- prompt revision pass. All defaults
-    # are empty so every existing test / caller keeps working; each
-    # block in `_build_user_prompt` gates on the corresponding field
-    # being non-empty.
-    #
-    #   allowed_people / allowed_things  Split roster for prompt
-    #       rendering. Cast names ("ALICE") and journalistic terms
-    #       ("CERN") render in distinct buckets. `allowed_roster`
-    #       remains the union and stays the input to the phantom gate;
-    #       these two fields are render-only. When both are empty the
-    #       composer falls back to the legacy combined ALLOWED NAMES
-    #       block driven by `allowed_roster`.
-    #   prev_speaker  Name of the character who spoke the immediately
-    #       preceding line. Renders in the WRITE LINE role-induction
-    #       block as "You are responding to <name>." Empty drops that
-    #       sentence (first line of a scene, post-music marker).
-    #   current_beat_block  Pre-rendered CURRENT BEAT block (one
-    #       outline-spine row for the beat we are writing now). The
-    #       writer computes this once per beat via
-    #       `render_current_beat(outline, beat.beat_id)`. Keeping the
-    #       outline_spine itself plain (no arrow) lets the static
-    #       prefix stay byte-stable across every call in an episode
-    #       so a future KV-cache reuse pass lands without re-encoding
-    #       the spine.
-    #   theme  One-sentence theme from `meta.news.script_brief`
-    #       (Commit 2 in the v4 plan). Optional flavor, not the
-    #       structural-direction outline.
-    #   all_voice_cards  Newline-joined voice cards for the whole
-    #       cast (Commit 2). When set, replaces single-speaker
-    #       CHARACTER block with CAST. Falls back to
-    #       `character_voice_card` when empty.
-    #   position  "<phase>, beat N of M. Next phase: <next>." string
-    #       (Commit 4). Replaces the generic per-phase ARC_PHASE_GUIDANCE
-    #       one-liner with a position-specific directive. Falls back
-    #       to the legacy ARC PHASE block driven by `arc_phase` when
-    #       empty.
+    # Split prompt context for cast names and source terms. These fields only
+    # guide the authoring call; they are never used as a prose allowlist.
     allowed_people: frozenset[str] = field(default_factory=frozenset)
     allowed_things: frozenset[str] = field(default_factory=frozenset)
     prev_speaker: str = ""
@@ -878,13 +239,6 @@ class LineRequest:
     # drops the block entirely. Default "" keeps every existing caller
     # and test working unchanged.
     continuity_slice: str = ""
-    # Sprint 5C (2026-05-25) -- targeted-reroll revision hint. When the
-    # Sprint 5B story critic flags this line for a reroll, the freeze
-    # cascade threads the critic's concrete `RerollTarget.hint` here.
-    # `_build_user_prompt` renders it as a REVISE block at the WRITE LINE
-    # tail. Empty string means this is a normal first-pass compose (the
-    # block is dropped), so every existing caller / test is unaffected.
-    reroll_hint: str = ""
     # ---- Sprint 3 (2026-05-28): arc-aware line generation ----
     # The line composer's previous diet (style + canon + cast + spine +
     # last 2 lines + intent + mood + word count) reliably reproduced
@@ -912,12 +266,6 @@ class LineRequest:
     # correct pronouns/title (kills the "Mister <female>"-class mismatch).
     # Empty string -> no PRONOUNS directive (legacy callers unaffected).
     speaker_gender: str = ""
-    # G1 (story-quality v2, 2026-06-28) -- the per-episode words_per_beat_range
-    # (episode_budget.words_per_beat_range; meta round-trips it as a LIST). On the
-    # v2 path derive_one_breath_cap(range) raises the one-breath cap so a
-    # budget-length spoken line is not collapsed into noun-salad. (0,0) / absent =>
-    # legacy 28-word cap => v2-OFF byte-identical. NEVER inferred from text.
-    words_per_beat_range: tuple = (0, 0)
     # Story-quality LIFT L1/L2 (2026-06-23) -- deterministic upstream beat
     # shaping. beat_role = the dramatic FUNCTION of this beat (setup / pressure
     # / personal_stake / irreversible_choice / consequence); conflict_object +
@@ -936,49 +284,11 @@ class LineRequest:
     # render below is dropped => byte-identical to the pre-grammar prompt. This
     # is the single behavioral injection of the style grammar.
     ending_template: str = ""
-    # Story-engine assumption-audit KILL 1 (2026-06-24) -- the grounded premise
-    # noun palette (roster names + premise / title / logline nouns) for THIS
-    # episode. Carried so a freeze-cascade reroll rebuild keeps the same
-    # grounding the writer's in-loop BODY-OUTPUT gate validated against; the
-    # composer itself does not render it (the gate is writer-side). Empty
-    # default => no effect => byte-identical.
-    grounded_nouns: frozenset = field(default_factory=frozenset)
-    # leak-floor-v2 (2026-06-25) -- the TRANSIENT per-episode EntityPolicy
-    # (_otr_line_hygiene.EntityPolicy: allowed roster + banned source entities).
-    # The writer builds it ONCE when OTR_ENABLE_LEAK_FLOOR_V2 is on and threads
-    # it here so compose_line can run verify_and_repair_line before TTS/freeze.
-    # None (the default) => the verifier never runs => byte-identical to the
-    # pre-leak-floor pipeline. NOT persisted (the ledger schema stays frozen).
-    entity_policy: Optional[object] = None
 
 
 @dataclass(frozen=True)
 class LineResult:
-    """compose_line return value.
-
-    Phase 0 (2026-05-11): replaced the bare-string return so the
-    composer can carry per-line diagnostic flags (phantom names,
-    future format-leak counts) back to the orchestrator without
-    coupling through globals or mutable side channels.
-
-    Fields:
-      text                cleaned dialogue text (post strip_line_formatting)
-      compose_flags       tuple of `"kind:detail"` strings, empty when the
-                          line had no detections. Currently emitted kinds:
-                            "phantom_name:<token>" — Phase 0 gate flagged
-                                                     a proper noun not in
-                                                     allowed_roster
-      validation_findings tuple of dicts (Sprint 10B Wave 1 Agent B,
-                          2026-05-27). Each dict is a serialized
-                          _otr_stage3_validators.ValidationFinding
-                          (severity / code / beat_id / speaker / message
-                          / expected / got). Empty when Stage 3
-                          validators are disabled OR when the line has
-                          no findings. Errors trigger ONE repair
-                          regenerate before findings are stamped from
-                          the FINAL state of the line (so post-repair
-                          findings reflect the shipped text).
-    """
+    """Transport-clean spoken text plus structural telemetry."""
 
     text: str
     compose_flags: tuple[str, ...] = ()
@@ -1215,8 +525,7 @@ CRAFT:
 - Use only proper nouns listed under NAMED ENTITIES. Generic roles
   ("the tech", "the lab", "mission control") are fine.
 
-Short and charged beats long and explanatory. Within plus or minus
-30% of the requested word count.
+Use the natural spoken length of the thought. Never pad or compress it to meet a count.
 """
 
 
@@ -1242,7 +551,7 @@ def _format_last_lines(last_lines: list[tuple[str, str]]) -> str:
     for spk, txt in last_lines:
         label = (
             "narration"
-            if (spk or "").strip().upper() == _ANNOUNCER_NAME
+            if (spk or "").strip().upper() == "ANNOUNCER"
             else spk
         )
         rows.append(f"[{label}]: {txt}")
@@ -1274,48 +583,6 @@ def _gender_to_pronouns(gender):
     return _PRONOUN_MAP.get(g, ("they", "them", "their"))
 
 
-_ONE_BREATH_MAX_WORDS = 24
-"""Per-beat word allocation at/below which a line stays ONE spoken breath.
-
-Undershoot root cause (2026-07-11, original_radio 26-roll review P1-1): the
-length rider below was TARGET-BLIND -- it told the model "one breath, concrete,
-no nested clauses" on EVERY voiced beat, whether the outline had allocated that
-beat 12 words or 53. At small targets that is correct radio craft; at the 720w
-scale (allocations of 20-53 words/beat) it actively FIGHTS the stated word
-target, and local 12B-class models obey the concrete cadence instruction over
-the bare number -- the mechanism behind the 239/420 (57%) undershoot.
-
-The fix is STEERING, never a gate: word counts remain advisory-only (operator
-law -- nothing here rejects, rerolls, or trims on word count). Beats at or below
-this threshold render the ORIGINAL one-breath rider byte-for-byte, so every
-short-target lane/test is unchanged; only beats the outline itself budgeted
-LARGE get the develop-the-beat steering."""
-
-
-def _length_steering(target_words) -> str:
-    """The per-beat length rider, SCALED to the beat's own word allocation.
-
-    Concrete technique steering, not a percentage -- percentages do not
-    reliably steer small local models; concrete craft instructions do."""
-    try:
-        tw = int(target_words)
-    except (TypeError, ValueError):
-        tw = 0
-    if tw <= 0 or tw <= _ONE_BREATH_MAX_WORDS:
-        # Byte-identical to the pre-2026-07-11 rider.
-        return ("Keep it spoken-length -- one breath, concrete, no "
-                "nested clauses.")
-    return (
-        f"This beat is budgeted about {tw} spoken words -- that is more than "
-        "one breath, so develop it across two or three spoken sentences "
-        "instead of stopping at the first. Let the reply complicate the "
-        "situation rather than merely answer it: state the thing, then press "
-        "it, resist it, or pay for it. Every sentence stays concrete and "
-        "speakable aloud -- length comes from developing the beat, never from "
-        "padding, restating, or nested clauses."
-    )
-
-
 def _build_user_prompt(req: LineRequest) -> str:
     """Render the per-beat user prompt for the composer.
 
@@ -1336,8 +603,7 @@ def _build_user_prompt(req: LineRequest) -> str:
         POSITION             (Commit 4: phase, beat N of M, next phase)
         LAST SPOKEN          (last_lines rolling window; scene-local
                               via Commit 3)
-        WRITE LINE           (role induction + beat + mood + word count
-                              + "Speak now.")
+        WRITE LINE           (role induction + beat + mood + "Speak now.")
 
     Optional blocks are dropped entirely when their LineRequest field
     is empty so unit tests that pin a specific minimal shape keep
@@ -1368,11 +634,7 @@ def _build_user_prompt(req: LineRequest) -> str:
     parts.append("EPISODE CONTEXT")
     parts.append(req.canon_header)
 
-    # NAMED ENTITIES split (Commit 1 in the v4 plan). The writer
-    # populates allowed_people / allowed_things separately on every
-    # real call. allowed_roster is still consumed by the phantom-gate
-    # check downstream (detect_phantom_names); the prompt-rendering
-    # side is split-only.
+    # The writer supplies named entities as generation context only.
     if req.allowed_people or req.allowed_things:
         parts.append("")
         parts.append("NAMED ENTITIES IN THIS WORLD")
@@ -1614,23 +876,7 @@ def _build_user_prompt(req: LineRequest) -> str:
         )
     parts.append(f"Mood: {req.mood}.")
     parts.append(f"Beat: {req.intent}.")
-    parts.append(f"Word count target: {req.target_words}.")
-    # REVISE block -- Sprint 5C (2026-05-25). When this beat is being
-    # RE-composed because the Sprint 5B story critic flagged the prior
-    # draft, the freeze cascade threads the critic's concrete instruction
-    # on `req.reroll_hint`. It renders as the last directive before
-    # "Speak now." so the rewrite instruction frames the line with maximum
-    # salience -- the model is fixing a flagged draft and the hint says
-    # exactly how. Empty string -> block dropped (the normal first-pass
-    # compose path), so every existing caller / test is unaffected.
-    if req.reroll_hint:
-        parts.append("")
-        parts.append(
-            "REVISE: the previous draft of this line was flagged by the "
-            "story critic. Rewrite it to address this note directly:"
-        )
-        parts.append(f"  {req.reroll_hint}")
-        parts.append("")
+    parts.append("Use the natural spoken length of this thought; do not pad or compress it to meet a count.")
     # Sprint 3 (2026-05-28): output constraint -- the anti-decorative
     # lever. Lands at the WRITE LINE tail (just above "Speak now.")
     # so it is the model's last instruction. Conditional on any
@@ -1658,50 +904,20 @@ def _build_user_prompt(req: LineRequest) -> str:
     if req.beat_turn:
         indirect += " The situation must be different after this line."
     parts.append(indirect)
-    # Story-spine Stream B1 (2026-05-31): universal news-grounding +
-    # one-breath length rider. Lands at the WRITE LINE tail (just above
-    # "Speak now.") so it is the model's last instruction, and applies
-    # to every model on every voiced beat -- premise grounding and
-    # spoken-length pacing are model-agnostic (no per-model branch, per
-    # spine invariant 6). `theme` / allowed_people / allowed_things on
-    # the request carry the news material; the phantom + cast gates
-    # still enforce entity discipline post-hoc, so this is a salience
-    # nudge, not the only guard.
-    # F1 (story-engine v1): DROP the literal "about 20-30 words" -- it
-    # hard-capped EVERY voiced line at one short breath regardless of the
-    # beat's allocated word band, which starved long episodes (the 0.70
-    # length_ratio). The per-line target is already stated above via
-    # "Word count target: {req.target_words}.", so the model still gets a
-    # concrete length; this rider keeps only the spoken-cadence guidance.
-    # KILL 1 (2026-06-24 assumption-audit): "ground in the news facts" nudged
-    # the weak model toward generic mission/console machinery on space premises.
-    # When the grounding lever is on (this beat has a premise-anchored
-    # conflict_object), ground in the PREMISE + that conflict and explicitly
-    # forbid retreating to control-room machinery. conflict_object is empty
-    # whenever the lever is off => the original rider renders => byte-identical.
+    # Grounding context guides the first authoring call; it is never a post-hoc vocabulary gate.
     if req.conflict_object:
         parts.append(
             "Ground this line in this scene's premise and the specific "
             f"conflict over {req.conflict_object}; do not invent people, "
             "places, or objects the premise does not imply, and do not "
             "retreat to generic control-room machinery (consoles, levers, "
-            "fuel cells, reactors). " + _length_steering(req.target_words)
+            "fuel cells, reactors). Keep it natural and speakable aloud."
         )
     else:
         parts.append(
             "Ground this line in the news facts and this scene's premise; "
             "do not invent people, places, or objects the news does not "
-            "imply. " + _length_steering(req.target_words)
-        )
-    # L3 (story-quality LIFT, 2026-06-23): give the model an explicit place to
-    # put non-spoken stage action so the deterministic post-strip removes it
-    # cleanly instead of letting it leak into the spoken text. Gated on
-    # OTR_COMPOSER_ACTION_STRIP; OFF (default) => no extra line => byte-identical.
-    if composer_action_strip_enabled():
-        parts.append(
-            "If any non-spoken stage action is unavoidable, put it on its own "
-            "line beginning with 'ACTION:' -- it will be removed and never "
-            "spoken. The spoken line itself must contain no stage directions."
+            "imply. Keep it natural and speakable aloud."
         )
     parts.append("Speak now.")
     return "\n".join(parts)
@@ -1722,339 +938,6 @@ back to a substring-matching StoppingCriteria when the underlying
 generate call doesn't natively support stop strings."""
 
 
-# ---------------------------------------------------------------------------
-# Phase 4 v4 (2026-05-11) — optional polish pass (regex-gated)
-# ---------------------------------------------------------------------------
-#
-# After the composer's retry ladder closes, optionally check the
-# generated line against a small narration-leak regex set. If the
-# line trips any pattern, fire ONE targeted polish LLM call with a
-# tight cleanup prompt and replace the line. Default OFF — keeps the
-# composer hot-path at 1 call per voiced beat. Opt-in via the
-# `enable_polish_pass` widget on OTR_LedgerScriptWriter.
-#
-# Cost when on: typically +1-2 calls per 15-line episode (~30s),
-# NOT +15 calls (~3-5 min) — the regex gate filters down to lines
-# that actually leaked. Targeted Script Doctor at the end of the
-# writer still catches anything the polish pass misses.
-
-_NARRATION_LEAK_PATTERNS: tuple[str, ...] = (
-    # "he said" / "she replied" / "they whispered" — narration verbs
-    # attached to a pronoun, mid-sentence or end-of-sentence.
-    # Tier 2 fix #13 (2026-05-11): added bare present-tense action
-    # verbs (pauses|smiles|nods|shrugs|coughs|looks|turns|leans|
-    # stares) — these surface in pronoun-action narration ("He
-    # pauses," "She looks away") that previously slipped the gate.
-    r"\b(?:he|she|they)\s+(?:said|replied|added|asked|whispered|"
-    r"shouted|paused|continued|murmured|exclaimed|"
-    r"pauses|smiles|nods|shrugs|coughs|looks|turns|leans|stares)\b",
-    # Opens with a quote mark (smart or straight). Note:
-    # strip_line_formatting removes PAIRED wrapping quotes first, so
-    # this pattern only catches UNPAIRED leading quotes — keep it.
-    r'^["“‘]',
-    # Markdown / asterisk wrapped action ("*sighs*").
-    r"\*[^*]+\*",
-    # Bracket stage direction ("[pauses]" / "[looks away]").
-    r"\[[^\]]+\]",
-    # Parenthesized cue verb ("(sighs)", "(pause)", "(laughs)").
-    r"\([^)]*(?:sigh|pause|beat|laughs?|smiles?|gestures?|nods?|"
-    r"shrugs?|cough)[^)]*\)",
-)
-
-_NARRATION_LEAK_REGEXES: tuple = tuple(
-    re.compile(p, re.IGNORECASE) for p in _NARRATION_LEAK_PATTERNS
-)
-
-
-
-
-
-
-
-
-# LFC sprint commit 3, section 6.2 (2026-05-11). Refusal detector.
-# Small instruction-tuned LLMs occasionally fall back to a polite
-# refusal ("I cannot rewrite this.") instead of doing the polish.
-# Shipping that as the polished dialogue corrupts the line; reject
-# the polish output and keep the pre-polish text in that case.
-#
-# Distinguishing real refusals from natural in-character dialogue
-# ("I cannot believe you did that.", "I'm afraid I lied to you.")
-# requires the regex to anchor on a refusal-action VERB, not just
-# the "I cannot..." opener -- otherwise legitimate dialogue gets
-# flagged. The verb whitelist below covers the common refusals
-# emitted by Mistral / Gemma / Qwen instruction-tuned 7B-12B class.
-_REFUSAL_VERBS = (
-    r"rewrite|help|do\s+that|do\s+this|comply|assist|fulfill|"
-    r"provide|produce|generate|complete|process|engage"
-)
-_REFUSAL_PATTERNS: tuple[str, ...] = (
-    # "I cannot rewrite this." / "I can't help with that."
-    rf"^\s*I\s+cannot\s+(?:{_REFUSAL_VERBS})\b",
-    rf"^\s*I\s+can[’']t\s+(?:{_REFUSAL_VERBS})\b",
-    # Apology openers that classifiers tend to attach verbatim.
-    r"^\s*Sorry,\s+I\s+can(?:not|[’']t)\b",
-    r"^\s*I[’']m\s+sorry,?\s+(?:but\s+)?I\s+can(?:not|[’']t)\b",
-    # AI-self-reference openers are refusals regardless of verb.
-    r"^\s*As\s+a(?:n)?\s+(?:language\s+model|AI|assistant|chatbot)\b",
-    # Apology + AI-self-reference combo ("I'm sorry, but as a language model...").
-    r"^\s*I[’']m\s+sorry,?\s+(?:but\s+)?as\s+a(?:n)?\s+(?:language\s+model|AI|assistant|chatbot)\b",
-    rf"^\s*I[’']m\s+unable\s+to\s+(?:{_REFUSAL_VERBS})\b",
-    rf"^\s*I\s+won[’']t\s+(?:{_REFUSAL_VERBS})\b",
-    rf"^\s*I\s+will\s+not\s+(?:{_REFUSAL_VERBS})\b",
-    rf"^\s*I[’']m\s+afraid\s+I\s+can(?:not|[’']t)\s+(?:{_REFUSAL_VERBS})\b",
-    rf"^\s*Unfortunately,\s+I\s+can(?:not|[’']t)\s+(?:{_REFUSAL_VERBS})\b",
-)
-
-_REFUSAL_REGEX: tuple = tuple(
-    re.compile(p, re.IGNORECASE) for p in _REFUSAL_PATTERNS
-)
-
-
-
-
-
-
-
-
-def _word_bands(target_words: int) -> tuple[int, int, int]:
-    """Return ``(word_cap, min_words, max_words)`` for a target length.
-
-    ``word_cap`` is the legacy 3x runaway ceiling; ``min_words`` /
-    ``max_words`` are the two-sided drift band.
-
-    BUG-LOCAL-279 (2026-05-26): lowered the min floor from 0.5x to
-    0.3x of target_words. The original 0.5x floor was set Tier 2 fix
-    #12 2026-05-11 against normal-budget episodes (~30+ word/beat
-    targets) where it converges fine; on Sprint 10A small-budget
-    smokes (60-110 word total, 20 word/beat targets) the 0.5x floor
-    sits exactly where Mistral-Nemo's natural-output distribution
-    misses (model emits ~5-15 word lines, floor of 10 was unreachable).
-    4 consecutive operator soaks 2026-05-26 tripped the floor on every
-    character line, exhausting the Sprint 5C reroll loop and stamping
-    needs_full_rerun via the legacy critic. 0.3x relaxes the floor
-    enough for the model's natural distribution to land inside the band
-    on small budgets while preserving the band's shape on larger
-    targets (target=37 -> min=11 vs old 18, still inside the model's
-    workable range). The 1.7x ceiling is unchanged -- only undershoot,
-    not overshoot, was the failure mode.
-
-    BUG-LOCAL-279 follow-on (2026-05-27, Sprint 10B Wave 0 smoke):
-    operator soak on 60-word AND 210-word runs still tripped the 0.3x
-    floor on target=39-word beats. Mistral-Nemo creative slot still
-    emits 4-15 word lines on those beats; critic flagged the short
-    ones as flat; Sprint 5C reroll loop exhausted both cycles trying
-    to lengthen them; cascade stamped needs_full_rerun; Bark halted
-    per BUG-LOCAL-276.
-
-    Operator directive 2026-05-27 (final): "in drama people may just
-    say one word -- yes, no, I understand. Maybe we don't have any
-    restrictions." Floor dropped entirely. The min was a defensive
-    catch against degenerate truncated-generate fragments, not a
-    dramatic minimum. Drama legitimately uses one-word replies ("Yes."
-    "No." "OK.") and the model's natural distribution should not be
-    policed by length on the lower side. min_words = 1 (any non-empty
-    word line passes). If broken-truncation fragments slip through,
-    the right fix is in the generate path, not the band.
-
-    Ceiling (1.7x) and word_cap (3x runaway) unchanged -- overshoot
-    was never the failure mode and a relaxed ceiling would mask other
-    bugs.
-
-    Pure and deterministic -- the single source of truth shared by
-    ``compose_line_draft`` (retry gating) and ``compose_line``'s
-    post-polish word-cap recheck. Never raises.
-    """
-    word_cap = max(15, int(target_words * _MAX_OVERSIZE_RATIO))
-    # BUG-LOCAL-279 follow-on final (Sprint 10B Wave 0 smoke
-    # 2026-05-27): floor dropped from 0.3x to 1 word. Operator
-    # directive: "in drama people may just say one word."
-    min_words = 1
-    max_words = max(min_words + 1, int(target_words * 1.7))
-    return word_cap, min_words, max_words
-
-
-def _strip_named_prefix(cleaned: str, req: LineRequest) -> str:
-    """Strip a leading mixed-case cast-name prefix from a draft line.
-
-    Tier 1 fix #6 (2026-05-11): the uppercase-anchored
-    ``_PREFIX_SPEAKER_COLON_RE`` inside ``strip_line_formatting`` misses
-    mixed-case speaker prefixes ("Alice:", "Bob -"). A dynamic
-    alternation built from ``req.allowed_people`` + ANNOUNCER + the
-    speaker catches those, and is false-positive-safe because it only
-    strips a prefix that literally matches a roster name. Only fires
-    when a named roster is available; legacy callers without one rely
-    on the static regex. Returns ``cleaned`` unchanged when the strip
-    would empty the line. Never raises.
-    """
-    if not cleaned:
-        return cleaned
-    roster_names = set(req.allowed_people or ())
-    roster_names.add("ANNOUNCER")
-    if req.speaker:
-        roster_names.add(req.speaker)
-    named_re = _build_named_prefix_re(roster_names)
-    if named_re is not None:
-        stripped = named_re.sub("", cleaned, count=1).strip()
-        if stripped:
-            return stripped
-    return cleaned
-
-
-_LEAK_NOUN_SLOT_WORDS = frozenset({
-    "the", "a", "an", "in", "of", "at", "on", "to", "with", "into", "onto",
-    "from", "near", "inside", "behind", "beside", "by", "for",
-})
-
-
-def _roster_leak_names(req) -> list[str]:
-    """BUG-LOCAL-295: OTHER characters' MULTI-word names (UPPERCASED) from the
-    episode's ACTUAL drawn roster (``req.allowed_people`` -- the dynamic
-    8316-combo cast, never a fixed list). A multi-word ALL-CAPS roster name in
-    body text is a generation leak, not dialogue. Single-word names are excluded
-    -- one-word cross-character drama ("Maeve.") is legitimate.
-    """
-    speaker = (getattr(req, "speaker", "") or "").strip().upper()
-    out: list[str] = []
-    for n in (getattr(req, "allowed_people", None) or ()):
-        nu = " ".join((n or "").split()).upper()
-        if nu and nu != speaker and len(nu.split()) >= 2:
-            out.append(nu)
-    out.sort(key=len, reverse=True)  # longest first
-    return out
-
-
-def _scrub_or_flag_roster_leak(cleaned: str, leak_names: list[str]):
-    """BUG-LOCAL-295: handle a leaked multi-word ALL-CAPS OTHER-roster name in
-    line body. Inside a ``*...*`` stage direction -> SCRUB it (deterministic,
-    cheap; stage-direction bleed, not spoken). In bare body -> flag for RETRY
-    only when the name sits in a grammatical NOUN SLOT (immediately preceded by
-    an article/preposition, e.g. "safe in the ERIN SPENDER"), which a scrub would
-    leave broken ("safe in the"); a vocative ("Get back here, ERIN SPENDER!") is
-    NOT flagged. Returns ``(possibly-scrubbed text, retry_name or None)``. Never
-    raises -- returns ``(cleaned, None)`` on any regex error.
-    """
-    if not leak_names or not cleaned:
-        return cleaned, None
-    try:
-        def _scrub_seg(m):
-            seg = m.group(0)
-            for n in leak_names:
-                seg = re.sub(rf"(?<![\w']){re.escape(n)}(?![\w'])", "", seg,
-                             flags=re.IGNORECASE)
-            seg = re.sub(r"\s{2,}", " ", seg)
-            return seg.replace("* ", "*").replace(" *", "*")
-        scrubbed = re.sub(r"\*[^*]+\*", _scrub_seg, cleaned)
-
-        bare = re.sub(r"\*[^*]+\*", " ", scrubbed)  # ignore stage directions
-        for n in leak_names:
-            for mobj in re.finditer(rf"(?<![\w']){re.escape(n)}(?![\w'])", bare,
-                                    flags=re.IGNORECASE):
-                prefix_words = bare[: mobj.start()].split()
-                if prefix_words:
-                    prev = prefix_words[-1].strip(".,;:!?\"'()").lower()
-                    if prev in _LEAK_NOUN_SLOT_WORDS:
-                        return scrubbed, n
-        return scrubbed, None
-    except re.error:
-        return cleaned, None
-
-
-def _replace_phantom_token(text: str, phantom: str, canonical: str) -> str:
-    """Whole-word, case-insensitive replace of ``phantom`` with
-    ``canonical`` in ``text``.
-
-    Used by ``cast_strip``. The match is boundary-anchored (``\\w`` and
-    apostrophe on both sides) so a phantom that is a substring of a
-    longer word is left alone. Never raises -- returns ``text``
-    unchanged on any regex error.
-    """
-    if not text or not phantom:
-        return text
-    try:
-        pattern = re.compile(
-            r"(?<![\w'])" + re.escape(phantom) + r"(?![\w'])",
-            re.IGNORECASE,
-        )
-        return pattern.sub(lambda _m: canonical, text)
-    except re.error:
-        return text
-
-
-def cast_strip(
-    text: str, req: LineRequest,
-) -> tuple[str, tuple[str, ...]]:
-    """Deterministically remap a near-miss phantom name to its cast spelling.
-
-    Sprint 3A: ``cast_strip`` is the strip-pipeline step that wraps the
-    project's existing ``auto_remap_phantom`` matcher
-    (``_otr_ledger_reviewer``). Every proper-noun candidate that
-    ``detect_phantom_names`` flags is run through ``auto_remap_phantom``
-    against the locked cast: a phantom that resolves to a cast member --
-    a single-character typo or casing slip, "Gulliver Reaves" for
-    "GULLIVER REEVES" -- is rewritten in place; a phantom that does not
-    resolve is left untouched for the downstream phantom-name gate to
-    flag.
-
-    The Levenshtein cap here is tight (``threshold=1``), deliberately
-    tighter than the reviewer's default of 3. ``cast_strip`` mutates
-    dialogue text at compose time with no story context, so it must
-    only fire on slam-dunk typos -- a looser cap produces false remaps
-    (a distance-3 match silently renamed "CARLA" to the news term
-    "CERN"). Multi-edit near-misses are left for the downstream
-    cast-contract reviewer, which has the full ledger as context and
-    keeps the threshold-3 pass.
-
-    Running this BEFORE ``compose_line`` returns means the corrected
-    line, never the typo, is what the caller appends to the rolling
-    ``last_lines`` window -- so the next beat's prompt cannot inherit a
-    misspelled name (Operating Philosophy 2: deterministic strips run
-    before LLM output re-enters context).
-
-    Returns ``(text, flags)`` where ``flags`` is a tuple of
-    ``"cast_remap:<phantom>-><canonical>"`` strings, empty when nothing
-    was remapped. Never raises -- on any failure the input text is
-    returned unchanged.
-    """
-    if not text or not req.allowed_roster:
-        return text, ()
-    phantoms = detect_phantom_names(text, req.speaker, req.allowed_roster)
-    if not phantoms:
-        return text, ()
-    try:
-        # Lazy import keeps _otr_line_composer off the reviewer's
-        # module-load import graph (same pattern as Sprint 2C).
-        from ._otr_ledger_reviewer import auto_remap_phantom
-    except Exception:  # noqa: BLE001
-        # Reviewer module unavailable -- skip the remap, leave the
-        # phantoms for the detect-and-flag gate.
-        return text, ()
-    # The remap target is the locked cast (allowed_people). Legacy
-    # callers that populate only the combined allowed_roster fall back
-    # to it.
-    remap_roster = list(req.allowed_people or req.allowed_roster)
-    out = text
-    flags: list[str] = []
-    for phantom in phantoms:
-        try:
-            # threshold=1: compose-time mutation fires on slam-dunk
-            # typos only. The reviewer keeps the wider threshold-3 pass.
-            canonical = auto_remap_phantom(
-                phantom, remap_roster, threshold=1,
-            )
-        except Exception:  # noqa: BLE001
-            canonical = None
-        if not canonical:
-            continue
-        if canonical.strip().upper() == phantom.strip().upper():
-            continue
-        remapped = _replace_phantom_token(out, phantom, canonical)
-        if remapped != out:
-            out = remapped
-            flags.append(f"cast_remap:{phantom}->{canonical}")
-    return out, tuple(flags)
-
-
 def compose_line_draft(
     *,
     creative_fn,
@@ -2064,3303 +947,356 @@ def compose_line_draft(
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     creative_repo_id: str | None = None,
-    reroll_hint: str | None = None,  # Sprint 5C
-    _stage_dir_repair_attempted: bool = False,  # D1 Tier-2 reroll guard
-    source_bank_id: str = "media_archive",  # Stage 2C widget threading
+    source_bank_id: str = "media_archive",
 ) -> str:
-    """Run the creative retry ladder and return ONE draft dialogue line.
+    """Return the first nonempty transport-clean spoken line.
 
-    Sprint 3A: this is the single creative job extracted out of the old
-    monolithic ``compose_line``. It generates a line, applies the
-    deterministic format strips the retry gates depend on
-    (``strip_line_formatting`` + the mixed-case named-prefix strip), and
-    enforces the size band. It returns the format-stripped,
-    size-checked draft STRING. It does NOT run the polish pass,
-    ``cast_strip``, the phantom-name gate, or ``vocative_strip`` --
-    those belong to the ``compose_line`` orchestrator.
-
-    Retry strategy (unchanged): attempt 1 at ``base_temperature``,
-    attempt 2 at ``base_temperature + 0.1``. ``max_new_tokens`` scales
-    with ``target_words`` on attempt 1 (``min(cap, target_words * 4)``)
-    and uses the full cap on attempt 2. Stop strings pass through to
-    ``creative_fn`` via the optional ``stop=`` kwarg; loaders without
-    it fall back to the no-``stop=`` path.
-
-    Failure conditions that trigger a retry: ``creative_fn`` raises, the
-    cleaned response is empty, or it exceeds the runaway ``word_cap``.
-    A response outside the two-sided drift band retries except on the
-    final attempt, where the drifty line ships with a WARNING.
-
-    Raises ``LineCompositionFailedError`` after all attempts exhausted.
-
-    Sprint 5C: a non-None ``reroll_hint`` overlays the story critic's
-    concrete revision instruction onto the (frozen) ``req`` so
-    ``_build_user_prompt`` renders the REVISE block. ``None`` leaves
-    ``req`` untouched -- the normal first-pass compose path.
+    Retries are limited to model-call failure or an empty response after
+    transport cleanup. Word count, names inside prose, style, and quality are
+    never inspected for acceptance.
     """
-    if reroll_hint is not None:
-        req = replace(req, reroll_hint=reroll_hint)
-
-    # All sub-passes route to creative_fn. Per-beat technical-slot
-    # dispatch in differing-slots mode would cost ~3.3 hr VRAM
-    # transition overhead per episode -- architecturally rejected at
-    # S32 design (plan D1). If a future use case justifies a T-side
-    # critic, design batched dispatch, not per-beat.
-    # LLM slot: creative -- dialogue composition per-beat
-    generate_fn = creative_fn
-
     if max_attempts < 1:
         raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
-    if not callable(generate_fn):
-        raise ValueError("generate_fn must be callable")
+    if not callable(creative_fn):
+        raise ValueError("creative_fn must be callable")
 
-    # Sprint D D2b: route via resolver. creative_repo_id is None for
-    # legacy callers + tests; on the SCIENCE lane that returns
-    # _SYSTEM_PROMPT by object identity so audio C7 holds.
-    # BUG-LOCAL-417 (Stage 4, kibitz r3 M2): a NON-science bank must route
-    # through the resolver EVEN with repo None -- the old repo-None
-    # short-circuit made source_bank_id a silent no-op at the reroll/spine
-    # call sites (their rerolls composed with the science prompt).
     if creative_repo_id is None and source_bank_id == "science_news":
         system = _SYSTEM_PROMPT
     else:
         from ._otr_creative_prompt_router import resolve_creative_system_prompt
         system = resolve_creative_system_prompt(
-            creative_repo_id, phase="line_composer_system",
+            creative_repo_id,
+            phase="line_composer_system",
             source_bank_id=source_bank_id,
         )
-    # D1 Tier-2: the user prompt is rebuilt from `current_req` so a bare
-    # stage-direction reroll can overlay a hint mid-loop. With no hit this is
-    # byte-identical to the old single build (current_req IS req).
-    current_req = req
-    user = _build_user_prompt(current_req)
     messages = [
         {"role": "system", "content": system},
-        {"role": "user", "content": user},
+        {"role": "user", "content": _build_user_prompt(req)},
     ]
-    _sd_reroll_done = bool(_stage_dir_repair_attempted)
-
     attempts: list[tuple[str, str]] = []
-    word_cap, min_words, max_words = _word_bands(req.target_words)
-    # Attempt-1 max_new_tokens scaled to target line length; attempt 2
-    # uses the full cap. ~4 tokens per English word is the textbook
-    # transformers heuristic.
-    # F1 (story-engine v1): None/zero-safe beat target -> the full cap (no
-    # starvation) when the per-line target is missing; otherwise scale to
-    # the beat band, floored at 40 and capped at max_new_tokens_cap (200).
-    _beat_target_words = (
-        int(req.target_words)
-        if isinstance(req.target_words, (int, float)) and req.target_words
-        else None
-    )
-    attempt_tokens = (
-        int(max_new_tokens_cap) if _beat_target_words is None
-        else min(int(max_new_tokens_cap), max(40, _beat_target_words * 4)),
-        int(max_new_tokens_cap),
-    )
-
     for attempt_idx in range(max_attempts):
-        temp = base_temperature + (0.1 * attempt_idx)
-        # Pick from attempt_tokens by index, falling back to the cap
-        # on any extra attempt past the table.
-        if attempt_idx < len(attempt_tokens):
-            mnt = attempt_tokens[attempt_idx]
-        else:
-            mnt = int(max_new_tokens_cap)
-        log.info(
-            "[OTR_LineComposer] attempt %d/%d for %s "
-            "(temp=%.2f, max_new_tokens=%d, target=%d words)",
-            attempt_idx + 1, max_attempts, req.speaker, temp, mnt,
-            req.target_words,
-        )
-
+        temperature = base_temperature + (0.1 * attempt_idx)
         try:
-            # LLM slot: creative -- per-beat dialogue generation
-            # Try with stop= first; older generate_fn signatures
-            # without the kwarg fall back to the no-stop path.
             try:
-                raw = generate_fn(
+                # LLM slot: creative -- one authored character line.
+                raw = creative_fn(
                     messages,
-                    temperature=temp,
-                    max_new_tokens=mnt,
+                    temperature=temperature,
+                    max_new_tokens=int(max_new_tokens_cap),
                     stop=list(stop_strings) if stop_strings else None,
                 )
             except TypeError:
-                # LLM slot: creative -- fallback (no stop= kwarg)
-                raw = generate_fn(
+                # LLM slot: creative -- compatibility retry for the same line.
+                raw = creative_fn(
                     messages,
-                    temperature=temp,
-                    max_new_tokens=mnt,
+                    temperature=temperature,
+                    max_new_tokens=int(max_new_tokens_cap),
                 )
         except Exception as exc:  # noqa: BLE001
-            err_msg = f"generate_fn raised: {type(exc).__name__}: {exc}"
-            log.warning("[OTR_LineComposer] %s", err_msg)
-            attempts.append(("", err_msg))
+            reason = f"generate_fn raised: {type(exc).__name__}: {exc}"
+            attempts.append(("", reason))
+            log.warning("[OTR_LineComposer] %s", reason)
             continue
 
-        # D1 Tier-2 (2026-06-22, story-quality lift): the SINGLE bare
-        # stage-direction reroll guard, moved here from the too-late
-        # `compose_line` site so it acts at compose time (the only tier that can
-        # reroll). Detect on the RAW draft BEFORE format-strip/normalization
-        # (so a trailing/embedded/undelimited direction is still intact), and
-        # owns the malformed cases (b015/b017). At most ONE reroll per line.
-        if not _sd_reroll_done:
-            _sd_hit, _sd_hint, _sd_reason = detect_stage_business_for_reroll(
-                raw or "", req.speaker,
-            )
-            if _sd_hit:
-                _sd_reroll_done = True
-                _existing = getattr(current_req, "reroll_hint", "") or ""
-                _combined = (
-                    f"{_existing}; {_sd_hint}" if _existing else _sd_hint
-                )
-                current_req = replace(current_req, reroll_hint=_combined)
-                user = _build_user_prompt(current_req)
-                messages = [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ]
-                err_msg = f"bare stage-direction reroll ({_sd_reason})"
-                log.warning(
-                    "[OTR_LineComposer] attempt %d reroll: %s (raw=%r)",
-                    attempt_idx + 1, err_msg, raw,
-                )
-                attempts.append((raw or "", err_msg))
-                continue
-
-        cleaned = strip_line_formatting(raw or "")
-
-        # Tier 1 fix #6 (2026-05-11): strip any leading mixed-case
-        # cast-name prefix that survived the uppercase-anchored
-        # `_PREFIX_SPEAKER_COLON_RE` pass.
-        cleaned = _strip_named_prefix(cleaned, req)
-
-        if not cleaned:
-            err_msg = "empty after format-strip"
-            log.warning("[OTR_LineComposer] attempt %d failed: %s (raw=%r)",
-                        attempt_idx + 1, err_msg, raw)
-            attempts.append((raw or "", err_msg))
-            continue
-
-        # BUG-LOCAL-279 follow-on (2026-05-27): degenerate-leak filter.
-        # The 1-word floor lets real one-word drama through ("Yes."
-        # "No." "OK." "Maeve.") but the model sometimes leaks JUST
-        # its own speaker label or the literal "ANNOUNCER" tag as
-        # the line text. Strip trailing punctuation + uppercase and
-        # compare to the speaker's own name AND to "ANNOUNCER" --
-        # those two shapes are leaks, not dialogue, and must retry.
-        # Saying ANOTHER cast member's name as a one-word line is
-        # legitimate drama ("Who did this?" "Maeve.") so we do NOT
-        # filter against the broader roster -- only the speaker's
-        # own name + the announcer label.
-        _norm_leak = (cleaned or "").strip().rstrip(".!?,;:").upper()
-        _speaker_self = (req.speaker or "").strip().upper()
-        if _norm_leak and (
-            _norm_leak == _speaker_self or _norm_leak == "ANNOUNCER"
-        ):
-            err_msg = (
-                f"speaker-self-name leak: line text {cleaned!r} equals "
-                f"speaker label {req.speaker!r}"
-                if _norm_leak == _speaker_self
-                else
-                f"announcer-label leak: line text {cleaned!r} equals "
-                f"literal 'ANNOUNCER'"
-            )
-            log.warning(
-                "[OTR_LineComposer] attempt %d retry: %s",
-                attempt_idx + 1, err_msg,
-            )
-            attempts.append((raw or "", err_msg))
-            continue
-
-        # BUG-LOCAL-295 (2026-06-03): a multi-word ALL-CAPS OTHER-roster name
-        # (from the episode's dynamic roster) leaked into the body -- mid-phrase
-        # or inside a *...* stage direction, e.g. "*ERIN SPENDER the monkeys'
-        # enclosure*" or "safe in the ERIN SPENDER". The self-name filter above
-        # misses these. Scrub inside a *...* group; retry on a bare noun-slot
-        # leak (a scrub there would break grammar). Mirrors the drift retry
-        # below -- ship-with-warning on the last attempt (PD1: never discard).
-        cleaned, _leak_name = _scrub_or_flag_roster_leak(
-            cleaned, _roster_leak_names(req)
-        )
-        if _leak_name:
-            is_last_attempt = (attempt_idx + 1 >= max_attempts)
-            err_msg = f"roster-name leak in body: {_leak_name!r}"
-            if not is_last_attempt:
-                log.warning(
-                    "[OTR_LineComposer] attempt %d retry: %s",
-                    attempt_idx + 1, err_msg,
-                )
-                attempts.append((raw or "", err_msg))
-                continue
-            log.warning(
-                "[OTR_LineComposer] shipping line with roster-name leak on "
-                "final attempt %d: %s", attempt_idx + 1, err_msg,
-            )
-
-        word_count = len(cleaned.split())
-        if word_count > word_cap:
-            err_msg = f"oversize: {word_count} words > cap {word_cap}"
-            log.warning("[OTR_LineComposer] attempt %d failed: %s",
-                        attempt_idx + 1, err_msg)
-            attempts.append((raw or "", err_msg))
-            continue
-        # Tier 2 fix #12 (2026-05-11): two-sided drift retry inside
-        # the 3x runaway cap. On the LAST attempt we ship the result
-        # anyway (drift is better than nothing) and log a WARNING so
-        # soak surfaces it.
-        if word_count > max_words or word_count < min_words:
-            is_last_attempt = (attempt_idx + 1 >= max_attempts)
-            err_msg = (
-                f"length drift: {word_count} words outside band "
-                f"[{min_words}..{max_words}] for target={req.target_words}"
-            )
-            if not is_last_attempt:
-                log.warning(
-                    "[OTR_LineComposer] attempt %d retry: %s",
-                    attempt_idx + 1, err_msg,
-                )
-                attempts.append((raw or "", err_msg))
-                continue
-            # Last attempt — keep the line but log the drift.
-            log.warning(
-                "[OTR_LineComposer] shipping drifty line on final "
-                "attempt %d: %s",
-                attempt_idx + 1, err_msg,
-            )
-
-        log.info(
-            "[OTR_LineComposer] draft ready on attempt %d/%d: %d words "
-            "for %s",
-            attempt_idx + 1, max_attempts, word_count, req.speaker,
-        )
-        return cleaned
-
+        roster_names = set(req.allowed_people or ())
+        roster_names.update((req.speaker, "ANNOUNCER"))
+        cleaned = strip_line_formatting(raw or "", roster_names)
+        if cleaned:
+            return cleaned
+        attempts.append((raw or "", "empty after transport cleanup"))
     raise LineCompositionFailedError(attempts=attempts, request=req)
-
-
-# Story-quality 3.2 (2026-06-27) -- the ONE per-line quality scorer (MF-5): the
-# single source of truth for the clean-quality gate AND its post-reroll
-# re-verify, so the re-verify can never reject a reroll for a flag the gate never
-# raised. ALWAYS-ON: cliche / flat stage-business / on-the-nose. v2 + CHARACTER
-# only: anchor-stuffing, one-breath, personal-cost boilerplate, objective-literal.
-# Coda / announcer lines never enter (they are composed by separate functions;
-# this is only reached from compose_line, and the v2 subset gates on
-# speaker_role == "character"). Returns [(code, reason, compose_flag), ...] in a
-# STABLE order. Pure; deterministic; never raises.
-_QUALITY_HINT_PRIORITY = (
-    "stage_direction", "one_breath", "anchor_stuffing", "personal_cost", "cliche",
-    "stage_business", "on_the_nose", "objective_literal",
-)
-#: one_breath + anchor_stuffing co-occur and share the rewrite -> one combined
-#: hint (W-D). 240-char cap applied by _quality_reroll_hint.
-_QUALITY_COLLAPSE_HINT = (
-    "Rewrite as one spoken beat under ~20 words, using at most one concrete "
-    "detail"
-)
-#: G1 (story-quality v2, 2026-06-28): the v2 collapse hint does NOT force the
-#: ~20-word compression that turned rich lines into noun-salad -- it asks for
-#: NATURAL spoken dialogue at the per-beat budget, split into short sentences,
-#: keeping the specifics. Selected by _quality_reroll_hint on the v2 path only;
-#: the original constant stays byte-identical for v2-OFF. <=240 chars.
-_QUALITY_COLLAPSE_HINT_V2 = (
-    "Rephrase as natural spoken dialogue; split into two short sentences if "
-    "needed; keep the specifics; drop listing or cramming; do not pad"
-)
-
-
-def _quality_flags_for_line(cleaned, req, *, rules=None):
-    """Single per-line quality scorer. See the module note above. Pure.
-    Stage 4: ``rules`` (a resolved StoryRules) supplies the vocabulary sets;
-    None = the science fixture defaults (byte-identical)."""
-    try:
-        flags: list = []
-        _h, _r = flag_cliche(cleaned, rules=rules)
-        if _h:
-            flags.append(("cliche", _r, "cliche"))
-        _h, _r = flag_stage_business(cleaned, rules=rules)
-        if _h:
-            flags.append(("stage_business", _r, "stage_business"))
-        # The detector needs the locked speaker name to catch an otherwise
-        # lexical whole-line action such as "Edna stares at the sealed vial."
-        # as narration by Edna, while leaving references to other people alone.
-        _sd_hit, _sd_hint, _sd_reason = detect_stage_business_for_reroll(
-            cleaned, getattr(req, "speaker", ""),
-        )
-        if is_stage_direction_only(cleaned):
-            _sd_hit = True
-            _sd_reason = "whole_line_action"
-            _sd_hint = (
-                "the line contains only stage business; write words the "
-                "character can actually speak"
-            )
-        if _sd_hit:
-            flags.append((
-                "stage_direction",
-                _sd_hint or (
-                    "remove every stage direction and write only spoken dialogue"
-                ),
-                f"stage_direction:{_sd_reason or 'detected'}",
-            ))
-        _h, _r = flag_on_the_nose(cleaned, rules=rules)
-        if _h:
-            flags.append(("on_the_nose", _r, "on_the_nose"))
-        if getattr(req, "speaker_role", "") == "character":
-            anchors = extract_specificity_anchors_from_header(
-                getattr(req, "canon_header", ""))
-            _h, _r = flag_anchor_stuffing(cleaned, anchors)
-            if _h:
-                flags.append(("anchor_stuffing", _r, "anchor_stuffing"))
-            # G1 (2026-06-28): the one-breath cap is the per-beat budget's high
-            # end (derive_one_breath_cap), and the SOFT clause tripwire is relaxed
-            # in proportion -- the cap alone is necessary but NOT sufficient (the
-            # soft path fires on clause count regardless of max_words), so a fuller
-            # well-structured line is not rerolled into noun-salad. (0,0)/absent
-            # range => 28/3 => byte-identical to the legacy flag_one_breath call.
-            _ob_cap = derive_one_breath_cap(
-                getattr(req, "words_per_beat_range", (0, 0)))
-            _h, _r = flag_one_breath(
-                cleaned, max_words=_ob_cap,
-                max_clause_markers=max(3, _ob_cap // 8))
-            if _h:
-                flags.append(("one_breath", _r, "one_breath"))
-            _h, _r = flag_personal_cost_boilerplate(cleaned, rules=rules)
-            if _h:
-                flags.append(("personal_cost", _r, "personal_cost"))
-            _obj = (getattr(req, "beat_objective", "") or "").strip()
-            if _obj:
-                _h, _r = flag_objective_literal(cleaned, _obj)
-                if _h:
-                    flags.append(
-                        ("objective_literal", _r, "objective_literal"))
-        return flags
-    except Exception:  # noqa: BLE001 -- a scorer must never break a render
-        return []
-
-
-def _surface_allowed_all_caps(req, explicit=()) -> frozenset[str]:
-    """Grounded acronyms/names that a final spoken surface may retain."""
-    allowed = {
-        str(value).strip()
-        for value in (explicit or ())
-        if str(value).strip()
-    }
-    allowed.update(
-        str(value).strip()
-        for value in (getattr(req, "allowed_roster", ()) or ())
-        if str(value).strip()
-    )
-    allowed.update(_COMMON_ALLCAPS_NON_NAMES)
-    header = str(getattr(req, "canon_header", "") or "")
-    allowed.update(match.group(0) for match in _ALL_CAPS_TOKEN_RE.finditer(header))
-    return frozenset(allowed)
-
-
-def spoken_surface_flags_for_line(
-    text,
-    req,
-    *,
-    rules=None,
-    include_thesis: bool = False,
-    allowed_all_caps=(),
-):
-    """Authoritative final-row spoken/craft scorer.
-
-    Ordinary ``compose_line`` keeps its role-sensitive creative scorer. Final
-    authoring boundaries need the wider contract: mechanical spoken form,
-    truncation, and the full craft suite apply to every voiced role, including
-    announcer rows written by whole-script lanes. Pure and never-raise.
-    """
-    try:
-        value = str(text or "")
-        if not value.strip():
-            return [("empty", "write one nonempty speakable line", "empty")]
-        flags = list(_quality_flags_for_line(value, req, rules=rules))
-        codes = {code for code, _reason, _flag in flags}
-
-        stripped = _strip_named_prefix(strip_line_formatting(value), req)
-        if (
-            stripped != value.strip()
-            or any(ch in value for ch in "[]{}<>()\n\r\t`*")
-        ):
-            flags.append((
-                "spoken_format",
-                "remove labels, wrappers, markup, and production notes",
-                "spoken_format",
-            ))
-            codes.add("spoken_format")
-
-        if scrub_self_vocative(value, getattr(req, "speaker", "")) != value:
-            flags.append((
-                "self_vocative",
-                "do not begin by addressing the speaker's own name",
-                "self_vocative",
-            ))
-            codes.add("self_vocative")
-
-        allowed = _surface_allowed_all_caps(req, allowed_all_caps)
-        if any(
-            match.group(0) not in allowed
-            for match in _ALL_CAPS_TOKEN_RE.finditer(value)
-        ):
-            flags.append((
-                "all_caps",
-                "use normal spoken casing except grounded acronyms",
-                "all_caps",
-            ))
-            codes.add("all_caps")
-
-        if (
-            not re.search(r"[A-Za-z]", value)
-            or any(
-                not token.strip(".,!?;:'\u2019-") for token in value.split()
-            )
-        ):
-            flags.append((
-                "non_lexical",
-                "remove punctuation-only tokens",
-                "non_lexical",
-            ))
-            codes.add("non_lexical")
-
-        if is_truncated(value):
-            flags.append((
-                "truncated",
-                "finish the thought as a complete spoken sentence",
-                "truncated",
-            ))
-            codes.add("truncated")
-
-        # Whole-script and announcer lanes bypass the character-only creative
-        # scorer, so add its context-dependent craft gates role-neutrally here.
-        if getattr(req, "speaker_role", "") != "character":
-            anchors = extract_specificity_anchors_from_header(
-                getattr(req, "canon_header", ""),
-            )
-            if "anchor_stuffing" not in codes:
-                hit, reason = flag_anchor_stuffing(value, anchors)
-                if hit:
-                    flags.append(("anchor_stuffing", reason, "anchor_stuffing"))
-            if "one_breath" not in codes:
-                cap = derive_one_breath_cap(
-                    getattr(req, "words_per_beat_range", (0, 0)),
-                )
-                hit, reason = flag_one_breath(
-                    value,
-                    max_words=cap,
-                    max_clause_markers=max(3, cap // 8),
-                )
-                if hit:
-                    flags.append(("one_breath", reason, "one_breath"))
-            if "personal_cost" not in codes:
-                hit, reason = flag_personal_cost_boilerplate(value, rules=rules)
-                if hit:
-                    flags.append(("personal_cost", reason, "personal_cost"))
-            objective = str(getattr(req, "beat_objective", "") or "").strip()
-            if objective and "objective_literal" not in codes:
-                hit, reason = flag_objective_literal(value, objective)
-                if hit:
-                    flags.append(("objective_literal", reason, "objective_literal"))
-
-        if include_thesis and flag_thesis_close(value, rules=rules)[0]:
-            flags.append((
-                "thesis_close",
-                flag_thesis_close(value, rules=rules)[1],
-                "thesis_close",
-            ))
-        return list(dict.fromkeys(flags))
-    except Exception:  # noqa: BLE001 -- final scorers never break a render
-        return []
-
-
-def _quality_reroll_hint(flags) -> str:
-    """W-D hint composition: TOP-1 by priority, EXCEPT one_breath+anchor_stuffing
-    collapse into one combined rewrite. 240-char cap. Pure. The collapse hint is
-    the non-compressing _QUALITY_COLLAPSE_HINT_V2 (rephrase as natural dialogue,
-    keep specifics, do not pad)."""
-    by_code = {code: reason for code, reason, _flag in flags}
-    if "one_breath" in by_code and "anchor_stuffing" in by_code:
-        return _QUALITY_COLLAPSE_HINT_V2[:240]
-    for code in _QUALITY_HINT_PRIORITY:
-        if code in by_code:
-            return str(by_code[code] or "")[:240]
-    return ""
-
-
-def line_quality_defect_score(text, req, *, rules=None) -> int:
-    """G1 (story-quality v2, 2026-06-28) -- a single ordering used ONLY on the v2
-    path to decide whether a reroll genuinely improved the line: the count of
-    quality flags + a strong penalty for a truncated/mid-cut line + a mild penalty
-    for excessive hard-clause nesting. LOWER wins; the ORIGINAL keeps a tie. Pure;
-    never raises. Stage 4: ``rules`` threads to the vocabulary sets."""
-    try:
-        flags = _quality_flags_for_line(text, req, rules=rules)
-        score = len(flags) + 2 * int(is_truncated(text))
-        if _hard_clauses(text) > 3:
-            score += 1
-        return score
-    except Exception:  # noqa: BLE001 -- a scorer must never break a render
-        return 0
-
-
-def _quality_codes(flags) -> "tuple[str, ...]":
-    return tuple(dict.fromkeys(code for code, _reason, _flag in (flags or ())))
-
-
-def _quality_critical_hint(flags, existing: str = "") -> str:
-    """Sharpen every still-open gate for the post-budget repair rungs."""
-    details = "; ".join(
-        f"{code}: {reason}" for code, reason, _flag in (flags or ())
-    )
-    critical = (
-        "CRITICAL SPOKEN-LINE REPAIR. Rewrite only this line as clean, natural, "
-        "SFW words the character can say aloud. Preserve the beat and meaning. "
-        "Resolve EVERY named hygiene defect; no stage action, markup, labels, "
-        "cliches, stated emotion, objective restatement, crammed anchors, or "
-        f"overlong breath. Defects: {details}"
-    )[:900]
-    return f"{existing}; {critical}" if existing else critical
-
-
-def _quality_model_repair_pass_budget(
-    gate_count: int,
-    lane_count: int,
-) -> int:
-    """Dynamic model-pass allowance for one rejected spoken chunk.
-
-    Every available writer lane receives several chances, while chunks with
-    several independent open gates receive proportionally more feedback/retry
-    cycles.  This bound prevents an unavailable or stubborn backend from
-    hanging a render forever; reaching it is *not* a rejection and therefore
-    proceeds to the scorer-validated ledger floor.
-    """
-    try:
-        gates = max(1, int(gate_count))
-    except (TypeError, ValueError):
-        gates = 1
-    try:
-        lanes = max(1, int(lane_count))
-    except (TypeError, ValueError):
-        lanes = 1
-    return min(
-        _QUALITY_DYNAMIC_MAX_MODEL_PASSES,
-        max(
-            _QUALITY_DYNAMIC_MIN_MODEL_PASSES,
-            lanes * 3,
-            2 + (gates * 2),
-        ),
-    )
-
-
-def _quality_dynamic_temperature(pass_index: int) -> float:
-    """Fresh, low-entropy temperature for a post-C repair pass."""
-    try:
-        index = max(0, int(pass_index))
-    except (TypeError, ValueError):
-        index = 0
-    return _QUALITY_DYNAMIC_TEMPERATURES[
-        index % len(_QUALITY_DYNAMIC_TEMPERATURES)
-    ]
-
-
-def _quality_dynamic_hint(
-    flags,
-    *,
-    existing: str,
-    rejected_text: str,
-    pass_number: int,
-    pass_budget: int,
-) -> str:
-    """Feedback for a fresh repair call after the fixed A/B/C rungs."""
-    critical = _quality_critical_hint(flags, existing)
-    rejected = " ".join(str(rejected_text or "").split())[:600]
-    return (
-        f"{critical}; DYNAMIC REPAIR PASS {pass_number}/{pass_budget}. "
-        "The previous candidate was rejected by the named gates. Produce a "
-        "genuinely different complete spoken line, then internally check every "
-        f"gate before answering. Rejected candidate: {rejected!r}"
-    )
-
-
-def _quality_stamp(result: LineResult, gates, rung: str) -> LineResult:
-    extra = ["hygiene_repaired_after_reroll"]
-    extra.extend(
-        f"hygiene_repaired_after_reroll:{gate}:{rung}" for gate in gates
-    )
-    merged = list(result.compose_flags)
-    for flag in extra:
-        if flag not in merged:
-            merged.append(flag)
-    return replace(result, compose_flags=tuple(merged))
-
-
-def _quality_floor_text(text, req, flags, *, rules=None):
-    """Run the pure floor to a fixed point under the authoritative scorer."""
-    out = str(text or "")
-    seen: list[str] = []
-    actions: list[str] = []
-    current = list(flags or ())
-    anchors = extract_specificity_anchors_from_header(
-        getattr(req, "canon_header", ""))
-    for _ in range(6):
-        if not current:
-            return out, tuple(seen), tuple(actions)
-        codes = _quality_codes(current)
-        for code in codes:
-            if code not in seen:
-                seen.append(code)
-        floor = deterministic_hygiene_floor(
-            out,
-            codes,
-            speaker_name=getattr(req, "speaker", ""),
-            beat_objective=getattr(req, "beat_objective", ""),
-            anchors=anchors,
-            rules=rules,
-        )
-        actions.extend(floor.actions)
-        if not floor.text or floor.text == out:
-            break
-        out = floor.text
-        current = _quality_flags_for_line(out, req, rules=rules)
-    current = _quality_flags_for_line(out, req, rules=rules)
-    if current and out.strip():
-        # The named per-gate floors above should normally converge. This final
-        # two-word utterance is the bounded totality proof for an unusual custom
-        # StoryRules pack whose patterns have no curated span replacement.
-        for code in _quality_codes(current):
-            if code not in seen:
-                seen.append(code)
-        for fallback in ("It moved.", "Go now.", "Yes."):
-            if not _quality_flags_for_line(fallback, req, rules=rules):
-                out = fallback
-                break
-        actions.append("total_craft_floor")
-    return out, tuple(seen), tuple(dict.fromkeys(actions))
-
-
-def repair_existing_spoken_line(
-    *,
-    text: str,
-    req: LineRequest,
-    creative_fn,
-    repair_fn=None,
-    story_rules=None,
-    include_thesis: bool = False,
-    candidate_validator=None,
-    spoken_projection_fn=None,
-) -> LineResult:
-    """Final B/C/floor scour for a voiced line authored outside compose_line.
-
-    Grouped exchanges and dedicated announcer rewrites intentionally bypass the
-    per-beat composer. The writer calls this at the final shared row boundary so
-    all source banks still receive the same craft guarantee. Clean input is
-    returned byte-identically and makes no model call. Content safety is not
-    handled here; G9 remains the downstream fail-closed authority.
-    """
-    original = str(text or "")
-
-    def _candidate_allowed(candidate: str) -> bool:
-        if not callable(candidate_validator):
-            return True
-        try:
-            return bool(candidate_validator(candidate))
-        except Exception:  # noqa: BLE001 - a validator rejects, never crashes
-            return False
-
-    def _project(candidate: str) -> str:
-        if not callable(spoken_projection_fn):
-            return str(candidate or "")
-        try:
-            projected = spoken_projection_fn(str(candidate or ""))
-            if isinstance(projected, tuple):
-                projected = projected[0] if projected else ""
-            return str(projected or "")
-        except Exception as exc:  # noqa: BLE001 -- keep repair total
-            log.warning(
-                "[OTR_LineComposer] spoken projection raised %s: %s; "
-                "scoring the canonical surface",
-                type(exc).__name__, str(exc)[:160],
-            )
-            return str(candidate or "")
-
-    def _flags(candidate: str):
-        return spoken_surface_flags_for_line(
-            _project(candidate),
-            req,
-            rules=story_rules,
-            include_thesis=include_thesis,
-        )
-
-    initial = _flags(original)
-    if not initial:
-        return LineResult(text=original)
-    seen = list(_quality_codes(initial))
-    current = original
-
-    def _call(
-        fn,
-        temperature: float,
-        *,
-        rung: str,
-        pass_number: int,
-        pass_budget: int,
-    ) -> str:
-        open_flags = _flags(current)
-        prompt = _quality_critical_hint(open_flags)
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "Repair one radio line. Scour the complete line for anything "
-                    "that does not sound like actual dialogue. Return only clean, "
-                    "natural, SFW vocabulary the named speaker can say aloud. "
-                    "Replace stage action with an in-character line serving the "
-                    "same beat; never return a cue, label, markup, or narration."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"Speaker: {req.speaker}\n"
-                    f"Beat intent: {req.intent}\n"
-                    f"Locked context:\n{str(req.canon_header or '')[-1800:]}\n"
-                    f"Current line: {current}\n"
-                    f"Required repair: {prompt}\n"
-                    f"Repair pass: {pass_number}/{pass_budget} ({rung}). "
-                    "A rejected answer will be rejudged and sent through a "
-                    "fresh writer pass."
-                ),
-            },
-        ]
-        try:
-            try:
-                raw = fn(
-                    messages,
-                    temperature=temperature,
-                    max_new_tokens=_MAX_NEW_TOKENS_PER_LINE,
-                    stop=list(_DEFAULT_STOP_STRINGS),
-                )
-            except TypeError:
-                raw = fn(
-                    messages,
-                    temperature=temperature,
-                    max_new_tokens=_MAX_NEW_TOKENS_PER_LINE,
-                )
-            return strip_line_formatting(raw or "")
-        except Exception as exc:  # noqa: BLE001 -- next rung owns recovery
-            log.warning(
-                "[OTR_LineComposer] final spoken repair call raised %s: %s",
-                type(exc).__name__, str(exc)[:160],
-            )
-            return ""
-
-    lanes = [
-        (fn, label)
-        for fn, label in (
-            (creative_fn, "same_slot"),
-            (repair_fn, "alternate_slot"),
-        )
-        if callable(fn)
-    ]
-    pass_budget = _quality_model_repair_pass_budget(
-        len(_quality_codes(initial)), len(lanes),
-    )
-    model_passes = 0
-    for fn, temperature, rung in (
-        (creative_fn, _QUALITY_REPAIR_B_TEMPERATURE, "repair_b_same_slot"),
-        (repair_fn, _QUALITY_REPAIR_C_TEMPERATURE, "repair_c_alternate_slot"),
-    ):
-        if not callable(fn):
-            continue
-        model_passes += 1
-        candidate = _call(
-            fn,
-            temperature,
-            rung=rung,
-            pass_number=model_passes,
-            pass_budget=pass_budget,
-        )
-        if not candidate:
-            continue
-        candidate_flags = _flags(candidate)
-        for code in _quality_codes(candidate_flags):
-            if code not in seen:
-                seen.append(code)
-        if not _candidate_allowed(candidate):
-            continue
-        current = candidate
-        if not candidate_flags:
-            return _quality_stamp(LineResult(text=current), seen, rung)
-
-    # D+: keep issuing fresh, independently judged repair calls after A/B/C.
-    # Rotate every available slot and vary the low repair temperature so a
-    # stubborn model/output cache cannot turn one bad answer into an episode
-    # failure.  The current best admissible candidate is the next pass input.
-    dynamic_index = 0
-    while lanes and model_passes < pass_budget and _flags(current):
-        fn, lane_label = lanes[dynamic_index % len(lanes)]
-        model_passes += 1
-        dynamic_index += 1
-        rung = f"repair_dynamic_{model_passes:02d}_{lane_label}"
-        candidate = _call(
-            fn,
-            _quality_dynamic_temperature(model_passes - 1),
-            rung=rung,
-            pass_number=model_passes,
-            pass_budget=pass_budget,
-        )
-        if not candidate:
-            continue
-        candidate_flags = _flags(candidate)
-        for code in _quality_codes(candidate_flags):
-            if code not in seen:
-                seen.append(code)
-        if not _candidate_allowed(candidate):
-            continue
-        current_flags = _flags(current)
-        if not candidate_flags:
-            return _quality_stamp(LineResult(text=candidate), seen, rung)
-        if len(candidate_flags) <= len(current_flags):
-            current = candidate
-
-    actions: list[str] = []
-    for _ in range(6):
-        open_flags = _flags(current)
-        if not open_flags:
-            break
-        codes = _quality_codes(open_flags)
-        for code in codes:
-            if code not in seen:
-                seen.append(code)
-        # A content-owned lane can preserve canonical spelling while its TTS
-        # delivery projection expands numbers/abbreviations. If that exact
-        # spoken projection is the failing surface, make it the deterministic
-        # floor input and return the clean result as canonical; the caller then
-        # rebuilds every proof/seal around the words that will actually air.
-        floor = deterministic_hygiene_floor(
-            _project(current),
-            codes,
-            speaker_name=req.speaker,
-            allowed_all_caps=_surface_allowed_all_caps(req),
-            beat_objective=req.beat_objective,
-            anchors=extract_specificity_anchors_from_header(req.canon_header),
-            rules=story_rules,
-        )
-        actions.extend(floor.actions)
-        if not floor.text:
-            current = ""
-            break
-        if not _candidate_allowed(floor.text):
-            break
-        if floor.text == current:
-            break
-        current = floor.text
-    if _flags(current):
-        if not re.search(r"[A-Za-z]", current):
-            failure_flags = ["hygiene_row_failed_mechanical"]
-            failure_flags.extend(
-                f"hygiene_row_failed_mechanical:{gate}" for gate in seen
-            )
-            return LineResult(text="", compose_flags=tuple(failure_flags))
-        # Fixed current packs always converge above. This bounded final choice
-        # keeps the totality promise even if a future custom vocabulary pack
-        # unexpectedly flags a curated floor phrase.
-        candidates = (
-            "At dawn, one lamp still burns beside the empty chair."
-            if include_thesis else "It moved.",
-            "Go now.",
-            "Yes.",
-        )
-        for candidate in candidates:
-            if not _flags(candidate) and _candidate_allowed(candidate):
-                current = candidate
-                actions.append("total_craft_floor")
-                break
-    if _flags(current):
-        return LineResult(
-            text=original,
-            compose_flags=("hygiene_repair_candidate_rejected",),
-        )
-    if current and not _candidate_allowed(current):
-        return LineResult(
-            text=original,
-            compose_flags=("hygiene_repair_candidate_rejected",),
-        )
-    result = _quality_stamp(
-        LineResult(
-            text=current,
-            compose_flags=tuple(
-                f"hygiene_floor_action:{action}"
-                for action in dict.fromkeys(actions)
-            ),
-        ),
-        seen,
-        "deterministic_floor",
-    )
-    return result
 
 
 def compose_line(
     *,
-    creative_fn,                # the generation slot -- all sub-passes
-    repair_fn=None,             # optional alternate/stronger writer for rung C
+    creative_fn,
     req: LineRequest,
     max_attempts: int = 2,
     base_temperature: float = _BASE_TEMPERATURE,
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
-    creative_repo_id: str | None = None,  # Sprint D D2b
-    reroll_hint: str | None = None,  # Sprint 5C
-    source_bank_id: str = "media_archive",  # Stage 2C widget threading
-    # Sprint 10B Wave 1 Agent B (2026-05-27): in-line Stage 3
-    # validators. When enable_stage3_validators=True AND both
-    # stage3_plan + stage3_beat are provided, the final cleaned
-    # text runs through _otr_stage3_validators.validate_line. Any
-    # error-severity findings trigger ONE recursive compose_line
-    # repair attempt with the finding messages overlaid as the
-    # reroll_hint. The repair attempt sets
-    # _stage3_repair_attempted=True so recursion can never deepen.
-    # Findings (errors + warns) are stamped on
-    # LineResult.validation_findings from the FINAL line state.
+    creative_repo_id: str | None = None,
+    source_bank_id: str = "media_archive",
     enable_stage3_validators: bool = False,
-    stage3_plan=None,           # Optional[Stage1Plan]
-    stage3_beat=None,           # Optional[Stage1Beat]
-    stage3_banned_phrases=None,  # Optional[List[str]]
-    _stage3_repair_attempted: bool = False,  # recursion guard
-    _stage_dir_repair_attempted: bool = False,  # bare-stage-direction reroll guard
-    _leak_repair_attempted: bool = False,  # leak-floor-v2 recompose guard
-    _quality_repair_attempted: bool = False,  # clean-quality (3.2) reroll guard
-    _quality_floor_allowed: bool = True,  # outer repair ladder owns the floor
-    # Stage 4 (2026-07-06): the resolved StoryRules for this episode's
-    # source_bank. None => resolved ONCE at entry from source_bank_id
-    # (fail-loud, OUTSIDE any swallow); forwarded on every recursive call so
-    # a repaired line is scored by the SAME bank vocabulary.
-    _story_rules=None,
+    stage3_beat=None,
 ) -> LineResult:
-    """Compose one cleaned dialogue line for a beat.
-
-    Sprint 3A: ``compose_line`` is now a thin orchestrator over the
-    single-job stages the overloaded monolith was split into:
-
-      1. ``compose_line_draft`` -- the creative job: generate + format
-         strip + size band, with the retry ladder.
-      2. optional polish -- regex-gated narration-leak cleanup.
-      3. the deterministic strip pipeline -- ``cast_strip`` (near-miss
-         phantom remap), the phantom-name gate, ``vocative_strip``.
-      4. assemble the ``LineResult``.
-
-    Critical ordering: every deterministic strip runs INSIDE this
-    function, before it returns -- so the corrected line, never a raw
-    hallucination, is what the caller appends to its rolling
-    ``last_lines`` window. Polish runs before the phantom gate so a
-    proper noun the polish prompt introduces is still flagged
-    (pinned by ``TestPolishBeforePhantom``).
-
-    Return:
-      ``LineResult(text=<cleaned dialogue>, compose_flags=<tuple>)`` --
-      ``compose_flags`` carries ``cast_remap:`` / ``phantom_name:`` /
-      ``vocative_drift:`` entries, empty when the line had no
-      detections.
-
-    Raises ``LineCompositionFailedError`` if the draft stage exhausts
-    its attempts.
-
-    Sprint 5C: a non-None ``reroll_hint`` overlays the story critic's
-    revision instruction onto the (frozen) ``req`` here, before the draft
-    stage, so ``_build_user_prompt`` renders the REVISE block. The
-    already-overlaid ``req`` is what flows into ``compose_line_draft``
-    below -- the hint is NOT forwarded a second time.
-    """
-    if reroll_hint is not None:
-        req = replace(req, reroll_hint=reroll_hint)
-
-    # Stage 4: resolve the rule vocabulary ONCE per entry, OUTSIDE every
-    # broad-catch scorer (a StoryRulesError must fail the episode LOUD --
-    # resolving inside the scorers' try blocks would silently disable
-    # fail-loud; kibitz r2 M3).
-    if _story_rules is None:
-        try:
-            from ._otr_story_rules import resolve_story_rules
-        except ImportError:  # pragma: no cover -- flat test imports; the
-            # rules module needs its package context (it imports the story
-            # routing layer relatively), so the fallback goes through the
-            # `nodes` package, never a bare flat copy.
-            from nodes._otr_story_rules import (  # type: ignore
-                resolve_story_rules)
-        _story_rules = resolve_story_rules(source_bank_id)
-
-    # Stage 1 -- draft. The one creative job. Raises
-    # LineCompositionFailedError on exhaustion (propagated unchanged).
-    _q_retry_flags: tuple[str, ...] = ()
-    try:
-        cleaned = compose_line_draft(
-            creative_fn=creative_fn,
-            req=req,
-            max_attempts=max_attempts,
-            base_temperature=base_temperature,
-            max_new_tokens_cap=max_new_tokens_cap,
-            stop_strings=stop_strings,
-            creative_repo_id=creative_repo_id,
-            # D1: the bare stage-direction reroll now lives INSIDE the draft (the
-            # only tier that can reroll). Thread the guard so a recursive repair
-            # cannot trigger a second stage-direction reroll.
-            _stage_dir_repair_attempted=_stage_dir_repair_attempted,
-            source_bank_id=source_bank_id,  # Stage 2C
-        )
-    except LineCompositionFailedError as exc:
-        if not _quality_floor_allowed:
-            raise
-        # Mechanical/stage-only exhaustion occurs before the ordinary quality
-        # block. Preserve the last nonempty authored surface and continue with
-        # B/C/floor instead of letting one line abort the episode.
-        last_surface = next((
-            str(raw) for raw, _reason in reversed(exc.attempts)
-            if str(raw or "").strip()
-        ), "")
-        recovered = repair_existing_spoken_line(
-            text=last_surface,
-            req=req,
-            creative_fn=creative_fn,
-            repair_fn=repair_fn,
-            story_rules=_story_rules,
-        )
-        if not recovered.text:
-            return recovered
-        cleaned = recovered.text
-        _q_retry_flags = recovered.compose_flags
-    word_count = len(cleaned.split())
-    word_cap, min_words, max_words = _word_bands(req.target_words)
-
-    # Total craft-hygiene repair ladder (2026-07-20/21). A quality flag can never
-    # declare the episode unrenderable: A uses the established reroll path; B is
-    # a lower-temperature CRITICAL rewrite on the same writer; C uses the
-    # optional alternate/stronger writer; D+ dynamically rotates fresh calls
-    # across every available slot and re-scores each answer; then the pure floor
-    # resolves any remaining named craft gate. Structural and content-safety
-    # gates do not enter this ladder.
-    if (
-        _quality_floor_allowed
-        and not _stage_dir_repair_attempted
-        and not _quality_repair_attempted
-    ):
-        # L1 observability: a tense character beat with no objective frame is a
-        # mis-wire -- warn once (the scorer itself skips objective-literal then).
-        if (req.speaker_role == "character"
-                and not (req.beat_objective or "").strip()
-                and 1 <= req.beat_tension <= 5):
-            log.warning(
-                "[OTR_LineComposer] L1 objective-literal gate skipped for "
-                "%s -- character beat at tension %d carries no "
-                "beat_objective frame", req.speaker, req.beat_tension,
-            )
-        _q_flags = _quality_flags_for_line(cleaned, req, rules=_story_rules)
-        if _q_flags:
-            _q_hint = _quality_reroll_hint(_q_flags)
-            _existing = getattr(req, "reroll_hint", "") or ""
-            _q_combined = (
-                f"{_existing}; {_q_hint}" if _existing else _q_hint)
-            _q_codes = ", ".join(c for c, _r, _f in _q_flags)
-            log.warning(
-                "[OTR_LineComposer] draft quality flag for %s (%s) -- "
-                "entering total repair ladder", req.speaker, _q_codes,
-            )
-            _retry = tuple(f"{c}_retry" for c, _r, _f in _q_flags)
-            _seen_codes = list(_quality_codes(_q_flags))
-            _candidates: list[tuple[LineResult, str]] = [
-                (LineResult(text=cleaned), "original"),
-            ]
-
-            def _attempt_quality_rung(
-                fn, *, hint: str, temperature: float, attempts: int, rung: str,
-            ) -> LineResult | None:
-                try:
-                    return compose_line(
-                        creative_fn=fn,
-                        repair_fn=repair_fn,
-                        req=req,
-                        max_attempts=attempts,
-                        base_temperature=temperature,
-                        max_new_tokens_cap=max_new_tokens_cap,
-                        stop_strings=stop_strings,
-                        creative_repo_id=creative_repo_id,
-                        reroll_hint=hint,
-                        source_bank_id=source_bank_id,
-                        enable_stage3_validators=enable_stage3_validators,
-                        stage3_plan=stage3_plan,
-                        stage3_beat=stage3_beat,
-                        stage3_banned_phrases=stage3_banned_phrases,
-                        _stage3_repair_attempted=_stage3_repair_attempted,
-                        _stage_dir_repair_attempted=True,
-                        _leak_repair_attempted=_leak_repair_attempted,
-                        _quality_repair_attempted=True,
-                        _quality_floor_allowed=False,
-                        _story_rules=_story_rules,
-                    )
-                except LineCompositionFailedError:
-                    log.warning(
-                        "[OTR_LineComposer] hygiene %s exhausted for %s",
-                        rung, req.speaker,
-                    )
-                    return None
-
-            # A: the established hinted recompose path.
-            _rr = _attempt_quality_rung(
-                creative_fn,
-                hint=_q_combined,
-                temperature=base_temperature,
-                attempts=max_attempts,
-                rung="repair_a",
-            )
-            if _rr is not None:
-                _candidates.append((_rr, "repair_a"))
-                _after = _quality_flags_for_line(
-                    _rr.text, req, rules=_story_rules)
-                for _code in _quality_codes(_after):
-                    if _code not in _seen_codes:
-                        _seen_codes.append(_code)
-                if not _after:
-                    _rr = replace(
-                        _rr, compose_flags=_rr.compose_flags + _retry,
-                    )
-                    return _quality_stamp(_rr, _seen_codes, "repair_a")
-
-            _current_flags = _quality_flags_for_line(
-                _candidates[-1][0].text, req, rules=_story_rules)
-            _critical = _quality_critical_hint(_current_flags or _q_flags, _existing)
-
-            # B: one same-writer call, lower entropy, every open gate named.
-            _b = _attempt_quality_rung(
-                creative_fn,
-                hint=_critical,
-                temperature=max(
-                    0.01, min(_QUALITY_REPAIR_B_TEMPERATURE, base_temperature * 0.5),
-                ),
-                attempts=1,
-                rung="repair_b_same_slot",
-            )
-            if _b is not None:
-                _candidates.append((_b, "repair_b_same_slot"))
-                _after = _quality_flags_for_line(
-                    _b.text, req, rules=_story_rules)
-                for _code in _quality_codes(_after):
-                    if _code not in _seen_codes:
-                        _seen_codes.append(_code)
-                if not _after:
-                    _b = replace(_b, compose_flags=_b.compose_flags + _retry)
-                    return _quality_stamp(
-                        _b, _seen_codes, "repair_b_same_slot",
-                    )
-
-            # C: the other model slot / stronger writer when one is available.
-            if callable(repair_fn):
-                _current_flags = _quality_flags_for_line(
-                    _candidates[-1][0].text, req, rules=_story_rules)
-                _critical = _quality_critical_hint(
-                    _current_flags or _q_flags, _existing,
-                )
-                _c = _attempt_quality_rung(
-                    repair_fn,
-                    hint=_critical,
-                    temperature=max(
-                        0.01,
-                        min(_QUALITY_REPAIR_C_TEMPERATURE, base_temperature * 0.3),
-                    ),
-                    attempts=1,
-                    rung="repair_c_alternate_slot",
-                )
-                if _c is not None:
-                    _candidates.append((_c, "repair_c_alternate_slot"))
-                    _after = _quality_flags_for_line(
-                        _c.text, req, rules=_story_rules)
-                    for _code in _quality_codes(_after):
-                        if _code not in _seen_codes:
-                            _seen_codes.append(_code)
-                    if not _after:
-                        _c = replace(
-                            _c, compose_flags=_c.compose_flags + _retry,
-                        )
-                        return _quality_stamp(
-                            _c, _seen_codes, "repair_c_alternate_slot",
-                        )
-
-            # D+: dynamically keep asking/rejudging after fixed A/B/C. The
-            # allowance scales with open-gate complexity and available lanes;
-            # its exhaustion is never a quality failure -- the validated floor
-            # below remains the total ledgerability terminus.
-            _lanes = [(creative_fn, "same_slot")]
-            if callable(repair_fn):
-                _lanes.append((repair_fn, "alternate_slot"))
-            _model_passes = 2 + int(callable(repair_fn))  # logical A + B + C
-            _pass_budget = _quality_model_repair_pass_budget(
-                len(_quality_codes(_q_flags)), len(_lanes),
-            )
-            _dynamic_index = 0
-            while _lanes and _model_passes < _pass_budget:
-                _best_so_far, _ = min(
-                    _candidates,
-                    key=lambda item: line_quality_defect_score(
-                        item[0].text, req, rules=_story_rules,
-                    ),
-                )
-                _open = _quality_flags_for_line(
-                    _best_so_far.text, req, rules=_story_rules,
-                )
-                if not _open:
-                    break
-                _fn, _lane_label = _lanes[
-                    _dynamic_index % len(_lanes)
-                ]
-                _model_passes += 1
-                _dynamic_index += 1
-                _rung = (
-                    f"repair_dynamic_{_model_passes:02d}_{_lane_label}"
-                )
-                _dynamic_hint = _quality_dynamic_hint(
-                    _open,
-                    existing=_existing,
-                    rejected_text=_best_so_far.text,
-                    pass_number=_model_passes,
-                    pass_budget=_pass_budget,
-                )
-                _candidate = _attempt_quality_rung(
-                    _fn,
-                    hint=_dynamic_hint,
-                    temperature=_quality_dynamic_temperature(
-                        _model_passes - 1,
-                    ),
-                    attempts=1,
-                    rung=_rung,
-                )
-                if _candidate is None:
-                    continue
-                _candidates.append((_candidate, _rung))
-                _after = _quality_flags_for_line(
-                    _candidate.text, req, rules=_story_rules,
-                )
-                for _code in _quality_codes(_after):
-                    if _code not in _seen_codes:
-                        _seen_codes.append(_code)
-                if not _after:
-                    _candidate = replace(
-                        _candidate,
-                        compose_flags=_candidate.compose_flags + _retry,
-                    )
-                    return _quality_stamp(
-                        _candidate, _seen_codes, _rung,
-                    )
-
-            # Floor: choose the lowest-defect authored candidate (stable tie:
-            # original), then resolve to a fixed point under the SAME scorer.
-            _best, _best_rung = min(
-                _candidates,
-                key=lambda item: line_quality_defect_score(
-                    item[0].text, req, rules=_story_rules,
-                ),
-            )
-            _best_flags = _quality_flags_for_line(
-                _best.text, req, rules=_story_rules)
-            _floor_text, _floor_codes, _floor_actions = _quality_floor_text(
-                _best.text, req, _best_flags, rules=_story_rules,
-            )
-            for _code in _floor_codes:
-                if _code not in _seen_codes:
-                    _seen_codes.append(_code)
-            cleaned = _floor_text
-            word_count = len(cleaned.split())
-            _q_retry_flags = _best.compose_flags + _retry
-            _q_retry_flags += tuple(
-                f"hygiene_floor_action:{action}" for action in _floor_actions
-            )
-            _stamped = _quality_stamp(
-                LineResult(text=cleaned, compose_flags=_q_retry_flags),
-                _seen_codes,
-                "deterministic_floor",
-            )
-            _q_retry_flags = _stamped.compose_flags
-            log.warning(
-                "[OTR_LineComposer] hygiene floor resolved %s after authored "
-                "candidate %s",
-                ",".join(_seen_codes), _best_rung,
-            )
-
-    # Stage 3 -- deterministic strip pipeline. Every strip below runs
-    # before this function returns, so the caller appends the corrected
-    # line (not a raw hallucination) to its rolling window.
-    compose_flags: tuple[str, ...] = _q_retry_flags
-
-    # 3a. cast_strip -- remap near-miss phantom names to the locked
-    # cast spelling (Levenshtein via auto_remap_phantom). Runs before
-    # the phantom gate so a resolvable typo becomes a `cast_remap:`
-    # flag, not a `phantom_name:` flag, and the corrected name is what
-    # later beats inherit through the rolling window.
-    cleaned, cast_flags = cast_strip(cleaned, req)
-    if cast_flags:
-        compose_flags = compose_flags + cast_flags
-        word_count = len(cleaned.split())
-        log.warning(
-            "[OTR_LineComposer] cast_strip remapped %d phantom(s) on "
-            "%s line: %s",
-            len(cast_flags), req.speaker, list(cast_flags),
-        )
-
-    # 3a-bis. leak-floor-v2 (2026-06-25) -- deterministic line verifier over the
-    # four named leak classes (capitalised-participle-before-quote extract,
-    # ALL-CAPS roster vocative drop, malformed internal quote, banned source
-    # entity). DEFAULT-OFF/dark: skipped entirely unless OTR_ENABLE_LEAK_FLOOR_V2
-    # is on AND the writer threaded a per-episode EntityPolicy -> byte-identical
-    # off. Runs AFTER cast_strip + BEFORE the phantom gate so the gate sees the
-    # verified text (a participle extract can expose an inner phantom). A
-    # malformed-quote / banned-entity defect asks for ONE recompose via the
-    # shared _leak_repair_attempted guard, then falls back to best-effort +
-    # telemetry (the freeze floor is the deterministic backstop).
-    if (
-        leak_floor_v2_enabled()
-        and req.entity_policy is not None
-        and not _leak_repair_attempted
-    ):
-        _vr = verify_and_repair_line(
-            cleaned, req, req.entity_policy,
-            strict=strict_local_clean_enabled(), repair_budget=1,
-        )
-        if _vr.compose_flags:
-            compose_flags = compose_flags + _vr.compose_flags
-        if _vr.changed and _vr.text:
-            cleaned = _vr.text
-            word_count = len(cleaned.split())
-        if _vr.needs_recompose:
-            _existing = getattr(req, "reroll_hint", "") or ""
-            _leak_hint = (
-                "output only the in-character spoken words: no leading action "
-                "description, no malformed or unclosed quotation marks, and no "
-                "real-world political figures or public officials"
-            )
-            _leak_combined = (
-                f"{_existing}; {_leak_hint}" if _existing else _leak_hint)
-            log.warning(
-                "[OTR_LineComposer] leak-floor-v2 defect on %s line "
-                "(%s) -- one recompose", req.speaker,
-                ",".join(d.reason_code for d in _vr.defects),
-            )
-            try:
-                return compose_line(
-                    creative_fn=creative_fn,
-                    repair_fn=repair_fn,
-                    req=req,
-                    max_attempts=max_attempts,
-                    base_temperature=base_temperature,
-                    max_new_tokens_cap=max_new_tokens_cap,
-                    stop_strings=stop_strings,
-                    creative_repo_id=creative_repo_id,
-                    reroll_hint=_leak_combined,
-                    source_bank_id=source_bank_id,  # Stage 2C
-                    enable_stage3_validators=enable_stage3_validators,
-                    stage3_plan=stage3_plan,
-                    stage3_beat=stage3_beat,
-                    stage3_banned_phrases=stage3_banned_phrases,
-                    # MF-1: thread ALL FOUR guards. _quality is threaded
-                    # (inherited) so a leak reroll cannot re-open the clean
-                    # -quality gate once it has already run.
-                    _stage3_repair_attempted=_stage3_repair_attempted,
-                    _stage_dir_repair_attempted=_stage_dir_repair_attempted,
-                    _leak_repair_attempted=True,
-                    _quality_repair_attempted=_quality_repair_attempted,
-                    _quality_floor_allowed=_quality_floor_allowed,
-                    _story_rules=_story_rules,  # Stage 4
-                )
-            except LineCompositionFailedError:
-                log.warning(
-                    "[OTR_LineComposer] leak-floor-v2 reroll exhausted for %s "
-                    "-- keeping best-effort; freeze floor is the backstop",
-                    req.speaker,
-                )
-
-    # 3b. Phantom-name gate. Detect-and-flag only -- the line commits
-    # regardless. Empty roster skips the gate entirely so early-stage
-    # callers / unit tests that don't populate it pay zero cost.
-    if req.allowed_roster:
-        phantoms = detect_phantom_names(
-            cleaned, req.speaker, req.allowed_roster,
-        )
-        if phantoms:
-            compose_flags = compose_flags + tuple(
-                f"phantom_name:{p}" for p in phantoms
-            )
-            log.warning(
-                "[OTR_LineComposer] %d phantom name(s) on %s line: %s",
-                len(phantoms), req.speaker, phantoms,
-            )
-
-    # 3c. BUG-LOCAL-233 vocative-drift gate. The phantom gate above
-    # whitelists every roster name, so "ANNOUNCER" -- the narration
-    # label, always on the roster -- slips through even when a CHARACTER
-    # line addresses it ("..., ANNOUNCER."). The announcer is exempt
-    # (it may reference its own role); every other speaker gets the
-    # vocative stripped + a flag stamped.
-    if req.speaker.strip().upper() != _ANNOUNCER_NAME:
-        devocalized, n_vocative = strip_announcer_vocative(cleaned)
-        if n_vocative > 0:
-            cleaned = devocalized
-            word_count = len(cleaned.split())
-            compose_flags = compose_flags + ("vocative_drift:ANNOUNCER",)
-            log.warning(
-                "[OTR_LineComposer] vocative drift on %s line: "
-                "stripped %d 'ANNOUNCER' address(es)",
-                req.speaker, n_vocative,
-            )
-
-    # Sprint 10B Wave 1 Agent B (2026-05-27): in-line Stage 3 validators.
-    # Runs AFTER every strip + the optional polish so the validators see
-    # the EXACT text that would ship. Disabled when the gate args aren't
-    # all provided; the legacy pipeline is unchanged on that path.
-    validation_findings_tuple: tuple[dict, ...] = ()
-    if (
-        enable_stage3_validators
-        and stage3_plan is not None
-        and stage3_beat is not None
-    ):
-        # Local import keeps the stage3 module out of cold-start cost
-        # for callers that never enable validators.
-        from . import _otr_stage3_validators as _OTRS3V
-        vr = _OTRS3V.validate_line(
-            stage3_plan,
-            stage3_beat,
-            cleaned,
-            banned_phrases=stage3_banned_phrases,
-        )
-        if vr.errors and not _stage3_repair_attempted:
-            # Build a concise repair hint from the error messages.
-            # Cap to 400 chars so the hint fits inside the prompt's
-            # REVISE block without crowding the rest of the context.
-            repair_hint = "; ".join(f.message for f in vr.errors)[:400]
-            log.warning(
-                "[OTR_LineComposer] Stage 3 validators flagged %d "
-                "error(s) on %s line %r -- one repair attempt with "
-                "hint: %s",
-                len(vr.errors), req.speaker,
-                stage3_beat.beat_id, repair_hint[:120],
-            )
-            try:
-                # Recursive call -- the _stage3_repair_attempted guard
-                # ensures recursion can never deepen past one level.
-                # Accept whatever the repair produces (per design doc
-                # Section 4 Wave 1 Agent B: "do not loop").
-                repaired = compose_line(
-                    creative_fn=creative_fn,
-                    repair_fn=repair_fn,
-                    req=req,
-                    max_attempts=max_attempts,
-                    base_temperature=base_temperature,
-                    max_new_tokens_cap=max_new_tokens_cap,
-                    stop_strings=stop_strings,
-                    creative_repo_id=creative_repo_id,
-                    reroll_hint=repair_hint,
-                    source_bank_id=source_bank_id,  # Stage 2C
-                    enable_stage3_validators=True,
-                    stage3_plan=stage3_plan,
-                    stage3_beat=stage3_beat,
-                    stage3_banned_phrases=stage3_banned_phrases,
-                    # MF-1: thread ALL FOUR guards. Previously only
-                    # _stage3_repair_attempted was passed, so a stage-3 repair
-                    # re-opened draft/clean/leak/quality. Now every recursive
-                    # compose_line call propagates the full guard set.
-                    _stage3_repair_attempted=True,
-                    _stage_dir_repair_attempted=_stage_dir_repair_attempted,
-                    _leak_repair_attempted=_leak_repair_attempted,
-                    _quality_repair_attempted=_quality_repair_attempted,
-                    _quality_floor_allowed=_quality_floor_allowed,
-                    _story_rules=_story_rules,  # Stage 4
-                )
-                cleaned = repaired.text
-                # Concat compose_flags from both passes; dedupe trivially
-                # by tuple union via list ordering.
-                _seen = set(compose_flags)
-                for f in repaired.compose_flags:
-                    if f not in _seen:
-                        compose_flags = compose_flags + (f,)
-                        _seen.add(f)
-                # Re-run validators on the repaired text so findings
-                # reflect the FINAL shipped state, not the pre-repair
-                # state. If repair fixed all errors, vr.errors == [].
-                vr = _OTRS3V.validate_line(
-                    stage3_plan,
-                    stage3_beat,
-                    cleaned,
-                    banned_phrases=stage3_banned_phrases,
-                )
-                log.info(
-                    "[OTR_LineComposer] Stage 3 repair landed on %s "
-                    "line %r: %d error(s) -> %d after repair",
-                    req.speaker, stage3_beat.beat_id,
-                    len(vr.errors),  # post-repair count
-                    len(vr.errors),
-                )
-            except LineCompositionFailedError:
-                # Repair regenerate exhausted its draft attempts.
-                # Keep the original cleaned text; original findings
-                # stand. PD1: ship something rather than nothing.
-                log.warning(
-                    "[OTR_LineComposer] Stage 3 repair exhausted for "
-                    "%s line %r -- shipping pre-repair text with "
-                    "original findings stamped",
-                    req.speaker, stage3_beat.beat_id,
-                )
-        # Stamp final findings. validation_findings = the validators'
-        # view of the text that ACTUALLY ships (post-repair if it ran).
-        validation_findings_tuple = tuple(
-            {
-                "severity": f.severity,
-                "code": f.code,
-                "beat_id": f.beat_id,
-                "speaker": f.speaker,
-                "message": f.message,
-                "expected": f.expected,
-                "got": f.got,
-            }
-            for f in vr.findings
-        )
-        if validation_findings_tuple:
-            # Count errors + warns separately for the log line.
-            _n_err = len(vr.errors)
-            _n_warn = len(vr.warns)
-            log.info(
-                "[OTR_LineComposer] Stage 3 findings stamped on %s "
-                "line %r: errors=%d warns=%d",
-                req.speaker, stage3_beat.beat_id, _n_err, _n_warn,
-            )
-
-    # L3 (story-quality LIFT, 2026-06-23): ACTION-marker strip -- right after
-    # compose/polish, before persistence. When OTR_COMPOSER_ACTION_STRIP is on,
-    # remove any model-marked "ACTION: ..." stage business from the shipped
-    # text + record a SEPARATE action_strip counter (never reuses l7_splits).
-    # internal_action is NEVER persisted. Flag OFF => no-op, byte-identical.
-    if composer_action_strip_enabled():
-        _as_clean, _as_action, _as_n = strip_action_marker(cleaned)
-        if _as_n and _as_clean.strip():
-            cleaned = _as_clean
-            compose_flags = compose_flags + (f"action_strip:{_as_n}",)
-            word_count = len(cleaned.split())
-
-    log.info(
-        "[OTR_LineComposer] composed line for %s: %d words (flags=%d)",
-        req.speaker, word_count, len(compose_flags),
+    """Compose one line without prose-quality or length control flow."""
+    cleaned = compose_line_draft(
+        creative_fn=creative_fn,
+        req=req,
+        max_attempts=max_attempts,
+        base_temperature=base_temperature,
+        max_new_tokens_cap=max_new_tokens_cap,
+        stop_strings=stop_strings,
+        creative_repo_id=creative_repo_id,
+        source_bank_id=source_bank_id,
     )
+    compose_flags: tuple[str, ...] = ()
+    validation_findings: tuple[dict, ...] = ()
+
+    if enable_stage3_validators and stage3_beat is not None:
+        from . import _otr_stage3_validators as validators
+        result = validators.validate_line(stage3_beat, cleaned)
+        validation_findings = tuple(
+            {
+                "severity": finding.severity,
+                "code": finding.code,
+                "beat_id": finding.beat_id,
+                "speaker": finding.speaker,
+                "message": finding.message,
+                "expected": finding.expected,
+                "got": finding.got,
+            }
+            for finding in result.findings
+        )
+
+    action_clean, _action, action_count = strip_action_marker(cleaned)
+    if action_count and action_clean.strip():
+        cleaned = action_clean
+        compose_flags = (f"action_strip:{action_count}",)
+
     return LineResult(
         text=cleaned,
         compose_flags=compose_flags,
-        validation_findings=validation_findings_tuple,
+        validation_findings=validation_findings,
     )
 
 
 # ---------------------------------------------------------------------------
-# Announcer dedicated passes (2026-05-22) -- BUG-LOCAL-255
+# Announcer and coda construction
 # ---------------------------------------------------------------------------
-#
-# The announcer's opening (first beat) and closing (last beat) lines
-# frame the episode -- they are a narration bookend, not character
-# dialogue. Before this section both routed through the shared
-# `compose_line` with the character-dialogue prompt; the closing line
-# was then supposed to be overwritten with the news interpreter's
-# `news_close_brief` by `_otr_news_wiring.override_announcer_close`,
-# but that overlay matched a private `_speaker_role` key absent from
-# the ledger's `lines[]` rows, so the close was silently never stamped
-# (BUG-LOCAL-255).
-#
-# Two purpose-built creative-slot passes replace both surfaces:
-#   compose_announcer_intro  -- in-loop on the first announcer beat;
-#                               a framing prompt from script_brief.
-#   compose_announcer_outro  -- post-loop on the last announcer beat;
-#                               a closing prompt from script_brief +
-#                               news_close_brief + the intro text.
-# Both bypass `compose_line` (so they are never re-polished -- correct
-# by construction) and emit plain text, not JSON: a one-line output
-# does not need a JSON envelope, and the envelope only adds a
-# broken-JSON failure mode. Each pass has a deterministic SIGNAL LOST
-# fallback so the narrative bookend can never be missing.
 
-# Generation params for the announcer passes. The authored attempts retain their
-# existing budget; validation exhaustion then escalates through the same-slot
-# low-temperature repair, the alternate writer slot, and a deterministic floor.
-_ANNOUNCER_MAX_NEW_TOKENS = 160
-_ANNOUNCER_INTRO_MIN_CHARS = 24
-_ANNOUNCER_INTRO_MAX_CHARS = 300
-_ANNOUNCER_OUTRO_MIN_CHARS = 28
-_ANNOUNCER_OUTRO_MAX_CHARS = 340
+# One creative call per surface. Python removes transport markup only. Length,
+# style, thesis, cadence, and vocabulary never trigger another authoring call.
 
-# An announcer line that misses the length window is a REJECTION, not a death
-# sentence. After the normal retries, repair B/C and a deterministic spoken floor
-# guarantee a bounded line. Missing upstream context remains a structural error.
-_ANNOUNCER_ATTEMPTS = 3
+_ANNOUNCER_MAX_NEW_TOKENS = 320
+_ANNOUNCER_LABELS = ("ANNOUNCER", "HOST", "NARRATOR", "NARRATION")
+_ANNOUNCER_INTRO_SYSTEM = """Write one spoken radio-announcer opening.
+Return only spoken words, without a label, markup, or stage direction.
+Do not reveal the ending."""
+_ANNOUNCER_INTRO_SYSTEM_SAFE = """Write one spoken radio-announcer opening
+from the supplied safe-open brief. Return only spoken words, without a label,
+markup, or stage direction. Do not invent facts or reveal the ending."""
+_ANNOUNCER_OUTRO_SYSTEM = """Write one spoken radio-announcer closing.
+Return only spoken words, without a label, markup, or stage direction."""
+_NEWS_CODA_SYSTEM = """Write one short spoken transition into the supplied
+factual source note. Return only the transition, without a label or markup."""
+_NEWS_CODA_SYSTEM_V2_EXAMPLES = ""
 
 
-def _announcer_retry_note(cleaned: str, *, min_chars: int, max_chars: int) -> str:
-    """Tell the model exactly why its line was rejected, and what to do about it."""
-    n = len(cleaned)
-    if n > max_chars:
-        why = (
-            f"Your line was {n} characters; the hard limit is {max_chars}. It is too "
-            f"long. Cut it down -- one sentence, spoken aloud, no scene-setting prose."
-        )
-    elif n < min_chars:
-        why = (
-            f"Your line was only {n} characters; it must be at least {min_chars}. Give "
-            f"the listener something to hold on to."
-        )
-    else:
-        why = (
-            "Your line was rejected: it must be ONE spoken announcer line -- no speaker "
-            "label, no quotation marks, no stage directions, no line breaks."
-        )
-    return (
-        why
-        + " Rewrite it now and return ONLY the spoken line itself, nothing else."
-    )
-
-# Speaker-label prefixes that must never lead an announcer line.
-_ANNOUNCER_BAD_PREFIXES: tuple[str, ...] = (
-    "ANNOUNCER:", "ANNOUNCER -", "HOST:", "NARRATOR:", "NARRATION:",
-    "SFX:", "MUSIC:", "VOICE:",
-)
-
-_ANNOUNCER_INTRO_SYSTEM = """\
-You are the radio announcer for SIGNAL LOST, an old-time radio drama.
-Write exactly ONE spoken opening line that frames tonight's story.
-
-OUTPUT - strict:
-- Only the words the announcer says out loud.
-- One line. No line breaks.
-- No speaker name, no colon, no quotation marks.
-- No stage directions, no brackets, no sound cues.
-- One or two sentences, roughly 12 to 30 words.
-
-VOICE:
-- A period radio host: warm, measured, a little mysterious.
-- Orient the listener -- hint at the story, do not summarize it.
-- Use only proper names that appear in the brief. Invent none.
-"""
-
-# KILL 2 (2026-06-24): the input-starvation OPEN. No script_brief is passed under
-# the flag, so the prompt is built from the SafeOpenBrief only; the announcer
-# orients the listener WITHOUT revealing the outcome (the outcome is never an
-# input). Used only when story_scaffold is on.
-_ANNOUNCER_INTRO_SYSTEM_SAFE = """\
-You are the radio announcer for SIGNAL LOST, an old-time radio drama.
-Write exactly ONE spoken opening line that sets tonight's scene.
-
-OUTPUT - strict:
-- Only the words the announcer says out loud.
-- One line. No line breaks.
-- No speaker name, no colon, no quotation marks.
-- No stage directions, no brackets, no sound cues.
-- One or two sentences, roughly 12 to 30 words.
-
-VOICE:
-- A period radio host: warm, measured, a little mysterious.
-- Sentence 1 orients the listener: the time and place, and who is there.
-- Sentence 2 raises a quiet intrigue -- a question or a tension in the air.
-- Do NOT reveal the outcome, the twist, or how the story ends.
-- Use ONLY the proper names in the cast list below; invent none.
-"""
-
-_ANNOUNCER_OUTRO_SYSTEM = """\
-You are the radio announcer for SIGNAL LOST, an old-time radio drama.
-Write exactly ONE spoken closing line that ends tonight's broadcast.
-
-OUTPUT - strict:
-- Only the words the announcer says out loud.
-- One line. No line breaks.
-- No speaker name, no colon, no quotation marks.
-- No stage directions, no brackets, no sound cues.
-- One or two sentences, roughly 14 to 34 words.
-
-VOICE:
-- A period radio host: warm, measured, reflective.
-- Land the journalistic note from the closing brief.
-- Lightly echo the opening line's tone; do not repeat its words.
-- Use only proper names that appear in the briefs. Invent none.
-- CLOSE ON A CONCRETE FINAL IMAGE: show what physically changed -- a person,
-  an object, a place. Do NOT state a moral, lesson, or news-summary ("the
-  lesson is", "reminding us", "tonight's revelation", "this shows").
-"""
-
-
-def clean_one_line(text: str, max_chars: int) -> str:
-    """Collapse a raw string into a single clean line.
-
-    Collapses every run of whitespace (newlines included) to one
-    space, strips wrapping straight/smart quotes, and -- when
-    ``max_chars > 0`` -- hard-caps the length on a word boundary,
-    re-terminating with a period if the cut left a bare word.
-
-    ``max_chars <= 0`` disables truncation (hygiene only). Pure and
-    deterministic: no timestamps, no randomness. Never raises.
-    """
-    if not text:
-        return ""
-    s = " ".join(str(text).split())
-    # Strip leading/trailing straight + smart quotes.
-    s = s.strip(" \t\"'“”‘’").strip()
-    if max_chars and max_chars > 0 and len(s) > max_chars:
-        s = s[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;:-")
-        if s and s[-1] not in ".!?":
-            s += "."
-    return s
+def clean_one_line(text: str, max_chars: int = 0) -> str:
+    """Transport-clean spoken text; max_chars is compatibility-only."""
+    del max_chars
+    return " ".join(str(text or "").split()).strip(" \t\"'").strip()
 
 
 def validate_announcer_line(
-    text: str,
-    *,
-    min_chars: int,
-    max_chars: int,
+    text: str, *, min_chars: int = 0, max_chars: int = 0,
 ) -> tuple[bool, str]:
-    """Validate one announcer line. Returns ``(ok, cleaned)``.
-
-    Rejects (``ok=False``, ``cleaned=""``): empty text, multi-line
-    output, a leading speaker label (``ANNOUNCER:`` etc.), bracket or
-    brace stage directions, and text outside the
-    ``[min_chars, max_chars]`` band. On success returns the cleaned,
-    whitespace-collapsed line. Never raises.
-    """
-    raw = text or ""
-    # Multi-line output is a framing failure for a one-line read --
-    # catch it before clean_one_line collapses the breaks away. A
-    # bare trailing newline is not multi-line, so strip first.
-    if "\n" in raw.strip():
-        return False, ""
-    cleaned = clean_one_line(raw, max_chars=0)
+    """Check only nonempty, label-free, markup-free row structure."""
+    del min_chars, max_chars
+    cleaned = clean_one_line(text)
     if not cleaned:
         return False, ""
-    upper = cleaned.upper()
-    if any(upper.startswith(p) for p in _ANNOUNCER_BAD_PREFIXES):
-        return False, ""
     if any(ch in cleaned for ch in "[]{}"):
-        return False, ""
-    if len(cleaned) < min_chars or len(cleaned) > max_chars:
         return False, ""
     return True, cleaned
 
 
 def fallback_announcer_intro(script_brief: str) -> str:
-    """Deterministic SIGNAL LOST opening line built from script_brief.
-
-    Fires when the intro LLM pass fails validation or has no brief to
-    work from. Pure string template -- the narrative frame must never
-    be missing. Never raises.
-    """
-    brief = clean_one_line(script_brief or "", max_chars=200)
-    if brief:
-        if brief[-1] not in ".!?":
-            brief += "."
-        return (
-            f"Good evening. This is SIGNAL LOST. Tonight: {brief} "
-            f"Stay with us."
-        )
+    brief = clean_one_line(script_brief)
     return (
-        "Good evening. This is SIGNAL LOST. Tonight, a signal breaks "
-        "through the static. Stay with us."
+        f"Good evening. This is SIGNAL LOST. Tonight: {brief}"
+        if brief else "Good evening. This is SIGNAL LOST."
     )
 
 
 def fallback_safe_open(safe_open_brief) -> str:
-    """Deterministic SIGNAL LOST opening built from the SafeOpenBrief ONLY --
-    never the script_brief (input starvation is the no-spoiler guarantee). Fires
-    when the open LLM pass fails validation or the brief is thin. Never raises."""
-    sb = safe_open_brief
-    setting = clean_one_line(str(getattr(sb, "setting", "") or ""), max_chars=120)
-    tod = clean_one_line(str(getattr(sb, "time_of_day", "") or ""), max_chars=40)
-    where = ", ".join(p for p in (tod, setting) if p)
-    if where:
-        where = where[0].upper() + where[1:]
-        return (
-            f"Good evening. This is SIGNAL LOST. Tonight, we open on {where}. "
-            f"Stay with us."
-        )
+    setting = clean_one_line(getattr(safe_open_brief, "setting", ""))
+    time_of_day = clean_one_line(getattr(safe_open_brief, "time_of_day", ""))
+    where = ", ".join(p for p in (time_of_day, setting) if p)
     return (
-        "Good evening. This is SIGNAL LOST. Tonight, a signal breaks "
-        "through the static. Stay with us."
+        f"Good evening. This is SIGNAL LOST. We open on {where}."
+        if where else "Good evening. This is SIGNAL LOST."
     )
 
 
 def fallback_announcer_outro(news_close_brief: str) -> str:
-    """Deterministic SIGNAL LOST closing line built from the close brief.
-
-    Fires when the outro LLM pass fails validation or has no brief to
-    work from. Pure string template -- the narrative frame must never
-    be missing. Never raises.
-    """
-    close = clean_one_line(news_close_brief or "", max_chars=240)
-    if close:
-        if close[-1] not in ".!?":
-            close += "."
-        return f"This has been SIGNAL LOST. {close} Good night."
+    close = clean_one_line(news_close_brief)
     return (
-        "This has been SIGNAL LOST. The report ends, but the signal "
-        "remains. Good night."
+        f"This has been SIGNAL LOST. {close} Good night."
+        if close else "This has been SIGNAL LOST. Good night."
     )
-
-
-def _resolved_outro_fallback(ending_change: str, news_close_brief: str) -> str:
-    """Deterministic resolved-ending outro (F3, story-engine v1).
-
-    Used when the episode's dramatic question RESOLVED but the LLM keeps
-    hedging ("remains to be seen", ...). States the ``ending_change`` plainly
-    with NO hedge phrase. Belt-and-suspenders: if the assembled line would
-    still contain a hedge phrase, falls back to the plain close template.
-    Pure + deterministic; never raises.
-    """
-    ec = clean_one_line(ending_change or "", max_chars=240)
-    if not ec:
-        return fallback_announcer_outro(news_close_brief)
-    if ec[-1] not in ".!?":
-        ec += "."
-    text = f"This has been SIGNAL LOST. {ec} Good night."
-    try:
-        from ._otr_dramatic_state import HEDGE_LIST as _HL
-    except ImportError:  # bare-name import context (no parent package)
-        from _otr_dramatic_state import HEDGE_LIST as _HL  # type: ignore
-    if any(p in text.lower() for p in _HL):
-        return fallback_announcer_outro(news_close_brief)
-    return text
 
 
 def _announcer_generate(
     creative_fn, messages, *, temperature: float = _BASE_TEMPERATURE,
 ) -> Optional[str]:
-    """Run one creative-slot LLM call for an announcer pass.
-
-    Mirrors `compose_line`'s call convention: try the `stop=` kwarg
-    form first, fall back to the no-`stop=` form for loaders that do
-    not accept it. Returns the raw string, or ``None`` if the call
-    raised (the caller then drops to the deterministic fallback).
-    """
-    # LLM slot: creative -- announcer dedicated-pass LLM call
+    """Make exactly one creative call; backend failure gets a structural floor."""
     try:
         try:
+            # LLM slot: creative -- one authored announcer/closing line.
             return creative_fn(
-                messages,
-                temperature=temperature,
+                messages, temperature=temperature,
                 max_new_tokens=_ANNOUNCER_MAX_NEW_TOKENS,
                 stop=list(_DEFAULT_STOP_STRINGS),
             )
         except TypeError:
-            # LLM slot: creative -- fallback (no stop= kwarg)
+            # LLM slot: creative -- compatibility retry for the same line.
             return creative_fn(
-                messages,
-                temperature=temperature,
+                messages, temperature=temperature,
                 max_new_tokens=_ANNOUNCER_MAX_NEW_TOKENS,
             )
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "[OTR_AnnouncerPass] creative_fn raised: %s: %s",
+            "[OTR_AnnouncerPass] call failed; structural fallback: %s: %s",
             type(exc).__name__, exc,
         )
         return None
 
 
-def _repair_announcer_validation_exhaustion(
-    *,
-    creative_fn,
-    repair_fn,
-    base_messages,
-    last_raw,
-    min_chars: int,
-    max_chars: int,
-    success_flag: str,
-    floor_flags=(),
-    fallback_candidates=(),
-    candidate_validator=None,
-) -> LineResult:
-    """Total B/C/floor repair for a nonempty announcer surface.
-
-    This helper owns *quality/format* exhaustion only. Callers still reject
-    missing structural context before entering it. The deterministic rung never
-    invents speech from an empty ledger row: its curated candidates are supplied
-    by the announcer composer, where a bookend is structurally required.
-    """
-    original_messages = list(base_messages or ())[:2]
-    system_text = ""
-    user_text = ""
-    for message in original_messages:
-        if not isinstance(message, dict):
-            continue
-        role = str(message.get("role") or "")
-        if role == "system" and not system_text:
-            system_text = str(message.get("content") or "")
-        elif role == "user" and not user_text:
-            user_text = str(message.get("content") or "")
-    critical_messages = [
-        {
-            "role": "system",
-            "content": (
-                system_text
-                + "\nCRITICAL SPOKEN-LINE REPAIR: scour the complete response for "
-                  "anything that is not vocabulary the announcer can say aloud. "
-                  "Replace stage action, cues, labels, markup, fragments, and "
-                  "non-dialogue with one natural SFW spoken line."
-            ).strip(),
-        },
-        {
-            "role": "user",
-            "content": (
-                user_text
-                + "\n\nThe prior output failed the spoken-line validation gate. "
-                  "Return ONLY one complete clean announcer line inside the "
-                  f"{min_chars}-{max_chars} character limit."
-            ).strip(),
-        },
-    ]
-
-    def _accepted(raw_text):
-        candidate = strip_line_formatting(raw_text or "")
-        ok, validated = validate_announcer_line(
-            candidate,
-            min_chars=min_chars,
-            max_chars=max_chars,
-        )
-        if not ok:
-            return ""
-        if callable(candidate_validator):
-            try:
-                if not candidate_validator(validated):
-                    return ""
-            except Exception:  # noqa: BLE001 -- reject; the next rung owns repair
-                return ""
-        return validated
-
-    for fn, temperature, rung in (
-        (creative_fn, _QUALITY_REPAIR_B_TEMPERATURE, "repair_b_same_slot"),
-        (repair_fn, _QUALITY_REPAIR_C_TEMPERATURE, "repair_c_alternate_slot"),
-    ):
-        if not callable(fn):
-            continue
-        validated = _accepted(
-            _announcer_generate(fn, critical_messages, temperature=temperature)
-        )
-        if validated:
-            return LineResult(
-                text=validated,
-                compose_flags=(
-                    success_flag,
-                    "hygiene_repaired_after_reroll",
-                    "hygiene_repaired_after_reroll:announcer_validation:"
-                    + rung,
-                ),
-            )
-
-    # The floor first attempts to salvage the last authored response, then uses
-    # caller-owned contextual/SFW bookends. Passing the named gates is safe here:
-    # every transform is conditional except bounded formatting normalization.
-    floor_actions: list[str] = []
-    candidates = (last_raw,) + tuple(fallback_candidates or ())
-    for raw_candidate in candidates:
-        cleaned = strip_line_formatting(raw_candidate or "")
-        floor = deterministic_hygiene_floor(
-            cleaned,
-            (
-                "spoken_format",
-                "stage_direction",
-                "non_lexical",
-                "all_caps",
-                "truncated",
-            ),
-            allowed_all_caps=("SIGNAL", "LOST"),
-        )
-        floor_actions.extend(floor.actions)
-        bounded = clean_one_line(floor.text, max_chars=max_chars)
-        validated = _accepted(bounded)
-        if not validated:
-            continue
-        flags = list(floor_flags or ())
-        flags.extend(
-            (
-                "hygiene_repaired_after_reroll",
-                "hygiene_repaired_after_reroll:announcer_validation:"
-                "deterministic_floor",
-            )
-        )
-        flags.extend(
-            "hygiene_floor_action:" + action
-            for action in dict.fromkeys(floor_actions)
-        )
-        return LineResult(
-            text=validated,
-            compose_flags=tuple(dict.fromkeys(flags)),
-        )
-
-    # Curated caller candidates always include a valid fixed phrase. Keep an
-    # explicit final totality proof in case a future fallback is edited badly.
-    fixed = (
-        "Good evening. This is SIGNAL LOST. Stay with us tonight."
-        if "intro" in success_flag
-        else "This has been SIGNAL LOST. One lamp remains. Good night."
+def _resolved_closing_prompt(repo_id, *, phase, source_bank_id):
+    from ._otr_creative_prompt_router import resolve_creative_system_prompt
+    return resolve_creative_system_prompt(
+        repo_id, phase=phase, source_bank_id=source_bank_id,
     )
-    flags = list(floor_flags or ())
-    flags.extend(
-        (
-            "hygiene_repaired_after_reroll",
-            "hygiene_repaired_after_reroll:announcer_validation:"
-            "deterministic_floor",
-            "hygiene_floor_action:total_announcer_floor",
-        )
-    )
-    return LineResult(text=fixed, compose_flags=tuple(dict.fromkeys(flags)))
 
 
 def compose_announcer_intro(
-    *,
-    creative_fn,
-    script_brief: str,
+    *, creative_fn, script_brief: str, safe_open_brief=None,
     creative_repo_id: str | None = None,
-    story_scaffold: bool = False,
-    safe_open_brief: SafeOpenBrief | None = None,
-    # Closing-layer routing (2026-07-09 QA F1): the episode's story-path bank;
-    # the intro system prompts resolve from its pack seams. Default keeps
-    # every legacy caller byte-identical (science constants).
-    source_bank_id: str = "media_archive",
-    repair_fn=None,
+    source_bank_id: str = "media_archive", **_compat,
 ) -> LineResult:
-    """Compose the episode's opening announcer line.
-
-    A dedicated creative-slot pass: a purpose-built framing prompt
-    from `script_brief`, plain-text output, one LLM call, no reroll.
-    On any failure (no brief, call raised, validation rejected) the
-    deterministic `fallback_announcer_intro` fires.
-
-    `creative_repo_id` is the writer's resolved creative-slot model id
-    -- accepted for call-signature parity with `compose_line` and
-    surfaced in the log line; the announcer framing prompt itself is
-    model-agnostic by design.
-
-    Returns a `LineResult`; `compose_flags` is ``("announcer_intro",)``
-    on the LLM path or ``("announcer_intro_fallback",)`` on fallback.
-
-    KILL 2 (2026-06-24): when ``story_scaffold`` is on and a ``safe_open_brief``
-    is supplied, the open is built by INPUT STARVATION from that brief only --
-    ``script_brief`` is ignored, so the announcer cannot leak the outcome.
-    """
-    # Closing-layer routing (2026-07-09 QA F1): resolve the system prompt
-    # through the creative router so each bank's authored pack seam actually
-    # reaches the LLM (they were authored + registry-REQUIRED but unrouted --
-    # every bank opened with the science constants). Science bank with repo
-    # None keeps the module constants by object identity (audio C7 fast path,
-    # mirrors compose_line's BUG-LOCAL-417 shape).
-    _use_safe = story_scaffold and safe_open_brief is not None
-    if creative_repo_id is None and source_bank_id == "science_news":
-        _intro_system = (
-            _ANNOUNCER_INTRO_SYSTEM_SAFE if _use_safe else _ANNOUNCER_INTRO_SYSTEM
-        )
+    """Author one opening; structural sanitation never re-calls the model."""
+    if safe_open_brief is not None:
+        phase = "announcer_intro_safe_system"
+        context = "\n".join(filter(None, (
+            f"SETTING: {clean_one_line(getattr(safe_open_brief, 'setting', ''))}",
+            f"TIME: {clean_one_line(getattr(safe_open_brief, 'time_of_day', ''))}",
+            f"HOOK: {clean_one_line(getattr(safe_open_brief, 'hook', ''))}",
+        )))
+        fallback = fallback_safe_open(safe_open_brief)
     else:
-        from ._otr_creative_prompt_router import resolve_creative_system_prompt
-        _intro_system = resolve_creative_system_prompt(
-            creative_repo_id,
-            phase=(
-                "announcer_intro_safe_system" if _use_safe
-                else "announcer_intro_system"
-            ),
-            source_bank_id=source_bank_id,
-        )
-    # KILL 2 / announcer OPEN: the input-starvation path. The script_brief (which
-    # can carry the outcome) is never read; the prompt is built from the
-    # SafeOpenBrief setup fields only. On any failure -> fallback_safe_open, which
-    # is also script_brief-free. Flag off / no brief -> the original path below.
-    if story_scaffold and safe_open_brief is not None:
-        cast = tuple(
-            str(n) for n in getattr(safe_open_brief, "cast", ()) if str(n).strip()
-        )
-        _era = clean_one_line(str(getattr(safe_open_brief, "era", "") or ""), max_chars=60)
-        _tod = clean_one_line(str(getattr(safe_open_brief, "time_of_day", "") or ""), max_chars=60)
-        _setting = clean_one_line(str(getattr(safe_open_brief, "setting", "") or ""), max_chars=160)
-        _sq = clean_one_line(str(getattr(safe_open_brief, "opening_status_quo", "") or ""), max_chars=200)
-        user_parts = []
-        if _era:
-            user_parts.append(f"Era: {_era}")
-        if _tod:
-            user_parts.append(f"Time of day: {_tod}")
-        if _setting:
-            user_parts.append(f"Setting: {_setting}")
-        if _sq:
-            user_parts.append(f"Where things stand as we open: {_sq}")
-        if cast:
-            user_parts.append(
-                "Cast (use ONLY these proper names): " + ", ".join(cast)
-            )
-        user_parts.append(
-            "Write the announcer's opening line now -- orient the listener and "
-            "raise a quiet intrigue. Do NOT reveal how the story ends."
-        )
-        messages = [
-            {"role": "system", "content": _intro_system},
-            {"role": "user", "content": "\n".join(user_parts)},
-        ]
-        # Keep the authored retry budget, then use the shared B/C/floor ladder.
-        raw = None
-        for attempt in range(1, _ANNOUNCER_ATTEMPTS + 1):
-            raw = _announcer_generate(creative_fn, messages)
-            cleaned = strip_line_formatting(raw or "")
-            ok, validated = validate_announcer_line(
-                cleaned,
-                min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
-                max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
-            )
-            if ok:
-                log.info(
-                    "[OTR_AnnouncerPass] safe-open pass ok (model=%s, %d chars, "
-                    "attempt %d)", creative_repo_id, len(validated), attempt,
-                )
-                return LineResult(text=validated, compose_flags=("announcer_intro",))
-            if attempt < _ANNOUNCER_ATTEMPTS:
-                log.warning(
-                    "[OTR_AnnouncerPass] intro attempt %d rejected (%d chars, limit "
-                    "%d-%d); asking again with the reason",
-                    attempt, len(cleaned), _ANNOUNCER_INTRO_MIN_CHARS,
-                    _ANNOUNCER_INTRO_MAX_CHARS,
-                )
-                messages = messages[:2] + [
-                    {"role": "assistant", "content": cleaned},
-                    {"role": "user", "content": _announcer_retry_note(
-                        cleaned,
-                        min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
-                        max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
-                    )},
-                ]
-        return _repair_announcer_validation_exhaustion(
-            creative_fn=creative_fn,
-            repair_fn=repair_fn,
-            base_messages=messages,
-            last_raw=raw,
-            min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
-            max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
-            success_flag="announcer_intro",
-            floor_flags=("announcer_intro_fallback", "open_safe_fallback"),
-            fallback_candidates=(
-                fallback_safe_open(safe_open_brief),
-                "Good evening. This is SIGNAL LOST. Tonight, a signal breaks "
-                "through the static. Stay with us.",
-            ),
-        )
-    # LLM slot: creative -- announcer intro is a narrative framing
-    # pass; routed through the writer's creative_writing_model slot.
-    brief = clean_one_line(script_brief or "", max_chars=0)
-    if not brief:
-        raise RuntimeError(
-            "[OTR_AnnouncerPass] announcer intro: EMPTY script_brief -- a "
-            "brief-less episode is already broken upstream. NO canned-template "
-            "fallback (no-fallback rip 2026-07-03); fix the missing brief."
-        )
-    messages = [
-        {"role": "system", "content": _intro_system},
-        {
-            "role": "user",
-            "content": (
-                f"Tonight's story brief:\n{brief}\n\n"
-                f"Write the announcer's opening line now."
-            ),
-        },
-    ]
-    # Same ladder as the safe-open path: rejected authored lines are asked again,
-    # then quality exhaustion repairs rather than terminating the episode.
-    raw = None
-    for attempt in range(1, _ANNOUNCER_ATTEMPTS + 1):
-        raw = _announcer_generate(creative_fn, messages)
-        cleaned = strip_line_formatting(raw or "")
-        ok, validated = validate_announcer_line(
-            cleaned,
-            min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
-            max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
-        )
-        if ok:
-            log.info(
-                "[OTR_AnnouncerPass] intro pass ok (model=%s, %d chars, attempt %d)",
-                creative_repo_id, len(validated), attempt,
-            )
-            return LineResult(
-                text=validated, compose_flags=("announcer_intro",),
-            )
-        if attempt < _ANNOUNCER_ATTEMPTS:
-            log.warning(
-                "[OTR_AnnouncerPass] intro attempt %d rejected (%d chars, limit %d-%d); "
-                "asking again with the reason",
-                attempt, len(cleaned), _ANNOUNCER_INTRO_MIN_CHARS,
-                _ANNOUNCER_INTRO_MAX_CHARS,
-            )
-            messages = messages[:2] + [
-                {"role": "assistant", "content": cleaned},
-                {"role": "user", "content": _announcer_retry_note(
-                    cleaned,
-                    min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
-                    max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
-                )},
-            ]
-    return _repair_announcer_validation_exhaustion(
-        creative_fn=creative_fn,
-        repair_fn=repair_fn,
-        base_messages=messages,
-        last_raw=raw,
-        min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
-        max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
-        success_flag="announcer_intro",
-        floor_flags=("announcer_intro_fallback",),
-        fallback_candidates=(
-            fallback_announcer_intro(brief),
-            "Good evening. This is SIGNAL LOST. Tonight, a signal breaks "
-            "through the static. Stay with us.",
-        ),
+        phase = "announcer_intro_system"
+        context = clean_one_line(script_brief)
+        if not context:
+            raise RuntimeError("[OTR_AnnouncerPass] empty opening brief")
+        fallback = fallback_announcer_intro(context)
+    system = _resolved_closing_prompt(
+        creative_repo_id, phase=phase, source_bank_id=source_bank_id,
+    )
+    raw = _announcer_generate(creative_fn, [
+        {"role": "system", "content": system},
+        {"role": "user", "content": context + "\nWrite the opening now."},
+    ])
+    ok, cleaned = validate_announcer_line(
+        strip_line_formatting(raw or "", _ANNOUNCER_LABELS)
+    )
+    return (
+        LineResult(cleaned, ("announcer_intro",))
+        if ok else LineResult(fallback, ("announcer_intro_structural_fallback",))
     )
 
 
-# ---------------------------------------------------------------------------
-# KILL 2 -- NEWS CODA (2026-06-24, coda-segue roundtable). A dynamic premise->
-# news segue: the LLM writes ONLY a short bridge clause (specific to tonight's
-# tale, never the outcome); the real news_close_brief is APPENDED
-# deterministically so the weak model can never blend the fact away. Reliability
-# is structural. compose_announcer_outro (below) is left UNTOUCHED -- off / no
-# news brief runs it verbatim, so it stays byte-identical.
-# ---------------------------------------------------------------------------
-NEWS_CODA_POOL = ("The real story:", "The true account:", "From tonight's headlines:")
-BRIDGE_GENERIC_OPENERS = (
-    "and now", "but in the real world", "in reality", "the real story",
-    "meanwhile", "tonight we", "what really happened",
-)
-_BRIDGE_MAX_CHARS = 80
-_CODA_FACT_MAX = 200
-_CODA_TOTAL_MAX = 320
-
-# A coda source fact is prose, not an arbitrary character buffer. The old
-# `_CODA_FACT_MAX` / `_CODA_TOTAL_MAX` cuts could stop a true source sentence at
-# a word boundary and add a period, manufacturing a statement the source never
-# made. Keep the constants exported for old measurement fixtures, but the live
-# coda path now selects only complete exact sentences and never character-cuts.
-_CODA_NONTERMINAL_ABBREVIATIONS = frozenset({
-    "ave", "blvd", "capt", "col", "cpl", "dr", "etc", "fig", "gen",
-    "jr", "lt", "maj", "mr", "mrs", "ms", "no", "prof", "rev", "sgt",
-    "sr", "st", "vol", "vs",
-})
-
-_NEWS_CODA_SYSTEM = """\
-You are the radio announcer for SIGNAL LOST, an old-time radio drama.
-Write ONE short bridge clause that turns from tonight's fictional tale to the real
-world. The real news report is added AFTER your clause by the producer -- you do
-NOT write it.
-
-OUTPUT - strict:
-- Only the words the announcer says out loud. One line, no line breaks.
-- No speaker name, no quotation marks, no brackets, no sound cues.
-- A SHORT pivot clause, at most ~16 words, ending with a colon.
-
-VOICE:
-- A period radio host: warm, measured.
-- Reference tonight's tale by its SUBJECT or SETTING (not how it ended).
-- Do NOT state any fact, number, date, or the story's outcome.
-- Do NOT open with a stock phrase ("And now", "But in the real world", "In reality",
-  "The real story", "Meanwhile"). Make the turn specific to tonight's tale.
-"""
-
-#: S2 (story-quality v2, 2026-06-28) -- v2-ONLY in-context examples, appended to a
-#: LOCAL copy of _NEWS_CODA_SYSTEM (the constant is NEVER mutated). Teaches the
-#: tale-specific pivot the gate wants instead of a stock opener.
-_NEWS_CODA_SYSTEM_V2_EXAMPLES = """
-Examples (tonight's tale -> your bridge clause):
-- A lighthouse keeper hiding a smuggled ledger -> Beyond tonight's lamp-lit ledger:
-- Two chemists racing a failing reactor -> Past the sparks of tonight's frantic lab:
-- A clerk who buried one fatal file -> Away from tonight's locked archive:
-"""
-
-#: S2 arc-shape-keyed CURATED bridge pool -- the v2 fallback floor: a curated,
-#: tale-toned pivot in place of a generic NEWS_CODA_POOL prefix, chosen by
-#: sha256(cast_seed). EVERY entry MUST pass validate_news_coda_bridge (asserted in
-#: tests/test_story_quality_coda.py): <=80 chars, no bracket, no generic opener, no
-#: speaker label. Unknown arc_shape OR zero valid => legacy NEWS_CODA_POOL (kept).
-_NEWS_CODA_ARC_BRIDGES = {
-    "betrayal": (
-        "Beyond tonight's tangle of crossed loyalties",
-        "Past the quiet treachery of tonight's tale",
-        "Away from the masks worn in tonight's story",
-    ),
-    "heist": (
-        "Beyond the locked rooms of tonight's tale",
-        "Past tonight's carefully timed theft",
-        "Away from the midnight scheme of tonight's story",
-    ),
-    "investigation_without_answer": (
-        "Beyond tonight's unanswered questions",
-        "Past the loose ends of tonight's tale",
-        "Away from the open file of tonight's story",
-    ),
-    "setup_complication_resolution": (
-        "Beyond tonight's hard-won turn",
-        "Past the trouble that drove tonight's tale",
-        "Away from the tested resolve of tonight's story",
-    ),
-    "slow_dread": (
-        "Beyond the long shadow of tonight's tale",
-        "Past tonight's creeping unease",
-        "Away from the slow chill of tonight's story",
-    ),
-}
-
-
 def validate_news_coda_bridge(text) -> tuple[bool, str]:
-    """Validate the LLM bridge clause ONLY (coda-specific -- do NOT reuse
-    validate_announcer_line: a TRAILING colon is the intended turn; only a LEADING
-    speaker label is rejected). Returns ``(ok, cleaned)``. Never raises."""
-    cleaned = clean_one_line(text or "", max_chars=0)
+    cleaned = clean_one_line(text).rstrip(" :;,-")
     if not cleaned:
         return False, ""
-    if "\n" in (text or "").strip():
-        return False, ""
     if any(ch in cleaned for ch in "[]{}"):
-        return False, ""
-    up = cleaned.upper()
-    if any(up.startswith(p) for p in _ANNOUNCER_BAD_PREFIXES):
-        return False, ""
-    low = cleaned.lower()
-    if any(low.startswith(g) for g in BRIDGE_GENERIC_OPENERS):
-        return False, ""
-    if len(cleaned) > _BRIDGE_MAX_CHARS:
         return False, ""
     return True, cleaned
 
 
-def _news_coda_fact_flags(raw_fact, cleaned_fact) -> "tuple[str, ...]":
-    """Record when the spoken coda carries less than the cleaned source fact.
-
-    The helper remains measurement-only. It compares two already-selected
-    values and never performs the reduction itself. This preserves the legacy
-    ``news_coda_truncated`` telemetry name while the live path now reduces only
-    at complete sentence boundaries (or defers the full note to credits).
-    """
-    try:
-        full = _clean_news_coda_fact(raw_fact)
-        if full != str(cleaned_fact or ""):
-            return ("news_coda_truncated",)
-    except Exception:  # noqa: BLE001
-        return ()
-    return ()
-
-
 def _clean_news_coda_fact(text) -> str:
-    """Collapse fact whitespace without stripping a quoted title's closer."""
-    try:
-        value = " ".join(str(text or "").split()).strip()
-        quote_pairs = {
-            '"': '"',
-            "'": "'",
-            "\u201c": "\u201d",
-            "\u2018": "\u2019",
-        }
-        if len(value) >= 2 and quote_pairs.get(value[0]) == value[-1]:
-            value = value[1:-1].strip()
-        return value
-    except Exception:  # noqa: BLE001
-        return ""
-
-
-def _news_coda_complete_sentence_prefixes(fact: str) -> "tuple[str, ...]":
-    """Return shorter exact complete-sentence prefixes, longest first.
-
-    This intentionally recognizes only conservative prose boundaries. Initials
-    (``H. G. Wells``), common titles/abbreviations, and decimals/version numbers
-    are never split. If a boundary is ambiguous, it is omitted and the total
-    coda floor can truthfully point to the intact credits instead of inventing
-    a factual fragment. Pure and never raises.
-    """
-    try:
-        value = _clean_news_coda_fact(fact)
-        if not value:
-            return ()
-        ends: list[int] = []
-        for match in re.finditer(
-            r"[.!?](?:[\"'\u2019\u201d])?(?=\s+[A-Z0-9]|$)", value,
-        ):
-            end = match.end()
-            if end >= len(value):
-                continue
-            if value[match.start()] == ".":
-                token_match = re.search(r"([A-Za-z]+|\d+)$", value[:match.start()])
-                token = token_match.group(1) if token_match else ""
-                if (
-                    (len(token) == 1 and token.isalpha())
-                    or token.casefold() in _CODA_NONTERMINAL_ABBREVIATIONS
-                ):
-                    continue
-            ends.append(end)
-        return tuple(value[:end].strip() for end in reversed(ends))
-    except Exception:  # noqa: BLE001 - conservative fallback is no prefix
-        return ()
-
-
-def _news_coda_delivery_projection(text: str) -> str:
-    """Project one coda onto the exact deterministic legacy TTS surface."""
-    try:
-        from ._otr_readiness import normalize_for_delivery
-    except ImportError:  # pragma: no cover - package fallback for flat tests
-        from nodes._otr_readiness import normalize_for_delivery  # type: ignore
-    try:
-        return str(normalize_for_delivery(str(text or ""))[0] or "")
-    except Exception as exc:  # noqa: BLE001 - scorer stays total
-        log.warning(
-            "[OTR_LineComposer] coda delivery projection failed (%s: %s); "
-            "scoring the canonical surface",
-            type(exc).__name__, str(exc)[:160],
-        )
-        return str(text or "")
+    return clean_one_line(text)
 
 
 def _assemble_news_coda_surface(bridge: str, fact: str) -> str:
-    """Join one bridge and one exact fact without character truncation."""
-    clean_bridge = clean_one_line(
-        bridge or "", max_chars=_BRIDGE_MAX_CHARS,
-    ).rstrip(".!?,;: ")
-    clean_fact = _clean_news_coda_fact(fact)
-    if not clean_bridge or not clean_fact:
+    bridge = clean_one_line(bridge).rstrip(" :;,-")
+    fact = _clean_news_coda_fact(fact)
+    if not fact:
         return ""
-    # `clean_one_line` strips every trailing quote character, even when that
-    # quote closes a title inside otherwise unquoted prose (``... Lawn.'``).
-    # Both halves are already one-line-clean, so whitespace collapse is the
-    # only safe final normalization here.
-    return " ".join(f"{clean_bridge}: {clean_fact}".split())
+    return " ".join((f"{bridge}: {fact}" if bridge else fact).split())
 
 
 def finalize_news_coda_surface(
-    *,
-    bridge: str,
-    fact: str,
-    req: LineRequest,
-    rules=None,
-    allow_fact_reduction: bool = True,
+    *, bridge: str, fact: str, req: LineRequest,
 ) -> LineResult:
-    """Build and verify the complete coda surface TTS will consume.
-
-    Full exact source prose wins. On a dirty full surface, only exact complete
-    sentence prefixes may be selected; an LLM never sees or rewrites the fact.
-    If no fact-safe prefix is speakable, a short truthful pointer leaves the
-    complete source note in ledger metadata/credits. Every returned nonempty
-    result has passed the authoritative final-row scorer after delivery
-    projection. ``allow_fact_reduction=False`` is the authored-bridge probe used
-    before the bounded bridge ladder is exhausted.
-    """
-    full_fact = _clean_news_coda_fact(fact)
-    full_surface = _assemble_news_coda_surface(bridge, full_fact)
-    if not full_surface:
-        return LineResult(text="", compose_flags=())
-    grounded_fact_all_caps = tuple(
-        match.group(0) for match in _ALL_CAPS_TOKEN_RE.finditer(full_fact)
-    )
-
-    def _surface_flags(candidate: str):
-        return spoken_surface_flags_for_line(
-            _news_coda_delivery_projection(candidate),
-            req,
-            rules=rules,
-            allowed_all_caps=grounded_fact_all_caps,
-        )
-
-    initial_flags = _surface_flags(full_surface)
-    if not initial_flags:
-        return LineResult(text=full_surface, compose_flags=())
-    if not allow_fact_reduction:
-        return LineResult(text="", compose_flags=())
-
-    defect_codes = tuple(dict.fromkeys(
-        str(code) for code, _reason, _flag in initial_flags if str(code)
-    ))
-
-    def _repair_flags(action: str, rung: str) -> "tuple[str, ...]":
-        return (
-            action,
-            "news_coda_delivery_floor",
-            "hygiene_repaired_after_reroll",
-        ) + tuple(
-            f"hygiene_repaired_after_reroll:{code}:{rung}"
-            for code in defect_codes
-        )
-
-    for prefix in _news_coda_complete_sentence_prefixes(full_fact):
-        candidate = _assemble_news_coda_surface(bridge, prefix)
-        if candidate and not _surface_flags(candidate):
-            return LineResult(
-                text=candidate,
-                compose_flags=_repair_flags(
-                    "news_coda_fact_reduced", "news_coda_fact_prefix",
-                ),
-            )
-
-    # The complete source fact remains in meta.news.news_close_brief and is
-    # printed by the credits treatment. These candidates make no factual claim
-    # beyond that durable truth and are intentionally tiny, deterministic, and
-    # independent of bank vocabulary.
-    for pointer in (
-        "For tonight's source note: See tonight's credits.",
-        "The complete source note appears in tonight's credits.",
-        "See tonight's credits for the source note.",
-        "See the credits.",
-    ):
-        if not _surface_flags(pointer):
-            return LineResult(
-                text=pointer,
-                compose_flags=_repair_flags(
-                    "news_coda_fact_deferred_to_credits",
-                    "news_coda_credits_pointer",
-                ),
-            )
-
-    # Future rule packs should never make all four neutral pointers dirty. Do
-    # not recreate the original bypass with an unscored emergency sentence:
-    # return an explicit mechanical failure so the row-local contract (or the
-    # writer's generic non-factual close) can handle it observably.
-    return LineResult(
-        text="",
-        compose_flags=(
-            "news_coda_no_clean_surface",
-            "hygiene_row_failed_mechanical",
-            "hygiene_row_failed_mechanical:news_coda_no_clean_surface",
-        ),
-    )
+    """Append the complete factual note; never score, shorten, or replace it."""
+    del req
+    return LineResult(_assemble_news_coda_surface(bridge, fact), ())
 
 
-def compose_news_coda(*, creative_fn, news_close_brief, premise, intro_text="",
-                      cast_seed=0, creative_repo_id=None,
-                      arc_shape: str = "",
-                      # Closing-layer routing (2026-07-09 QA F1): the bank
-                      # whose pack seam supplies the coda system prompt.
-                      # Default keeps legacy callers byte-identical.
-                      source_bank_id: str = "media_archive",
-                      repair_fn=None,
-                      canon_header: str = "",
-                      words_per_beat_range: tuple = (0, 0)) -> LineResult:
-    """The dynamic news-coda segue (KILL 2). The LLM writes only a short bridge
-    clause from the premise + the safe intro tone (NEVER the outcome / the news
-    fact); the real ``news_close_brief`` is appended deterministically, so the
-    weak local model can never write the fact wrong. sha256(cast_seed)
-    rotating-pool fallback floor. Never raises.
-
-    ``premise`` MUST be the macro dramatic premise (setup-framed), NOT the
-    script_brief (whose news distillation can hint the resolution). ``intro_text``
-    is the SAFE no-spoiler open -- safe to pass for tone.
-    """
-    # 1) clean the FACT first (defined before generate/validate/fallback). Do
-    # not character-cut factual prose: the total finalizer below selects only
-    # complete exact sentences or a truthful credits pointer.
+def compose_news_coda(
+    *, creative_fn, news_close_brief, premise, intro_text="",
+    creative_repo_id=None, source_bank_id: str = "media_archive",
+) -> LineResult:
+    """Author one bridge and append the complete source fact unchanged."""
     fact = _clean_news_coda_fact(news_close_brief)
     if not fact:
-        return LineResult(text="", compose_flags=("news_coda_no_brief",))  # caller handles
-    fact = (fact[0].upper() + fact[1:]) if fact[0].isalpha() else fact
-
-    try:
-        from ._otr_story_rules import resolve_story_rules
-    except ImportError:  # pragma: no cover - package fallback for flat tests
-        from nodes._otr_story_rules import resolve_story_rules  # type: ignore
-    _story_rules = resolve_story_rules(source_bank_id)
-    _coda_req = LineRequest(
-        speaker="ANNOUNCER",
-        intent="bridge the completed tale to its factual source note",
-        mood="reflective",
-        target_words=15,
-        canon_header=str(canon_header or ""),
-        last_lines=[],
-        speaker_role="announcer",
-        words_per_beat_range=tuple(words_per_beat_range or ()),
+        return LineResult("", ("news_coda_no_brief",))
+    system = _resolved_closing_prompt(
+        creative_repo_id, phase="coda_system",
+        source_bank_id=source_bank_id,
     )
-
-    def _finish(bridge: str, base_flags, *, allow_fact_reduction: bool):
-        finished = finalize_news_coda_surface(
-            bridge=bridge,
-            fact=fact,
-            req=_coda_req,
-            rules=_story_rules,
-            allow_fact_reduction=allow_fact_reduction,
-        )
-        if not finished.text:
-            return None
-        _separator = finished.text.partition(":")
-        selected_fact = (
-            _separator[2].strip() if _separator[1] else finished.text
-        )
-        fact_flags = _news_coda_fact_flags(fact, selected_fact)
-        return LineResult(
-            text=finished.text,
-            compose_flags=tuple(dict.fromkeys(
-                tuple(base_flags) + finished.compose_flags + fact_flags
-            )),
-        )
-
-    # 2) dynamic bridge: setup-only inputs (NO ending_change / final_char / fact).
-    # Closing-layer routing (2026-07-09 QA F1): the coda system prompt resolves
-    # from the bank's pack seam -- before this, EVERY bank got the science
-    # "the real news report is added AFTER your clause" framing on what is
-    # (for PD/Shakespeare/archive) a source-attribution note. The pack seam is
-    # the COMPLETE prompt: the science pack's coda_system already inlines the
-    # S2 V2 examples (pinned constant+examples by tests/test_story_pack_stage1),
-    # so nothing is appended on the routed path -- appending here would DOUBLE
-    # the examples. The science-default fast path keeps the legacy
-    # constant+examples assembly byte-identical (audio C7, mirrors
-    # compose_line's BUG-LOCAL-417 shape).
-    if creative_repo_id is None and source_bank_id == "science_news":
-        _system = _NEWS_CODA_SYSTEM + _NEWS_CODA_SYSTEM_V2_EXAMPLES
-    else:
-        from ._otr_creative_prompt_router import resolve_creative_system_prompt
-        _system = resolve_creative_system_prompt(
-            creative_repo_id, phase="coda_system",
-            source_bank_id=source_bank_id,
-        )
-
-    def _msgs(retry: bool):
-        u = f"Tonight's tale (setup only):\n{premise}"
-        if intro_text:
-            u += f"\n\nThe announcer's opening line was:\n{intro_text}"
-        if retry:
-            u += "\n\nAttempt 2 -- different wording; be more specific to the tale."
-        return [{"role": "system", "content": _system},
-                {"role": "user", "content": u}]   # fresh 2-msg array, no role-stutter
-
-    for attempt, flag in ((False, "news_coda_bridge"), (True, "news_coda_bridge_reroll")):
-        raw = _announcer_generate(creative_fn, _msgs(attempt))   # no seed arg
-        ok, bridge = validate_news_coda_bridge(strip_line_formatting(raw or ""))
-        if ok:
-            finished = _finish(
-                bridge, (flag,), allow_fact_reduction=False,
-            )
-            if finished is not None:
-                return finished
-
-    # 3) Authored repair B/C: lower-temperature same slot, then the alternate
-    # writer. The real fact remains starved from both prompts and is appended
-    # byte-for-byte by _assemble only after a bridge validates.
-    critical_messages = _msgs(False)
-    critical_messages[1] = {
-        "role": "user",
-        "content": (
-            critical_messages[1]["content"]
-            + "\n\nCRITICAL SPOKEN-LINE REPAIR. Scour the complete bridge for "
-              "anything that is not natural vocabulary the announcer says aloud. "
-              "Replace stage action, labels, cues, markup, generic pivots, and "
-              "fragments. Return ONLY one tale-specific SFW bridge clause."
-        ),
-    }
-    for fn, temperature, rung in (
-        (creative_fn, _QUALITY_REPAIR_B_TEMPERATURE, "repair_b_same_slot"),
-        (repair_fn, _QUALITY_REPAIR_C_TEMPERATURE, "repair_c_alternate_slot"),
-    ):
-        if not callable(fn):
-            continue
-        repair_raw = _announcer_generate(
-            fn, critical_messages, temperature=temperature,
-        )
-        ok, bridge = validate_news_coda_bridge(
-            strip_line_formatting(repair_raw or "")
-        )
-        if ok:
-            finished = _finish(
-                bridge,
-                (
-                    "news_coda_bridge_repaired",
-                    "hygiene_repaired_after_reroll",
-                    "hygiene_repaired_after_reroll:news_coda_bridge:" + rung,
-                ),
-                allow_fact_reduction=False,
-            )
-            if finished is not None:
-                return finished
-
-    # 4) Deterministic sanitize floor. Every chosen clause passes the same
-    # validator that rejected the authored attempts; NEWS_CODA_POOL is retained
-    # for compatibility/telemetry but is not a clean floor because its stock
-    # openers intentionally trip BRIDGE_GENERIC_OPENERS.
-    h = int(
-        hashlib.sha256(f"news-coda:{cast_seed}".encode("utf-8")).hexdigest(),
-        16,
+    raw = _announcer_generate(creative_fn, [
+        {"role": "system", "content": system},
+        {"role": "user", "content": (
+            f"PREMISE: {clean_one_line(premise)}\n"
+            f"OPENING TONE: {clean_one_line(intro_text)}\n"
+            "Write only a transition into the source note."
+        )},
+    ])
+    ok, bridge = validate_news_coda_bridge(
+        strip_line_formatting(raw or "", _ANNOUNCER_LABELS)
     )
-    arc_bridges = tuple(_NEWS_CODA_ARC_BRIDGES.get(arc_shape) or ())
-    valid_arc = tuple(
-        bridge for bridge in arc_bridges
-        if validate_news_coda_bridge(bridge)[0]
-    )
-    if valid_arc:
-        floor_bridge = valid_arc[h % len(valid_arc)]
-        floor_kind = "news_coda_arc_bridge"
-    else:
-        valid_curated = tuple(
-            bridge
-            for bridges in _NEWS_CODA_ARC_BRIDGES.values()
-            for bridge in bridges
-            if validate_news_coda_bridge(bridge)[0]
-        )
-        if not valid_curated:  # totality proof if a future edit empties the pools
-            valid_curated = ("Beyond tonight's tale",)
-        floor_bridge = valid_curated[h % len(valid_curated)]
-        floor_kind = "news_coda_curated_bridge"
-    finished = _finish(
-        floor_bridge,
-        (
-            "news_coda_fallback",
-            "news_coda_bridge_invalid",
-            floor_kind,
-        ) + (
-            "hygiene_repaired_after_reroll",
-            "hygiene_repaired_after_reroll:news_coda_bridge:deterministic_floor",
-        ),
-        allow_fact_reduction=True,
-    )
-    if finished is not None:
-        return finished
-    return LineResult(
-        text="",
-        compose_flags=(
-            "news_coda_no_clean_surface",
-            "hygiene_row_failed_mechanical",
-            "hygiene_row_failed_mechanical:news_coda_no_clean_surface",
-        ),
-    )
+    if not ok:
+        bridge = ""
+    result = _assemble_news_coda_surface(bridge, fact)
+    flag = "news_coda_bridge" if bridge else "news_coda_fact_only"
+    return LineResult(result, (flag,))
 
 
 def compose_announcer_outro(
-    *,
-    creative_fn,
-    repair_fn=None,
-    script_brief: str,
-    news_close_brief: str,
-    intro_text: str,
-    creative_repo_id: str | None = None,
-    ending_change: str = "",
+    *, creative_fn, script_brief: str,
+    news_close_brief: str, intro_text: str,
+    creative_repo_id: str | None = None, ending_change: str = "",
     final_character_line: str = "",
-    # Stage 4 (2026-07-06): the episode's story-path bank; the thesis-close
-    # gate's vocabulary resolves from its rules pack (this function had NO
-    # bank-context slot at all -- the worst threading gap, kibitz r2).
     source_bank_id: str = "media_archive",
 ) -> LineResult:
-    """Compose the episode's closing announcer line.
-
-    A dedicated creative-slot pass run post-loop, once the script and
-    the intro line both exist. Context is `script_brief` +
-    `news_close_brief` + `intro_text` only -- never the full script (a
-    tight prompt yields a tight close, and it keeps the KV cache
-    small). Plain-text output, one LLM call. On any failure the
-    deterministic `fallback_announcer_outro` fires.
-
-    F3 (story-engine v1): when the episode's dramatic question RESOLVED,
-    the close must STATE the outcome, not hedge. ``ending_change`` (from
-    ``meta.dramatic_state``) and ``final_character_line`` (null-guarded --
-    "" when not available at outro-compose time) are threaded into the
-    prompt, and a deterministic post-check recomposes ONCE if the LLM
-    hedges on a resolved ending, then drops to a resolved fallback
-    template that states ``ending_change`` with no hedge phrase. Both new
-    params default "" so legacy callers/tests are byte-identical.
-
-    `creative_repo_id` is accepted for call-signature parity with
-    `compose_line` (see `compose_announcer_intro`).
-
-    Returns a `LineResult`; `compose_flags` is ``("announcer_outro",)``
-    on the LLM path or ``("announcer_outro_fallback",)`` on fallback.
-    """
-    try:
-        from ._otr_dramatic_state import HEDGE_LIST, is_resolved_ending_change
-    except ImportError:  # bare-name import context (no parent package)
-        from _otr_dramatic_state import (  # type: ignore
-            HEDGE_LIST, is_resolved_ending_change,
-        )
-
-    def _hedges(t: str) -> bool:
-        low = (t or "").lower()
-        return any(p in low for p in HEDGE_LIST)
-
-    # Stage 4: resolve the rule vocabulary ONCE at entry, outside any
-    # swallow -- the thesis gate below scores with the bank's own patterns.
-    try:
-        from ._otr_story_rules import resolve_story_rules
-    except ImportError:  # pragma: no cover -- flat test imports (package
-        # fallback: the rules module needs its package context).
-        from nodes._otr_story_rules import (  # type: ignore
-            resolve_story_rules)
-    _story_rules = resolve_story_rules(source_bank_id)
-
-    resolved = is_resolved_ending_change(ending_change)
-    ending = clean_one_line(ending_change or "", max_chars=240)
-    final_line = clean_one_line(final_character_line or "", max_chars=240)
-
-    # LLM slot: creative -- announcer outro is a narrative framing
-    # pass; routed through the writer's creative_writing_model slot.
-    brief = clean_one_line(script_brief or "", max_chars=0)
-    close = clean_one_line(news_close_brief or "", max_chars=0)
-    intro = clean_one_line(intro_text or "", max_chars=0)
+    """Author one closing; style and length never reopen authorship."""
+    brief = clean_one_line(script_brief)
+    close = clean_one_line(news_close_brief)
     if not brief and not close:
-        raise RuntimeError(
-            "[OTR_AnnouncerPass] announcer outro: EMPTY script_brief AND "
-            "news_close_brief -- no context to write the close from (broken "
-            "upstream). NO canned-template fallback (no-fallback rip 2026-07-03)."
-        )
-    user_parts: list[str] = []
-    if brief:
-        user_parts.append(f"Tonight's story brief:\n{brief}")
-    if close:
-        user_parts.append(
-            f"Closing brief (the journalistic note to land):\n{close}"
-        )
-    if intro:
-        user_parts.append(f"The announcer's opening line was:\n{intro}")
-    if final_line:
-        user_parts.append(f"The final character line was:\n{final_line}")
-    if resolved and ending:
-        user_parts.append(
-            "The dramatic question RESOLVED. The outcome: "
-            f"{ending}\nState this outcome plainly in the close. Do NOT "
-            "hedge -- do not say it 'remains to be seen' or 'time will tell'."
-        )
-    user_parts.append("Write the announcer's closing line now.")
-    # Closing-layer routing (2026-07-09 QA F1): the outro system prompt
-    # resolves from the bank's pack seam (Stage 4 threaded the bank id for
-    # the thesis gate but the SYSTEM prompt still hardcoded the science
-    # constant). Science bank with repo None keeps the constant (audio C7
-    # fast path, mirrors compose_line's BUG-LOCAL-417 shape).
-    if creative_repo_id is None and source_bank_id == "science_news":
-        _outro_base = _ANNOUNCER_OUTRO_SYSTEM
-    else:
-        from ._otr_creative_prompt_router import resolve_creative_system_prompt
-        _outro_base = resolve_creative_system_prompt(
-            creative_repo_id, phase="announcer_outro_system",
-            source_bank_id=source_bank_id,
-        )
-    system_content = _outro_base
-    if resolved and ending:
-        system_content = (
-            _outro_base
-            + "\n- The story resolved tonight: state the outcome; never "
-              "hedge or defer it to the future."
-        )
-    messages = [
-        {"role": "system", "content": system_content},
-        {"role": "user", "content": "\n\n".join(user_parts)},
-    ]
-    # Same ladder as the intro: a line that misses the length window is asked again with
-    # the reason, not executed on the spot. Quality misses below (hedged / thesis close)
-    # already recompose and keep the AI-written line; this covers outright rejection.
-    raw = None
-    cleaned = ""
-    ok, validated = False, ""
-    for _attempt in range(1, _ANNOUNCER_ATTEMPTS + 1):
-        raw = _announcer_generate(creative_fn, messages)
-        cleaned = strip_line_formatting(raw or "")
-        ok, validated = validate_announcer_line(
-            cleaned,
-            min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-            max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-        )
-        if ok or _attempt == _ANNOUNCER_ATTEMPTS:
-            break
-        log.warning(
-            "[OTR_AnnouncerPass] outro attempt %d rejected (%d chars, limit %d-%d); "
-            "asking again with the reason",
-            _attempt, len(cleaned), _ANNOUNCER_OUTRO_MIN_CHARS,
-            _ANNOUNCER_OUTRO_MAX_CHARS,
-        )
-        messages = messages[:2] + [
-            {"role": "assistant", "content": cleaned},
-            {"role": "user", "content": _announcer_retry_note(
-                cleaned,
-                min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-                max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-            )},
-        ]
-    if ok:
-        _outro_flags: list[str] = ["announcer_outro"]
-
-        def _finish_thesis(text: str, rung: str, legacy_flag: str) -> LineResult:
-            flags = list(_outro_flags)
-            if legacy_flag not in flags:
-                flags.append(legacy_flag)
-            flags.append("hygiene_repaired_after_reroll")
-            flags.append(
-                f"hygiene_repaired_after_reroll:thesis_close:{rung}"
-            )
-            return LineResult(text=text, compose_flags=tuple(dict.fromkeys(flags)))
-
-        # F3 post-check: a resolved episode whose close still hedges is a
-        # contradiction -- recompose once with a stronger directive. Continue
-        # into the thesis gate afterward: an F3 repair can itself state a moral.
-        if resolved and _hedges(validated):
-            log.info(
-                "[OTR_AnnouncerPass] outro hedged on a RESOLVED ending; "
-                "recomposing once (F3).",
-            )
-            redo_user = list(user_parts[:-1]) + [
-                "Your previous closing line hedged the outcome. The story "
-                f"RESOLVED: {ending or close}. Rewrite the close to STATE "
-                "the outcome plainly. Do not use 'remains to be seen', "
-                "'time will tell', 'open question', or any hedge.",
-                "Write the announcer's closing line now.",
-            ]
-            redo = _announcer_generate(creative_fn, [
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": "\n\n".join(redo_user)},
-            ])
-            ok2, validated2 = validate_announcer_line(
-                strip_line_formatting(redo or ""),
-                min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-                max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-            )
-            if ok2 and not _hedges(validated2):
-                log.info(
-                    "[OTR_AnnouncerPass] outro recompose ok (model=%s).",
-                    creative_repo_id,
-                )
-                validated = validated2
-                _outro_flags = ["announcer_outro_resolved_recomposed"]
-            else:
-                log.warning(
-                    "[OTR_AnnouncerPass] outro still hedged after recompose; "
-                    "keeping the AI-written close with a residual stamp.",
-                )
-                _outro_flags.append("outro_residual_hedge")
-        # S2 (story-quality R2): a close that STATES a moral / lesson /
-        # news-summary instead of showing a concrete final image is flat. It now
-        # gets the same total A/B/C/floor shape as character craft gates.
-        _thesis_hit, _thesis_reason = flag_thesis_close(
-            validated, rules=_story_rules)
-        if _thesis_hit:
-            log.info(
-                "[OTR_AnnouncerPass] outro reads as thesis/moral (%s); "
-                "recomposing once for a concrete final image (S2).",
-                _thesis_reason,
-            )
-            image_user = list(user_parts[:-1]) + [
-                "Your previous closing line stated a moral, lesson, or "
-                "news-summary. Replace it with ONE concrete final image: show "
-                "what physically changed -- a person, an object, or a place -- "
-                "not what it means. Do not say 'the lesson is', 'reminding "
-                "us', \"tonight's revelation\", or 'this shows'.",
-                "Write the announcer's closing line now.",
-            ]
-            redo2 = _announcer_generate(creative_fn, [
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": "\n\n".join(image_user)},
-            ])
-            ok3, validated3 = validate_announcer_line(
-                strip_line_formatting(redo2 or ""),
-                min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-                max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-            )
-            if ok3 and not flag_thesis_close(
-                    validated3, rules=_story_rules)[0]:
-                log.info(
-                    "[OTR_AnnouncerPass] outro image-recompose ok (model=%s).",
-                    creative_repo_id,
-                )
-                return _finish_thesis(
-                    validated3, "repair_a", "announcer_outro_image_recomposed",
-                )
-            _thesis_candidate = validated3 if ok3 else validated
-
-            critical_user = list(user_parts[:-1]) + [
-                "CRITICAL SPOKEN-LINE REPAIR. Scan the entire line for anything "
-                "that reads like commentary, a moral, a lesson, a stage note, "
-                "or non-dialogue. Replace it with one concrete final image in "
-                "plain SFW words the announcer can actually say. Preserve the "
-                "story outcome. Return only that clean spoken line.",
-                "Write the announcer's closing line now.",
-            ]
-            redo_b = _announcer_generate(
-                creative_fn,
-                [
-                    {"role": "system", "content": system_content},
-                    {"role": "user", "content": "\n\n".join(critical_user)},
-                ],
-                temperature=_QUALITY_REPAIR_B_TEMPERATURE,
-            )
-            ok_b, validated_b = validate_announcer_line(
-                strip_line_formatting(redo_b or ""),
-                min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-                max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-            )
-            if ok_b:
-                _thesis_candidate = validated_b
-                if not flag_thesis_close(validated_b, rules=_story_rules)[0]:
-                    return _finish_thesis(
-                        validated_b,
-                        "repair_b_same_slot",
-                        "announcer_outro_image_recomposed",
-                    )
-
-            if callable(repair_fn):
-                redo_c = _announcer_generate(
-                    repair_fn,
-                    [
-                        {"role": "system", "content": system_content},
-                        {"role": "user", "content": "\n\n".join(critical_user)},
-                    ],
-                    temperature=_QUALITY_REPAIR_C_TEMPERATURE,
-                )
-                ok_c, validated_c = validate_announcer_line(
-                    strip_line_formatting(redo_c or ""),
-                    min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-                    max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-                )
-                if ok_c:
-                    _thesis_candidate = validated_c
-                    if not flag_thesis_close(
-                            validated_c, rules=_story_rules)[0]:
-                        return _finish_thesis(
-                            validated_c,
-                            "repair_c_alternate_slot",
-                            "announcer_outro_image_recomposed",
-                        )
-
-            floor = deterministic_hygiene_floor(
-                _thesis_candidate,
-                ("thesis_close",),
-                rules=_story_rules,
-            )
-            for floor_candidate in (
-                floor.text,
-                "Dawn finds the room quiet beneath one last lamp.",
-                "At one, it is as it was, and we go on.",
-            ):
-                floor_ok, floor_text = validate_announcer_line(
-                    floor_candidate,
-                    min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-                    max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-                )
-                if (
-                    floor_ok
-                    and not flag_thesis_close(
-                        floor_text, rules=_story_rules,
-                    )[0]
-                ):
-                    log.warning(
-                        "[OTR_AnnouncerPass] deterministic thesis floor resolved "
-                        "the close after authored repair exhaustion.",
-                    )
-                    return _finish_thesis(
-                        floor_text,
-                        "deterministic_floor",
-                        "announcer_outro_image_recomposed",
-                    )
-            # Current packs cannot reach this branch. Keep the totality contract
-            # explicit if a future pack bans every bounded floor phrase.
-            return _finish_thesis(
-                "At one, it is as it was, and we go on.",
-                "deterministic_floor",
-                "announcer_outro_image_recomposed",
-            )
-        log.info(
-            "[OTR_AnnouncerPass] outro pass ok (model=%s, %d chars)",
-            creative_repo_id, len(validated),
-        )
-        return LineResult(
-            text=validated, compose_flags=tuple(dict.fromkeys(_outro_flags)),
-        )
-    fallback = (
-        _resolved_outro_fallback(ending, close)
-        if resolved and ending
-        else fallback_announcer_outro(close or brief)
+        raise RuntimeError("[OTR_AnnouncerPass] empty closing briefs")
+    system = _resolved_closing_prompt(
+        creative_repo_id, phase="announcer_outro_system",
+        source_bank_id=source_bank_id,
     )
-    return _repair_announcer_validation_exhaustion(
-        creative_fn=creative_fn,
-        repair_fn=repair_fn,
-        base_messages=messages,
-        last_raw=raw,
-        min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
-        max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
-        success_flag="announcer_outro",
-        floor_flags=("announcer_outro_fallback",),
-        fallback_candidates=(
-            fallback,
-            "This has been SIGNAL LOST. One lamp remains. Good night.",
+    context = "\n".join(filter(None, (
+        f"STORY: {brief}" if brief else "",
+        f"SOURCE NOTE: {close}" if close else "",
+        f"OPENING: {clean_one_line(intro_text)}" if intro_text else "",
+        f"ENDING: {clean_one_line(ending_change)}" if ending_change else "",
+        (
+            f"FINAL CHARACTER LINE: {clean_one_line(final_character_line)}"
+            if final_character_line else ""
         ),
-        candidate_validator=lambda text: (
-            (not resolved or not _hedges(text))
-            and not flag_thesis_close(text, rules=_story_rules)[0]
-        ),
+        "Write the closing now.",
+    )))
+    raw = _announcer_generate(creative_fn, [
+        {"role": "system", "content": system},
+        {"role": "user", "content": context},
+    ])
+    ok, cleaned = validate_announcer_line(
+        strip_line_formatting(raw or "", _ANNOUNCER_LABELS)
+    )
+    return (
+        LineResult(cleaned, ("announcer_outro",))
+        if ok else LineResult(
+            fallback_announcer_outro(close or brief),
+            ("announcer_outro_structural_fallback",),
+        )
     )
 
 
-# ---------------------------------------------------------------------------
-# Self-test (run as `python nodes/_otr_line_composer.py`)
-# ---------------------------------------------------------------------------
-
-
-if __name__ == "__main__":
-    print("=== _otr_line_composer.py self-test ===")
-
-    # Test 1: strip_line_formatting handles each formatting type.
-    print("\n[Test 1] strip_line_formatting")
-    cases = [
-        ("Hello there.", "Hello there."),
-        ('"Hello there."', "Hello there."),
-        ("'Hello there.'", "Hello there."),
-        ("“Hello there.”", "Hello there."),
-        ("ALICE: Hello there.", "Hello there."),
-        ("ALICE - Hello there.", "Hello there."),
-        ("[ALICE] Hello there.", "Hello there."),
-        ("[VOICE: ALICE] Hello there.", "Hello there."),
-        ("[ALICE, female, 30s, calm] Hello there.", "Hello there."),
-        ("**Hello there.**", "Hello there."),
-        ("*Hello there.*", "Hello there."),
-        ("ALICE: *Hello there.*", "Hello there."),
-        ('  "ALICE: Hello there."  ', "Hello there."),
-        ("**[ALICE]**", ""),
-        ("*[ALICE]*", ""),
-        ("**ALICE:**", ""),
-        ("**[ALICE] Hello there.**", "Hello there."),
-        ("", ""),
-        ("   ", ""),
-    ]
-    for raw, expected in cases:
-        got = strip_line_formatting(raw)
-        marker = "PASS" if got == expected else "FAIL"
-        print(f"  {marker}: {raw!r:50} -> {got!r}")
-
-    # Test 2: _format_last_lines empty + populated.
-    print("\n[Test 2] _format_last_lines")
-    # v4: placeholder phrasing updated to "scene just opened".
-    assert "scene just opened" in _format_last_lines([])
-    populated = _format_last_lines([("ALICE", "Hi."), ("BOB", "Hello.")])
-    assert "[ALICE]: Hi." in populated
-    assert "[BOB]: Hello." in populated
-    print("  PASS")
-
-    # Test 3: _build_user_prompt structure.
-    print("\n[Test 3] _build_user_prompt")
-    req = LineRequest(
-        speaker="ALICE",
-        intent="reveal the signal",
-        mood="tense",
-        target_words=15,
-        canon_header="TITLE: x\nSETTING: y\nTIME: z\nPREMISE: w",
-        last_lines=[("BOB", "What did you find?")],
-    )
-    user_prompt = _build_user_prompt(req)
-    # v4 (2026-05-11): block labels updated for the prompt-revision pass.
-    for required in ("EPISODE CONTEXT", "LAST SPOKEN (this scene):",
-                     "WRITE LINE", "You are ALICE.", "Mood: tense.",
-                     "15", "Speak now."):
-        assert required in user_prompt, f"missing {required!r}"
-    # Bare-bones request omits STYLE / THEME / OUTLINE / NAMED ENTITIES
-    # / CAST / CURRENT BEAT / POSITION blocks. SOUND IN THE ROOM was
-    # removed 2026-07-01 (rip-sfx-broll) -- assert it NEVER renders.
-    for missing in ("STYLE:", "THEME:", "OUTLINE:", "NAMED ENTITIES",
-                    "ALLOWED NAMES", "CAST", "CURRENT BEAT", "POSITION:",
-                    "SOUND IN THE ROOM"):
-        assert missing not in user_prompt, f"unexpected {missing!r}"
-    print("  PASS")
-
-    # Test 4: compose_line happy path with mock generate_fn.
-    print("\n[Test 4] compose_line happy path")
-    def mock_ok(messages, *, temperature, max_new_tokens):
-        return "ALICE: I found something I cannot explain."
-    result = compose_line(creative_fn=mock_ok, req=req)
-    assert isinstance(result, LineResult)
-    assert result.text == "I found something I cannot explain."
-    assert result.compose_flags == ()
-    print(f"  PASS (cleaned: {result.text!r})")
-
-    # Test 5: compose_line retries on empty.
-    print("\n[Test 5] compose_line retries on empty response")
-    call_count = {"n": 0}
-    def mock_empty_then_ok(messages, *, temperature, max_new_tokens):
-        call_count["n"] += 1
-        if call_count["n"] == 1:
-            return "**[ALICE]**"  # strips to empty
-        return "I see it now."
-    result = compose_line(creative_fn=mock_empty_then_ok, req=req)
-    assert result.text == "I see it now."
-    assert call_count["n"] == 2
-    print("  PASS")
-
-    # Test 6: compose_line retries on oversize.
-    print("\n[Test 6] compose_line retries on oversize response")
-    call_count2 = {"n": 0}
-    def mock_oversize_then_ok(messages, *, temperature, max_new_tokens):
-        call_count2["n"] += 1
-        if call_count2["n"] == 1:
-            return " ".join(["word"] * 200)  # way over cap
-        return "Short reply."
-    result = compose_line(creative_fn=mock_oversize_then_ok, req=req)
-    assert result.text == "Short reply."
-    print("  PASS")
-
-    # Test 7: compose_line raises after exhausting attempts.
-    print("\n[Test 7] LineCompositionFailedError after exhaustion")
-    def mock_always_empty(messages, *, temperature, max_new_tokens):
-        return ""
-    try:
-        compose_line(creative_fn=mock_always_empty, req=req)
-        print("  FAIL: should have raised")
-    except LineCompositionFailedError as e:
-        assert len(e.attempts) == 2
-        assert e.request.speaker == "ALICE"
-        assert "2 attempts" in str(e)
-        print("  PASS")
-
-    # Test 8: compose_line propagates generate_fn exceptions through retry.
-    print("\n[Test 8] generate_fn exceptions are caught and retried")
-    call_count3 = {"n": 0}
-    def mock_raise_then_ok(messages, *, temperature, max_new_tokens):
-        call_count3["n"] += 1
-        if call_count3["n"] == 1:
-            raise RuntimeError("simulated CUDA OOM")
-        return "Recovered line."
-    result = compose_line(creative_fn=mock_raise_then_ok, req=req)
-    assert result.text == "Recovered line."
-    print("  PASS")
-
-    # Test 9 (Phase 0): build_allowed_roster + detect_phantom_names.
-    print("\n[Test 9] Phase 0 roster + phantom detection")
-    roster = build_allowed_roster(
-        cast_rows=[{"name": "ALICE"}, {"name": "BOB"}],
-        key_terms=("CERN", "Voyager"),
-    )
-    assert "ALICE" in roster
-    assert "BOB" in roster
-    assert "ANNOUNCER" in roster
-    assert "CERN" in roster
-    assert "VOYAGER" in roster
-    # ALICE's own line never flags herself.
-    assert detect_phantom_names("Alice waits.", "ALICE", roster) == []
-    # CERN is in roster.
-    assert detect_phantom_names("The CERN team is ready.", "ALICE", roster) == []
-    # Dr. Patel is a phantom.
-    flagged = detect_phantom_names(
-        "Dr. Patel can confirm the readings.", "ALICE", roster,
-    )
-    assert flagged == ["Dr. Patel"], f"expected ['Dr. Patel'], got {flagged!r}"
-    # CARLA is a phantom (uppercase, not in roster).
-    assert detect_phantom_names(
-        "CARLA knows the truth.", "ALICE", roster,
-    ) == ["CARLA"]
-    # "The radio crackles." -- "The radio" at sentence start is not a phantom.
-    assert detect_phantom_names(
-        "The radio crackles.", "ALICE", roster,
-    ) == []
-    print("  PASS")
-
-    # Test 10 (Phase 0): compose_line stamps flags on LineResult.
-    print("\n[Test 10] compose_line stamps compose_flags for phantoms")
-    req_with_roster = LineRequest(
-        speaker="ALICE", intent="reveal", mood="tense", target_words=15,
-        canon_header="TITLE: x\nSETTING: y\nTIME: z\nPREMISE: w",
-        last_lines=[],
-        allowed_roster=roster,
-    )
-    def mock_phantom(messages, *, temperature, max_new_tokens):
-        return "Dr. Patel insists this is real."
-    res = compose_line(creative_fn=mock_phantom, req=req_with_roster)
-    assert res.compose_flags == ("phantom_name:Dr. Patel",), \
-        f"expected 1 phantom flag, got {res.compose_flags!r}"
-    print("  PASS")
-
-    # Test 11 (Phase 0): aggregate_compose_flags counts kinds.
-    print("\n[Test 11] aggregate_compose_flags rolls up flag kinds")
-    fake_ledger = {
-        "lines": [
-            {"line_id": "b001", "compose_flags": ["phantom_name:Dr. Patel"]},
-            {"line_id": "b002", "compose_flags": ["phantom_name:CARLA",
-                                                   "phantom_name:Dr. Patel"]},
-            {"line_id": "b003", "compose_flags": []},
-            {"line_id": "b004"},  # missing field entirely
-        ]
-    }
-    summary = aggregate_compose_flags(fake_ledger)
-    assert summary == {"phantom_name": 3}, f"got {summary!r}"
-    assert aggregate_compose_flags({}) == {}
-    assert aggregate_compose_flags({"lines": []}) == {}
-    print("  PASS")
-
-    print("\n=== Task 3 + Phase 0 self-tests passed ===")

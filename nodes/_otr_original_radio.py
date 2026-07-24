@@ -1,30 +1,11 @@
-"""nodes/_otr_original_radio.py -- the original_radio creative front + QA.
+"""Original-radio source construction.
 
-The no-source original-drama lane (ARCHITECTURE_V4 2026-07-09, kibitz
-r2-r4): a spark-deck entropy draw feeds a three-pass creative front
-(CONCEPT -> SELECT -> BRIEF) that emits the SAME interpreter-result
-contract the source lanes produce (validate_interpreter_result duck
-contract; news_close_brief hardwired "" so the close routes to the
-announcer outro -- the Hitchcock epilogue seam). A post-composition
-whole-script QA pass (original_qa_system) judges the enumerated hard-rule
-classes; the WRITER owns dynamic cross-slot repair for subjective findings and
-keeps deterministic evidence-backed violations fail-closed.
-
-Posture: PURE module -- stdlib + pydantic + the shared structured_call
-ladder. No I/O beyond the deck file read, no GPU, no ComfyUI imports, no
-writer imports. Structural failures and corroborated deterministic violations
-raise; subjective QA dissatisfaction is repair feedback, never an episode veto.
-
-Pack seams are read DIRECTLY from pack.prompt_stages (kibitz r3 D1): the
-shared pack-prompt accessors hard-check the PRODUCTION seam allowlist
-and reject this pipeline's declared original_* seams by design.
-
-Forbidden-term defense (V4 lock 4): the lane-local lexicon below scans
-the deck at load and every brief-field at the gate -- weapons/smoking,
-modern-IP wording, news framing, and a small anachronism lexicon. Data
-here, not Python branches: extend the lists, not the code.
-
-UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
+A spark-deck draw feeds the fixed CONCEPT -> SELECT -> BRIEF front and emits
+the interpreter-compatible source metadata consumed by the shared writer.
+These passes establish the original source/cast authority before a complete
+story exists. Post-script prose QA, vocabulary policy, and re-authoring are
+owned nowhere in this module; the shared narrow safety cleanup and structural
+freeze are the only publication gates.
 """
 from __future__ import annotations
 
@@ -33,23 +14,19 @@ import hashlib
 import logging
 import os
 import random
-import re
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field
 
 try:
-    from ._otr_json import parse_first_json_object
     from ._otr_structured_call import (
         StructuredCallFailedError,
         structured_call,
     )
     from ._otr_repair_prompts import make_dispatching_repair_factory
 except ImportError:  # pragma: no cover -- flat test/standalone load
-    from _otr_json import parse_first_json_object  # type: ignore
     from _otr_structured_call import (  # type: ignore
         StructuredCallFailedError,
         structured_call,
@@ -74,107 +51,6 @@ class OriginalDeckError(OriginalRadioError):
 
 class OriginalBriefsError(OriginalRadioError):
     """The creative front could not produce a valid brief set."""
-
-
-class OriginalQAError(OriginalRadioError):
-    """Whole-script QA found a corroborated deterministic ship-stop."""
-
-
-# ---------------------------------------------------------------------------
-# Forbidden-term lexicon (lane data; scanned at deck load + brief gate)
-# ---------------------------------------------------------------------------
-
-FORBIDDEN_TERMS: tuple[str, ...] = (
-    # weapons / smoking (operator hard rule)
-    "gun", "pistol", "rifle", "revolver", "knife", "dagger", "blade",
-    "shotgun", "bullet", "ammunition", "cigarette", "cigar", "smoking",
-    "tobacco", "pipe smoke",
-    # news / source framing (this lane has no source)
-    "breaking news", "according to reports", "our correspondent",
-    "news bulletin", "the headlines",
-)
-
-ANACHRONISM_TERMS: tuple[str, ...] = (
-    # small modern-tech lexicon (V4 lock 4) -- plot must not depend on these
-    "internet", "smartphone", "cell phone", "cellphone", "mobile phone",
-    "computer", "laptop", "email", "e-mail", "website", "online",
-    "television", "webcam", "wifi", "wi-fi", "app ", "software",
-    "database", "satellite", "drone", "credit card", "social media",
-)
-
-_ALL_FORBIDDEN = FORBIDDEN_TERMS + ANACHRONISM_TERMS
-
-# Evidence lexicons for the episode-KILLING QA classes (live-smoke
-# hardening 2026-07-10: the first original_radio smoke died on a judge
-# that invented 'weapons_smoking' for a weaponless threat line and
-# 'news_source_framing' for a plain dramatic teaser). A hard-class
-# finding may kill the episode only when (a) one of these terms
-# corroborates it in the quoted detail or the script, or (b) the ONE
-# bounded confirm re-judge produces a verbatim script quote for it.
-# Data here, not Python branches: extend the lists, not the code.
-WEAPON_SMOKING_EVIDENCE: tuple[str, ...] = (
-    "gun", "pistol", "rifle", "revolver", "shotgun", "firearm",
-    "derringer", "holster", "bullet", "ammunition", "weapon",
-    "six-shooter", "sixgun", "luger", "musket", "carbine",
-    "knife", "dagger", "blade", "bayonet", "switchblade", "stiletto",
-    "machete", "saber", "sabre", "sword",
-    "cigarette", "cigar", "smoking", "tobacco", "pipe smoke",
-    "ashtray", "lit a pipe", "lights a pipe", "smokes a", "lit up a",
-)
-NEWS_FRAMING_EVIDENCE: tuple[str, ...] = (
-    "news", "report", "reported", "reporter", "bulletin", "headline",
-    "correspondent", "according to", "true story", "sources say",
-    "dispatch", "journalist", "press conference", "this really happened",
-)
-MACHINE_ATTRIBUTION_EVIDENCE: tuple[str, ...] = (
-    "machine", "computer", "generated", "algorithm", "artificial",
-    "automaton", "automated", "synthetic", "fabricated by",
-)
-HARD_CLASS_EVIDENCE: "dict[str, tuple[str, ...]]" = {
-    "weapons_smoking": WEAPON_SMOKING_EVIDENCE,
-    "news_source_framing": NEWS_FRAMING_EVIDENCE,
-    "machine_attribution": MACHINE_ATTRIBUTION_EVIDENCE,
-    "anachronism_dependency": ANACHRONISM_TERMS,
-}
-
-# Kill authority per hard class (run-3 live catch 2026-07-10: the
-# confirm judge "proved" weapons_smoking with the verbatim quote
-# 'I don't care if the coils start to smoke' -- a grounded quote proves
-# the LINE EXISTS, not that it belongs to the CLASS; the first 420w
-# roll repeated the hole on news_source_framing by quoting the entire
-# -- perfectly clean -- intro line). Radio is pure dialogue: a weapon,
-# a tobacco act, NEWS FRAMING, or MACHINE ATTRIBUTION must be SAID in
-# words to exist on air, so every class takes the lexicon as its only
-# kill authority and an uncorroborated flag is discarded LOUDLY (meta
-# stamp + log keep it auditable; the operator eyeball reviews discards).
-# Data here, not Python branches.
-#
-# RIPPED 2026-07-11 (operator directive: "no more IP gates"). The pipeline
-# had ONE open-vocabulary class -- brand / franchise wording -- and it was
-# the only one whose kill authority was a confirm-quote rather than a
-# lexicon. Unenumerable by nature, it could never be corroborated: it killed
-# an episode on an unbounded hunch, with nothing to check it against and no
-# repair path. It took down the original_radio bank in the all-banks 30w
-# sweep. A gate with no enumerable evidence and no way to fix the finding is
-# not a gate; it is a coin flip the episode can only lose. Every surviving
-# class corroborates against a lexicon.
-KILL_POLICY_BY_CLASS: "dict[str, str]" = {
-    "weapons_smoking": "lexicon_only",
-    "anachronism_dependency": "lexicon_only",
-    "news_source_framing": "lexicon_only",
-    "machine_attribution": "lexicon_only",
-}
-
-
-def scan_forbidden(text: str, *, origin: str) -> None:
-    """Case-insensitive whole-ish word scan; raises OriginalRadioError
-    naming the first hit. Data-driven -- extend the lexicons, not this."""
-    low = f" {str(text).lower()} "
-    for term in _ALL_FORBIDDEN:
-        if term in low:
-            raise OriginalRadioError(
-                f"{origin}: forbidden term {term!r} present"
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -224,8 +100,6 @@ def load_spark_deck(path: "Path | None" = None) -> dict:
                 f"spark deck axis {axis!r}: needs >= "
                 f"{_DECK_MIN_ATOMS_PER_AXIS} non-empty string atoms"
             )
-        for a in atoms:
-            scan_forbidden(a, origin=f"spark deck axis {axis!r}")
     unknown = sorted(set(axes) - set(DECK_AXES))
     if unknown:
         raise OriginalDeckError(f"spark deck: unknown axes {unknown}")
@@ -263,54 +137,11 @@ def draw_spark_atoms(deck: "dict | None" = None) -> SparkDraw:
 # Creative-front schemas (loose shells; content gates are post-validators)
 # ---------------------------------------------------------------------------
 
-#: Title tokens stripped from the LEADING edge of an LLM-generated cast name.
-#: Same token set fable2 uses (`_otr_scifi_fable2._HONORIFIC_TOKENS`, 19th live
-#: smoke 2026-07-10); kept lane-local rather than imported so this lane does not
-#: take a hard dependency on the fable2 module.
-_HONORIFIC_TOKENS = frozenset({
-    "DR", "DOCTOR", "MR", "MRS", "MS", "MISS", "PROF", "PROFESSOR",
-    "CAPTAIN", "CAPT", "COMMANDER", "CMDR", "COLONEL", "COL",
-    "LIEUTENANT", "LT", "SERGEANT", "SGT", "REVEREND", "REV", "SIR",
-    "MADAM", "MAJOR", "MAJ", "GENERAL", "GEN",
-})
-
-
-def strip_leading_honorifics(name: str) -> str:
-    """Deterministic cast-name LABEL normalization: drop LEADING honorific
-    tokens ('DR. ELI CROSS' -> 'ELI CROSS').
-
-    Local 12B-class models title their scientists/officers reflexively. Fable2
-    hit the same class (roll 19: 'DR. HARRIS' broke repair convergence) and
-    fixed it with a deterministic strip; original_radio's cast names ride
-    through every gate literally today (`_normalize_speaker` in _otr_outline.py
-    preserves INTERNAL punctuation by design, so it never removes the title).
-
-    Shape differs from fable2 on purpose: fable2 bills a ONE-WORD surname and
-    keeps only the last token, while original_radio bills a two-word period
-    personal name ("MARTHA VANE", "ELI CROSS"), so we strip only the leading
-    title tokens and keep the WHOLE remaining name. Never invents a character;
-    only normalizes the label shape (Python judges, the LLM writes). A name
-    that is nothing BUT a title is returned unchanged so this normalizer never
-    manufactures an empty cast name -- the existing empty-name gates own that.
-    """
-    if not isinstance(name, str):
-        return name
-    tokens = name.strip().split()
-    i = 0
-    while i < len(tokens) and tokens[i].rstrip(".").upper() in _HONORIFIC_TOKENS:
-        i += 1
-    kept = tokens[i:]
-    return " ".join(kept) if kept else name.strip()
-
 
 class CastSketchEntry(BaseModel):
     name: str = Field(default="")
     role: str = Field(default="")
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _strip_honorifics(cls, v):
-        return strip_leading_honorifics(v) if isinstance(v, str) else v
 
 
 class ConceptPitch(BaseModel):
@@ -330,10 +161,6 @@ class SelectCastEntry(BaseModel):
     pressure: str = Field(default="")
     relationship: str = Field(default="")
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _strip_honorifics(cls, v):
-        return strip_leading_honorifics(v) if isinstance(v, str) else v
 
 
 class SelectedPitch(BaseModel):
@@ -360,51 +187,6 @@ class OriginalBriefsModel(BaseModel):
     key_terms: list[str] = Field(default_factory=list)
     news_close_brief: str = Field(default="")
     attempts: int = Field(default=0)
-
-
-class QAFinding(BaseModel):
-    finding_class: str = Field(default="", alias="class")
-    detail: str = Field(default="")
-
-    model_config = {"populate_by_name": True}
-
-
-class QAFindings(BaseModel):
-    findings: list[QAFinding] = Field(default_factory=list)
-
-
-# The brand/franchise class is GONE (operator 2026-07-11: "no more IP gates").
-# A QA class the judge can flag but nobody can enumerate, corroborate, or repair
-# is not a safety net -- it is a lottery the episode can only lose.
-QA_CLASSES: frozenset = frozenset({
-    "weapons_smoking", "news_source_framing",
-    "machine_attribution", "epilogue_missing", "epilogue_moralizes",
-    "epilogue_contradicts", "anachronism_dependency",
-})
-
-# The repair interface is DATA. Epilogue classes coalesce into a dynamic
-# writer-owned compose_announcer_outro repair/rejudge loop.
-#
-# "fail" here means ELIGIBLE to end the episode -- NOT that the judge's word is
-# enough. A fail-class finding must still clear the deterministic evidence bar
-# in `triage_hard_findings` (a lexicon hit, or a grounded verbatim quote from
-# the script itself); an unproven hard finding is discarded loudly. That
-# evidence bar is what makes these classes lawful ship-stops.
-#
-# The epilogue classes have NO evidence bar, because "the outro moralizes" is an
-# aesthetic opinion and there is nothing to corroborate it against. They trigger
-# fresh cross-slot repairs and independent re-judges until clean or the finite
-# no-hang budget. Exhaustion keeps the best valid close with a quality-floor
-# receipt (THE LAW: an audit may improve a story, it may never fail one).
-REPAIR_ACTION_BY_CLASS: "dict[str, str]" = {
-    "weapons_smoking": "fail",
-    "news_source_framing": "fail",
-    "machine_attribution": "fail",
-    "epilogue_missing": "recompose_outro",
-    "epilogue_moralizes": "recompose_outro",
-    "epilogue_contradicts": "recompose_outro",
-    "anachronism_dependency": "fail",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -434,35 +216,6 @@ def _concept_corpus(sel: SelectedConcept) -> str:
     for c in sel.cast:
         parts.extend([c.name, c.want, c.pressure, c.relationship])
     return "\n".join(p for p in parts if p)
-
-
-_LEXICON_PATTERNS: "dict[tuple[str, ...], re.Pattern[str]]" = {}
-
-
-def lexicon_hits(text: str, terms: "Sequence[str]") -> "list[str]":
-    """Word-boundary lexicon scan over spoken text. The only kill authority.
-
-    The old scan was a raw substring test over the JUDGE'S OWN PROSE plus the
-    script -- so "gun" fired on "begun", and a model that wrote "the scene
-    mentions a gun" in its detail corroborated itself. A closed vocabulary is
-    only meaningful if the match is a WORD.
-    """
-    key = tuple(terms)
-    pattern = _LEXICON_PATTERNS.get(key)
-    if pattern is None:
-        body = "|".join(
-            re.escape(term.strip().lower())
-            for term in terms if term and term.strip()
-        )
-        pattern = re.compile(rf"(?<!\w)(?:{body})(?!\w)", re.IGNORECASE) if body \
-            else re.compile(r"(?!x)x")
-        _LEXICON_PATTERNS[key] = pattern
-    found = {match.group(0).lower()
-             for match in pattern.finditer(_norm_ws_lower(text))}
-    # Lexicon order, not alphabetical: the vocabulary lists the plainest term
-    # first, and that is the one worth naming in the error.
-    return [term.strip().lower() for term in terms
-            if term and term.strip().lower() in found]
 
 
 def _norm_ws_lower(text: str) -> str:
@@ -510,8 +263,8 @@ def build_original_briefs(
 
     # --- CONCEPT (creative slot, high temperature: divergence) ----------
     def _concept_gate(m: ConceptPitches) -> "str | None":
-        if len(m.pitches) != 3:
-            return f"need exactly 3 pitches, got {len(m.pitches)}"
+        if not m.pitches:
+            return "need at least one pitch"
         for i, p in enumerate(m.pitches):
             if not p.logline.strip() or not p.hook.strip():
                 return f"pitch {i}: empty logline/hook"
@@ -520,14 +273,6 @@ def build_original_briefs(
                         f"roles, got {len(p.cast_sketch)}")
             if any(not c.name.strip() for c in p.cast_sketch):
                 return f"pitch {i}: empty cast name"
-            try:
-                scan_forbidden(
-                    " ".join([p.logline, p.hook, p.radio_device] +
-                             [f"{c.name} {c.role}" for c in p.cast_sketch]),
-                    origin=f"concept pitch {i}",
-                )
-            except OriginalRadioError as exc:
-                return str(exc)
         return None
 
     # LLM slot: creative -- divergent concept pitches.
@@ -537,7 +282,7 @@ def build_original_briefs(
             {"role": "user", "content": (
                 f"SPARK ATOMS:\n{atoms_text}\n{hint_text}\n"
                 f"N (dramatic roles per pitch, announcer NOT included): {n}\n"
-                f"Pitch three concepts now."
+                "Pitch episode concepts now."
             )},
         ],
         schema=ConceptPitches,
@@ -553,20 +298,17 @@ def build_original_briefs(
 
     # --- SELECT (creative slot, low temperature: judgment) --------------
     def _select_gate(m: SelectedConcept) -> "str | None":
-        if m.selected_index not in (0, 1, 2):
-            return f"selected_index must be 0..2, got {m.selected_index}"
+        if not (0 <= m.selected_index < len(pitches.pitches)):
+            return (
+                f"selected_index must address one of {len(pitches.pitches)} "
+                f"pitches, got {m.selected_index}"
+            )
         if len(m.cast) != n:
             return f"cast must have exactly {n} entries, got {len(m.cast)}"
         if any(not c.name.strip() for c in m.cast):
             return "empty cast name"
         if not m.pitch.logline.strip():
             return "empty winning logline"
-        if not m.selection_rationale.strip():
-            return "empty selection_rationale"
-        try:
-            scan_forbidden(_concept_corpus(m), origin="selected concept")
-        except OriginalRadioError as exc:
-            return str(exc)
         return None
 
     # LLM slot: creative -- convergent selection.
@@ -574,7 +316,7 @@ def build_original_briefs(
         prompt=[
             {"role": "system", "content": _seam(pack, "original_select_system")},
             {"role": "user", "content": (
-                f"N (dramatic roles): {n}\n\nTHE THREE PITCHES:\n"
+                f"N (dramatic roles): {n}\n\nTHE CANDIDATE PITCHES:\n"
                 + json.dumps(pitches.model_dump(), ensure_ascii=False,
                              indent=2)
                 + "\n\nChoose now."
@@ -594,81 +336,6 @@ def build_original_briefs(
     corpus_norm = _norm_ws_lower(corpus)
 
     # --- BRIEF (technical slot: the compat contract) ---------------------
-    def _brief_gate(m: OriginalBriefsModel) -> "str | None":
-        if len(m.casting_brief.strip()) < 60:
-            return "casting_brief too short (>= 60 chars; QA trap 3)"
-        if len(m.script_brief.strip()) < 60:
-            return "script_brief too short (>= 60 chars; QA trap 3)"
-        if not (2 <= len(m.key_terms) <= 6):
-            return f"key_terms must be 2-6, got {len(m.key_terms)}"
-        for t in m.key_terms:
-            ts = str(t).strip()
-            if not ts:
-                return "empty key_term"
-            if _norm_ws_lower(ts) not in corpus_norm:
-                return (f"key_term {ts!r} not grounded in the concept "
-                        f"text (anchor A2)")
-        if m.news_close_brief.strip():
-            return ("news_close_brief must stay EMPTY for this lane "
-                    "(V4 lock 1: the close is the announcer outro)")
-        try:
-            scan_forbidden(
-                m.casting_brief + " " + m.script_brief +
-                " " + " ".join(m.key_terms),
-                origin="original briefs",
-            )
-        except OriginalRadioError as exc:
-            return str(exc)
-        return None
-
-    def _prune_ungrounded_key_terms(
-        failed_output: str, error: BaseException,
-    ) -> "OriginalBriefsModel | None":
-        """Deterministic A2 repair: drop ungrounded key_terms, keep the rest.
-
-        Mirrors the cast-membership Levenshtein split (see the repair-
-        prompts module docstring): the dispatcher consults this BEFORE
-        building the LLM repair turn. Pruning to the grounded subset is
-        strictly stronger anti-drift than a paraphrase re-roll -- every
-        surviving term is a verbatim concept phrase -- and it is pure
-        text filtering: deterministic, seed-independent, no LLM spend.
-        Declines (returns None -> typed LLM repair) unless the pruned
-        instance passes the FULL brief gate, so a briefs set with any
-        other latent problem keeps its LLM repair rung instead of
-        burning the ladder's last attempt on a half-fix. Live-smoke
-        hardening 2026-07-09: the technical model paraphrased one
-        key_term twice and exhausted the ladder.
-        """
-        try:
-            data = parse_first_json_object(failed_output or "")
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(data, dict):
-            return None
-        raw_terms = data.get("key_terms")
-        if not isinstance(raw_terms, list):
-            return None
-        kept = [
-            str(t) for t in raw_terms
-            if str(t).strip() and _norm_ws_lower(str(t)) in corpus_norm
-        ]
-        if len(kept) < 2:
-            return None
-        try:
-            candidate = OriginalBriefsModel.model_validate(
-                {**data, "key_terms": kept}
-            )
-        except ValidationError:
-            return None
-        if _brief_gate(candidate) is not None:
-            return None
-        log.info(
-            "[OTR_OriginalRadio] anchor A2 deterministic repair: pruned "
-            "%d ungrounded key_term(s), kept %d verbatim term(s)",
-            len(raw_terms) - len(kept), len(kept),
-        )
-        return candidate
-
     # LLM slot: technical -- structured compat briefs.
     briefs = structured_call(
         prompt=[
@@ -683,16 +350,26 @@ def build_original_briefs(
         slot_fn=technical_fn,
         base_temperature=0.3,
         structural_retry_temperature=0.2,
-        repair_prompt_factory=make_dispatching_repair_factory(
-            deterministic_repair=_prune_ungrounded_key_terms,
-        ),
-        post_validator=_brief_gate,
+        repair_prompt_factory=make_dispatching_repair_factory(),
         max_new_tokens=900,
         max_attempts=3,
         helper_name="original_brief",
     )
+    raw_terms = list(briefs.key_terms)
+    grounded_terms = [
+        str(term).strip() for term in raw_terms
+        if str(term).strip()
+        and _norm_ws_lower(str(term)) in corpus_norm
+    ]
+    if grounded_terms != raw_terms:
+        log.warning(
+            "[OTR_OriginalRadio] dropped %d unsupported/empty key_term(s); "
+            "source-proof terms are optional and never have a count floor",
+            len(raw_terms) - len(grounded_terms),
+        )
     briefs = briefs.model_copy(update={
-        "news_close_brief": "",   # belt + suspenders: the lane hardwire
+        "key_terms": grounded_terms,
+        "news_close_brief": "",   # lane hardwire; no retry for model prose
         "attempts": 3,            # ladder-bounded; exact count is internal
     })
 
@@ -713,165 +390,8 @@ def build_original_briefs(
     return briefs, delta
 
 
-# ---------------------------------------------------------------------------
-# Whole-script QA (the writer owns repair + fail-loud)
-# ---------------------------------------------------------------------------
-
-def script_excerpt(led: Any, cap: int = 6000) -> str:
-    """Public alias of the QA excerpt builder -- the writer's QA gate
-    reuses the exact text the judge saw for evidence corroboration."""
-    return _script_excerpt(led, cap=cap)
-
-
-def _script_excerpt(led: Any, cap: int = 6000) -> str:
-    data = getattr(led, "data", led)
-    rows = []
-    used = 0
-    for ln in (data.get("lines") or []):
-        if not isinstance(ln, dict):
-            continue
-        role = str(ln.get("speaker_role") or "").lower()
-        text = str(ln.get("text") or "").strip()
-        if role not in ("character", "announcer") or not text:
-            continue
-        speaker = "ANNOUNCER" if role == "announcer" else str(
-            ln.get("char_id") or "CHARACTER").upper()
-        rows.append(f"{speaker}: {text}")
-        used += len(text)
-        if used >= cap:
-            break
-    return "\n".join(rows)
-
-
-def run_original_qa(
-    led: Any,
-    *,
-    technical_fn: Callable[..., str],
-    technical_model_id: str = "",
-    concept_text: str = "",
-    pack: Any,
-) -> QAFindings:
-    """Judge the finished script against the enumerated hard-rule classes.
-
-    Returns the (possibly empty) findings; unknown classes are discarded by
-    the post-validator. The WRITER maps findings through
-    REPAIR_ACTION_BY_CLASS, dynamically repairs subjective outro findings, and
-    raises OriginalQAError only for corroborated deterministic ship-stops."""
-    script = _script_excerpt(led)
-    if not script.strip():
-        raise OriginalQAError("original QA: empty script excerpt")
-
-    def _qa_gate(m: QAFindings) -> "str | None":
-        # A finding whose class we do not recognise -- a retired class, or one the
-        # judge invented -- is DROPPED, not fatal.
-        # Rejecting the whole artifact over it sends the pass round the retry
-        # ladder and then kills the episode: the judge naming a class we no longer
-        # act on is not a defect in the SCRIPT, and it must never cost a broadcast.
-        kept = []
-        for f in m.findings:
-            if f.finding_class not in QA_CLASSES:
-                log.warning(
-                    "[original_qa] discarding finding of unknown/retired class %r "
-                    "(detail=%r) -- it is not a class this pipeline acts on",
-                    f.finding_class, f.detail,
-                )
-                continue
-            if not f.detail.strip():
-                return f"finding {f.finding_class!r}: empty detail"
-            kept.append(f)
-        m.findings = kept
-        return None
-
-    # LLM slot: technical -- structured audit, not narrative.
-    return structured_call(
-        prompt=[
-            {"role": "system", "content": _seam(pack, "original_qa_system")},
-            {"role": "user", "content": (
-                f"THE CONCEPT:\n{concept_text or '(none provided)'}\n\n"
-                f"THE FULL SPOKEN SCRIPT:\n{script}\n\nAudit now."
-            )},
-        ],
-        schema=QAFindings,
-        slot_fn=technical_fn,
-        base_temperature=0.2,
-        structural_retry_temperature=0.1,
-        repair_prompt_factory=make_dispatching_repair_factory(),
-        post_validator=_qa_gate,
-        max_new_tokens=800,
-        max_attempts=3,
-        helper_name="original_qa",
-    )
-
-
-# ---------------------------------------------------------------------------
-# Hard-finding evidence triage (live-smoke hardening 2026-07-10)
-# ---------------------------------------------------------------------------
-#
-# The first live original_radio smoke died on a single uncorroborated
-# 12B judgment: THREE findings in one pass ('weapons_smoking' for a
-# lever-and-sirens threat, 'news_source_framing' for a dramatic teaser,
-# 'epilogue_missing' with the ironic outro plainly present). The
-# episode-killing decision now demands EVIDENCE: a lexicon hit
-# (deterministic, data above) or a verbatim script quote from ONE
-# bounded confirm re-judge. Unproven findings are discarded LOUDLY
-# (caller logs + stamps meta) -- never silently. Confirmed findings
-# kill exactly as before: a dead episode is fine, a shipped bad one is
-# not. Epilogue-class repair mechanics are untouched (r4 P3/P4).
-
-
-def corroborate_hard_finding(finding: QAFinding, script: str) -> "str | None":
-    """Deterministic evidence check for an episode-killing finding.
-
-    The SCRIPT is the only evidence. The finding's own prose is not: a judge that
-    writes "the scene mentions a gun" would otherwise corroborate itself, and
-    that is exactly what a closed vocabulary is supposed to prevent. Word
-    boundaries, so "gun" never fires on "begun". Pure text; no LLM.
-    """
-    terms = HARD_CLASS_EVIDENCE.get(finding.finding_class) or ()
-    hits = lexicon_hits(script, terms)
-    return hits[0] if hits else None
-
-
-def triage_hard_findings(
-    findings: "Sequence[QAFinding]",
-    *,
-    script: str,
-    technical_fn: Callable[..., str],
-) -> "tuple[list[tuple[QAFinding, str]], list[QAFinding]]":
-    """Evidence triage for episode-killing findings.
-
-    EVERY class corroborates against a LEXICON. A weapon, a tobacco act, news
-    framing, machine attribution, an anachronism -- radio is pure dialogue, so
-    each must be SAID in words to exist on air, and the words are enumerable.
-    A flag with no lexicon hit is judge noise: it is discarded (the caller logs
-    it loudly and stamps meta for the operator eyeball).
-
-    Nothing kills an episode on an open-vocabulary judgement. The confirm-quote
-    ladder was ripped with the brand/franchise class (operator 2026-07-11): a quote
-    proves the LINE EXISTS, never that it belongs to the class, and it was the
-    only path by which an unenumerable hunch could take a broadcast off the air.
-
-    Returns (kills, discarded); each kill pairs the finding with a human-readable
-    evidence string for the OriginalQAError / meta stamp.
-    """
-    kills: "list[tuple[QAFinding, str]]" = []
-    discarded: "list[QAFinding]" = []
-    for f in findings:
-        term = corroborate_hard_finding(f, script)
-        if term is not None:
-            kills.append((f, f"lexicon evidence {term!r}"))
-        else:
-            discarded.append(f)
-    return kills, discarded
-
-
 __all__ = [
     "OriginalRadioError", "OriginalDeckError", "OriginalBriefsError",
-    "OriginalQAError", "SparkDraw", "load_spark_deck", "draw_spark_atoms",
-    "OriginalBriefsModel", "QAFindings", "QAFinding", "QA_CLASSES",
-    "REPAIR_ACTION_BY_CLASS", "build_original_briefs", "run_original_qa",
-    "scan_forbidden", "DECK_AXES", "FORBIDDEN_TERMS", "ANACHRONISM_TERMS",
-    "HARD_CLASS_EVIDENCE", "KILL_POLICY_BY_CLASS",
-    "corroborate_hard_finding",
-    "triage_hard_findings", "script_excerpt",
+    "SparkDraw", "load_spark_deck", "draw_spark_atoms",
+    "OriginalBriefsModel", "build_original_briefs", "DECK_AXES",
 ]

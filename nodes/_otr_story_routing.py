@@ -45,9 +45,9 @@ _PACK_SIDECAR_FILENAMES_BY_BANK = {
     # deck is entropy data for the concept pass, not a story pack --
     # _otr_original_radio validates it with its own schema at load.
     "original": frozenset({"spark_deck.json"}),
-    # scifi_news_pro (renamed from scifi_fable2 2026-07-19; S0 architecture doc
-    # section 11): the frame-card + stance deck is entropy data for the P1 pitch
-    # pass, not a story pack -- _otr_scifi_fable2 validates it at load (S1b).
+    # scifi_news_pro: the frame-card + stance deck is entropy data for the P1
+    # pitch pass, not a story pack -- its dedicated internal runner validates
+    # it at load.
     "scifi_news_pro": frozenset({"frame_deck.json"}),
 }
 
@@ -216,12 +216,8 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
         raise RegistryValidationError(
             f"{origin}: defaults must be an object of scalar values"
         )
-    # v4 campaign (2026-07-17): three VALIDATED scalar bank-defaults that
-    # replace the former hardcoded exact-id sets (visual-style pool / science
-    # floor / adaptation-cast). They live inside `defaults` (already scalar-
-    # checked above) but carry stricter contracts so a bad value fails loud at
-    # load -- the mechanism that lets a fully-independent _v4 bank re-own each
-    # behaviour without a family base-map.
+    # Validated scalar bank defaults. They live inside `defaults` (already
+    # scalar-checked above) and carry stricter contracts for structural routing.
     _spc = defaults.get("style_pool_class")
     if _spc is not None and _spc not in ("media", "adaptation", "generic"):
         raise RegistryValidationError(
@@ -229,11 +225,7 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
             f"'media'|'adaptation'|'generic', got {_spc!r}"
         )
     for _bkey in (
-        "require_science_floor",
         "propagate_adaptation_cast",
-        "genre_guard_spoken",  # v4 P1(iii): opt-in bank-aware spoken-text genre gate
-        "require_outro_cast_complete",  # v4 P1(v): opt-in outro cast-completeness gate
-        "placeholder_guard",  # v4 P1(vii): opt-in literal-placeholder-token gate
         "provenance_normalize",  # v4 P1(viii): opt-in source-provenance normalizer
         "scene_coherence_check",  # v4 P1(vi): opt-in header<->scene structural gate
     ):

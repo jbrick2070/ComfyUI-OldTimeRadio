@@ -410,24 +410,27 @@ class TestSceneStillObjects:
         assert not [t for t in targets if t["kind"] == "scene_open"]
         assert not warns
 
-    def test_guards_branch_by_kind(self):
-        """Scene stills SKIP the person guard + gear scrub (they are radio
-        sets, not people) and carry the no-text clause; portraits keep
-        their guards. The derivation paths split BEFORE the guards."""
+    def test_scene_and_portrait_prompts_preserve_authored_world_terms(self):
         from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{"char_id": "c01", "name": "HAYES",
-                 "portrait_prompt": "a stocky engineer near a radio console"}]
-        payload, warns = mbp.derive_image_prompts(
-            cast, _meta_ok(), llm_fn=None, lines=_lines_timed())
-        objs = mbp.objects_by_id(payload)
-        opn = objs["still_b000_music_open"]
-        assert "radio" in opn["prompt"].lower()          # gear NOT scrubbed
-        assert opn["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
-        port = objs["c01"]
-        assert port["kind"] == "portrait"
-        assert "radio" not in port["prompt"].lower()     # gear scrubbed
-        assert not port["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
-        assert not any("still_b000" in w for w in warns)
+        cast = [{
+            "char_id": "c01",
+            "name": "HAYES",
+            "portrait_prompt": "a stocky engineer near a radio console",
+        }]
+
+        payload, warnings = mbp.derive_image_prompts(
+            cast, _meta_ok(), llm_fn=None, lines=_lines_timed(),
+        )
+
+        objects = mbp.objects_by_id(payload)
+        opening = objects["still_b000_music_open"]
+        assert "radio" in opening["prompt"].lower()
+        assert opening["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
+        portrait = objects["c01"]
+        assert portrait["kind"] == "portrait"
+        assert "radio console" in portrait["prompt"].lower()
+        assert not portrait["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
+        assert not any("still_b000" in warning for warning in warnings)
 
     def test_scene_dims_landscape_div32(self, monkeypatch):
         from nodes import otr_meta_brief_image_prompt as mbp
@@ -525,24 +528,32 @@ class TestSceneStillObjects:
         assert s2["prompt"].startswith("a stocky foreman")
         assert helpers.RADIO_BROADCAST_TAIL not in s2["prompt"]
 
-    def test_character_scene_still_llm_failure_raises(self):
-        """NO-FALLBACK rip (2026-07-03): when a writer LLM is ATTEMPTED for a
-        spoken beat and returns nothing usable, the char-scene path FAILS LOUD --
-        no silent swap to the deterministic scene_character composer. (llm_fn=None
-        stays the legit template lane, covered above.)"""
+    def test_character_scene_still_llm_failure_uses_same_story_template(self):
         from nodes import otr_meta_brief_image_prompt as mbp
         cast = [{"char_id": "c01", "appearance": "a stocky foreman"}]
-        lines = [{"line_id": "b002", "speaker_role": "character", "char_id": "c01",
-                  "text": "The reactor is failing!", "start_s": 1.0, "dur_s": 2.0}]
-        with pytest.raises(RuntimeError, match="no-fallback rip"):
-            mbp.derive_image_prompts(
-                cast, _meta_ok(), llm_fn=lambda _p: "", lines=lines)
+        lines = [{
+            "line_id": "b002",
+            "speaker_role": "character",
+            "char_id": "c01",
+            "text": "The reactor is failing!",
+            "start_s": 1.0,
+            "dur_s": 2.0,
+        }]
+
+        payload, warnings = mbp.derive_image_prompts(
+            cast, _meta_ok(), llm_fn=lambda _prompt: "", lines=lines,
+        )
+
+        scene = mbp.objects_by_id(payload)["still_b002"]
+        assert scene["source"] == "char_scene_template_after_llm_miss"
+        assert scene["prompt"].startswith("a stocky foreman")
+        assert any("deterministic same-story composition" in row for row in warnings)
 
     def test_portrait_carries_cinematic_grade_bug411(self):
         """BUG-411 consistency (operator 2026-06-14): portraits now carry the
         same cinematic GRADE tail as the scene stills, so a still_pan beat in
         place of HuMo shows the 6/5 graded look. Radio tail stays OFF portraits
-        (a person is not a radio set); the gear scrub still removes radio words."""
+        because a person is not a radio set."""
         from nodes import otr_meta_brief_image_prompt as mbp
         cast = [{"char_id": "c01",
                  "portrait_prompt": "a weathered engineer, kind eyes"}]
@@ -719,8 +730,8 @@ class TestDispatcherStillSpine:
             assert row["beat_id"] == "b000_music_open"
             assert "otr/episodes/ep_scene/stills/" in \
                 row["path"].replace("\\", "/")
-            import os, json as _json
             assert led["images"]["required_scene_targets"][0]["path"] == row["path"]
+            import os, json as _json
             assert os.path.exists(row["path"])
             man = _json.loads(open(
                 os.path.join(os.path.dirname(row["path"]),

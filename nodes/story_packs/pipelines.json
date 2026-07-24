@@ -25,18 +25,6 @@
           "description": "Macro/phase/beat outline passes."
         },
         {
-          "pass_id": "pitch_room",
-          "slot": "creative",
-          "seam_refs": [],
-          "description": "Divergent pitch generation (prompt not pack-sourced yet)."
-        },
-        {
-          "pass_id": "story_select",
-          "slot": "technical",
-          "seam_refs": [],
-          "description": "Candidate grading/selection (prompt not pack-sourced yet)."
-        },
-        {
           "pass_id": "dramatic_state",
           "slot": "creative",
           "seam_refs": [],
@@ -108,8 +96,7 @@
       "declared_seams": [
         "original_concept_system",
         "original_select_system",
-        "original_brief_system",
-        "original_qa_system"
+        "original_brief_system"
       ],
       "passes": [
         {
@@ -135,14 +122,6 @@
             "original_brief_system"
           ],
           "description": "Concept -> interpreter-result compat briefs; news_close_brief hardwired empty (the close is the announcer outro epilogue)."
-        },
-        {
-          "pass_id": "original_qa",
-          "slot": "technical",
-          "seam_refs": [
-            "original_qa_system"
-          ],
-          "description": "Post-composition whole-script audit; subjective outro findings drive dynamic cross-slot repair/rejudge cycles, while corroborated deterministic violations fail loud."
         }
       ],
       "notes": [
@@ -158,12 +137,9 @@
       "declared_seams": [
         "fable2_dossier_system",
         "fable2_pitch_system",
-        "fable2_select_system",
         "fable2_treatment_system",
         "fable2_news_read_system",
         "fable2_script_system",
-        "fable2_critic_system",
-        "fable2_revision_system",
         "fable2_casting_system"
       ],
       "passes": [
@@ -176,20 +152,12 @@
           "description": "P0: python-capped source digest -> DossierArtifact (facts, allowed numbers, entities, dramatizable vectors)."
         },
         {
-          "pass_id": "pitch_room",
+          "pass_id": "pitch",
           "slot": "creative",
           "seam_refs": [
             "fable2_pitch_system"
           ],
-          "description": "P1 CREATIVE 1: dossier + dealt frame cards + stance -> PitchSlate (3 pitches full mode, 1 in low-budget one-pitch mode)."
-        },
-        {
-          "pass_id": "pitch_select",
-          "slot": "technical",
-          "seam_refs": [
-            "fable2_select_system"
-          ],
-          "description": "P2a technical-judge: dossier + slate + stance -> PitchSelect (winner + rationale; skipped in one-pitch mode)."
+          "description": "P1 creative: dossier + one dealt frame card + stance -> one pitch object. This is the pitch authority."
         },
         {
           "pass_id": "treatment",
@@ -197,7 +165,7 @@
           "seam_refs": [
             "fable2_treatment_system"
           ],
-          "description": "P2b creative: dossier + winning pitch + stance + N_MAX -> Treatment (cast shapes w/ registers, priced ending, news thread). Cast names are born here; the factual close moved to news_read (S1b read-split)."
+          "description": "P2 creative: dossier + sole pitch + stance + N_MAX -> Treatment (cast shapes, priced ending, news thread). Cast names are born here."
         },
         {
           "pass_id": "news_read",
@@ -205,7 +173,7 @@
           "seam_refs": [
             "fable2_news_read_system"
           ],
-          "description": "P2c technical (S1b read-split, kibitz r2 Q1): dossier + provenance -> the 1-2 sentence factual close under the anti-invention subset laws; stamped onto treatment.news_close_read by the runner."
+          "description": "P2 technical: dossier + provenance -> the factual close under source-grounding laws; stamped onto treatment.news_close_read."
         },
         {
           "pass_id": "script",
@@ -213,23 +181,19 @@
           "seam_refs": [
             "fable2_script_system"
           ],
-          "description": "P3 CREATIVE 2: treatment + digest + envelope -> COMPLETE play in strict markup; markup ladder + budget gate + truncation retry."
+          "description": "P3 creative: treatment + digest -> the complete play in strict markup. Only malformed or truncated markup opens a bounded retry; the first clean parse wins."
         },
         {
-          "pass_id": "critic",
+          "pass_id": "same_story_safety_cleanup",
           "slot": "technical",
-          "seam_refs": [
-            "fable2_critic_system"
-          ],
-          "description": "P4 technical-judge: draft + treatment -> CriticNotes (never replacement dialogue; skipped in low-budget mode)."
+          "seam_refs": [],
+          "description": "Bounded exact-line cleanup of the same P3 artifact for the narrow terminal prose safety policy; IDs, speakers, ordering, source facts, and topology stay fixed."
         },
         {
-          "pass_id": "revision",
-          "slot": "creative",
-          "seam_refs": [
-            "fable2_revision_system"
-          ],
-          "description": "P5 CREATIVE 3: draft + notes + treatment -> COMPLETE play rewritten with verbatim-preserve law; keep-better-draft defect judge (skipped in low-budget mode)."
+          "pass_id": "final_draft_proof",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "Seals normalized P3 text, parse proof, constituent hashes, and source-grounded factual-read evidence after cleanup."
         },
         {
           "pass_id": "casting_voices",
@@ -237,25 +201,19 @@
           "seam_refs": [
             "fable2_casting_system"
           ],
-          "description": "P6 technical-creative: winning parsed script + cast shapes + dealt voice menu -> CastingVoices (voices/portraits only; register authority stays with the treatment)."
+          "description": "Technical casting: the accepted parsed script + cast shapes + dealt voice menu -> CastingVoices. Story text is not rewritten."
         },
         {
           "pass_id": "assemble",
           "slot": "technical",
           "seam_refs": [],
-          "description": "P7: pure Python assembly, no LLM -- slot is registry metadata. The selected sealed FinalDraft + Treatment -> ledger rows with per-constituent verbatim proof gates; incremental led.save() per scene."
-        },
-        {
-          "pass_id": "safety_scan",
-          "slot": "technical",
-          "seam_refs": [],
-          "description": "P8: pure Python -- slot is registry metadata. Word-boundary scan of the shared weapons/tobacco lexicon over the spoken drama. No LLM audit: a model opinion may not end an episode, and the lexicon was always the only kill authority anyway."
+          "description": "Pure Python assembly of the sealed FinalDraft + Treatment into proof-backed ledger rows, followed by non-strict actual-word telemetry and authorship/delivery seals."
         }
       ],
       "notes": [
         "Visible experiment; failure NEVER routes to legacy_many_pass.",
         "Consumes the bank fetcher payload via the writer's shared fetch lane; interpreter intentionally empty -- the treatment IS the interpretation.",
-        "executable:true = the S2 runner exists: nodes/_otr_scifi_fable2.py via the writer's _RUNNER_BY_PIPELINE dispatch. Below 120 words it runs compact one-pitch/one-draft mode with explicit P2a/P4/P5 skips; 120-900 runs the real three-pitch selection, critic, revision, and keep-better path.",
+        "executable:true = nodes/_otr_scifi_fable2.py via the writer's _RUNNER_BY_PIPELINE dispatch. Every requested duration runs the same fixed one-pitch, one-P3-artifact topology.",
         "Python judges; the LLM writes: every spoken ledger row must be traceable to a named LLM artifact (proof gate)."
       ]
     },
@@ -333,18 +291,6 @@
           "description": "Macro/phase/beat outline passes."
         },
         {
-          "pass_id": "pitch_room",
-          "slot": "creative",
-          "seam_refs": [],
-          "description": "Divergent pitch generation (prompt not pack-sourced yet)."
-        },
-        {
-          "pass_id": "story_select",
-          "slot": "technical",
-          "seam_refs": [],
-          "description": "Candidate grading/selection (prompt not pack-sourced yet)."
-        },
-        {
           "pass_id": "dramatic_state",
           "slot": "creative",
           "seam_refs": [],
@@ -418,13 +364,8 @@
         "codex_question_system",
         "codex_pressure_cast_system",
         "codex_radio_score_system",
-        "codex_radio_score_text_patch",
         "codex_coda_contract_system",
-        "codex_play_system",
-        "codex_listening_room_system",
-        "codex_retake_system",
-        "codex_final_audit_system",
-        "codex_structured_repair_system"
+        "codex_play_system"
       ],
       "passes": [
         {
@@ -461,92 +402,38 @@
           "description": "Builds scenes, shots, beats, music cues, fact placements, and advisory beat-length centers."
         },
         {
-          "pass_id": "P3_authored_text_patch",
-          "slot": "creative",
-          "seam_refs": [
-            "codex_radio_score_text_patch"
-          ],
-          "description": "Conditional P3/P3-rewrite text shortening repair over an explicitly proven transport. It returns a bounded replacement patch, never a complete score, and reuses the originating creative slot."
-        },
-        {
-          "pass_id": "P4_structure_review",
-          "slot": "technical",
-          "seam_refs": [
-            "codex_radio_score_system",
-            "codex_coda_contract_system"
-          ],
-          "description": "Reviews P3; a rewrite verdict loops once to P3 and a second rewrite verdict fails loud."
-        },
-        {
           "pass_id": "P5_first_play",
           "slot": "creative",
           "seam_refs": [
             "codex_play_system",
             "codex_coda_contract_system"
           ],
-          "description": "Writes the compact closed {line_id,text} spoken draft. Python compiles score-owned ScriptArtifact metadata, validates the complete artifact, and runs at most one fresh technical-slot ladder if the creative ladder exhausts."
+          "description": "Writes the sole compact closed {line_id,text} spoken artifact. The creative structured ladder repairs only malformed schema or closed graph/roster IDs."
         },
         {
-          "pass_id": "P6_listening_room",
-          "slot": "technical",
-          "seam_refs": [
-            "codex_listening_room_system"
-          ],
-          "description": "Judges the current whole script in a fresh context. Concrete issues trigger P7; an issue-free review accepts the current script. P6 repeats after each retake until clean or the finite quality-floor budget."
-        },
-        {
-          "pass_id": "P7_full_retake",
-          "slot": "creative",
-          "seam_refs": [
-            "codex_retake_system",
-            "codex_coda_contract_system"
-          ],
-          "description": "Writes a bounded line-text patch from the current script and latest P6 review, merges only target line text, and returns every accepted patch to a fresh P6 judgment."
-        },
-        {
-          "pass_id": "P8_final_audit",
-          "slot": "technical",
-          "seam_refs": [
-            "codex_final_audit_system",
-            "codex_coda_contract_system"
-          ],
-          "description": "Audits the current full script, source mappings, and ledger-ready role references. A rewrite verdict feeds P9; a pass accepts the script. P8 repeats after every P9 until clean or the finite quality-floor budget."
-        },
-        {
-          "pass_id": "P9_closing_rewrite",
-          "slot": "creative",
-          "seam_refs": [
-            "codex_retake_system",
-            "codex_coda_contract_system"
-          ],
-          "description": "Writes a bounded line-text patch from the current script and latest P8 findings. Every accepted patch returns to a fresh P8 audit; quality-budget exhaustion keeps the best structurally valid script."
-        },
-        {
-          "pass_id": "P10_structured_repair",
-          "slot": "technical",
-          "seam_refs": [
-            "codex_structured_repair_system"
-          ],
-          "description": "Metadata-only repair seam: it supplies messages but makes no standalone call; shared repair reuses the originating pass slot and never changes model selection."
-        },
-        {
-          "pass_id": "P11_pre_tail_assembly",
+          "pass_id": "same_story_safety_cleanup",
           "slot": "technical",
           "seam_refs": [],
-          "description": "Validates and assembles the complete canonical ledger, then requires a warning-free Phase 0 report."
+          "description": "Bounded exact-line cleanup of the same P5 artifact for the narrow terminal prose safety policy; graph, IDs, speakers, ordering, facts, and topology stay fixed."
         },
         {
-          "pass_id": "P12_post_tail_freeze",
+          "pass_id": "assembly",
           "slot": "technical",
           "seam_refs": [],
-          "description": "Runs through the planned tail finalizer: warning-free Phase 10 before save, then a read-only persisted-ledger verification after save."
+          "description": "Validates graph/roster/order and assembles the canonical ledger once, then stamps non-strict actual-word telemetry and authorship."
+        },
+        {
+          "pass_id": "tail_finalizer",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "Runs the existing tail finalizer, freeze, save/reopen audit, media, and publish sequence without length- or quality-based liveness gates."
         }
       ],
       "notes": [
         "A0 is the first artifact and P0 is the first model call.",
-        "P3 to P4 to P3 is bounded to one structural rewrite.",
-        "P5 enters dynamic P6/P7 listener-repair cycles, then dynamic P8/P9 final-audit cycles. Every repair is independently rejudged; a clean verdict accepts, while finite budget exhaustion records a quality floor and keeps the best structurally valid script.",
-        "Every model invocation uses only the pass slot. P11 and P12 are deterministic orchestration stages.",
+        "P3 has one structural artifact ladder; the optional text patch touches nonspoken transport fields only.",
+        "P5 is the sole spoken-story authority. Only malformed schema, closed graph/roster IDs, or the narrow terminal safety policy may open bounded same-artifact repair.",
+        "Assembly and tail finalization are deterministic orchestration stages; word count and quality are telemetry only.",
         "Proof-pressure campaign (renamed from scifi_codex_v4 2026-07-19): the delta lives entirely in the scifi_news pack seams; this pipeline reuses the dedicated _run_scifi_codex_lane runner DIRECTLY (no v3 advisory wrapper)."
       ]
     }

@@ -78,22 +78,18 @@ def test_sample_manifest_validates():
     assert scene["recommended_word_budget"] == 300
 
 
-def test_scene_deck_has_source_links_and_safe_prompt_terms():
+def test_scene_deck_has_source_links_and_nonempty_assets():
     manifest = _manifest()
-    forbidden = ("blood", "gun", "guns", "knife", "knives", "smoking", "cigarette")
     play_titles = {scene["play_title"] for scene in manifest["scenes"]}
     assert len(play_titles) >= 8
     for scene in manifest["scenes"]:
         assert scene["source_url"].startswith(
             "https://www.folger.edu/explore/shakespeares-works/")
+        assert scene["synopsis"].strip()
+        assert scene["scene_label"].strip()
         text_path = SAMPLE_MANIFEST.parent / scene["text_path"]
         assert text_path.is_file()
-        hay = " ".join([
-            scene["synopsis"],
-            scene["scene_label"],
-            text_path.read_text(encoding="utf-8"),
-        ]).casefold()
-        assert not any(term in hay for term in forbidden)
+        assert text_path.read_text(encoding="utf-8").strip()
 
 
 def test_manifest_unknown_keys_and_rights_fail_loud():

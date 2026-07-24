@@ -29,52 +29,8 @@ SUPPORTED_MODELS = (DEFAULT_MODEL,)
 FIXED_CLIP_DURATION_S = 30
 SAMPLE_RATE = 44100
 _TIMEOUT_S = 300
-_SAFE_BASE_PROMPT = (
-    "instrumental cinematic radio drama cue, archival documentary tone, "
-    "warm analog strings, soft piano, brushed percussion, wordless music"
-)
-_SAFE_TAIL = "balanced mix, gentle dynamics, family friendly"
-_MOOD_HINTS = (
-    ("mechanical", "soft pulsing analog texture"),
-    ("static", "soft pulsing analog texture"),
-    ("archive", "vintage documentary color"),
-    ("dusty", "vintage documentary color"),
-    ("melanchol", "reflective minor-key warmth"),
-    ("minor", "reflective minor-key warmth"),
-    ("mystery", "curious harmonic motion"),
-    ("myster", "curious harmonic motion"),
-    ("rising", "subtle rising figure"),
-    ("urgent", "steady forward pulse"),
-    ("build", "slow atmospheric build"),
-    ("intro", "slow atmospheric build"),
-    ("closing", "gentle closing cadence"),
-    ("outro", "gentle closing cadence"),
-    ("interstitial", "short textural transition"),
-    ("transition", "short textural transition"),
-)
-_POLICY_RISK_TERMS = (
-    "blood",
-    "bloody",
-    "gun",
-    "guns",
-    "knife",
-    "knives",
-    "smoking",
-    "cigarette",
-    "tobacco",
-    "violence",
-    "violent",
-    "danger",
-    "conflict",
-    "unsettling",
-    "claustrophobic",
-    "dissonant",
-    "horror",
-)
-
-
 class GoogleLyriaError(GoogleAPIError):
-    """Raised for sanitized Google Lyria invoke/decode failures."""
+    """Raised for Google Lyria invoke/decode failures."""
 
 
 def _selected_model() -> str:
@@ -105,34 +61,18 @@ def _cue_duration_s(value) -> int:
 def _interaction_payload(model: str, prompt: str) -> dict:
     return {
         "model": model,
-        "input": _provider_safe_prompt(prompt),
+        "input": _provider_prompt(prompt),
     }
 
 
-def _provider_safe_prompt(prompt: str) -> str:
-    """Map OTR's story-rich cue prompt to Lyria-safe instrumental language.
+def _provider_prompt(prompt: str) -> str:
+    """Preserve the authored instrumental cue, normalizing whitespace only.
 
-    Lyria is stricter than local music engines about narrative-danger words.
-    The local composer can still express story intent, but the direct provider
-    request must stay music-only so a cue does not fail before the episode can
-    render. This is not a substitute engine or fallback; it only normalizes the
-    text sent to the selected Google model.
+    Story vocabulary is not a provider-policy classifier. Upstream authoring
+    and the shared prose safety boundary own content decisions; this adapter
+    sends the accepted music direction without Python word filtering.
     """
-    raw = str(prompt or "")
-    folded = raw.lower()
-    hints: list[str] = []
-    seen: set[str] = set()
-    for needle, replacement in _MOOD_HINTS:
-        if needle in folded and replacement not in seen:
-            hints.append(replacement)
-            seen.add(replacement)
-    if not hints:
-        hints.append("atmospheric, restrained, warm")
-
-    safe = ", ".join([_SAFE_BASE_PROMPT, *hints[:4], _SAFE_TAIL])
-    for term in _POLICY_RISK_TERMS:
-        safe = safe.replace(term, "")
-    return " ".join(safe.split())
+    return " ".join(str(prompt or "").split())
 
 
 def _audio_block(data: str, block: dict) -> dict:

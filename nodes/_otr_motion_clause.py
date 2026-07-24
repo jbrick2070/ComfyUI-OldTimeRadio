@@ -27,19 +27,6 @@ SCHEMA_VERSION = 1
 FLAG_ENV = "OTR_LTX_MOTION_CLAUSE"
 CLAUSE_MAX_CHARS = 70
 
-# Allowed SUBTLE motion phrases (substring match -- the clause must contain >=1).
-ALLOWED_PHRASES = (
-    "talks", "speaks", "gestures", "leans", "nods", "glances", "tilts",
-    "breathes", "shifts", "blinks", "small hand", "looks", "smiles", "listens",
-)
-# BANNED big-action / scene-cut phrases (the clause must contain NONE).
-BANNED_PHRASES = (
-    "stands up", "stands", "walks", "runs", "jumps", "turns around", "enters",
-    "exits", "dramatic", "full-body", "full body", "camera cut", "cut to",
-    "flies", "dances", "spins",
-)
-GENERIC_SUBJECTS = ("a person", "the person", "someone", "a man", "a woman", "a figure")
-
 GENERATED_MODEL_UNSET = "static-role-map"
 
 
@@ -67,23 +54,18 @@ def compute_source_hash(char_id: str, beat_id: str, dialogue: str,
 
 
 def validate_motion_clause(text: str, subject_name: str) -> tuple[bool, str]:
-    """Return ``(ok, reason)``. The clause must be non-empty, within budget, name the
-    subject, contain >=1 allowed phrase, and contain NO banned phrase / generic subject."""
+    """Return ``(ok, reason)`` for the provider-facing clause shape.
+
+    Vocabulary, subject phrasing, and motion quality are authored by the model and
+    never act as Python rejection gates. Only the genuine non-empty/provider-length
+    contract is enforced here. ``subject_name`` remains in the public signature for
+    callers that share the generation interface.
+    """
     t = str(text or "").strip()
     if not t:
         return False, "empty"
     if len(t) > CLAUSE_MAX_CHARS:
         return False, "over_budget"
-    low = t.lower()
-    if any(b in low for b in BANNED_PHRASES):
-        return False, "banned_phrase"
-    if any(g in low for g in GENERIC_SUBJECTS):
-        return False, "generic_subject"
-    subj = _norm(subject_name)
-    if subj and subj.split()[0] not in low:
-        return False, "subject_missing"
-    if not any(a in low for a in ALLOWED_PHRASES):
-        return False, "no_allowed_phrase"
     return True, "ok"
 
 

@@ -520,35 +520,27 @@ def test_passpm_no_llm_is_template_lane():
     assert c["prompt_hash"] == sl._content_hash(c["text_prompt"])
 
 
-def test_story_consistency_gate_templates_or_warn_only_keeps():
-    """A hallucinated (inconsistent/faceless) LLM prompt templates by default;
-    consistency_gate_warn_only=True KEEPS the AI prompt (operator toggle)."""
+def test_authored_visual_prompt_is_preserved_for_both_compatibility_values():
+    """The retained workflow widget is ABI-only and never gates vocabulary."""
     led = _char_ledger()
 
-    def halluc_llm(_prompt):
-        # authors a full prompt that drops BOTH the cast trait and the setting
+    def authored_llm(_prompt):
         return json.dumps([{"beat_id": "b1", "expression": "x",
                             "text_prompt": "bright sunny flower meadow"}])
 
-    # default (warn_only=False): the LLM prompt fails the gate -> template guard
-    creative, warns = sl.derive_creative_directives(
-        _char_beat(), led["meta"], led, llm_fn=halluc_llm)
-    c = creative["b1"]
-    assert c["source"] == "template_after_consistency_miss"
-    assert "bright sunny flower meadow" not in c["text_prompt"]
-    assert "spacer" in c["text_prompt"]
-    assert "station" in c["text_prompt"]
-    assert any("deterministic template collapse guard" in w for w in warns)
-
-    # warn_only=True keeps the AI prompt (source stays "llm"), logs the miss
-    creative, warns = sl.derive_creative_directives(
-        _char_beat(), led["meta"], led, llm_fn=halluc_llm,
-        consistency_gate_warn_only=True,
-    )
-    c = creative["b1"]
-    assert c["source"] == "llm"
-    assert "spacer" in c["text_prompt"]   # via the subject anchor
-    assert any("consistency gate" in w for w in warns)
+    outputs = []
+    for compat_value in (False, True):
+        creative, warns = sl.derive_creative_directives(
+            _char_beat(), led["meta"], led, llm_fn=authored_llm,
+            consistency_gate_warn_only=compat_value,
+        )
+        outputs.append(creative["b1"])
+        assert creative["b1"]["source"] == "llm"
+        assert "bright sunny flower meadow" in creative["b1"]["text_prompt"]
+        assert creative["b1"]["text_prompt"].startswith(
+            "face visible, speaking to camera")
+        assert not warns
+    assert outputs[0] == outputs[1]
 
 
 def test_appearance_lookup_by_char_id():

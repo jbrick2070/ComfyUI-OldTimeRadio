@@ -16,7 +16,6 @@ import pytest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "nodes"))
-
 from nodes._otr_video_engines import eng_ltx_video as _ltx          # noqa: E402
 from nodes._otr_video_engines import render_driver as _rd           # noqa: E402
 from nodes import otr_shot_lock as _sl                               # noqa: E402
@@ -288,11 +287,8 @@ class TestPersonAnchor:
         a = _sl._subject_anchor("x" * 400)
         assert len(a) < 200
 
-    def test_object_only_llm_prompt_templates(self):
-        """The b002 shape -- an LLM prompt describing PROPS without the cast
-        trait -- drops to the deterministic collapse guard at the
-        story-CONSISTENCY gate. The person/face DETECTOR remains removed; this
-        is the text-level cast/setting consistency guard."""
+    def test_object_only_llm_prompt_is_preserved_and_subject_anchored(self):
+        """Authored visual vocabulary is not replaced by Python token overlap."""
         beats = [{"beat_id": "b1", "role": _sl.Role.CHARACTER_VIDEO.value,
                   "char_id": "c02", "text": "It's alive.",
                   "samples": None, "sample_rate": None, "dur_s": 2.0}]
@@ -307,11 +303,12 @@ class TestPersonAnchor:
         creative, warnings = _sl.derive_creative_directives(
             beats, meta, led, llm_fn=llm)
         row = creative["b1"]
-        assert row["source"] == "template_after_consistency_miss"
-        assert "stocky engineer" in row["text_prompt"]
-        assert "foundry" in row["text_prompt"]
-        assert "fingers dancing" not in row["text_prompt"]
-        assert any("consistency gate" in w for w in warnings)
+        assert row["source"] == "llm"
+        assert row["text_prompt"].startswith(
+            "face visible, speaking to camera, a stocky engineer in grey")
+        assert "fingers dancing across the console" in row["text_prompt"]
+        assert "foundry floor" in row["text_prompt"]
+        assert not warnings
 
     def test_person_grounded_llm_prompt_kept_and_anchored(self):
         beats = [{"beat_id": "b1", "role": _sl.Role.CHARACTER_VIDEO.value,
@@ -392,42 +389,18 @@ class TestSelfVocativeBackstop:
 
 
 # --------------------------------------------------------------------------- #
-# Portrait gear scrub (round 5 operator directive: no radio/mic/studio in
-# CHARACTER portrait prompts; the ANNOUNCER keeps radio styling by design)
+# Portrait prompt guidance (wording belongs in the LLM request, not a Python
+# vocabulary classifier)
 # --------------------------------------------------------------------------- #
 
-class TestPortraitGearScrub:
-    def test_scrub_removes_gear_tokens(self):
-        from nodes import otr_meta_brief_image_prompt as mb
-        out = mb._scrub_gear_words(
-            "a stocky engineer holding a microphone, beside a vintage radio "
-            "set, in a recording studio, warm light")
-        low = out.lower()
-        assert "microphone" not in low and "radio" not in low \
-            and "studio" not in low
-        assert "stocky engineer" in out and "warm light" in out
-
-    def test_character_prompt_scrubbed_announcer_exempt(self):
-        from nodes import otr_meta_brief_image_prompt as mb
-        cast = [
-            {"char_id": "c01", "name": "ANNOUNCER",
-             "portrait_prompt": "a radio announcer at a glowing radio set"},
-            {"char_id": "c02", "name": "HAYES VANCE",
-             "portrait_prompt": "a stocky engineer near a radio console"},
-        ]
-        prompts, warnings = mb.derive_image_prompts(cast, {}, llm_fn=None)
-        objs = mb.objects_by_id(prompts)
-        assert "radio" in objs["c01"]["prompt"].lower()      # exempt
-        assert "radio" not in objs["c02"]["prompt"].lower()  # scrubbed
-        assert any("gear tokens scrubbed" in w for w in warnings)
-
+class TestPortraitPromptGuidance:
     def test_style_anchor_positive_only_three_quarter(self):
         from nodes import otr_meta_brief_image_prompt as mb
         low = mb.STYLE_ANCHOR.lower()
         assert "three-quarter" in low
         assert "no microphone" not in low and "not a recording" not in low
 
-    def test_instruction_bans_gear_and_asks_upper_body(self):
+    def test_instruction_guides_world_grounding_and_upper_body(self):
         from nodes import otr_meta_brief_image_prompt as mb
         req = mb._build_char_prompt_request(
             {"char_id": "c02", "portrait_prompt": "an engineer"}, {}, "lab")

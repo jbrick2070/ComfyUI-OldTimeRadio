@@ -52,9 +52,8 @@ from nodes import _otr_story_brief as sb
 def _mk_ledger() -> dict:
     """Construct a minimal valid ledger dict.
 
-    Mirrors `_mk_ledger` in tests/test_story_brief_c5a1.py: a Jones /
-    Smith two-hander so the content validator has real cast-name
-    tokens to check the repaired brief against.
+    Mirrors `_mk_ledger` in tests/test_story_brief_c5a1.py: a small
+    two-hander that exercises the real structured response path.
     """
     lines: list[dict] = [
         {"speaker_role": "scene", "text": "=== SCENE 1 -- INTERIOR -- NIGHT"},
@@ -110,12 +109,11 @@ def _schema_invalid_json() -> str:
     """Valid JSON that FAILS StoryBriefModel schema validation.
 
     The JSON parses cleanly (so Block 2's json parse passes), but
-    `story_brief` is below the model's `min_length=10` floor, so
-    `StoryBriefModel.model_validate` raises `ValidationError` -- which
-    is exactly what drives the entrypoint into the schema-repair arm.
+    the required `story_brief` is empty, so `StoryBriefModel.model_validate`
+    raises `ValidationError` and drives the schema-repair arm.
     """
     return (
-        '{"story_brief": "too dim", '
+        '{"story_brief": "", '
         '"setting_terms": ["room"], '
         '"lighting_terms": ["bulb"], '
         '"atmosphere_terms": ["tense"]}'
@@ -123,13 +121,7 @@ def _schema_invalid_json() -> str:
 
 
 def _valid_brief_json() -> str:
-    """A payload that passes StoryBriefModel schema AND _validate_brief.
-
-    No cast names (Jones / Smith), no dialogue or plot verbs, no quote
-    or markup characters, no period literals, under 300 chars -- so the
-    repaired brief sails through the content gate too and the
-    entrypoint returns a successful delta.
-    """
+    """A payload that satisfies the required-field/type/size schema."""
     return (
         '{"story_brief": "a dim interrogation room under a swinging bare '
         'bulb, rain-streaked window, sweat and smoke", '
@@ -163,7 +155,7 @@ def test_invalid_payload_parses_as_json_but_fails_schema():
         raised = True
     assert raised, (
         "_schema_invalid_json must fail StoryBriefModel validation "
-        "(story_brief is below min_length=10) so it drives the "
+        "(story_brief is empty) so it drives the "
         "schema-repair arm"
     )
 

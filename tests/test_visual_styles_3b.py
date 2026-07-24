@@ -38,7 +38,7 @@ _NON_DEFAULT_IDS = tuple(i for i in _ALL_IDS if i != "sci_fi_radio")
 # Chunk A1 (2026-07-05): the schema is v2 -- the v1 tail keys PLUS the 11
 # look/subject str fields + 4 dict fields (r4 authoritative inventory).
 _V2_KEYS = {"style_id", "label", "positive_tail", "image_grade_tail",
-            "broadcast_tail", "allow_radio_tails", "forbidden_terms",
+            "broadcast_tail", "allow_radio_tails",
             "era_tail", "schema_version",
             "portrait_look", "portrait_look_talking",
             "portrait_instruction_look", "scene_instruction_look",
@@ -91,8 +91,6 @@ class TestRegistry:
     def test_non_default_flags(self, style_id):
         style = vs.resolve_visual_style(style_id)
         assert style.allow_radio_tails is False
-        assert style.forbidden_terms, (
-            f"{style_id} declares its residue bans (inert data in v1)")
 
     def test_archival_kept_its_three_tails(self):
         s = vs.resolve_visual_style("archival_documentary")

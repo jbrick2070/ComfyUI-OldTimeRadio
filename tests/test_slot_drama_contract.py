@@ -3,8 +3,8 @@
 Covers:
   * deterministic derivation correctness (speaker, must_turn,
     state_before/after, concrete-detail rotation);
-  * the per-slot validator catching EACH failure mode;
-  * the episode-level "exactly one costly-choice turn" rule;
+  * per-slot schema and derived-source identity validation;
+  * pivot/detail quality telemetry remaining non-gating;
   * the LLM job-field pass via a FAKE generate_fn (no torch, no model);
   * the regenerate-once-then-deterministic-fallback path.
 
@@ -137,7 +137,7 @@ def test_empty_pool_yields_no_details():
 
 
 # ---------------------------------------------------------------------------
-# Validator -- catches each failure mode
+# Validator -- schema/identity failures and non-gating quality telemetry
 # ---------------------------------------------------------------------------
 
 
@@ -200,29 +200,23 @@ def test_validator_rejects_empty_field():
 
 def test_validator_rejects_detail_not_in_pool():
     ok, reasons = sdc.validate_contract(
-        _good_contract(concrete_detail_required=["a smoking pistol"]),
+        _good_contract(concrete_detail_required=["an invented object"]),
         ACTIVE_PROPS, KEY_TERMS,
     )
     assert not ok
     assert any("concrete_detail_not_in_pool" in r for r in reasons)
 
 
-def test_validator_rejects_turn_without_state_change():
-    ok, reasons = sdc.validate_contract(
-        _good_contract(state_before="same", state_after="same"),
-        ACTIVE_PROPS, KEY_TERMS,
-    )
-    assert not ok
-    assert any("must_turn_but_state_unchanged" in r for r in reasons)
+def test_validator_accepts_turn_without_state_change():
+    contract = _good_contract(state_before="same", state_after="same")
+    ok, reasons = sdc.validate_contract(contract, ACTIVE_PROPS, KEY_TERMS)
+    assert ok, reasons
 
 
-def test_validator_rejects_turn_without_concrete_detail():
-    ok, reasons = sdc.validate_contract(
-        _good_contract(concrete_detail_required=[]),
-        ACTIVE_PROPS, KEY_TERMS,
-    )
-    assert not ok
-    assert any("must_turn_but_no_concrete_detail" in r for r in reasons)
+def test_validator_accepts_turn_without_concrete_detail():
+    contract = _good_contract(concrete_detail_required=[])
+    ok, reasons = sdc.validate_contract(contract, ACTIVE_PROPS, KEY_TERMS)
+    assert ok, reasons
 
 
 def test_validator_allows_non_turn_equal_state():
@@ -239,11 +233,11 @@ def test_validator_allows_non_turn_equal_state():
 
 
 # ---------------------------------------------------------------------------
-# Episode-level rule -- exactly one costly-choice turn
+# Episode-level structural validation; pivot count is telemetry
 # ---------------------------------------------------------------------------
 
 
-def test_episode_requires_exactly_one_turn():
+def test_episode_accepts_structurally_valid_contracts():
     good = [_good_contract(dialogue_slot_id="d004", must_turn=True)]
     good.append(
         _good_contract(
@@ -256,7 +250,7 @@ def test_episode_requires_exactly_one_turn():
     assert ok, reasons
 
 
-def test_episode_rejects_zero_turns():
+def test_episode_accepts_zero_turns():
     contracts = [
         _good_contract(
             dialogue_slot_id="d001", must_turn=False,
@@ -264,18 +258,16 @@ def test_episode_rejects_zero_turns():
         )
     ]
     ok, reasons = sdc.validate_episode_contracts(contracts, ACTIVE_PROPS, KEY_TERMS)
-    assert not ok
-    assert any("no slot carries the costly-choice turn" in r for r in reasons)
+    assert ok, reasons
 
 
-def test_episode_rejects_two_turns():
+def test_episode_accepts_two_turns():
     contracts = [
         _good_contract(dialogue_slot_id="d003", must_turn=True),
         _good_contract(dialogue_slot_id="d004", must_turn=True),
     ]
     ok, reasons = sdc.validate_episode_contracts(contracts, ACTIVE_PROPS, KEY_TERMS)
-    assert not ok
-    assert any("more than one costly-choice turn" in r for r in reasons)
+    assert ok, reasons
 
 
 # ---------------------------------------------------------------------------

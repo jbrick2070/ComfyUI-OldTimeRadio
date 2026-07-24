@@ -7,8 +7,8 @@ Chunk 1 (radio_form_from_meta / build_radio_host_prompt): a DETERMINISTIC brief
 (adult, never a baby; the ONLY on-screen face this feature grants).
 
 Acceptance (Plan F): a non-1940s brief (the automated_space_docking episode)
-(a) carries a radio-form noun, (b) passes _passes_consistency, (c) is NOT
-scrubbed on the announcer-exempt path.
+(a) carries a brief-grounded radio-form noun and (b) is not scrubbed on
+the announcer-exempt path.
 """
 from __future__ import annotations
 
@@ -180,9 +180,8 @@ def test_acceptance_space_docking_host_reads_as_radio_and_grounds():
     p = mbp.build_radio_host_prompt(_SPACE_META, aspect="portrait")
     # (a) carries a radio-form noun (a radio BODY, not a generic human host)
     assert "console" in p and ("radio" in p or "communications" in p)
-    # (b) grounds on the brief (appearance/setting overlap)
-    setting = mbp._read_setting(_SPACE_META)
-    assert mbp._passes_consistency(p, "", setting)
+    # (b) the form is derived from the brief's orbital setting.
+    assert mbp.radio_form_from_meta(_SPACE_META) in p
     # (c) the announcer/radio-host path is gear-scrub EXEMPT -- the form noun
     # survives (scrubbing would strip "radio"/"console"); we assert the token
     # the exempt path preserves is present (never a 1940s studio revert).
@@ -253,7 +252,7 @@ _GOLDEN_CONSOLE_PORTRAIT = (
     "cinematic three-quarter portrait, full head and face clearly visible "
     "with natural headroom above the head (never crop the top of the head), "
     "period-accurate costume and environment, dramatic film lighting, cold "
-    "blue panel glow, cinematic, 35mm film look, subtle film grain, "
+    "blue panel glow, tense, cinematic, 35mm film look, subtle film grain, "
     "volumetric lighting, anamorphic lens, heavy vignette, muted color "
     "grade, sharp focus")
 _GOLDEN_CONSOLE_WIDE = (
@@ -264,7 +263,7 @@ _GOLDEN_CONSOLE_WIDE = (
     "cinematic medium shot, head and shoulders, face clearly visible, "
     "subject centred with natural headroom above the head (never crop the "
     "top of the head), period-accurate costume and environment, dramatic "
-    "film lighting, cold blue panel glow, cinematic, 35mm film look, subtle "
+    "film lighting, cold blue panel glow, tense, cinematic, 35mm film look, subtle "
     "film grain, volumetric lighting, anamorphic lens, heavy vignette, muted "
     "color grade, sharp focus")
 _GOLDEN_BARE_CONSOLE_PORTRAIT = (
@@ -280,7 +279,7 @@ _GOLDEN_BARE_CONSOLE_PORTRAIT = (
     "focus")
 
 
-def test_humo_console_face_prompts_byte_unchanged():
+def test_humo_console_face_prompts_preserve_authored_atmosphere():
     assert mbp.build_radio_host_prompt(
         _SPACE_META, "portrait", "console_face") == _GOLDEN_CONSOLE_PORTRAIT
     assert mbp.build_radio_host_prompt(

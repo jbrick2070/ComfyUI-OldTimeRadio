@@ -16,8 +16,9 @@ Law: JSON owns content/config (banks.json carries the ids); Python owns
 validation/routing/execution (this module carries the callables); NO ROUTING
 fallbacks. Unknown/missing id = hard typed error -- a selected bank without a
 built lane FAILS THE EPISODE LOUD, never a silent slide into the science path.
-The finite quality floor below is not routing: it preserves the selected bank,
-validated payload, source hash, and bank-specific truth/adaptation contract.
+The finite structural fallback below is not routing: it preserves the selected
+bank, validated payload, source hash, and bank-specific truth/adaptation
+contract without inventing semantic key terms.
 
 Import posture: stdlib-only at import time. This module imports NEITHER the
 writer NOR news_interpreter NOR _otr_story_routing at module level (three-edge
@@ -76,14 +77,14 @@ class SourceInterpretError(SourcePayloadError):
     science failure surface stays byte-identical."""
 
 
-_QUALITY_ATTEMPT_RE = re.compile(
+_EXHAUSTION_ATTEMPT_RE = re.compile(
     r"(?:all\s+)?(?P<count>\d+)\s+attempt(?:\(s\)|s)?\s+(?:failed|exhausted)",
     re.IGNORECASE,
 )
 
 
-def quality_interpret_failure_attempts(exc: BaseException) -> int:
-    """Return model calls consumed by a retryable interpreter-quality failure.
+def interpreter_exhaustion_attempts(exc: BaseException) -> int:
+    """Return model calls consumed by a retryable structured interpreter exhaustion.
 
     The source wrappers deliberately translate only their typed interpreter
     exhaustion errors to :class:`SourceInterpretError`.  A few of those typed
@@ -93,7 +94,7 @@ def quality_interpret_failure_attempts(exc: BaseException) -> int:
     may enter the liveness rescue chain; configuration, I/O, backend, and code
     failures keep their existing fail-loud behavior.
 
-    ``0`` therefore means "not a quality exhaustion; do not retry or floor".
+    ``0`` therefore means "not a structured/content exhaustion; do not retry or floor".
     """
     if not isinstance(exc, SourceInterpretError):
         return 0
@@ -106,7 +107,7 @@ def quality_interpret_failure_attempts(exc: BaseException) -> int:
     attempts = getattr(cause, "attempts", None)
     if isinstance(attempts, int) and not isinstance(attempts, bool):
         return max(0, attempts)
-    match = _QUALITY_ATTEMPT_RE.search(reason)
+    match = _EXHAUSTION_ATTEMPT_RE.search(reason)
     return int(match.group("count")) if match else 0
 
 
@@ -296,99 +297,48 @@ def validate_interpreter_result(result, origin: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# bounded source-interpreter quality floor
+# deterministic source-interpreter fallback
 # ---------------------------------------------------------------------------
 
-SOURCE_INTERPRETER_FLOOR_VERSION = "source_interpreter_floor_v1"
-
-_FLOOR_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9'-]{2,}")
-_FLOOR_STOPWORDS = frozenset({
-    "about", "after", "again", "against", "also", "among", "another",
-    "because", "before", "being", "between", "could", "from", "have",
-    "into", "more", "most", "other", "over", "same", "should", "some",
-    "such", "than", "that", "their", "them", "then", "there", "these",
-    "they", "this", "those", "through", "under", "very", "what", "when",
-    "where", "which", "while", "with", "would", "your", "body", "source",
-    "summary", "title", "http", "https", "www",
-})
-_FLOOR_UNSAFE_TERMS = frozenset({
-    "blood", "body count", "corpse", "cursed", "cigarette", "ghost",
-    "gun", "guns", "haunting", "knife", "knives", "murder", "ransom",
-    "serial killer", "smoking", "weapon", "weapons",
-})
+SOURCE_INTERPRETER_FALLBACK_VERSION = "source_interpreter_fallback_v2"
 
 
-def _floor_one_line(value: object, *, max_chars: int) -> str:
-    clean = " ".join(str(value or "").split()).strip()
-    if len(clean) <= max_chars:
-        return clean
-    clipped = clean[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;:-")
-    return clipped or clean[:max_chars]
+def _fallback_one_line(value: object) -> str:
+    """Collapse transport whitespace without truncating authored source text."""
+    return " ".join(str(value or "").split()).strip()
 
 
-def _source_floor_terms(payload: dict) -> list[str]:
-    """Derive 2-5 safe, exact source tokens without asking a model."""
-    ordered_text = (
-        payload["headline"], payload["summary"], payload["full_text"],
-        payload["seed_text"],
-    )
-    terms: list[str] = []
-    seen: set[str] = set()
-
-    def _collect(*, keep_stopwords: bool) -> None:
-        for text in ordered_text:
-            for token in _FLOOR_TOKEN_RE.findall(text):
-                folded = token.casefold()
-                if folded in seen:
-                    continue
-                if not keep_stopwords and folded in _FLOOR_STOPWORDS:
-                    continue
-                if any(bad in folded for bad in _FLOOR_UNSAFE_TERMS):
-                    continue
-                seen.add(folded)
-                terms.append(token[:80])
-                if len(terms) >= 5:
-                    return
-
-    _collect(keep_stopwords=False)
-    if len(terms) < 2:
-        _collect(keep_stopwords=True)
-    if len(terms) < 2:
-        raise SourcePayloadContractError(
-            "source interpreter quality floor could not derive two safe, "
-            "grounded key terms from the validated source payload"
-        )
-    return terms
+def _fallback_error_excerpt(value: object, max_chars: int = 600) -> str:
+    """Bound diagnostic metadata only; this never enters story authorship."""
+    clean = _fallback_one_line(value)
+    return clean if len(clean) <= max_chars else clean[:max_chars]
 
 
-def _source_floor_character_names(source_meta: dict) -> list[str]:
+
+def _source_fallback_character_names(source_meta: dict) -> list[str]:
     raw = source_meta.get("cast_hints") or source_meta.get("character_names")
     if not isinstance(raw, (list, tuple)):
         return []
     out: list[str] = []
     seen: set[str] = set()
     for value in raw:
-        name = _floor_one_line(value, max_chars=64)
+        name = _fallback_one_line(value)
         folded = name.casefold()
-        if (not name or folded in seen
-                or any(bad in folded for bad in _FLOOR_UNSAFE_TERMS)):
+        if not name or folded in seen:
             continue
         seen.add(folded)
         out.append(name)
-        if len(out) >= 6:
-            break
     return out
 
 
 @dataclass
-class SourceInterpreterFloor:
-    """Duck-typed briefs result for finite, truthful quality exhaustion.
+class SourceInterpreterFallback:
+    """Duck-typed briefs result for finite structured-output exhaustion.
 
-    This is not a generic story author.  ``build_source_interpreter_floor``
-    selects a bank-specific brief template and injects only exact safe tokens
-    and cast hints from the already validated payload/sidecar.  It therefore
-    preserves each bank's truth/adaptation rules while giving the shared writer
-    a ledgerable minimum when every model-authored brief was rejected.
+    This is not a generic story author. ``build_source_interpreter_fallback``
+    selects a bank-specific brief template and carries the validated source
+    title/summary plus cast hints forward verbatim. It does not classify words
+    or fabricate a key-term floor.
     """
 
     casting_brief: str
@@ -398,11 +348,11 @@ class SourceInterpreterFloor:
     attempts: int
     source_hash: str
     character_names: list[str]
-    quality_floor_reason: str
+    fallback_reason: str
     model_id: str = "deterministic"
-    prompt_version: str = SOURCE_INTERPRETER_FLOOR_VERSION
-    schema_version: str = SOURCE_INTERPRETER_FLOOR_VERSION
-    quality_floor: bool = True
+    prompt_version: str = SOURCE_INTERPRETER_FALLBACK_VERSION
+    schema_version: str = SOURCE_INTERPRETER_FALLBACK_VERSION
+    deterministic_fallback: bool = True
 
     def model_dump(self) -> dict:
         return {
@@ -413,30 +363,30 @@ class SourceInterpreterFloor:
             "attempts": self.attempts,
             "source_hash": self.source_hash,
             "character_names": list(self.character_names),
-            "quality_floor_reason": self.quality_floor_reason,
+            "fallback_reason": self.fallback_reason,
             "model_id": self.model_id,
             "prompt_version": self.prompt_version,
             "schema_version": self.schema_version,
-            "quality_floor": self.quality_floor,
+            "deterministic_fallback": self.deterministic_fallback,
         }
 
 
-def build_source_interpreter_floor(
+def build_source_interpreter_fallback(
     *, bank, payload: dict, source_meta: dict | None,
     attempts: int, failure_reason: str,
-) -> SourceInterpreterFloor:
+) -> SourceInterpreterFallback:
     """Build a validated, bank-specific minimum brief from source truth.
 
     Only the four registered source-interpreter families are accepted.  Router
     mistakes and malformed source payloads remain hard contract failures.
     """
     clean_payload = validate_source_payload(
-        payload, origin="build_source_interpreter_floor",
+        payload, origin="build_source_interpreter_fallback",
     )
     if (not isinstance(attempts, int) or isinstance(attempts, bool)
             or attempts < 1):
         raise SourcePayloadContractError(
-            "source interpreter quality floor attempts must be a positive int"
+            "source interpreter structural fallback attempts must be a positive int"
         )
     if source_meta is None:
         clean_meta: dict = {}
@@ -444,13 +394,25 @@ def build_source_interpreter_floor(
         clean_meta = dict(source_meta)
     else:
         raise SourcePayloadContractError(
-            "source interpreter quality floor source_meta must be dict or None"
+            "source interpreter structural fallback source_meta must be dict or None"
         )
 
     interpreter_id = str(getattr(bank, "interpreter", "") or "").strip()
-    terms = _source_floor_terms(clean_payload)
-    anchors = ", ".join(terms[:3])
-    names = _source_floor_character_names(clean_meta)
+    headline = _fallback_one_line(clean_payload["headline"])
+    summary = _fallback_one_line(
+        clean_payload["summary"]
+        or clean_payload["full_text"]
+        or clean_payload["seed_text"]
+    )
+    source_context = " ".join(
+        part for part in (
+            f"Source title: {headline}." if headline else "",
+            f"Source summary: {summary}." if summary else "",
+        )
+        if part
+    )
+    headline_suffix = f": {headline}" if headline else ""
+    names = _source_fallback_character_names(clean_meta)
     names_clause = (
         f" Use the source's named characters: {', '.join(names)}."
         if names else " Use only people and roles supported by the source."
@@ -465,12 +427,12 @@ def build_source_interpreter_floor(
             "Create a compact SFW fictional archive drama grounded in the "
             "selected media-history item. Make the conflict about identifying, "
             "restoring, researching, or preserving that item, and resolve with "
-            f"credible preservation progress. Exact source anchors: {anchors}. "
+            f"credible preservation progress. {source_context} "
             "Treat the RSS payload as the only authority for factual claims."
         )
         close = (
             "This fictional archive drama was inspired by the selected media "
-            f"source. Its factual anchors are {anchors}; all added dramatic "
+            f"source{headline_suffix}; all added dramatic "
             "events are fictional."
         )
     elif interpreter_id == "public_domain_interpreter":
@@ -483,11 +445,11 @@ def build_source_interpreter_floor(
             "Create a compact, faithful, SFW radio adaptation of the configured "
             "public-domain unit. Preserve its central dramatic turn and ending; "
             "do not add an unrelated framing story or change the resolution. "
-            f"Exact source anchors: {anchors}."
+            f"{source_context}"
         )
         close = (
             "This broadcast is a dramatization of the configured public-domain "
-            f"source unit, preserving the source anchors {anchors}."
+            f"source unit{headline_suffix}."
         )
     elif interpreter_id == "shakespeare_interpreter":
         casting = (
@@ -499,12 +461,11 @@ def build_source_interpreter_floor(
             "Create a compact, faithful, SFW radio adaptation of the selected "
             "Shakespeare scene. Preserve its characters, dramatic turn, "
             "play-world stakes, and ending without an unrelated modern frame. "
-            f"Exact scene anchors: {anchors}."
+            f"{source_context}"
         )
         close = (
             "This noncommercial broadcast adapts the configured Shakespeare "
-            f"scene under its recorded source and rights terms. Scene anchors: "
-            f"{anchors}."
+            f"scene under its recorded source and rights terms{headline_suffix}."
         )
     elif interpreter_id == "news_interpreter":
         casting = (
@@ -513,16 +474,16 @@ def build_source_interpreter_floor(
         )
         script = (
             "Create a compact SFW dramatization grounded only in the supplied "
-            f"article. Preserve these exact reported anchors: {anchors}. "
+            f"article. {source_context} "
             "Clearly separate fictional dramatic events from reported facts."
         )
         close = (
             "The preceding dramatization was inspired by the supplied report; "
-            f"its exact source anchors are {anchors}."
+            f"the reported source was {headline or 'the selected article'}."
         )
     else:
         raise UnknownInterpreterError(
-            f"source interpreter quality floor has no bank-specific builder "
+            f"source interpreter fallback has no bank-specific builder "
             f"for interpreter {interpreter_id!r}"
         )
 
@@ -530,23 +491,21 @@ def build_source_interpreter_floor(
     for key in sorted(SOURCE_PAYLOAD_KEYS):
         digest.update(clean_payload[key].encode("utf-8", "replace"))
         digest.update(b"\0")
-    floor = SourceInterpreterFloor(
-        casting_brief=_floor_one_line(casting, max_chars=900),
-        script_brief=_floor_one_line(script, max_chars=1200),
-        news_close_brief=_floor_one_line(close, max_chars=500),
-        key_terms=terms,
+    fallback = SourceInterpreterFallback(
+        casting_brief=_fallback_one_line(casting),
+        script_brief=_fallback_one_line(script),
+        news_close_brief=_fallback_one_line(close),
+        key_terms=[],
         attempts=attempts,
         source_hash=digest.hexdigest()[:16],
         character_names=names,
-        quality_floor_reason=_floor_one_line(failure_reason, max_chars=600),
+        fallback_reason=_fallback_error_excerpt(failure_reason),
     )
-    # Exercise the exact writer/freeze contract here, at floor construction,
-    # rather than trusting a later consumer to discover a malformed floor.
     validate_interpreter_result(
-        floor,
-        origin=f"source quality floor ({interpreter_id})",
+        fallback,
+        origin=f"source deterministic fallback ({interpreter_id})",
     )
-    return floor
+    return fallback
 
 
 # ---------------------------------------------------------------------------
@@ -605,24 +564,9 @@ def _fetch_science_rss(*, bank, technical_model: str,
         from . import OTR_LedgerScriptWriter as _writer
     except ImportError:  # pragma: no cover -- flat-import test harnesses
         import OTR_LedgerScriptWriter as _writer  # type: ignore
-    # Sci-fi v4 validates the fetched body itself before any model call. Keep
-    # the legacy science_news forwarding surface byte-compatible, but make all
-    # three v4 lanes ask the shared selector for an eligible article instead of
-    # receiving the richest thin fallback and failing after model setup.
-    # v4 campaign 2026-07-17: the science-floor requirement is a VALIDATED bank
-    # default (`require_science_floor`), read PRE-writer directly off
-    # bank.defaults -- no hardcoded exact-id set, no family base-map, so an
-    # independent _v4 bank opts in by its own row. (Source FEED axis: science_rss
-    # eligibility, distinct from the visual-style pool.)
-    if bool((getattr(bank, "defaults", None) or {}).get("require_science_floor")):
-        payload = _writer._fetch_rss_seed_or_die(
-            technical_model, require_science_floor=True,
-            load_config=load_config, policy=policy,
-        )
-    else:
-        payload = _writer._fetch_rss_seed_or_die(
-            technical_model, load_config=load_config, policy=policy,
-        )
+    payload = _writer._fetch_rss_seed_or_die(
+        technical_model, load_config=load_config, policy=policy,
+    )
     return _rss_source_fetch_result(payload, fetcher_kind="science_rss")
 
 
@@ -856,18 +800,18 @@ def resolve_interpreter(bank):
 __all__ = [
     "FetcherEntry",
     "SOURCE_PAYLOAD_KEYS",
-    "SOURCE_INTERPRETER_FLOOR_VERSION",
+    "SOURCE_INTERPRETER_FALLBACK_VERSION",
     "SourceFetchResult",
     "SourceContractMissingError",
     "SourceInterpretError",
-    "SourceInterpreterFloor",
+    "SourceInterpreterFallback",
     "SourcePayloadContractError",
     "SourcePayloadError",
     "UnknownFetcherError",
     "UnknownInterpreterError",
-    "build_source_interpreter_floor",
+    "build_source_interpreter_fallback",
     "normalize_fetch_result",
-    "quality_interpret_failure_attempts",
+    "interpreter_exhaustion_attempts",
     "registered_fetcher_ids",
     "registered_interpreter_ids",
     "resolve_fetcher",

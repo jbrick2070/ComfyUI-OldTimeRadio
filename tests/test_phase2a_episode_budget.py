@@ -290,36 +290,6 @@ class TestOutlineSchemaChanges:
         b = Beat(**_ok_beat("b001", phase="setup"))
         assert b.arc_phase == "setup"
 
-    def test_arc_phase_default_caught_by_5_act_budget_validator(self):
-        """Fix 1 (post-Phase-3 review, 2026-05-11): when a 5-act
-        episode uses arc_phases = (exposition, rising_action, ...),
-        a default 'setup' value leaks into a beat as a placeholder.
-        Validator #5 catches it via the membership check and returns
-        a structured violation -- bounded retry, not infinite reroll."""
-        eb = compute_episode_budget(1000, 5, True, 2)
-        req = OutlineRequest(
-            news_seed="seed", style="noir",
-            character_cast=("ALICE", "BOB"),
-            target_words=1000,
-            budget=eb,
-        )
-        # Build a minimal outline where one voiced beat has the
-        # default-omitted 'setup' value but the budget expects
-        # exposition / rising_action / etc.
-        beats = [
-            _ok_beat("b001", speaker="NARRATOR", role="music_open", words=5),
-            _ok_beat("b002", speaker="ANNOUNCER", role="announcer",
-                     words=25, phase="exposition"),
-            # This beat carries the schema default 'setup' which is
-            # NOT in the 5-act arc_phases tuple.
-            _ok_beat("b003", speaker="ALICE", words=30, phase="setup"),
-            _ok_beat("b004", speaker="NARRATOR", role="music_close", words=5),
-        ]
-        outline = _outline_from_beats(beats)
-        violation = validate_outline_against_budget(outline, req)
-        assert violation is not None
-        assert "arc_phase" in violation or "setup" in violation
-
     def test_outline_accepts_32_beats(self):
         beats = [_ok_beat(f"b{i:03d}") for i in range(1, 33)]
         Outline.model_validate({
@@ -357,7 +327,7 @@ class TestEpisodeBudgetPromptBlock:
     # the next class for the producer-contract enforcement test that
     # replaces it.
 
-    def test_block_renders_when_budget_set(self):
+    def test_block_renders_as_nonbinding_plan(self):
         eb = compute_episode_budget(350, 3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
@@ -366,12 +336,10 @@ class TestEpisodeBudgetPromptBlock:
             budget=eb,
         )
         prompt = _build_user_prompt(req)
-        assert "EPISODE BUDGET" in prompt
-        assert "setup -> 98" in prompt or "setup ~98" in prompt
-        assert "complication" in prompt
-        assert "20-35 words" in prompt
-        assert "arc_phase" in prompt
-        # 2 announcer beats noted in budget block.
+        assert "EPISODE PLAN:" in prompt
+        assert "Requested spoken length: about 350 words" in prompt
+        assert "Use this only as broad guidance" in prompt
+        assert "never pad or compress" in prompt
         assert "Announcer beats: 2" in prompt
 
 
@@ -446,8 +414,7 @@ class TestValidateOutlineAgainstBudget:
         outline = _outline_for_350_3_acts()
         assert validate_outline_against_budget(outline, req) is None
 
-    def test_per_phase_word_drift_rejected(self):
-        """Per-phase word total way under target -> hard reject."""
+    def test_per_phase_word_drift_is_metadata_only(self):
         eb = compute_episode_budget(350, 3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
@@ -456,24 +423,11 @@ class TestValidateOutlineAgainstBudget:
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
-        # Shrink complication-phase words to 80 total (target 154,
-        # allowed 123-185). Override the 6 complication beats to
-        # carry ~13-14 words each (still in the 20-35 range gets
-        # caught by validator #4 first; instead, drop the per-phase
-        # total via fewer beats). Simpler: set them to 10 words each
-        # which fails validator #4 first... that's fine -- we just
-        # want to confirm SOME hard violation is reported.
-        # Reduce only 2 beats to drop the total significantly:
-        outline.beats[7].target_words = 25
-        outline.beats[8].target_words = 26
-        outline.beats[9].target_words = 26
-        outline.beats[10].target_words = 26
-        outline.beats[11].target_words = 5  # below 20 -> validator #4 trips
-        outline.beats[12].target_words = 5  # below 20 -> validator #4 trips
-        violation = validate_outline_against_budget(outline, req)
-        assert violation is not None
+        outline.beats[11].target_words = 5
+        outline.beats[12].target_words = 5
+        assert validate_outline_against_budget(outline, req) is None
 
-    def test_arc_phase_ordering_violation_rejected(self):
+    def test_arc_phase_ordering_is_metadata_only(self):
         eb = compute_episode_budget(350, 3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
@@ -482,12 +436,8 @@ class TestValidateOutlineAgainstBudget:
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
-        # Swap arc_phase on b015 (resolution) to "setup" so a setup
-        # beat appears AFTER complication beats -- ordering violation.
         outline.beats[14].arc_phase = "setup"
-        violation = validate_outline_against_budget(outline, req)
-        assert violation is not None
-        assert "ordering" in violation or "arc_phase" in violation
+        assert validate_outline_against_budget(outline, req) is None
 
     def test_music_inter_count_violation_rejected(self):
         eb = compute_episode_budget(350, 3, True, 2)
@@ -519,7 +469,7 @@ class TestValidateOutlineAgainstBudget:
         assert violation is not None
         assert "announcer" in violation
 
-    def test_per_beat_word_range_violation_rejected(self):
+    def test_per_beat_word_range_is_metadata_only(self):
         eb = compute_episode_budget(350, 3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
@@ -528,13 +478,10 @@ class TestValidateOutlineAgainstBudget:
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
-        # b003 below 20-word floor.
         outline.beats[2].target_words = 10
-        violation = validate_outline_against_budget(outline, req)
-        assert violation is not None
-        assert "b003" in violation or "target_words" in violation
+        assert validate_outline_against_budget(outline, req) is None
 
-    def test_unknown_arc_phase_rejected(self):
+    def test_unknown_arc_phase_is_metadata_only(self):
         eb = compute_episode_budget(350, 3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
@@ -543,10 +490,8 @@ class TestValidateOutlineAgainstBudget:
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
-        outline.beats[2].arc_phase = "midpoint"  # not in 3-act phases
-        violation = validate_outline_against_budget(outline, req)
-        assert violation is not None
-        assert "arc_phase" in violation
+        outline.beats[2].arc_phase = "midpoint"
+        assert validate_outline_against_budget(outline, req) is None
 
 
 # ---------------------------------------------------------------------------
@@ -559,7 +504,7 @@ class TestComposerArcPhasePromptBlock:
     def test_arc_phase_block_omitted_when_empty(self):
         from nodes._otr_line_composer import LineRequest, _build_user_prompt
         req = LineRequest(
-            speaker="ALICE", intent="x", mood="x", target_words=10,
+            speaker="ALICE", intent="x", mood="x",
             canon_header="x", last_lines=[],
             arc_phase="",
         )
@@ -569,7 +514,7 @@ class TestComposerArcPhasePromptBlock:
     def test_arc_phase_block_renders_with_guidance(self):
         from nodes._otr_line_composer import LineRequest, _build_user_prompt
         req = LineRequest(
-            speaker="ALICE", intent="x", mood="x", target_words=10,
+            speaker="ALICE", intent="x", mood="x",
             canon_header="x", last_lines=[],
             arc_phase="complication",
         )

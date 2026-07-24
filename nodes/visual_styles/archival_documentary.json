@@ -5,13 +5,6 @@
   "image_grade_tail": "subtle archival patina, clean readable composition",
   "broadcast_tail": "broadcast-history atmosphere without futuristic equipment",
   "allow_radio_tails": false,
-  "forbidden_terms": [
-    "spaceship",
-    "mission control",
-    "laboratory containment",
-    "35mm sci-fi film grain",
-    "futuristic console"
-  ],
   "era_tail": "grounded archival documentary aesthetic",
   "schema_version": "v2",
   "portrait_look": "period-accurate costume and setting, grounded natural lighting, restored archival photograph texture",

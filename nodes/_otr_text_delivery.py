@@ -4,22 +4,13 @@ The voice nodes must speak the right string for a line: the CANONICAL
 text drives identity/proof, but what actually goes to the TTS engine is
 the DELIVERY text. For two lane families those differ:
 
-* LEGACY lanes (science_news, public_domain, shakespeare, media_archive,
-  untagged ledgers) run `phase_7_audio_readiness`, which rewrites
-  `line.text` in place -- so by the time the voice node reads it, the
-  canonical text IS already the delivery text. The resolver returns it
-  UNCHANGED: passthrough, byte-identical to the pre-C2 spine. This is the
-  contract the science_news byte-parity fixture locks.
+* LEGACY lanes stamp a pronunciation-only text_for_tts projection during
+  Phase 7. The resolver uses it only when its source hash matches canonical
+  text; a missing or stale stamp safely falls back to canonical text.
 
-* CONTENT-OWNED lanes (scifi_fable2 and any pack that owns its content
-  loop) keep canonical `text` sealed against a proof map, so Phase 7 is
-  skipped by policy. Instead they STAMP the delivery onto a separate
-  `text_for_tts` field (`_otr_readiness.stamp_text_for_tts_delivery`).
-  The resolver returns that stamped field -- but ONLY after verifying it
-  is present, non-empty, AND fresh (its stored source-sha matches the
-  live canonical text). An absent / empty / STALE stamp is a terminal
-  error raised BEFORE any audio is generated: the pipeline must re-stamp,
-  never speak text that does not match the sealed canonical line.
+* CONTENT-OWNED lanes stamp the same projection before their proof-owned tail.
+  Missing, empty, or stale delivery remains terminal for those lanes because
+  speaking unstamped text would violate their sealed authorship contract.
 
 This is the ONE place the canonical-vs-delivery decision is made. Every
 voice-node surface (line filtering, neutral prep, adapter prep, delivery
@@ -46,19 +37,16 @@ def delivery_mode_for_meta(meta: "Dict[str, Any] | None") -> str:
     """Resolve the delivery mode for an episode from its ledger meta.
 
     Uses the SAME `resolve_freeze_policy` decision that gates the freeze
-    cascade, so the voice lane and the cascade can never disagree about
-    which family a bank belongs to. `run_legacy_content_passes` True
-    (legacy / untagged) -> LEGACY passthrough; False (content-owned) ->
-    CONTENT_OWNED stamped delivery."""
-    try:
-        from ._otr_freeze_cascade import resolve_freeze_policy
-        policy = resolve_freeze_policy(meta or {})
-        return LEGACY if policy.run_legacy_content_passes else CONTENT_OWNED
-    except Exception:  # noqa: BLE001 -- resolver import/edge: default legacy
-        # A resolution failure defaults to LEGACY passthrough: the
-        # conservative choice preserves the byte-identical spine and never
-        # invents a stamped-delivery requirement for a lane that has none.
-        return LEGACY
+    cascade, so the voice lane and the cascade cannot disagree about which
+    family a bank belongs to. Inline safety-cleanup lanes use LEGACY delivery;
+    producer-owned read-only lanes require CONTENT_OWNED stamped delivery.
+    A tagged bank that cannot resolve is a structural configuration error."""
+    from ._otr_freeze_cascade import resolve_freeze_policy
+
+    policy = resolve_freeze_policy(meta or {})
+    if policy.terminal_error:
+        raise TextDeliveryError(policy.terminal_error)
+    return LEGACY if policy.run_inline_safety_cleanup else CONTENT_OWNED
 
 
 def _s(v: Any) -> str:
@@ -71,15 +59,17 @@ def resolve_line_delivery(
 ) -> "Tuple[str, str]":
     """Return ``(canonical, delivery)`` for a single line row.
 
-    - LEGACY: ``delivery == canonical`` (passthrough). Zero behavior
-      change: canonical text was already normalized in place by Phase 7.
-    - CONTENT_OWNED: ``delivery`` is the stamped ``text_for_tts``, but
-      only after verifying it is present, non-empty, and its stored
-      ``text_for_tts_source_sha256`` matches the live canonical text.
-      Otherwise raise `TextDeliveryError` (terminal before generation).
+    - LEGACY: use a non-empty, fresh delivery stamp when present; otherwise
+      fall back to canonical text.
+    - CONTENT_OWNED: require a non-empty, fresh delivery stamp.
     """
     canonical = _s(line_row.get("text"))
+    delivery = _s(line_row.get("text_for_tts"))
+    stored_sha = _s(line_row.get("text_for_tts_source_sha256"))
+    want_sha = text_for_tts_source_sha256(canonical)
     if mode != CONTENT_OWNED:
+        if delivery.strip() and stored_sha == want_sha:
+            return canonical, delivery
         return canonical, canonical
 
     delivery = _s(line_row.get("text_for_tts"))

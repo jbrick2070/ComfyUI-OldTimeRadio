@@ -1,12 +1,10 @@
 """nodes/_otr_news_wiring.py -- writer-side glue for news_interpreter
 briefs.
 
-  post_assembly_keyterm_check(line_rows, key_terms, min_required=2)
+  post_assembly_keyterm_check(line_rows, key_terms)
       Walk every voiced line (speaker_role in {character, announcer}),
-      concatenate their text, and verify each key_term landed via the
-      same word-boundary regex used by news_interpreter.v1_validate.
-      Returns (landed, missing) lists; the caller decides whether to
-      log + proceed, warn, or hard-fail. Per ADR section 4.4.
+      concatenate their text, and measure which optional key_terms landed.
+      Returns (landed, missing) telemetry lists; neither list gates publish.
 
 This helper lives in its own small module so tests can exercise it
 without importing the heavy OTR_LedgerScriptWriter module (which
@@ -30,8 +28,7 @@ import re
 _VOICED_ROLES: frozenset[str] = frozenset({"character", "announcer"})
 
 
-# Word-boundary regex pattern shared with news_interpreter.v1_validate.
-# Built fresh per term so we can re.escape() correctly.
+# Word-boundary telemetry pattern, built fresh per term for re.escape().
 def _word_boundary_pattern(term: str) -> str:
     return (
         r"(?<![A-Za-z0-9])"
@@ -43,25 +40,16 @@ def _word_boundary_pattern(term: str) -> str:
 def post_assembly_keyterm_check(
     line_rows: list[dict],
     key_terms: tuple[str, ...] | list[str],
-    *,
-    min_required: int = 2,
 ) -> tuple[list[str], list[str]]:
     """Word-boundary check that each key_term landed in dialogue.
 
-    Returns ``(landed, missing)`` -- two disjoint lists of terms.
-    The caller decides policy (warn / hard-fail / repair pass).
-
-    ``min_required`` is for the caller's policy decision; this
-    function does not enforce it. Per ADR section 4.4, the
-    canonical policy is:
-      - zero terms landed -> hard fail (with a repair pass before)
-      - some missing but ``len(landed) >= min_required`` -> warn
-      - all landed -> pass clean
+    Returns ``(landed, missing)`` -- two disjoint telemetry lists.
+    Missing terms never trigger repair, retry, or
+    publication failure.
 
     Only voiced lines (speaker_role in {character, announcer}) count.
     music beats have no dialogue, so the term cannot land there.
-    Match is case-insensitive (same as v1_validate in
-    news_interpreter).
+    Match is case-insensitive.
     """
     # Concat every voiced line's text. _speaker_role on line_rows is
     # the in-flight key the writer uses before set_lines() strips it;
@@ -99,9 +87,4 @@ def post_assembly_keyterm_check(
             landed.append(term)
         else:
             missing.append(term)
-    # min_required is a caller policy knob; documented in signature
-    # so the parameter shows up in inspect.signature for any caller
-    # that wants to surface the canonical default. We do not act on
-    # it here.
-    _ = min_required
     return landed, missing

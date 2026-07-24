@@ -215,10 +215,10 @@ def test_request_shape_sends_predict_long_running_payload(monkeypatch, tmp_path)
     }
     assert list(payload["instances"][0]) == ["prompt"]
     lower = payload["instances"][0]["prompt"].lower()
-    assert "no blood" in lower
-    assert "no guns" in lower
-    assert "no knives" in lower
-    assert "no smoking" in lower
+    assert "no explicit guns" in lower
+    assert "knives" in lower
+    assert "weapons" in lower
+    assert "nudity" in lower
     forbidden = {"seed", "tools", "audio", "lastFrame", "referenceImages"}
     assert forbidden.isdisjoint(payload)
     assert forbidden.isdisjoint(payload["instances"][0])

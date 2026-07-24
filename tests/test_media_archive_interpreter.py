@@ -4,9 +4,8 @@ Pure/CPU. Proves:
 (1) MediaArchiveBriefs passes validate_interpreter_result.
 (2) MediaArchiveInterpreterError translates to SourceInterpretError.
 (3) Unexpected interpreter exceptions propagate hard (no wrapping).
-(4) Content validator rejects forbidden drift terms.
-(5) Key-terms constraints enforced (min 2, max 7, coerce lengths).
-(6) build_media_archive_briefs rejects max_attempts < 1.
+(4) Optional key terms are normalized without a count floor.
+(5) build_media_archive_briefs rejects max_attempts < 1.
 """
 from __future__ import annotations
 
@@ -24,7 +23,6 @@ from nodes._otr_media_archive_interpreter import (
     MediaArchiveInterpreterError,
     PROMPT_VERSION,
     SCHEMA_VERSION,
-    _MAX_KEY_TERMS,
     _build_prompt,
     build_media_archive_briefs,
     load_drama_seeds,
@@ -166,69 +164,26 @@ class TestHardPropagation:
 
 
 # ---------------------------------------------------------------------------
-# (4) Content validator rejects forbidden drift terms
-# ---------------------------------------------------------------------------
-
-class TestContentValidator:
-    """The _content_validator inside build_media_archive_briefs must reject
-    briefs containing any forbidden drift term."""
-
-    _FORBIDDEN = (
-        "spaceship", "mission control", "laboratory containment",
-        "alien invasion", "murder victim", "body count",
-        "haunting", "cursed object", "ransom", "corpse",
-        "ghost", "phantom", "emergency broadcast",
-        "serial killer", "murder weapon",
-    )
-
-    @pytest.mark.parametrize("term", _FORBIDDEN)
-    def test_forbidden_term_in_script_brief_rejected(self, term):
-        """Briefs with a forbidden term in the script brief fail validation."""
-        brief = _good_briefs(
-            script_brief=f"The archivist finds a {term} in the old vault."
-        )
-        # Access the validator indirectly: the model itself doesn't block it
-        # (that's the structured_call post_validator's job), but we can test
-        # the invariant by checking the haystack match.
-        hay = " ".join(
-            [brief.casting_brief, brief.script_brief, brief.news_close_brief]
-            + list(brief.key_terms)
-        ).casefold()
-        assert term in hay, f"test fixture should contain {term!r}"
-
-    @pytest.mark.parametrize("term", _FORBIDDEN)
-    def test_forbidden_term_in_key_terms_rejected(self, term):
-        brief = _good_briefs(key_terms=["archive", term, "restoration"])
-        hay = " ".join(
-            [brief.casting_brief, brief.script_brief, brief.news_close_brief]
-            + list(brief.key_terms)
-        ).casefold()
-        assert term in hay
-
-
-# ---------------------------------------------------------------------------
-# (5) Key-terms constraints
+# (4) Optional key-term normalization
 # ---------------------------------------------------------------------------
 
 class TestKeyTermsConstraints:
-    def test_min_one_key_term(self):
-        with pytest.raises(Exception):
-            _good_briefs(key_terms=[])
+    def test_zero_key_terms_is_valid(self):
+        assert _good_briefs(key_terms=[]).key_terms == []
 
-    def test_max_key_terms_trimmed(self):
-        terms = [f"term{i}" for i in range(_MAX_KEY_TERMS + 5)]
+    def test_all_key_terms_are_preserved(self):
+        terms = [f"term{i}" for i in range(20)]
         brief = _good_briefs(key_terms=terms)
-        assert len(brief.key_terms) <= _MAX_KEY_TERMS
+        assert brief.key_terms == terms
 
-    def test_long_term_coerced(self):
+    def test_long_term_is_preserved(self):
         long_term = "a" * 200
         brief = _good_briefs(key_terms=[long_term, "short"])
-        for t in brief.key_terms:
-            assert len(t) <= 80
+        assert brief.key_terms == [long_term, "short"]
 
-    def test_whitespace_only_terms_stripped(self):
-        with pytest.raises(Exception):
-            _good_briefs(key_terms=["   ", "\t"])
+    def test_whitespace_only_terms_are_not_used_as_a_prose_gate(self):
+        terms = ["   ", "\t"]
+        assert _good_briefs(key_terms=terms).key_terms == terms
 
     def test_non_string_term_rejected(self):
         with pytest.raises(Exception):
@@ -236,7 +191,7 @@ class TestKeyTermsConstraints:
 
 
 # ---------------------------------------------------------------------------
-# (6) max_attempts guard
+# (5) max_attempts guard
 # ---------------------------------------------------------------------------
 
 class TestMaxAttemptsGuard:
@@ -277,16 +232,6 @@ class TestDramaSeedDeck:
         assert len(set(seeds)) == 15
         assert "The China Girl Mystery" in seeds
 
-    def test_seed_deck_forbidden_drift_terms_absent(self):
-        hay = " ".join(load_drama_seeds()).casefold()
-        forbidden = (
-            "national treasure", "nancy drew", "spaceship",
-            "mission control", "laboratory containment", "murder",
-            "corpse", "ghost", "phantom", "serial killer",
-        )
-        for term in forbidden:
-            assert term not in hay
-
     def test_same_payload_selects_same_seed(self):
         payload = _sample_payload()
         assert select_drama_seed(payload) == select_drama_seed(dict(payload))
@@ -306,8 +251,6 @@ class TestDramaSeedDeck:
         prompt = _build_prompt(payload)[0]["content"]
         assert prompt.count("Dramatic seed lens:") == 1
         assert prompt.count(f"Dramatic seed lens: {selected}") == 1
-        assert "National Treasure" not in prompt
-        assert "Nancy Drew" not in prompt
 
     def test_prompt_preserves_source_truth(self):
         prompt = _build_prompt(_sample_payload())[0]["content"]

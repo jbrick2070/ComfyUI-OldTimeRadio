@@ -81,32 +81,6 @@ def test_source_ref_is_real_run_parameter_and_resolved_value():
     assert resolved2["source_ref"] == "https://example.invalid/source.txt"
 
 
-def test_refine_core_carries_source_ref(monkeypatch):
-    from nodes import _otr_story_select as sel
-
-    class _Rcfg:
-        target_grade = "B"
-        bar = 0
-        effective_passes = 2
-
-    monkeypatch.setattr(sel, "resolve_refine_passes", lambda *_a, **_k: _Rcfg())
-    captured = {}
-
-    def _fake_loop(self, _rcfg, _core):
-        captured.update(_core)
-        return ("", "", "", 0, "")
-
-    monkeypatch.setattr(OTR_LedgerScriptWriter, "_refine_loop", _fake_loop)
-    node = OTR_LedgerScriptWriter()
-    # Writer refine re-entry is a legacy-lane seam; thread a legacy many-pass
-    # bank (the new default scifi_news -> scifi_news_circuit rejects re-entry).
-    out = node.run(source_bank="media_archive",
-                   source_ref="archive://fixture-001", refine_target_grade="B")
-
-    assert out == ("", "", "", 0, "")
-    assert captured["source_ref"] == "archive://fixture-001"
-    assert "os" not in captured and "_scaffold" not in captured
-
 
 def test_source_ref_on_both_headless_whitelists():
     from nodes._otr_workflow_apply import CREATIVE_WHITELIST as pkg_wl

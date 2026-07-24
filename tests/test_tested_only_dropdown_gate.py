@@ -48,7 +48,7 @@ def test_formerly_hidden_engines_are_now_selectable():
     assert {"wan_i2v", "still_motion"} <= video
     assert "still_parallax" not in video
     image = set(idr._image_model_combo())
-    assert "qwen_image" in image
+    assert "z_image_turbo" in image
 
 
 def test_registry_unchanged_v6_intact():

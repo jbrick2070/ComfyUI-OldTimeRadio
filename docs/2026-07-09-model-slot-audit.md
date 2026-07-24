@@ -36,7 +36,7 @@ token-level lm-format-enforcer schema constraint.
 | Namespace | Candidates | Status |
 | --- | --- | --- |
 | audio/TTS/music | `bark`, `kokoro`, `indextts2`, `chatterbox`, `dia`, `musicgen`, `stable_audio_music`, `stable_audio_3` | Registered and selectable. Unsupported role picks fail loud through `EngineUnusable`; deeper model/token checks run on dispatch/load. |
-| still image | `flux_gen1`, `flux2_klein`, `lumina_image`, `qwen_image`, `z_image_turbo` | Registered and selectable. Missing weight files fail loud in adapter `assert_usable`; no silent Flux fallback. |
+| still image | `flux_gen1`, `flux2_klein`, `lumina_image`, `z_image_turbo` | Registered and selectable. Missing weight files fail loud in adapter `assert_usable`; no silent Flux fallback. |
 | video | `still_motion`, `viz_green`, `viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera`, `still_flat`, `still_pan`, `still_word`, `humo`, `humo_1.7B`, `humo_1.7B_169`, `humo_14B_169`, `ltx_video`, `mesh_stage`, `wan_i2v`, `wan_ti2v`, `ltx_audio_in` | Registered and selectable. Runtime failures are hard failures; every registered adapter declares `fallback_engine = None`. |
 
 ## Pre-Smoke Readiness Inspection
@@ -48,7 +48,6 @@ Inspection of the requested candidates says:
 | --- | --- | --- | --- |
 | `chatterbox` | Per-line text + reference WAV + delivery vector/seed; roles `char_voice`, `announcer_voice`. | Main-venv `AUDIO` dict from worker WAV, 24000 Hz. | Ready for local sidecar preflight and one-line voice smoke if the isolated Chatterbox venv, worker, and CC0 ref bank exist. Missing pieces fail loud. |
 | `dia` | Per-line text + reference WAV + optional ref transcript + seed; role `char_voice` only. | Main-venv `AUDIO` dict from worker WAV, 44100 Hz. | Ready for local char-voice sidecar preflight. Not an announcer test yet; no Dia announcer role is registered. |
-| `qwen_image` | Text prompt + seed/dims; graph needs Qwen GGUF diffusion, Qwen CLIP, Qwen VAE. | Decoded RGB still frame returned to the dispatcher. | Graph-ready, but live smoke should wait until the CLIP/VAE files are preflighted alongside the GGUF path; current `assert_usable` proves only the diffusion GGUF before render. |
 | `wan_ti2v` | Init image + prompt/seed/canvas; graph needs Wan2.2 TI2V-5B UNET, umt5 CLIP, approved `wan2.2_vae.safetensors`. | Silent bt709 MP4 clip dict after ffprobe contract validation. | Best first local Wan test. The adapter already fail-closes on UNET, CLIP, VAE, VAE basename, sampler, and scheduler before forward. |
 | `wan_i2v` | Init image + prompt/seed/canvas; graph needs Wan I2V UNET, umt5 CLIP, VAE. | Silent bt709 MP4 clip dict after ffprobe contract validation. | Structurally ready but heavier and not the first Wan smoke. Run after `wan_ti2v` unless there is a specific 14B quality target. |
 
@@ -71,13 +70,15 @@ Recommended live-smoke order after the selective headless reset:
 2. Cloud stills: `cloud_luma_photon_flash`, `cloud_krea_2_turbo`,
    `cloud_seedream_2`, then `cloud_nano_banana_2`.
 3. Cheap cloud video: `cloud_vidu_q2_pro_fast_720p`.
-4. Local heavy visual lanes: `wan_ti2v`, then `qwen_image` after the CLIP/VAE
-   preflight is strengthened, then `wan_i2v` if the 14B target is still wanted.
+4. Local heavy visual lanes: `wan_ti2v`, then `wan_i2v` if the 14B target is
+   still wanted. The unprovisioned optional Qwen-Image lane was removed from
+   the registry and smoke queue on 2026-07-23.
 
 ## Retired / Non-Invocable
 
 | Engine | Namespace | Disposition |
 | --- | --- | --- |
+| `qwen_image` | image | Removed from source, registry, smoke, and engine-specific tests on 2026-07-23; historical failure receipts remain for audit. |
 | `hidream_i1`, `sd35_large` | image | Source files remain, but they are unregistered dark scaffolds and have no capability row. |
 | `still_parallax` | video | Source file remains, but the engine is unregistered; the old fallback chain was removed. |
 | `triposr`, `triposg_talk`, `hunyuan3d_talk`, `trellis_talk` | video | Source files remain, but dark 3D scaffolds are unregistered until a real forward ships. |

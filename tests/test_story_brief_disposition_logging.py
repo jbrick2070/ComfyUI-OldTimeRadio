@@ -15,10 +15,7 @@ from io import StringIO
 
 import pytest
 
-from nodes._otr_story_brief_helpers import (
-    log_story_brief_disposition,
-    get_story_brief_music_mood,
-)
+from nodes._otr_story_brief_helpers import log_story_brief_disposition
 
 
 CONSUMER_IDS = ("flux_env", "flux_portrait", "ltx", "humo", "musicgen")

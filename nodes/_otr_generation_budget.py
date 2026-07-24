@@ -10,6 +10,20 @@ from typing import Any
 
 
 MIN_OUTPUT_TOKENS = 64
+class ProviderCapacityMessages(list):
+    """Message payload for prose whose size must never be pre-judged.
+
+    Transports reserve their full remaining provider/context capacity. If the
+    provider consumes that capacity before reaching its own stop condition, the
+    call fails as a capacity defect and the caller must not reinterpret the
+    partial artifact as bad prose or feed it into a retry ladder.
+    """
+
+    _otr_prompt_must_fit = True
+    _otr_output_budget_mode = "provider_capacity"
+    _otr_reserve_remaining_output_capacity = True
+    _otr_fail_on_output_limit = True
+    _otr_strict_remote_output_budget = True
 
 
 class GenerationContextOverflowError(RuntimeError):

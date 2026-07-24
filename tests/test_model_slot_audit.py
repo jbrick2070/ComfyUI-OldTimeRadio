@@ -139,19 +139,6 @@ def test_requested_local_smoke_candidate_contracts_are_inspected(monkeypatch):
     assert dia.missing_ref_fallback is None
     assert dia.sample_rate == 44100
 
-    qwen = image_registry.get_engine("qwen_image")
-    assert qwen.required_inputs == ("text_prompt",)
-    assert qwen.default_roles == ()
-    assert qwen.commercial_clean is True
-    assert qwen._node_candidates()["unet"] == ("UnetLoaderGGUF",)
-    assert qwen._node_candidates()["clip"] == ("CLIPLoader",)
-    params = qwen._qwen_params({"prompt": "radio console", "seed": 11,
-                                "width": 832, "height": 448})
-    assert params["clip_name"] == "qwen_2.5_vl_7b_fp8_scaled.safetensors"
-    assert params["vae_name"] == "qwen_image_vae.safetensors"
-    assert params["prompt"] == "radio console"
-    assert (params["width"], params["height"], params["seed"]) == (832, 448, 11)
-
     wan_i2v = video_registry.get_engine("wan_i2v")
     assert wan_i2v.family == "image_to_video"
     assert wan_i2v.required_inputs == ("init_image",)

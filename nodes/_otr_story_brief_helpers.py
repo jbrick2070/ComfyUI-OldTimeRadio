@@ -1,13 +1,12 @@
 """nodes/_otr_story_brief_helpers.py -- central consumer helpers (C5b).
 
 Visual + audio consumers do NOT parse the brief prose themselves. They
-call one of these five helpers, each shaped to the consumer's prompt
+call one of these four helpers, each shaped to the consumer's prompt
 budget and narrative concern:
 
   get_story_brief_full     -> full brief prose, "" if absent or failed
   get_story_brief_ltx      -> sentence-boundary-trimmed fragment for LTX
   get_story_brief_lighting -> lighting + atmosphere terms, comma joined
-  get_story_brief_music_mood -> list[str] of in-vocab mood terms
   get_story_brief_status   -> 'ok' | 'failed' | 'absent'
 
 One helper per consumer shape. The alternative was N slightly-different
@@ -15,14 +14,6 @@ bad implementations across N consumer files (refinement section 5).
 
 Module is PURE: no I/O, no GPU, no ComfyUI imports, no MusicGen import.
 The dependency direction is consumer -> helper, NEVER the reverse.
-(2026-06-10 gap audit: the historical music consumer
-`nodes/musicgen_theme.py` no longer exists -- the live music lane reads
-the brief via `nodes/_otr_music_prompt.py`'s own protocol. The live
-VISUAL consumers are the prompt finisher's callers: ShotLock M4, the
-image-prompt deriver, and the render driver's scene composer.) The
-`test_get_music_mood_no_musicgen_import` test in
-`tests/test_story_brief_helpers_c5b.py` locks the no-reverse-import
-property via AST inspection.
 
 UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 """
@@ -31,28 +22,18 @@ from __future__ import annotations
 from typing import Any
 
 
-# MusicGen mood vocabulary -- 16 terms that the audio model handles
-# well as a prepended mood prefix. Atmosphere terms outside this set
-# are filtered out so the MusicGen prompt stays in known-vocabulary
-# space (refinement section 6.3).
-_MUSIC_MOOD_VOCAB: frozenset[str] = frozenset({
-    "tense", "ominous", "melancholic", "hopeful", "urgent", "calm",
-    "eerie", "sombre", "playful", "menacing", "wistful", "frantic",
-    "reverent", "uneasy", "stoic", "yearning",
-})
-
 VISUAL_SAFETY_POSITIVE_CLAUSE = (
-    "family-safe, nonviolent, no blood, no guns, no knives, no smoking"
+    "family-safe, no explicit guns, knives, weapons, or nudity"
 )
 VISUAL_SAFETY_NEGATIVE_PROMPT = (
-    "blood, gore, violence, guns, firearms, weapons, knives, blades, "
-    "smoking, cigarettes, cigars, tobacco"
+    "guns, firearms, weapons, knives, blades, nudity, naked, "
+    "pornographic content"
 )
 SFX_AUDIO_SAFETY_CLAUSE = (
     "environmental ambience and foley only, no spoken words, no singing, "
     "no lyrics, no narration, no voiceover, no intelligible speech, "
-    "no subtitles, no captions, no readable text, no blood, no guns, "
-    "no knives, no smoking"
+    "no subtitles, no captions, no readable text, no explicit guns, "
+    "knives, weapons, or nudity"
 )
 
 
@@ -66,8 +47,8 @@ def append_visual_safety_clause(prompt: str) -> str:
     if not text:
         return ""
     folded = text.lower()
-    if ("no blood" in folded and "no guns" in folded
-            and "no knives" in folded and "no smoking" in folded):
+    if ("no explicit guns" in folded and "knives" in folded
+            and "weapons" in folded and "nudity" in folded):
         return text
     return f"{text}, {VISUAL_SAFETY_POSITIVE_CLAUSE}"
 
@@ -235,45 +216,6 @@ def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
     return status
 
 
-def get_story_brief_music_mood(meta: Any) -> list[str]:
-    """Mood keywords from atmosphere_terms, intersected with the
-    MusicGen mood vocabulary.
-
-    Per refinement section 6.3: MusicGen never sees prose. The helper
-    extracts in-vocab terms from atmosphere_terms so the MusicGen
-    prompt stays in known-vocabulary space. Returns an empty list
-    when the brief is absent, failed, or carries no in-vocab atmosphere
-    terms -- the caller (wired at C5g per E-12) treats an empty list
-    as "fall through to legacy prompt construction" per refinement
-    section 8.2.
-
-    Dependency direction: consumer -> helper. This module does NOT
-    import musicgen_theme; the consumer imports THIS helper.
-
-    DEPRECATED-IN-PLACE (2026-06-10 gap audit): the consumer named here
-    historically, ``nodes/musicgen_theme.py``, no longer exists (audio
-    cleanbreak); the LIVE music lane reads the brief through its own
-    protocol in ``nodes/_otr_music_prompt.py`` (v2 music_mood_terms -> v1
-    fallback) and does NOT call this helper. Kept for compatibility; do
-    not wire new consumers to it without checking _otr_music_prompt first.
-    """
-    m = _meta(meta)
-    if get_story_brief_status(m) != "ok":
-        return []
-    terms = m.get("story_brief_terms") or {}
-    if not isinstance(terms, dict):
-        return []
-    atmosphere = terms.get("atmosphere") or []
-    if not isinstance(atmosphere, list):
-        return []
-    # Preserve order, intersect against vocab.
-    out: list[str] = []
-    for raw in atmosphere:
-        t = str(raw).strip().lower()
-        if t in _MUSIC_MOOD_VOCAB and t not in out:
-            out.append(t)
-    return out
-
 
 # ---------------------------------------------------------------------------
 # The prompt FINISHER (2026-06-10 brief-downstream gap audit, F1).
@@ -361,7 +303,7 @@ def get_era_tail(meta: Any, profile: str = "full", style: Any = None) -> str:
     brief reader; every failure path degrades, fail-soft.
 
     ``profile="still"`` (still-spine ST-1): the TRIMMED tail for still-image
-    prompts -- atmosphere line + palette top-2 + lighting top-2, capped at
+    prompts -- atmosphere line + palette top-2 + lighting and atmosphere terms, capped at
     ~120 chars on a word boundary. Stills carry their subject up front; the
     full tail diet would push FLUX toward atmosphere soup. The per-episode
     palette color (e.g. Mars = red) comes through HERE by design -- the
@@ -406,11 +348,14 @@ def get_era_tail(meta: Any, profile: str = "full", style: Any = None) -> str:
             terms = {}
         lighting = [str(t).strip() for t in (terms.get("lighting") or [])
                     if str(t).strip()][:2]
+        atmosphere = [str(t).strip() for t in (terms.get("atmosphere") or [])
+                      if str(t).strip()][:2]
         parts = []
         if atmosphere_line:
             parts.append(atmosphere_line)
         parts.extend(palette[:2])
         parts.extend(lighting)
+        parts.extend(atmosphere)
         out = ", ".join(parts) or _era_default
         if len(out) > 120:                 # word-boundary trim (~120 chars)
             cut = out[:120]

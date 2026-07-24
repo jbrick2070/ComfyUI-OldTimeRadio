@@ -372,13 +372,8 @@ def _resolve_title_via_chain(led: dict, widget_title: str) -> tuple[str, str]:
     chain logic."""
     import time as _time
 
-    _STUCK_TITLE_DEFAULTS = {
-        "", "the last frequency", "untitled", "episode",
-        "signal lost", "custom episode",
-    }
-
     def _is_clean(s: str) -> bool:
-        return bool(s) and s.lower() not in _STUCK_TITLE_DEFAULTS
+        return bool(s)
 
     _meta = led.get("meta") or {}
     _meta_episode_title = (_meta.get("episode_title") or "").strip()
@@ -444,14 +439,15 @@ def test_video_title_chain():
         f"timestamp_lastresort format unexpected: {title!r}"
     )
 
-    # Stuck-title default rejection: widget="The Last Frequency" is in
-    # _STUCK_TITLE_DEFAULTS -> falls through to TIMESTAMP.
+    # Any non-empty authored title, including a formerly blacklisted phrase,
+    # is accepted rather than replaced by a Python taste judgment.
     led6 = make_stub_ledger()
     led6.pop("meta", None)
     title, source = _resolve_title_via_chain(
         led6, widget_title="The Last Frequency",
     )
-    assert source == "timestamp_lastresort"
+    assert title == "The Last Frequency"
+    assert source == "widget_override"
 
 
 # ---------------------------------------------------------------------------

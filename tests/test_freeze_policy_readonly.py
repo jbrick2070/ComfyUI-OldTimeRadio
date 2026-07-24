@@ -1,303 +1,56 @@
-"""FreezePolicy + proof-preserving freeze boundary (external QA ROUND 2
-fold, 2026-07-10, fable2 S1b -> S2 runway).
+"""Freeze-policy resolution for the six live story banks.
 
-The r2 P0 chain this file locks down:
-
-  P0.1  the cascade invoked the text-mutating reviewer BEFORE its lane
-        capability gate, so a sealed content-authorship receipt could diverge from
-        the live canonical text (Butterfly b2/b5, Einstein b3). Fix: ONE
-        typed FreezePolicy resolved before any content pass; for
-        content-owned lanes every legacy mutator is skipped and only
-        read-only structural validation + Phase 10 run; a TAGGED bank
-        that fails to resolve is TERMINAL, never fail-open.
-  P0.3  Ledger.save() rebinds led.data; the cascade kept writing phase
-        records and the terminal veto into the detached pre-save dict,
-        so the persisted ledger had NO freeze_verdict and CastLock's
-        missing-verdict legacy path let a needs_full_rerun episode
-        through. Fix: refresh led.data immediately after review_ledger.
+The policy decides who may perform the bounded same-story safety cleanup. It
+never converts word count, visual vocabulary, style, or craft observations into
+an episode veto.
 """
 from __future__ import annotations
 
-import copy
-import json
 import sys
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from nodes import _otr_freeze_cascade as LFC  # noqa: E402
-from nodes import _otr_story_routing as ROUTING  # noqa: E402
-from nodes import production_ledger as _PL  # noqa: E402
-from nodes._otr_ledger_reviewer import ReviewerDisposition  # noqa: E402
-from nodes._otr_word_delivery import stamp_contract  # noqa: E402
-
-import test_fable2_assembly as _F2A  # noqa: E402  (golden-chain helpers)
+from nodes import _otr_freeze_cascade as LFC
+from nodes import _otr_story_routing as ROUTING
 
 
 @pytest.fixture(autouse=True)
-def _fresh_registry_and_ledger():
-    saved = _PL._CURRENT
+def _fresh_registry():
     ROUTING._REGISTRY = None
     yield
     ROUTING._REGISTRY = None
-    _PL._CURRENT = saved
 
 
-def _fail_generate(*_a, **_k):
-    raise AssertionError(
-        "generate_fn must NEVER be called under a readonly/terminal policy")
+@pytest.mark.parametrize(
+    "bank_id",
+    ["media_archive", "original", "public_domain", "shakespeare"],
+)
+def test_inline_banks_receive_same_story_cleanup_policy(bank_id):
+    policy = LFC.resolve_freeze_policy({"source_bank": bank_id})
+    assert policy.name == "inline_safety_cleanup"
+    assert policy.run_inline_safety_cleanup is True
+    assert policy.terminal_error == ""
 
 
-def _forbid_legacy_passes(monkeypatch):
-    """Spy every legacy content entry point: any call is a test failure."""
-    def _boom(name):
-        def _fn(*_a, **_k):
-            raise AssertionError(f"{name} must not run under this policy")
-        return _fn
-    monkeypatch.setattr(LFC._OTRLR, "review_ledger",
-                        _boom("review_ledger"))
-    monkeypatch.setattr(LFC._OTRSC, "run_story_critic",
-                        _boom("run_story_critic"))
-    monkeypatch.setattr(LFC._OTRRR, "run_targeted_reroll",
-                        _boom("run_targeted_reroll"))
+@pytest.mark.parametrize("bank_id", ["scifi_news", "scifi_news_pro"])
+def test_fixed_topology_banks_are_content_owned(bank_id):
+    policy = LFC.resolve_freeze_policy({"source_bank": bank_id})
+    assert policy.name == "content_owned_readonly"
+    assert policy.run_inline_safety_cleanup is False
+    assert policy.terminal_error == ""
 
 
-def _golden_fable2_ledger(tmp_path, *, source_bank="scifi_news_pro"):
-    led, _parsed, meta = _F2A._assembled(tmp_path)
-    if source_bank is not None:
-        meta["source_bank"] = source_bank
-    led.data.setdefault("meta", {}).update(meta)
-    return led
+def test_untagged_ledger_uses_inline_compatibility_policy():
+    policy = LFC.resolve_freeze_policy({})
+    assert policy.name == "inline_safety_cleanup"
+    assert policy.run_inline_safety_cleanup is True
 
 
-# ---------------------------------------------------------------------------
-# 1. Policy resolution (replaces the retired fail-open boolean)
-# ---------------------------------------------------------------------------
-
-def test_policy_untagged_ledger_is_legacy():
-    pol = LFC.resolve_freeze_policy({})
-    assert pol.name == "legacy_full"
-    assert pol.run_legacy_content_passes is True
-    assert pol.terminal_error == ""
-
-
-def test_policy_seam_bank_is_legacy():
-    pol = LFC.resolve_freeze_policy({"source_bank": "media_archive"})
-    assert pol.name == "legacy_full"
-    assert pol.run_legacy_content_passes is True
-
-
-def test_policy_fable2_is_content_owned_readonly():
-    pol = LFC.resolve_freeze_policy({"source_bank": "scifi_news_pro"})
-    assert pol.name == "content_owned_readonly"
-    assert pol.run_legacy_content_passes is False
-    assert pol.terminal_error == ""
-
-
-def test_policy_unresolvable_tagged_bank_is_terminal_not_fail_open():
-    # r2 P1.2: "unknown means legacy applicable" is RETIRED for declared
-    # sources -- a tagged bank that fails to resolve must halt, never
-    # fall open into legacy content mutation.
-    pol = LFC.resolve_freeze_policy({"source_bank": "no_such_bank"})
-    assert pol.name == "policy_resolution_failed"
-    assert pol.run_legacy_content_passes is False
-    assert pol.terminal_error
-
-
-# ---------------------------------------------------------------------------
-# 2. Readonly cascade: proof invariance + zero legacy calls (P0.1)
-# ---------------------------------------------------------------------------
-
-@pytest.mark.parametrize("escalation_env", ["", "1"])
-def test_readonly_cascade_freezes_without_any_content_mutation(
-        tmp_path, monkeypatch, escalation_env):
-    if escalation_env:
-        monkeypatch.setenv("OTR_ENABLE_CRITIC_ESCALATION", escalation_env)
-    else:
-        monkeypatch.delenv("OTR_ENABLE_CRITIC_ESCALATION", raising=False)
-    _forbid_legacy_passes(monkeypatch)
-    led = _golden_fable2_ledger(tmp_path)
-    before_lines = copy.deepcopy(led.data["lines"])
-    before_authorship = copy.deepcopy(
-        led.data["meta"]["content_authorship"])
-
-    disp = LFC.run_freeze_cascade(_fail_generate, led)
-
-    assert disp.verdict in ("frozen_clean", "frozen_with_warns"), (
-        disp.verdict)
-    meta = led.data["meta"]
-    # canonical text + generic authorship receipt byte-identical through cascade
-    assert [r["text"] for r in led.data["lines"]] == [
-        r["text"] for r in before_lines]
-    assert meta["content_authorship"] == before_authorship
-    # truthful capability receipt (r2 P0.1)
-    receipt = meta["freeze_capability_receipt"]
-    assert receipt["policy"] == "content_owned_readonly"
-    assert receipt["content_mutations"] == 0
-    assert receipt["text_sha256_entry"] == receipt["text_sha256_exit"]
-    assert receipt["content_authorship_sha256_entry"] == (
-        receipt["content_authorship_sha256_exit"])
-    for phase in LFC._LEGACY_CONTENT_PHASES:
-        assert phase in receipt["skipped_phases"], phase
-    # the reviewer result is a capability disposition, NOT a fake clean
-    assert meta["reviewer_disposition_capability"] == (
-        "not_applicable_content_owned")
-    assert "story_critic_status" not in meta  # 5B genuinely did not run
-    # Phase 7 canonical-text normalization skipped BY POLICY
-    assert meta["audio_readiness"]["skipped_reason"] == (
-        "content_owned_readonly_policy")
-
-
-def test_readonly_cascade_proof_divergence_is_terminal(
-        tmp_path, monkeypatch):
-    _forbid_legacy_passes(monkeypatch)
-    led = _golden_fable2_ledger(tmp_path)
-    # tamper one proven line AFTER the seal (the Butterfly b2 shape)
-    for row in led.data["lines"]:
-        if row.get("speaker_role") == "character" and row.get("text"):
-            row["text"] = row["text"] + " tampered"
-            break
-    disp = LFC.run_freeze_cascade(_fail_generate, led)
-    assert disp.verdict == "needs_full_rerun"
-    meta = led.data["meta"]
-    assert meta["freeze_block_class"] == "structural"
-    receipt = meta["freeze_capability_receipt"]
-    assert receipt["structural_errors"], "proof divergence must be recorded"
-    assert any("content_authorship" in e for e in receipt["structural_errors"])
-
-
-def test_declared_word_delivery_passes_readonly_freeze_without_content_mutation(
-        tmp_path, monkeypatch):
-    _forbid_legacy_passes(monkeypatch)
-    led = _golden_fable2_ledger(tmp_path)
-    stamp_contract(
-        led.data["meta"],
-        target_words=50,
-        planned_voiced_words=50,
-        owner="scifi_news_pro",
-    )
-    before = [row.get("text") for row in led.data["lines"]]
-
-    disp = LFC.run_freeze_cascade(_fail_generate, led)
-
-    assert disp.verdict in ("frozen_clean", "frozen_with_warns")
-    assert [row.get("text") for row in led.data["lines"]] == before
-    backstop = led.data["meta"]["word_delivery_backstop"]
-    assert backstop["status"] == "pass"
-    assert backstop["stage"] == "freeze_pre_media"
-    assert backstop["actual_voiced_words"] == 51
-    assert backstop["actual_drift"] is False
-
-
-def test_declared_word_drift_halts_before_video_readiness(
-        tmp_path, monkeypatch):
-    _forbid_legacy_passes(monkeypatch)
-    led = _golden_fable2_ledger(tmp_path)
-    stamp_contract(
-        led.data["meta"],
-        target_words=180,
-        planned_voiced_words=180,
-        owner="scifi_news_pro",
-    )
-    before = [row.get("text") for row in led.data["lines"]]
-
-    def _phase8_must_not_run(*_args, **_kwargs):
-        raise AssertionError("video readiness must not run after word drift")
-
-    monkeypatch.setattr(LFC, "_phase_8_video_readiness", _phase8_must_not_run)
-
-    disp = LFC.run_freeze_cascade(_fail_generate, led)
-
-    assert disp.verdict == "needs_full_rerun"
-    meta = led.data["meta"]
-    assert [row.get("text") for row in led.data["lines"]] == before
-    assert meta["freeze_block_class"] == "structural"
-    assert meta["word_delivery_backstop"]["status"] == "failed"
-    assert meta["word_budget"]["actual_drift"] is True
-    receipt = meta["freeze_capability_receipt"]
-    assert any("word_delivery" in err for err in receipt["structural_errors"])
-    assert "phase_8_video_readiness" in receipt["skipped_phases"]
-    assert "phase_10_gap_audit_post_and_freeze" in receipt["skipped_phases"]
-    assert meta["video_readiness"]["skipped_reason"] == "terminal_skipped"
-
-
-def test_unresolvable_tagged_bank_cascade_halts_before_any_pass(
-        tmp_path, monkeypatch):
-    _forbid_legacy_passes(monkeypatch)
-    led = _golden_fable2_ledger(tmp_path, source_bank="no_such_bank")
-    disp = LFC.run_freeze_cascade(_fail_generate, led)
-    assert disp.verdict == "needs_full_rerun"
-    meta = led.data["meta"]
-    assert meta["freeze_block_class"] == "structural"
-    receipt = meta["freeze_capability_receipt"]
-    assert receipt["policy"] == "policy_resolution_failed"
-    assert receipt["terminal_error"]
-
-
-# ---------------------------------------------------------------------------
-# 3. P0.3 -- reviewer save/rebind must not detach the terminal veto
-# ---------------------------------------------------------------------------
-
-def _rebinding_reviewer(verdict: str):
-    """A reviewer double that performs a REAL rebinding save (the exact
-    production sequence: mutate -> Ledger.save() -> self.data = merged)
-    and then returns the requested verdict."""
-    def _review(_generate_fn, led):
-        led.data.setdefault("meta", {})["reviewer_probe"] = "ran"
-        old_root = led.data
-        led.save()  # rebinds led.data to the merged dict
-        assert led.data is not old_root, (
-            "precondition: save() must rebind led.data for this test "
-            "to exercise the P0.3 detachment")
-        return ReviewerDisposition(
-            verdict=verdict,
-            pre_audit_violations=0, pre_audit_repairs_applied=0,
-            doctor_edits_proposed=0, doctor_edits_applied=0,
-            post_audit_violations=0,
-        )
-    return _review
-
-
-def test_terminal_reviewer_verdict_lands_on_live_root_and_disk(
-        tmp_path, monkeypatch):
-    # untagged ledger -> legacy_full policy -> reviewer runs
-    led = _golden_fable2_ledger(tmp_path, source_bank=None)
-    led.data["meta"].pop("source_bank", None)
-    monkeypatch.setattr(LFC._OTRLR, "review_ledger",
-                        _rebinding_reviewer("needs_full_rerun"))
-    disp = LFC.run_freeze_cascade(_fail_generate, led)
-    assert disp.verdict == "needs_full_rerun"
-    # LIVE root carries the veto (pre-fix: only the detached dict did)
-    meta = led.data["meta"]
-    assert meta["freeze_verdict"] == "needs_full_rerun"
-    assert meta["freeze_disposition"]["verdict"] == "needs_full_rerun"
-    phase_names = [p.get("phase_name") for p in
-                   (meta.get("cleanup_passes") or [])]
-    assert "phase_1_2_9_reviewer_composite" in phase_names
-    # persisted JSON carries it too (CastLock halts on the explicit veto)
-    on_disk = json.loads(Path(led.path).read_text(encoding="utf-8"))
-    assert on_disk["meta"]["freeze_verdict"] == "needs_full_rerun"
-
-
-def test_commit_path_reviewer_rebind_keeps_phase_records_live(
-        tmp_path, monkeypatch):
-    led = _golden_fable2_ledger(tmp_path, source_bank=None)
-    led.data["meta"].pop("source_bank", None)
-    monkeypatch.setattr(LFC._OTRLR, "review_ledger",
-                        _rebinding_reviewer("clean_no_edits"))
-    # keep the rest of the legacy chain deterministic + offline
-    monkeypatch.setattr(LFC._OTRSC, "run_story_critic",
-                        lambda *_a, **_k: LFC._OTRSC.StoryCriticReport.clean())
-    disp = LFC.run_freeze_cascade(_fail_generate, led)
-    assert disp.verdict in (
-        "frozen_clean", "frozen_with_warns", "frozen_with_doctor_edits")
-    meta = led.data["meta"]
-    assert meta.get("freeze_verdict") == disp.verdict
-    phase_names = [p.get("phase_name") for p in
-                   (meta.get("cleanup_passes") or [])]
-    assert "phase_1_2_9_reviewer_composite" in phase_names
-    receipt = meta["freeze_capability_receipt"]
-    assert receipt["policy"] == "legacy_full"
+def test_unknown_declared_bank_fails_as_structural_configuration():
+    policy = LFC.resolve_freeze_policy({"source_bank": "no_such_bank"})
+    assert policy.name == "policy_resolution_failed"
+    assert policy.run_inline_safety_cleanup is False
+    assert policy.terminal_error

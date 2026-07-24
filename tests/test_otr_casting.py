@@ -694,10 +694,9 @@ def test_description_response_accepts_valid():
     assert r.character_description.startswith("Female")
 
 
-def test_description_response_rejects_short_description():
-    from pydantic import ValidationError
-    with pytest.raises(ValidationError):
-        _OTRC.DescriptionResponse(character_description="too short")
+def test_description_response_preserves_short_description():
+    r = _OTRC.DescriptionResponse(character_description="terse")
+    assert r.character_description == "terse"
 
 
 def test_casting_response_accepts_valid():
@@ -723,14 +722,13 @@ def test_casting_response_rejects_bad_gender():
         )
 
 
-def test_casting_response_rejects_short_description():
-    from pydantic import ValidationError
-    with pytest.raises(ValidationError):
-        _OTRC.CastingResponse(
-            character_description="too short",  # < 10 chars
-            gender="male",
-            voice_preset="v2/en_speaker_0",
-        )
+def test_casting_response_preserves_short_description():
+    r = _OTRC.CastingResponse(
+        character_description="terse",
+        gender="male",
+        voice_preset="v2/en_speaker_0",
+    )
+    assert r.character_description == "terse"
 
 
 def test_casting_response_normalizes_gender_case():

@@ -18,8 +18,8 @@ every case here runs.
 
 Hermetic: no GPU, no I/O, no live LLM. All generate_fn calls are stubs.
 
-The function and class surface asserted below (NewsBriefs, v1/v2/v3
-validate, build_source_wrapper, compute_cache_key, extract_json_block,
+The function and class surface asserted below (NewsBriefs,
+build_source_wrapper, compute_cache_key, extract_json_block,
 build_news_briefs) is the API contract that commit 2 must satisfy.
 That's the safety-net mechanic -- locking the API before code lands.
 """
@@ -89,8 +89,8 @@ def _valid_brief_json(**overrides):
     return json.dumps(payload)
 
 
-# Source text containing every key_term from _VALID_BRIEFS so V1
-# passes. Canonical "well-formed article body" fixture.
+# Source text containing every key_term from _VALID_BRIEFS for the
+# canonical well-formed article fixture.
 _GOOD_SOURCE = (
     "Astronomers using a large telescope reported an unexplained "
     "signal from a nearby star system this week. Researchers cautioned "
@@ -99,60 +99,7 @@ _GOOD_SOURCE = (
 
 
 # ---------------------------------------------------------------------------
-# ADR Case 3 -- V2 source-context allowance
-# ---------------------------------------------------------------------------
-
-
-def test_v2_allows_period_term_when_in_source():
-    """V2 must NOT reject a brief mentioning '1940' when the source
-    article itself discusses 1940s history.
-
-    ADR section 4.2 -- false-reject avoidance.
-    """
-    source = (
-        "The Eckert-Mauchly team pioneered electronic computing in "
-        "1940 and the architecture that grew out of that work shaped "
-        "every modern processor."
-    )
-    brief = news_interpreter.NewsBriefs(
-        casting_brief=(
-            "An engineer who lived through the 1940 push to build the "
-            "first electronic computer and a young chronicler."
-        ),
-        script_brief="A historical debate over credit and design.",
-        news_close_brief="A new look at early computing history.",
-        key_terms=["Eckert-Mauchly"],
-    )
-    failures = news_interpreter.v2_validate(brief, source_text=source)
-    assert failures == [], (
-        "V2 rejected '1940' even though the source article contains "
-        f"it: {failures!r}"
-    )
-
-
-def test_v2_rejects_period_term_absent_from_source():
-    source = (
-        "Researchers announced a new exoplanet candidate at the Mars "
-        "Reconnaissance Orbiter team meeting."
-    )
-    brief = news_interpreter.NewsBriefs(
-        casting_brief=(
-            "An archivist for a 1940s radio drama hour and a younger "
-            "skeptic colleague."
-        ),
-        script_brief="A debate over data.",
-        news_close_brief="A new exoplanet candidate was reported.",
-        key_terms=["Mars"],
-    )
-    failures = news_interpreter.v2_validate(brief, source_text=source)
-    assert any("1940" in f for f in failures), (
-        "V2 must reject '1940s' when the source has no 1940 "
-        f"reference; failures: {failures!r}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# ADR Case 4 -- prompt-injection defense (wrapper-shape verification)
+# Prompt-injection defense (wrapper-shape verification)
 # ---------------------------------------------------------------------------
 
 
@@ -185,295 +132,6 @@ def test_source_wrapper_marks_article_as_inert():
     # defense is contextual, not strip-based.
     assert "IGNORE PREVIOUS INSTRUCTIONS" in wrapper
 
-
-# ---------------------------------------------------------------------------
-# ADR Case 5 -- key_terms word-boundary precision
-# ---------------------------------------------------------------------------
-
-
-def test_v1_word_boundary_rejects_substring_only_match():
-    """V1 must use word boundaries so 'AI' does NOT match 'paid'.
-
-    Pure substring matching would silently accept fabricated terms
-    that appear inside other words. ADR section 4.1.
-    """
-    source = (
-        "The system is paid for by a research grant. It is afraid of "
-        "nothing."
-    )
-    brief = news_interpreter.NewsBriefs(
-        casting_brief="A team lead and a wary collaborator.",
-        script_brief="Funding politics meet research ethics.",
-        news_close_brief="The grant question lingers.",
-        key_terms=["AI"],
-    )
-    failures = news_interpreter.v1_validate(brief, source_text=source)
-    assert any("AI" in f for f in failures), (
-        "V1 must reject 'AI' when it only appears as a substring of "
-        f"'paid'/'afraid'; failures: {failures!r}"
-    )
-
-
-def test_v1_word_boundary_accepts_real_word_match():
-    source = "Researchers built a new AI model to interpret the signal."
-    brief = news_interpreter.NewsBriefs(
-        casting_brief="A model builder and a domain expert.",
-        script_brief="Model design under deadline.",
-        news_close_brief="A new AI model was demonstrated.",
-        key_terms=["AI"],
-    )
-    failures = news_interpreter.v1_validate(brief, source_text=source)
-    assert failures == [], (
-        f"V1 must accept 'AI' as a standalone word; failures: {failures!r}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Sprint 10B Wave 1 Agent A -- v1_validate LLM-judge fallback
-# ---------------------------------------------------------------------------
-#
-# BUG-LOCAL-264 family fixtures: articles where the LLM emits a
-# key_term the source supports semantically but not verbatim. Strict
-# word-boundary rejects; the new LLM-as-judge fallback accepts.
-#
-# All judge_fn mocks here return deterministic yes/no based on the
-# term; no real LLM call fires in the test suite.
-
-
-def _mock_judge_yes(messages, *, temperature, max_new_tokens):
-    """Mock judge that always says yes -- simulates a model that
-    correctly identifies the paraphrase."""
-    return "yes"
-
-
-def _mock_judge_no(messages, *, temperature, max_new_tokens):
-    """Mock judge that always says no -- simulates a model that
-    correctly identifies a hallucinated term."""
-    return "no"
-
-
-def _mock_judge_only_for(accepted_terms: tuple[str, ...]):
-    """Mock judge that says yes ONLY for the listed terms. Used to
-    pin per-term routing -- the judge sees one call per failing
-    term."""
-    accepted_lower = tuple(t.lower() for t in accepted_terms)
-
-    def judge(messages, *, temperature, max_new_tokens):
-        # The candidate term is in the user message after "Candidate
-        # term:". Extract and compare lowercased.
-        user_msg = ""
-        for m in messages:
-            if m.get("role") == "user":
-                user_msg = str(m.get("content") or "")
-        marker = "Candidate term: "
-        idx = user_msg.find(marker)
-        if idx < 0:
-            return "no"
-        rest = user_msg[idx + len(marker):]
-        # repr() quotes around the term -- strip them.
-        term = rest.split("\n", 1)[0].strip().strip("'\"")
-        return "yes" if term.lower() in accepted_lower else "no"
-
-    return judge
-
-
-class TestBugLocal264SemanticFallback:
-    """Sprint 10B Wave 1 Agent A: when strict word-boundary v1
-    rejects a key_term but the article semantically supports it, the
-    LLM-judge fallback accepts. Without the fallback, the writer's
-    3-attempt retry ladder exhausts on every hard paraphrase article
-    and the writer degrades to raw news_seed (no key_terms anchor)."""
-
-    def test_strict_only_still_rejects_paraphrase(self):
-        """Baseline: with no judge_fn, behavior is identical to the
-        original strict-only v1. Pinned to prove the fallback is the
-        ONLY behavior change."""
-        source = (
-            "Scientists at UCLA developed a treatment that targets "
-            "Epidermal Growth Factor Receptor pathways in glioblastoma."
-        )
-        brief = news_interpreter.NewsBriefs(
-            casting_brief="A lead researcher and a clinical fellow.",
-            script_brief="Targeted therapy meets a stubborn cancer.",
-            news_close_brief="Trials continue at UCLA.",
-            key_terms=["EGFR"],   # paraphrase only; verbatim absent
-        )
-        failures = news_interpreter.v1_validate(
-            brief, source_text=source, judge_fn=None,
-        )
-        assert any("EGFR" in f for f in failures), (
-            "Without judge_fn, strict v1 must still reject the "
-            "paraphrase. Got: {!r}".format(failures)
-        )
-
-    def test_judge_yes_accepts_paraphrase(self):
-        """The fix: with judge_fn provided AND judge returns yes,
-        the paraphrase key_term is accepted."""
-        source = (
-            "Scientists at UCLA developed a treatment that targets "
-            "Epidermal Growth Factor Receptor pathways in glioblastoma."
-        )
-        brief = news_interpreter.NewsBriefs(
-            casting_brief="A lead researcher and a clinical fellow.",
-            script_brief="Targeted therapy meets a stubborn cancer.",
-            news_close_brief="Trials continue at UCLA.",
-            key_terms=["EGFR"],
-        )
-        failures = news_interpreter.v1_validate(
-            brief, source_text=source, judge_fn=_mock_judge_yes,
-        )
-        assert failures == [], (
-            "judge_fn returning 'yes' must accept the paraphrase; "
-            "got failures: {!r}".format(failures)
-        )
-
-    def test_judge_no_keeps_rejection(self):
-        """Halluciation defense: when the model judges the term not
-        supported, the strict failure stands. The fallback only ADDS
-        a chance to accept -- never overrides a clear rejection."""
-        source = "An article about deep-sea coral reefs and bleaching."
-        brief = news_interpreter.NewsBriefs(
-            casting_brief="A marine biologist and a documentarian.",
-            script_brief="Coral bleaching and the warming oceans.",
-            news_close_brief="The reefs survive another year.",
-            key_terms=["quantum entanglement"],   # hallucinated; not in source
-        )
-        failures = news_interpreter.v1_validate(
-            brief, source_text=source, judge_fn=_mock_judge_no,
-        )
-        assert any("quantum entanglement" in f for f in failures), (
-            "judge_fn returning 'no' must keep the rejection; "
-            "got failures: {!r}".format(failures)
-        )
-        # Failure message names BOTH tiers so soak can grep the path.
-        assert any("LLM-judge" in f for f in failures), (
-            "Two-tier failure must mention LLM-judge in the message; "
-            "got: {!r}".format(failures)
-        )
-
-    def test_judge_skipped_when_strict_passes(self):
-        """Strict word-boundary acceptance must short-circuit -- no
-        LLM call fires. Verifies the cost-saving fast path."""
-        source = "Researchers built a new AI model to interpret the signal."
-        brief = news_interpreter.NewsBriefs(
-            casting_brief="A model builder and a domain expert.",
-            script_brief="Model design under deadline.",
-            news_close_brief="A new AI model was demonstrated.",
-            key_terms=["AI"],
-        )
-        judge_calls = {"n": 0}
-
-        def counting_judge(messages, *, temperature, max_new_tokens):
-            judge_calls["n"] += 1
-            return "yes"
-
-        failures = news_interpreter.v1_validate(
-            brief, source_text=source, judge_fn=counting_judge,
-        )
-        assert failures == []
-        assert judge_calls["n"] == 0, (
-            "Strict word-boundary passed; judge_fn must not have "
-            "been called. Calls: {}".format(judge_calls["n"])
-        )
-
-    def test_judge_only_called_for_failing_terms(self):
-        """Mixed brief: some terms pass strict, others need the
-        judge. Only the failing terms get an LLM call."""
-        source = (
-            "Researchers at UCLA built a new AI model to interpret "
-            "signals from the targeted therapy trial."
-        )
-        brief = news_interpreter.NewsBriefs(
-            casting_brief="A researcher and a clinician.",
-            script_brief="AI-assisted analysis of the trial data.",
-            news_close_brief="The trial reports next month.",
-            key_terms=["AI", "UCLA", "EGFR"],   # AI + UCLA pass strict; EGFR doesn't
-        )
-        judge_call_terms: list[str] = []
-
-        def tracking_judge(messages, *, temperature, max_new_tokens):
-            user_msg = ""
-            for m in messages:
-                if m.get("role") == "user":
-                    user_msg = str(m.get("content") or "")
-            marker = "Candidate term: "
-            idx = user_msg.find(marker)
-            if idx >= 0:
-                rest = user_msg[idx + len(marker):]
-                judge_call_terms.append(
-                    rest.split("\n", 1)[0].strip().strip("'\"")
-                )
-            return "yes"
-
-        failures = news_interpreter.v1_validate(
-            brief, source_text=source, judge_fn=tracking_judge,
-        )
-        assert failures == []
-        # Only EGFR should have triggered the judge; AI + UCLA passed strict.
-        assert judge_call_terms == ["EGFR"], (
-            "judge_fn should be called ONLY for the term that failed "
-            "strict word-boundary. Calls: {!r}".format(judge_call_terms)
-        )
-
-    def test_judge_exception_falls_back_to_rejection(self):
-        """PD1-style defense: a broken judge_fn must not break the
-        validator. Exception inside judge → term stays rejected,
-        validator returns the strict failure cleanly."""
-        source = "An article about deep-sea coral reefs and bleaching."
-        brief = news_interpreter.NewsBriefs(
-            casting_brief="A marine biologist and a documentarian.",
-            script_brief="Coral bleaching and the warming oceans.",
-            news_close_brief="The reefs survive another year.",
-            key_terms=["quantum entanglement"],
-        )
-
-        def broken_judge(messages, *, temperature, max_new_tokens):
-            raise RuntimeError("simulated judge crash")
-
-        failures = news_interpreter.v1_validate(
-            brief, source_text=source, judge_fn=broken_judge,
-        )
-        assert any("quantum entanglement" in f for f in failures)
-
-    def test_judge_parses_yes_with_punctuation_and_caps(self):
-        """The judge response parser accepts 'Yes', 'YES', 'yes.',
-        'Yes -- the article mentions ...' as accepts. Anything not
-        starting with 'yes' is a reject."""
-        from nodes import news_interpreter as ni
-        # All of these should classify as accept.
-        for reply in ("yes", "Yes", "YES", "yes.", "Yes -- supported",
-                      "yes\nmore explanation"):
-            def reply_judge(messages, *, temperature, max_new_tokens, _r=reply):
-                return _r
-            failures = ni.v1_validate(
-                ni.NewsBriefs(
-                    casting_brief="x" * 30, script_brief="x" * 30,
-                    news_close_brief="x" * 30, key_terms=["EGFR"],
-                ),
-                source_text="paraphrase only; the verbatim term is absent here.",
-                judge_fn=reply_judge,
-            )
-            assert failures == [], (
-                "Reply {!r} should classify as accept; got {!r}"
-                .format(reply, failures)
-            )
-        # And these should classify as reject.
-        for reply in ("no", "No", "maybe", "the article discusses",
-                      "", "  ", "I am not sure"):
-            def reply_judge(messages, *, temperature, max_new_tokens, _r=reply):
-                return _r
-            failures = ni.v1_validate(
-                ni.NewsBriefs(
-                    casting_brief="x" * 30, script_brief="x" * 30,
-                    news_close_brief="x" * 30, key_terms=["EGFR"],
-                ),
-                source_text="paraphrase only; the verbatim term is absent here.",
-                judge_fn=reply_judge,
-            )
-            assert any("EGFR" in f for f in failures), (
-                "Reply {!r} should classify as reject; got {!r}"
-                .format(reply, failures)
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -572,26 +230,17 @@ def test_byte_identical_with_mocked_generate_fn():
 #           ledger consumers test family.
 # Case 12 (old ledger without meta.news loads with warning) --
 #           integration, lives in test_downstream_prompt_contract.py.
-# Case 13 (article with <2 extractable proper nouns -> graceful) --
-#           covered by post-assembly key_terms check (commit 4 wiring);
-#           test lands with that commit.
+# Optional source terms are covered by the focused grounding and
+# post-assembly telemetry tests.
 
 
 # ---------------------------------------------------------------------------
-# BUG-LOCAL-307 -- key_term length is COERCED (truncated), never a hard halt
+# Authored brief content is structurally typed but never length-gated
 # ---------------------------------------------------------------------------
-#
-# The 40-char cap RAISED on a real >40-char news entity, exhausting the
-# structured-call retry ladder -> NewsInterpreterError -> the whole episode
-# HARD-HALTED in NewsCurationDeep (soak 2026-06-03, mn_musicgen_100, term
-# "University Consortium for Atmospheric Research" = 45 chars). The cap is now
-# 80 and the validator truncates an over-long term at a word boundary instead
-# of raising, so a long entity can never halt the run.
 
 
-def test_bug307_long_real_entity_key_term_accepted():
-    """A real >40-char news entity now fits under the relaxed 80-char cap and
-    constructs without raising (the old 40-char cap raised here)."""
+def test_long_real_entity_key_term_preserved():
+    """A long source term survives schema construction byte-for-byte."""
     long_term = "University Consortium for Atmospheric Research"  # 45 chars
     assert len(long_term) > 40
     brief = news_interpreter.NewsBriefs(
@@ -600,12 +249,11 @@ def test_bug307_long_real_entity_key_term_accepted():
         news_close_brief="A new atmospheric dataset was released tonight.",
         key_terms=[long_term],
     )
-    assert brief.key_terms == [long_term]  # <= 80 -> kept verbatim
+    assert brief.key_terms == [long_term]
 
 
-def test_bug307_overlong_key_term_truncated_not_raised():
-    """A pathological >80-char term is COERCED (truncated at a word boundary),
-    never raised -- so it can never exhaust the ladder / halt the episode."""
+def test_arbitrarily_long_key_term_preserved():
+    """Term length is not a candidate or episode gate."""
     overlong = (
         "International Intergovernmental Panel Consortium for Atmospheric "
         "and Oceanic Research Coordination"
@@ -617,10 +265,7 @@ def test_bug307_overlong_key_term_truncated_not_raised():
         news_close_brief="The committee adjourned without a vote tonight.",
         key_terms=[overlong],
     )
-    (kept,) = brief.key_terms
-    assert len(kept) <= 80
-    assert overlong.startswith(kept)        # a clean prefix of the original
-    assert kept == kept.rstrip()            # word-boundary trim, no trailing space
+    assert brief.key_terms == [overlong]
 
 
 def test_bug307_normal_key_terms_pass_through_unchanged():
@@ -635,15 +280,7 @@ def test_bug307_normal_key_terms_pass_through_unchanged():
     assert brief.key_terms == ["telescope", "signal", "researchers"]
 
 
-# ---------------------------------------------------------------------------
-# BUG-LOCAL-264 -- over-cap news_briefs fields are COERCED, not rejected
-# ---------------------------------------------------------------------------
-# Weak writers (gemma-2-2b-it) return 9-10 key_terms (> cap) and over-long
-# briefs; the schema USED to reject -> the whole NewsBriefs object was lost ->
-# the announcer intro AND outro fell back to generic text. The fields now coerce.
-
-
-def test_bug264_overlong_key_terms_list_trimmed_to_cap():
+def test_all_optional_key_terms_are_preserved():
     terms = [f"term{i}" for i in range(10)]
     brief = news_interpreter.NewsBriefs(
         casting_brief="A scientist and a skeptic.",
@@ -651,36 +288,29 @@ def test_bug264_overlong_key_terms_list_trimmed_to_cap():
         news_close_brief="A dataset was released tonight.",
         key_terms=terms,
     )
-    assert brief.key_terms == terms[: news_interpreter._MAX_KEY_TERMS]
-    assert len(brief.key_terms) == news_interpreter._MAX_KEY_TERMS
+    assert brief.key_terms == terms
 
 
-def test_bug264_overlong_script_brief_truncated_at_word_boundary():
-    cap = news_interpreter._MAX_SCRIPT_BRIEF_CHARS
-    long_brief = ("word " * ((cap // 5) + 20)).strip()
-    assert len(long_brief) > cap
+def test_long_script_brief_is_preserved():
+    long_brief = ("word " * 500).strip()
     brief = news_interpreter.NewsBriefs(
         casting_brief="A scientist and a skeptic.",
         script_brief=long_brief,
         news_close_brief="A dataset was released tonight.",
         key_terms=["dataset"],
     )
-    assert len(brief.script_brief) <= cap
-    assert not brief.script_brief.endswith(" ")
-    assert long_brief.startswith(brief.script_brief)
+    assert brief.script_brief == long_brief
 
 
-def test_bug264_overlong_news_close_brief_truncated():
-    cap = news_interpreter._MAX_NEWS_CLOSE_BRIEF_CHARS
-    long_close = ("alpha " * ((cap // 6) + 20)).strip()
-    assert len(long_close) > cap
+def test_long_news_close_brief_is_preserved():
+    long_close = ("alpha " * 500).strip()
     brief = news_interpreter.NewsBriefs(
         casting_brief="A scientist and a skeptic.",
         script_brief="A debate over a dataset.",
         news_close_brief=long_close,
         key_terms=["dataset"],
     )
-    assert len(brief.news_close_brief) <= cap
+    assert brief.news_close_brief == long_close
 
 
 def test_bug264_non_list_key_terms_still_rejected():

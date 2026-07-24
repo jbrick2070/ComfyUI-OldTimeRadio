@@ -32,7 +32,7 @@ import sys
 import textwrap
 from pathlib import Path
 
-# 12 prompt entrypoint modules from the Sprint H tester scope.
+# Active prompt entrypoint modules.
 # Order does not matter for the guard; module names mirror the
 # table in docs/2026-05-16-otr-headless-prompt-tester__00_question.md.
 PROMPT_MODULES = (
@@ -41,7 +41,6 @@ PROMPT_MODULES = (
     "nodes._otr_casting",
     "nodes._otr_line_composer",
     "nodes._otr_story_brief",
-    "nodes._otr_ledger_reviewer",
     "nodes.news_interpreter",
 )
 

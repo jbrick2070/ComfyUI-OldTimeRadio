@@ -16,10 +16,10 @@ What a slot drama contract is
 For each voiced dialogue slot, the contract is the per-line OBLIGATION
 the exchange writer (Build 4) must honor: who speaks, what the line is
 trying to do (`line_job`), the unspoken force under it
-(`hidden_pressure`), at least one concrete detail it must ground in,
-and the emotional/positional state before vs after the line. The
-`must_turn` flag marks the slot that pivots the episode -- the
-costly-choice beat -- where state_before MUST differ from state_after.
+(`hidden_pressure`), optional source-derived grounding details, and the
+emotional/positional state before vs after the line. The `must_turn` flag
+records the slot selected as the episode pivot; it is story telemetry, not an
+acceptance or publication gate.
 
 ----------------------------------------------------------------------
 LLM surface is deliberately tiny (plan critique 4 & 5)
@@ -38,9 +38,9 @@ fields only):
   * line_job        -- one clause: what this line is trying to do.
   * hidden_pressure -- one clause: the unspoken force under it.
 
-Everything else is derived, so a bad LLM pass can only corrupt two
-short strings; the deterministic validator + minimal-contract fallback
-cover the rest.
+Everything else is derived, so a malformed LLM pass can only corrupt two
+short strings; typed schema validation + minimal-contract fallback cover the
+rest. Story quality preferences never trigger another model call.
 
 PURE module: pydantic + stdlib only. No torch, no I/O, no node
 surface. The LLM pass takes a `generate_fn` by dependency injection
@@ -52,7 +52,7 @@ import json
 import logging
 from typing import Any, Callable, List, Optional, Tuple
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
 log = logging.getLogger("OTR")
@@ -84,25 +84,35 @@ class SlotDramaContract(BaseModel):
       * speaker          -- speaker NAME (derived from the slot row).
       * line_job         -- LLM-written: what this line is trying to do.
       * hidden_pressure  -- LLM-written: the unspoken force under it.
-      * concrete_detail_required -- one or more grounding details, each
-        drawn from (continuity active_props  union  news key_terms).
-        The exchange writer must land at least one across the exchange
-        (Build 4 weights this per-exchange, not per-line).
+      * concrete_detail_required -- zero or more optional grounding details,
+        each drawn from (continuity active_props union news key_terms).
       * state_before / state_after -- the emotional/positional state
         of the scene entering vs leaving this slot. Derived from
         DramaticState + beat position.
-      * must_turn -- True ONLY for the costly-choice slot. When True
-        the validator demands state_before != state_after.
+      * must_turn -- derived telemetry for the selected costly-choice slot.
     """
 
     dialogue_slot_id: str = Field(..., pattern=r"^d\d{3}$")
-    speaker: str = Field(..., min_length=1, max_length=120)
-    line_job: str = Field(..., min_length=1, max_length=240)
-    hidden_pressure: str = Field(..., min_length=1, max_length=240)
+    speaker: str
+    line_job: str
+    hidden_pressure: str
     concrete_detail_required: List[str] = Field(default_factory=list)
-    state_before: str = Field(..., min_length=1, max_length=200)
-    state_after: str = Field(..., min_length=1, max_length=200)
+    state_before: str
+    state_after: str
     must_turn: bool = Field(default=False)
+
+    @field_validator(
+        "speaker",
+        "line_job",
+        "hidden_pressure",
+        "state_before",
+        "state_after",
+    )
+    @classmethod
+    def _text_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("slot-drama text must not be blank")
+        return value
 
 
 class SlotJobFields(BaseModel):
@@ -115,8 +125,15 @@ class SlotJobFields(BaseModel):
     both then re-checked by the deterministic validator.
     """
 
-    line_job: str = Field(..., min_length=1, max_length=240)
-    hidden_pressure: str = Field(..., min_length=1, max_length=240)
+    line_job: str
+    hidden_pressure: str
+
+    @field_validator("line_job", "hidden_pressure")
+    @classmethod
+    def _text_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("slot-job text must not be blank")
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -172,12 +189,12 @@ def _state_phrases(dramatic_state: Any) -> Tuple[str, str]:
                      the two opposed wants (the world at the open).
     ending_state  -- the ending_change (the world at the close).
 
-    Both clamped to the SlotDramaContract state field cap (200).
+    Authored context is preserved without prose-length classification.
     """
-    dq = " ".join(str(_get(dramatic_state, "dramatic_question", "") or "").split())
-    a = " ".join(str(_get(dramatic_state, "character_a_wants", "") or "").split())
-    b = " ".join(str(_get(dramatic_state, "character_b_wants", "") or "").split())
-    ec = " ".join(str(_get(dramatic_state, "ending_change", "") or "").split())
+    dq = str(_get(dramatic_state, "dramatic_question", "") or "").strip()
+    a = str(_get(dramatic_state, "character_a_wants", "") or "").strip()
+    b = str(_get(dramatic_state, "character_b_wants", "") or "").strip()
+    ec = str(_get(dramatic_state, "ending_change", "") or "").strip()
 
     if a and b:
         opening = f"unresolved: {a} vs {b}"
@@ -188,18 +205,7 @@ def _state_phrases(dramatic_state: Any) -> Tuple[str, str]:
 
     ending = ec or "the question is answered and the world has changed"
 
-    return (_clamp(opening, 200), _clamp(ending, 200))
-
-
-def _clamp(s: str, n: int) -> str:
-    s = " ".join((s or "").split())
-    if len(s) <= n:
-        return s
-    cut = s[: n - 1]
-    sp = cut.rfind(" ")
-    if sp > n // 2:
-        return cut[:sp].rstrip()
-    return cut.rstrip()
+    return (opening, ending)
 
 
 def _pick_concrete_details(
@@ -214,8 +220,7 @@ def _pick_concrete_details(
     slots ground in different props/terms (avoids object spam --
     plan critique 6). The turning slot gets two candidates when the
     pool allows (it carries the most weight); other slots get one.
-    Empty pool -> empty list (validator will flag if a turning slot
-    needs grounding; minimal-contract fallback handles that case).
+    Empty pool -> empty list; optional source terms never create a floor.
     """
     if not candidates:
         return []
@@ -273,8 +278,10 @@ def derive_contract_skeleton(
     else:
         # Non-turning slots hold the line: same state on each side.
         # The validator only forbids equality when must_turn is True.
-        held = opening if slot_index == 0 else _clamp(
-            "tension carried forward, unresolved", 200
+        held = (
+            opening
+            if slot_index == 0
+            else "tension carried forward, unresolved"
         )
         state_before, state_after = held, held
 
@@ -309,8 +316,9 @@ EXACTLY one JSON object, no prose, no Markdown fences:
   "line_job":        "one clause: what this line is trying to DO (a verb-driven aim, not the words spoken)",
   "hidden_pressure": "one clause: the unspoken force under the line (what the speaker will not say outright)"
 }
-Keep each field under 240 characters. Be specific to THIS slot. Do not
-restate the state phrases verbatim. Safe for work."""
+Use non-empty strings. Be specific to THIS slot. Do not restate the
+state phrases verbatim. Wording and length are creative choices. Safe for
+work."""
 
 
 def _build_slot_job_user_prompt(
@@ -427,29 +435,26 @@ def build_minimal_contract(
     intent = " ".join((beat_intent or "").split())
     if skeleton["must_turn"]:
         ec = str(_get(dramatic_state, "ending_change", "") or "").strip()
-        line_job = _clamp(
+        line_job = (
             f"force the irreversible choice that brings about: {ec}"
             if ec
-            else "force the irreversible choice that pivots the episode",
-            240,
+            else "force the irreversible choice that pivots the episode"
         )
-        hidden_pressure = _clamp(
-            "the cost of choosing -- what the speaker loses either way",
-            240,
+        hidden_pressure = (
+            "the cost of choosing -- what the speaker loses either way"
         )
     else:
-        line_job = _clamp(
-            f"advance the beat: {intent}" if intent else "advance the scene's tension",
-            240,
+        line_job = (
+            f"advance the beat: {intent}"
+            if intent
+            else "advance the scene's tension"
         )
         a = str(_get(dramatic_state, "character_a_wants", "") or "").strip()
         b = str(_get(dramatic_state, "character_b_wants", "") or "").strip()
         if a and b:
-            hidden_pressure = _clamp(f"the unspoken pull between {a} and {b}", 240)
+            hidden_pressure = f"the unspoken pull between {a} and {b}"
         else:
-            hidden_pressure = _clamp(
-                "the unspoken stake neither party will name", 240
-            )
+            hidden_pressure = "the unspoken stake neither party will name"
 
     return SlotDramaContract(
         line_job=line_job,
@@ -575,15 +580,12 @@ def validate_contract(
     Rules (each failure appends a reason; same input -> same verdict):
       1. schema-valid -- coerces to SlotDramaContract (catches bad
          slot id pattern, missing/empty required fields, wrong types).
-      2. every text field non-empty after strip (line_job,
-         hidden_pressure, speaker, state_before, state_after).
-      3. concrete_detail_required subset of (active_props union
-         key_terms), case-insensitive. Each entry must be non-empty.
-      4. when must_turn is True: state_before != state_after (the turn
-         must actually change the state) AND at least one concrete
-         detail is required (the pivot must ground in something real).
-      5. when must_turn is True: at least one concrete detail present
-         (covered in rule 4; called out for the episode-level check).
+      2. every required text field is non-empty after strip.
+      3. concrete_detail_required contains only non-empty values derived from
+         (active_props union key_terms), case-insensitive.
+
+    State change, pivot count, and detail presence are story-quality telemetry;
+    they never reject a structurally valid contract or trigger a model retry.
 
     Returns (ok, reasons). ok == (reasons == []).
     """
@@ -615,12 +617,6 @@ def validate_contract(
         if d.lower() not in pool:
             reasons.append(f"concrete_detail_not_in_pool: {d!r}")
 
-    # Rule 4 -- the turning slot must actually turn AND must ground.
-    if c.must_turn:
-        if _eq_norm(c.state_before, c.state_after):
-            reasons.append("must_turn_but_state_unchanged")
-        if not [d for d in c.concrete_detail_required if str(d or "").strip()]:
-            reasons.append("must_turn_but_no_concrete_detail")
 
     return (not reasons), reasons
 
@@ -632,32 +628,18 @@ def validate_episode_contracts(
 ) -> Tuple[bool, List[str]]:
     """Episode-level deterministic check across ALL slot contracts.
 
-    Per-slot rules (delegated to `validate_contract`) PLUS the
-    cross-slot invariant from the plan:
-      * EXACTLY ONE slot carries the costly-choice obligation
-        (must_turn == True). Zero -> the episode never turns; more
-        than one -> ambiguous pivot.
+    Delegates the structural/schema checks to `validate_contract` for every
+    row. Pivot count is story telemetry and does not control liveness.
 
-    Returns (ok, reasons). Reasons are prefixed with the slot id for
-    per-slot failures and "episode:" for the cross-slot rule.
+    Returns (ok, reasons). Reasons are prefixed with the slot id.
     """
     reasons: List[str] = []
 
-    turn_slots: List[str] = []
     for c in contracts:
         ok, sub = validate_contract(c, active_props, key_terms)
         sid = str(_get(c, "dialogue_slot_id", "") or "").strip() or "?"
         if not ok:
             reasons.extend(f"{sid}: {r}" for r in sub)
-        if bool(_get(c, "must_turn", False)):
-            turn_slots.append(sid)
-
-    if len(turn_slots) == 0:
-        reasons.append("episode: no slot carries the costly-choice turn")
-    elif len(turn_slots) > 1:
-        reasons.append(
-            "episode: more than one costly-choice turn: " + ", ".join(turn_slots)
-        )
 
     return (not reasons), reasons
 

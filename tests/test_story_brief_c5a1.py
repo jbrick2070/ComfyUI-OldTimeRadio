@@ -22,13 +22,9 @@ Coverage map (per C5a1 pytest table):
     4. under 250 tokens; the redundant name/proper-noun suppression
        list is trimmed now the input is pre-sanitized.
 
-  Validation gate (refinement section 3.4 + 3.3):
-    5. rejects named character
-    6. rejects dialogue verb
-    7. rejects decade literal
-    8. rejects over 300 chars
-    The OUTPUT reject-list safety net stays live after 3G input
-    sanitization (TestOutputRejectSafetyNetUnchanged).
+  Schema-only acceptance:
+    5. preserves authored names, actions, eras, and punctuation
+    6. accepts any nonblank brief without a content-driven retry
 
   Retry ladder (Sprint 2A/2D -- structured_call):
     9. structural retry re-rolls when initial validation fails
@@ -48,6 +44,7 @@ Coverage map (per C5a1 pytest table):
 from __future__ import annotations
 
 import ast
+import json
 import re
 from pathlib import Path
 
@@ -69,8 +66,7 @@ _MODULE_PATH = _REPO_ROOT / "nodes" / "_otr_story_brief.py"
 def _mk_ledger(num_lines: int = 6, with_period: str | None = None) -> dict:
     """Construct a minimal valid ledger dict for tests.
 
-    `with_period` injects a period string into a cast description so
-    the period-validator's "already present" exemption can be tested.
+    `with_period` optionally enriches a cast description for input-builder tests.
     """
     desc_extra = f" Set in {with_period}." if with_period else ""
     lines: list[dict] = [
@@ -130,13 +126,19 @@ def _make_spy_fn(*, responses: list[str]):
     return fn
 
 
+def _brief_json(story_brief: str) -> str:
+    return json.dumps({
+        "story_brief": story_brief,
+        "setting_terms": ["interrogation room"],
+        "lighting_terms": ["bare bulb"],
+        "atmosphere_terms": ["tense"],
+    })
+
+
 def _valid_brief_json() -> str:
-    return (
-        '{"story_brief": "a dim interrogation room under a swinging bare bulb, '
-        'rain-streaked window, sweat and smoke", '
-        '"setting_terms": ["interrogation room", "steel table", "rain-streaked window"], '
-        '"lighting_terms": ["swinging bare bulb", "harsh top-down shadow"], '
-        '"atmosphere_terms": ["sweat", "smoke", "tense"]}'
+    return _brief_json(
+        "a dim interrogation room under a swinging bare bulb, "
+        "rain-streaked window, sweat and smoke"
     )
 
 
@@ -159,30 +161,17 @@ class TestReflectionInputBuilder:
             "fixture margin)"
         )
 
-    def test_includes_required_fields(self):
-        """The input builder still emits every required section.
-
-        Sprint 3G: the TITLE and CAST sections are now sanitized -- the
-        episode title is a proper-noun phrase and collapses to a
-        `source_entity` token, and cast names collapse to `character_*`
-        tokens. The section HEADERS, the STYLE controlled-vocab slug,
-        and the structural SFX / ENV markers all survive verbatim. The
-        un-sanitized-name assertion is intentionally GONE -- the
-        builder must never hand the LLM a real cast name (see
-        TestReflectionInputSanitization below)."""
+    def test_includes_exact_required_fields(self):
+        """The model receives the canonical names and world terms unchanged."""
         led = _mk_ledger()
         text = sb._build_reflection_input(led)
-        # Section headers + the controlled-vocab style slug pass through.
-        assert "TITLE: " in text
+        assert "TITLE: The Bulkhead Closes" in text
         assert "STYLE: noir_interrogation" in text
         assert "CAST:" in text
-        # Cast roster present as neutral tokens, not real names.
-        assert "character_a" in text
-        # Scene headers.
+        assert "Jones" in text
+        assert "Smith" in text
         assert "SCENE 1" in text
-        # Opening lines.
         assert "OPENING" in text
-        # Non-dialogue rows -- structural markers, no names.
         assert "[SFX: bulkhead seals" in text
         assert "[ENV: light rain" in text
 
@@ -222,146 +211,41 @@ class TestReflectionInputBuilder:
 
 
 # ---------------------------------------------------------------------------
-# 3G. Input sanitization -- cast names + proper nouns -> neutral tokens
+# 3G. Exact context preservation
 # ---------------------------------------------------------------------------
-# Sprint 3G: `_build_reflection_input` runs a deterministic strip before
-# the text reaches the LLM. Every cast name and proper noun is replaced
-# with a neutral token (character_a, source_entity) so the model never
-# sees a real name it is then told to suppress. The OUTPUT reject lists
-# in `_validate_brief` stay as the safety net -- proven still live by
-# TestValidation below and TestOutputRejectSafetyNetUnchanged.
 
 
-class TestReflectionInputSanitization:
+class TestReflectionInputPreservation:
 
-    def test_cast_names_replaced_with_neutral_tokens(self):
-        """No cast name surface form survives into the LLM-facing text;
-        each maps to a stable `character_*` token instead."""
-        led = _mk_ledger()
-        text = sb._build_reflection_input(led)
-        # The fixture cast is Jones / Smith.
-        assert "Jones" not in text, "real cast name 'Jones' leaked to the LLM"
-        assert "Smith" not in text, "real cast name 'Smith' leaked to the LLM"
-        # char_id tokens are the upper-case form of the same names; the
-        # case-insensitive substitution must catch them too.
-        assert "JONES" not in text
-        assert "SMITH" not in text
-        # Both characters present as distinct neutral tokens.
-        assert "character_a" in text
-        assert "character_b" in text
-
-    def test_cast_substitution_is_deterministic(self):
-        """Same ledger -> byte-identical sanitized input on every call,
-        and the name->token mapping is stable (Jones is always the same
-        token within a build)."""
-        led = _mk_ledger()
-        first = sb._build_reflection_input(led)
-        second = sb._build_reflection_input(led)
-        assert first == second, "sanitized input is not deterministic"
-
-    def test_cast_name_in_line_text_is_sanitized(self):
-        """A cast name appearing inside dialogue / line text -- not just
-        the CAST roster -- is also replaced before the LLM sees it."""
-        led = _mk_ledger(num_lines=2)
-        # Inject a line that names a cast member in its body text.
-        led["lines"].append({
-            "speaker_role": "character",
-            "char_id":      "SMITH",
-            "text":         "Jones already left through the back door.",
-        })
-        text = sb._build_reflection_input(led)
-        assert "Jones" not in text, (
-            "cast name embedded in line text leaked to the LLM unsanitized"
-        )
-        # The neutral token replaces it.
-        assert "character_a" in text
-
-    def test_name_part_is_sanitized(self):
-        """A multi-word cast name is replaced whether it appears in full
-        or by one of its parts -- both collapse onto the SAME token so
-        the input stays internally coherent."""
-        led = _mk_ledger(num_lines=2)
-        led["cast"] = [
-            {"char_id": "DETECTIVE_HALE", "name": "Detective Hale",
-             "character_description": "Weary investigator."},
-        ]
-        led["lines"].append({
-            "speaker_role": "character",
-            "char_id":      "DETECTIVE_HALE",
-            "text":         "Hale studies the rain-streaked glass.",
-        })
-        text = sb._build_reflection_input(led)
-        assert "Hale" not in text, "cast name part 'Hale' leaked unsanitized"
-        assert "Detective Hale" not in text
-        # Full name and bare part both map to character_a.
-        assert "character_a" in text
-        assert "character_b" not in text, (
-            "the two surface forms of one character produced two tokens"
-        )
-
-    def test_proper_noun_replaced_with_source_entity_token(self):
-        """A proper noun that is NOT a cast name (an episode title /
-        place / source entity) is replaced with a `source_entity_*`
-        token before the LLM sees it."""
-        led = _mk_ledger(num_lines=2)
-        led["meta"]["episode_title"] = "The Bulkhead Closes"
-        text = sb._build_reflection_input(led)
-        # The title proper-noun phrase does not survive verbatim.
-        assert "Bulkhead Closes" not in text
-        assert "source_entity" in text, (
-            "no source_entity token emitted; the title proper noun was "
-            "not sanitized"
-        )
-
-    def test_proper_noun_substitution_is_stable_within_a_call(self):
-        """The same proper noun seen twice in one build maps to the
-        SAME token both times -- cross-references stay coherent.
-
-        The title proper noun "Halloran" appears in the TITLE line and
-        again in a scene header. Both occurrences must resolve to the
-        identical `source_entity_*` token, so the substituted token
-        appears at least twice and "Halloran" never leaks."""
-        import re as _re
+    def test_names_places_objects_and_smoking_are_preserved(self):
         led = _mk_ledger(num_lines=2)
         led["meta"]["episode_title"] = "Halloran Tower"
         led["lines"].append({
-            "speaker_role": "scene",
-            "text":         "=== Halloran Tower -- ROOFTOP",
+            "speaker_role": "character",
+            "char_id": "SMITH",
+            "text": (
+                "Jones waits in the smoking room beside a velvet chair "
+                "and the decryption machine."
+            ),
         })
-        # Resolve which token "Halloran" maps to via the deterministic
-        # substitution helper, then confirm that exact token carries
-        # both occurrences in the built input.
-        cast_map = sb._build_cast_substitution(led["cast"])
-        probe_map: dict[str, str] = {}
-        sb._sanitize_reflection_text("x Halloran x", cast_map, probe_map)
-        halloran_token = probe_map["halloran"]
-
         text = sb._build_reflection_input(led)
-        assert "Halloran" not in text, "proper noun leaked unsanitized"
-        assert text.count(halloran_token) >= 2, (
-            f"the repeated proper noun did not reuse a stable token "
-            f"({halloran_token!r} appears {text.count(halloran_token)} "
-            "times, expected >= 2)"
-        )
+        assert "Halloran Tower" in text
+        assert "Jones waits in the smoking room" in text
+        assert "velvet chair" in text
+        assert "decryption machine" in text
 
-    def test_no_real_name_handed_to_llm_via_entrypoint(self):
-        """End-to-end: the user message `run_story_brief_reflection`
-        actually sends the slot fn contains no real cast name -- the
-        sanitized input is what reaches the LLM, not the raw ledger."""
+    def test_entrypoint_sends_exact_cast_and_world_context(self):
         led = _mk_ledger()
         spy = _make_spy_fn(responses=[_valid_brief_json()])
         sb.run_story_brief_reflection(led, spy)
         assert len(spy.calls) == 1
         sent = spy.calls[0]["messages"][0]["content"]
-        assert "Jones" not in sent and "Smith" not in sent, (
-            "the LLM call carried a real cast name -- 3G sanitization "
-            "did not reach the entrypoint"
-        )
-        assert "character_a" in sent
+        assert "Jones" in sent
+        assert "Smith" in sent
 
 
 # ---------------------------------------------------------------------------
-# 4. Prompt body length + 3G suppression-text trim
+# 4. Prompt body length + exact-context guidance
 # ---------------------------------------------------------------------------
 
 
@@ -385,116 +269,41 @@ def test_reflection_prompt_under_320_tokens():
     )
 
 
-def test_reflection_prompt_dropped_name_suppression_list():
-    """Sprint 3G: because the input is pre-sanitized, the prompt no
-    longer needs the verbose 'No cast names. No proper nouns.'
-    suppression list. That redundant text is gone; a concise positive
-    'use no names' instruction replaces it. The dialogue/plot-verb and
-    invented-period guidance STAYS -- those constrain words the model
-    could volunteer that are not in the sanitized input."""
+def test_reflection_prompt_requests_exact_context_preservation():
     prompt = sb._REFLECTION_PROMPT
-    # The redundant suppression line is gone.
-    assert "No cast names. No proper nouns." not in prompt
-    # A positive 'use no names' instruction is present instead.
-    assert "no names" in prompt.lower()
-    # The guidance that still does real work survives.
+    assert "Preserve exact context names and world terms" in prompt
     assert "dialogue verbs" in prompt
     assert "plot verbs" in prompt
     assert "invented dates" in prompt
 
 
 # ---------------------------------------------------------------------------
-# 5-8. Validation gate
+# 5-8. Authored content is preserved; only schema integrity can retry
 # ---------------------------------------------------------------------------
 
 
-class TestValidation:
+class TestAuthoredBriefAcceptance:
 
-    def test_rejects_named_character(self):
+    def test_names_actions_eras_and_punctuation_preserved_without_retry(self):
         led = _mk_ledger()
-        # The brief mentions "Jones" -- one of the cast names.
-        brief = ("a dim room under a swinging bare bulb where Jones leans "
-                 "over the table")
-        reasons = sb._validate_brief(brief, led)
-        assert sb.REJECT_NAMED_CHARACTER in reasons
-
-    def test_rejects_dialogue_verb(self):
-        led = _mk_ledger()
-        brief = "a dim interrogation room where shadows fall, speaking softly"
-        reasons = sb._validate_brief(brief, led)
-        assert sb.REJECT_DIALOGUE_VERB in reasons
-
-    def test_rejects_decade_literal(self):
-        led = _mk_ledger()  # No period in the source.
-        brief = "a dim 1940s interrogation room under a swinging bare bulb"
-        reasons = sb._validate_brief(brief, led)
-        assert sb.REJECT_UNSUPPORTED_PERIOD in reasons
-
-    def test_decade_literal_allowed_when_in_source(self):
-        """If the ledger already names a period, the brief may carry it."""
-        led = _mk_ledger(with_period="1947")
-        brief = "a dim 1947 interrogation room under a swinging bare bulb"
-        reasons = sb._validate_brief(brief, led)
-        assert sb.REJECT_UNSUPPORTED_PERIOD not in reasons
-
-    def test_rejects_over_300_chars(self):
-        led = _mk_ledger()
-        brief = "a dim interrogation room " * 30  # Way over 300 chars.
-        reasons = sb._validate_brief(brief, led)
-        assert sb.REJECT_TOO_LONG in reasons
-
-    def test_rejects_quote_or_markup(self):
-        led = _mk_ledger()
-        brief = 'a dim "interrogation" room'
-        reasons = sb._validate_brief(brief, led)
-        assert sb.REJECT_QUOTES_OR_MARKUP in reasons
-
-    def test_accepts_clean_brief(self):
-        led = _mk_ledger()
-        brief = ("a dim interrogation room under a swinging bare bulb, "
-                 "rain on tin, sweat and smoke")
-        reasons = sb._validate_brief(brief, led)
-        assert reasons == []
-
-
-# ---------------------------------------------------------------------------
-# 3G. Output reject-list safety net stays live after input sanitization
-# ---------------------------------------------------------------------------
-# Sprint 3G sanitizes the INPUT. The schema-side reject lists that catch
-# a name in the OUTPUT must STAY exactly as they are -- they are the
-# safety net for a model that volunteers a name on its own. These tests
-# prove the OUTPUT gate is unweakened by the 3G change.
-
-
-class TestOutputRejectSafetyNetUnchanged:
-
-    def test_output_validator_still_rejects_named_character(self):
-        """`_validate_brief` -- the OUTPUT gate -- still flags a cast
-        name in the produced brief, unchanged by 3G input sanitization."""
-        led = _mk_ledger()
-        leaked = "a dim room where Jones leans over the table"
-        reasons = sb._validate_brief(leaked, led)
-        assert sb.REJECT_NAMED_CHARACTER in reasons
-
-    def test_entrypoint_rerolls_when_output_leaks_a_name(self):
-        """End-to-end: even with a sanitized input, if the LLM still
-        emits a cast name in its OUTPUT the content gate fires and the
-        ladder re-rolls. The reject-list safety net is intact."""
-        led = _mk_ledger()
-        name_leaking = (
-            '{"story_brief": "a dim room where Jones leans over a table", '
-            '"setting_terms": ["room", "table"], '
-            '"lighting_terms": ["bare bulb"], '
-            '"atmosphere_terms": ["tense"]}'
+        authored = (
+            'Jones speaks in a 1940s "interrogation" room, then discovers '
+            "the Victorian machine"
         )
-        spy = _make_spy_fn(responses=[name_leaking, _valid_brief_json()])
+        spy = _make_spy_fn(responses=[_brief_json(authored)])
         result = sb.run_story_brief_reflection(led, spy)
-        assert len(spy.calls) == 2, (
-            "output name-leak did not trigger a re-roll -- the OUTPUT "
-            "reject-list safety net regressed"
-        )
+
         assert result["story_brief_status"] == "ok"
-        assert "Jones" not in result["story_brief"]
+        assert result["story_brief"] == authored
+        assert len(spy.calls) == 1
+
+    def test_any_nonblank_schema_valid_brief_is_accepted_once(self):
+        spy = _make_spy_fn(responses=[_brief_json("x")])
+        result = sb.run_story_brief_reflection(_mk_ledger(), spy)
+
+        assert result["story_brief_status"] == "ok"
+        assert result["story_brief"] == "x"
+        assert len(spy.calls) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -513,23 +322,14 @@ class TestOutputRejectSafetyNetUnchanged:
 
 class TestRetryLadder:
 
-    def test_retry_runs_when_initial_fails(self):
-        """A content-rejected first response must re-roll the ladder --
-        the entrypoint invokes technical_fn a second time."""
+    def test_retry_runs_when_initial_json_is_structurally_invalid(self):
+        """Only a malformed structured response spends a retry turn."""
         led = _mk_ledger()
-        # First response mentions a cast name (content reject); second
-        # is clean.
-        bad_brief = (
-            '{"story_brief": "a dim room where Jones leans over a table", '
-            '"setting_terms": ["room", "table"], '
-            '"lighting_terms": ["bare bulb"], '
-            '"atmosphere_terms": ["tense"]}'
+        spy = _make_spy_fn(
+            responses=["this is not valid JSON at all {{{", _valid_brief_json()]
         )
-        spy = _make_spy_fn(responses=[bad_brief, _valid_brief_json()])
         result = sb.run_story_brief_reflection(led, spy)
-        assert len(spy.calls) == 2, (
-            "structural retry should have invoked technical_fn twice"
-        )
+        assert len(spy.calls) == 2
         assert result["story_brief_status"] == "ok"
 
     def test_retry_does_not_run_when_initial_passes(self):
@@ -545,12 +345,9 @@ class TestRetryLadder:
         re-roll lowers entropy, it never raises it (the old repair pass
         RAISED it by +0.15)."""
         led = _mk_ledger()
-        bad_brief = (
-            '{"story_brief": "a dim room where Jones leans over a table", '
-            '"setting_terms": ["room"], "lighting_terms": ["bulb"], '
-            '"atmosphere_terms": ["tense"]}'
+        spy = _make_spy_fn(
+            responses=["this is not valid JSON at all {{{", _valid_brief_json()]
         )
-        spy = _make_spy_fn(responses=[bad_brief, _valid_brief_json()])
         sb.run_story_brief_reflection(led, spy)
         assert len(spy.calls) == 2, "structural retry did not run"
         assert abs(spy.calls[0]["temperature"]
@@ -826,16 +623,10 @@ class TestV2ProducerFields:
                 "safe-empty default ([] or '')"
             )
 
-    def test_schema_caps_string_v2_fields(self):
-        """Schema-side length caps on the two string v2 fields fire
-        when the LLM produces over-long content. Locks the producer-
-        side defence so a runaway response cannot smuggle a paragraph
-        into the LTX motion prompt via tempo_hint."""
-        # tempo_hint cap is _TEMPO_HINT_HARD_MAX_CHARS (80).
-        oversized_tempo = "x" * (sb._TEMPO_HINT_HARD_MAX_CHARS + 5)
-        # atmosphere_line cap is _ATMOSPHERE_LINE_HARD_MAX_CHARS (200).
-        oversized_atmo = "y" * (sb._ATMOSPHERE_LINE_HARD_MAX_CHARS + 5)
-        bad_json = (
+    def test_schema_preserves_long_v2_string_fields(self):
+        oversized_tempo = "x" * 500
+        oversized_atmo = "y" * 900
+        response = (
             '{"story_brief": "a dim interrogation room under a swinging '
             'bare bulb, rain-streaked window, sweat and smoke", '
             '"setting_terms": ["room"], "lighting_terms": ["bulb"], '
@@ -845,26 +636,12 @@ class TestV2ProducerFields:
             f'"tempo_hint": "{oversized_tempo}", '
             f'"atmosphere_line": "{oversized_atmo}"}}'
         )
-        spy = _make_spy_fn(
-            responses=[bad_json, _valid_brief_json_v2()],
-        )
+        spy = _make_spy_fn(responses=[response])
         result = sb.run_story_brief_reflection(led=_mk_ledger(), technical_fn=spy)
-        # structured_call now CLAMPS an over-long capped field to its schema
-        # max_length IN PLACE (commit 4c0e943, the "no loud fail" graceful-
-        # degradation contract) rather than rejecting the response and re-rolling.
-        # So a single call recovers ("ok") with the OVER-LONG values truncated to
-        # the cap -- the important contract (over-long never reaches the meta
-        # delta) holds, now via coercion instead of a structural retry.
         assert result["story_brief_status"] == "ok"
-        assert len(result["tempo_hint"]) == sb._TEMPO_HINT_HARD_MAX_CHARS
-        assert (
-            len(result["atmosphere_line"])
-            == sb._ATMOSPHERE_LINE_HARD_MAX_CHARS
-        )
-        # The clamp fixes the response in place -> NO structural retry needed.
-        assert len(spy.calls) == 1, (
-            "over-long capped fields should be coerced in place, not re-rolled"
-        )
+        assert result["tempo_hint"] == oversized_tempo
+        assert result["atmosphere_line"] == oversized_atmo
+        assert len(spy.calls) == 1
 
     def test_prompt_lists_all_nine_field_names(self):
         """The reflection prompt body explicitly names every v1 + v2
@@ -884,159 +661,41 @@ class TestV2ProducerFields:
 
 
 # ---------------------------------------------------------------------------
-# PBUG-20260721-08: generic cast roles are not personal-name leaks
+# Six-bank exact-context and authored-output preservation
 # ---------------------------------------------------------------------------
 
 
-class TestCastRoleIdentityProjection:
+class TestSixBankAuthoredVocabulary:
 
     @pytest.mark.parametrize(
-        ("name", "brief"),
+        ("bank", "name", "authored"),
         [
-            ("THE TRAVELER", "a weary traveler beneath cold laboratory light"),
-            ("THE WITNESSES", "skeptical witnesses in a storm-dark chamber"),
-            ("THE TIME TRAVELER", "a time traveler beside a brass machine"),
-            ("THE PSYCHOLOGIST", "a psychologist under a flickering lamp"),
-            ("THE SCIENTIST", "a scientist amid ruined instruments"),
-            ("First Witch", "a witch on a rain-dark heath"),
-            ("ANNOUNCER", "an announcer booth under an amber dial glow"),
-            ("WITNESS", "a witness beside a shadowed table"),
+            ("media_archive", "JOEL PIERCE", "Pierce speaks beside the reel"),
+            ("original", "BOB FLANDERS", "Flanders discovers a velvet chair"),
+            ("public_domain", "FILBY", "Filby waits beside the machine"),
+            ("shakespeare", "MACBETH", "Macbeth watches the smoking heath"),
+            ("scifi_news", "Dr. Aris Thorne", "Thorne studies a 1940s console"),
+            ("scifi_news_pro", "LARKIN", "Larkin argues under Victorian lamps"),
         ],
     )
-    def test_generic_role_labels_are_legal_visual_nouns(self, name, brief):
-        led = {"cast": [{"char_id": "c01", "name": name}], "lines": []}
-        assert sb._cast_output_forbidden_forms(name) == set()
-        assert sb.REJECT_NAMED_CHARACTER not in sb._validate_brief(brief, led)
-
-    @pytest.mark.parametrize(
-        ("bank", "name", "leaked_surface"),
-        [
-            ("media_archive", "JOEL PIERCE", "Pierce"),
-            ("original", "BOB FLANDERS", "Flanders"),
-            ("public_domain", "FILBY", "Filby"),
-            ("shakespeare", "MACBETH", "Macbeth"),
-            ("scifi_news", "Dr. Aris Thorne", "Thorne"),
-            ("scifi_news_pro", "LARKIN", "Larkin"),
-        ],
-    )
-    def test_all_six_bank_personal_name_shapes_stay_forbidden(
-        self, bank, name, leaked_surface,
+    def test_all_six_banks_preserve_context_and_accept_authored_vocabulary_once(
+        self, bank, name, authored,
     ):
         led = {
             "cast": [{"char_id": "c01", "name": name}],
-            "lines": [],
-            "meta": {"source_bank": bank},
-        }
-        leaked = f"a lamp-lit room where {leaked_surface} waits by the console"
-        assert sb._validate_brief(leaked, led) == [sb.REJECT_NAMED_CHARACTER]
-        assert sb._validate_brief(
-            "a lamp-lit room with rain on the windows", led,
-        ) == []
-
-    def test_role_input_forms_preserve_one_identity_without_mapping_articles(self):
-        cast = [
-            {"char_id": "announcer", "name": "ANNOUNCER"},
-            {"char_id": "traveler", "name": "THE TRAVELER"},
-            {"char_id": "witnesses", "name": "THE WITNESSES"},
-        ]
-        mapping = sb._build_cast_substitution(cast)
-        assert mapping["the traveler"] == "character_b"
-        assert mapping["traveler"] == "character_b"
-        assert mapping["the witnesses"] == "character_c"
-        assert mapping["witnesses"] == "character_c"
-        assert "the" not in mapping
-
-        led = {
-            "cast": cast,
             "lines": [{
                 "speaker_role": "character",
-                "char_id": "traveler",
-                "text": "The weary Traveler enters as the Witnesses wait.",
+                "char_id": "c01",
+                "text": authored,
             }],
-            "meta": {"episode_title": "", "style": ""},
+            "meta": {"source_bank": bank, "episode_title": authored},
         }
-        text = sb._build_reflection_input(led)
-        assert "The weary character_b" in text
-        assert "character_c wait" in text
-        assert "source_entity" not in text
+        reflection_input = sb._build_reflection_input(led)
+        assert name in reflection_input
+        assert authored in reflection_input
 
-    def test_ordinal_role_maps_full_label_and_role_noun_to_same_identity(self):
-        mapping = sb._build_cast_substitution([
-            {"char_id": "witch", "name": "First Witch"},
-        ])
-        assert mapping["first witch"] == "character_a"
-        assert mapping["witch"] == "character_a"
-        assert "first" not in mapping
-        assert sb._cast_output_forbidden_forms("First Witch") == set()
-
-    def test_titles_do_not_make_generic_words_forbidden_or_drop_real_names(self):
-        led = {
-            "cast": [{"char_id": "c01", "name": "Doctor Aris Thorne"}],
-            "lines": [],
-        }
-        forms = sb._cast_output_forbidden_forms("Doctor Aris Thorne")
-        assert "doctor aris thorne" in forms
-        assert "aris" in forms and "thorne" in forms
-        assert "doctor" not in forms
-        assert sb._validate_brief(
-            "a doctor beside a cold instrument panel", led,
-        ) == []
-        assert sb._validate_brief(
-            "a cold instrument panel beside Thorne", led,
-        ) == [sb.REJECT_NAMED_CHARACTER]
-
-    def test_hyphen_apostrophe_and_common_word_mononym_remain_protected(self):
-        assert {"jean-luc picard", "jean", "luc", "picard"}.issubset(
-            sb._cast_output_forbidden_forms("Jean-Luc Picard")
-        )
-        assert {"o'connor", "connor"}.issubset(
-            sb._cast_output_forbidden_forms("O'Connor")
-        )
-        # Shakespeare's Bottom is a real proper mononym despite also being an
-        # ordinary English word; dictionary-word heuristics must not erase it.
-        assert sb._cast_output_forbidden_forms("Bottom") == {"bottom"}
-
-    def test_article_does_not_hide_a_non_role_personal_name(self):
-        forms = sb._cast_output_forbidden_forms("The Count of Monte Cristo")
-        assert "the count of monte cristo" in forms
-        assert "monte" in forms and "cristo" in forms
-
-    def test_live_role_brief_succeeds_without_spending_a_repair_turn(self):
-        led = {
-            "cast": [
-                {"char_id": "c01", "name": "ANNOUNCER"},
-                {"char_id": "c02", "name": "THE TRAVELER"},
-                {"char_id": "c03", "name": "THE WITNESSES"},
-            ],
-            "lines": [],
-            "meta": {},
-        }
-        response = (
-            '{"story_brief": "A weary traveler faces a skeptical assembly '
-            'over the wreckage of a collapsed world", '
-            '"setting_terms": ["smoldering ruins"], '
-            '"lighting_terms": ["dying embers"], '
-            '"atmosphere_terms": ["somber"]}'
-        )
-        spy = _make_spy_fn(responses=[response])
+        spy = _make_spy_fn(responses=[_brief_json(authored)])
         result = sb.run_story_brief_reflection(led, spy)
         assert result["story_brief_status"] == "ok"
+        assert result["story_brief"] == authored
         assert len(spy.calls) == 1
-
-    def test_private_repair_detail_names_surface_but_public_code_stays_stable(self):
-        led = _mk_ledger()
-        leaked = (
-            '{"story_brief": "a dim room where Jones waits by a table", '
-            '"setting_terms": ["room"], "lighting_terms": ["dim"], '
-            '"atmosphere_terms": ["tense"]}'
-        )
-        assert sb._validate_brief("a dim room beside Jones", led) == [
-            sb.REJECT_NAMED_CHARACTER,
-        ]
-        spy = _make_spy_fn(responses=[leaked, _valid_brief_json()])
-        result = sb.run_story_brief_reflection(led, spy)
-        assert result["story_brief_status"] == "ok"
-        repair_message = spy.calls[1]["messages"][0]["content"]
-        assert 'blocked personal-name surface is "jones"' in repair_message
-        assert "PostValidationError" not in repair_message
-        assert "environment, light, color, texture" in repair_message

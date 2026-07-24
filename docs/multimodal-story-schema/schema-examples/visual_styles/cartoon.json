@@ -5,11 +5,6 @@
   "image_grade_tail": "",
   "broadcast_tail": "",
   "allow_radio_tails": false,
-  "forbidden_terms": [
-    "35mm film",
-    "film grain",
-    "photorealistic"
-  ],
   "era_tail": "",
   "schema_version": "v2.0"
 }

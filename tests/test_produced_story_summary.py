@@ -4,13 +4,13 @@ summary pass.
 `meta` was always meant to carry a brief of the ACTUAL produced story for
 downstream consumer prompts; the pre-generation interpreter digest
 (`meta["news"]`) got conflated with it. K.5.5's reflection is deliberately a
-mood board (content gate bans plot/names), so this NEW K.5.6 pass summarizes
+mood board, so this NEW K.5.6 pass summarizes
 the composed episode itself -- real names + plot + stated ending -- under the
 distinct key `meta["produced_story"]`.
 
-Pins: the input builder keeps real names; the content gate's accept/reject
-classes; the success/failure delta shapes; and the music-prompt last-ditch
-fallback preferring the produced logline over the source digest.
+Pins: the input builder keeps real names; any nonblank provider-bounded summary
+is accepted without semantic retry; success/failure delta shapes remain stable;
+and the music fallback prefers the produced logline over the source digest.
 """
 
 import json
@@ -57,12 +57,9 @@ def _ledger() -> dict:
 
 def test_builder_keeps_real_names_and_windows():
     text = SB._build_produced_story_input(_ledger())
-    assert "Mara Voss" in text            # cast roster, unscrubbed
-    assert "CAST:" in text
+    assert "CAST: Mara Voss, Tom Hale" in text
     assert "OPENING (" in text
     assert "CLOSING (" in text
-    assert "character_a" not in text      # the reflection scrub must NOT run
-    assert "source_entity" not in text
 
 
 def test_builder_short_episode_has_no_middle_window():
@@ -75,12 +72,8 @@ def test_builder_short_episode_has_no_middle_window():
 
 
 # ---------------------------------------------------------------------------
-# Content gate
+# Non-gating schema
 # ---------------------------------------------------------------------------
-
-
-def _model(logline: str, subject: str = "a stubborn archive reel"):
-    return SB.ProducedStoryModel(logline=logline, subject=subject)
 
 
 GOOD_LOGLINE = (
@@ -89,58 +82,10 @@ GOOD_LOGLINE = (
 )
 
 
-def test_gate_accepts_a_grounded_plot_logline():
-    assert SB._validate_produced_story(_model(GOOD_LOGLINE), _ledger()) is None
-
-
-def test_gate_rejects_markup_and_brackets_and_labels():
-    led = _ledger()
-    assert "has_markup" in SB._validate_produced_story(
-        _model('Mara said "never" and walked out of the archive forever.'),
-        led,
-    )
-    assert "has_bracket" in SB._validate_produced_story(
-        _model("Mara Voss finds the reel [SFX: hum] and saves the archive."),
-        led,
-    )
-    assert "speaker_labeled" in SB._validate_produced_story(
-        _model("MARA: the label says 1931 but the film itself disagrees."),
-        led,
-    )
-
-
-def test_gate_rejects_a_logline_that_names_nobody():
-    reasons = SB._validate_produced_story(
-        _model(
-            "A keeper and a stranger argue over a light that blinks a "
-            "name until dawn settles the question."
-        ),
-        _ledger(),
-    )
-    assert reasons is not None and "names_no_cast_member" in reasons
-
-
-def test_gate_stopword_cast_name_cannot_trivially_pass():
-    """Local-fanout QA 2026-07-09: a cast name like 'The Stranger' must not
-    let a logline pass grounding just by containing 'the'."""
-    led = _ledger()
-    led["cast"] = [{"name": "The Stranger"}]
-    rejected = SB._validate_produced_story(
-        _model(
-            "A keeper argues with the light over a name that blinks until "
-            "dawn settles the question for good."
-        ),
-        led,
-    )
-    assert rejected is not None and "names_no_cast_member" in rejected
-    accepted = SB._validate_produced_story(
-        _model(
-            "The Stranger walks out of the fog, trades one true name for "
-            "the keeper's silence, and the light burns on."
-        ),
-        led,
-    )
-    assert accepted is None
+def test_schema_accepts_arbitrary_nonblank_bounded_summary_text():
+    model = SB.ProducedStoryModel(logline="x", subject="y")
+    assert model.logline == "x"
+    assert model.subject == "y"
 
 
 def test_builder_exact_cap_boundary_keeps_closing_window():
@@ -161,18 +106,6 @@ def test_builder_exact_cap_boundary_keeps_closing_window():
     # No overlap: the last opening row and first closing row differ.
     assert f"Boundary line {SB._PRODUCED_STORY_OPENING_CAP - 1}" in text
     assert f"Boundary line {SB._PRODUCED_STORY_OPENING_CAP}" in text
-
-
-def test_gate_skips_name_grounding_when_cast_is_empty():
-    led = _ledger()
-    led["cast"] = []
-    assert SB._validate_produced_story(
-        _model(
-            "A keeper and a stranger argue over a light that blinks a "
-            "name until dawn settles the question."
-        ),
-        led,
-    ) is None
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +130,24 @@ def test_success_delta_shape():
     assert delta["produced_story"]["subject"] == "a mislabeled archive reel"
     assert delta["produced_story_model_id"] == "stub/technical"
     assert delta["produced_story_source"] == "llm_post_composition"
+
+
+def test_arbitrary_safe_summary_vocabulary_is_accepted_without_retry():
+    calls = []
+
+    def technical_fn(*args, **kwargs):
+        calls.append((args, kwargs))
+        return json.dumps({
+            "logline": "A keeper waits in the smoking room.",
+            "subject": "one",
+        })
+
+    delta = SB.run_produced_story_summary(_ledger(), technical_fn)
+    assert delta["produced_story"] == {
+        "logline": "A keeper waits in the smoking room.",
+        "subject": "one",
+    }
+    assert len(calls) == 1
 
 
 def test_failure_delta_never_raises_and_omits_the_field():

@@ -96,7 +96,7 @@ other lane.
 | Bank | What it does |
 |------|--------------|
 | `scifi_news` | proof-pressure sci-fi radio; the local default (robust on a local LLM) |
-| `scifi_news_pro` | LLM-first multipass sci-fi writer; the cloud/quality lane (needs a strong API model) |
+| `scifi_news_pro` | alternate LLM-first multipass sci-fi writer using the configured model slots |
 | `media_archive` | media RSS / archive items → restoration-adventure episodes |
 | `public_domain` | faithful radio adaptation of a public-domain source |
 | `shakespeare` | Folger scene adaptation |

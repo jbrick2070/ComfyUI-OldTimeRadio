@@ -18,19 +18,15 @@ Design (roundtable-converged):
   * `structured_call` with a NEW Pydantic schema emitting ONLY the four
     DramaticState-compatible strings (the costly_choice_beat is derived
     deterministically, not by the LLM).
-  * A POST-VALIDATOR (the about-the-news guard): Pydantic only checks
-    lengths + non-identical wants, so a weak model can emit generic-but-
-    valid strings. After the call we REQUIRE >= 1 news key term to appear
-    across the wants / question / ending, and reject same-direction wants;
-    on rejection `structured_call` advances its ladder, then -> fallback.
+  * The prompt asks for news-grounded, opposed wants as creative direction.
+    Those quality preferences are deliberately non-gating: once the four
+    fields satisfy the typed schema, they are accepted without a model retry.
   * DETERMINISTIC FALLBACK (LLM reject / news failure): opposed wants built
     from `meta["news"]["key_terms"]` + PAIRED conflict templates opposed BY
     CONSTRUCTION. Never the `_DEFAULT_*` constant path.
-  * TURNING-SLOT DETAIL FLOOR: `validate_contract` requires the must_turn
-    slot's concrete_detail to be a subset of `active_props U key_terms`. So
-    we GUARANTEE >= 1 entry in `meta["news"]["key_terms"]` (seeding it from
-    the script brief's first noun phrase, else "the event") BEFORE contract
-    derivation runs.
+  * Optional news key terms remain optional. This module never fabricates a
+    term from the brief or mutates an empty key-term list to satisfy a later
+    quality preference.
 
 NEVER raises (Prime Directive 1, audio is king): any LLM / validation
 failure degrades to the deterministic fallback. Content-only -- the ledger
@@ -41,10 +37,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Tuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, field_validator
 
 from ._otr_dramatic_state import DramaticState, pick_costly_choice_slot
 
@@ -55,15 +50,13 @@ __all__ = [
     "derive_news_dramatic_state",
     "ARC_SHAPES",
     "pick_arc_shape",
-    "is_nonownable_story_object",
-    "derive_safe_fallback_term",
 ]
 
 # F8 (story-engine v1): arc-shape variety. A seeded pre-step picks one of these
 # shapes per episode so every story is not the same setup->complication->
-# resolution mold. CONFRONTATION shapes turn on two opposed wants; the others
-# (investigation / slow_dread) are NOT a clash of wills, so the post-validator
-# relaxes the opposed-wants requirement for them (prevents a generation stall).
+# resolution mold. CONFRONTATION shapes ask for two opposed wants; the others
+# (investigation / slow_dread) are not framed as a clash of wills. This is
+# prompt guidance only and never an acceptance gate.
 ARC_SHAPES: Tuple[str, ...] = (
     "setup_complication_resolution",
     "investigation_without_answer",
@@ -91,56 +84,28 @@ def pick_arc_shape(seed: Any) -> str:
     except Exception:  # noqa: BLE001
         return ARC_SHAPES[0]
 
-_WS = re.compile(r"\s+")
-_PUNCT = re.compile(r"[^\w\s]", re.UNICODE)
-
-# A small stopword set for the script-brief noun-phrase seed (B1 fallback).
-_STOPWORDS = frozenset({
-    "the", "a", "an", "this", "that", "these", "those", "of", "in", "on",
-    "at", "to", "for", "and", "or", "but", "with", "as", "is", "are", "was",
-    "were", "be", "been", "by", "from", "into", "about", "after", "before",
-    "when", "while", "how", "what", "who", "why", "their", "his", "her",
-    "its", "our", "your", "they", "it", "he", "she", "we", "you",
-})
-
 
 class DramaticStateLLM(BaseModel):
-    """The LLM-authored subset of DramaticState (no costly_choice_beat).
+    """LLM-authored dramatic context with structural validation only."""
 
-    Constraints MIRROR DramaticState so a schema-valid instance always
-    builds a valid DramaticState. The opposition + news-grounding checks
-    live in the post-validator (the model only forbids zero-length fields).
-    """
+    dramatic_question: str
+    character_a_wants: str
+    character_b_wants: str
+    ending_change: str
 
-    dramatic_question: str = Field(..., min_length=10, max_length=240)
-    character_a_wants: str = Field(..., min_length=4, max_length=120)
-    character_b_wants: str = Field(..., min_length=4, max_length=120)
-    ending_change: str = Field(..., min_length=4, max_length=200)
-
-
-def _norm(s: Any) -> str:
-    try:
-        return _WS.sub(" ", _PUNCT.sub(" ", str(s or ""))).strip().lower()
-    except Exception:  # noqa: BLE001
-        return ""
-
-
-def _trunc(s: str, n: int) -> str:
-    s = " ".join(str(s or "").split())
-    if len(s) <= n:
-        return s
-    cut = s[:n].rsplit(" ", 1)[0].strip()
-    return cut or s[:n].strip()
+    @field_validator(
+        "dramatic_question",
+        "character_a_wants",
+        "character_b_wants",
+        "ending_change",
+    )
+    @classmethod
+    def _text_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("dramatic-state text must not be blank")
+        return value
 
 
-def _first_noun_phrase(script_brief: str) -> Optional[str]:
-    """A best-effort short content phrase from the script brief, for seeding
-    a key term when the news brief carried none. Deterministic."""
-    words = _norm(script_brief).split()
-    content = [w for w in words if w not in _STOPWORDS and len(w) > 2]
-    if not content:
-        return None
-    return " ".join(content[:3])
 
 
 def _key_terms(meta: Any) -> List[str]:
@@ -162,26 +127,6 @@ def _script_brief(meta: Any) -> str:
         return ""
 
 
-def _inject_key_term(meta: Any, term: str) -> None:
-    """Append `term` to meta['news']['key_terms'] if missing, initializing the
-    dict/list as needed. This is the turning-slot detail floor -- it lets
-    validate_contract's must_turn branch find a concrete detail in the
-    active_props U key_terms pool. Never raises."""
-    if not term or not isinstance(meta, dict):
-        return
-    try:
-        news = meta.get("news")
-        if not isinstance(news, dict):
-            news = {}
-            meta["news"] = news
-        kt = news.get("key_terms")
-        if not isinstance(kt, list):
-            kt = []
-        if term not in kt:
-            kt.append(term)
-        news["key_terms"] = kt
-    except Exception as exc:  # noqa: BLE001
-        log.warning("[B1] key-term injection failed: %r", exc)
 
 
 # Paired conflict templates -- opposed BY CONSTRUCTION. {t} = a news key term.
@@ -207,8 +152,7 @@ _TEMPLATES: Tuple[Tuple[str, str, str, str], ...] = (
 
 
 # F8 (story-engine v1): shape-appropriate template sets for the NON-
-# confrontation arc shapes. The two wants are still DISTINCT (the DramaticState
-# floor forbids identical strings) but they are not a head-to-head clash --
+# confrontation arc shapes. They are not framed as a head-to-head clash:
 # investigation is seeker-vs-withheld-truth, slow_dread is hold-back-vs-the-
 # threat. Confrontation shapes fall through to the opposed _TEMPLATES default.
 _INVESTIGATION_TEMPLATES: Tuple[Tuple[str, str, str, str], ...] = (
@@ -237,78 +181,9 @@ _SHAPE_TEMPLATES = {
 }
 
 
-# 3.1 dignity guard (story-quality R2): the fallback DramaticState must NEVER
-# template ownership / credit / control over PEOPLE or a protected-identity /
-# harm-population group (frostbite_facility shipped "take sole credit for
-# transgender people" / "Control of transgender people passes to whoever is
-# willing to pay the higher price."). The head-noun rule keeps object heads with
-# a people MODIFIER ownable ("patient records", "children's health study",
-# "survey data"); the protected-identity substring set also catches an ownable
-# head riding a harm phrase ("suicide thoughts").
-_PEOPLE_NOUNS = frozenset({
-    "people", "person", "persons", "man", "men", "woman", "women",
-    "child", "children", "kid", "kids", "resident", "residents",
-    "patient", "patients", "worker", "workers", "citizen", "citizens",
-    "population", "populations", "community", "communities", "group", "groups",
-    "humanity", "victim", "victims", "family", "families",
-    "individual", "individuals",
-})
-#: Protected-identity / harm-population substrings -- non-ownable even when the
-#: grammatical head is an object noun. Casefolded substring match.
-_PROTECTED_IDENTITY_SUBSTRINGS = ("transgender", "suicide")
-#: Index of the ownership tuple in _TEMPLATES ("take sole credit" / "Control of
-#: {t} passes ...") -- dropped from the candidate set when ownership is barred.
-_OWNERSHIP_TEMPLATE_INDEX = 2
-#: Neutral, always-ownable default object term for the dignity fallback.
-_SAFE_DEFAULT_TERM = "the findings"
 
-
-def is_nonownable_story_object(term: object) -> bool:
-    """True when ``term`` names PEOPLE or a protected-identity / harm-population
-    group -- a thing a dramatic-state template must never put up for ownership,
-    credit, or control (3.1 dignity guard). An object head with a people MODIFIER
-    is ownable and returns False (``patient records``, ``children's health
-    study``, ``survey data``). Deterministic; never raises."""
-    t = _norm(term)
-    if not t:
-        return False
-    for sub in _PROTECTED_IDENTITY_SUBSTRINGS:
-        if sub in t:
-            return True
-    words = t.split()
-    if not words:
-        return False
-    head = words[-1]
-    if head in _PEOPLE_NOUNS:
-        return True
-    if head.endswith("s") and head[:-1] in _PEOPLE_NOUNS:   # naive plural fold
-        return True
-    return False
-
-
-def derive_safe_fallback_term(key_terms: object, cast: object = (),
-                              default: str = _SAFE_DEFAULT_TERM) -> str:
-    """The first key term that is a safe, OWNABLE story object (not people-class
-    / protected-identity, not a cast member's name); else ``default``.
-    Deterministic; never raises."""
-    cast_norm = {_norm(c) for c in (cast or ()) if _norm(c)}
-    for kt in (key_terms or ()):
-        s = str(kt).strip()
-        if not s or _norm(s) in cast_norm:
-            continue
-        if not is_nonownable_story_object(s):
-            return s
-    return default
-
-
-def _pick_templates(term: str, arc_shape: str = "", *,
-                    allow_ownership: bool = True) -> Tuple[str, str, str, str]:
+def _pick_templates(term: str, arc_shape: str = "") -> Tuple[str, str, str, str]:
     tmpls = _SHAPE_TEMPLATES.get(arc_shape, _TEMPLATES)
-    if not allow_ownership and tmpls is _TEMPLATES:
-        # Drop the ownership/credit tuple so a people-class term can never be
-        # templated as something to "take sole credit for" / "control".
-        tmpls = tuple(t for i, t in enumerate(_TEMPLATES)
-                      if i != _OWNERSHIP_TEMPLATE_INDEX)
     candidates = tmpls or _TEMPLATES        # defensive belt (never empty)
     idx = (sum(ord(c) for c in term) % len(candidates)) if term else 0
     a, b, q, e = candidates[idx]
@@ -319,69 +194,23 @@ def _pick_templates(term: str, arc_shape: str = "", *,
 def _fallback_state(meta: Any, voice_slot_ids, costly_choice_beat: str,
                     arc_shape: str = "") -> DramaticState:
     """Deterministic news-templated wants (shape-appropriate). NEVER the
-    _DEFAULT_* constant path. Guarantees the chosen term is in meta key_terms
-    (the turning-slot detail floor)."""
+    _DEFAULT_* constant path."""
     key_terms = _key_terms(meta)
-    raw_first = key_terms[0] if key_terms else (
-        _first_noun_phrase(_script_brief(meta)) or "the event")
-    # 3.1 dignity guard: pick the first OWNABLE key term (else the neutral
-    # default) BEFORE templating, and drop the ownership tuple if the chosen term
-    # is somehow still people-class (belt). Preserves the legacy term byte-for-
-    # byte whenever the first key term is already an ownable object.
-    candidates = list(key_terms) or [raw_first]
-    term = derive_safe_fallback_term(candidates, default=_SAFE_DEFAULT_TERM)
-    replaced = _norm(term) != _norm(raw_first)
-    _inject_key_term(meta, term)
-    allow_ownership = not is_nonownable_story_object(term)
-    a, b, q, e = _pick_templates(term, arc_shape, allow_ownership=allow_ownership)
+    raw_first = key_terms[0] if key_terms else "the event"
+    # Preserve the accepted source vocabulary. Python does not classify or
+    # replace story nouns; the prompt and shared safety boundary own prose.
+    term = str(raw_first).strip() or "the event"
+    a, b, q, e = _pick_templates(term, arc_shape)
     if isinstance(meta, dict):
         meta["dramatic_state_fallback_term"] = term
-        meta["dramatic_state_fallback_term_replaced"] = bool(replaced)
     return DramaticState(
-        dramatic_question=_trunc(q, 240),
-        character_a_wants=_trunc(a, 120),
-        character_b_wants=_trunc(b, 120),
+        dramatic_question=q,
+        character_a_wants=a,
+        character_b_wants=b,
         costly_choice_beat=costly_choice_beat,
-        ending_change=_trunc(e, 200),
+        ending_change=e,
     )
 
-
-def _make_post_validator(key_terms: List[str], confrontation: bool = True):
-    """The about-the-news guard. Returns an error string to REJECT (advancing
-    the structured_call ladder), None to ACCEPT. ``confrontation`` (F8) gates
-    whether the two wants must be OPPOSED or merely distinct + news-grounded."""
-    norm_terms = [t for t in (_norm(x) for x in key_terms) if t]
-
-    def _pv(ds: DramaticStateLLM) -> Optional[str]:
-        a = _norm(ds.character_a_wants)
-        b = _norm(ds.character_b_wants)
-        if a == b:
-            # F8: identical wants are bad for ANY shape, but only confrontation
-            # shapes are asked to be OPPOSED; non-confrontation shapes
-            # (investigation / slow_dread) just need distinct, news-grounded
-            # wants -- relaxing this prevents a generation stall on a shape
-            # that is not a clash of wills.
-            if confrontation:
-                return ("character_a_wants and character_b_wants are not "
-                        "opposed; make them genuinely conflict over the news")
-            return ("character_a_wants and character_b_wants are identical; "
-                    "make them distinct and grounded in the news event")
-        if norm_terms:
-            blob_words = set(" ".join([
-                a, b, _norm(ds.dramatic_question), _norm(ds.ending_change),
-            ]).split())
-
-            def _hit(term: str) -> bool:
-                tw = term.split()
-                return bool(tw) and all(w in blob_words for w in tw)
-
-            if not any(_hit(t) for t in norm_terms):
-                return ("the conflict is not grounded in the news; at least "
-                        "one news key term must appear in the wants, the "
-                        "dramatic question, or the ending")
-        return None
-
-    return _pv
 
 
 _ARC_SHAPE_GUIDANCE = {
@@ -448,9 +277,9 @@ def _build_prompt(meta: Any, cast_rows, key_terms: List[str],
         "Return ONLY a JSON object with exactly these string keys:\n"
         '{"character_a_wants": "...", "character_b_wants": "...", '
         '"dramatic_question": "...", "ending_change": "..."}\n'
-        "character_a_wants and character_b_wants: 4-120 characters each. "
-        "dramatic_question: 10-240 characters. ending_change: 4-200 "
-        "characters. No commentary outside the JSON."
+        "Every value must be a non-empty string. Wording and length are "
+        "creative choices, not rejection criteria. No commentary outside "
+        "the JSON."
     )
 
 
@@ -469,38 +298,29 @@ def derive_news_dramatic_state(
     news, via the resident technical slot. NEVER raises -- any LLM /
     validation failure degrades to the deterministic news-templated fallback.
 
-    ``arc_shape`` (F8) steers the prompt + the post-validator + the fallback
-    templates toward the episode's chosen shape; CONFRONTATION shapes require
-    opposed wants, the others only distinct + news-grounded.
+    ``arc_shape`` (F8) steers the prompt and no-news fallback templates toward
+    the episode's chosen shape. Shape, opposition, and grounding are creative
+    guidance and never reject a structurally valid model response.
 
-    Side effect (intended): guarantees >= 1 entry in
-    ``meta['news']['key_terms']`` (the turning-slot detail floor) and stamps
-    ``meta['dramatic_state_source']`` for observability. The caller stamps
+    The optional key-term list is preserved as supplied. The function stamps
+    ``meta['dramatic_state_source']`` for observability; the caller stamps
     ``meta['dramatic_state']`` from the returned object.
     """
     costly_choice_beat = pick_costly_choice_slot(voice_slot_ids)
     orig_key_terms = _key_terms(meta)
     script_brief = _script_brief(meta)
-    confrontation = (not arc_shape) or (arc_shape in _CONFRONTATION_SHAPES)
     if arc_shape and isinstance(meta, dict):
         meta["arc_shape"] = arc_shape
 
     # No usable news context at all -> deterministic fallback (no wasted LLM
-    # call). _fallback_state still seeds meta key_terms ("the event") so the
-    # turning-slot detail floor holds even with news=None.
+    # call). Optional source key terms remain empty.
     if not orig_key_terms and not script_brief:
         state = _fallback_state(meta, voice_slot_ids, costly_choice_beat, arc_shape)
         if isinstance(meta, dict):
             meta["dramatic_state_source"] = "fallback_no_news"
         return state
 
-    # Turning-slot detail floor: ensure key_terms is non-empty before the LLM
-    # grounding + contract derivation (seed from the brief's first noun phrase).
     key_terms = orig_key_terms
-    if not key_terms:
-        seed = _first_noun_phrase(script_brief) or "the event"
-        _inject_key_term(meta, seed)
-        key_terms = _key_terms(meta)
 
     sc = structured_call_fn
     if sc is None:
@@ -525,28 +345,29 @@ def derive_news_dramatic_state(
             slot_fn=slot_fn,
             base_temperature=base_temperature,
             structural_retry_temperature=structural_retry_temperature,
-            post_validator=_make_post_validator(key_terms, confrontation),
             helper_name="derive_dramatic_state",
         )
         state = DramaticState(
-            dramatic_question=_trunc(llm.dramatic_question, 240),
-            character_a_wants=_trunc(llm.character_a_wants, 120),
-            character_b_wants=_trunc(llm.character_b_wants, 120),
+            dramatic_question=llm.dramatic_question,
+            character_a_wants=llm.character_a_wants,
+            character_b_wants=llm.character_b_wants,
             costly_choice_beat=costly_choice_beat,
-            ending_change=_trunc(llm.ending_change, 200),
+            ending_change=llm.ending_change,
         )
         if isinstance(meta, dict):
             meta["dramatic_state_source"] = "llm"
         log.info("[B1] news-derived DramaticState built from the LLM.")
         return state
-    except Exception as exc:  # LLM failure -> FAIL LOUD (no-fallback rip 2026-07-03)
-        # A failed/timed-out/junk writer LLM call STOPS the episode; it never
-        # silently ships the deterministic news-templated dramatic skeleton as if
-        # the model wrote it. (The genuine "no news input at all" path above still
-        # uses _fallback_state -- that is a no-input case, not a model failure.)
-        raise RuntimeError(
-            "[B1] news-derived DramaticState LLM path failed (%s: %s). NO "
-            "deterministic-templated fallback (no-fallback rip) -- a failed writer "
-            "LLM stops the episode; fix the model/prompt/slot." % (
-                type(exc).__name__, str(exc)[:200])
-        ) from exc
+    except Exception as exc:  # noqa: BLE001 - optional authoring pass
+        log.warning(
+            "[B1] dramatic-state LLM path failed (%s: %s); preserving episode "
+            "liveness with the source-grounded fallback.",
+            type(exc).__name__,
+            exc,
+        )
+        state = _fallback_state(
+            meta, voice_slot_ids, costly_choice_beat, arc_shape,
+        )
+        if isinstance(meta, dict):
+            meta["dramatic_state_source"] = "fallback_llm_error"
+        return state

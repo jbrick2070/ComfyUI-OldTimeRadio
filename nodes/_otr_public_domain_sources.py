@@ -27,15 +27,15 @@ try:
 except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
 
+try:
+    from ._otr_content_safety import find_text_hits
+except ImportError:  # pragma: no cover -- flat import harnesses
+    from _otr_content_safety import find_text_hits  # type: ignore
+
 MANIFEST_SCHEMA_VERSION = "v1"
 PROMPT_VERSION = "public_domain_interpreter_v2"
 SCHEMA_VERSION = "public_domain_briefs_v1"
 
-_MAX_CASTING_BRIEF_CHARS = 900
-_MAX_SCRIPT_BRIEF_CHARS = 1200
-_MAX_CLOSE_BRIEF_CHARS = 500
-_MAX_KEY_TERMS = 7
-_MAX_KEY_TERM_CHARS = 80
 
 _LICENSE_STATUSES = frozenset({"public_domain_us", "cc0", "research_only"})
 _ADAPTER_TYPES = frozenset({
@@ -407,10 +407,10 @@ def source_meta_from_unit(resolved: PublicDomainUnit) -> dict[str, Any]:
 class PublicDomainBriefs(BaseModel):
     """Briefs contract consumed by ``_otr_source_payload`` and the writer."""
 
-    casting_brief: str = Field(..., max_length=_MAX_CASTING_BRIEF_CHARS)
-    script_brief: str = Field(..., max_length=_MAX_SCRIPT_BRIEF_CHARS)
-    news_close_brief: str = Field(..., max_length=_MAX_CLOSE_BRIEF_CHARS)
-    key_terms: list[str] = Field(..., min_length=1, max_length=_MAX_KEY_TERMS)
+    casting_brief: str
+    script_brief: str
+    news_close_brief: str
+    key_terms: list[str] = Field(default_factory=list)
     # The SOURCE's real named characters (Ebenezer Scrooge, Bob Cratchit), so the
     # adaptation cast preserves the story's people instead of rolling random pool
     # names. OPTIONAL + default empty: a source with no named characters, or an
@@ -444,30 +444,6 @@ class PublicDomainBriefs(BaseModel):
                 break
         return out
 
-    @field_validator("key_terms", mode="before")
-    @classmethod
-    def _trim_term_count(cls, value):
-        if isinstance(value, list) and len(value) > _MAX_KEY_TERMS:
-            return value[:_MAX_KEY_TERMS]
-        return value
-
-    @field_validator("key_terms")
-    @classmethod
-    def _coerce_term_lengths(cls, value: list[str]) -> list[str]:
-        out: list[str] = []
-        for term in value:
-            if not isinstance(term, str):
-                raise ValueError(
-                    f"key_term must be str, got {type(term).__name__}: {term!r}"
-                )
-            clean = " ".join(term.split()).strip()
-            if len(clean) > _MAX_KEY_TERM_CHARS:
-                clean = clean[:_MAX_KEY_TERM_CHARS].rsplit(" ", 1)[0].rstrip()
-            if clean:
-                out.append(clean)
-        if not out:
-            raise ValueError("key_terms must contain at least one non-empty term")
-        return out
 
 
 def _source_hash(payload: dict[str, str]) -> str:
@@ -507,14 +483,14 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "major turns, and ending. Compression is allowed; replacement is not. "
         "Do not invent an unrelated framing story, a new protagonist, or a "
         "different ending.\n\n"
-        "Keep it safe for a general audience: no blood, guns, knives, smoking, "
-        "or graphic violence in the adapted premise.\n\n"
+        "Keep it SFW: no profanity, explicit guns/knives/weapons, or "
+        "explicit sexual/nudity language in the adapted premise.\n\n"
         "Return ONE JSON object only with exactly these keys:\n"
         "{\n"
-        "  \"casting_brief\": \"80-700 chars; source-grounded roles and voices\",\n"
-        "  \"script_brief\": \"120-1000 chars; faithful radio adaptation brief\",\n"
-        "  \"news_close_brief\": \"80-420 chars; source attribution note\",\n"
-        "  \"key_terms\": [\"2-7 concise source/adaptation terms\"],\n"
+        "  \"casting_brief\": \"source-grounded roles and voices\",\n"
+        "  \"script_brief\": \"faithful radio adaptation brief\",\n"
+        "  \"news_close_brief\": \"source attribution note\",\n"
+        "  \"key_terms\": [\"optional concise source/adaptation terms\"],\n"
         "  \"character_names\": [\"REQUIRED, 2-6. The story's OWN cast, taken "
         "straight from the source text, in order of appearance. Use each "
         "character exactly as the text refers to them -- a proper name when the "
@@ -553,8 +529,6 @@ def build_public_domain_briefs(
         )
 
     def _content_validator(brief: PublicDomainBriefs) -> str | None:
-        if len(brief.key_terms) < 2:
-            return "public-domain briefs require at least two key_terms"
         # Runtime cast extraction is the ONLY faithful casting source for the
         # public-domain lane (the manifest carries only generic role hints like
         # "traveler"). So the cast is a REQUIRED generation input, not a
@@ -570,13 +544,13 @@ def build_public_domain_briefs(
             [brief.casting_brief, brief.script_brief, brief.news_close_brief]
             + list(brief.key_terms)
         ).casefold()
-        for term in (
-            "changed ending", "different ending", "unrelated framing story",
-            "invented protagonist", "blood", "gun", "guns", "knife", "knives",
-            "smoking", "cigarette", "graphic violence",
-        ):
-            if term in hay:
-                return f"public-domain brief drifted into forbidden term {term!r}"
+        safety_hits = find_text_hits(hay)
+        if safety_hits:
+            category, term = safety_hits[0]
+            return (
+                "public-domain brief contains explicit safety term "
+                f"{category}={term!r}"
+            )
         return None
 
     try:

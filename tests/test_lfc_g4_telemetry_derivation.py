@@ -18,14 +18,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_freeze_cascade as _LFC_ORCH  # noqa: E402
-from nodes import _otr_ledger_reviewer as _OTRLR  # noqa: E402
 
 
 def _line(line_id, char_id, role, text, *, skip=False):
@@ -59,17 +57,6 @@ def _ledger(lines, cast=None):
     )
 
 
-def _stub_reviewer(verdict="clean_no_edits"):
-    def fake_review(_fn, _led):
-        return _OTRLR.ReviewerDisposition(
-            verdict=verdict,
-            pre_audit_violations=0, pre_audit_repairs_applied=0,
-            doctor_edits_proposed=0, doctor_edits_applied=0,
-            post_audit_violations=0,
-        )
-    return fake_review
-
-
 class TestTelemetryDerivedFromBuckets:
     """G4 contract: meta.freeze_phase_telemetry IS A DERIVED VIEW.
     The source of truth is the three bucket lists. Any future
@@ -80,9 +67,7 @@ class TestTelemetryDerivedFromBuckets:
         led = _ledger([
             _line("l001", "c01", "character", "Hello there general."),
         ])
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=_stub_reviewer("clean_no_edits")):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+        _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         meta = led.data["meta"]
         stored = meta.get("freeze_phase_telemetry")
@@ -104,9 +89,7 @@ class TestTelemetryDerivedFromBuckets:
         led = _ledger([
             _line("l001", "c01", "character", "Hello."),
         ])
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=_stub_reviewer("clean_no_edits")):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+        _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         meta = led.data["meta"]
         bucket_records = (
@@ -131,9 +114,7 @@ class TestTelemetryDerivedFromBuckets:
         led = _ledger([
             _line("l001", "c01", "character", "Hello."),
         ])
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=_stub_reviewer("clean_no_edits")):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+        _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         tel = led.data["meta"]["freeze_phase_telemetry"]
         for entry in tel:
@@ -147,22 +128,6 @@ class TestTelemetryDerivedFromBuckets:
                 f"{expected_bucket!r}"
             )
 
-    def test_quality_exhaustion_run_telemetry_derives_correctly(self):
-        # A reviewer quality-budget exhaustion now continues through the
-        # repair/freeze path; telemetry must remain purely re-derivable.
-        led = _ledger([
-            _line("l001", "c01", "character", "Hello."),
-        ])
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=_stub_reviewer("too_many_edits")):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
-
-        meta = led.data["meta"]
-        stored = meta["freeze_phase_telemetry"]
-        rederived = _LFC_ORCH.build_phase_telemetry(meta)
-        assert stored == rederived
-        assert meta["freeze_verdict"].startswith("frozen")
-
     def test_idempotent_re_derivation(self):
         """build_phase_telemetry called twice on the same meta
         returns equal lists. Pure function over the bucket
@@ -170,9 +135,7 @@ class TestTelemetryDerivedFromBuckets:
         led = _ledger([
             _line("l001", "c01", "character", "Hello."),
         ])
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=_stub_reviewer("clean_no_edits")):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+        _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         meta = led.data["meta"]
         first = _LFC_ORCH.build_phase_telemetry(meta)

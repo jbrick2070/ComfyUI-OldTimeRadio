@@ -14,6 +14,7 @@ MAX_FACT_ROWS = 6
 MAX_ENTITY_ROWS = 4
 MAX_NUMBER_ROWS = 4
 MAX_SPANS_PER_EVIDENCE_ROW = 1
+P0_REPAIR_CONTEXT_MAX_BYTES = 16_384
 MAX_CLAIM_CHARS = 240
 MAX_ENTITY_NAME_CHARS = 120
 MAX_NUMERIC_TOKEN_CHARS = 96
@@ -171,8 +172,10 @@ def p0_contract_instruction(*, has_numeric_tokens: bool) -> str:
         f"{MAX_NUMERIC_TOKEN_CHARS}, and every quoted source slice at most "
         f"{MAX_QUOTE_CHARS} characters.{numeric_token_rule} Tone is exactly one "
         f"nonempty source-derived string of at most {MAX_TONE_CHARS} characters, "
-        "never an array or object. This is an evidence index, not an exhaustive "
-        "transcription."
+        "never an array or object. For every span, the literal identity MUST "
+        "hold: payload[field][start:end] == quote. Do not paraphrase, "
+        "normalize, or reconstruct quote text. This is an evidence index, "
+        "not an exhaustive transcription."
     )
 
 
@@ -183,10 +186,13 @@ def compact_p0_repair_context(
     source_evidence: Mapping[str, Any],
     source_digest: str,
     allowed_source_fields: Sequence[str],
+    max_bytes: int = P0_REPAIR_CONTEXT_MAX_BYTES,
 ) -> str:
-    """Render non-copyable P0 repair references without a JSON request wrapper."""
-    return "\n".join((
+    """Render bounded, tagged P0 repair references as data-only input."""
+    rendered = "\n".join((
         "INPUT REFERENCES ONLY -- they are not an output shape.",
+        "REPAIR RULE: payload[field][start:end] == quote; quote is a literal "
+        "source slice, never a paraphrase.",
         "<failed_fact_index>",
         str(failed_artifact),
         "</failed_fact_index>",
@@ -209,3 +215,14 @@ def compact_p0_repair_context(
         ),
         "</allowed_source_fields>",
     ))
+    if max_bytes < 1:
+        raise ValueError(
+            f"P0 repair context max_bytes must be positive, got {max_bytes}"
+        )
+    rendered_bytes = len(rendered.encode("utf-8"))
+    if rendered_bytes > max_bytes:
+        raise ValueError(
+            f"P0 repair context is {rendered_bytes} bytes, over the hard "
+            f"limit {max_bytes}"
+        )
+    return rendered

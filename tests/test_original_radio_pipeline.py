@@ -1,4 +1,4 @@
-"""original_radio lane -- registry, dispatch, creative front, QA, provenance.
+"""original_radio lane -- registry, dispatch, creative front, and provenance.
 
 CHUNK B tests (ARCHITECTURE_V4 + R2_CODING_PLAN + R3 deltas + r4 pins,
 2026-07-09). Pure Python; no GPU, no real LLM, no network: every LLM call
@@ -56,16 +56,19 @@ class TestRegistry:
         assert pipe.requires_source_contract is False
         assert pipe.declared_seams == frozenset({
             "original_concept_system", "original_select_system",
-            "original_brief_system", "original_qa_system",
+            "original_brief_system",
         })
 
-    def test_pack_carries_13_stages_and_required_subset(self):
+    def test_pack_carries_12_stages_and_required_subset(self):
         bank = ROUTING.get_bank("original")
         pack = ROUTING.resolve_story_pack("original")
-        assert len(pack.prompt_stages) == 13
+        assert len(pack.prompt_stages) == 12
         assert set(bank.required_seams) <= set(pack.prompt_stages)
-        for seam in ("original_concept_system", "original_select_system",
-                     "original_brief_system", "original_qa_system"):
+        for seam in (
+            "original_concept_system",
+            "original_select_system",
+            "original_brief_system",
+        ):
             assert pack.prompt_stages[seam].strip()
 
     def test_sweep_demands_executable_true(self):
@@ -85,12 +88,6 @@ class TestRegistry:
     def test_custom_bank_still_dies_at_run_gate(self):
         with pytest.raises(ROUTING.StoryBankNotRunnableError):
             ROUTING.require_runnable_bank("custom_source_bank")
-
-    def test_story_rules_resolve_for_original(self):
-        rules = __import__(
-            "nodes._otr_story_rules", fromlist=["resolve_story_rules"]
-        ).resolve_story_rules("original")
-        assert rules is not None
 
 
 # ---------------------------------------------------------------------------
@@ -191,10 +188,6 @@ class TestCreativeFront:
         assert set(draw.atoms) == set(ORR.DECK_AXES)
         assert draw.digest.strip() and draw.deck_version == "v1"
 
-    def test_forbidden_scan(self):
-        with pytest.raises(ORR.OriginalRadioError, match="forbidden"):
-            ORR.scan_forbidden("he drew a gun", origin="t")
-
     def _pack(self):
         return ROUTING.resolve_story_pack("original")
 
@@ -226,19 +219,26 @@ class TestCreativeFront:
                 pack=self._pack(),
             )
 
-    def test_ungrounded_key_term_exhausts(self):
-        bad_briefs = json.dumps({
+    def test_unsupported_key_term_is_deleted_without_another_model_call(self):
+        calls = {"n": 0}
+        payload = json.dumps({
             **json.loads(_BRIEFS_JSON),
             "key_terms": ["pawn ticket", "ZEPPELIN"],
         })
-        with pytest.raises(StructuredCallFailedError):
-            ORR.build_original_briefs(
-                spark_atoms={"place": "the lock"},
-                num_characters=2,
-                creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
-                technical_fn=_seq_fn(bad_briefs),
-                pack=self._pack(),
-            )
+
+        def tech_fn(messages, **kw):
+            calls["n"] += 1
+            return payload
+
+        briefs, _ = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
+            technical_fn=tech_fn,
+            pack=self._pack(),
+        )
+        assert briefs.key_terms == ["pawn ticket"]
+        assert calls["n"] == 1
 
     def test_key_term_grounds_across_a_line_wrap(self):
         # A2 normalization (live-smoke hardening 2026-07-09): the corpus
@@ -257,10 +257,8 @@ class TestCreativeFront:
         assert briefs.key_terms == ["pawn ticket", "ELLIS"]
 
     def test_ungrounded_key_term_pruned_deterministically(self):
-        # The 2026-07-09 live-smoke failure class: one paraphrased
-        # key_term ('grieving mother') exhausted the ladder. With >= 2
-        # verbatim terms surviving, the A2 deterministic repair must
-        # prune the paraphrase and finish with NO second technical call.
+        # Unsupported optional proof terms are dropped after the first
+        # structurally valid response, with no second technical call.
         calls = {"n": 0}
         bad = json.dumps({
             **json.loads(_BRIEFS_JSON),
@@ -281,46 +279,63 @@ class TestCreativeFront:
         assert briefs.key_terms == ["pawn ticket", "ELLIS"]
         assert calls["n"] == 1, "prune must not spend an LLM repair call"
 
-    def test_prune_declines_below_two_grounded_terms(self):
-        # Only one grounded term would survive -> the prune declines,
-        # the typed A2 LLM repair turn runs (and re-fails on the canned
-        # reply), and the ladder exhausts loud.
+    def test_zero_grounded_key_terms_is_valid(self):
         calls = {"n": 0}
-        bad = json.dumps({
+        payload = json.dumps({
             **json.loads(_BRIEFS_JSON),
-            "key_terms": ["pawn ticket", "ZEPPELIN"],
+            "key_terms": ["ZEPPELIN"],
         })
 
         def tech_fn(messages, **kw):
             calls["n"] += 1
-            if calls["n"] > 1:
-                # The repair turn must carry the typed A2 directive.
-                assert "COPIED verbatim" in json.dumps(messages)
-            return bad
+            return payload
 
-        with pytest.raises(StructuredCallFailedError):
-            ORR.build_original_briefs(
-                spark_atoms={"place": "the lock"},
-                num_characters=2,
-                creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
-                technical_fn=tech_fn,
-                pack=self._pack(),
-            )
-        assert calls["n"] == 2, "base + one typed LLM repair, then loud"
+        briefs, _ = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
+            technical_fn=tech_fn,
+            pack=self._pack(),
+        )
+        assert briefs.key_terms == []
+        assert calls["n"] == 1
 
-    def test_nonempty_close_brief_rejected(self):
-        bad_briefs = json.dumps({
+    def test_nonempty_close_brief_is_hardwired_empty_without_retry(self):
+        calls = {"n": 0}
+        payload = json.dumps({
             **json.loads(_BRIEFS_JSON),
             "news_close_brief": "tonight's tale was generated",
         })
-        with pytest.raises(StructuredCallFailedError):
-            ORR.build_original_briefs(
-                spark_atoms={"place": "the lock"},
-                num_characters=2,
-                creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
-                technical_fn=_seq_fn(bad_briefs),
-                pack=self._pack(),
-            )
+
+        def tech_fn(messages, **kw):
+            calls["n"] += 1
+            return payload
+
+        briefs, _ = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
+            technical_fn=tech_fn,
+            pack=self._pack(),
+        )
+        assert briefs.news_close_brief == ""
+        assert calls["n"] == 1
+
+    def test_one_pitch_is_valid_and_selected_dynamically(self):
+        concept = json.loads(_CONCEPT_JSON)
+        concept["pitches"] = concept["pitches"][:1]
+        selected = json.loads(_SELECT_JSON)
+        selected["selected_index"] = 0
+        briefs, delta = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=_seq_fn(json.dumps(concept), json.dumps(selected)),
+            technical_fn=_seq_fn(_BRIEFS_JSON),
+            pack=self._pack(),
+        )
+        assert briefs.script_brief
+        assert len(delta["pitches"]) == 1
+        assert delta["selected_concept"]["selected_index"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -360,321 +375,7 @@ class TestInterpreterAdapter:
                     technical_fn=_seq_fn(_BRIEFS_JSON), model_id="t")
 
 
-# ---------------------------------------------------------------------------
-# 6. QA gate (clean / fail-class / coalesced repair, r4 P3+P4)
-# ---------------------------------------------------------------------------
-
-def _qa_ledger():
-    return SimpleNamespace(
-        data={
-            "lines": [
-                {"line_id": "a0", "speaker_role": "announcer",
-                 "text": "Good evening.", "compose_flags": ["announcer_intro"]},
-                {"line_id": "b1", "speaker_role": "character",
-                 "text": "MARA: The ticket names no item.", "char_id": "mara"},
-                {"line_id": "z9", "speaker_role": "announcer",
-                 "text": "This has been SIGNAL LOST.",
-                 "compose_flags": ["announcer_outro", "news_coda_no_brief"]},
-            ],
-            "cast": [{"name": "Mara"}],
-        },
-        save=lambda self=None: None,
-    )
-
-
-def _findings_fn(*payloads):
-    return _seq_fn(*[json.dumps({"findings": p}) for p in payloads])
-
-
-class TestQAGate:
-    def _run(self, led, technical_fn, monkeypatch, compose_text=None,
-             compose_calls=None):
-        if compose_text is not None:
-            import nodes._otr_line_composer as LC
-
-            texts = ([compose_text] if isinstance(compose_text, str)
-                     else list(compose_text))
-            compose_index = 0
-
-            def _fake_outro(**kw):
-                nonlocal compose_index
-                if compose_calls is not None:
-                    compose_calls.append(dict(kw))
-                text = texts[min(compose_index, len(texts) - 1)]
-                compose_index += 1
-                return LC.LineResult(text=text,
-                                     compose_flags=("announcer_outro",))
-            monkeypatch.setattr(LC, "compose_announcer_outro", _fake_outro)
-        resolved = {"technical_model": "t", "creative_writing_model": "c",
-                    "source_bank": "original"}
-        meta = {"source_meta": {"concept_corpus": "the lock"},
-                "dramatic_state": {"ending_change": "the ticket is read"}}
-        W._run_original_qa_gate(
-            led, meta, resolved,
-            bank_row=ROUTING.get_bank("original"),
-            technical_fn=technical_fn,
-            creative_fn=lambda *a, **k: "",
-            first_announcer_id="a0", last_announcer_id="z9",
-            script_brief="brief", nc_brief="",
-        )
-        return meta
-
-    def test_clean(self, monkeypatch):
-        meta = self._run(_qa_ledger(), _findings_fn([]), monkeypatch)
-        assert meta["original_qa"] == {"status": "clean", "repaired": False}
-
-    def test_fail_class_raises(self, monkeypatch):
-        fn = _findings_fn([{"class": "weapons_smoking",
-                            "detail": "MARA mentions a pistol"}])
-        # The weapon has to be ON THE AIR. A judge's own prose is not evidence.
-        led = _qa_ledger()
-        led.data["lines"][1]["text"] = "MARA: The pistol names no item."
-        with pytest.raises(ORR.OriginalQAError, match="weapons_smoking"):
-            self._run(led, fn, monkeypatch)
-
-    def test_an_uncorroborated_weapons_flag_no_longer_kills(self, monkeypatch):
-        """The script is clean; only the judge said "pistol". Ship it."""
-        fn = _findings_fn([{"class": "weapons_smoking",
-                            "detail": "MARA mentions a pistol"}])
-        meta = self._run(_qa_ledger(), fn, monkeypatch)
-        assert meta["original_qa"]["status"] == "clean_after_discard"
-        assert meta["original_qa"]["discarded"] == ["weapons_smoking"]
-
-    def test_epilogue_repair_preserves_flags(self, monkeypatch):
-        led = _qa_ledger()
-        fn = _findings_fn(
-            [{"class": "epilogue_moralizes", "detail": "the lesson is"}],
-            [],   # re-judge: clean
-        )
-        meta = self._run(led, fn, monkeypatch,
-                         compose_text="A wry new closing line.")
-        assert meta["original_qa"]["status"] == "clean"
-        assert meta["original_qa"]["repaired"] is True
-        assert meta["original_qa"]["repair_count"] == 1
-        row = led.data["lines"][2]
-        assert row["text"] == "A wry new closing line."
-        assert "news_coda_no_brief" in row["compose_flags"]       # r4 P3
-        assert "original_qa_outro_recomposed" in row["compose_flags"]
-
-    def test_stubborn_subjective_judge_gets_dynamic_cross_slot_repairs(
-            self, monkeypatch):
-        """THE LAW: an audit may improve a story. It may never fail one.
-
-        Live proof this mattered: prompt `030f73e6`, a complete 30-word
-        `original_radio` episode killed by `epilogue_moralizes` after every
-        writer pass had already succeeded. "Moralizes" is an aesthetic opinion
-        about an outro the model itself just rewrote AT THIS AUDIT'S REQUEST --
-        there is no evidence bar behind it, unlike the hard classes. The bounded
-        Each unhappy verdict now drives another fresh repair/rejudge cycle. A
-        finite no-hang floor still ships the best structurally valid close.
-        """
-        led = _qa_ledger()
-        fn = _findings_fn(
-            [{"class": "epilogue_moralizes", "detail": "the lesson is"}],
-            [{"class": "epilogue_moralizes", "detail": "still moralizing"}],
-            [{"class": "epilogue_moralizes", "detail": "still moralizing"}],
-            [{"class": "epilogue_moralizes", "detail": "still moralizing"}],
-        )
-        compose_calls = []
-
-        meta = self._run(led, fn, monkeypatch,
-                         compose_text=[
-                             "First new closing line.",
-                             "Second new closing line.",
-                             "Third new closing line.",
-                         ], compose_calls=compose_calls)
-
-        assert meta["original_qa"]["status"] == "quality_floor"
-        assert meta["original_qa"]["repaired"] is True
-        assert meta["original_qa"]["repair_count"] == 3
-        assert meta["original_qa"]["repair_budget"] == 3
-        assert [c["repair_slot"] for c in meta["original_qa"]["cycles"]] == [
-            "creative", "technical", "creative",
-        ]
-        assert [c["creative_repo_id"] for c in compose_calls] == ["c", "t", "c"]
-        assert meta["original_qa"]["objections"] == [
-            "epilogue_moralizes: still moralizing"
-        ]
-        # The latest equally-scored authored candidate wins; the rejected
-        # original line can never win by inertia.
-        assert led.data["lines"][2]["text"] == "Third new closing line."
-        assert "original_qa_quality_floor" in led.data["lines"][2]["compose_flags"]
-
-    def test_a_corroborated_hard_class_still_ends_the_episode(self, monkeypatch):
-        """The law frees SUBJECTIVE verdicts, not evidence-backed ship-stops.
-
-        A weapon actually spoken on the air still kills the run: that finding
-        clears the deterministic evidence bar. Pinned alongside the test above so
-        nobody reads "audits may not fail a story" as "nothing may fail a story".
-        """
-        led = _qa_ledger()
-        led.data["lines"][1]["text"] = "MARA: The pistol names no item."
-        fn = _findings_fn(
-            [{"class": "weapons_smoking", "detail": "MARA mentions a pistol"},
-             {"class": "epilogue_moralizes", "detail": "the lesson is"}],
-        )
-        with pytest.raises(ORR.OriginalQAError, match="weapons_smoking"):
-            self._run(led, fn, monkeypatch,
-                      compose_text="Another closing line.")
-
-    def test_epilogue_missing_refuted_when_outro_exists(self, monkeypatch):
-        # Run-5 live catch (2026-07-10): the re-judge re-claimed
-        # 'epilogue_missing' about the recomposed non-empty outro row
-        # it had just been shown. Python refutes the absence claim
-        # deterministically; the episode survives, discard stamped.
-        led = _qa_ledger()
-        fn = _findings_fn(
-            [{"class": "epilogue_missing", "detail": "no closing line"}],
-            [{"class": "epilogue_missing",
-              "detail": "still no closing line"}],
-        )
-        meta = self._run(led, fn, monkeypatch,
-                         compose_text="A wry recomposed closing line.")
-        assert meta["original_qa"]["status"] == "clean_after_discard"
-        assert meta["original_qa"]["repaired"] is True
-        assert meta["original_qa"]["discarded"] == ["epilogue_missing"]
-
-    def test_hallucinated_hard_findings_discarded_then_clean(self, monkeypatch):
-        # The 2026-07-09 live-smoke trio: weapons on a weaponless
-        # threat, news framing on a teaser, epilogue_missing with the
-        # outro present. Evidence bar: confirm drops the hard pair;
-        # the epilogue class takes the ONE bounded repair; re-judge
-        # clean -> episode survives, discards stamped for audit.
-        led = _qa_ledger()
-        fn = _seq_fn(
-            json.dumps({"findings": [
-                {"class": "weapons_smoking",
-                 "detail": "the sirens will be the last thing you hear"},
-                {"class": "news_source_framing",
-                 "detail": "Late tonight in a dim office"},
-                {"class": "epilogue_missing",
-                 "detail": "The closing line does not comment"},
-            ]}),
-            # both hard classes are lexicon_only now: no confirm call.
-            json.dumps({"findings": []}),    # re-judge after repair
-        )
-        meta = self._run(led, fn, monkeypatch,
-                         compose_text="A dry closing line.")
-        assert meta["original_qa"]["status"] == "clean_after_discard"
-        assert meta["original_qa"]["repaired"] is True
-        assert sorted(meta["original_qa"]["discarded"]) == [
-            "news_source_framing", "weapons_smoking"]
-
-    def test_all_hard_discarded_no_epilogue_continues(self, monkeypatch):
-        fn = _seq_fn(
-            json.dumps({"findings": [
-                {"class": "weapons_smoking",
-                 "detail": "the sirens sound ominous"},
-            ]}),
-            json.dumps({"confirmed": []}),
-        )
-        meta = self._run(_qa_ledger(), fn, monkeypatch)
-        assert meta["original_qa"]["status"] == "clean_after_discard"
-        assert meta["original_qa"]["discarded"] == ["weapons_smoking"]
-
-# ---------------------------------------------------------------------------
-# 6b. Hard-finding evidence triage (pure module, live-smoke hardening)
-# ---------------------------------------------------------------------------
-
-class TestHardFindingTriage:
-    _SCRIPT = ("ANNOUNCER: Good evening.\n"
-               "MARA: I am reaching for the lever by the door.\n"
-               "ANNOUNCER: This has been SIGNAL LOST.")
-
-    def _finding(self, cls, detail):
-        return ORR.QAFinding.model_validate({"class": cls, "detail": detail})
-
-    def test_lexicon_corroboration_kills_without_llm(self):
-        calls = {"n": 0}
-
-        def tech_fn(messages, **kw):
-            calls["n"] += 1
-            return "{}"
-
-        armed = self._SCRIPT.replace(
-            "I am reaching for the lever by the door.",
-            "I am reaching for the pistol by the door.")
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("weapons_smoking", "MARA draws a pistol")],
-            script=armed, technical_fn=tech_fn)
-        assert len(kills) == 1 and not discarded
-        assert "pistol" in kills[0][1]
-        assert calls["n"] == 0, "lexicon kill must not spend an LLM call"
-
-    def test_the_judges_own_words_cannot_corroborate_the_judge(self):
-        """The old scan was `finding.detail + script`, so a judge that wrote
-        "MARA draws a pistol" proved its own flag against a clean script.
-        Evidence means the word is ON THE AIR.
-        """
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("weapons_smoking", "MARA draws a pistol")],
-            script=self._SCRIPT, technical_fn=_seq_fn("{}"))
-        assert not kills and len(discarded) == 1
-
-    def test_the_scan_is_word_boundary_not_substring(self):
-        """"gun" must never fire on "begun" -- the raw substring scan did."""
-        begun = self._SCRIPT.replace(
-            "Good evening.", "Good evening, the broadcast has begun.")
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("weapons_smoking", "someone has a gun")],
-            script=begun, technical_fn=_seq_fn("{}"))
-        assert not kills and len(discarded) == 1
-
-    def test_lexicon_only_class_discards_without_confirm(self):
-        # Run-3 live catch (2026-07-10): 'coils start to smoke' is not
-        # tobacco; a lexicon_only class with no lexicon hit is judge
-        # noise and must be discarded with ZERO LLM calls -- a grounded
-        # quote cannot prove class membership for a closed vocabulary.
-        calls = {"n": 0}
-
-        def tech_fn(messages, **kw):
-            calls["n"] += 1
-            return json.dumps({"confirmed": [
-                {"class": "weapons_smoking",
-                 "quote": "reaching for the lever by the door"}]})
-
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("weapons_smoking",
-                           "the coils start to smoke like doom")],
-            script=self._SCRIPT, technical_fn=tech_fn)
-        assert not kills and len(discarded) == 1
-        assert calls["n"] == 0, "lexicon_only class must never confirm"
-
-    def test_news_framing_is_lexicon_only(self):
-        # First 420w roll (2026-07-10): the confirm judge "proved"
-        # news_source_framing by quoting the ENTIRE (clean) intro line
-        # -- grounded, but with zero news wording. News framing is a
-        # closed vocabulary on radio: no lexicon hit -> discard, no
-        # confirm call.
-        calls = {"n": 0}
-
-        def tech_fn(messages, **kw):
-            calls["n"] += 1
-            return json.dumps({"confirmed": []})
-
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("news_source_framing",
-                           "sounds like a factual teaser")],
-            script=self._SCRIPT, technical_fn=tech_fn)
-        assert not kills and len(discarded) == 1
-        assert calls["n"] == 0, "news framing must never confirm"
-
-    def test_news_framing_lexicon_hit_still_kills(self):
-        script = self._SCRIPT + "\nANNOUNCER: This is tonight's news bulletin."
-        kills, discarded = ORR.triage_hard_findings(
-            [self._finding("news_source_framing", "calls it a news bulletin")],
-            script=script, technical_fn=_seq_fn("{}"))
-        assert len(kills) == 1 and not discarded
-        assert "news" in kills[0][1]
-
-    def test_no_class_still_kills_on_an_unenumerable_hunch(self):
-        # Every surviving class corroborates against a LEXICON. Nothing may kill an
-        # episode on an open-vocabulary judgement no one can enumerate or check.
-        assert set(ORR.KILL_POLICY_BY_CLASS.values()) == {"lexicon_only"}
-
-# ---------------------------------------------------------------------------
-# 7. Provenance surfaces
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------\n# 6. Provenance surfaces\n# ---------------------------------------------------------------------------
 
 class TestProvenance:
     def test_news_payload_legacy_byte_shape(self):

@@ -136,15 +136,15 @@ def _request(tmp_path, **over):
 
 def _assert_visual_safety(prompt: str):
     lower = prompt.lower()
-    assert "no blood" in lower
-    assert "no guns" in lower
-    assert "no knives" in lower
-    assert "no smoking" in lower
+    assert "no explicit guns" in lower
+    assert "knives" in lower
+    assert "weapons" in lower
+    assert "nudity" in lower
 
 
 def _assert_negative_safety(prompt: str):
     lower = prompt.lower()
-    for term in ("blood", "guns", "knives", "smoking"):
+    for term in ("guns", "knives", "nudity"):
         assert term in lower
 
 

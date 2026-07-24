@@ -276,6 +276,20 @@ class TestPhase10HardFail:
             for e in ei.value.errors
         )
 
+    @pytest.mark.parametrize("text", ["[Silence]", "(breathes)"])
+    def test_voiced_line_stage_direction_only_no_skip_raises(self, text):
+        data = _clean_ledger_data()
+        data["lines"][2]["text"] = text
+        data["lines"][2]["char_count"] = len(text)
+        data["lines"][2]["word_count"] = 1
+        data["lines"][2]["skip"] = False
+        with pytest.raises(_LFC.FreezeAssertionError) as ei:
+            _LFC.phase_10_gap_audit_post_and_freeze(data)
+        assert any(
+            "voiced, not skipped" in e and "cleans to empty spoken text" in e
+            for e in ei.value.errors
+        )
+
     def test_empty_cast_no_announcer_only_raises(self):
         data = _clean_ledger_data()
         data["cast"] = []

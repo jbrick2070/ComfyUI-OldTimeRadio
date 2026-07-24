@@ -103,7 +103,6 @@ def test_clean_pass_zero_failures():
     assert result.failures == []
     assert result.failure_codes == []
     assert len(result.parsed_slots) == 4
-    assert result.word_floor == cf.DEFAULT_WORD_FLOOR
 
 
 def test_clean_pass_accepts_tuple_manifest():
@@ -192,43 +191,16 @@ def test_empty_line():
     result = cf.evaluate_tier_a(raw, _manifest())
     assert result.passed is False
     assert cf.EMPTY_LINE in result.failure_codes
-    # EMPTY_LINE is specific -- the same row must NOT also raise
-    # BELOW_WORD_FLOOR.
-    floor_rows = [
-        f for f in result.failures
-        if f.slot_id == "d003" and f.code == cf.BELOW_WORD_FLOOR
-    ]
-    assert floor_rows == []
-
-
-def test_below_word_floor():
-    # d002 has two words; default floor is 4.
+def test_short_nonempty_line_is_accepted():
     raw = (
         "d001|ANNOUNCER: From the late desk, a story that would not stay.\n"
-        "d002|REN BLACK: I refuse.\n"
+        "d002|REN BLACK: No.\n"
         "d003|DR. MAEVE COLE: Then we both go down with it tonight here.\n"
         "d004|ANNOUNCER: And the lamp in the records room burned till dawn."
     )
     result = cf.evaluate_tier_a(raw, _manifest())
-    assert result.passed is False
-    assert cf.BELOW_WORD_FLOOR in result.failure_codes
-    floor_fail = next(
-        f for f in result.failures if f.code == cf.BELOW_WORD_FLOOR
-    )
-    assert floor_fail.slot_id == "d002"
-
-
-def test_word_floor_is_parameterized():
-    # The same two-word d002 passes when the floor is lowered to 2.
-    raw = (
-        "d001|ANNOUNCER: From the late desk, a story that would not stay.\n"
-        "d002|REN BLACK: I refuse.\n"
-        "d003|DR. MAEVE COLE: Then we both go down with it tonight here.\n"
-        "d004|ANNOUNCER: And the lamp in the records room burned till dawn."
-    )
-    result = cf.evaluate_tier_a(raw, _manifest(), word_floor=2)
-    assert cf.BELOW_WORD_FLOOR not in result.failure_codes
     assert result.passed is True
+    assert result.failure_codes == []
 
 
 def test_parse_error():
@@ -270,7 +242,6 @@ def test_failure_code_vocabulary_is_complete():
         cf.SLOT_ORDER_MISMATCH,
         cf.SPEAKER_MISMATCH,
         cf.EMPTY_LINE,
-        cf.BELOW_WORD_FLOOR,
         cf.PARSE_ERROR,
         cf.DUPLICATE_SLOT,
     ):
@@ -289,8 +260,8 @@ def test_determinism_clean():
 
 
 def test_determinism_failing():
-    # A deliberately multi-failure draft: wrong speaker on d002, short
-    # line on d003, and a parse error block.
+    # A deliberately multi-failure draft: wrong speaker, missing manifest
+    # row, and a parse-error block. The short nonempty line is valid.
     raw = (
         "d001|ANNOUNCER: From the late desk, a story that would not stay.\n"
         "d002|DR. MAEVE COLE: I read the ledger twice and it holds firm.\n"

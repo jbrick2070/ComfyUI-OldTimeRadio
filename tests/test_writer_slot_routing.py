@@ -276,13 +276,8 @@ def test_same_slot_id_means_zero_transitions(monkeypatch):
     assert all(model_id == SAME for _slot, model_id in trace)
 
 
-def test_scheduler_declares_catalog_local_p3_patch_capability(monkeypatch):
-    """A local catalog row must explicitly authorize P3's tokenizer guard.
-
-    This is the counterpart to the scheduler-wrapped OpenRouter P3 test: the
-    wrapper must be conservative for unknown/remote rows without accidentally
-    disabling the exact local catalog route it is meant to protect.
-    """
+def test_scheduler_declares_catalog_local_schema_binding(monkeypatch):
+    """A local catalog row exposes lazy typed-schema binding."""
     import nodes.OTR_LedgerScriptWriter as W
     import nodes._otr_model_catalog as catalog
 
@@ -300,8 +295,7 @@ def test_scheduler_declares_catalog_local_p3_patch_capability(monkeypatch):
     )
 
     slot_fn = scheduler.for_slot("creative")
-    assert slot_fn._otr_p3_text_patch_local is True  # type: ignore[attr-defined]
-    assert slot_fn._otr_p3_text_patch_transport == "exact_local"  # type: ignore[attr-defined]
+    assert slot_fn._otr_local_schema_binding is True  # type: ignore[attr-defined]
     assert slot_fn._otr_openrouter is False  # type: ignore[attr-defined]
     assert slot_fn._otr_response_format is None  # type: ignore[attr-defined]
     assert callable(slot_fn._otr_bind_schema)  # type: ignore[attr-defined]
@@ -350,7 +344,7 @@ def test_scheduler_local_schema_binding_reaches_truncating_generator(monkeypatch
         "repetition_penalty": 1.03,
     }
     assert bound._otr_bound_schema_model is ExactSchema  # type: ignore[attr-defined]
-    assert bound._otr_p3_text_patch_transport == "exact_local"  # type: ignore[attr-defined]
+    assert bound._otr_local_schema_binding is True  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------

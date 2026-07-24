@@ -1,74 +1,10 @@
-"""nodes/_otr_repair_prompts.py -- typed repair-prompt factories (Sprint 2C).
+"""Typed repair prompts for machine-readable structured output.
 
-`structured_call`'s Attempt 3 (typed repair) builds its repair prompt
-through a `RepairPromptFactory`. Sprint 2A shipped exactly one generic
-factory, `default_repair_prompt_factory`, which every converted call
-site used. This module ships the SIX bespoke per-failure-class
-factories the v4 plan (section 2C) calls for, plus a dispatcher that
-routes an Attempt-3 failure to the right one by inspecting the error.
-
-The seven failure classes:
-
-  json_syntax_repair     -- json.JSONDecodeError: output was not
-                            parseable JSON at all.
-  schema_field_repair    -- pydantic.ValidationError: JSON parsed, but
-                            a field is missing / wrong type / out of
-                            range.
-  cast_membership_repair -- a speaker / character named outside the
-                            locked cast.
-  too_many_words_repair  -- output ran over a length budget.
-  narration_leak_repair  -- action / dialogue / plot prose leaked into
-                            a description meant to be purely visual.
-  forbidden_name_repair  -- a character name appears where the pass is
-                            forbidden to name characters.
-  payload_null_repair    -- pydantic.ValidationError where a required
-                            `payload` string field arrived as `None`.
-                            Specific to Sprint 7C / BUG-LOCAL-275 -- the
-                            Script Doctor edits pass keeps emitting
-                            null payloads on no-op / annotation-only
-                            edits. The generic schema_field_repair
-                            directive ("fix the field") was too vague
-                            to recover; this factory tells the model
-                            to either supply a real replacement string
-                            or OMIT the edit row entirely.
-  key_term_grounding_repair -- an original_radio key_term is not a
-                            verbatim substring of the concept text
-                            (anchor A2). Caught live 2026-07-09 on the
-                            first original_radio OBS smoke: the
-                            technical-slot model paraphrases despite
-                            the seam demanding verbatim terms, and the
-                            generic default repair did not recover.
-                            Like cast membership, the call site
-                            supplies a deterministic prune callback
-                            consulted BEFORE this LLM fallback.
-
-`cast_membership_repair` is special. The v4 plan requires it to NEVER
-call the LLM when the project's existing Levenshtein matcher resolves
-the phantom name deterministically. A `RepairPromptFactory` cannot do
-that on its own -- it only builds a prompt -- so the work is split:
-
-  * This module owns the LLM-prompt half (`cast_membership_repair`) and
-    the dispatch.
-  * The call site that has a locked cast (the outline phase stage)
-    supplies a `deterministic_repair` callback to
-    `make_dispatching_repair_factory`. The callback reuses the
-    project's one Levenshtein matcher -- `auto_remap_phantom` in
-    `_otr_ledger_reviewer.py`, threshold 3 -- and, when every phantom
-    resolves unambiguously, returns the corrected pydantic instance.
-
-`structured_call` accepts a schema instance handed back by a repair
-factory as a finished result and returns it with NO LLM repair call.
-That is the "never calls the LLM if Levenshtein resolves" path.
-
-This module is PURE: no I/O, no GPU, no ComfyUI imports. It depends
-only on stdlib, pydantic, and the sibling `_otr_structured_call`
-helper. It does NOT import `_otr_ledger_reviewer` -- the Levenshtein
-reuse lives in the call-site callback, which keeps this module free of
-the node-side import graph.
-
-UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
-4-space indentation.
+Repairs are limited to JSON syntax, schema shape/type, null payloads, and
+membership in an authoritative locked roster. Authored prose is never repaired
+because of word count, vocabulary, names, style, visual content, or quality.
 """
+
 from __future__ import annotations
 
 import json
@@ -99,11 +35,7 @@ __all__ = [
     "json_syntax_repair",
     "schema_field_repair",
     "cast_membership_repair",
-    "too_many_words_repair",
-    "narration_leak_repair",
-    "forbidden_name_repair",
     "payload_null_repair",
-    "key_term_grounding_repair",
     "make_dispatching_repair_factory",
 ]
 
@@ -153,7 +85,7 @@ def _compose_repair(
 
 
 # ---------------------------------------------------------------------------
-# The six typed repair-prompt factories
+# Typed structural repair-prompt factories
 # ---------------------------------------------------------------------------
 #
 # Each matches the `RepairPromptFactory` Protocol exactly:
@@ -228,82 +160,6 @@ def cast_membership_repair(
     )
 
 
-def too_many_words_repair(
-    *,
-    original_prompt: Any,
-    failed_output: str,
-    error: BaseException,
-) -> list[dict[str, str]]:
-    """Repair prompt for output that ran over a length budget."""
-    directive = (
-        "CRITICAL: Your previous response was over the length budget: "
-        f"{_error_text(error)}. Rewrite it SHORTER -- cut words, drop "
-        "every clause that is not essential, and keep the core meaning. "
-        "Do not add new content. Return ONE valid JSON object, no "
-        "Markdown, no prose."
-    )
-    return _compose_repair(
-        directive, failed_output=failed_output, original_prompt=original_prompt,
-    )
-
-
-def narration_leak_repair(
-    *,
-    original_prompt: Any,
-    failed_output: str,
-    error: BaseException,
-) -> list[dict[str, str]]:
-    """Repair prompt for action / dialogue / plot prose in a visual brief."""
-    directive = (
-        "CRITICAL: Your previous response leaked narration into a brief "
-        f"that must be purely visual: {_error_text(error)}. Describe "
-        "ONLY what is visually present -- light, color, texture, space, "
-        "material, weather. Remove every action, every line of "
-        "dialogue, and every plot verb (no speaking, arguing, "
-        "discovering, escaping, and the like). Return ONE valid JSON "
-        "object, no Markdown, no prose."
-    )
-    return _compose_repair(
-        directive, failed_output=failed_output, original_prompt=original_prompt,
-    )
-
-
-def forbidden_name_repair(
-    *,
-    original_prompt: Any,
-    failed_output: str,
-    error: BaseException,
-) -> list[dict[str, str]]:
-    """Repair prompt for a character name where naming is forbidden."""
-    marker = "named_character:"
-    raw_error = str(error)
-    marker_at = raw_error.lower().find(marker)
-    surface = ""
-    if marker_at >= 0:
-        surface = raw_error[marker_at + len(marker):].split(",", 1)[0]
-        surface = " ".join(surface.split())[:120]
-    if surface:
-        blocked = json.dumps(surface, ensure_ascii=False)
-        detail = (
-            f"The blocked personal-name surface is {blocked}. Remove that "
-            "exact surface entirely. "
-        )
-    else:
-        detail = "Remove every personal name entirely. "
-    directive = (
-        "CRITICAL: Your previous response named a character, but this "
-        "pass must not name anyone. " + detail +
-        "If a person reference is uncertain, omit people and rewrite the "
-        "story_brief around environment, light, color, texture, space, "
-        "material, weather, and concrete objects. Preserve the required JSON "
-        "schema and sidecar fields. Return ONE valid JSON object, no Markdown, "
-        "no prose."
-    )
-    return _compose_repair(
-        directive, failed_output=failed_output, original_prompt=original_prompt,
-    )
-
-
 def payload_null_repair(
     *,
     original_prompt: Any,
@@ -329,41 +185,6 @@ def payload_null_repair(
         "line, OMIT the entire edit row -- do not emit it with "
         "`payload: null`, `payload: \"\"`, or any other placeholder. "
         "Return ONE valid JSON object, no Markdown, no prose."
-    )
-    return _compose_repair(
-        directive, failed_output=failed_output, original_prompt=original_prompt,
-    )
-
-
-def key_term_grounding_repair(
-    *,
-    original_prompt: Any,
-    failed_output: str,
-    error: BaseException,
-) -> list[dict[str, str]]:
-    """Repair prompt for a key_term that is not a verbatim concept phrase.
-
-    original_radio anchor A2 (ARCHITECTURE_V2): every key_term must be
-    an exact contiguous substring of the concept text (case- and
-    whitespace-run-insensitive). Local technical-slot models routinely
-    paraphrase ('grieving mother' for 'a mother, grieving') despite the
-    seam prompt already demanding verbatim terms -- caught live
-    2026-07-09 on the first original_radio 30-word OBS smoke, where the
-    generic default repair failed to recover and the ladder exhausted.
-    The deterministic prune at the call site resolves most cases with
-    no LLM call; this directive is the LLM fallback when too few
-    grounded terms survive the prune.
-    """
-    directive = (
-        "CRITICAL: One or more of your key_terms is NOT an exact "
-        f"phrase from the concept text: {_error_text(error)}. Every "
-        "key_term must be COPIED verbatim -- an exact contiguous "
-        "phrase, character for character -- from THE SELECTED CONCEPT "
-        "in the original instruction below. Do not paraphrase, "
-        "reorder, inflect, or summarize. Replace every rejected "
-        "key_term with a short concrete noun or name copied exactly "
-        "from that concept text, keeping 2-6 key_terms total. Return "
-        "ONE valid JSON object, no Markdown, no prose."
     )
     return _compose_repair(
         directive, failed_output=failed_output, original_prompt=original_prompt,
@@ -420,40 +241,12 @@ def make_dispatching_repair_factory(
     *,
     deterministic_repair: Optional[DeterministicRepair] = None,
 ) -> RepairPromptFactory:
-    """Build a `RepairPromptFactory` that dispatches by failure class.
+    """Build a repair factory for structural machine-output failures.
 
-    The returned callable inspects the Attempt-3 error and routes:
-
-      * `json.JSONDecodeError`      -> `json_syntax_repair`
-      * `pydantic.ValidationError`  -> classified:
-            null `payload` field           -> `payload_null_repair`
-            everything else                -> `schema_field_repair`
-      * `PostValidationError`       -> classified by its message:
-            "locked cast"                  -> cast membership
-            "anchor a2"                    -> key_term grounding
-            "named_character"              -> forbidden name
-            "dialogue_verb" / "plot_verb"  -> narration leak
-            "too_long"                     -> too many words
-      * anything else / unrecognised content failure
-                                    -> `default_repair_prompt_factory`
-
-    `deterministic_repair`, when supplied, is consulted for the cast-
-    membership and key_term-grounding cases BEFORE the LLM prompt is
-    built. If it returns a pydantic instance, that instance is returned
-    straight to `structured_call`, which accepts it as a finished
-    result and makes no LLM repair call. If it returns None, the
-    matching typed LLM prompt (`cast_membership_repair` /
-    `key_term_grounding_repair`) is used instead. Call sites with
-    neither a locked cast nor an A2 corpus omit the argument entirely;
-    a callback is only ever consulted for failure classes its own call
-    site can produce, so one kwarg serves both cases without
-    collision.
-
-    The message-substring dispatch is deliberate: the project's
-    `post_validator` functions return short, stable rejection codes
-    (`named_character`, `dialogue_verb`, `too_long`) or quoted phrases
-    (`is not in locked cast [...]`), and a content failure that matches
-    none of them is correctly handled by the generic default factory.
+    JSON syntax, pydantic schema, null payload, and locked-roster membership
+    have typed repair prompts. A deterministic locked-roster repair may
+    short-circuit the model. Every other post-validation error uses the generic
+    structural repair prompt; prose semantics never select a repair path.
     """
 
     def factory(
@@ -496,36 +289,6 @@ def make_dispatching_repair_factory(
                         # a finished result -- no LLM repair call.
                         return resolved
                 return cast_membership_repair(
-                    original_prompt=original_prompt,
-                    failed_output=failed_output,
-                    error=error,
-                )
-            if "anchor a2" in message:
-                if deterministic_repair is not None:
-                    resolved = deterministic_repair(failed_output, error)
-                    if resolved is not None:
-                        # Same contract as the cast branch: a schema
-                        # instance is a finished result -- no LLM call.
-                        return resolved
-                return key_term_grounding_repair(
-                    original_prompt=original_prompt,
-                    failed_output=failed_output,
-                    error=error,
-                )
-            if "named_character" in message:
-                return forbidden_name_repair(
-                    original_prompt=original_prompt,
-                    failed_output=failed_output,
-                    error=error,
-                )
-            if "dialogue_verb" in message or "plot_verb" in message:
-                return narration_leak_repair(
-                    original_prompt=original_prompt,
-                    failed_output=failed_output,
-                    error=error,
-                )
-            if "too_long" in message:
-                return too_many_words_repair(
                     original_prompt=original_prompt,
                     failed_output=failed_output,
                     error=error,

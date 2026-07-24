@@ -1125,120 +1125,64 @@ class Ledger:
         outline,
         char_id_by_name: Optional[Dict[str, str]] = None,
     ) -> "Ledger":
-        """Phase 2B: pre-stamp skeleton line rows from a validated outline.
-
-        `outline` must expose ``.beats`` (an iterable of Beat-like
-        objects with beat_id / speaker / speaker_role / intent / mood
-        / target_words / arc_phase attributes). Plain dicts
-        with the same fields also work for tests.
-
-        Each accepted outline beat produces one top-level ``beats[]`` row and
-        one initial ``lines[]`` row:
-          * beat_id == line_id at initialization. A later structural editor
-            may create multiple unique line_ids that retain this parent
-            beat_id; ``beats[].line_ids`` records that exact membership.
-          * char_id looked up from `char_id_by_name` for character
-            beats; "announcer" for announcer beats; the speaker_role
-            string itself for music beats (matches existing writer
-            convention).
-          * text starts EMPTY for voiced beats (the composer will fill
-            it via update_line_text) AND for music render-contract rows
-            (never transcript text -- rip-sfx-broll 2026-07-01).
-          * speaker_role, arc_phase, compose_flags are additive Phase
-            2A / Phase 0 fields stamped at init time so the schema is
-            uniform across rows.
-
-        Returns self so call sites can chain `.save()`.
-        """
+        """Pre-stamp one canonical beat and line row per outline beat."""
         char_id_by_name = char_id_by_name or {}
         beats = list(getattr(outline, "beats", []) or [])
         rows: List[Dict[str, Any]] = []
         beat_rows: List[Dict[str, Any]] = []
         for beat in beats:
-            def _g(k: str, default=""):
+            def _g(key: str, default=""):
                 if isinstance(beat, dict):
-                    return beat.get(k, default)
-                return getattr(beat, k, default)
+                    return beat.get(key, default)
+                return getattr(beat, key, default)
+
             beat_id = _safe_str(_g("beat_id"))
             speaker = _safe_str(_g("speaker"))
             role = _safe_str(_g("speaker_role")) or "character"
             mood = _safe_str(_g("mood"))
             intent = _safe_str(_g("intent"))
             arc_phase = _safe_str(_g("arc_phase"))
-            # Script Doctor row fields (Sprint 3E, 2026-05-25): persist
-            # the owning beat's narrative `intent` and Python-allocated
-            # per-beat `target_words` on each line record so the
-            # downstream Script Doctor cleanup pass receives the full
-            # 7-field row. Both ride on the validated outline Beat
-            # objects (`intent` Field + `target_words` Field; the
-            # latter is stamped by the outline combiner's
-            # `_allocate_phase_target_words` allocation). A genuinely
-            # absent value stays None rather than being fabricated.
-            _beat_intent_raw = _g("intent", None)
-            beat_intent = (
-                _safe_str(_beat_intent_raw) or None
-                if _beat_intent_raw is not None
-                else None
-            )
-            _target_words_raw = _g("target_words", None)
+
+            target_words_raw = _g("target_words", None)
             target_words = (
-                _safe_int(_target_words_raw)
-                if _target_words_raw is not None
+                _safe_int(target_words_raw)
+                if target_words_raw is not None
                 else None
             )
-            # Sprint 1 keystone (2026-05-28): copy dialogue_slot_id
-            # from the outline beat onto the ledger line so
-            # OTR_StoryRoomCommit can join StoryRoom dialogue rows by
-            # slot id rather than raw beat_id. Voiced beats carry a
-            # `d\d{3}` id stamped by `stamp_dialogue_slot_ids`;
-            # non-voiced beats (music_open / music_close /
-            # music_inter) stay None. The getattr default keeps
-            # the line schema additive -- pre-Sprint-1 outlines that
-            # never ran through the stamper just produce None slots,
-            # and the legacy compose path is byte-identical.
-            dialogue_slot_id = _g("dialogue_slot_id", None)
+            dialogue_slot_raw = _g("dialogue_slot_id", None)
+            dialogue_slot_id = (
+                _safe_str(dialogue_slot_raw) or None
+                if dialogue_slot_raw is not None
+                else None
+            )
             if role == "character":
-                cid = char_id_by_name.get(speaker, "")
+                char_id = char_id_by_name.get(speaker, "")
             elif role == "announcer":
-                cid = "announcer"
+                char_id = "announcer"
             else:
-                cid = role
-            if is_spoken_role(role):
-                text = ""    # composer fills via update_line_text
-            else:
-                # S1 (2026-06-22) + rip-sfx-broll (2026-07-01): non-spoken
-                # render-contract rows (music_open / music_inter /
-                # music_close) NEVER carry transcript text -- the old
-                # intent fallback stamped filler like "Musical interlude
-                # bridging <phase>..." into the transcript, and the
-                # sfx_cue carrier died with the sfx subsystem. The beat
-                # intent is still preserved separately in `beat_intent`
-                # below for any visual/music-prompt consumer.
-                text = ""
+                char_id = role
+
+            # Spoken rows are filled by update_line_text. Music rows remain
+            # render contracts and never carry transcript text.
+            text = ""
             rows.append({
-                "line_id":       beat_id,
-                "shot_id":       None,
-                "beat_id":       beat_id,
-                "char_id":       cid,
-                "text":          text,
-                "traits":        mood or None,
-                "boundary":      None,
-                "char_count":    _char_count(text),
-                "word_count":    _word_count(text),
-                "bark_wav_path": None,
-                "start_s":       None,
-                "dur_s":         None,
-                # Phase 0 / 2A additive fields (stamped at init time).
-                "speaker_role":  role,
-                "arc_phase":     arc_phase or None,
-                "compose_flags": [],
-                # Script Doctor row fields (Sprint 3E): the owning
-                # beat's narrative intent + Python-allocated per-beat
-                # target word count. None when the source beat does
-                # not carry the value.
-                "beat_intent":   beat_intent,
-                "target_words":  target_words,
-                # Sprint 1 keystone (2026-05-28): voiced slot id.
+                "line_id":          beat_id,
+                "shot_id":          None,
+                "beat_id":          beat_id,
+                "char_id":          char_id,
+                "text":             text,
+                "traits":           mood or None,
+                "boundary":         None,
+                "char_count":       _char_count(text),
+                "word_count":       _word_count(text),
+                "bark_wav_path":    None,
+                "start_s":          None,
+                "dur_s":            None,
+                "speaker_role":     role,
+                "arc_phase":        arc_phase or None,
+                "compose_flags":    [],
+                "beat_intent":      intent or None,
+                "target_words":     target_words,
                 "dialogue_slot_id": dialogue_slot_id,
             })
             beat_rows.append({
@@ -1246,15 +1190,13 @@ class Ledger:
                 "shot_id":  _g("shot_id", None),
                 "scene_id": _g("scene_id", None),
                 "speaker":  speaker or None,
-                "char_id":  cid or None,
+                "char_id":  char_id or None,
                 "line_ids": [beat_id] if beat_id else [],
                 "start_s":  _g("start_s", None),
                 "dur_s":    _g("dur_s", None),
             })
+
         self.data["lines"] = rows
-        # The accepted outline owns the durable beat set. Scene/timing stages
-        # may enrich or replace these rows later, but the writer must not emit
-        # a line hierarchy whose parent collection is empty.
         self.set_beats(beat_rows)
         self._recompute_totals()
         return self
@@ -1265,135 +1207,77 @@ class Ledger:
         text: str,
         compose_flags_append: Optional[Iterable[str]] = None,
     ) -> bool:
-        """Phase 2B: in-place text update on one existing line row.
-
-        Matches the row whose `beat_id` (or fall-back `line_id`)
-        equals `beat_id`. Recomputes char_count + word_count in
-        lockstep so downstream consumers comparing budget vs actual
-        word counts see fresh numbers.
-
-        C0 (2026-06-22 story-quality R3): when ``compose_flags_append`` is
-        given, each flag is appended (in order, duplicates preserved) to the
-        row's ``compose_flags`` LIST via the shared ``append_compose_flag``
-        mutator -- so flags minted during a targeted reroll land on the ROW,
-        not only in ``meta["reroll_history"]`` (verified dropped before this).
-        A missing / non-list ``compose_flags`` is coerced to ``[]``. The text +
-        length + flag mutations happen in ONE row mutation.
-
-        Returns True if a row was updated, False if no matching row.
-        Does NOT save -- the writer calls `.save()` after the update
-        so a crash between save and update doesn't lose the text.
-        """
+        """Update one existing line and its derived text metrics atomically."""
         safe_text = text or ""
         target = _safe_str(beat_id)
         for row in self.data["lines"]:
-            if (row.get("beat_id") == target
-                    or row.get("line_id") == target):
+            if row.get("beat_id") == target or row.get("line_id") == target:
                 set_line_text_metrics(row, safe_text)
-                # A targeted reroll is an authoritative replacement for the
-                # row's prior text.  Script Doctor may have marked that row
-                # skipped while its text was empty; leaving the editorial
-                # skip state attached to the newly composed text creates the
-                # impossible Phase 10 state ``skip=True + text`` and blocks
-                # CastLock.  Clear only the skip metadata when a meaningful
-                # replacement arrives; empty text must retain its skip state.
                 if safe_text.strip():
                     row.pop("skip", None)
                     row.pop("tts_skip_reason", None)
-                    row.pop("reviewer_skip_reason", None)
                 if compose_flags_append:
-                    for _flag in compose_flags_append:
-                        append_compose_flag(row, _flag)
+                    for flag in compose_flags_append:
+                        append_compose_flag(row, flag)
                 self._recompute_totals()
                 return True
         return False
 
     def set_lines(self, line_rows: Iterable[Dict[str, Any]]) -> "Ledger":
-        """Set the lines[] section.
-
-        ``beat_id`` and ``boundary`` are optional but recommended once
-        the upstream pipeline (SceneSequencer or build_silent_test_episode)
-        has populated the beat hierarchy. ``boundary`` is one of:
-            - "shot_start"  first clip of a new shot (visual reset)
-            - "beat_start"  first clip of a new speaker turn within a shot
-            - "continue"    same shot, same speaker (Goal 3 daisy chain)
-        Older callers that pre-date the beat hierarchy can omit both
-        fields; downstream consumers must treat missing values as
-        equivalent to "shot_start" for safety.
-        """
+        """Replace lines[] while preserving the canonical row schema."""
         rows: List[Dict[str, Any]] = []
-        for r in line_rows or []:
-            text = _safe_str(r.get("text"))
-            # Script Doctor row fields (Sprint 3E, 2026-05-25): keep the
-            # lines[] schema uniform with init_lines_from_outline. Pre-
-            # Phase-2B callers that supply these keys have them
-            # preserved; callers that omit them store None rather than
-            # a fabricated value.
-            _bi_raw = r.get("beat_intent")
+        for raw in line_rows or []:
+            text = _safe_str(raw.get("text"))
+            beat_intent_raw = raw.get("beat_intent")
             beat_intent = (
-                _safe_str(_bi_raw) or None if _bi_raw is not None else None
+                _safe_str(beat_intent_raw) or None
+                if beat_intent_raw is not None
+                else None
             )
-            _tw_raw = r.get("target_words")
+            target_words_raw = raw.get("target_words")
             target_words = (
-                _safe_int(_tw_raw) if _tw_raw is not None else None
+                _safe_int(target_words_raw)
+                if target_words_raw is not None
+                else None
             )
-            # Sprint 1 keystone (2026-05-28): preserve dialogue_slot_id
-            # so set_lines stays schema-uniform with
-            # init_lines_from_outline. Callers that omit the key store
-            # None rather than a fabricated value.
-            _dsi_raw = r.get("dialogue_slot_id")
+            dialogue_slot_raw = raw.get("dialogue_slot_id")
             dialogue_slot_id = (
-                _safe_str(_dsi_raw) or None if _dsi_raw is not None else None
+                _safe_str(dialogue_slot_raw) or None
+                if dialogue_slot_raw is not None
+                else None
             )
-            # STEP 1 (2026-06-22 story+cast fix): guarantee every line row
-            # is born with an explicit speaker_role. set_lines previously
-            # DROPPED the field entirely (unlike init_lines_from_outline,
-            # which stamps `role or "character"`), so rows minted on the
-            # streaming partial-ledger path (story_orchestrator
-            # ._emit_partial_ledger) reached the reviewer with NO
-            # speaker_role -> an undefined role comparison in the cast
-            # auditor. Preserve a supplied role; default missing to
-            # "character" exactly as init_lines_from_outline does.
-            speaker_role = _safe_str(r.get("speaker_role")) or "character"
-            # C0 (2026-06-22 story-quality R3): preserve the per-line
-            # compose_flags LIST + arc_phase. set_lines previously DROPPED both
-            # (verified) -- every targeted-reroll / partial-ledger rebuild that
-            # round-trips through set_lines silently lost the row's flags
-            # (role_coerce / stage_dir_stripped / objective_literal_retry /
-            # action_split). Same class as the STEP-1 speaker_role fix. Coerce a
-            # missing/non-list compose_flags to []; pass arc_phase through
-            # unchanged (None when absent).
-            _cf_raw = r.get("compose_flags")
-            compose_flags = list(_cf_raw) if isinstance(_cf_raw, list) else []
-            arc_phase = _safe_str(r.get("arc_phase")) or None
+            compose_flags_raw = raw.get("compose_flags")
+            compose_flags = (
+                list(compose_flags_raw)
+                if isinstance(compose_flags_raw, list)
+                else []
+            )
             rows.append({
-                "line_id":          _safe_str(r.get("line_id")),
-                "shot_id":          _safe_str(r.get("shot_id")) or None,
-                "beat_id":          _safe_str(r.get("beat_id")) or None,
-                "char_id":          _safe_str(r.get("char_id")) or None,
+                "line_id":          _safe_str(raw.get("line_id")),
+                "shot_id":          _safe_str(raw.get("shot_id")) or None,
+                "beat_id":          _safe_str(raw.get("beat_id")) or None,
+                "char_id":          _safe_str(raw.get("char_id")) or None,
                 "text":             text,
-                "traits":           _safe_str(r.get("traits")) or None,
-                "boundary":         _safe_str(r.get("boundary")) or None,
+                "traits":           _safe_str(raw.get("traits")) or None,
+                "boundary":         _safe_str(raw.get("boundary")) or None,
                 "char_count":       _char_count(text),
                 "word_count":       _word_count(text),
-                "bark_wav_path":    _safe_str(r.get("bark_wav_path")) or None,
-                "start_s":          _safe_float(r.get("start_s")),
-                "dur_s":            _safe_float(r.get("dur_s")),
-                "speaker_role":     speaker_role,
-                "arc_phase":        arc_phase,
+                "bark_wav_path":    _safe_str(raw.get("bark_wav_path")) or None,
+                "start_s":          _safe_float(raw.get("start_s")),
+                "dur_s":            _safe_float(raw.get("dur_s")),
+                "speaker_role":     _safe_str(raw.get("speaker_role")) or "character",
+                "arc_phase":        _safe_str(raw.get("arc_phase")) or None,
                 "compose_flags":    compose_flags,
                 "beat_intent":      beat_intent,
                 "target_words":     target_words,
                 "dialogue_slot_id": dialogue_slot_id,
             })
-        # D3 (2026-06-22): coerce speaker_role for any row whose char_id is a
-        # real cast id (cast table read at this call site; if the cast is not
-        # yet populated this is a no-op and the mandatory pre-freeze sweep is the
-        # backstop). Never raises.
-        _cast_ids = cast_ids_from_ledger(self.data)
-        if _cast_ids:
-            for _r in rows:
-                coerce_speaker_role_for_char_id(_r, _cast_ids, source="set_lines")
+
+        cast_ids = cast_ids_from_ledger(self.data)
+        if cast_ids:
+            for row in rows:
+                coerce_speaker_role_for_char_id(
+                    row, cast_ids, source="set_lines")
         self.data["lines"] = rows
         self._recompute_totals()
         return self
@@ -1671,7 +1555,7 @@ class Ledger:
         # (external QA round 1, 2026-07-10) NOR when a fresh
         # authoritative rebuild simply OMITS the key (external QA r2
         # P0.2: `set_lines()` builds rows without `skip`/
-        # `tts_skip_reason`/`reviewer_skip_reason`, and the old
+        # skip state, and the old
         # key-presence test read that omission as "please restore old
         # disk state" -- resurrecting a stale skip flag onto a newly
         # non-empty line -> Phase 10 freeze error). Ownership is at the
@@ -1687,8 +1571,7 @@ class Ledger:
             "beat_intent", "target_words", "dialogue_slot_id",
             "shot_id", "beat_id",
             # skip / editorial state
-            "skip", "tts_skip_reason", "reviewer_skip_reason",
-            "reviewer_note", "needs_render_realign",
+            "skip", "tts_skip_reason", "needs_render_realign",
             # authored music cue spec (S2 P1.1 / C1): OWNED like line
             # composition -- a re-authored cue must never have its spec
             # resurrected from a stale disk row (that would make the
@@ -1736,17 +1619,8 @@ class Ledger:
                 # value with a disk value -- in-memory is fresher
                 # for rows the Ledger class actually manages.
                 #
-                # OWNERSHIP-AWARE (external QA root-cause, 2026-07-10,
-                # fable2 S1b): canonical OWNED content/state fields are
-                # NEVER restored from disk when the key exists in
-                # memory, even when the in-memory value is falsy -- a
-                # Script Doctor "skip" edit intentionally clears text to
-                # "" and the old rule resurrected the STALE disk text
-                # into the cleared row (skip=True + non-empty text ->
-                # Phase 10 critical gap, dead run). The merge exists for
-                # out-of-band DURABLE extension fields (BUG-LOCAL-108:
-                # bark_wav_path, timings, render stamps) -- those still
-                # copy forward.
+                # Canonical composition/state fields are never restored from
+                # disk. Only out-of-band durable render fields copy forward.
                 for k, v in disk_row.items():
                     # ``shot_id`` is authored ownership for lines/clips, but
                     # renderer ownership for music: SceneSequencer derives it

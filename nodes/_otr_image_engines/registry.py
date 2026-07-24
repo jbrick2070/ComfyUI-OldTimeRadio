@@ -127,11 +127,6 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["lumina-image-2"]},
-    "qwen_image": {"required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["qwen-image"]},
     # sd35_large CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
     # (NotImplementedError render) is unregistered; the registry-consistency
     # invariant forbids a row without a registered engine.

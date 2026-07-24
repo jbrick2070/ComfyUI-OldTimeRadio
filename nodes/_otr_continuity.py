@@ -50,7 +50,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 log = logging.getLogger("OTR")
@@ -142,9 +142,7 @@ class ContinuityFact(BaseModel):
 
     fact: str = Field(
         ...,
-        min_length=1,
-        max_length=400,
-        description="One concrete narrative fact, plain prose, one clause.",
+        description="One concrete narrative fact, plain prose.",
     )
     known_by: list[str] = Field(
         default_factory=list,
@@ -160,6 +158,13 @@ class ContinuityFact(BaseModel):
         description="Beat index (0-based) where the fact becomes true.",
     )
 
+    @field_validator("fact")
+    @classmethod
+    def _fact_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("continuity fact must not be blank")
+        return value
+
 
 class ContinuityState(BaseModel):
     """The full continuity ledger for one episode.
@@ -174,7 +179,6 @@ class ContinuityState(BaseModel):
 
     location: str = Field(
         default="",
-        max_length=200,
         description="Primary location of the episode, plain prose.",
     )
     active_props: list[str] = Field(

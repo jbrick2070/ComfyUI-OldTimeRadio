@@ -46,14 +46,15 @@ from __future__ import annotations
 
 try:  # pragma: no cover - package and standalone import styles
     from ._otr_text_metrics import canonical_char_count, canonical_word_count
+    from ._otr_script_prep import clean_spoken_text
 except ImportError:  # pragma: no cover
     from _otr_text_metrics import (  # type: ignore
         canonical_char_count,
         canonical_word_count,
     )
+    from _otr_script_prep import clean_spoken_text  # type: ignore
 
 import logging
-import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, List, Literal, Optional
@@ -362,10 +363,16 @@ def _check_per_line_invariants(
                 )
         else:
             # Non-skipped voiced beats must have non-empty text.
-            if speaker_role in ("character", "announcer") and text == "":
-                errors.append(
-                    f"line_id={line_id!r} (voiced, not skipped) has empty text"
-                )
+            if speaker_role in ("character", "announcer"):
+                if text == "":
+                    errors.append(
+                        f"line_id={line_id!r} (voiced, not skipped) has empty text"
+                    )
+                elif not clean_spoken_text(text):
+                    errors.append(
+                        f"line_id={line_id!r} (voiced, not skipped) cleans to "
+                        "empty spoken text"
+                    )
 
         # beat_id reference (warn-only when valid_beat_ids is empty --
         # some unit-test fixtures omit beats[] entirely; we don't want
@@ -638,18 +645,6 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g9_sfw_spoken_text(
             ledger_data, report.errors, report.warnings,
         )
-        _check_g10_genre_spoken_text(
-            ledger_data, report.errors, report.warnings,
-        )
-        _check_g11_beat_floor(
-            ledger_data, report.errors, report.warnings,
-        )
-        _check_g12_outro_cast_complete(
-            ledger_data, report.errors, report.warnings,
-        )
-        _check_g13_placeholder_tokens(
-            ledger_data, report.errors, report.warnings,
-        )
         _check_g14_provenance_publish(
             ledger_data, report.errors, report.warnings,
         )
@@ -659,46 +654,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
     return report
 
 
-# G9 SFW ship-stop on spoken text. Phase 0 collect / Phase 10 raise.
-#
-# PD4 is a hard rule ("Safe for work. No profanity.") and until now nothing
-# enforced it on the episode that actually ships. `_otr_ledger_scrub` runs only
-# on the lanes with `run_story_spine=True` -- never on the content-owned lanes --
-# and even where it runs, its verdict is stamped and read by nobody. The lanes
-# that had any profanity check at all had it as an LLM opinion.
-#
-# This is the deterministic version: one word-boundary scan over the spoken text
-# that reaches the microphone, on the one path EVERY lane crosses. It runs inside
-# the gap audit, so Phase 10 raises FreezeAssertionError on it exactly like any
-# other critical gap -- a verdict an existing caller already acts on.
-#
-# Announcer lines are in scope: the bookends ship too.
-
-
-def _profanity_terms() -> List[str]:
-    """The live SFW vocabulary. Global policy -- never pack-tunable."""
-    try:
-        from ._otr_stage3_validators import DEFAULT_PROFANITY_TERMS
-    except ImportError:  # pragma: no cover -- flat test/standalone load
-        from _otr_stage3_validators import DEFAULT_PROFANITY_TERMS  # type: ignore
-    return list(DEFAULT_PROFANITY_TERMS)
-
-
-def _sfw_pattern() -> "re.Pattern[str]":
-    """Whole-word, case-insensitive alternation over the live term list.
-
-    Word-boundary, so "hell" fires on "go to hell" and never on "hello",
-    "shellfish", or "Michelle". Multi-word entries ("screw you") keep their
-    internal spacing and stay bounded at both ends.
-    """
-    terms = sorted(
-        (t.strip() for t in _profanity_terms() if t and t.strip()),
-        key=len, reverse=True,
-    )
-    if not terms:
-        return re.compile(r"(?!x)x")  # matches nothing
-    body = "|".join(re.escape(term) for term in terms)
-    return re.compile(rf"(?<!\w)(?:{body})(?!\w)", re.IGNORECASE)
+# G9: narrow terminal spoken-safety policy. Phase 0 observes; Phase 10
+# raises only when exact delivered character/announcer rows retain profanity,
+# explicit weapon language, or explicit sexual/nudity language.
 
 
 def _check_g9_sfw_spoken_text(
@@ -706,210 +664,27 @@ def _check_g9_sfw_spoken_text(
     errors: List[str],
     warnings: List[str],
 ) -> None:
-    """G9: no profanity in the spoken text of any ledger line."""
-    lines = ledger_data.get("lines")
-    if not isinstance(lines, list):
-        return
-    pattern = _sfw_pattern()
-    hits: list[str] = []
-    for line in lines:
-        if not isinstance(line, dict):
-            continue
-        text = line.get("text")
-        if not isinstance(text, str) or not text:
-            continue
-        found = sorted({match.group(0).lower() for match in pattern.finditer(text)})
-        if found:
-            lid = line.get("line_id") or "<no line_id>"
-            hits.append(f"{lid}: {', '.join(found)}")
+    """G9: apply the one shared whole-word policy to delivered spoken rows."""
+    del warnings
+    try:
+        from ._otr_content_safety import (
+            format_safety_hits,
+            scan_spoken_ledger,
+        )
+    except ImportError:  # pragma: no cover - flat test/standalone load
+        from _otr_content_safety import (  # type: ignore
+            format_safety_hits,
+            scan_spoken_ledger,
+        )
+    hits = scan_spoken_ledger(ledger_data)
     if hits:
-        sample = hits[:5]
-        more = "" if len(hits) <= 5 else f" (+{len(hits) - 5} more)"
         errors.append(
-            f"G9: profanity in the spoken text of {len(hits)} line(s): "
-            f"{'; '.join(sample)}{more}. PD4 is a hard ship rule -- the "
-            f"episode does not freeze with these words on the microphone. "
-            f"The vocabulary is DEFAULT_PROFANITY_TERMS in "
-            f"_otr_stage3_validators."
+            "G9: explicit spoken safety violation in "
+            f"{len(hits)} match(es): {format_safety_hits(hits)}. "
+            "Only profanity, explicit guns/knives/weapons, and explicit "
+            "sexual/nudity language are terminal prose policy."
         )
 
-
-# G10 GENRE spoken-text ship-stop (v4 campaign P1(iii)). Phase 0 collect / Phase
-# 10 raise -- the deterministic terminal for a banned GENRE phrase surviving on
-# the microphone. Bank-aware + OPT-IN: reads meta["genre_banned_phrases"], which
-# the writer stamps ONLY when the bank sets defaults.genre_guard_spoken=True. The
-# key is absent for every current bank, so G10 is INERT until a v4 lane opts in.
-#
-# THE LAW: an audit may improve a story, never fail one; only a DETERMINISTIC
-# validator ends an episode. The upstream authored repair (_otr_genre_guard.
-# apply_genre_spoken_repair, run at the writer creative boundary) is the "improve"
-# side; this read-only scan is the terminal for a surviving hit. It uses the
-# boundary matcher (casefolded, Unicode-aware) so "gun" never fires on "begun".
-# Runs on the one path EVERY execution family crosses (codex phase_10 finalizer,
-# inline run_freeze_cascade, fable2 finalizer), exactly like G9.
-
-
-def _check_g10_genre_spoken_text(
-    ledger_data: dict,
-    errors: List[str],
-    warnings: List[str],
-) -> None:
-    """G10: no banned GENRE phrase in the spoken text of any ledger line."""
-    meta = ledger_data.get("meta")
-    if not isinstance(meta, dict):
-        return
-    phrases = meta.get("genre_banned_phrases")
-    if not isinstance(phrases, list) or not phrases:
-        return  # opt-in only; inert for every current bank
-    try:
-        from ._otr_genre_guard import scan_spoken_lines
-    except ImportError:  # pragma: no cover -- flat test/standalone load
-        from _otr_genre_guard import scan_spoken_lines  # type: ignore
-    hits = [
-        f"{lid}: {', '.join(found)}"
-        for lid, found in scan_spoken_lines(ledger_data, phrases)
-    ]
-    if hits:
-        sample = hits[:5]
-        more = "" if len(hits) <= 5 else f" (+{len(hits) - 5} more)"
-        errors.append(
-            f"G10: banned genre phrase in the spoken text of {len(hits)} "
-            f"line(s): {'; '.join(sample)}{more}. The bank sets "
-            f"genre_guard_spoken; the vocabulary is its story_rules."
-            f"banned_phrases. An audit may improve a story, never fail one -- "
-            f"the fix is the upstream authored repair, not a relaxed gate."
-        )
-
-
-# G11 STRUCTURAL BEAT FLOOR (v4 campaign P1(iv)). Phase 0 collect / Phase 10
-# raise. Operator decision (2026-07-17): beat_bounds gates ONLY a structural
-# beat-count floor that would break downstream consumers; episode length is
-# recorded-not-gated (never chase word count). OPT-IN: reads meta["beat_bounds"]
-# (the writer stamps it with the family band + soft word-derived target); inert
-# when absent (every current freeze-unit fixture). Counts distinct beat_ids
-# among SPOKEN (non-music) lines. Every real episode clears the floor (codex
-# beat_ids = max(3, ...); the legacy adapter pads to >=3), so this never
-# false-fails a shipping lane -- it is the deterministic terminal for a
-# degenerate v4 outline. The family MAX in meta is recorded, NOT gated here
-# (Phase-2 live). Lawful under THE LAW: a deterministic validator ends an
-# episode; the soft length target only steers.
-
-
-def _check_g11_beat_floor(
-    ledger_data: dict,
-    errors: List[str],
-    warnings: List[str],
-) -> None:
-    """G11: an episode must clear the structural voiced-beat floor."""
-    meta = ledger_data.get("meta")
-    if not isinstance(meta, dict):
-        return
-    bounds = meta.get("beat_bounds")
-    if not isinstance(bounds, dict):
-        return  # opt-in only; inert for every current freeze-unit fixture
-    try:
-        floor = int(bounds.get("min"))
-    except (TypeError, ValueError):
-        return
-    lines = ledger_data.get("lines")
-    if not isinstance(lines, list):
-        return
-    try:
-        from ._otr_genre_guard import is_spoken_role
-    except ImportError:  # pragma: no cover -- flat test/standalone load
-        from _otr_genre_guard import is_spoken_role  # type: ignore
-    beat_ids: set = set()
-    spoken = 0
-    for line in lines:
-        if not isinstance(line, dict):
-            continue
-        if not is_spoken_role(line.get("speaker_role")):
-            continue
-        spoken += 1
-        bid = line.get("beat_id")
-        if bid:
-            beat_ids.add(str(bid))
-    # Prefer distinct beat_ids; fall back to spoken-line count when a ledger
-    # carries no beat_id (so a missing field never manufactures a false floor).
-    observed = len(beat_ids) if beat_ids else spoken
-    if observed < floor:
-        errors.append(
-            f"G11: episode has {observed} voiced beat(s), below the structural "
-            f"floor of {floor} (family={bounds.get('family')!r}). Below this an "
-            f"episode is not assemblable downstream. Episode length is "
-            f"recorded-not-gated; only this structural floor ends the episode."
-        )
-
-
-# G12 OUTRO CAST-COMPLETENESS (v4 campaign P1(v)). Phase 0 collect / Phase 10
-# raise. Opt-in via meta["outro_cast_complete"] (the writer stamps it when the
-# bank sets defaults.require_outro_cast_complete); inert for every current bank.
-# Reads the REAL final rows (character char_ids with a non-skipped spoken line)
-# and checks each name is credited in the last announcer line -- lenient
-# (full-name OR significant token) so it never false-fails a good sign-off. THE
-# LAW: the deterministic validator ends the episode; the upstream authored repair
-# (_otr_outro_guard.apply_outro_completeness_repair) is the improve side. Skips
-# cleanly when there is no outro line (presence is the existing epilogue check).
-
-
-def _check_g12_outro_cast_complete(
-    ledger_data: dict,
-    errors: List[str],
-    warnings: List[str],
-) -> None:
-    """G12: the outro must credit every character who appears in the final rows."""
-    meta = ledger_data.get("meta")
-    if not isinstance(meta, dict) or not meta.get("outro_cast_complete"):
-        return  # opt-in only; inert for every current bank
-    try:
-        from ._otr_outro_guard import missing_final_cast_names
-    except ImportError:  # pragma: no cover -- flat test/standalone load
-        from _otr_outro_guard import missing_final_cast_names  # type: ignore
-    missing = missing_final_cast_names(ledger_data)
-    if missing:
-        sample = missing[:6]
-        more = "" if len(missing) <= 6 else f" (+{len(missing) - 6} more)"
-        errors.append(
-            f"G12: the outro does not credit {len(missing)} cast member(s): "
-            f"{', '.join(sample)}{more}. A radio sign-off names its cast; the fix "
-            f"is the upstream authored outro repair, not a relaxed gate (Python "
-            f"never appends a name to prose)."
-        )
-
-
-# G13 LITERAL PLACEHOLDER TOKENS (v4 campaign P1(vii)). Phase 0 collect / Phase
-# 10 raise. Opt-in via meta["placeholder_guard"] (the writer stamps it when the
-# bank sets defaults.placeholder_guard); inert for every current bank. Flags a
-# named field (cast name / character description, line speaker, or a spoken line
-# that is WHOLLY a placeholder) carrying a bare scaffolding token (X, Y, TBD,
-# ...). Whole-value + token-boundary, so a real word containing those letters
-# never trips. Deterministic terminal -- no authored repair (a placeholder is a
-# generation bug the pack fixes, not prose to re-author).
-
-
-def _check_g13_placeholder_tokens(
-    ledger_data: dict,
-    errors: List[str],
-    warnings: List[str],
-) -> None:
-    """G13: no bare placeholder token in a named field."""
-    meta = ledger_data.get("meta")
-    if not isinstance(meta, dict) or not meta.get("placeholder_guard"):
-        return  # opt-in only; inert for every current bank
-    try:
-        from ._otr_placeholder_guard import find_placeholder_fields
-    except ImportError:  # pragma: no cover -- flat test/standalone load
-        from _otr_placeholder_guard import find_placeholder_fields  # type: ignore
-    hits = find_placeholder_fields(ledger_data)
-    if hits:
-        sample = hits[:6]
-        more = "" if len(hits) <= 6 else f" (+{len(hits) - 6} more)"
-        errors.append(
-            f"G13: {len(hits)} field(s) carry a literal placeholder token: "
-            f"{'; '.join(sample)}{more}. A placeholder that survives to freeze is "
-            f"a generation bug -- the pack must author a real value, never ship "
-            f"'X'/'Y'/'TBD' on the microphone or in the credits."
-        )
 
 
 # G14 PROVENANCE PUBLISH GATE (v4 campaign P1(viii)). Phase 0 collect / Phase 10

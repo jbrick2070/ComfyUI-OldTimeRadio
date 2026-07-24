@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 try:
     from ._otr_structured_call import StructuredCallFailedError, structured_call
@@ -25,31 +25,12 @@ PROMPT_VERSION = "media_archive_interpreter_v1"
 SCHEMA_VERSION = "media_archive_briefs_v1"
 DRAMA_SEED_SCHEMA_VERSION = "media_archive_drama_seeds_v1"
 
-_MAX_CASTING_BRIEF_CHARS = 900
-_MAX_SCRIPT_BRIEF_CHARS = 1200
-_MAX_CLOSE_BRIEF_CHARS = 500
-_MAX_KEY_TERMS = 7
-_MAX_KEY_TERM_CHARS = 80
 _DRAMA_SEEDS_PATH = (
     Path(__file__).resolve().parent
     / "story_packs"
     / "media_archive"
     / "drama_seeds.json"
 )
-_DRAMA_SEED_FORBIDDEN_TERMS = (
-    "national treasure",
-    "nancy drew",
-    "spaceship",
-    "mission control",
-    "laboratory containment",
-    "alien invasion",
-    "murder",
-    "corpse",
-    "ghost",
-    "phantom",
-    "serial killer",
-)
-
 
 class MediaArchiveInterpreterError(RuntimeError):
     """Raised when the media archive source brain cannot produce briefs."""
@@ -64,43 +45,18 @@ class MediaArchiveInterpreterError(RuntimeError):
 
 
 class MediaArchiveBriefs(BaseModel):
-    """Briefs contract consumed by ``_otr_source_payload`` and the writer."""
+    """Briefs contract consumed by the source adapter and writer."""
 
-    casting_brief: str = Field(..., max_length=_MAX_CASTING_BRIEF_CHARS)
-    script_brief: str = Field(..., max_length=_MAX_SCRIPT_BRIEF_CHARS)
-    news_close_brief: str = Field(..., max_length=_MAX_CLOSE_BRIEF_CHARS)
-    key_terms: list[str] = Field(..., min_length=1, max_length=_MAX_KEY_TERMS)
+    casting_brief: str
+    script_brief: str
+    news_close_brief: str
+    key_terms: list[str] = Field(default_factory=list)
 
     source_hash: str = ""
     prompt_version: str = PROMPT_VERSION
     schema_version: str = SCHEMA_VERSION
     model_id: str = ""
     attempts: int = 0
-
-    @field_validator("key_terms", mode="before")
-    @classmethod
-    def _trim_term_count(cls, value):
-        if isinstance(value, list) and len(value) > _MAX_KEY_TERMS:
-            return value[:_MAX_KEY_TERMS]
-        return value
-
-    @field_validator("key_terms")
-    @classmethod
-    def _coerce_term_lengths(cls, value: list[str]) -> list[str]:
-        out: list[str] = []
-        for term in value:
-            if not isinstance(term, str):
-                raise ValueError(
-                    f"key_term must be str, got {type(term).__name__}: {term!r}"
-                )
-            clean = " ".join(term.split()).strip()
-            if len(clean) > _MAX_KEY_TERM_CHARS:
-                clean = clean[:_MAX_KEY_TERM_CHARS].rsplit(" ", 1)[0].rstrip()
-            if clean:
-                out.append(clean)
-        if not out:
-            raise ValueError("key_terms must contain at least one non-empty term")
-        return out
 
 
 def _source_hash(payload: dict) -> str:
@@ -166,16 +122,6 @@ def _load_drama_seeds_cached(seed_path: str) -> tuple[str, ...]:
                 attempts=0,
                 reason=f"media archive drama seed {idx} is empty",
             )
-        hay = title.casefold()
-        for term in _DRAMA_SEED_FORBIDDEN_TERMS:
-            if term in hay:
-                raise MediaArchiveInterpreterError(
-                    attempts=0,
-                    reason=(
-                        f"media archive drama seed {title!r} contains "
-                        f"forbidden term {term!r}"
-                    ),
-                )
         seeds.append(title)
 
     if len(seeds) != len(set(seeds)):
@@ -241,12 +187,10 @@ def _build_prompt(payload: dict) -> list[dict[str, str]]:
         "fact and must not create source facts.\n\n"
         "Return ONE JSON object only with exactly these keys:\n"
         "{\n"
-        "  \"casting_brief\": \"80-700 chars; likely human roles and voices\",\n"
-        "  \"script_brief\": \"120-1000 chars; fictional radio story premise "
-        "grounded in the archive source\",\n"
-        "  \"news_close_brief\": \"80-420 chars; archive/source note for the "
-        "announcer, not a news report\",\n"
-        "  \"key_terms\": [\"2-7 concise archive/source terms\"]\n"
+        "  \"casting_brief\": \"source-grounded human roles and voices\",\n"
+        "  \"script_brief\": \"fictional radio story premise grounded in the archive source\",\n"
+        "  \"news_close_brief\": \"archive/source note for the announcer, not a news report\",\n"
+        "  \"key_terms\": [\"optional concise archive/source terms\"]\n"
         "}\n\n"
         "The story may be fictional, but the archive object, collection, "
         "preservation labor, or media-history hook must clearly come from the "
@@ -280,21 +224,6 @@ def build_media_archive_briefs(
         )
 
     def _content_validator(brief: MediaArchiveBriefs) -> str | None:
-        if len(brief.key_terms) < 2:
-            return "media archive briefs require at least two key_terms"
-        hay = " ".join(
-            [brief.casting_brief, brief.script_brief, brief.news_close_brief]
-            + list(brief.key_terms)
-        ).casefold()
-        for term in (
-            "spaceship", "mission control", "laboratory containment",
-            "alien invasion", "murder victim", "body count",
-            "haunting", "cursed object", "ransom", "corpse",
-            "ghost", "phantom", "emergency broadcast",
-            "serial killer", "murder weapon",
-        ):
-            if term in hay:
-                return f"media archive brief drifted into forbidden term {term!r}"
         return None
 
     try:

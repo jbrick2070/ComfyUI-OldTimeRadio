@@ -1,228 +1,175 @@
-"""tests/test_bug_local_288_sfw_validator.py
+"""BUG-LOCAL-288 and shared narrow spoken-safety regressions.
 
-BUG-LOCAL-288 (2026-05-27): SFW post-validator in compose_line.
-
-Live evidence: pending_20260527_153942 ("Space Force / SpaceX
-targeting") shipped first character line "Damn it, we've got
-thirty-seven minutes..." -- profanity that PD4 explicitly bans.
-The whole-episode SFW critic axis catches it post-assembly but
-compose_line had no per-line gate. validate_sfw + a new
-CODE_SFW_VIOLATION code close the loop so the line-level repair
-branch fires before the line ever reaches the cascade.
+The original production failure was a profane first character line. The same
+whole-word policy now covers explicit guns/knives/weapons and explicit
+sexual/nudity language. It deliberately does not classify smoking, style,
+visual vocabulary, or harmless words that merely contain a blocked token.
 """
+
 from __future__ import annotations
+
+from types import SimpleNamespace
 
 import pytest
 
-from nodes._otr_stage1_plan import Stage1Beat
+from nodes._otr_content_safety import (
+    EXPLICIT_NUDITY_TERMS,
+    EXPLICIT_WEAPON_TERMS,
+    PROFANITY_TERMS,
+    find_text_hits,
+    profanity_terms,
+)
 from nodes._otr_stage3_validators import (
     CODE_SFW_VIOLATION,
-    DEFAULT_PROFANITY_TERMS,
     validate_line,
     validate_sfw,
 )
 
 
-def _beat(speaker: str = "REN BLACK", beat_id: str = "b002") -> Stage1Beat:
-    return Stage1Beat(
+def _beat(speaker: str = "REN BLACK", beat_id: str = "b002"):
+    return SimpleNamespace(
         beat_id=beat_id,
         speaker=speaker,
-        intent="A short procedural beat that names the premise.",
-        length_target_words=20,
-        emotional_register="measured",
+        speaker_role="character",
     )
 
 
-class TestValidateSFW:
-    """Direct validator tests."""
-
-    def test_clean_line_returns_none(self):
+class TestLiveProfanityRegression:
+    def test_live_damn_it_line_fails(self):
         finding = validate_sfw(
             _beat(),
-            "We need to evacuate the building before the storm.",
-            "REN BLACK",
+            "Damn it, we've got thirty-seven minutes before the window closes.",
         )
-        assert finding is None
 
-    def test_damn_it_fires_violation(self):
-        # The live-run "Damn it, we've got thirty-seven minutes..."
-        finding = validate_sfw(
-            _beat(),
-            "Damn it, we've got thirty-seven minutes before the next "
-            "signal window closes.",
-            "REN BLACK",
-        )
         assert finding is not None
         assert finding.code == CODE_SFW_VIOLATION
         assert finding.severity == "error"
-        assert "damn" in finding.got.lower()
+        assert finding.got == "damn"
 
-    def test_hell_fires_violation(self):
-        finding = validate_sfw(
-            _beat(),
-            "What the hell is going on here?",
-            "REN BLACK",
-        )
-        assert finding is not None
-        assert finding.code == CODE_SFW_VIOLATION
-
-    def test_hello_does_NOT_fire(self):
-        """Word-boundary check: 'hell' must NOT match inside 'hello'."""
-        finding = validate_sfw(
-            _beat(),
-            "Hello, Maeve. The team is ready.",
-            "REN BLACK",
-        )
-        assert finding is None
-
-    def test_hellish_does_NOT_fire(self):
-        """'hell' inside 'hellish' is OK."""
-        finding = validate_sfw(
-            _beat(),
-            "It was a hellish week but we shipped.",
-            "REN BLACK",
-        )
-        assert finding is None
-
-    def test_shellfish_does_NOT_fire(self):
-        """'hell' inside 'shellfish' is OK."""
-        finding = validate_sfw(
-            _beat(),
-            "The shellfish reports came back clean.",
-            "REN BLACK",
-        )
-        assert finding is None
-
-    def test_case_insensitive(self):
-        finding = validate_sfw(
-            _beat(),
-            "DAMN this is bad.",
-            "REN BLACK",
-        )
-        assert finding is not None
-        assert finding.code == CODE_SFW_VIOLATION
-
-    def test_multiword_phrase_fires(self):
-        # "screw you" is in DEFAULT_PROFANITY_TERMS.
-        finding = validate_sfw(
-            _beat(),
-            "Screw you, I'm publishing it anyway.",
-            "REN BLACK",
-        )
-        assert finding is not None
-        assert finding.code == CODE_SFW_VIOLATION
-
-    def test_punctuation_does_not_block_match(self):
-        # The regex uses \b which respects punctuation as a
-        # word boundary.
-        finding = validate_sfw(
-            _beat(),
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "What the hell is going on?",
+            "DAMN, this is bad.",
+            "Screw you, I am publishing it anyway.",
             "...damn!",
-            "REN BLACK",
-        )
+        ],
+    )
+    def test_profanity_is_case_insensitive_and_boundary_aware(self, text):
+        finding = validate_sfw(_beat(), text)
+
         assert finding is not None
         assert finding.code == CODE_SFW_VIOLATION
 
-    def test_custom_terms_override_default(self):
-        finding = validate_sfw(
-            _beat(),
-            "She tossed the wrench across the lab.",
-            "REN BLACK",
-            terms=["wrench"],
-        )
+
+class TestWholeWordSafetyContract:
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Hello, Maeve. The team is ready.",
+            "It was a hellish week, but we shipped.",
+            "The shellfish reports came back clean.",
+            "The transmission has begun.",
+        ],
+    )
+    def test_blocked_tokens_inside_ordinary_words_pass(self, text):
+        assert find_text_hits(text) == ()
+        assert validate_sfw(_beat(), text) is None
+
+    @pytest.mark.parametrize(
+        ("text", "category", "term"),
+        [
+            ("A gun lay on the table.", "weapon", "gun"),
+            ("The guns were removed.", "weapon", "guns"),
+            ("She counted two knives.", "weapon", "knives"),
+            ("No weapon should appear.", "weapon", "weapon"),
+            ("No weapons should appear.", "weapon", "weapons"),
+            (
+                "The report described explicit sex.",
+                "sexual_nudity",
+                "explicit sex",
+            ),
+            (
+                "The report described sexual intercourse.",
+                "sexual_nudity",
+                "sexual intercourse",
+            ),
+            ("The gallery displayed nudity.", "sexual_nudity", "nudity"),
+            ("The figure was naked.", "sexual_nudity", "naked"),
+        ],
+    )
+    def test_explicit_weapon_and_sexual_nudity_terms_fail(
+        self, text, category, term
+    ):
+        assert (category, term) in find_text_hits(text)
+
+        finding = validate_sfw(_beat(), text)
         assert finding is not None
-        assert finding.got == "wrench"
+        assert finding.code == CODE_SFW_VIOLATION
+        assert finding.got == term
 
-    def test_empty_term_list_yields_no_finding(self):
-        finding = validate_sfw(
-            _beat(),
-            "Damn it.",
-            "REN BLACK",
-            terms=[],
+    def test_multiple_categories_are_reported_by_the_shared_matcher(self):
+        assert find_text_hits("Damn, the gun was beside the nudity exhibit.") == (
+            ("profanity", "damn"),
+            ("weapon", "gun"),
+            ("sexual_nudity", "nudity"),
         )
-        assert finding is None
 
-    def test_non_string_input_returns_none(self):
-        finding = validate_sfw(_beat(), None, "REN BLACK")
-        assert finding is None
 
-    def test_default_term_list_includes_common_profanity(self):
-        # Spot pin: the list ships with the everyday terms PD4 cares
-        # about. Don't enumerate the full list (operator may extend).
-        assert "damn" in DEFAULT_PROFANITY_TERMS
-        assert "hell" in DEFAULT_PROFANITY_TERMS
-        assert "shit" in DEFAULT_PROFANITY_TERMS
-        assert "fuck" in DEFAULT_PROFANITY_TERMS
+class TestDeliberateNonGates:
+    def test_smoking_terms_pass(self):
+        text = "He lit a cigarette, packed tobacco, and watched the pipe smoke."
+
+        assert find_text_hits(text) == ()
+        assert validate_sfw(_beat(), text) is None
+
+    def test_visual_vocabulary_passes(self):
+        text = (
+            "The violet lighthouse framed a brass telescope, a red bicycle, "
+            "and seven silver umbrellas."
+        )
+
+        assert validate_sfw(_beat(), text) is None
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Yes.",
+            " ".join(["signal"] * 500),
+        ],
+    )
+    def test_short_and_long_text_are_not_safety_findings(self, text):
+        assert validate_sfw(_beat(), text) is None
+
+
+class TestSharedVocabulary:
+    def test_public_profanity_accessor_is_the_shared_tuple(self):
+        assert profanity_terms() == PROFANITY_TERMS
+        for term in ("damn", "hell", "shit", "fuck"):
+            assert term in profanity_terms()
+
+    def test_explicit_categories_expose_representative_terms(self):
+        for term in ("gun", "guns", "knife", "knives", "weapon", "weapons"):
+            assert term in EXPLICIT_WEAPON_TERMS
+        for term in ("nude", "nudity", "naked", "explicit sex"):
+            assert term in EXPLICIT_NUDITY_TERMS
 
 
 class TestValidateLineWiring:
-    """validate_line dispatches to validate_sfw."""
-
-    def _plan(self, speaker_name: str = "REN BLACK"):
-        from nodes._otr_stage1_plan import (
-            Stage1Arc,
-            Stage1CastMember,
-            Stage1Plan,
-        )
-        return Stage1Plan(
-            premise="A two-hander about a publication decision.",
-            arc=Stage1Arc(
-                setup="The recording matches a living pod.",
-                complication="Publication will draw boats.",
-                resolution="Suri opts for sound-only release.",
-            ),
-            cast=[
-                Stage1CastMember(
-                    name=speaker_name,
-                    gender="male",
-                    pronouns="he/him",
-                    voice_id="v2/en_speaker_6",
-                    persona="Station operator. Clipped, wary.",
-                    arc_role="reluctant insider",
-                ),
-            ],
-            beats=[
-                Stage1Beat(
-                    beat_id="b001",
-                    speaker=speaker_name,
-                    intent="Open the scene at the station console.",
-                    length_target_words=18,
-                    emotional_register="grounded",
-                ),
-                Stage1Beat(
-                    beat_id="b002",
-                    speaker=speaker_name,
-                    intent="Refuse the publication offer concretely.",
-                    length_target_words=20,
-                    emotional_register="guarded",
-                ),
-                Stage1Beat(
-                    beat_id="b003",
-                    speaker=speaker_name,
-                    intent="Land the refusal and walk out.",
-                    length_target_words=15,
-                    emotional_register="resigned",
-                ),
-            ],
-            running_facts=[],
-        )
-
-    def test_sfw_violation_lands_in_findings(self):
-        plan = self._plan()
+    def test_shared_safety_violation_reaches_the_result(self):
         result = validate_line(
-            plan,
-            plan.beats[1],  # the b002 refusal beat
-            "Damn it, I'm not signing that paper.",
+            _beat(),
+            "The gun is beside the console.",
         )
-        codes = [f.code for f in result.findings]
-        assert CODE_SFW_VIOLATION in codes
 
-    def test_clean_line_has_no_sfw_finding(self):
-        plan = self._plan()
+        assert not result.ok
+        assert [row.code for row in result.errors] == [CODE_SFW_VIOLATION]
+
+    def test_clean_line_has_no_safety_finding(self):
         result = validate_line(
-            plan,
-            plan.beats[0],
-            "I'm not signing that paper. The pod stays off the maps.",
+            _beat(),
+            "The first transmission has begun beside the tobacco tin.",
         )
-        codes = [f.code for f in result.findings]
-        assert CODE_SFW_VIOLATION not in codes
+
+        assert result.ok
+        assert CODE_SFW_VIOLATION not in [row.code for row in result.findings]

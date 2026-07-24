@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Updated:** 2026-07-12
+**Updated:** 2026-07-22
 
 **Branch:** `v2.0-alpha`
 
@@ -122,6 +122,11 @@ with the campaign unless the operator explicitly promotes it earlier.
 
 Choose these as separate campaigns after the core surface is stable:
 
+- a non-gating episode content rating on the opening sequence and repeated in
+  the credits, derived from the final canonical episode on a G-through-XXX
+  scale; a future design may combine transcript/audio analysis with video-frame
+  moderation, but the rating is advisory display metadata only and must never
+  reject, reroll, rewrite, or block publication;
 - Randomizer Design B: visual-pack roll, only after `dynamic_story` establishes
   one visual-style authority;
 - richer brief-driven music-cue still prompts;

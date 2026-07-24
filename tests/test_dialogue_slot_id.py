@@ -3,8 +3,7 @@
 Covers the three live touch surfaces (Story Room extract/commit removed
 in the 2026-05-29 lean-down):
   1. _otr_outline.Beat + stamp_dialogue_slot_ids
-  2. _otr_stage1_plan.Stage1Beat + stamp_dialogue_slot_ids
-  3. production_ledger.init_lines_from_outline + set_lines
+  2. production_ledger.init_lines_from_outline + set_lines
 
 The 5/5 episode soak gate post-commit verifies live integrity; this
 file pins the deterministic invariants subagents can run before push.
@@ -21,14 +20,6 @@ from nodes._otr_outline import (
     Beat as OutlineBeat,
     Outline,
     stamp_dialogue_slot_ids as stamp_outline_slot_ids,
-)
-from nodes._otr_stage1_plan import (
-    Stage1Beat,
-    Stage1CastMember,
-    Stage1Arc,
-    Stage1Plan,
-    parse_and_validate_plan,
-    stamp_dialogue_slot_ids as stamp_stage1_slot_ids,
 )
 from nodes.production_ledger import Ledger
 
@@ -87,59 +78,6 @@ def _outline_with_mixed_beats() -> Outline:
         beats=beats,
     )
 
-
-def _stage1_plan_with_mixed_beats() -> Stage1Plan:
-    return Stage1Plan(
-        premise="A short test premise for Stage 1 slot id stamping.",
-        arc=Stage1Arc(
-            setup="setup statement long enough to validate.",
-            complication="complication statement long enough to validate.",
-            resolution="resolution statement long enough to validate.",
-        ),
-        cast=[
-            Stage1CastMember(
-                name="ALICE", gender="female", pronouns="she/her",
-                voice_id="v2/en_speaker_3",
-                persona="weary forensic engineer with dry humor and "
-                        "twenty years on the night shift.",
-                arc_role="reluctant insider",
-            ),
-            Stage1CastMember(
-                name="BOB", gender="male", pronouns="he/him",
-                voice_id="v2/en_speaker_5",
-                persona="ambitious grant officer evasive about funding "
-                        "and prone to deflection.",
-                arc_role="pressure source",
-            ),
-        ],
-        beats=[
-            Stage1Beat(beat_id="b001", speaker="ANNOUNCER",
-                       intent="opening bookend",
-                       length_target_words=15,
-                       emotional_register="welcoming"),
-            Stage1Beat(beat_id="b002", speaker="ALICE",
-                       intent="set up the question",
-                       length_target_words=20,
-                       emotional_register="curious dread"),
-            Stage1Beat(beat_id="b003", speaker="MUSIC",
-                       intent="bridge",
-                       length_target_words=0,
-                       emotional_register="transitional"),
-            Stage1Beat(beat_id="b004", speaker="BOB",
-                       intent="apply pressure",
-                       length_target_words=25,
-                       emotional_register="tight evasion"),
-            Stage1Beat(beat_id="b005", speaker="ALICE",
-                       intent="costly choice",
-                       length_target_words=30,
-                       emotional_register="grim resolve"),
-            Stage1Beat(beat_id="b006", speaker="ANNOUNCER",
-                       intent="closing bookend",
-                       length_target_words=15,
-                       emotional_register="quiet aftermath"),
-        ],
-        running_facts=["the device is in the basement"],
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -201,56 +139,8 @@ def test_stamp_outline_slot_ids_is_idempotent():
     stamp_outline_slot_ids(out)
     assert [b.dialogue_slot_id for b in out.beats] == snapshot
 
-
 # ---------------------------------------------------------------------------
-# 2. _otr_stage1_plan.Stage1Beat + stamp_dialogue_slot_ids
-# ---------------------------------------------------------------------------
-
-
-def test_stage1beat_accepts_well_formed_slot_id():
-    b = Stage1Beat(
-        beat_id="b001", speaker="ALICE",
-        intent="set up the question",
-        length_target_words=20,
-        emotional_register="curious dread",
-        dialogue_slot_id="d001",
-    )
-    assert b.dialogue_slot_id == "d001"
-
-
-def test_stage1_stamp_voiced_predicate_is_speaker_not_music():
-    """MUSIC beats stay None; ANNOUNCER + cast names get a slot id."""
-    plan = _stage1_plan_with_mixed_beats()
-    stamp_stage1_slot_ids(plan)
-    pairs = [(b.beat_id, b.speaker, b.dialogue_slot_id) for b in plan.beats]
-    # Voiced (speaker != MUSIC): b001/ANN, b002/ALICE, b004/BOB,
-    # b005/ALICE, b006/ANN. b003/MUSIC stays None.
-    assert pairs == [
-        ("b001", "ANNOUNCER", "d001"),
-        ("b002", "ALICE",     "d002"),
-        ("b003", "MUSIC",     None),
-        ("b004", "BOB",       "d003"),
-        ("b005", "ALICE",     "d004"),
-        ("b006", "ANNOUNCER", "d005"),
-    ]
-
-
-def test_parse_and_validate_plan_stamps_slot_ids():
-    """The canonical parse entry point runs the stamping helper."""
-    plan = _stage1_plan_with_mixed_beats()
-    plan_dict = plan.model_dump()
-    parsed = parse_and_validate_plan(plan_dict)
-    voiced = [b for b in parsed.beats if b.speaker != "MUSIC"]
-    music = [b for b in parsed.beats if b.speaker == "MUSIC"]
-    assert all(b.dialogue_slot_id is not None for b in voiced)
-    assert all(b.dialogue_slot_id is None for b in music)
-    # Ensure d-id sequence is dense, monotonic.
-    seq = [b.dialogue_slot_id for b in voiced]
-    assert seq == [f"d{i:03d}" for i in range(1, len(seq) + 1)]
-
-
-# ---------------------------------------------------------------------------
-# 3. production_ledger.init_lines_from_outline / set_lines
+# 2. production_ledger.init_lines_from_outline / set_lines
 # ---------------------------------------------------------------------------
 
 

@@ -272,7 +272,7 @@ _FACE_LEDGER = {"meta": _OK_META, "lines": [
      "text": "The storm speaks.", "start_s": 1.0, "dur_s": 3.0}]}
 
 
-def test_humo_character_beat_consumes_m4_prompt_with_gear_scrub():
+def test_humo_character_beat_preserves_authored_m4_visual_vocabulary():
     from nodes._otr_video_engines import render_driver as rd
     creative = {"text_prompt": ("KEEPER, 60s weathered face, speaking into a "
                                 "studio microphone, lantern glow"),
@@ -281,9 +281,9 @@ def test_humo_character_beat_consumes_m4_prompt_with_gear_scrub():
         _face_shot("character_video", creative), _FACE_LEDGER)
     p = req["text_prompt"]
     assert req["observability"]["prompt_source"] == "m4"
-    assert "microphone" not in p.lower() and "studio" not in p.lower()
-    assert "weathered face" in p          # the creative content survived
-    assert "no microphone" not in p.lower()   # NEVER negations
+    assert "studio microphone" in p.lower()
+    assert "weathered face" in p
+    assert "lantern glow" in p
 
 
 def test_humo_announcer_beat_keeps_radio_styling(monkeypatch):
@@ -311,15 +311,14 @@ def test_humo_announcer_beat_keeps_radio_styling(monkeypatch):
     assert req["observability"]["prompt_source"] == "m4"
 
 
-def test_humo_character_beat_missing_creative_falls_back_loud_and_gear_free():
+def test_humo_character_beat_missing_creative_uses_world_neutral_fallback():
     from nodes._otr_video_engines import render_driver as rd
     req = rd.build_request_from_shot(
         _face_shot("character_video", {}), _FACE_LEDGER)
     p = req["text_prompt"]
-    assert req["observability"]["prompt_source"] == "default_scrubbed"
+    assert req["observability"]["prompt_source"] == "default_character"
     assert p == rd._CHAR_FACE_FALLBACK_PROMPT
-    assert not rd._GEAR_WORDS_RD.search(p)
-    assert "no " not in p.lower()                      # no negations
+    assert "attire from the story world" in p.lower()
 
 
 def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console(
@@ -347,15 +346,6 @@ def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console(
     assert shot["engine_id"] == "ltx_audio_in"              # redirected off HuMo
     assert req["observability"]["prompt_source"] == "motion_role"
     assert "console" in req["text_prompt"].lower()
-
-
-def test_gear_scrub_regex_lockstep_with_image_prompt_module():
-    """The driver's local mirror must stay in LOCKSTEP with the image-prompt
-    module's _GEAR_WORDS (the shared-scrub contract of the ticket)."""
-    from nodes._otr_video_engines import render_driver as rd
-    assert rd._GEAR_WORDS_RD.pattern == mbp._GEAR_WORDS.pattern
-    sample = "a person speaking, studio microphone, on-air sign, lantern glow"
-    assert rd._scrub_gear(sample) == mbp._scrub_gear_words(sample)
 
 
 def test_retired_role_a_on_ltx_no_longer_generic(monkeypatch):

@@ -153,8 +153,6 @@ class TestLoaderV2:
         (lambda d: d["still_word_backdrop"].update(default=""),
          "non-empty string"),
         (lambda d: d.update(scene_instruction_look=7), "must be str"),
-        (lambda d: d.update(forbidden_terms=["needle-fan"]),
-         "appears in its own"),
     ])
     def test_fail_loud_matrix_v2(self, tmp_path, monkeypatch, mutate,
                                  exc_fragment):

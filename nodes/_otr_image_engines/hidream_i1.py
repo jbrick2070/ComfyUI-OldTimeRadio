@@ -2,7 +2,7 @@
 
 A 4th image engine from ``C2_DEP_LICENSE_MATRIX.md`` (the MIT-licensed GGUF
 candidate). It registers EXACTLY like ``flux_gen1`` / ``z_image_turbo`` /
-``qwen_image``, growing the open registry of per-role peers. Like Qwen-Image it
+``z_image_turbo``, growing the open registry of per-role peers. Like the other
 rides the ALREADY-INSTALLED in-stack ComfyUI-GGUF loader -- a GGUF checkpoint is
 dtype-isolated and does NOT swap torch or pull a banned dep onto the protected
 cu130 main venv, so it needs no cu128 sidecar. Per the matrix: HiDream-I1 Fast is

@@ -134,10 +134,10 @@ def test_request_shape_sends_interactions_image_format(monkeypatch):
         "image_size": "2K",
     }
     lower = payload["input"].lower()
-    assert "no blood" in lower
-    assert "no guns" in lower
-    assert "no knives" in lower
-    assert "no smoking" in lower
+    assert "no explicit guns" in lower
+    assert "knives" in lower
+    assert "weapons" in lower
+    assert "nudity" in lower
     assert seen["kwargs"]["_api_key"] == "KEY"
     assert seen["kwargs"]["timeout_s"] == 300
     assert seen["kwargs"]["max_retries"] == 0

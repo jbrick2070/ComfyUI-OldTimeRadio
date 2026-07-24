@@ -372,7 +372,7 @@ class TestRecursiveFractalExplicitStyleCue:
         req = rd.build_request_from_shot(shot, led)
         assert req["text_prompt"].startswith(
             "recursive fractal light field. close-up cinematic portrait")
-        assert req["observability"]["prompt_source"] == "default_scrubbed"
+        assert req["observability"]["prompt_source"] == "default_character"
 
     def test_recursive_fractal_style_cue_hits_brief_video_prompt(
             self, _single_pass_recipe):
@@ -397,45 +397,3 @@ class TestRecursiveFractalExplicitStyleCue:
         assert req["observability"]["prompt_source"] == "brief+beat"
 
 
-# ---------------------------------------------------------------------------
-# 3. Negative-vocab smokes (r1 codex OPT): no pack's own forbidden term
-#    survives into any styled composed surface.
-# ---------------------------------------------------------------------------
-class TestNegativeVocabSmokes:
-    def _surfaces(self, style_id):
-        s = vs.resolve_visual_style(style_id)
-        meta = _meta_for(style_id)
-        outs = []
-        for arm in ("console_face", "ltx_radio_mouth", "radio_object"):
-            outs.append(imgp.build_radio_host_prompt(
-                meta, "portrait", radio_host_style=arm))
-        for talking in (False, True):
-            outs.append(imgp.compose_image_prompt_fallback(
-                meta, _CHAR, "portrait", talking=talking))
-        outs.append(imgp._compose_background_plate_prompt(
-            meta, "village square"))
-        outs.append(imgp._compose_mesh_fodder_prompt(
-            meta, None, {}, "village square", "music_visual"))
-        for role, syn in (("music_visual", True),
-                          ("announcer_visual", False)):
-            outs.append(helpers.get_open_subject(role, syn, meta, style=s))
-        outs.extend(s.motion_registers.values())
-        outs.append(imgp._build_char_prompt_request(
-            _CHAR, meta, "village square", "portrait", style=s))
-        outs.append(imgp._build_char_scene_request(
-            _CHAR, meta, "village square", _LINE, style=s))
-        outs.append(helpers.compose_still_prompt(
-            meta, kind="scene_beat", role="announcer_visual"))
-        return outs
-
-    @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
-    def test_no_own_forbidden_term_survives(self, style_id):
-        s = vs.resolve_visual_style(style_id)
-        offenders = []
-        for i, text in enumerate(self._surfaces(style_id)):
-            low = text.lower()
-            for term in s.forbidden_terms:
-                if term.lower() in low:
-                    offenders.append(f"surface[{i}] carries {term!r}: "
-                                     f"{text[:90]}...")
-        assert not offenders, "\n".join(offenders)

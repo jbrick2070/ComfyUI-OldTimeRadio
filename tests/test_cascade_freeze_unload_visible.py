@@ -1,20 +1,4 @@
-"""tests/test_cascade_freeze_unload_visible.py — S34 B2 P1 proof.
-
-S34 B2 (2026-05-15) makes the `meta.freeze_unload_ok` stamp visible
-to downstream JSON consumers. The cascade's finally block stamps
-the flag on `led.data` AFTER the first serialization of
-`updated_script_json` -- pre-B2 the returned JSON didn't contain
-the stamp. B2 adds a reserialization step between the finally
-block and the return so the stamp lands in the output.
-
-Tests prove:
-  1. On a clean unload, returned `updated_script_json` carries
-     `meta.freeze_unload_ok=True`.
-  2. On a failed unload, returned `updated_script_json` carries
-     `meta.freeze_unload_ok=False` (NOT missing).
-  3. The returned JSON's stamp matches `led.data["meta"][
-     "freeze_unload_ok"]` post-finally (consistency).
-"""
+"""The cascade exposes its final local-LLM unload receipt."""
 from __future__ import annotations
 
 import json
@@ -23,247 +7,128 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-
-# ---------------------------------------------------------------------------
-# Fixtures (mirrors test_lfc_b1_cascade_unload_in_finally.py)
-# ---------------------------------------------------------------------------
 
 
 def _ledger_obj():
     data = {
         "schema_version": "l3-2026-05-14",
-        "episode_id": "ep_b2_test",
-        "cast": [], "scenes": [], "shots": [], "beats": [],
-        "lines": [], "music": [], "clips": [],
-        "meta": {"episode_title": "b2", "style": "x"},
+        "episode_id": "ep_unload_visible",
+        "cast": [],
+        "scenes": [],
+        "shots": [],
+        "beats": [],
+        "lines": [],
+        "music": [],
+        "clips": [],
+        "meta": {"episode_title": "unload receipt"},
     }
     return SimpleNamespace(
-        data=data, episode_id=data["episode_id"], save=lambda: None,
+        data=data,
+        episode_id=data["episode_id"],
+        save=lambda: None,
     )
 
 
-class _LoaderStubContext:
-    """Patch `_otr_model_loader` + `production_ledger` module
-    attributes the cascade node lazy-imports inside run(). The
-    `unload_raises` knob simulates an unload failure so the
-    `freeze_unload_ok=False` path can be tested."""
+def _disposition():
+    report = SimpleNamespace(warnings=[])
+    return SimpleNamespace(
+        verdict="frozen_clean",
+        gap_audit_pre=report,
+        gap_audit_post=report,
+        cleanup_receipt={"status": "clean"},
+    )
 
-    def __init__(self, *, unload_raises: bool = False):
-        self._unload_raises = unload_raises
-        self.unload_mock = MagicMock(
-            side_effect=(
-                RuntimeError("simulated unload failure")
-                if unload_raises else None
-            )
-        )
-        self.led = _ledger_obj()
-        self._patches: list = []
 
-    def __enter__(self):
-        from nodes import _otr_model_loader as _real_loader
-        from nodes import production_ledger as _real_pl
+def _run_node(*, unload_error=None):
+    from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
+    from nodes import _otr_freeze_cascade as cascade
+    from nodes import _otr_model_loader as loader
+    from nodes import production_ledger as ledger_module
 
-        _real_loader.LLM_CACHE.clear()
-        _real_loader.LLM_CACHE.update({
-            "model_id": None, "slot": None, "cache_entry": None,
-        })
-
-        gen_fn = lambda *a, **k: ""  # noqa: E731
-        polish_fn = lambda *a, **k: ""  # noqa: E731
-
-        p_load = patch.object(
-            _real_loader, "load_llm",
-            return_value={"model": object(), "tokenizer": object()},
-        )
-        p_make = patch.object(
-            _real_loader, "make_generate_fn", return_value=gen_fn,
-        )
-        p_polish = patch.object(
-            _real_loader, "make_polish_generate_fn",
-            return_value=polish_fn,
-        )
-        p_unload = patch.object(
-            _real_loader, "unload_llm", new=self.unload_mock,
-        )
-        p_has = patch.object(
-            _real_pl, "has_current_ledger", return_value=True,
-        )
-        p_peek = patch.object(
-            _real_pl, "peek_ledger", return_value=self.led,
-        )
-        p_assemble = patch.object(
-            _real_pl, "assemble_script_text_from_ledger",
+    led = _ledger_obj()
+    unload = MagicMock(side_effect=unload_error)
+    with (
+        patch.object(ledger_module, "has_current_ledger", return_value=True),
+        patch.object(ledger_module, "peek_ledger", return_value=led),
+        patch.object(
+            ledger_module,
+            "assemble_script_text_from_ledger",
             return_value="rebuilt script text",
+        ),
+        patch.object(
+            loader,
+            "request_slot",
+            return_value={"model": object(), "tokenizer": object()},
+        ),
+        patch.object(
+            loader,
+            "make_generate_fn",
+            return_value=lambda *args, **kwargs: "",
+        ),
+        patch.object(
+            loader,
+            "unload_llm_if_local_resident",
+            unload,
+        ),
+        patch.object(
+            cascade,
+            "run_freeze_cascade",
+            return_value=_disposition(),
+        ),
+    ):
+        result = OTR_LedgerFreezeCascade().run(
+            script_text="incoming",
+            script_json="{}",
+            news_used="",
+            estimated_minutes=15,
+            technical_model="mistralai/Mistral-Nemo-Instruct-2407",
         )
-
-        for p in (p_load, p_make, p_polish, p_unload,
-                  p_has, p_peek, p_assemble):
-            p.start()
-            self._patches.append(p)
-        return self
-
-    def __exit__(self, *_exc):
-        for p in self._patches:
-            p.stop()
-        return False
+    return led, unload, result
 
 
-def _stub_reviewer():
-    """Return a fake `review_ledger` that yields a clean
-    ReviewerDisposition so the cascade reaches the normal-success
-    path that exercises the B2 reserialization."""
-    from nodes import _otr_ledger_reviewer as _OTRLR
+def test_freeze_unload_ok_stamp_is_visible_in_returned_json():
+    led, unload, result = _run_node()
 
-    def fake_review(_fn, _led):
-        return _OTRLR.ReviewerDisposition(
-            verdict="clean_no_edits",
-            pre_audit_violations=0,
-            pre_audit_repairs_applied=0,
-            doctor_edits_proposed=0,
-            doctor_edits_applied=0,
-            post_audit_violations=0,
-        )
-    return fake_review
+    assert len(result) == 7
+    assert unload.call_count == 1
+    assert json.loads(result[1])["meta"]["freeze_unload_ok"] is True
+    assert led.data["meta"]["freeze_unload_ok"] is True
 
 
-# ---------------------------------------------------------------------------
-# 1. Stamp visible in returned JSON on clean unload
-# ---------------------------------------------------------------------------
+def test_freeze_unload_failure_stamp_is_visible_in_returned_json():
+    led, unload, result = _run_node(
+        unload_error=RuntimeError("simulated unload failure"))
+
+    assert len(result) == 7
+    assert unload.call_count == 1
+    assert json.loads(result[1])["meta"]["freeze_unload_ok"] is False
+    assert led.data["meta"]["freeze_unload_ok"] is False
 
 
-class TestFreezeUnloadStampVisible:
-    def test_freeze_unload_ok_stamp_in_returned_json(self):
-        """Happy path: unload succeeds -> returned
-        updated_script_json carries meta.freeze_unload_ok=True."""
-        from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
-        from nodes import _otr_freeze_cascade as _LFC_ORCH
+def test_returned_unload_stamp_matches_live_ledger():
+    led, _unload, result = _run_node()
+    assert json.loads(result[1])["meta"]["freeze_unload_ok"] == (
+        led.data["meta"]["freeze_unload_ok"])
 
-        with _LoaderStubContext() as ctx:
-            with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                              side_effect=_stub_reviewer()):
-                inst = OTR_LedgerFreezeCascade()
-                result = inst.run(
-                    script_text="x", script_json="{}",
-                    news_used="", estimated_minutes=15,
-                    technical_model="mistralai/Mistral-Nemo-Instruct-2407",
-                )
 
-        # Output slot 1 is updated_script_json per cascade RETURN_NAMES.
-        assert isinstance(result, tuple) and len(result) == 7
-        returned_json = result[1]
-        parsed = json.loads(returned_json)
-        meta = parsed.get("meta", {})
-        assert "freeze_unload_ok" in meta, (
-            "S34 B2 P1 regressed: returned updated_script_json does NOT "
-            "contain meta.freeze_unload_ok. The reserialization after "
-            "the finally block was the fix."
-        )
-        assert meta["freeze_unload_ok"] is True, (
-            f"S34 B2 P1 regressed: meta.freeze_unload_ok in returned "
-            f"JSON is {meta['freeze_unload_ok']!r}, expected True on "
-            f"clean unload"
-        )
+def test_remote_cache_entry_skips_local_teardown():
+    from nodes import _otr_model_loader as loader
 
-    def test_freeze_unload_failure_stamp_in_returned_json(self):
-        """Failure path: unload raises -> returned JSON carries
-        meta.freeze_unload_ok=False (NOT missing, NOT True)."""
-        from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
-        from nodes import _otr_freeze_cascade as _LFC_ORCH
-
-        with _LoaderStubContext(unload_raises=True) as ctx:
-            with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                              side_effect=_stub_reviewer()):
-                inst = OTR_LedgerFreezeCascade()
-                result = inst.run(
-                    script_text="x", script_json="{}",
-                    news_used="", estimated_minutes=15,
-                    technical_model="mistralai/Mistral-Nemo-Instruct-2407",
-                )
-
-        # Cascade still returns its 7-tuple (the unload failure is
-        # logged, stamped, and the cascade carries on; only downstream
-        # video nodes might decide to bail).
-        assert isinstance(result, tuple) and len(result) == 7
-        returned_json = result[1]
-        parsed = json.loads(returned_json)
-        meta = parsed.get("meta", {})
-        assert "freeze_unload_ok" in meta, (
-            "S34 B2 P1 regressed: returned JSON missing "
-            "freeze_unload_ok stamp on unload failure"
-        )
-        assert meta["freeze_unload_ok"] is False, (
-            f"S34 B2 P1 regressed: meta.freeze_unload_ok in returned "
-            f"JSON is {meta['freeze_unload_ok']!r}, expected False on "
-            f"unload failure"
-        )
-
-    def test_freeze_unload_stamp_consistent_with_led_data(self):
-        """Consistency: returned JSON's freeze_unload_ok must match
-        what got stamped on `led.data` post-finally. The
-        reserialization is a faithful snapshot, not a divergent
-        write."""
-        from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
-        from nodes import _otr_freeze_cascade as _LFC_ORCH
-
-        # Run with unload that succeeds.
-        with _LoaderStubContext() as ctx:
-            with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                              side_effect=_stub_reviewer()):
-                inst = OTR_LedgerFreezeCascade()
-                result = inst.run(
-                    script_text="x", script_json="{}",
-                    news_used="", estimated_minutes=15,
-                    technical_model="mistralai/Mistral-Nemo-Instruct-2407",
-                )
-
-            # Direct stamp on led.data
-            led_stamp = ctx.led.data["meta"].get("freeze_unload_ok")
-            # Stamp in returned JSON
-            returned_stamp = json.loads(result[1]).get(
-                "meta", {}
-            ).get("freeze_unload_ok")
-
-        assert led_stamp == returned_stamp, (
-            f"S34 B2 P1 regressed: returned JSON freeze_unload_ok "
-            f"({returned_stamp!r}) diverges from led.data stamp "
-            f"({led_stamp!r}). The reserialization must be a faithful "
-            f"snapshot of led.data after the finally block."
-        )
-
-    def test_remote_technical_model_skips_local_unload(self):
-        """Cloud technical cascade uses a provider-tagged remote entry. The
-        finally block must not call local unload_llm, because a remote request
-        never populates the local singleton cache."""
-        from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
-        from nodes import _otr_freeze_cascade as _LFC_ORCH
-        from nodes import _otr_model_inputs as _OTRMI
-        from nodes import _otr_model_loader as _OTRML
-
-        remote_entry = {
-            "provider": "openrouter",
+    saved = dict(loader.LLM_CACHE)
+    try:
+        loader.LLM_CACHE.clear()
+        loader.LLM_CACHE.update({
             "model_id": "openrouter:slot-b",
-            "slot_letter": "B",
-            "slug": "openai/gpt-5.5",
-        }
-
-        with _LoaderStubContext() as ctx:
-            with patch.object(_OTRMI, "require_model",
-                              return_value="openrouter:slot-b"):
-                with patch.object(_OTRML, "request_slot",
-                                  return_value=remote_entry):
-                    with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                                      side_effect=_stub_reviewer()):
-                        inst = OTR_LedgerFreezeCascade()
-                        result = inst.run(
-                            script_text="x", script_json="{}",
-                            news_used="", estimated_minutes=15,
-                            technical_model="openrouter:slot-b",
-                        )
-
-        ctx.unload_mock.assert_not_called()
-        meta = json.loads(result[1]).get("meta", {})
-        assert meta.get("freeze_unload_ok") is True
+            "slot": "technical",
+            "cache_entry": {
+                "provider": "openrouter",
+                "model_id": "openrouter:slot-b",
+            },
+        })
+        with patch.object(loader, "unload_llm") as local_unload:
+            assert loader.unload_llm_if_local_resident() is False
+        local_unload.assert_not_called()
+    finally:
+        loader.LLM_CACHE.clear()
+        loader.LLM_CACHE.update(saved)

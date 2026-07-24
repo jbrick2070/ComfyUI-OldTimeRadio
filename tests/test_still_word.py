@@ -294,13 +294,23 @@ def test_genre_typography_and_backdrop_maps():
             "capitals" in ip._STILL_WORD_TYPOGRAPHY[genre]
 
 
-def test_era_tail_text_summoners_scrubbed_word_mode():
-    # a "neon signs" atmosphere in the era tail is a text-summoner -> MANDATORY
-    # scrub in word mode (never a QA-watch).
-    meta = {"episode_title": "X",
-            "story_brief_terms": {"lighting": ["flickering neon signs"]}}
-    out = ip.compose_still_word_prompt(meta, "character_video", {"text": "Run."})
-    assert "neon" not in out and "signs" not in out
+def test_era_tail_preserves_authored_world_terms_in_word_mode():
+    meta = {
+        "episode_title": "X",
+        "story_brief_status": "ok",
+        "story_brief_terms": {
+            "lighting": ["flickering neon signs"],
+            "atmosphere": ["poster label", "smoking lounge"],
+        },
+    }
+
+    out = ip.compose_still_word_prompt(
+        meta, "character_video", {"text": "Run."},
+    )
+
+    assert "flickering neon signs" in out
+    assert "poster label" in out
+    assert "smoking lounge" in out
 
 
 # --------------------------------------------------------------------------- #

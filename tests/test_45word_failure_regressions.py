@@ -117,9 +117,16 @@ def test_markup_repair_explicitly_handles_standalone_stage_direction():
 
 def test_p3_transport_has_finite_schema_and_output_reservation():
     schema = codex.RadioScoreDraftV4.model_json_schema()
-    assert schema["properties"]["premise"]["maxLength"] == 240
+    # Authored prose is deliberately not a Pydantic length gate.  The
+    # transport is still finite through its structural graph bounds and fixed
+    # output reservation; overlong creative text must remain representable and
+    # cannot be silently clipped by the typed boundary.
+    assert "maxLength" not in schema["properties"]["premise"]
     scene = schema["$defs"]["RadioScoreDraftSceneV4"]
-    assert scene["properties"]["description"]["maxLength"] == 144
+    assert "maxLength" not in scene["properties"]["description"]
+    assert schema["properties"]["scenes"]["maxItems"] == 3
+    assert scene["properties"]["shots"]["maxItems"] == 2
+    assert scene["properties"]["beats"]["maxItems"] == 4
     assert codex._RADIO_SCORE_CONTEXT_CAP_TOKENS == 8192
     assert codex._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS == 1829
     receipt = codex._radio_score_draft_surface_receipt()

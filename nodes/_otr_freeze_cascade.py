@@ -1,64 +1,11 @@
-"""nodes/_otr_freeze_cascade.py — Ledger Freeze Cascade orchestrator.
+"""Final ledger safety, readiness, and freeze orchestration.
 
-Wraps the existing `_otr_ledger_reviewer.review_ledger` 3-pass with
-Phase 0 (gap_audit_pre) at entry and Phase 10 (gap_audit_post +
-freeze) at exit. Subsequent sprint commits decompose the reviewer's
-internal passes into discrete cascade phases (Phase 1 / Phase 2)
-AND insert the new LLM phases (Phase 3 polish, Phase 4 scene
-coherence, Phase 4.5 smart suggestion, Phase 5 voice drift, Phase 6
-episode arc, Phase 7 audio readiness, Phase 8 video readiness).
-This commit (commit 2 of 14) ships the orchestrator skeleton only
--- Phase 3/4/4.5/5/6/7/8 are no-op holes for now.
-
-S33 B3 (2026-05-15) retired Phase 9 (the post-edit `audit_cast_contract(
-label="post")` LLM call) per the refined no-auditors rule: its only
-consumer was the `post_audit_pass` rollback gate that B2 removed.
-The phase_name string `phase_1_2_9_reviewer_composite` is retained
-for forensic / soak-diagnostic continuity even though the "9"
-component no longer fires.
-
-ADR mapping (`docs/2026-05-11-multi-turn-polish-adr.md`):
-
-    [Writer ledger]
-        |
-        v
-    Phase 0    gap_audit_pre              (commit 1, deterministic)
-    Phase 1    cast audit + repairs       (existing reviewer Pass 1)  <- review_ledger
-    Phase 2    script doctor              (existing reviewer Pass 2)  <- review_ledger
-    Phase 3    per-line polish            (commit 4, no-op here)
-    Phase 4    per-scene coherence        (commit 8, no-op here)
-    Phase 4.5  smart suggestion           (commit 11, no-op here)
-    Phase 5    per-speaker voice drift    (commit 9, no-op here)
-    Phase 6    episode arc                (commit 10, no-op here)
-    Phase 7    audio readiness            (commit 5, no-op here)
-    Phase 8    video readiness            (commit 5, no-op here)
-    Phase 9    RETIRED in S33 B3 (2026-05-15) -- pipeline cut, no
-               editor consumer; rollback gate B2 retired first.
-    Phase 10   gap_audit_post + freeze    (commit 1, deterministic)
-        |
-        v
-    [Frozen ledger; meta.cleanup_locked == True]
-
-Verdict mapping (ADR section 9, S33 B2 trim 2026-05-15):
-
-    Reviewer verdict          Freeze verdict
-    ----------------          --------------
-    clean_no_edits + clean    -> frozen_clean
-    clean_no_edits + warns    -> frozen_with_warns
-    improved                  -> frozen_with_doctor_edits
-    too_many_edits            -> repair-then-freeze (quality exhaustion)
-    needs_full_rerun          -> needs_full_rerun
-    Phase 10 raises           -> needs_full_rerun        (gap audit forced)
-
-S33 B2 retired `cast_unrecoverable` (speaker_unknowns rollback gate)
-and `post_audit_failed` (post_audit_pass rollback gate). Both were
-pipeline cuts; the refined no-auditors rule forbids audit calls that
-just gate / halt / rollback without feeding an editor.
-
-Failure cascade (ADR section 8): the cascade is skip-and-continue
-EXCEPT on Phase 10 critical gaps (hard-fail at the freeze gate).
-
-Status: sprint commit 2 of 14 (2026-05-11).
+Every bank converges here. Inline banks may receive one bounded atomic patch
+for the shared narrow spoken-safety policy; producer-owned banks arrive sealed
+and are checked read-only. Word count, visual vocabulary, style, craft, and
+subjective quality are telemetry or generation guidance only and never affect
+liveness. Genuine ledger structure, authorship, provenance, or residual safety
+corruption remains fail-closed.
 """
 from __future__ import annotations
 
@@ -67,10 +14,6 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from . import _otr_ledger_freeze as _LFC
-from . import _otr_ledger_reviewer as _OTRLR
-from . import _otr_story_critic as _OTRSC
-from . import _otr_reroll as _OTRRR
-from . import _otr_render_plan as _OTRRP
 from . import _otr_word_delivery as _OTRWD
 
 log = logging.getLogger("OTR.freeze_cascade")
@@ -79,64 +22,27 @@ log = logging.getLogger("OTR.freeze_cascade")
 __all__ = [
     "FreezeDisposition",
     "run_freeze_cascade",
-    "REVIEWER_TO_FREEZE_VERDICT",
-    "FREEZE_TERMINAL_FAILURE_VERDICTS",
     "all_phase_passes",
     "build_phase_telemetry",
 ]
 
 
 # ---------------------------------------------------------------------------
-# Verdict mapping
-# ---------------------------------------------------------------------------
-
-
-# Maps `_otr_ledger_reviewer.ReviewerVerdict` literals (Phases 1+2+9)
-# to FreezeVerdict literals (Phase 10 / cascade exit). `clean_no_edits`
-# is conditionally lifted to `frozen_clean` or `frozen_with_warns`
-# depending on Phase 10 warning state -- the table here lists the
-# interim mapping; the final stamp happens in run_freeze_cascade.
-#
-# S33 B2 (2026-05-15): `cast_unrecoverable` and `post_audit_failed`
-# rows retired with the rollback gates that produced them.
-REVIEWER_TO_FREEZE_VERDICT: dict[str, str] = {
-    "clean_no_edits":     "frozen_clean",
-    "improved":           "frozen_with_doctor_edits",
-    "too_many_edits":     "too_many_edits",
-    "needs_full_rerun":   "needs_full_rerun",
-}
-
-
-# Structural reviewer verdicts that terminate the cascade WITHOUT Phase 10.
-# review_ledger has already restored the ledger to its pre-review state
-# for these; running Phase 10 on the restored ledger would either
-# re-flag the same pre-existing gaps or stamp `frozen_clean` on an
-# unaltered ledger, both of which are misleading.
-#
-# S33 B2 (2026-05-15): `cast_unrecoverable` and `post_audit_failed`
-# removed -- their rollback gates were retired so neither verdict is
-# reachable anymore.
-FREEZE_TERMINAL_FAILURE_VERDICTS: frozenset[str] = frozenset({
-    "needs_full_rerun",
-})
-
-
-# ---------------------------------------------------------------------------
 # Freeze WARN taxonomy (story-ledger DRIFT chunk 4, 2026-06-25).
 #
-# Stop labeling a SHIPPED arc / critic / continuity failure "structural".
+# Keep renderability errors distinct from non-terminal accuracy warnings.
 # Three deterministic tiers (no LLM):
 #   * structural_error       -> a genuinely UNRENDERABLE gap (missing voiced
 #                               text, broken structure). BLOCKS at Phase 10
 #                               (needs_full_rerun) -- this is the ONLY blocking
 #                               tier and it is already enforced by the critical-
 #                               gap path; the taxonomy just names it.
-#   * story_accuracy_warning -> continuity / canon-divergence / an UNVERIFIED
-#                               critic / a ledger-consistency defect. The
+#   * story_accuracy_warning -> continuity, canon, or consistency telemetry.
+#                               The
 #                               episode is RENDERABLE, so it SHIPS -- but NON-
 #                               clean (frozen_with_warns) + operator-visible
 #                               meta. NEVER a hard block (don't gate audio on a
-#                               flaky LLM or a cosmetic-content note).
+#                               an advisory or cosmetic-content note).
 #   * cosmetic_warning       -> everything else: ships clean-with-warns.
 # ---------------------------------------------------------------------------
 FREEZE_WARN_TIERS: tuple[str, ...] = (
@@ -176,40 +82,25 @@ def classify_freeze_warning(text: Any) -> str:
 def build_freeze_warn_taxonomy(
     *,
     gap_warnings: Any = (),
-    critic_report: Any = None,
-    critic_status: Any = None,
     consistency_status: Any = None,
 ) -> dict:
-    """Bucket every non-structural freeze finding into the 3-tier taxonomy.
-
-    Sources: the gap-audit warnings (classified by text), an UNVERIFIED critic
-    (critic_status.validated is False -> accuracy), the critic's continuity
-    issues (-> accuracy), and any ledger-consistency defects (-> accuracy).
-    Returns ``{tier: [messages]}`` for every tier. PURE; never raises."""
-    tax: dict = {t: [] for t in FREEZE_WARN_TIERS}
+    """Bucket non-terminal deterministic warnings for operator telemetry."""
+    tax: dict = {tier: [] for tier in FREEZE_WARN_TIERS}
     try:
-        for w in (gap_warnings or ()):
-            tax[classify_freeze_warning(w)].append(str(w)[:240])
-        # an unverified critic is a story-ACCURACY warning (chunk 1 fail-closed),
-        # never structural -- the episode renders, the arc just was not checked.
-        if isinstance(critic_status, dict) and critic_status.get("validated") is False:
-            tax["story_accuracy_warning"].append(
-                "story_critic_unverified: the arc was not actually evaluated"
-            )
-        if critic_report is not None:
-            for ci in (getattr(critic_report, "continuity_issues", None) or []):
-                issue = (ci.get("issue") if isinstance(ci, dict)
-                         else getattr(ci, "issue", "")) or ""
-                tax["story_accuracy_warning"].append(
-                    f"continuity: {str(issue)[:200]}"
-                )
+        for warning in gap_warnings or ():
+            tax[classify_freeze_warning(warning)].append(str(warning)[:240])
         if isinstance(consistency_status, dict) and not consistency_status.get(
-            "clean", True
+            "clean", True,
         ):
-            for d in (consistency_status.get("defects") or []):
-                fld = d.get("field") if isinstance(d, dict) else str(d)
-                tax["story_accuracy_warning"].append(f"consistency: {fld}")
-    except Exception:  # noqa: BLE001 -- taxonomy is observability, never fatal
+            for defect in consistency_status.get("defects") or ():
+                field_name = (
+                    defect.get("field") if isinstance(defect, dict)
+                    else str(defect)
+                )
+                tax["story_accuracy_warning"].append(
+                    f"consistency: {field_name}"
+                )
+    except Exception:
         pass
     return tax
 
@@ -221,29 +112,22 @@ def build_freeze_warn_taxonomy(
 
 @dataclass(frozen=True)
 class FreezeDisposition:
-    """End-of-cascade summary stamped to `meta.freeze_disposition`.
+    """End-of-cascade summary stamped to meta.freeze_disposition."""
 
-    `reviewer_disposition` is the original 3-pass return -- preserved
-    intact for forensic continuity with the pre-cascade
-    `meta.reviewer_disposition` shape. `gap_audit_pre` and
-    `gap_audit_post` carry the deterministic audit reports from
-    Phase 0 / Phase 10. `verdict` is the final FreezeVerdict literal.
-    """
-
-    verdict: str  # FreezeVerdict
-    reviewer_disposition: Optional[_OTRLR.ReviewerDisposition]
+    verdict: str
+    cleanup_receipt: Optional[dict[str, Any]]
     gap_audit_pre: _LFC.GapAuditReport
     gap_audit_post: Optional[_LFC.GapAuditReport]
 
     def to_dict(self) -> dict:
-        """JSON-friendly view for stamping on meta.freeze_disposition."""
-        rev = self.reviewer_disposition
         pre = self.gap_audit_pre
         post = self.gap_audit_post
         return {
             "verdict": self.verdict,
-            "reviewer_disposition": (
-                rev.__dict__ if rev is not None else None
+            "cleanup_receipt": (
+                dict(self.cleanup_receipt)
+                if isinstance(self.cleanup_receipt, dict)
+                else None
             ),
             "gap_audit_pre": {
                 "errors": list(pre.errors),
@@ -269,33 +153,18 @@ class FreezeDisposition:
 
 @dataclass(frozen=True)
 class FreezePolicy:
-    """Typed freeze policy, resolved ONCE before any content-mutating
-    phase runs (external QA r2 P0.1, 2026-07-10). Replaces the retired
-    `_legacy_line_compose_applicable` fail-open boolean: a sealed proof
-    map is only meaningful if no unaccounted writer can reach the sealed
-    fields after the seal, so the policy -- not per-phase local guards --
-    is the single branch predicate for the whole reviewer-to-A2 subgraph
-    AND the Phase-7 canonical-text normalizer.
+    """One resolved mutation policy for the final ledger boundary.
 
-    States:
-      * legacy_full            -- untagged ledgers + packs that declare a
-                                  `line_composer_system` seam. Full legacy
-                                  cascade, unchanged.
-      * content_owned_readonly -- packs that OWN their content loop
-                                  (scifi_fable2: P4/P5/P8). Every legacy
-                                  content-mutating pass is skipped; only
-                                  read-only structural validation + the
-                                  Phase 10 hard gate run.
-      * terminal_error != ""   -- a TAGGED bank failed to resolve. This is
-                                  a terminal structural error, NEVER a
-                                  fail-open into legacy mutation (r2 P1.2:
-                                  "unknown means legacy" is retired for
-                                  declared sources; only untagged ledgers
-                                  keep the legacy route)."""
+    inline_safety_cleanup permits only the shared atomic safety patch and
+    deterministic role normalization. content_owned_readonly verifies the
+    producer's sealed authorship and structure without changing canonical text.
+    A tagged bank that cannot resolve returns a terminal configuration error;
+    an untagged legacy ledger uses the inline safety policy for migration.
+    """
 
     name: str
     source: str
-    run_legacy_content_passes: bool
+    run_inline_safety_cleanup: bool
     terminal_error: str = ""
 
 
@@ -306,10 +175,10 @@ def resolve_freeze_policy(meta: dict) -> FreezePolicy:
     bank_id = str((meta or {}).get("source_bank") or "")
     if not bank_id:
         return FreezePolicy(
-            name="legacy_full",
+            name="inline_safety_cleanup",
             source="untagged ledger (no meta.source_bank) -- legacy "
                    "route retained for migration",
-            run_legacy_content_passes=True,
+            run_inline_safety_cleanup=True,
         )
     try:
         from . import _otr_story_routing as _RT
@@ -317,23 +186,23 @@ def resolve_freeze_policy(meta: dict) -> FreezePolicy:
         stages = getattr(pack, "prompt_stages", None) or {}
         if str(stages.get("line_composer_system") or "").strip():
             return FreezePolicy(
-                name="legacy_full",
+                name="inline_safety_cleanup",
                 source=f"pack for bank {bank_id!r} declares the "
                        "line_composer_system seam",
-                run_legacy_content_passes=True,
+                run_inline_safety_cleanup=True,
             )
         return FreezePolicy(
             name="content_owned_readonly",
             source=f"pack for bank {bank_id!r} declares NO "
                    "line_composer_system seam -- the lane owns its own "
                    "content loop",
-            run_legacy_content_passes=False,
+            run_inline_safety_cleanup=False,
         )
     except Exception as exc:  # noqa: BLE001 -- returned, not raised
         return FreezePolicy(
             name="policy_resolution_failed",
             source=f"bank {bank_id!r} is TAGGED but failed to resolve",
-            run_legacy_content_passes=False,
+            run_inline_safety_cleanup=False,
             terminal_error=(
                 f"freeze policy resolution failed for declared bank "
                 f"{bank_id!r}: {type(exc).__name__}: {exc} -- refusing "
@@ -437,18 +306,10 @@ def _stamp_capability_receipt(
     return receipt
 
 
-# Phase identifiers for the capability receipt (r2 P0.1). The readonly
-# policy skips every legacy content-mutating pass by NAME so the receipt
-# is auditable, not inferred.
-_LEGACY_CONTENT_PHASES = (
-    "phase_1_2_9_reviewer_composite",   # cast repair + Script Doctor
-    "sprint_5b_story_critic",
-    "a3_mechanical_floor",
-    "stage7_escalation",
-    "sprint_5c_targeted_reroll",
-    "a2_ship_through",
+# Inline banks may perform only this content mutation at freeze.
+_INLINE_CLEANUP_PHASES = (
+    "same_story_safety_cleanup",
     "d3_role_sweep_mutation",
-    "phase_7_canonical_text_normalization",
 )
 
 
@@ -464,27 +325,12 @@ def _hash_lines_text(ledger_data: dict) -> int:
     return hash(tuple((ln or {}).get("text", "") for ln in lines))
 
 
-# Bucket routing per B6 (clean-break 2026-05-12). "Cleanup" reads as
-# polish / structural-edit scope; readiness checks are not cleanup.
-# Phase 0 + Phase 10 are audit gates -- their own bucket so the
-# semantic split is clean across the four record kinds:
-#   audit_passes      Phase 0 (pre)  + Phase 10 (post + freeze)
-#   cleanup_passes    Phase 1+2 (reviewer composite, Phase 9 retired
-#                     in S33 B3) + Phase 3 (polish) + Phase 4 (scene
-#                     coherence) + Phase 4.5 (smart suggestion) +
-#                     Phase 5 (voice drift) + Phase 6 (episode arc)
-#   readiness_passes  Phase 7 (audio readiness) + Phase 8 (video
-#                     readiness)
-# S30 B4: phase_3 / 4 / 4.5 / 5 / 6 entries DELETED from this table.
-# Those phases were removed from the cascade in the same commit.
-# S33 B3 (2026-05-15): Phase 9 component of the reviewer composite
-# retired. The phase_name string `phase_1_2_9_reviewer_composite`
-# stays for forensic continuity even though only Phase 1 + 2 actually
-# run inside it.
+# Phase records are grouped by purpose for diagnostics. Only the shared safety
+# cleanup can mutate accepted text; readiness and audits are deterministic.
 _PHASE_BUCKETS: dict[str, str] = {
     "phase_0_gap_audit_pre":              "audit_passes",
     "phase_10_gap_audit_post_and_freeze": "audit_passes",
-    "phase_1_2_9_reviewer_composite":     "cleanup_passes",
+    "same_story_safety_cleanup":           "cleanup_passes",
     "phase_7_audio_readiness":            "readiness_passes",
     "phase_8_video_readiness":            "readiness_passes",
 }
@@ -510,7 +356,7 @@ def build_phase_telemetry(meta: dict) -> list:
 
     Each entry shape:
       {
-        "phase":    "phase_1_2_9_reviewer_composite",  # phase_name
+        "phase":    "same_story_safety_cleanup",  # phase_name
         "bucket":   "cleanup_passes",            # audit/cleanup/readiness
         "skipped":  bool,                        # did the phase run?
         "changed":  bool,                        # did line.text mutate?
@@ -728,39 +574,7 @@ def _phase_8_video_readiness(led, *, enable: bool = True):
 
 
 def _persist_cascade_meta(led) -> None:
-    """Persist the in-memory ledger to disk at every cascade exit.
-
-    BUG-LOCAL-278 fix. The freeze cascade modifies `meta` in place
-    (`freeze_verdict`, `freeze_disposition`, `story_critic_report`,
-    etc.) but does not save the ledger to disk
-    at its exit points. Downstream consumers split into two camps:
-
-      * In-memory readers (BatchBarkGenerator, MusicGenTheme, the
-        SceneSequencer that flows the ledger socket-to-socket) SEE the
-        cascade's stamps from the live `led.data` reference -- the
-        bark halt for BUG-LOCAL-276 works correctly.
-
-      * Disk readers (KokoroAnnouncer's load_ledger_safe + write-back
-        path, post-run forensic tools, the operator's manual inspection
-        of `pending_*_ledger.json`) DO NOT see them. KokoroAnnouncer in
-        particular reads the pre-cascade ledger from disk, stamps its
-        own line_id fields, and writes back -- silently dropping every
-        cascade modification.
-
-    Symptom: Step 8 operator gate criteria (meta.freeze_verdict,
-    meta.story_critic_report) are MISSING from the
-    persisted ledger even when the in-memory log confirms they were
-    stamped. The operator cannot verify the gate criteria from the
-    .json after the run; the data exists only in the live log tail.
-
-    Fix: persist the ledger at every cascade exit (terminal-skip,
-    Phase 10 rejection, successful freeze, render-plan post-stamp
-    [BUG-LOCAL-274 precedent]). Production Ledger.save() never raises
-    (Prime Directive 1); defensive getattr handles test fixtures that
-    stub `led` as a SimpleNamespace without a save method.
-
-    PD1 (audio is king): N/A; persistence is forensic. Never raises.
-    """
+    """Persist cascade receipts at every exit; never raise."""
     _save_fn = getattr(led, "save", None)
     if callable(_save_fn):
         try:
@@ -783,7 +597,7 @@ def _build_terminal_skip_disposition(
     ledger_data: dict,
     *,
     verdict: str,
-    reviewer_disp: Optional[_OTRLR.ReviewerDisposition],
+    cleanup_receipt: Optional[dict[str, Any]],
     pre_report: _LFC.GapAuditReport,
     block_class: str = "structural",
     remaining_phase_names: tuple[str, ...] = (
@@ -792,14 +606,7 @@ def _build_terminal_skip_disposition(
         "phase_10_gap_audit_post_and_freeze",
     ),
 ) -> FreezeDisposition:
-    """Stamp the terminal-skip state and build the FreezeDisposition.
-
-    Used only when a structural reviewer/capability failure leaves the ledger
-    in a state Phase 10 must not freeze. Phase 7 / 8 / 10 are stamped
-    ``terminal_skipped`` and the audio/video readiness keys carry the same
-    reason. Craft/quality reroll exhaustion does not enter this helper: A2 and
-    the final spoken-row cascade repair then continue through the normal freeze.
-    """
+    """Stamp a terminal structural or residual-safety disposition."""
     meta = ledger_data.setdefault("meta", {})
     meta["freeze_verdict"] = verdict
     # BUG-LOCAL-300 retains the explicit class for downstream compatibility.
@@ -827,7 +634,7 @@ def _build_terminal_skip_disposition(
         })
     disp = FreezeDisposition(
         verdict=verdict,
-        reviewer_disposition=reviewer_disp,
+        cleanup_receipt=cleanup_receipt,
         gap_audit_pre=pre_report,
         gap_audit_post=None,
     )
@@ -840,249 +647,45 @@ def _build_terminal_skip_disposition(
 
 
 # ---------------------------------------------------------------------------
-# Legacy content chain (Phases 1+2 -> 5B -> A3 -> escalation -> 5C -> A2)
+# Inline same-story cleanup
 # ---------------------------------------------------------------------------
 
 
-def _run_legacy_content_chain(generate_fn, led, pre_report):
-    """The full legacy content-mutating chain, extracted verbatim from
-    run_freeze_cascade (r2 P0.1, 2026-07-10) so the FreezePolicy is the
-    ONE branch predicate wrapping the complete reviewer-to-A2 subgraph
-    -- no more per-phase local guards.
-
-    Returns ``(terminal_disposition_or_None, reviewer_disp,
-    story_critic_report)``. A non-None terminal disposition means the
-    caller must stamp the capability receipt, persist, and return it.
-    """
+def _run_inline_safety_cleanup(generate_fn, led) -> dict[str, Any]:
+    """Run one atomic safety-only cleanup over the accepted inline story."""
     ledger_data = led.data
-
-    # ---- Phase 1 + 2: reviewer composite (Phase 9 retired S33 B3) ----
     started = _isoformat_utc_now()
     hash_before = _hash_lines_text(ledger_data)
-    reviewer_disp = _OTRLR.review_ledger(generate_fn, led)
-    # P0.3 (external QA r2, 2026-07-10): review_ledger saves internally,
-    # and Ledger.save() REBINDS led.data to the merged dict (wiring-
-    # review #5 assignment in production_ledger.save). Refresh
-    # IMMEDIATELY -- before the phase record, the terminal check, and
-    # the terminal disposition -- so every stamp lands on the LIVE root.
-    # Pre-fix, a reviewer terminal verdict wrote freeze_verdict /
-    # freeze_disposition / phase records into the DETACHED pre-save
-    # dict: the persisted ledger had NO verdict, and CastLock's
-    # missing-verdict legacy path would let a needs_full_rerun episode
-    # straight through to render.
+    try:
+        from ._otr_content_safety import apply_safety_cleanup
+        receipt = apply_safety_cleanup(ledger_data, generate_fn)
+    except Exception as exc:
+        receipt = {
+            "status": "cleanup_failed",
+            "patch_count": 0,
+            "error": f"{type(exc).__name__}: {exc}"[:600],
+        }
     ledger_data = led.data
     meta = ledger_data.setdefault("meta", {})
-    hash_after = _hash_lines_text(ledger_data)
+    meta["same_story_safety_cleanup"] = dict(receipt)
+    failures = []
+    if receipt.get("status") in {"cleanup_failed", "apply_failed"}:
+        failures.append({
+            "line_id": "__safety_cleanup__",
+            "reason": str(receipt.get("error") or receipt.get("status")),
+        })
     _stamp_phase_record(
         ledger_data,
-        phase_name="phase_1_2_9_reviewer_composite",
+        phase_name="same_story_safety_cleanup",
         text_hash_before=hash_before,
-        text_hash_after=hash_after,
+        text_hash_after=_hash_lines_text(ledger_data),
         started_at=started,
         finished_at=_isoformat_utc_now(),
-        edits_proposed=reviewer_disp.doctor_edits_proposed,
-        edits_applied=reviewer_disp.doctor_edits_applied,
+        edits_proposed=int(receipt.get("patch_count") or 0),
+        edits_applied=int(receipt.get("patch_count") or 0),
+        failures=failures,
     )
-
-    # ---- B7 fix (commit 12.1): terminal-verdict check moved here ----
-    # Pre-12.1 the terminal check fired AFTER Phase 4.5 / 7 / 8 had
-    # already mutated the restored ledger, breaking the "ledger
-    # byte-identical to input" guarantee that justifies skipping
-    # Phase 10.
-    interim_verdict = REVIEWER_TO_FREEZE_VERDICT.get(
-        reviewer_disp.verdict, "needs_full_rerun",
-    )
-    if interim_verdict == "too_many_edits":
-        # The reviewer edit cap is a bounded QUALITY budget, not evidence that
-        # the ledger is structurally unrenderable. The reviewer already restored
-        # the pre-edit snapshot. Continue into critic/reroll/final hygiene and
-        # ship the best clean lines with an observability stamp.
-        meta["reviewer_quality_exhausted"] = {
-            "verdict": interim_verdict,
-            "doctor_edits_proposed": reviewer_disp.doctor_edits_proposed,
-            "doctor_edits_applied": reviewer_disp.doctor_edits_applied,
-            "disposition": "continue_to_repair_then_ship",
-        }
-        log.warning(
-            "[LFC] reviewer quality edit budget exhausted (%d proposed); "
-            "continuing to repair-then-ship -- quality may never terminal-skip",
-            reviewer_disp.doctor_edits_proposed,
-        )
-    elif interim_verdict in FREEZE_TERMINAL_FAILURE_VERDICTS:
-        disp = _build_terminal_skip_disposition(
-            ledger_data,
-            verdict=interim_verdict,
-            reviewer_disp=reviewer_disp,
-            pre_report=pre_report,
-            block_class="structural",
-        )
-        log.info(
-            "[LFC] terminal reviewer verdict %r -- skipping Phase 4..10 "
-            "(B7 fix: short-circuit moved before mutation phases)",
-            interim_verdict,
-        )
-        return disp, reviewer_disp, None
-
-    # ---- Sprint 5B: whole-script story-quality critic --------------
-    # Advisory report for 5C (reroll_targets) + Sprint 6 (render
-    # coupling). run_story_critic NEVER raises -- on any failure it
-    # returns StoryCriticReport.clean() (PD1).
-    # BUG-LOCAL-273: refresh handled above (P0.3 refresh is now
-    # immediate after review_ledger, superseding the old late refresh).
-    story_critic_report = _OTRSC.run_story_critic(
-        generate_fn,
-        ledger_data,
-        ledger_data.get("cast", []) or [],
-    )
-    meta["story_critic_report"] = story_critic_report.model_dump()
-    # story-ledger DRIFT (2026-06-25): observable critic provenance so a
-    # fail-CLOSED critic (arc_verdict="unverified") is visible, not silent.
-    _critic_unverified = (story_critic_report.arc_verdict == "unverified")
-    meta["story_critic_status"] = {
-        "ran": True,
-        "validated": not _critic_unverified,
-        "failure": "critic_unverified_fail_closed" if _critic_unverified else "",
-    }
-    log.info(
-        "[LFC] Sprint 5B story critic: arc_verdict=%s, %d reroll "
-        "target(s), %d flat line(s), %d continuity issue(s), %d line(s) "
-        "in render priority (advisory -- no line text changed)",
-        story_critic_report.arc_verdict,
-        len(story_critic_report.reroll_targets),
-        len(story_critic_report.flat_lines),
-        len(story_critic_report.continuity_issues),
-        len(story_critic_report.render_priority),
-    )
-
-    # ---- A3 (story-quality Phase 1): UNCONDITIONAL mechanical floor ----
-    try:
-        from . import _otr_anti_loop as _OTRAL  # type: ignore
-        _existing_ids = {
-            str(getattr(t, "line_id", ""))
-            for t in story_critic_report.reroll_targets
-        }
-        _mech_added = 0
-        for _lid, _hint in _OTRAL.anti_loop_reroll_targets(ledger_data):
-            if _lid in _existing_ids:
-                continue
-            story_critic_report.reroll_targets.append(
-                _OTRSC.RerollTarget(line_id=_lid, hint=_hint)
-            )
-            _existing_ids.add(_lid)
-            _mech_added += 1
-        if _mech_added:
-            if story_critic_report.arc_verdict in ("strong", "unverified"):
-                story_critic_report.arc_verdict = "uneven"
-            meta["story_critic_report"] = story_critic_report.model_dump()
-            meta["anti_loop_mechanical_targets_added"] = _mech_added
-            log.info(
-                "[LFC] A3 mechanical floor: unioned %d deterministic "
-                "anti-loop target(s) into the critic reroll set "
-                "(total now %d, arc_verdict=%s).",
-                _mech_added, len(story_critic_report.reroll_targets),
-                story_critic_report.arc_verdict,
-            )
-    except Exception as _a3_exc:  # noqa: BLE001 -- floor must never break freeze
-        log.warning("[LFC] A3 mechanical floor failed: %r", _a3_exc)
-
-    # ---- Sprint 5C: targeted reroll loop ---------------------------
-    # BUG-LOCAL-281 (Sprint 10B Wave 0 follow-on, 2026-05-27): Stage 7
-    # ship-verdict gate on the legacy Sprint 5C reroll loop -- when the
-    # authoritative critic confirms a ship, skip the legacy reroll
-    # entirely (its cycles would exhaust on short-but-shippable lines
-    # and stamp needs_full_rerun, halting Bark per BUG-LOCAL-276).
-    # Sprint 10B Wave 1 Agent C (2026-05-27): critic-driven reroll
-    # escalation replaced the Wave 0 simple ship-gate with a typed
-    # scope decision (decide_escalation_scope): structural failures
-    # route to whole-episode regenerate immediately; local failures
-    # fall back to the legacy line reroll. See
-    # nodes/_otr_reroll_escalation.decide_escalation_scope.
-    from . import _otr_reroll_escalation as _OTRRE
-    from . import _otr_story_select as _OTRSEL_ESC
-    _w0f_s7 = _OTRSEL_ESC.build_escalation_signal(story_critic_report, meta)
-    _w1c_escalation = _OTRRE.decide_escalation_scope(
-        _w0f_s7,
-        story_critic_targets=(
-            getattr(story_critic_report, "reroll_targets", None)
-            or []
-        ),
-    )
-    meta["reroll_escalation"] = _w1c_escalation.to_dict()
-    log.info(
-        "[LFC] Wave 1 Agent C escalation: scope=%s reason=%s targets=%d",
-        _w1c_escalation.scope.value,
-        _w1c_escalation.reason[:120],
-        len(_w1c_escalation.target_beat_ids),
-    )
-
-    if _w1c_escalation.scope is _OTRRE.EscalationScope.NONE:
-        reroll_disp = _OTRRR.RerollDisposition(
-            verdict="no_reroll",
-            cycles_run=0,
-            lines_rerolled=0,
-            final_report=story_critic_report,
-        )
-        meta["reroll_skipped_by_stage7_ship"] = True
-        log.info(
-            "[LFC] Stage 7 verdict=ship -- skipping Sprint 5C legacy "
-            "reroll loop; episode ships as composed."
-        )
-    elif _w1c_escalation.scope is _OTRRE.EscalationScope.EPISODE:
-        reroll_disp = _OTRRR.RerollDisposition(
-            verdict="needs_full_rerun",
-            cycles_run=0,
-            lines_rerolled=0,
-            final_report=story_critic_report,
-        )
-        meta["reroll_skipped_by_structural_escalation"] = True
-        if _w1c_escalation.regeneration_hint:
-            meta["regeneration_hint"] = _w1c_escalation.regeneration_hint
-        log.warning(
-            "[LFC] Wave 1 Agent C: structural failure -- skipping "
-            "line reroll, stamping needs_full_rerun immediately. "
-            "Hint: %s",
-            (_w1c_escalation.regeneration_hint or "")[:200],
-        )
-    else:
-        reroll_disp = _OTRRR.run_targeted_reroll(generate_fn, led)
-        log.info(
-            "[LFC] Sprint 5C targeted reroll (scope=%s): verdict=%s, "
-            "%d cycle(s), %d line(s) re-composed",
-            _w1c_escalation.scope.value,
-            reroll_disp.verdict, reroll_disp.cycles_run,
-            reroll_disp.lines_rerolled,
-        )
-    if reroll_disp.verdict == "needs_full_rerun":
-        # ---- A2 (story-quality Phase 1): repair-then-ship, NEVER refuse ----
-        # BUG-LOCAL-273: refresh ledger_data + meta -- run_targeted_reroll may
-        # have called Ledger.save() (rebinding led.data).
-        ledger_data = led.data
-        meta = ledger_data.setdefault("meta", {})
-        try:
-            _a2_resid = _LFC.run_gap_audit(ledger_data, label="a2_ship_through")
-            _a2_errs = list(_a2_resid.errors)
-            _a2_warns = list(_a2_resid.warnings)
-        except Exception as _a2_exc:  # noqa: BLE001 -- never break the ship
-            log.warning("[LFC] A2 ship-through gap audit failed: %r", _a2_exc)
-            _a2_errs, _a2_warns = [], []
-        meta["a2_ship_through"] = {
-            "reason": "reroll_exhausted_or_structural_escalation",
-            "cycles_run": int(getattr(reroll_disp, "cycles_run", 0) or 0),
-            "residual_structural_errors": _a2_errs,
-            "residual_warnings": _a2_warns,
-        }
-        log.warning(
-            "[LFC] A2 repair-then-ship: reroll bounded at %d cycle(s), "
-            "critic still flagging -- SHIPPING the best candidate through "
-            "the normal freeze (%d residual structural error(s), %d "
-            "warning(s) logged; never refusing).",
-            int(getattr(reroll_disp, "cycles_run", 0) or 0),
-            len(_a2_errs), len(_a2_warns),
-        )
-        # No terminal-skip, no early return -- execution continues to the
-        # Phase 6 render plan + Phase 7/8/10 ship path in the caller.
-
-    return None, reviewer_disp, story_critic_report
+    return dict(receipt)
 
 
 # ---------------------------------------------------------------------------
@@ -1094,58 +697,15 @@ def run_freeze_cascade(
     generate_fn,
     led,
     *,
-    polish_generate_fn=None,
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
-    # Sprint 6 -- critic-to-render coupling widgets (cascade node
-    # surface). Defaults match the node's INPUT_TYPES defaults so
-    # existing callers / tests are unaffected (render_selection="all"
-    # with no flat_lines / arc-block reduces to "stamp every character
-    # line_id in ledger order" -- HuMo's filter is then a no-op).
-    render_selection: str = "all",
-    render_max_n: int = 6,
-    protagonist_only: bool = False,
-    manual_line_ids: str = "",
 ) -> FreezeDisposition:
-    """Orchestrate Phase 0 -> reviewer (Phase 1+2) -> Phase 10.
+    """Validate, optionally clean narrow safety, then freeze the ledger.
 
-    Behaviour:
-      * Phase 0 always runs first; warn-only. Records to
-        meta.cleanup_passes.
-      * Existing review_ledger runs next. Only Phases 1 + 2 fire
-        inside it after S33 B3 (Phase 9 retired per refined
-        no-auditors rule). The composite phase_name string
-        `phase_1_2_9_reviewer_composite` is retained for forensic
-        continuity.
-      * If the reviewer verdict is the structural terminal failure
-        (needs_full_rerun), the cascade stops there:
-        the ledger has already been restored to its pre-review state,
-        and Phase 10 would either re-flag the same pre-existing gap
-        or stamp frozen_clean on an unaltered ledger -- both
-        misleading. ``too_many_edits`` is quality-budget exhaustion and
-        continues through repair-then-freeze. S33 B2 (2026-05-15) retired the two rollback-gate
-        verdicts (cast_unrecoverable, post_audit_failed) per the
-        refined no-auditors rule.
-      * On reviewer success (clean_no_edits / improved), Phase 10
-        runs and either freezes the ledger or raises
-        FreezeAssertionError. The exception is caught and translated
-        to a `needs_full_rerun` verdict; the freeze stamp from
-        phase_10 lives on meta.
-
-    Stamps:
-      meta.cleanup_passes      list of phase records
-      meta.freeze_verdict      final cascade verdict
-      meta.freeze_disposition  full FreezeDisposition dict
-      meta.gap_audit_pre       Phase 0 report
-      meta.gap_audit_post      Phase 10 report (only when Phase 10 ran)
-      meta.cleanup_locked      True only on successful freeze
-
-    `led` is a `production_ledger.Ledger`-like object exposing `.data`.
-
-    Honors meta.skip_reviewer (test bypass) -- when set, Phases 1-9
-    are skipped via the existing reviewer's own bypass, and the
-    cascade still runs Phase 0 / Phase 10 around it. This keeps the
-    freeze contract (ledger-health audit) independent of LLM cleanup.
+    Phase 0 records a deterministic preflight. Inline banks receive at most one
+    atomic safety-only patch set; producer-owned banks are verified read-only.
+    Phase 7/8 readiness and Phase 10 structural/safety gates then run. Advisory
+    word, visual, style, craft, and quality observations never affect liveness.
     """
     ledger_data = led.data
 
@@ -1180,17 +740,11 @@ def run_freeze_cascade(
                   for e in pre_report.errors],
     )
 
-    # ---- FreezePolicy (external QA r2 P0.1, 2026-07-10) ----------
-    # ONE typed policy decision BEFORE any content-mutating phase. For
-    # content-owned lanes (scifi_fable2) every legacy mutator -- the
-    # reviewer (cast repair + Script Doctor), 5B/A3/5C, Stage-7
-    # escalation, A2, the D3 role-sweep mutation, and the Phase-7
-    # canonical-text normalizer -- is SKIPPED by capability, and only
-    # read-only structural validation + the Phase 10 hard gate run. A
-    # TAGGED bank that fails to resolve is a TERMINAL structural error,
-    # never a fail-open into legacy mutation. (Phase 3 was DELETED in
-    # S30 B4; the legacy chain itself now lives in
-    # _run_legacy_content_chain, extracted verbatim.)
+    # ---- Freeze policy ---------------------------------------------
+    # Inline banks may run one atomic, same-story safety cleanup. Content-owned
+    # banks perform that cleanup before sealing their authorship receipt, so the
+    # cascade validates them read-only. A tagged bank that cannot resolve is a
+    # structural configuration error; it never falls through to another lane.
     policy = resolve_freeze_policy(meta)
     meta["freeze_policy"] = {"name": policy.name, "source": policy.source}
     _cap_entry_text_sha = _sha256_lines_text(ledger_data)
@@ -1200,7 +754,7 @@ def run_freeze_cascade(
         disp = _build_terminal_skip_disposition(
             ledger_data,
             verdict="needs_full_rerun",
-            reviewer_disp=None,
+            cleanup_receipt=None,
             pre_report=pre_report,
             block_class="structural",
         )
@@ -1208,76 +762,54 @@ def run_freeze_cascade(
             led, policy,
             entry_text_sha=_cap_entry_text_sha,
             entry_authorship_sha=_cap_entry_authorship_sha,
-            skipped_phases=_LEGACY_CONTENT_PHASES,
+            skipped_phases=_INLINE_CLEANUP_PHASES,
             executed_phases=("phase_0_gap_audit_pre",),
             structural_errors=(policy.terminal_error,),
         )
         _persist_cascade_meta(led)
         return disp
 
-    reviewer_disp = None
-    story_critic_report = None
-    if policy.run_legacy_content_passes:
-        term_disp, reviewer_disp, story_critic_report = (
-            _run_legacy_content_chain(generate_fn, led, pre_report)
-        )
-        if term_disp is not None:
-            _stamp_capability_receipt(
-                led, policy,
-                entry_text_sha=_cap_entry_text_sha,
-                entry_authorship_sha=_cap_entry_authorship_sha,
-                skipped_phases=(),
-                executed_phases=(
-                    "phase_0_gap_audit_pre",
-                    "phase_1_2_9_reviewer_composite",
-                ),
-            )
-            _persist_cascade_meta(led)
-            return term_disp
+    cleanup_receipt: Optional[dict[str, Any]] = None
+    if policy.run_inline_safety_cleanup:
+        cleanup_receipt = _run_inline_safety_cleanup(generate_fn, led)
     else:
-        # ---- content_owned_readonly: read-only validation instead ----
         ledger_data = led.data
         meta = ledger_data.setdefault("meta", {})
-        _ro_started = _isoformat_utc_now()
+        meta["same_story_safety_cleanup"] = {
+            "status": "not_applicable_content_owned",
+            "reason": "producer_cleanup_precedes_authorship_seal",
+            "patch_count": 0,
+        }
         _stamp_stub_or_skipped_phase(
             ledger_data,
-            phase_name="phase_1_2_9_reviewer_composite",
+            phase_name="same_story_safety_cleanup",
             reason="not_applicable_content_owned",
         )
-        # Truthful capability disposition -- NOT an emulated "clean"
-        # reviewer result (r2 P0.1: downstream must never read "clean"
-        # as "reviewed").
-        meta["reviewer_disposition_capability"] = (
-            "not_applicable_content_owned"
-        )
-        meta["legacy_quality_passes"] = (
-            "inapplicable: " + policy.source + " -- reviewer/5B/A3/5C/"
-            "escalation/A2/D3-mutation/Phase-7-normalization skipped by "
-            "capability, NOT a failure; read-only structural validation "
-            "+ Phase 10 hard gate still run"
-        )
-        _ro_errors = _readonly_structural_validation(ledger_data)
+        readonly_started = _isoformat_utc_now()
+        readonly_hash = _hash_lines_text(ledger_data)
+        readonly_errors = _readonly_structural_validation(ledger_data)
         _stamp_phase_record(
             ledger_data,
             phase_name="readonly_structural_validation",
-            text_hash_before=_hash_lines_text(ledger_data),
+            text_hash_before=readonly_hash,
             text_hash_after=_hash_lines_text(ledger_data),
-            started_at=_ro_started,
+            started_at=readonly_started,
             finished_at=_isoformat_utc_now(),
-            failures=[{"line_id": "__readonly__", "reason": e}
-                      for e in _ro_errors],
+            failures=[
+                {"line_id": "__readonly__", "reason": error}
+                for error in readonly_errors
+            ],
         )
-        if _ro_errors:
+        if readonly_errors:
             log.error(
-                "[LFC] read-only structural validation FAILED (%d "
-                "error(s)) under policy %s: %s",
-                len(_ro_errors), policy.name,
-                "; ".join(_ro_errors)[:400],
+                "[LFC] read-only structural validation failed under %s: %s",
+                policy.name,
+                "; ".join(readonly_errors)[:400],
             )
             disp = _build_terminal_skip_disposition(
                 ledger_data,
                 verdict="needs_full_rerun",
-                reviewer_disp=None,
+                cleanup_receipt=None,
                 pre_report=pre_report,
                 block_class="structural",
             )
@@ -1285,106 +817,46 @@ def run_freeze_cascade(
                 led, policy,
                 entry_text_sha=_cap_entry_text_sha,
                 entry_authorship_sha=_cap_entry_authorship_sha,
-                skipped_phases=_LEGACY_CONTENT_PHASES,
+                skipped_phases=_INLINE_CLEANUP_PHASES,
                 executed_phases=(
                     "phase_0_gap_audit_pre",
                     "readonly_structural_validation",
                 ),
-                structural_errors=_ro_errors,
+                structural_errors=readonly_errors,
             )
             _persist_cascade_meta(led)
             return disp
         log.info(
-            "[LFC] policy %s: read-only structural validation clean; "
-            "legacy content passes skipped by capability.", policy.name,
+            "[LFC] policy %s: content-owned ledger is structurally clean",
+            policy.name,
         )
 
-    # Receipt phase lists for the exits below (r2 P0.1).
     _cap_skipped = (
-        () if policy.run_legacy_content_passes else _LEGACY_CONTENT_PHASES
+        () if policy.run_inline_safety_cleanup else _INLINE_CLEANUP_PHASES
     )
     _cap_executed_tail = (
         (
             "phase_0_gap_audit_pre",
-            "phase_1_2_9_reviewer_composite",
-            "sprint_5b_story_critic",
-            "a3_mechanical_floor",
-            "stage7_escalation",
-            "sprint_5c_targeted_reroll",
+            "same_story_safety_cleanup",
             "d3_role_sweep_mutation",
             "phase_7_audio_readiness",
-            "word_delivery_backstop",
+            "word_delivery_telemetry",
             "phase_8_video_readiness",
             "phase_10_gap_audit_post_and_freeze",
         )
-        if policy.run_legacy_content_passes
+        if policy.run_inline_safety_cleanup
         else (
             "phase_0_gap_audit_pre",
             "readonly_structural_validation",
-            "word_delivery_backstop",
+            "word_delivery_telemetry",
             "phase_8_video_readiness",
             "phase_10_gap_audit_post_and_freeze",
         )
     )
 
-    # ---- Sprint 6: critic -> legacy render-plan receipt -------------
-    # Compute the render plan AFTER the reroll completes (so the plan
-    # sees the FINAL critic report + cycle_count + reroll_history) and
-    # BEFORE Phase 7 / 8 / 10 freeze the ledger. The plan rides on
-    # `meta.render_plan` as story-QA telemetry/legacy receipt only. The real
-    # episode renderer renders every ShotLock video.shots row so story-QA
-    # metadata can never remove a voiced beat's visible coverage.
-    # build_render_plan NEVER raises (PD1) -- a degraded computation returns
-    # None and the stamp is skipped.
-    #
-    # BUG-LOCAL-273 fix (cont.): refresh ledger_data + meta again before the
-    # Sprint 6 stamp. The Sprint 5C reroll above may have triggered an
-    # internal Ledger.save() (update_line_text on rerolled lines is followed
-    # by save() in some paths), rebinding self.data again. Same root cause
-    # as the 5B refresh above.
-    ledger_data = led.data
-    meta = ledger_data.setdefault("meta", {})
-    render_plan = _OTRRP.build_render_plan(
-        ledger_data,
-        render_selection=render_selection,
-        render_max_n=render_max_n,
-        protagonist_only=protagonist_only,
-        manual_line_ids=manual_line_ids,
-    )
-    if render_plan is not None:
-        meta["render_plan"] = render_plan
-        log.info(
-            "[LFC] Sprint 6 render plan: mode=%s, %d line(s) (blocked=%s, "
-            "applied_max_n=%d, arc_verdict=%s, cycle_count=%d, "
-            "%d flat line(s) excluded)",
-            render_plan["selection_mode"], len(render_plan["line_ids"]),
-            render_plan["blocked"], render_plan["applied_max_n"],
-            render_plan["source_arc_verdict"],
-            render_plan["source_cycle_count"],
-            len(render_plan["excluded_flat_lines"]),
-        )
-        # BUG-LOCAL-274 fix retained: persist the render_plan receipt to disk
-        # for audit/legacy readers. Phase 10's later save would normally cover
-        # this, but the belt-and-braces save here makes the contract explicit
-        # and survives any future Phase 10 refactor. Production Ledger.save()
-        # never raises (Prime Directive 1). Defensive getattr handles test
-        # fixtures that stub `led` as a SimpleNamespace without a save method
-        # (test_lfc_phase_7_8_readiness, etc.).
-        _save_fn = getattr(led, "save", None)
-        if callable(_save_fn):
-            try:
-                _save_fn()
-            except Exception as _save_exc:  # noqa: BLE001 -- PD1
-                log.warning(
-                    "[LFC] post-render-plan save failed (%s: %s); "
-                    "render_plan receipt lives in-memory only",
-                    type(_save_exc).__name__,
-                    _save_exc,
-                )
-
-    # ---- D3 (2026-06-22, story-quality lift): MANDATORY pre-freeze role sweep
+    # ---- D3: mandatory pre-freeze role sweep
     # The FINAL mutation step before the freeze hash + role-dependent routing
-    # (Phase 7 audio readiness / scrub / TTS). The reviewer's role_mismatch
+    # (Phase 7 audio readiness / scrub / TTS). A prior role mismatch
     # repair can leave a cast character stamped speaker_role="announcer" (b011
     # "Chandra's Echo": char_id=c02, role=announcer). Force speaker_role=
     # "character" on every line whose char_id is a real cast id. Audit rides
@@ -1401,7 +873,7 @@ def run_freeze_cascade(
         # equivalent CHECK already ran read-only inside
         # _readonly_structural_validation, where a violation is
         # terminal, not silently repaired).
-        if _d3_cast_ids and policy.run_legacy_content_passes:
+        if _d3_cast_ids and policy.run_inline_safety_cleanup:
             for _row in ledger_data.get("lines", []) or []:
                 _, _ch = _PL.coerce_speaker_role_for_char_id(
                     _row, _d3_cast_ids, source="pre_freeze_sweep",
@@ -1446,59 +918,20 @@ def run_freeze_cascade(
                     f"(line_id={_row.get('line_id')!r})"
                 )
 
-    # Final LEGACY content-authoring boundary. Reviewer/Script Doctor and the
-    # targeted reroll run after the writer's own final scan, so they must not be
-    # allowed to reintroduce a craft defect immediately before TTS. Re-scan the
-    # exact post-review rows with the resident technical writer (B), its polish
-    # closure (C when available), then the deterministic floor. Content-owned
-    # lanes are sealed/read-only and already own the same repair before sealing.
-    if policy.run_legacy_content_passes:
-        ledger_data = led.data
-        _freeze_hygiene = _OTRRR.repair_ledger_spoken_hygiene(
-            ledger_data,
-            creative_fn=generate_fn,
-            # Both resident closures resolve to the same technical cache/model;
-            # calling the polish closure would falsely stamp an alternate-slot C
-            # repair. The writer-side final scan already used the real alternate
-            # slot. This defense uses honest same-slot B then the total floor.
-            repair_fn=None,
-        )
-        if _freeze_hygiene.repaired or _freeze_hygiene.failed:
-            ledger_data.setdefault("meta", {})[
-                "freeze_hygiene_repaired_rows"
-            ] = _freeze_hygiene.repaired
-            ledger_data.setdefault("meta", {})[
-                "freeze_hygiene_failed_rows"
-            ] = _freeze_hygiene.failed
-            log.warning(
-                "[LFC] final spoken hygiene repaired %d post-review row(s) "
-                "and row-muted %d mechanical defect(s) before readiness/freeze",
-                _freeze_hygiene.repaired, _freeze_hygiene.failed,
-            )
-
-    # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------
-    # S30 B4: Phase 4 / 4.5 / 5 / 6 DELETED. The standalone
-    # OTR_LFCPhase4Scene / 5Voice / 6Arc node classes were orphaned
-    # from every shipped workflow JSON and all five backing functions
-    # defaulted OFF on every code path. Cascade flow is now:
-    #   Phase 0 -> Phase 1/2/9 reviewer -> Phase 7 -> Phase 8 -> Phase 10.
-
-    # Phase 7 / 8 -- deterministic readiness checks (LFC commit 5).
-    # r2 P0.1: Phase 7 rewrites canonical `text` in place (Dr. ->
-    # Doctor, digits -> words) -- a proof breaker for content-owned
-    # lanes. Under content_owned_readonly it is skipped by POLICY;
-    # P1.3 (text_for_tts) will carry pronunciation without touching
-    # the sealed canonical text.
+    # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------\n\n    # Phase 7 stamps a pronunciation-only projection and never mutates
+    # canonical text. Content-owned producers already stamp their projection,
+    # so the cascade keeps their policy skip while preserving the same public
+    # readiness surface for inline banks.
     started_7 = _isoformat_utc_now()
     hash_before_7 = _hash_lines_text(ledger_data)
     _p7_enabled = bool(
-        enable_phase_7_audio_readiness and policy.run_legacy_content_passes
+        enable_phase_7_audio_readiness and policy.run_inline_safety_cleanup
     )
-    p7_report = _phase_7_audio_readiness(led, enable=_p7_enabled)
+    _phase_7_audio_readiness(led, enable=_p7_enabled)
     if enable_phase_7_audio_readiness and not _p7_enabled:
         led.data.setdefault("meta", {})["audio_readiness"] = {
             "skipped": True,
-            "skipped_reason": "content_owned_readonly_policy",
+            "skipped_reason": "producer_owned_delivery_stamp",
         }
     hash_after_7 = _hash_lines_text(ledger_data)
     _stamp_phase_record(
@@ -1508,42 +941,8 @@ def run_freeze_cascade(
         text_hash_after=hash_after_7,
         started_at=started_7,
         finished_at=_isoformat_utc_now(),
-        edits_applied=(
-            p7_report.lines_normalized if p7_report is not None else 0
-        ),
+        edits_applied=0,
     )
-    # Phase 7 expands abbreviations, symbols, and numerals in the exact legacy
-    # string TTS will consume. Re-score that delivery surface: a short canonical
-    # line can become an overlong breath only after expansion. This scan is still
-    # pre-freeze and uses the same honest same-slot-B + deterministic floor.
-    if _p7_enabled:
-        _p7_hygiene_started = _isoformat_utc_now()
-        _p7_hygiene_before = _hash_lines_text(ledger_data)
-        _p7_hygiene = _OTRRR.repair_ledger_spoken_hygiene(
-            ledger_data,
-            creative_fn=generate_fn,
-            repair_fn=None,
-        )
-        _p7_hygiene_after = _hash_lines_text(ledger_data)
-        _stamp_phase_record(
-            ledger_data,
-            phase_name="phase_7_spoken_hygiene",
-            text_hash_before=_p7_hygiene_before,
-            text_hash_after=_p7_hygiene_after,
-            started_at=_p7_hygiene_started,
-            finished_at=_isoformat_utc_now(),
-            edits_applied=_p7_hygiene.repaired,
-            failures=[
-                {
-                    "line_id": str(failure.get("line_id") or ""),
-                    "reason": str(failure.get("failure") or ""),
-                }
-                for failure in _p7_hygiene.failures
-            ],
-        )
-        if _p7_hygiene.repaired or _p7_hygiene.failed:
-            meta["phase_7_hygiene_repaired_rows"] = _p7_hygiene.repaired
-            meta["phase_7_hygiene_failed_rows"] = _p7_hygiene.failed
 
     # PBUG-20260721-15: one derived-metric owner at the final text boundary.
     # Phase 0 intentionally preserves the incoming producer diagnosis. After
@@ -1554,70 +953,24 @@ def run_freeze_cascade(
     ledger_data = led.data
     meta = ledger_data.setdefault("meta", {})
 
-    # PBUG-20260721-18: final read-only requested-length backstop. Every current
-    # six-bank producer declares meta.word_budget.owner and proves its exact
-    # character rows before this point. Recount once after every permitted
-    # legacy Phase-7/hygiene mutation and before Phase 8/media; the receipt is
-    # meta-only, so sealed canonical text and content-authorship hashes remain
-    # byte-identical. Historical synthetic/loaded ledgers without an owner keep
-    # their compatibility path, explicitly recorded rather than guessed.
+    # Final word observations are stamped after every permitted text mutator.
+    # Target metadata may be missing, invalid, under, or over; none of those
+    # states can change freeze/media/publication liveness.
     _declared_word_budget = meta.get("word_budget")
     _declared_word_owner = str(
         _declared_word_budget.get("owner")
         if isinstance(_declared_word_budget, dict) else ""
     ).strip()
-    if _declared_word_owner:
-        try:
-            _freeze_word_receipt = _OTRWD.stamp_actual(
-                ledger_data,
-                stage="freeze_pre_media",
-                require_in_band=True,
-            )
-        except _OTRWD.WordDeliveryError as exc:
-            _word_err = f"word_delivery: {exc}"
-            meta["word_delivery_backstop"] = {
-                "status": "failed",
-                "owner": _declared_word_owner,
-                "error": str(exc),
-            }
-            log.error("[LFC] %s", _word_err)
-            disp = _build_terminal_skip_disposition(
-                ledger_data,
-                verdict="needs_full_rerun",
-                reviewer_disp=reviewer_disp,
-                pre_report=pre_report,
-                block_class="structural",
-                remaining_phase_names=(
-                    "phase_8_video_readiness",
-                    "phase_10_gap_audit_post_and_freeze",
-                ),
-            )
-            _terminal_remaining = (
-                "phase_8_video_readiness",
-                "phase_10_gap_audit_post_and_freeze",
-            )
-            _stamp_capability_receipt(
-                led, policy,
-                entry_text_sha=_cap_entry_text_sha,
-                entry_authorship_sha=_cap_entry_authorship_sha,
-                skipped_phases=tuple(_cap_skipped) + _terminal_remaining,
-                executed_phases=tuple(
-                    phase for phase in _cap_executed_tail
-                    if phase not in _terminal_remaining
-                ),
-                structural_errors=(_word_err,),
-            )
-            _persist_cascade_meta(led)
-            return disp
-        meta["word_delivery_backstop"] = {
-            "status": "pass",
-            "owner": _declared_word_owner,
-            **_freeze_word_receipt,
-        }
-    else:
-        meta["word_delivery_backstop"] = {
-            "status": "not_declared_compatibility",
-        }
+    _freeze_word_receipt = _OTRWD.stamp_actual(
+        ledger_data,
+        stage="freeze_pre_media",
+    )
+    meta["word_delivery_telemetry"] = {
+        "status": "telemetry_only",
+        "owner": _declared_word_owner,
+        **_freeze_word_receipt,
+    }
+
 
     started_8 = _isoformat_utc_now()
     hash_before_8 = _hash_lines_text(ledger_data)
@@ -1638,7 +991,7 @@ def run_freeze_cascade(
     # mutated canonical text or the authorship receipt between cascade entry and
     # the freeze gate. A divergence means an unaccounted writer ran --
     # terminal structural error, fail loud, never freeze.
-    if not policy.run_legacy_content_passes:
+    if not policy.run_inline_safety_cleanup:
         _ro_exit_text = _sha256_lines_text(led.data)
         _ro_exit_authorship = _sha256_content_authorship(led.data)
         if (_ro_exit_text != _cap_entry_text_sha
@@ -1652,7 +1005,7 @@ def run_freeze_cascade(
             disp = _build_terminal_skip_disposition(
                 led.data,
                 verdict="needs_full_rerun",
-                reviewer_disp=None,
+                cleanup_receipt=None,
                 pre_report=pre_report,
                 block_class="structural",
             )
@@ -1689,13 +1042,15 @@ def run_freeze_cascade(
         # when it raised (when meta was stampable).
         if not meta.get("freeze_verdict"):
             meta["freeze_verdict"] = "needs_full_rerun"
-        # BUG-LOCAL-300: Phase 10 gap-audit rejection = critical structural
-        # gaps -> the ledger is genuinely unrenderable. Mark structural so the
-        # Bark halt always blocks (never downgraded to a quality warn-through).
-        meta["freeze_block_class"] = "structural"
+        safety_only = bool(exc.errors) and all(
+            str(error).startswith("G9:") for error in exc.errors
+        )
+        meta["freeze_block_class"] = (
+            "safety" if safety_only else "structural"
+        )
         disp = FreezeDisposition(
             verdict="needs_full_rerun",
-            reviewer_disposition=reviewer_disp,
+            cleanup_receipt=cleanup_receipt,
             gap_audit_pre=pre_report,
             gap_audit_post=exc.report,
         )
@@ -1732,44 +1087,26 @@ def run_freeze_cascade(
     )
 
     # ---- Successful freeze -> finalize verdict ------------
-    # phase_10 stamped meta.freeze_verdict = frozen_clean OR
-    # frozen_with_warns. Lift `improved` reviewer paths to
-    # frozen_with_doctor_edits regardless (the doctor-edits result is
-    # more informative than the gap-audit warn-state alone).
     meta = ledger_data["meta"]
-    if reviewer_disp is not None and reviewer_disp.verdict == "improved":
-        meta["freeze_verdict"] = "frozen_with_doctor_edits"
-        final_verdict = "frozen_with_doctor_edits"
-    else:
-        final_verdict = meta.get("freeze_verdict", "frozen_clean")
-    # story-ledger DRIFT chunk 4 (2026-06-25): the freeze WARN taxonomy. Bucket
-    # every non-structural finding (gap-audit warns + an UNVERIFIED critic +
-    # critic continuity issues + ledger-consistency defects) into the 3 tiers
-    # and stamp it operator-visible. A STORY-ACCURACY warning (continuity /
-    # canon-divergence / unverified / consistency) ships the renderable episode
-    # NON-clean (frozen_with_warns) -- it is NOT a structural block (which is
-    # reserved for the genuinely unrenderable Phase-10 critical gap above). This
-    # generalizes the chunk-1 unverified->non-clean map; a real, validated,
-    # clean arc with no warnings still ships frozen_clean.
-    _warn_tax = build_freeze_warn_taxonomy(
+    final_verdict = meta.get("freeze_verdict", "frozen_clean")
+    warn_taxonomy = build_freeze_warn_taxonomy(
         gap_warnings=list(getattr(post_report, "warnings", None) or []),
-        critic_report=story_critic_report,
-        critic_status=meta.get("story_critic_status"),
         consistency_status=meta.get("consistency_status"),
     )
-    meta["freeze_warn_taxonomy"] = _warn_tax
-    if _warn_tax["story_accuracy_warning"]:
-        meta["freeze_story_accuracy_warnings"] = _warn_tax["story_accuracy_warning"]
-    if getattr(story_critic_report, "arc_verdict", "") == "unverified":
-        meta["freeze_unverified_critic"] = True
+    meta["freeze_warn_taxonomy"] = warn_taxonomy
+    if warn_taxonomy["story_accuracy_warning"]:
+        meta["freeze_story_accuracy_warnings"] = (
+            warn_taxonomy["story_accuracy_warning"]
+        )
     if final_verdict == "frozen_clean" and (
-        _warn_tax["story_accuracy_warning"] or _warn_tax["cosmetic_warning"]
+        warn_taxonomy["story_accuracy_warning"]
+        or warn_taxonomy["cosmetic_warning"]
     ):
         final_verdict = "frozen_with_warns"
-        meta["freeze_verdict"] = "frozen_with_warns"
+        meta["freeze_verdict"] = final_verdict
     disp = FreezeDisposition(
         verdict=final_verdict,
-        reviewer_disposition=reviewer_disp,
+        cleanup_receipt=cleanup_receipt,
         gap_audit_pre=pre_report,
         gap_audit_post=post_report,
     )
@@ -1779,10 +1116,12 @@ def run_freeze_cascade(
     # freeze_verdict output STRING stays the verdict literal.
     meta["freeze_phase_telemetry"] = build_phase_telemetry(meta)
     log.info(
-        "[LFC] freeze landed: verdict=%s reviewer=%s pre_warns=%d "
+        "[LFC] freeze landed: verdict=%s cleanup=%s pre_warns=%d "
         "post_warns=%d",
-        final_verdict, getattr(reviewer_disp, "verdict", "not_applicable"),
-        len(pre_report.warnings), len(post_report.warnings),
+        final_verdict,
+        (cleanup_receipt or {}).get("status", "not_applicable"),
+        len(pre_report.warnings),
+        len(post_report.warnings),
     )
     _stamp_capability_receipt(
         led, policy,

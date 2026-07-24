@@ -114,25 +114,21 @@ def test_scratchpad_no_title_line_returns_empty():
     assert _generate_title_from_script(gen, SAMPLE_SCRIPT) == ""
 
 
-def test_scratchpad_rejects_stuck_default_on_title_line():
-    """A stuck default emitted on the TITLE: line is still rejected."""
-    for stuck in ("Untitled", "Signal Lost", "Episode"):
-        def gen(*_a, _s=stuck, **_kw):
-            return _scratchpad(["a", "b", "c"], ["x", "y", "z"], _s)
+def test_scratchpad_accepts_any_nonempty_authored_title():
+    """Phrase lists and title word counts never discard authored output."""
+    for authored in (
+        "Untitled",
+        "Signal Lost",
+        "Episode",
+        "Here is a title that the model authored as a complete English "
+        "sentence well over ten words long indeed",
+    ):
+        def gen(*_a, _title=authored, **_kw):
+            return _scratchpad(["a", "b", "c"], ["x", "y", "z"], _title)
 
-        assert _generate_title_from_script(gen, SAMPLE_SCRIPT) == "", stuck
-
-
-def test_scratchpad_rejects_overlong_title_line():
-    """A full-sentence leak (>10 words) on the TITLE: line is rejected."""
-    def gen(*_a, **_kw):
-        return _scratchpad(
-            ["a", "b", "c"], ["x", "y", "z"],
-            "Here is a title that the model leaked as a complete English "
-            "sentence well over ten words long indeed",
-        )
-
-    assert _generate_title_from_script(gen, SAMPLE_SCRIPT) == ""
+        assert _generate_title_from_script(
+            gen, SAMPLE_SCRIPT,
+        ) == authored
 
 
 def test_scratchpad_empty_script_skips_llm():

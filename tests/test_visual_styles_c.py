@@ -213,28 +213,6 @@ class TestLetteringLock:
         assert s.still_word_backdrop[genre] in a
         assert s.still_word_backdrop[genre] in b
 
-
-# --------------------------------------------------------------------------- #
-# 6. Negative-vocab: no pack's own forbidden term survives a styled card
-# --------------------------------------------------------------------------- #
-class TestNegativeVocab:
-    @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
-    def test_no_own_forbidden_term_in_word_or_title_cards(self, style_id):
-        s = vs.resolve_visual_style(style_id)
-        cards = [ip.compose_still_word_prompt(
-                    _meta(style_id, g), "character_video", {"text": "Go."})
-                 for g in _GENRE_KEYS]
-        cards.append(ip.compose_still_word_prompt(
-            _meta(style_id, "default"), "music_visual", {}))
-        offenders = []
-        for i, text in enumerate(cards):
-            low = text.lower()
-            for term in s.forbidden_terms:
-                if term.lower() in low:
-                    offenders.append(f"card[{i}] carries {term!r}: {text[:90]}")
-        assert not offenders, "\n".join(offenders)
-
-
 # --------------------------------------------------------------------------- #
 # 7. AST guard: the composer reads the PACK, not the module fixtures
 # --------------------------------------------------------------------------- #

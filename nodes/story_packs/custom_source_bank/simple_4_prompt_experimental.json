@@ -18,11 +18,6 @@
     "Python should validate and repair structure, not secretly co-write the story.",
     "No fallback to legacy_many_pass if this experiment fails."
   ],
-  "forbidden_plot_patterns": [
-    "hidden fallback to science RSS",
-    "silent fallback to legacy builder"
-  ],
-  "forbidden_leakage_terms": [],
   "source_requirements": [
     "Any selected source bank must provide a valid source packet and story pack."
   ],

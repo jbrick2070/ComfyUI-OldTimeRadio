@@ -7,10 +7,6 @@ patterns) -- distinct from the cast contract which describes ROUTING (id,
 name, aliases, voice spec). Hard contract = routing; canon = identity.
 
 Status: data model + markdown rendering + file I/O round-trip.
-ScriptWriter prompt injection and _check_voice_consistency rubric
-integration are DEFERRED to a follow-up session (those touch
-story_orchestrator.py which is load-bearing during the in-flight FULL
-acceptance run).
 
 Public surface:
     CharacterCanonEntry — dataclass per character

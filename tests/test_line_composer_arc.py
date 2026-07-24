@@ -31,7 +31,6 @@ def _minimal_legacy_request(**overrides) -> LineRequest:
         speaker="ALICE",
         intent="press maeve to admit the omission",
         mood="dry",
-        target_words=20,
         canon_header="TITLE: TBD\nPREMISE: test premise\nSETTING: lab\nTIME: midnight",
         last_lines=[("ANNOUNCER", "Welcome back to Night Forensics.")],
     )
@@ -45,7 +44,6 @@ def _sprint3_request(**overrides) -> LineRequest:
         speaker="ALICE",
         intent="press maeve to admit the omission",
         mood="dry",
-        target_words=20,
         canon_header="TITLE: TBD\nPREMISE: test premise\nSETTING: lab\nTIME: midnight",
         last_lines=[("ANNOUNCER", "Welcome back to Night Forensics.")],
         dramatic_question="Will Maeve sign the confession before the audit closes?",

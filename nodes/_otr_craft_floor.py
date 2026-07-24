@@ -18,15 +18,9 @@ What it validates (Tier-A, all deterministic):
     3. SPEAKER_MISMATCH     -- a row's speaker != the manifest speaker
                                for that slot id.
     4. EMPTY_LINE           -- a voiced row carries empty text.
-    5. BELOW_WORD_FLOOR     -- a row's word count is below the floor
-                               parameter (default 4).
-    6. PARSE_ERROR          -- a raw line is not parseable as
+    5. PARSE_ERROR          -- a raw line is not parseable as
                                d###|SPEAKER: text (one block per slot).
-    7. DUPLICATE_SLOT       -- the same slot id appears twice in the
-                               parsed output (deterministic structural
-                               break; surfaced so the order check has a
-                               clean failure code rather than a confusing
-                               count/order combination).
+    6. DUPLICATE_SLOT       -- the same slot id appears twice.
 
 Contract assumptions (read from the live Build-1 code, see WIRING_SPEC):
     * The Story Room writer (Build 2 task 3a) EMITS one block per voiced
@@ -43,9 +37,7 @@ Contract assumptions (read from the live Build-1 code, see WIRING_SPEC):
       Match is case-sensitive and exact, mirroring the commit join.
 
 This module is PURE: no I/O, no GPU, no ComfyUI imports, no torch, no
-pydantic. Word-count tokenization mirrors OTR_StoryRoomCommit's
-convention ([A-Za-z][A-Za-z0-9'\\-]*) so a row that passes the floor
-here produces the same word_count the commit node stamps.
+pydantic. Prose length and vocabulary never participate in the verdict.
 
 UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 4-space indentation. No profanity. SFW.
@@ -67,7 +59,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 __all__ = [
     "FAILURE_CODES",
     "SLOT_LINE_RE",
-    "DEFAULT_WORD_FLOOR",
     "SlotFailure",
     "CraftFloorResult",
     "ParsedSlot",
@@ -89,7 +80,6 @@ SLOT_COUNT_MISMATCH = "SLOT_COUNT_MISMATCH"
 SLOT_ORDER_MISMATCH = "SLOT_ORDER_MISMATCH"
 SPEAKER_MISMATCH = "SPEAKER_MISMATCH"
 EMPTY_LINE = "EMPTY_LINE"
-BELOW_WORD_FLOOR = "BELOW_WORD_FLOOR"
 PARSE_ERROR = "PARSE_ERROR"
 DUPLICATE_SLOT = "DUPLICATE_SLOT"
 
@@ -98,7 +88,6 @@ FAILURE_CODES = (
     SLOT_ORDER_MISMATCH,
     SPEAKER_MISMATCH,
     EMPTY_LINE,
-    BELOW_WORD_FLOOR,
     PARSE_ERROR,
     DUPLICATE_SLOT,
 )
@@ -125,16 +114,8 @@ SLOT_LINE_RE = re.compile(
     re.DOTALL,
 )
 
-# Word-count tokenizer. Mirrors OTR_StoryRoomCommit._commit_dialogue and
-# production_ledger._word_count so the floor here agrees with the
-# word_count the commit node stamps.
-_WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9'\-]*")
-
-# Block-start detector for splitting a multi-block raw string. A new
-# block begins at the start of a line that opens with d###|.
+# Structural block boundary: each new d###| prefix begins one slot block.
 _BLOCK_START_RE = re.compile(r"(?m)^\s*d\d{3}\s*\|")
-
-DEFAULT_WORD_FLOOR = 4
 
 
 # ---------------------------------------------------------------------------
@@ -198,16 +179,14 @@ class CraftFloorResult:
     failures:      ordered list of SlotFailure. Order is deterministic:
                    parse errors first (in draft order), then structural
                    (duplicate, count, order), then per-slot semantic-free
-                   checks (speaker, empty, word floor) in draft order.
+                   checks (speaker, empty) in draft order.
     parsed_slots:  the ParsedSlot list (empty when a parse error aborts
                    before a full parse is possible).
-    word_floor:    the floor that was applied (echoed for the audit log).
     """
 
     passed: bool
     failures: List[SlotFailure] = field(default_factory=list)
     parsed_slots: List[ParsedSlot] = field(default_factory=list)
-    word_floor: int = DEFAULT_WORD_FLOOR
 
     @property
     def failure_codes(self):
@@ -227,7 +206,6 @@ class CraftFloorResult:
                 }
                 for s in self.parsed_slots
             ],
-            "word_floor": int(self.word_floor),
         }
 
 
@@ -313,14 +291,6 @@ def normalize_slot_line(slot_id, speaker, text):
     return sid + "|" + spk + ": " + txt
 
 
-def _word_count(text):
-    """Count words the same way OTR_StoryRoomCommit does.
-
-    Tokenizes on a leading letter followed by letters/digits/apostrophe/
-    hyphen. A line of pure punctuation or pauses counts as 0 words.
-    """
-    return len(_WORD_RE.findall(text or ""))
-
 
 # ---------------------------------------------------------------------------
 # Manifest normalization
@@ -368,52 +338,31 @@ def _normalize_manifest(manifest):
 # ---------------------------------------------------------------------------
 
 
-def evaluate_tier_a(raw, manifest, word_floor=DEFAULT_WORD_FLOOR):
-    """Run the deterministic Tier-A gate.
+def evaluate_tier_a(raw, manifest):
+    """Validate only slot transport, ordering, speaker binding, and nonempty text.
 
-    Args:
-        raw: the Story Room writer's slot-formatted output -- one
-            d###|SPEAKER: text block per voiced slot.
-        manifest: ordered expected slots. List of
-            {"slot_id"/"dialogue_slot_id", "speaker"} dicts OR
-            (slot_id, speaker) tuples. The same ordered voiced-slot list
-            OTR_StoryRoomExtract derives and OTR_StoryRoomCommit joins on.
-        word_floor: minimum word count per voiced line. Default
-            DEFAULT_WORD_FLOOR (4). A row at or above the floor passes
-            that check.
-
-    Returns:
-        CraftFloorResult. passed is True iff zero failures. Failure order
-        is deterministic (see CraftFloorResult docstring).
-
-    Determinism guarantee: this function performs only regex parsing,
-    list comparison, and integer counting. No randomness, no clock, no
-    model. Same (raw, manifest, word_floor) -> identical CraftFloorResult.
+    Prose length, vocabulary, style, and quality are outside this integrity
+    boundary. Any nonempty authored line is accepted regardless of word count.
     """
-    floor = int(word_floor)
     expected = _normalize_manifest(manifest)
     expected_ids = [sid for sid, _ in expected]
     expected_speaker_by_id = {}
     for sid, spk in expected:
-        # First occurrence wins; a duplicate manifest id is itself a
-        # caller bug, but we stay deterministic by keeping the first.
         expected_speaker_by_id.setdefault(sid, spk)
 
     failures = []
     parsed = []
 
-    # ---- Parse pass (attribute parse errors by position) ----
     blocks = _split_blocks(raw)
     for idx, block in enumerate(blocks):
-        m = SLOT_LINE_RE.match(block)
-        if not m:
+        match = SLOT_LINE_RE.match(block)
+        if not match:
             failures.append(SlotFailure(
                 code=PARSE_ERROR,
                 slot_id="",
                 index=idx,
                 detail=(
-                    "block at position "
-                    + str(idx)
+                    "block at position " + str(idx)
                     + " did not match d###|SPEAKER: text (first 60 "
                     + "chars: " + repr(block[:60]) + ")"
                 ),
@@ -421,29 +370,27 @@ def evaluate_tier_a(raw, manifest, word_floor=DEFAULT_WORD_FLOOR):
             continue
         parsed.append(ParsedSlot(
             index=idx,
-            slot_id=m.group("slot_id").strip(),
-            speaker=m.group("speaker").strip(),
-            text=m.group("text").strip(),
+            slot_id=match.group("slot_id").strip(),
+            speaker=match.group("speaker").strip(),
+            text=match.group("text").strip(),
             raw=block,
         ))
 
-    parsed_ids = [p.slot_id for p in parsed]
+    parsed_ids = [row.slot_id for row in parsed]
 
-    # ---- Duplicate slot id (structural; deterministic) ----
     seen = set()
-    dup_reported = set()
-    for p in parsed:
-        if p.slot_id in seen and p.slot_id not in dup_reported:
+    duplicate_reported = set()
+    for row in parsed:
+        if row.slot_id in seen and row.slot_id not in duplicate_reported:
             failures.append(SlotFailure(
                 code=DUPLICATE_SLOT,
-                slot_id=p.slot_id,
-                index=p.index,
-                detail="slot id " + p.slot_id + " appears more than once",
+                slot_id=row.slot_id,
+                index=row.index,
+                detail="slot id " + row.slot_id + " appears more than once",
             ))
-            dup_reported.add(p.slot_id)
-        seen.add(p.slot_id)
+            duplicate_reported.add(row.slot_id)
+        seen.add(row.slot_id)
 
-    # ---- Count check ----
     if len(parsed_ids) != len(expected_ids):
         failures.append(SlotFailure(
             code=SLOT_COUNT_MISMATCH,
@@ -455,27 +402,17 @@ def evaluate_tier_a(raw, manifest, word_floor=DEFAULT_WORD_FLOOR):
             ),
         ))
 
-    # ---- Order check ----
-    # Compared position-by-position over the overlap so we report the
-    # first divergent index concretely; a pure list-inequality would
-    # hide WHERE it broke.
     if parsed_ids != expected_ids:
         overlap = min(len(parsed_ids), len(expected_ids))
         first_bad = -1
-        for i in range(overlap):
-            if parsed_ids[i] != expected_ids[i]:
-                first_bad = i
+        for index in range(overlap):
+            if parsed_ids[index] != expected_ids[index]:
+                first_bad = index
                 break
         if first_bad == -1:
-            # Same prefix, differing length -- the count check already
-            # fired; still record an order failure for the tail so the
-            # code vocabulary is unambiguous.
             first_bad = overlap
         got = parsed_ids[first_bad] if first_bad < len(parsed_ids) else "(none)"
-        want = (
-            expected_ids[first_bad]
-            if first_bad < len(expected_ids) else "(none)"
-        )
+        want = expected_ids[first_bad] if first_bad < len(expected_ids) else "(none)"
         failures.append(SlotFailure(
             code=SLOT_ORDER_MISMATCH,
             slot_id=want if want != "(none)" else got,
@@ -486,59 +423,31 @@ def evaluate_tier_a(raw, manifest, word_floor=DEFAULT_WORD_FLOOR):
             ),
         ))
 
-    # ---- Per-slot checks: speaker, empty line, word floor ----
-    # Walk parsed rows in draft order. Speaker is checked against the
-    # manifest entry for THIS row's slot id (not its position) so a
-    # correctly-named-but-misordered row is not double-flagged as a
-    # speaker mismatch. Rows whose slot id is not in the manifest are
-    # skipped for the speaker check (the order/count failure owns that
-    # divergence); empty-line and word-floor still apply to every voiced
-    # row regardless of manifest membership.
-    for p in parsed:
-        # Empty line.
-        if not p.text.strip():
+    for row in parsed:
+        if not row.text.strip():
             failures.append(SlotFailure(
                 code=EMPTY_LINE,
-                slot_id=p.slot_id,
-                index=p.index,
-                detail="slot " + p.slot_id + " has empty voiced text",
+                slot_id=row.slot_id,
+                index=row.index,
+                detail="slot " + row.slot_id + " has empty voiced text",
             ))
-            # An empty line is also below any positive floor, but we do
-            # NOT also stamp BELOW_WORD_FLOOR for the same row --
-            # EMPTY_LINE is the more specific code. Next row.
             continue
-
-        # Speaker mismatch (only when the slot id is in the manifest).
-        if p.slot_id in expected_speaker_by_id:
-            want_spk = expected_speaker_by_id[p.slot_id]
-            if p.speaker != want_spk:
+        if row.slot_id in expected_speaker_by_id:
+            expected_speaker = expected_speaker_by_id[row.slot_id]
+            if row.speaker != expected_speaker:
                 failures.append(SlotFailure(
                     code=SPEAKER_MISMATCH,
-                    slot_id=p.slot_id,
-                    index=p.index,
+                    slot_id=row.slot_id,
+                    index=row.index,
                     detail=(
-                        "slot " + p.slot_id + " speaker "
-                        + repr(p.speaker) + "; manifest expects "
-                        + repr(want_spk)
+                        "slot " + row.slot_id + " speaker "
+                        + repr(row.speaker) + "; manifest expects "
+                        + repr(expected_speaker)
                     ),
                 ))
-
-        # Word floor.
-        wc = _word_count(p.text)
-        if wc < floor:
-            failures.append(SlotFailure(
-                code=BELOW_WORD_FLOOR,
-                slot_id=p.slot_id,
-                index=p.index,
-                detail=(
-                    "slot " + p.slot_id + " has " + str(wc)
-                    + " word(s); floor is " + str(floor)
-                ),
-            ))
 
     return CraftFloorResult(
         passed=(len(failures) == 0),
         failures=failures,
         parsed_slots=parsed,
-        word_floor=floor,
     )

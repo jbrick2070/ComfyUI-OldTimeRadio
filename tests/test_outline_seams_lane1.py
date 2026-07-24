@@ -72,7 +72,7 @@ class TestThreading:
                     f"writer generate_outline call at line {call.lineno} "
                     f"missing source_bank_id")
                 sites += 1
-        assert sites == 2, f"expected 2 writer call sites, found {sites}"
+        assert sites == 1, f"expected 1 authoritative writer call site, found {sites}"
 
     def test_outline_stage_constants_still_fixture(self):
         # The constants stay in _otr_outline as the extraction fixture; the

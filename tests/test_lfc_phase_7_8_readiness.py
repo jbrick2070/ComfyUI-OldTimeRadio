@@ -1,9 +1,4 @@
-"""tests/test_lfc_phase_7_8_readiness.py
-
-LFC sprint Commit 5 -- regression coverage for Phase 7 (audio
-readiness) + Phase 8 (video readiness). Both phases are
-deterministic, no LLM calls, default ON.
-"""
+"""Regression coverage for non-destructive audio/video readiness."""
 from __future__ import annotations
 
 import sys
@@ -14,384 +9,278 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nodes import _otr_readiness as _LFC_RDY  # noqa: E402
+from nodes import _otr_readiness as readiness  # noqa: E402
 from nodes._otr_text_metrics import canonical_word_count  # noqa: E402
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 def _ledger(lines, cast=None):
-    return SimpleNamespace(
-        data={
-            "schema_version": "l3-2026-05-14",
-            "episode_id": "ep_test_readiness",
-            "cast": cast or [
-                {"char_id": "c01", "name": "ALICE",
-                 "portrait_path": "ALICE_portrait.png"},
-                {"char_id": "c02", "name": "BOB",
-                 "portrait_path": "BOB_portrait.png"},
-                {"char_id": "announcer", "name": "ANNOUNCER",
-                 "portrait_path": "ANNOUNCER_portrait.png"},
-            ],
-            "scenes": [], "shots": [], "beats": [],
-            "lines": lines, "music": [], "clips": [],
-            "meta": {},
+    data = {
+        "schema_version": "l3-2026-05-14",
+        "episode_id": "ep_test_readiness",
+        "cast": cast or [
+            {
+                "char_id": "c01",
+                "name": "ALICE",
+                "portrait_path": "ALICE_portrait.png",
+            },
+            {
+                "char_id": "c02",
+                "name": "BOB",
+                "portrait_path": "BOB_portrait.png",
+            },
+            {
+                "char_id": "announcer",
+                "name": "ANNOUNCER",
+                "portrait_path": "ANNOUNCER_portrait.png",
+            },
+        ],
+        "scenes": [],
+        "shots": [],
+        "beats": [],
+        "lines": lines,
+        "music": [],
+        "clips": [],
+        "meta": {
+            "episode_title": "Readiness Test",
+            "style": "radio_drama",
         },
-        episode_id="ep_test_readiness",
+    }
+    return SimpleNamespace(
+        data=data,
+        episode_id=data["episode_id"],
+        save=lambda: None,
     )
 
 
 def _line(line_id, char_id, role, text, *, skip=False):
     return {
-        "line_id": line_id, "char_id": char_id,
-        "speaker_role": role, "text": text, "skip": skip,
+        "line_id": line_id,
+        "beat_id": line_id,
+        "char_id": char_id,
+        "speaker_role": role,
+        "text": text,
+        "skip": skip,
         "char_count": len(text),
-        "word_count": sum(1 for _ in text.split()),
+        "word_count": canonical_word_count(text),
     }
 
 
-# ---------------------------------------------------------------------------
-# Phase 7 -- audio readiness
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("canonical", "expected"),
+    [
+        ("Dr. Hawking confirmed it.", "Doctor Hawking confirmed it."),
+        ("Mr. Smith and Mrs. Smith arrived.", "Mister Smith and Missus Smith arrived."),
+        ("It was Earth vs. Mars.", "It was Earth versus Mars."),
+        ("Black & White.", "Black and White."),
+        ("Off by half%.", "Off by half percent."),
+        ("Meet @ noon.", "Meet at noon."),
+    ],
+)
+def test_phase_7_stamps_pronounceable_projection_without_mutating_canonical(
+    canonical,
+    expected,
+):
+    line = _line("l001", "c01", "character", canonical)
+    original_metrics = (line["word_count"], line["char_count"])
+    led = _ledger([line])
+
+    report = readiness.phase_7_audio_readiness(led)
+
+    row = led.data["lines"][0]
+    assert row["text"] == canonical
+    assert (row["word_count"], row["char_count"]) == original_metrics
+    assert row["text_for_tts"] == expected
+    assert row["text_for_tts_source_sha256"] == (
+        readiness.text_for_tts_source_sha256(canonical)
+    )
+    assert row["text_for_tts_receipt"]["changed"] is True
+    assert report.lines_normalized == 1
 
 
-class TestPhase7Abbreviations:
-    def test_doctor_expanded(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Dr. Hawking confirmed it."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        assert "Doctor Hawking" in led.data["lines"][0]["text"]
-        assert "Dr." not in led.data["lines"][0]["text"]
+def test_phase_7_stamps_identity_projection_when_no_normalization_is_needed():
+    canonical = "Then we should go now."
+    led = _ledger([_line("l001", "c01", "character", canonical)])
 
-    def test_mister_expanded(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Mr. Smith and Mrs. Smith arrived."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        text = led.data["lines"][0]["text"]
-        assert "Mister Smith" in text
-        assert "Missus Smith" in text
+    report = readiness.phase_7_audio_readiness(led)
 
-    def test_versus_expanded(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "It was Earth vs. Mars."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        assert "versus" in led.data["lines"][0]["text"]
-
-    def test_no_op_when_no_abbreviations(self):
-        original = "Then we should go now."
-        led = _ledger([_line("l001", "c01", "character", original)])
-        rep = _LFC_RDY.phase_7_audio_readiness(led)
-        assert led.data["lines"][0]["text"] == original
-        assert rep.abbreviations_expanded == 0
+    row = led.data["lines"][0]
+    assert row["text"] == canonical
+    assert row["text_for_tts"] == canonical
+    assert row["text_for_tts_receipt"]["changed"] is False
+    assert report.lines_normalized == 0
 
 
-class TestPhase7Symbols:
-    def test_ampersand(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Black & White."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        assert "and" in led.data["lines"][0]["text"]
-        assert "&" not in led.data["lines"][0]["text"]
+def test_phase_7_expands_numbers_only_in_tts_projection():
+    pytest.importorskip("num2words")
+    canonical = "We need 42 samples and 1,234 controls."
+    led = _ledger([_line("l001", "c01", "character", canonical)])
 
-    def test_percent(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Off by 50%."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        text = led.data["lines"][0]["text"]
-        assert "%" not in text
-        assert "percent" in text
+    report = readiness.phase_7_audio_readiness(led)
 
-    def test_at_sign(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Meet @ noon."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        assert "@" not in led.data["lines"][0]["text"]
-        assert " at " in led.data["lines"][0]["text"]
+    row = led.data["lines"][0]
+    assert row["text"] == canonical
+    assert "42" not in row["text_for_tts"]
+    assert "1,234" not in row["text_for_tts"]
+    assert report.numbers_expanded == 2
 
 
-class TestPhase7Numbers:
-    def test_integer_expanded(self):
-        pytest.importorskip("num2words")
-        led = _ledger([
-            _line("l001", "c01", "character", "We need 42 samples."),
-        ])
-        rep = _LFC_RDY.phase_7_audio_readiness(led)
-        text = led.data["lines"][0]["text"]
-        assert "42" not in text
-        assert "forty-two" in text or "forty two" in text
-        assert rep.numbers_expanded >= 1
+def test_phase_7_without_num2words_keeps_numeric_projection_and_warns(monkeypatch):
+    monkeypatch.setattr(readiness, "_try_import_num2words", lambda: None)
+    canonical = "We need 42 samples."
+    led = _ledger([_line("l001", "c01", "character", canonical)])
 
-    def test_large_integer_expanded(self):
-        pytest.importorskip("num2words")
-        led = _ledger([
-            _line("l001", "c01", "character", "Total: 1,234 units."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        text = led.data["lines"][0]["text"]
-        assert "1234" not in text  # comma stripped, then converted
-        assert "1,234" not in text
+    report = readiness.phase_7_audio_readiness(led)
 
-    def test_num2words_unavailable_skips_with_warning(self, monkeypatch):
-        monkeypatch.setattr(
-            _LFC_RDY, "_try_import_num2words",
-            lambda: None,
-        )
-        led = _ledger([
-            _line("l001", "c01", "character", "We need 42 samples."),
-        ])
-        rep = _LFC_RDY.phase_7_audio_readiness(led)
-        # Number stays intact, no crash, warning recorded.
-        assert "42" in led.data["lines"][0]["text"]
-        assert any("num2words" in w for w in rep.warnings)
+    row = led.data["lines"][0]
+    assert row["text"] == canonical
+    assert row["text_for_tts"] == canonical
+    assert row["text_for_tts_receipt"]["num2words_available"] is False
+    assert any("num2words" in warning for warning in report.warnings)
 
 
-class TestPhase7Boundaries:
-    def test_skipped_lines_not_touched(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Dr. Hawking.", skip=True),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        # Skipped lines bypassed.
-        assert led.data["lines"][0]["text"] == "Dr. Hawking."
+@pytest.mark.parametrize(
+    "line",
+    [
+        _line("l001", "c01", "character", "", skip=True),
+        _line("l002", "sfx", "sfx", "[door slam]"),
+    ],
+)
+def test_phase_7_does_not_project_skipped_or_non_voiced_rows(line):
+    led = _ledger([line])
 
-    def test_sfx_lines_not_touched(self):
-        led = _ledger([
-            _line("l001", "sfx", "sfx", "[door slam]"),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        assert led.data["lines"][0]["text"] == "[door slam]"
+    readiness.phase_7_audio_readiness(led)
 
-    def test_word_count_updated_after_expansion(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Mr. Smith spoke."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        # "Mister Smith spoke." = 3 words.
-        assert led.data["lines"][0]["word_count"] == 3
-        assert led.data["lines"][0]["char_count"] == len(
-            "Mister Smith spoke."
-        )
-
-    def test_punctuation_glue_uses_canonical_metrics_after_expansion(self):
-        led = _ledger([
-            _line(
-                "l001", "c01", "character",
-                "Dr. Vale said off\u2014it's elsewhere.",
-            ),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        row = led.data["lines"][0]
-        assert row["text"].startswith("Doctor Vale")
-        assert row["word_count"] == canonical_word_count(row["text"])
-        assert row["char_count"] == len(row["text"])
-
-    def test_meta_audio_readiness_stamped(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Mr. Smith."),
-        ])
-        _LFC_RDY.phase_7_audio_readiness(led)
-        meta = led.data["meta"]["audio_readiness"]
-        assert meta["lines_scanned"] == 1
-        assert meta["lines_normalized"] == 1
-        assert meta["abbreviations_expanded"] >= 1
+    assert "text_for_tts" not in led.data["lines"][0]
+    assert "text_for_tts_source_sha256" not in led.data["lines"][0]
 
 
-# ---------------------------------------------------------------------------
-# Phase 8 -- video readiness
-# ---------------------------------------------------------------------------
+def test_phase_7_stamps_audio_readiness_summary():
+    led = _ledger([_line("l001", "c01", "character", "Mr. Smith.")])
+
+    readiness.phase_7_audio_readiness(led)
+
+    summary = led.data["meta"]["audio_readiness"]
+    assert summary["lines_scanned"] == 1
+    assert summary["lines_normalized"] == 1
+    assert summary["abbreviations_expanded"] >= 1
 
 
 class TestPhase8VideoReadiness:
-    def test_all_portraits_present_passes(self):
+    def test_all_portraits_present(self):
         led = _ledger([
             _line("l001", "c01", "character", "Hello."),
             _line("l002", "c02", "character", "Hi."),
         ])
-        rep = _LFC_RDY.phase_8_video_readiness(led)
-        assert rep.cast_with_portrait == 3
-        assert rep.cast_missing_portrait == []
-        assert rep.voiced_lines == 2
-        assert rep.voiced_lines_with_visual_mapping == 2
 
-    def test_missing_portrait_warned_not_failed(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Hello."),
-        ], cast=[
-            {"char_id": "c01", "name": "ALICE"},  # no portrait field
-        ])
-        rep = _LFC_RDY.phase_8_video_readiness(led)
-        assert "c01" in rep.cast_missing_portrait
-        assert rep.voiced_lines_with_visual_mapping == 0
-        assert "l001" in rep.voiced_lines_missing_visual
-        assert rep.warnings
+        report = readiness.phase_8_video_readiness(led)
 
-    def test_phase_8_does_not_mutate_lines(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Hello."),
-        ])
-        original_text = led.data["lines"][0]["text"]
-        _LFC_RDY.phase_8_video_readiness(led)
-        assert led.data["lines"][0]["text"] == original_text
+        assert report.cast_with_portrait == 3
+        assert report.cast_missing_portrait == []
+        assert report.voiced_lines == 2
+        assert report.voiced_lines_with_visual_mapping == 2
 
-    def test_meta_video_readiness_stamped(self):
-        led = _ledger([
-            _line("l001", "c01", "character", "Hello."),
-        ])
-        _LFC_RDY.phase_8_video_readiness(led)
-        meta = led.data["meta"]["video_readiness"]
-        assert meta["cast_total"] == 3
-        assert meta["voiced_lines"] == 1
+    def test_missing_portrait_warns_without_failing(self):
+        led = _ledger(
+            [_line("l001", "c01", "character", "Hello.")],
+            cast=[{"char_id": "c01", "name": "ALICE"}],
+        )
 
-    def test_portrait_path_recognised_alongside_alt_keys(self):
+        report = readiness.phase_8_video_readiness(led)
+
+        assert report.cast_missing_portrait == ["c01"]
+        assert report.voiced_lines_missing_visual == ["l001"]
+        assert report.warnings
+
+    def test_audit_preserves_lines_and_stamps_meta(self):
+        led = _ledger([_line("l001", "c01", "character", "Hello.")])
+        before = dict(led.data["lines"][0])
+
+        readiness.phase_8_video_readiness(led)
+
+        assert led.data["lines"][0] == before
+        assert led.data["meta"]["video_readiness"]["voiced_lines"] == 1
+
+    def test_all_supported_portrait_keys_are_recognized(self):
         led = _ledger([], cast=[
-            {"char_id": "c01", "name": "ALICE",
-             "portrait_path": "ALICE.png"},
-            {"char_id": "c02", "name": "BOB",
-             "portrait_image": "BOB.png"},
+            {"char_id": "c01", "name": "ALICE", "portrait_path": "A.png"},
+            {"char_id": "c02", "name": "BOB", "portrait_image": "B.png"},
             {"char_id": "c03", "name": "CARL", "portrait": "C.png"},
             {"char_id": "c04", "name": "DOE", "image_path": "D.png"},
         ])
-        rep = _LFC_RDY.phase_8_video_readiness(led)
-        # All four cast members are recognised as having a portrait.
-        assert rep.cast_with_portrait == 4
-        assert rep.cast_missing_portrait == []
+
+        report = readiness.phase_8_video_readiness(led)
+
+        assert report.cast_with_portrait == 4
+        assert report.cast_missing_portrait == []
 
 
-# ---------------------------------------------------------------------------
-# Cascade integration
-# ---------------------------------------------------------------------------
-
-
-class TestCascadeWiring:
-    def test_final_metric_refresh_preserves_pre_diagnosis_and_cleans_post(self):
-        from unittest.mock import patch
-        from nodes import _otr_freeze_cascade as _LFC_ORCH
-        from nodes import _otr_ledger_reviewer as _OTRLR
+class TestCascadeReadiness:
+    def test_metric_refresh_preserves_pre_diagnosis_and_cleans_post(self):
+        from nodes import _otr_freeze_cascade as cascade
 
         text = "The dial says off\u2014it's actually elsewhere."
-        led = _ledger([
-            _line("l001", "c01", "character", text),
-        ])
+        led = _ledger([_line("l001", "c01", "character", text)])
         led.data["lines"][0].update({"word_count": 999, "char_count": 999})
-        reviewer_disp = _OTRLR.ReviewerDisposition(
-            verdict="clean_no_edits",
-            pre_audit_violations=0, pre_audit_repairs_applied=0,
-            doctor_edits_proposed=0, doctor_edits_applied=0,
-            post_audit_violations=0,
-        )
-        hygiene = SimpleNamespace(repaired=0, failed=0, failures=[])
 
-        with (
-            patch.object(
-                _LFC_ORCH,
-                "_run_legacy_content_chain",
-                return_value=(None, reviewer_disp, None),
-            ),
-            patch.object(
-                _LFC_ORCH._OTRRR,
-                "repair_ledger_spoken_hygiene",
-                return_value=hygiene,
-            ),
-        ):
-            disp = _LFC_ORCH.run_freeze_cascade(
-                lambda *a, **k: "",
-                led,
-                enable_phase_7_audio_readiness=False,
-            )
+        disposition = cascade.run_freeze_cascade(
+            lambda *args, **kwargs: "",
+            led,
+            enable_phase_7_audio_readiness=False,
+        )
 
         assert any(
             "word_count=999" in warning
-            for warning in disp.gap_audit_pre.warnings
+            for warning in disposition.gap_audit_pre.warnings
         )
         assert not any(
             "word_count=" in warning
-            for warning in disp.gap_audit_post.warnings
+            for warning in disposition.gap_audit_post.warnings
         )
         row = led.data["lines"][0]
         expected = canonical_word_count(text)
+        assert row["text"] == text
         assert row["word_count"] == expected
         assert row["char_count"] == len(text)
         assert led.data["total_word_count"] == expected
         assert led.data["meta"]["character_word_count"] == expected
 
-    def test_phase_7_record_appended_to_readiness_passes(self):
-        from unittest.mock import patch
-        from nodes import _otr_freeze_cascade as _LFC_ORCH
-        from nodes import _otr_ledger_reviewer as _OTRLR
+    def test_phase_7_and_8_records_land_in_readiness_bucket(self):
+        from nodes import _otr_freeze_cascade as cascade
 
-        led = _ledger([
-            _line("l001", "c01", "character", "Mr. Smith arrived."),
-            _line("l002", "c02", "character", "He said 100 percent."),
-        ])
+        canonical = "Mr. Smith arrived."
+        led = _ledger([_line("l001", "c01", "character", canonical)])
 
-        def fake_review(_fn, _led):
-            return _OTRLR.ReviewerDisposition(
-                verdict="clean_no_edits",
-                pre_audit_violations=0, pre_audit_repairs_applied=0,
-                doctor_edits_proposed=0, doctor_edits_applied=0,
-                post_audit_violations=0,
-            )
+        cascade.run_freeze_cascade(lambda *args, **kwargs: "", led)
 
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=fake_review):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
-
-        # B6 split (2026-05-12): Phase 7 + Phase 8 go to readiness_passes,
-        # not cleanup_passes. The bucket split makes semantic sense --
-        # readiness checks are not cleanup edits.
-        readiness = led.data["meta"]["readiness_passes"]
-        names = [p["phase_name"] for p in readiness]
+        names = [
+            record["phase_name"]
+            for record in led.data["meta"]["readiness_passes"]
+        ]
         assert "phase_7_audio_readiness" in names
         assert "phase_8_video_readiness" in names
-        # Phase 7 + Phase 8 must NOT land in cleanup_passes (B6
-        # mis-scope check).
         cleanup_names = [
-            p["phase_name"] for p in led.data["meta"].get("cleanup_passes", [])
+            record["phase_name"]
+            for record in led.data["meta"].get("cleanup_passes", [])
         ]
         assert "phase_7_audio_readiness" not in cleanup_names
         assert "phase_8_video_readiness" not in cleanup_names
-        # Phase 7 normalized "Mr." -> "Mister" so meta.audio_readiness
-        # has lines_normalized >= 1.
-        ar = led.data["meta"]["audio_readiness"]
-        assert ar["lines_normalized"] >= 1
-        # Phase 8 stamped meta.video_readiness.
+        row = led.data["lines"][0]
+        assert row["text"] == canonical
+        assert row["text_for_tts"] == "Mister Smith arrived."
         assert "video_readiness" in led.data["meta"]
 
     def test_phase_7_can_be_disabled(self):
-        from unittest.mock import patch
-        from nodes import _otr_freeze_cascade as _LFC_ORCH
-        from nodes import _otr_ledger_reviewer as _OTRLR
+        from nodes import _otr_freeze_cascade as cascade
 
         led = _ledger([
             _line("l001", "c01", "character", "Mr. Smith arrived."),
         ])
 
-        def fake_review(_fn, _led):
-            return _OTRLR.ReviewerDisposition(
-                verdict="clean_no_edits",
-                pre_audit_violations=0, pre_audit_repairs_applied=0,
-                doctor_edits_proposed=0, doctor_edits_applied=0,
-                post_audit_violations=0,
-            )
+        cascade.run_freeze_cascade(
+            lambda *args, **kwargs: "",
+            led,
+            enable_phase_7_audio_readiness=False,
+        )
 
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=fake_review):
-            _LFC_ORCH.run_freeze_cascade(
-                lambda *a, **k: "", led,
-                enable_phase_7_audio_readiness=False,
-            )
-
-        # Text NOT normalized.
-        assert "Mr. Smith" in led.data["lines"][0]["text"]
-        # Skip marker recorded.
-        ar = led.data["meta"]["audio_readiness"]
-        assert ar.get("skipped") is True
+        assert "text_for_tts" not in led.data["lines"][0]
+        assert led.data["meta"]["audio_readiness"]["skipped"] is True

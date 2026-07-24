@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import ast
 import copy
-import os
 from pathlib import Path
 from typing import Any
 
@@ -253,21 +252,20 @@ def test_call_site_before_led_save(execute_fn):
     )
 
 
-def test_reflections_describe_the_final_word_fitted_rows(execute_fn):
-    """PBUG-20260721-18: metadata reflection follows the final row gate."""
+def test_reflections_follow_final_telemetry_and_precede_summary(execute_fn):
+    """Reflection describes the final canonical rows without a length gate."""
     refl = _reflection_call(execute_fn)
-    fit_calls = _find_call_site(
-        execute_fn, "fit_final_word_delivery_campaign",
-    )
     actual_calls = _find_call_site(execute_fn, "stamp_actual")
     produced_calls = _find_call_site(execute_fn, "run_produced_story_summary")
 
-    assert len(fit_calls) == 1
     assert len(actual_calls) == 1
     assert len(produced_calls) == 1
-    assert _line_of(fit_calls[0]) < _line_of(actual_calls[0]) < _line_of(refl)
+    assert _line_of(actual_calls[0]) < _line_of(refl)
     assert _line_of(refl) < _line_of(produced_calls[0])
 
+
+# ---------------------------------------------------------------------------
+# 4.
 
 # ---------------------------------------------------------------------------
 # 4. Call site uses technical_generate_fn, not creative (E-03)
@@ -329,42 +327,7 @@ def test_reflection_result_folded_into_meta(execute_fn):
 
 
 # ---------------------------------------------------------------------------
-# 6. No explicit eviction call at K.5.5 (E-15 revised)
-# ---------------------------------------------------------------------------
-
-
-def test_no_explicit_eviction_call_at_k55(execute_fn):
-    """E-15 revised at C1 audit per RR-A1: the loader is single-slot.
-    `request_slot(technical_model)` inside `technical_generate_fn`
-    handles eviction implicitly. The K.5.5 site does NOT call
-    `evict_model` or `unload_llm` explicitly."""
-    forbidden = {"evict_model", "unload_llm"}
-    refl = _reflection_call(execute_fn)
-    refl_line = _line_of(refl)
-    # Window: from K.5 closer to the reflection call. Walk the whole
-    # function and flag any forbidden call near the K.5.5 site (within
-    # 50 lines either side).
-    for node in ast.walk(execute_fn):
-        if not isinstance(node, ast.Call):
-            continue
-        func = node.func
-        name = None
-        if isinstance(func, ast.Name):
-            name = func.id
-        elif isinstance(func, ast.Attribute):
-            name = func.attr
-        if name not in forbidden:
-            continue
-        if abs(_line_of(node) - refl_line) <= 50:
-            pytest.fail(
-                f"forbidden eviction call `{name}` at line {_line_of(node)} "
-                f"within 50 lines of K.5.5 reflection call at line "
-                f"{refl_line}; E-15 revised at C1 audit prohibits "
-                "explicit eviction here -- request_slot's existing "
-                "single-slot swap order is the safety mechanism"
-            )
-
-
+# 7.
 # ---------------------------------------------------------------------------
 # 7. Deep-dict mutation guard (R-03)
 # ---------------------------------------------------------------------------
@@ -486,62 +449,3 @@ def test_meta_failure_stamps_status_failed_on_raise():
     assert ledger["meta"]["story_brief"] == ""
 
 
-# ---------------------------------------------------------------------------
-# 9-11. VRAM-accounting + cache-stability runtime tests (OTR_REGRESSION_RUNTIME)
-# ---------------------------------------------------------------------------
-
-
-_RUNTIME_REASON = (
-    "Set OTR_REGRESSION_RUNTIME=1 to run the C5a2 VRAM-accounting / "
-    "cache-stability tests. They need real ComfyUI + GPU loaders."
-)
-
-
-class TestRuntimeOnly:
-    """Tests in this class gate on OTR_REGRESSION_RUNTIME (same pattern
-    as `tests/test_audio_byte_identical.py::TestAudioRegressionGate`).
-    They run on the operator's GPU machine; they skip in the
-    pytest-only sandbox."""
-
-    @pytest.mark.skipif(
-        not os.environ.get("OTR_REGRESSION_RUNTIME"),
-        reason=_RUNTIME_REASON,
-    )
-    def test_c5a2_dual_slot_does_not_oom(self):
-        """E-15 / RR-A1 revised: dual-slot config (creative=Mistral-Nemo,
-        technical=Gemma-4-E4B-it). Instrument `_otr_model_loader` with
-        a VRAM-accounting spy; assert peak resident size stays at or
-        below 14.5 GB through composition + reflection."""
-        pytest.skip("Sprint A runtime verification scope; placeholder.")
-
-    @pytest.mark.skipif(
-        not os.environ.get("OTR_REGRESSION_RUNTIME"),
-        reason=_RUNTIME_REASON,
-    )
-    def test_c5a2_dual_slot_evicts_creative_before_technical_loads(self):
-        """E-15 / RR-A1 revised: in dual-slot config, request_slot's
-        swap order calls `unload_llm(creative)` BEFORE the technical
-        model load begins. Verifies the actual safety mechanism."""
-        pytest.skip("Sprint A runtime verification scope; placeholder.")
-
-    @pytest.mark.skipif(
-        not os.environ.get("OTR_REGRESSION_RUNTIME"),
-        reason=_RUNTIME_REASON,
-    )
-    def test_c5a2_single_slot_no_unload(self):
-        """Single-slot config (creative == technical): the
-        composition + reflection sequence emits zero spurious
-        unload_llm calls. Single-slot is the audio C7 baseline path
-        and must not be perturbed."""
-        pytest.skip("Sprint A runtime verification scope; placeholder.")
-
-    @pytest.mark.skipif(
-        not os.environ.get("OTR_REGRESSION_RUNTIME"),
-        reason=_RUNTIME_REASON,
-    )
-    def test_reflection_reuses_technical_model_cache_entry(self):
-        """R-01 (moved to C5a2 per E-21 / RR-B2): in single-slot
-        config, the technical-model cache entry registers exactly
-        ONE load event across composition + reflection (no cache
-        thrash)."""
-        pytest.skip("Sprint A runtime verification scope; placeholder.")

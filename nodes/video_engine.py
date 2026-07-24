@@ -2161,13 +2161,8 @@ class SignalLostVideoRenderer:
         # the J.5 title pass live, slot 1 is populated on every writer
         # run; the timestamp last-resort fires only on a degenerate run
         # where the writer produced no title at all.
-        _STUCK_TITLE_DEFAULTS = {
-            "", "the last frequency", "untitled", "episode",
-            "signal lost", "custom episode",
-        }
-
         def _is_clean(s):
-            return bool(s) and s.lower() not in _STUCK_TITLE_DEFAULTS
+            return bool(s)
 
         _meta = led.get("meta") or {}
         _meta_episode_title = (_meta.get("episode_title") or "").strip()
@@ -2189,13 +2184,13 @@ class SignalLostVideoRenderer:
             _title_source = "widget_override"
         else:
             # Final fallback: timestamp-based unique title. Guarantees
-            # we never crash the run; passes stuck-check by uniqueness.
+            # we never crash the run when every title source is empty.
             episode_title = f"Signal Lost {_time.strftime('%Y%m%d %H%M%S')}"
             _title_source = "timestamp_lastresort"
             log.warning(
                 "[Video] TITLE LAST-RESORT: meta.episode_title='%s', "
                 "meta.title='%s', led.title='%s', widget='%s' -- ALL "
-                "EMPTY/STUCK. Using timestamp fallback %r so the run "
+                "EMPTY. Using timestamp fallback %r so the run "
                 "can finish. This should not happen on a normal run: "
                 "OTR_LedgerScriptWriter's J.5 title pass stamps "
                 "led.meta.episode_title every time. Reaching here means "

@@ -5,13 +5,6 @@
   "image_grade_tail": "subtle archival patina, clean readable composition",
   "broadcast_tail": "broadcast-history atmosphere without futuristic equipment",
   "allow_radio_tails": false,
-  "forbidden_terms": [
-    "spaceship",
-    "mission control",
-    "laboratory containment",
-    "35mm sci-fi film grain",
-    "futuristic console"
-  ],
   "announcer_visual_subject": "archive presenter at a catalog table with labeled boxes and a restored microphone",
   "music_visual_subject": "archival audio equipment and labeled reels arranged for restoration",
   "scene_open_subject": "archive workroom with film cans, paper labels, and careful preservation tools",

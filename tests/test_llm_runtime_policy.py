@@ -338,7 +338,7 @@ def test_downstream_llm_consumers_thread_the_ledger_policy():
     root = pathlib.Path(__file__).resolve().parents[1] / "nodes"
     lfc = (root / "OTR_LedgerFreezeCascade.py").read_text(encoding="utf-8")
     assert "policy_from_meta" in lfc
-    assert "policy=_lfc_policy" in lfc
+    assert "policy=lfc_policy" in lfc
     sl = (root / "otr_shot_lock.py").read_text(encoding="utf-8")
     assert "policy=policy_from_meta(meta)" in sl
 

@@ -257,53 +257,32 @@ class CastLock:
     # ------------------------------------------------------------------ #
     @staticmethod
     def _enforce_freeze_gate(meta) -> None:
-        """Freeze-halt + VRAM-recovery gate, re-homed from the legacy audio
-        nodes in the audio clean-break (BUG-LOCAL-276 / BUG-LOCAL-300 / E9).
+        """Enforce the structural/safety freeze and recover writer VRAM.
 
-        freeze_verdict=='needs_full_rerun' refuses to cast/render UNLESS the
-        block is a subjective 'quality' verdict (renders with a warning -- the
-        cast is clean, only the story-critic arc is weak) or the operator sets
-        OTR_BYPASS_FREEZE_HALT=1 for sprint-time smoke iteration. A missing or
-        unknown block class is treated as structural (halt);
-        OTR_BARK_HALT_ON_QUALITY_BLOCK=1 restores strict halt-on-any. A missing
-        verdict (legacy graphs / tests) proceeds unchanged.
+        Current freeze failures are only genuine ledger corruption or residual
+        narrow spoken-safety violations. Subjective quality block classes and
+        their escape hatch are retired. A missing verdict remains compatible
+        with legacy ledgers.
 
-        Then, if the cascade teardown reported an unload failure
-        (freeze_unload_ok is False), attempt one defensive unload_llm before the
-        audio chain claims VRAM -- CastLock runs before any audio engine loads,
-        so this protects the 14.5 GB ceiling (I-7).
+        If writer teardown reported an unload failure, attempt one defensive
+        unload before the audio chain claims VRAM.
         """
         verdict = (meta or {}).get("freeze_verdict")
         if verdict == "needs_full_rerun":
-            block_class = (meta or {}).get("freeze_block_class")
             bypass = os.environ.get("OTR_BYPASS_FREEZE_HALT", "0") == "1"
-            strict_quality = (
-                os.environ.get("OTR_BARK_HALT_ON_QUALITY_BLOCK", "0") == "1"
-            )
             if bypass:
                 log.warning(
                     "[CastLock] FREEZE HALT BYPASSED (OTR_BYPASS_FREEZE_HALT=1); "
-                    "casting a flagged ledger. Intended for sprint-time smoke "
-                    "iteration only; downstream gates may still surface issues. "
-                    "See BUG-LOCAL-276."
-                )
-            elif block_class == "quality" and not strict_quality:
-                log.warning(
-                    "[CastLock] freeze_verdict='needs_full_rerun' with "
-                    "freeze_block_class='quality' -- a subjective story-critic "
-                    "verdict on a cast-clean, renderable ledger, not a "
-                    "renderability failure. Proceeding. Set "
-                    "OTR_BARK_HALT_ON_QUALITY_BLOCK=1 to halt on quality blocks "
-                    "too. See BUG-LOCAL-300."
+                    "casting a structurally or safety-flagged ledger for "
+                    "operator diagnostics only. See BUG-LOCAL-276."
                 )
             else:
                 raise ValueError(
                     "OTR_CastLock: freeze cascade stamped "
-                    "freeze_verdict='needs_full_rerun' (structural -- the writer "
-                    "left the ledger in an unrenderable state). Refusing to "
-                    "cast/render. Re-run the writer phase. Set "
-                    "OTR_BYPASS_FREEZE_HALT=1 only for sprint-time smoke "
-                    "iteration. See BUG-LOCAL-276."
+                    "freeze_verdict='needs_full_rerun' for structural or "
+                    "residual spoken-safety corruption. Refusing to cast/render. "
+                    "Set OTR_BYPASS_FREEZE_HALT=1 only for operator diagnostics. "
+                    "See BUG-LOCAL-276."
                 )
 
         if (meta or {}).get("freeze_unload_ok") is False:

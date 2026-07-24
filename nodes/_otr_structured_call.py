@@ -35,9 +35,11 @@ UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 """
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import re
+import uuid
 from typing import Any, Callable, Mapping, Optional, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -68,6 +70,14 @@ T = TypeVar("T", bound=BaseModel)
 # repair. When a schema/content failure skips the structural rung, the
 # remaining third call may recover JSON syntax from the typed repair.
 _DEFAULT_MAX_ATTEMPTS: int = 3
+
+# The alternate-owner handoff is deliberately a single direct branch. A
+# caller can disable it with zero, but cannot accidentally turn this helper
+# into an unbounded owner loop.
+# Existing callers have no alternate owner yet, so the safe compatibility
+# default is disabled. A caller that supplies an owner opts into one attempt.
+_DEFAULT_MAX_REPAIR_ATTEMPTS: int = 0
+_DEFAULT_REPAIR_CONTEXT_MAX_BYTES: int = 16_384
 
 # Token budget for a structured-JSON pass. A JSON object plus a short
 # payload fits comfortably here; structured passes are not narrative
@@ -134,10 +144,14 @@ class StructuredCallFailedError(RuntimeError):
         helper_name: str,
         attempts: int,
         last_error: Optional[BaseException],
+        repair_attempted: bool = False,
+        terminal_disposition: str = "primary_ladder_exhausted",
     ) -> None:
         self.helper_name = helper_name
         self.attempts = attempts
         self.last_error = last_error
+        self.repair_attempted = repair_attempted
+        self.terminal_disposition = terminal_disposition
         last_error_text = (
             f"{type(last_error).__name__}: {last_error}"
             if last_error is not None
@@ -145,7 +159,8 @@ class StructuredCallFailedError(RuntimeError):
         )
         super().__init__(
             f"[OTR_StructuredCall] '{helper_name}' failed after "
-            f"{attempts} attempt(s); last error -> {last_error_text}"
+            f"{attempts} attempt(s); disposition={terminal_disposition}; "
+            f"last error -> {last_error_text}"
         )
 
 
@@ -460,6 +475,20 @@ class RepairPromptFactory(Protocol):
         ...
 
 
+class RepairLedgerBuilder(Protocol):
+    """Build the bounded, data-only prompt for an alternate repair owner."""
+
+    def __call__(
+        self,
+        *,
+        failed_output: str,
+        error: BaseException,
+        repair_nonce: str,
+        max_bytes: int,
+    ) -> Any:
+        ...
+
+
 def default_repair_prompt_factory(
     *,
     original_prompt: Any,
@@ -537,9 +566,27 @@ def _prompt_has_schema_contract(prompt: Any) -> bool:
     return False
 
 
-def _copy_message_prompt(prompt: list[Any] | tuple[Any, ...]) -> list[Any]:
-    """Shallow-copy message rows before adding a system instruction."""
-    return [dict(row) if isinstance(row, Mapping) else row for row in prompt]
+def _copy_message_prompt(prompt: list[Any] | tuple[Any, ...]) -> Any:
+    """Shallow-copy rows without erasing a message-container contract."""
+    rows = [dict(row) if isinstance(row, Mapping) else row for row in prompt]
+    if isinstance(prompt, list):
+        copied = copy.copy(prompt)
+        copied[:] = rows
+        return copied
+    return tuple(rows)
+
+
+def _inherit_generation_contract(source: Any, target: Any) -> Any:
+    """Rewrap repair rows in the original list subtype and all its markers."""
+    if not isinstance(source, list) or type(source) is list:
+        return target
+    if not isinstance(target, (list, tuple)):
+        return target
+    copied = copy.copy(source)
+    copied[:] = [
+        dict(row) if isinstance(row, Mapping) else row for row in target
+    ]
+    return copied
 
 
 def _prompt_with_schema_contract(prompt: Any, schema: type[BaseModel]) -> Any:
@@ -585,7 +632,7 @@ def invoke_structured_slot(
     messages: Any,
     *,
     temperature: float,
-    max_new_tokens: int,
+    max_new_tokens: int | None,
 ) -> str:
     """Call the slot fn with the standard structured-pass signature.
 
@@ -677,52 +724,14 @@ def validate_tolerant_data(
     schema: type[T],
     *,
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
-    clamp_overlong_strings: bool = True,
 ) -> T:
-    """Strict-first validate, then bounded tolerance, then the content check.
+    """Validate exact structured data, then run an optional structural check.
 
-    The shared tolerant core reused by ``structured_call`` (through
-    ``_parse_and_validate`` / ``parse_validate_tolerant``) AND by the binary
-    decision lane. The ladder:
-
-      1. ``schema.model_validate(data)`` -- the EXACT current strict parse. A
-         schema with no tolerance hooks is byte-identical to today.
-      2. When ``clamp_overlong_strings`` is true, on ``ValidationError`` ONLY:
-         clamp over-long top-level string fields to their declared ``max_length``
-         and re-validate. A verbose/weak model can
-         overflow a short capped tag field (e.g. the outline's ``time_of_day``,
-         max 40 chars: an 8B model wrote a whole sentence -> the whole episode
-         aborted, 2026-06-18). This fires solely on a would-fail output -- a good
-         model's result is never touched (byte-identical) -- and any OTHER
-         validation error still propagates.
-      3. ``post_validator`` content check (a CONTENT failure pydantic cannot
-         see -- a voice preset outside the pool, a speaker outside the locked
-         cast) -> ``PostValidationError`` on rejection.
-
-    DELIBERATELY NO alias key-normalization here: alias drift is handled DURING
-    step 1 by each annotated schema's own ``mode="before"`` validator
-    (``apply_field_aliases``), so it also covers NESTED models (pydantic
-    recursion) and stays byte-identical on canonical input. Keeping the except
-    arm to CLAMPING only avoids a second alias code path in the shared core.
+    The core never truncates or rewrites model-authored strings. Schemas retain
+    only genuine machine, provenance, graph, cardinality, and nonempty
+    constraints; validation errors advance the bounded structural repair ladder.
     """
-    try:
-        instance = schema.model_validate(data)
-    except ValidationError as ve:
-        if not clamp_overlong_strings:
-            # Authored prose is not safe to silently shorten.  A caller that
-            # owns a finite creative artifact can choose this fail-closed path
-            # so the structured ladder reaches its typed repair instead.
-            raise
-        repaired = _clamp_overlong_strings(data, ve)
-        if repaired is None:
-            raise
-        repaired_data, clamped = repaired
-        instance = schema.model_validate(repaired_data)  # other errors propagate
-        log.warning(
-            "[OTR_StructuredCall] coerced %d over-long field(s) to the schema "
-            "max_length to avoid an abort: %s",
-            len(clamped), ", ".join(clamped),
-        )
+    instance = schema.model_validate(data)
     if post_validator is not None:
         content_error = post_validator(instance)
         if content_error is not None:
@@ -735,21 +744,13 @@ def parse_validate_tolerant(
     schema: type[T],
     *,
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
-    clamp_overlong_strings: bool = True,
 ) -> T:
-    """Extract the first JSON object from ``raw`` then ``validate_tolerant_data``.
-
-    Uses the shared ``_otr_json.parse_first_json_object`` -- no second JSON
-    parser. Raises ``json.JSONDecodeError`` on unparseable output. Raw-string
-    structured sites call this; already-parsed-dict sites call
-    ``validate_tolerant_data`` directly (e.g. the binary decision lane).
-    """
+    """Extract the first JSON object and validate it without prose mutation."""
     data = _otr_json.parse_first_json_object(raw or "")
     return validate_tolerant_data(
         data,
         schema,
         post_validator=post_validator,
-        clamp_overlong_strings=clamp_overlong_strings,
     )
 
 
@@ -771,80 +772,13 @@ def _parse_and_validate(
     raw: str,
     schema: type[T],
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
-    *,
-    clamp_overlong_strings: bool = True,
 ) -> T:
-    """Back-compat thin wrapper over ``parse_validate_tolerant``.
-
-    Preserved so the retry ladder's three call sites stay unchanged. Behavior is
-    byte-identical to the pre-refactor function: parse the first JSON object ->
-    strict validate with the over-long-string clamp fallback -> ``post_validator``
-    content check (raised as ``PostValidationError``). All three recoverable
-    exception types are caught by the ladder, which advances to the next attempt.
-    """
+    """Parse and validate one structured response without rewriting prose."""
     return parse_validate_tolerant(
         raw,
         schema,
         post_validator=post_validator,
-        clamp_overlong_strings=clamp_overlong_strings,
     )
-
-
-def _clamp_overlong_strings(
-    data: object, ve: "ValidationError"
-) -> Optional[tuple[dict, list[str]]]:
-    """Given a ValidationError, clamp every ``string_too_long`` field in
-    ``data`` -- at ANY depth the error's ``loc`` path reaches (nested
-    models / list items included; the scifi_fable2 S1b live smoke
-    2026-07-10 overflowed ``pitches.0.hook`` and the old top-level-only
-    clamp skipped it) -- to the ``max_length`` carried in that error's
-    ``ctx`` (pydantic supplies it), trimming at a word boundary where
-    possible. Returns ``(repaired_dict, clamped_field_paths)`` or
-    ``None`` when nothing is clampable (so the caller re-raises the
-    original error untouched)."""
-    if not isinstance(data, dict):
-        return None
-    import copy
-    out = copy.deepcopy(data)
-    clamped: list[str] = []
-    for err in ve.errors():
-        if err.get("type") != "string_too_long":
-            continue
-        loc = err.get("loc") or ()
-        max_len = (err.get("ctx") or {}).get("max_length")
-        if not loc or not isinstance(max_len, int):
-            continue
-        # Walk the loc path to the leaf's parent container.
-        node: object = out
-        reachable = True
-        for key in loc[:-1]:
-            if isinstance(node, dict) and key in node:
-                node = node[key]
-            elif (isinstance(node, list) and isinstance(key, int)
-                    and 0 <= key < len(node)):
-                node = node[key]
-            else:
-                reachable = False
-                break
-        if not reachable:
-            continue
-        leaf = loc[-1]
-        if isinstance(node, dict) and leaf in node:
-            val = node[leaf]
-        elif (isinstance(node, list) and isinstance(leaf, int)
-                and 0 <= leaf < len(node)):
-            val = node[leaf]
-        else:
-            continue
-        if not isinstance(val, str) or len(val) <= max_len:
-            continue
-        cut = val[:max_len].rstrip()
-        if " " in cut:  # prefer a clean word boundary over a mid-word chop
-            cut = cut.rsplit(" ", 1)[0].rstrip()
-        new_val = cut or val[:max_len]
-        node[leaf] = new_val  # type: ignore[index]
-        clamped.append(".".join(str(k) for k in loc))
-    return (out, clamped) if clamped else None
 
 
 # ---------------------------------------------------------------------------
@@ -861,13 +795,16 @@ def structured_call(
     structural_retry_temperature: float,
     repair_prompt_factory: Optional[RepairPromptFactory] = None,
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
-    clamp_overlong_strings: bool = True,
-    max_new_tokens: int = _STRUCTURED_MAX_NEW_TOKENS,
+    max_new_tokens: int | None = _STRUCTURED_MAX_NEW_TOKENS,
     max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     helper_name: str = "structured_call",
     on_attempt_complete: Optional[
         Callable[[int, str, Optional[BaseException]], None]
     ] = None,
+    repair_slot_fn: Optional[Callable[..., str]] = None,
+    repair_ledger_builder: Optional[RepairLedgerBuilder] = None,
+    repair_context_max_bytes: int = _DEFAULT_REPAIR_CONTEXT_MAX_BYTES,
+    max_repair_attempts: int = _DEFAULT_MAX_REPAIR_ATTEMPTS,
 ) -> T:
     """Run a structured-JSON LLM call through the shared retry ladder.
 
@@ -911,11 +848,6 @@ def structured_call(
         `PostValidationError` and advances the ladder exactly like a
         schema failure. Mirrors the `extra_check` idiom already used by
         `_otr_outline._run_call_with_retry`. `None` disables the check.
-      clamp_overlong_strings
-        Defaults to `True` to preserve the bounded compatibility repair for
-        existing callers. An authored-artifact boundary can set it to `False`
-        so an over-limit prose field remains a `ValidationError`, advances to
-        typed repair, and is never silently shortened.
       max_new_tokens
         Token budget passed to `slot_fn` on every attempt. Structured
         passes vary widely -- a story-brief reflection needs ~160, a
@@ -933,6 +865,20 @@ def structured_call(
         or the raised validation/parse/provider exception on failure. The hook
         is diagnostic only: a hook exception is logged and never changes the
         structured-call result or retry ladder.
+      repair_slot_fn
+        Optional alternate owner callable using the same slot-fn convention.
+        It runs only after the primary ladder exhausts with a recoverable
+        parse/schema/post-validation failure.
+      repair_ledger_builder
+        Optional builder for the alternate owner's bounded, data-only prompt.
+        It receives the failed output, last recoverable error, a fresh nonce,
+        and the byte ceiling. A builder without a repair slot is invalid.
+      repair_context_max_bytes
+        Hard UTF-8 byte ceiling for the alternate repair prompt. Oversized
+        context fails explicitly; it is never silently clipped.
+      max_repair_attempts
+        Alternate-owner budget. This helper permits zero or one direct repair
+        attempt; recursive re-entry is not supported.
 
     The ladder (stops at the first schema-valid result that also
     clears `post_validator`; only `json.JSONDecodeError`,
@@ -973,6 +919,33 @@ def structured_call(
             f">= 1, got {max_attempts}"
         )
 
+    if max_repair_attempts not in (0, 1):
+        raise ValueError(
+            f"[OTR_StructuredCall] '{helper_name}': max_repair_attempts "
+            f"must be 0 or 1, got {max_repair_attempts}"
+        )
+    if repair_context_max_bytes < 1:
+        raise ValueError(
+            f"[OTR_StructuredCall] '{helper_name}': "
+            f"repair_context_max_bytes must be >= 1, got "
+            f"{repair_context_max_bytes}"
+        )
+    if repair_slot_fn is None and repair_ledger_builder is not None:
+        raise ValueError(
+            f"[OTR_StructuredCall] '{helper_name}': a repair ledger builder "
+            "requires repair_slot_fn"
+        )
+    if repair_slot_fn is not None and repair_ledger_builder is None:
+        raise ValueError(
+            f"[OTR_StructuredCall] '{helper_name}': repair_slot_fn requires "
+            "repair_ledger_builder"
+        )
+    if max_repair_attempts and repair_slot_fn is None:
+        raise ValueError(
+            f"[OTR_StructuredCall] '{helper_name}': max_repair_attempts "
+            "requires repair_slot_fn and repair_ledger_builder"
+        )
+
     factory: RepairPromptFactory = (
         repair_prompt_factory
         if repair_prompt_factory is not None
@@ -985,6 +958,7 @@ def structured_call(
     last_raw: str = ""
     attempts_run = 0
     repair_messages: Any = None
+    repair_attempted = False
 
     def notify_attempt(error: Optional[BaseException]) -> None:
         if on_attempt_complete is None:
@@ -1016,7 +990,6 @@ def structured_call(
                 last_raw,
                 schema,
                 post_validator,
-                clamp_overlong_strings=clamp_overlong_strings,
             )
             notify_attempt(None)
             return result
@@ -1060,7 +1033,6 @@ def structured_call(
                 last_raw,
                 schema,
                 post_validator,
-                clamp_overlong_strings=clamp_overlong_strings,
             )
             notify_attempt(None)
             return result
@@ -1115,6 +1087,9 @@ def structured_call(
                     helper_name, attempts_run,
                 )
                 return repair_prompt
+            repair_prompt = _inherit_generation_contract(
+                contract_prompt, repair_prompt,
+            )
             repair_messages = _prompt_to_messages(
                 _prompt_with_schema_contract(repair_prompt, schema)
             )
@@ -1128,7 +1103,6 @@ def structured_call(
                 last_raw,
                 schema,
                 post_validator,
-                clamp_overlong_strings=clamp_overlong_strings,
             )
             notify_attempt(None)
             return result
@@ -1176,7 +1150,6 @@ def structured_call(
                 last_raw,
                 schema,
                 post_validator,
-                clamp_overlong_strings=clamp_overlong_strings,
             )
             notify_attempt(None)
             return result
@@ -1192,6 +1165,78 @@ def structured_call(
             notify_attempt(exc)
             raise
 
+    # --- Alternate owner: one direct bounded handoff after recoverable
+    # primary-ladder exhaustion. This branch intentionally does not call
+    # `structured_call` again, so an alternate owner cannot recurse forever.
+    if (
+        repair_slot_fn is not None
+        and repair_ledger_builder is not None
+        and max_repair_attempts == 1
+        and isinstance(
+            last_error,
+            (json.JSONDecodeError, ValidationError, PostValidationError),
+        )
+    ):
+        repair_attempted = True
+        repair_nonce = uuid.uuid4().hex
+        repair_prompt = repair_ledger_builder(
+            failed_output=last_raw,
+            error=last_error,
+            repair_nonce=repair_nonce,
+            max_bytes=repair_context_max_bytes,
+        )
+        repair_prompt = _inherit_generation_contract(
+            contract_prompt, repair_prompt,
+        )
+        repair_messages = _prompt_to_messages(
+            _prompt_with_schema_contract(repair_prompt, schema)
+        )
+        rendered_bytes = len(
+            _prompt_to_text(repair_messages).encode("utf-8")
+        )
+        if rendered_bytes > repair_context_max_bytes:
+            raise ValueError(
+                f"[OTR_StructuredCall] '{helper_name}': alternate repair "
+                f"context is {rendered_bytes} bytes, over the hard limit "
+                f"{repair_context_max_bytes}"
+            )
+        attempts_run += 1
+        log.info(
+            "[OTR_StructuredCall] '%s' alternate repair attempt %d "
+            "nonce=%s at temperature=%.3f",
+            helper_name, attempts_run, repair_nonce, _REPAIR_TEMPERATURE,
+        )
+        try:
+            last_raw = ""
+            last_raw = _invoke_slot(
+                repair_slot_fn,
+                repair_messages,
+                temperature=_REPAIR_TEMPERATURE,
+                max_new_tokens=max_new_tokens,
+            )
+            result = _parse_and_validate(
+                last_raw,
+                schema,
+                post_validator,
+            )
+            notify_attempt(None)
+            return result
+        except (
+            json.JSONDecodeError,
+            ValidationError,
+            PostValidationError,
+        ) as exc:
+            last_error = exc
+            notify_attempt(exc)
+            log.warning(
+                "[OTR_StructuredCall] '%s' alternate repair failed: %s | "
+                "raw head: %s",
+                helper_name, exc, _raw_head(last_raw),
+            )
+        except Exception as exc:
+            notify_attempt(exc)
+            raise
+
     # --- Ladder exhausted: fail loud. ---
     log.error(
         "[OTR_StructuredCall] '%s' exhausted the retry ladder after %d "
@@ -1202,4 +1247,10 @@ def structured_call(
         helper_name=helper_name,
         attempts=attempts_run,
         last_error=last_error,
+        repair_attempted=repair_attempted,
+        terminal_disposition=(
+            "repair_owner_exhausted"
+            if repair_attempted
+            else "primary_ladder_exhausted"
+        ),
     )

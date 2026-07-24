@@ -1,16 +1,14 @@
-"""G9: the deterministic SFW ship-stop on spoken text.
+"""G9 narrow spoken-safety ship stop shared by every story bank."""
 
-PD4 ("Safe for work. No profanity.") had no enforcement on the episode that
-ships: the ledger scrub runs only on `run_story_spine=True` lanes and nothing
-reads its verdict, and the lanes that checked at all did it with an LLM opinion.
-
-G9 lives in the gap audit -- the one path every lane crosses -- so Phase 10
-raises on it like any other critical gap.
-"""
 import pytest
 
 from nodes import _otr_ledger_freeze as freeze
-from nodes._otr_stage3_validators import DEFAULT_PROFANITY_TERMS
+from nodes._otr_content_safety import (
+    EXPLICIT_NUDITY_TERMS,
+    EXPLICIT_WEAPON_TERMS,
+    PROFANITY_TERMS,
+    find_text_hits,
+)
 
 
 def _ledger(*texts):
@@ -24,48 +22,52 @@ def _ledger(*texts):
         "music": [],
         "clips": [],
         "lines": [
-            {"line_id": f"line_{i:03d}", "text": text}
-            for i, text in enumerate(texts, 1)
+            {
+                "line_id": f"line_{index:03d}",
+                "speaker_role": "character",
+                "char_id": "c01",
+                "text": text,
+            }
+            for index, text in enumerate(texts, 1)
         ],
     }
 
 
-def _g9_errors(led):
-    report = freeze.phase_0_gap_audit_pre(led)
-    return [e for e in report.errors if e.startswith("G9")]
+def _g9_errors(ledger):
+    report = freeze.phase_0_gap_audit_pre(ledger)
+    return [error for error in report.errors if error.startswith("G9")]
 
 
-def test_clean_spoken_text_passes_g9():
-    assert not _g9_errors(_ledger(
-        "Good evening, and welcome to the broadcast.",
-        "Hello there -- the shellfish stand is closed.",
-        "Michelle heard the grille repeat every word.",
-    ))
-
-
-@pytest.mark.parametrize("term", ["damn", "hell", "shit", "screw you"])
-def test_profanity_on_the_microphone_is_a_critical_gap(term):
-    g9 = _g9_errors(_ledger("Fine.", f"Oh {term}, the tape is gone."))
-    assert g9, f"{term!r} must be a critical gap"
-    assert "line_002" in g9[0]
-    assert term in g9[0]
-
-
-def test_g9_is_whole_word_only():
-    # "hell" inside "hello"/"shelf", "ass" inside "passed"/"class".
+def test_ordinary_visual_language_smoking_and_begun_pass():
     assert not _g9_errors(
-        _ledger("Hello, class -- the parcel passed the shelf."),
+        _ledger(
+            "The velvet chair stood beside a smoking chimney.",
+            "She had begun the long walk past the silver machine.",
+        )
     )
 
 
-def test_g9_matches_every_term_in_the_live_list():
-    pattern = freeze._sfw_pattern()
-    for term in DEFAULT_PROFANITY_TERMS:
-        assert pattern.search(f"and then {term} happened"), term
+@pytest.mark.parametrize("term", ["damn", "gun", "knife", "naked"])
+def test_authorized_terminal_categories_are_critical_gaps(term):
+    errors = _g9_errors(_ledger("Fine.", f"The report says {term} tonight."))
+    assert errors
+    assert "line_002" in errors[0]
+    assert term in errors[0]
 
 
-def test_phase_10_refuses_to_freeze_a_profane_episode():
-    led = _ledger("Welcome.", "What the hell was that noise?")
+def test_policy_is_whole_word_only():
+    assert not _g9_errors(
+        _ledger("Hello, class; the parcel passed after the work had begun.")
+    )
+
+
+def test_shared_live_vocabulary_is_detected():
+    for term in (*PROFANITY_TERMS, *EXPLICIT_WEAPON_TERMS, *EXPLICIT_NUDITY_TERMS):
+        assert find_text_hits(f"and then {term} happened"), term
+
+
+def test_phase_10_refuses_an_unsafe_episode():
+    ledger = _ledger("Welcome.", "What the hell was that noise?")
     with pytest.raises(freeze.FreezeAssertionError):
-        freeze.phase_10_gap_audit_post_and_freeze(led)
-    assert led["meta"]["freeze_verdict"] == "needs_full_rerun"
+        freeze.phase_10_gap_audit_post_and_freeze(ledger)
+    assert ledger["meta"]["freeze_verdict"] == "needs_full_rerun"

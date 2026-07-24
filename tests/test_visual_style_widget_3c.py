@@ -13,9 +13,8 @@ Pins:
   3. Gate order: an unknown visual_style raises UnknownVisualStyleError
      with ZERO side effects, and the bank gate fires BEFORE the style gate
      (non-runnable custom bank wins even when both are bad).
-  4. Refine capture carries visual_style (the 2C signature-filtered fix).
-  5. _resolve_inputs carries visual_style as the authoritative value.
-  6. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name lands
+  4. _resolve_inputs carries visual_style as the authoritative value.
+  5. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name lands
      slot 24 (shifted -2 by the 2026-07-05 style-engine consolidation,
      which deleted the style / style_custom widgets). Later widgets append
      after it.
@@ -118,34 +117,6 @@ class TestGateOrder:
                 node.run(visual_style=sid)
             assert seen == ["past-the-gates"]
 
-
-class TestRefineCarry:
-    def test_refine_core_carries_visual_style(self, monkeypatch):
-        from nodes import _otr_story_select as sel
-
-        class _Rcfg:
-            target_grade = "B"
-            bar = 0
-            effective_passes = 2
-
-        monkeypatch.setattr(
-            sel, "resolve_refine_passes", lambda *_a, **_k: _Rcfg())
-        captured = {}
-
-        def _fake_loop(self, _rcfg, _core):
-            captured.update(_core)
-            return ("", "", "", 0, "")
-
-        monkeypatch.setattr(OTR_LedgerScriptWriter, "_refine_loop", _fake_loop)
-        node = OTR_LedgerScriptWriter()
-        # Writer refine re-entry is a legacy-lane seam; thread a legacy
-        # many-pass bank (the new default scifi_news -> scifi_news_circuit
-        # rejects re-entry by design).
-        out = node.run(source_bank="media_archive",
-                       visual_style="anime", refine_target_grade="B")
-        assert out == ("", "", "", 0, "")
-        assert captured["visual_style"] == "anime"
-        assert "os" not in captured and "_scaffold" not in captured
 
 
 class TestResolvedSurface:

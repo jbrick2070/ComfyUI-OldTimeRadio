@@ -15,55 +15,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_style_catalog as CAT  # noqa: E402
-from nodes import _otr_story_quality_l12 as L12  # noqa: E402
-
-
-# ---------------------------------------------------------------------------
-# Chunk 1 -- climax-class roles + validator (default-preserving)
-# ---------------------------------------------------------------------------
-class TestClimaxClassRoles:
-    def test_irreversible_choice_is_one_of_nine_climax_classes(self):
-        assert "irreversible_choice" in L12.CLIMAX_CLASS_ROLES
-        assert len(L12.CLIMAX_CLASS_ROLES) == 9
-
-    def test_default_assign_is_byte_identical(self):
-        # No climax_role => irreversible_choice everywhere (pre-2026-06-24 behavior).
-        ids = [f"b{i:03d}" for i in range(1, 6)]
-        roles = L12.assign_beat_roles(ids)
-        assert roles[ids[-1]] == "irreversible_choice"
-        L12.validate_beat_roles(roles, ids)
-
-    def test_climax_role_drives_last_beat(self):
-        ids = ["b001", "b002", "b003"]
-        roles = L12.assign_beat_roles(ids, climax_role="confession")
-        assert roles["b003"] == "confession"
-        assert roles["b001"] == "setup"
-        assert roles["b002"] == "personal_stake"
-        L12.validate_beat_roles(roles, ids)   # a non-irreversible climax validates
-
-    def test_invalid_climax_role_falls_back(self):
-        roles = L12.assign_beat_roles(["b001"], climax_role="not_a_role")
-        assert roles["b001"] == "irreversible_choice"
-
-    def test_validator_accepts_any_single_climax_class_last(self):
-        for tag in L12.CLIMAX_CLASS_ROLES:
-            roles = L12.assign_beat_roles(["b001", "b002", "b003"], climax_role=tag)
-            L12.validate_beat_roles(roles, ["b001", "b002", "b003"])
-
-    def test_validator_rejects_two_climax_class(self):
-        bad = {"b001": "revelation", "b002": "confession"}
-        with pytest.raises(L12.BeatRoleViolation):
-            L12.validate_beat_roles(bad, ["b001", "b002"])
-
-    def test_validator_rejects_climax_not_last(self):
-        bad = {"b001": "reversal", "b002": "pressure", "b003": "setup"}
-        with pytest.raises(L12.BeatRoleViolation):
-            L12.validate_beat_roles(bad, ["b001", "b002", "b003"])
-
-    def test_validator_rejects_zero_climax(self):
-        bad = {"b001": "setup", "b002": "pressure", "b003": "consequence"}
-        with pytest.raises(L12.BeatRoleViolation):
-            L12.validate_beat_roles(bad, ["b001", "b002", "b003"])
 
 
 # ---------------------------------------------------------------------------
@@ -78,10 +29,10 @@ class TestCatalogEndings:
         # shakespeare/public_domain source-deferential period styles).
         assert len(CAT.STYLE_CATALOG) == 104
         for s in CAT.STYLE_CATALOG:
-            assert s["ending_tag"] in L12.CLIMAX_CLASS_ROLES
+            assert s["ending_tag"] in CAT.CLIMAX_CLASS_ROLES
 
     def test_ending_tags_match_climax_classes(self):
-        assert set(CAT.ENDING_TAGS) == set(L12.CLIMAX_CLASS_ROLES)
+        assert set(CAT.ENDING_TAGS) == set(CAT.CLIMAX_CLASS_ROLES)
 
     def test_variety_and_irreversible_is_rare(self):
         used = {s["ending_tag"] for s in CAT.STYLE_CATALOG}

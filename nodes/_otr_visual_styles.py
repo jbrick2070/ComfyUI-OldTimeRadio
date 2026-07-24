@@ -27,9 +27,8 @@ Template fields carry EXACTLY one placeholder and no other brace tokens:
 `announcer_subject_ltx_mouth` + every `open_subjects` value take `{form}`;
 `non_character_emblem_fallback` takes `{base}`. `announcer_subject_ltx_mouth`
 must additionally carry mouth-prominence vocabulary (the ia2v lip-sync
-contract). `motion_registers` values are budgeted at 240 chars at LOAD
-(BUG-LOCAL-112). The forbidden-terms lint sweeps the 4 tail fields plus ALL
-new string leaves + dict values (r2 codex S2).
+contract). `motion_registers` values are budgeted at 240 chars at load
+(BUG-LOCAL-112). Authored style vocabulary is never classified or banned.
 
 The byte-identity contract: sci_fi_radio.json's fields are byte-identical to
 the extraction-fixture constants (tails in _otr_story_brief_helpers.py; look/
@@ -64,7 +63,6 @@ _V1_FIELDS: "dict[str, type]" = {
     "image_grade_tail": str,
     "broadcast_tail": str,
     "allow_radio_tails": bool,
-    "forbidden_terms": list,
     "era_tail": str,
     "schema_version": str,
 }
@@ -100,11 +98,6 @@ _V2_DICT_FIELDS: "dict[str, frozenset]" = {
 _REQUIRED_FIELDS: "dict[str, type]" = dict(_V1_FIELDS)
 _REQUIRED_FIELDS.update({name: str for name in _V2_STR_FIELDS})
 _REQUIRED_FIELDS.update({name: dict for name in _V2_DICT_FIELDS})
-
-#: The four tail fields the load-time forbidden-terms lint has always swept;
-#: v2 extends the sweep over all new string leaves + dict values.
-_LINTED_TAIL_FIELDS = ("positive_tail", "image_grade_tail",
-                       "broadcast_tail", "era_tail")
 
 #: Template fields: field -> the exactly-once placeholder name.
 _TEMPLATE_STR_FIELDS = {
@@ -145,7 +138,6 @@ class VisualStyle:
     image_grade_tail: str
     broadcast_tail: str
     allow_radio_tails: bool
-    forbidden_terms: "tuple[str, ...]"
     era_tail: str
     schema_version: str
     # -- v2 LOOK/SUBJECT surfaces (geometry stays Python) --
@@ -246,7 +238,6 @@ def _validate_row(raw: dict, path: Path) -> VisualStyle:
             f"mouth-prominence vocabulary ({'/'.join(_MOUTH_VOCAB)}) -- the "
             f"ia2v lip-sync contract drives whatever READS as a mouth")
     # -- dict fields: exact keys, non-empty str values --
-    dict_values: "list[tuple[str, str]]" = []
     for name, keys in _V2_DICT_FIELDS.items():
         got = raw[name]
         if set(got) != keys:
@@ -258,7 +249,6 @@ def _validate_row(raw: dict, path: Path) -> VisualStyle:
                 raise VisualStyleValidationError(
                     f"visual style {path}: {name}[{k!r}] must be a "
                     f"non-empty string")
-            dict_values.append((f"{name}[{k!r}]", v))
     for k, v in raw["open_subjects"].items():
         _lint_template(path, f"open_subjects[{k!r}]", v,
                        _OPEN_SUBJECTS_PLACEHOLDER)
@@ -268,28 +258,6 @@ def _validate_row(raw: dict, path: Path) -> VisualStyle:
                 f"visual style {path}: motion_registers[{k!r}] is "
                 f"{len(v)} chars, over the {_MOTION_REGISTER_MAX_CHARS}-char "
                 f"motion budget (BUG-LOCAL-112)")
-    terms: "list[str]" = []
-    for i, t in enumerate(raw["forbidden_terms"]):
-        if not isinstance(t, str) or not t.strip():
-            raise VisualStyleValidationError(
-                f"visual style {path}: forbidden_terms[{i}] must be a "
-                f"non-empty string")
-        terms.append(t)
-    # Load-time lint (r2 codex S2): case-insensitive substring over the 4
-    # tail fields + ALL new string leaves + dict values -- a pack must not
-    # violate its own bans anywhere.
-    linted: "list[tuple[str, str]]" = [
-        (fld, str(raw[fld])) for fld in _LINTED_TAIL_FIELDS]
-    linted.extend((name, str(raw[name])) for name in _V2_STR_FIELDS)
-    linted.extend(dict_values)
-    for term in terms:
-        needle = term.lower()
-        for label, text in linted:
-            if needle in text.lower():
-                raise VisualStyleValidationError(
-                    f"visual style {path}: forbidden term {term!r} appears "
-                    f"in its own {label} -- a pack must not violate its own "
-                    f"bans")
     return VisualStyle(
         style_id=style_id,
         label=raw["label"],
@@ -297,7 +265,6 @@ def _validate_row(raw: dict, path: Path) -> VisualStyle:
         image_grade_tail=raw["image_grade_tail"],
         broadcast_tail=raw["broadcast_tail"],
         allow_radio_tails=raw["allow_radio_tails"],
-        forbidden_terms=tuple(terms),
         era_tail=raw["era_tail"],
         schema_version=raw["schema_version"],
         portrait_look=raw["portrait_look"],

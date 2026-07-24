@@ -1,6 +1,6 @@
 {
   "schema_version": "fable2_deck_v1",
-  "notes": "Frame cards give a pitch its SHAPE (whose eyes, what scale, what genre feel); stances give the writers' room its editorial posture for the night. Dealt by python (OTR_FABLE2_SEED reproducible); the P1 pitch pass copies card names verbatim into PitchSlate.frame_card. SFW deck law: no weapons, no horror, no smoking -- deck-lint test enforced.",
+  "notes": "Frame cards give a pitch its SHAPE (whose eyes, what scale, what genre feel); stances give the writers' room its editorial posture for the night. Dealt by Python (OTR_FABLE2_SEED reproducible); the P1 pitch pass copies card names verbatim into the pitch object's frame_card field. Cards are generation guidance, never post-output acceptance filters.",
   "cards": [
     {
       "name": "The Night Operator",

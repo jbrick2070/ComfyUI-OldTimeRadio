@@ -1,13 +1,12 @@
 """v4 campaign P1(i): validated scalar bank defaults replace the hardcoded
-exact-id sets (visual-style pool / science floor / adaptation cast).
+exact-id sets (visual-style pool / adaptation cast).
 
 Asserts every runnable bank preserves its pre-migration behaviour (the former
 base_source_bank_id / strict_v4_banks / (shakespeare, public_domain)
 semantics, now DECLARED as validated `defaults` scalars) and that the parser
-validates the three new keys. The visual-STYLE pool (media|adaptation|generic)
-is a separate axis from the source FEED (science_rss vs media_archive_rss vs
-folger) -- this suite covers the style-pool + science-floor + adaptation-cast
-axes only. Pure / CPU. UTF-8 no BOM, SFW.
+validates the surviving keys. The visual-STYLE pool
+(media|adaptation|generic) is a separate axis from the source feed; this suite
+covers only the style-pool and adaptation-cast routing axes. Pure / CPU. UTF-8 no BOM, SFW.
 """
 from __future__ import annotations
 
@@ -22,14 +21,13 @@ from nodes import _otr_story_routing as SR  # noqa: E402
 from nodes import _otr_style_catalog as SC  # noqa: E402
 
 
-# (style_pool_class, require_science_floor, propagate_adaptation_cast) expected
-# per runnable bank -- exactly the pre-migration behaviour.
+# (style_pool_class, propagate_adaptation_cast) expected per runnable bank.
 EXPECTED = {
-    "media_archive":          ("media",      False, False),
-    "original":         ("generic",    False, False),
-    "scifi_news_pro":           ("generic",    False, False),
-    "public_domain": ("adaptation", False, True),
-    "shakespeare":         ("adaptation", False, True),
+    "media_archive": ("media", False),
+    "original": ("generic", False),
+    "scifi_news_pro": ("generic", False),
+    "public_domain": ("adaptation", True),
+    "shakespeare": ("adaptation", True),
 }
 
 
@@ -39,9 +37,8 @@ class TestScalarDefaultsMigration:
         bank = SR.require_runnable_bank(bank_id)
         d = bank.defaults or {}
         spc = str(d.get("style_pool_class", "generic") or "generic")
-        floor = bool(d.get("require_science_floor"))
         prop = bool(d.get("propagate_adaptation_cast"))
-        assert (spc, floor, prop) == EXPECTED[bank_id]
+        assert (spc, prop) == EXPECTED[bank_id]
 
     @pytest.mark.parametrize("bank_id", sorted(EXPECTED))
     def test_select_style_pool_matches_class(self, bank_id):
@@ -84,10 +81,6 @@ class TestParserValidation:
         with pytest.raises(SR.RegistryValidationError):
             SR._parse_bank(self._row({"style_pool_class": "scifi"}), "test")
 
-    def test_non_bool_science_floor_rejected(self):
-        with pytest.raises(SR.RegistryValidationError):
-            SR._parse_bank(self._row({"require_science_floor": 1}), "test")
-
     def test_non_bool_propagate_rejected(self):
         with pytest.raises(SR.RegistryValidationError):
             SR._parse_bank(self._row({"propagate_adaptation_cast": "yes"}), "test")
@@ -95,11 +88,10 @@ class TestParserValidation:
     def test_valid_scalar_defaults_accepted(self):
         b = SR._parse_bank(self._row({
             "style_pool_class": "adaptation",
-            "require_science_floor": True,
             "propagate_adaptation_cast": False,
         }), "test")
         assert b.defaults["style_pool_class"] == "adaptation"
-        assert b.defaults["require_science_floor"] is True
+        assert b.defaults["propagate_adaptation_cast"] is False
 
     def test_absent_keys_ok(self):
         b = SR._parse_bank(self._row({}), "test")

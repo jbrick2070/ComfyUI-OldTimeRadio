@@ -14,7 +14,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
@@ -22,7 +21,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import production_ledger as PL  # noqa: E402
 from nodes import _otr_freeze_cascade as _LFC_ORCH  # noqa: E402
-from nodes import _otr_ledger_reviewer as _OTRLR  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -124,51 +122,6 @@ class TestSetLinesCoercion:
 
 
 # ---------------------------------------------------------------------------
-# Site (a): reviewer role_mismatch repair guard (the culprit)
-# ---------------------------------------------------------------------------
-
-def _candidate_ledger():
-    return {
-        "schema_version": "l3-2026-05-14",
-        "cast": list(CAST),
-        "lines": [
-            {"line_id": "b011", "char_id": "c02", "speaker_role": "announcer",
-             "text": "I've sent a copy of your research to The Chronicle."},
-            {"line_id": "b001", "char_id": "announcer", "speaker_role": "character",
-             "text": "Gather round, listeners."},
-        ],
-        "meta": {},
-    }
-
-
-class TestReviewerRoleMismatchGuard:
-    def test_rejects_announcer_on_cast_charid(self):
-        led = _candidate_ledger()
-        pre = _OTRLR.PreAuditReport(violations=[
-            _OTRLR.CastViolation(line_id="b011", kind="role_mismatch",
-                                 found="announcer", expected="announcer"),
-        ])
-        repaired = _OTRLR.apply_deterministic_cast_repairs(led, pre, list(CAST))
-        rows = {r["line_id"]: r for r in led["lines"]}
-        assert rows["b011"]["speaker_role"] == "character"
-        assert repaired >= 1
-        flags = rows["b011"].get("compose_flags") or []
-        assert any(f.startswith("role_coerce:") for f in flags)
-
-    def test_legit_announcer_repair_still_applies(self):
-        # a real announcer row (char_id=announcer) flagged role_mismatch
-        # expected=announcer must STILL be set to announcer (not coerced).
-        led = _candidate_ledger()
-        pre = _OTRLR.PreAuditReport(violations=[
-            _OTRLR.CastViolation(line_id="b001", kind="role_mismatch",
-                                 found="character", expected="announcer"),
-        ])
-        _OTRLR.apply_deterministic_cast_repairs(led, pre, list(CAST))
-        rows = {r["line_id"]: r for r in led["lines"]}
-        assert rows["b001"]["speaker_role"] == "announcer"
-
-
-# ---------------------------------------------------------------------------
 # Site (c): MANDATORY pre-freeze sweep in run_freeze_cascade (VERIFY item 1)
 # ---------------------------------------------------------------------------
 
@@ -216,17 +169,7 @@ def _cascade_ledger_data():
 class TestPreFreezeSweep:
     def test_sweep_coerces_b011_keeps_announcer(self):
         led = _ledger_obj(_cascade_ledger_data())
-
-        def fake_review(_fn, _led):
-            return _OTRLR.ReviewerDisposition(
-                verdict="clean_no_edits", pre_audit_violations=0,
-                pre_audit_repairs_applied=0, doctor_edits_proposed=0,
-                doctor_edits_applied=0, post_audit_violations=0,
-            )
-
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=fake_review):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+        _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         rows = {r["line_id"]: r for r in led.data["lines"]}
         # b011 coerced to character; legit announcer rows untouched

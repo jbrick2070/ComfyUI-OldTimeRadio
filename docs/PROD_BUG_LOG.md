@@ -2592,3 +2592,86 @@ out until they independently meet the same production-only admission rule.
   and canonical workflow gates (48 passed; byte-identical SHA-256
   f9d9c2c3a101ec607c9658456f6e191a164d8214be7b6d560bc68975d0511e9a) GREEN;
   commit/push and six-bank 320-word OBS qualification pending**
+
+## PBUG-20260722-01 -- scifi_news codex seam lookup bypassed prompt_stages
+- surfaced: canonical six-bank sweep `six_bank_sweep_20260722_162943_317`,
+  `scifi_news` at 120 words, 2026-07-22
+- symptom: the episode failed before model inference with
+  `CodexPackContractError: P0 missing nonempty prompt seam
+  'codex_fact_index_system'`; no episode or OBS asset was published
+- root cause: the shared Codex-lane seam resolver used `getattr(pack, seam,
+  None)` even though production seams are stored in the `StoryPack.prompt_stages`
+  mapping. The resolver therefore returned `None` for every valid Codex seam.
+- fix: the resolver now reads `pack.prompt_stages.get(seam)` and fails closed
+  only when that mapped seam is absent or empty; a regression test proves a
+  valid prompt-stage seam reaches the structured pass.
+- verify idea: load every runnable bank's declared seams through its selected
+  runner, assert the exact prompt text reaches the structured-call system
+  message, and require the canonical `scifi_news` 120/320 legs to publish.
+- bible-worthy: yes -- BUG-12.72; production pack seams must be accessed
+  through the canonical mapping owner, not dataclass attribute guesses;
+  executable regression coverage is present
+- status: **LIVE-ADMITTED / ROOT-FIXED IN WORKTREE; post-fix scifi_news live
+  requalification pending**
+
+## PBUG-20260722-02 -- scifi_news P0 fact spans still exhausted the bounded repair ladder
+- surfaced: fresh post-seam-fix focused qualification runs
+  `six_bank_sweep_20260722_200609_509` (`scifi_news` at 120 words, prompt
+  `59256a76-bd44-447e-88a2-fab5fe2c350f`) and
+  `six_bank_sweep_20260722_201449_793` (`scifi_news` at 320 words, prompt
+  `4b9f096b-3d8c-4c89-9f00-8924ad0e177c`), 2026-07-22
+- symptom: P0 failed after two structured attempts on both distinct source
+  payloads because `F01` returned a quote that did not equal the declared
+  `full_text[start:end]` slice; no ledger or OBS asset was published. The
+  320-word run was the same class after the prompt-stage seam fix and the
+  120-word run also had no word/length gate involvement
+- root cause: the accepted source payload is already normalized at admission
+  and the literal-span validator is correctly fail-closed, but the technical
+  model plus bounded repair still returned a non-literal or unrelated quote
+  instead of repairing the exact field/start/end/quote identity. This extends
+  the existing source-span contract defect covered by BUG-11.35; it is not a
+  new whitespace-ingestion defect and not a prose/length gate
+- fix: **KIBITZ-HARDENED / IMPLEMENTED IN WORKTREE**. The first mechanical fix
+  is an explicit literal identity instruction
+  `payload[field][start:end] == quote`. The shared structured-call boundary
+  then gets one direct, bounded alternate repair owner with a hard context
+  ceiling, original post-validator reuse, owner/backend/rung/nonce journal
+  fields, and explicit terminal disposition. P0 now wires the creative owner
+  through that one-shot branch. The remote RTX 4060 Qwen worker
+  at `10.55.0.2:1234` completed the four scoped read-only reviews; the RTX
+  5080 remains reserved for ComfyUI and must not load this worker. Any patch
+  stays out of live qualification until the accepted-object boundary is
+  proven against the captured production payloads
+- verify idea: replay both captured P0 failures with the exact normalized A0
+  payloads, require a repair whose quote is byte-identical to the selected
+  slice, preserve the payload digest, and then requalify both canonical
+  `scifi_news` legs through `RESULT SUCCESS`, `obs_publish OK`, and exact
+  episode/OBS assets
+- bible-worthy: extends BUG-11.35; no new portable rule
+- status: **LIVE-ADMITTED / ROOT-FIXED IN WORKTREE; focused/canonical offline
+  gates green, live 120/320 requalification pending**
+
+## PBUG-20260723-01 -- six-bank campaign trusted exit 0 over canonical RESULT FAIL
+- surfaced: live six-bank 120-word viz campaign
+  `six_bank_viz_120_20260723_20260723_011138`, `scifi_news` leg, prompt
+  `cde10c6d-3b70-4732-8179-4b18c8bcd933`, 2026-07-23
+- symptom: the child stdout contained `[canonical-api] RESULT FAIL`, but the
+  campaign receipt recorded `status=PASS`, `exit_code=0`, and `queue_empty=true`.
+  The campaign therefore reported `6/6 PASS` despite a live P0 fact-span
+  failure and no valid qualification evidence for that leg
+- root cause: the PowerShell campaign wrapper inferred terminal success from a
+  zero child exit code and an empty ComfyUI queue. It did not consume the
+  canonical runner's explicit terminal result, so a contradictory `RESULT FAIL`
+  was invisible to the receipt owner
+- fix: the wrapper now delegates verdict construction to
+  `scripts/otr_campaign_receipt.ps1`. A leg is PASS only when exit code is zero,
+  the queue is empty, and the latest explicit terminal marker is
+  `RESULT SUCCESS`; missing/contradictory markers are recorded as FAIL with the
+  observed terminal line and reason
+- verify idea: feed captured `RESULT FAIL` stdout with exit code zero, missing
+  terminal output, `RESULT SUCCESS` with a nonzero exit, and a clean success
+  through the helper; require truthful verdicts and nonzero failure exits
+- bible-worthy: extends BUG-12.50's terminal-evidence contract; no new
+  portable rule
+- status: **LIVE-ADMITTED / ROOT-FIXED IN WORKTREE; helper regression GREEN;
+  six-bank live requalification pending**

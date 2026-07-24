@@ -6,16 +6,10 @@ propagating Meta brief (setting / period / mood) + the character's appearance,
 optionally refined by ONE LLM call on the writer's slot (V-11, no new model_id
 widget) at ``temperature=0`` with the ``prompt_hash`` taken AFTER the call.
 
-Collapse guard (PASS-IMG SHOULD-FIX + BUG-099): empty / unparseable LLM output
--> reseed up to ``max_reseed`` -> a DETERMINISTIC brief-composed template that is
-NEVER empty (a generic portrait must never ship a generic mesh silently, so we
-WARN, but we never abort the episode or emit an empty prompt). Appearance is
-looked up by ``char_id`` (BUG-098), never the display name.
-
-Story-consistency gate (v1 = a SCHEMA assertion, not a 2nd LLM call): the final
-prompt MUST carry the character's appearance token + the brief setting; a
-hallucinated / missing trait -> WARN + fall back to the template
-(``consistency_gate_warn_only`` toggles fail-closed vs warn on the hard case).
+LLM refinement is bounded and optional. Empty or failed output uses a
+deterministic brief-composed prompt. Python does not classify or reject
+authored visual nouns, objects, style terms, or vocabulary. The canonical
+compatibility widget remains wired but has no gating effect.
 
 PURE core (``compose_image_prompt_fallback`` / ``derive_image_prompts``): no I/O,
 no GPU, no engine imports -- the LLM is injected (tests) or resolved lazily from
@@ -29,19 +23,6 @@ import logging
 import re
 
 log = logging.getLogger("OTR")
-
-#: Stopwords ignored when checking brief-grounding (so "a"/"the" never count).
-_STOPWORDS = frozenset({
-    "a", "an", "the", "of", "and", "with", "in", "on", "at", "to", "for",
-    "from", "into", "setting", "portrait", "style", "studio",
-})
-
-
-def _significant_words(s: str) -> set:
-    """Significant (len>=4, non-stopword) lowercase words in ``s``."""
-    return {w for w in re.findall(r"[a-z]{4,}", (s or "").lower())
-            if w not in _STOPWORDS}
-
 
 def _content_hash(obj) -> str:
     return hashlib.sha256(
@@ -110,9 +91,9 @@ def _ensure_gender_anchor(prompt: str, char: dict) -> str:
 # Round 5 operator notes (2026-06-10): the wider framing is a KEEPER ("this
 # week's portraits show more body -- better"), so it is now intentional
 # (three-quarter, not head-and-shoulders). The old "no microphone, not a
-# recording studio" NEGATIONS are gone -- negative phrasing PLANTS the tokens
-# in the image embedding (the c01 giant-mic catch); gear words are instead
-# scrubbed from the OUTPUT (see _GEAR_WORDS) and banned in the instruction.
+# recording studio" NEGATIONS are gone -- negative phrasing plants those
+# tokens in the image embedding. Guidance stays in the LLM request; Python does
+# not filter the authored prompt vocabulary.
 # GEOMETRY-vs-LOOK split (visual-style TOTAL COVERAGE chunk A1, 2026-07-05):
 # the *_GEOMETRY constants below are ENGINE-SAFETY framing contracts
 # (framing / headroom / face-visibility / mouth-safety) and NEVER move into
@@ -747,7 +728,7 @@ _STILL_WORD_MUSIC_ROLE = "music_visual"
 # still_word PROMPT v2 (2026-07-04) -- R1 roundtable + kibitz + Fable-final.
 # The word card is: quoted words -> legibility guard -> per-EPISODE locked
 # lettering -> per-episode COOL backdrop (+ ONE beat mood on character cards) ->
-# scrubbed era tail -> grade -> POSITIVE text guard LAST. The per-episode
+# authored era tail -> grade -> POSITIVE text guard LAST. The per-episode
 # lettering + backdrop are LOCKED per episode (deterministic, no LLM) so every
 # word card in an episode reads as ONE consistent typographic set; only the beat
 # MOOD adjective varies per character card (the operator's consistency ask).
@@ -839,11 +820,6 @@ _STILL_WORD_MOOD_BUCKETS = (
 #: BEFORE the hash so the composer stays pure. Blank line still fails LOUD.
 STILL_WORD_MAX_WORDS = 12
 STILL_WORD_MAX_CHARS = 60
-#: era-tail text summoners scrubbed (word mode ONLY, MANDATORY -- not a QA-watch):
-#: a "flickering neon signs" atmosphere leaks extra glowing text onto the card.
-_STILL_WORD_TEXT_SUMMONERS = (
-    "marquee", "poster", "magazine", "newspaper", "neon", "sign", "signs",
-    "signage", "label", "labels", "theatrical", "billboard", "banner")
 
 
 def _still_word_genre(meta) -> str:
@@ -917,21 +893,6 @@ def _still_word_fit_card(words: str) -> str:
     return s.strip()
 
 
-def _scrub_still_word_era_tail(era) -> str:
-    """Strip text-SUMMONING comma-segments (sign / marquee / newspaper / neon /
-    poster / label ...) from the still-word era tail ONLY (word mode). A whole
-    comma-segment mentioning a summoner is dropped -- MANDATORY, not a QA-watch
-    (a "flickering neon signs" atmosphere would summon extra glowing card text).
-    Pure; word-boundary match."""
-    kept = []
-    for seg in str(era or "").split(","):
-        low = seg.lower()
-        if seg.strip() and not any(
-                re.search(r"\b%s\b" % re.escape(t), low)
-                for t in _STILL_WORD_TEXT_SUMMONERS):
-            kept.append(seg.strip())
-    return ", ".join(kept)
-
 
 def _episode_title(meta) -> str:
     """The episode title from meta (``episode_title`` -> ``title``), stripped.
@@ -966,7 +927,7 @@ def compose_still_word_prompt(meta, role, beat_line, style=None):
 
     WORD mode (character_video / announcer_visual): quoted words -> legibility
     guard -> per-episode LOCKED lettering -> per-episode COOL backdrop (+ one
-    ``"<mood> mood"`` on character cards) -> SCRUBBED era tail -> grade ->
+    ``"<mood> mood"`` on character cards) -> authored era tail -> grade ->
     POSITIVE text guard LAST. FAILS LOUD (``ValueError``, NO FALLBACK) on a BLANK
     line; an overflowing line is REDUCED (never aborted). MUSIC mode is the
     UNTOUCHED wordless abstract-title still. All raises precede any prompt hash."""
@@ -1022,7 +983,6 @@ def compose_still_word_prompt(meta, role, beat_line, style=None):
             if _role == "character_video" else "")
     if mood:
         backdrop = "%s, %s mood" % (backdrop, mood)
-    era = _scrub_still_word_era_tail(era)               # MANDATORY word-mode scrub
     pieces = ['a title card displaying the words "%s"' % words,
               _STILL_WORD_LEGIBILITY_GUARD, lettering, backdrop, era,
               _style.image_grade_tail, _STILL_WORD_TEXT_GUARD]
@@ -1132,6 +1092,18 @@ def derive_scene_still_targets(lines, fps: int = 25,
                  char_id=str(ln.get("char_id") or ""))
         else:
             _add(bid, "scene_beat", role, "scene_role_map")
+    if include_synthetic_closing and not any(
+            str(ln.get("speaker_role") or "").strip().lower() == "music_close"
+            for _bid, ln in _iter_beat_lines(lines)):
+        # EpisodeAssembler mirrors the closing cue into ledger.lines after
+        # this node has already produced image_prompts.  Reserve the same
+        # deterministic line id that the assembler will mint so ShotLock's
+        # later music_closing_001 shot has a producer-owned scene target.
+        # This is intentionally optimistic like the synthetic opening target:
+        # an unused still is cheap; a missing still reaches video dispatch too
+        # late to repair safely.
+        _add("music_closing_001", "scene_beat", "music_visual",
+             "scene_close_pretiming")
     return targets, warnings
 
 
@@ -1306,43 +1278,36 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
 
 def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
                                warnings, cid, max_reseed=2, vstyle=None):
-    """Beat-aware 16:9 character still prompt -> ``(prompt, source)``. LLM-refined
-    (the beat's action/emotion) when a writer LLM is available -- so each beat
-    differs -- else the deterministic per-character ``scene_character`` composer.
-    Always depicts the CHARACTER, never a radio booth. Guards + finishes exactly
-    like the portrait path (person guard, gear scrub, era+grade tail, no-text
-    clause)."""
+    """Compose one beat-aware character still prompt without content gates.
+
+    A writer LLM may refine the visual description. Empty, malformed, or failed
+    refinement uses the deterministic same-story composer so visual prompt
+    authoring cannot abort an otherwise publishable episode.
+    """
     ce = char_entry if isinstance(char_entry, dict) else {}
     prompt = ""
     source = "char_scene_template"
     said = str((line or {}).get("text") or "").strip()
-    # A writer LLM present AND a spoken line = the LLM lane was ATTEMPTED; if it
-    # then fails/returns junk we FAIL LOUD rather than swap to the deterministic
-    # composer (no-fallback rip 2026-07-03). llm_fn=None (no writer LLM) or a
-    # dialogue-less beat is the legit template lane, not a failure.
-    _llm_attempted = llm_fn is not None and bool(said)
-    if _llm_attempted:
-        req = _build_char_scene_request(ce, meta, setting, line, style=vstyle)
+    llm_attempted = llm_fn is not None and bool(said)
+    if llm_attempted:
+        request = _build_char_scene_request(
+            ce, meta, setting, line, style=vstyle,
+        )
         for attempt in range(max_reseed + 1):
             try:
-                raw = llm_fn(req)
+                raw = llm_fn(request)
             except Exception as exc:  # noqa: BLE001
-                warnings.append(f"char-scene llm_fn raised for {cid} ({exc}); "
-                                f"reseed {attempt}")
+                warnings.append(
+                    f"char-scene llm_fn raised for {cid} ({exc}); "
+                    f"reseed {attempt}"
+                )
                 raw = ""
-            cand = _clean_llm_prompt(raw)
-            if cand:
-                prompt = cand
+            candidate = _clean_llm_prompt(raw)
+            if candidate:
+                prompt = candidate
                 source = "char_scene_llm"
                 break
-    # Person/face analysis REMOVED (operator directive 2026-07-04): no person
-    # detector discards or annotates a beat still. The gear scrub below still runs;
-    # an EMPTY LLM return still fails loud at the gate further down.
-    if prompt:
-        scrubbed = _scrub_gear_words(prompt)
-        if scrubbed != prompt:
-            warnings.append(f"char-scene prompt for {cid}: broadcast-gear scrubbed")
-            prompt = scrubbed or ""
+
     try:
         from ._otr_story_brief_helpers import (  # type: ignore
             compose_still_prompt)
@@ -1350,34 +1315,35 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
         from _otr_story_brief_helpers import (  # type: ignore
             compose_still_prompt)
     if not prompt:
-        if _llm_attempted:
-            raise RuntimeError(
-                "[OTR_ImagePrompt] char-scene: the writer LLM produced no usable "
-                "PERSON prompt for %s (empty / non-person / all-gear after %d "
-                "reseeds) -- NO deterministic template fallback (no-fallback rip "
-                "2026-07-03); a failed char-scene LLM stops the episode."
-                % (cid, max_reseed)
+        if llm_attempted:
+            warnings.append(
+                f"char-scene LLM produced no usable prompt for {cid}; "
+                "using deterministic same-story composition"
             )
-        # No writer LLM (or a dialogue-less beat): the deterministic per-character
-        # scene composer is the PRIMARY local-lane output, not a fallback.
-        return (compose_still_prompt(meta, kind="scene_character",
-                                     role="character_video", char_entry=ce,
-                                     style=vstyle),
-                source)
-    # FINISH like a scene still: era tail + cinematic grade + the no-text clause.
-    # Stage 3 de-swallow (kibitz r2 M1): ImportError shim only; a style error
-    # RAISES (no silent unstyled prompt).
+            source = "char_scene_template_after_llm_miss"
+        return (
+            compose_still_prompt(
+                meta,
+                kind="scene_character",
+                role="character_video",
+                char_entry=ce,
+                style=vstyle,
+            ),
+            source,
+        )
+
     try:
         from ._otr_story_brief_helpers import (  # type: ignore
             NO_TEXT_CLAUSE, _resolve_style, finish_visual_prompt)
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_story_brief_helpers import (  # type: ignore
             NO_TEXT_CLAUSE, _resolve_style, finish_visual_prompt)
-    _style = _resolve_style(meta, vstyle)
-    prompt = finish_visual_prompt(meta, prompt, era_profile="portrait",
-                                  style=_style)
-    if _style.image_grade_tail and _style.image_grade_tail not in prompt:
-        prompt = f"{prompt}, {_style.image_grade_tail}"
+    style = _resolve_style(meta, vstyle)
+    prompt = finish_visual_prompt(
+        meta, prompt, era_profile="portrait", style=style,
+    )
+    if style.image_grade_tail and style.image_grade_tail not in prompt:
+        prompt = f"{prompt}, {style.image_grade_tail}"
     if not prompt.endswith(NO_TEXT_CLAUSE):
         prompt = f"{prompt}, {NO_TEXT_CLAUSE}"
     return prompt, source
@@ -1513,36 +1479,6 @@ def _compose_background_plate_prompt(meta, setting, style=None) -> str:
     return plate
 
 
-#: Person-evidence vocabulary for the portrait guard: an accepted prompt that
-#: matches NONE of these almost certainly depicts scenery/objects (the
-#: "microphone, no person" live catch, look-QA round 4) -> template fallback.
-# Person/face DETECTOR removed (operator directive 2026-07-04): the _PERSON_WORDS
-# regex + _depicts_person() analyzer that grep-gated portraits and beat stills are
-# gone. Face quality is QA'd visually by the operator reviewing the derived
-# prompts, not analyzed here.
-
-
-#: Broadcast-gear vocabulary (round 5 operator directive 2026-06-10): CHARACTER
-#: portrait prompts must not mention radio/mic/studio gear -- the tokens drag
-#: FLUX toward microphones and consoles (the c01 giant-mic catch). The
-#: ANNOUNCER is exempt (his portrait is radio-styled BY DESIGN).
-_GEAR_WORDS = re.compile(
-    r"\s*\b(?:radios?|microphones?|mics?|broadcasts?|broadcasters?|"
-    r"broadcasting|recording\s+studios?|radio\s+(?:station|studio|set|"
-    r"booth)s?|studios?|on[- ]air(?:\s+sign)?)\b[,;]?",
-    re.IGNORECASE)
-
-
-def _scrub_gear_words(prompt: str) -> str:
-    """Remove broadcast-gear tokens from a CHARACTER portrait prompt, tidying
-    the leftover separators. Pure; '' stays ''."""
-    out = _GEAR_WORDS.sub("", prompt or "")
-    out = re.sub(r"\s{2,}", " ", out)
-    out = re.sub(r"(,\s*)+,", ", ", out)
-    out = re.sub(r"\s+,", ",", out)
-    return out.strip(" ,;").strip()
-
-
 def _clean_llm_prompt(raw: str) -> str:
     """First non-empty line of the LLM output, trimmed; '' if unusable."""
     if not raw:
@@ -1552,36 +1488,6 @@ def _clean_llm_prompt(raw: str) -> str:
         if line:
             return line
     return ""
-
-
-#: Radio-form vocabulary (2026-07-01): a brief-driven radio surface is inherently
-#: brief-grounded even when its exact words do not overlap the appearance/setting
-#: text (a "space-station communications console" for a docking brief). Widening
-#: the gate to accept these prevents a valid NON-1940s radio form from failing
-#: the overlap check and silently reverting to the (1940s) template.
-_RADIO_VOCAB = frozenset({
-    "radio", "console", "transceiver", "wireless", "receiver", "comms",
-    "communications", "broadcast", "microphone",
-})
-
-
-def _passes_consistency(prompt: str, appearance: str, setting: str) -> bool:
-    """v1 schema gate: the prompt must be GROUNDED in the brief -- it shares at
-    least one significant word with the character appearance or the story
-    setting. Cheap word-overlap check, not a 2nd LLM call. When neither
-    appearance nor setting is known, nothing to assert -> passes.
-
-    Widened 2026-07-01: a recognized radio-form token (:data:`_RADIO_VOCAB`) is
-    itself brief-grounded, so a brief-driven radio surface passes even when its
-    exact words do not overlap. Strictly more permissive -- never fails a prompt
-    that passed before."""
-    want = _significant_words(appearance) | _significant_words(setting)
-    if not want:
-        return True
-    pw = _significant_words(prompt)
-    if want & pw:
-        return True
-    return bool(pw & _RADIO_VOCAB)
 
 
 def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int = 2,
@@ -1595,18 +1501,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
 
     Each object carries ``object_id`` / ``kind`` / ``role`` / ``w`` / ``h`` /
     ``prompt`` / ``prompt_hash`` / ``source`` plus ``char_id`` (portraits;
-    object_id == char_id) or ``beat_id`` (scene stills). Guards branch by
-    KIND before running: the person guard + gear scrub run ONLY on
-    kind=portrait; scene stills get the no-text clause (inside
-    ``compose_still_prompt``) and skip the person guard entirely.
+    object_id == char_id) or ``beat_id`` (scene stills).
 
-    Portrait path: LLM (temp=0, injected or lazily resolved) refines each;
-    empty/unparseable -> reseed. NO-FALLBACK (rip 2026-07-03): when a writer LLM
-    was ATTEMPTED (``llm_fn`` present) and it produces no usable prompt, or the
-    prompt fails the story-consistency gate / person guard / gear scrub, this
-    FAILS LOUD (RuntimeError) rather than swapping in the deterministic template.
-    ``llm_fn=None`` (no writer LLM configured) is the legit template lane, not a
-    failure, and never raises. ``prompt_hash`` is taken AFTER the call.
+    Portrait path: a bounded writer-LLM refinement is used when it
+    returns a non-empty line. Empty or failed refinement uses the deterministic
+    same-story template. No Python vocabulary or overlap classifier can reject,
+    rewrite, or block the prompt. The compatibility gate argument is ignored.
     Returns ``(payload, warnings)``.
 
     ``lines`` (optional, the frozen ledger lines, READ-ONLY): announcer
@@ -1614,6 +1514,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     (open/announcer/outro via :func:`derive_scene_still_targets`).
     """
     warnings: list = []
+    del consistency_gate_warn_only
     still_capabilities = _still_consumer_capabilities(video_models)
     if (still_capabilities is not None
             and all(value is False for value in still_capabilities.values())):
@@ -1674,15 +1575,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # Synthetic announcers keep their radio-host path untouched.
         _talking = bool((talking_roles or {}).get("character_video")) and (
             not _is_announcer_row)
-        # C1 + E (2026-07-01 brief-driven radio-host): the synthetic announcer /
-        # radio-host prompt is BRIEF-DRIVEN and stamped DIRECTLY -- SKIP the LLM
-        # refine. The refine instruction (_build_char_prompt_request: "Do not
-        # mention radios, microphones, studios") CONTRADICTS a radio-styled host,
-        # so a refined prompt strips the radio tokens, fails _passes_consistency,
-        # and reverts to the (old 1940s) template. build_radio_host_prompt already
-        # finishes (era tail + grade), so the loop's LLM / consistency /
-        # gear-scrub / finish steps are all bypassed for this row (also saves an
-        # LLM call). The negative is populated on the object row.
+        # The synthetic announcer/radio-host prompt is brief-driven and
+        # stamped directly because it follows a distinct faceless/animated
+        # radio-host visual contract. The negative is populated on the object row.
         if _is_announcer_row:
             # RADIO FACE LOGIC (2026-07-04): the announcer portrait gets a FACE
             # only when an AUDIO-DRIVEN engine will animate it -- i.e. HuMo hosts
@@ -1729,69 +1624,26 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 if attempt < max_reseed:
                     warnings.append(f"empty image prompt for {cid}; reseed {attempt + 1}/{max_reseed}")
         if not prompt:
+            prompt = compose_image_prompt_fallback(
+                meta,
+                char,
+                _aspect,
+                talking=_talking,
+                style=_vstyle,
+            )
             if llm_fn is not None:
-                raise RuntimeError(
-                    "[OTR_ImagePrompt] portrait: the writer LLM produced no "
-                    "usable prompt for %s after %d reseeds -- NO deterministic "
-                    "template fallback (no-fallback rip 2026-07-03); a failed "
-                    "portrait LLM stops the episode." % (cid, max_reseed)
-                )
-            # No writer LLM configured: the deterministic template IS the primary
-            # local-lane portrait, not a fallback.
-            prompt = compose_image_prompt_fallback(meta, char, _aspect,
-                                                   talking=_talking,
-                                                   style=_vstyle)
-            source = "template"
-        prompt = _ensure_gender_anchor(prompt, char)
-        # Story-consistency gate (schema assertion, v1). The synthetic
-        # ANNOUNCER grounds on APPEARANCE ONLY (the radio anchor): an LLM
-        # line that drops the radio styling for pure story-setting flavor
-        # fails the gate and falls back to the radio template (operator
-        # directive 2026-06-09: the announcer gets a RADIO-style image).
-        gate_setting = "" if char.get("_synthetic_announcer") else setting
-        if not _passes_consistency(prompt, appearance, gate_setting):
-            msg = f"image prompt for {cid} missing appearance/setting trait"
-            if consistency_gate_warn_only or source != "llm":
-                # warn-only toggle, OR the deterministic template itself (no LLM
-                # to blame) -- keep the prompt, log loud. Not a model swap.
-                warnings.append(msg + " (kept; warn-only or template path)")
-            else:
-                raise RuntimeError(
-                    "[OTR_ImagePrompt] portrait: the writer LLM visual prompt for "
-                    "%s failed the story-consistency gate (%s) -- NO template "
-                    "fallback (no-fallback rip 2026-07-03)." % (cid, msg)
-                )
-        # Person/face analysis REMOVED (operator directive 2026-07-04): no
-        # automated person detector gates or annotates the portrait. The operator
-        # crafts the prompts and QAs faces visually by reviewing them; a token-grep
-        # face check earns nothing and previously failed builds / burned credits.
-        # The prompt flows straight to the gear scrub + finisher below.
-        # GEAR SCRUB (round 5 operator directive): character portraits never
-        # mention radio/mic/studio gear -- the tokens pull FLUX toward
-        # equipment (the c01 giant-mic catch). The ANNOUNCER keeps his radio
-        # styling by design (radio-grounding gate): synthetic announcer rows
-        # AND a cast row literally named ANNOUNCER are exempt.
-        if not _is_announcer_row:
-            _scrubbed = _scrub_gear_words(prompt)
-            if _scrubbed != prompt:
                 warnings.append(
-                    f"image prompt for {cid}: broadcast-gear tokens scrubbed")
-                if not _scrubbed and source == "llm":
-                    # An LLM prompt that is ENTIRELY broadcast-gear tokens is a
-                    # model miss -- fail loud, no template swap (no-fallback rip).
-                    raise RuntimeError(
-                        "[OTR_ImagePrompt] portrait: the writer LLM visual prompt "
-                        "for %s was ENTIRELY broadcast-gear tokens -- NO template "
-                        "fallback (no-fallback rip 2026-07-03)." % cid
-                    )
-                prompt = _scrubbed or compose_image_prompt_fallback(
-                    meta, char, talking=_talking, style=_vstyle)
+                    f"image prompt LLM produced no usable prompt for {cid}; "
+                    "using deterministic same-story composition"
+                )
+                source = "template_after_llm_miss"
+            else:
+                source = "template"
+        prompt = _ensure_gender_anchor(prompt, char)
         if char.get("_synthetic_announcer"):
             source = "announcer_" + source   # traceable in reports/ledger
-        # FINISH the prompt (gap-audit F3, 2026-06-10): era tail + film style
-        # tail, restored from the deleted legacy composer. Runs AFTER the
-        # consistency + person guards (finishing never re-triggers them) and
-        # BEFORE the hash so the stamped hash matches the rendered prompt.
+        # Finish after optional refinement and before hashing so the
+        # stamped hash matches the rendered prompt.
         # TALKING lane (S4b): SKIP both tails -- the era atmosphere + grade
         # darken/mute the face exactly like the brief palette murked the
         # radio still (proof8: near-black profile portraits, motion 0.23) --

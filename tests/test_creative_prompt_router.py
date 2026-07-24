@@ -200,31 +200,19 @@ def _count_callers(symbol_name: str, exclude_path: Path) -> tuple[int, list[str]
 
 
 def test_router_production_caller_count_pinned() -> None:
-    """`resolve_creative_system_prompt` has EXACTLY 5 production
-    call-site references. Catches both under-wiring (missed phase)
-    and over-wiring (accidental extra call site).
+    """The router has three production dispatch points.
 
-    D2a shipped with 0 callers. D2b wired:
-      _otr_outline.generate_outline      (phase="outline")
-      _otr_line_composer.compose_line    (phase="line_composer_system")
-    Closing-layer QA F1 (2026-07-09) wired:
-      _otr_line_composer.compose_announcer_intro
-        (phase= conditional: announcer_intro_system /
-         announcer_intro_safe_system)
-      _otr_line_composer.compose_news_coda         (phase="coda_system")
-      _otr_line_composer.compose_announcer_outro
-        (phase="announcer_outro_system")
-
-    The router module's own definition file is excluded -- this
-    test counts CALL sites, not definitions or imports.
+    Outline and character-line composition each dispatch directly. All closing
+    layers share ``_resolved_closing_prompt`` so their runtime-selected phase
+    stays centralized; closing-phase behavior is covered by the bank-routing
+    tests rather than duplicated static call sites.
     """
     router_src = REPO_ROOT / "nodes" / "_otr_creative_prompt_router.py"
     count, hits = _count_callers("resolve_creative_system_prompt", router_src)
-    assert count == 5, (
+    assert count == 3, (
         f"resolve_creative_system_prompt has {count} production "
-        f"caller(s); expected exactly 5 (outline, compose_line, "
-        f"announcer intro, news coda, announcer outro). Hits:\n  "
-        + "\n  ".join(hits)
+        f"caller(s); expected outline, compose_line, and the shared "
+        f"closing resolver. Hits:\n  " + "\n  ".join(hits)
     )
 
 

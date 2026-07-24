@@ -14,16 +14,11 @@ Pins:
   3. Gate-first ordering: a non-runnable source_bank pick raises
      StoryBankNotRunnableError as the FIRST act of run() -- before the
      story-scaffold env mutation and before _resolve_inputs (RSS fetch).
-  4. Refine capture regression (BUG found by kibitz r2): the refine _core
-     capture must contain ONLY real run() parameters -- the old bare
-     locals() capture leaked `os` + `_scaffold` and made every
-     refine-enabled run a TypeError since 2026-06-24. source_bank must
-     survive into the refine re-entry kwargs.
-  5. Threading: resolve_creative_system_prompt(source_bank_id=...) selects
+  4. Threading: resolve_creative_system_prompt(source_bank_id=...) selects
      the pack; compose_line/compose_line_draft thread it end-to-end, and
      every recursive compose_line self-call forwards it (AST pin).
-  6. _resolve_inputs carries source_bank as the one authoritative value.
-  7. Headless surface: source_bank is on both CREATIVE_WHITELISTs and
+  5. _resolve_inputs carries source_bank as the one authoritative value.
+  6. Headless surface: source_bank is on both CREATIVE_WHITELISTs and
      patch_widget_by_name lands it at slot 23 of the canonical workflow
      (shifted -2 by the 2026-07-05 style-engine consolidation, which
      deleted the style / style_custom widgets).
@@ -128,54 +123,7 @@ class TestGateFirst:
 
 
 # ---------------------------------------------------------------------------
-# 4. Refine capture regression (kibitz r2 bug)
-# ---------------------------------------------------------------------------
-class TestRefineCoreCapture:
-    def test_core_kwargs_are_exactly_run_parameters(self, monkeypatch):
-        from nodes import _otr_story_select as sel
-
-        class _Rcfg:
-            target_grade = "B"
-            bar = 0
-            effective_passes = 2
-
-        monkeypatch.setattr(
-            sel, "resolve_refine_passes", lambda *_a, **_k: _Rcfg())
-
-        captured = {}
-
-        def _fake_loop(self, _rcfg, _core):
-            captured.update(_core)
-            return ("", "", "", 0, "")
-
-        monkeypatch.setattr(
-            OTR_LedgerScriptWriter, "_refine_loop", _fake_loop)
-        node = OTR_LedgerScriptWriter()
-        # Writer refine re-entry is a LEGACY-lane seam; the LLM-first custom
-        # pipelines (the new default scifi_news -> scifi_news_circuit) reject
-        # it by design. Thread a legacy many-pass bank so the capture test
-        # targets the refine re-entry contract, not lane dispatch.
-        out = node.run(source_bank="media_archive",
-                       refine_target_grade="B")
-        assert out == ("", "", "", 0, "")
-        # The regression: non-parameter locals leaked into the capture and
-        # made self.run(**_core) a TypeError on every refine pass.
-        assert "os" not in captured
-        assert "_scaffold" not in captured
-        # Excluded-by-design keys.
-        for k in ("self", "refine_target_grade", "_refine_active",
-                  "_refine_prior_macro", "_refine_prior_critique",
-                  "_refine_forced_cast_seed"):
-            assert k not in captured
-        # The selection survives re-entry.
-        assert captured["source_bank"] == "media_archive"
-        # Every captured key is a real run() parameter -> **_core is safe.
-        import inspect
-        params = inspect.signature(OTR_LedgerScriptWriter.run).parameters
-        unknown = [k for k in captured if k not in params]
-        assert not unknown, f"non-parameter keys captured: {unknown}"
-
-
+# 4. Threading
 # ---------------------------------------------------------------------------
 # 5. Threading
 # ---------------------------------------------------------------------------
@@ -198,7 +146,7 @@ class TestThreading:
         pack = json.loads(pack_path.read_text(encoding="utf-8"))
         assert other == pack["prompt_stages"]["line_composer_system"]
 
-    def test_compose_line_draft_threads_source_bank(self, monkeypatch):
+    def test_compose_line_threads_source_bank(self, monkeypatch):
         from nodes import _otr_line_composer as lc
         from nodes import _otr_creative_prompt_router as router
         seen = []
@@ -214,52 +162,39 @@ class TestThreading:
             speaker="MARGOT",
             intent="steady the room",
             mood="calm",
-            target_words=8,
             canon_header="",
             last_lines=[],
         )
-        # public_domain now has its own story_rules pack, but pass the
-        # kept legacy-seam (media_archive) rules explicitly so this test keeps
-        # targeting PROMPT threading rather than content-rule vocabulary.
-        from nodes._otr_story_rules import resolve_story_rules
         out = lc.compose_line(
-            creative_fn=lambda *a, **k: "A quiet line about the machine.",
+            creative_fn=lambda *args, **kwargs: (
+                "A quiet line about the machine."),
             req=req,
             creative_repo_id="mistralai/Mistral-Nemo-Instruct-2407",
             source_bank_id=_PUBLIC_DOMAIN_BANK,
-            _story_rules=resolve_story_rules("media_archive"),
         )
         assert out.text
-        assert seen and all(s == _PUBLIC_DOMAIN_BANK for s in seen)
+        assert seen == [_PUBLIC_DOMAIN_BANK]
 
-    def test_every_recursive_compose_line_call_forwards_the_bank(self):
-        # AST pin (kibitz r3 M2): compose_line's recursive self-calls and
-        # its compose_line_draft call must ALL forward source_bank_id --
-        # a missed one silently falls back to science.
+
+    def test_compose_line_forwards_bank_to_draft(self):
         src = (_REPO / "nodes" / "_otr_line_composer.py").read_text(
             encoding="utf-8")
         tree = ast.parse(src)
         fn = next(
-            n for n in ast.walk(tree)
-            if isinstance(n, ast.FunctionDef) and n.name == "compose_line")
-        checked = 0
-        for call in ast.walk(fn):
-            if not isinstance(call, ast.Call):
-                continue
-            callee = call.func
-            name = getattr(callee, "id", getattr(callee, "attr", ""))
-            if name not in ("compose_line", "compose_line_draft"):
-                continue
-            kwarg_names = {k.arg for k in call.keywords}
-            assert "source_bank_id" in kwarg_names, (
-                f"{name} call at line {call.lineno} does not forward "
-                f"source_bank_id"
-            )
-            checked += 1
-        assert checked >= 4, (
-            f"expected >=4 threaded calls (draft + 3 recursive); "
-            f"found {checked}"
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "compose_line"
         )
+        draft_calls = [
+            call for call in ast.walk(fn)
+            if isinstance(call, ast.Call)
+            and getattr(call.func, "id", getattr(call.func, "attr", ""))
+            == "compose_line_draft"
+        ]
+        assert len(draft_calls) == 1
+        assert "source_bank_id" in {
+            keyword.arg for keyword in draft_calls[0].keywords
+        }
+
 
     def test_writer_call_sites_pass_the_resolved_bank(self):
         # AST pin: every _OTRLC.compose_line( call in the writer passes
@@ -280,7 +215,7 @@ class TestThreading:
                     f"missing source_bank_id"
                 )
                 sites += 1
-        assert sites == 3, f"expected 3 writer compose_line sites, {sites}"
+        assert sites == 2, f"expected 2 writer compose_line sites, {sites}"
 
 
 # ---------------------------------------------------------------------------

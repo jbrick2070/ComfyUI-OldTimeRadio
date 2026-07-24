@@ -38,16 +38,24 @@ def test_validate_ok():
     assert ok and reason == "ok"
 
 
-@pytest.mark.parametrize("text,subject,reason", [
-    ("", "Mara", "empty"),
-    ("Mara " + "x" * 80, "Mara", "over_budget"),
-    ("Mara stands up and gestures", "Mara", "banned_phrase"),
-    ("a person talks softly", "Mara", "generic_subject"),
-    ("He leans and talks", "Mara", "subject_missing"),
-    ("Mara waits in silence", "Mara", "no_allowed_phrase"),
+@pytest.mark.parametrize("text,subject", [
+    ("Mara stands up and gestures", "Mara"),
+    ("a person talks softly", "Mara"),
+    ("He leans and talks", "Mara"),
+    ("Mara waits in silence", "Mara"),
+    ("camera cut to a dancer who spins", "Mara"),
 ])
-def test_validate_rejections(text, subject, reason):
-    ok, got = mc.validate_motion_clause(text, subject)
+def test_validate_preserves_authored_vocabulary(text, subject):
+    ok, reason = mc.validate_motion_clause(text, subject)
+    assert ok and reason == "ok"
+
+
+@pytest.mark.parametrize("text,reason", [
+    ("", "empty"),
+    ("Mara " + "x" * 80, "over_budget"),
+])
+def test_validate_structural_rejections(text, reason):
+    ok, got = mc.validate_motion_clause(text, "Mara")
     assert not ok and got == reason
 
 
@@ -122,10 +130,22 @@ def test_generate_flag_on_dialogue_beat(flag_on):
     assert mc.resolve_motion_clause_text(s0) == "Mara leans in and talks"
 
 
-def test_generate_invalid_output_falls_back(flag_on):
+def test_generate_authored_motion_is_preserved(flag_on):
+    led = _ledger()
+    authored = "Everyone stands up and runs away"
+    counts = mc.generate_motion_clauses(
+        led, generate_fn=lambda *a, **k: authored,
+        name_resolver=_names)
+    assert counts["generated"] == 1 and counts["invalid"] == 0
+    clause = led["video"]["shots"][0]["motion_clause"]
+    assert clause["text"] == authored
+    assert clause["fallback"] is False
+
+
+def test_generate_over_provider_budget_falls_back(flag_on):
     led = _ledger()
     counts = mc.generate_motion_clauses(
-        led, generate_fn=lambda *a, **k: "Everyone stands up and runs away",
+        led, generate_fn=lambda *a, **k: "Mara " + "x" * 80,
         name_resolver=_names)
     assert counts["invalid"] == 1 and counts["generated"] == 0
     assert led["video"]["shots"][0]["motion_clause"]["fallback"] is True

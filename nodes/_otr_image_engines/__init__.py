@@ -1,7 +1,7 @@
 """OTR image-engine namespace (the model-agnostic image-gen adapter registry).
 
 Subproject C, one level UP from the video platform: every image generator
-(Flux gen-1, and later Z-Image / Klein / Qwen / any "+ Add Custom Model") is a
+(Flux gen-1, and later Z-Image / Klein / any "+ Add Custom Model") is a
 pluggable adapter the user selects PER ROLE -- "Flux" is just gen 1, never a
 hardcoded default. Swap the image-gen and nothing downstream changes (A's video
 init-image / portrait + B's portrait->mesh resolve by ledger, not by engine).
@@ -38,16 +38,6 @@ except Exception:  # noqa: BLE001
 # guard so a quirk in one adapter never blocks the other from registering.
 try:  # pragma: no cover - trivial guard
     from . import z_image_turbo as _z_image_turbo  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
-# C3 (generic peer, default-OFF): the Qwen-Image (GGUF) adapter -- a 3rd image
-# engine carrying the layer to an OPEN set, via a DIFFERENT integration mode (the
-# in-stack ComfyUI-GGUF loader, no cu128 sidecar) behind the same protocol.
-# Cold-import clean; greyed until OTR_ENABLE_QWEN_IMAGE=1 + its GGUF weights exist.
-# Its own guard so a quirk in one adapter never blocks the others from registering.
-try:  # pragma: no cover - trivial guard
-    from . import qwen_image as _qwen_image  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
 

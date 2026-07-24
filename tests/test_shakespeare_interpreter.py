@@ -14,7 +14,6 @@ from nodes._otr_shakespeare_sources import (
     SCHEMA_VERSION,
     ShakespeareBriefs,
     ShakespeareInterpreterError,
-    _MAX_KEY_TERMS,
     build_shakespeare_briefs,
 )
 from nodes._otr_source_payload import validate_interpreter_result
@@ -118,13 +117,14 @@ def test_build_shakespeare_briefs_rejects_max_attempts_lt_one():
         )
 
 
-def test_shakespeare_briefs_trim_key_terms():
-    terms = [f"term{i}" for i in range(_MAX_KEY_TERMS + 4)]
+def test_shakespeare_briefs_preserve_optional_terms_without_caps():
+    assert _good_briefs(key_terms=[]).key_terms == []
+    terms = [f"term{i}" for i in range(20)] + ["x" * 200]
     brief = _good_briefs(key_terms=terms)
-    assert len(brief.key_terms) == _MAX_KEY_TERMS
+    assert brief.key_terms == terms
 
 
-def test_shakespeare_prompt_contains_safety_and_rights_terms(monkeypatch):
+def test_shakespeare_prompt_contains_narrow_safety_and_rights_terms(monkeypatch):
     captured = {}
 
     def _fake_structured_call(**kwargs):
@@ -141,7 +141,7 @@ def test_shakespeare_prompt_contains_safety_and_rights_terms(monkeypatch):
         model_id="test-model",
     )
     prompt_text = "\n".join(m["content"] for m in captured["prompt"])
-    for term in ("no blood", "guns", "knives", "smoking", "CC BY-NC"):
+    for term in ("no profanity", "guns/knives/weapons", "sexual/nudity", "CC BY-NC"):
         assert term in prompt_text
     assert "Folger Shakespeare" in prompt_text
     assert brief.model_id == "test-model"

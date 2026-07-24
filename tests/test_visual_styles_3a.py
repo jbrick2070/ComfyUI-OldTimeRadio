@@ -9,7 +9,7 @@ Pins:
      the _otr_story_brief_helpers constants, byte-for-byte.
   2. Loader: lazy (zero import-time I/O), fail-loud matrix, sweep,
      schema_version pin, style_id regex + path coordinate, load-time
-     forbidden-terms lint, _clear_caches, deterministic list_style_ids
+     authored-vocabulary preservation, _clear_caches, deterministic list_style_ids
      with sci_fi_radio always a valid choice.
   3. BYTE-IDENTITY MATRIX: default meta -> composed prompts identical to
      constants-built expectations across era profiles + still kinds.
@@ -59,7 +59,6 @@ class TestExtractionFixture:
         assert raw["broadcast_tail"] == helpers.RADIO_BROADCAST_TAIL
         assert raw["era_tail"] == helpers.ERA_TAIL_DEFAULT
         assert raw["allow_radio_tails"] is True
-        assert raw["forbidden_terms"] == []
 
     def test_loaded_default_matches_constants(self):
         style = vs.resolve_visual_style("sci_fi_radio")
@@ -138,8 +137,6 @@ class TestLoader:
         (lambda d: d.pop("era_tail"), "missing required"),
         (lambda d: d.update(style_id="Bad-Id!"), "must match"),
         (lambda d: d.update(allow_radio_tails="yes"), "must be a bool"),
-        (lambda d: d.update(forbidden_terms=["film grain"]),
-         "appears in its own"),
     ])
     def test_fail_loud_matrix(self, tmp_path, monkeypatch, mutate,
                               exc_fragment):

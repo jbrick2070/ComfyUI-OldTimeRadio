@@ -7,11 +7,10 @@ Reads the full article body,
 emits four purpose-specific briefs that downstream consumers read
 INSTEAD of raw `news_seed`:
 
-  - casting_brief    (<=200 chars): what kinds of people belong here.
-  - script_brief     (<=350 chars): premise arc + central tension.
-  - news_close_brief (<=250 chars): era-neutral closing news read.
-  - key_terms        (2-6 entries): journalistic terms that must
-                                    appear in dialogue.
+  - casting_brief: what kinds of people belong here.
+  - script_brief: premise arc + central tension.
+  - news_close_brief: era-neutral closing news read.
+  - key_terms        (optional): source-grounded telemetry terms.
 
 Python stamps the rest (source_hash, model_id, attempts, ...). The LLM
 never authors metadata it could hallucinate.
@@ -28,11 +27,10 @@ Key rules:
     Mistral/Gemma/Qwen names anywhere in this file. Loader-side
     integration (Gemma 4 + MTP, llama.cpp + GBNF, vLLM, HF Trans-
     formers) is opaque to this module.
-  - No hardcoded period literals.
-  - Validator + reroll is the safety net. The V0-V2 LLM call routes
-    through the shared `structured_call` retry ladder (base ->
-    structural retry -> typed repair); a structural re-roll LOWERS
-    temperature rather than raising it (the Sprint 2B principle).
+  - No hardcoded period or style-vocabulary rejection.
+  - Structured parsing uses the shared bounded ladder (base ->
+    structural retry -> typed repair). Optional source terms are grounded
+    once afterward and never cause a model retry.
   - Determinism contract narrowed (ADR section 3.5): byte-identity
     is a fixture-test claim only (mocked generate_fn). Live model
     runs assert schema validity + contract preservation, not byte
@@ -43,14 +41,10 @@ Public surface
   NewsBriefs               -- pydantic model (4 LLM fields + 8 Python-
                               stamped metadata fields).
   NewsInterpreterError     -- raised when all attempts fail.
-  FORBIDDEN_ERA_TERMS      -- tuple of period-literal triggers.
   PROMPT_VERSION           -- "news_interpreter_v1".
   SCHEMA_VERSION           -- bumps when meta.news shape changes
                               (commit 3 lands the writer wiring).
   DEFAULT_DECODER_PROFILE  -- "default_v1".
-  v1_validate(brief, *, source_text)  -- key_terms word-boundary check.
-  v2_validate(brief, *, source_text)  -- period literals with source-
-                                         context allowance.
   build_source_wrapper(...)           -- inert-source prompt wrapper.
   compute_cache_key(...)              -- sha256 over the cache axes.
   extract_json_block(raw)             -- fence-tolerant JSON extractor.
@@ -63,12 +57,7 @@ import logging
 import re
 from typing import Callable
 
-try:
-    # Pydantic v2 (project default; see cast contract memory).
-    from pydantic import BaseModel, Field, field_validator
-except ImportError:  # pragma: no cover -- v1 fallback if ever needed.
-    from pydantic import BaseModel, Field  # type: ignore
-    from pydantic import validator as field_validator  # type: ignore
+from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
@@ -86,44 +75,10 @@ SCHEMA_VERSION = "l3-2026-05-14"
 
 DEFAULT_DECODER_PROFILE = "default_v1"
 
-# Caps from ADR section 4.5. Pydantic enforces on construction.
-_MAX_CASTING_BRIEF_CHARS = 200
-_MAX_SCRIPT_BRIEF_CHARS = 350
-_MAX_NEWS_CLOSE_BRIEF_CHARS = 250
-# BUG-LOCAL-307 (2026-06-03): cap relaxed 40 -> 80. Real news entity names
-# routinely exceed 40 chars (e.g. "University Consortium for Atmospheric
-# Research" = 45); at 40 the key_terms validator RAISED, the structured-call
-# retry ladder exhausted -> NewsInterpreterError -> the whole episode HARD-
-# HALTED in NewsCurationDeep. The validator below now also COERCES (truncates)
-# an over-long term instead of raising, so even a pathological term can never
-# halt the run (cf. BUG-303 coerce-not-reject).
-_MAX_KEY_TERM_CHARS = 80
-_MIN_KEY_TERMS = 2
-# BUG-LOCAL-283 (2026-05-27): cap relaxed 6 -> 7. The LLM consistently
-# wants to emit one more term than the cap allows (NASA, FireSense,
-# Wildfire, Thermal Sensor, Fire Mission, Fire Bulldozer, Firefighter
-# = 7 distinct named terms) and the structural retry burns a 2nd call
-# to land back inside 6. Bumping to 7 keeps the news interpreter on
-# its first attempt without diluting the wave-1A semantic check the
-# downstream `_judge_term_supported_by_source` runs against the
-# article body (the judge does not care about the count, only that
-# each term semantically appears in the source).
-_MAX_KEY_TERMS = 7
-
 # ADR section 3.2 -- article body slicing.
 _BODY_HEAD_CHARS = 1500
 _BODY_TAIL_CHARS = 500
 _BODY_TAIL_THRESHOLD = 2500
-
-# ADR section 4.2.
-FORBIDDEN_ERA_TERMS: tuple[str, ...] = (
-    "1940", "1940s", "1903",
-    "vintage radio", "vintage broadcast",
-    "old time radio", "old-time radio",
-    "swing era", "art deco",
-    "radio drama", "radio play", "radio hour",
-    "brass speaker",
-)
 
 
 # ---------------------------------------------------------------------------
@@ -163,17 +118,12 @@ class NewsBriefs(BaseModel):
     """
 
     # ---- LLM-authored content -------------------------------------------
-    casting_brief: str = Field(..., max_length=_MAX_CASTING_BRIEF_CHARS)
-    script_brief: str = Field(..., max_length=_MAX_SCRIPT_BRIEF_CHARS)
-    news_close_brief: str = Field(..., max_length=_MAX_NEWS_CLOSE_BRIEF_CHARS)
-    # Schema-level min is 1 so unit tests can construct briefs with a
-    # single key_term to isolate V1/V2/V3 behavior. The production
-    # 2-6 bound is enforced at the orchestration layer
-    # (build_news_briefs) which rejects + rerolls. Keeping the
-    # field-level constraint at 1 separates "structurally invalid"
-    # from "below production threshold" -- two different failure
-    # categories with different rerolls.
-    key_terms: list[str] = Field(..., min_length=1, max_length=_MAX_KEY_TERMS)
+    casting_brief: str
+    script_brief: str
+    news_close_brief: str
+    # Optional source-proof telemetry. Unsupported terms are deleted
+    # deterministically after structural parsing; count never causes a retry.
+    key_terms: list[str] = Field(default_factory=list)
 
     # ---- Python-stamped metadata ----------------------------------------
     source_hash: str = ""
@@ -186,65 +136,6 @@ class NewsBriefs(BaseModel):
     attempts: int = 0
     attempt_failures: list[str] = Field(default_factory=list)
 
-    @field_validator("key_terms")
-    @classmethod
-    def _coerce_term_lengths(cls, value: list[str]) -> list[str]:
-        # BUG-LOCAL-307 (2026-06-03): COERCE an over-long term (truncate at a
-        # word boundary), never raise. A real news entity routinely exceeds the
-        # cap (e.g. "University Consortium for Atmospheric Research" = 45); the
-        # old raise exhausted the structured-call retry ladder ->
-        # NewsInterpreterError -> hard HALT of the whole episode. Truncating
-        # keeps the schema always-valid; a clipped term that no longer matches
-        # the source is handled downstream by V1 (soft reroll / raw-seed
-        # fallback), which is recoverable -- never a hard halt. A non-string is
-        # still a genuine structural error and is raised. (cf. BUG-303.)
-        coerced: list[str] = []
-        for t in value:
-            if not isinstance(t, str):
-                raise ValueError(
-                    f"key_term must be str, got {type(t).__name__}: {t!r}"
-                )
-            if len(t) > _MAX_KEY_TERM_CHARS:
-                clipped = t[:_MAX_KEY_TERM_CHARS]
-                # keep a clean word boundary when the kept span has a space
-                if " " in clipped:
-                    clipped = clipped.rsplit(" ", 1)[0]
-                t = clipped.rstrip()
-            coerced.append(t)
-        return coerced
-
-    @field_validator("key_terms", mode="before")
-    @classmethod
-    def _coerce_term_count(cls, value):
-        # BUG-LOCAL-264 (2026-06-03): trim an over-long key_terms LIST to the cap
-        # (keep the first _MAX_KEY_TERMS) instead of rejecting. Weak models return
-        # 9-10 terms; the schema cap-rejection lost the whole NewsBriefs object,
-        # so the announcer intro AND outro fell back to generic text. First-N is
-        # deterministic + offline. A non-list is left to normal validation; the
-        # per-term char-length coerce is _coerce_term_lengths (BUG-307). Silent
-        # coerce, matching that sibling validator.
-        if isinstance(value, list) and len(value) > _MAX_KEY_TERMS:
-            return value[:_MAX_KEY_TERMS]
-        return value
-
-    @field_validator("script_brief", "news_close_brief", mode="before")
-    @classmethod
-    def _coerce_brief_length(cls, value, info):
-        # BUG-LOCAL-264: truncate an over-long brief at a word boundary instead of
-        # rejecting (a weak-model overrun otherwise drops BOTH distilled briefs ->
-        # generic announcer intro/outro). Non-str left to normal validation.
-        caps = {
-            "script_brief": _MAX_SCRIPT_BRIEF_CHARS,
-            "news_close_brief": _MAX_NEWS_CLOSE_BRIEF_CHARS,
-        }
-        cap = caps.get(info.field_name)
-        if cap and isinstance(value, str) and len(value) > cap:
-            clipped = value[:cap]
-            if " " in clipped:
-                clipped = clipped.rsplit(" ", 1)[0]
-            return clipped.rstrip()
-        return value
-
 
 # ---------------------------------------------------------------------------
 # Validators
@@ -255,9 +146,10 @@ log = logging.getLogger("OTR")
 
 
 def _term_in_source_strict(term: str, source_text: str) -> bool:
-    """Strict word-boundary, case-insensitive in-source match for a single
-    key_term -- the deterministic half of V1 (no LLM judge). Shared by
-    ``v1_validate`` and the A2b prune-to-floor path so the two never drift.
+    """Return whether an optional telemetry term occurs in the source.
+
+    This deterministic helper only prunes unsupported terms after a valid
+    response; it never rejects the brief or invokes a model.
     """
     # Clean parenthetical plurals: e.g. pylon(s) -> pylon
     t = re.sub(r"\((s|es)\)$", "", term).strip()
@@ -275,204 +167,6 @@ def _term_in_source_strict(term: str, source_text: str) -> bool:
     return False
 
 
-def v1_validate(
-    brief: NewsBriefs,
-    *,
-    source_text: str,
-    judge_fn: Callable[..., str] | None = None,
-) -> list[str]:
-    """V1 -- every key_term must be present in source, either by
-    word-boundary regex OR (Sprint 10B Wave 1 Agent A) by a semantic
-    LLM-as-judge fallback when ``judge_fn`` is provided.
-
-    Strict word-boundary first (cheap, deterministic, ADR section 4.1).
-    "Mars" matches "Mars rover" but NOT "Marsbar". "AI" matches "AI
-    model" but NOT "paid" / "afraid" / "available". If strict accepts,
-    no LLM call fires.
-
-    BUG-LOCAL-264 family (logged 2026-05-24, recurring):
-    Live operator articles routinely paraphrase the headline term in
-    the body ("Epidermal Growth Factor Receptor" without the verbatim
-    "EGFR", "Dr. David Nathanson" but the LLM emits just "Nathanson",
-    "nasal spray reversing brain aging" but the LLM emits "brain-aging
-    nasal spray"). Strict word-boundary rejects these even though the
-    article DOES support the claim semantically. The 3-attempt retry
-    ladder retries the same prompt at lower temperature with no
-    semantic flexibility and exhausts on every hard article -- the
-    writer then falls back to raw news_seed with NO key_terms
-    enforcement at all. This is worse than accepting a paraphrase.
-
-    Sprint 10B Wave 1 Agent A fix: when ``judge_fn`` is provided, any
-    term that fails strict word-boundary escalates to a single
-    technical-slot LLM call asking "does this article support the
-    claim that this term is a key topic?" If the model answers yes,
-    the term is accepted. If no, it stays a failure.
-
-    ``judge_fn`` is the standard control-plane callable
-    ``generate_fn(messages, *, temperature, max_new_tokens) -> str``.
-    Routed by the caller (build_news_briefs) to the technical slot.
-
-    `source_text` should be ``headline + summary + cleaned_body`` --
-    the full article, NOT the truncated prompt slice.
-
-    # LLM slot: technical
-    # Reason: the optional judge call (one per failing term) is a
-    # structured yes/no semantic-presence check -- not creative
-    # dialogue. Routes through the technical slot the caller already
-    # has resident.
-    """
-    failures: list[str] = []
-    for term in brief.key_terms:
-        if _term_in_source_strict(term, source_text):
-            # Strict word-boundary accepted. No LLM call needed.
-            continue
-
-        if judge_fn is None:
-            # Strict-only mode (judge fallback disabled). Original
-            # behavior; preserved for unit tests that pin the strict
-            # contract and for callers that explicitly want strict.
-            failures.append(f"V1: key_term {term!r} not in source")
-            continue
-
-        # Strict failed AND judge_fn is available -- escalate to the
-        # semantic-presence check.
-        if _judge_term_supported_by_source(
-            term=term,
-            source_text=source_text,
-            judge_fn=judge_fn,
-        ):
-            # LLM-judge accepted. The term is semantically supported by
-            # the article even though the verbatim string is absent.
-            # Continue without flagging.
-            continue
-
-        # Both strict AND judge rejected. Real failure.
-        failures.append(
-            f"V1: key_term {term!r} not in source (strict + LLM-judge)"
-        )
-    return failures
-
-
-# Token cap for the source slice we hand to the LLM judge. Keeps the
-# judge call cheap and bounded; the article body can be 5-10k tokens,
-# we don't need the whole thing to answer the yes/no question.
-_JUDGE_SOURCE_CHAR_CAP = 4000
-
-# Per-term token budget for the judge response. The model only needs
-# to emit "yes" or "no" plus a one-line rationale at most; cap small
-# so a runaway generation doesn't burn the budget on every call.
-_JUDGE_MAX_NEW_TOKENS = 24
-
-# Low temperature for the judge: deterministic yes/no answers, not
-# creative reasoning.
-_JUDGE_TEMPERATURE = 0.10
-
-
-def _judge_term_supported_by_source(
-    *,
-    term: str,
-    source_text: str,
-    judge_fn: Callable[..., str],
-) -> bool:
-    """One LLM call per failing term. Returns True iff the model
-    affirms that ``term`` is a topic the article supports.
-
-    Conservative parser: only an unambiguous "yes" at the start of
-    the response (after trimming) counts as accept. Anything else --
-    "no", "maybe", "the article mentions ...", empty response,
-    exception -- counts as reject. False positives are worse than
-    false negatives here: an accepted paraphrase that doesn't really
-    fit the article propagates downstream as a key_term the writer
-    is asked to anchor to.
-
-    Never raises. Any judge_fn exception is swallowed and treated as
-    a rejection -- the original strict failure stands.
-    """
-    if not term or not source_text or judge_fn is None:
-        return False
-    source_slice = (source_text or "")[:_JUDGE_SOURCE_CHAR_CAP].strip()
-    if not source_slice:
-        return False
-
-    system = (
-        "You are an editorial fact-checker. You read a news article "
-        "excerpt and decide whether a candidate topic term is "
-        "supported by the article. A term is SUPPORTED if the article "
-        "discusses the concept, names a paraphrase, refers to it by "
-        "an obvious synonym, or includes the term as a substring of a "
-        "longer phrase the article uses. A term is NOT SUPPORTED if "
-        "the article does not discuss the concept at all -- a term "
-        "fabricated outside the article's content. Answer with a "
-        'single word, "yes" or "no", on its own line. No '
-        "explanation."
-    )
-    user = (
-        f"Article excerpt:\n[BEGIN]\n{source_slice}\n[END]\n\n"
-        f"Candidate term: {term!r}\n\n"
-        "Is this term supported by the article? Answer yes or no."
-    )
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-    ]
-
-    try:
-        # LLM slot: technical
-        # Reason: structured yes/no semantic-presence judgment. One
-        # call per failing key_term per attempt; bounded by
-        # _MAX_KEY_TERMS (6) * max_attempts (3) = 18 calls in the
-        # worst case, typically 1-2 calls.
-        raw = judge_fn(
-            messages,
-            temperature=_JUDGE_TEMPERATURE,
-            max_new_tokens=_JUDGE_MAX_NEW_TOKENS,
-        )
-    except Exception:  # noqa: BLE001 -- never break the validator on
-        # a judge failure; the term stays rejected, the strict failure
-        # message lands, and the caller's existing retry ladder
-        # handles re-rolling the brief.
-        return False
-
-    if not isinstance(raw, str):
-        return False
-    # Conservative parser. Only "yes" (or "yes." / "Yes" with any
-    # capitalization) at the head of the first non-blank line accepts.
-    first_line = ""
-    for line in (raw or "").splitlines():
-        s = line.strip()
-        if s:
-            first_line = s
-            break
-    if not first_line:
-        return False
-    first_word = re.split(r"[^A-Za-z]+", first_line, maxsplit=1)[0]
-    return first_word.lower() == "yes"
-
-
-def v2_validate(
-    brief: NewsBriefs,
-    *,
-    source_text: str,
-) -> list[str]:
-    """V2 -- forbidden era terms reject only when in brief AND absent
-    from source.
-
-    Source-context allowance per ADR section 4.2. An article about
-    1940s computing history, vintage Voyager footage, or radio
-    astronomy may legitimately surface those terms in the brief --
-    only flag them when the brief invented them.
-    """
-    failures: list[str] = []
-    source_lower = source_text.lower()
-    fields = ("casting_brief", "script_brief", "news_close_brief")
-    for field_name in fields:
-        field_text = getattr(brief, field_name).lower()
-        for term in FORBIDDEN_ERA_TERMS:
-            if term in field_text and term not in source_lower:
-                failures.append(
-                    f"V2: {term!r} in {field_name} but not in source"
-                )
-    return failures
 
 
 # ---------------------------------------------------------------------------
@@ -593,7 +287,7 @@ except ImportError:  # pragma: no cover - standalone / test load
 extract_json_block = _otr_json.extract_first_json_block
 
 # Sprint 2A/2D: the shared structured-JSON retry ladder. build_news_briefs
-# routes its V0-V3 LLM call through it -- the ladder subsumes the former
+# routes its one structured brief call through it -- the ladder subsumes the former
 # hand-rolled 3-attempt loop + repair branch. Package import in
 # production; flat import when loaded standalone / under test.
 try:
@@ -673,16 +367,12 @@ def _build_user_prompt(
         "You are interpreting a news article for an audio drama "
         "production. Read the article and emit ONE JSON object with "
         "exactly these fields:\n"
-        f"  casting_brief    (<={_MAX_CASTING_BRIEF_CHARS} chars; what "
-        "kinds of people belong in this story -- occupations, "
+        "  casting_brief    (who belongs in the story: occupations, "
         "dynamics, stakes).\n"
-        f"  script_brief     (<={_MAX_SCRIPT_BRIEF_CHARS} chars; "
-        "premise arc + central tension + beat hooks).\n"
-        f"  news_close_brief (<={_MAX_NEWS_CLOSE_BRIEF_CHARS} chars; "
-        "era-neutral 1-2 sentence closing news read).\n"
-        f"  key_terms        ({_MIN_KEY_TERMS}-{_MAX_KEY_TERMS} "
-        "short strings; people, places, technology verbatim from "
-        "the source -- singular or plural must match the source).\n"
+        "  script_brief     (premise arc, central tension, beat hooks).\n"
+        "  news_close_brief (an era-neutral closing news read).\n"
+        "  key_terms        (optional source-verbatim people, places, or "
+        "technology terms).\n"
         "\n"
         f"{wrapper}\n"
         "Return ONE JSON object. No prose. No code fences.\n"
@@ -711,15 +401,15 @@ def build_news_briefs(
 ) -> NewsBriefs:
     """End-to-end caller.
 
-    Sprint 2A/2D: the V0-V3 LLM call routes through the shared
+    Sprint 2A/2D: the structured brief call routes through the shared
     `structured_call` retry ladder (base -> structural retry -> typed
     repair). The ladder subsumes the former hand-rolled 3-attempt loop
     and bespoke repair branch. Two responsibilities stay in this
     function:
 
-      * `post_validator` carries the V0 production key-term floor plus
-        the V1/V2/V3 content validators. A content rejection re-rolls
-        the ladder exactly like a JSON / schema failure.
+      * The retry ladder repairs malformed JSON/schema only.
+      * Optional key terms are grounded deterministically after parsing;
+        unsupported terms are deleted without another model call or a floor.
       * Python stamps the nine metadata fields on the validated
         instance AFTER the ladder returns -- the LLM never authors
         metadata it could hallucinate. `model_validate` runs against
@@ -739,7 +429,7 @@ def build_news_briefs(
     prompt + reroll) -- this module's contract is "I send messages +
     sampling knobs, you return a string."
     """
-    # All sub-passes (V0 emit, V1-V3 retries) run on the technical
+    # The structured brief emit and schema repairs run on the technical
     # slot -- structured-output JSON, not creative prose. The body
     # alias keeps the call sites below readable.
     generate_fn = technical_fn
@@ -748,10 +438,8 @@ def build_news_briefs(
         raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
 
     cleaned_body = _clean_body(full_text)
-    # Source text for V1 is the FULL article (head + summary + body),
-    # not the truncated prompt slice. The prompt sees a slice; the
-    # validator sees the full article so key_terms drawn from the
-    # tail of the body still validate.
+    # Optional-term grounding sees the full article (head + summary + body),
+    # not the truncated prompt slice, so terms drawn from the tail still match.
     source_text_full = " ".join(
         s for s in (headline, summary, cleaned_body) if s
     )
@@ -765,72 +453,9 @@ def build_news_briefs(
     )
     messages = [{"role": "user", "content": user_prompt}]
 
-    # Content gate: V0 production key-term floor + V1/V2/V3 validators.
-    # structured_call runs this on every schema-valid instance; a non-
-    # None return is a content rejection that re-rolls the ladder.
-    # The schema accepts 1-6 key_terms (unit-test isolation); the
-    # production contract is 2-6, enforced here as V0 -- <2 terms means
-    # the LLM failed to surface enough journalistic anchors.
-    def _run_content_validators(brief: NewsBriefs) -> list[str]:
-        v_failures: list[str] = []
-        # Sprint 10B Wave 1 Agent A (2026-05-27): v1_validate gains an
-        # optional judge_fn that escalates strict-word-boundary failures
-        # to a semantic LLM-as-judge check (BUG-LOCAL-264 family). The
-        # judge runs on the same technical slot the brief generator
-        # uses -- model already resident; one call per failing term per
-        # attempt, typically 0-2 calls per run.
-        v_failures.extend(v1_validate(
-            brief,
-            source_text=source_text_full,
-            judge_fn=_counting_slot_fn,
-        ))
-        v_failures.extend(v2_validate(brief, source_text=source_text_full))
-        return v_failures
-
-    def _content_validator(brief: NewsBriefs) -> str | None:
-        if len(brief.key_terms) < _MIN_KEY_TERMS:
-            return (
-                f"V0: key_terms below production minimum "
-                f"({len(brief.key_terms)} < {_MIN_KEY_TERMS})"
-            )
-        v_failures = _run_content_validators(brief)
-        if not v_failures:
-            return None
-        # A2b (durable, 2026-06-13): rather than HALT the whole episode on
-        # a single fabricated key_term, prune the key_terms that fail a
-        # STRICT word-boundary in-source match and re-validate on the
-        # grounded subset. Prunes, never relaxes:
-        #   * if fewer than _MIN_KEY_TERMS survive -> still halt (V0 floor);
-        #   * if all terms are already grounded (so the failure is V2/V3,
-        #     not fabrication) -> nothing to prune, halt loud;
-        #   * if pruning leaves any residual failure -> restore + halt loud.
-        # NewsBriefs is a plain BaseModel, so attribute assignment is safe.
-        grounded = [
-            t for t in brief.key_terms
-            if _term_in_source_strict(t, source_text_full)
-        ]
-        if (
-            len(grounded) < _MIN_KEY_TERMS
-            or len(grounded) == len(brief.key_terms)
-        ):
-            return "; ".join(v_failures)
-        original_terms = list(brief.key_terms)
-        brief.key_terms = grounded
-        residual = _run_content_validators(brief)
-        if residual:
-            # Pruning did not clear every failure (e.g. a V2/V3 problem) --
-            # restore the original brief and halt loud; never silently ship
-            # a degraded brief that still fails a validator.
-            brief.key_terms = original_terms
-            return "; ".join(v_failures)
-        dropped = [t for t in original_terms if t not in grounded]
-        log.warning(
-            "[news_interpreter] V1 prune-to-floor (A2b): dropped %d "
-            "fabricated key_term(s) %r; kept %d grounded %r -- degraded "
-            "instead of halting the run.",
-            len(dropped), dropped, len(grounded), grounded,
-        )
-        return None
+    # Optional key terms are source-proof telemetry, not a candidate gate.
+    # Ground them once after the structurally valid response returns; never
+    # trigger an extra model call, repair prompt, or minimum-count retry.
 
     # structured_call returns only the validated instance, not its
     # attempt count. Count slot-fn invocations so the success path can
@@ -845,7 +470,7 @@ def build_news_briefs(
             msgs, temperature=temperature, max_new_tokens=max_new_tokens,
         )
 
-    # LLM slot: technical -- structured JSON briefs (V0-V3 schema),
+    # LLM slot: technical -- structured JSON briefs,
     # routed through the shared ladder. The structural retry runs at
     # half the base temperature: strictly below base, never above (the
     # Sprint 2B principle; the old loop RAISED it to base + 0.1).
@@ -857,7 +482,6 @@ def build_news_briefs(
             base_temperature=float(base_temperature),
             structural_retry_temperature=float(base_temperature) / 2.0,
             repair_prompt_factory=make_dispatching_repair_factory(),
-            post_validator=_content_validator,
             max_new_tokens=int(max_new_tokens),
             max_attempts=int(max_attempts),
             helper_name="build_news_briefs",
@@ -884,6 +508,20 @@ def build_news_briefs(
             attempts=[],
             reason=f"slot fn raised: {type(exc).__name__}: {exc}",
         ) from exc
+
+    raw_terms = list(brief.key_terms)
+    grounded_terms = [
+        str(term).strip() for term in raw_terms
+        if str(term).strip()
+        and _term_in_source_strict(str(term).strip(), source_text_full)
+    ]
+    if grounded_terms != raw_terms:
+        log.warning(
+            "[news_interpreter] dropped %d unsupported/empty key_term(s); "
+            "source-proof terms are optional and never have a count floor",
+            len(raw_terms) - len(grounded_terms),
+        )
+    brief.key_terms = grounded_terms
 
     # SUCCESS. Python-stamp metadata. NOT non-deterministic -- all
     # values derive from the inputs. Per-attempt failure records live

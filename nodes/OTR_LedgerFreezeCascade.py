@@ -1,36 +1,10 @@
-"""nodes/OTR_LedgerFreezeCascade.py — Ledger Freeze Cascade ComfyUI node.
+"""ComfyUI node for final ledger safety, readiness, and freeze.
 
-Wires AFTER OTR_LedgerScriptWriter and BEFORE SceneSequencer. Touches
-the production ledger only; emits no audio, no video, no LLM weights
-beyond what the writer already loaded.
-
-Output contract (7 slots):
-    script_text, script_json, news_used, estimated_minutes, freeze_verdict,
-    episode_seed, v2_ledger_json
-
-R0a (2026-06-02): episode_seed + v2_ledger_json appended at output indices
-5,6 -- never inserted, so outputs 0-4 (and the 13-consumer fan-out on out[1]
-script_json) keep byte-identical raw-delegation behavior. episode_seed is
-derived read-only from the frozen ledger (never stamped back), so out[1] stays
-unchanged; v2_ledger_json carries the frozen ledger for OTR_CastLock (Wave 2a).
-
-`freeze_verdict` literal set (S33 B2 trim 2026-05-15):
-
-    frozen_clean
-    frozen_with_warns
-    frozen_with_doctor_edits
-    too_many_edits
-    needs_full_rerun
-
-``too_many_edits`` is an observable quality-budget verdict, not a terminal
-episode disposition. Only ``needs_full_rerun`` may enter the structural
-terminal-skip path; spoken craft exhaustion repairs and continues to freeze.
-
-`cast_unrecoverable` and `post_audit_failed` retired in S33 B2 with
-their respective rollback gates per the refined no-auditors rule.
-
-Status: LFC v2.0-alpha (2026-05-12 clean-break).
+The node preserves the writer's accepted story. It permits only bounded,
+same-story cleanup of the narrow terminal safety policy; word length, visual
+vocabulary, style, craft, and quality never affect publication.
 """
+
 from __future__ import annotations
 
 import json
@@ -97,32 +71,7 @@ def _episode_seed_from_ledger(ledger_json: str) -> int:
 
 
 class OTR_LedgerFreezeCascade:
-    """Ledger Freeze Cascade -- multi-phase post-writer cleanup.
-
-    Inputs:
-      script_text         Forwarded from OTR_LedgerScriptWriter so the
-                          graph wires this node in line. Returned
-                          rebuilt (from the post-freeze ledger) as the
-                          first output slot.
-      script_json         Forwarded JSON snapshot from the writer
-                          (slot index 1). Re-serialized from the
-                          post-freeze ledger in the output.
-      news_used           Passthrough of the writer's news_used slot.
-      estimated_minutes   Passthrough of the writer's est_minutes INT.
-      model_id            HF model ID for the reviewer LLM passes
-                          (Phase 1 Auditor, Phase 2 Script Doctor).
-                          S33 B3 (2026-05-15) retired Phase 9 per
-                          the refined no-auditors rule. Phase
-                          3/4/4.5/5/6 future LLM phases reuse the
-                          same loader.
-
-    Outputs (5 slots):
-      script_text         Rebuilt from the post-freeze ledger.
-      script_json         JSON snapshot of the post-freeze ledger.
-      news_used           Passthrough from writer to SignalLostVideo.
-      estimated_minutes   Passthrough INT.
-      freeze_verdict      One of the FreezeVerdict literals.
-    """
+    """Finalize the accepted ledger without quality-driven reauthoring."""
 
     CATEGORY = "OldTimeRadio/v2"
     FUNCTION = "run"
@@ -194,10 +143,9 @@ class OTR_LedgerFreezeCascade:
                     "forceInput": True,
                     "tooltip": (
                         "Resolved technical_model id from the writer's "
-                        "broadcast output (S30 B3). No local widget; "
-                        "the cascade must be wired into the writer's "
-                        "technical_model output socket to receive its "
-                        "reviewer-LLM id. Validated at run-time via "
+                        "broadcast output. No local widget; the "
+                        "cascade uses it only for bounded same-story "
+                        "safety cleanup on inline banks. Validated via "
                         "_otr_model_inputs.require_model -- an unwired "
                         "socket raises MissingModelInputError loud."
                     ),
@@ -221,24 +169,14 @@ class OTR_LedgerFreezeCascade:
                         "Default ON."
                     ),
                 }),
-                # ---- Sprint 6 -- legacy critic-to-render receipt ---
-                # These four widgets are retained for workflow compatibility
-                # and story-QA telemetry. The real episode renderer now treats
-                # `meta.render_plan` as informational only: ShotLock's
-                # video.shots list is the visible delivery authority, so a
-                # story-QA plan can never remove a voiced beat's video.
+                # Positional compatibility inputs retained because the canonical
+                # workflow is immutable in this change. All four are ignored;
+                # real render selection belongs exclusively to ShotLock.
                 "render_selection": (
                     ("all", "dramatic_peaks_only"),
                     {
                         "default": "all",
-                        "tooltip": (
-                            "Legacy Sprint 6 story-QA receipt only. The "
-                            "real episode renderer ignores meta.render_plan "
-                            "and renders every ShotLock shot. 'all' keeps "
-                            "the receipt in ledger order; "
-                            "'dramatic_peaks_only' reorders the receipt to "
-                            "the critic's render_priority list."
-                        ),
+                        "tooltip": "Deprecated compatibility input; ignored.",
                     },
                 ),
                 "render_max_n": ("INT", {
@@ -246,32 +184,16 @@ class OTR_LedgerFreezeCascade:
                     "min": 0,
                     "max": 999,
                     "step": 1,
-                    "tooltip": (
-                        "Legacy Sprint 6 receipt cap. Default 6. 0 disables "
-                        "the cap in meta.render_plan. This no longer limits "
-                        "real episode rendering; ShotLock video.shots renders "
-                        "in full."
-                    ),
+                    "tooltip": "Deprecated compatibility input; ignored.",
                 }),
                 "protagonist_only": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": (
-                        "Legacy Sprint 6 receipt toggle. Restricts "
-                        "meta.render_plan to the protagonist's lines, but "
-                        "does not restrict real episode rendering. "
-                        "manual_line_ids, when non-empty, supersedes this "
-                        "toggle in the receipt."
-                    ),
+                    "tooltip": "Deprecated compatibility input; ignored.",
                 }),
                 "manual_line_ids": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "tooltip": (
-                        "Legacy Sprint 6 receipt override. When non-empty, "
-                        "supersedes render_selection / flat_lines exclusion "
-                        "/ arc_verdict gating inside meta.render_plan. It "
-                        "does not select which real episode shots render."
-                    ),
+                    "tooltip": "Deprecated compatibility input; ignored.",
                 }),
             },
         }
@@ -293,14 +215,15 @@ class OTR_LedgerFreezeCascade:
         technical_model: str = "",
         enable_phase_7_audio_readiness: bool = True,
         enable_phase_8_video_readiness: bool = True,
-        # Sprint 6 -- critic-to-render coupling widgets. Defaults match
-        # the INPUT_TYPES defaults; the cascade stamps meta.render_plan
-        # from these + the post-reroll critic report.
+        # Deprecated positional compatibility arguments; the canonical
+        # workflow keeps their slots byte-identical, but runtime ignores them.
         render_selection: str = "all",
         render_max_n: int = 6,
         protagonist_only: bool = False,
         manual_line_ids: str = "",
     ):
+        del render_selection, render_max_n, protagonist_only, manual_line_ids
+
         # Lazy imports to keep node-load cheap.
         from . import _otr_freeze_cascade as _LFC_ORCH
         from . import _otr_model_loader as _OTRML
@@ -340,48 +263,29 @@ class OTR_LedgerFreezeCascade:
                 _no_ledger_error_json(script_json),
             )
 
-        # S30 B3: resolve the technical_model id via the shared
-        # require_model helper. Fail loud (MissingModelInputError) if
-        # the input socket is unwired -- the recovery is to connect
-        # the writer's broadcast `technical_model` output.
-        # LLM slot: technical -- reviewer Phase 1 (auditor) + Phase 2
-        # (Script Doctor) consume this entry. Structured verdict-style
-        # passes; routes to the technical slot per the S30 routing
-        # table. S33 B3 (2026-05-15) retired Phase 9 (post-edit
-        # auditor) per the refined no-auditors rule.
+        # Resolve the wired technical model for the one permitted inline
+        # content mutation: atomic same-story safety cleanup.
         resolved_technical_id = _OTRMI.require_model(
             technical_model, slot="technical",
         )
-        # Post-ship audit fix (2026-07-10): run the reviewer under the
-        # SAME runtime policy the writer stamped into the ledger
-        # (meta.llm_policy) -- an unthreaded call here reloaded the LLM
-        # under the nv50 baseline on every non-baseline tier, after the
-        # writer's full budget was already spent. None (pre-stamp
-        # ledger) keeps the documented BASELINE backstop.
         from ._otr_shared.llm_policy import policy_from_meta
         from ._otr_gguf_backend import load_config_from_meta
-        # `led` is the production Ledger HANDLE (dict lives at .data).
-        _lfc_data = getattr(led, "data", led)
-        _lfc_meta = (_lfc_data.get("meta") or {}) if isinstance(
-            _lfc_data, dict) else {}
-        _lfc_policy = policy_from_meta(_lfc_meta)
-        # GGUF row registry (2026-07-16): thread the writer's exact per-slot
-        # load contract (ledger stamp) so a resident-cache MISS reloads the
-        # selected row (e.g. Qwen) under ITS registry entry, never the gemma
-        # env-fallback. None for a non-GGUF run -> unchanged behavior.
-        _lfc_load_config = load_config_from_meta(_lfc_meta, "technical")
-        cache_entry = _OTRML.request_slot(  # LLM slot: technical
-            "technical", resolved_technical_id, policy=_lfc_policy,
-            load_config=_lfc_load_config,
+        lfc_data = getattr(led, "data", led)
+        lfc_meta = (
+            (lfc_data.get("meta") or {})
+            if isinstance(lfc_data, dict)
+            else {}
+        )
+        lfc_policy = policy_from_meta(lfc_meta)
+        lfc_load_config = load_config_from_meta(lfc_meta, "technical")
+        # LLM slot: technical -- bounded same-story safety cleanup only.
+        cache_entry = _OTRML.request_slot(
+            "technical",
+            resolved_technical_id,
+            policy=lfc_policy,
+            load_config=lfc_load_config,
         )
         generate_fn = _OTRML.make_generate_fn(cache_entry)
-        # LFC commit 12, ADR section 6.4: build the polish-specific
-        # generate_fn off the same cache_entry so composer-tuned
-        # sampling does not leak in. S28 cleanbreak: drop the
-        # try/except None-fallback (producer-side legacy debris).
-        # B3 keeps the call required; a factory failure surfaces as
-        # a hard node error rather than silently degrading.
-        polish_generate_fn = _OTRML.make_polish_generate_fn(cache_entry)
 
         log.info(
             "[OTR_LedgerFreezeCascade] running cascade on ledger %s "
@@ -410,18 +314,12 @@ class OTR_LedgerFreezeCascade:
             disp = _LFC_ORCH.run_freeze_cascade(
                 generate_fn,
                 led,
-                polish_generate_fn=polish_generate_fn,
                 enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
                 enable_phase_8_video_readiness=enable_phase_8_video_readiness,
-                # Sprint 6 -- critic-to-render coupling.
-                render_selection=str(render_selection or "all"),
-                render_max_n=int(render_max_n or 0),
-                protagonist_only=bool(protagonist_only),
-                manual_line_ids=str(manual_line_ids or ""),
             )
             log.info(
                 "[OTR_LedgerFreezeCascade] freeze_verdict=%s "
-                "(pre_warns=%d post_warns=%s reviewer=%s)",
+                "(pre_warns=%d post_warns=%s cleanup=%s)",
                 disp.verdict,
                 len(disp.gap_audit_pre.warnings),
                 (
@@ -430,8 +328,8 @@ class OTR_LedgerFreezeCascade:
                     else "n/a"
                 ),
                 (
-                    disp.reviewer_disposition.verdict
-                    if disp.reviewer_disposition is not None
+                    (disp.cleanup_receipt or {}).get("status", "n/a")
+                    if isinstance(disp.cleanup_receipt, dict)
                     else "n/a"
                 ),
             )

@@ -14,7 +14,6 @@ from nodes._otr_public_domain_sources import (
     SCHEMA_VERSION,
     PublicDomainBriefs,
     PublicDomainInterpreterError,
-    _MAX_KEY_TERMS,
     build_public_domain_briefs,
 )
 from nodes._otr_source_payload import validate_interpreter_result
@@ -119,13 +118,14 @@ def test_build_public_domain_briefs_rejects_max_attempts_lt_one():
         )
 
 
-def test_public_domain_briefs_trim_key_terms():
-    terms = [f"term{i}" for i in range(_MAX_KEY_TERMS + 4)]
+def test_public_domain_briefs_preserve_optional_terms_without_caps():
+    assert _good_briefs(key_terms=[]).key_terms == []
+    terms = [f"term{i}" for i in range(20)] + ["x" * 200]
     brief = _good_briefs(key_terms=terms)
-    assert len(brief.key_terms) == _MAX_KEY_TERMS
+    assert brief.key_terms == terms
 
 
-def test_public_domain_prompt_contains_no_visual_safety_terms(monkeypatch):
+def test_public_domain_prompt_carries_narrow_safety_guidance(monkeypatch):
     captured = {}
 
     def _fake_structured_call(**kwargs):
@@ -142,7 +142,7 @@ def test_public_domain_prompt_contains_no_visual_safety_terms(monkeypatch):
         model_id="test-model",
     )
     prompt_text = "\n".join(m["content"] for m in captured["prompt"])
-    for term in ("no blood", "guns", "knives", "smoking"):
+    for term in ("no profanity", "guns/knives/weapons", "sexual/nudity"):
         assert term in prompt_text
     assert brief.model_id == "test-model"
     assert brief.attempts == 0

@@ -802,3 +802,130 @@ def test_repair_factory_instance_clearing_post_validator_is_returned():
     assert result is resolved
     assert len(slot.calls) == 2
     assert post_validator.seen == [resolved]
+
+
+# ---------------------------------------------------------------------------
+# 20-23. Bounded alternate-owner handoff
+# ---------------------------------------------------------------------------
+
+
+def test_alternate_owner_repairs_after_primary_post_validation_exhaustion():
+    primary = _make_counting_slot_fn(
+        responses=[_valid_json(), _valid_json()],
+    )
+    alternate = _make_counting_slot_fn(responses=[_valid_json()])
+    verdicts = iter(["primary reject", "typed repair reject", None])
+    seen_builder: dict[str, object] = {}
+
+    def post_validator(value):
+        verdict = next(verdicts)
+        if verdict is not None:
+            return verdict
+        return None
+
+    def ledger_builder(*, failed_output, error, repair_nonce, max_bytes):
+        seen_builder.update({
+            "failed_output": failed_output,
+            "error": error,
+            "repair_nonce": repair_nonce,
+            "max_bytes": max_bytes,
+        })
+        return [{
+            "role": "user",
+            "content": (
+                "REPAIR_LEDGER nonce=" + repair_nonce +
+                " failed=" + failed_output
+            ),
+        }]
+
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=primary,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        post_validator=post_validator,
+        max_attempts=2,
+        repair_slot_fn=alternate,
+        repair_ledger_builder=ledger_builder,
+        max_repair_attempts=1,
+        repair_context_max_bytes=2048,
+        helper_name="alternate_owner_pass",
+    )
+
+    assert result.score == 42
+    assert len(primary.calls) == 2
+    assert len(alternate.calls) == 1
+    assert isinstance(seen_builder["error"], sc.PostValidationError)
+    assert isinstance(seen_builder["repair_nonce"], str)
+    assert seen_builder["repair_nonce"]
+    assert seen_builder["max_bytes"] == 2048
+
+
+def test_alternate_owner_exhaustion_is_explicit_and_bounded():
+    primary = _make_counting_slot_fn(responses=[_schema_violating_json()])
+    alternate = _make_counting_slot_fn(responses=[_schema_violating_json()])
+
+    with pytest.raises(sc.StructuredCallFailedError) as exc_info:
+        sc.structured_call(
+            prompt="produce a title and score",
+            schema=SampleSchema,
+            slot_fn=primary,
+            base_temperature=0.40,
+            structural_retry_temperature=0.20,
+            max_attempts=1,
+            repair_slot_fn=alternate,
+            repair_ledger_builder=lambda **kwargs: "bounded repair ledger",
+            max_repair_attempts=1,
+            helper_name="alternate_owner_exhaustion",
+        )
+
+    error = exc_info.value
+    assert len(primary.calls) == 1
+    assert len(alternate.calls) == 1
+    assert error.repair_attempted is True
+    assert error.terminal_disposition == "repair_owner_exhausted"
+    assert error.attempts == 2
+    assert isinstance(error.last_error, Exception)
+
+
+def test_alternate_owner_provider_failure_is_not_swallowed():
+    primary = _make_counting_slot_fn(responses=[_schema_violating_json()])
+
+    def alternate(messages, *, temperature, max_new_tokens):
+        raise RuntimeError("alternate provider unavailable")
+
+    with pytest.raises(RuntimeError, match="alternate provider unavailable"):
+        sc.structured_call(
+            prompt="produce a title and score",
+            schema=SampleSchema,
+            slot_fn=primary,
+            base_temperature=0.40,
+            structural_retry_temperature=0.20,
+            max_attempts=1,
+            repair_slot_fn=alternate,
+            repair_ledger_builder=lambda **kwargs: "bounded repair ledger",
+            max_repair_attempts=1,
+            helper_name="alternate_provider_failure",
+        )
+
+
+def test_alternate_repair_context_hard_limit_never_silently_clips():
+    primary = _make_counting_slot_fn(responses=[_schema_violating_json()])
+    alternate = _make_counting_slot_fn(responses=[_valid_json()])
+
+    with pytest.raises(ValueError, match="over the hard limit"):
+        sc.structured_call(
+            prompt="produce a title and score",
+            schema=SampleSchema,
+            slot_fn=primary,
+            base_temperature=0.40,
+            structural_retry_temperature=0.20,
+            max_attempts=1,
+            repair_slot_fn=alternate,
+            repair_ledger_builder=lambda **kwargs: "x" * 100,
+            repair_context_max_bytes=10,
+            max_repair_attempts=1,
+            helper_name="alternate_context_limit",
+        )
+    assert len(alternate.calls) == 0

@@ -21,7 +21,7 @@ UTF-8 no BOM, SFW.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 # Each entry: slug (snake_case id), label (human), sound_world, story_engine,
 # ending_mode. tags help the picker bias away from the over-used emergency
@@ -475,10 +475,31 @@ STYLE_CATALOG: List[Dict[str, str]] = [
 # at the final character beat. Every template steers AWAY from machinery
 # (console / countdown / self-destruct / kill-switch) and TOWARD a human, on-mic
 # ending.
-try:
-    from ._otr_story_quality_l12 import CLIMAX_CLASS_ROLES, premise_texts
-except ImportError:  # pragma: no cover - standalone / test load
-    from _otr_story_quality_l12 import CLIMAX_CLASS_ROLES, premise_texts  # type: ignore
+CLIMAX_CLASS_ROLES = frozenset({
+    "irreversible_choice",
+    "revelation",
+    "reversal",
+    "unresolved_final_sound",
+    "reconciliation",
+    "bittersweet_parting",
+    "ironic_twist",
+    "quiet_acceptance",
+    "confession",
+})
+
+
+def premise_texts(meta: Any) -> Tuple[str, ...]:
+    """Return available premise text for style selection."""
+    out: List[str] = []
+    if isinstance(meta, Mapping):
+        news = meta.get("news") if isinstance(meta.get("news"), Mapping) else {}
+        for field_name in (
+            "title", "logline", "script_brief", "theme", "headline",
+        ):
+            for source in (meta, news):
+                if isinstance(source, Mapping) and source.get(field_name):
+                    out.append(str(source.get(field_name)))
+    return tuple(out)
 
 ENDING_TEMPLATES: Dict[str, str] = {
     "irreversible_choice":

@@ -23,8 +23,7 @@ Per workflows/GO_FORWARD_PLAN_v10_four_builds_2026-05-28.md, Build 4:
       speakers, no added/skipped slots (critique 8).
     * De-exposition lives in the writer prompt, weighted to avoid object
       spam: require ONE concrete grounding per EXCHANGE, not per line
-      (critique 6). Forbidden generic words are a SOFT hygiene nudge in
-      the prompt, NOT a hard rule here (critique 7).
+      (critique 6). Authored vocabulary is not filtered or scored by Python.
     * Repair by exchange GROUP, not single slot (critique 11): if any
       slot fails the injected Tier-A check, re-run the WHOLE exchange
       ONCE with the failure reasons appended; preserve slot ids +
@@ -101,15 +100,14 @@ SLOT_LINE_RE = re.compile(
 class VoicedSlot:
     """One voiced slot in a beat group (Build 2 slot-format shape).
 
-    The integration may pass any object exposing these three attributes
-    (a pydantic Stage1Beat-derived row, a ledger dict wrapped in a small
-    adapter, etc.). compose_exchange only reads these fields.
+    The integration may pass any object exposing these attributes.
+    compose_exchange reads only the structural slot identity and prompt
+    context carried here.
     """
 
     dialogue_slot_id: str       # d### (Build 2)
     speaker: str                # cast member name, ALL CAPS
-    intent: str = ""            # one-sentence beat intent (grounding)
-    length_target_words: int = 20
+    intent: str = ""            # beat intent (prompt context)
 
 
 # ---- Build 3: slot_drama_contract ----------------------------------------
@@ -143,8 +141,8 @@ class SlotContract:
 # ---- Build 2: Tier-A integrity check (injected) --------------------------
 #
 # Tier-A is format/integrity only, deterministic, hard-fail: slot count,
-# slot order, speaker match, empty line, per-line word floor. Nothing
-# semantic. Build 4 calls it through this injected callable so tests can
+# slot order, speaker match, and empty lines. Prose length and vocabulary are
+# never gated. Build 4 calls it through this injected callable so tests can
 # pass a fake. The real Build 2 validator is adapted to this signature at
 # wire-up (see WIRING_SPEC.md).
 
@@ -198,10 +196,8 @@ so the integration can experiment without an API change."""
 # system prompt, extracted so the seam can be pack-routed. This constant is
 # the SCIENCE EXTRACTION FIXTURE (byte-identity pinned against the science
 # pack's `exchange_system` seam by tests/test_exchange_seam_lane2.py) and
-# the default when no pack-routed prompt is injected. The two dynamic craft
-# bullets (grounding clause + soft nudge) are appended by
-# build_exchange_prompt at assembly time -- they are Python-owned behavior,
-# not bank content.
+# the default when no pack-routed prompt is injected. The dynamic grounding
+# clause is appended by build_exchange_prompt at assembly time.
 EXCHANGE_SYSTEM_PROMPT: str = (
     "You write old-time-radio drama dialogue. Write an EXCHANGE "
     "between the speakers below -- naturalistic, with subtext.\n\n"
@@ -212,21 +208,6 @@ EXCHANGE_SYSTEM_PROMPT: str = (
     "object or action, not by naming the feeling.\n"
     "  - Do NOT summarize the situation. Do NOT explain the theme.\n"
 )
-
-# Soft hygiene nudge ONLY -- NOT a gate (critique 7). Listed in the
-# prompt so the model avoids them; never enforced in code here.
-FORBIDDEN_GENERIC_WORDS: Tuple[str, ...] = (
-    "intriguing",
-    "game-changing",
-    "transformative",
-    "unbelievable",
-    "anomaly",
-    "unprecedented",
-    "revolutionary",
-    "fascinating",
-    "remarkable",
-)
-
 
 # ===========================================================================
 # Result envelope
@@ -336,8 +317,8 @@ def build_exchange_prompt(
             uses EXCHANGE_SYSTEM_PROMPT (the science extraction fixture).
             The writer injects the bank's pack-routed `exchange_system`
             seam here (lane-enablement chunk 2) -- this module stays
-            import-free of the routing layer by design. The two dynamic
-            craft bullets are always appended after it.
+            import-free of the routing layer by design. The dynamic grounding
+            guidance is always appended after it.
 
     Returns:
         chat messages (list of {"role", "content"}) for generate_fn.
@@ -347,7 +328,7 @@ def build_exchange_prompt(
     one line reveals pressure through a concrete object or action; do not
     summarize the situation; do not explain the theme. De-exposition:
     require ONE concrete grounding per EXCHANGE (not per line). The
-    forbidden-word list is a SOFT nudge, not a gate.
+    authored vocabulary is never filtered or scored by this module.
     """
     slot_ids = _slot_ids_of(beat_group)
     persona_by_name = {
@@ -401,21 +382,11 @@ def build_exchange_prompt(
 
     prior_block = "\n".join(prior_committed_lines) if prior_committed_lines else "  (scene opens here)"
 
-    soft_nudge = (
-        "Avoid flat, generic words such as: "
-        + ", ".join(FORBIDDEN_GENERIC_WORDS)
-        + ". (Guidance, not a hard rule.)"
-    )
-
     # Lane chunk 2: static portion is injectable (pack-routed by the writer);
     # None keeps the module constant -- byte-identical assembly either way
     # when the injected value equals the constant (science lane, test-pinned).
     base = EXCHANGE_SYSTEM_PROMPT if system_prompt is None else system_prompt
-    system = (
-        base
-        + f"  - {grounding_clause}\n"
-        + f"  - {soft_nudge}\n"
-    )
+    system = base + f"  - {grounding_clause}\n"
 
     fmt = (
         "Output EXACTLY one line per slot id, in this order, nothing else:\n"
@@ -814,12 +785,10 @@ def group_voiced_beats(
 def make_tier_a_adapter(
     evaluate_tier_a: Callable[..., Any],
     normalize_slot_line: Callable[[str, str, str], str],
-    *,
-    word_floor: Optional[int] = None,
 ) -> TierACheckFn:
     """Adapt Build 2's deterministic Tier-A validator to a TierACheckFn.
 
-    Build 2 exposes `evaluate_tier_a(raw, manifest, word_floor=...)` over
+    Build 2 exposes `evaluate_tier_a(raw, manifest)` over
     the `d###|SPEAKER: text` slot format plus `normalize_slot_line` to
     serialize one block. This wraps them into the
     `(parsed, expected_slots) -> TierAResult` signature compose_exchange
@@ -827,8 +796,9 @@ def make_tier_a_adapter(
     module stays import-free / unit-testable with fakes.
 
     The serialized rows use each expected slot's authoritative speaker, so
-    the adapter exercises Build 2's count / order / empty / word-floor
-    checks; the speaker is bound to the slot id by construction
+    the adapter exercises Build 2's count / order / empty checks; prose
+    length and vocabulary never participate. The speaker is
+    bound to the slot id by construction
     (parse_exchange already fixed the ids), so SPEAKER_MISMATCH cannot
     false-fire here.
     """
@@ -849,10 +819,7 @@ def make_tier_a_adapter(
             {"slot_id": s.dialogue_slot_id, "speaker": s.speaker}
             for s in expected_slots
         ]
-        if word_floor is not None:
-            verdict = evaluate_tier_a(raw, manifest, word_floor=word_floor)
-        else:
-            verdict = evaluate_tier_a(raw, manifest)
+        verdict = evaluate_tier_a(raw, manifest)
         failures = list(getattr(verdict, "failures", []) or [])
         reasons = [
             str(getattr(f, "detail", "") or getattr(f, "code", ""))
@@ -936,7 +903,7 @@ def run_exchange_prepass(
     so the caller renders those beats via its existing path.
 
     `beats` items are duck-typed: .dialogue_slot_id, .speaker, .beat_id,
-    .intent, and optionally .target_words / .length_target_words.
+    and .intent.
 
     prior_window: how many already-composed display lines to feed the
     next group as scene context. Composed lines accumulate as the prepass
@@ -969,13 +936,6 @@ def run_exchange_prepass(
             and spk.lower() not in reserved_lower
         )
 
-    def _target_words(b: Any) -> int:
-        for attr in ("target_words", "length_target_words"):
-            v = getattr(b, attr, None)
-            if isinstance(v, int) and v > 0:
-                return v
-        return 20
-
     out: Dict[str, str] = {}
     prior: List[str] = []
 
@@ -988,7 +948,6 @@ def run_exchange_prepass(
                 dialogue_slot_id=_slot_id(b),
                 speaker=_speaker(b),
                 intent=str(getattr(b, "intent", "") or ""),
-                length_target_words=_target_words(b),
             )
             for b in run_beats
         ]

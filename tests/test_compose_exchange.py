@@ -36,12 +36,11 @@ def _group(n=3):
     """A 2-3 slot beat group."""
     slots = [
         ce.VoicedSlot(dialogue_slot_id="d001", speaker="MARLOW",
-                      intent="resist signing the contract", length_target_words=20),
+                      intent="resist signing the contract"),
         ce.VoicedSlot(dialogue_slot_id="d002", speaker="REESE",
-                      intent="apply pressure without naming the stakes",
-                      length_target_words=18),
+                      intent="apply pressure without naming the stakes"),
         ce.VoicedSlot(dialogue_slot_id="d003", speaker="MARLOW",
-                      intent="reveal pressure through an object", length_target_words=22),
+                      intent="reveal pressure through an object"),
     ]
     return slots[:n]
 
@@ -100,7 +99,7 @@ def _always_ok(parsed, slots):
 def _always_fail(parsed, slots):
     return ce.TierAResult(
         ok=False,
-        reasons=["slot d002 below word floor"],
+        reasons=["slot d002 speaker mismatch"],
         failing_slot_ids=["d002"],
     )
 
@@ -228,7 +227,7 @@ def test_repair_triggers_once_then_succeeds():
     def tier_a(parsed, group):
         state["calls"] += 1
         if state["calls"] == 1:
-            return ce.TierAResult(ok=False, reasons=["d002 below word floor"],
+            return ce.TierAResult(ok=False, reasons=["d002 speaker mismatch"],
                                   failing_slot_ids=["d002"])
         return ce.TierAResult(ok=True)
 
@@ -314,7 +313,7 @@ def test_parse_failure_then_repair_succeeds():
 
 
 # ---------------------------------------------------------------------------
-# Prompt content: concrete grounding + soft nudge
+# Prompt content: concrete grounding + transport identity
 # ---------------------------------------------------------------------------
 
 
@@ -327,17 +326,6 @@ def test_prompt_has_one_grounding_per_exchange_instruction():
     assert "not one per line" in blob
     # Grounding candidates from the Build 3 contracts surface in the prompt.
     assert "the fountain pen" in blob or "the ledger" in blob
-
-
-def test_prompt_lists_forbidden_words_as_soft_nudge_only():
-    slots = _group(2)
-    messages = ce.build_exchange_prompt(slots, _contracts(), [], _cast())
-    blob = "\n".join(m["content"] for m in messages)
-    # Words present as guidance...
-    assert "intriguing" in blob
-    assert "anomaly" in blob
-    # ...explicitly framed as not a hard rule.
-    assert "not a hard rule" in blob.lower()
 
 
 def test_prompt_preserves_slot_ids_and_speakers():
@@ -446,18 +434,19 @@ def test_tier_a_adapter_passes_clean_exchange_against_live_build2():
     assert res.reasons == []
 
 
-def test_tier_a_adapter_flags_below_word_floor_against_live_build2():
+def test_tier_a_adapter_accepts_short_nonempty_line_against_live_build2():
     from nodes._otr_craft_floor import evaluate_tier_a, normalize_slot_line
 
     adapter = ce.make_tier_a_adapter(evaluate_tier_a, normalize_slot_line)
     slots = [_vs("d001", "MARLOW"), _vs("d002", "REN BLACK")]
     parsed = {
-        "d001": "No.",  # one word -- below the floor of 4
+        "d001": "No.",
         "d002": "Then we both lose everything we built.",
     }
     res = adapter(parsed, slots)
-    assert res.ok is False
-    assert "d001" in res.failing_slot_ids
+    assert res.ok is True
+    assert res.reasons == []
+    assert res.failing_slot_ids == []
 
 
 # ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 from xml.etree import ElementTree
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 try:
     from . import _otr_source_payload as _osp
@@ -28,15 +28,15 @@ try:
 except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
 
+try:
+    from ._otr_content_safety import find_text_hits
+except ImportError:  # pragma: no cover -- flat import harnesses
+    from _otr_content_safety import find_text_hits  # type: ignore
+
 MANIFEST_SCHEMA_VERSION = "v1"
 PROMPT_VERSION = "shakespeare_interpreter_v1"
 SCHEMA_VERSION = "shakespeare_briefs_v1"
 
-_MAX_CASTING_BRIEF_CHARS = 900
-_MAX_SCRIPT_BRIEF_CHARS = 1200
-_MAX_CLOSE_BRIEF_CHARS = 520
-_MAX_KEY_TERMS = 7
-_MAX_KEY_TERM_CHARS = 80
 
 _TOP_KEYS = frozenset({"schema_version", "scenes"})
 _SCENE_KEYS = frozenset({
@@ -452,43 +452,18 @@ def parse_folger_scene(xml_text: str, play_code: str, act: int, scene: int) -> F
 
 
 class ShakespeareBriefs(BaseModel):
-    """Briefs contract consumed by the writer's source interpreter path."""
+    """Briefs contract consumed by the source adapter and writer."""
 
-    casting_brief: str = Field(..., max_length=_MAX_CASTING_BRIEF_CHARS)
-    script_brief: str = Field(..., max_length=_MAX_SCRIPT_BRIEF_CHARS)
-    news_close_brief: str = Field(..., max_length=_MAX_CLOSE_BRIEF_CHARS)
-    key_terms: list[str] = Field(..., min_length=1, max_length=_MAX_KEY_TERMS)
+    casting_brief: str
+    script_brief: str
+    news_close_brief: str
+    key_terms: list[str] = Field(default_factory=list)
 
     source_hash: str = ""
     prompt_version: str = PROMPT_VERSION
     schema_version: str = SCHEMA_VERSION
     model_id: str = ""
     attempts: int = 0
-
-    @field_validator("key_terms", mode="before")
-    @classmethod
-    def _trim_term_count(cls, value):
-        if isinstance(value, list) and len(value) > _MAX_KEY_TERMS:
-            return value[:_MAX_KEY_TERMS]
-        return value
-
-    @field_validator("key_terms")
-    @classmethod
-    def _coerce_term_lengths(cls, value: list[str]) -> list[str]:
-        out: list[str] = []
-        for term in value:
-            if not isinstance(term, str):
-                raise ValueError(
-                    f"key_term must be str, got {type(term).__name__}: {term!r}"
-                )
-            clean = " ".join(term.split()).strip()
-            if len(clean) > _MAX_KEY_TERM_CHARS:
-                clean = clean[:_MAX_KEY_TERM_CHARS].rsplit(" ", 1)[0].rstrip()
-            if clean:
-                out.append(clean)
-        if not out:
-            raise ValueError("key_terms must contain at least one non-empty term")
-        return out
 
 
 def _source_hash(payload: dict[str, str]) -> str:
@@ -523,14 +498,15 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "not replace the scene with a modern mystery or unrelated framing "
         "story.\n\n"
         "Make stage directions audible through spoken implication or concrete "
-        "radio business. Keep it safe for a general audience: no blood, guns, "
-        "knives, smoking, or graphic violence in the adapted premise.\n\n"
+        "radio business. Keep it SFW: no profanity, explicit "
+        "guns/knives/weapons, or explicit sexual/nudity language in the "
+        "adapted premise.\n\n"
         "Return ONE JSON object only with exactly these keys:\n"
         "{\n"
-        "  \"casting_brief\": \"80-700 chars; source-grounded roles and voices\",\n"
-        "  \"script_brief\": \"120-1000 chars; compact scene adaptation brief\",\n"
-        "  \"news_close_brief\": \"80-440 chars; Folger/noncommercial source note\",\n"
-        "  \"key_terms\": [\"2-7 concise scene/adaptation terms\"]\n"
+        "  \"casting_brief\": \"source-grounded roles and voices\",\n"
+        "  \"script_brief\": \"compact scene adaptation brief\",\n"
+        "  \"news_close_brief\": \"Folger/noncommercial source note\",\n"
+        "  \"key_terms\": [\"optional concise scene/adaptation terms\"]\n"
         "}\n\n"
         f"{source_block}"
     )
@@ -560,19 +536,17 @@ def build_shakespeare_briefs(
         return technical_fn(msgs, temperature=temperature, max_new_tokens=max_new_tokens)
 
     def _content_validator(brief: ShakespeareBriefs) -> str | None:
-        if len(brief.key_terms) < 2:
-            return "shakespeare briefs require at least two key_terms"
         hay = " ".join(
             [brief.casting_brief, brief.script_brief, brief.news_close_brief]
             + list(brief.key_terms)
         ).casefold()
-        for term in (
-            "unrelated framing story", "modern detective", "changed ending",
-            "blood", "gun", "guns", "knife", "knives", "smoking",
-            "cigarette", "graphic violence", "commercially cleared",
-        ):
-            if term in hay:
-                return f"shakespeare brief drifted into forbidden term {term!r}"
+        safety_hits = find_text_hits(hay)
+        if safety_hits:
+            category, term = safety_hits[0]
+            return (
+                "shakespeare brief contains explicit safety term "
+                f"{category}={term!r}"
+            )
         return None
 
     try:

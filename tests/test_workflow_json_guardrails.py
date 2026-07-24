@@ -700,11 +700,11 @@ class TestWriterB2aSurface:
             f"scaffold setting in the shipped bake); got {wv[22]!r}"
         )
         # Slot 23: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
-        # -- APPENDED at the END; ships the production sci-fi fable2 lane AND
+        # -- APPENDED at the END; ships the production story-bank surface AND
         # must be a REGISTERED bank id (cross-checked against the live routing
         # registry so a re-order / typo cannot ship silently). The roster trim
         # (2026-07-17) retired the science_news family; the default lane is now
-        # scifi_news (the local-default sci-fi lane, renamed from scifi_codex_v4).
+        # scifi_news (the local-default sci-fi bank).
         assert wv[23] == "scifi_news", (
             f"source_bank (slot 23) must ship 'scifi_news' (the local default "
             f"story lane); got {wv[23]!r}"

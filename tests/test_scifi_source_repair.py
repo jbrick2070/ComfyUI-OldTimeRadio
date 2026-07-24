@@ -4,6 +4,10 @@ from nodes._otr_scifi_codex import FactIndexV4
 from nodes._otr_scifi_codex import RadioScoreV4, ScriptArtifactV4, _schema_instruction as codex_schema_instruction
 from nodes._otr_json import parse_first_json_object
 from nodes._otr_scifi_source_repair import repair_literal_source_metadata
+from nodes._otr_scifi_p0_contract import (
+    compact_p0_repair_context,
+    p0_contract_instruction,
+)
 from nodes._otr_structured_call import schema_required_paths
 
 
@@ -114,6 +118,28 @@ def test_repair_refuses_an_oversized_quote_that_is_not_literal_source_text():
 def test_all_lane_schema_seams_name_exact_top_level_keys():
     assert "facts" in codex_schema_instruction(FactIndexV4)
     assert "scenes[*].shots[*].scene_id" in codex_schema_instruction(RadioScoreV4)
+
+
+def test_p0_contract_states_literal_slice_identity():
+    instruction = p0_contract_instruction(has_numeric_tokens=True)
+    assert "payload[field][start:end] == quote" in instruction
+    assert "Do not paraphrase" in instruction
+
+
+def test_p0_repair_context_enforces_hard_byte_limit():
+    try:
+        compact_p0_repair_context(
+            failed_artifact="x" * 200,
+            rejection="bad span",
+            source_evidence={"full_text": "source"},
+            source_digest="digest",
+            allowed_source_fields=["full_text"],
+            max_bytes=32,
+        )
+    except ValueError as exc:
+        assert "over the hard limit" in str(exc)
+    else:
+        raise AssertionError("oversized P0 repair context must fail loudly")
 
 
 def test_schema_instruction_contains_every_required_path_for_nested_radio_score():

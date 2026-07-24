@@ -83,8 +83,6 @@ class StoryPack:
     status: str = ""
     examples: list = field(default_factory=list)
     tone_guardrails: list = field(default_factory=list)
-    forbidden_plot_patterns: list = field(default_factory=list)
-    forbidden_leakage_terms: list = field(default_factory=list)
     source_requirements: list = field(default_factory=list)
     ledger_validation_notes: list = field(default_factory=list)
 
@@ -155,8 +153,7 @@ def _validate(data: dict, origin: str,
             )
 
     # Optional/inert fields: type-checked only, never consumed in Stage 1.
-    for key in ("examples", "tone_guardrails", "forbidden_plot_patterns",
-                "forbidden_leakage_terms", "source_requirements",
+    for key in ("examples", "tone_guardrails", "source_requirements",
                 "ledger_validation_notes"):
         if key in data and not isinstance(data[key], list):
             raise StoryPackValidationError(f"{origin}: {key} must be a list")

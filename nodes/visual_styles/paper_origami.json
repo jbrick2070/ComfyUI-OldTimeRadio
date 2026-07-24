@@ -5,11 +5,6 @@
   "image_grade_tail": "",
   "broadcast_tail": "",
   "allow_radio_tails": false,
-  "forbidden_terms": [
-    "photorealistic",
-    "cinematic 35mm",
-    "film grain"
-  ],
   "era_tail": "",
   "schema_version": "v2",
   "portrait_look": "folded paper puppet character, crisp crease lines, layered papercraft texture, soft studio light",

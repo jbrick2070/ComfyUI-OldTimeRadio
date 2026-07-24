@@ -41,11 +41,6 @@ __all__ = [
     "max_act_count",
     "compute_episode_budget",
     "auto_act_count",
-    "WORDS_PER_BEAT",
-    "STRUCTURAL_MIN_BEATS",
-    "beat_bounds",
-    "target_beat_count",
-    "classify_beat_count",
 ]
 
 
@@ -368,76 +363,6 @@ def auto_act_count(target_words: int) -> int:
         return min(fits)
     return max(candidates, key=_max_target_words_for_act_count)
 
-
-# ---------------------------------------------------------------------------
-# beat_bounds -- v4 campaign P1(iv): cross-family structural beat contract
-# ---------------------------------------------------------------------------
-#
-# Operator decision (2026-07-17): WORDS_PER_BEAT is a SOFT target only --
-# episode length is RECORDED-NOT-GATED, never pass/fail (the "never chase word
-# count" law). `beat_bounds` therefore gates ONLY a STRUCTURAL FLOOR: the
-# minimum voiced-beat count below which an episode is not assemblable
-# downstream. The word-derived count is a soft steering/telemetry target.
-#
-# Evidence for the floor (=3): the codex lane fixes its beat count at
-# `max(3, min(12, cast*3))` (_otr_scifi_codex.py) and the legacy->stage1 adapter
-# pads to `>=3` (_otr_legacy_to_stage1_adapter.py). Both families already clear
-# 3 for every real episode, so the freeze-time floor terminal (G11) never
-# false-triggers. The per-family MAX + the word->beat derivation change are
-# RECORDED here but their live enforcement is deferred to Phase 2 per-bank
-# (operator "validate live"): the max caps mirror codex's schema
-# `_RADIO_SCORE_MAX_BEATS=12` and the inline PBUG-20260713-18 cap 40.
-
-WORDS_PER_BEAT: int = 40           # SOFT target; NEVER a pass/fail gate
-STRUCTURAL_MIN_BEATS: int = 3      # the only gated bound (assemblability floor)
-
-_BEAT_FAMILY_MAX: dict[str, int] = {
-    "codex": 12,      # _RADIO_SCORE_MAX_SCENES(3) * _RADIO_SCORE_MAX_BEATS_PER_SCENE(4)
-    "inline": 40,     # PBUG-20260713-18 cap; ~720 words / 40 wpb ~= 18 beats
-    "default": 40,
-}
-
-
-def _beat_family(family) -> str:
-    f = str(family or "").strip().lower()
-    return f if f in _BEAT_FAMILY_MAX else "default"
-
-
-def beat_bounds(target_words: int, family: str = "default") -> "tuple[int, int]":
-    """Structural ``(min_beats, max_beats)`` band for a lane *family*.
-
-    ``min_beats`` is the STRUCTURAL FLOOR (the only gated bound). ``max_beats``
-    is RECORDED for steering/telemetry; its live enforcement is a Phase-2
-    per-bank decision (operator "validate live"). ``target_words`` is accepted
-    for signature symmetry with ``target_beat_count`` but does not move the
-    band. Pure; never raises."""
-    return (STRUCTURAL_MIN_BEATS, _BEAT_FAMILY_MAX[_beat_family(family)])
-
-
-def target_beat_count(target_words: int, family: str = "default") -> int:
-    """SOFT word-derived beat target: ``round-half-up(target_words /
-    WORDS_PER_BEAT)`` clamped to the family band. RECORDED-NOT-GATED (operator:
-    never chase word count). Pure; never raises."""
-    try:
-        tw = max(0, int(target_words or 0))
-    except (TypeError, ValueError):
-        tw = 0
-    lo, hi = beat_bounds(tw, family)
-    raw = (tw + WORDS_PER_BEAT // 2) // WORDS_PER_BEAT  # round-half-up
-    return max(lo, min(hi, int(raw)))
-
-
-def classify_beat_count(observed, family: str = "default") -> str:
-    """``'ok'`` when ``observed >= STRUCTURAL_MIN_BEATS`` else ``'below_min'``.
-
-    Only the structural floor is a verdict; the family MAX is recorded, not
-    classified here (Phase-2 live). Never raises."""
-    lo, _hi = beat_bounds(0, family)
-    try:
-        n = int(observed)
-    except (TypeError, ValueError):
-        return "below_min"
-    return "ok" if n >= lo else "below_min"
 
 
 # ---------------------------------------------------------------------------

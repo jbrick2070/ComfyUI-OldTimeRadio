@@ -5,8 +5,9 @@ the LLM phases in the cascade chain so the final readiness report
 reflects whatever the cleanup produced.
 
 Phase 7 -- audio readiness
-  Normalises line.text for TTS so the Bark / Kokoro / AudioGen
-  consumers downstream get pronounceable input:
+  Projects canonical line text into a separate text_for_tts field so
+  Bark / Kokoro / AudioGen consumers get pronounceable input without
+  changing the authored ledger:
     * Numeric expansion via `num2words` when the package is present
       (1234 -> "one thousand two hundred thirty-four").
     * Common abbreviation expansion via a small built-in dict
@@ -37,11 +38,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
-
-try:  # pragma: no cover - package and standalone import styles
-    from ._otr_text_metrics import set_line_text_metrics
-except ImportError:  # pragma: no cover
-    from _otr_text_metrics import set_line_text_metrics  # type: ignore
 
 log = logging.getLogger("OTR.readiness")
 
@@ -206,25 +202,15 @@ class AudioReadinessReport:
 
 
 def phase_7_audio_readiness(led) -> AudioReadinessReport:
-    """LFC Phase 7. Deterministic TTS-safety normalization on line.text.
+    """LFC Phase 7. Deterministic, non-destructive TTS normalization.
 
-    Iterates every voiced line (skipped lines excluded). For each:
-      1. Expand abbreviations (Dr. -> Doctor, etc.).
-      2. Replace symbols with words (& -> "and", etc.).
-      3. Expand integers / floats via num2words when available.
-      4. Recompute word_count + char_count in lockstep.
-
-    On num2words ImportError the numeric-expansion step is skipped
-    with a warning; everything else still runs. Deterministic; no
-    LLM calls.
-
-    Stamps meta.audio_readiness with full counts + unparseable
-    tokens for soak diagnostics. Returns the report.
+    Every non-skipped voiced line receives a complete text_for_tts
+    projection, a canonical-source hash, and a normalization receipt.
+    Canonical text, word counts, and proof ownership are never changed.
     """
     ledger_data = led.data if hasattr(led, "data") else led
     rep = AudioReadinessReport()
-    num2words_fn = _try_import_num2words()
-    if num2words_fn is None:
+    if _try_import_num2words() is None:
         rep.warnings.append(
             "num2words not installed; numeric expansion skipped"
         )
@@ -232,46 +218,33 @@ def phase_7_audio_readiness(led) -> AudioReadinessReport:
     lines = ledger_data.get("lines") or []
     rep.lines_scanned = len(lines)
     for ln in lines:
-        if not isinstance(ln, dict):
-            continue
-        if ln.get("skip"):
+        if not isinstance(ln, dict) or ln.get("skip"):
             continue
         role = (ln.get("speaker_role") or "").strip().lower()
         if role not in ("character", "announcer"):
             continue
-        text = ln.get("text") or ""
-        if not text:
+        canonical = str(ln.get("text") or "")
+        if not canonical:
             continue
-        original = text
-        # 1. Abbreviations.
-        expanded = _expand_abbreviations(text)
-        abbrev_hits = sum(1 for k in ABBREV_EXPANSIONS if k in original)
-        if abbrev_hits:
-            rep.abbreviations_expanded += abbrev_hits
-        # 2. Symbols.
-        expanded_2 = _expand_symbols(expanded)
-        sym_hits = sum(1 for k in SYMBOL_REPLACEMENTS if k in expanded)
-        if sym_hits:
-            rep.symbols_expanded += sym_hits
-        # 3. Numbers.
-        expanded_3, unparseable = _expand_numbers(
-            expanded_2, num2words_fn=num2words_fn,
-        )
-        if unparseable:
-            rep.unparseable_numbers.extend(unparseable)
-            for u in unparseable:
-                rep.warnings.append(
-                    f"line_id={ln.get('line_id','')!r} number "
-                    f"{u!r} could not be expanded"
-                )
-        num_hits = sum(
-            1 for _ in _NUM_TOKEN_RE.finditer(text)
-        ) - len(unparseable)
-        if num_hits > 0:
-            rep.numbers_expanded += num_hits
 
-        if expanded_3 != original:
-            set_line_text_metrics(ln, expanded_3)
+        delivery, receipt = normalize_for_delivery(canonical)
+        rep.abbreviations_expanded += int(receipt["abbreviations_expanded"])
+        rep.symbols_expanded += int(receipt["symbols_expanded"])
+        rep.numbers_expanded += int(receipt["numbers_expanded"])
+        unparseable = list(receipt["unparseable_numbers"])
+        rep.unparseable_numbers.extend(unparseable)
+        for token in unparseable:
+            rep.warnings.append(
+                f"line_id={ln.get('line_id','')!r} number "
+                f"{token!r} could not be expanded"
+            )
+
+        ln["text_for_tts"] = delivery
+        ln["text_for_tts_source_sha256"] = text_for_tts_source_sha256(
+            canonical
+        )
+        ln["text_for_tts_receipt"] = receipt
+        if receipt["changed"]:
             rep.lines_normalized += 1
 
     ledger_data.setdefault("meta", {})["audio_readiness"] = rep.to_dict()
@@ -341,151 +314,39 @@ def normalize_for_delivery(text: str) -> "tuple[str, dict]":
     return expanded_3, receipt
 
 
-def _delivery_hygiene_gates(
-    text: str, speaker_name: str = "",
-) -> "tuple[str, ...]":
-    """Small exact-surface backstop for post-normalization TTS text."""
-    try:
-        from ._otr_line_hygiene import (
-            detect_stage_business_for_reroll,
-            flag_one_breath,
-            is_non_dialogue_stage_line,
-            is_stage_direction_only,
-        )
-    except ImportError:  # pragma: no cover -- flat test import
-        from _otr_line_hygiene import (  # type: ignore
-            detect_stage_business_for_reroll,
-            flag_one_breath,
-            is_non_dialogue_stage_line,
-            is_stage_direction_only,
-        )
-    value = str(text or "")
-    gates: list[str] = []
-    if (
-        is_non_dialogue_stage_line(value, speaker_name)
-        or is_stage_direction_only(value)
-        or detect_stage_business_for_reroll(value, speaker_name)[0]
-    ):
-        gates.append("stage_direction")
-    if any(ch in value for ch in "[]{}<>()\n\r\t`*"):
-        gates.append("spoken_format")
-    if (
-        not re.search(r"[A-Za-z]", value)
-        or any(
-            not token.strip(".,!?;:'\u2019-")
-            for token in value.split()
-        )
-    ):
-        gates.append("non_lexical")
-    if flag_one_breath(value)[0]:
-        gates.append("one_breath")
-    return tuple(dict.fromkeys(gates))
-
-
-def _emergency_clean_delivery_surface(
-    text: str, speaker_name: str = "",
-) -> "tuple[str, tuple[str, ...], tuple[str, ...]]":
-    """Unreachable defense if a content-owned pre-seal scour was bypassed.
-
-    Normal content-owned execution repairs the normalized projection before it
-    seals canonical text. This total deterministic backstop exists so a future
-    missed call site still cannot put an overlong breath or production cue on
-    the microphone. Its use is stamped as an emergency proof divergence.
-    """
-    try:
-        from ._otr_line_hygiene import deterministic_hygiene_floor
-    except ImportError:  # pragma: no cover -- flat test import
-        from _otr_line_hygiene import deterministic_hygiene_floor  # type: ignore
-    current = str(text or "")
-    seen: list[str] = []
-    actions: list[str] = []
-    for _ in range(6):
-        gates = _delivery_hygiene_gates(current, speaker_name)
-        if not gates:
-            return current, tuple(seen), tuple(dict.fromkeys(actions))
-        for gate in gates:
-            if gate not in seen:
-                seen.append(gate)
-        floor = deterministic_hygiene_floor(
-            current, gates, speaker_name=speaker_name,
-        )
-        actions.extend(floor.actions)
-        if not floor.text or floor.text == current:
-            break
-        current = floor.text
-    if _delivery_hygiene_gates(current, speaker_name):
-        # Every shipped rules pack converges above. Keep a small SFW spoken
-        # totality floor for a future detector/normalizer interaction.
-        current = "Give me a moment."
-        actions.append("total_delivery_floor")
-    return current, tuple(seen), tuple(dict.fromkeys(actions))
-
-
 def stamp_text_for_tts_delivery(led) -> dict:
-    """Content-owned Phase 7 (720-bakeoff C2 / S2 P1.3): stamp
-    ``text_for_tts`` + ``text_for_tts_source_sha256`` + a normalization
-    receipt on EVERY non-skipped voiced line -- even when the delivery
-    text equals canonical -- so the delivery resolver always has a
-    verified source of truth. Canonical ``text`` / ``char_count`` /
-    ``word_count`` / proof map are NEVER touched. Returns a summary dict
-    (also stamped on ``meta.text_for_tts_delivery``). Deterministic; no
-    LLM; never raises."""
+    """Stamp a complete, non-destructive TTS projection on voiced lines.
+
+    The projection expands pronunciation-only abbreviations, symbols, and
+    numbers. It never judges prose, substitutes content, or changes canonical
+    text and therefore cannot reject an episode.
+    """
     ledger_data = led.data if hasattr(led, "data") else led
     stamped = 0
     changed = 0
-    emergency_repaired = 0
-    cast_names = {
-        str(row.get("char_id") or ""): str(row.get("name") or "")
-        for row in (ledger_data.get("cast") or [])
-        if isinstance(row, dict) and row.get("char_id")
-    }
     for ln in ledger_data.get("lines") or []:
-        if not isinstance(ln, dict):
-            continue
-        if ln.get("skip"):
+        if not isinstance(ln, dict) or ln.get("skip"):
             continue
         role = (ln.get("speaker_role") or "").strip().lower()
         if role not in ("character", "announcer"):
             continue
-        canonical = ln.get("text") or ""
+        canonical = str(ln.get("text") or "")
         if not canonical.strip():
             continue
-        speaker_name = (
-            cast_names.get(str(ln.get("char_id") or ""))
-            or str(ln.get("speaker") or "")
-        )
         delivery, receipt = normalize_for_delivery(canonical)
-        delivery_gates = _delivery_hygiene_gates(delivery, speaker_name)
-        if delivery_gates:
-            before_delivery = delivery
-            delivery, seen_gates, actions = _emergency_clean_delivery_surface(
-                delivery, speaker_name,
-            )
-            receipt.update({
-                "delivery_hygiene_emergency": True,
-                "delivery_hygiene_rung": "deterministic_emergency_floor",
-                "delivery_hygiene_gates": list(seen_gates),
-                "delivery_hygiene_actions": list(actions),
-                "delivery_hygiene_pre_sha256": hashlib.sha256(
-                    before_delivery.encode("utf-8")
-                ).hexdigest(),
-                "delivery_hygiene_post_sha256": hashlib.sha256(
-                    delivery.encode("utf-8")
-                ).hexdigest(),
-            })
-            emergency_repaired += 1
-        receipt["changed"] = delivery != canonical
         ln["text_for_tts"] = delivery
-        ln["text_for_tts_source_sha256"] = text_for_tts_source_sha256(canonical)
+        ln["text_for_tts_source_sha256"] = text_for_tts_source_sha256(
+            canonical
+        )
         ln["text_for_tts_receipt"] = receipt
         stamped += 1
         if receipt["changed"]:
             changed += 1
+
     summary = {
         "mode": "content_owned_delivery_stamp",
         "lines_stamped": int(stamped),
         "lines_delivery_differs": int(changed),
-        "lines_emergency_hygiene_repaired": int(emergency_repaired),
     }
     ledger_data.setdefault("meta", {})["text_for_tts_delivery"] = summary
     log.info(

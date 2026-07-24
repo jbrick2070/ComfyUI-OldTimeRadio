@@ -60,7 +60,6 @@ import hashlib
 import logging
 import os
 import random
-import re
 from dataclasses import dataclass, replace
 from typing import Any, Callable, List, Optional
 
@@ -163,12 +162,12 @@ class DescriptionResponse(BaseModel):
     # _format_prior_entry already trims the echoed description to 60 chars,
     # so the stored length never touches prompt budget. Local Mistral's
     # short descriptions are unaffected.
-    character_description: str = Field(..., min_length=10, max_length=1500)
+    character_description: str = Field(..., min_length=1)
     # F5 (story-engine v1): a <=5-word speech register/signature ("clipped,
     # formal", "warm, rambling") the line composer threads into the cast card
     # so each character reads as a distinct voice. Optional (default "") so a
     # model that omits it never fails the schema; backfilled downstream.
-    speech_signature: str = Field(default="", max_length=60)
+    speech_signature: str = ""
 
     @field_validator("character_description")
     @classmethod
@@ -193,11 +192,11 @@ class CastingResponse(BaseModel):
     construction.
     """
 
-    character_description: str = Field(..., min_length=10, max_length=1500)
-    gender: str = Field(..., min_length=3, max_length=12)
+    character_description: str = Field(..., min_length=1)
+    gender: str = Field(..., min_length=1)
     # F5 (story-engine v1): speech register/signature, assembled from the
     # description call. Optional (default "") -> backfilled to "plain spoken".
-    speech_signature: str = Field(default="", max_length=60)
+    speech_signature: str = ""
     # Sprint 2 (a): voice_preset is no longer assigned by the writer -- OTR_CastLock
     # replays the picker and stamps it after the freeze. cast_one_character leaves
     # it EMPTY, so the field allows "" (was min_length=3).
@@ -205,7 +204,7 @@ class CastingResponse(BaseModel):
     # this field carry a verbose voice_ref_id (cloner id) in addition to a short
     # bark v2/* preset; a deeply-named clone reference can exceed 80 chars. The cap
     # is a runaway guard, not a content target.
-    voice_preset: str = Field(default="", max_length=255)
+    voice_preset: str = ""
 
     @field_validator("gender")
     @classmethod
@@ -424,15 +423,14 @@ def _build_user_prompt(
         "stock-photo language."
     )
     parts.append(
-        "- Also give a speech_signature: at most 5 words naming how this "
-        "character TALKS (e.g. 'clipped, formal', 'warm and rambling', "
-        "'blunt, profane'). Distinct from the other cast."
+        "- Also give a brief speech_signature naming how this character "
+        "talks. This is generation guidance, not an acceptance score."
     )
     parts.append("")
     parts.append("JSON only:")
     parts.append(
         '{"character_description":"<as above>",'
-        '"speech_signature":"<<=5 words>"}'
+        '"speech_signature":"<spoken delivery note>"}'
     )
     return "\n".join(parts)
 
@@ -1423,137 +1421,6 @@ def _apply_llm_slot_fill(
 
 
 # ---------------------------------------------------------------------------
-# C3 (story-quality R2) -- contrasting speech signatures
-# ---------------------------------------------------------------------------
-
-#: Deterministic pool of CONTRASTING speech registers. Used to replace an
-#: empty / default / duplicate signature so no two characters share a voice.
-_SPEECH_REGISTER_POOL = (
-    "clipped and terse",
-    "warm and rambling",
-    "formal and precise",
-    "blunt, plain-spoken",
-    "wry and indirect",
-    "gruff, few words",
-    "earnest, over-explaining",
-    "dry and sardonic",
-)
-
-
-def _norm_sig(s) -> str:
-    return " ".join(str(s or "").lower().split()).strip(" .")
-
-
-#: Speech-signature stopwords -- joiners that carry no register meaning, dropped
-#: before the overlap comparison so "measured, precise" and "measured and precise"
-#: tokenize the same.
-_SIG_STOPWORDS = frozenset({"and", "but", "the", "a", "an", "with", "of", "very",
-                            "or", "yet", "then"})
-#: 3.7 (story-quality R2): two signatures count as NEAR-duplicates -- and collide
-#: in diversify_speech_signatures -- when their token overlap coefficient reaches
-#: this. 0.5 catches a shared DOMINANT trait ("measured, precise, weary" vs
-#: "measured, concise" share "measured" = 0.5 of the shorter set) while leaving
-#: disjoint registers ("clipped, procedural" / "warm, rambling" = 0.0) alone.
-_SIG_NEAR_DUP_THRESHOLD = 0.5
-
-
-def _sig_tokens(s) -> set:
-    import re
-    return {t for t in re.findall(r"[a-z]+", _norm_sig(s))
-            if len(t) > 2 and t not in _SIG_STOPWORDS}
-
-
-def speech_signature_overlap(a, b) -> float:
-    """Token OVERLAP COEFFICIENT (0..1) between two speech signatures -- the shared
-    fraction of the SMALLER token set, so identical registers score 1.0 and a
-    shared dominant trait scores high even when one signature is longer.
-    Deterministic; never raises."""
-    ta, tb = _sig_tokens(a), _sig_tokens(b)
-    if not ta or not tb:
-        return 0.0
-    return len(ta & tb) / min(len(ta), len(tb))
-
-
-def flag_low_register_divergence(cast, *, threshold: float = 0.67):
-    """3.7 (2026-06-27) deferred flag half: (flagged, reason) when two CHARACTER
-    voices share a near-duplicate speech signature (token overlap >= threshold).
-    The cast-time fix (`diversify_speech_signatures`) collides at the tighter
-    _SIG_NEAR_DUP_THRESHOLD; this is a measurement/observability helper for the
-    scan + an optional cast-time check. ANNOUNCER excluded. Pure; never raises."""
-    try:
-        sigs: list = []
-        for row in (cast or ()):
-            if isinstance(row, dict):
-                name = str(row.get("name") or "")
-                sig = str(row.get("speech_signature") or "")
-            else:
-                name = str(getattr(row, "name", "") or "")
-                sig = str(getattr(row, "speech_signature", "") or "")
-            if name.strip().upper() == "ANNOUNCER":
-                continue
-            if sig.strip():
-                sigs.append((name, sig))
-        for i in range(len(sigs)):
-            for j in range(i + 1, len(sigs)):
-                if speech_signature_overlap(sigs[i][1], sigs[j][1]) >= threshold:
-                    return True, (
-                        f"near-duplicate register: {sigs[i][0]!r} vs "
-                        f"{sigs[j][0]!r}")
-        return False, ""
-    except Exception:  # noqa: BLE001
-        return False, ""
-
-
-def diversify_speech_signatures(cast, seed: int = 0):
-    """Ensure each cast row's speech_signature is DISTINCT (C3). A non-colliding
-    LLM signature is KEPT; an empty / 'plain spoken' default / EXACT-duplicate /
-    NEAR-duplicate one (3.7: token overlap >= threshold, e.g. "measured, precise,
-    weary" vs "measured, concise") is reassigned from a deterministic contrasting
-    pool (rotated by `seed` for C7 reproducibility) so two characters never share
-    a register. Mutates rows in place; never raises."""
-    try:
-        n = len(_SPEECH_REGISTER_POOL)
-        start = (int(seed) % n) if n else 0
-        pool = [_SPEECH_REGISTER_POOL[(start + i) % n] for i in range(n)]
-        used: set = set()
-        kept: list = []           # the signatures retained so far (near-dup base)
-        default_norm = _norm_sig("plain spoken")
-        pool_idx = 0
-
-        def _near_dup(sig) -> bool:
-            return any(speech_signature_overlap(sig, k) >= _SIG_NEAR_DUP_THRESHOLD
-                       for k in kept)
-
-        for row in cast:
-            if not isinstance(row, dict):
-                continue
-            sig = str(row.get("speech_signature") or "").strip()
-            norm = _norm_sig(sig)
-            if (not sig) or norm == default_norm or norm in used or _near_dup(sig):
-                # advance past any pool entry already used OR near-dup of a kept
-                # signature, so the reassignment is itself genuinely contrasting.
-                while pool_idx < len(pool) and (
-                        _norm_sig(pool[pool_idx]) in used
-                        or _near_dup(pool[pool_idx])):
-                    pool_idx += 1
-                if pool_idx < len(pool):
-                    new_sig = pool[pool_idx]
-                    row["speech_signature"] = new_sig
-                    used.add(_norm_sig(new_sig))
-                    kept.append(new_sig)
-                    pool_idx += 1
-                else:
-                    used.add(norm)        # more chars than pool -- leave as-is
-                    kept.append(sig)
-            else:
-                used.add(norm)
-                kept.append(sig)
-        return cast
-    except Exception:  # noqa: BLE001
-        return cast
-
-
-# ---------------------------------------------------------------------------
 # Top-level: lock_cast -- runs the LLM call per open slot, returns
 # the full locked cast.
 # ---------------------------------------------------------------------------
@@ -1753,17 +1620,10 @@ def lock_cast(
         # just stamp 1 -- a successful call returned without raising.
         casting_attempts.append(1)
 
-    # C3 (story-quality R2): make the speech registers CONTRAST so two
-    # characters never share a voice (empty/default/duplicate signatures get a
-    # distinct pool register; deterministic by cast_seed for C7).
-    diversify_speech_signatures(cast, seed=cast_seed)
-
     meta: dict = {}
-    # llm_slot_fill Pass-1 (S6): overlay LLM names + texture onto the finished,
-    # already-coherent deterministic cast. Runs BEFORE the structural-token guard
-    # so a bad LLM name is still rejected. NO-FALLBACK rip (2026-07-03): on a
-    # naming-LLM failure this RAISES CastValidationLLMError -- it no longer keeps
-    # the deterministic RNG-pool names (this lane is opt-in via name_mode).
+    # llm_slot_fill Pass-1 (S6): overlay LLM names + texture onto the
+    # finished, already-coherent deterministic cast. Names are accepted as
+    # authored strings; Python does not classify them by vocabulary.
     if name_mode == "llm_slot_fill":
         cast = _apply_llm_slot_fill(
             cast, ensemble_slots, voice_by_char_id, age_by_char_id,
@@ -1776,11 +1636,6 @@ def lock_cast(
     # replays it byte-identically after the freeze), so asserting v2/* here would
     # fail on the now-empty rows. _assert_unique_bark_voices +
     # _assert_voice_preset_invariant run in OTR_CastLock after it stamps voices.
-    # S13.1: structural-token guard. Reject cast rows whose name is a
-    # SFX cue / screenplay meta-direction / parser artefact / one of
-    # TITLE / NOTE / TARGET / STYLE.
-    _assert_no_structural_tokens_in_cast(cast)
-
     # VC chunk 4 (2026-06-22): HYBRID LLM voice-fit. Per open character, the LLM
     # PROPOSES a voice_ref_id from the default cloner engine's same-gender cards;
     # Python VALIDATES it (in-library + engine + gender + no-collision) and the
@@ -1935,107 +1790,6 @@ def _assert_voice_preset_invariant(cast: List[dict]) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Structural-token guard (S13.1, ports + extends the deleted
-# story_orchestrator._looks_like_non_character_cast_name heuristic)
-# ---------------------------------------------------------------------------
-
-
-# Patterns that indicate the cast name is a parser artefact / SFX cue /
-# screenplay meta-direction tag, NOT a real character. Ported verbatim
-# from the pre-S7.1 story_orchestrator._SFX_CAST_BLOCKLIST_PATTERNS
-# (deleted in commit b6fb314) plus FIVE additional standalone tokens
-# (TITLE / NOTE / TARGET / STYLE / NARRATOR-as-name) that appeared in
-# the pre-S7.1 story_orchestrator._BRACKET_STRUCTURAL_TOKENS but were
-# not in the cast-blocklist patterns. The S13.1 cast-contract
-# verification confirmed all five slipped through pre-port. After
-# port: each one raises CastingFailedError with a structural-token
-# diagnostic.
-_NON_CHARACTER_CAST_PATTERNS = (
-    # SFX cue artefacts (BUG-LOCAL-090 root cause)
-    r"^SFX\b", r"^MUSIC\b", r"^THEME\b",
-    r"\bBLARING\b", r"\bBLARE\b", r"\bWHOOSH\b", r"\bWHOOSHING\b",
-    r"\bFLICKERS?\b", r"\bFLICKER\b",
-    r"\bCHAMBER\b", r"\bPORTAL\b", r"\bALARM\b",
-    r"\bEQUIPMENT\b", r"\bCUE\b",
-    r"\bAT THE\b",
-    r"\bSOUND\b", r"\bMUSIC QUEUE\b",
-    r"\bINTENSE\b", r"\bMYSTERIOUS VOICE\b",
-    # Screenplay meta-direction (BUG-LOCAL-097)
-    r"\bVOICEOVER\b", r"\bVOICE\s?OVER\b", r"\bVOICEOBER\b",
-    r"\bNARRATOR\b",
-    # NOTE: Original pre-S7.1 patterns had trailing ``\b`` after the
-    # final ``\.`` -- a no-op because ``.`` is non-word and the post-
-    # period regex \b never fires. Faithful port + bugfix here drops
-    # the trailing \b so ``JOHN V.O.`` actually matches.
-    r"\bV\.O\.", r"\bO\.S\.",
-    r"\bSCREEN\b", r"\bOFF.SCREEN\b",
-    # S13.1 additions: structural tokens that the LLM occasionally
-    # emits as standalone "character" names. The risk asymmetry
-    # (real character named "Style" gets rejected) is far lower than
-    # the false-negative cost (an LLM hallucination renders as a
-    # voice line in production).
-    r"^TITLE$", r"^NOTE$", r"^TARGET$", r"^STYLE$",
-)
-
-
-def _looks_like_non_character_cast_name(name: str) -> bool:
-    """Return True when ``name`` is almost certainly an SFX cue,
-    music stinger, scene-direction fragment, structural token, or
-    other parser artefact -- not a real character.
-
-    Ported from story_orchestrator (deleted in S7.1 / commit b6fb314)
-    and extended with TITLE / NOTE / TARGET / STYLE per S13.1
-    cast-contract verification.
-    """
-    if not name:
-        return True
-    n = name.upper().strip()
-    for pat in _NON_CHARACTER_CAST_PATTERNS:
-        if re.search(pat, n):
-            return True
-    return False
-
-
-def _assert_no_structural_tokens_in_cast(cast: List[dict]) -> None:
-    """Cast contract S13.1: reject any cast row whose ``name`` is
-    a structural token (SFX cue, screenplay meta-direction, parser
-    artefact, or one of TITLE / NOTE / TARGET / STYLE). ANNOUNCER
-    is allowed because it's the canonical narrator slot, not an
-    artefact.
-
-    The risk asymmetry (false-positive: a real character named
-    "Style" gets rejected; false-negative: an LLM hallucination
-    renders as a voice line in production) heavily favors
-    rejection. If a future story legitimately needs a character
-    named one of these tokens, the right move is to add a
-    case-sensitive whitelist check, not to widen the patterns.
-    """
-    bad: list[str] = []
-    for row in cast or []:
-        if not isinstance(row, dict):
-            continue
-        name = row.get("name") or ""
-        if name == "ANNOUNCER":
-            continue
-        if _looks_like_non_character_cast_name(name):
-            bad.append(name)
-    if not bad:
-        return
-    raise CastingFailedError(
-        attempts=[(
-            "",
-            f"S13.1 STRUCTURAL TOKEN GUARD: {len(bad)} cast row(s) "
-            f"have names that look like SFX cues / screenplay meta-"
-            f"direction / structural tokens, not real characters: "
-            f"{', '.join(repr(n) for n in bad)}. The pre-filter + cast "
-            f"LLM should have rejected these; a refactor likely broke "
-            f"the upstream guarantee.",
-        )],
-        name="<lock_cast structural-token invariant>",
-    )
-
-
 def _assert_unique_bark_voices(cast: List[dict]) -> None:
     """Raise CastingFailedError if any two Bark cast rows share a
     voice_preset. ANNOUNCER (Kokoro namespace) is excluded.
@@ -2080,8 +1834,6 @@ __all__ = [
     "CastValidationLLMError",
     "_assert_unique_bark_voices",
     "_assert_voice_preset_invariant",
-    "_assert_no_structural_tokens_in_cast",
-    "_looks_like_non_character_cast_name",
     "CastSlot",
     "EnsembleSlot",
     "assemble_pre_locked_rows",

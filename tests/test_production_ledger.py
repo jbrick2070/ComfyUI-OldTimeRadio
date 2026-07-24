@@ -1062,19 +1062,13 @@ class TestComposeFlagsPlumbing:
         assert led.data["lines"][0]["compose_flags"] == ["keep"]
 
     def test_update_line_text_clears_skip_state_on_recomposed_text(self, tmp_out):
-        """A rerolled replacement must not remain editorially skipped.
-
-        Script Doctor can clear a row and stamp skip metadata before the
-        targeted reroll puts fresh text back.  Keeping that metadata creates
-        the production-only Phase 10 invariant failure ``skip=True + text``.
-        """
-        led = Ledger("test_reroll_clears_skip", str(tmp_out))
+        """A meaningful replacement reactivates a formerly empty row."""
+        led = Ledger("test_recompose_clears_skip", str(tmp_out))
         led.set_lines([{"line_id": "b004", "char_id": "c01", "text": ""}])
         row = led.data["lines"][0]
         row.update({
             "skip": True,
-            "tts_skip_reason": "script_doctor_skip",
-            "reviewer_skip_reason": "flat_line",
+            "tts_skip_reason": "mechanical_empty_row",
         })
 
         assert led.update_line_text("b004", "The signal returns.") is True
@@ -1082,7 +1076,6 @@ class TestComposeFlagsPlumbing:
         assert row["text"] == "The signal returns."
         assert row.get("skip") is None
         assert row.get("tts_skip_reason") is None
-        assert row.get("reviewer_skip_reason") is None
 
     def test_update_line_text_preserves_skip_state_for_empty_text(self, tmp_out):
         """An empty replacement remains skipped until real text arrives."""

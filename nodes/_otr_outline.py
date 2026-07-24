@@ -91,8 +91,7 @@ class Beat(BaseModel):
     speaker: str = Field(
         ...,
         min_length=1,
-        max_length=40,
-        description="Character name in ALL CAPS, or 'NARRATOR' for music beats",
+        description="Locked character name, or the fixed non-character label",
     )
     speaker_role: SpeakerRole = Field(
         ...,
@@ -100,25 +99,20 @@ class Beat(BaseModel):
     )
     intent: str = Field(
         ...,
-        min_length=4,
-        max_length=200,
-        description="What this beat accomplishes narratively, one sentence",
+        min_length=1,
+        description="What this beat accomplishes narratively",
     )
     target_words: int = Field(
         ...,
-        ge=3,
-        le=80,
-        description="Approximate word count for the dialogue line",
+        description="Optional generation guidance; never an acceptance gate",
     )
     mood: str = Field(
         ...,
-        min_length=2,
-        max_length=40,
-        description="Tone descriptor, e.g. 'tense', 'wry', 'foreboding'",
+        min_length=1,
+        description="Tone descriptor",
     )
     arc_phase: str = Field(
         default="setup",
-        max_length=40,
         description=(
             "Phase 2A (2026-05-11): narrative phase label from "
             "EpisodeBudget.arc_phases (setup / complication / "
@@ -158,8 +152,10 @@ class Beat(BaseModel):
 
     @field_validator("speaker")
     @classmethod
-    def _speaker_uppercase(cls, v: str) -> str:
-        return v.strip().upper()
+    def _speaker_must_not_be_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("speaker must not be blank")
+        return v.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +171,7 @@ class TurnRef(BaseModel):
     exist until Python has assembled the beat list."""
 
     beat_index: int = Field(..., ge=0, description="0-based index into Outline.beats")
-    what_changes: str = Field(..., min_length=3, max_length=200)
+    what_changes: str = Field(..., min_length=1)
 
 
 class ButtonRef(BaseModel):
@@ -184,7 +180,7 @@ class ButtonRef(BaseModel):
     Stamped by the combiner, same rationale as ``TurnRef``."""
 
     beat_index: int = Field(..., ge=0, description="0-based index into Outline.beats")
-    payoff: str = Field(..., min_length=3, max_length=200)
+    payoff: str = Field(..., min_length=1)
 
 
 class Outline(BaseModel):
@@ -201,14 +197,14 @@ class Outline(BaseModel):
     local LLM to lift per call.
     """
 
-    title: str = Field(..., min_length=3, max_length=80)
-    premise: str = Field(..., min_length=10, max_length=400)
-    setting: str = Field(..., min_length=4, max_length=120)
-    time_of_day: str = Field(..., min_length=3, max_length=40)
+    title: str = Field(..., min_length=1)
+    premise: str = Field(..., min_length=1)
+    setting: str = Field(..., min_length=1)
+    time_of_day: str = Field(..., min_length=1)
     # Phase 2A (2026-05-11) raised max from 24 -> 32 so 6- and 7-act
     # outlines (synthesis §3 Phase 2A beat-count table) still fit
     # within the schema cap with music_inter beats.
-    beats: list[Beat] = Field(..., min_length=4, max_length=32)
+    beats: list[Beat] = Field(..., min_length=1, max_length=32)
 
     # Story-spine Stream A (2026-05-31): arc gate. central_tension rides
     # the Stage-1 _MacroShape LLM call; turning_point + button are
@@ -220,7 +216,7 @@ class Outline(BaseModel):
     # turn + a payoff). The _arc_refs_coherent validator below only
     # checks coherence WHEN present, so it never fail-closes a back-compat
     # outline.
-    central_tension: str = Field(default="", max_length=300)
+    central_tension: str = ""
     turning_point: Optional[TurnRef] = Field(default=None)
     button: Optional[ButtonRef] = Field(default=None)
 
@@ -303,7 +299,7 @@ class OutlineRequest:
                              # the single source of truth for story planning;
                              # there is no seconds field — see Jeffrey 2026-05-10.
     character_cast: tuple[str, ...]
-                             # ALL-CAPS character names from the LOCKED cast.
+                             # Exact character names from the locked cast.
                              # Excludes ANNOUNCER (the writer hardcodes
                              # speaker="ANNOUNCER" on announcer-role beats so
                              # the LLM never needs to handle ANNOUNCER itself).
@@ -403,8 +399,7 @@ class OutlineRequest:
                              # can plan beats that exploit each
                              # character's distinct personality + stakes
                              # (instead of writing generic-sci-fi-
-                             # character beats keyed only on ALL-CAPS
-                             # names). When empty, the prompt falls
+                             # character beats keyed only on names). When empty, the prompt falls
                              # back to the bare name list (back-compat
                              # for tests + early-stage callers).
                              #
@@ -461,10 +456,6 @@ class OutlineRequest:
                 raise ValueError(
                     f"character_cast names must be non-empty strings, "
                     f"got {name!r}"
-                )
-            if name != name.upper():
-                raise ValueError(
-                    f"character_cast names must be ALL CAPS, got {name!r}"
                 )
         if self.cast_descriptions:
             if len(self.cast_descriptions) != len(self.character_cast):
@@ -534,18 +525,18 @@ You are a story editor for short science-fiction audio dramas grounded in real s
 
 Schema:
 {
-  "title":       str 3-80,
-  "premise":     str 10-400,
-  "setting":     str 4-120,
-  "time_of_day": str 3-40,
-  "beats":       array 4-32 of Beat objects:
+  "title":       non-empty string,
+  "premise":     non-empty string,
+  "setting":     non-empty string,
+  "time_of_day": non-empty string,
+  "beats":       array 1-32 of Beat objects:
                  {
                    "beat_id":      "b001", "b002", ... monotonic,
-                   "speaker":      ALL-CAPS name from Cast, or "NARRATOR" for music beats,
+                   "speaker":      exact name from Cast, or "NARRATOR" for music beats,
                    "speaker_role": one of: character, announcer, music_open, music_close, music_inter,
-                   "intent":       one sentence (4-200 chars), narrative purpose only,
-                   "target_words": int 3-80,
-                   "mood":         str 2-40
+                   "intent":       non-empty narrative purpose string, not dialogue,
+                   "target_words": integer advisory value,
+                   "mood":         non-empty tone string
                  }
 }
 
@@ -657,7 +648,7 @@ def _format_cast_block(req: OutlineRequest) -> str:
     The rich format gives the outline LLM enough character signal
     to plan beats that exploit each character's distinct
     personality + stakes (instead of writing generic-sci-fi-
-    character beats keyed only on ALL-CAPS names). __post_init__
+    character beats keyed only on names). __post_init__
     has already validated 1:1 alignment between cast_descriptions
     and character_cast when the rich path is taken.
     """
@@ -806,84 +797,43 @@ def _get_budget(req: "OutlineRequest"):
 
 
 def _format_episode_budget_block(req: "OutlineRequest") -> str:
-    """Render the EPISODE BUDGET block. Empty string when no budget."""
+    """Render structural planning context; requested length is guidance only."""
     b = _get_budget(req)
     if b is None:
         return ""
     arc_phases = list(b.arc_phases)
-    per_phase_words = list(b.per_phase_words)
     per_phase_beats = list(b.per_phase_beats)
-    words_lo, words_hi = b.words_per_beat_range
-    lines: list[str] = [
-        "EPISODE BUDGET -- hit these numbers:",
-        f"- Total spoken words: ~{b.target_words} (within 15%)",
-        f"- Structure: {b.act_count} act"
-        f"{'s' if b.act_count != 1 else ''} -> {', '.join(arc_phases)}",
+    lines = [
+        "EPISODE PLAN:",
+        (
+            f"- Requested spoken length: about {b.target_words} words. "
+            "Use this only as broad guidance; never pad or compress a story "
+            "to meet the number."
+        ),
+        (
+            f"- Structure: {b.act_count} act"
+            f"{'s' if b.act_count != 1 else ''} -> {', '.join(arc_phases)}"
+        ),
+        "- Voiced beats per phase: " + ", ".join(
+            f"{name} {count}"
+            for name, count in zip(arc_phases, per_phase_beats)
+        ),
+        f"- Music inter beats: {b.music_inter_count}",
+        f"- Announcer beats: {b.announcer_beats} (open + close)",
+        (
+            "- Every voiced beat must carry an arc_phase from: "
+            + ", ".join(arc_phases)
+        ),
     ]
-    phase_words = ", ".join(
-        f"{name} ~{w}"
-        for name, w in zip(arc_phases, per_phase_words)
-    )
-    lines.append(f"- Words per phase: {phase_words}")
-    phase_beats = ", ".join(
-        f"{name} {n}"
-        for name, n in zip(arc_phases, per_phase_beats)
-    )
-    lines.append(f"- Voiced beats per phase: {phase_beats}")
-    lines.append(f"- Each voiced beat: {words_lo}-{words_hi} words")
-    lines.append(
-        f"- Music inter beats: {b.music_inter_count} "
-        f"({'one between each pair of phases' if b.music_inter_count > 0 else 'continuous flow, no music_inter'})"
-    )
-    lines.append(
-        f"- Announcer beats: {b.announcer_beats} (open + close)"
-    )
-    lines.append(
-        "- Every voiced beat MUST carry an `arc_phase` field set to "
-        f"one of: {', '.join(arc_phases)}."
-    )
     return "\n".join(lines)
 
 
 def validate_outline_against_budget(
     outline: "Outline",
     req: "OutlineRequest",
-    *,
-    word_drift_warn_ratio: float = 0.25,
 ) -> Optional[str]:
-    """Run the Phase 2A outline validators.
-
-    Returns None on pass. Returns an error string on the FIRST hard
-    failure (suitable for the reroll-then-repair loop). Validator #1
-    (total word drift) is WARN-only per §6.E -- never fails. Per
-    §6.G announcer + music beats are EXCLUDED from word and
-    per-phase budgets but are still counted by validators #6 / #7.
-
-    S28 cleanbreak: budget is now required at OutlineRequest
-    construction time, so _get_budget always returns a populated
-    EpisodeBudget here. The pre-S28 `if b is None: return None`
-    branch is extinct.
-
-    Validator list (re-numbered after §6.C dropped per-character
-    distribution):
-      #1  total word drift (WARN >25%, no reroll per §6.E)
-      #2  per-phase word totals within [0.80, 1.20] of target
-      #3  per-phase voiced-beat counts within [target-1, target+2]
-      #4  per-voiced-beat target_words ∈ words_per_beat_range
-      #5  arc_phase monotonic ordering (no interleaving)
-      #6  count(music_inter beats) == budget.music_inter_count
-      #7  count(announcer beats) == budget.announcer_beats
-      #8  every speaker ∈ character_cast ∪ {ANNOUNCER}
-          (existing cast-membership check; KEPT)
-    """
+    """Validate only closed, Python-owned outline topology counts."""
     b = _get_budget(req)
-    # S28 cleanbreak: dropped `if b is None: return None` no-op
-    # fallback. Producer contract guarantees b is non-None here.
-
-    voiced = [
-        beat for beat in outline.beats
-        if beat.speaker_role == "character"
-    ]
     announcer_beats = [
         beat for beat in outline.beats
         if beat.speaker_role == "announcer"
@@ -893,110 +843,16 @@ def validate_outline_against_budget(
         if beat.speaker_role == "music_inter"
     ]
 
-    # Wiring-review #13 (2026-05-11): validate arc_phase
-    # existence + allowed-value-membership + monotonic ordering
-    # BEFORE running per-phase word totals or per-phase beat
-    # counts. Otherwise an unknown / missing phase value silently
-    # miscounts under the per-phase aggregations (validators 2 + 3)
-    # and the reroll prompt fires for the wrong reason.
-
-    arc_phases = list(b.arc_phases)
-    per_phase_words = list(b.per_phase_words)
-    per_phase_beats = list(b.per_phase_beats)
-    phase_index = {ph: i for i, ph in enumerate(arc_phases)}
-
-    # --- arc_phase: existence + value + monotonic order (was #5) ---
-    last_idx = -1
-    for beat in voiced:
-        ph = (beat.arc_phase or "").strip()
-        if not ph:
-            return (
-                f"Beat {beat.beat_id} is missing arc_phase. Every "
-                f"voiced beat MUST carry one of: "
-                f"{', '.join(arc_phases)}."
-            )
-        if ph not in phase_index:
-            return (
-                f"Beat {beat.beat_id} has arc_phase={ph!r}; not in "
-                f"budget arc_phases={arc_phases!r}."
-            )
-        idx = phase_index[ph]
-        if idx < last_idx:
-            return (
-                f"Beat {beat.beat_id} (arc_phase={ph!r}) breaks "
-                f"arc_phase ordering. Voiced beats must be grouped "
-                f"by arc_phase in order {arc_phases!r}."
-            )
-        last_idx = idx
-
-    # --- #1: total word drift (WARN-only per §6.E) ---
-    total = sum(beat.target_words for beat in voiced)
-    if total > 0:
-        ratio = total / max(1, b.target_words)
-        if abs(ratio - 1.0) > word_drift_warn_ratio:
-            log.warning(
-                "[OTR_Outline] WARN: total voiced words=%d vs "
-                "target_words=%d (ratio=%.2f); >25%% drift but "
-                "per §6.E this is warn-only.",
-                total, b.target_words, ratio,
-            )
-
-    # --- #2: per-phase word totals ---
-    for phase, target_w in zip(arc_phases, per_phase_words):
-        got = sum(
-            beat.target_words for beat in voiced
-            if (beat.arc_phase or "").strip() == phase
-        )
-        lo = round(target_w * 0.80)
-        hi = round(target_w * 1.20)
-        if not (lo <= got <= hi):
-            return (
-                f"Phase {phase!r} got {got} words "
-                f"(target {target_w}, allowed {lo}-{hi}). "
-                f"Reallocate words: adjust voiced-beat target_words "
-                f"in that phase."
-            )
-
-    # --- #3: per-phase voiced-beat counts ---
-    for phase, target_n in zip(arc_phases, per_phase_beats):
-        got = sum(
-            1 for beat in voiced
-            if (beat.arc_phase or "").strip() == phase
-        )
-        lo = max(1, target_n - 1)
-        hi = target_n + 2
-        if not (lo <= got <= hi):
-            return (
-                f"Phase {phase!r} has {got} voiced beats "
-                f"(target {target_n}, allowed {lo}-{hi}). "
-                f"Add or remove voiced beats in that phase."
-            )
-
-    # --- #4: per-voiced-beat target_words in range ---
-    words_lo, words_hi = b.words_per_beat_range
-    for beat in voiced:
-        if not (words_lo <= beat.target_words <= words_hi):
-            return (
-                f"Beat {beat.beat_id} has target_words={beat.target_words}; "
-                f"required range is {words_lo}-{words_hi} per the budget."
-            )
-
-    # --- #6: music_inter count ---
-    got_mi = len(music_inter_beats)
-    if got_mi != b.music_inter_count:
+    if len(music_inter_beats) != b.music_inter_count:
         return (
-            f"music_inter beat count is {got_mi}; budget requires "
-            f"{b.music_inter_count}."
+            f"music_inter beat count is {len(music_inter_beats)}; "
+            f"plan requires {b.music_inter_count}."
         )
-
-    # --- #7: announcer count ---
-    got_ann = len(announcer_beats)
-    if got_ann != b.announcer_beats:
+    if len(announcer_beats) != b.announcer_beats:
         return (
-            f"announcer beat count is {got_ann}; budget requires "
-            f"{b.announcer_beats} (open + close)."
+            f"announcer beat count is {len(announcer_beats)}; "
+            f"plan requires {b.announcer_beats}."
         )
-
     return None
 
 
@@ -1049,28 +905,30 @@ def validate_outline_against_budget(
 
 # Stage 1 schema -- macro shape.
 class _MacroShape(BaseModel):
-    title: str = Field(..., min_length=3, max_length=80)
-    premise: str = Field(..., min_length=10, max_length=400)
-    setting: str = Field(..., min_length=4, max_length=120)
-    time_of_day: str = Field(..., min_length=3, max_length=40)
+    title: str = Field(..., min_length=1)
+    premise: str = Field(..., min_length=1)
+    setting: str = Field(..., min_length=1)
+    time_of_day: str = Field(..., min_length=1)
     # Story-spine Stream A: the dramatic question. Required-with-default
     # (like Beat.arc_phase) -- a small local model frequently omits an
     # Optional field, so default="" guarantees the macro parses even when
     # omitted; the combiner then falls back to the premise. Capable
     # models emit it from the _MACRO_SYSTEM_PROMPT schema below.
-    central_tension: str = Field(default="", max_length=300)
+    central_tension: str = ""
 
 
 # Stage 2 schema -- per-phase speaker assignments only. Each beat is
 # just a speaker name. beat_id, arc_phase, and speaker_role are
 # stamped by Python in the combiner.
 class _PhaseBeatSeed(BaseModel):
-    speaker: str = Field(..., min_length=1, max_length=40)
+    speaker: str = Field(..., min_length=1)
 
     @field_validator("speaker")
     @classmethod
-    def _speaker_uppercase(cls, v: str) -> str:
-        return v.strip().upper()
+    def _speaker_must_not_be_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("speaker must not be blank")
+        return v.strip()
 
 
 class _PhaseSkeleton(BaseModel):
@@ -1095,8 +953,8 @@ class _PhaseSkeleton(BaseModel):
 # `target_words` key parses cleanly -- the stray key is dropped, not
 # rejected.
 class _BeatFleshout(BaseModel):
-    intent: str = Field(..., min_length=4, max_length=200)
-    mood: str = Field(..., min_length=2, max_length=40)
+    intent: str = Field(..., min_length=1)
+    mood: str = Field(..., min_length=1)
 
 
 _MACRO_SYSTEM_PROMPT = """\
@@ -1104,11 +962,11 @@ You plan short science-fiction audio dramas. Return one JSON object only -- no p
 
 Schema:
 {
-  "title":           3-80 chars,
-  "premise":         10-400 chars; one sentence that extrapolates dramatically from the story,
-  "setting":         4-120 chars; concrete place,
-  "time_of_day":     3-40 chars; e.g. "midnight", "pre-dawn", "after first contact",
-  "central_tension": 10-300 chars; the single dramatic question the episode answers, one sentence.
+  "title":           non-empty episode title,
+  "premise":         non-empty dramatic extrapolation from the story,
+  "setting":         non-empty concrete place,
+  "time_of_day":     non-empty time context,
+  "central_tension": the dramatic question the episode answers.
 }
 """
 
@@ -1118,11 +976,11 @@ You plan one phase of a science-fiction audio drama. Return one JSON object only
 Schema:
 {
   "beats": array of 1-10 objects, each:
-    { "speaker": one ALL-CAPS name from the Cast block }
+    { "speaker": one exact name from the Cast block }
 }
 
 Rules:
-- Use ONLY the exact ALL-CAPS names from the Cast block. Never invent a name or alter its spelling.
+- Use ONLY the exact names from the Cast block. Never invent a name or alter its spelling.
 - Speaker variation across beats is optional, not required. Vary speakers only when it serves the scene; repeating the same speaker on consecutive beats is fine.
 - The number of beats you return MUST equal the requested count.
 """
@@ -1132,8 +990,8 @@ You flesh out one beat of a science-fiction audio drama. Return one JSON object 
 
 Schema:
 {
-  "intent": 4-200 chars; one sentence on what this beat accomplishes narratively. NOT dialogue text.
-  "mood":   2-40 chars; one tone descriptor.
+  "intent": a non-empty statement of what this beat accomplishes; not dialogue.
+  "mood":   a non-empty tone descriptor.
 }
 """
 
@@ -1361,27 +1219,6 @@ def _build_beat_user_prompt(
     return "\n".join(parts)
 
 
-# C0 (story-quality R2): an action-under-pressure beat intent leads with (or
-# contains) a stakes verb. Used as a measurement signal by the story-quality
-# scan; NOT a hard outline-failing gate (a strict structured_call post_validator
-# would flake outlines on weak models -- the prompt constraint is the lever).
-_ACTION_PRESSURE_RE = re.compile(
-    r"\b(reveal|refus|deny|denies|denied|demand|bargain|accus|conceal|hid|"
-    r"hides|choos|chose|chooses|threaten|confess|betray|expos|defy|defies|"
-    r"defied|insist|warn|confront|sacrific|risk|gambl|force)\w*",
-    re.IGNORECASE,
-)
-
-
-def intent_is_action_under_pressure(intent) -> bool:
-    """True when a beat intent reads as an action under pressure (carries a
-    stakes verb). Pure; never raises."""
-    try:
-        return bool(_ACTION_PRESSURE_RE.search(str(intent or "")))
-    except Exception:  # noqa: BLE001
-        return False
-
-
 def _allocate_phase_target_words(
     phase_total_words: int,
     n_beats: int,
@@ -1555,7 +1392,7 @@ def _derive_arc_refs(
     char_idxs = [i for i, b in enumerate(beats) if b.speaker_role == "character"]
     central = (getattr(macro, "central_tension", "") or "").strip()
     if not central:
-        central = (macro.premise or "").strip()[:300]
+        central = (macro.premise or "").strip()
     if len(char_idxs) < 2:
         return central, None, None
     button_idx = char_idxs[-1]
@@ -1828,6 +1665,9 @@ def generate_outline(
     per_phase_beats = tuple(budget.per_phase_beats)
     words_per_beat_range = tuple(budget.words_per_beat_range)
     locked_cast_set = set(req.character_cast)
+    locked_cast_by_normalized = {
+        _normalize_speaker(name): name for name in req.character_cast
+    }
 
     # Sprint D D2b: creative-phase prompt routes via the resolver.
     # The new per-stage prompts replace the legacy _SYSTEM_PROMPT
@@ -1965,8 +1805,9 @@ def generate_outline(
                 if b.speaker in locked_cast_set:
                     continue
                 normalized = _normalize_speaker(b.speaker)
-                if normalized in locked_cast_set:
-                    b.speaker = normalized
+                canonical = locked_cast_by_normalized.get(normalized)
+                if canonical is not None:
+                    b.speaker = canonical
                     continue
                 return (
                     f"phase {phase_name!r} beat speaker "
@@ -1974,46 +1815,6 @@ def generate_outline(
                     f"{sorted(locked_cast_set)!r}"
                 )
             return None
-
-        def _phase_cast_phantom_repair(
-            failed_output: str, error: BaseException,
-        ) -> Optional[_PhaseSkeleton]:
-            """Sprint 2C cast_membership deterministic repair.
-
-            When the phase skeleton was rejected for a speaker outside
-            the locked cast, try to remap every phantom speaker to a
-            cast member with the project's one Levenshtein matcher
-            (auto_remap_phantom, threshold 3). If EVERY phantom resolves
-            unambiguously, return the corrected _PhaseSkeleton --
-            structured_call accepts it and makes no LLM repair call.
-            Return None when the output cannot be parsed or any phantom
-            is ambiguous; the dispatcher then builds an LLM cast-
-            membership repair turn instead.
-            """
-            try:  # lazy import: keep _otr_outline off the reviewer import graph
-                from ._otr_ledger_reviewer import auto_remap_phantom
-            except ImportError:  # pragma: no cover - standalone / test load
-                from _otr_ledger_reviewer import (  # type: ignore
-                    auto_remap_phantom,
-                )
-            try:
-                data = _otr_json.parse_first_json_object(failed_output or "")
-                skeleton = _PhaseSkeleton.model_validate(data)
-            except Exception:  # noqa: BLE001 -- unparseable: no deterministic fix
-                return None
-            remaps: list[tuple[int, str]] = []
-            for idx, beat in enumerate(skeleton.beats):
-                if beat.speaker in locked_cast_set:
-                    continue
-                canonical = auto_remap_phantom(
-                    beat.speaker, locked_cast_set, threshold=3,
-                )
-                if canonical is None:
-                    return None  # ambiguous phantom -- fall through to LLM
-                remaps.append((idx, canonical))
-            for idx, canonical in remaps:
-                skeleton.beats[idx].speaker = canonical
-            return skeleton
 
         # LLM slot: creative -- per-phase speaker routing
         try:
@@ -2029,9 +1830,7 @@ def generate_outline(
                 structural_retry_temperature=(
                     _STAGE2_STRUCTURAL_RETRY_TEMPERATURE
                 ),
-                repair_prompt_factory=make_dispatching_repair_factory(
-                    deterministic_repair=_phase_cast_phantom_repair,
-                ),
+                repair_prompt_factory=make_dispatching_repair_factory(),
                 post_validator=_phase_check,
                 max_new_tokens=200,
                 max_attempts=max_attempts,

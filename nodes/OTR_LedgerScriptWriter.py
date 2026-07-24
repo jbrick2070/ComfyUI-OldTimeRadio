@@ -110,7 +110,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import os
 import re
 from dataclasses import dataclass
@@ -215,28 +214,6 @@ composer prompt budget, and the extra context smooths line-to-line
 voice consistency (especially in multi-character scenes where the
 prior 3-line window often dropped one speaker's last beat)."""
 
-WORD_BUDGET_RATIO_LO = _OTRWD.LOW_RATIO_EXCLUSIVE
-WORD_BUDGET_RATIO_HI = _OTRWD.HIGH_RATIO_INCLUSIVE
-
-
-def _producer_word_budget_band(receipt) -> tuple[float, float]:
-    """Return a valid persisted ratio band or the common delivery ratios."""
-    band = receipt.get("band") if isinstance(receipt, dict) else None
-    if isinstance(band, (list, tuple)) and len(band) == 2:
-        try:
-            low, high = float(band[0]), float(band[1])
-        except (TypeError, ValueError):
-            pass
-        else:
-            if (
-                math.isfinite(low)
-                and math.isfinite(high)
-                and 0.0 < low <= high
-            ):
-                return low, high
-    return WORD_BUDGET_RATIO_LO, WORD_BUDGET_RATIO_HI
-"""Common planning ratios; final integer delivery uses _otr_word_delivery."""
-
 WORDS_PER_MINUTE_ESTIMATE = 140
 """Word-per-minute estimate for the est_minutes output socket only.
 Story planning is words-only; this constant is never used to derive
@@ -320,20 +297,6 @@ _LEMMY_CAMEO_FORCE = {
 # ---------------------------------------------------------------------------
 # Title regeneration (post-composition, news-seed-free per Jeffrey 2026-05-10)
 # ---------------------------------------------------------------------------
-
-_STUCK_TITLE_DEFAULTS = frozenset({
-    "",
-    "the last frequency",
-    "untitled",
-    "episode",
-    "signal lost",
-    "custom episode",
-    "pending",
-    "(pending)",
-})
-"""Reject set for post-composition title regen. Mirrors the legacy
-story_orchestrator._STUCK_TITLE_DEFAULTS set, plus "(pending)" guard
-in case a future canon_header placeholder leaks into the LLM output."""
 
 _TITLE_PREFIX_RE = None  # compiled lazily inside the helper to keep
                           # this module's import surface stdlib-only.
@@ -639,12 +602,9 @@ class _SlotScheduler:
         """Return the declared transport capability for one configured slot.
 
         ``for_slot`` deliberately defers model acquisition until an actual
-        generation call.  Its wrapper must nevertheless retain the catalog's
-        transport behavior: structured callers decide whether a bounded repair
-        is safe *before* invoking the wrapper, and OpenRouter needs its
-        JSON-object request mode forwarded through it.  An unknown/non-curated
-        id is conservative (not eligible for the P3 text patch), while proven
-        local and full-message remote catalog rows are explicitly eligible.
+        generation call. Its wrapper retains the catalog's structured transport
+        behavior: local models expose lazy schema binding and remote providers
+        retain their JSON-object capability markers.
         """
         try:
             row = _otr_model_catalog._by_repo_id().get(self.ids[slot])
@@ -652,12 +612,7 @@ class _SlotScheduler:
         except Exception:  # noqa: BLE001 -- capability is a safe false default
             provider = ""
         return {
-            "_otr_p3_text_patch_local": provider == "local",
-            "_otr_p3_text_patch_transport": (
-                "exact_local" if provider == "local"
-                else "full_message_remote" if provider == "openrouter"
-                else None
-            ),
+            "_otr_local_schema_binding": provider == "local",
             "_otr_openrouter": provider == "openrouter",
             "_otr_comfy_credits": provider == "comfy_credits",
             "_otr_google_api": provider == "google_api",
@@ -710,11 +665,10 @@ class _SlotScheduler:
 
             for marker, value in transport_markers.items():
                 setattr(generate_fn, marker, value)
-            if transport_markers["_otr_p3_text_patch_local"]:
+            if transport_markers["_otr_local_schema_binding"]:
                 # Lazy schema binding preserves slot accounting and model
                 # transitions while making invalid JSON un-sampleable on the
-                # local Transformers lane. The bound closure keeps every
-                # transport marker needed by the P3 repair path.
+                # local Transformers lane.
                 generate_fn._otr_bind_schema = _make_generate_fn  # type: ignore[attr-defined]
                 generate_fn._otr_bound_schema_model = schema_model  # type: ignore[attr-defined]
             return generate_fn
@@ -1141,7 +1095,7 @@ def _generate_title_from_script(
     # field). Default keeps legacy callers/self-tests byte-identical.
     title_form_label: str = "sci-fi radio drama",
 ) -> str:
-    """Generate a 2-5 word episode title via a forced scratchpad pass.
+    """Generate an episode title via a forced scratchpad pass.
 
     Per Jeffrey 2026-05-10: "title should generate only AFTER the whole
     story is done via the LLM, nothing with the news seed". The prompt
@@ -1166,10 +1120,9 @@ def _generate_title_from_script(
     today the writer passes ""; the ARC block flips off cleanly when
     empty.
 
-    Returns the cleaned title, or empty string on any failure (LLM
-    raise, no parseable `TITLE:` line, stuck-default rejection, overlong
-    leak, smart-quote-only wrappers that strip to nothing). Caller falls
-    back to outline.title on "".
+    Returns the cleaned authored title, or an empty string on an LLM
+    failure, missing `TITLE:` line, or wrapper-only output. The caller
+    falls back to outline.title on an empty result.
 
     `generate_fn` matches the (messages, *, temperature, max_new_tokens)
     contract returned by `_build_truncating_generate_fn`.
@@ -1214,7 +1167,7 @@ def _generate_title_from_script(
     sys_msg = (
         f"You are titling a single episode of a {_form}. "
         "You receive the finished story material and propose an "
-        "evocative 2-5 word episode title. You work on a scratchpad "
+        "specific, evocative episode title. You work on a scratchpad "
         "first, then commit to a final answer."
     )
     user_msg = (
@@ -1223,12 +1176,12 @@ def _generate_title_from_script(
         "DETAILS: list 3 concrete physical details actually present "
         "in the story above -- a specific object, place, sound, or "
         "image, one per line.\n"
-        "CANDIDATES: draft 3 candidate episode titles, each 2 to 5 "
-        "words, each drawing on one of those details, one per line.\n"
+        "CANDIDATES: draft 3 distinct candidate episode titles, each "
+        "drawing on one of those details, one per line.\n"
         "TITLE: on the final line, write the single best title from "
         "your candidates.\n\n"
         "Rules for the final title:\n"
-        " - 2 to 5 words\n"
+        " - use a non-empty authored title\n"
         " - draw from a vivid image, important object, character, or "
         "thematic tension actually present in the story\n"
         " - feel specific and memorable, not generic\n"
@@ -1298,29 +1251,8 @@ def _generate_title_from_script(
     if not candidate:
         return ""
 
-    # Reject stuck defaults.
-    if candidate.lower() in _STUCK_TITLE_DEFAULTS:
-        log.info(
-            "[OTR_LedgerScriptWriter] title regen rejected stuck default: %r",
-            candidate,
-        )
-        return ""
-
-    # Reject full-sentence leaks. Legacy threshold = 10 words; mirror it.
-    word_count = len(candidate.split())
-    if word_count > 10:
-        log.info(
-            "[OTR_LedgerScriptWriter] title regen rejected overlong (%d "
-            "words): %r",
-            word_count, candidate,
-        )
-        return ""
-
-    # Outline.title schema allows 3-80 chars; enforce upper bound here
-    # too so the regenerated title stays drop-in compatible with the
-    # canon.title field downstream.
-    if len(candidate) > 80:
-        candidate = candidate[:80].rstrip()
+    # Any non-empty authored title is valid. Python phrase lists and word
+    # ceilings are not story-quality judges and must not discard model output.
 
     log.info(
         "[OTR_LedgerScriptWriter] title regen -> %r (scratchpad pass, "
@@ -1374,8 +1306,7 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
 
 
 def _fetch_rss_seed_or_die(
-    model_id: str, *, require_science_floor: bool = False,
-    load_config=None, policy=None,
+    model_id: str, *, load_config=None, policy=None,
 ) -> dict:
     """Run the story_orchestrator RSS fetcher and return the article dict.
 
@@ -1403,7 +1334,6 @@ def _fetch_rss_seed_or_die(
         news = _so._fetch_science_news(
             max_feeds=10, model_id=model_id,
             optimization_profile="Standard",
-            require_science_floor=require_science_floor,
             load_config=load_config, policy=policy,
         )
         if not news:
@@ -1960,114 +1890,6 @@ def _run_scifi_codex_lane(**kwargs):
     return _SC.run_scifi_codex_episode(**kwargs)
 
 
-def _v3_max_run(seq):
-    """Longest run of the same value in a sequence (deterministic helper)."""
-    best = run = 0
-    prev = object()
-    for s in seq:
-        run = run + 1 if s == prev else 1
-        prev = s
-        best = max(best, run)
-    return best
-
-
-def run_v3_advisory(led, meta, *, lane, version: int = 1) -> None:
-    """Bake-off v3: bounded, ADVISORY-ONLY, deterministic structural diagnostic.
-
-    Reads the ALREADY-ASSEMBLED ledger (kibitz r2, CONFIRMED: sci-fi runners call
-    ``led.set_lines`` etc. INSIDE the runner before return, and the inline lanes
-    have saved at Phase-0 before this hook) and records ONE meta field it owns.
-    It NEVER mutates ``lines/beats/shots/music/cast`` and NEVER raises -- any
-    error is stamped, not thrown (operator law: an audit may improve a story, it
-    may never fail one; and every field it writes has exactly one owner)."""
-    # lane is the full bank id (e.g. "public_domain"); the owned meta
-    # field is "<lane>_advisory".
-    key = f"{lane}_advisory"
-    data = getattr(led, "data", None)
-    # Stamp into the LIVE ledger meta (survives incremental saves that replace
-    # led.data); fall back to the passed meta only if led has no data mapping.
-    target = data.setdefault("meta", {}) if isinstance(data, dict) else (
-        meta if isinstance(meta, dict) else None)
-    if target is None:
-        return
-    try:
-        try:
-            from ._otr_bank_variants import base_source_bank_id
-        except ImportError:  # pragma: no cover -- flat/standalone load
-            from _otr_bank_variants import base_source_bank_id  # type: ignore
-        data = data or {}
-        rows = []
-        for r in (data.get("lines") or []):
-            if not isinstance(r, dict):
-                continue
-            if r.get("skip") or r.get("skip_tts"):
-                continue
-            if not str(r.get("text") or "").strip():
-                continue
-            rows.append(r)
-        speakers = [str(r.get("char_id") or r.get("speaker_role") or "") for r in rows]
-        counts: dict[str, int] = {}
-        for s in speakers:
-            counts[s] = counts.get(s, 0) + 1
-        words = [canonical_word_count(r.get("text")) for r in rows]
-        base = base_source_bank_id(lane)
-        focus = _v3_focus_metric(base, rows, speakers, words, counts)
-        target[key] = {
-            "status": "ok",
-            "version": int(version),
-            "basis": "assembled_ledger_lines",
-            "line_count": len(rows),
-            "distinct_speakers": len([s for s in counts if s]),
-            "max_same_speaker_run": _v3_max_run(speakers),
-            "total_words": sum(words),
-            "focus": focus,
-        }
-    except Exception as exc:  # noqa: BLE001 -- advisory must never fail an episode
-        target[key] = {
-            "status": "error",
-            "version": int(version),
-            "error_type": type(exc).__name__,
-            "message": str(exc)[:200],
-        }
-
-
-def _v3_focus_metric(base, rows, speakers, words, counts):
-    """Per-family deterministic focus metric (the v3 lane's improvement target)."""
-    import re
-    cast = len([s for s in counts if s])
-    if base == "scifi_codex":
-        by_beat: dict[str, int] = {}
-        for r, w in zip(rows, words):
-            bid = str(r.get("beat_id") or "")
-            by_beat[bid] = by_beat.get(bid, 0) + w
-        vals = list(by_beat.values())
-        if len(vals) >= 2:
-            mean = sum(vals) / len(vals)
-            var = sum((v - mean) ** 2 for v in vals) / len(vals)
-        else:
-            var = 0.0
-        return {"metric": "beat_word_variance", "beats": len(vals), "value": round(var, 2)}
-    if base == "scifi_sonnet":
-        return {"metric": "reader_alternation", "max_same_speaker_run": _v3_max_run(speakers)}
-    if base == "scifi_fable2":
-        non_ann = [s for r, s in zip(rows, speakers)
-                   if "announcer" not in str(r.get("speaker_role") or "").lower()]
-        distinct = len(set(s for s in non_ann if s))
-        return {"metric": "two_voice_exchange", "distinct_dramatic_speakers": distinct,
-                "present": distinct >= 2}
-    if base == "media_archive":
-        rx = re.compile(r"\b[A-Z][A-Z]+['’](ve|s|ll|re|d|t|m)\b")
-        hits = sum(len(rx.findall(str(r.get("text") or ""))) for r in rows)
-        return {"metric": "allcaps_name_contraction_hits", "value": hits}
-    if base == "public_domain":
-        return {"metric": "compression_line_count", "value": len(rows)}
-    if base == "shakespeare":
-        return {"metric": "distinct_source_speakers", "value": cast}
-    if base == "original_radio":
-        return {"metric": "spoken_line_count", "value": len(rows)}
-    return {"metric": "generic", "value": len(rows)}
-
-
 # scifi_fable2 S2 (doc s11): pipeline-id -> lane runner. Consulted
 # exactly ONCE per run, after the shared front (bank resolve -> runnable
 # gate -> fetch -> validate -> D.1 ledger + meta stamps) and BEFORE the
@@ -2076,27 +1898,17 @@ def _v3_focus_metric(base, rows, speakers, words, counts):
 # writer's own inline branches (byte-identical on a map miss).
 _RUNNER_BY_PIPELINE = {
     "scifi_news_pro_multipass": _run_fable2_lane,
-    # 2026-07-19: base scifi_codex (v1) ripped; scifi_codex_v4 renamed ->
-    # scifi_news (local default). It reuses the dedicated codex runner DIRECTLY;
-    # the proof-pressure improvement is pack-seam-only, and it deliberately does
-    # NOT invoke the v3 advisory wrapper (no <lane>_advisory meta field, no
-    # _v3_focus_metric).
+    # 2026-07-19: base scifi_codex (v1) was retired and the v4 lane
+    # became the direct scifi_news runner.
     "scifi_news_circuit": _run_scifi_codex_lane,
 }
 
-# Bake-off v3 inline lane: a clone of the legacy_many_pass inline pipeline. It
-# runs the inline body byte-identically (map miss -> None) plus one post-assembly
-# advisory diagnostic; it must be in _LEGACY_INLINE_PIPELINES so
-# _resolve_lane_runner returns None instead of raising. (original_multi_pass_v3
-# was retired with the original_radio_v3 lane in the 2026-07-17 roster trim.)
-_INLINE_V3_PIPELINES = frozenset({
-    "legacy_many_pass_adapt",
-})
-
-# The pipelines whose execution lane IS this writer's inline body.
+# The pipelines whose execution lane is this writer's inline body.
 _LEGACY_INLINE_PIPELINES = frozenset({
-    "legacy_many_pass", "original_multi_pass",
-}) | _INLINE_V3_PIPELINES
+    "legacy_many_pass",
+    "legacy_many_pass_adapt",
+    "original_multi_pass",
+})
 
 
 def _stamp_final_slot_telemetry(
@@ -2133,16 +1945,16 @@ def _stamp_final_slot_telemetry(
         return
     params = {}
     if meta.get("news") is not None:
-        _source_chain = meta.get("source_interpreter_chain")
-        _source_slot = "technical"
-        _source_model = resolved["technical_model"]
-        if isinstance(_source_chain, dict):
-            _source_slot = str(
-                _source_chain.get("accepted_slot") or _source_slot)
-            _source_model = str(
-                _source_chain.get("accepted_model") or _source_model)
+        source_receipt = meta.get("source_interpreter")
+        source_slot = "technical"
+        source_model = resolved["technical_model"]
+        if isinstance(source_receipt, dict):
+            source_model = str(
+                source_receipt.get("model") or source_model)
+            if source_model == "deterministic":
+                source_slot = "deterministic"
         params["news_interpreter"] = {
-            "slot": _source_slot, "model": _source_model,
+            "slot": source_slot, "model": source_model,
         }
     for phase in ("cast_lock", "outline", "dialogue_composer"):
         params[phase] = {
@@ -2246,480 +2058,66 @@ def _make_original_interpreter(*, creative_fn, resolved, meta):
     return _original_interpret
 
 
-_SOURCE_INTERPRETER_MAX_MODEL_CALLS = 12
-
-
-def _run_source_interpreter_quality_chain(
-    *, interpreter, bank, payload, source_meta,
-    technical_fn, creative_fn,
-    technical_model_id: str, creative_model_id: str,
-    slot_scheduler, meta,
-):
-    """Run a bank-specific source brain until accepted or its safe floor.
-
-    Each interpreter keeps its own prompt, schema, truth rules, and content
-    validator.  This helper owns only the shared liveness policy: a typed
-    structured-output/content exhaustion opens a fresh pass on the other model
-    slot with the exact rejection fed back, alternating until acceptance or the
-    finite 12-call ceiling.  The ceiling produces a deterministic, source-
-    derived BANK-SPECIFIC minimum brief.  Configuration/I/O/backend/contract
-    failures are not quality failures and propagate unchanged.
-    """
-    lanes = (
-        ("technical", technical_fn, str(technical_model_id)),
-        ("creative", creative_fn, str(creative_model_id)),
-    )
-    total_calls = 0
-    cycle = 0
-    failures: list[str] = []
-    journal: list[dict] = []
-
-    while total_calls < _SOURCE_INTERPRETER_MAX_MODEL_CALLS:
-        slot_name, slot_fn, model_name = lanes[cycle % len(lanes)]
-        prior_feedback = failures[-1] if failures else ""
-
-        def _fresh_slot_fn(messages, *, temperature, max_new_tokens):
-            patched = list(messages)
-            if prior_feedback:
-                patched.append({
-                    "role": "user",
-                    "content": (
-                        "A previous independent source-interpreter pass was "
-                        "rejected. Correct the exact issue below while "
-                        "preserving every bank-specific source-truth, rights, "
-                        "adaptation, and safety rule. Return only the required "
-                        "schema JSON.\n\nPREVIOUS REJECTION:\n"
-                        + prior_feedback[:700]
-                    ),
-                })
-            return slot_fn(
-                patched,
-                temperature=temperature,
-                max_new_tokens=max_new_tokens,
-            )
-
-        try:
-            with slot_scheduler.helper_context("build_news_briefs"):
-                briefs = interpreter(
-                    bank=bank,
-                    payload=payload,
-                    technical_fn=_fresh_slot_fn,
-                    model_id=model_name,
-                )
-        except _otr_source_payload.SourceInterpretError as exc:
-            used = _otr_source_payload.quality_interpret_failure_attempts(exc)
-            if used <= 0:
-                raise
-            total_calls += used
-            reason = " ".join(str(exc).split())[:700]
-            failures.append(reason)
-            journal.append({
-                "cycle": cycle + 1,
-                "slot": slot_name,
-                "model": model_name,
-                "status": "quality_rejected",
-                "model_calls": used,
-                "reason": reason,
-            })
-            log.warning(
-                "[OTR_LedgerScriptWriter] source interpreter quality reject "
-                "cycle=%d slot=%s calls=%d total=%d/%d: %s",
-                cycle + 1, slot_name, used, total_calls,
-                _SOURCE_INTERPRETER_MAX_MODEL_CALLS, reason,
-            )
-            cycle += 1
-            continue
-
-        used = max(1, int(getattr(briefs, "attempts", 1) or 1))
-        total_calls += used
-        journal.append({
-            "cycle": cycle + 1,
-            "slot": slot_name,
-            "model": model_name,
-            "status": "accepted",
-            "model_calls": used,
-            "reason": "",
-        })
-        meta["source_interpreter_chain"] = {
-            "schema_version": "source_interpreter_chain_v1",
-            "status": "accepted",
-            "max_model_calls": _SOURCE_INTERPRETER_MAX_MODEL_CALLS,
-            "model_calls": total_calls,
-            "cycles": len(journal),
-            "accepted_slot": slot_name,
-            "accepted_model": model_name,
-            "attempts": journal,
-        }
-        return briefs
-
-    failure_summary = " | ".join(failures[-3:])
-    floor = _otr_source_payload.build_source_interpreter_floor(
-        bank=bank,
-        payload=payload,
-        source_meta=source_meta,
-        attempts=total_calls,
-        failure_reason=failure_summary,
-    )
-    journal.append({
-        "cycle": len(journal) + 1,
-        "slot": "deterministic",
-        "model": floor.model_id,
-        "status": "quality_floor",
-        "model_calls": 0,
-        "reason": floor.quality_floor_reason,
-    })
-    meta["source_interpreter_chain"] = {
-        "schema_version": "source_interpreter_chain_v1",
-        "status": "quality_floor",
-        "max_model_calls": _SOURCE_INTERPRETER_MAX_MODEL_CALLS,
-        "model_calls": total_calls,
-        "cycles": len(journal),
-        "accepted_slot": "deterministic",
-        "accepted_model": floor.model_id,
-        "attempts": journal,
-    }
-    log.warning(
-        "[OTR_LedgerScriptWriter] source interpreter exhausted %d quality "
-        "model calls; continuing with validated bank-specific source floor",
-        total_calls,
-    )
-    return floor
-
-
-_ORIGINAL_QA_MIN_REPAIR_CYCLES = 3
-_ORIGINAL_QA_MAX_REPAIR_CYCLES = 6
-
-
-def _original_qa_repair_budget(issue_count: int) -> int:
-    """Return a dynamic, finite semantic-repair budget for the original lane."""
-    return min(
-        _ORIGINAL_QA_MAX_REPAIR_CYCLES,
-        max(_ORIGINAL_QA_MIN_REPAIR_CYCLES, 2 + max(1, int(issue_count))),
-    )
-
-
-def _run_original_qa_gate(
-    led, meta, resolved, *,
-    bank_row,
+def _run_source_interpreter(
+    *,
+    interpreter,
+    bank,
+    payload,
+    source_meta,
     technical_fn,
-    creative_fn,
-    first_announcer_id,
-    last_announcer_id,
-    script_brief,
-    nc_brief,
+    technical_model_id: str,
+    slot_scheduler,
+    meta,
 ):
-    """Original whole-script QA plus dynamic, non-veto semantic repair.
+    """Run one bank interpreter with a deterministic same-source fallback.
 
-    Judge -> if dirty: a fail-class finding raises OriginalQAError ONLY when it
-    clears the deterministic evidence bar (lexicon hit or a grounded verbatim
-    quote -- see `_triage_or_raise`); unproven hard findings are discarded
-    loudly. Epilogue-class findings coalesce into a dynamic sequence of
-    ``compose_announcer_outro`` repairs. Each authored candidate is independently
-    re-judged, repair ownership alternates across the creative and technical
-    slots, and the outro row is patched READ-EXTEND so existing flags survive.
-
-    A still-unhappy subjective verdict ("moralizes" / "contradicts") triggers
-    another fresh repair instead of ending the episode. Exhaustion keeps the
-    best structurally valid authored candidate and stamps a nonterminal
-    ``quality_floor`` receipt. Only deterministic validators may end an episode.
-    ``epilogue_missing`` remains deterministically refutable and is discarded
-    when the outro row demonstrably exists."""
+    Each interpreter retains its own bounded structured-output repair ladder.
+    If model-authored output exhausts that ladder, a validated bank-specific
+    brief is derived from the same source. Backend, configuration, I/O, and
+    contract defects still propagate.
+    """
     try:
-        from . import _otr_original_radio as _OTROR
-        from . import _otr_line_composer as _OTRLC
-        from . import _otr_ledger as _OTRL
-    except ImportError:  # pragma: no cover -- flat test/standalone load
-        import _otr_original_radio as _OTROR  # type: ignore
-        import _otr_line_composer as _OTRLC  # type: ignore
-        import _otr_ledger as _OTRL  # type: ignore
-
-    pack = _otr_story_routing.resolve_story_pack(bank_row.source_bank_id)
-    concept_text = str(
-        (meta.get("source_meta") or {}).get("concept_corpus") or ""
-    )
-
-    def _judge():
-        return _OTROR.run_original_qa(
-            led,
-            technical_fn=technical_fn,
-            technical_model_id=str(resolved["technical_model"]),
-            concept_text=concept_text,
-            pack=pack,
-        )
-
-    def _triage_or_raise(found, *, repaired: bool) -> "list[str]":
-        """Evidence bar for the episode-killing classes (2026-07-10
-        live-smoke hardening: the first smoke died on THREE judge
-        hallucinations in one pass). Kills require lexicon evidence or
-        a confirm-pass verbatim quote; unproven hard findings are
-        DISCARDED LOUDLY (returned for the meta stamp). Epilogue-class
-        findings pass through untouched (r4 P3/P4 repair semantics)."""
-        hard = [
-            f for f in found.findings
-            if _OTROR.REPAIR_ACTION_BY_CLASS.get(f.finding_class, "fail")
-            == "fail"
-        ]
-        if not hard:
-            return []
-        kills, discarded = _OTROR.triage_hard_findings(
-            hard,
-            script=_OTROR.script_excerpt(led),
-            technical_fn=technical_fn,
-        )
-        if discarded:
-            log.warning(
-                "[OTR_LedgerScriptWriter] original_qa: DISCARDED %d "
-                "unproven hard finding(s) (no lexicon evidence, no "
-                "grounded confirm quote): %s",
-                len(discarded),
-                "; ".join(f"{f.finding_class}: {f.detail}"
-                          for f in discarded),
+        with slot_scheduler.helper_context("build_news_briefs"):
+            briefs = interpreter(
+                bank=bank,
+                payload=payload,
+                technical_fn=technical_fn,
+                model_id=str(technical_model_id),
             )
-        if kills:
-            meta["original_qa"] = {
-                "status": "failed",
-                "classes": [f.finding_class for f in found.findings],
-                "repaired": repaired,
-                "evidence": [
-                    f"{f.finding_class}: {ev}" for f, ev in kills
-                ],
-                "discarded": [f.finding_class for f in discarded],
-            }
-            led.save()
-            raise _OTROR.OriginalQAError(
-                "original_qa: unrepairable finding class(es) "
-                f"{[f.finding_class for f, _ in kills]}; "
-                + "; ".join(
-                    f"{f.finding_class}: {f.detail} [{ev}]"
-                    for f, ev in kills
-                )
-            )
-        return [f.finding_class for f in discarded]
-
-    findings = _judge()
-    if not findings.findings:
-        meta["original_qa"] = {"status": "clean", "repaired": False}
-        led.save()
-        log.info("[OTR_LedgerScriptWriter] original_qa: clean")
-        return
-
-    discarded_classes = _triage_or_raise(findings, repaired=False)
-    classes = [f.finding_class for f in findings.findings]
-    epilogue_findings = [
-        f for f in findings.findings
-        if _OTROR.REPAIR_ACTION_BY_CLASS.get(f.finding_class, "fail")
-        == "recompose_outro"
-    ]
-    if not epilogue_findings:
-        # Every finding was an unproven hard flag, now discarded: the
-        # episode is clean by the evidence bar. Stamp the discard so
-        # soak/eyeball can audit it -- loud, never silent.
-        meta["original_qa"] = {
-            "status": "clean_after_discard", "repaired": False,
-            "discarded": discarded_classes,
+    except _otr_source_payload.SourceInterpretError as exc:
+        used = _otr_source_payload.interpreter_exhaustion_attempts(exc)
+        if used <= 0:
+            raise
+        reason = " ".join(str(exc).split())[:700]
+        fallback = _otr_source_payload.build_source_interpreter_fallback(
+            bank=bank,
+            payload=payload,
+            source_meta=source_meta,
+            attempts=used,
+            failure_reason=reason,
+        )
+        meta["source_interpreter"] = {
+            "schema_version": "source_interpreter_v2",
+            "status": "deterministic_same_source_fallback",
+            "model_calls": used,
+            "model": fallback.model_id,
+            "reason": reason,
         }
-        led.save()
-        log.info(
-            "[OTR_LedgerScriptWriter] original_qa: clean after "
-            "discarding unproven finding(s) %s", discarded_classes,
+        log.warning(
+            "[OTR_LedgerScriptWriter] interpreter output exhausted; "
+            "using the deterministic same-source fallback: %s",
+            reason,
         )
-        return
+        return fallback
 
-    # Epilogue classes are subjective semantic feedback. Keep asking fresh model
-    # passes to repair and independently re-judge instead of giving one critic a
-    # terminal veto. The finite ceiling is only a backend-hang guard; exhaustion
-    # ships the best structurally valid candidate with a quality-floor receipt.
-    log.warning(
-        "[OTR_LedgerScriptWriter] original_qa dirty (%s) -- entering the "
-        "dynamic cross-slot outro repair loop", classes,
-    )
-    intro_text = ""
-    _final_char_line = ""
-    for _ln in led.data.get("lines") or []:
-        if _ln.get("line_id") == first_announcer_id:
-            intro_text = str(_ln.get("text") or "")
-            break
-    for _ln in reversed(led.data.get("lines") or []):
-        if str(_ln.get("speaker_role") or "").strip() == "character":
-            _t = str(_ln.get("text") or "").strip()
-            if _t:
-                _final_char_line = _t
-                break
-    # READ-EXTEND the outro row: news_coda_no_brief and existing in-place
-    # telemetry survive every semantic repair cycle.
-    row = None
-    for _ln in led.data.get("lines") or []:
-        if _ln.get("line_id") == last_announcer_id:
-            row = _ln
-            break
-    if row is None:
-        raise RuntimeError(
-            f"[OTR_LedgerScriptWriter] original_qa repair: no outro row "
-            f"line_id={last_announcer_id!r}"
-        )
-    all_discarded: "list[str]" = list(discarded_classes)
-    repair_budget = _original_qa_repair_budget(len(epilogue_findings))
-    repair_count = 0
-    cycles: "list[dict[str, Any]]" = []
-    current_epilogue = list(epilogue_findings)
-    best_text = str(row.get("text") or "")
-    best_score = len(current_epilogue)
-    best_cycle = 0
-    best_objections = [
-        f"{f.finding_class}: {f.detail}" for f in current_epilogue
-    ]
-
-    while repair_count < repair_budget:
-        repair_count += 1
-        previous_text = str(row.get("text") or "").strip()
-        concerns = [
-            f"{f.finding_class}: {f.detail}" for f in current_epilogue
-        ]
-        repair_slot = "creative" if repair_count % 2 else "technical"
-        primary_fn = creative_fn if repair_slot == "creative" else technical_fn
-        alternate_fn = technical_fn if repair_slot == "creative" else creative_fn
-        primary_model = (
-            resolved["creative_writing_model"]
-            if repair_slot == "creative"
-            else resolved["technical_model"]
-        )
-        repair_brief = (
-            f"{script_brief}\n\n"
-            f"ORIGINAL QA REPAIR CYCLE {repair_count}. A fresh standards "
-            "judgment rejected the previous closing line. Rewrite only the "
-            "announcer close; do not repeat the rejected wording.\n"
-            f"PREVIOUS REJECTED CLOSE: {previous_text}\n"
-            f"EXACT QA CONCERNS: {'; '.join(concerns)}"
-        )
-        outro_res = _OTRLC.compose_announcer_outro(
-            creative_fn=primary_fn,
-            repair_fn=alternate_fn,
-            script_brief=repair_brief,
-            news_close_brief=nc_brief,
-            intro_text=intro_text,
-            creative_repo_id=primary_model,
-            ending_change=str(
-                (meta.get("dramatic_state") or {}).get("ending_change") or ""
-            ),
-            final_character_line=_final_char_line,
-            source_bank_id=resolved["source_bank"],
-        )
-        flags = list(row.get("compose_flags") or [])
-        flags.extend(outro_res.compose_flags)
-        flags.extend((
-            "original_qa_outro_recomposed",
-            f"original_qa_repair_cycle:{repair_count}:{repair_slot}",
-        ))
-        _OTRL.patch_line_text(led.data, last_announcer_id, outro_res.text)
-        _OTRL.patch_line_fields(
-            led.data, last_announcer_id,
-            {"compose_flags": list(dict.fromkeys(flags))},
-        )
-        led.save()
-
-        refindings = _judge()
-        discarded_this = _triage_or_raise(refindings, repaired=True)
-        all_discarded.extend(discarded_this)
-        still_epilogue = [
-            f for f in refindings.findings
-            if _OTROR.REPAIR_ACTION_BY_CLASS.get(f.finding_class, "fail")
-            == "recompose_outro"
-        ]
-
-        # ``epilogue_missing`` is an objective absence claim. Refute it with the
-        # real row, not another opinion, once a nonempty close demonstrably exists.
-        current_text = str(row.get("text") or "").strip()
-        refuted = [
-            f for f in still_epilogue
-            if f.finding_class == "epilogue_missing" and current_text
-        ]
-        if refuted:
-            log.warning(
-                "[OTR_LedgerScriptWriter] original_qa: REFUTED "
-                "'epilogue_missing' deterministically -- outro row %s exists "
-                "with %d chars; discarding the judge claim",
-                last_announcer_id, len(current_text),
-            )
-            refuted_classes = [f.finding_class for f in refuted]
-            all_discarded.extend(refuted_classes)
-            discarded_this.extend(refuted_classes)
-            still_epilogue = [f for f in still_epilogue if f not in refuted]
-
-        objections = [
-            f"{f.finding_class}: {f.detail}" for f in still_epilogue
-        ]
-        score = len(still_epilogue)
-        cycles.append({
-            "cycle": repair_count,
-            "repair_slot": repair_slot,
-            "judge_slot": "technical",
-            "finding_classes": [
-                f.finding_class for f in refindings.findings
-            ],
-            "remaining_objections": objections,
-            "discarded": sorted(set(discarded_this)),
-        })
-        # Prefer fewer surviving objections; on a tie keep the fresher authored
-        # candidate so the original rejected line can never win by inertia.
-        if score <= best_score:
-            best_text = current_text
-            best_score = score
-            best_cycle = repair_count
-            best_objections = objections
-
-        if not still_epilogue:
-            status = "clean_after_discard" if all_discarded else "clean"
-            receipt = {
-                "status": status,
-                "repaired": True,
-                "repair_count": repair_count,
-                "repair_budget": repair_budget,
-                "cycles": cycles,
-            }
-            if all_discarded:
-                receipt["discarded"] = sorted(set(all_discarded))
-            meta["original_qa"] = receipt
-            led.save()
-            log.info(
-                "[OTR_LedgerScriptWriter] original_qa: clean after %d "
-                "dynamic repair cycle(s)", repair_count,
-            )
-            return
-
-        current_epilogue = still_epilogue
-        repair_budget = max(
-            repair_budget,
-            _original_qa_repair_budget(len(current_epilogue)),
-        )
-
-    # No subjective verdict can kill a complete ledger. Keep the best valid
-    # authored candidate, stamp the finite floor, and continue to the shared
-    # deterministic safety/readiness gates.
-    if str(row.get("text") or "").strip() != best_text:
-        _OTRL.patch_line_text(led.data, last_announcer_id, best_text)
-    floor_flags = list(row.get("compose_flags") or [])
-    floor_flags.append("original_qa_quality_floor")
-    _OTRL.patch_line_fields(
-        led.data, last_announcer_id,
-        {"compose_flags": list(dict.fromkeys(floor_flags))},
-    )
-    meta["original_qa"] = {
-        "status": "quality_floor",
-        "repaired": True,
-        "repair_count": repair_count,
-        "repair_budget": repair_budget,
-        "best_cycle": best_cycle,
-        "objections": best_objections,
-        "discarded": sorted(set(all_discarded)),
-        "cycles": cycles,
+    used = max(1, int(getattr(briefs, "attempts", 1) or 1))
+    meta["source_interpreter"] = {
+        "schema_version": "source_interpreter_v2",
+        "status": "accepted",
+        "model_calls": used,
+        "model": str(technical_model_id),
     }
-    led.save()
-    log.warning(
-        "[OTR_LedgerScriptWriter] original_qa: subjective judge remained "
-        "unhappy after %d fresh repair/rejudge cycle(s); keeping best cycle %d "
-        "and continuing to deterministic ledger validation. Objections: %s",
-        repair_count, best_cycle, "; ".join(best_objections),
-    )
+    return briefs
 
 
 def _build_news_payload(
@@ -2760,148 +2158,6 @@ def _build_news_payload(
         entry["origin_label"] = origin_label
     return json.dumps([entry], indent=2, ensure_ascii=False)
 
-
-def _otr_body_gate_hint(reasons, sq_entry) -> str:
-    """Turn KILL-1 body-gate validation reasons into ONE concrete reroll note.
-
-    SPLITS the machine reasons from ``validate_composed_grounding``:
-      ``ungrounded_crisis:<toks>``  -> name the offending generic words to drop;
-      ``missing_conflict_object:<obj>`` -> name the premise object to ground in.
-    Falls back to the beat's ``conflict_object`` when reasons carry no object.
-    Deterministic, ASCII, SFW; never raises."""
-    parts: list[str] = []
-    for r in reasons or ():
-        r = str(r)
-        if r.startswith("ungrounded_crisis:"):
-            toks = [t for t in r.split(":", 1)[1].split(",") if t]
-            if toks:
-                parts.append(
-                    "Do not lean on generic crisis machinery ("
-                    + ", ".join(toks)
-                    + "); say what is actually happening in this scene's "
-                    "own terms."
-                )
-        elif r.startswith("missing_conflict_object:"):
-            obj = r.split(":", 1)[1].strip()
-            if obj:
-                parts.append(
-                    "Ground the line in the actual conflict over " + obj + "."
-                )
-    if not parts and isinstance(sq_entry, dict):
-        obj = str(sq_entry.get("conflict_object", "") or "").strip()
-        if obj:
-            parts.append("Ground the line in the conflict over " + obj + ".")
-    return " ".join(parts).strip()
-
-
-def _otr_cast_fullnames(req) -> "tuple[str, ...]":
-    """The episode's LOCKED cast FULL names for the C4 (S3) roster-caps signal:
-    the multi-word entries of the UPPERCASE ``allowed_roster`` on the line
-    request. NASA/UCLA-safe -- full names ONLY (a name contains a space), never
-    a single ALL-CAPS token. Longest-first (so a substring name never shadows a
-    longer one). Pure; never raises."""
-    try:
-        roster = getattr(req, "allowed_roster", ()) or ()
-        return tuple(sorted(
-            {str(n).strip() for n in roster if n and " " in str(n).strip()},
-            key=len, reverse=True,
-        ))
-    except Exception:  # noqa: BLE001
-        return ()
-
-
-def _otr_allcaps_cast_hits(text, fullnames) -> int:
-    """Count ALL-CAPS occurrences of a locked cast FULL name in ``text`` -- the
-    gemma shout-leak (``...when CLARISSE GORDON claim...``). Case-SENSITIVE on
-    the uppercase literal (a normal-case ``Clarisse Gordon`` is NOT a defect),
-    word-boundary anchored; mirrors ``scrub_roster_vocative``'s matching. Pure;
-    never raises."""
-    try:
-        s = "" if text is None else str(text)
-        if not s or not fullnames:
-            return 0
-        n = 0
-        for name in fullnames:
-            up = str(name).strip().upper()
-            if " " in up and re.search(rf"\b{re.escape(up)}\b", s):
-                n += 1
-        return n
-    except Exception:  # noqa: BLE001
-        return 0
-
-
-def _otr_roster_caps_midclause(text, fullnames) -> bool:
-    """True when an ALL-CAPS locked cast FULL name survives a leading/trailing
-    vocative scrub -- i.e. it sits MID-CLAUSE (a grammatical subject/object,
-    ``...when CLARISSE GORDON claim...``) where an in-place strip would mangle
-    the sentence, so the body gate must REROLL rather than strip. A pure
-    leading/trailing vocative is scrubbed by ``scrub_roster_vocative`` and does
-    NOT trip this. Pure; never raises."""
-    try:
-        from . import _otr_line_hygiene as _HY
-        scrubbed = _HY.scrub_roster_vocative(text, fullnames)
-        return _otr_allcaps_cast_hits(scrubbed, fullnames) > 0
-    except Exception:  # noqa: BLE001
-        return False
-
-
-def _otr_body_score(text, bg_entry, grounded_nouns, entity_policy, req) -> int:
-    """C4 (S3) total-order defect score for ONE shipped character line -- LOWER
-    is cleaner. The body gate scores the SHIPPED text of BOTH the original and a
-    reroll and keeps the lower (ORIGINAL on tie), so a reroll is accepted only
-    when it is genuinely better, not merely re-grounded. Weighted so grounding
-    dominates, then a hard (unscrubable) leak, then truncation / run-on, then a
-    cast-name shout as the tie-break:
-
-        10*grounding_failed + 3*hard_leak + 2*trunc + 2*run_on + 1*roster_caps
-
-    The run-on cap MATCHES C2's one-breath gate exactly (``derive_one_breath_cap``
-    + relaxed ``max_clause_markers = max(3, cap // 8)``) so a budget-length
-    multi-clause line C2 deliberately allowed is not counted against a reroll
-    here. Pure + deterministic; never raises (any feature that errors scores 0,
-    never a crash mid-render)."""
-    from . import _otr_story_quality_l12 as _SQL12
-    from . import _otr_line_hygiene as _HY
-    try:
-        s = "" if text is None else str(text)
-        try:
-            _roles = _SQL12.CLIMAX_CLASS_ROLES | {_SQL12.BEAT_ROLE_PRESSURE}
-            g_ok, _ = _SQL12.validate_composed_grounding(
-                s, bg_entry, grounded_nouns,
-                max_ungrounded=0,
-                require_conflict_object_on_roles=_roles,
-            )
-            grounding_failed = 0 if g_ok else 1
-        except Exception:  # noqa: BLE001
-            grounding_failed = 0
-        try:
-            hard_leak = 1 if _HY.verify_and_repair_line(
-                s, policy=entity_policy,
-            ).needs_recompose else 0
-        except Exception:  # noqa: BLE001
-            hard_leak = 0
-        try:
-            trunc = 1 if _HY.is_truncated(s) else 0
-        except Exception:  # noqa: BLE001
-            trunc = 0
-        try:
-            _cap = _HY.derive_one_breath_cap(
-                getattr(req, "words_per_beat_range", (0, 0)))
-            run_on = 1 if _HY.flag_one_breath(
-                s, max_words=_cap, max_clause_markers=max(3, _cap // 8),
-            )[0] else 0
-        except Exception:  # noqa: BLE001
-            run_on = 0
-        roster_caps = _otr_allcaps_cast_hits(s, _otr_cast_fullnames(req))
-        return (
-            10 * grounding_failed
-            + 3 * hard_leak
-            + 2 * trunc
-            + 2 * run_on
-            + 1 * roster_caps
-        )
-    except Exception:  # noqa: BLE001 -- scoring must never break a render
-        return 0
 
 
 def _apply_story_scaffold_env(scaffold) -> str:
@@ -2977,7 +2233,7 @@ class WriterTailContext:
     behavior: final_title_override=None, run_story_spine=True keeps the
     env-gated spine default). The fable2 lane (S1b+) builds it from its
     parsed artifacts. The tail consumes ONLY this context -- no closure
-    over run() locals; `self` is touched solely for the refine stash.
+    over run() locals.
     """
 
     led: Any
@@ -2997,9 +2253,6 @@ class WriterTailContext:
     slot_scheduler: Any
     creative_fn: Any
     technical_fn: Any
-    cast_seed: Any             # refine stash only
-    refine_active: bool        # fable2: MUST be False S1-S3 (refine loop
-                               # unsupported on this lane)
     run_story_spine: bool      # legacy True (env-gated as today); fable2
                                # FALSE -- its P4/P5/P8 loop is the lane's
                                # equivalent; revisit post-S3
@@ -3537,10 +2790,11 @@ class OTR_LedgerScriptWriter:
                             "schema). Selects which registered story pack "
                             "supplies the pack-routed creative prompts and "
                             "which lane the episode runs. scifi_news = the "
-                            "local default lane; scifi_news_pro = the "
-                            "cloud/quality lane (needs a strong API model). "
+                            "local default bank; scifi_news_pro = the "
+                            "alternate LLM-first bank using the configured "
+                            "model slots. "
                             "Each lane is an INDEPENDENT bank (own pack + "
-                            "story_rules). The only non-runnable row is '+ Add "
+                            "bank metadata). The only non-runnable row is '+ Add "
                             "Your Own' (custom_source_bank) -- picking it "
                             "FAILS LOUD before any story work (no fallback)."
                         ),
@@ -3717,193 +2971,6 @@ class OTR_LedgerScriptWriter:
     # FUNCTION method
     # ------------------------------------------------------------------
 
-    def _refine_loop(self, _rcfg, _core_kwargs):
-        """Iterative story-REVISION loop (v1, 2026-06-23). Called by run() ONLY
-        when refine is enabled (effective_passes >= 2). Re-runs the writer body
-        (self.run with _refine_active=True) up to N times sharing ONE cast seed;
-        grades each pass and, below the target, REVISES (prior_macro + critique)
-        and retries. Keep-best by grade; commit the winner; clean up losers."""
-        from . import _otr_story_select as _OTRSEL
-        import hashlib
-        import random as _rnd
-        try:
-            import torch as _torch
-        except Exception:  # noqa: BLE001
-            _torch = None
-
-        def _seed(ns):
-            h = int(hashlib.sha256(ns.encode("utf-8")).hexdigest(), 16)
-            if _torch is not None:
-                _torch.manual_seed(h % (2 ** 64))
-            _rnd.seed(h % (2 ** 32))
-
-        def _build_prior_macro(_outline):
-            if _outline is None:
-                return ""
-            try:
-                _beats = getattr(_outline, "beats", []) or []
-                _intents = [
-                    str(getattr(b, "intent", "") or "")
-                    for b in _beats
-                    if str(getattr(b, "speaker_role", "") or "")
-                    in ("character", "announcer")
-                ]
-                _bs = "; ".join(f"{j + 1}. {t}" for j, t in enumerate(_intents))
-                return (
-                    f"Title: {getattr(_outline, 'title', '')}\n"
-                    f"Premise: {getattr(_outline, 'premise', '')}\n"
-                    f"Setting: {getattr(_outline, 'setting', '')}\n"
-                    f"Beats: {_bs[:600]}"
-                )
-            except Exception:  # noqa: BLE001
-                return ""
-
-        forced_seed = _resolve_cast_rng_seed()[0]   # ONE cast seed for all passes
-        log.info(
-            "[refine] ON: target=%s bar=%d max_passes=%d cast_seed=%d",
-            _rcfg.target_grade, _rcfg.bar, _rcfg.effective_passes, forced_seed,
-        )
-        candidates = []
-        prior_macro, prior_critique = "", ""
-        for i in range(_rcfg.effective_passes):
-            _seed(f"{forced_seed}:refine:{i}")
-            try:
-                out = self.run(
-                    **_core_kwargs,
-                    _refine_active=True,
-                    _refine_prior_macro=prior_macro,
-                    _refine_prior_critique=prior_critique,
-                    _refine_forced_cast_seed=forced_seed,
-                )
-            except Exception as _rexc:  # noqa: BLE001
-                # NO-FALLBACK rip (2026-07-03): a CASTING failure is fatal on ANY
-                # refine pass, not just pass 0. The cast is deterministic per
-                # forced_seed (one seed for all passes), so a naming/cast failure
-                # is a hard failure -- never silently drop the pass and ship an
-                # earlier one, which would hide a failed naming LLM. Other
-                # transient compose hiccups keep the pass-skip resilience below.
-                try:
-                    from . import _otr_casting as _CASTMOD
-                except ImportError:  # pragma: no cover -- flat test imports
-                    import _otr_casting as _CASTMOD  # type: ignore
-                if isinstance(_rexc, _CASTMOD.CastingFailedError):
-                    raise
-                if i == 0:
-                    raise   # pass-0 failure == the existing LOUD writer failure
-                log.warning("[refine] pass %d compose failed; skipping", i)
-                continue
-            last = getattr(self, "_refine_last", {}) or {}
-            _seed(f"{forced_seed}:refine:{i}:grade")
-            grade = _OTRSEL.grade_story(
-                out[0], last.get("premise", ""),
-                generate_fn=last.get("creative_fn"),
-            )
-            log.info(
-                "[refine] pass %d/%d grade=%d (target=%d) weakness=%r",
-                i, _rcfg.effective_passes, grade.score_0_100, _rcfg.bar,
-                str(grade.biggest_weakness)[:80],
-            )
-            cand = {"i": i, "grade": grade, "out": out, "last": last}
-            candidates.append(cand)
-            if grade.score_0_100 >= _rcfg.bar:
-                break   # early-stop: this pass hit the target; it is the last
-            prior_macro = _build_prior_macro(last.get("outline"))
-            # T2 (2026-06-23): when the per-pass result exposes the 5B critic's
-            # StoryCriticReport, build the next-pass critique from the critic
-            # ADAPTER (arc_verdict -> failing_axes + reroll-target hints) so the
-            # re-plan is steered by the structural critic, not only by
-            # grade_story.biggest_weakness. The writer's compose body does NOT
-            # currently stash a report (the 5B critic runs DOWNSTREAM in the
-            # freeze cascade), so today this falls back to the grader weakness
-            # -- byte-identical to the pre-T2 refine loop. The plumbing is ready
-            # for a future increment that runs the critic in-pass.
-            _critic_report = last.get("story_critic_report")
-            _critic_hint = ""
-            if _critic_report is not None:
-                _faxes, _regen = _OTRSEL.critic_report_to_refine_signals(
-                    _critic_report
-                )
-                _critic_hint = _OTRSEL.critique_to_hint(_regen)
-                try:
-                    _cled = (last or {}).get("led")
-                    if _cled is not None and isinstance(
-                        getattr(_cled, "data", None), dict
-                    ):
-                        _csq = _cled.data.setdefault("meta", {}).setdefault(
-                            "story_quality", {}
-                        )
-                        if isinstance(_csq, dict):
-                            _csq["critic_failing_axes"] = list(_faxes)
-                            _csq["critic_regeneration_hint"] = _regen
-                except Exception:  # noqa: BLE001 -- telemetry never breaks the run
-                    pass
-            if _critic_hint:
-                prior_critique = _critic_hint
-            else:
-                prior_critique = (
-                    "" if grade.error_type
-                    else _OTRSEL.critique_to_hint(grade.biggest_weakness)
-                )
-        # Keep-BEST across passes (operator 2026-06-23). Revision is NOT monotonic
-        # -- the cap case can leave an EARLIER pass scoring higher than the last
-        # (a live gemma episode saw pass1=72 then drift to pass4=65). Ship the
-        # HIGHEST-grade pass, not the last; tie -> the earliest pass (cleaner draft,
-        # fewer edits). The telemetry block below re-saves the WINNER's ledger LAST,
-        # so the downstream latest-ledger handoff ships THIS pass even when it is
-        # not the final one composed. Earlier-pass dirs are NOT deleted (deleting
-        # raced the freeze -- the PendingSweep / operator reclaims them).
-        # Keep-best via the shared pure helper (T2): highest grade, ties -> the
-        # earliest pass (candidates are in append/pass order). Identical result
-        # to the prior max(grade, -i) comparator.
-        winner = candidates[_OTRSEL.keep_best_index(
-            [c["grade"].score_0_100 for c in candidates]
-        )]
-        _reached = winner["grade"].score_0_100 >= _rcfg.bar
-        _stop = "bar_reached" if _reached else "cap_reached_below_bar"
-        if not _reached:
-            log.warning(
-                "[refine] cap reached BELOW bar: BEST grade=%d < target=%d (%s); "
-                "shipping the best of %d passes -- consider a lower target grade",
-                winner["grade"].score_0_100, _rcfg.bar, _rcfg.target_grade,
-                len(candidates),
-            )
-        # Stamp refine telemetry on the WINNER's ledger (merged) + re-save.
-        try:
-            _wled = (winner["last"] or {}).get("led")
-            if _wled is not None and isinstance(getattr(_wled, "data", None), dict):
-                _sq = _wled.data.setdefault("meta", {}).setdefault("story_quality", {})
-                if isinstance(_sq, dict):
-                    _sq["refine_loop"] = {
-                        "requested_passes": _rcfg.requested_passes,
-                        "effective_passes": _rcfg.effective_passes,
-                        "max_passes": _rcfg.max_passes,
-                        "bar": _rcfg.bar,
-                        "target_grade": _rcfg.target_grade,
-                        "override_source": _rcfg.override_source,
-                        "winner_pass": winner["i"],
-                        "winner_grade": winner["grade"].score_0_100,
-                        "stop_reason": _stop,
-                        "target_reached": bool(_reached),
-                        "provider": _rcfg.provider,
-                        "clamp_reason": _rcfg.clamp_reason,
-                        "passes": [
-                            {
-                                "pass_index": c["i"],
-                                "score_0_100": c["grade"].score_0_100,
-                                "grade_error_type": c["grade"].error_type,
-                                "grade_delta": (
-                                    None if c["i"] == 0
-                                    else c["grade"].score_0_100
-                                    - candidates[0]["grade"].score_0_100
-                                ),
-                            }
-                            for c in candidates
-                        ],
-                    }
-                    _wled.save()
-        except Exception:  # noqa: BLE001 -- telemetry must never break the run
-            log.warning("[refine] telemetry stamp failed")
-        return winner["out"]
 
     def run(
         self,
@@ -3995,20 +3062,8 @@ class OTR_LedgerScriptWriter:
         # S5 gate_in (validation-order fix): opaque ordering signal from
         # OTR_WorkflowValidator -- never parsed, just sequenced.
         gate_in="",
-        # Refine loop (v1, 2026-06-23) -- keyword-only overrides set ONLY by
-        # _refine_loop when a refine pass re-enters this body. All default to the
-        # no-op so a normal (non-refine) call is byte-identical.
-        *,
-        _refine_active=False,
-        _refine_prior_macro="",
-        _refine_prior_critique="",
-        _refine_forced_cast_seed=None,
     ):
-        """Generate a v2.0 LPL script. See the module docstring for the pipeline.
-
-        The optional default-OFF iterative story-REVISION loop (v1, 2026-06-23)
-        is delegated to ``_refine_loop`` on the INITIAL call; each refine pass
-        re-enters this body with ``_refine_active=True`` and runs it directly."""
+        """Generate one accepted v2.0 LPL story artifact."""
         # Stage 2C run-intent gate -- the FIRST statement of the body, before
         # the story-scaffold env mutation, the refine gate, the budget resets,
         # and _resolve_inputs (RSS fetch): a non-runnable source_bank pick
@@ -4023,30 +3078,11 @@ class OTR_LedgerScriptWriter:
         # Every REGISTERED style is valid to run (styles are prompt-tail
         # deltas; no execution lane to gate).
         _otr_visual_styles.resolve_visual_style(visual_style)
-        # scifi_fable2 S2 entry gates (r3/M4): the lane's word-budget gate
-        # runs HERE -- before the story-scaffold env mutation, the refine
-        # gate, the budget resets, and _resolve_inputs (the RSS fetch) --
-        # so an unsupported target_words fails ONCE, loud and cheap, with
-        # zero side effects. Keyed on the BANK's declared pipeline (not the
-        # bank id) so a future fable2-family bank inherits the gate. The
-        # runner re-asserts defensively at its own entry. The refine loop
-        # is unsupported on this lane S1-S3 (WriterTailContext law) -- a
-        # non-Off refine widget fails loud here too.
         _selected_pipeline_id = str(getattr(
-            _source_bank_row, "default_story_pipeline", "") or "")
-        if _selected_pipeline_id == "scifi_news_pro_multipass":
-            try:
-                from . import _otr_scifi_fable2 as _F2GATE
-            except ImportError:  # pragma: no cover -- flat/standalone load
-                import _otr_scifi_fable2 as _F2GATE  # type: ignore
-            _F2GATE.assert_supported_target_words(int(target_words))
-        if (_selected_pipeline_id in _RUNNER_BY_PIPELINE
-                and (_refine_active or refine_target_grade != "Off")):
-            raise RuntimeError(
-                "[OTR_LedgerScriptWriter] dispatched custom pipeline "
-                f"{_selected_pipeline_id!r} does not support writer refine "
-                "re-entry. Set refine_target_grade to 'Off' for this bank."
-            )
+            _source_bank_row, "default_story_pipeline", "",
+        ) or "")
+        # target_words and refine_target_grade remain compatibility/guidance
+        # inputs only. Neither can reject a bank or author a competing story.
         # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the
         # process env FIRST, before generate_outline + every style-grammar read,
         # so this single control governs the whole bundled scaffold: the style
@@ -4082,34 +3118,6 @@ class OTR_LedgerScriptWriter:
                 "OTR_ENABLE_STYLE_GRAMMAR=%s (widget override)",
                 _scaffold, os.environ.get("OTR_ENABLE_STYLE_GRAMMAR"),
             )
-        if not _refine_active:
-            from . import _otr_story_select as _OTRSEL_GATE
-            _rcfg = _OTRSEL_GATE.resolve_refine_passes(
-                creative_writing_model, widget_target=refine_target_grade,
-            )
-            if _rcfg.effective_passes >= 2:
-                # BUG-LOCAL-4xx root-cause fix (2026-07-05, kibitz r2): the old
-                # bare locals() capture also swept up NON-parameter locals
-                # created above this point (`os`, `_scaffold`), so
-                # `self.run(**_core)` inside _refine_loop raised TypeError on
-                # every refine-enabled run since the story_scaffold block
-                # (2026-06-24) introduced those locals. Filter against the
-                # ACTUAL run() signature so only real parameters are captured,
-                # and keep excluding the refine internals (re-set by
-                # _refine_loop per pass) + refine_target_grade (the loop must
-                # not re-trigger itself).
-                import inspect as _inspect
-                _run_params = _inspect.signature(type(self).run).parameters
-                _locals = locals()
-                _core = {
-                    k: _locals[k] for k in _run_params
-                    if k in _locals and k not in (
-                        "self", "refine_target_grade", "_refine_active",
-                        "_refine_prior_macro", "_refine_prior_critique",
-                        "_refine_forced_cast_seed",
-                    )
-                }
-                return self._refine_loop(_rcfg, _core)
 
         # BUG-LOCAL-296 (2026-05-31): reset the OpenRouter per-RUN cost
         # budget at the top of every episode. The budget is a module-level
@@ -4217,13 +3225,6 @@ class OTR_LedgerScriptWriter:
             technical_load_config=_llm_preflight.load_config_by_slot.get("technical"),
         )
 
-        # Stage 4 (2026-07-06): resolve the bank's story-content RULES once
-        # per episode, after the gates + input resolution and BEFORE the
-        # beat loop (fail-loud; kibitz r3 M1). One object feeds the stage3
-        # banned-phrase seed AND every compose_line call (_story_rules=).
-        from . import _otr_story_rules as _OTRRULES
-        story_rules = _OTRRULES.resolve_story_rules(resolved["source_bank"])
-
         log.info(
             "[OTR_LedgerScriptWriter] start: creative_model=%r, "
             "technical_model=%r, target_words=%d, num_characters=%d, "
@@ -4250,17 +3251,7 @@ class OTR_LedgerScriptWriter:
         from . import _otr_news_wiring as _OTRNW
         from . import production_ledger as _PL
         from . import _otr_continuity as _OTRCONT
-        # Lean-down 2026-05-29: the multiturn dispatch was deleted; the
-        # in-loop Stage1Plan adapters it hosted moved to
-        # _otr_legacy_to_stage1_adapter, which the kept Stage 3
-        # validators path imports here. Pure module; no LLM, no model
-        # loads at import time.
-        from . import _otr_legacy_to_stage1_adapter as _OTRL2S1
         from . import _otr_config as _OTRCFG
-        from . import _otr_line_hygiene as _OTRHY  # leak-floor-v2 EntityPolicy
-        from . import _otr_story_quality_l12 as _OTRSQL12
-        from . import _otr_story_select as _OTRSEL
-        from . import _otr_pitch_room as _OTRPR
         from . import _otr_style_catalog as _OTRSTYLE
         # KILL 2 (2026-06-24): hoist the style-grammar gate to ONE variable so every
         # story_scaffold branch below (the pre-outline StoryContract, the
@@ -4362,51 +3353,10 @@ class OTR_LedgerScriptWriter:
             (_source_bank_row.defaults or {}).get("style_pool_class", "generic")
             or "generic"
         )
-        # v4 campaign P1(iii): opt-in bank-aware GENRE spoken-text guard. A bank
-        # with defaults.genre_guard_spoken=True stamps its story_rules.
-        # banned_phrases so the deterministic Phase-10 G10 terminal (and the
-        # upstream authored repair below) scan the spoken text. Default False ->
-        # key absent -> G10 inert for every current (non-v4) bank.
-        if bool((_source_bank_row.defaults or {}).get("genre_guard_spoken", False)):
-            meta["genre_guard_spoken"] = True
-            meta["genre_banned_phrases"] = list(story_rules.banned_phrases)
-        # v4 P1(v): opt-in outro cast-completeness gate. Stamp the flag; the
-        # deterministic G12 terminal + the authored outro repair both read the
-        # final cast + outro line from the ledger. Default False -> inert.
-        if bool((_source_bank_row.defaults or {}).get(
-                "require_outro_cast_complete", False)):
-            meta["outro_cast_complete"] = True
-        # v4 P1(vii): opt-in literal-placeholder-token gate (deterministic G13).
-        # Default False -> key absent -> inert for every current bank.
-        if bool((_source_bank_row.defaults or {}).get("placeholder_guard", False)):
-            meta["placeholder_guard"] = True
         # v4 P1(vi): opt-in header<->scene structural gate (deterministic G15).
         # Default False -> key absent -> inert for every current bank.
         if bool((_source_bank_row.defaults or {}).get("scene_coherence_check", False)):
             meta["scene_coherence_check"] = True
-        # v4 P1(iv): record the beat-bounds contract -- the SOFT word-derived
-        # target (WORDS_PER_BEAT=40) + the family band. Length is
-        # recorded-not-gated (operator); only the structural floor (min) is
-        # enforced at freeze (G11). family = codex vs inline by pipeline.
-        try:
-            from . import _otr_episode_budget as _OTRB_BB
-        except ImportError:  # pragma: no cover -- flat load
-            import _otr_episode_budget as _OTRB_BB  # type: ignore
-        _bb_family = (
-            "codex"
-            if "codex" in str(
-                getattr(_source_bank_row, "default_story_pipeline", "") or ""
-            ).lower()
-            else "inline"
-        )
-        _bb_min, _bb_max = _OTRB_BB.beat_bounds(target_words, _bb_family)
-        meta["beat_bounds"] = {
-            "family": _bb_family,
-            "min": _bb_min,
-            "max": _bb_max,
-            "target": _OTRB_BB.target_beat_count(target_words, _bb_family),
-            "words_per_beat": _OTRB_BB.WORDS_PER_BEAT,
-        }
         meta["source_ref"] = resolved["source_ref"]
         meta["source_meta"] = dict(resolved["source_meta"])
         meta["source_rights"] = dict(resolved["source_rights"])
@@ -4447,14 +3397,6 @@ class OTR_LedgerScriptWriter:
         # get_visual_style(meta) off the serialized ledger (stamp precedes
         # all of them by construction -- verified 2026-07-05).
         meta["visual_style"] = resolved["visual_style"]
-        # Story-quality v2 is BAKED IN (operator 2026-06-28): the dialogue-craft
-        # spine (objective gate, body-gate text-score, cliche span-repair,
-        # one-breath budget cap, news-coda bridge, two-principal scan + telemetry)
-        # IS the engine, not an opt-in lever. Always enabled -- the
-        # OTR_STORY_QUALITY_V2 env kill-switch is removed so the improvement can
-        # never silently regress. (Default was already True since 2026-06-23.)
-        meta["story_quality_v2_enabled"] = True
-
         # Ledger durability P1 (2026-05-19): persist a skeleton ledger to
         # disk NOW, before the style-picker / news-interpreter / cast /
         # outline LLM phases run. Those phases are several minutes and the
@@ -4514,12 +3456,6 @@ class OTR_LedgerScriptWriter:
             _source_bank_row, "default_story_pipeline", "") or "")
         _lane_runner = _resolve_lane_runner(_pipeline_id)
         if _lane_runner is not None:
-            if _refine_active:
-                raise RuntimeError(
-                    "[OTR_LedgerScriptWriter] refine re-entry reached custom "
-                    f"pipeline {_pipeline_id!r}; the early generic gate "
-                    "should have rejected it."
-                )
             _parts = _lane_runner(
                 payload=dict(resolved["news_article"]),
                 pack=_otr_story_routing.resolve_story_pack(
@@ -4531,7 +3467,6 @@ class OTR_LedgerScriptWriter:
                 technical_fn=technical_generate_fn,
                 slot_scheduler=slot_scheduler,
                 source_bank_row=_source_bank_row,
-                story_rules=story_rules,
                 episode_root=episode_root,
                 episode_id=episode_id,
             )
@@ -4553,8 +3488,6 @@ class OTR_LedgerScriptWriter:
                 slot_scheduler=slot_scheduler,
                 creative_fn=creative_generate_fn,
                 technical_fn=technical_generate_fn,
-                cast_seed=None,
-                refine_active=False,
                 run_story_spine=_parts.run_story_spine,
                 final_title_override=_parts.final_title_override,
             )
@@ -4604,16 +3537,13 @@ class OTR_LedgerScriptWriter:
                 _source_bank_row)
         try:
             if _source_contract_lane:
-                briefs = _run_source_interpreter_quality_chain(
+                briefs = _run_source_interpreter(
                     interpreter=_interp,
                     bank=_source_bank_row,
                     payload=article,
                     source_meta=meta.get("source_meta") or {},
                     technical_fn=technical_generate_fn,
-                    creative_fn=creative_generate_fn,
                     technical_model_id=str(resolved["technical_model"]),
-                    creative_model_id=str(
-                        resolved["creative_writing_model"]),
                     slot_scheduler=slot_scheduler,
                     meta=meta,
                 )
@@ -4759,13 +3689,7 @@ class OTR_LedgerScriptWriter:
         # it drove no per-episode variety once the cast (here), the
         # style picker (BUG-LOCAL-270), and the LEMMY cameo
         # (BUG-LOCAL-260) were each decoupled from it.
-        if _refine_forced_cast_seed is not None:
-            # Refine loop: all passes share ONE cast seed so the cast (and the
-            # cast-keyed determinism) stays stable while the outline is revised.
-            cast_seed = int(_refine_forced_cast_seed)
-            cast_seed_source = "refine_forced"
-        else:
-            cast_seed, cast_seed_source = _resolve_cast_rng_seed()
+        cast_seed, cast_seed_source = _resolve_cast_rng_seed()
         cast_rng = _random.Random(cast_seed)
         log.info(
             "[OTR_LedgerScriptWriter] cast RNG seed=%d (%s) -- cast "
@@ -4794,7 +3718,6 @@ class OTR_LedgerScriptWriter:
                     str(resolved.get("news_seed", "") or ""),
                     meta,
                 )
-                meta.setdefault("story_quality", {})
                 meta["story_contract"] = {
                     "slug": contract.slug,
                     "label": contract.label,
@@ -4962,14 +3885,6 @@ class OTR_LedgerScriptWriter:
             list(episode_budget.words_per_beat_range),
             episode_budget.music_inter_count,
         )
-        # G1 (story-quality v2, 2026-06-28): stamp the per-beat word budget so the
-        # reroll rebuilder (_otr_reroll) + story_quality_scan derive the SAME
-        # one-breath cap as the first pass (derive_one_breath_cap). v2-ONLY -- the
-        # key stays OFF the ledger for a v2-OFF render (byte-identical) and the
-        # scan/reroll then fall back to the legacy 28-word cap.
-        meta["words_per_beat_range"] = list(
-            episode_budget.words_per_beat_range)
-
         # The StoryContract (`contract`) was already built earlier in this
         # function, right after cast_seed -- before lock_cast -- so its
         # style-label threads into the casting prompt too (style-engine
@@ -4984,163 +3899,31 @@ class OTR_LedgerScriptWriter:
             cast_descriptions=cast_descriptions,
             include_act_breaks=bool(resolved.get("include_act_breaks", True)),
             budget=episode_budget,
-            prior_macro=_refine_prior_macro,
-            prior_critique=_refine_prior_critique,
+            prior_macro="",
+            prior_critique="",
             style_grammar=(contract.grammar if contract else ""),
             story_engine=(contract.story_engine if contract else ""),
         )
-        # T1 PITCH ROOM (2026-06-23) -- THE primary story-architecture lever.
-        # Default OFF (OTR_ENABLE_PITCH_ROOM). When ON (and NOT a refine sub-pass
-        # -- the refine loop owns premise stability via prior_macro/prior_critique),
-        # generate 3 forcibly-divergent premises, taste-select one, and REPLACE
-        # script_brief with the winner's distilled brief before the outline is
-        # generated. OFF => no pitch call, no meta.story_quality.pitch key =>
-        # byte-identical. run_pitch_room never raises (internal fallback), but the
-        # gate import + call are wrapped defensively per CLAUDE.md.
-        if not _refine_active and _OTRPR.pitch_room_enabled():
-            try:
-                outline_req, _pitch_meta = _OTRPR.run_pitch_room(
-                    outline_req,
-                    generate_fn=creative_generate_fn,
-                    local_model=resolved["creative_writing_model"],
-                    frontier_cfg=None,
-                    seed_context=cast_seed,
-                    meta=meta,
-                )
-            except Exception as _pitch_exc:  # noqa: BLE001 -- never break the writer
-                log.warning(
-                    "[OTR_LedgerScriptWriter] pitch room skipped (%s); using the "
-                    "original brief", _pitch_exc,
-                )
-        # LLM slot: creative -- outline drives the episode narrative
-        # arc (beats, characters, structure). Single creative pass.
-        # Sprint D D2b: thread creative_repo_id so the outline phase
-        # prompt routes via _otr_creative_prompt_router. At default
-        # config (Mistral-Nemo) the resolver returns _SYSTEM_PROMPT
-        # by object identity so audio C7 holds.
-        # Sprint 0 (v4 plan): helper_context attribution.
-        #
-        # Best-of-N structural story-refine selector (2026-06-23). Default OFF:
-        # OTR_STORY_BEST_OF_N unset/0/1 => one generate_outline call,
-        # byte-identical to the pre-selector pipeline (no selector entry, no
-        # meta.story_quality.best_of_n key). When >= 2 AND the creative writer
-        # is local, generate N candidate outlines under cast_seed-keyed seeds +
-        # structural diversity_hints, score each with the PURE scorer (raw
-        # intents, no build_sq_data), and keep the best. Remote writers clamp to
-        # N=1 unless the operator opts in (OTR_STORY_BEST_OF_N_ALLOW_REMOTE).
-        # build_sq_data still runs exactly ONCE downstream (F2 block) on the
-        # winning outline -- the selector never calls it.
-        if _refine_active:
-            # Refine loop owns outline variety via prior_macro/prior_critique;
-            # bypass best-of-N entirely (exactly one outline per refine pass).
-            _bon_requested_n, _bon_effective_n, _bon_clamp_reason = (
-                1, 1, "refine_bypass",
+        # The first structurally valid outline is authoritative. Requested word
+        # count remains prompt guidance; no grade-selected outline can replace it.
+        with slot_scheduler.helper_context("generate_outline"):
+            outline = _OTRO.generate_outline(
+                creative_generate_fn,
+                outline_req,
+                creative_repo_id=resolved["creative_writing_model"],
+                source_bank_id=resolved["source_bank"],
             )
-        else:
-            _bon_requested_n, _bon_effective_n, _bon_clamp_reason = (
-                _OTRSEL.resolve_best_of_n(resolved)
-            )
-        if _bon_effective_n >= 2:
-            _bon_model = str(resolved["creative_writing_model"])
-            _bon_is_remote = _bon_model.startswith(("openrouter:", "comfy:"))
 
-            def _gen_outline(_req):
-                return _OTRO.generate_outline(
-                    creative_generate_fn,
-                    _req,
-                    creative_repo_id=resolved["creative_writing_model"],
-                    source_bank_id=resolved["source_bank"],  # lane chunk 1
-                )
-
-            def _bon_cost_probe():
-                # Cumulative remote spend so far (USD) from the OpenRouter
-                # backend's per-run accounting; the selector records the
-                # per-candidate delta. Best-effort; never raises.
-                try:
-                    from . import _otr_openrouter_backend as _OROB
-                    snap = _OROB.resolved_models_snapshot()
-                    return float(sum(
-                        float((v or {}).get("cost_usd", 0.0) or 0.0)
-                        for v in snap.values()
-                    ))
-                except Exception:  # noqa: BLE001
-                    return 0.0
-
-            with slot_scheduler.helper_context("generate_outline"):
-                outline = _OTRSEL.select_best_outline(
-                    _gen_outline,
-                    outline_req,
-                    cast_seed=cast_seed,
-                    n=_bon_effective_n,
-                    meta=meta,
-                    roster=outline_req.character_cast,
-                    cost_probe=_bon_cost_probe if _bon_is_remote else None,
-                    # T4 (2026-06-23): deterministic on-mic-climax staging
-                    # penalty. Env-gated (OTR_ENABLE_STAGING_PENALTY); default
-                    # OFF => None => byte-identical selection.
-                    penalty=_OTRSEL.resolve_staging_penalty(),
-                )
-            # Stamp the telemetry the selector cannot know: requested_n +
-            # clamp_reason (gate) + provider (resolved model). Merge, never
-            # replace.
-            _bon_sq = meta.setdefault("story_quality", {})
-            if isinstance(_bon_sq, dict) and isinstance(
-                _bon_sq.get("best_of_n"), dict
-            ):
-                _bon_sq["best_of_n"]["requested_n"] = _bon_requested_n
-                _bon_sq["best_of_n"]["clamp_reason"] = _bon_clamp_reason
-                _bon_sq["best_of_n"]["provider"] = _bon_model
-            log.info(
-                "[OTR_LedgerScriptWriter] best-of-N ON: requested=%d "
-                "effective=%d winner_index=%s clamp=%r provider=%r",
-                _bon_requested_n, _bon_effective_n,
-                (_bon_sq.get("best_of_n", {}) or {}).get("winner_index")
-                if isinstance(_bon_sq, dict) else None,
-                _bon_clamp_reason, _bon_model,
-            )
-        else:
-            # Disabled / clamped-to-1: the existing single path runs EXACTLY
-            # once. THIS is the byte-identical path -- no selector entry, no
-            # meta.story_quality.best_of_n key.
-            with slot_scheduler.helper_context("generate_outline"):
-                outline = _OTRO.generate_outline(
-                    creative_generate_fn,
-                    outline_req,
-                    creative_repo_id=resolved["creative_writing_model"],
-                    source_bank_id=resolved["source_bank"],  # lane chunk 1
-                )
-
-        # --- E. Word-budget integration check -------------------------
-        # Sum VOICED (character) beats only. `resolved["target_words"]`
-        # is a voiced-dialogue-only budget; announcer / music_inter
-        # beats carry a fixed, non-scaling overhead (announcer beats are
-        # hardcoded ~15 words each) and are excluded from the word
-        # budget per outline budget rules §6.G. Summing every beat let
-        # that fixed overhead trip a false WORD_BUDGET_DRIFT on small
-        # targets (ratio 2.00 on the 2026-05-25 30-word smoke run).
-        # Mirrors validate_outline_against_budget validator #1.
+        # Requested length guides planning only. Record the planned allocation
+        # without comparing, rejecting, or re-authoring the accepted outline.
         voiced_beats = [
-            b for b in outline.beats
-            if getattr(b, "speaker_role", "") == "character"
+            beat for beat in outline.beats
+            if getattr(beat, "speaker_role", "") == "character"
         ]
-        beat_word_sum = sum(b.target_words for b in voiced_beats)
-        _word_target = int(resolved["target_words"])
-        _word_lower, _word_upper = _OTRWD.delivery_word_bounds(_word_target)
-        ratio = beat_word_sum / max(1, _word_target)
-        if not (_word_lower <= beat_word_sum <= _word_upper):
-            log.warning(
-                "[OTR_LedgerScriptWriter] WORD_BUDGET_DRIFT: outline "
-                "voiced beats sum to %d words, target %d (ratio=%.2f, "
-                "delivery=%d..%d); final row-local fit will reconcile",
-                beat_word_sum, _word_target, ratio, _word_lower, _word_upper,
-            )
-        # Planning can miss without killing authorship, but the persisted
-        # contract is explicit and common to all four inline banks. The final
-        # row boundary below must author its way into this integer band before
-        # any reflection/readiness/freeze/media consumer runs.
+        beat_word_sum = sum(beat.target_words for beat in voiced_beats)
         _OTRWD.stamp_contract(
             meta,
-            target_words=_word_target,
+            target_words=int(resolved["target_words"]),
             planned_voiced_words=beat_word_sum,
             owner=f"inline:{resolved['source_bank']}",
         )
@@ -5166,168 +3949,6 @@ class OTR_LedgerScriptWriter:
                 cast=tuple(character_cast),
                 era=str(meta.get("period", "") or ""),
             )
-
-        # --- F2. Story-Quality LIFT L1/L2 (2026-06-23) -- deterministic,
-        # UPSTREAM beat-plan shaping. OFF by default (env OTR_STORY_QUALITY_L12).
-        # When ON: build the writer-side sq dict[beat_id -> {beat_role,
-        # conflict_object, conflict_type, ...}] and ground the GENERIC crisis
-        # nouns in each beat.intent (intent ONLY) so the weak local writer cannot
-        # collapse every premise into the same "console standoff". The composer
-        # threads beat_role/conflict_object/conflict_type into LineRequest. Flag
-        # OFF => empty dict, no intent mutation, no field populated => the prompt
-        # is byte-identical to the pre-LIFT pipeline. NEVER raises into the
-        # writer (the LIFT must never break audio).
-        _sq_by_beat: dict = {}
-        # KILL 1 (2026-06-24 assumption-audit) -- the grounded premise noun
-        # palette for the in-loop BODY-OUTPUT gate. Populated below ONLY when the
-        # grounding build runs (lever on); stays empty when off, so the gate is
-        # skipped and the render is byte-identical.
-        _grounded_nouns: frozenset = frozenset()
-        # Story-grammar build (2026-06-24, C5) -- the per-beat ending injection.
-        # _ending_template is the climax beat's on-mic ending instruction;
-        # _climax_beat_id is the beat that receives it (section I). Both stay ""
-        # whenever the style-grammar lever is off => no LineRequest carries an
-        # ending_template => byte-identical.
-        _ending_template: str = ""
-        _climax_beat_id: str = ""
-        # The style-grammar lever (climax SHAPE selection) is BUNDLED with L1/L2:
-        # when on, it deterministically picks a radio-drama style per episode and
-        # feeds that style's ending-taxonomy class as the climax ROLE, runs the
-        # L12 build path so the role flows through build_sq_data, and injects the
-        # matching final-beat ending template at the climax beat. OFF => no style,
-        # climax stays irreversible_choice (the build_sq_data default).
-        _climax_role = _OTRSQL12.BEAT_ROLE_IRREVERSIBLE_CHOICE
-        _style_slug = ""
-        _ending_tag = ""
-        if _style_grammar_on and contract is not None:
-            try:
-                # KILL 2 (2026-06-24): the climax SHAPE comes from the ONE
-                # pre-outline StoryContract (selected from script_brief/
-                # news_seed, built right after cast_seed) -- one style
-                # source per episode, no second draw. Style-engine
-                # consolidation (2026-07-05): the old defensive fallback
-                # to a second select_style() draw when the contract build
-                # failed is REMOVED -- an invalid contract state fails
-                # loud (climax stays irreversible_choice), per the
-                # no-fallback rule, rather than silently re-drawing.
-                _style_slug = contract.slug
-                _ending_tag = contract.ending_tag
-                _ending_template = contract.ending_template
-                if _ending_tag in _OTRSQL12.CLIMAX_CLASS_ROLES:
-                    _climax_role = _ending_tag
-            except Exception as exc:  # noqa: BLE001 -- grammar must never break audio
-                log.warning(
-                    "[OTR_LedgerScriptWriter] style-grammar select skipped (%s); "
-                    "climax stays irreversible_choice", exc,
-                )
-                _style_grammar_on = False
-                _ending_template = ""
-        try:
-            if _OTRCFG.story_quality_l12_enabled() or _style_grammar_on:
-                _l12_roster = [
-                    str(r.get("name") or "")
-                    for r in (led.data.get("cast") or [])
-                    if isinstance(r, dict) and r.get("name")
-                ]
-                _sq_by_beat = _OTRSQL12.build_sq_data(
-                    list(outline.beats),
-                    meta,
-                    str(getattr(outline, "premise", "") or ""),
-                    cast_seed,
-                    roster=_l12_roster,
-                    climax_role=_climax_role,
-                )
-                meta["story_quality_l12_enabled"] = True
-                # KILL 1 (2026-06-24): the grounded premise palette the in-loop
-                # BODY-OUTPUT gate validates the SHIPPED line against -- roster
-                # names + news_seed + premise + title/logline nouns. Stamped on
-                # meta so a freeze-cascade reroll rebuild (build_reroll_line_
-                # request) composes against the SAME grounding.
-                _grounded_nouns = _OTRSQL12.premise_noun_palette(
-                    _l12_roster,
-                    str(resolved.get("news_seed", "") or ""),
-                    str(getattr(outline, "premise", "") or ""),
-                    *_OTRSQL12.premise_texts(meta),
-                )
-                meta["grounded_nouns"] = sorted(_grounded_nouns)
-                # The climax-class beat (exactly one, the last voiced character
-                # beat) is the one that receives the ending template.
-                if _style_grammar_on:
-                    for _bid, _ent in _sq_by_beat.items():
-                        if _ent.get("beat_role") in _OTRSQL12.CLIMAX_CLASS_ROLES:
-                            _climax_beat_id = str(_bid)
-                            break
-                    if not _climax_beat_id:
-                        # No climax beat resolved (e.g. zero character beats) ->
-                        # nothing to inject; keep the render byte-clean.
-                        _ending_template = ""
-                # Telemetry (MERGE -- the scrub's L5a setdefault/update keeps
-                # these): the per-episode distinct conflict slots are the
-                # cross-episode SAMENESS measure (compare distinct object/type
-                # counts across a soak). ungrounded_crisis (shipped-text density)
-                # is stamped later by the scrub over the final spoken lines.
-                _l12_objs = sorted({
-                    str(v.get("conflict_object", ""))
-                    for v in _sq_by_beat.values() if v.get("conflict_object")
-                })
-                _l12_types = sorted({
-                    str(v.get("conflict_type", ""))
-                    for v in _sq_by_beat.values() if v.get("conflict_type")
-                })
-                _l12_sq = meta.setdefault("story_quality", {})
-                if isinstance(_l12_sq, dict):
-                    _l12_sq.update({
-                        "l12_domain": _OTRSQL12.select_domain(
-                            meta, str(getattr(outline, "premise", "") or "")
-                        ),
-                        "conflict_objects": _l12_objs,
-                        "conflict_types": _l12_types,
-                    })
-                # Story-grammar telemetry: which style + climax class was chosen,
-                # and the crisis-noun count on the (grounded) final beat -- the
-                # soak target is ~0 (the climax is no longer a console standoff).
-                if _style_grammar_on and isinstance(_l12_sq, dict):
-                    _final_crisis = -1
-                    try:
-                        _grounded = _OTRSQL12.premise_noun_palette(
-                            _l12_roster,
-                            str(getattr(outline, "premise", "") or ""),
-                            *_OTRSQL12.premise_texts(meta),
-                        )
-                        for _b in outline.beats:
-                            if str(getattr(_b, "beat_id", "")) == _climax_beat_id:
-                                _final_crisis = _OTRSQL12.count_ungrounded_crisis(
-                                    str(getattr(_b, "intent", "") or ""), _grounded,
-                                )
-                                break
-                    except Exception:  # noqa: BLE001 -- telemetry never breaks audio
-                        _final_crisis = -1
-                    _l12_sq.update({
-                        "style_slug": _style_slug,
-                        "ending_tag": _ending_tag,
-                        "final_beat_crisis_nouns": _final_crisis,
-                    })
-                    meta["story_quality_grammar_enabled"] = True
-                    log.info(
-                        "[OTR_LedgerScriptWriter] story-grammar ON: style=%s "
-                        "ending_tag=%s climax_beat=%s final_beat_crisis=%d",
-                        _style_slug, _ending_tag, _climax_beat_id, _final_crisis,
-                    )
-                log.info(
-                    "[OTR_LedgerScriptWriter] story-quality L1/L2 ON: shaped "
-                    "%d voiced beat(s) (domain=%s, %d distinct conflict objects)",
-                    len(_sq_by_beat), _l12_sq.get("l12_domain")
-                    if isinstance(_l12_sq, dict) else "?", len(_l12_objs),
-                )
-        except Exception as exc:  # noqa: BLE001 -- the LIFT must never break audio
-            log.warning(
-                "[OTR_LedgerScriptWriter] story-quality L1/L2 skipped (%s); "
-                "proceeding with the unshaped outline", exc,
-            )
-            _sq_by_beat = {}
-            _grounded_nouns = frozenset()
-            _ending_template = ""
-            _climax_beat_id = ""
 
         # --- G. Build episode_canon (write deferred to section J.5) ----
         # Disk write moved out so the post-composition title regen
@@ -5390,12 +4011,9 @@ class OTR_LedgerScriptWriter:
         canon_header = canon_header.replace(
             "TITLE: TBD", "EPISODE_TITLE: TBD", 1,
         )
-        # C1 + C2 (story-quality R2): derive specificity anchors + the central
-        # story-object DETERMINISTICALLY from the curated news key_terms (no LLM
-        # call), excluding cast names. Inject the anchors into the per-line
-        # canon_header (injection-only, no gate); central_object is consumed at
-        # the announcer-close. Idempotent: derive only when absent, inject once
-        # via a meta flag (so a resume/retry never duplicates the block).
+        # Optional source terms are prompt context only. Preserve their authored
+        # wording; Python performs no noun/entity/cast-name classification and
+        # their presence or absence never affects acceptance.
         try:
             from . import _otr_specificity as _OTRSPEC
         except ImportError:  # pragma: no cover
@@ -5403,20 +4021,16 @@ class OTR_LedgerScriptWriter:
         _spec_kts = (meta.get("news") or {}).get("key_terms") or ()
         if "specificity_anchors" not in meta:
             meta["specificity_anchors"] = _OTRSPEC.derive_specificity_anchors(
-                _spec_kts, character_cast)
-        if "central_object" not in meta:
-            meta["central_object"] = _OTRSPEC.derive_central_object(
-                _spec_kts, character_cast)
+                _spec_kts)
         if (not meta.get("_specificity_anchors_injected")
                 and meta.get("specificity_anchors")):
             canon_header = _OTRSPEC.inject_anchors_into_header(
                 canon_header, meta["specificity_anchors"])
             meta["_specificity_anchors_injected"] = True
             log.info(
-                "[OTR_LedgerScriptWriter] C1: injected %d specificity anchor(s)"
-                " into canon_header; C2 central_object=%r",
+                "[OTR_LedgerScriptWriter] injected %d optional source term(s) "
+                "into the composition prompt",
                 len(meta["specificity_anchors"]),
-                (meta.get("central_object") or "")[:40],
             )
         log.info(
             "[OTR_LedgerScriptWriter] episode_canon built; composition "
@@ -5530,17 +4144,8 @@ class OTR_LedgerScriptWriter:
                 type(_exc).__name__, str(_exc)[:200],
             )
 
-        # --- H.2. Story-quality Phase 1 (A1, 2026-06-19): NEUTRALIZED ------
-        # The Sprint 5.1 constraint-editor diagnostic that stamped
-        # meta["editor_constraints"] via check_constraints_from_ledger has
-        # been removed. It was a write-only diagnostic with ZERO consumers
-        # anywhere in the pipeline (a verify-at-build consumer grep confirmed
-        # no meta.get("editor_constraints")/string-key/getattr reader exists)
-        # -- pure scoring that never drove a decision. Dropping the call site
-        # removes the per-episode pass + a redundant led.save() with no
-        # behavioral change. The _otr_editor_constraints module + its unit
-        # tests stay in place (physical deletion deferred to a post-spine
-        # cleanup, per the Phase-1 plan) but are no longer wired in.
+        # Retired constraint-editor scoring is fully removed; no write-only
+        # quality receipt or dormant repair architecture remains here.
 
         # --- H.5. Sprint 5A: continuity ledger -------------------------
         # One structured LLM call that reads the finished outline + the
@@ -5587,8 +4192,8 @@ class OTR_LedgerScriptWriter:
         # six deterministic contract fields (speaker / concrete details /
         # state_before / state_after / must_turn) from DramaticState +
         # continuity active_props + news key_terms, attach the two
-        # free-text fields (line_job, hidden_pressure), validate per-slot
-        # + episode-level (exactly one must_turn), and stamp on
+        # free-text fields (line_job, hidden_pressure), validate schema and
+        # derived-source identity per slot, and stamp on
         # meta["slot_drama_contracts"] keyed by slot id. Build 4
         # (compose_exchange) is the sole consumer; nothing in the render
         # path reads it yet, so this build only produces + validates +
@@ -5651,8 +4256,8 @@ class OTR_LedgerScriptWriter:
             # list the audit checks; if the dramatic_state's costly slot is
             # not a character beat (the rare all-announcer / empty-cast case),
             # clear it on a COPY so NO contract is marked must_turn -- the
-            # audit then reports the episode invalid (acceptable + rare)
-            # rather than pinning the turn on the announcer/music rows.
+            # audit then records zero pivots without rejecting the contracts,
+            # rather than pinning the turn on announcer/music rows.
             _sdc_char_slots = {
                 str(getattr(b, "dialogue_slot_id", "") or "").strip()
                 for b in _sdc_voiced_beats
@@ -5754,72 +4359,6 @@ class OTR_LedgerScriptWriter:
 
         base_temp = resolved["temperature"]
 
-        # Phase 0 (2026-05-11): build the UPPERCASE name-roster ONCE.
-        # Passed to every LineRequest so compose_line can detect
-        # proper nouns the LLM invented outside the locked cast +
-        # journalistic key_terms. Detection-only: phantoms are flagged
-        # on lines[k].compose_flags; the composer does NOT reroll.
-        # Phase 3 reviewer + deterministic Step 2.5 fallback own
-        # repair downstream. See synthesis §6.A (Option 1, strict).
-        # leak-floor-v2 rule 4 (2026-06-25, DEFAULT-OFF/dark): split real-person
-        # / political-figure source entities OUT of the roster so the EXISTING
-        # phantom gate REJECTS them (-> reroll); org/place/mission terms
-        # (NASA/CERN/JPL) stay. OFF => banned set empty, no key_term filtered,
-        # banned_terms=() is a no-op => the roster is byte-identical. Also builds
-        # the transient per-episode EntityPolicy threaded onto every LineRequest.
-        _lfv2_on = _OTRCFG.leak_floor_v2_enabled()
-        _lfv2_banned: frozenset = frozenset()
-        _episode_entity_policy = None
-        roster_key_terms = key_terms_tuple
-        if _lfv2_on:
-            try:
-                _lfv2_news_text = str(
-                    (meta.get("news") or {}).get("script_brief") or ""
-                )
-            except Exception:  # noqa: BLE001
-                _lfv2_news_text = ""
-            _lfv2_banned = _OTRLC.build_banned_source_proper_nouns(
-                terms=key_terms_tuple, raw_text=_lfv2_news_text,
-            )
-            if _lfv2_banned:
-                _banned_u = {b.upper() for b in _lfv2_banned}
-                roster_key_terms = tuple(
-                    t for t in key_terms_tuple
-                    if str(t).strip().upper() not in _banned_u
-                )
-        allowed_roster = _OTRLC.build_allowed_roster(
-            cast_rows=cast_rows,
-            key_terms=roster_key_terms,
-            banned_terms=_lfv2_banned,
-        )
-        if _lfv2_on:
-            _episode_entity_policy = _OTRHY.EntityPolicy(
-                allowed=allowed_roster,
-                banned=frozenset(b.upper() for b in _lfv2_banned),
-            )
-            meta["leak_floor_v2"] = {
-                "active": True,
-                "banned": sorted(_lfv2_banned),
-                "filtered_key_terms": sorted(
-                    {str(t) for t in key_terms_tuple}
-                    - {str(t) for t in roster_key_terms}
-                ),
-            }
-        # Wiring-review #7 / #9 (2026-05-11): stamp the canonical
-        # allowed_roster on meta as a sorted JSON-serializable list
-        # so every downstream consumer (composer, Pass 1 auditor,
-        # deterministic repair, Step 2.5 phantom-skip, Pass 3
-        # auditor) reads ONE roster. Nobody recomputes locally; the
-        # roster is immutable for the episode's life.
-        meta["allowed_roster"] = sorted(allowed_roster)
-        log.info(
-            "[OTR_LedgerScriptWriter] phase 0 roster built: %d entries "
-            "(cast=%d + announcer + key_terms=%d), stamped on meta",
-            len(allowed_roster),
-            len([r for r in cast_rows if r.get("name") != "ANNOUNCER"]),
-            len(key_terms_tuple),
-        )
-
         # Phase 1 (2026-05-11): build outline_spine + voice_card map
         # ONCE. Both are stable across every composer call in the
         # episode so they live in the static prefix of the prompt
@@ -5852,19 +4391,13 @@ class OTR_LedgerScriptWriter:
             len(outline_spine), len(voice_card_by_name),
         )
 
-        # Phase 4 v4 (2026-05-11): split rosters for prompt rendering.
-        # `allowed_roster` stays the union (input to the phantom
-        # gate); cast names and journalistic key_terms render in
-        # distinct buckets inside the composer's NAMED ENTITIES block.
+        # Cast names and source terms are prompt context only.
         allowed_people = frozenset(
             (r.get("name") if isinstance(r, dict) else getattr(r, "name", ""))
             for r in cast_rows
             if (r.get("name") if isinstance(r, dict) else getattr(r, "name", ""))
         )
-        # leak-floor-v2 (2026-06-25): render the FILTERED key_terms in the prompt
-        # NAMED ENTITIES bucket so a banned real-person term is not re-injected
-        # (roster_key_terms == key_terms_tuple when the flag is off => identical).
-        allowed_things = frozenset(roster_key_terms)
+        allowed_things = frozenset(key_terms_tuple)
 
         # Phase 4 v4 (2026-05-11): full-cast voice cards block. Joined
         # in cast_rows order (dict ordering preserves insertion order).
@@ -5959,23 +4492,6 @@ class OTR_LedgerScriptWriter:
         # contract.
         style_descriptor = str(contract.label if contract else "").strip()
 
-        # --- Sprint 5C (2026-05-25): stamp the composer's static-prefix
-        # context onto meta so a LATER node (OTR_LedgerFreezeCascade)
-        # can reconstruct a LineRequest for a targeted reroll. These four
-        # values are computed writer-locally in section I and were lost
-        # once the per-beat loop ended; the freeze cascade runs in its
-        # own node invocation and reads the ledger from disk, so it needs
-        # them on meta. `allowed_roster` is already stamped above; the
-        # per-line ledger rows already carry beat_intent / mood (traits)
-        # / target_words / arc_phase (Sprint 3C enrichment). Together
-        # that is everything `_otr_reroll.build_reroll_line_request`
-        # needs. Stamped here, after all four exist; persisted by the
-        # ledger saves that follow in the per-beat loop and section J.
-        meta["canon_header"]     = canon_header
-        meta["outline_spine"]    = outline_spine
-        meta["theme"]            = theme
-        meta["style_descriptor"] = style_descriptor
-
         # Announcer dedicated-pass bookend ids (2026-05-22,
         # BUG-LOCAL-255). `_otr_outline._synthesize_outline` always
         # stamps the FIRST and LAST beats as announcer; those two get
@@ -5997,13 +4513,6 @@ class OTR_LedgerScriptWriter:
         nc_brief = str(
             (meta.get("news") or {}).get("news_close_brief") or ""
         ).strip()
-        # C2 (story-quality R2): thread the central story-object into the close
-        # brief so the S2 "use the central object if set" close lands on a
-        # concrete final image. Unchanged when central_object is "". _OTRSPEC was
-        # imported above at the C1 anchor-derivation site (same execute scope).
-        nc_brief = _OTRSPEC.inject_central_object_into_brief(
-            nc_brief, meta.get("central_object") or "")
-
         # STEP 6 (2026-06-22 story+cast fix, roundtable-converged): a
         # deterministic escalating beat_tension (1..5) over the CHARACTER beats.
         # arc_phase already escalates; beat_tension was never assigned, so the
@@ -6121,43 +4630,17 @@ class OTR_LedgerScriptWriter:
                 except Exception:  # noqa: BLE001 -- never break audio
                     _a5_obj = _a5_obs = _a5_turn = _a5_sub = ""
 
-            # STEP 6: derive this character beat's tension (0 for announcer --
-            # announcer lines are excluded from the curve) and STAMP the per-line
-            # dramatic frame onto meta. The frame is the single source the critic
-            # reads (target_tension) and the reroll reconstructs (objective /
-            # obstacle / turn / subtext / tension / dramatic_question / next_turn)
-            # -- build_reroll_line_request otherwise loses all of it. META ONLY:
-            # the ledger {cast,lines,meta} wire format stays frozen.
+            # Derive this character beat's prompt tension.
             _a5_tension = (
                 int(_otr_tension_by_beat.get(beat.beat_id, 0))
                 if not is_announcer else 0
             )
-            if not is_announcer:
-                try:
-                    _otr_frames = meta.setdefault("line_dramatic_frame", {})
-                    _otr_frames[str(beat.beat_id)] = {
-                        "objective": _a5_obj,
-                        "obstacle": _a5_obs,
-                        "turn": _a5_turn,
-                        "subtext": _a5_sub,
-                        "tension": _a5_tension,
-                        "dramatic_question": _dramatic_question,
-                        "next_turn": _next_turn_text,
-                    }
-                except Exception:  # noqa: BLE001 -- never break audio
-                    pass
-
             return _OTRLC.LineRequest(
                 speaker=speaker,
                 intent=beat.intent,
                 mood=beat.mood,
-                target_words=beat.target_words,
                 canon_header=canon_header,
                 last_lines=list(last_lines),
-                allowed_roster=allowed_roster,
-                # leak-floor-v2 (2026-06-25): transient per-episode policy (None
-                # when the flag is off => compose_line's verifier never runs).
-                entity_policy=_episode_entity_policy,
                 # Phase 1 (2026-05-11) prompt enrichment.
                 style_descriptor=style_descriptor,
                 outline_spine=outline_spine,
@@ -6195,81 +4678,14 @@ class OTR_LedgerScriptWriter:
                 beat_tension=_a5_tension,
                 # F4 (story-engine v1) -- speaker gender/pronouns.
                 speaker_gender=gender_by_name.get(speaker, ""),
-                # G1 (story-quality v2, 2026-06-28) -- the per-beat word budget so
-                # the composer's one-breath gate derives a budget-sized cap on the
-                # v2 path. Always threaded (consumed ONLY when v2), so a v2-OFF
-                # render is byte-identical (the cap stays the legacy 28).
-                words_per_beat_range=tuple(
-                    episode_budget.words_per_beat_range
-                ),
-                # Story-quality LIFT L1/L2 (2026-06-23) -- threaded from the
-                # writer-side sq dict. Empty unless OTR_STORY_QUALITY_L12 is on
-                # (then build_sq_data populated it) => "" => byte-identical.
-                beat_role=str(
-                    (_sq_by_beat.get(beat.beat_id) or {}).get("beat_role", "")
-                ),
-                conflict_object=str(
-                    (_sq_by_beat.get(beat.beat_id) or {}).get("conflict_object", "")
-                ),
-                conflict_type=str(
-                    (_sq_by_beat.get(beat.beat_id) or {}).get("conflict_type", "")
-                ),
-                # Story-grammar build (2026-06-24, C4): the style-selected ending
-                # instruction, injected ONLY on the climax-class (final character)
-                # beat when OTR_ENABLE_STYLE_GRAMMAR is on. "" on every other beat
-                # and whenever the lever is off => byte-identical.
-                ending_template=(
-                    _ending_template
-                    if (_ending_template and beat.beat_id == _climax_beat_id)
-                    else ""
-                ),
-                # KILL 1 (2026-06-24) -- the grounded premise palette, carried so
-                # a freeze-cascade reroll rebuild keeps the same grounding the
-                # in-loop body gate used. Empty when the lever is off.
-                grounded_nouns=_grounded_nouns,
             )
 
-        # Sprint 10B Wave 1 Agent B (2026-05-27): build the in-loop
-        # Stage1Plan once before the render loop. Needed only when the
-        # production Stage 3 validators are on -- they consume the
-        # Stage1Plan + per-beat Stage1Beat to score lines. Off (the
-        # default) this is a no-op and the legacy path is byte-
-        # identical (PD1). Built from in-loop writer state (outline,
-        # cast_rows, meta) via the in-loop adapter migrated out of the
-        # deleted multiturn module into _otr_legacy_to_stage1_adapter.
+        # Stage 3 reads the real outline beat directly. It validates only
+        # nonempty transport shape and the shared narrow safety policy; no
+        # synthetic Stage1Plan or vocabulary/length model is constructed.
         _w1b_stage3_enabled: bool = bool(resolved.get(
             "enable_production_stage3_validators", False,
         ))
-        _w0_stage1_plan = None
-        if _w1b_stage3_enabled:
-            try:
-                _w0_stage1_plan = _OTRL2S1.build_inloop_stage1_plan(
-                    outline=outline,
-                    cast_rows=cast_rows,
-                    meta=meta,
-                )
-                if _w0_stage1_plan is None:
-                    log.warning(
-                        "[Stage3Validators] build_inloop_stage1_plan "
-                        "returned None; Stage 3 validators disabled "
-                        "for this episode"
-                    )
-                else:
-                    log.info(
-                        "[Stage3Validators] in-loop Stage1Plan built: "
-                        "cast=%d, beats=%d, running_facts=%d",
-                        len(_w0_stage1_plan.cast),
-                        len(_w0_stage1_plan.beats),
-                        len(_w0_stage1_plan.running_facts),
-                    )
-            except Exception as _w0_exc:  # noqa: BLE001 -- PD1
-                log.warning(
-                    "[Stage3Validators] build_inloop_stage1_plan "
-                    "raised %s: %s -- Stage 3 validators disabled for "
-                    "this episode",
-                    type(_w0_exc).__name__, str(_w0_exc)[:200],
-                )
-                _w0_stage1_plan = None
 
         # --- Build 4 (2026-05-28): grouped-exchange pre-pass -----------
         # When use_exchange is ON, render consecutive voiced beat groups
@@ -6310,7 +4726,9 @@ class OTR_LedgerScriptWriter:
                     evaluate_tier_a as _eval_tier_a,
                     normalize_slot_line as _norm_slot_line,
                 )
-                _ex_tier_a = _make_tier_a(_eval_tier_a, _norm_slot_line)
+                _ex_tier_a = _make_tier_a(
+                    _eval_tier_a, _norm_slot_line,
+                )
                 _ex_cast = getattr(outline, "cast", None) or cast_rows or []
                 with slot_scheduler.helper_context("compose_line"):
                     _ex_lines_by_beat_id = _run_ex_prepass(
@@ -6373,43 +4791,24 @@ class OTR_LedgerScriptWriter:
                     # constant-time and negligible relative to the LLM
                     # call itself.
                     #
-                    # Sprint 10B Wave 1 Agent B (2026-05-27): pass
-                    # Stage 3 validator inputs when the widget is on
-                    # AND the in-loop Stage1Plan was built successfully.
-                    # The validators fire inside compose_line after the
-                    # strip pipeline; one repair regenerate on errors,
-                    # findings stamped on line_res.validation_findings.
-                    _w1b_s3_kwargs = {}
-                    if _w1b_stage3_enabled and _w0_stage1_plan is not None:
-                        _w1b_s3_beat = (
-                            _OTRL2S1.line_request_to_stage1_beat(
-                                beat,
-                                fallback_index=beat_index_by_id.get(
-                                    beat.beat_id, 0,
-                                ),
-                            )
-                        )
-                        _w1b_s3_kwargs = dict(
-                            enable_stage3_validators=True,
-                            stage3_plan=_w0_stage1_plan,
-                            stage3_beat=_w1b_s3_beat,
-                            # Stage 4: the banned-phrase seed comes from the
-                            # bank's rules pack -- WITHOUT this producer the
-                            # JSON extraction would be runtime-dead (the
-                            # module default only fires on None).
-                            stage3_banned_phrases=list(
-                                story_rules.banned_phrases),
-                        )
+                    # Stage 3 observes the exact cleaned line against the real
+                    # outline beat. Findings are telemetry; it never reauthors
+                    # or retires the line.
+                    _w1b_s3_kwargs = (
+                        {
+                            "enable_stage3_validators": True,
+                            "stage3_beat": beat,
+                        }
+                        if _w1b_stage3_enabled else {}
+                    )
                     with slot_scheduler.helper_context("compose_line"):
                         line_res = _OTRLC.compose_line(
                             creative_fn=creative_generate_fn,
-                            repair_fn=technical_generate_fn,
                             req=line_req,
                             base_temperature=base_temp,
                             max_new_tokens_cap=resolved["max_new_tokens_cap"],
                             creative_repo_id=resolved["creative_writing_model"],
                             source_bank_id=resolved["source_bank"],  # 2C
-                            _story_rules=story_rules,  # Stage 4
                             **_w1b_s3_kwargs,
                         )
                     cleaned = line_res.text
@@ -6425,129 +4824,6 @@ class OTR_LedgerScriptWriter:
                         )[beat.beat_id] = list(
                             line_res.validation_findings,
                         )
-                # --- KILL 1 (2026-06-24 assumption-audit): deterministic
-                # BODY-OUTPUT gate. Validate the SHIPPED character line (NOT
-                # beat.intent) against the grounded premise palette -- it must
-                # not lean on ungrounded generic crisis machinery, and a
-                # climax-class / pressure beat must REFERENCE its premise-
-                # anchored conflict_object. ONE guarded reroll with a split,
-                # targeted hint; ship the reroll ONLY if it validates, else keep
-                # the original (deterministic). Runs after BOTH the exchange
-                # (cleaned=_ex_text) and the per-beat composer (cleaned=
-                # line_res.text) paths, so the use_exchange bypass is covered.
-                # Active only when the grounding build ran (palette + sq dict
-                # populated) => byte-identical when the lever is off.
-                if _grounded_nouns and _sq_by_beat:
-                    _bg_entry = _sq_by_beat.get(beat.beat_id) or {}
-                    _bg_roles = (
-                        _OTRSQL12.CLIMAX_CLASS_ROLES
-                        | {_OTRSQL12.BEAT_ROLE_PRESSURE}
-                    )
-                    _bg_ok, _bg_reasons = _OTRSQL12.validate_composed_grounding(
-                        cleaned, _bg_entry, _grounded_nouns,
-                        max_ungrounded=0,
-                        require_conflict_object_on_roles=_bg_roles,
-                    )
-                    _bg_sq = meta.setdefault("story_quality", {})
-                    # C4 (S3, story-quality v2): also REROLL on a MID-CLAUSE
-                    # roster-caps shout (a locked cast FULL name in ALL CAPS at a
-                    # grammatical subject/object position, where an in-place strip
-                    # would mangle the clause), and ACCEPT the reroll by a total-
-                    # order defect score on the shipped text (below) rather than
-                    # grounding alone.
-                    _bg_fullnames = _otr_cast_fullnames(line_req)
-                    _bg_roster_mid = bool(
-                        _bg_fullnames
-                        and _otr_roster_caps_midclause(cleaned, _bg_fullnames)
-                    )
-                    if (not _bg_ok) or _bg_roster_mid:
-                        _bg_hint = _otr_body_gate_hint(_bg_reasons, _bg_entry)
-                        if _bg_roster_mid:
-                            _bg_hint = (
-                                (_bg_hint + " ") if _bg_hint else ""
-                            ) + (
-                                "Do not write a character's full name in "
-                                "capital letters; refer to other characters "
-                                "normally."
-                            )
-                        try:
-                            with slot_scheduler.helper_context("compose_line"):
-                                _bg_res = _OTRLC.compose_line(
-                                    creative_fn=creative_generate_fn,
-                                    repair_fn=technical_generate_fn,
-                                    req=line_req,
-                                    base_temperature=base_temp,
-                                    max_new_tokens_cap=resolved[
-                                        "max_new_tokens_cap"
-                                    ],
-                                    creative_repo_id=resolved[
-                                        "creative_writing_model"
-                                    ],
-                                    reroll_hint=_bg_hint,
-                                    source_bank_id=resolved["source_bank"],  # 2C
-                                    _story_rules=story_rules,  # Stage 4
-                                )
-                            _bg_res_ok, _ = _OTRSQL12.validate_composed_grounding(
-                                _bg_res.text, _bg_entry, _grounded_nouns,
-                                max_ungrounded=0,
-                                require_conflict_object_on_roles=_bg_roles,
-                            )
-                            # C4 ACCEPT: keep the reroll only when it scores
-                            # STRICTLY cleaner on the shipped text (lower wins,
-                            # ORIGINAL on tie).
-                            _bg_rr_ok = bool(_bg_res.text.strip())
-                            _use_rr = _bg_rr_ok and (
-                                _otr_body_score(
-                                    _bg_res.text, _bg_entry, _grounded_nouns,
-                                    _episode_entity_policy, line_req,
-                                )
-                                < _otr_body_score(
-                                    cleaned, _bg_entry, _grounded_nouns,
-                                    _episode_entity_policy, line_req,
-                                )
-                            )
-                            if _use_rr:
-                                cleaned = _bg_res.text
-                                beat_compose_flags = (
-                                    tuple(_bg_res.compose_flags)
-                                    + ("body_gate_reroll",)
-                                )
-                                if isinstance(_bg_sq, dict):
-                                    _bg_sq["body_gate_rerolls"] = int(
-                                        _bg_sq.get("body_gate_rerolls", 0)
-                                    ) + 1
-                            else:
-                                if isinstance(_bg_sq, dict):
-                                    _bg_sq["body_gate_failed"] = int(
-                                        _bg_sq.get("body_gate_failed", 0)
-                                    ) + 1
-                                log.info(
-                                    "[OTR_LedgerScriptWriter] body-gate reroll "
-                                    "did not validate for beat %s; keeping "
-                                    "original (%s)",
-                                    beat.beat_id, ",".join(_bg_reasons)[:160],
-                                )
-                        except Exception as _bg_exc:  # noqa: BLE001 -- never break audio
-                            if isinstance(_bg_sq, dict):
-                                _bg_sq["body_gate_failed"] = int(
-                                    _bg_sq.get("body_gate_failed", 0)
-                                ) + 1
-                                _bg_sq["grounding_reroll_failed"] = True
-                            log.warning(
-                                "[OTR_LedgerScriptWriter] body-gate reroll raised "
-                                "(%s: %s) for beat %s; keeping original",
-                                type(_bg_exc).__name__, str(_bg_exc)[:160],
-                                beat.beat_id,
-                            )
-                    # Telemetry: the SHIPPED-text ungrounded-crisis density,
-                    # accumulated across body beats (final `cleaned`, post-reroll)
-                    # -- the soak target vs the flag-off baseline.
-                    if isinstance(_bg_sq, dict):
-                        _bg_sq["body_gate_ungrounded_crisis"] = int(
-                            _bg_sq.get("body_gate_ungrounded_crisis", 0)
-                        ) + len(_OTRSQL12.ungrounded_crisis_tokens(
-                            cleaned, _grounded_nouns,
-                        ))
 
                 cid = char_id_by_name[beat.speaker]
                 token = f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
@@ -6587,14 +4863,11 @@ class OTR_LedgerScriptWriter:
                             safe_open_brief=safe_open_brief,
                             # QA F1 (2026-07-09): pack-routed intro seam.
                             source_bank_id=resolved["source_bank"],
-                            repair_fn=technical_generate_fn,
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
-                    # KILL 2 telemetry (under flag only): did the safe-open pass
-                    # fall back to the deterministic template?
                     if _style_grammar_on:
-                        meta.setdefault("story_quality", {})["open_safe_fallback"] = (
+                        meta["open_safe_fallback"] = (
                             "open_safe_fallback" in line_res.compose_flags
                         )
                 elif (
@@ -6619,7 +4892,6 @@ class OTR_LedgerScriptWriter:
                     with slot_scheduler.helper_context("compose_line"):
                         line_res = _OTRLC.compose_line(
                             creative_fn=creative_generate_fn,
-                            repair_fn=technical_generate_fn,
                             req=line_req,
                             base_temperature=base_temp,
                             max_new_tokens_cap=resolved[
@@ -6629,7 +4901,6 @@ class OTR_LedgerScriptWriter:
                                 "creative_writing_model"
                             ],
                             source_bank_id=resolved["source_bank"],  # 2C
-                            _story_rules=story_rules,  # Stage 4
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
@@ -6678,16 +4949,6 @@ class OTR_LedgerScriptWriter:
             # matched -- the ledger skeleton and the outline have
             # drifted apart and the disk ledger silently misses this
             # beat while script_text_parts populates. Fail loud.
-            _mechanical_row_failure = (
-                "hygiene_row_failed_mechanical" in beat_compose_flags
-            )
-            if _mechanical_row_failure:
-                # Empty/punctuation-only exhaustion is a row-local mechanical
-                # failure, not permission to invent speech and not an episode
-                # terminal. Keep the accepted graph row, exclude it from TTS,
-                # and stamp the exact reason for the gap/readiness audits.
-                cleaned = ""
-                token = ""
             _ok = led.update_line_text(beat.beat_id, cleaned)
             if not _ok:
                 raise RuntimeError(
@@ -6703,11 +4964,6 @@ class OTR_LedgerScriptWriter:
                 "traits":        traits,
                 "compose_flags": list(beat_compose_flags),
             }
-            if _mechanical_row_failure:
-                _line_fields.update({
-                    "skip": True,
-                    "tts_skip_reason": "spoken_hygiene_unspeakable_row",
-                })
             _OTRL.patch_line_fields(led.data, beat.beat_id, _line_fields)
             led.save()
             # rip-sfx-broll (2026-07-01): music render-contract rows emit
@@ -6776,7 +5032,6 @@ class OTR_LedgerScriptWriter:
                             era=str(meta.get("period", "") or ""),
                         ),
                         source_bank_id=resolved["source_bank"],
-                        repair_fn=technical_generate_fn,
                     )
                 _rw_text = _rw_res.text
                 _rw_compose_flags = _rw_res.compose_flags
@@ -6856,24 +5111,7 @@ class OTR_LedgerScriptWriter:
                         news_close_brief=nc_brief,
                         premise=str(getattr(outline, "premise", "") or ""),
                         intro_text=intro_text,
-                        cast_seed=cast_seed,
                         creative_repo_id=resolved["creative_writing_model"],
-                        # S2 (story-quality v2, 2026-06-28): system examples +
-                        # arc_shape-keyed curated fallback floor.
-                        arc_shape=str(meta.get("arc_shape") or ""),
-                        # QA F1 (2026-07-09): pack-routed coda seam -- a
-                        # PD/Shakespeare/archive close is a source note, not
-                        # a "real news report" pivot.
-                        source_bank_id=resolved["source_bank"],
-                        repair_fn=technical_generate_fn,
-                        # Live-bug 5: score the exact complete coda against the
-                        # same injected anchors and breath range as every other
-                        # authored row. The factual tail is still starved from
-                        # every model call.
-                        canon_header=canon_header,
-                        words_per_beat_range=tuple(
-                            episode_budget.words_per_beat_range
-                        ),
                     )
                 if not outro_res.text:
                     # Pathological (brief cleaned to empty) -- never ship an empty
@@ -6911,7 +5149,6 @@ class OTR_LedgerScriptWriter:
                 with slot_scheduler.helper_context("compose_announcer_outro"):
                     outro_res = _OTRLC.compose_announcer_outro(
                         creative_fn=creative_generate_fn,
-                        repair_fn=technical_generate_fn,
                         script_brief=script_brief,
                         news_close_brief=nc_brief,
                         intro_text=intro_text,
@@ -6927,11 +5164,9 @@ class OTR_LedgerScriptWriter:
                         outro_res,
                         compose_flags=outro_res.compose_flags + ("news_coda_no_brief",),
                     )
-            # KILL 2 telemetry (under flag only).
             if _style_grammar_on:
-                _sqd = meta.setdefault("story_quality", {})
-                _sqd["news_coda_emitted"] = bool(nc_brief.strip())
-                _sqd["news_coda_fallback"] = (
+                meta["news_coda_emitted"] = bool(nc_brief.strip())
+                meta["news_coda_fallback"] = (
                     "news_coda_fallback" in outro_res.compose_flags
                 )
             # patch_line_text recomputes char_count + word_count in
@@ -6975,256 +5210,22 @@ class OTR_LedgerScriptWriter:
                 last_announcer_id, outro_res.compose_flags,
             )
 
-            # --- I.5.5. original_radio whole-script QA gate ------------
-            # (kibitz r2-r4; V4 locks 2+7.) Runs ONLY on the original
-            # lane, immediately after the outro write and BEFORE the
-            # key_terms audit + J aggregates (r3 D5: flags/word counts
-            # stay fresh; K.5.6 + news_used read post-repair text).
-            # OriginalQAError is reserved for corroborated deterministic
-            # ship-stops. Subjective findings stay inside the dynamic repair /
-            # quality-floor path and cannot end the episode.
-            if _bank_has_no_source_contract(_source_bank_row):
-                with slot_scheduler.helper_context("original_qa"):
-                    _run_original_qa_gate(
-                        led, meta, resolved,
-                        bank_row=_source_bank_row,
-                        technical_fn=technical_generate_fn,
-                        creative_fn=creative_generate_fn,
-                        first_announcer_id=first_announcer_id,
-                        last_announcer_id=last_announcer_id,
-                        script_brief=script_brief,
-                        nc_brief=nc_brief,
-                    )
 
         nc_key_terms = tuple(news_meta.get("key_terms") or ())
         if nc_key_terms:
             landed, missing = _OTRNW.post_assembly_keyterm_check(
-                led.data["lines"], nc_key_terms, min_required=2,
+                led.data["lines"], nc_key_terms,
             )
             meta["post_assembly_key_terms"] = {
-                "landed":       landed,
-                "missing":      missing,
-                "min_required": 2,
-                "passed":       len(landed) >= 2,
-                "repair_pass":  "deferred",
+                "status": "telemetry_only",
+                "landed": landed,
+                "missing": missing,
             }
-            if not landed:
-                log.warning(
-                    "[OTR_LedgerScriptWriter] post-assembly key_terms "
-                    "ZERO landed (terms=%r). ADR section 4.4 calls "
-                    "for hard-fail + repair pass; current alpha ships "
-                    "warn-only and DEFERS the repair pass. Episode proceeds.",
-                    list(nc_key_terms),
-                )
-            elif len(landed) < 2:
-                log.warning(
-                    "[OTR_LedgerScriptWriter] post-assembly key_terms "
-                    "below min_required=2: %d/%d landed (missing=%r)",
-                    len(landed), len(nc_key_terms), missing,
-                )
-            elif missing:
-                log.warning(
-                    "[OTR_LedgerScriptWriter] post-assembly key_terms "
-                    "%d/%d landed (missing=%r); proceeding",
-                    len(landed), len(nc_key_terms), missing,
-                )
-            else:
-                log.info(
-                    "[OTR_LedgerScriptWriter] post-assembly key_terms "
-                    "all %d landed",
-                    len(landed),
-                )
-
-        # --- I.6. Dialogue scrubs (operator look-QA 2026-06-10) ------
-        # Deterministic, pre-freeze (audio has not rendered yet, so the
-        # text edits are safe), LOUD per fix.
-        #
-        # (a) STAGE-DIRECTION scrub: the composer sometimes embeds a
-        # parenthetical/bracketed action inside the LINE TEXT --
-        # '..."Observe." (HAYES VANCE removes a vintage pocket watch
-        # from...)' -- which the TTS then SPEAKS and the captions
-        # display (look-QA round 4). Radio-drama dialogue carries no
-        # parentheticals, so every (...) / [...] span is stripped; a
-        # line left with <2 words keeps its original text (warned).
-        # Symmetric wrapping double-quotes are unwrapped in the same
-        # pass.
-        _sd_re = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]")
-        _sd_fixed = 0
-        for _ln in led.data.get("lines") or []:
-            if not isinstance(_ln, dict) or _ln.get("skip"):
-                continue
-            _txt = str(_ln.get("text") or "")
-            _new = _sd_re.sub(" ", _txt)
-            _new = re.sub(r"\s{2,}", " ", _new).strip()
-            if (len(_new) >= 2 and _new[0] == '"' and _new[-1] == '"'
-                    and _new.count('"') == 2):
-                _new = _new[1:-1].strip()
-            if _new == _txt.strip():
-                continue
-            if len(_new.split()) < 2:
-                log.warning(
-                    "[OTR_LedgerScriptWriter] stage-direction scrub would "
-                    "empty line %s; original text kept", _ln.get("line_id"))
-                continue
-            log.warning(
-                "[OTR_LedgerScriptWriter] stage-direction scrub %s: %r -> %r",
-                _ln.get("line_id"), _txt[:70], _new[:70])
-            set_line_text_metrics(_ln, _new)
-            _sd_fixed += 1
-        if _sd_fixed:
-            led.save()
-            log.warning(
-                "[OTR_LedgerScriptWriter] stage-direction scrub fixed %d "
-                "line(s) pre-freeze", _sd_fixed)
-
-        # (b) SELF-VOCATIVE scrub: the composer sometimes opens a line
-        # with the SPEAKER'S OWN first name as a vocative ("GULLIVER
-        # REEVES: Gulliver, have you...") -- a character addressing
-        # themselves. Strip the leading self-vocative + separator,
-        # re-capitalize, restamp word_count; never touches a line that
-        # addresses ANOTHER character.
-        _voc_fixed = 0
-        _name_by_cid = {
-            str(c.get("char_id") or ""): str(c.get("name") or "")
-            for c in (led.data.get("cast") or []) if isinstance(c, dict)
-        }
-        for _ln in led.data.get("lines") or []:
-            if not isinstance(_ln, dict) or _ln.get("skip"):
-                continue
-            _nm = _name_by_cid.get(str(_ln.get("char_id") or ""), "")
-            _first = (_nm.split() or [""])[0]
-            _txt = str(_ln.get("text") or "")
-            if len(_first) < 2 or not _txt:
-                continue
-            _m = re.match(
-                r"^\s*" + re.escape(_first) + r"\s*[,!?—…:;-]+\s*",
-                _txt, flags=re.IGNORECASE)
-            if not _m:
-                continue
-            _rest = _txt[_m.end():].lstrip()
-            if len(_rest.split()) < 2:
-                continue                      # never empty a line
-            _fixed = _rest[0].upper() + _rest[1:]
-            log.warning(
-                "[OTR_LedgerScriptWriter] self-vocative scrub %s (%s): "
-                "%r -> %r", _ln.get("line_id"), _nm, _txt[:60], _fixed[:60])
-            set_line_text_metrics(_ln, _fixed)
-            _voc_fixed += 1
-        if _voc_fixed:
-            led.save()
-            log.warning(
-                "[OTR_LedgerScriptWriter] self-vocative scrub fixed %d "
-                "line(s) pre-freeze", _voc_fixed)
-
-        # (c) SELF-VOCATIVE ATTRIBUTION repair (round 5, 2026-06-10) --
-        # the LAST pre-freeze word on speaker identity, deliberately AFTER
-        # every text-mutating pass: the b004 acceptance catch was a line
-        # REWRITTEN after scrubs (a)/(b) into "Gulliver, it's not just a
-        # machine..." while stamped char_id=GULLIVER -- the content belongs
-        # to the OTHER character (a self-vocative is an address, and you do
-        # not address yourself). Deterministic, no LLM:
-        #   * exactly TWO character rows in the cast -> re-attribute the
-        #     line to the interlocutor (text kept -- it is now a CORRECT
-        #     address), LOUD;
-        #   * ambiguous (3+ characters) -> strip the leading vocative like
-        #     scrub (b) (which already ran, BEFORE the late rewrites) and
-        #     LOUD-warn the attribution; never silent, never raises.
-        # Runs pre-freeze and pre-TTS, so the corrected speaker's voice is
-        # the one minted. Frozen ledgers are never re-touched (this is the
-        # writer; the ledger freezes after J).
-        _att_fixed = 0
-        _char_rows = [
-            c for c in (led.data.get("cast") or [])
-            if isinstance(c, dict)
-            and str(c.get("name") or "").strip().upper() != "ANNOUNCER"
-            and str(c.get("char_id") or "")
-        ]
-        for _ln in led.data.get("lines") or []:
-            if not isinstance(_ln, dict) or _ln.get("skip"):
-                continue
-            _cid = str(_ln.get("char_id") or "")
-            _nm = _name_by_cid.get(_cid, "")
-            _first = (_nm.split() or [""])[0]
-            _txt = str(_ln.get("text") or "")
-            if len(_first) < 2 or not _txt:
-                continue
-            _m = re.match(
-                r"^\s*" + re.escape(_first) + r"\s*[,!?—…:;-]+\s*",
-                _txt, flags=re.IGNORECASE)
-            if not _m:
-                continue
-            _others = [c for c in _char_rows
-                       if str(c.get("char_id") or "") != _cid]
-            if len(_char_rows) == 2 and len(_others) == 1:
-                _new_cid = str(_others[0].get("char_id") or "")
-                log.warning(
-                    "[OTR_LedgerScriptWriter] self-vocative re-attribution "
-                    "%s: %s->%s (%r is %s addressing %s)",
-                    _ln.get("line_id"), _cid, _new_cid, _txt[:50],
-                    _others[0].get("name"), _nm)
-                _ln["char_id"] = _new_cid
-                _att_fixed += 1
-            else:
-                _rest = _txt[_m.end():].lstrip()
-                if len(_rest.split()) >= 2:
-                    _fixed = _rest[0].upper() + _rest[1:]
-                    log.warning(
-                        "[OTR_LedgerScriptWriter] self-vocative LATE strip "
-                        "%s (%s, ambiguous %d-char cast): %r -> %r",
-                        _ln.get("line_id"), _nm, len(_char_rows),
-                        _txt[:50], _fixed[:50])
-                    set_line_text_metrics(_ln, _fixed)
-                    _att_fixed += 1
-                else:
-                    log.warning(
-                        "[OTR_LedgerScriptWriter] self-vocative on %s (%s) "
-                        "left as-is (strip would empty the line; ambiguous "
-                        "cast)", _ln.get("line_id"), _nm)
-        if _att_fixed:
-            led.save()
-            log.warning(
-                "[OTR_LedgerScriptWriter] self-vocative attribution pass "
-                "fixed %d line(s) pre-freeze", _att_fixed)
-
-        # --- I.7 GENRE spoken-text authored repair (v4 P1(iii), opt-in) ----
-        # The LAST creative pass before the J rollup + freeze. For a bank that
-        # opted in (meta.genre_guard_spoken), re-author any spoken line hitting a
-        # banned genre phrase via the creative slot (bounded, keep-if-clean).
-        # Survivors fall through to the deterministic Phase-10 G10 terminal.
-        # Inert for every current bank (key absent). Never raises.
-        if meta.get("genre_guard_spoken"):
-            try:
-                from . import _otr_genre_guard as _OTRGENRE
-            except ImportError:  # pragma: no cover -- flat load
-                import _otr_genre_guard as _OTRGENRE  # type: ignore
-            _genre_fixed = _OTRGENRE.apply_genre_spoken_repair(
-                led.data,
-                meta.get("genre_banned_phrases") or [],
-                creative_generate_fn,
+            log.info(
+                "[OTR_LedgerScriptWriter] optional post-assembly key-term "
+                "telemetry: %d/%d landed (missing=%r)",
+                len(landed), len(nc_key_terms), missing,
             )
-            if _genre_fixed:
-                led.save()
-                log.warning(
-                    "[OTR_LedgerScriptWriter] genre spoken-text repair "
-                    "re-authored %d line(s) pre-freeze", _genre_fixed)
-
-        # --- I.8 OUTRO cast-completeness authored repair (v4 P1(v), opt-in) ----
-        # Re-author the announcer sign-off so it credits the full final cast.
-        # Keep-if-complete; survivors fall through to the deterministic G12
-        # terminal. Inert for every current bank (flag absent). Never raises.
-        if meta.get("outro_cast_complete"):
-            try:
-                from . import _otr_outro_guard as _OTROUTRO
-            except ImportError:  # pragma: no cover -- flat load
-                import _otr_outro_guard as _OTROUTRO  # type: ignore
-            _outro_fixed = _OTROUTRO.apply_outro_completeness_repair(
-                led.data, creative_generate_fn,
-            )
-            if _outro_fixed:
-                led.save()
-                log.warning(
-                    "[OTR_LedgerScriptWriter] outro cast-completeness repair "
-                    "re-authored the sign-off pre-freeze")
 
         # --- J. Phase 0 aggregate + §6.G word counts + final save ----
         # No set_lines + post-patch pass any more -- every line was
@@ -7249,17 +5250,6 @@ class OTR_LedgerScriptWriter:
         )
         led.save()
 
-        # Bake-off v3 (inline lanes): bounded advisory-only diagnostic over the
-        # composed + scrubbed + saved ledger, keyed on the v3 pipeline id. Reads
-        # + stamps the LIVE led.data meta; never mutates rows, never raises
-        # (L-6 + no-hole law). Base inline lanes are unaffected (map miss).
-        if str(getattr(_source_bank_row, "default_story_pipeline", "") or "") \
-                in _INLINE_V3_PIPELINES:
-            run_v3_advisory(
-                led, led.data.setdefault("meta", {}),
-                lane=str(resolved.get("source_bank") or ""),
-            )
-
         # --- Tail handoff (scifi_fable2 S1a extraction) ----------------
         # Everything from J.5 to the M save lives in _run_writer_tail and
         # consumes ONLY the context below. The legacy path builds it from
@@ -7280,8 +5270,6 @@ class OTR_LedgerScriptWriter:
             slot_scheduler=slot_scheduler,
             creative_fn=creative_generate_fn,
             technical_fn=technical_generate_fn,
-            cast_seed=cast_seed,
-            refine_active=_refine_active,
             run_story_spine=True,
             final_title_override=None,
         )
@@ -7297,8 +5285,7 @@ class OTR_LedgerScriptWriter:
         provenance stamps -> L return assembly -> M save.
 
         Consumes ONLY ``ctx`` (scifi_fable2 S1a extraction -- no closure
-        over run() locals). ``self`` is touched solely for the
-        ``self._refine_last`` stash when ``ctx.refine_active``. Returns
+        over run() locals). Returns
         ``(script_text, script_json, news_json, est_minutes,
         technical_model)`` -- the writer's output tuple.
         """
@@ -7320,8 +5307,6 @@ class OTR_LedgerScriptWriter:
         slot_scheduler = ctx.slot_scheduler
         creative_generate_fn = ctx.creative_fn
         technical_generate_fn = ctx.technical_fn
-        cast_seed = ctx.cast_seed
-        _refine_active = ctx.refine_active
 
         # --- J.5. Post-composition title regen (late binding) ---------
         # Per Jeffrey 2026-05-10: when the user leaves episode_title
@@ -7545,148 +5530,32 @@ class OTR_LedgerScriptWriter:
         _stamp_story_style_receipt(
             meta, contract=contract, scaffold_enabled=_style_grammar_on)
 
-        # --- Story-spine Wave 2: the post-script passes (Stage 2.5 length
-        # pass / Stage 3 QA router / Stage 3.5 micro-repair / unload /
-        # Stage 4 scrub), in-process + env-gated, DEFAULT ON (opt-out). The
-        # orchestrator runs them out of the box; OTR_ENABLE_STORY_SPINE=0
-        # restores the writer's byte-identical default path (the unload
-        # block in the else branch). When on, the orchestrator performs the
-        # writer-LLM unload itself, after the LLM passes (D8). The spine
-        # NEVER raises (PD1); the only fail-loud signal is the REJECT gate
-        # checked right after this block. No node surface, no workflow-JSON
-        # change (D4/D5); model ids come from resolved[...] (QA -> technical
-        # slot, length pass + micro-repair -> creative slot).
-        try:
-            from . import _otr_story_spine as _OTRSPINE
-        except ImportError:  # pragma: no cover - standalone / test load
-            import _otr_story_spine as _OTRSPINE  # type: ignore
-        # S1a: ctx.run_story_spine gates the spine WITHOUT disturbing the
-        # legacy env default -- legacy passes True, so the env-gated
-        # _OTRSPINE.enabled() decides exactly as before; fable2 passes
-        # False (its P4/P5/P8 loop is the lane's equivalent) and takes
-        # the unload branch below.
-        if ctx.run_story_spine and _OTRSPINE.enabled():
-            _OTRSPINE.run_post_script_spine(
-                led, meta, outline,
-                creative_generate_fn=creative_generate_fn,
-                technical_generate_fn=technical_generate_fn,
-                resolved=resolved,
-                slot_scheduler=slot_scheduler,
-            )
+        # Shared inline banks run one mandatory structural/safety handoff.
+        # Producer-owned banks already performed their fixed tail and only need
+        # the writer-model unload here. Neither path judges story length or
+        # quality and neither can author a replacement story.
+        if ctx.run_story_spine:
+            try:
+                from . import _otr_story_spine as _OTRSPINE
+            except ImportError:  # pragma: no cover
+                import _otr_story_spine as _OTRSPINE  # type: ignore
+            _OTRSPINE.run_post_script_spine(led, meta)
         else:
-            # S3 (VRAM): reclaim the runner's current model before the final
-            # word-fit/reflection boundary. Those later passes may reload a
-            # slot; a second final eviction follows the reflections below.
-            # Never raises (PD1, audio is king); gated by
-            # OTR_WRITER_UNLOAD_AFTER_SCRIPT (default on). VRAM-envelope
-            # benefit needs an operator GPU smoke to confirm.
             try:
                 from . import _otr_writer_vram as _OTRVRAM
-            except ImportError:  # pragma: no cover - standalone / test load
+            except ImportError:  # pragma: no cover
                 import _otr_writer_vram as _OTRVRAM  # type: ignore
-            meta["writer_llm_unload"] = _OTRVRAM.unload_writer_llm_after_script()
-
-        # Quality/liveness split (operator 2026-07-21): a subjective Story-QA
-        # verdict may request more authored repair but may never abort a
-        # ledgerable episode. The dynamic spine now consumes REJECT internally;
-        # clear a stale pre-fix stamp defensively so an imported/legacy ledger
-        # cannot revive the removed writer-boundary failure. Structural gaps,
-        # unsafe speech, and broken ownership still fail closed downstream.
-        if meta.pop("story_verdict", None) == "REJECT":
-            meta["story_qa_disposition"] = "legacy_reject_ignored"
-            meta["story_quality_warning"] = {
-                "status": "legacy_reject_ignored",
-                "reason": str(
-                    meta.pop("story_reject_reason", "story rejected")
-                )[:1200],
-            }
-            log.warning(
-                "[OTR_LedgerScriptWriter] ignored stale Story-QA REJECT; "
-                "quality cannot own episode liveness"
+            meta["writer_llm_unload"] = (
+                _OTRVRAM.unload_writer_llm_after_script()
             )
 
-        # Final INLINE spoken-row authoring boundary. The story-spine length
-        # editor above can rewrite text after the ordinary composer, grouped
-        # exchange, announcer, and genre passes. Scour its exact output before
-        # any delivery/freeze consumer sees it. The two content-owned whole-
-        # script lanes repair before sealing inside their own runners, so their
-        # canonical/proof contract remains read-only in this shared tail.
-        from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
-        _delivery_mode = delivery_mode_for_meta(meta)
-        _word_receipt = meta.get("word_budget")
-        _word_owner = str(
-            _word_receipt.get("owner")
-            if isinstance(_word_receipt, dict) else ""
-        ).strip()
-        if _delivery_mode != CONTENT_OWNED:
-            from . import _otr_reroll as _OTRRR_FINAL
-            # The extracted tail consumes ctx/meta only. In the normal writer
-            # run, meta.canon_header is the exact injected header (including
-            # specificity anchors); synthetic/legacy callers may not have it,
-            # so fall back to the final EpisodeCanon rendering.
-            _final_scour_canon_header = str(
-                meta.get("canon_header")
-                or _OTRC.render_episode_canon_header(canon)
-            ).replace(
-                "EPISODE_TITLE: TBD",
-                f"EPISODE_TITLE: {str(canon.title or 'TBD')}",
-                1,
-            )
-            with slot_scheduler.helper_context("spoken_hygiene_final"):
-                _final_hygiene = _OTRRR_FINAL.repair_ledger_spoken_hygiene(
-                    led.data,
-                    creative_fn=creative_generate_fn,
-                    repair_fn=technical_generate_fn,
-                    # Preserve the injected specificity block. Re-rendering
-                    # from EpisodeCanon here silently dropped those anchors.
-                    canon_header=_final_scour_canon_header,
-                )
-            if _final_hygiene.repaired or _final_hygiene.failed:
-                log.warning(
-                    "[OTR_LedgerScriptWriter] final spoken hygiene resolved "
-                    "%d row(s), with %d row-local mechanical failure(s), "
-                    "after all inline authoring passes",
-                    _final_hygiene.repaired, _final_hygiene.failed,
-                )
+        # The first structurally complete inline ledger is authoritative.
+        _writer_word_receipt = _OTRWD.stamp_actual(
+            led.data,
+            stage="writer_final_rows",
+        )
+        meta["writer_word_delivery"] = dict(_writer_word_receipt)
 
-            if _word_owner:
-                from . import _otr_radio_editor as _OTR_WORD_FIT
-                with slot_scheduler.helper_context(
-                    "final_word_delivery_campaign"
-                ):
-                    _word_campaign = (
-                        _OTR_WORD_FIT.fit_final_word_delivery_campaign(
-                            led.data,
-                            creative_fn=creative_generate_fn,
-                            technical_fn=technical_generate_fn,
-                            creative_model=resolved["creative_writing_model"],
-                            technical_model=resolved["technical_model"],
-                            source_bank_id=resolved["source_bank"],
-                            canon_header=_final_scour_canon_header,
-                        )
-                    )
-                _word_fit_hygiene = _word_campaign["post_fit_hygiene"]
-                if (
-                    _word_fit_hygiene["repaired"]
-                    or _word_fit_hygiene["failed"]
-                ):
-                    log.warning(
-                        "[OTR_LedgerScriptWriter] post-word-fit hygiene "
-                        "changed %d row(s) and row-muted %d; the campaign "
-                        "accepted only after its strict delivery recount",
-                        _word_fit_hygiene["repaired"],
-                        _word_fit_hygiene["failed"],
-                    )
-        # Production producers stamp an explicit owner. Synthetic historical
-        # tail fixtures without that declaration retain their compatibility
-        # path, while every real six-bank run is recounted from the exact final
-        # character rows and fails before reflections/readiness on any drift.
-        if _word_owner:
-            _OTRWD.stamp_actual(
-                led.data,
-                stage="writer_final_rows",
-                require_in_band=True,
-            )
 
         # --- K.5.5/K.5.6 final-row reflections ------------------------
         # Both reflections must describe the exact delivered story, not the
@@ -7710,8 +5579,7 @@ class OTR_LedgerScriptWriter:
             )
         meta.update(_story_delta)
 
-        # Word fitting, its hygiene proof, or the final reflections may have
-        # reloaded either writer slot after Story Spine's earlier eviction.
+        # The metadata reflections may have reloaded either writer slot.
         # Reclaim it unconditionally before TTS/image/video consumers.
         from . import _otr_writer_vram as _OTRVRAM_FINAL
         meta["writer_llm_unload"] = (
@@ -7905,20 +5773,6 @@ class OTR_LedgerScriptWriter:
         # output sockets. Labels stripped (resolved["creative_writing_model"]
         # / ["technical_model"] are already _strip_label_suffix-normalized).
         # B3 wires `technical_model` into the cascade.
-        if _refine_active:
-            # Stash what the refine loop in run() needs: the grader fn + premise
-            # to grade THIS pass; the outline + cast_seed to build the next
-            # REVISE overlay; episode_root for loser cleanup; led to stamp the
-            # refine telemetry on the winner.
-            self._refine_last = {
-                "outline": outline,
-                "premise": str(getattr(outline, "premise", "") or ""),
-                "creative_fn": creative_generate_fn,
-                "cast_seed": cast_seed,
-                "episode_root": episode_root,
-                "led": led,
-                "script_text": script_text,
-            }
         return (
             script_text,
             script_json,
@@ -8183,35 +6037,36 @@ if __name__ == "__main__":
             )
         assert _generate_title_from_script(_no_title, SAMPLE_SCRIPT) == ""
 
-        # 8g. Stuck defaults rejected even when emitted on a TITLE: line.
-        for stuck in ("Untitled", "Signal Lost", "Episode", "the last frequency"):
-            def _stuck(*a, _s=stuck, **kw):
+        # 8g. Any non-empty authored title is accepted; no phrase blacklist.
+        for authored in ("Untitled", "Signal Lost", "Episode", "the last frequency"):
+            def _authored(*a, _s=authored, **kw):
                 return _scratch(["a", "b", "c"], ["x", "y", "z"], _s)
-            assert _generate_title_from_script(_stuck, SAMPLE_SCRIPT) == "", \
-                f"stuck default {stuck!r} should be rejected"
+            assert _generate_title_from_script(
+                _authored, SAMPLE_SCRIPT) == authored
 
-        # 8h. Full-sentence leak on the TITLE: line (>10 words) rejected.
-        def _leak(*a, **kw):
-            return _scratch(
-                ["a", "b", "c"], ["x", "y", "z"],
-                "Here is a title that the model leaked as a complete "
-                "English sentence well over ten words long indeed",
-            )
-        assert _generate_title_from_script(_leak, SAMPLE_SCRIPT) == ""
+        # 8h. Title wording and length are not quality gates.
+        long_title = (
+            "Here is a title that the model authored as a complete "
+            "English sentence well over ten words long indeed"
+        )
+        def _long(*a, **kw):
+            return _scratch(["a", "b", "c"], ["x", "y", "z"], long_title)
+        assert _generate_title_from_script(
+            _long, SAMPLE_SCRIPT) == long_title
 
         # 8i. Empty LLM output -> "".
         def _empty(*a, **kw):
             return ""
         assert _generate_title_from_script(_empty, SAMPLE_SCRIPT) == ""
 
-        # 8j. 80+ char title on the TITLE: line gets truncated to 80.
+        # 8j. Long authored titles survive unchanged.
+        authored_long = "X" * 90 + " A Title"
         def _long(*a, **kw):
             return _scratch(
-                ["a", "b", "c"], ["x", "y", "z"], "X" * 90 + " A Title",
+                ["a", "b", "c"], ["x", "y", "z"], authored_long,
             )
-        result_long = _generate_title_from_script(_long, SAMPLE_SCRIPT)
-        assert len(result_long) <= 80, \
-            f"title truncation failed: len={len(result_long)}"
+        assert _generate_title_from_script(
+            _long, SAMPLE_SCRIPT) == authored_long
 
         # 8k. Trailing punctuation on the TITLE: line stripped.
         def _punct(*a, **kw):

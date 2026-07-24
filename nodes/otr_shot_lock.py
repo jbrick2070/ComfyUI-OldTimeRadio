@@ -600,26 +600,6 @@ def _deterministic_template(appearance: str, setting: str, beat_text: str) -> st
     return ", ".join(parts) if parts else setting
 
 
-def _prompt_is_consistent(text_prompt: str, appearance: str, setting: str) -> bool:
-    """Schema-level consistency: the prompt must carry the cast's core trait
-    token and the brief setting (v1 gate; LLM-as-judge is v2).
-
-    SCOPE (round 5): only ever called for CHARACTER_BEARING_ROLES beats (the
-    char_beats loop in derive_creative_directives) -- object-only b-roll
-    prompts never pass through here, so the person checks must not be reused
-    for non-character roles."""
-    if not text_prompt:
-        return False
-    low = text_prompt.lower()
-    appearance_ok = (not appearance) or any(
-        tok in low for tok in _core_tokens(appearance)
-    )
-    setting_ok = (not setting) or any(
-        tok in low for tok in _core_tokens(setting)
-    )
-    return appearance_ok and setting_ok
-
-
 # Person-anchor DETECTOR removed (operator directive 2026-07-04): no automated
 # person/face analyzer gates the talking-head prompt. The _subject_anchor below
 # is prompt COMPOSITION (it always leads with face/framing tokens); face QUALITY
@@ -634,10 +614,6 @@ def _subject_anchor(appearance: str) -> str:
     app = (appearance or "").strip().rstrip(",.;: ")
     return f"{base}, {app[:120].rstrip(', ')}" if app else base
 
-
-def _core_tokens(text: str) -> list:
-    toks = [t.strip(",.;:").lower() for t in str(text).split() if len(t) > 3]
-    return toks[:6]
 
 
 def _parse_directives(raw: str, expected_ids: list) -> dict:
@@ -730,11 +706,11 @@ def derive_creative_directives(
     resolved lazily from the writer's slot and, if unavailable (llm_fn stays
     None), the deterministic template carries every beat -- the legit local lane.
     If an attempted writer LLM yields no usable directive after ``max_reseed``
-    reseeds, or authors a prompt that fails the story-consistency gate, the
-    deterministic template carries that beat with a loud warning. This is a
-    prompt collapse guard, not an engine/model fallback, and it never touches
-    frozen audio.
+    reseeds, the deterministic template carries that beat with a loud warning.
+    Authored non-empty visual vocabulary is preserved; this pass does not use
+    Python token overlap as a story-world judge. It never touches frozen audio.
     """
+    del consistency_gate_warn_only  # retained only for saved-workflow ABI
     warnings: list = []
     # The image dispatcher owns effective init-image capability (including
     # force-map and radio-host redirects).  Ask it lazily so every direct legacy
@@ -820,41 +796,15 @@ def derive_creative_directives(
                 text_prompt = _deterministic_template(appearance, setting, b["text"])
                 source = "template"
                 d = {k: "" for k in _DIRECTIVE_KEYS}
-            # Round 5 F3: BOTH gates run on the UNANCHORED candidate (the
-            # anchor would otherwise satisfy them tautologically -- pass03
-            # panel catch). The person gate binds the AUTHORED freeform
-            # text_prompt path only (the b002 lesson: an action/prop-only
-            # authored prompt lets HuMo abandon the init portrait). The
-            # composed-directives path leads with the appearance by
-            # construction, and the deterministic template IS the sanctioned
-            # fallback -- both get the anchor regardless.
-            # Person/face analysis REMOVED (operator directive 2026-07-04): no
-            # person-anchor detector gates or annotates the prompt. The
-            # _subject_anchor prepended below still leads every talking-head prompt
-            # with face/framing tokens (prompt COMPOSITION, not analysis), and the
-            # operator QAs faces visually. Only the story-consistency gate
-            # remains; by default an inconsistent AI prompt drops to the
-            # deterministic collapse guard, while consistency_gate_warn_only
-            # keeps the AI prompt.
-            if not _prompt_is_consistent(text_prompt, appearance, setting):
-                msg = (f"consistency gate for beat {b['beat_id']}: prompt missing "
-                       f"cast/setting trait")
-                if consistency_gate_warn_only or source != "llm":
-                    warnings.append(msg + " (kept; warn-only or template path)")
-                else:
-                    warnings.append(
-                        msg + "; using deterministic template collapse guard")
-                    text_prompt = _deterministic_template(
-                        appearance, setting, b["text"])
-                    source = "template_after_consistency_miss"
-            # The subject anchor leads EVERY talking-head prompt path (llm,
-            # composed, template): face/framing tokens first, bounded
-            # appearance after -- prepended AFTER the gates, BEFORE finishing.
+            # No Python vocabulary or token-overlap judge may replace an
+            # authored non-empty visual prompt. The subject anchor remains
+            # prompt composition: it leads every talking-head path (LLM,
+            # composed, template) with face/framing context.
             text_prompt = f"{_subject_anchor(appearance)}, {text_prompt}"
             # FINISH the prompt (gap-audit F3, 2026-06-10): era tail (brief
             # atmosphere/palette/lighting) + the film style tail, restored
-            # from the deleted legacy composer. MUST run after the
-            # consistency gate and BEFORE prompt_hash so the stored hash
+            # from the deleted legacy composer. MUST run before
+            # prompt_hash so the stored hash
             # matches the rendered prompt. Fail-soft.
             try:
                 try:
@@ -1256,10 +1206,9 @@ class OTRShotLock:
                 "consistency_gate_warn_only": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "M4 story-consistency gate. Default: an inconsistent "
-                        "writer-LLM prompt is replaced by the deterministic "
-                        "template collapse guard with a loud warning. warn-only: "
-                        "keep the AI prompt and log the miss."
+                        "Compatibility-only saved-workflow widget. Authored "
+                        "non-empty M4 prompts are always preserved; empty or "
+                        "unparseable replies use the deterministic template."
                     ),
                 }),
                 "gate_in": ("STRING", {

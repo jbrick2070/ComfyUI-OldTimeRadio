@@ -65,13 +65,12 @@ class TestAssemblyIdentity:
             system_prompt=system_prompt,
         )
 
-    def test_dynamic_bullets_still_appended(self):
-        # The pack owns only the STATIC portion; the grounding clause and
-        # soft nudge stay Python-owned and are appended after it.
+    def test_dynamic_grounding_guidance_is_appended(self):
+        # The pack owns only the STATIC portion; prompt-only grounding guidance
+        # is appended without any Python vocabulary filter.
         system = self._messages(None)[0]["content"]
         assert system.startswith(EXCHANGE_SYSTEM_PROMPT)
         assert "Ground the exchange in ONE concrete detail" in system
-        assert "Avoid flat, generic words" in system
 
     def test_custom_system_prompt_replaces_static_portion_only(self):
         custom = "You write anime-style radio banter.\n\nCraft rules:\n"

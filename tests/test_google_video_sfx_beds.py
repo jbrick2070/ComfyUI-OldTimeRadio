@@ -157,10 +157,10 @@ def test_sfx_prompt_helper_terms_and_idempotency():
         "no subtitles",
         "no captions",
         "no readable text",
-        "no blood",
-        "no guns",
-        "no knives",
-        "no smoking",
+        "no explicit guns",
+        "knives",
+        "weapons",
+        "nudity",
     ):
         assert term in lower
     assert append_sfx_audio_safety_clause(out) == out

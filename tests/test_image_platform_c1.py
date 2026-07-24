@@ -427,31 +427,49 @@ def test_no_hardcoded_image_engine_name(clean_image_registry):
 
 
 # --------------------------------------------------------------------------- #
-def test_meta_brief_prompt_temp0_hash_reseed_fallback():
-    cast = [{"char_id": "c1", "name": "BABA", "portrait_prompt": "a tall weathered spacer"}]
+def test_meta_brief_prompt_temp0_hash_and_bounded_fallback():
+    cast = [{
+        "char_id": "c1",
+        "name": "BABA",
+        "portrait_prompt": "a tall weathered spacer",
+    }]
     meta = {"story_brief_terms": {"setting": ["a derelict orbital station"]}}
 
-    # "lined face" keeps the person guard satisfied (look-QA round 4).
-    good = mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "a tall weathered spacer, lined face, station, photographic")
-    p = _by_id(good)["c1"]
-    assert p["source"] == "llm" and p["prompt_hash"]
-    assert p["kind"] == "portrait" and p["w"] == 832 and p["h"] == 1216
+    payload, _warnings = mbp.derive_image_prompts(
+        cast,
+        meta,
+        llm_fn=lambda _prompt: (
+            "a tall weathered spacer, lined face, station, photographic"
+        ),
+    )
+    prompt = _by_id(payload)["c1"]
+    assert prompt["source"] == "llm"
+    assert prompt["prompt_hash"]
+    assert prompt["kind"] == "portrait"
+    assert (prompt["w"], prompt["h"]) == (832, 1216)
 
-    # NO-FALLBACK rip (2026-07-03): an ATTEMPTED writer LLM (llm_fn present) that
-    # returns empty after every reseed now FAILS LOUD -- no template swap.
-    with pytest.raises(RuntimeError, match="no-fallback rip"):
-        mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "")
+    fallback, warnings = mbp.derive_image_prompts(
+        cast, meta, llm_fn=lambda _prompt: "",
+    )
+    fallback_prompt = _by_id(fallback)["c1"]
+    assert fallback_prompt["source"] == "template_after_llm_miss"
+    assert "spacer" in fallback_prompt["prompt"]
+    assert "station" in fallback_prompt["prompt"]
+    assert any("deterministic same-story composition" in row for row in warnings)
 
-    # llm_fn=None is the legit template LANE (not a failure): deterministic,
-    # never empty, hash taken AFTER the call.
-    templ = mbp.derive_image_prompts(cast, meta, llm_fn=None)
-    p2 = _by_id(templ)["c1"]
-    assert p2["source"].startswith("template") and p2["prompt"]
-    assert "spacer" in p2["prompt"] and "station" in p2["prompt"]
+    template, _warnings = mbp.derive_image_prompts(cast, meta, llm_fn=None)
+    template_prompt = _by_id(template)["c1"]
+    assert template_prompt["source"] == "template"
     import hashlib
-    expect = hashlib.sha256(json.dumps(p2["prompt"], ensure_ascii=True,
-                            sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    assert p2["prompt_hash"] == expect
+    expected_hash = hashlib.sha256(
+        json.dumps(
+            template_prompt["prompt"],
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    assert template_prompt["prompt_hash"] == expected_hash
 
 
 def test_meta_brief_appearance_by_char_id():
@@ -463,21 +481,23 @@ def test_meta_brief_appearance_by_char_id():
     ) == ""   # never by display name
 
 
-def test_meta_brief_consistency_gate_fallback():
-    cast = [{"char_id": "c1", "name": "X", "portrait_prompt": "scarred veteran"}]
+def test_meta_brief_keeps_authored_visual_vocabulary():
+    cast = [{
+        "char_id": "c1",
+        "name": "X",
+        "portrait_prompt": "scarred veteran",
+    }]
     meta = {"story_brief_terms": {"setting": ["a neon market"]}}
-    # NO-FALLBACK rip (2026-07-03): an LLM prompt that fails the story-consistency
-    # gate now FAILS LOUD (default warn_only=False) -- no template_consistency swap.
-    with pytest.raises(RuntimeError, match="no-fallback rip"):
-        mbp.derive_image_prompts(cast, meta, llm_fn=lambda _p: "totally unrelated text")
-    # consistency_gate_warn_only=True keeps the AI prompt (operator toggle): the
-    # prompt fails the gate but still depicts a PERSON, so it is logged + kept.
-    out, warns = mbp.derive_image_prompts(
-        cast, meta,
-        llm_fn=lambda _p: "a weathered man in a long coat, face visible",
-        consistency_gate_warn_only=True)
-    assert _by_id(out)["c1"]["source"] == "llm"
-    assert any("missing appearance/setting" in w for w in warns)
+
+    payload, _warnings = mbp.derive_image_prompts(
+        cast,
+        meta,
+        llm_fn=lambda _prompt: "totally unrelated text",
+    )
+
+    prompt = _by_id(payload)["c1"]
+    assert prompt["source"] == "llm"
+    assert "totally unrelated text" in prompt["prompt"]
 
 
 def test_roles_requiring_stills_needs_a_complete_resolvable_policy(monkeypatch):
@@ -712,28 +732,6 @@ def test_c1_still_pan_and_motion_consume_their_scene_still():
     assert disp.engine_consumes_still(vreg.get_engine("viz_green")) is False
 
 
-def test_still_needed_honors_force_engine_map(monkeypatch):
-    """Operator 2026-07-01: when OTR_FORCE_ENGINE_MAP forces a no-still visualizer
-    onto a role, the still dispatcher must resolve the SAME effective engine (the
-    render-time apply_engine_override runs LATER) and SKIP the still -- an
-    all-mandala episode must not waste a Flux image-gen pass on stills the mandala
-    ignores. Without the env, humo still consumes its init still (unchanged)."""
-    import nodes._otr_video_engines  # noqa: F401  self-register the engines
-    policy = {"video_models": {
-        "character_video_model": {"engine_id": "humo_14B_169", "custom": False}}}
-    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    assert disp._still_needed_for_role(policy, "character_video") is True
-    # force ALL roles to the mandala (accepts_still=False) -> still NOT needed
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_mandala")
-    assert disp._still_needed_for_role(policy, "character_video") is False
-    # a per-role force to the rainbow scope also skips
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=viz_mxc_cpu")
-    assert disp._still_needed_for_role(policy, "character_video") is False
-    # forcing a STILL-consuming engine (all-humo) keeps the still
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=humo")
-    assert disp._still_needed_for_role(policy, "character_video") is True
-
-
 def test_dispatcher_rejects_unmaterialized_required_scene_target(tmp_path):
     """The image phase cannot hand video an incomplete still spine."""
     policy = {
@@ -760,6 +758,26 @@ def test_dispatcher_rejects_unmaterialized_required_scene_target(tmp_path):
             output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
 
 
+def test_still_needed_honors_force_engine_map(monkeypatch):
+    """Operator 2026-07-01: when OTR_FORCE_ENGINE_MAP forces a no-still visualizer
+    onto a role, the still dispatcher must resolve the SAME effective engine (the
+    render-time apply_engine_override runs LATER) and SKIP the still -- an
+    all-mandala episode must not waste a Flux image-gen pass on stills the mandala
+    ignores. Without the env, humo still consumes its init still (unchanged)."""
+    import nodes._otr_video_engines  # noqa: F401  self-register the engines
+    policy = {"video_models": {
+        "character_video_model": {"engine_id": "humo_14B_169", "custom": False}}}
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    assert disp._still_needed_for_role(policy, "character_video") is True
+    # force ALL roles to the mandala (accepts_still=False) -> still NOT needed
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_mandala")
+    assert disp._still_needed_for_role(policy, "character_video") is False
+    # a per-role force to the rainbow scope also skips
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=viz_mxc_cpu")
+    assert disp._still_needed_for_role(policy, "character_video") is False
+    # forcing a STILL-consuming engine (all-humo) keeps the still
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=humo")
+    assert disp._still_needed_for_role(policy, "character_video") is True
 
 
 def test_still_needed_honors_radio_is_host_redirect(monkeypatch):
@@ -874,7 +892,7 @@ def test_dispatch_appends_visual_safety_to_image_requests(
 
     assert done.startswith("image:done:")
     prompt = calls["last"]["prompt"].lower()
-    for term in ("no blood", "no guns", "no knives", "no smoking"):
+    for term in ("no explicit guns", "knives", "weapons", "nudity"):
         assert term in prompt
     assert calls["last"]["prompt_hash"] != "oldhash"
     assert led["images"]["images"][0]["prompt_hash"] == calls["last"]["prompt_hash"]

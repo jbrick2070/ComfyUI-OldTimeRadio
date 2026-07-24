@@ -51,13 +51,6 @@ from datetime import datetime, timedelta
 # Project State (v1.4 Theme C) - series bible for cross-episode consistency.
 # Read-only during generation. See nodes/project_state.py for the write path.
 from .project_state import ProjectState
-from ._otr_rss_source_contract import (
-    MIN_CHARS as _V4_RSS_MIN_CHARS,
-    MIN_UNIQUE_TOKENS as _V4_RSS_MIN_UNIQUE_TOKENS,
-    MIN_WORDS as _V4_RSS_MIN_WORDS,
-    meets_v4_rss_source_floor,
-)
-
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
 from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
 
@@ -85,80 +78,6 @@ def _flush_vram_keep_llm():
             torch.cuda.empty_cache()
     except Exception:
         gc.collect()
-
-
-# ---------------------------------------------------------------------------
-# Parse-check helper for the script-writer retry loop (BUG-LOCAL-004 + 005).
-#
-# Extracted to module scope 2026-05-02 so tests can lock the parse contract
-# without driving the whole `write_script` method end-to-end. The loop in
-# `write_script` uses `_check_parse_ok(text, is_ultra_smoke=..., is_tiny_smoke=...)`
-# and acts on the returned mapping.
-#
-# Round-robin verdict 2026-05-02 (gpt-5.5 / gemini-3.1-pro-customtools /
-# nemotron-49b): the bare-form regex MUST negative-lookahead the structural
-# markers (TITLE/SCENE/GENRE/ENV/SFX/MUSIC/VOICE/CAST/AUTHOR) so a degenerate
-# "TITLE: only" output cannot falsely PARSE_OK. The [VOICE: ...] regex stays
-# strict to mirror the downstream parser at story_orchestrator.py:3021,
-# avoiding C7 violations where the orchestrator passes a script the parser
-# then drops dialogue from.
-# ---------------------------------------------------------------------------
-import re as _re  # noqa: E402 -- placed after _flush_vram_keep_llm
-
-_PARSE_CHECK_SCENE_RE = _re.compile(
-    r'^\s*===\s*SCENE\s+\d+\s*===\s*$', _re.MULTILINE
-)
-_PARSE_CHECK_VOICE_RE = _re.compile(
-    r'^\s*\[VOICE:\s*[A-Z_]+', _re.MULTILINE
-)
-_PARSE_CHECK_BARE_RE = _re.compile(
-    r'^\s*(?!TITLE\b|SCENE\b|GENRE\b|ENV\b|SFX\b|MUSIC\b|VOICE\b|CAST\b|AUTHOR\b)'
-    r'[A-Z][A-Z0-9_ ]{1,19}:\s*\S',
-    _re.MULTILINE,
-)
-
-
-def _check_parse_ok(
-    text: str,
-    *,
-    is_ultra_smoke: bool = False,
-    is_tiny_smoke: bool = False,
-) -> dict:
-    """Cheap structural-marker parseability check for script-writer output.
-
-    Returns a dict with keys:
-        has_scene  -- bool, `=== SCENE N ===` marker present at least once
-        voice_hits -- int, count of `[VOICE: NAME...]` line starts
-        bare_hits  -- int, count of bare `CHARACTER:` line starts (excluding
-                      structural markers like TITLE/SCENE/GENRE/etc.)
-        parse_ok   -- bool, branch-aware verdict:
-                        ultra-smoke -> has_scene AND voice_hits >= 2
-                        tiny-smoke  -> has_scene AND voice_hits >= 4
-                        standard    -> has_scene AND (voice_hits + bare_hits) > 0
-
-    The cap of voice_hits >= 2 for ultra-smoke matches the prompt's REQUIRED
-    OUTPUT structure (2 character lines plus 2 ANNOUNCER lines == 4 voice
-    lines; require >= 2 to tolerate one missing line). For tiny-smoke the
-    template asks for ~6-8 voice lines; require >= 4 to allow modest droppage.
-    """
-    text = text or ""
-    has_scene = bool(_PARSE_CHECK_SCENE_RE.search(text))
-    voice_hits = len(_PARSE_CHECK_VOICE_RE.findall(text))
-    bare_hits = len(_PARSE_CHECK_BARE_RE.findall(text))
-
-    if is_ultra_smoke:
-        parse_ok = has_scene and voice_hits >= 2
-    elif is_tiny_smoke:
-        parse_ok = has_scene and voice_hits >= 4
-    else:
-        parse_ok = has_scene and (voice_hits + bare_hits) > 0
-
-    return {
-        "has_scene": has_scene,
-        "voice_hits": voice_hits,
-        "bare_hits": bare_hits,
-        "parse_ok": parse_ok,
-    }
 
 
 # Lazy heavy imports (Section 8) - torch, numpy, transformers inside methods/classes only
@@ -782,85 +701,6 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 
 # -----------------------------------------------------------------------------
-# CONTENT SAFETY FILTER - catches profanity/NSFW that slips past the prompt
-# -----------------------------------------------------------------------------
-
-# Word list: common profanity, slurs, and explicit terms.
-# Kept as a set for O(1) lookup. Checked against whole-word boundaries only
-# so words like "assembly" or "hell" (in sci-fi context) aren't false-flagged.
-_BLOCKED_WORDS = {
-    # profanity
-    "fuck", "fucking", "fucked", "fucker", "motherfucker", "motherfucking",
-    "shit", "shitting", "shitty", "bullshit",
-    "damn", "damned", "dammit", "goddamn", "goddammit",
-    "ass", "asshole", "arse", "arsehole",
-    "bitch", "bitches", "bastard", "crap", "crappy",
-    "piss", "pissed", "pissing",
-    "dick", "cock", "pussy", "tits", "boobs",
-    "whore", "slut", "skank",
-    # slurs (abbreviated to avoid reproducing full slurs in source)
-    "nigger", "nigga", "faggot", "fag", "retard", "retarded",
-    "spic", "chink", "kike", "wetback", "coon",
-    # violence-adjacent shock terms
-    "disembowel", "dismember", "decapitate", "eviscerate",
-    "rape", "raped", "raping", "molest",
-}
-
-# FIX-2 (v1.2): Minced-oath pool replaces [BLEEP] censor.
-# Period-authentic 1940s radio euphemisms + pulp adventure + sci-fi flavor.
-# Rotated per-replacement so the same script doesn't repeat the same oath twice.
-_MINCED_OATHS = [
-    # Golden-age radio (G-rated)
-    "Golly", "Gee", "Gee whiz", "Jeepers", "Jiminy", "Jiminy Cricket",
-    "Heavens", "Heavens to Betsy", "Good heavens", "My stars",
-    "Land sakes", "Goodness gracious", "For Pete's sake", "By Jove",
-    "Great Scott", "Cheese and crackers",
-    # Pulp adventure
-    "Blazes", "Thunderation", "Hot dog", "Holy smokes", "Holy cow",
-    "Holy mackerel", "Suffering succotash", "Leapin' lizards",
-    "Good grief", "Gadzooks", "Zounds",
-    # Sci-fi space-opera
-    "Stars above", "By the stars", "Great galaxies", "Holy vacuum",
-    "Sweet cosmos", "By the rings", "Thundering comets", "Sputtering satellites",
-]
-
-
-def _content_filter(text: str) -> tuple:
-    """Scrub blocked words from generated script text.
-
-    Returns (cleaned_text, list_of_replacements_made).
-    Uses whole-word regex matching to avoid false positives.
-    Replacements rotate through _MINCED_OATHS (period-appropriate euphemisms)
-    instead of emitting [BLEEP] - preserves the old-time-radio atmosphere.
-    """
-    replacements = []
-    _oath_cursor = [0]  # list-wrapped so closure can mutate
-    def _replace(match):
-        word = match.group(0)
-        replacements.append(word.lower())
-        oath = _MINCED_OATHS[_oath_cursor[0] % len(_MINCED_OATHS)]
-        _oath_cursor[0] += 1
-        # Preserve capitalization style of the original word
-        if word.isupper():
-            return oath.upper()
-        if word[0].isupper():
-            return oath
-        return oath.lower()
-
-    # Build regex: whole-word match, case-insensitive
-    if not _BLOCKED_WORDS:
-        return text, []
-    pattern = r'\b(?:' + '|'.join(re.escape(w) for w in sorted(_BLOCKED_WORDS, key=len, reverse=True)) + r')\b'
-    cleaned = re.sub(pattern, _replace, text, flags=re.IGNORECASE)
-
-    if replacements:
-        log.warning("[ContentFilter] Replaced %d blocked word(s): %s",
-                    len(replacements), ", ".join(set(replacements)))
-
-    return cleaned, replacements
-
-
-# -----------------------------------------------------------------------------
 # PROCEDURAL CHARACTER GENERATOR - name, age, gender, demeanor, accent, voice
 # All traits derived deterministically from episode seed + character index.
 # LEMMY stays LEMMY with fixed traits. ANNOUNCER stays ANNOUNCER.
@@ -975,79 +815,6 @@ _VOICE_TRAITS = [
     ("male",   "20s", "earnest",      "high",   "vernacular",   "uses contractions even when formal"),
     ("female", "60s", "quiet",        "low",    "lyrical",      "speaks in metaphor when scared"),
 ]
-
-
-def _check_voice_consistency(script_text, pre_rolled_cast_traits):
-    """Walk every [VOICE: NAME, gender, age, tone, energy] tag in the final
-    script and compare the LLM-chosen traits against the pre-rolled cast
-    traits. Returns a list of soft-warning dicts (no schema bump, written
-    to ledger.voice_warnings[] for forward analysis). ANNOUNCER tags are
-    skipped because the announcer alternates per episode and is not in the
-    pre-rolled cast traits dict.
-
-    Each warning dict shape:
-        {
-          "char_id": str (canonical NAME, all caps),
-          "expected": {"gender", "age", "tone", "energy"},
-          "actual":   {"gender", "age", "tone", "energy"},
-          "mismatches": [str, ...]  # one short tag per drifted field
-        }
-
-    The check is forgiving: trait matches use substring-in-actual so
-    "30s" pre-rolled matches "30s, anxious" actual, etc. A trait whose
-    actual value is missing or unparseable is reported as
-    'mismatch:absent'. Failure of the regex itself is swallowed -- the
-    whole pipeline never blocks on a soft-warning collection.
-    """
-    if not pre_rolled_cast_traits:
-        return []
-    try:
-        # [VOICE: NAME, gender, age, tone, energy]
-        # Allow optional whitespace and accept gender words wrapped in <>
-        # placeholders the LLM may leak from prompt scaffolding.
-        pattern = re.compile(
-            r'\[VOICE:\s*'
-            r'([A-Z][A-Z0-9 _\-]+?)\s*,'   # name
-            r'\s*<?([^,\]<>]+)>?\s*,'      # gender
-            r'\s*<?([^,\]<>]+)>?\s*,'      # age
-            r'\s*<?([^,\]<>]+)>?\s*,'      # tone
-            r'\s*<?([^,\]<>]+)>?\s*\]',    # energy
-            re.IGNORECASE,
-        )
-        warnings_out = []
-        for m in pattern.finditer(script_text or ""):
-            raw_name = (m.group(1) or "").strip().upper()
-            if not raw_name or raw_name == "ANNOUNCER":
-                continue
-            traits = pre_rolled_cast_traits.get(raw_name)
-            if not traits:
-                continue
-            exp_gender, exp_age, exp_tone, exp_energy = traits[:4]
-            act_gender = (m.group(2) or "").strip().lower()
-            act_age    = (m.group(3) or "").strip().lower()
-            act_tone   = (m.group(4) or "").strip().lower()
-            act_energy = (m.group(5) or "").strip().lower()
-            mismatches = []
-            if exp_gender.lower() not in act_gender:
-                mismatches.append(f"gender:{exp_gender}!={act_gender}")
-            if exp_age.lower() not in act_age:
-                mismatches.append(f"age:{exp_age}!={act_age}")
-            if exp_tone.lower() not in act_tone:
-                mismatches.append(f"tone:{exp_tone}!={act_tone}")
-            if exp_energy.lower() not in act_energy:
-                mismatches.append(f"energy:{exp_energy}!={act_energy}")
-            if mismatches:
-                warnings_out.append({
-                    "char_id":  raw_name,
-                    "expected": {"gender": exp_gender, "age": exp_age,
-                                 "tone": exp_tone,    "energy": exp_energy},
-                    "actual":   {"gender": act_gender, "age": act_age,
-                                 "tone": act_tone,    "energy": act_energy},
-                    "mismatches": mismatches,
-                })
-        return warnings_out
-    except Exception:  # noqa: BLE001 - soft-warning collection never blocks
-        return []
 
 
 # Voice presets mapped by gender + vocal quality + language code.
@@ -1749,41 +1516,9 @@ def _llm_rerank_with_bodies(
         return list(candidates_with_body)
 
 
-def _science_body_meets_v4_floor(
-    text: object, *, min_chars: int = _V4_RSS_MIN_CHARS,
-    min_words: int = _V4_RSS_MIN_WORDS,
-    min_unique_tokens: int = _V4_RSS_MIN_UNIQUE_TOKENS,
-) -> bool:
-    """Compatibility forwarding surface for the shared Sci-Fi v4 floor."""
-    return meets_v4_rss_source_floor(
-        text,
-        min_chars=min_chars,
-        min_words=min_words,
-        min_unique_tokens=min_unique_tokens,
-    )
-
-
-def _prioritize_strict_rss_candidates(pool: list[dict]) -> list[dict]:
-    """Stable-partition already-qualified inline RSS bodies to the front.
-
-    This is a bounded pre-fetch preference for strict v4 lanes only. It never
-    drops candidates or changes their source strings: URL-scrape candidates
-    remain in their prior order after the inline-qualified bucket.
-    """
-    qualified: list[dict] = []
-    remaining: list[dict] = []
-    for candidate in pool:
-        if meets_v4_rss_source_floor(candidate.get("rss_full") or ""):
-            qualified.append(candidate)
-        else:
-            remaining.append(candidate)
-    return qualified + remaining
-
-
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
                          model_id=None, optimization_profile="Standard",
-                         *, require_science_floor=False,
-                         load_config=None, policy=None):
+                         *, load_config=None, policy=None):
     """Fetch science stories from multiple RSS feeds in parallel.
 
     2026-04-29: now also (a) filters out previously-used URLs via
@@ -1835,29 +1570,6 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
                 if not title:
                     continue
 
-                # -- Headline pre-filter: reject non-article content ----------
-                # Teaser/media headlines have no science payload for Gemma to
-                # work with. A podcast slug or video title gives Gemma 90 chars
-                # about content it can't access. Drop these at the source.
-                _SKIP_PREFIXES = (
-                    "podcast:", "watch:", "video:", "listen:", "opinion:",
-                    "q&a:", "quiz:", "gallery:", "photos:", "slideshow:",
-                    "live:", "webinar:", "event:", "in photos:",
-                )
-                _SKIP_PHRASES = (
-                    "behind-the-scenes", "tour of", "in conversation with",
-                    "ask the expert", "meet the", "alumni spotlight",
-                    "faculty spotlight", "student spotlight", "donate",
-                    "how to apply", "registration open",
-                )
-                title_lower = title.lower()
-                if any(title_lower.startswith(p) for p in _SKIP_PREFIXES):
-                    log.debug("[NewsFetcher] Skipping non-article (prefix): %s", title[:60])
-                    continue
-                if any(p in title_lower for p in _SKIP_PHRASES):
-                    log.debug("[NewsFetcher] Skipping non-article (phrase): %s", title[:60])
-                    continue
-                # -------------------------------------------------------------
 
                 content_candidates = entry.get("content", [])
                 rss_full = ""
@@ -1990,37 +1702,14 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
     # extrapolate from -- the story ends up generic rather than
     # grounded in real science. Anything below the floor is excluded
     # from the re-rank pool.
-    CONTENT_FLOOR = _V4_RSS_MIN_CHARS
-    MIN_WORDS = _V4_RSS_MIN_WORDS
-    MIN_UNIQUE_TOKENS = _V4_RSS_MIN_UNIQUE_TOKENS
-    # The sci-fi v4 payload contract has a stricter semantic floor than the
-    # legacy writer. Inspect more candidates before failing so a thin RSS
-    # entry cannot starve an otherwise healthy fetch batch.
-    MAX_ATTEMPTS = 10 if require_science_floor else 5
-
-    if require_science_floor:
-        prequalified_count = sum(
-            meets_v4_rss_source_floor(candidate.get("rss_full") or "")
-            for candidate in pool
-        )
-        pool = _prioritize_strict_rss_candidates(pool)
-        log.info(
-            "[NewsFetcher] Strict v4 admission prioritized %d/%d "
-            "inline RSS candidate(s) before the %d-attempt cap",
-            prequalified_count,
-            len(pool),
-            MAX_ATTEMPTS,
-        )
+    CONTENT_FLOOR = 400
+    MAX_ATTEMPTS = 5
 
     def _resolve_body(candidate: dict) -> dict:
         """Body resolver for one candidate. Pure; thread-safe."""
         out = dict(candidate)
         rss_full = out.get("rss_full")
-        has_acceptable_inline_rss = (
-            meets_v4_rss_source_floor(rss_full)
-            if require_science_floor
-            else bool(rss_full) and len(rss_full) > 300
-        )
+        has_acceptable_inline_rss = bool(rss_full) and len(rss_full) > 300
         if has_acceptable_inline_rss:
             out["full_text"] = rss_full
             out["_body_source"] = "rss_full"
@@ -2067,25 +1756,15 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
     )
 
     rich = [
-        c for c in fetched
-        if (
-            _science_body_meets_v4_floor(
-                c.get("full_text", ""),
-                min_chars=CONTENT_FLOOR,
-                min_words=MIN_WORDS,
-                min_unique_tokens=MIN_UNIQUE_TOKENS,
-            )
-            if require_science_floor
-            else len(c.get("full_text", "")) >= CONTENT_FLOOR
-        )
+        candidate for candidate in fetched
+        if len(candidate.get("full_text", "")) >= CONTENT_FLOOR
     ]
 
     if rich:
         log.info(
             "[NewsFetcher] %d/%d candidate(s) passed content floor "
             "(>=%d chars%s) -> body re-rank",
-            len(rich), len(fetched), CONTENT_FLOOR,
-            ", >=80 words, >=12 unique tokens" if require_science_floor else "",
+            len(rich), len(fetched), CONTENT_FLOOR, "",
         )
         if model_id and len(rich) > 1:
             rich = _llm_rerank_with_bodies(
@@ -2096,25 +1775,6 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
                 policy=policy,
             )
         chosen = rich[0]
-    elif require_science_floor:
-        # Name the REAL cause. When the HTML body scraper cannot load, every
-        # candidate here is an RSS teaser, and blaming the feed pool sends the
-        # reader hunting for a news outage that never happened (2026-07-14: bs4
-        # was simply absent from the venv, and this message cost hours).
-        scraper_note = ""
-        if _BODY_SCRAPER_UNAVAILABLE:
-            scraper_note = (
-                ". ROOT CAUSE: article-body scraping is DISABLED "
-                f"({_BODY_SCRAPER_UNAVAILABLE}), so every candidate above is "
-                "only its RSS teaser and no candidate CAN clear the floor. "
-                "This is not a feed problem. Fix: pip install beautifulsoup4"
-            )
-        raise RuntimeError(
-            "No science RSS candidate met the v4 source floor "
-            f"(>={CONTENT_FLOOR} chars, >={MIN_WORDS} words, "
-            f">={MIN_UNIQUE_TOKENS} unique tokens) after inspecting "
-            f"{len(fetched)} candidates{scraper_note}"
-        )
     else:
         # All candidates thin - take the richest available so the run
         # continues. Better a thin real story than a hard fail.
@@ -2515,51 +2175,6 @@ _RE_VOICE_TAG_DIALOGUE = re.compile(
     re.MULTILINE
 )
 
-def _is_inline_narration(speaker_name, text):
-    """BUG-LOCAL-100: detect inline stage direction in [VOICE:] line.
-
-    Some LLMs (Captain-Eris, Mistral Nemo at higher temperatures)
-    emit a stage direction on the same line as the VOICE tag, with
-    the actual dialogue on the next line::
-
-        [VOICE: LEV SHAW, traits] Lev bursts onto deck, hurrying...
-        Got the newest readings yet?
-
-    Without this check the parser captures "Lev bursts onto deck..."
-    as the dialogue and Bark TTS reads the stage direction aloud
-    (Stellar Shadows ledger 2026-04-28: l002 + l003 are pure
-    narration that got vocalized).
-
-    Heuristic: the captured text starts with the speaker's first
-    word in third-person form (e.g. "Lev " for LEV SHAW, "Stanley "
-    for STANLEY CRANSTON). Returns True when the caller should look
-    ahead to the next line for the actual dialogue.
-
-    False positives are unlikely: real dialogue almost never starts
-    with the speaker's own name in third person (a character does
-    not say "Lev bursts..." about themselves). False negatives fall
-    through to current parser behavior unchanged.
-    """
-    if not text or not speaker_name:
-        return False
-    # Strip leading ASCII straight quote, smart quotes, asterisks,
-    # underscores, and whitespace before checking for the speaker's first
-    # name. Smart quotes assembled via chr() to keep this file ASCII-clean
-    # (CLAUDE.md: UTF-8 no BOM, ASCII source where possible).
-    _LDQ = chr(0x201C)  # left double smart quote
-    _RDQ = chr(0x201D)  # right double smart quote
-    _LEADING_NOISE = "[*_\"" + _LDQ + _RDQ + "\\s]+"
-    _TRAIL_PUNCT = ".,!?;:'\"" + _LDQ + _RDQ
-    cleaned = re.sub("^" + _LEADING_NOISE, "", text).strip()
-    if not cleaned:
-        return False
-    first_word = cleaned.split()[0].rstrip(_TRAIL_PUNCT).lower()
-    speaker_words = speaker_name.strip().split()
-    if not speaker_words:
-        return False
-    return first_word == speaker_words[0].lower()
-
-
 _DIALOGUE_FALSE_POSITIVES = frozenset({
     "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
     "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
@@ -2569,88 +2184,6 @@ _DIALOGUE_FALSE_POSITIVES = frozenset({
     # Block it everywhere a NAME: <text> shape gets read as dialogue.
     "TITLE",
 })
-
-# BUG-LOCAL-035: Titles that indicate a stuck default or an unresolved title.
-# When a title resolution path yields one of these, we treat it as a failure
-# and either re-derive or fail loud. Keep lowercase, no punctuation.
-_STUCK_TITLE_DEFAULTS = frozenset({
-    "",
-    "the last frequency",
-    "untitled",
-    "episode",
-    "signal lost",
-    "custom episode",
-})
-
-# Matches a leading "TITLE:" line (case-insensitive) the LLM may emit when
-# asked to generate a title. We accept up to the end of the first line.
-_RE_TITLE_LINE = re.compile(
-    r'^\s*(?:\*\*)?\s*TITLE\s*:\s*["\u201C]?\s*(.+?)\s*["\u201D]?\s*(?:\*\*)?\s*$',
-    re.IGNORECASE | re.MULTILINE,
-)
-
-
-def _extract_title_from_script_text(text):
-    """Pull a 'TITLE: ...' line out of raw LLM script text.
-
-    Gemma is instructed to emit such a line when episode_title is blank.
-    Returns the extracted title string (stripped, quotes removed) or "".
-    """
-    if not text:
-        return ""
-    m = _RE_TITLE_LINE.search(text[:2000])  # only look near the top
-    if not m:
-        return ""
-    cand = m.group(1).strip().strip('"\u201C\u201D\u2018\u2019')
-    # BUG-LOCAL-039: strip markdown bold/italic wrappers on the value itself
-    # (e.g. "TITLE: **Bioluminal Tide**" leaks leading "**" into the capture).
-    cand = re.sub(r'^(?:\*{1,3}|_{1,3})\s*', '', cand)
-    cand = re.sub(r'\s*(?:\*{1,3}|_{1,3})$', '', cand)
-    cand = cand.strip().strip('"\u201C\u201D\u2018\u2019')
-    # Reject obviously broken captures (too long, template residue).
-    if not cand:
-        return ""
-    if len(cand) > 120:
-        return ""
-    if cand.lower() in _STUCK_TITLE_DEFAULTS:
-        return ""
-    return cand
-
-
-def _derive_title_from_script_lines(lines):
-    """Deterministic fallback title when the LLM didn't emit one.
-
-    Strategy: take the first 'environment' token's description, pick the
-    most-specific noun phrase from its first 6 words, title-case it.
-    This is last-resort; it keeps the filename layer unblocked when the
-    LLM path silently failed, without silently reusing a stuck default.
-    """
-    try:
-        for ln in lines or []:
-            if not isinstance(ln, dict):
-                continue
-            if ln.get("type") == "environment":
-                desc = (ln.get("description") or "").strip()
-                if not desc:
-                    continue
-                # Take first 6 tokens, drop stopwords/punctuation.
-                tokens = re.findall(r"[A-Za-z][A-Za-z0-9'\-]+", desc)[:6]
-                stop = {"a", "an", "the", "of", "on", "in", "at", "and",
-                        "or", "is", "with", "for", "to", "from", "by"}
-                kept = [t for t in tokens if t.lower() not in stop]
-                if not kept:
-                    continue
-                phrase = " ".join(kept[:4]).title()
-                # Filter if phrase collapses to a stuck default.
-                if phrase.lower() in _STUCK_TITLE_DEFAULTS:
-                    continue
-                return phrase
-    except Exception:
-        pass
-    # Final fallback: timestamped derivative so each run is unique and
-    # the filename layer never regresses to a stuck default.
-    return f"Transmission {int(time.time()) % 100000}"
-
 
 def _extract_all_dialogue(text):
     """Extract (name, dialogue) pairs from both bare and VOICE-tag formats.

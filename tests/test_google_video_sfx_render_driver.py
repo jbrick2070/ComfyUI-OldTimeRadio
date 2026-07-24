@@ -66,7 +66,7 @@ def test_silent_google_prompt_routing_still_uses_visual_google_branch():
     req = rd.build_request_from_shot(shot, led)
     prompt = req["text_prompt"].lower()
     assert "single luminous radio receiver" in prompt
-    assert "no blood" in prompt
+    assert "no explicit guns, knives, weapons, or nudity" in prompt
     assert req["observability"].get("visual_safety_prompt") == "applied"
 
 

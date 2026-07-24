@@ -42,7 +42,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
@@ -50,7 +49,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import production_ledger as PL  # noqa: E402
 from nodes import _otr_freeze_cascade as _LFC_ORCH  # noqa: E402
-from nodes import _otr_ledger_reviewer as _OTRLR  # noqa: E402
 
 
 _CAST = [
@@ -58,23 +56,6 @@ _CAST = [
     {"char_id": "c02", "name": "MANFRED"},
     {"char_id": "announcer", "name": "ANNOUNCER"},
 ]
-
-
-def _candidate_ledger():
-    """Reviewer-site (a) reproduction: b011 is a real cast row (c02) wrongly
-    stamped speaker_role="announcer" -- the b011 "Chandra's Echo" shape and the
-    same class as the PBUG-07 silent flip."""
-    return {
-        "schema_version": "l3-2026-05-14",
-        "cast": list(_CAST),
-        "lines": [
-            {"line_id": "b011", "char_id": "c02", "speaker_role": "announcer",
-             "text": "I've sent a copy of your research to The Chronicle."},
-            {"line_id": "b001", "char_id": "announcer", "speaker_role": "character",
-             "text": "Gather round, listeners."},
-        ],
-        "meta": {},
-    }
 
 
 def _ledger_obj(data):
@@ -119,14 +100,6 @@ def _cascade_ledger_data():
     }
 
 
-def _clean_disposition():
-    return _OTRLR.ReviewerDisposition(
-        verdict="clean_no_edits", pre_audit_violations=0,
-        pre_audit_repairs_applied=0, doctor_edits_proposed=0,
-        doctor_edits_applied=0, post_audit_violations=0,
-    )
-
-
 # ---------------------------------------------------------------------------
 # INVARIANT A -- NO SILENT MUTATION (every cast-keyed flip carries a reason)
 # ---------------------------------------------------------------------------
@@ -144,30 +117,11 @@ class TestInvariantANoSilentMutation:
                    for f in flags), (
             "cast-keyed role coercion must stamp a reason breadcrumb")
 
-    def test_reviewer_role_mismatch_repair_stamps_reason(self):
-        # Site (a) -- the reviewer role_mismatch repair was the original silent
-        # flipper. It must now leave a breadcrumb carrying a reason.
-        led = _candidate_ledger()
-        pre = _OTRLR.PreAuditReport(violations=[
-            _OTRLR.CastViolation(line_id="b011", kind="role_mismatch",
-                                 found="announcer", expected="announcer"),
-        ])
-        repaired = _OTRLR.apply_deterministic_cast_repairs(led, pre, list(_CAST))
-        assert repaired >= 1
-        row = {r["line_id"]: r for r in led["lines"]}["b011"]
-        assert row["speaker_role"] == "character"
-        flags = row.get("compose_flags") or []
-        assert any(f.startswith("role_coerce:") and "reason=" in f
-                   for f in flags), (
-            "reviewer cast-keyed repair must stamp a reason breadcrumb")
-
     def test_pre_freeze_sweep_records_audit_and_reason(self):
         # Site (c) -- the mandatory pre-freeze sweep. The mutation must ride an
         # auditable trail: per-line reason breadcrumb + meta["role_coercions"].
         led = _ledger_obj(_cascade_ledger_data())
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=lambda _fn, _led: _clean_disposition()):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+        _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
         rows = {r["line_id"]: r for r in led.data["lines"]}
         assert rows["b011"]["speaker_role"] == "character"
         rc = led.data["meta"].get("role_coercions")
@@ -211,9 +165,7 @@ class TestInvariantBAnnouncerSentinelProtection:
 
     def test_sweep_leaves_sentinel_announcer_rows_untouched(self):
         led = _ledger_obj(_cascade_ledger_data())
-        with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=lambda _fn, _led: _clean_disposition()):
-            _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
+        _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
         rows = {r["line_id"]: r for r in led.data["lines"]}
         # sentinel announcer rows keep their role; only the b011 culprit moved
         assert rows["b001"]["speaker_role"] == "announcer"

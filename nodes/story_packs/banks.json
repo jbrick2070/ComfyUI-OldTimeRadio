@@ -84,7 +84,7 @@
       },
       "required_seams": [],
       "runnable": true,
-      "guide_ref": "LLM-first multipass lane: the LLM writes the whole play (markup), Python parses it into the ledger. Consumes the raw science_rss payload; interpreter intentionally empty -- the treatment IS the interpretation. No fallback to legacy_many_pass. S2: compact one-draft mode below 120 words; real three-pitch/P2a/P4/P5/keep-better full mode from 120 through 900 words."
+      "guide_ref": "Fixed LLM-first lane: source dossier, one pitch, treatment, factual read, and the first structurally clean P3 whole-play markup are the sole story authority at every requested duration. Python performs narrow same-artifact safety cleanup, proof-backed assembly, and non-strict actual-count telemetry. No selector, critic, revision, keep-better path, or fallback to legacy_many_pass."
     },
     {
       "source_bank_id": "public_domain",
@@ -174,13 +174,11 @@
         "coda_mode": "real_news_report",
         "credits_source_line": "dramatized by machine from a science report",
         "style_pool_class": "generic",
-        "require_science_floor": true,
-        "placeholder_guard": true,
         "scene_coherence_check": true
       },
       "required_seams": [],
       "runnable": true,
-      "guide_ref": "Local default sci-fi lane (renamed from scifi_codex_v4, 2026-07-19): fully INDEPENDENT bank; the proof-pressure delta (a want, the gating proof, a mandatory cost beat, one reversal) lives in the pack seams. Opt-in deterministic gates placeholder_guard + scene_coherence_check are ON (codex's fail-closed compiler satisfies both structurally). genre_guard_spoken and require_outro_cast_complete are deferred: the dedicated codex runner does not cross the inline I.7/I.8 authored-repair boundary, so they would be no-repair hard gates until that boundary is wired for the codex family."
+      "guide_ref": "Independent fixed-topology sci-fi lane: P0 evidence, P1 question, P2 cast, P3 score, one P5 closed-line artifact, narrow same-artifact safety cleanup, assembly/authorship, and non-strict actual-count telemetry. scene_coherence_check protects structural source/graph integrity; no quality, vocabulary, genre, outro-taste, or word-length gate owns liveness."
     },
     {
       "source_bank_id": "custom_source_bank",
