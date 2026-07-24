@@ -336,6 +336,15 @@ def test_headless_wrapper_clears_stale_extra_env_hook_before_boot():
     assert "Remove-Item -LiteralPath $StaleExtraEnv -Force" in src
 
 
+def test_headless_wrapper_applies_profile_launch_env_before_boot():
+    src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
+    assert "config\\profiles\\{0}.json" in src
+    assert "ProfileObject.launch.env" in src
+    assert "Set-Item -Path (\"Env:{0}\" -f $name)" in src
+    assert "profile launch env" in src
+    assert "-NoBoot server cannot satisfy profile" in src
+
+
 def test_headless_wrapper_does_not_assign_reserved_pid_variable():
     src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
     assert "foreach ($pid " not in src

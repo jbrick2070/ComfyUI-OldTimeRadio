@@ -111,6 +111,45 @@ if (-not (Test-Path -LiteralPath $Canonical)) {
 
 Say "canonical workflow: $Canonical"
 
+# A capability profile has two distinct artifacts: workflow widget overrides
+# and launch-time environment.  The latter must reach the ComfyUI server
+# BEFORE it boots; applying it only in otr_canonical_api_run.py changes the
+# client process, not the already-running server that owns the engine.  Keep
+# this boundary explicit so a low-VRAM profile cannot silently run with the
+# engine's wider default frame cap.
+$ProfileEnv = @{}
+if ($Profile -and $Profile -ne "none") {
+    $ProfilePath = Join-Path $Repo ("config\profiles\{0}.json" -f $Profile)
+    if (-not (Test-Path -LiteralPath $ProfilePath)) {
+        throw "Profile not found: $ProfilePath"
+    }
+    $ProfileObject = Get-Content -LiteralPath $ProfilePath -Raw | ConvertFrom-Json
+    foreach ($property in @($ProfileObject.launch.env.PSObject.Properties)) {
+        $name = [string]$property.Name
+        $value = [string]$property.Value
+        if (-not $name -or $null -eq $property.Value) {
+            throw "Profile '$Profile' has an invalid launch.env entry"
+        }
+        $ProfileEnv[$name] = $value
+    }
+    if ($ProfileEnv.Count -gt 0) {
+        if ($NoBoot) {
+            foreach ($name in $ProfileEnv.Keys) {
+                $current = [string](Get-Item -Path ("Env:{0}" -f $name) -ErrorAction SilentlyContinue).Value
+                if ($current -ne $ProfileEnv[$name]) {
+                    throw "-NoBoot server cannot satisfy profile '$Profile' launch.env: " +
+                        "$name expected '$($ProfileEnv[$name])', current '$current'"
+                }
+            }
+        } else {
+            foreach ($name in $ProfileEnv.Keys) {
+                Set-Item -Path ("Env:{0}" -f $name) -Value $ProfileEnv[$name]
+                Say ("profile launch env: {0}={1}" -f $name, $ProfileEnv[$name])
+            }
+        }
+    }
+}
+
 if ($NoBoot -and $Port -le 0) {
     throw "-NoBoot requires an explicit -Port for the existing ComfyUI API server"
 }
