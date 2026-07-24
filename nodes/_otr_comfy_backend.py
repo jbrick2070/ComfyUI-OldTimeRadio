@@ -468,6 +468,13 @@ class ComfyCreditsBackend:
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
+        reserve_remaining = bool(getattr(
+            messages, "_otr_reserve_remaining_output_capacity", False,
+        ))
+        bounded_capacity = reserve_remaining and max_new_tokens is not None
+        fail_on_output_limit = bool(getattr(
+            messages, "_otr_fail_on_output_limit", False,
+        ))
         cache_entry = model
         bearer = _bearer()
         if not bearer:
@@ -481,14 +488,16 @@ class ComfyCreditsBackend:
         cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_OUTPUT_TOKENS_CAP)
         floor = _int_env("OTR_COMFY_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
         requested_tokens = max(1, int(max_new_tokens or 0))
-        if require_full_output and requested_tokens > cap:
+        if (require_full_output or bounded_capacity) and requested_tokens > cap:
             capacity = GenerationContextOverflowError(
                 f"Comfy Credits {slug} cannot fit the complete requested "
                 f"output: requested_output={requested_tokens}, "
                 f"provider_output_cap={cap}"
             )
             raise ComfyCreditsConfigError(str(capacity)) from capacity
-        if bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
+        if reserve_remaining:
+            out_tokens = cap
+        elif bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
             out_tokens = requested_tokens
         else:
             out_tokens = max(requested_tokens, floor)
@@ -501,7 +510,7 @@ class ComfyCreditsBackend:
                 prompt_tokens=estimate_prompt_tokens(messages),
                 min_output_tokens=min(floor, cap),
                 label=f"Comfy Credits {slug}",
-                require_full=require_full_output,
+                require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
             raise ComfyCreditsConfigError(str(exc)) from exc
@@ -534,7 +543,10 @@ class ComfyCreditsBackend:
         if response_format is not None:
             payload["response_format"] = response_format
 
-        text = self._post_with_retries(bearer=bearer, payload=payload, slug=slug)
+        text = self._post_with_retries(
+            bearer=bearer, payload=payload, slug=slug,
+            fail_on_output_limit=fail_on_output_limit,
+        )
         self._account_spend(est)
         return text
 
@@ -569,7 +581,10 @@ class ComfyCreditsBackend:
             est_tokens, _run_token_total,
         )
 
-    def _post_with_retries(self, *, bearer: str, payload: dict, slug: str) -> str:
+    def _post_with_retries(
+        self, *, bearer: str, payload: dict, slug: str,
+        fail_on_output_limit: bool = False,
+    ) -> str:
         url = _chat_url()
         timeout_s = _int_env("OTR_COMFY_TIMEOUT_S", DEFAULT_TIMEOUT_S)
         max_retries = _int_env("OTR_COMFY_MAX_RETRIES", DEFAULT_MAX_RETRIES)
@@ -590,7 +605,10 @@ class ComfyCreditsBackend:
 
             status = int(result.get("status_code") or 0)
             if status == 200:
-                return self._extract_text(result, slug=slug)
+                return self._extract_text(
+                    result, slug=slug,
+                    fail_on_output_limit=fail_on_output_limit,
+                )
 
             last_err = f"HTTP {status}: {self._error_snippet(result)}"
             if status in _RETRYABLE_STATUS and attempt < max_retries:
@@ -617,7 +635,9 @@ class ComfyCreditsBackend:
             time.sleep(delay)
 
     @staticmethod
-    def _extract_text(result: dict, *, slug: str) -> str:
+    def _extract_text(
+        result: dict, *, slug: str, fail_on_output_limit: bool = False,
+    ) -> str:
         body = result.get("json") or {}
         if os.environ.get("OTR_COMFY_DEBUG_RAW") == "1":
             log.info("[ComfyCredits] raw %s response: %s", slug, json.dumps(body)[:1500])
@@ -627,6 +647,11 @@ class ComfyCreditsBackend:
                 f"Comfy Credits {slug} returned no choices: {str(body)[:300]}"
             )
         if choices[0].get("finish_reason") == "length":
+            if fail_on_output_limit:
+                raise ComfyCreditsCallFailedError(
+                    f"Comfy Credits {slug} exhausted the provider output "
+                    "capacity; the partial artifact is not eligible for reroll"
+                )
             log.warning(
                 "[ComfyCredits] %s hit finish_reason=length -- output "
                 "truncated at the token ceiling; raise "

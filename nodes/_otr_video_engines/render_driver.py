@@ -27,6 +27,7 @@ import logging
 import math
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -513,6 +514,256 @@ def _mesh_fodder_row_index(ledger):
             if k:
                 out[k] = im
     return out
+
+
+def _still_spine_row_key(value):
+    """Return a filesystem-safe, stable component for a materialized still."""
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value or "").strip())
+    return value.strip("._") or "still"
+
+
+def _still_spine_episode_id(ledger):
+    """Resolve the durable episode id used by the active render handoff."""
+    return str(
+        (ledger or {}).get("episode_id")
+        or ((ledger or {}).get("meta") or {}).get("episode_id")
+        or ""
+    ).strip()
+
+
+def _still_spine_materialize_row(row, stills_root):
+    """Repair one image row to an active-episode file, if its source exists.
+
+    ``path`` is authoritative only when it is a real file under the active
+    episode's stills directory. A content-addressed ``pool_path`` (or a stale
+    path from a renamed pending episode) is copied into that directory and the
+    row is updated. This is intentionally local and deterministic; it never
+    selects a sibling episode or substitutes a different beat's still.
+    """
+    if not isinstance(row, dict):
+        return ""
+    root = os.path.abspath(str(stills_root))
+    current = os.path.abspath(str(row.get("path") or "")) if row.get("path") else ""
+    try:
+        if current and os.path.isfile(current):
+            if os.path.commonpath((root, current)) == root:
+                return current
+    except (OSError, ValueError):
+        pass
+    source = ""
+    for candidate in (current, str(row.get("pool_path") or "")):
+        if candidate and os.path.isfile(candidate):
+            source = os.path.abspath(candidate)
+            break
+    if not source:
+        return ""
+    object_id = _still_spine_row_key(
+        row.get("object_id") or row.get("beat_id") or row.get("char_id")
+    )
+    content_hash = str(
+        row.get("content_hash") or row.get("sha256") or row.get("hash") or ""
+    ).strip()
+    if not content_hash:
+        content_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    destination = os.path.join(
+        root, "%s_%s.png" % (object_id, content_hash[:12])
+    )
+    os.makedirs(root, exist_ok=True)
+    if not os.path.isfile(destination):
+        shutil.copyfile(source, destination)
+    if not os.path.isfile(destination):
+        return ""
+    row["path"] = destination
+    row["materialized_path"] = destination
+    return destination
+
+
+def _still_spine_image_rows(ledger):
+    rows = ((ledger or {}).get("images") or {}).get("images") or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _still_spine_row_for_beat(rows, beat_id):
+    """Choose the same plate-over-scene precedence as ``_still_index``."""
+    matches = [
+        row for row in rows
+        if str(row.get("beat_id") or "") == str(beat_id or "")
+        and str(row.get("kind") or "").startswith("scene_")
+    ]
+    if not matches:
+        return None
+    plates = [row for row in matches
+              if str(row.get("kind") or "") == "scene_background_plate"]
+    return (plates or matches)[-1]
+
+
+def _still_spine_row_for_portrait(rows, char_id):
+    matches = [
+        row for row in rows
+        if str(row.get("kind") or "") in ("", "portrait")
+        and str(row.get("object_id") or row.get("char_id") or "")
+        == str(char_id or "")
+    ]
+    return matches[-1] if matches else None
+
+
+def _still_spine_row_for_mesh(rows, beat_id, char_id):
+    for row in reversed(rows):
+        if str(row.get("kind") or "") != "mesh_fodder":
+            continue
+        keys = {
+            str(row.get("mesh_subject_id") or ""),
+            str(row.get("object_id") or ""),
+            str(row.get("char_id") or ""),
+            str(row.get("beat_id") or ""),
+        }
+        if str(char_id or "") in keys or str(beat_id or "") in keys:
+            return row
+    return None
+
+
+def _still_spine_manifest_object_ids(images):
+    receipt = images.get("required_scene_targets")
+    if not isinstance(receipt, list):
+        return set()
+    return {
+        str(row.get("object_id") or "")
+        for row in receipt if isinstance(row, dict)
+    }
+
+
+def _still_spine_requires_scene(shot, engine_id, family):
+    if str(engine_id or "") in (
+            "still_pan", "still_flat", "still_word", "ltx_audio_in"):
+        return True
+    if family in _SCENE_INIT_FAMILIES:
+        return True
+    if family in ("audio_driven_face", "character_3d"):
+        return False
+    if "init_image" in _required_inputs_for_engine(engine_id, family):
+        return True
+    try:
+        eng = _vreg.get_engine(engine_id) if _vreg.is_registered(engine_id) else None
+        return bool(eng and getattr(eng, "provider_side", False)
+                    and getattr(eng, "accepts_still", False))
+    except Exception:  # noqa: BLE001 -- unknown engine fails elsewhere
+        return False
+
+
+def validate_and_repair_still_spine(ledger):
+    """Prove every still-consuming beat has an active, materialized input.
+
+    This is the final image-to-video handoff contract. It repairs only an
+    already-authorized row whose ``path`` or ``pool_path`` is readable, writes
+    the repaired path back to that row and the required-target receipt, and
+    raises before the first video engine request when the target is absent.
+    Mesh lanes are checked separately: fodder is never replaced by a scene
+    still. Deferred request sentinels are not inspected here because this pass
+    validates image assets, not cast-time handles.
+    """
+    if not isinstance(ledger, dict):
+        raise RenderError("still-spine handoff requires a ledger object")
+    images = ledger.get("images")
+    if not isinstance(images, dict):
+        raise RenderError("still-spine handoff has no images section")
+    episode_id = _still_spine_episode_id(ledger)
+    if not episode_id:
+        raise RenderError("still-spine handoff requires a durable episode_id")
+    try:
+        from .._otr_paths import otr_stills_dir
+        stills_root = str(otr_stills_dir(episode_id))
+    except Exception as exc:  # noqa: BLE001
+        raise RenderError(
+            "still-spine handoff cannot resolve active episode stills: %s" % exc
+        ) from exc
+    rows = _still_spine_image_rows(ledger)
+    manifest_ids = _still_spine_manifest_object_ids(images)
+    if not manifest_ids:
+        raise RenderError(
+            "still-spine handoff has no required_scene_targets receipt; "
+            "image generation did not publish an authoritative target manifest"
+        )
+    lines = _line_index(ledger)
+    validated = []
+    for shot in ((ledger.get("video") or {}).get("shots") or []):
+        if not isinstance(shot, dict):
+            continue
+        raw_bid = _beat_id_for_shot(shot)
+        line = lines.get(raw_bid, {})
+        beat_id = _canonical_visual_beat_id(raw_bid, line)
+        engine_id = str(shot.get("engine_id") or "")
+        family = engine_family(engine_id, str(shot.get("family") or ""))
+        char_id = str(shot.get("char_id") or line.get("char_id") or "")
+        requires_mesh = bool(
+            engine_id and _vreg.is_registered(engine_id)
+            and getattr(_vreg.get_engine(engine_id), "requires_mesh_fodder", False)
+        )
+        scene_row = _still_spine_row_for_beat(rows, beat_id)
+        if requires_mesh:
+            fodder_row = _still_spine_row_for_mesh(rows, beat_id, char_id)
+            fodder_path = _still_spine_materialize_row(fodder_row, stills_root)
+            if not fodder_row or not fodder_path:
+                raise RenderError(
+                    "still-spine handoff missing materialized mesh_fodder for "
+                    "shot %s beat %s; scene still substitution is forbidden"
+                    % (shot.get("shot_id"), beat_id)
+                )
+            if str(fodder_row.get("object_id") or "") not in manifest_ids:
+                raise RenderError(
+                    "still-spine handoff mesh target %s is not in the "
+                    "required_scene_targets receipt" % (
+                        fodder_row.get("object_id") or beat_id)
+                )
+            validated.append({"shot_id": shot.get("shot_id"),
+                              "beat_id": beat_id, "engine_id": engine_id,
+                              "kind": "mesh_fodder", "path": fodder_path})
+        if _still_spine_requires_scene(shot, engine_id, family):
+            scene_path = _still_spine_materialize_row(scene_row, stills_root)
+            if not scene_row or not scene_path:
+                raise RenderError(
+                    "still-spine handoff missing materialized scene still for "
+                    "shot %s beat %s engine %s"
+                    % (shot.get("shot_id"), beat_id, engine_id)
+                )
+            object_id = str(scene_row.get("object_id") or "")
+            if object_id not in manifest_ids:
+                raise RenderError(
+                    "still-spine handoff scene target %s for beat %s is not "
+                    "in the required_scene_targets receipt"
+                    % (object_id or "<missing>", beat_id)
+                )
+            validated.append({"shot_id": shot.get("shot_id"),
+                              "beat_id": beat_id, "engine_id": engine_id,
+                              "kind": str(scene_row.get("kind") or "scene"),
+                              "path": scene_path})
+        if family == "audio_driven_face":
+            portrait_row = _still_spine_row_for_portrait(rows, char_id)
+            portrait_path = _still_spine_materialize_row(
+                portrait_row, stills_root)
+            if not portrait_row or not portrait_path:
+                raise RenderError(
+                    "still-spine handoff missing materialized portrait for "
+                    "shot %s character %s" % (shot.get("shot_id"), char_id)
+                )
+            validated.append({"shot_id": shot.get("shot_id"),
+                              "beat_id": beat_id, "engine_id": engine_id,
+                              "kind": "portrait", "path": portrait_path})
+    receipt = {
+        "version": 1,
+        "episode_id": episode_id,
+        "validated": validated,
+    }
+    images["still_spine_receipt"] = receipt
+    for target in images.get("required_scene_targets") or []:
+        if not isinstance(target, dict):
+            continue
+        target_id = str(target.get("object_id") or "")
+        row = next((candidate for candidate in rows
+                    if str(candidate.get("object_id") or "") == target_id), None)
+        if row and row.get("path"):
+            target["path"] = str(row["path"])
+            target["materialized_path"] = str(row["path"])
+    return receipt
 
 
 #: Engine FAMILIES whose render is conditioned on a SCENE still (still-spine

@@ -1115,6 +1115,13 @@ class OpenRouterBackend:
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
+        reserve_remaining = bool(getattr(
+            messages, "_otr_reserve_remaining_output_capacity", False,
+        ))
+        bounded_capacity = reserve_remaining and max_new_tokens is not None
+        fail_on_output_limit = bool(getattr(
+            messages, "_otr_fail_on_output_limit", False,
+        ))
         cache_entry = model
         api_key = _env("OPENROUTER_API_KEY")
         if not api_key:
@@ -1155,13 +1162,15 @@ class OpenRouterBackend:
             ))
 
         requested_tokens = max(1, int(max_new_tokens or 0))
-        if require_full_output and requested_tokens > cap:
+        if (require_full_output or bounded_capacity) and requested_tokens > cap:
             capacity = GenerationContextOverflowError(
                 f"OpenRouter {slug} cannot fit the complete requested output: "
                 f"requested_output={requested_tokens}, provider_output_cap={cap}"
             )
             raise OpenRouterConfigError(str(capacity)) from capacity
-        if bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
+        if reserve_remaining:
+            out_tokens = cap
+        elif bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
             out_tokens = requested_tokens
         else:
             out_tokens = max(requested_tokens, floor)
@@ -1182,7 +1191,7 @@ class OpenRouterBackend:
                 # the reasoning floor would abort it.
                 min_output_tokens=min(base_floor, cap),
                 label=f"OpenRouter {slug}",
-                require_full=require_full_output,
+                require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
             raise OpenRouterConfigError(str(exc)) from exc
@@ -1269,6 +1278,7 @@ class OpenRouterBackend:
         try:
             text = self._post_with_retries(
                 base_url=base_url, api_key=api_key, payload=payload, slug=slug,
+                fail_on_output_limit=fail_on_output_limit,
             )
         except OpenRouterModelGoneError as gone:
             # The operator's chosen model was DELETED. If this call came through
@@ -1294,6 +1304,7 @@ class OpenRouterBackend:
             payload["model"] = fb_clean
             text = self._post_with_retries(
                 base_url=base_url, api_key=api_key, payload=payload, slug=fb_clean,
+                fail_on_output_limit=fail_on_output_limit,
             )
 
         # Account actual spend (best-effort; falls back to the estimate).
@@ -1337,6 +1348,7 @@ class OpenRouterBackend:
 
     def _post_with_retries(
         self, *, base_url: str, api_key: str, payload: dict, slug: str,
+        fail_on_output_limit: bool = False,
     ) -> str:
         timeout_s = _int_env("OPENROUTER_TIMEOUT_S", DEFAULT_TIMEOUT_S)
         max_retries = _int_env("OPENROUTER_MAX_RETRIES", DEFAULT_MAX_RETRIES)
@@ -1369,7 +1381,10 @@ class OpenRouterBackend:
 
             status = int(result.get("status_code") or 0)
             if status == 200:
-                return self._extract_text(result, slug=slug)
+                return self._extract_text(
+                    result, slug=slug,
+                    fail_on_output_limit=fail_on_output_limit,
+                )
 
             last_snippet = self._error_snippet(result)
             last_status = status
@@ -1427,7 +1442,9 @@ class OpenRouterBackend:
             time.sleep(delay)
 
     @staticmethod
-    def _extract_text(result: dict, *, slug: str) -> str:
+    def _extract_text(
+        result: dict, *, slug: str, fail_on_output_limit: bool = False,
+    ) -> str:
         body = result.get("json") or {}
         if os.environ.get("OPENROUTER_DEBUG_RAW") == "1":
             log.info("[OpenRouter] raw %s response: %s", slug, json.dumps(body)[:1500])
@@ -1441,6 +1458,11 @@ class OpenRouterBackend:
                 f"{str(body)[:300]}"
             )
         if choices[0].get("finish_reason") == "length":
+            if fail_on_output_limit:
+                raise OpenRouterCallFailedError(
+                    f"OpenRouter {slug} exhausted the provider output capacity; "
+                    "the partial artifact is not eligible for reroll"
+                )
             log.warning(
                 "[OpenRouter] %s hit finish_reason=length -- output truncated "
                 "at the token ceiling; a downstream JSON parse may fail. Raise "

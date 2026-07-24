@@ -1221,18 +1221,27 @@ def make_generate_fn(cache_entry: dict[str, Any]):
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
+        reserve_remaining = bool(getattr(
+            messages, "_otr_reserve_remaining_output_capacity", False,
+        ))
+        bounded_capacity = reserve_remaining and max_new_tokens is not None
+        fail_on_output_limit = bool(getattr(
+            messages, "_otr_fail_on_output_limit", False,
+        ))
         messages = _normalize_messages_for_cache_entry(cache_entry, messages)
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        context_cap = int(cache_entry.get("context_cap") or 8192)
+        requested_tokens = context_cap if reserve_remaining else max_new_tokens
         try:
             effective_max_new_tokens = fit_output_tokens(
-                max_new_tokens,
-                context_cap=int(cache_entry.get("context_cap") or 8192),
+                requested_tokens,
+                context_cap=context_cap,
                 prompt_tokens=inputs["input_ids"].shape[1],
                 label=f"local model {cache_entry.get('model_id', '<unknown>')}",
-                require_full=require_full_output,
+                require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
             raise ModelLoaderError(str(exc)) from exc
@@ -1247,8 +1256,14 @@ def make_generate_fn(cache_entry: dict[str, Any]):
             )
         # Strip prompt prefix from decoded output.
         prompt_len = inputs["input_ids"].shape[1]
+        generated_ids = out[0][prompt_len:]
+        if fail_on_output_limit and len(generated_ids) >= effective_max_new_tokens:
+            raise ModelLoaderError(
+                "prose generation exhausted the full remaining provider/context "
+                "capacity; the partial artifact is not eligible for reroll"
+            )
         return tokenizer.decode(
-            out[0][prompt_len:],
+            generated_ids,
             skip_special_tokens=True,
         )
 
@@ -1330,18 +1345,27 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
+        reserve_remaining = bool(getattr(
+            messages, "_otr_reserve_remaining_output_capacity", False,
+        ))
+        bounded_capacity = reserve_remaining and max_new_tokens is not None
+        fail_on_output_limit = bool(getattr(
+            messages, "_otr_fail_on_output_limit", False,
+        ))
         messages = _normalize_messages_for_cache_entry(cache_entry, messages)
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        context_cap = int(cache_entry.get("context_cap") or 8192)
+        requested_tokens = context_cap if reserve_remaining else max_new_tokens
         try:
             effective_max_new_tokens = fit_output_tokens(
-                max_new_tokens,
-                context_cap=int(cache_entry.get("context_cap") or 8192),
+                requested_tokens,
+                context_cap=context_cap,
                 prompt_tokens=inputs["input_ids"].shape[1],
                 label=f"local polish {cache_entry.get('model_id', '<unknown>')}",
-                require_full=require_full_output,
+                require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
             raise ModelLoaderError(str(exc)) from exc
@@ -1355,8 +1379,14 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 pad_token_id=tokenizer.eos_token_id,
             )
         prompt_len = inputs["input_ids"].shape[1]
+        generated_ids = out[0][prompt_len:]
+        if fail_on_output_limit and len(generated_ids) >= effective_max_new_tokens:
+            raise ModelLoaderError(
+                "prose generation exhausted the full remaining provider/context "
+                "capacity; the partial artifact is not eligible for reroll"
+            )
         return tokenizer.decode(
-            out[0][prompt_len:],
+            generated_ids,
             skip_special_tokens=True,
         )
 

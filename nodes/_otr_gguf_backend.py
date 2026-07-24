@@ -1142,6 +1142,13 @@ class GGUFNativeBackend:
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
+        reserve_remaining = bool(getattr(
+            messages, "_otr_reserve_remaining_output_capacity", False,
+        ))
+        bounded_capacity = reserve_remaining and max_new_tokens is not None
+        fail_on_output_limit = bool(getattr(
+            messages, "_otr_fail_on_output_limit", False,
+        ))
         if grammar:
             raise GGUFNativeConfigError(
                 "The native GGUF lane does not accept raw GBNF `grammar`; "
@@ -1152,13 +1159,13 @@ class GGUFNativeBackend:
             raise GGUFNativeConfigError("cache_entry is missing the GGUF model.")
         cap = _int_env("GEMMA4_12B_MAX_NEW_TOKENS", DEFAULT_OUTPUT_TOKENS_CAP)
         requested_tokens = int(max_new_tokens or cap)
-        if require_full_output and requested_tokens > cap:
+        if (require_full_output or bounded_capacity) and requested_tokens > cap:
             capacity = GenerationContextOverflowError(
                 f"GGUF {ROW_ID} cannot fit the complete requested output: "
                 f"requested_output={requested_tokens}, provider_output_cap={cap}"
             )
             raise GGUFNativeConfigError(str(capacity)) from capacity
-        out_tokens = requested_tokens
+        out_tokens = cap if reserve_remaining else requested_tokens
         if out_tokens > cap:
             log.warning(
                 "[GGUFNative] output token request capped: requested=%d "
@@ -1176,7 +1183,7 @@ class GGUFNativeBackend:
                 prompt_tokens=estimate_prompt_tokens(messages),
                 min_output_tokens=min(64, cap),
                 label=f"GGUF {ROW_ID}",
-                require_full=require_full_output,
+                require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
             raise GGUFNativeConfigError(str(exc)) from exc
@@ -1237,7 +1244,9 @@ class GGUFNativeBackend:
                 f"Native GGUF call failed for {_row_id or ROW_ID}: "
                 f"{type(exc).__name__}: {exc}"
             ) from exc
-        text = self._extract_text(result)
+        text = self._extract_text(
+            result, fail_on_output_limit=fail_on_output_limit,
+        )
         # think-strip: a qwen3 row emits a leading <think>...</think> envelope on
         # free-form calls (structured passes carry rf and are JSON-constrained).
         # The strip also drops a DANGLING/clipped leading <think>. If nothing but
@@ -1266,13 +1275,20 @@ class GGUFNativeBackend:
                 log.debug("[GGUFNative] close() failed: %s", exc)
 
     @staticmethod
-    def _extract_text(result: dict) -> str:
+    def _extract_text(
+        result: dict, *, fail_on_output_limit: bool = False,
+    ) -> str:
         choices = result.get("choices") if isinstance(result, dict) else None
         if not choices:
             raise GGUFNativeCallFailedError(
                 f"Native GGUF response had no choices: {str(result)[:300]}"
             )
         first = choices[0]
+        if first.get("finish_reason") == "length" and fail_on_output_limit:
+            raise GGUFNativeCallFailedError(
+                "Native GGUF generation exhausted the provider output capacity; "
+                "the partial artifact is not eligible for reroll"
+            )
         content = (first.get("message") or {}).get("content")
         if content is None and isinstance(first.get("text"), str):
             content = first.get("text")

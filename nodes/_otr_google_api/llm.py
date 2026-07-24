@@ -74,7 +74,35 @@ def _response_format_payload(response_format: Any | None) -> dict[str, Any] | No
     }
 
 
-def _extract_text(body: dict[str, Any]) -> str:
+def _output_limit_reason(body: Any) -> str:
+    """Return a provider limit reason from common interaction response shapes."""
+    limit_values = {"length", "max_tokens", "max_output_tokens", "max_tokens_reached"}
+    if isinstance(body, dict):
+        for key, value in body.items():
+            if key in {"finish_reason", "finishReason", "stop_reason", "incomplete_reason"}:
+                normalized = str(value or "").strip().casefold()
+                if normalized in limit_values:
+                    return normalized
+            found = _output_limit_reason(value)
+            if found:
+                return found
+    elif isinstance(body, list):
+        for value in body:
+            found = _output_limit_reason(value)
+            if found:
+                return found
+    return ""
+
+
+def _extract_text(
+    body: dict[str, Any], *, fail_on_output_limit: bool = False,
+) -> str:
+    limit_reason = _output_limit_reason(body)
+    if fail_on_output_limit and limit_reason:
+        raise GoogleAPIRequestShapeError(
+            "Google API exhausted the provider output capacity "
+            f"({limit_reason}); the partial artifact is not eligible for reroll"
+        )
     if isinstance(body.get("output_text"), str) and body["output_text"]:
         return body["output_text"]
     texts: list[str] = []
@@ -139,6 +167,13 @@ class GoogleAPIBackend:
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
+        reserve_remaining = bool(getattr(
+            messages, "_otr_reserve_remaining_output_capacity", False,
+        ))
+        bounded_capacity = reserve_remaining and max_new_tokens is not None
+        fail_on_output_limit = bool(getattr(
+            messages, "_otr_fail_on_output_limit", False,
+        ))
         cache_entry = model
         google_model = str(cache_entry.get("google_model") or "")
         if not google_model:
@@ -153,17 +188,20 @@ class GoogleAPIBackend:
         generation_config: dict[str, Any] = {}
         if temperature is not None:
             generation_config["temperature"] = float(temperature)
-        if max_new_tokens is not None:
-            requested_tokens = max(1, int(max_new_tokens))
+        if max_new_tokens is not None or reserve_remaining:
+            context_cap = int(
+                cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
+            )
+            requested_tokens = (
+                context_cap if reserve_remaining else max(1, int(max_new_tokens))
+            )
             try:
                 generation_config["max_output_tokens"] = fit_output_tokens(
                     requested_tokens,
-                    context_cap=int(
-                        cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
-                    ),
+                    context_cap=context_cap,
                     prompt_tokens=estimate_prompt_tokens(messages),
                     label=f"Google API {google_model}",
-                    require_full=require_full_output,
+                    require_full=require_full_output or bounded_capacity,
                 )
             except GenerationContextOverflowError as exc:
                 raise GoogleAPIRequestShapeError(str(exc)) from exc
@@ -181,7 +219,9 @@ class GoogleAPIBackend:
         if rf is not None:
             payload["response_format"] = rf
         body = create_interaction(payload)
-        return _extract_text(body)
+        return _extract_text(
+            body, fail_on_output_limit=fail_on_output_limit,
+        )
 
     def unload(self, model: Any) -> None:  # noqa: ARG002
         return None

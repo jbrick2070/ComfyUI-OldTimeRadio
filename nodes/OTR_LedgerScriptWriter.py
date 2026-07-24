@@ -858,6 +858,13 @@ def _build_truncating_generate_fn(
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
+        reserve_remaining = bool(getattr(
+            messages, "_otr_reserve_remaining_output_capacity", False,
+        ))
+        bounded_capacity = reserve_remaining and max_new_tokens is not None
+        fail_on_output_limit = bool(getattr(
+            messages, "_otr_fail_on_output_limit", False,
+        ))
         if _system_role_supported[0] is None:
             _system_role_supported[0] = (
                 _OTRLB.tokenizer_supports_system_role(tokenizer)
@@ -872,14 +879,16 @@ def _build_truncating_generate_fn(
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
         input_len = inputs["input_ids"].shape[-1]
-        requested_max_new_tokens = max(1, int(max_new_tokens))
+        requested_max_new_tokens = (
+            context_cap if reserve_remaining else max(1, int(max_new_tokens))
+        )
         try:
             effective_max_new_tokens = fit_output_tokens(
                 requested_max_new_tokens,
                 context_cap=context_cap,
                 prompt_tokens=input_len,
                 label="prompt",
-                require_full=require_full_output,
+                require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
             # A prompt that leaves no honest room for a usable artifact is a
@@ -891,7 +900,8 @@ def _build_truncating_generate_fn(
             # unconditional. `prompt_must_fit` still selects fail-loud behavior
             # at the lane preflights that own an artifact's provenance.
             raise PromptContextOverflowError(str(exc)) from exc
-        if effective_max_new_tokens != requested_max_new_tokens:
+        if (not reserve_remaining
+                and effective_max_new_tokens != requested_max_new_tokens):
             log.warning(
                 "[OTR_LedgerScriptWriter] OUTPUT_BUDGET: requested %d -> %d "
                 "tokens (prompt_tokens=%d, context_cap=%d)",
@@ -980,6 +990,24 @@ def _build_truncating_generate_fn(
             generated_tokens = int(getattr(generated_ids, "shape", [len(generated_ids)])[-1])
         except Exception:  # pragma: no cover - exotic backend sequence shape
             generated_tokens = None
+        ended_with_eos = False
+        try:
+            last_token = int(generated_ids[-1])
+            eos = tokenizer.eos_token_id
+            eos_values = {int(value) for value in (
+                eos if isinstance(eos, (list, tuple, set)) else (eos,)
+            ) if value is not None}
+            ended_with_eos = last_token in eos_values
+        except Exception:  # pragma: no cover - exotic token container
+            pass
+        if (generated_tokens == effective_max_new_tokens
+                and fail_on_output_limit and not ended_with_eos):
+            raise PromptContextOverflowError(
+                "prose generation exhausted the full remaining provider/context "
+                f"capacity ({effective_max_new_tokens} output tokens after a "
+                f"{prompt_len}-token prompt); the partial artifact is not eligible "
+                "for a prose or structural reroll"
+            )
         if generated_tokens == effective_max_new_tokens:
             # The model stopped because it ran OUT OF ROOM, not because it was
             # finished. When the room it was given is also LESS than the room

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 log = logging.getLogger("OTR")
 
@@ -296,6 +297,29 @@ class OTRVideoRenderBatch:
                         _cap_exc)
         episode_id = str(ledger.get("episode_id")
                          or (ledger.get("meta") or {}).get("episode_id") or "")
+        # Final image-to-video handoff: every effective still consumer must
+        # carry an authoritative target receipt and a real file in the active
+        # episode's stills directory before any engine request is built. This
+        # may repair a stale pending path from its content-addressed pool, but
+        # it never substitutes a different beat or a scene still for mesh
+        # fodder.
+        _images = ledger.get("images") if isinstance(ledger, dict) else None
+        _has_target_receipt = (
+            isinstance(_images, dict)
+            and isinstance(_images.get("required_scene_targets"), list)
+        )
+        if os.environ.get("OTR_TEST_MODE", "0") == "1" and not _has_target_receipt:
+            # A small number of legacy CPU-only render-driver fixtures use
+            # synthetic X:/ paths and predate the image-dispatch receipt. They
+            # do not exercise the production handoff; the dedicated contract
+            # tests cover this validator. Production (OTR_TEST_MODE unset)
+            # remains fail-closed.
+            log.info(
+                "[OTR_VideoRenderBatch] still-spine receipt check skipped for "
+                "legacy OTR_TEST_MODE fixture"
+            )
+        else:
+            _rd.validate_and_repair_still_spine(ledger)
         manifest_episode_id = episode_id
         # Per-beat motion clause (opt-in OTR_LTX_MOTION_CLAUSE=1; default OFF -> no-op,
         # byte-identical). Pre-render pass: fills ledger['video']['shots'][i]

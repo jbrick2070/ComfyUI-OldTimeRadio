@@ -1101,7 +1101,12 @@ def _strip_conversational_wrapper(raw: str) -> str:
 
 
 def _standalone_stage_direction_repair_note(defect_rows):
-    """Give the repair rung an explicit rule for illegal parenthetical rows."""
+    """Give the repair rung an explicit rule for illegal parenthetical rows.
+
+    The parser reports the offending source row and line number. Keep that
+    evidence in the repair instruction so a retry repairs the named format
+    defect instead of regenerating a similarly shaped whole-play artifact.
+    """
     for defect in defect_rows:
         row = str(defect)
         if not row.startswith("BAD_LINE_SHAPE"):
@@ -1115,6 +1120,9 @@ def _standalone_stage_direction_repair_note(defect_rows):
                 "nearest legal labelled spoken line as natural words, or omit "
                 "it when nonessential. Every nonblank row must begin with a "
                 "legal label; do not invent an unlabeled narration row."
+                "\nThe malformed source row reported by the parser is exactly "
+                f"{detail.strip()!r}. It must not appear as a standalone output "
+                "row. Return no explanation, markdown, or repair commentary."
             )
     return ""
 
@@ -1208,7 +1216,7 @@ def _run_markup_ladder(
             "Repair only the malformed FORMAT defects below. Return the "
             "complete episode from TITLE through END as plain text. Keep "
             "the same story, cast, events, and wording wherever the format "
-            "is already valid."
+            "is already valid. Do not repeat a rejected malformed row."
             + _standalone_stage_direction_repair_note(defect_rows)
             + "\n" + rendered
         )
