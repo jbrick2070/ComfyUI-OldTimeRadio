@@ -1637,8 +1637,16 @@ def _resolve_inputs(
         # Style-engine consolidation (2026-07-05): the fetch is
         # style-agnostic now -- there is no style value yet at this
         # pre-contract sourcing stage, and none is needed for rerank.
+        # Independent source banks wave 3: a CLIENT bank may own its fetch
+        # lane. `user_bank_bundle` is None for every shipped bank, so this is a
+        # no-op on the six; for a client bank it hands resolution the ONE
+        # bundle allowed to execute for that id. The result still flows through
+        # normalize_fetch_result below -- client code never reaches the ledger.
         _fetch_bank = _otr_story_routing.get_bank(source_bank or "scifi_news")
-        _fetch_entry = _otr_source_payload.resolve_fetcher(_fetch_bank)
+        _fetch_owner = _otr_story_routing.user_bank_bundle(
+            _fetch_bank.source_bank_id)
+        _fetch_entry = _otr_source_payload.resolve_fetcher(
+            _fetch_bank, owner=_fetch_owner)
         _fetch_origin = (
             f"_resolve_inputs fetch (bank={_fetch_bank.source_bank_id!r}, "
             f"fetcher={_fetch_bank.fetcher!r})"
@@ -3533,8 +3541,14 @@ class OTR_LedgerScriptWriter:
                 meta=meta,
             )
         else:
+            # Wave 3: None for every shipped bank; a client bank resolves to
+            # its OWN bundle's interpret_source, called with the identical
+            # kwargs and validated by the identical validate_interpreter_result
+            # below. Resolution stays OUTSIDE the try (AST-pinned).
+            _interp_owner = _otr_story_routing.user_bank_bundle(
+                _source_bank_row.source_bank_id)
             _interp = _otr_source_payload.resolve_interpreter(
-                _source_bank_row)
+                _source_bank_row, owner=_interp_owner)
         try:
             if _source_contract_lane:
                 briefs = _run_source_interpreter(

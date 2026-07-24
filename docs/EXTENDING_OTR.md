@@ -106,15 +106,38 @@ user_packs/source_banks/<bank_id>/
   declare that pipeline, every `required_seams` entry must be present in it,
   and a `runnable` bank must have a real execution lane.
 
-- **`fetch_source`** returns the exact seven-key payload envelope --
+- **Routing an entry point to your own code.** Set the row's `fetcher` and/or
+  `interpreter` to the reserved value `"self"` -- "my bundle owns this lane".
+  OTR then calls your module's `fetch_source` / `interpret_source`. Only a
+  CLIENT bundle may say `"self"`; the shipped registry never learns that value,
+  so you can neither shadow nor replace a shipped entry point. You may instead
+  name a registered shipped id (`science_rss`, `media_archive_rss`,
+  `public_domain_source`, `shakespeare_folger` / `news_interpreter`,
+  `media_archive_interpreter`, `public_domain_interpreter`,
+  `shakespeare_interpreter`) and reuse that lane wholesale, or mix -- a `"self"`
+  fetcher with a shipped interpreter is fine. Any other value is a typo and
+  quarantines the bundle. A bank only ever executes its OWN bundle.
+- **`fetch_source(*, bank, technical_model, source_ref="", load_config=None,
+  policy=None)`** returns the exact seven-key payload envelope --
   `headline`, `summary`, `full_text`, `source`, `date`, `link`, `seed_text`
-  (all strings, `seed_text` non-empty; unknown key = hard error) -- plus the
+  (all strings, `seed_text` non-empty; unknown key = hard error) -- either as a
+  plain dict or wrapped in `SourceFetchResult` to carry the
   `source_meta` / `source_rights` provenance sidecars. This is the same
-  contract every shipped fetcher obeys (`SOURCE_BANK_GUIDE.md` section 5).
-- **`interpret_source`** returns the interpreter surfaces the shared writer
-  consumes (casting brief, script brief, close brief, key terms).
+  contract every shipped fetcher obeys (`SOURCE_BANK_GUIDE.md` section 5), and
+  your return value is validated by the same `normalize_fetch_result`. Your
+  lane's ledger `seed_source` stamp is `user_bank:<bank_id>`, so client-sourced
+  provenance is never mistaken for a shipped fetcher's.
+- **`interpret_source(*, bank, payload, technical_fn, model_id)`** returns the
+  interpreter surfaces the shared writer consumes: an object exposing
+  `casting_brief`, `script_brief`, `key_terms`, `attempts` and `model_dump()`
+  (with `news_close_brief` in the dump). The same
+  `validate_interpreter_result` that judges the shipped interpreters judges
+  yours, and the writer -- not you -- writes the result into the ledger.
 - **`check_compatibility`** accepts or refuses a request (word target, refine,
-  source_ref, custom premise) with a structured reason.
+  source_ref, custom premise) with a structured reason. NOT YET WIRED: the
+  activation CLI is the planned caller, so define it now if you like, but no
+  code path invokes it today. It is listed here as the bundle's third entry
+  point, not as a live contract.
 - Python discipline: single file, stdlib + the OTR contracts leaf at import
   time, heavy imports lazy inside functions. If your code needs a third-party
   library that is not installed, the run HARD-FAILS with the ImportError --

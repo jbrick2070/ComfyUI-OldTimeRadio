@@ -19,6 +19,13 @@ activation receipt, content digest). Row SEMANTICS are parsed by the ONE
 authority via the injected `parse_row` callable, so there is exactly one bank
 schema parser in the tree and client rows can never drift from shipped ones.
 
+It also owns the EXECUTION seam for an already-admitted bundle (wave 3):
+loading the bundle's single module and handing back one declared entry point.
+That half is loud by design -- see `UserBankExecutionError`. Integrity is judged
+before anything is dropped in a dropdown; execution happens only after the
+operator selected the bank, so a failure there is a failed run, never a
+substitution.
+
 LAZY: importing this module performs ZERO file I/O, the same posture as the
 routing authority and the pack loader. Stdlib only.
 """
@@ -46,6 +53,23 @@ _DIGEST_EXCLUDED_DIRS = frozenset({"__pycache__", SNAPSHOTS_DIRNAME})
 
 RECEIPT_KEYS = frozenset({"schema_version", "source_bank_id", "digest", "snapshot"})
 RECEIPT_SCHEMA_VERSION = "v2.0"
+
+# Client-owned execution (wave 3). A bank row routes an entry point to its own
+# bundle by naming SELF_ENTRY_POINT where a shipped row names a registry id --
+# "my bundle owns this". Only a CLIENT row may say it: the shipped registries
+# in _otr_source_payload never learn this value, so a shipped row that declares
+# it still dies at the registry sweep as an unregistered typo.
+SELF_ENTRY_POINT = "self"
+FETCH_ENTRY_ATTR = "fetch_source"
+INTERPRET_ENTRY_ATTR = "interpret_source"
+COMPAT_ENTRY_ATTR = "check_compatibility"
+BUNDLE_ENTRY_ATTRS = frozenset({
+    FETCH_ENTRY_ATTR, INTERPRET_ENTRY_ATTR, COMPAT_ENTRY_ATTR,
+})
+
+# sys.modules namespace for loaded bundles. The activated digest rides in the
+# name so edited bytes can never be served from a stale cache entry.
+_MODULE_NAME_PREFIX = "otr_user_bank_"
 
 
 @dataclass(frozen=True)
@@ -81,6 +105,18 @@ class UserBankLayoutError(Exception):
 
     Bundle problems become ValidationIssue rows; this exists so a genuine
     contract violation (e.g. a non-callable parse_row) still fails loud."""
+
+
+class UserBankExecutionError(Exception):
+    """An admitted bundle's Python could not be loaded, or does not expose an
+    entry point its own bank row routed to it.
+
+    DELIBERATELY LOUD -- the one failure class in this module that raises.
+    Discovery quarantines a broken bundle long BEFORE it can reach a dropdown;
+    by the time anything executes, the operator has selected this bank and
+    pressed go. Substituting another bank, another entry point, or a canned
+    payload here would be exactly the silent routing fallback the source-payload
+    contract forbids. The run fails, named, with the path to fix."""
 
 
 class _Quarantine(Exception):
@@ -375,16 +411,113 @@ def discover(*, parse_row, protected_ids, root: "Path | None" = None
     return tuple(admitted), tuple(issues)
 
 
+# ---------------------------------------------------------------------------
+# client-owned execution (wave 3)
+#
+# Everything above judges BYTES; everything below RUNS them. The boundary is
+# deliberate: discovery never raises for a bundle problem, execution never
+# swallows one.
+# ---------------------------------------------------------------------------
+
+
+def bundle_module_name(bank_id: str, digest: str) -> str:
+    """`sys.modules` key for a bundle's module: bank id + activated digest.
+
+    The digest is part of the name ON PURPOSE. Re-activating changed bytes
+    yields a different name, so an edited bundle can never be served from a
+    cache entry built out of its old source."""
+    return f"{_MODULE_NAME_PREFIX}{bank_id}_{digest[:16]}"
+
+
+def load_bundle_module(bundle: UserBankBundle):
+    """Import an ADMITTED bundle's single module. LOUD on any failure.
+
+    `importlib` is imported function-locally so this module keeps its zero-I/O,
+    stdlib-leaf import posture. The module executes in-process, user-trusted,
+    like any custom node -- `otr_check bank <path> --activate` was the consent
+    act (docs/EXTENDING_OTR.md section 2), and integrity/staleness were already
+    proven at discovery. One run imports it once."""
+    import importlib.util
+    import sys
+
+    if not isinstance(bundle, UserBankBundle):
+        raise UserBankLayoutError(
+            f"load_bundle_module expects an admitted UserBankBundle, got "
+            f"{type(bundle).__name__}"
+        )
+    name = bundle_module_name(bundle.bank_id, bundle.digest)
+    cached = sys.modules.get(name)
+    if cached is not None:
+        return cached
+    spec = importlib.util.spec_from_file_location(name, bundle.module_path)
+    if spec is None or spec.loader is None:
+        raise UserBankExecutionError(
+            f"source bank {bundle.bank_id!r}: cannot build an import spec for "
+            f"{bundle.module_path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    # Registered BEFORE exec so the module can import itself by name; popped
+    # again on failure so a half-executed module is never reused.
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException as exc:
+        sys.modules.pop(name, None)
+        raise UserBankExecutionError(
+            f"source bank {bundle.bank_id!r}: importing "
+            f"{bundle.module_path.name} failed ({type(exc).__name__}: {exc}). "
+            f"Fix the bundle and re-run `otr_check bank {bundle.root} "
+            f"--activate`."
+        ) from exc
+    return module
+
+
+def bundle_entry_point(bundle: UserBankBundle, attr: str):
+    """One declared entry point off an admitted bundle's module. LOUD.
+
+    A row that routed `attr` to its own bundle and then does not define it is a
+    broken contract, not a reason to reach for someone else's implementation."""
+    if attr not in BUNDLE_ENTRY_ATTRS:
+        raise UserBankLayoutError(
+            f"{attr!r} is not a bundle entry point; known: "
+            f"{sorted(BUNDLE_ENTRY_ATTRS)}"
+        )
+    module = load_bundle_module(bundle)
+    fn = getattr(module, attr, None)
+    if fn is None:
+        raise UserBankExecutionError(
+            f"source bank {bundle.bank_id!r}: {BANK_JSON_FILENAME} routes this "
+            f"lane to the bundle ({SELF_ENTRY_POINT!r}) but "
+            f"{bundle.module_path.name} defines no {attr!r} function"
+        )
+    if not callable(fn):
+        raise UserBankExecutionError(
+            f"source bank {bundle.bank_id!r}: "
+            f"{bundle.module_path.name}.{attr} is {type(fn).__name__}, "
+            f"not callable"
+        )
+    return fn
+
+
 __all__ = [
     "BANK_JSON_FILENAME",
+    "BUNDLE_ENTRY_ATTRS",
+    "COMPAT_ENTRY_ATTR",
+    "FETCH_ENTRY_ATTR",
+    "INTERPRET_ENTRY_ATTR",
     "RECEIPT_FILENAME",
     "RECEIPT_SCHEMA_VERSION",
     "RECEIPT_KEYS",
+    "SELF_ENTRY_POINT",
     "UserBankBundle",
+    "UserBankExecutionError",
     "UserBankLayoutError",
     "ValidationIssue",
     "bundle_digest",
+    "bundle_entry_point",
+    "bundle_module_name",
     "discover",
+    "load_bundle_module",
     "read_receipt",
     "repo_root",
     "snapshot_dirname",

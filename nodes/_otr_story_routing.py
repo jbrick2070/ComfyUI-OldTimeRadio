@@ -440,12 +440,17 @@ def _sweep_and_crossref(banks: "dict[str, SourceBank]",
 
 def _crossref_bank(bank: SourceBank, pipelines: "dict[str, StoryPipeline]",
                    pack_dirs: "dict[str, Path]",
-                   origin: "str | None" = None) -> None:
+                   origin: "str | None" = None,
+                   *, is_client: bool = False) -> None:
     """Every contract a bank row owes its pipeline + default pack.
 
-    Identical for a shipped bank and a client bundle -- only the ORIGIN label
-    and the pack OWNER differ, so a client bank is held to exactly the same
-    standard as the shipped six."""
+    Identical for a shipped bank and a client bundle -- only the ORIGIN label,
+    the pack OWNER, and the one entry-point exemption below differ, so a client
+    bank is held to exactly the same standard as the shipped six.
+
+    `is_client` is the ONLY thing that unlocks the reserved self-owned
+    entry-point id (wave 3). It is passed explicitly rather than inferred from
+    `origin`, so no future caller can widen the exemption by relabelling."""
     if origin is None:
         origin = f"banks.json bank {bank.source_bank_id!r}"
     if bank.default_story_pipeline not in pipelines:
@@ -497,18 +502,32 @@ def _crossref_bank(bank: SourceBank, pipelines: "dict[str, StoryPipeline]",
     # bank.default_story_pipeline is already proven consistent). IDS ONLY
     # -- never executes wrapper bodies (lazy law).
     # (a) Dangling non-empty ids are typos -- loud, on EVERY bank.
-    if bank.fetcher and bank.fetcher not in _osp.registered_fetcher_ids():
+    # A CLIENT row may instead route an entry point to its OWN bundle with the
+    # reserved self id (wave 3): the bundle module owns fetch_source /
+    # interpret_source. The shipped registries never learn that id, so a
+    # SHIPPED row declaring it still dies here as an unregistered typo, and a
+    # client bank can neither shadow nor extend a shipped entry point.
+    _self_id = _oub.SELF_ENTRY_POINT
+    _self_hint = (
+        f"; a client bundle may also declare {_self_id!r} to own it"
+        if is_client else ""
+    )
+    _allowed_fetchers = set(_osp.registered_fetcher_ids())
+    _allowed_interpreters = set(_osp.registered_interpreter_ids())
+    if is_client:
+        _allowed_fetchers.add(_self_id)
+        _allowed_interpreters.add(_self_id)
+    if bank.fetcher and bank.fetcher not in _allowed_fetchers:
         raise RegistryValidationError(
             f"{origin}: fetcher {bank.fetcher!r} is not registered in "
             f"_otr_source_payload (registered: "
-            f"{sorted(_osp.registered_fetcher_ids())})"
+            f"{sorted(_osp.registered_fetcher_ids())}){_self_hint}"
         )
-    if (bank.interpreter
-            and bank.interpreter not in _osp.registered_interpreter_ids()):
+    if bank.interpreter and bank.interpreter not in _allowed_interpreters:
         raise RegistryValidationError(
             f"{origin}: interpreter {bank.interpreter!r} is not registered "
             f"in _otr_source_payload (registered: "
-            f"{sorted(_osp.registered_interpreter_ids())})"
+            f"{sorted(_osp.registered_interpreter_ids())}){_self_hint}"
         )
     # (b) A runnable bank must have a REAL execution lane: either its
     # pipeline consumes the source-payload contract and both ids are
@@ -551,7 +570,7 @@ def _admit_user_banks(banks: "dict[str, SourceBank]",
             _sweep_pack_dir(bundle.bank_id, bundle.story_packs_dir, pipelines)
             _crossref_bank(bundle.row, pipelines,
                            {**pack_dirs, bundle.bank_id: bundle.story_packs_dir},
-                           origin=origin)
+                           origin=origin, is_client=True)
         except Exception as exc:  # any contract failure -> quarantine, not boot death
             quarantined.append(_oub.ValidationIssue(
                 bank_id=bundle.bank_id, path=str(bundle.root),

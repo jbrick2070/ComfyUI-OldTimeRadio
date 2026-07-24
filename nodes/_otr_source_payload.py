@@ -25,7 +25,8 @@ writer NOR news_interpreter NOR _otr_story_routing at module level (three-edge
 cycle guard, test-pinned); the heavy imports happen LAZILY inside the wrapper
 bodies. Zero file I/O at import. The ``bank`` parameter is DUCK-TYPED
 (``.fetcher`` / ``.interpreter`` / ``.source_bank_id`` attributes) -- no
-runtime routing import.
+runtime routing import. ``_otr_user_banks`` (client-owned entry points) is
+likewise imported function-locally, so the import block alone proves the leaf.
 
 Registry metadata vs execution errors:
   - the routing SWEEP (in _otr_story_routing) validates ids at registry load
@@ -63,6 +64,15 @@ class SourceContractMissingError(SourcePayloadError):
 
     Its source-payload lane is not built yet (lane-enablement checklist,
     STAGE2_SUBPLAN.md section 4b item 3). There is no fallback."""
+
+
+class ClientOwnerMissingError(SourcePayloadError):
+    """A bank row routes an entry point to its own bundle, but resolution got
+    no matching owner bundle.
+
+    Always a CALL-SITE defect (the caller forgot `owner=`, or passed another
+    bank's bundle), never client data -- an unowned or cross-owned `self` row
+    could otherwise execute the wrong bundle's code."""
 
 
 class SourcePayloadContractError(SourcePayloadError):
@@ -749,18 +759,80 @@ _INTERPRETERS: "dict[str, object]" = {
 
 
 def registered_fetcher_ids() -> "frozenset[str]":
-    """Registered fetcher ids (for the routing sweep; ids only, no execution)."""
+    """Registered fetcher ids (for the routing sweep; ids only, no execution).
+
+    SHIPPED ids only, forever. Client-owned lanes resolve through their own
+    bundle (see `resolve_fetcher`) and never enter this registry -- a client
+    bank cannot shadow, replace, or extend a shipped entry point."""
     return frozenset(_FETCHERS)
 
 
 def registered_interpreter_ids() -> "frozenset[str]":
-    """Registered interpreter ids (for the routing sweep)."""
+    """Registered interpreter ids (for the routing sweep). Shipped only."""
     return frozenset(_INTERPRETERS)
 
 
-def resolve_fetcher(bank) -> FetcherEntry:
-    """Bank row -> its registered FetcherEntry. Empty id = the bank's
-    source-payload lane is not built -- LOUD, never a slide into science."""
+# Client-owned lanes get a namespaced seed_source stamp so a ledger never
+# confuses "a client bundle fetched this" with any shipped fetcher's provenance.
+USER_BANK_SEED_SOURCE_PREFIX = "user_bank:"
+
+
+def _user_banks():
+    """The client-bundle module, imported FUNCTION-LOCALLY.
+
+    `_otr_user_banks` is another stdlib-only, zero-I/O leaf, so this could be a
+    module-level import -- it stays local so this module's documented
+    "stdlib-only at import time" posture remains provable by inspecting the
+    import block, and the leaf can never grow an edge into the authority."""
+    try:
+        from . import _otr_user_banks as _oub
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        import _otr_user_banks as _oub  # type: ignore
+    return _oub
+
+
+def client_entry_point_id() -> str:
+    """The reserved entry-point value meaning "my own bundle owns this lane"."""
+    return _user_banks().SELF_ENTRY_POINT
+
+
+def _require_owner(owner, *, bank_id: str, field: str):
+    """The admitted bundle that may execute for `bank_id`, or LOUD.
+
+    Identity is checked, not merely presence: resolving bank A's `self` lane
+    against bank B's bundle would silently run the wrong client's code."""
+    _oub = _user_banks()
+    self_id = _oub.SELF_ENTRY_POINT
+    if owner is None:
+        raise ClientOwnerMissingError(
+            f"source_bank {bank_id!r} routes its {field} to its own bundle "
+            f"({self_id!r}) but no owner bundle reached resolution; pass "
+            f"owner=_otr_story_routing.user_bank_bundle({bank_id!r})"
+        )
+    if not isinstance(owner, _oub.UserBankBundle):
+        raise ClientOwnerMissingError(
+            f"source_bank {bank_id!r}: owner must be an admitted "
+            f"UserBankBundle, got {type(owner).__name__}"
+        )
+    if owner.bank_id != bank_id:
+        raise ClientOwnerMissingError(
+            f"owner bundle {owner.bank_id!r} does not own source_bank "
+            f"{bank_id!r}; a bank may only execute its OWN bundle"
+        )
+    return owner
+
+
+def resolve_fetcher(bank, *, owner=None) -> FetcherEntry:
+    """Bank row -> its FetcherEntry. Empty id = the bank's source-payload lane
+    is not built -- LOUD, never a slide into science.
+
+    `owner` is the admitted client bundle behind this bank
+    (`_otr_story_routing.user_bank_bundle(bank_id)`), or None for a shipped
+    bank. A row whose fetcher is the reserved client id resolves to its OWN
+    bundle's `fetch_source`, which obeys the identical keyword contract as a
+    shipped fetcher and whose result still passes `normalize_fetch_result`.
+    A client bank may equally declare a SHIPPED fetcher id and get the shipped
+    wrapper -- reuse is allowed, replacement is not."""
     fetcher_id = getattr(bank, "fetcher", "")
     bank_id = getattr(bank, "source_bank_id", "?")
     if not fetcher_id:
@@ -768,6 +840,13 @@ def resolve_fetcher(bank) -> FetcherEntry:
             f"source_bank {bank_id!r} declares no fetcher: its source-payload "
             f"lane is not built yet (lane-enablement checklist, STAGE2_SUBPLAN "
             f"section 4b item 3). There is no fallback."
+        )
+    _oub = _user_banks()
+    if fetcher_id == _oub.SELF_ENTRY_POINT:
+        bundle = _require_owner(owner, bank_id=bank_id, field="fetcher")
+        return FetcherEntry(
+            fetch=_oub.bundle_entry_point(bundle, _oub.FETCH_ENTRY_ATTR),
+            seed_source=f"{USER_BANK_SEED_SOURCE_PREFIX}{bank_id}",
         )
     entry = _FETCHERS.get(fetcher_id)
     if entry is None:
@@ -778,8 +857,12 @@ def resolve_fetcher(bank) -> FetcherEntry:
     return entry
 
 
-def resolve_interpreter(bank):
-    """Bank row -> its registered interpreter callable. Empty id = LOUD."""
+def resolve_interpreter(bank, *, owner=None):
+    """Bank row -> its interpreter callable. Empty id = LOUD.
+
+    Same owner contract as `resolve_fetcher`: the reserved client id resolves
+    to the bundle's `interpret_source`, called with the identical keyword
+    contract and validated by the identical `validate_interpreter_result`."""
     interpreter_id = getattr(bank, "interpreter", "")
     bank_id = getattr(bank, "source_bank_id", "?")
     if not interpreter_id:
@@ -788,6 +871,10 @@ def resolve_interpreter(bank):
             f"source-payload lane is not built yet (lane-enablement checklist, "
             f"STAGE2_SUBPLAN section 4b item 3). There is no fallback."
         )
+    _oub = _user_banks()
+    if interpreter_id == _oub.SELF_ENTRY_POINT:
+        bundle = _require_owner(owner, bank_id=bank_id, field="interpreter")
+        return _oub.bundle_entry_point(bundle, _oub.INTERPRET_ENTRY_ATTR)
     fn = _INTERPRETERS.get(interpreter_id)
     if fn is None:
         raise UnknownInterpreterError(
@@ -798,9 +885,11 @@ def resolve_interpreter(bank):
 
 
 __all__ = [
+    "ClientOwnerMissingError",
     "FetcherEntry",
     "SOURCE_PAYLOAD_KEYS",
     "SOURCE_INTERPRETER_FALLBACK_VERSION",
+    "USER_BANK_SEED_SOURCE_PREFIX",
     "SourceFetchResult",
     "SourceContractMissingError",
     "SourceInterpretError",
@@ -810,6 +899,7 @@ __all__ = [
     "UnknownFetcherError",
     "UnknownInterpreterError",
     "build_source_interpreter_fallback",
+    "client_entry_point_id",
     "normalize_fetch_result",
     "interpreter_exhaustion_attempts",
     "registered_fetcher_ids",
