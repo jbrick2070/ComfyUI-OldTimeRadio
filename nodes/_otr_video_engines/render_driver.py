@@ -677,17 +677,33 @@ def validate_and_repair_still_spine(ledger):
             "still-spine handoff cannot resolve active episode stills: %s" % exc
         ) from exc
     rows = _still_spine_image_rows(ledger)
+    shots = [shot for shot in ((ledger.get("video") or {}).get("shots") or [])
+             if isinstance(shot, dict)]
     manifest_ids = _still_spine_manifest_object_ids(images)
-    if not manifest_ids:
+    # Audio-reactive visualizers and portrait-only face lanes deliberately do
+    # not consume scene stills.  Their image phase can therefore have no
+    # required_scene_targets receipt at all.  Require the producer-owned target
+    # manifest only when a rendered shot actually needs scene or mesh input;
+    # still-consuming lanes remain fail-closed below.
+    requires_scene_manifest = False
+    for shot in shots:
+        engine_id = str(shot.get("engine_id") or "")
+        family = engine_family(engine_id, str(shot.get("family") or ""))
+        requires_mesh = bool(
+            engine_id and _vreg.is_registered(engine_id)
+            and getattr(_vreg.get_engine(engine_id), "requires_mesh_fodder", False)
+        )
+        if requires_mesh or _still_spine_requires_scene(shot, engine_id, family):
+            requires_scene_manifest = True
+            break
+    if requires_scene_manifest and not manifest_ids:
         raise RenderError(
             "still-spine handoff has no required_scene_targets receipt; "
             "image generation did not publish an authoritative target manifest"
         )
     lines = _line_index(ledger)
     validated = []
-    for shot in ((ledger.get("video") or {}).get("shots") or []):
-        if not isinstance(shot, dict):
-            continue
+    for shot in shots:
         raw_bid = _beat_id_for_shot(shot)
         line = lines.get(raw_bid, {})
         beat_id = _canonical_visual_beat_id(raw_bid, line)
@@ -1016,36 +1032,11 @@ def _motion_clause_override(shot):
     return _mc_text(shot)
 
 
-#: HuMo-seam ticket Part C (2026-06-11). Broadcast-gear scrub for CHARACTER
-#: face beats -- LOCAL mirror of nodes/otr_meta_brief_image_prompt._GEAR_WORDS
-#: (the node module registers classes at import; mirroring follows the
-#: _OPENING_MUSIC_SUFFIX local-constant pattern -- keep the two regexes in
-#: LOCKSTEP; tests/test_brief_prompt_finishing.py pins the parity). NO
-#: negations anywhere: negative phrasing PLANTS the tokens (the c01 giant-mic
-#: lesson) -- gear is scrubbed from the OUTPUT, never "no microphone"-ed.
-_GEAR_WORDS_RD = re.compile(
-    r"\s*\b(?:radios?|microphones?|mics?|broadcasts?|broadcasters?|"
-    r"broadcasting|recording\s+studios?|radio\s+(?:station|studio|set|"
-    r"booth)s?|studios?|on[- ]air(?:\s+sign)?)\b[,;]?",
-    re.IGNORECASE)
-
-#: Gear-free fallback prompt for a CHARACTER face beat whose shot carries no
-#: M4 creative prompt (the proven microphone re-introduction path). Keeps the
-#: face anchored for the audio_driven_face family; zero broadcast tokens.
+#: Deterministic fallback for a CHARACTER face beat whose shot carries no M4
+#: creative prompt. It stays world-neutral; authored prompts are preserved.
 _CHAR_FACE_FALLBACK_PROMPT = (
     "close-up cinematic portrait of a person speaking, face centered, subtle "
-    "facial motion, period 1940s costume, dramatic film lighting")
-
-
-def _scrub_gear(prompt: str) -> str:
-    """Remove broadcast-gear tokens from a character prompt, tidying the
-    leftover separators. Pure; '' stays ''. Mirrors
-    otr_meta_brief_image_prompt._scrub_gear_words (lockstep)."""
-    out = _GEAR_WORDS_RD.sub("", prompt or "")
-    out = re.sub(r"\s{2,}", " ", out)
-    out = re.sub(r"(,\s*)+,", ", ", out)
-    out = re.sub(r"\s+,", ",", out)
-    return out.strip(" ,;").strip()
+    "facial motion, attire from the story world, dramatic film lighting")
 
 #: Round 5 F2 -- beat_intent -> scene clause. Unmapped intents fall back to a
 #: loose "a beat of <intent>" clause + one INFO line (never a silent skip).
@@ -1804,8 +1795,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # look restoration): every ltx_video shot conditions on the beat's
     # ST-3-minted scene still (init_source=scene_still in the trace) --
     # the music open b000 included (its text-only render was the murk
-    # cause). A missing still falls back LOUD to the round-5 text path --
-    # never silent. Set OTR_ENABLE_LTX_I2V=0 to restore text-only LTX.
+    # cause). A missing still is a structural image/video failure, not a
+    # permitted quality downgrade. Set OTR_ENABLE_LTX_I2V=0 to explicitly
+    # restore text-only LTX.
     if (str(shot.get("engine_id") or "") == "ltx_video"
             and os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"):
         _bid = _visual_beat_id
@@ -2069,23 +2061,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             "non-ia2v engines)", _shot_role, shot.get("shot_id"))
         text_prompt = ""
     # ROLE-driven (2026-06-26): the shared classifier also catches ltx_audio_in
-    # CHARACTER beats (audio_conditioned_video family), so the gear scrub + the
-    # char-fallback prompt + the scene-prompt EXCLUSION all apply to them exactly
-    # like an audio_driven_face talking head. announcer/music bookends stay scene.
+    # CHARACTER beats (audio_conditioned_video family), so the character
+    # fallback prompt + scene-prompt exclusion apply exactly as they do to an
+    # audio_driven_face talking head. Announcer/music bookends stay scenes.
     _is_char_face_beat = _is_character_face_beat(shot)
     if text_prompt:
-        # HuMo-seam ticket Part C (2026-06-11): CHARACTER face beats get the
-        # gear scrub (the c01 lesson: scrub the OUTPUT, never add "no
-        # microphone" -- negations PLANT the tokens). ANNOUNCER beats are
-        # exempt (radio-styled BY DESIGN).
-        if _is_char_face_beat:
-            _scrubbed = _scrub_gear(text_prompt)
-            if _scrubbed and _scrubbed != text_prompt:
-                _LOG.warning(
-                    "[OTR.render_driver] HuMo character beat %s: broadcast-"
-                    "gear tokens scrubbed from the M4 prompt (announcer "
-                    "stays radio-styled)", _beat_id_for_shot(shot))
-                text_prompt = _scrubbed
+        # Authored M4 visual vocabulary is not a publication gate. Preserve it
+        # verbatim; framing/style composition below may add context but never
+        # deletes story-world objects by means of a Python word list.
         # 2026-06-16 framing fix (roundtable pass03): LTX character/person beats
         # drift the subject's head out of frame over the clip. Append a POSITIVE
         # composition clause -- "stable centered subject" penalizes X/Y drift but
@@ -2146,12 +2129,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     elif _is_char_face_beat or _fam == "audio_driven_face":
         # HuMo-seam ticket Part C: a FACE beat with NO M4 creative prompt is
         # the proven microphone re-introduction path -- the build_request
-        # studio default ("a 1940s radio studio... on air") re-dresses the
-        # gear the FLUX portraits were scrubbed of. LOUD + a gear-free
-        # fallback for character beats; the announcer keeps the studio
+        # generic studio default is inappropriate for a character beat. Use a
+        # world-neutral deterministic fallback; the announcer keeps the radio
         # default (radio-styled by design). Never silent. (2026-06-26: the
         # _is_char_face_beat arm also routes ltx_audio_in CHARACTER beats here
-        # so they get the gear-free char fallback, not the generic radio default.)
+        # so they get the character fallback, not the generic radio default.)
         if _is_char_face_beat:
             _LOG.warning(
                 "[OTR.render_driver] HuMo character beat %s carries NO M4 "
@@ -2168,7 +2150,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                                 "who %s" % _IA2V_TALKING_CLAUSE_CHARACTER)
             _cf_fallback = _prefix_video_style_cue(_vstyle, _cf_fallback)
             req["text_prompt"] = _cf_fallback
-            _stamp_prompt_meta(req, "default_scrubbed", _cf_fallback,
+            _stamp_prompt_meta(req, "default_character", _cf_fallback,
                                beat=_beat_id_for_shot(shot))
         else:
             _default_prompt = _prefix_video_style_cue(

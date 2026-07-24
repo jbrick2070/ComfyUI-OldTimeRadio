@@ -65,6 +65,29 @@ def test_still_spine_fails_closed_without_authoritative_target_receipt(
         rd.validate_and_repair_still_spine(ledger)
 
 
+def test_still_spine_allows_visualizer_without_scene_manifest(
+        tmp_path, monkeypatch):
+    """No-still visualizers do not need a scene-target receipt."""
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path / "output"))
+    ledger = {
+        "episode_id": "ep_visualizer",
+        "lines": [{"line_id": "b001", "char_id": "",
+                   "speaker_role": "background"}],
+        "images": {"images": []},
+        "video": {"shots": [{
+            "shot_id": "shot_b001",
+            "source_line_ids": ["b001"],
+            "engine_id": "viz_mxc_cpu",
+            "family": "abstract",
+        }]},
+    }
+
+    receipt = rd.validate_and_repair_still_spine(ledger)
+
+    assert receipt["validated"] == []
+    assert ledger["images"]["still_spine_receipt"]["validated"] == []
+
+
 def test_safety_cleanup_rejects_replacement_with_empty_spoken_surface(
         monkeypatch):
     ledger = {"lines": [{
