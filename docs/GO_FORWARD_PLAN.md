@@ -1,18 +1,21 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-6
-LANDED @ `3d97a130`.** Client bundles are discovered, integrity-checked,
-admitted ALONGSIDE the shipped six in the one routing authority, may OWN their
-`fetch_source` / `interpret_source` via the reserved `"self"` entry point, are
-VALIDATED AND ACTIVATED by `scripts/otr_check.py bank <path> --activate`, reach
-the network only through ONE bounded seam (`nodes/_otr_feed_fetch.py`), and now
-hand every downstream consumer a COMPLETE ledger via the shared tail's cleanup
-pass (`nodes/_otr_ledger_cleanup.py`) -- content repaired, structure named.
-Suite 6398 / Bible 17; canonical byte-identical. NEXT for CODER E = **wave 7**
-(story_pack widget / canonical JSON -- ASSESS FIRST: waves 1-6 changed no node,
-widget or link, so w7 may already be satisfied; if so, close the block).
-SIX-BANK REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the render
-track; bug-first items still open for CODER A.
+**Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
+waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
+bundle under `user_packs/source_banks/<id>/`, runs
+`scripts/otr_check.py bank <path> --activate`, restarts ComfyUI, and their bank
+is a selectable peer of the shipped six: discovered and integrity-checked,
+admitted in the ONE routing authority, free to own `fetch_source` /
+`interpret_source` via the reserved `"self"` entry point, reaching the network
+only through the bounded `nodes/_otr_feed_fetch.py` seam, and handed a COMPLETE
+ledger by the shared tail's cleanup pass (`nodes/_otr_ledger_cleanup.py`).
+Wave 7 was ASSESSED, not built: the `source_bank` COMBO already reads its
+choices live from the registry and a bank's own `default_story_model` picks its
+pack, so no node, widget, link or canonical-JSON change was ever needed --
+canonical is still byte-identical at `A66A416B` after all seven waves. Suite
+6403 / Bible 17. `docs/EXTENDING_OTR.md` is the client contract of record.
+NEXT: SIX-BANK REQUALIFICATION + 45-WORD SCENE MATRIX for the render track;
+bug-first items for CODER A; Randomizer A -> `dynamic_story` is now UNBLOCKED.
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to
@@ -25,54 +28,41 @@ This block is the current source of truth for the overnight qualification.
 Nothing in this file is an instruction to reset, stash, delete, or overwrite
 user changes.
 
-- Branch: `v2.0-alpha`; HEAD and origin are `3d97a130` (CODER E wave 6 is
-  `1504bb4c` + `3d97a130`; wave 5 is `c97a0e91` + `8c45172d`; wave 4 is
-  `84945bc4`; waves 1-3 are `66e214ec` + `cc69e683`; the six-bank
-  no-prose-gate retirement chunk is `314dd481` below). The worktree is
+- Branch: `v2.0-alpha`; HEAD and origin are `30358ad1` (the seven extensibility
+  waves are `66e214ec`, `cc69e683`, `84945bc4`, `c97a0e91` + `8c45172d`,
+  `1504bb4c` + `3d97a130`, `30358ad1`; the six-bank no-prose-gate retirement
+  chunk is `314dd481` below). Per-wave detail lives in
+  `docs/HANDOFF_LOG.md`. The worktree is
   CLEAN of task-owned changes -- what remains is `tmp/` scratch (including
   another window's modified `tmp/_chain_720.ps1`, `tmp/_rearm_gate.ps1`,
   `tmp/_status_bake.ps1` -- PRESERVE) and untracked campaign receipts (plus
   `config/profiles/otr_sbcov_1..6.json`, intentionally untracked
   coverage-campaign scratch; nothing in-repo references them, and untracked
   `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier window).
-- LANDED @ `1504bb4c` + `3d97a130` (2026-07-24; suite 6398 passed / 27 skipped
-  / 1 xfailed; Bible 17; AST/BOM/zero-byte/UTF-8 clean; canonical
-  byte-identical; pushed, HEAD == origin): wave 6, the LEDGER CLEANUP PASS
-  (`nodes/_otr_ledger_cleanup.py`), wired at the one shared producer boundary
-  in `_run_writer_tail` -- after every writer-side text mutation, before the
-  TTS delivery stamp and the freeze cascade. Deterministic completion (mint
-  `line_id`, rename a duplicate rather than drop the row, resolve a blank
-  `speaker_role` from a real cast `char_id`, turn an unsayable row into an
-  EXPLICIT skip with its reason, re-derive counts through the canonical
-  `set_line_text_metrics` owner) -> safety repair IN PLACE -> one bounded LLM
-  `meta.episode_title` fill with a source-derived backstop -> `LedgerIncomplete
-  Error` naming every remaining hole at once. THE LAW HOLDS BOTH WAYS: residual
-  unsafe hits are REPORTED, never escalated (a second terminal content policy
-  is exactly what the law forbids), so the freeze gate's G9 stays the
-  last-resort backstop -- it should now rarely fire, because
-  `content_owned_readonly` SKIPS the cascade's inline safety cleanup on the
-  assumption the producer already cleaned, and for a client bank the shared
-  writer IS that producer. `1504bb4c` is the same wave's smaller half: the
-  reserved `"self"` interpreter now gets its own fallback-brief branch instead
-  of `UnknownInterpreterError`. TWO FINDINGS, both from failures this pass
-  caused, are in the log: the ANNOUNCER (a voiced `char_id` with no cast row is
-  LEGAL), and the episode seed (NOT this pass's to own -- minting one broke
-  tail byte-identity).
-- LANDED earlier the same day (detail in `docs/HANDOFF_LOG.md`): wave 5, the
-  bounded `nodes/_otr_feed_fetch.py` network seam and its
-  `FeedFetchRefused` / `FeedFetchUnavailable` split, @ `c97a0e91` + `8c45172d`;
-  wave 4, the `otr_check bank <path> [--activate]` CLI and the
-  `validate_client_bundle_contract()` routing seam, @ `84945bc4`; waves 1-3,
-  client-bundle integrity + admission in the one routing authority + the
-  client-owned `fetch_source` / `interpret_source` execution seam, @ `66e214ec`
-  + `cc69e683`. `docs/EXTENDING_OTR.md` carries the landed contract for all
-  six waves.
+- LANDED @ `30358ad1` (2026-07-24; suite 6403 passed / 27 skipped / 1 xfailed;
+  Bible 17; AST/JSON/BOM/zero-byte/UTF-8 clean; canonical byte-identical;
+  pushed, HEAD == origin): wave 7, CLOSED BY ASSESSMENT. The `source_bank`
+  COMBO on `OTR_LedgerScriptWriter` already reads its choices live from the
+  routing registry, and waves 1-3 already made that registry own pack
+  directories BY BANK (`_Registry.pack_dirs`), so an activated client bank is
+  selectable with no new node, widget, link or canonical change. The chunk
+  shipped the missing PROOF (three pins that an activated bundle reaches
+  `INPUT_TYPES()["optional"]["source_bank"]`, that its widget value resolves to
+  a pack inside its own bundle, and that admitting a bank leaves the canonical
+  34-slot positional widget vector untouched) and fixed the one real defect:
+  `guide_ref` had NO runtime consumer, so the `+ Add Your Own` row answered a
+  click with a dead end while its own text still claimed "the simple_4 pass
+  runner does not exist yet". `require_runnable_bank` now appends the row's
+  `guide_ref`, and that text names the folder, the CLI, the restart and
+  `docs/EXTENDING_OTR.md` (new section 6: what the client sees in ComfyUI).
+- All seven extensibility waves and their per-wave findings are recorded in
+  `docs/HANDOFF_LOG.md`; `docs/EXTENDING_OTR.md` is the landed client contract.
 - Prior root fix at `f150213f`: `nodes/_otr_video_engines/render_driver.py` requires
   an authoritative scene-target manifest only for scene/mesh-consuming shots;
   visualizer-only `viz_mxc_cpu`, `viz_mxc_mandala`, and `viz_camera` lanes may
   execute without one. Regression coverage:
   `tests/test_ledger_cleanup_contracts.py`.
-- Verification: full Windows OTR suite `6398 passed, 27 skipped, 1 xfailed`;
+- Verification: full Windows OTR suite `6403 passed, 27 skipped, 1 xfailed`;
   Bug Bible `17 passed, 24 skipped, 3 xfailed`.
 - Canonical workflow byte-identical at SHA-256
   `A66A416BFBCAD127356047043C8C07637BC50CACE2CD7D4E0436C7CD80B09CB4`.
@@ -262,9 +252,8 @@ six-bank requalification (chunk landed @ 314dd481)
   -> 45w scene matrix + 54-case visual-style qualification
   -> quick-wins block (coder windows A/B/C)
   -> LEAN-MEAN FRONT (W0->W1->W2->W3->W4a->W4b->W7->W6->W5+SW4->C1-C5)
-  -> independent client-authored source banks (lean v1; w1-w2 @ 66e214ec,
-       w3 @ cc69e683; CODER E owns w4..w7 -- runs PARALLEL to the lean-mean front)
-  -> Randomizer A -> dynamic_story
+  -> [DONE 2026-07-24 @ 30358ad1] independent client-authored source banks v1
+  -> Randomizer A -> dynamic_story  (UNBLOCKED: extensibility landed)
   -> LEAN-MEAN TAIL (SW1/SW2/SW3 -> C6 -> C7 -> W8)
   -> ROADMAP (SFX campaign after Timeline Cue Ledger gate)
 ```
@@ -295,43 +284,18 @@ by the campaign queue.)
    (SW-3 news_ingest re-survey, W6 keep-list adds + ENGINE_MATRIX
    precondition = quick-win 8, W7 tombstone re-triage, R-7 re-grep; SW-1
    writer re-survey waits for the TAIL). Dedicated window; multi-day.
-2. **Independent source banks (client-authored)** --
-   `docs/2026-07-24-independent-source-banks-v1-plan.md` (PLAN OF RECORD;
-   supersedes the retired Path-A/B `docs/2026-07-12-user-source-lanes-architecture.md`).
-   Operator reframe 2026-07-24: N INDEPENDENT banks (no Path A/B, no family);
-   client adds one from a folder equal to the shipped six; TRUSTED shared writer
-   builds the COMPLETE ledger (the #1 key); a ledger-cleanup LLM pass fills/cleans
-   it; content by REPAIR never a story-fail (SFW dropped as a gate); broken
-   bundle QUARANTINES. DEFERRED past v1: client own-runner + staging, dependency
-   subsystem, standalone story_rules. DOCS-FIRST: `docs/EXTENDING_OTR.md`
-   (complete-ledger field contract) is the primary deliverable. Full r1-r4 arc +
-   r5 simplification DONE + CONVERGED (codex gpt-5.6-sol high + agy Gemini 3.6
-   Flash High; Claude judge; `kibitz-runs/2026-07-24-user-source-lanes-r6*/`).
-   `docs/EXTENDING_OTR.md` DRAFTED; waves 1-2 (bundle integrity + admission in
-   the one authority) LANDED @ `66e214ec`; wave 3 (client-owned
-   `fetch_source`/`interpret_source` via the reserved `"self"` entry point)
-   LANDED @ `cc69e683`. REMAINING WAVES, in order:
-   wave 4 (the `otr_check bank --activate` CLI) LANDED @ `84945bc4`;
-   `check_compatibility` was NOT wired -- `EXTENDING_OTR.md` now calls it a
-   reserved name with no contract. Wave 5 (the bounded `_otr_feed_fetch` seam,
-   ALL THREE hops -- the plan said two) LANDED @ `c97a0e91`. Wave 6 (the
-   ledger-cleanup pass in the shared tail + the client-interpreter fallback
-   gap) LANDED @ `1504bb4c` + `3d97a130`; `EXTENDING_OTR.md` section 4 now
-   describes what actually landed. REMAINING: **w7** story_pack widget /
-   canonical JSON -- ASSESS FIRST, because waves 1-6 changed no node, widget or
-   link and the canonical hash never moved; if no surface needs to change, w7
-   closes as satisfied and the whole block is DONE for v1. Re-estimate at the
-   wave boundary.
-3. **Randomizer Rolls Design A** --
-   `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`, AFTER extensibility
-   (its `_otr_lane_specs` authority is ABSORBED by the extensibility build;
-   this shrinks to `_otr_bank_roll` + eligibility). Re-ground per its
-   2026-07-15 header. 1-2 d + 1 GPU day.
-4. **`dynamic_story` visual direction** -- rev-5 FINAL, do not rerun panels;
-   roster-agnostic; re-derive IDs at build. After extensibility + randomizer.
+2. **Randomizer Rolls Design A** --
+   `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`. NO LONGER GATED --
+   extensibility landed, and its `_otr_lane_specs` authority was ABSORBED by
+   that build, so this shrinks to `_otr_bank_roll` + eligibility. Re-ground per
+   its 2026-07-15 header, and re-derive the bank list against the LIVE registry
+   rather than a six-row literal: `list_bank_ids()` can now return a client
+   bank, and eligibility must treat one as an ordinary peer. 1-2 d + 1 GPU day.
+3. **`dynamic_story` visual direction** -- rev-5 FINAL, do not rerun panels;
+   roster-agnostic; re-derive IDs at build. After the randomizer.
    5-9 coder-days + 2-4 GPU days.
-5. **LEAN-MEAN TAIL** (`SW1/SW2/SW3 -> C6 -> C7 -> W8`) -- the writer/widget
-   structural split, REQUIRED by ROADMAP to come after blocks 2-4. SW-1 full
+4. **LEAN-MEAN TAIL** (`SW1/SW2/SW3 -> C6 -> C7 -> W8`) -- the writer/widget
+   structural split, REQUIRED by ROADMAP to come after blocks 2-3. SW-1 full
    seam re-survey happens here, against the then-current writer.
 
 Open judgment question (render-window, not coder-slot): the LOCAL
@@ -355,9 +319,9 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | CODER B "harness" | quick-wins 5 + 10, then one canonical `scifi_news_pro` full-media qualification leg | same | after A | ~1-2 d |
 | CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
 | CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |
-| PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out; plan upkeep | rungs 2-4 | parallel with D | docs |
-| CODER E | independent client-authored source banks (lean v1); waves 1-6 LANDED @ `3d97a130`; NEXT = **wave 7** (story_pack widget / canonical JSON) -- ASSESS FIRST, it may already be satisfied and close the block | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
-| CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | after E | ~6-11 d |
+| PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out + the `check_compatibility` fork; plan upkeep | rungs 2-4 | parallel with D | docs |
+| ~~CODER E~~ | independent client-authored source banks v1 -- **ALL SEVEN WAVES DONE @ `30358ad1`**; slot RETIRED, do not reopen (deferred power-user tiers are a NEW block, not this one) | -- | -- | -- |
+| CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | UNGATED (E is done; re-pin at HEAD first) | ~6-11 d |
 | CODER G "lean-mean tail" | SW1-SW3, C6, C7, W8 | Claude; Fable single final epoch gate | after F | multi-day |
 
 Kickoff lines (paste as the FIRST message of the new window; swap the letter):
@@ -368,15 +332,6 @@ Kickoff lines (paste as the FIRST message of the new window; swap the letter):
 
 ## Parallel lane -- no coder slot required
 
-- **Extensibility hardening -- DONE 2026-07-24 (planner window).** The r1-r4
-  kibitz arc + an r5 simplification pass ran and CONVERGED; the operator
-  reframed to N independent client-authored banks (lean v1, docs-first). Plan of
-  record: `docs/2026-07-24-independent-source-banks-v1-plan.md`.
-  **`docs/EXTENDING_OTR.md` DRAFTED + linked from README (same session):** the
-  complete-ledger requirements contract, grounded per-consumer (TTS / slicing /
-  shot direction / captions / credits / mux+publish) against the live code.
-  CODER E is now UNGATED. (The old sec-16 nine-flags gate is retired with the
-  A/B doc.)
 - **Bug Bible operator fan-out** -- 9+ closed candidates + the
   duplicate-legacy_id cleanup waiting on one fan-out session.
 - **Render-window fillers:** cpu-tier smoke (needs the google image lane or
@@ -425,19 +380,27 @@ fixture creates a row.
 
 ## Open risks
 
-- Extensibility hardening is DONE + CONVERGED and `docs/EXTENDING_OTR.md` is
-  drafted, so CODER E is executing. Materially smaller than the retired
-  ~21-31-day A/B scope; it still constrains randomizer + dynamic_story
-  sequencing. Deferred power-user tiers (client own-runner + staging, deps,
-  story_rules) are explicitly out of v1, not forgotten. Waves 1-4 are LANDED
-  (@ `84945bc4`); the remaining waves still touch the writer hot path.
-- CLIENT-AUTHORED PYTHON now executes in-process (wave 3). The posture that
-  must hold in every later wave: `--activate` is the consent act; the seam
-  fails LOUD (`UserBankExecutionError`) and never substitutes; client code
-  never touches the canonical ledger; owner IDENTITY is verified so a bank can
-  only run its OWN bundle; the shipped fetcher/interpreter registries are never
-  widened to admit a client id. Do not relax any of these to make a later wave
-  easier.
+- Extensibility v1 is DONE, so it no longer constrains randomizer /
+  dynamic_story sequencing. Deferred power-user tiers (client own-runner +
+  staging, dependency manifest, standalone story_rules) are explicitly OUT of
+  v1 and are a NEW block if the operator ever wants them -- not a reopening of
+  CODER E. NO CLIENT BANK HAS EVER RUN LIVE: every wave is proven by the suite
+  and by contract tests, and the first real client bundle is still an unproven
+  path end to end (fetch -> interpret -> writer -> cleanup -> tail -> publish).
+  Treat the first live client-bank leg as a qualification, not a formality.
+- CLIENT-AUTHORED PYTHON executes in-process (wave 3). The posture that must
+  hold in every future change: `--activate` is the consent act; the seam fails
+  LOUD (`UserBankExecutionError`) and never substitutes; client code never
+  touches the canonical ledger; owner IDENTITY is verified so a bank can only
+  run its OWN bundle; the shipped fetcher/interpreter registries are never
+  widened to admit a client id. Do not relax any of these for convenience.
+- The client-facing surface is now LIVE TEXT, not just docs: the
+  `custom_source_bank` row's `guide_ref` is raised to the operator by
+  `require_runnable_bank`, and the `source_bank` tooltip repeats it. Any future
+  change to the activation path (folder name, CLI verb, restart behaviour) must
+  update `nodes/story_packs/banks.json`, that tooltip and
+  `docs/EXTENDING_OTR.md` together, or the product will confidently instruct
+  clients to do the wrong thing.
 - **`check_compatibility` is RESERVED, not wired (wave-4 decision, kibitz
   r3 codex `gpt-5.6-sol` high + r4 agy Gemini 3.6 Flash High, Claude judge).**
   No request type, no decision type, no runtime consumer exists, so activation
@@ -486,8 +449,9 @@ fixture creates a row.
   confound -- the 420-rung lesson).
 - The active campaigns may surface new lane defects; the campaign window owns
   admitting PBUGs (new-bug problem-statement rule applies).
-- User extensibility and `dynamic_story` both touch the writer, visual-style
-  authority, and canonical workflow: serial, each re-derives the live JSON.
+- `dynamic_story` touches the writer, the visual-style authority and the
+  canonical workflow; it re-derives the live JSON at build. It is now the only
+  claimant on those surfaces (extensibility has released them).
 - Generated-SFX R4 stays local/ignored evidence until the tracked R4.1 refit
   lands; it is not an executable queue.
 
@@ -501,7 +465,11 @@ by operator decision; plan of record `docs/2026-07-17-v4-campaign/final.md`) --
 codex56sol attempt telemetry + PBUG-20260712-17 root fix -- fresh two-matrix
 bakeoff -- Qwen-Image still engine (removed 2026-07-23) -- word-fit ceilings /
 candidate campaigns -- style-dropdown four-surfaces -- otr-build-tracker
-artifact -- `tencent/hy3:free` panel seat (expired 2026-07-21).
+artifact -- `tencent/hy3:free` panel seat (expired 2026-07-21) --
+**independent client-authored source banks v1 (all seven waves, CODER E,
+2026-07-24 @ `30358ad1`; contract `docs/EXTENDING_OTR.md`; w7 closed by
+assessment -- no widget was needed and none was invented)** -- the retired
+Path-A/B user-source-lanes architecture.
 
 ## Pointers
 
@@ -513,7 +481,8 @@ artifact -- `tencent/hy3:free` panel seat (expired 2026-07-21).
 - `docs/2026-07-23-video-failure-inventory.md` (campaign staging record)
 - `docs/2026-07-15-720-bakeoff-verdict.md` (KEEP/IMPROVE + open items)
 - `docs/2026-07-17-model-bakeoff-scoreboard.md` (writer-model verdict)
-- `docs/2026-07-24-independent-source-banks-v1-plan.md` (extensibility PLAN OF RECORD)
+- `docs/EXTENDING_OTR.md` (LANDED client contract: add your own source bank)
+- `docs/2026-07-24-independent-source-banks-v1-plan.md` (extensibility plan -- DELIVERED)
 - `docs/2026-07-12-user-source-lanes-architecture.md` (SUPERSEDED -- Path-A/B decision log)
 - `docs/2026-07-10-lean-mean-rip-final.md` (drift-check header 2026-07-15)
 - `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`

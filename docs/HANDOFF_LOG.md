@@ -3,6 +3,70 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 15:42 -- HEAD 30358ad1 (v2.0-alpha) -- WINDOW CODER E (Opus)
+Did: independent source banks WAVE 7 -- ASSESSED, then closed. One green pushed
+chunk @ `30358ad1`, and the block is DONE for v1 (all seven waves).
+THE ASSESSMENT, which was the actual work: the plan's w7 line promised a "Story
+Pack widget" with packs resolving by OWNER via a four-field `PackRef` /
+`resolve_pack_ref`. Neither name exists in the tree and neither is needed.
+Packs already resolve by owner -- waves 1-3 gave `_Registry` a `pack_dirs` map
+of bank id -> the directory that owns its packs, so a client pack loads from
+the client's own bundle. And the widget already exists: the `source_bank` COMBO
+on node 1 reads `list(list_bank_ids())` LIVE at `INPUT_TYPES()`, and
+`_admit_user_banks` folds activated client rows into exactly that registry. The
+pack needs no second widget because `resolve_story_pack(bank_id)` takes the
+model from the row's own `default_story_model` -- the plan's own alternative,
+"or a bank's manifest default covers it". So: no node, no widget, no link, no
+canonical change, and the canonical hash is STILL `A66A416B` after seven waves.
+Inventing a pack widget would have added a second way to say what the bank row
+already says. Closed as satisfied instead.
+WHAT THE ASSESSMENT ACTUALLY FOUND, and the reason this was a chunk and not a
+one-line report: `guide_ref` had NO runtime consumer anywhere -- parsed by
+`_parse_bank`, stored on `SourceBank`, read by nothing. So the one row shipped
+expressly to advertise this feature, `+ Add Your Own` (`custom_source_bank`),
+answered a click with a generic "pick a runnable bank", while the only text
+that could have helped sat unread in banks.json still saying "the simple_4 pass
+runner does not exist yet" -- false since wave 4. `require_runnable_bank` now
+appends the row's own `guide_ref` (JSON owns the words, Python owns the
+raising, this module's standing split), and any client bank shipping
+runnable=false inherits the courtesy. Same error also said "runnable=false in
+banks.json"; a client's row lives in its own bank.json, and naming the wrong
+file to the one person who must go edit it is the defect class 8c45172d closed
+-- it now says "its bank row". banks.json, the `source_bank` tooltip and
+EXTENDING_OTR.md (new section 6: the dropdown is live, restart is the refresh,
+your default_story_model IS the pack selector, the signpost row is not your
+bank, a quarantined bank is simply absent) now all name the same path.
+THE GAP THE TESTS CLOSED: `test_client_bank_joins_the_dropdown` (wave 2) is
+named for the dropdown but asserts `list_bank_ids()` -- the registry, one hop
+short of the widget the operator actually sees. Three new pins in
+`test_source_bank_widget_2c.py` (the file that owns that surface) take the last
+hop: an activated bundle appears in `INPUT_TYPES()["optional"]["source_bank"]`,
+its widget value resolves to a pack inside its own bundle, and admitting a bank
+leaves the canonical 34-slot positional widget vector untouched
+(BUG-LOCAL-097). Two more pin the signpost text and the corrected wording.
+Worth carrying forward: NEVER `Select-String` the canonical JSON -- it is one
+line, so a "grep" dumps the entire 200 KB graph into context. Read it with
+`json.loads` in a temp script instead.
+Gates: suite 6403 passed / 27 skipped / 1 xfailed (was 6398; +5); Bible
+17/24/3; AST/JSON/BOM/zero-byte/UTF-8 clean on all five touched files;
+canonical byte-identical A66A416B. Pathspec commits -- the other window's three
+modified tmp/*.ps1 and all untracked scratch preserved; temp probe scripts
+deleted before commit. `git commit -F` per the standing note.
+Current step: six-bank requalification + the bug-first items (CODER A) and the
+render track's 45-word scene matrix. The CODER E slot is RETIRED, not idle --
+the deferred power-user tiers (client own-runner + staging, dependency
+manifest, standalone story_rules) are a NEW block if the operator wants them.
+Next: CODER A takes bug-first items 1-3, or CODER F opens Randomizer A, which
+this session unblocked. Flag for the planner: the `check_compatibility` fork
+still has a standing 2-of-2 rip recommendation and is still unratified, and NO
+CLIENT BANK HAS EVER RUN LIVE -- every wave is proven by suite and contract
+tests only, so the first real client bundle is a qualification, not a
+formality.
+Models: Claude Opus (rung 4) only. No strikes used -- the focused suite, the
+full suite and the Bible were green on the first run -- so no kibitz was owed.
+Commits: 30358ad1 (wave 7) + this handoff.
+
+
 ## 2026-07-24 14:15 -- HEAD 3d97a130 (v2.0-alpha) -- WINDOW CODER E (Opus)
 Did: independent source banks WAVE 6, two green pushed chunks.
 `1504bb4c` = the client-interpreter fallback gap. `build_source_interpreter_
