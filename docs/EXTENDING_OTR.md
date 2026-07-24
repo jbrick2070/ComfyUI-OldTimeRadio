@@ -148,6 +148,39 @@ user_packs/source_banks/<bank_id>/
   `**kwargs` catch-all satisfies this. A function that imports cleanly but
   takes the wrong keywords is refused at activation rather than minutes into
   your first render.
+- **Going to the network: use the bounded seam, not your own client.** If your
+  `fetch_source` reads a feed or scrapes a page, import
+  `nodes._otr_feed_fetch` and call `fetch_feed(url)` or `fetch_article(url)`.
+  It is stdlib-only, so it costs you no dependency, and it is the same seam the
+  shipped banks use:
+
+      from nodes._otr_feed_fetch import (
+          FeedFetchUnavailable, fetch_article, fetch_feed,
+      )
+
+      document = fetch_feed(url)      # document.text is decoded and bounded
+
+  Every fetch is https-only (no silent upgrade from `http://`), connect 5s /
+  read 10s, at most 3 redirects, at most 2 MiB of DECODED body, 2 retries, one
+  ~25s monotonic deadline for the whole call, and a media-type check (a feed
+  must be RSS/Atom/XML, an article HTML/XHTML). Loopback, private, link-local,
+  multicast and reserved addresses are refused -- on every redirect hop, not
+  just the first -- and a name that resolves to a mix of public and private
+  addresses is refused outright.
+
+  **The two failure classes are different and you should treat them
+  differently.** `FeedFetchRefused` means a bound of OURS tripped: the URL or
+  the configuration is wrong. Let it propagate -- do not catch it, and never
+  turn it into an empty result. `FeedFetchUnavailable` means the remote simply
+  did not deliver (404, paywall, timeout, 503 after retries); if you have
+  another candidate to try, catching this one and moving on is legitimate.
+  `.reason` on either carries a stable machine-readable code.
+
+  Nothing forces you through the seam -- your module is ordinary Python and
+  could open its own socket. Do not. A bank that brings its own HTTP client
+  inherits none of the above, which is exactly the trap wave 5 exists to close:
+  network hardening is NOT inherited, it has to be wired on purpose.
+
 - Python discipline: single file, stdlib + the OTR contracts leaf at import
   time, heavy imports lazy inside functions. If your code needs a third-party
   library that is not installed, the run HARD-FAILS with the ImportError --

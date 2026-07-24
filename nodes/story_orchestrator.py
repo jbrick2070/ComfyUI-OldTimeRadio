@@ -42,7 +42,6 @@ from random import SystemRandom
 _LEMMY_RNG = SystemRandom()
 _LEMMY_HISTORY = []  # Rolling window of recent Lemmy coin flips (True/False)
 import re
-import socket
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1051,18 +1050,26 @@ def body_scraper_unavailable() -> str:
 def _fetch_full_article(url, timeout=20):
     """Fetch the full text of a science article from its URL.
 
-    Uses requests + BeautifulSoup to strip HTML boilerplate and extract
-    the article body. Returns the raw text (up to 12000 chars) so Gemma
-    gets real science content - methodology, findings, implications -
-    not just the RSS teaser. Falls back to empty string on any failure
-    (paywalls, bot blocks, timeouts) so the caller can degrade gracefully.
+    Fetches through the bounded seam (`_otr_feed_fetch`) and uses
+    BeautifulSoup to strip HTML boilerplate and extract the article body.
+    Returns the raw text (up to 12000 chars) so Gemma gets real science
+    content - methodology, findings, implications - not just the RSS teaser.
+
+    Wave 5: the fetch is https-only, size-capped, redirect-capped and
+    address-checked. The two failure classes are NOT the same thing and are
+    handled differently on purpose. A `FeedFetchUnavailable` (paywall, bot
+    block, 404, timeout) still returns "" so the caller degrades to the next
+    candidate exactly as before. A `FeedFetchRefused` -- our own bound tripped,
+    e.g. a redirect into the private network or a 40 MB body -- PROPAGATES.
+    That is a defect in the URL or the configuration, and swallowing it is how
+    this function spent an unknown number of episodes silently returning ""
+    for a missing bs4 (see the scar below).
 
     The scraper tries a cascade of CSS selectors before falling back to
     the full document, so it handles sites that don't use semantic
     <article>/<main> tags (e.g. UCLA Newsroom, institutional press pages).
     """
     try:
-        import requests
         from bs4 import BeautifulSoup
     except ImportError as exc:
         # A MISSING PACKAGE MUST NOT LOOK LIKE A PAYWALL.
@@ -1097,11 +1104,21 @@ def _fetch_full_article(url, timeout=20):
             )
         return ""
 
+    from ._otr_feed_fetch import (
+        FeedFetchRefused, FeedFetchUnavailable, fetch_article,
+    )
+
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; OTR-ScriptBot/1.0)"}
-        resp = requests.get(url, timeout=timeout, headers=headers)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+        document = fetch_article(url, deadline_s=timeout)
+    except FeedFetchRefused:
+        raise                      # our own bound -- never swallowed
+    except FeedFetchUnavailable as exc:
+        log.debug("[NewsFetcher] article body unavailable (%s): %s",
+                  exc.reason, url)
+        return ""
+
+    try:
+        soup = BeautifulSoup(document.text, "html.parser")
 
         # Strip boilerplate - nav, ads, footer, sidebar, scripts
         for tag in soup(["script", "style", "nav", "footer", "header",
@@ -1553,17 +1570,22 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
         log.error(msg)
         raise ImportError(msg)
 
+    from ._otr_feed_fetch import FeedFetchRefused, fetch_feed
+
     def _fetch_single_feed(feed_url):
         data = []
-        FEED_TIMEOUT = 7
         try:
-            # Set socket timeout locally for this thread
-            _prev_timeout = socket.getdefaulttimeout()
-            socket.setdefaulttimeout(FEED_TIMEOUT)
-            try:
-                feed = feedparser.parse(feed_url)
-            finally:
-                socket.setdefaulttimeout(_prev_timeout)
+            # Wave 5: the bytes arrive through the bounded seam and feedparser
+            # is handed a STRING. It never touches the network here.
+            #
+            # What this replaced: `feedparser.parse(feed_url)` -- which does its
+            # own unbounded urllib fetch -- wrapped in a PROCESS-GLOBAL
+            # socket.setdefaulttimeout(7). That global was set and restored by
+            # every worker in a ~30-wide thread pool concurrently, so the
+            # timeout any given feed actually ran under was whatever another
+            # thread had most recently installed. It was never a per-feed
+            # timeout; it only looked like one.
+            feed = feedparser.parse(fetch_feed(feed_url).text)
 
             for entry in feed.entries[:6]:
                 title = entry.get("title", "").strip()
@@ -1587,6 +1609,12 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
                     "link": entry.get("link", ""),
                 })
             return data
+        except FeedFetchRefused:
+            # A shipped or client-authored feed row that is http://, points at
+            # a private address, or serves something that is not a feed is a
+            # CONFIGURATION defect, not a flaky feed. Let it out of the pool
+            # worker so `future.result()` re-raises it and the run fails loud.
+            raise
         except Exception as e:
             log.debug("[NewsFetcher] Feed failed %s: %s", feed_url, e)
             return []

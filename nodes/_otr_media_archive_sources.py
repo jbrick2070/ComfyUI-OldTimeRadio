@@ -125,6 +125,18 @@ def parse_media_archive_feed(
 
     Uses ``feedparser`` deliberately: it is already a project dependency and is
     more robust than a small bespoke XML parser for mixed RSS/Atom blog feeds.
+
+    Wave 5: when ``raw_or_url`` is a URL the bytes come from the bounded seam
+    (``_otr_feed_fetch``) and feedparser is handed a DOCUMENT. It previously
+    received the URL and did its own fetch, which had no timeout, no size cap,
+    no redirect cap, no scheme check and no address check. A ``FeedFetchRefused``
+    is deliberately NOT wrapped in ``MediaArchiveSourceError``: the caller
+    (``fetch_media_archive_rss``) collects that error per feed and carries on to
+    the next one, so wrapping a tripped bound would let a misconfigured feed URL
+    pass unnoticed whenever another feed happened to succeed.
+
+    The imports are function-local by design -- this module stays import-light
+    and free of network imports at module scope.
     """
     try:
         import feedparser
@@ -133,7 +145,19 @@ def parse_media_archive_feed(
             "feedparser is required for media archive RSS parsing"
         ) from exc
 
-    feed = feedparser.parse(raw_or_url)
+    from ._otr_feed_fetch import FeedFetchUnavailable, fetch_feed, looks_like_url
+
+    document = raw_or_url
+    if looks_like_url(raw_or_url):
+        try:
+            document = fetch_feed(raw_or_url).text
+        except FeedFetchUnavailable as exc:
+            raise MediaArchiveSourceError(
+                f"media archive feed could not be fetched: {exc}"
+            ) from exc
+        source_url = source_url or raw_or_url
+
+    feed = feedparser.parse(document)
     feed_label = _feed_title(feed, source_url or raw_or_url)
     out: list[dict] = []
     for entry in getattr(feed, "entries", []) or []:
