@@ -24,8 +24,11 @@ same session (complete-ledger contract grounded per-consumer via a DC fan-out:
 voice loop / scene_sequencer / shot_lock / captions / credits roll /
 master mux+obs_publish, with SOURCE_BANK_GUIDE s5+s7 as the authored-inputs
 base) + linked from README's source-banks section. CODER E UNGATED.
-Next: CODER E (independent-banks lean v1 code, re-pin at HEAD) or CODER A
-(bug-first); both open.
+Next: CODER E (operator-chosen) -- code independent-banks lean v1 on an OPUS
+window (Fable stays reserved for the section-9 epoch gate; this is structural
+code = Claude rung 4, Qwen rung-1 triage, codex gpt-5.6-sol high via
+two-strikes). Re-derive every line pin at the recorded HEAD before editing.
+CODER A (bug-first) remains open as the parallel track.
 Models: Claude Opus (planner/judge) + 10 kibitz calls (codex gpt-5.6-sol high +
 agy Gemini 3.6 Flash High). $0 local panel + Codex weekly credits.
 Commits: docs handoff (this session's docs by pathspec).
