@@ -14,8 +14,14 @@ choices live from the registry and a bank's own `default_story_model` picks its
 pack, so no node, widget, link or canonical-JSON change was ever needed --
 canonical is still byte-identical at `A66A416B` after all seven waves. Suite
 6403 / Bible 17. `docs/EXTENDING_OTR.md` is the client contract of record.
-NEXT: SIX-BANK REQUALIFICATION + 45-WORD SCENE MATRIX for the render track;
-bug-first items for CODER A; Randomizer A -> `dynamic_story` is now UNBLOCKED.
+**OPERATOR RESCOPE 2026-07-24 (supersedes the older queue everywhere in this
+file):** the 45-word scene matrix, the 54-case visual-style sweep and the
+WHOLE quick-wins block are CUT -- the operator wants coding, not matrices, and
+will triage bugs as a batch later. The order is now **WAN 8-GB contract ->
+LEAN-MEAN FRONT -> Randomizer A -> `dynamic_story` -> LEAN-MEAN TAIL -> SFX ->
+re-observe the parked story bugs.** ENGINE_MATRIX survives the cut as a W6
+sub-step, not a standalone chunk. Two story-shaped defects are PARKED, not
+closed (see OPEN BUGS).
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to
@@ -96,9 +102,8 @@ user changes.
 
 1. Preserve the completed run artifacts and record its 4/5 120-word receipt
    result; do not rerun the known provider-capacity failure as a workaround.
-2. After a fresh selective reset, run the bounded 45-word scene-consuming
-   qualification in `still_word`, `mesh_stage`, `ltx_video`, and `ltx_audio_in`
-   order using `workflows/otr_canonical.json`; stop at the first shared failure.
+2. Open a coder window on the WAN 8-GB low-VRAM launch contract. It is the
+   first item of the rescoped order and needs no GPU to write.
 3. For any reproduced failure, fix the owning producer/receipt boundary,
    re-run focused tests, the full Windows suite, and Bug Bible, then commit and
    push the green code chunk to `v2.0-alpha` and verify `HEAD == origin`.
@@ -160,19 +165,27 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- six-bank requalification + bug-first fixes
+## CURRENT STEP -- WAN 8-GB contract, then the lean-mean front
 
-The retirement chunk is LANDED (`314dd481`); the coder slot is FREE. In
-order:
+Operator rescope 2026-07-24. The coder slot is FREE and the order is fixed:
 
-1. Requalify the captured six-bank leg against the landed code: require
-   canonical `RESULT SUCCESS`, `obs_publish OK`, exact episode/OBS assets,
-   AND the archival final's parent equal to the ledger-owned episode root
-   (PBUG-20260720-05 acceptance).
-2. Close the remaining bug-first items below, one green pushed chunk each.
-3. Keep the RTX 5080 free for ComfyUI; the 4060 Qwen endpoint is a read-only
-   QA reviewer, not a production ComfyUI slot.
-4. Keep GPU media qualification paused until the bug-first items are closed.
+1. **WAN 8-GB low-VRAM launch contract** -- make the 8-GB profile carry its
+   actual 832x480 / 17-frame launch contract instead of falling back to the
+   177-frame default. Pure coding; no GPU needed to write it.
+2. **LEAN-MEAN FRONT** (`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 ->
+   W5+SW4 -> C1-C5`), with `docs/ENGINE_MATRIX.md` folded in as a W6 sub-step.
+3. **Randomizer A -> `dynamic_story`.**
+4. **LEAN-MEAN TAIL** (`SW1/SW2/SW3 -> C6 -> C7 -> W8`).
+5. **SFX** (still behind the Timeline Cue Ledger C0/C1 gate).
+6. **Re-observe the parked story bugs** -- after SFX, see whether they still
+   occur at that HEAD (see OPEN BUGS).
+
+Standing constraints, unchanged by the rescope: keep the RTX 5080 free for
+ComfyUI; the 4060 Qwen endpoint is a read-only QA reviewer, not a production
+ComfyUI slot; six-bank requalification (canonical `RESULT SUCCESS`,
+`obs_publish OK`, exact episode/OBS assets, and the archival final's parent
+equal to the ledger-owned episode root -- PBUG-20260720-05 acceptance) is
+still owed whenever a render window next opens, and was NOT cut.
 
 ## OPERATOR CAMPAIGN QUEUE -- 2026-07-23 (PAUSED)
 
@@ -193,11 +206,11 @@ Bug-first order before resuming:
    scene/mesh-consuming ownership contract is the remaining piece.)
 3. Make the WAN 8-GB profile carry its actual 832x480/17-frame low-VRAM
    launch contract instead of falling back to the 177-frame default.
-4. Then provider-capacity and SciFi News markup-repair residuals, followed by
-   a fresh 45-word visual-style qualification.
+4. Then provider-capacity and SciFi News markup-repair residuals.
 
-Deferred media qualification order (unchanged; exact word counts and matrices
-ARE the queue -- any new length/provider tier is a new operator decision):
+Remaining media qualification (CUT DOWN by the operator rescope 2026-07-24 --
+the 45-word model-coverage matrix and the 54-case visual-style sweep are
+DELETED, not deferred; reviving either is a new operator decision):
 
 1. Six 120-word canonical runs in bank order `media_archive`, `original`,
    `public_domain`, `shakespeare`, `scifi_news`, `scifi_news_pro`:
@@ -205,14 +218,7 @@ ARE the queue -- any new length/provider tier is a new operator decision):
    `viz_mxc_mandala` / `viz_camera` video slots, `z_image_turbo` all three
    image slots. (4/5 of the 120w receipts are already banked from
    `tmp/six_bank_sweep_20260723_205002_331`; `scifi_news` is the open FAIL.)
-2. Local 45-word model coverage: one video model across all three video slots
-   and one local image model across all three image slots per case, banks
-   rotated; covers local viz/still/mesh/word engines, LTX, HuMo, Wan. Cloud
-   video/image providers excluded (external/billable).
-3. Fifty-four 45-word `ltx_audio_in` runs: every live visual style (`anime`,
-   `archival_documentary`, `cartoon`, `paper_origami`, `recur_frac`,
-   `sci_fi_radio`, `shakespeare_stage_realism`, `storybook_engraving`,
-   `video_art`) across all six banks.
+   This is the ONLY surviving matrix.
 
 The coordinator keeps one canonical API prompt active at a time, reloads
 `workflows/otr_canonical.json` for every case, and records each prompt and
@@ -220,21 +226,41 @@ receipt under `tmp/`.
 
 ## OPEN BUGS / DEFECTS (live, not yet closed)
 
+MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
+That split is why the two eyeball-era entries below are PARKED rather than
+listed as live.
+
 - **`scifi_news` P0 convergence defect** -- both 120w and 320w legs fail in P0
   after two attempts on non-literal fact source spans; provider/model
   convergence, extends BUG-11.35. NOT a word/length gate. Blocks the last 120w
-  receipt and quick-win 1.
+  receipt and the `scifi_news` live reverify (PBUGs 20260712-22/23/24/25, fixed
+  in tree, reverify still owed).
 - **`scifi_news_pro` provider capacity** -- `requested_output=2800` vs
   provider cap `512`; the whole-artifact retry contracts LANDED @ `314dd481`
   are the base; the residual fix is now unblocked. Related independent items: the P9 8K
   structured-capacity follow-up + the GGUF structured-enforcement NEWBUG. Do
   not raise the minimum word target as a capacity workaround.
-- **WAN 8-GB low-VRAM launch contract** -- bug-first item 3 above.
+- **WAN 8-GB low-VRAM launch contract** -- FIRST item of the rescoped order.
 - **Image-phase still ownership** -- bug-first item 2 above.
-- **Announcer framing defect** (`docs/2026-07-11-announcer-framing-defect.md`,
-  OPEN) -- quick-win 3.
-- **Name-splice defect #2** -- OPEN per its timebox (v4-campaign Phase 0
-  record in HANDOFF_LOG).
+
+**PARKED -- unverified at HEAD, re-observe AFTER SFX (operator 2026-07-24).**
+Both were eyeball observations against a story engine that has since had its
+LLM vetoes ripped, THE LAW imposed (2026-07-22), six banks renamed onto new
+packs, word-fit ceilings retired, the repair-first plan landed, and a ledger
+cleanup pass added. Neither has a reproduction at current HEAD, and under the
+standing rule a finding with no reproduction is not a row. Do NOT schedule
+coder time against either. They are settled by the operator eyeballing a real
+render leg after SFX: still there -> re-admit as a FRESH dated row with that
+leg as evidence; gone -> the LAW-era work already fixed it, tombstone it.
+
+- **Announcer framing defect** (`docs/2026-07-11-announcer-framing-defect.md`)
+  -- PARKED. Episodes START a story instead of admitting you into one; the
+  announcer takes debate turns instead of framing. Operator eyeball
+  2026-07-11. If it survives re-observation the fix is still seam + score
+  contract + fail-closed validator, never Python authorship.
+- **Name-splice defect #2** -- PARKED. v4-campaign Phase 0 record in
+  HANDOFF_LOG; its timebox predates THE LAW.
+
 - **PBUG-20260710-07** -- root fix shipped; stays ROOT-OPEN in the log until
   ratified at the next operator fan-out (green codex leg `c1f3891f` is the
   retire candidate).
@@ -247,43 +273,57 @@ One coder window at a time; every chunk = focused tests + full suite + Bug
 Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
 
 ```text
-six-bank requalification (chunk landed @ 314dd481)
-  -> bug-first items (receipt truth live, still ownership, WAN contract)
-  -> 45w scene matrix + 54-case visual-style qualification
-  -> quick-wins block (coder windows A/B/C)
+WAN 8-GB low-VRAM launch contract
   -> LEAN-MEAN FRONT (W0->W1->W2->W3->W4a->W4b->W7->W6->W5+SW4->C1-C5)
-  -> [DONE 2026-07-24 @ 30358ad1] independent client-authored source banks v1
+       (ENGINE_MATRIX.md is a W6 SUB-STEP now, not a standalone chunk)
   -> Randomizer A -> dynamic_story  (UNBLOCKED: extensibility landed)
   -> LEAN-MEAN TAIL (SW1/SW2/SW3 -> C6 -> C7 -> W8)
-  -> ROADMAP (SFX campaign after Timeline Cue Ledger gate)
+  -> SFX campaign (after the Timeline Cue Ledger C0/C1 gate)
+  -> re-observe the PARKED story bugs; batch-triage whatever is left
 ```
 
-### Quick-wins block (~5-11 coder-days; small chunks, any order inside)
+CUT by the operator 2026-07-24 and NOT to be re-derived by a later window: the
+45-word scene matrix, the 54-case visual-style sweep, and the entire
+quick-wins block. Image-phase still ownership and the six-bank requalification
+were not cut -- they stay in OPEN BUGS / the campaign queue and get picked up
+whenever a render window opens.
 
-| # | Chunk | Gate | Est |
-|---:|---|---|---:|
-| 1 | `scifi_news` reverify tail | PBUGs 20260712-22/23/24/25 FIXED IN TREE, LIVE REVERIFY PENDING. The 120w sweep leg is the natural reverify vehicle but is itself blocked by the P0 convergence defect above -- fix that first, then one green base `scifi_news` 120w leg closes both; mark the log and release the slot formally. | 0.25-0.5 d |
-| 2 | Cliche-span excision (X1-X4) | `docs/2026-07-10-llm-first-story-edit-pass.md` Wave 3: `repair_cliche_span` (`_otr_line_composer.py` ~:2632/:2676) + `cliche_replacements` in the story_rules JSONs still rewrite SPOKEN lines -- a standing LLM-first violation. Excise deterministically. Do not land mid-sweep of an active qualification campaign (uniform-code confound). | 0.5-1 d |
-| 3 | Announcer framing contract | `scifi_news_pro` already contracts announcer intro/outro-only; the structural gap is the `scifi_news` dedicated story graph. Ship the `scifi_news` structural-contract chunk (seam + score contract + fail-closed validator, lawful under THE LAW), then AUDIT the other banks' frames before touching them. Fold into the same pass as quick-win 4 so packs are touched once. | 0.5-1 d |
-| 4 | Bank IMPROVE passes (720-verdict survivors) | Only the kept banks: `shakespeare` (confirm which seam version produced judged leg `c42700e1`; second prompt pass if the fix didn't take) + `original` (clarity/throughline without losing the noir mood + the F2 weapons-steering finding). The scifi_sonnet and science_news rows are RETIRED-BY-RIP. Standing consideration: source-native dramatic framing for shakespeare/public_domain vs the shared adapter. Seam/prompt work, no Python authorship. | 0.5-2 d |
-| 5 | Canonical watchdog support | Runner heartbeats, watchdog recognizes canonical `RESULT`, pinned failure/stall paths; launcher has TWO missing-log echoes (C7 `scripts/_otr_soak_server_launch.cmd:38`, manifest `:48`) -- redirect both to quoted `%~1` and prove both appear in the server log. Harness defect, not a PBUG. | 0.5 d |
-| 7 | Rip interstitial audio only | Node 83's cue audio/manifest fans to SceneSequencer via links 280/281 and to EpisodeAssembler via 282/283; SceneSequencer inserts interstitials at `scene_sequencer.py` ~:794-951. Remove ONLY the SceneSequencer side (links 280/281, its two cue inputs, insertion path, retired timing + mirrored-ledger fields -- enumerate them); RETAIN 282/283 + opening/closing synthesis + `music_inter` story/visual semantics. Canonical JSON updated + validated in the SAME commit. If shipped before lean-mean, mark the plan's standalone interstitial rip SATISFIED at re-ground. | 0.5-1 d |
-| 8 | `docs/ENGINE_MATRIX.md` | Emit from the three live CAPABILITIES registries per the existing generator pattern (`build_variants.py` ~:276-338): write during `--all`/explicit emit; `--check` regenerates in memory and FAILS on drift without writing. Columns + stable ordering; link from README. PRECONDITION for Lean-Mean W6. | 0.5-1 d |
-| 9 | Context/cap foundation | One provider-effective cap/count/reservation/must-fit authority feeding preflight, invocation, receipts; no silent truncation, no blind cap raise. Owner module must be CREATED (none exists; cap logic scattered across writer + backends -- both r4 panelists hallucinated `_otr_generation_budget.py`). Enumerate migrations at build: `_otr_openrouter_backend.py`, `_otr_comfy_backend.py`, `_otr_google_api/llm.py`, `_otr_gguf_backend.py`, `_otr_model_loader.py`, writer preflight. Acceptance: preflight and invocation provably make the SAME decision; must-fit overflow fails loud; receipts show provider, resolved model, cap source, counts, reservation, effective output. RE-GROUND against the dirty-tree provider-capacity contracts + the 16384 Mistral-Nemo cap fix before scoping. Carries the diagnostic-gap class from SUPERSEDED PBUG-20260712-17. | 1-3 d |
-| 10 | Operator backlog (render tuning) | (a) Kokoro ALL-CAPS pre-TTS normalization: kokoro serves the ANNOUNCER bus, indextts2 the character bus (canonical nodes ~81/82 -- confirm at build); normalize a TTS-only copy, never ledger `spoken_text` or captions. (b) Credits ~1.5x faster = CONSTANT-ONLY: `_SCROLL_PPS = 60.0` (`otr_credits_roll.py:70`) -> 90.0, duration/`_MAX_HOLD_S`/no-truncation tests, NO canonical JSON change; the node reads a filesystem path + global ledger with no `IS_CHANGED` -- add a change key or force rerun. Ideal filler during render campaigns. | 0.5-1 d |
+### Quick-wins block -- CUT 2026-07-24 (operator)
 
-(Quick-win 6, `scifi_news_pro` C5 consumers, is CLOSED IN CODE under
-PBUG-20260720-04; only the live six-bank qualification remains and is covered
-by the campaign queue.)
+The whole block is gone. The operator's call, verbatim in intent: "we will
+triage more bugs later" -- the block was a schedule, and ripping a schedule
+does not rip the underlying defects. Everything in it that was a real bug
+still lives in OPEN BUGS above; everything in it that was a nice-to-have is
+simply not being built. Do NOT re-derive this table from git history.
+
+ONE item survived the cut, folded into LEAN-MEAN W6 as a sub-step rather than
+kept as a standalone chunk:
+
+- **`docs/ENGINE_MATRIX.md`** -- emit from the three live CAPABILITIES
+  registries per the existing generator pattern (`build_variants.py`
+  ~:276-338): write during `--all` / explicit emit; `--check` regenerates in
+  memory and FAILS on drift without writing. Columns + stable ordering; link
+  from README. The lean-mean doc (`:301-304`) only needs W6's README policy
+  line to link it, so this is an ordering preference the operator set on
+  2026-07-10 -- NOT a hard technical dependency. W6 executes without it; the
+  README link is what suffers. Estimate 0.5-1 d.
+
+Also recorded so a later window does not re-open them: quick-win 6
+(`scifi_news_pro` C5 consumers) was already CLOSED IN CODE under
+PBUG-20260720-04. The `scifi_news` live reverify (PBUGs 20260712-22/23/24/25)
+is not lost either -- it moved into the `scifi_news` P0 convergence row in
+OPEN BUGS, which is what actually blocks it.
 
 ### Big blocks (in ROADMAP-ratified order)
 
 1. **LEAN-MEAN FRONT** (`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 ->
    W5+SW4 -> C1-C5`) -- `docs/2026-07-10-lean-mean-rip-final.md`, D-1..D-6
    RATIFIED. Execute after its 2026-07-15 drift-check header is satisfied
-   (SW-3 news_ingest re-survey, W6 keep-list adds + ENGINE_MATRIX
-   precondition = quick-win 8, W7 tombstone re-triage, R-7 re-grep; SW-1
-   writer re-survey waits for the TAIL). Dedicated window; multi-day.
+   (SW-3 news_ingest re-survey, W6 keep-list adds, W7 tombstone re-triage,
+   R-7 re-grep; SW-1 writer re-survey waits for the TAIL). ENGINE_MATRIX is
+   now a W6 SUB-STEP of this block, not a separate precondition to satisfy
+   first. Dedicated window; multi-day. THIS IS THE SECOND ITEM IN THE
+   RESCOPED ORDER, after the WAN 8-GB contract.
 2. **Randomizer Rolls Design A** --
    `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`. NO LONGER GATED --
    extensibility landed, and its `_otr_lane_specs` authority was ABSORBED by
@@ -314,11 +354,11 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
-| RENDER (running now) | finish six-bank wrap -> 45w scene matrix -> 54-case style sweep; fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | bug-first items closed per campaign queue | GPU days |
-| CODER A "seams" | bug-first items 1-3 (receipt-truth live confirm, still ownership, WAN contract), then quick-wins 1 + 2 + 3 + 4 | Claude codes, Qwen triages, codex on 3rd strike | no code mid-sweep | ~2-4 d |
-| CODER B "harness" | quick-wins 5 + 10, then one canonical `scifi_news_pro` full-media qualification leg | same | after A | ~1-2 d |
-| CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
-| CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |
+| RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
+| CODER A "seams" | **the WAN 8-GB low-VRAM launch contract** -- first item of the rescoped order, no GPU needed to write. Then image-phase still ownership if the slot is still open. | Claude codes, Qwen triages, codex on 3rd strike | UNGATED | ~1-2 d |
+| ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
+| ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
+| CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5, with ENGINE_MATRIX as a W6 sub-step | same | after A | multi-day |
 | PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out + the `check_compatibility` fork; plan upkeep | rungs 2-4 | parallel with D | docs |
 | ~~CODER E~~ | independent client-authored source banks v1 -- **ALL SEVEN WAVES DONE @ `30358ad1`**; slot RETIRED, do not reopen (deferred power-user tiers are a NEW block, not this one) | -- | -- | -- |
 | CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | UNGATED (E is done; re-pin at HEAD first) | ~6-11 d |
@@ -349,11 +389,11 @@ Kickoff lines (paste as the FIRST message of the new window; swap the letter):
 
 | Record | Pending action |
 |---|---|
-| `PBUG-20260712-22/23/24/25` | Live reverify (quick-win 1), then fan-out |
+| `PBUG-20260712-22/23/24/25` | Live reverify -- blocked by the `scifi_news` P0 convergence defect, then fan-out |
 | `PBUG-20260712-18/19/26` + `PBUG-20260713-15..18` + `-20` | Awaiting the next operator Bible fan-out (overlap check + approval) |
 | `PBUG-20260713-19` | Live requalification pending (promoted BUG-05.11) |
 | duplicate-id cleanup | Same fan-out: BUG-11.54 legacy_id -> `PBUG-20260713-21`; verify the acronym-union rule's legacy_id (both Bible rows cite `-10`; see the log's renumber note) |
-| historical `PBUG-20260711-18` | Keep as the quick-win-9 engineering risk; never eligible from static evidence |
+| historical `PBUG-20260711-18` | Keep as a standing context/cap engineering risk (its quick-win-9 home was cut 2026-07-24); never eligible from static evidence |
 | `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
 
 The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval
@@ -362,7 +402,7 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-24): full Windows suite `6398 passed /
+- Current whole-tree receipt (2026-07-24): full Windows suite `6403 passed /
   27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`.
   Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
@@ -466,6 +506,10 @@ codex56sol attempt telemetry + PBUG-20260712-17 root fix -- fresh two-matrix
 bakeoff -- Qwen-Image still engine (removed 2026-07-23) -- word-fit ceilings /
 candidate campaigns -- style-dropdown four-surfaces -- otr-build-tracker
 artifact -- `tencent/hy3:free` panel seat (expired 2026-07-21) --
+**the 45-word scene matrix, the 54-case visual-style sweep, and the entire
+quick-wins block (CUT by the operator 2026-07-24: coding over matrices, bugs
+triaged as a batch later; ENGINE_MATRIX survived as a Lean-Mean W6 sub-step,
+CODER B and CODER C dissolved with the block)** --
 **independent client-authored source banks v1 (all seven waves, CODER E,
 2026-07-24 @ `30358ad1`; contract `docs/EXTENDING_OTR.md`; w7 closed by
 assessment -- no widget was needed and none was invented)** -- the retired

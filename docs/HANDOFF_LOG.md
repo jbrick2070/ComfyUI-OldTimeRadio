@@ -3,6 +3,52 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 16:20 -- HEAD d036931b (v2.0-alpha) -- OPERATOR RESCOPE (Opus)
+Did: recorded an operator scope decision in GO_FORWARD. No code touched.
+CUT, on the operator's call ("i need to get coding done", "we will triage more
+bugs later"): the 45-word scene matrix, the 54-case visual-style sweep, and
+the ENTIRE quick-wins block. CODER B and CODER C dissolved with it -- both
+windows existed only to hold quick-wins. New order, operator-dictated: WAN
+8-GB contract -> LEAN-MEAN FRONT -> Randomizer A -> dynamic_story -> LEAN-MEAN
+TAIL -> SFX -> re-observe the parked story bugs.
+NOT cut, and said so explicitly so a later window does not assume otherwise:
+the six-bank 120w requalification and image-phase still ownership. Ripping a
+schedule does not rip the defects under it.
+ONE item survived the quick-wins cut as a LEAN-MEAN W6 SUB-STEP, not a
+standalone chunk: `docs/ENGINE_MATRIX.md`. Worth recording WHY, because I got
+this wrong first and had to correct it in front of the operator: GO_FORWARD
+called it a "PRECONDITION for Lean-Mean W6", and I repeated that as a hard
+blocker. The source doc (`docs/2026-07-10-lean-mean-rip-final.md:301-304`)
+says only that W6's README policy line "should link it" and that it lands
+before the campaign -- an ORDERING PREFERENCE the operator set on 2026-07-10,
+not a technical dependency. W6 executes without it. The class: GO_FORWARD's
+one-line summary of a source doc can be STRONGER than the doc; when a
+"precondition" is about to cost the operator a decision, read the source.
+THE OPERATOR'S OWN CALL, and it is a good one worth keeping as doctrine:
+"we have done so much story engine change, i'm not sure the old story bugs are
+bugs to be honest." Correct, and it splits on a clean line -- MECHANICAL
+defects survive story-engine churn (WAN frame counts, a 2800-vs-512 cap, a
+missing receipt), STORY-QUALITY judgments do not. The two eyeball-era rows
+(announcer framing 2026-07-11, name-splice #2) were observed against an engine
+that has since had its LLM vetoes ripped, THE LAW imposed, six banks renamed
+onto new packs, word-fit ceilings retired, the repair-first plan landed and a
+ledger cleanup pass added. Neither has a reproduction at HEAD, and the
+standing rule already says a finding without one is not a row. Both are now
+PARKED with their doc links intact -- not deleted, because deleting loses the
+observation -- and are settled by the operator eyeballing a real render leg
+AFTER SFX: still there -> re-admit as a FRESH dated row with that leg as
+evidence; gone -> the LAW-era work already fixed it, tombstone it. No coder
+time is scheduled against either meanwhile.
+Also fixed in passing: the whole-tree receipt line still read 6398 (wave 6's
+number) after wave 7 landed 6403.
+Current step: WAN 8-GB low-VRAM launch contract, CODER A, ungated, no GPU
+needed to write it.
+Next: CODER A takes the WAN contract; CODER D takes the lean-mean front after
+it. RENDER opens only when the operator wants the six-bank 120w wrap.
+Models: Claude Opus (rung 4) only; a plan edit, not a build.
+Commits: this one.
+
+
 ## 2026-07-24 15:42 -- HEAD 30358ad1 (v2.0-alpha) -- WINDOW CODER E (Opus)
 Did: independent source banks WAVE 7 -- ASSESSED, then closed. One green pushed
 chunk @ `30358ad1`, and the block is DONE for v1 (all seven waves).
