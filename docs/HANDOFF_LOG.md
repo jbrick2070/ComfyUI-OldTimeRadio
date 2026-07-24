@@ -3,6 +3,40 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 ~12:00 -- HEAD 66e214ec (v2.0-alpha) -- WINDOW CODER E (Opus)
+Did: independent source banks waves 1-2, one green pushed chunk @ 66e214ec.
+New `nodes/_otr_user_banks.py` -- client bundle discovery + integrity
+(timestamp-free content-addressed digest over authoring bytes, activation
+receipt + snapshot check, symlink/path-escape refusal, protected + malformed id
+refusal); it NEVER raises for a bundle problem, it returns (admitted, issues).
+`_otr_story_routing.py` now admits client rows ALONGSIDE the shipped six
+through the SAME `_parse_bank` and the same pack/pipeline/seam cross-refs
+(extracted `_sweep_pack_dir` + `_crossref_bank`); pack resolution routes by
+OWNER via a new `pack_dirs` map instead of assuming the shipped root; registry
+publishes atomically behind a re-entrancy guard; `_clear_caches` resets the
+flag too; new `list_validation_issues()` / `user_bank_bundle()`. Asymmetry
+pinned by test: a bad shipped seed still kills node registration, a bad client
+bundle quarantines alone. 53 new tests (`test_user_bank_bundles.py`,
+`test_user_bank_admission.py`). `docs/EXTENDING_OTR.md` updated to the landed
+bundle layout / id rules / activation-staleness contract.
+Gotcha for the next window: `test_story_pack_stage1.py::test_only_sanctioned_
+consumer_uses_loader` is a plain SUBSTRING grep over `nodes/**.py` -- merely
+NAMING `_otr_story_pack` in a docstring trips it. Reword, do not weaken the
+guard. Also the known-fail-guard plugin swallows pytest's FAILURES section, so
+diagnose failures with a temp probe script, not `--tb=long`.
+Current step: CODER E wave 3 -- client-owned `fetch_source`/`interpret_source`
+execution (`fetcher`/`interpreter` = `"self"`, bundle module loaded function-
+locally, `_otr_source_payload` resolvers take an owner bundle, `_crossref_bank`
+accepts `"self"` for client rows only; results still pass
+`normalize_fetch_result` / `validate_interpreter_result`). Re-derive the writer
+call sites in `OTR_LedgerScriptWriter.py` FIRST.
+Next: fresh Opus CODER E window takes wave 3. CODER A (bug-first items) and the
+RENDER track remain open in parallel.
+Models: Claude Opus (rung 4) only. No panels, no Codex, no roundtable spent --
+no fix needed a second attempt.
+Commits: 66e214ec (waves 1-2) + this handoff commit.
+
+
 ## 2026-07-24 ~09:55 -- HEAD 314dd481 (v2.0-alpha) -- WINDOW PLANNER (Opus)
 Did: ran extensibility hardening. Full r1-r4 `/kibitz` arc + an r5
 simplification pass on the user-source-lanes architecture (codex gpt-5.6-sol
