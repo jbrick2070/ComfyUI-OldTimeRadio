@@ -5668,12 +5668,36 @@ class OTR_LedgerScriptWriter:
         # Sprint 3E (2026-05-25): the former J.6 post-hoc title
         # substitution -- another such ledger-only mutation -- is gone
         # (late title binding means no provisional title in dialogue).
-        # Content-owned lanes seal canonical ``text`` before this shared
-        # tail, so their pronunciation-safe delivery string must be stamped
-        # here, after every writer-side text mutation and before the lane
-        # finalizer's Phase-10 freeze.  This is the one final producer
-        # boundary shared by every content-owned source bank; legacy lanes
-        # keep their byte-identical canonical-text delivery path.
+        # What follows is the one final producer boundary shared by every
+        # source bank: after every writer-side text mutation, before the lane
+        # finalizer's Phase-10 freeze.
+        #
+        # Independent source banks wave 6: the LEDGER CLEANUP PASS. Every
+        # downstream consumer reads FIELDS, so this boundary owes them a
+        # COMPLETE ledger -- especially for a client-authored bank, whose own
+        # code may never touch the ledger and whose source material may have
+        # been thin. The pass completes what the writer owns deterministically,
+        # REPAIRS unsafe spoken language in place (content is never a
+        # story-fail; the freeze gate's G9 stays the last-resort backstop),
+        # fills the one required prose field, and raises only when a required
+        # field has no owner and no value. It runs BEFORE the delivery stamp
+        # below: sanitizing after that stamp would leave text_for_tts carrying
+        # language the canonical row no longer has.
+        #
+        # The pass does NOT own the episode seed. That receipt has one owner
+        # per lane family -- the seeded cast picker upstream for legacy lanes,
+        # the content-owned block just below for lanes that never run it --
+        # and a freshly minted seed is not derivable from the inputs, so a
+        # pass that minted one for every lane would make this tail
+        # irreproducible (tests/test_fable2_tail_context.py pins that).
+        from . import _otr_ledger_cleanup as _OTRLCLEAN
+        with slot_scheduler.helper_context("ledger_cleanup"):
+            _OTRLCLEAN.run_ledger_cleanup(
+                led.data,
+                slot_fn=technical_generate_fn,
+                bank_id=str(meta.get("source_bank") or ""),
+            )
+
         from ._otr_readiness import stamp_text_for_tts_delivery
         from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
         if delivery_mode_for_meta(meta) == CONTENT_OWNED:
@@ -5698,6 +5722,9 @@ class OTR_LedgerScriptWriter:
                     "(%s) stamped before freeze",
                     _episode_seed, _episode_seed_source,
                 )
+            # Canonical ``text`` is sealed before this shared tail, so the
+            # pronunciation-safe delivery string is stamped here -- after the
+            # cleanup pass above, the last thing that may touch that text.
             stamp_text_for_tts_delivery(led)
 
         # story-ledger DRIFT chunk 2 (2026-06-25): PRE-FREEZE cross-stage

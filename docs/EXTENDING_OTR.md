@@ -233,17 +233,41 @@ user_packs/source_banks/<bank_id>/
 
 ## 4. The ledger-cleanup pass (your safety net, not your license)
 
-After your fetch/interpret and the writer's passes, the shared tail runs a
-ledger cleanup/completion pass: deterministic checks plus as many LLM passes
-as needed to fill gaps, normalize rows, and sanitize content IN PLACE.
+After your fetch/interpret and the writer's passes, the shared tail runs
+`nodes/_otr_ledger_cleanup.run_ledger_cleanup` -- deterministic completion,
+then safety repair, then a bounded LLM fill -- and stamps its receipt at
+`meta.ledger_cleanup`. It is the last thing that touches canonical line text.
 
-- **Content is repaired, never fatal.** Profanity or unsafe content in a line
-  gets sanitized in place. Length, style, vocabulary, and quality NEVER fail a
-  story (the standing law: an audit may improve a story, never fail one).
-- **Structure is fatal.** A required field with no owner and no value after
-  cleanup -- a line with no `line_id`, a speaker with no cast row, a missing
-  `episode_seed` -- hard-fails the run with the field named. Fix the bank, not
-  the symptom.
+- **It fills what it can derive.** A row with no `line_id` gets one minted; a
+  duplicate id is renamed, not dropped; a blank `speaker_role` is resolved
+  from a `char_id` that names a real cast row; a row with nothing sayable
+  becomes an EXPLICIT skip carrying its reason instead of a silent hole; stale
+  word/char counts are re-derived. Nothing here authors prose.
+- **Content is repaired, never fatal.** Profanity and explicit weapon or
+  sexual language in a delivered spoken row is rewritten in place by the
+  shared same-story cleanup. If repair itself fails, the residual hits are
+  reported and the freeze gate's G9 check remains the last-resort backstop --
+  the cleanup pass never adds a second terminal content policy. Length, style,
+  vocabulary and quality NEVER fail a story (the standing law: an audit may
+  improve a story, never fail one).
+- **One prose field is filled for you.** A blank `meta.episode_title` gets one
+  bounded same-story LLM title, then a title derived from your source
+  headline. `otr_credits_roll` raises on a missing title, so a hole here would
+  otherwise surface as a crash minutes later in a node with no idea which bank
+  caused it.
+- **Structure is fatal.** A required field with NO owner and NO value after
+  all of the above hard-fails with every offending field named at once: a
+  blank `speaker_role` that no `char_id` could resolve, a role outside the
+  five allowed values, a voiced row with no `char_id` at all, a skip row with
+  no reason, a cast row with no `char_id` or no `name`, an unfillable
+  `episode_title`. Fix the bank, not the symptom.
+- **What it does NOT judge.** Fields another producer stamps later are not
+  holes here: `meta.style`, `meta.render_engines` / `image_engines` /
+  `music_engine`, the timeline (`start_s` / `dur_s`) and the clips manifest.
+  Nor is the episode-seed receipt, which is owned by the cast picker or by the
+  writer's content-owned branch. And a voiced `char_id` need not name a cast
+  row -- the ANNOUNCER speaks on nearly every episode with no cast entry at
+  all.
 
 ## 5. Author checks before you activate
 
