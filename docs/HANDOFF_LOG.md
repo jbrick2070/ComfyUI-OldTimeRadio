@@ -3,6 +3,72 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-24 12:22 -- HEAD 8c45172d (v2.0-alpha) -- WINDOW CODER E (Opus)
+(Clock note: the entry below it reads 14:05 but its commit `eba8da25` is
+stamped 11:45 local. This entry's time is the real local time; the log is
+append-only, so that one stands as written.)
+Did: independent source banks WAVE 5, two green pushed chunks.
+`c97a0e91` = `nodes/_otr_feed_fetch.py`, the ONE bounded seam OTR uses to reach
+the network for source text: https-only with no silent upgrade, connect 5s /
+read 10s, 3 redirects, a 2 MiB DECODED cap enforced during the read AND again
+after content-encoding, 2 retries, loopback/private/link-local/multicast/
+reserved reject on EVERY redirect hop, MIME media-type parse, one ~25s
+monotonic deadline, UA + charset detection. Stdlib-only so a client bundle can
+import it with no dependency and activation never drags in requests/feedparser.
+THE DESIGN DECISION worth carrying forward is the FAILURE SPLIT:
+`FeedFetchRefused` (a bound of OURS tripped -- loud, never retried, never
+swallowed) vs `FeedFetchUnavailable` (the remote did not deliver -- an ordinary
+per-URL miss a caller holding other candidates may catch). Collapsing them
+either lets one paywalled article kill a run, or makes a redirect into the
+private network look like a paywall. The article scraper therefore keeps
+returning "" for Unavailable (unchanged degrade-to-next-candidate) while a
+Refused propagates.
+THE FIND: re-pinning at HEAD showed the plan undercounted -- there were THREE
+unhardened hops, not two. The third, `_otr_media_archive_sources.
+parse_media_archive_feed`, handed feedparser a URL with no bound at all. Also
+worth keeping: `_fetch_single_feed`'s `socket.setdefaulttimeout(7)` was never a
+per-feed timeout. It is PROCESS-GLOBAL, and a ~30-wide thread pool set and
+restored it concurrently, so the timeout any feed actually ran under was
+whatever another thread had most recently installed. It only looked like a
+bound. Both hops now hand feedparser a STRING; it never touches the network.
+`8c45172d` = the `missing_module` quarantine message told clients the bundle
+"must ship one module with fetch_source + interpret_source +
+check_compatibility". False -- a bundle with no `check_compatibility` activates
+cleanly, as `test_otr_check_cli.py` already asserted. Fixed + regression test.
+Operator-directed consult on the flagged unwired-constant fork: codex
+`gpt-5.6-sol` high and Fable, independently, both said RIP (Option B), and both
+found the `:353` falsehood on their own. The argument that moved it: Option A's
+stated benefit is factually false -- `BUNDLE_ENTRY_ATTRS` reserves nothing
+against clients, it only constrains what OTR-side code may ask
+`bundle_entry_point()` for. The rip itself was NOT executed: it touches landed
+wave-3/4 code and the plan of record, which a coder window does not own. It is
+flagged in GO_FORWARD with the 2-of-2 recommendation and a verified blast
+radius for the operator/planner.
+Self-correction worth keeping: the first version of the call-site guards in
+`tests/test_feed_fetch_seam.py` grepped the source text, and failed -- against
+the comments that explain WHICH unbounded call was removed. A guard must not
+fight the documentation of the thing it guards; they read the AST now.
+Gates: suite 6365 passed / 27 skipped / 1 xfailed (was 6294; +70 seam tests,
++1 message regression); Bible 17/24/3; AST/BOM/zero-byte/UTF-8 clean on all
+seven touched files; canonical byte-identical A66A416B (no node/widget/link
+touched). Pathspec commits -- the other window's three modified tmp/*.ps1 and
+all untracked scratch preserved.
+Note for the next window: `git commit -m` with a multi-line PowerShell
+here-string mangles into stray pathspecs (`fatal: '/' is outside repository`).
+Use `git commit -F <file>`.
+Current step: CODER E wave 6 -- the ledger-cleanup pass in the shared tail,
+which also owns the client-interpreter fallback gap
+(`build_source_interpreter_fallback` switches on the four SHIPPED interpreter
+ids and gives a client interpreter a confusing `UnknownInterpreterError`).
+Next: fresh CODER E window takes wave 6. CODER A (bug-first) and RENDER remain
+open in parallel. Operator/planner still owns the `check_compatibility` fork.
+Models: Claude Opus (rung 4) + one operator-directed consult -- codex
+`gpt-5.6-sol` high (rung 3) and Fable (rung 6), both off their usual use by
+explicit operator instruction, run in parallel so they cost no coder time. No
+strike against the two-strikes law; no failure drove them.
+Commits: c97a0e91 (wave 5) + 8c45172d (message fix) + this handoff commit.
+
+
 ## 2026-07-24 14:05 -- HEAD 84945bc4 (v2.0-alpha) -- WINDOW CODER E (Opus)
 Did: independent source banks WAVE 4, one green pushed chunk @ 84945bc4 -- the
 `otr_check bank <path> [--activate] [--all] [--json]` CLI (`scripts/otr_check.py`

@@ -1,16 +1,16 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-4
-LANDED @ `84945bc4`.** Client bundles are discovered, integrity-checked,
+**Updated:** 2026-07-24 -- **CODER E OPEN: independent source banks waves 1-5
+LANDED @ `8c45172d`.** Client bundles are discovered, integrity-checked,
 admitted ALONGSIDE the shipped six in the one routing authority, may OWN their
-`fetch_source` / `interpret_source` via the reserved `"self"` entry point, and
-are now VALIDATED AND ACTIVATED by `scripts/otr_check.py bank <path>
---activate` -- which runs the same admission contracts boot runs, imports the
-bundle in a bounded child process, binds the writer's keyword sets, and
-publishes the snapshot before the receipt. Suite 6294 / Bible 17; canonical
-byte-identical. NEXT for CODER E = wave 5 (the bounded `_otr_feed_fetch` seam,
-BOTH hops). SIX-BANK REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the
-render track; bug-first items still open for CODER A.
+`fetch_source` / `interpret_source` via the reserved `"self"` entry point, are
+VALIDATED AND ACTIVATED by `scripts/otr_check.py bank <path> --activate`, and
+every network hop -- shipped or client-authored -- now goes through ONE bounded
+seam (`nodes/_otr_feed_fetch.py`). Suite 6365 / Bible 17; canonical
+byte-identical. NEXT for CODER E = **wave 6** (the ledger-cleanup pass in the
+shared tail, which also owns the client-interpreter fallback gap). SIX-BANK
+REQUALIFICATION + 45-WORD SCENE MATRIX still NEXT for the render track;
+bug-first items still open for CODER A.
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to
@@ -23,8 +23,8 @@ This block is the current source of truth for the overnight qualification.
 Nothing in this file is an instruction to reset, stash, delete, or overwrite
 user changes.
 
-- Branch: `v2.0-alpha`; HEAD and origin are `84945bc4` (CODER E wave 4; waves
-  1-3 are `66e214ec` + `cc69e683`; the
+- Branch: `v2.0-alpha`; HEAD and origin are `8c45172d` (CODER E wave 5 is
+  `c97a0e91`; wave 4 is `84945bc4`; waves 1-3 are `66e214ec` + `cc69e683`; the
   six-bank no-prose-gate retirement chunk is `314dd481` below). The worktree is
   CLEAN of task-owned changes -- what remains is `tmp/` scratch (including
   another window's modified `tmp/_chain_720.ps1`, `tmp/_rearm_gate.ps1`,
@@ -32,6 +32,23 @@ user changes.
   `config/profiles/otr_sbcov_1..6.json`, intentionally untracked
   coverage-campaign scratch; nothing in-repo references them, and untracked
   `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier window).
+- LANDED @ `c97a0e91` + `8c45172d` (2026-07-24; suite 6365 passed / 27 skipped
+  / 1 xfailed; Bible 17; AST/BOM/zero-byte/UTF-8 clean; canonical
+  byte-identical; pushed, HEAD == origin): wave 5, the bounded
+  `nodes/_otr_feed_fetch.py` seam. ONE way to the network for source text --
+  https-only (no silent upgrade), connect 5s / read 10s, 3 redirects, a 2 MiB
+  DECODED cap enforced during the read and again after content-encoding, 2
+  retries, loopback/private/link-local/multicast/reserved reject on EVERY hop
+  (a name resolving to a public+private mix is refused outright), MIME
+  media-type parse, one ~25s monotonic deadline, UA + charset. Stdlib-only so a
+  client bundle imports it with no dependency. THE CONTRACT IS THE SPLIT:
+  `FeedFetchRefused` = our bound tripped (loud, never retried, never swallowed)
+  vs `FeedFetchUnavailable` = the remote did not deliver (an ordinary per-URL
+  miss a caller with other candidates may catch). Re-pinning at HEAD found
+  THREE unhardened hops, not the two the plan named -- the third being
+  `_otr_media_archive_sources.parse_media_archive_feed`. The `8c45172d` chunk
+  is separate and small: the `missing_module` quarantine message demanded a
+  `check_compatibility` the code has never required.
 - LANDED @ `84945bc4` (2026-07-24; suite 6294 passed / 27 skipped / 1 xfailed;
   Bible 17; canonical byte-identical; pushed, HEAD == origin): wave 4, the
   `otr_check bank <path> [--activate]` CLI (`scripts/otr_check.py` +
@@ -305,11 +322,12 @@ by the campaign queue.)
    LANDED @ `cc69e683`. REMAINING WAVES, in order:
    wave 4 (the `otr_check bank --activate` CLI) LANDED @ `84945bc4`;
    `check_compatibility` was NOT wired -- `EXTENDING_OTR.md` now calls it a
-   reserved name with no contract. REMAINING: **w5** the bounded
-   `_otr_feed_fetch` seam, BOTH hops (feed + article scrape); **w6** the
-   ledger-cleanup pass in the shared tail -- ALSO the right home for the
-   client-interpreter fallback gap below; **w7** story_pack widget / canonical
-   JSON if a surface changes. Re-estimate at each wave boundary.
+   reserved name with no contract. Wave 5 (the bounded `_otr_feed_fetch` seam,
+   ALL THREE hops -- the plan said two) LANDED @ `c97a0e91`;
+   `EXTENDING_OTR.md` carries the seam as the client contract. REMAINING:
+   **w6** the ledger-cleanup pass in the shared tail -- ALSO the right home for
+   the client-interpreter fallback gap below; **w7** story_pack widget /
+   canonical JSON if a surface changes. Re-estimate at each wave boundary.
 3. **Randomizer Rolls Design A** --
    `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`, AFTER extensibility
    (its `_otr_lane_specs` authority is ABSORBED by the extensibility build;
@@ -344,7 +362,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | CODER C "foundations" | quick-wins 7 + 8 + 9 | same | after B | ~2-5 d |
 | CODER D "lean-mean front" | drift-check re-verifies, then W0 .. C1-C5 | same | after C (W6 needs quick-win 8) | multi-day |
 | PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out; plan upkeep | rungs 2-4 | parallel with D | docs |
-| CODER E | independent client-authored source banks (lean v1); waves 1-4 LANDED @ `84945bc4`; NEXT = **wave 5** (bounded `_otr_feed_fetch` seam, BOTH hops), then w6 ledger cleanup, w7 surfaces | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
+| CODER E | independent client-authored source banks (lean v1); waves 1-5 LANDED @ `8c45172d`; NEXT = **wave 6** (ledger-cleanup pass in the shared tail + the client-interpreter fallback gap), then w7 surfaces | Claude; Qwen triage; codex via two-strikes | UNGATED (re-pin every line at HEAD first) | 1 wave per window |
 | CODER F | Randomizer A -> `dynamic_story` | Claude + Qwen triage | after E | ~6-11 d |
 | CODER G "lean-mean tail" | SW1-SW3, C6, C7, W8 | Claude; Fable single final epoch gate | after F | multi-day |
 
@@ -395,7 +413,7 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-24): full Windows suite `6294 passed /
+- Current whole-tree receipt (2026-07-24): full Windows suite `6365 passed /
   27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`.
   Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
@@ -432,11 +450,33 @@ fixture creates a row.
   does not inspect it -- not even for callability -- and `EXTENDING_OTR.md`
   now calls it a reserved name instead of "NOT YET WIRED". `COMPAT_ENTRY_ATTR`
   is left INERT in `BUNDLE_ENTRY_ATTRS` with a comment saying so. **Operator /
-  planner decision flagged:** codex argued for deleting the constant outright
-  (it names a pseudo-ABI in executable code); that edit touches landed wave-3
-  code AND the plan of record's "fetch_source + interpret_source +
-  check_compatibility" line, which a coder window does not own. Either ratify
-  the inert constant or schedule the rip as a planner chunk.
+  planner decision flagged, NOW WITH A 2-of-2 RECOMMENDATION TO RIP
+  (2026-07-24, operator-directed consult; codex `gpt-5.6-sol` high and Fable,
+  independently, no shared context; Claude grounded both against the tree):**
+  the argument that decided it is that Option A's stated benefit is FALSE --
+  `BUNDLE_ENTRY_ATTRS` constrains what OTR-side code may request from
+  `bundle_entry_point()`, it reserves nothing against clients, and activation
+  provably ignores whatever a client puts under that name
+  (`tests/test_otr_check_cli.py:335` asserts a bundle whose
+  `check_compatibility` is a plain integer activates). The only artifact that
+  reserves the name is the `EXTENDING_OTR.md` paragraph, which exists either
+  way; the constant's sole executable effect is to legalize a call nobody
+  makes. Verified blast radius if ripped: ~5 code sites, 2 test files, 3 docs;
+  no workflow JSON, no routing, no source-payload consumer. Case AGAINST,
+  stated by both: churn on landed green code for zero behaviour change, the
+  constant is loudly commented inert and a test documents the inertness, and
+  the plan of record already names the future consumer (randomizer
+  eligibility), so it may be re-added within a wave or two. STILL NOT A CODER
+  CHUNK -- the rip touches landed wave-3/4 code and the plan of record's
+  "fetch_source + interpret_source + check_compatibility" line. Either ratify
+  the inert constant or schedule the rip as a planner chunk. (The one piece
+  already fixed @ `8c45172d`, correct under either answer: the `missing_module`
+  quarantine message demanded a `check_compatibility` the code has never
+  required. Both panelists found it independently. Proposed doctrine line: a
+  name published to clients before its consumer exists lives in the
+  client-facing DOC as "reserved, no contract, ignored if defined" and nowhere
+  in executable code, because code that names an interface is read as
+  enforcing it.)
 - **Client-interpreter fallback gap (known, deliberate, w6):**
   `_otr_source_payload.build_source_interpreter_fallback` switches on the four
   SHIPPED interpreter ids and raises `UnknownInterpreterError` otherwise, so a
