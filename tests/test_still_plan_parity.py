@@ -471,6 +471,204 @@ def test_special_cases_match_head():
 
 
 # ---------------------------------------------------------------------------
+# S0a-b amendments (isolation properties) -- landed after S0a and BEFORE
+# S0b flips the routing. These two tests strengthen the S0a fixture from a
+# whole-tree characterization ("here is the current answer per engine")
+# into a structural INVARIANT the routing freeze must preserve:
+#
+#   (a) each engine's parity row is a function ONLY of that engine's own
+#       declarations -- mutating engine X's still-plan-relevant attribute
+#       must never change engine Y's row (Y != X) under any configuration
+#       where X is not being force-redirected onto Y;
+#   (b) a MIXED-engine episode's per-role render decisions equal the same
+#       role's SINGLE-ENGINE baseline -- so the fixture's per-role rows
+#       remain the right ground truth even when the picked engine differs
+#       per role, which S0b's `routing_state.effective_video_models` will
+#       formalise as an authoritative per-role mapping.
+#
+# The spec's `still_plan` class attribute does not exist yet at HEAD (S1
+# introduces it). The proxy is the trio of per-engine attributes the
+# current still dispatcher and render path already read: ``accepts_still``,
+# ``render_aspect``, ``family``. If S1/S2 later add ``still_plan`` these
+# tests remain the fence -- they assert the invariant, not the attribute
+# names, so the fence tightens rather than moves.
+# ---------------------------------------------------------------------------
+
+#: Configurations where the effective engine equals the picked engine for
+#: every role. In these configurations, engine X's declarations MUST NOT
+#: affect engine Y's row (Y != X). The four omitted configurations
+#: (``force_all_viz_camera``, ``force_all_ltx_audio_in``,
+#: ``force_bookends_cloud_kling``, ``ia2v_non_talking`` inclusion is fine
+#: because it doesn't redirect) redirect all/some slots onto another
+#: engine by design, so isolation across the redirect is EXPECTED to fail.
+#: ``malformed_force_map`` falls through to no override in
+#: ``_effective_engine_after_force_map``, so it stays in the clean set.
+_ISOLATION_CLEAN_CONFIGS = (
+    "default",
+    "hosts_on",
+    "ltx_i2v_off",
+    "ia2v_non_talking",
+    "malformed_force_map",
+)
+
+
+#: A representative mutation set -- one engine per shape so a leak across
+#: any of the three (scene-spine, mesh-fork, visualizer) surfaces here
+#: rather than only under a specific engine. Chosen over the full 31 to
+#: keep wall-clock inside a normal test budget; the invariant is universal
+#: so a small representative sample is diagnostic.
+_ISOLATION_MUTATION_ENGINES = ("wan_i2v", "mesh_stage", "viz_camera")
+
+
+def _cfg_env_by_label(label):
+    """Look up a configuration's env-overrides dict by label. Small helper
+    so a rename in ``_CONFIGURATIONS`` fails LOUD here instead of skipping
+    silently."""
+    for lbl, env in _CONFIGURATIONS:
+        if lbl == label:
+            return dict(env)
+    raise KeyError(
+        "unknown configuration %r; known: %r"
+        % (label, [lbl for lbl, _ in _CONFIGURATIONS]))
+
+
+def _mutate_engine_still_plan_proxies(engine):
+    """Mutate the trio of attributes the current still dispatcher / render
+    path read as the pre-S1 still_plan proxy: ``accepts_still``,
+    ``render_aspect``, ``family``. Returns a restorer callable that puts
+    each attribute back exactly as it was (instance-scoped when the
+    original lived on the class, so a mutation cannot leak to sibling
+    engine instances that share the same class -- a real risk for the
+    MotionEngineBase family). The flipped values are chosen to
+    MEANINGFULLY differ from any current declaration so an isolation
+    violation is detectable: ``accepts_still`` flipped, aspect swapped
+    ``wide`` <-> ``portrait``, family set to a probe token no consumer
+    handles.
+    """
+    saved = []
+    for attr in ("accepts_still", "render_aspect", "family"):
+        if attr in engine.__dict__:
+            saved.append((attr, "instance", engine.__dict__[attr]))
+        else:
+            saved.append((attr, "class", None))
+    # Flip attributes.
+    engine.accepts_still = not bool(
+        getattr(engine, "accepts_still", False))
+    cur_aspect = getattr(engine, "render_aspect", "wide")
+    engine.render_aspect = "portrait" if cur_aspect == "wide" else "wide"
+    engine.family = "isolation_probe_family"
+
+    def _restore():
+        for attr, scope, val in saved:
+            if scope == "instance":
+                setattr(engine, attr, val)
+            elif attr in engine.__dict__:
+                delattr(engine, attr)  # unmask the class-level attribute
+    return _restore
+
+
+def test_still_plan_isolation_property():
+    """S0a-b amendment (a): the parity row for engine Y is a function only
+    of Y's own declarations. Mutating engine X's still-plan proxies in
+    memory MUST leave engine Y's row byte-identical to the fixture, for
+    every Y != X, under every clean configuration.
+
+    This is the invariant S1 will codify as ``still_plan`` and that S0b's
+    routing freeze must not accidentally violate by, say, hoisting a
+    shared mutable resolver. It is asserted here so that the fence lands
+    at pre-S0b HEAD; the fixture-cell comparison catches any per-cell
+    leak, and the assertion message pins (config, mutated_engine,
+    observed_engine, section) for pytest's short diff.
+    """
+    fixture = _load_fixture()
+    engines = _all_registered_video_engines()
+    for cfg_label in _ISOLATION_CLEAN_CONFIGS:
+        cfg_env = _cfg_env_by_label(cfg_label)
+        for mut_id in _ISOLATION_MUTATION_ENGINES:
+            assert mut_id in engines, mut_id  # spec sanity
+            mut_engine = _vreg._VIDEO_REGISTRY._registry[mut_id]
+            restore = _mutate_engine_still_plan_proxies(mut_engine)
+            try:
+                for other_id in engines:
+                    if other_id == mut_id:
+                        continue
+                    got = _engine_row(other_id, cfg_env)
+                    baseline = fixture["matrix"][cfg_label][other_id]
+                    for section in ("authored", "materialized",
+                                    "render_decisions"):
+                        assert got[section] == baseline[section], (
+                            "still-plan isolation VIOLATED under cfg=%s: "
+                            "mutating %s changed %s.%s"
+                            % (cfg_label, mut_id, other_id, section))
+            finally:
+                restore()
+
+
+def test_mixed_engine_policy_per_role_isolation():
+    """S0a-b amendment (b): a mixed-engine episode's per-role render
+    decisions equal the same role's single-engine baseline recorded in
+    the fixture. Concretely: with
+    ``announcer_video_model=cloud_kling_avatar``,
+    ``music_video_model=google_veo_video``,
+    ``character_video_model=wan_i2v`` under the default env, the
+    ``render_decisions[role]`` and ``materialized.effective_engine[role]``
+    for each role MUST match those roles' single-engine baselines from
+    the fixture's ``default`` configuration.
+
+    ``authored`` is a whole-policy derive (image dispatcher enumerates
+    over all beats + speakers) and is NOT decomposable per-role, so this
+    test is scoped to the two dimensions that ARE per-role at HEAD.
+    ``roles_requiring_stills`` / ``capabilities`` / ``mesh_fodder_roles``
+    IS decomposable: each is a per-slot read of the picked engine, so
+    the mixed policy's materialized answer for role R is the same as
+    engine(R)'s single-engine materialized answer for role R.
+    """
+    fixture = _load_fixture()
+    # Three heterogeneous engines chosen so the picked==effective
+    # condition holds under the default env matching the fixture:
+    #  - cloud_kling_avatar   (audio-driven-face, PARTNER side -> not
+    #                          eligible for the local radio-host redirect)
+    #  - google_veo_video     (partner text-to-video)
+    #  - wan_i2v              (local image-to-video, not a HuMo family)
+    role_engine = {
+        "announcer_visual": "cloud_kling_avatar",
+        "music_visual":     "google_veo_video",
+        "character_video":  "wan_i2v",
+    }
+    vm = {
+        _role_slots.ROLE_TO_VIDEO_SLOT[role]:
+            {"engine_id": eng, "custom": False}
+        for role, eng in role_engine.items()
+    }
+    mixed_policy = {"policy_version": 2, "video_models": vm}
+    with _env_override({}):
+        mixed_render = _render_decisions_row("_mixed_", mixed_policy)
+        mixed_materialized = _materialized_row("_mixed_", mixed_policy)
+    # Per-role render decisions must equal the same role's single-engine
+    # fixture baseline under the default configuration.
+    for role, eng in role_engine.items():
+        baseline_row = fixture["matrix"]["default"][eng]
+        assert mixed_render[role] == \
+            baseline_row["render_decisions"][role], (
+                "mixed-policy render_decisions for role %s did not match "
+                "the single-engine %s baseline"
+                % (role, eng))
+        assert mixed_materialized["effective_engine"][role] == \
+            baseline_row["materialized"]["effective_engine"][role], (
+                "mixed-policy effective_engine for role %s != "
+                "%s single-engine baseline"
+                % (role, eng))
+    # And roles beyond ``_ROLE_BEAT_PAIRS`` in the effective map should
+    # each match their single-engine baseline for that role too (belt-and-
+    # braces coverage: every role_slot ended up in mixed_materialized
+    # because the dispatcher walked ROLE_TO_VIDEO_SLOT unconditionally).
+    for role, eng in role_engine.items():
+        assert mixed_materialized["effective_engine"][role] == \
+            fixture["matrix"]["default"][eng]["materialized"][
+                "effective_engine"][role], role
+
+
+# ---------------------------------------------------------------------------
 # Regeneration entry point. Run as::
 #
 #   .venv\Scripts\python.exe tests\test_still_plan_parity.py --regenerate
