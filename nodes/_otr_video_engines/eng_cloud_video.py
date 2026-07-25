@@ -60,25 +60,31 @@ _CLOUD_VIDEO_SHAPE_A_BASE_PLAN = (
     StillPlanRow(kind="scene_open", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide establishing shot; the scene an audience is "
-                     "entering."),
+                     "full-frame macro, centered subject"),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_beat", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide continuity framing for the beat, matching the "
-                     "scene_open geometry."),
+                     ("cinematic three-quarter framing, people shown with "
+                      "full heads and clear headroom inside frame, faces "
+                      "unobstructed, balanced composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_character", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide framing that keeps the named character legible in "
-                     "the scene."),
+                     ("cinematic medium shot, the character framed within a "
+                      "wide 16:9 environment, full head and shoulders with "
+                      "clear headroom inside frame, face unobstructed, "
+                      "balanced landscape composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="portrait", cardinality="per_subject",
                  target_class="portrait", aspect="inherit_engine",
                  required="never",
-                 framing_geometry="",
+                 framing_geometry=("in-character cinematic medium shot, head "
+                                   "and shoulders, face clearly visible, "
+                                   "subject centred with natural headroom "
+                                   "above the head (never crop the top of the "
+                                   "head)"),
                  style_tail_policy="full"),
 )
 
@@ -90,27 +96,31 @@ _CLOUD_KLING_AVATAR_PLAN = (
     StillPlanRow(kind="scene_open", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide establishing shot; the scene an audience is "
-                     "entering."),
+                     "full-frame macro, centered subject"),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_beat", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide continuity framing for the beat, matching the "
-                     "scene_open geometry."),
+                     ("cinematic three-quarter framing, people shown with "
+                      "full heads and clear headroom inside frame, faces "
+                      "unobstructed, balanced composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_character", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide framing that keeps the named character legible in "
-                     "the scene."),
+                     ("cinematic medium shot, the character framed within a "
+                      "wide 16:9 environment, full head and shoulders with "
+                      "clear headroom inside frame, face unobstructed, "
+                      "balanced landscape composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="portrait", cardinality="per_subject",
                  target_class="portrait", aspect="inherit_engine",
                  required="always",
                  framing_geometry=(
-                     "Face-forward portrait framing; head and upper body of "
-                     "the named subject centered in the frame."),
+                     ("in-character cinematic medium shot, head and "
+                      "shoulders, face clearly visible, subject centred with "
+                      "natural headroom above the head (never crop the top of "
+                      "the head)")),
                  style_tail_policy="full"),
 )
 

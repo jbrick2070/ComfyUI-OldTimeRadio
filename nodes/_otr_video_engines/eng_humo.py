@@ -80,40 +80,101 @@ _HUMO_DEFAULT_NEGATIVE = (
 _HUMO_DEFAULT_UNET = "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"
 
 
-#: S1 (2026-07-25) per-model still plan for the four HuMo engines (spec
-#: section 3, Shape A -- scene spine, audio-driven-face variant with
-#: portrait REQUIRED). FILE-LOCAL, fully declared. All four HuMo engines
-#: share this plan; the difference is in the ENGINE'S render_aspect (which
-#: ``resolve_row_aspect`` will read for the portrait row): humo /
-#: humo_1.7B have render_aspect="portrait" -> 832x1216 stills TODAY;
-#: humo_1.7B_169 / humo_14B_169 have render_aspect="wide" -> 832x480 stills.
-#: S2's HuMo cutover (announcer/music 832x1216 -> 832x480) is where the
-#: operator eyeballs the shape delta; S1 declares the plan structure.
+#: S1 (2026-07-25) per-model still plan for the PORTRAIT HuMo engines --
+#: ``humo`` and ``humo_1.7B``, both shipping ``render_aspect="portrait"``
+#: (spec section 3, Shape A -- scene spine, audio-driven-face variant with
+#: portrait REQUIRED). FILE-LOCAL, fully declared.
+#:
+#: S1b SPLIT (2026-07-25): S1 had all FOUR HuMo engines sharing ONE plan
+#: object across TWO shipped aspects. That was survivable only while the
+#: portrait row's ``framing_geometry`` was a paraphrase. It is not survivable
+#: now: the producer picks ``PORTRAIT_GEOMETRY`` for a portrait renderer and
+#: ``WIDE_PORTRAIT_GEOMETRY`` for a wide one (``_style_anchor_for_aspect`` --
+#: a three-quarter body shot decapitates the subject in a short landscape
+#: frame, the 2026-06-17 operator catch), so one static string cannot serve
+#: both. The wide siblings get their own plan below. This also honours the
+#: spec's own "no inheritance or shared defaults" rule, and
+#: ``tests/test_still_plan_layer2_parity.py`` now enforces it so the sharing
+#: cannot regrow.
+#:
+#: The ``aspect="inherit_engine"`` FIELD is unchanged -- it still drives the
+#: DIMENSIONS through ``resolve_row_aspect``. Only the authored layer-2 TEXT
+#: is pinned per file. S2's HuMo cutover is the FOUR hosts-off bookend
+#: role-cells (portrait humo / humo_1.7B x announcer / music, redirected by
+#: ``_enforce_radio_is_host`` to the WIDE ``ltx_audio_in`` that renders them);
+#: with ``OTR_ENABLE_HUMO_HOSTS=1`` a portrait HuMo keeps its portrait still.
 _HUMO_STILL_PLAN = (
     StillPlanRow(kind="scene_open", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide establishing shot; the scene an audience is "
-                     "entering."),
+                     "full-frame macro, centered subject"),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_beat", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide continuity framing for the beat, matching the "
-                     "scene_open geometry."),
+                     ("cinematic three-quarter framing, people shown with "
+                      "full heads and clear headroom inside frame, faces "
+                      "unobstructed, balanced composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_character", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide framing that keeps the named character legible in "
-                     "the scene."),
+                     ("cinematic medium shot, the character framed within a "
+                      "wide 16:9 environment, full head and shoulders with "
+                      "clear headroom inside frame, face unobstructed, "
+                      "balanced landscape composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="portrait", cardinality="per_subject",
                  target_class="portrait", aspect="inherit_engine",
                  required="always",
                  framing_geometry=(
-                     "Face-forward portrait framing; head and upper body of "
-                     "the named subject centered in the frame."),
+                     ("in-character cinematic three-quarter portrait, full "
+                      "head and face clearly visible with natural headroom "
+                      "above the head (never crop the top of the head)")),
+                 style_tail_policy="full"),
+)
+
+#: S1b (2026-07-25) per-model still plan for the LANDSCAPE HuMo siblings --
+#: ``humo_1.7B_169`` and ``humo_14B_169``, both shipping
+#: ``render_aspect="wide"``. Structurally IDENTICAL to
+#: :data:`_HUMO_STILL_PLAN`; it exists as a SEPARATE plan object because the
+#: portrait row's layer-2 text differs by shipped aspect (see the split note
+#: above). Fully declared -- no inheritance from, and no shared rows with,
+#: the portrait plan, per spec section 6.
+#:
+#: The ComfyUI dropdown labels this split to the operator as "(portrait)" vs
+#: "(16:9)" and that is a VISIBLE PRODUCT CONTRACT: these two siblings were
+#: ALREADY wide before this build, nothing about them flips, and a blanket
+#: "HuMo -> wide" would be a regression rather than a fix.
+_HUMO_169_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "full-frame macro, centered subject"),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     ("cinematic three-quarter framing, people shown with "
+                      "full heads and clear headroom inside frame, faces "
+                      "unobstructed, balanced composition")),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     ("cinematic medium shot, the character framed within a "
+                      "wide 16:9 environment, full head and shoulders with "
+                      "clear headroom inside frame, face unobstructed, "
+                      "balanced landscape composition")),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="always",
+                 framing_geometry=(
+                     ("in-character cinematic medium shot, head and "
+                      "shoulders, face clearly visible, subject centred with "
+                      "natural headroom above the head (never crop the top of "
+                      "the head)")),
                  style_tail_policy="full"),
 )
 
@@ -598,11 +659,12 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
 
     name = "humo_1.7B_169"
     render_aspect = "wide"
-    #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` -- shared HuMo shape;
-    #: this landscape sibling's ``render_aspect="wide"`` will drive
-    #: ``resolve_row_aspect`` to size portraits WIDE, matching S2's
-    #: 832x1216 -> 832x480 cutover the operator will eyeball).
-    still_plan = _HUMO_STILL_PLAN
+    #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
+    #: HuMo plan). ``render_aspect="wide"`` drives ``resolve_row_aspect`` to
+    #: size portraits WIDE, and the plan's portrait row carries the WIDE
+    #: layer-2 geometry to match. This sibling was ALREADY wide before the
+    #: still-plans build; nothing about it flips.
+    still_plan = _HUMO_169_STILL_PLAN
 
     def _cfg(self):
         # 16:9 sweet spot (cfg sweep 2026-06-16); override via OTR_HUMO_17B_169_CFG.
@@ -627,10 +689,11 @@ class HuMo14BLandscapeEngine(HuMoEngine):
 
     name = "humo_14B_169"
     render_aspect = "wide"
-    #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` -- shared HuMo shape;
-    #: the 14B landscape sibling's ``render_aspect="wide"`` drives portraits
-    #: WIDE via ``resolve_row_aspect``, matching S2's HuMo cutover).
-    still_plan = _HUMO_STILL_PLAN
+    #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
+    #: HuMo plan). ``render_aspect="wide"`` drives portraits WIDE via
+    #: ``resolve_row_aspect``, and the plan's portrait row carries the WIDE
+    #: layer-2 geometry to match. Already wide before this build.
+    still_plan = _HUMO_169_STILL_PLAN
     #: Route-A VRAM frame cap (only this 14B tier; base humo / humo_1.7B* stay
     #: uncapped). render_clip renders at the cap then exact-fits to the audio
     #: target. env override: OTR_HUMO_14B_SAFE_FRAMES (after a higher-frame probe).

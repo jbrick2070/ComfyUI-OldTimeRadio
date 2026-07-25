@@ -310,19 +310,30 @@ _MESH_STAGE_STILL_PLAN = (
     StillPlanRow(kind="mesh_fodder", cardinality="per_beat",
                  target_class="mesh", aspect="wide", required="always",
                  framing_geometry=(
-                     "Clean mesh fodder: subject centered, neutral studio "
-                     "backdrop, no letterboxing; ONE isolated subject only."),
+                     ("single centered subject, simple clean unbroken "
+                      "silhouette, smooth solid form, plain matte "
+                      "solid-colour clothing, short tight neat hair, neutral "
+                      "symmetrical forward stance, full unoccluded "
+                      "three-quarter view, entire head and body clearly "
+                      "visible, plain seamless neutral mid-grey studio "
+                      "backdrop, even soft diffuse frontal lighting, no hard "
+                      "shadows, no props, sharp focus, full natural color")),
                  style_tail_policy="minimal_clean"),
     StillPlanRow(kind="scene_background_plate", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide background plate for the beat; the stage the "
-                     "meshed subject will inhabit."),
+                     ("empty establishing environment, no people, no subject, "
+                      "no characters, wide 16:9 cinematic scene, atmospheric "
+                      "depth")),
                  style_tail_policy="full"),
     StillPlanRow(kind="portrait", cardinality="per_subject",
                  target_class="portrait", aspect="inherit_engine",
                  required="never",
-                 framing_geometry="",
+                 framing_geometry=("in-character cinematic medium shot, head "
+                                   "and shoulders, face clearly visible, "
+                                   "subject centred with natural headroom "
+                                   "above the head (never crop the top of the "
+                                   "head)"),
                  style_tail_policy="full"),
 )
 

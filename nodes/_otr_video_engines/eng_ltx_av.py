@@ -1122,35 +1122,53 @@ _LTX_AUDIO_IN_STILL_PLAN = (
     StillPlanRow(kind="scene_open", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide establishing shot; the scene an audience is "
-                     "entering."),
+                     "full-frame macro, centered subject"),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_beat", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide continuity framing for the beat, matching the "
-                     "scene_open geometry."),
+                     ("cinematic three-quarter framing, people shown with "
+                      "full heads and clear headroom inside frame, faces "
+                      "unobstructed, balanced composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_character", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     "Wide framing that keeps the named character legible in "
-                     "the scene."),
+                     ("cinematic medium shot, the character framed within a "
+                      "wide 16:9 environment, full head and shoulders with "
+                      "clear headroom inside frame, face unobstructed, "
+                      "balanced landscape composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="portrait", cardinality="per_subject",
                  target_class="portrait", aspect="inherit_engine",
                  required="never",
-                 framing_geometry="",
+                 framing_geometry=("in-character cinematic medium shot, head "
+                                   "and shoulders, face clearly visible, "
+                                   "subject centred with natural headroom "
+                                   "above the head (never crop the top of the "
+                                   "head)"),
                  style_tail_policy="full"),
     # Per spec section 3: '+ WIDE radio face per bookend role,
     # required=when_engine_talking'. A WIDE face still per bookend role
     # (announcer_visual / music_visual) fed into I2V when the engine talks.
-    StillPlanRow(kind="scene_character", cardinality="per_bookend_role",
-                 target_class="scene", aspect="wide",
+    # S1b CORRECTION (kibitz r4, codex gpt-5.6-sol high; grounded against the
+    # producer): this row is a PORTRAIT-class object, not a scene one. The
+    # producer mints it at otr_meta_brief_image_prompt.py:1782-1790 with
+    # kind="portrait" / source="ltx_radio_face", from
+    # build_radio_host_prompt(meta, "wide", radio_host_style=
+    # "ltx_radio_mouth") -- and that branch composes the WIDE portrait anchor
+    # (_style_anchor_for_aspect("wide"), no talking flag), so the layer-2 text
+    # is WIDE_PORTRAIT_GEOMETRY rather than the talking close-up bust. The
+    # radio_host_style is a LITERAL at that call site, so there is no runtime
+    # branch being frozen here.
+    StillPlanRow(kind="portrait", cardinality="per_bookend_role",
+                 target_class="portrait", aspect="wide",
                  required="when_engine_talking",
                  framing_geometry=(
-                     "Wide radio-face framing for the announcer/music "
-                     "bookend; period broadcast host at the microphone."),
+                     ("in-character cinematic medium shot, head and "
+                      "shoulders, face clearly visible, subject centred with "
+                      "natural headroom above the head (never crop the top of "
+                      "the head)")),
                  style_tail_policy="full"),
     # Per spec section 3: '+ cast portrait on character beats,
     # required=when_engine_talking'. The cast portrait feeds the I2V head on
@@ -1159,8 +1177,12 @@ _LTX_AUDIO_IN_STILL_PLAN = (
                  target_class="portrait", aspect="inherit_engine",
                  required="when_engine_talking",
                  framing_geometry=(
-                     "Face-forward portrait framing for a character beat; "
-                     "head and upper body of the named cast subject."),
+                     ("in-character face-forward frontal close-up bust, "
+                      "looking directly at the camera, the whole face and "
+                      "mouth clearly visible and unobstructed, the face "
+                      "brightly lit and filling much of the frame, subject "
+                      "centred with natural headroom above the head (never "
+                      "crop the top of the head)")),
                  style_tail_policy="full"),
 )
 
