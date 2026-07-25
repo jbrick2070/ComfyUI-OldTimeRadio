@@ -397,6 +397,23 @@ class OTRImageDirector:
             "video_models": (video_policy.get("video_models")
                              if isinstance(video_policy.get("video_models"), dict)
                              else {}),
+            # THE FROZEN ROUTE (2026-07-25, multi-clip coverage chunk 1b),
+            # forwarded verbatim from OTR_VideoDirector. This payload is built
+            # KEY BY KEY, so an upstream key is NOT forwarded automatically --
+            # every field above needed its own line and so do these two. Node 89
+            # (MetaBrief) and node 91 (the dispatcher) both hang off THIS node,
+            # so this is the only path by which the image branch can learn the
+            # route that node 90 (ShotLock) freezes on the other branch.
+            # {} -> a pre-1b policy; consumers fall back to resolving the route
+            # themselves exactly as they did before.
+            "effective_video_models": (
+                video_policy.get("effective_video_models")
+                if isinstance(video_policy.get("effective_video_models"), dict)
+                else {}),
+            "routing_env_snapshot": (
+                video_policy.get("routing_env_snapshot")
+                if isinstance(video_policy.get("routing_env_snapshot"), dict)
+                else {}),
             # (The character {clip_mode, pool_n} passthrough died with the
             # pooling rip, 2026-07-01 -- every beat is per-beat now.)
             # 3D image streams (2026-06-21): the IMAGE-prompt roles whose paired

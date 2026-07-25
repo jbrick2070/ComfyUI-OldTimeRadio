@@ -28,6 +28,24 @@ from ._otr_video_engines import registry as _vreg
 from ._otr_image_engines import registry as _ireg
 from ._otr_shared import role_compat as _rc
 from ._otr_shared import role_slots as _role_slots
+
+
+def _engine_for_role(resolved_video, effective_by_role, role):
+    """The engine a per-role derivation should read (2026-07-25, chunk 1b).
+
+    When the caller supplies the FROZEN route map, that map wins -- derived
+    values (still aspect, talking flag) must describe the engine that actually
+    renders, not the one the operator picked, or a redirected beat gets a still
+    sized for an engine that never runs. When it is absent, this falls back to
+    the picked slot map, which preserves every pre-1b caller's meaning exactly.
+    """
+    if effective_by_role:
+        eid = str((effective_by_role or {}).get(role) or "")
+        if eid:
+            return eid
+    return _role_slots.engine_id_for_role(resolved_video, role)
+
+
 # Video-tiers (2026-07-20): the public-name resolver is the SINGLE source of truth
 # for the menu id <-> internal id mapping AND the legacy-alias table (moved out of
 # this module). Dep-free / cold-import clean.
@@ -307,6 +325,21 @@ class OTRVideoDirector:
         # box-fresh graph (empty registry) validates clean here.
         return True
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        """Re-run whenever the ROUTING ENVIRONMENT changes (2026-07-25, 1b).
+
+        This node is where effective routing is FROZEN, and it freezes state
+        that lives outside its inputs: ``OTR_FORCE_ENGINE_MAP`` and
+        ``OTR_ENABLE_HUMO_HOSTS``. Without this, ComfyUI would serve a cached
+        policy across an env change and every downstream consumer -- MetaBrief,
+        ShotLock, the dispatcher -- would plan against a route the operator has
+        already changed. Widget-only changes are still handled by ComfyUI's
+        ordinary input hashing; this covers ONLY the ambient state.
+        """
+        from ._otr_shared import route_freeze as _rf
+        return _rf.snapshot_fingerprint(_rf.routing_env_snapshot())
+
     # ------------------------------------------------------------------ #
     def direct(self, announcer_video_model, music_video_model,
                character_video_model, announcer_image_model,
@@ -345,6 +378,29 @@ class OTRVideoDirector:
                     "OTR_VideoDirector: video role %r (slot %r) resolved to an "
                     "EMPTY engine. Pick a model -- NO FALLBACK." % (role, slot))
 
+        # THE ROUTE FREEZE (2026-07-25, multi-clip coverage chunk 1b; kibitz r4
+        # codex gpt-5.6-sol high + agy, then a six-way grounded Sonnet fan-out).
+        # This node is the UNIQUE COMMON ANCESTOR of both downstream branches --
+        # verified against workflows/otr_canonical.json's link list, node 89
+        # (MetaBrief) and node 90 (ShotLock) are INDEPENDENT branches that
+        # reconverge at node 91, with no 89->90 edge. Ascending node ids are NOT
+        # an execution order. So a freeze taken at ShotLock can never inform the
+        # image phase, and node 87 is the only point that can inform both.
+        # Everything downstream consumes THIS map instead of re-deriving the
+        # route from ambient env (the four-mirror defect retired at chunk 1a).
+        from ._otr_shared import route_freeze as _rf
+        routing_snapshot = _rf.routing_env_snapshot()
+        effective_video = _rf.freeze_role_engines(
+            resolved_video, snapshot=routing_snapshot)
+        for _role, _eff in sorted(effective_video.items()):
+            _picked = _role_slots.engine_id_for_role(resolved_video, _role)
+            if _eff != _picked:
+                log.warning(
+                    "[OTR_VideoDirector] ROUTE FREEZE: role=%s picked=%s -> "
+                    "EFFECTIVE=%s (force map and/or radio-is-host redirect); "
+                    "stills, prompts and shots all plan against %s",
+                    _role, _picked, _eff, _eff)
+
         policy = {
             # S4 platform-portability (2026-07-10): version 2 adds the
             # explicit device/dtype policy fields (defaults = nv50
@@ -360,16 +416,38 @@ class OTRVideoDirector:
             # server's boot environment. 0 = unpinned (every shipped tier).
             "max_render_frames": max(0, int(max_render_frames or 0)),
             "video_models": resolved_video,
-            # Per-role still aspect, resolved from each slot's selected engine, so
-            # the image node mints character stills to MATCH the chosen video
-            # engine with ONE dropdown pick (portrait humo_1.7B vs wide
-            # humo_1.7B_169). Opaque to everyone who does not size stills.
-            "aspects": self._role_aspects(resolved_video),
-            # Per-role TALKING flag (S4b 2026-07-02): whether the selected
-            # engine lip-syncs (wants_talking_prompt, the ia2v register), so
+            # THE FROZEN ROUTE (chunk 1b): role -> the engine that will ACTUALLY
+            # render the beat, force map and radio-is-host redirect already
+            # applied. ``video_models`` above stays the PICKED map -- both are
+            # stamped so an equality failure downstream can be replayed and
+            # audited rather than guessed at.
+            "effective_video_models": effective_video,
+            # The exact routing environment this policy was frozen from.
+            # ShotLock rejects a mismatch against the live environment.
+            "routing_env_snapshot": routing_snapshot,
+            # Per-role still aspect, resolved from each role's EFFECTIVE engine, so
+            # the image node mints character stills to MATCH the engine that
+            # actually renders (portrait humo_1.7B vs wide humo_1.7B_169).
+            # Opaque to everyone who does not size stills.
+            #
+            # EFFECTIVE, NOT PICKED (2026-07-25, chunk 1b) -- this was a LIVE
+            # DEFAULT-ENV BUG, not a latent one. Picking a portrait HuMo for
+            # announcer_visual with OTR_ENABLE_HUMO_HOSTS unset redirects the
+            # render to the WIDE ltx_audio_in console, but the aspect map was
+            # derived from the PICKED portrait engine -- so a 832x1216 portrait
+            # still was minted and the wide render centre-cropped it. The
+            # consequence is recorded verbatim in eng_ltx_av.py:345-347:
+            # "the director defaulted to a 832x1216 PORTRAIT still that the wide
+            # render then centre-cropped, lopping the subject's head off."
+            "aspects": self._role_aspects(resolved_video, effective_video),
+            # Per-role TALKING flag (S4b 2026-07-02): whether the engine
+            # lip-syncs (wants_talking_prompt, the ia2v register), so
             # the image node mints FACE-FORWARD portraits for that lane --
             # proof8 showed brief-styled profile portraits cannot drive lips.
-            "talking": self._role_talking(resolved_video),
+            # Also EFFECTIVE as of chunk 1b: MetaBrief's _effective_talking_roles
+            # already upgraded False->True off the effective engine, but only in
+            # that one direction and only in that one node.
+            "talking": self._role_talking(resolved_video, effective_video),
             "image_models": {
                 "announcer_image_model": announcer_image_model,
                 "music_image_model": music_image_model,
@@ -396,15 +474,19 @@ class OTRVideoDirector:
         return {}
 
     @staticmethod
-    def _role_aspects(resolved_video):
-        """Map each video ROLE to its SELECTED engine's ``render_aspect`` so
-        stills match their video engine. One entry PER ROLE
-        (announcer_visual / music_visual / character_video), each resolved
-        through the shared per-role map (the dedicated per-role slot only). Unknown / custom / unresolved
-        picks -> 'portrait' (the safe legacy look). Pure registry read, no
-        side effects."""
+    def _role_aspects(resolved_video, effective_by_role=None):
+        """Map each video ROLE to its EFFECTIVE engine's ``render_aspect`` so
+        stills match the engine that actually renders. One entry PER ROLE
+        (announcer_visual / music_visual / character_video). Unknown / custom /
+        unresolved picks -> 'portrait' (the safe legacy look). Pure registry
+        read, no side effects.
+
+        ``effective_by_role`` is the frozen route map (chunk 1b). It is
+        OPTIONAL so the many existing callers that pass only the slot map keep
+        their meaning -- without it this resolves the PICKED engine exactly as
+        before, which is correct for any caller that has no route to freeze."""
         def _asp_for_role(role):
-            eid = _role_slots.engine_id_for_role(resolved_video, role)
+            eid = _engine_for_role(resolved_video, effective_by_role, role)
             try:
                 eng = _vreg.get_engine(eid)
                 if getattr(eng, "render_aspect", "portrait") == "wide":
@@ -419,14 +501,17 @@ class OTRVideoDirector:
         }
 
     @staticmethod
-    def _role_talking(resolved_video):
-        """Map each video ROLE to whether its SELECTED engine renders TALKING
+    def _role_talking(resolved_video, effective_by_role=None):
+        """Map each video ROLE to whether its EFFECTIVE engine renders TALKING
         lip-sync (the engine's ``wants_talking_prompt`` hook -- the ia2v
         register), so stills can be minted face-forward for that lane (S4b).
         Hook errors resolve False here: the RENDER path stays the loud
-        enforcer of a misconfigured recipe; the director only styles stills."""
+        enforcer of a misconfigured recipe; the director only styles stills.
+
+        ``effective_by_role`` is the frozen route map (chunk 1b), OPTIONAL for
+        the same reason as :meth:`_role_aspects`."""
         def _talk_for_role(role):
-            eid = _role_slots.engine_id_for_role(resolved_video, role)
+            eid = _engine_for_role(resolved_video, effective_by_role, role)
             try:
                 eng = _vreg.get_engine(eid)
                 fn = getattr(eng, "wants_talking_prompt", None)

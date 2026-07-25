@@ -1067,10 +1067,26 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
     shots)`` after ``resolver.validate_execution_groups``.
     """
     video_models = (policy or {}).get("video_models") or {}
+    #: THE FROZEN ROUTE (2026-07-25, multi-clip coverage chunk 1b), stamped by
+    #: OTR_VideoDirector. Absent on a pre-1b policy or a hand-built fixture, in
+    #: which case this falls back to the PICKED slot map exactly as before.
+    effective_video = (policy or {}).get("effective_video_models") or {}
 
     def engine_for(role):
         # Route-A: dedicated per-role video slot only (empty resolves empty / fails loud)
         # (ONE shared map; nodes/_otr_shared/role_slots.py).
+        #
+        # EFFECTIVE FROM BIRTH (chunk 1b). Every consumer of this function --
+        # the execution GROUPS, the cast-time preflight, and the shot ROWS --
+        # now mints the engine that will actually render. Previously the groups
+        # and rows carried the PICKED engine while the preflight quietly
+        # re-derived the effective one through its own private mirror, so a
+        # redirected bookend was validated as one engine and stamped as
+        # another. One resolution, three consumers, no divergence.
+        if effective_video:
+            frozen = str(effective_video.get(role) or "")
+            if frozen:
+                return frozen
         return _role_slots.engine_id_for_role(video_models, role)
 
     roles_present = []
@@ -1224,6 +1240,19 @@ class OTRShotLock:
     def VALIDATE_INPUTS(cls, **kwargs):
         return True
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        """Re-lock whenever the ROUTING ENVIRONMENT changes (2026-07-25, 1b).
+
+        ShotLock validates the frozen route against the live environment and
+        mints every shot from it, so a cached lock served across an env change
+        would hand the dispatcher and the render batch a plan built for a route
+        the operator has already replaced. The same fingerprint is used by
+        OTR_VideoDirector, so both ends of the freeze invalidate together.
+        """
+        from ._otr_shared import route_freeze as _rf
+        return _rf.snapshot_fingerprint(_rf.routing_env_snapshot())
+
     # ------------------------------------------------------------------ #
     def lock(self, script_json, audio_done="", video_policy_json="{}",
              image_done="", consistency_gate_warn_only=False, gate_in=""):
@@ -1251,6 +1280,31 @@ class OTRShotLock:
                 "OTR_ShotLock: video_policy_json carries policy_version="
                 f"{policy.get('policy_version')!r}; expected 2. Re-run "
                 "OTR_VideoDirector (stale/hand-crafted policy).")
+
+        # THE ROUTE-FREEZE GUARD (2026-07-25, multi-clip coverage chunk 1b).
+        # OTR_VideoDirector froze effective routing from a captured environment
+        # and stamped that capture into the policy. If the environment has moved
+        # since -- a cached upstream node, an operator exporting
+        # OTR_FORCE_ENGINE_MAP between nodes, a headless leg submitted to a
+        # server booted with a different env -- then the frozen map describes a
+        # route that is no longer real, and every still, prompt and shot planned
+        # from it is planned for engines that will not run. That is precisely
+        # the defect class this build closes, so it is TERMINAL, before any GPU
+        # time or image time is spent. A policy with NO snapshot is a pre-1b or
+        # hand-built ledger and is left alone.
+        _frozen_snapshot = policy.get("routing_env_snapshot")
+        if isinstance(_frozen_snapshot, dict) and _frozen_snapshot:
+            from ._otr_shared import route_freeze as _rf
+            _live_snapshot = _rf.routing_env_snapshot()
+            if not _rf.snapshots_agree(_frozen_snapshot, _live_snapshot):
+                raise ValueError(
+                    "OTR_ShotLock: the routing environment CHANGED after "
+                    "OTR_VideoDirector froze it. Frozen %r, live %r. The "
+                    "frozen route no longer describes what will render, so "
+                    "every still and prompt planned from it is planned for the "
+                    "wrong engine. Re-run the graph from OTR_VideoDirector with "
+                    "the environment you actually want. NO FALLBACK."
+                    % (_frozen_snapshot, _live_snapshot))
 
         canvas = (policy.get("canvas") or {})
         fps = int(canvas.get("fps") or 25)
@@ -1319,6 +1373,14 @@ class OTRShotLock:
             "locked_against_audio_rev": str(meta.get("audio_revision") or ""),
             "execution_groups": groups,
             "roles": policy.get("video_models") or {},
+            # BOTH maps ride the ledger (2026-07-25, chunk 1b). ``roles`` stays
+            # the PICKED map for continuity; ``roles_effective`` is what every
+            # shot was actually minted from, and ``routing_env_snapshot`` is the
+            # environment it was frozen under. Stamping only the picked map made
+            # an equality failure at render unreplayable -- you could see that
+            # the engines disagreed but not what the plan had believed or why.
+            "roles_effective": policy.get("effective_video_models") or {},
+            "routing_env_snapshot": policy.get("routing_env_snapshot") or {},
             "shots": shots,
             "clip_budget": {
                 "total_frames": budget["total_frames"],
