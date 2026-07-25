@@ -3,6 +3,59 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-25 19:15 -- HEAD 84328aa1 (v2.0-alpha) -- CODER WINDOW A (Opus)
+Did: ran the still-plan kibitz arc r1->r5 to CONVERGENCE and landed three
+tracked docs. No production code touched; canonical byte-identical at
+`5377914B`. Panel every round: codex `gpt-5.6-sol` high + agy Gemini 3.6 Flash
+(High), model pinned and VERIFIED per round; Claude grounded panelist + judge.
+THE ARC REFRAMED THE BLOCK. It was scoped as "five role-indexed places
+disagree about what images a model needs". Grounding says the root cause is
+FIVE modules independently re-deriving WHICH ENGINE IS EFFECTIVE, from live
+env, at five different moments -- `otr_video_director` (picked only),
+`otr_image_gen_dispatcher`, `otr_meta_brief_image_prompt`,
+`otr_shot_lock:919-933`, `render_driver` -- and `validate_and_repair_still_
+spine` (`otr_video_render_batch.py:322`) running BEFORE `apply_engine_override`
+(`render_driver.py:2751`). With a force map set, the spine is validated against
+the PICKED engine and rendered with the FORCED one. It survived because the
+validator is skipped entirely under OTR_TEST_MODE with no target receipt.
+So routing is frozen FIRST (new S0a/S0b) and the plan table wires to it.
+THE TABLE IS SMALL, measured not argued: driving the real producer over all 31
+registered engines yields THREE shapes -- scene spine x26, the `mesh_stage`
+fork, `viz_*` zero -- plus one aspect knob. The operator's "this was
+over-engineered" call is correct on the evidence.
+Landed (docs only): `docs/2026-07-25-still-plans-locked-build-spec.md` (new,
+self-contained, `84328aa1`); `docs/STILL_PLAN_SEED_INVENTORY.md` gained the
+four-fall-through mechanism map + five traps (`3713ceb5`) and the 31-engine
+parity matrix + a CORRECTION (`aa2d4a15`).
+THE PANEL CAUGHT ME THREE TIMES, twice in an already-pushed doc: I called
+`EngineNotRunnableError` invented (it is real, `engine_registry_base.py:228`);
+I wrote that `ltx_video` needs no scene still (`render_driver.py:1801-1817`
+requires it whenever `OTR_ENABLE_LTX_I2V` is set, and it DEFAULTS ON); and I
+gave `ltx_audio_in` a two-row plan when `:1709-1721` also demands a cast
+portrait on character beats under the IA2V register. All three were me
+generalizing from seams I had read to seams I had not -- the init-selection
+branch (`:1528-1853`), which is now first-class in the site inventory. Fixed at
+the root and pushed.
+Found by me, not the panel: `_still_spine_requires_scene` has FOUR
+fall-throughs and `still_motion` is NOT in the hardcoded id list (it rides the
+family branch); `mesh_stage` DOES require a scene-slot row, satisfied by the
+background plate via explicit plate-over-scene precedence at `:586-597`; the
+producer is engine-BLIND by design (enumerate-then-filter), so the plan applies
+at the FILTER, never the enumerator; `apply_engine_override` is idempotent per
+shot, so the prepass is a hoist, not a rewrite.
+Credit note: the local kibitz panel was running THREE seats -- the third is a
+`claude -p` CLI seat spending the Claude weekly pool (~11.5 min with no output
+on r2 before I killed it). The ladder budgets kibitz as rung 2-3. Since the
+judge IS the Claude seat, r3-r5 ran `--driver claude` (codex + agy only).
+Recommend making that permanent in the kibitz invocation.
+Current step: S0a -- the characterization fixture at HEAD, per section 11 of
+the locked spec. No further panel round is owed.
+Next: CODER A executes S0a -> S0b -> S1 -> S2 (operator eyeball: HuMo
+announcer/music stills go 832x1216 -> 832x480) -> S3 -> S4 two live legs.
+Models: Claude Opus (rung 4) + 5 kibitz rounds (codex `gpt-5.6-sol` high, agy
+Gemini 3.6 Flash High). No roundtable, no Fable.
+Commits: 3713ceb5, aa2d4a15, 84328aa1, plus this handoff.
+
 ## 2026-07-25 01:30 -- HEAD 9d1874f1 (v2.0-alpha) -- CODER WINDOW A (Opus)
 Did: landed the WAN 8-GB low-VRAM launch contract @ `f914f0a4`, then opened the
 NEW operator block (per-engine image contract) and landed its C0 @ `9d1874f1`.

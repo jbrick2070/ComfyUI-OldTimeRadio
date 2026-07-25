@@ -11,15 +11,20 @@ OPTIONAL key `video.max_render_frames`, so every other tier -- including the
 qualified 16-GB WAN lane -- is unchanged. Canonical `A66A416B` -> `5377914B`;
 11 variants + 4 paired `.env.json` hashes regenerated. Record:
 `PBUG-20260723-02`. Live 8-GB requalification leg still OWED.
-**NEW OPERATOR BLOCK 2026-07-25 -- PER-ENGINE IMAGE CONTRACT** (operator: "each
-video engine needs a separate set of instructions and prompts about what kind of
-images it needs; the image gen dropdown stays separate"). C0 LANDED @
-`9d1874f1` (test-only) and it DISPROVED the standing theory: the image phase
-already enumerates the opening beat and the mesh fodder/plate pair for every
-failing engine, and `viz_*` correctly requires zero images. Plan of record +
-r2/r3 judgments live in `kibitz-runs/2026-07-24-engine-image-contract/`
-(gitignored, local). **r4 is still owed before any contract chunk executes.**
-See the block entry below.
+**OPERATOR BLOCK 2026-07-25 -- PER-MODEL STILL PLANS. ARC CONVERGED @
+`84328aa1`; PLAN OF RECORD IS TRACKED.** Operator: "each video engine needs a
+separate set of instructions and prompts about what kind of images it needs;
+the image gen dropdown stays separate" / "we don't need complex lip logic". The
+r1->r5 kibitz arc is DONE (codex `gpt-5.6-sol` high + agy Gemini 3.6 Flash
+High, Claude judge; agy at r5: "architecture and chunking have fully
+converged"). The self-contained build spec is
+**`docs/2026-07-25-still-plans-locked-build-spec.md`** -- tracked, so no plan
+lives only in the gitignored `kibitz-runs/` tree. The earlier cross-cutting
+"engine image contract" framing (its r2/r3 pair and C1..C5 / C2a) is
+SUPERSEDED; C0 stays landed @ `9d1874f1`. Two grounding docs are tracked
+alongside it in `docs/STILL_PLAN_SEED_INVENTORY.md`: the per-kind prompt
+inventory, the four-fall-through mechanism map with five named traps, and the
+31-engine parity matrix. **Nothing has executed yet -- S0a is the next code.**
 
 **Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
 waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
@@ -190,28 +195,37 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- the per-engine IMAGE CONTRACT block (r4, then C2a)
+## CURRENT STEP -- PER-MODEL STILL PLANS: arc CONVERGED, S0a is next
 
-Operator rescope 2026-07-24, amended 2026-07-25 by the new image-contract
-block. Item 1 is DONE; the live order is now:
+Operator rescope 2026-07-24, amended 2026-07-25 by the still-plans block.
+Item 1 is DONE; the live order is now:
 
-0. **PER-ENGINE IMAGE CONTRACT (NEW, operator 2026-07-25).** C0 landed
-   test-only @ `9d1874f1`. NEXT: an **r4 convergence at current HEAD** (the
-   standing gate -- nothing has executed against the plan yet), then **C2a**:
-   snapshot `OTR_FORCE_ENGINE_MAP` / `OTR_ENABLE_HUMO_HOSTS` /
-   `OTR_ENABLE_LTX_I2V` + `canvas.fps` ONCE into the video policy, forward
-   through `OTR_ImageDirector`, persist in the ShotLock ledger, and make all
-   three phases read the snapshot instead of re-reading the environment. C2a is
-   a standalone correctness fix (the image and render phases can resolve
-   DIFFERENT engines for one episode today) and is a live candidate explanation
-   for the 2026-07-23 still-spine rows. Then C1 (contract module + adapter
-   declarations + FROZEN parity fixture captured at `f914f0a4`), C2, C3, C4, C5.
-   Detail: `kibitz-runs/2026-07-24-engine-image-contract/r2/final.md` +
-   `r3/final.md`. HARD acceptance: the golden-nugget inventory (operator
-   2026-07-25) -- HuMo portrait vs 16:9 wide, lips vs no-lips, mesh isolated
-   subject + plate, radio bookends, `still_*` needing a base still, `viz_*`
-   needing NO images -- migrates as declared data with a test per row, and a
-   frozen fixture proves the contract reproduces every current decision.
+0. **PER-MODEL STILL PLANS (operator 2026-07-25).** The r1->r5 kibitz arc is
+   DONE and CONVERGED; the plan of record is the tracked, self-contained
+   **`docs/2026-07-25-still-plans-locked-build-spec.md`** (@ `84328aa1`).
+   The earlier cross-cutting "engine image contract" framing (the
+   `kibitz-runs/2026-07-24-engine-image-contract/` r2+r3 pair, and C1..C5 /
+   C2a) is **SUPERSEDED by operator directive** -- judged over-engineered; do
+   not revive it. C0 stays landed @ `9d1874f1`.
+   **What the arc changed:** the root cause is not five role-indexed places
+   disagreeing about images. It is FIVE modules independently re-deriving
+   WHICH ENGINE IS EFFECTIVE, from live environment, at five different moments
+   (`otr_video_director` picked-only, `otr_image_gen_dispatcher`,
+   `otr_meta_brief_image_prompt`, `otr_shot_lock:919-933`, `render_driver`) --
+   with `validate_and_repair_still_spine` (`otr_video_render_batch.py:322`)
+   running BEFORE `apply_engine_override` (`render_driver.py:2751`), so a
+   forced route is validated against the picked engine and rendered with the
+   forced one. The plan table itself is small: driving the real producer over
+   all 31 engines yields THREE shapes (scene spine x26, the `mesh_stage` fork,
+   `viz_*` zero) plus one aspect knob.
+   **Chunk order (routing first):** `S0a` characterization fixture at HEAD ->
+   `S0b` the routing freeze (policy v3 + `IS_CHANGED` + one resolver + the
+   frozen-routing prepass) -> `S1` schema + 31 declarations + audit -> `S2`
+   atomic 7-site cutover **(OPERATOR EYEBALL: HuMo announcer/music stills go
+   832x1216 -> 832x480)** -> `S3` shim + stale-prose deletion -> `S4` TWO
+   fresh-boot live legs (default route + forced HuMo bookend).
+   Supporting data, both tracked: `docs/STILL_PLAN_SEED_INVENTORY.md` (per-kind
+   prompts, the four-fall-through mechanism map, the parity matrix).
 
 1. ~~**WAN 8-GB low-VRAM launch contract**~~ -- DONE @ `f914f0a4`
    (`PBUG-20260723-02`). The live 8-GB requalification leg is still owed and
@@ -480,7 +494,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "seams" | **the WAN 8-GB low-VRAM launch contract** -- first item of the rescoped order, no GPU needed to write. Then image-phase still ownership if the slot is still open. | Claude codes, Qwen triages, codex on 3rd strike | UNGATED | ~1-2 d |
+| CODER A "still-plans" | WAN 8-GB contract DONE @ `f914f0a4`; the r1->r5 still-plan arc DONE and CONVERGED @ `84328aa1`. **NEXT: execute `docs/2026-07-25-still-plans-locked-build-spec.md` in order -- S0a, S0b, S1, S2, S3, then S4 live.** No further panel round is owed. | Claude codes, Qwen triages, codex on 3rd strike | UNGATED (S2 needs the operator eyeball) | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
