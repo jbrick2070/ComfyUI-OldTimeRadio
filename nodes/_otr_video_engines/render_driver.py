@@ -650,6 +650,36 @@ def _still_spine_requires_scene(shot, engine_id, family):
         return False
 
 
+def _jump_still_requests_for_shot(shot):
+    """Every jump-segment still this shot owes, READ off the durable stamp.
+
+    Never re-derived (2026-07-25, chunk 4). ShotLock minted these ids from the
+    beat_id it was building, and the beat id a shot renders passes through
+    :func:`_canonical_visual_beat_id` on the way here -- so recomputing an id
+    at this end would be a second derivation of one string, which is the mirror
+    class chunk 1a collapsed. A stamp that exists but is shaped wrong is
+    TERMINAL: this pass is the last gate before a GPU render, and a request it
+    cannot read is a still it cannot prove.
+    """
+    rows = shot.get("jump_still_requests")
+    if rows is None:
+        return ()
+    if not isinstance(rows, list):
+        raise RenderError(
+            "still-spine handoff: shot %s carries a malformed "
+            "jump_still_requests stamp (%s)"
+            % (shot.get("shot_id"), type(rows).__name__))
+    out = []
+    for row in rows:
+        if not isinstance(row, dict) or not str(row.get("object_id") or ""):
+            raise RenderError(
+                "still-spine handoff: shot %s carries a jump-still request "
+                "with no object_id, so its segment still can never be proven"
+                % (shot.get("shot_id"),))
+        out.append(row)
+    return tuple(out)
+
+
 def validate_and_repair_still_spine(ledger):
     """Prove every still-consuming beat has an active, materialized input.
 
@@ -693,7 +723,8 @@ def validate_and_repair_still_spine(ledger):
             engine_id and _vreg.is_registered(engine_id)
             and getattr(_vreg.get_engine(engine_id), "requires_mesh_fodder", False)
         )
-        if requires_mesh or _still_spine_requires_scene(shot, engine_id, family):
+        if (requires_mesh or _still_spine_requires_scene(shot, engine_id, family)
+                or _jump_still_requests_for_shot(shot)):
             requires_scene_manifest = True
             break
     if requires_scene_manifest and not manifest_ids:
@@ -752,6 +783,40 @@ def validate_and_repair_still_spine(ledger):
                               "beat_id": beat_id, "engine_id": engine_id,
                               "kind": str(scene_row.get("kind") or "scene"),
                               "path": scene_path})
+        # EVERY JUMP SEGMENT, not just the beat (2026-07-25, chunk 4). The
+        # checks above prove the beat has ONE still, which is all a single-clip
+        # beat needs. A jump-cut beat renders N independent clips and segment 0
+        # is the only one that beat still covers -- so each remaining segment
+        # is proven here, by object id, or the render does not start. There is
+        # deliberately no repair-by-substitution: borrowing the beat's still
+        # for a segment would put the identical image at both ends of the cut,
+        # which is the held-frame degradation this build removes.
+        for request in _jump_still_requests_for_shot(shot):
+            segment_oid = str(request.get("object_id") or "")
+            segment_row = next(
+                (candidate for candidate in rows
+                 if str(candidate.get("object_id") or "") == segment_oid), None)
+            segment_path = _still_spine_materialize_row(segment_row, stills_root)
+            if not segment_row or not segment_path:
+                raise RenderError(
+                    "still-spine handoff missing materialized jump-segment "
+                    "still %s for shot %s beat %s segment %s; a jump cut whose "
+                    "segment has no still would render from nothing"
+                    % (segment_oid or "<missing>", shot.get("shot_id"),
+                       beat_id, request.get("segment_index"))
+                )
+            if segment_oid not in manifest_ids:
+                raise RenderError(
+                    "still-spine handoff jump-segment target %s for beat %s is "
+                    "not in the required_scene_targets receipt"
+                    % (segment_oid, beat_id)
+                )
+            validated.append({"shot_id": shot.get("shot_id"),
+                              "beat_id": beat_id, "engine_id": engine_id,
+                              "kind": str(segment_row.get("kind") or "jump_segment"),
+                              "segment_index": int(
+                                  request.get("segment_index") or 0),
+                              "path": segment_path})
         if family == "audio_driven_face":
             portrait_row = _still_spine_row_for_portrait(rows, char_id)
             portrait_path = _still_spine_materialize_row(

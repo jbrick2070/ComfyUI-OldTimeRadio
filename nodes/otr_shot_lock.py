@@ -1067,7 +1067,7 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
             "request to an engine)" % (effective_engine, fam, missing))
 
 
-def _stamp_coverage_plan(shot):
+def _stamp_coverage_plan(shot, beat_id):
     """Attach this beat's durable ``coverage_plan`` to its shot row (chunk 3b).
 
     Resolves the shot's engine to its declared :class:`FrameContract` and
@@ -1083,6 +1083,12 @@ def _stamp_coverage_plan(shot):
     propagates. An engine that is simply not registered yet (a custom slot, a
     test stub) gets NO plan rather than a guessed one: the row stays absent and
     the render path behaves exactly as it did before 3b.
+
+    ALSO MINTS THE JUMP-STILL REQUESTS (2026-07-25, chunk 4). A jump segment is
+    an independent render with nothing to begin from, so every segment after
+    the first owes the image phase its own still. They are minted HERE, where
+    ``beat_id`` is authoritative rather than re-derived, and stamped durably so
+    the image dispatcher and the still spine can READ the ids.
     """
     target = int(shot.get("target_frame_count") or 0)
     if target < 1:
@@ -1107,6 +1113,14 @@ def _stamp_coverage_plan(shot):
     plan = _cp.partition_beat(target, contract)
     _cp.validate_coverage_plan(plan, contract)
     shot["coverage_plan"] = plan.to_dict()
+    requests = _cp.jump_still_requests(
+        plan, beat_id,
+        role=str(shot.get("role") or ""),
+        engine_id=engine_id,
+        char_id=str(shot.get("char_id") or ""),
+    )
+    if requests:
+        shot["jump_still_requests"] = [dict(row) for row in requests]
 
 
 def build_execution_plan(beats, budget, creative, policy, ledger=None):
@@ -1219,7 +1233,7 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
         # INERT TODAY BY CONSTRUCTION: every adapter still resolves to
         # frame_contract.SINGLE_ONLY, whose ladder accepts any length, so every
         # beat gets a one-segment plan that renders exactly as it does now.
-        _stamp_coverage_plan(shots[-1])
+        _stamp_coverage_plan(shots[-1], b["beat_id"])
     return groups, shots
 
 

@@ -511,6 +511,152 @@ def roles_requiring_stills(image_policy: dict):
     return frozenset(role for role, value in capabilities.items() if value)
 
 
+def _coverage_plan_module():
+    try:
+        from ._otr_video_engines import coverage_plan as _cp  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import coverage_plan as _cp  # type: ignore
+    return _cp
+
+
+def merge_jump_still_requests(ledger, objects, required_scene_targets):
+    """Merge ShotLock's per-segment jump-still requests into the image phase.
+
+    THE POINT OF CHUNK 4: a jump-cut beat renders N independent clips, but the
+    image phase mints exactly ONE still per beat, so segments 1..N-1 would
+    reach the render with no init image at all. ShotLock stamped a request row
+    per such segment (``shot['jump_still_requests']``); this turns each one
+    into a real image OBJECT the dispatcher will render, plus a
+    ``required_scene_targets`` row so the existing completion contract fails
+    closed when one does not materialize.
+
+    THE SEGMENT STILL IS A CLONE OF THE BEAT'S OWN SCENE STILL -- same prompt,
+    same dimensions, same visual style -- with a different ``object_id``. That
+    is what makes it a jump CUT rather than a duplicate frame: the per-object
+    seed is derived from the object id (``resolve_object_seed`` under the
+    default ``request_hash`` mode), so each segment gets a different image of
+    the same scene. Under an operator-selected ``fixed`` seed mode they are
+    identical by that choice, not by this merge. Prompt DIFFERENTIATION per
+    segment is a later chunk's job; the image phase owns prompts, this does not
+    invent any.
+
+    FAIL-CLOSED, NEVER GUESSING:
+      * a beat whose still IS required but has no scene object to clone,
+      * a mesh/plate beat, where the correct source (fodder? plate? both?) is
+        genuinely ambiguous and multi-clip mesh lanes are out of scope,
+      * more than one candidate scene object for one beat,
+      * a malformed request row, or an id that already exists,
+    all RAISE. A beat with no scene object AND no required target is a
+    visualizer lane that consumes no still at all; its segments need none
+    either, and that is reported rather than silently dropped.
+
+    Returns ``(objects, required_scene_targets, report_lines)``; the inputs are
+    never mutated.
+    """
+    _cp = _coverage_plan_module()
+    shots = [shot for shot in
+             (((ledger or {}).get("video") or {}).get("shots") or [])
+             if isinstance(shot, dict)]
+    requests = []
+    for shot in shots:
+        rows = shot.get("jump_still_requests")
+        if rows is None:
+            continue
+        if not isinstance(rows, list):
+            raise ImageRenderError(
+                "shot %s carries a malformed jump_still_requests stamp (%s); "
+                "refusing an image phase that cannot be proven complete."
+                % (shot.get("shot_id"), type(rows).__name__))
+        for row in rows:
+            if not isinstance(row, dict) or not str(row.get("object_id") or ""):
+                raise ImageRenderError(
+                    "shot %s carries a jump-still request without an "
+                    "object_id; refusing an unverifiable image phase."
+                    % (shot.get("shot_id"),))
+            requests.append((shot, row))
+    if not requests:
+        return objects, required_scene_targets, []
+
+    scene_by_beat = {}
+    ambiguous_beats = set()
+    mesh_beats = set()
+    existing_ids = set()
+    for obj in objects:
+        if not isinstance(obj, dict):
+            continue
+        existing_ids.add(str(obj.get("object_id") or ""))
+        kind = str(obj.get("kind") or "")
+        beat = str(obj.get("beat_id") or "")
+        if not beat:
+            continue
+        if kind in ("mesh_fodder", "scene_background_plate"):
+            mesh_beats.add(beat)
+        elif kind.startswith("scene_"):
+            if beat in scene_by_beat:
+                ambiguous_beats.add(beat)
+            scene_by_beat[beat] = obj
+
+    required_beats = {
+        str(target.get("beat_id") or "")
+        for target in (required_scene_targets or [])
+        if isinstance(target, dict)
+    }
+    merged_objects = list(objects)
+    merged_targets = list(required_scene_targets or [])
+    report = []
+    for shot, row in requests:
+        beat = str(row.get("beat_id") or "")
+        oid = str(row["object_id"])
+        segment = int(row.get("segment_index") or 0)
+        if beat in mesh_beats:
+            raise ImageRenderError(
+                "beat %s renders a 3D/mesh lane and also asks for jump-segment "
+                "stills; the source still is ambiguous (mesh fodder or "
+                "background plate) and multi-clip mesh coverage is not built. "
+                "NO GUESS." % beat)
+        if beat in ambiguous_beats:
+            raise ImageRenderError(
+                "beat %s has more than one scene still object, so the image "
+                "phase cannot say which one its jump segments should look "
+                "like. NO GUESS." % beat)
+        base = scene_by_beat.get(beat)
+        if base is None:
+            if beat in required_beats:
+                raise ImageRenderError(
+                    "beat %s owes a jump-segment still (%s) but the image "
+                    "phase minted no scene still to derive it from, while the "
+                    "beat's own still IS required. A jump cut with no still "
+                    "renders from nothing. NO FALLBACK." % (beat, oid))
+            report.append(
+                "jump-still: beat %s consumes no scene still (no required "
+                "target); segment %d needs none" % (beat, segment))
+            continue
+        if oid in existing_ids:
+            raise ImageRenderError(
+                "jump-segment still %s already exists in the image payload; "
+                "refusing an ambiguous duplicate object." % oid)
+        clone = dict(base)
+        clone["object_id"] = oid
+        clone["kind"] = _cp.JUMP_STILL_KIND
+        clone["beat_id"] = beat
+        clone["segment_index"] = segment
+        clone["role"] = str(row.get("role") or base.get("role") or "")
+        clone["source"] = "jump_segment_cover"
+        clone.pop("mesh_subject_id", None)
+        existing_ids.add(oid)
+        merged_objects.append(clone)
+        merged_targets.append({
+            "object_id": oid,
+            "kind": _cp.JUMP_STILL_KIND,
+            "role": clone["role"],
+            "beat_id": beat,
+        })
+        report.append(
+            "jump-still: beat %s segment %d -> %s (from %s)"
+            % (beat, segment, oid, base.get("object_id")))
+    return merged_objects, merged_targets, report
+
+
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
                     handoff_min_bytes: int = _MIN_PNG_BYTES,
@@ -577,6 +723,16 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         raise ImageRenderError(
             "OTR_ImageGenDispatcher received a malformed required_scene_targets "
             "receipt; refusing video dispatch without a target contract.")
+    # THE JUMP-STILL MERGE (2026-07-25, multi-clip coverage chunk 4). ShotLock
+    # ran BEFORE this node and stamped one still request per jump-cut segment
+    # on its shot rows; fold them into the object list and the required-target
+    # receipt HERE, before either is validated below, so the merged rows are
+    # held to exactly the same id/duplicate/completion contract as the
+    # producer's own. Empty and free on every single-clip episode, which is
+    # every episode until an adapter opts in to multi-clip coverage.
+    objects, required_scene_targets, _jump_report = merge_jump_still_requests(
+        ledger, objects, required_scene_targets)
+    report.extend(_jump_report)
     _required_ids = []
     for _target in required_scene_targets:
         if not isinstance(_target, dict) or not str(

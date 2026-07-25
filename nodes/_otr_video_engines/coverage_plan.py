@@ -431,3 +431,75 @@ def validate_coverage_plan(plan: CoveragePlan, contract):
             raise CoveragePlanError(
                 "plan trims a tail but the adapter declares allow_tail_trim=False")
     return plan
+
+
+# --------------------------------------------------------------------------- #
+# JUMP-STILL REQUESTS -- what the IMAGE phase owes a jump-cut beat (chunk 4)
+# --------------------------------------------------------------------------- #
+#
+# A CHAIN successor begins on its predecessor's terminal frame, so it needs no
+# new still. A JUMP successor is an INDEPENDENT render with nothing to begin
+# from, and the image phase mints exactly ONE still per beat -- so without this
+# every segment after the first would render from no init image at all. That is
+# the text-only / dark-floor degradation this build exists to remove, which is
+# why chunk 4 exists at all: WITHOUT IT A JUMP CUT HAS NO STILL.
+#
+# ONE AUTHORITY, THREE CONSUMERS, NO RE-DERIVATION. OTR_ShotLock mints these
+# rows and stamps them durably on the shot; the image dispatcher and the still
+# spine READ them off the ledger rather than recomputing an id from a beat id.
+# That is deliberate. The beat id a SHOT renders and the beat id an image
+# OBJECT was keyed under pass through a canonicalizing remap (the positioned
+# music opener, ``render_driver._canonical_visual_beat_id``), so two
+# independent derivations are two chances to disagree about one string -- the
+# mirror class chunk 1a collapsed for routing.
+
+#: The ledger ``kind`` every jump-segment still carries. Deliberately NOT a
+#: ``scene_*`` kind: ``render_driver._still_index`` and
+#: ``_still_spine_row_for_beat`` both select scene rows BY BEAT with a
+#: last-write-wins / plate precedence, so a segment still wearing a scene kind
+#: would shadow the beat's own still and segment 0 would render from the LAST
+#: segment's image. A distinct kind makes the segment rows invisible to every
+#: existing consumer, which is what keeps this chunk behaviour-inert.
+JUMP_STILL_KIND = "jump_segment"
+
+#: Object-id prefix for a jump-segment still.
+JUMP_STILL_ID_PREFIX = "jumpstill_"
+
+
+def jump_still_object_id(beat_id, segment_index) -> str:
+    """The durable object id of one jump segment's still. Pure."""
+    return "%s%s_s%d" % (JUMP_STILL_ID_PREFIX, str(beat_id or ""),
+                         int(segment_index))
+
+
+def jump_still_requests(plan, beat_id, *, role="", engine_id="", char_id=""):
+    """Every still this beat's plan owes the image phase, in segment order.
+
+    EMPTY for a single-clip beat and for a CHAIN. One request per segment
+    AFTER the first under a JUMP: segment 0 uses the beat's existing scene
+    still, which the image phase already mints and the spine already validates,
+    so minting a second still for it would orphan the first.
+
+    Returns plain JSON-safe dicts because they ride the durable ledger.
+    """
+    if plan is None or plan.join_mode != JOIN_JUMP or not plan.is_multi_clip:
+        return ()
+    beat = str(beat_id or "")
+    if not beat:
+        raise CoveragePlanError(
+            "a jump-cut beat needs a beat_id to key its per-segment stills -- "
+            "an unkeyed request could never be matched to a rendered still")
+    out = []
+    for seg in plan.segments[1:]:
+        row = {
+            "object_id": jump_still_object_id(beat, seg.index),
+            "kind": JUMP_STILL_KIND,
+            "beat_id": beat,
+            "segment_index": int(seg.index),
+            "role": str(role or ""),
+            "engine_id": str(engine_id or ""),
+        }
+        if char_id:
+            row["char_id"] = str(char_id)
+        out.append(row)
+    return tuple(out)
