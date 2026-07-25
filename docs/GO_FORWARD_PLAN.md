@@ -1,5 +1,10 @@
 # OTR Go-Forward Plan
 
+**Updated:** 2026-07-25 -- CODER A still-plans: r3 panel (codex
+`gpt-5.6-sol` high + agy Gemini 3.6 Flash High) + Claude grounding.
+Chunk order corrected to S1b -> S0b-core -> S2 -> S3/S0c -> S5 -> S4.
+HEAD `79fe4d3f`; no production code touched this session.
+
 **Updated:** 2026-07-25 -- **WAN 8-GB LOW-VRAM LAUNCH CONTRACT IS DONE @
 `f914f0a4`** (first item of the rescoped order, CODER A). The 8-GB tier's
 render ceiling now travels profile -> `OTR_VideoDirector.max_render_frames`
@@ -11,56 +16,13 @@ OPTIONAL key `video.max_render_frames`, so every other tier -- including the
 qualified 16-GB WAN lane -- is unchanged. Canonical `A66A416B` -> `5377914B`;
 11 variants + 4 paired `.env.json` hashes regenerated. Record:
 `PBUG-20260723-02`. Live 8-GB requalification leg still OWED.
-**OPERATOR BLOCK 2026-07-25 -- PER-MODEL STILL PLANS. ARC CONVERGED @
-`84328aa1`; PLAN OF RECORD IS TRACKED.** Operator: "each video engine needs a
-separate set of instructions and prompts about what kind of images it needs;
-the image gen dropdown stays separate" / "we don't need complex lip logic". The
-r1->r5 kibitz arc is DONE (codex `gpt-5.6-sol` high + agy Gemini 3.6 Flash
-High, Claude judge; agy at r5: "architecture and chunking have fully
-converged"). The self-contained build spec is
-**`docs/2026-07-25-still-plans-locked-build-spec.md`** -- tracked, so no plan
-lives only in the gitignored `kibitz-runs/` tree. The earlier cross-cutting
-"engine image contract" framing (its r2/r3 pair and C1..C5 / C2a) is
-SUPERSEDED; C0 stays landed @ `9d1874f1`. Two grounding docs are tracked
-alongside it in `docs/STILL_PLAN_SEED_INVENTORY.md`: the per-kind prompt
-inventory, the four-fall-through mechanism map with five named traps, and the
-31-engine parity matrix. **S0a DONE @ `33c4d8cf` (finished 2026-07-24 20:22
-local, wall 14m) -- 6432 passed / 27 skipped / 1 xfailed; Bible 17 passed;
-tests/fixtures/still_plan_head_parity.json (31 engines x 8 configurations)
-locks HEAD before S0b flips the routing. S0a-b DONE @ `e60185a0`
-(finished 2026-07-24 22:48 local, wall 18m) -- isolation property test
-amendment (two new tests: mutate one engine's still-plan proxies -> prove
-every OTHER engine's row byte-identical to fixture under clean configs;
-mixed-policy episode with three heterogeneous engines -> prove each
-role's render_decisions and effective_engine equal the same role's
-single-engine baseline). Full suite 6434 passed / 27 skipped / 1 xfailed
-(+2 vs S0a); Bible 17 passed; audio byte-identical 7 passed. S0b
-BLOCKED on a kibitz-scoped coder window (2026-07-24 22:50 local) --
-`docs/S0b_KIBITZ_NEEDED.md` filed instead of half-landing the routing
-freeze. The autonomous window that ran S0a-b hit the same
-"cross-module atomic refactor that cannot land as one atomic push in
-this window's remaining budget without breaking the
-routing-is-frozen-first invariant silently" judgment the PRIOR
-autonomous window did at `d6655690`; no S0b production code was
-touched, so the tree remains at the S0a + S0a-b fence. `S0b_HANDOFF.md`
-stays the site inventory; the KIBITZ_NEEDED doc names the
-two-strikes budget and the two options for the next window
-(atomic-with-time-budget vs green-between-consumers split, plus an
-r3+r4 local kibitz at CURRENT HEAD if either stalls). This window is
-proceeding to S1 (safe leaf per section 11 of the spec: schema + 31
-declarations + audit; nothing reads the plan) and then HALTING at
-S2 per operator. S1 DONE @ `a98b1d5d` (finished 2026-07-24 23:19 local,
-wall 25m) -- new `nodes/_otr_shared/still_plan_helpers.py`
-(schema + `resolve_row_aspect` + audit helpers, stdlib-only, cold-import
-clean), 31 per-engine `still_plan` class attributes across 16 adapter
-files covering Shape A (26 engines including the audio-driven-face,
-LTX-I2V, and LTX-audio-in variants), Shape B (mesh_stage), Shape C (4
-visualizers with explicit `()`), and new
-`tests/test_still_plan_audit.py` (6 tests, 265 lines) with the
-`CAPABILITIES == all_engine_names() == valid-plan owners` invariant.
-Full suite 6440 passed / 27 skipped / 1 xfailed (+6 vs S0a-b);
-Bible 17 passed; audio byte-identical 7 passed. HALTING here per
-operator (`docs/S2_EYEBALL_REQUEST.md` filed next).**
+**OPERATOR BLOCK -- PER-MODEL STILL PLANS (CODER A, live).** Spec of
+record: `docs/2026-07-25-still-plans-locked-build-spec.md`; grounding:
+`docs/STILL_PLAN_SEED_INVENTORY.md`. S0a / S0a-b / S1 are LANDED, S0b is
+FILED-BLOCKED, and the build is at the S2 gate -- per-chunk detail is in
+`docs/HANDOFF_LOG.md`, not here. The 2026-07-25 r3 panel (codex
+`gpt-5.6-sol` high + agy Gemini 3.6 Flash High, both pins verified) plus
+Claude's grounding CORRECTED the plan in four ways; see CURRENT STEP.
 
 **Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
 waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
@@ -231,37 +193,81 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- PER-MODEL STILL PLANS: arc CONVERGED, S0a is next
+## CURRENT STEP -- PER-MODEL STILL PLANS: S1b, then S0b-core, then S2
 
-Operator rescope 2026-07-24, amended 2026-07-25 by the still-plans block.
-Item 1 is DONE; the live order is now:
+The r1->r5 arc converged and S1 landed, but a 2026-07-25 r3 panel + Claude
+grounding found FOUR corrections that must be made before any wiring. The
+chunk order is now:
 
-0. **PER-MODEL STILL PLANS (operator 2026-07-25).** The r1->r5 kibitz arc is
-   DONE and CONVERGED; the plan of record is the tracked, self-contained
-   **`docs/2026-07-25-still-plans-locked-build-spec.md`** (@ `84328aa1`).
-   The earlier cross-cutting "engine image contract" framing (the
-   `kibitz-runs/2026-07-24-engine-image-contract/` r2+r3 pair, and C1..C5 /
-   C2a) is **SUPERSEDED by operator directive** -- judged over-engineered; do
-   not revive it. C0 stays landed @ `9d1874f1`.
-   **What the arc changed:** the root cause is not five role-indexed places
-   disagreeing about images. It is FIVE modules independently re-deriving
-   WHICH ENGINE IS EFFECTIVE, from live environment, at five different moments
-   (`otr_video_director` picked-only, `otr_image_gen_dispatcher`,
-   `otr_meta_brief_image_prompt`, `otr_shot_lock:919-933`, `render_driver`) --
-   with `validate_and_repair_still_spine` (`otr_video_render_batch.py:322`)
-   running BEFORE `apply_engine_override` (`render_driver.py:2751`), so a
-   forced route is validated against the picked engine and rendered with the
-   forced one. The plan table itself is small: driving the real producer over
-   all 31 engines yields THREE shapes (scene spine x26, the `mesh_stage` fork,
-   `viz_*` zero) plus one aspect knob.
-   **Chunk order (routing first):** `S0a` characterization fixture at HEAD ->
-   `S0b` the routing freeze (policy v3 + `IS_CHANGED` + one resolver + the
-   frozen-routing prepass) -> `S1` schema + 31 declarations + audit -> `S2`
-   atomic 7-site cutover **(OPERATOR EYEBALL: HuMo announcer/music stills go
-   832x1216 -> 832x480)** -> `S3` shim + stale-prose deletion -> `S4` TWO
-   fresh-boot live legs (default route + forced HuMo bookend).
-   Supporting data, both tracked: `docs/STILL_PLAN_SEED_INVENTORY.md` (per-kind
-   prompts, the four-fall-through mechanism map, the parity matrix).
+**S1b (NEW, do first -- pure parity, blocked on nothing).** S1's
+`framing_geometry` strings are PARAPHRASES, not transplants, and spec section
+5 makes that field the layer-2 prompt TEXT ("authored TEXT -- the ONE free
+field"). Wiring S1 as it stands would silently degrade every prompt in the
+system. Concretely lost against `docs/STILL_PLAN_SEED_INVENTORY.md`:
+`mesh_fodder` dropped the entire clay-blob clause (unbroken silhouette, plain
+seamless mid-grey backdrop, no props, even diffuse frontal light);
+`scene_background_plate` dropped "no people, no subject, no characters";
+`portrait` dropped "never crop the top of the head" and is the EMPTY STRING on
+19 engines. S1b restores every clause VERBATIM from the inventory. The S0a
+fixture must stay green -- this is transcription, not design.
+
+**S0b-core (corrected).** Land the routing freeze atomically. THREE
+corrections to `docs/S0b_KIBITZ_NEEDED.md` before it is built:
+  1. The closed `engine_facts` descriptor `{engine_id, family, provider_side}`
+     (spec:230) has NO aspect field, but `resolve_row_aspect`
+     (`still_plan_helpers.py:177-189`) needs `engine_render_aspect` /
+     `render_aspect` and SILENTLY RETURNS PORTRAIT when absent -- so every
+     `inherit_engine` row would resolve portrait, including `cloud_kling_avatar`
+     and both wide `_169` HuMos. Add a canonical `render_aspect` field and
+     reject missing values instead of falling back.
+  2. The frozen-routing prepass as specified does NOT close the defect it is
+     named for. `apply_engine_override` (`render_driver.py:2784`) applies only
+     `OTR_FORCE_ENGINE_MAP`; the radio-host redirect is a SEPARATE mutation at
+     `:1413-1513`. The prepass must freeze each role's FINAL effective engine,
+     redirect included, before `validate_and_repair_still_spine`.
+  3. The test-literal inventory is stale: ~35 `policy_version=2` sites, not 31
+     (`test_hybrid_voice_fit` has none; `test_still_plan_parity` adds five).
+     Derive the list mechanically.
+  SCOPE (judge call on a panel split): adopt agy's S0b-core / S0c relief, but
+  keep `ltx_resolved` FROZEN inside S0b-core -- that answers codex's objection
+  that deferring it desynchronizes `when_engine_talking`. Only the
+  `eng_ltx_av.assert_usable` mismatch ASSERTION defers to S0c.
+
+**S2 (cutover).** OPERATOR EYEBALL RESOLVED 2026-07-25 -- and it is far
+narrower than three docs claimed. There are FOUR HuMo engines; only `humo` and
+`humo_1.7B` ship `render_aspect="portrait"`, and `humo_1.7B_169` /
+`humo_14B_169` are ALREADY wide (the ComfyUI dropdown labels this to the
+operator as "(portrait)" / "(16:9)" -- a visible product contract). Nothing
+about HuMo "flips". The S2 delta is FOUR ROLE-CELLS: two portrait HuMo picks x
+announcer/music, under the hosts-off DEFAULT, where `_enforce_radio_is_host`
+redirects the beat to the WIDE `ltx_audio_in` that actually renders it. With
+`OTR_ENABLE_HUMO_HOSTS=1` a portrait HuMo keeps its portrait still. Confirmed
+three ways: operator, codex, and agy independently. The old "via the `_169`
+siblings' render_aspect" framing in `docs/S2_EYEBALL_REQUEST.md` is WRONG on
+mechanism and must be corrected along with the S0a fixture's special_cases
+rows.
+
+**S3** shim + stale-prose deletion. **S0c** the ltx_av mismatch gate.
+
+**S5 (NEW, the operator's actual directive).** Operator 2026-07-25: "ensure
+that each video path has its own customized still operations." It is NOT met
+today. Driving the live registry over all 31 engines yields 14 shared plan
+objects but only SIX distinct signatures and SIX distinct structures -- meaning
+the framing prose adds ZERO per-engine differentiation, and 19 engines
+(`wan_ti2v`, `google_*`, `still_*`, `word_razzle`, `cloud_*`, `ltx_8gb`) share
+one identical signature whose portrait row is empty. S5 diverges the restored
+clauses per engine so an i2v engine whose still IS the init frame, a t2v engine
+whose still is optional, and a Ken Burns pan stop receiving identical
+instructions. S5 CHANGES PROMPTS: it needs its own acceptance and must land
+after the wiring, never inside a parity chunk.
+
+**S4** two fresh-boot live legs (default route + forced HuMo bookend).
+
+Gate: r4 convergence at CURRENT HEAD on the corrected plan before code. Both
+r3 panelists explicitly rejected Path B (S2-first against live env); do not
+revive it.
+
+Operator rescope 2026-07-24 -- the rest of the live order:
 
 1. ~~**WAN 8-GB low-VRAM launch contract**~~ -- DONE @ `f914f0a4`
    (`PBUG-20260723-02`). The live 8-GB requalification leg is still owed and
@@ -336,6 +342,17 @@ listed as live.
   not raise the minimum word target as a capacity workaround.
 - **WAN 8-GB low-VRAM launch contract** -- FIRST item of the rescoped order.
 - **Image-phase still ownership** -- bug-first item 2 above.
+- **`eng_ltx_video._use_i2v` contradicts fail-closed** (found 2026-07-25, r3
+  panel, grounded). With I2V enabled and the init image missing it LOGS and
+  degrades to the text-to-video path (`eng_ltx_video.py:559-572`), while
+  `render_driver.py:1801-1817` RAISES `RenderError` "NO FALLBACK to text-only
+  rendering" on that same state. Two contradictory policies; whichever fires
+  first wins. Static finding at HEAD -- needs a live reproduction before it
+  becomes a PBUG row.
+- **Four env-read sites missing from the S0b inventory** (r3 panel, grounded):
+  `eng_ltx_video.py:541-564` (`OTR_ENABLE_LTX_I2V`), `render_driver.py:1176-1203`
+  and `otr_meta_brief_image_prompt.py:297-300` (`OTR_ENABLE_HUMO_HOSTS`), and
+  `eng_ltx_av.py:352-353,403-432` (recipe/UNET re-read outside `assert_usable`).
 
 **PARKED -- unverified at HEAD, re-observe AFTER SFX (operator 2026-07-24).**
 Both were eyeball observations against a story engine that has since had its

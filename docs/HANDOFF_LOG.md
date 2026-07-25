@@ -3,6 +3,71 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-25 -- HEAD 79fe4d3f (v2.0-alpha) -- CODER WINDOW A (Opus)
+Did: resumed after the prior window was killed mid-stream. Kickoff baseline was
+STALE (said 90e52f13 / "r1 launched"; real HEAD 79fe4d3f with the arc converged
+and S0a/S0a-b/S1 landed). No production code touched; canonical 5377914B.
+Ran kibitz r3 on the S0b-vs-S2 ordering question -- codex `gpt-5.6-sol` high +
+agy Gemini 3.6 Flash (High), BOTH pins verified per round, `--driver claude` so
+the third `claude -p` seat stops spending the Claude weekly pool.
+BOTH panelists and my own grounding REJECT Path B. Order is S0b atomically first.
+FOUND BY ME, missed by both panelists -- the biggest item: S1's
+`framing_geometry` strings are PARAPHRASES, not transplants, and spec section 5
+makes that field the layer-2 prompt TEXT. `mesh_fodder` lost the whole clay-blob
+clause; `scene_background_plate` lost "no people, no subject, no characters";
+`portrait` lost "never crop the top of the head" and is the EMPTY STRING on 19
+engines. Wiring S1 as-is silently degrades every prompt. NEW CHUNK S1b restores
+the clauses verbatim from the seed inventory; it must precede any wiring.
+FOUND (registry audit): 31 engines -> 14 shared plan objects -> only SIX distinct
+signatures AND six distinct structures, i.e. the prose adds ZERO per-engine
+differentiation; 19 engines share one signature. The operator directive "each
+video path owns its own customized still operations" is NOT met. NEW CHUNK S5,
+after the wiring, changes prompts and needs its own acceptance. Operator
+confirmed the acceptance line: every engine EXCEPT the four `viz_*` needs real
+prompt text, including the four `still_*` and the `mesh_stage` 3D option.
+HuMo CORRECTED three ways (operator + codex + agy, independently): there are
+FOUR HuMo engines; only `humo`/`humo_1.7B` are portrait, both `_169` are ALREADY
+wide, and the ComfyUI dropdown shows that split to the operator. Nothing about
+HuMo flips. The S2 delta is FOUR ROLE-CELLS -- two portrait HuMo picks x
+announcer/music -- under hosts-off default, because `_enforce_radio_is_host`
+redirects to the WIDE `ltx_audio_in` that actually renders the beat.
+`OTR_ENABLE_HUMO_HOSTS=1` preserves portrait. The "via the `_169` siblings"
+framing in S2_EYEBALL_REQUEST + GO_FORWARD was wrong on mechanism; corrected.
+Panel MUST-FIX, grounded CONFIRMED by me against the files: (a) the closed
+`engine_facts` descriptor `{engine_id, family, provider_side}` (spec:230) has no
+aspect field, and `resolve_row_aspect` SILENTLY RETURNS PORTRAIT when it is
+absent -- every `inherit_engine` row would go portrait. agy MISREAD this as
+"key-name insensitivity confirmed" (true but irrelevant -- the field is absent);
+codex is right. (b) the frozen-routing prepass as specified fixes only the force
+map: `apply_engine_override` (`:2784`) never applies the radio-host redirect
+(`:1413-1513`), so the reproduced defect survives the chunk named for it.
+(c) `eng_ltx_video._use_i2v` degrades to text-to-video while
+`render_driver.py:1801-1817` RAISES on the same state.
+JUDGE CALL on a panel split: adopt agy's S0b-core/S0c scope relief BUT keep
+`ltx_resolved` frozen inside S0b-core -- that answers codex's objection that
+deferring it desynchronizes `when_engine_talking`. Only the
+`eng_ltx_av.assert_usable` mismatch ASSERTION defers to S0c.
+Current step: S1b -> S0b-core (corrected) -> S2 -> S3/S0c -> S5 -> S4.
+Next: CODER A -- r4 convergence at HEAD on the corrected plan, then build.
+Models: Claude Opus (rung 4) + one kibitz r3 (codex gpt-5.6-sol high + agy).
+Commits: docs handoff only; no code.
+
+## 2026-07-25 (earlier) -- HEAD 79fe4d3f (v2.0-alpha) -- CODER A (autonomous, killed)
+Reconstructed from git + tracked docs: this window was killed at the S2 gate
+before it wrote its own entry, and its history had been inlined into
+GO_FORWARD_PLAN.md (trimmed back out to here per the forward-only rule).
+- `33c4d8cf` S0a -- characterization fixture, 31 engines x 8 configurations.
+- `e60185a0` S0a-b -- isolation property amendment (per-engine byte-identity;
+  mixed-policy per-role parity). Suite 6434 / 27 skipped / 1 xfailed.
+- `c8db4c92` S0b -- NOT LANDED, filed BLOCKED as `docs/S0b_KIBITZ_NEEDED.md`
+  rather than half-land a cross-module atomic refactor. Correct call; the
+  2026-07-25 r3 panel then found three real defects in that chunk's own spec.
+- `a98b1d5d` S1 -- `nodes/_otr_shared/still_plan_helpers.py`, 31 per-engine
+  `still_plan` attributes across 16 adapters, `tests/test_still_plan_audit.py`
+  (6 tests). Suite 6440 / Bible 17. Nothing reads the plan yet.
+- `79fe4d3f` -- `docs/S2_EYEBALL_REQUEST.md`, the halt gate.
+Canonical `5377914B` throughout; no node/widget/link touched.
+
 ## 2026-07-25 19:15 -- HEAD 84328aa1 (v2.0-alpha) -- CODER WINDOW A (Opus)
 Did: ran the still-plan kibitz arc r1->r5 to CONVERGENCE and landed three
 tracked docs. No production code touched; canonical byte-identical at

@@ -1,5 +1,23 @@
 # S2 -- OPERATOR EYEBALL REQUEST (still-plans build)
 
+> **ANSWERED AND PARTLY SUPERSEDED 2026-07-25. Read `docs/GO_FORWARD_PLAN.md`
+> CURRENT STEP first.** Both questions below are resolved, and this file's
+> stated MECHANISM for question 1 is WRONG -- confirmed independently by the
+> operator, by codex `gpt-5.6-sol` high and by agy Gemini 3.6 Flash (High) in
+> the 2026-07-25 r3 panel. There are FOUR HuMo engines. Only `humo` and
+> `humo_1.7B` ship `render_aspect="portrait"`; `humo_1.7B_169` and
+> `humo_14B_169` are ALREADY wide, and the ComfyUI dropdown labels that split
+> to the operator as "(portrait)" / "(16:9)". Nothing about HuMo "flips", and
+> the `_169` siblings are irrelevant to what `humo` resolves to. The real S2
+> delta is FOUR ROLE-CELLS -- the two portrait HuMo picks x announcer/music --
+> under the hosts-off DEFAULT, where `_enforce_radio_is_host` redirects the
+> beat to the WIDE `ltx_audio_in` that actually renders it. With
+> `OTR_ENABLE_HUMO_HOSTS=1` a portrait HuMo keeps its portrait still, so a
+> blanket "HuMo announcer/music -> wide" would be a REGRESSION on that lane.
+> Question 2 is answered: Path A-lite (S0b atomically first). Both panelists
+> rejected Path B. S0b's own spec needs three corrections, and a new chunk
+> S1b must precede all wiring -- all recorded in GO_FORWARD_PLAN.md.
+
 **Written 2026-07-24 23:19 local by the CODER WINDOW A autonomous run.**
 HEAD when this file lands: `a98b1d5d` on `v2.0-alpha` (S1 done).
 Spec of record: `docs/2026-07-25-still-plans-locked-build-spec.md` @
