@@ -475,10 +475,33 @@ class HuMoEngine(_MC.MotionEngineBase):
         frames = _wb.images_to_uint8(images)
         # Route-A exact-fit: a capped tier may have rendered FEWER frames than the
         # audio target (or, on a tiny beat quantized up to the floor, more) -- trim
-        # or mirror-extend so the encoded clip's frame_count EQUALS target_fc (else
-        # the composite holds the last frame / the manifest timing drifts).
+        # so the encoded clip's frame_count EQUALS target_fc (else the manifest
+        # timing drifts).
+        #
+        # NO MIRROR ON A LIP-SYNCED LANE (operator directive 2026-07-25: "lip
+        # sync needs continuity, no render backwards, that doesn't work").
+        # HuMo is ``audio_driven_face`` -- its whole output is a mouth driven by
+        # this beat's speech. ``fit_frames_to_target`` used to mirror-extend a
+        # SHORT capped render up to the audio target, and the back half of that
+        # mirror cycle is the render in REVERSE, so a capped 14B beat longer
+        # than the cap shipped a face that speaks forwards and then unspeaks
+        # backwards, in time with forward audio. Trimming is still fine (it
+        # never reverses time); a SHORT render is now TERMINAL and LOUD, with
+        # the remedy in the message. This can fail a beat that previously
+        # "succeeded" -- those episodes had backwards lip sync.
         if cap is not None and target_fc > 0:
-            frames = _wb.fit_frames_to_target(frames, target_fc)
+            try:
+                frames = _wb.fit_frames_to_target(
+                    frames, target_fc, allow_mirror=False)
+            except _wb.MirrorExtensionForbidden as exc:
+                raise _wb.GraphExecutionError(
+                    "%s: %s. This tier's VRAM-safe cap is %d frame(s) and the "
+                    "beat needs %d. NO FALLBACK -- fix the routing, not the "
+                    "frames: raise OTR_HUMO_14B_SAFE_FRAMES if the card can "
+                    "afford it, route this beat to an uncapped HuMo tier, or "
+                    "give the beat a shorter line. Mirroring it would play the "
+                    "mouth backwards." % (
+                        self.name, exc, int(cap), int(target_fc))) from exc
         out_path = otr_engine_tmp_mp4("otr_humo_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # Restore the proven HuMo VRAM discipline the refactor dropped: the frames

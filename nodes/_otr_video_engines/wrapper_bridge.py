@@ -463,7 +463,24 @@ def extend_frames_to_target(frames, target_frame_count):
     return np.ascontiguousarray(tiled[:target])
 
 
-def fit_frames_to_target(frames, target_frame_count):
+class MirrorExtensionForbidden(ValueError):
+    """A short render on an AUDIO-SYNCED lane cannot be mirror-extended.
+
+    Raised by :func:`fit_frames_to_target` when ``allow_mirror=False`` and the
+    render is shorter than the audio target. Carries the numbers so the caller
+    can name the tier and the remedy.
+    """
+
+    def __init__(self, rendered, target):
+        self.rendered = int(rendered)
+        self.target = int(target)
+        super().__init__(
+            "audio-synced render is %d frame(s) but the beat's audio needs %d; "
+            "mirror-extension is FORBIDDEN on a lip-synced lane (it would play "
+            "the mouth backwards)" % (self.rendered, self.target))
+
+
+def fit_frames_to_target(frames, target_frame_count, *, allow_mirror=True):
     """EXACT-FIT ``frames`` to ``target_frame_count``: TRIM when over,
     mirror-extend (:func:`extend_frames_to_target`) when short, identity on a
     match. The capped render tiers (e.g. HuMo-14B's VRAM frame cap) need this so
@@ -471,7 +488,19 @@ def fit_frames_to_target(frames, target_frame_count):
     would otherwise make the composite hold the last frame, and a long one would
     drift the manifest timing. ``frames`` is the uint8 ``[N,H,W,C]`` array from
     :func:`images_to_uint8`; numpy is imported lazily (cold-import V-12). Pure;
-    CPU-testable."""
+    CPU-testable.
+
+    ``allow_mirror=False`` (operator directive 2026-07-25: "lip sync needs
+    continuity, no render backwards, that doesn't work") makes a SHORT render
+    TERMINAL instead of mirrored. :func:`extend_frames_to_target` builds the
+    cycle ``[0,1,..,N-1,N-2,..,1]`` -- the back half of every cycle is the
+    render played in REVERSE. On a scene lane that is decorative motion and
+    the loop is seamless by design. On an AUDIO-SYNCED lane (an
+    ``audio_driven_face`` talking head, anything lip-synced) it plays the
+    mouth backwards against forward speech, which is a sync defect that ships
+    as a finished episode. TRIMMING stays legal under this flag -- trimming
+    never reverses time.
+    """
     import numpy as np
     arr = np.asarray(frames)
     n = int(arr.shape[0]) if arr.ndim else 0
@@ -480,6 +509,8 @@ def fit_frames_to_target(frames, target_frame_count):
         return arr
     if n > target:
         return np.ascontiguousarray(arr[:target])
+    if not allow_mirror:
+        raise MirrorExtensionForbidden(n, target)
     return extend_frames_to_target(arr, target)
 
 
