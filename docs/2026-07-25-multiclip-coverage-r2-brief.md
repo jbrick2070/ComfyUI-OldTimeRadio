@@ -63,7 +63,28 @@ Veo sells discrete 4/6/8-second durations (`eng_google_veo_video.py:245`);
   what genuinely differs -- preserves "slightly different" with one place to
   fix a defect.
 
-**Design the second reading, but PROVE it can express the real differences.**
+**THE OPERATOR HAS NOW RESOLVED THIS HIMSELF -- design to it.** Verbatim:
+
+> "Sure -- if we can still have **each video model declare its own video
+> prompts** and **reuse a phrase multi-clip beat splitter and
+> putter-together for continuity**, great."
+
+So the split of ownership is settled and is not an open question:
+
+- **PER-ADAPTER (each video path owns it):** its own video PROMPTS, and its
+  own frame-contract numbers (legal lengths, quantum, caps, continuity
+  capability). This is the "slightly different" he means.
+- **SHARED (one implementation, reused by every lane):** the phrase-aware
+  multi-clip beat SPLITTER, and the ASSEMBLER that puts the clips back
+  together for continuity.
+
+Your plan must honour exactly that boundary. A design that pushes prompt
+authorship into the shared splitter, or that duplicates the splitter/assembler
+per adapter, is wrong on the operator's own instruction. Note this also lines
+up with the still-plans build's separate per-engine layer-2 PROMPT HOOK -- say
+whether these are the same hook or two, and if two, why.
+
+**PROVE the shared skeleton can express the real differences.**
 Walk at least `ltx_8gb`, `wan_ti2v`, HuMo, `ltx_av` and one cloud lane through
 your proposed contract and show each one's "slightly different" is expressible
 WITHOUT an escape hatch that lets an adapter fork the skeleton. If some lane
