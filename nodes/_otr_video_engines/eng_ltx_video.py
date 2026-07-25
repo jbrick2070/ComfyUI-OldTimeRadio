@@ -51,6 +51,7 @@ import logging
 import os
 
 from . import motion_common as _MC
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
 _LOG = logging.getLogger("OTR.video.eng_ltx_video")
@@ -311,6 +312,42 @@ class _SigmasFromValues:
                              dtype=torch.float32),)
 
 
+#: S1 (2026-07-25) per-model still plan for ltx_video (spec section 3,
+#: Shape A -- scene spine with an LTX I2V twist). FILE-LOCAL, fully
+#: declared. Scene stills carry ``required="when_ltx_i2v_enabled"``
+#: because ltx_video renders text->video by default; only when the frozen
+#: ``routing_state.enable_ltx_i2v`` flag is on does it consume an init
+#: image per beat (S0b introduces the frozen flag; S2 wires this in).
+_LTX_VIDEO_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide",
+                 required="when_ltx_i2v_enabled",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide",
+                 required="when_ltx_i2v_enabled",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide",
+                 required="when_ltx_i2v_enabled",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
+
+
 @register
 class LtxVideoEngine(_MC.MotionEngineBase):
     """The ltx_video text->video adapter (in-process, default-OFF / dark)."""
@@ -322,6 +359,9 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: a portrait still fed to the wide render decapitates heads. A class attribute
     #: only (the sampler/sigma chain this file freezes is untouched).
     render_aspect = "wide"
+    #: S1 per-model still plan (see ``_LTX_VIDEO_STILL_PLAN`` above -- scene
+    #: stills required ONLY when frozen ``routing_state.enable_ltx_i2v``).
+    still_plan = _LTX_VIDEO_STILL_PLAN
     # Generative motion music/announcer visuals -- the roles whose only
     # required input is a text prompt. ``announcer_visual`` GRANTED
     # 2026-06-10 (production restore): the operator's radio OPEN renders the

@@ -36,6 +36,12 @@ class VizCameraEngine:
     required_inputs = ()
     accepts_still = False
     render_aspect = "wide"
+    #: S1 (2026-07-25) per-model still plan (spec
+    #: ``docs/2026-07-25-still-plans-locked-build-spec.md`` section 3, Shape
+    #: C -- "nothing"). ``viz_camera`` mints NO still. The empty tuple is
+    #: the EXPLICIT "needs no images" declaration; a missing ``still_plan``
+    #: would be treated as UNKNOWN and fail closed by the S1 audit.
+    still_plan = ()
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
     engine_version = "1"

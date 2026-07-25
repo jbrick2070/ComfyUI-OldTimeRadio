@@ -37,6 +37,7 @@ from __future__ import annotations
 import os
 
 from . import motion_common as _MC
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
 _THIS = os.path.abspath(__file__)
@@ -79,12 +80,53 @@ _HUMO_DEFAULT_NEGATIVE = (
 _HUMO_DEFAULT_UNET = "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"
 
 
+#: S1 (2026-07-25) per-model still plan for the four HuMo engines (spec
+#: section 3, Shape A -- scene spine, audio-driven-face variant with
+#: portrait REQUIRED). FILE-LOCAL, fully declared. All four HuMo engines
+#: share this plan; the difference is in the ENGINE'S render_aspect (which
+#: ``resolve_row_aspect`` will read for the portrait row): humo /
+#: humo_1.7B have render_aspect="portrait" -> 832x1216 stills TODAY;
+#: humo_1.7B_169 / humo_14B_169 have render_aspect="wide" -> 832x480 stills.
+#: S2's HuMo cutover (announcer/music 832x1216 -> 832x480) is where the
+#: operator eyeballs the shape delta; S1 declares the plan structure.
+_HUMO_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="always",
+                 framing_geometry=(
+                     "Face-forward portrait framing; head and upper body of "
+                     "the named subject centered in the frame."),
+                 style_tail_policy="full"),
+)
+
+
 @register
 class HuMoEngine(_MC.MotionEngineBase):
     """The humo audio-driven-face adapter (in-process, default-OFF / dark)."""
 
     name = "humo"
     family = "audio_driven_face"
+    #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` above -- audio-
+    #: driven-face with portrait REQUIRED).
+    still_plan = _HUMO_STILL_PLAN
     # RADIO IS THE HOST (reversal of Route-A 2026-06-28, operator 2026-06-30):
     # HuMo's finetuned weights only animate a FACE. Route-A had added
     # announcer_visual/music_visual here + a radio-face-still workaround
@@ -500,6 +542,9 @@ class HuMo17BEngine(HuMoEngine):
     name = "humo_1.7B"
     engine_version = "1"
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
+    #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` -- shared HuMo shape,
+    #: portrait REQUIRED for the audio-driven-face lane).
+    still_plan = _HUMO_STILL_PLAN
 
     def _ckpt_path(self):
         env = os.environ.get("OTR_HUMO_17B_CKPT")
@@ -553,6 +598,11 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
 
     name = "humo_1.7B_169"
     render_aspect = "wide"
+    #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` -- shared HuMo shape;
+    #: this landscape sibling's ``render_aspect="wide"`` will drive
+    #: ``resolve_row_aspect`` to size portraits WIDE, matching S2's
+    #: 832x1216 -> 832x480 cutover the operator will eyeball).
+    still_plan = _HUMO_STILL_PLAN
 
     def _cfg(self):
         # 16:9 sweet spot (cfg sweep 2026-06-16); override via OTR_HUMO_17B_169_CFG.
@@ -577,6 +627,10 @@ class HuMo14BLandscapeEngine(HuMoEngine):
 
     name = "humo_14B_169"
     render_aspect = "wide"
+    #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` -- shared HuMo shape;
+    #: the 14B landscape sibling's ``render_aspect="wide"`` drives portraits
+    #: WIDE via ``resolve_row_aspect``, matching S2's HuMo cutover).
+    still_plan = _HUMO_STILL_PLAN
     #: Route-A VRAM frame cap (only this 14B tier; base humo / humo_1.7B* stay
     #: uncapped). render_clip renders at the cap then exact-fits to the audio
     #: target. env override: OTR_HUMO_14B_SAFE_FRAMES (after a higher-frame probe).

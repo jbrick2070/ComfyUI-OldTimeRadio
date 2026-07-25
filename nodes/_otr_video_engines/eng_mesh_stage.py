@@ -62,6 +62,7 @@ import time
 
 from .cheap_families import _CheapFamilyBase
 from .directory_clip import validate_directory_clip
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
 _LOG = logging.getLogger("OTR.video.eng_mesh_stage")
@@ -295,11 +296,48 @@ def cleanup_stale_tmp(parent, prefix="otr_mesh_tmp_", max_age_hours=24.0):
 # --------------------------------------------------------------------------- #
 # The engine (E-1 mesher + E-5 registration)
 # --------------------------------------------------------------------------- #
+#: S1 (2026-07-25) per-model still plan for mesh_stage (spec section 3,
+#: Shape B -- mesh fork). FILE-LOCAL, fully declared. Two per-beat rows
+#: (mesh_fodder = the clean single-subject image the hy3d-2mv mesher
+#: consumes; scene_background_plate = the wide backdrop the meshed subject
+#: is composited over) plus a per-subject portrait. NO cinematic scene
+#: still (mesh_stage does not consume scene_open / scene_beat /
+#: scene_character -- that is the whole POINT of the mesh fork). Per spec
+#: section 5, ``scene_background_plate`` carries ``target_class="scene"``
+#: because the render_driver matches ``kind.startswith("scene_")`` then
+#: applies plate-over-scene precedence. Nothing reads the plan at S1.
+_MESH_STAGE_STILL_PLAN = (
+    StillPlanRow(kind="mesh_fodder", cardinality="per_beat",
+                 target_class="mesh", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Clean mesh fodder: subject centered, neutral studio "
+                     "backdrop, no letterboxing; ONE isolated subject only."),
+                 style_tail_policy="minimal_clean"),
+    StillPlanRow(kind="scene_background_plate", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide background plate for the beat; the stage the "
+                     "meshed subject will inhabit."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
+
+
 @register
 class MeshStageEngine(_CheapFamilyBase):
     """``mesh_stage`` -- portrait -> hy3d-2mv GLB -> Blender orbit stage."""
 
     name = "mesh_stage"
+    #: S1 per-model still plan (see ``_MESH_STAGE_STILL_PLAN`` -- Shape B
+    #: mesh fork; mesh_fodder + scene_background_plate + portrait). This
+    #: engine intentionally has NO scene_open / scene_beat / scene_character
+    #: rows, because the mesh spine composites a meshed subject onto a
+    #: background plate rather than consuming a cinematic scene still.
+    still_plan = _MESH_STAGE_STILL_PLAN
     honest_label = ("real 3D object on a turntable stage (hy3d-2mv mesh + "
                     "Blender matcap orbit; camera motion only, no rig, no "
                     "lip-sync)")

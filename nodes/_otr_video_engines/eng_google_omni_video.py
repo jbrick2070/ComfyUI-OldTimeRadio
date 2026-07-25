@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 from .registry import register
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_google_api.client import (
     GoogleAPIError,
     GoogleAPIRequestShapeError,
@@ -309,6 +310,35 @@ def _canvas_get(request, key: str, default):
     return getattr(canvas, key, default)
 
 
+#: S1 (2026-07-25) per-model still plan for google_omni_video (spec
+#: section 3, Shape A -- scene spine). FILE-LOCAL, fully declared.
+_GOOGLE_OMNI_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
+
+
 @register
 class GoogleOmniVideoEngine:
     """Registered as ``google_omni_video``. Direct Omni text-to-video, BYO key."""
@@ -328,6 +358,8 @@ class GoogleOmniVideoEngine:
     accepts_still = True
     accepts_init_image = True
     render_aspect = "wide"
+    #: S1 per-model still plan (see ``_GOOGLE_OMNI_STILL_PLAN`` above).
+    still_plan = _GOOGLE_OMNI_STILL_PLAN
 
     def load(self) -> None:
         return None

@@ -21,6 +21,7 @@ from pathlib import Path
 from . import eng_google_omni_video as _omni
 from . import eng_google_veo_video as _veo
 from .registry import register
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_google_api.client import GoogleAPIRequestShapeError
 from .._otr_story_brief_helpers import append_sfx_audio_safety_clause
 
@@ -500,24 +501,61 @@ class _GoogleOmniSfxEngine(_GoogleVidSfxBase):
         return self._canonical_video_and_sfx(raw, request)
 
 
+#: S1 (2026-07-25) per-model still plan for the google_vid_sfx_* engines
+#: (spec section 3, Shape A -- scene spine). FILE-LOCAL, fully declared.
+_GOOGLE_VID_SFX_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
+
+
 class GoogleVidSfxOmniEngine(_GoogleOmniSfxEngine):
     name = "google_vid_sfx_omni"
     model = SFX_ENGINE_MODEL_IDS[name]
+    #: S1 per-model still plan (Shape A base -- see the module constant above).
+    still_plan = _GOOGLE_VID_SFX_STILL_PLAN
 
 
 class GoogleVidSfxVeoLiteEngine(_GoogleVeoSfxEngine):
     name = "google_vid_sfx_veo_lite"
     model = SFX_ENGINE_MODEL_IDS[name]
+    #: S1 per-model still plan (Shape A base).
+    still_plan = _GOOGLE_VID_SFX_STILL_PLAN
 
 
 class GoogleVidSfxVeoFastEngine(_GoogleVeoSfxEngine):
     name = "google_vid_sfx_veo_fast"
     model = SFX_ENGINE_MODEL_IDS[name]
+    #: S1 per-model still plan (Shape A base).
+    still_plan = _GOOGLE_VID_SFX_STILL_PLAN
 
 
 class GoogleVidSfxVeoProEngine(_GoogleVeoSfxEngine):
     name = "google_vid_sfx_veo_pro"
     model = SFX_ENGINE_MODEL_IDS[name]
+    #: S1 per-model still plan (Shape A base).
+    still_plan = _GOOGLE_VID_SFX_STILL_PLAN
 
 
 GoogleVidSfxOmni = GoogleVidSfxOmniEngine()

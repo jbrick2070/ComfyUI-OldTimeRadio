@@ -52,6 +52,7 @@ import os
 from . import motion_common as _MC
 from . import wan_shared as _WS
 from .._otr_shared.role_compat import ROLES
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
@@ -92,6 +93,37 @@ def _ltx8_frame_length(target_frame_count, cap):
     return ((length - 1) // 8) * 8 + 1
 
 
+#: S1 (2026-07-25) per-model still plan for ltx_8gb (spec section 3,
+#: Shape A -- scene spine). FILE-LOCAL, fully declared. scene_open +
+#: scene_beat + scene_character all WIDE + required=always; portrait per
+#: subject at inherit_engine + not required.
+_LTX_8GB_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
+
+
 @register
 class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     """The ltx_8gb LTX-Video 0.9.8 distilled 2B image->video adapter (8GB tier)."""
@@ -101,6 +133,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: 16:9 (matches the menu suffix ``ltx_8gb (16:9)``): the director mints a WIDE
     #: init still (non-HuMo, non-mesh-portrait).
     render_aspect = "wide"
+    #: S1 per-model still plan (see ``_LTX_8GB_STILL_PLAN`` above).
+    still_plan = _LTX_8GB_STILL_PLAN
     # FLEXIBLE: eligible for every role -- role_compat is the real gate (it admits
     # ltx_8gb only where the role supplies the required init_image). Opening `roles`
     # lets the operator pick ltx_8gb for any still-bearing beat; required_inputs

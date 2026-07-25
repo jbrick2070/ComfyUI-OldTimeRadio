@@ -41,6 +41,7 @@ import os
 
 from . import motion_common as _MC
 from . import wan_shared as _WS
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
 # Re-export the shared M7 clip-contract helpers so render_clip below and the
 # existing test imports (``from ...eng_wan_i2v import validate_silent_clip_contract``)
@@ -70,6 +71,43 @@ _WAN_MIN_FRAMES = 33
 _WAN_MAX_FRAMES = 177
 
 
+#: S1 (2026-07-25) per-model still plan for wan_i2v (spec
+#: ``docs/2026-07-25-still-plans-locked-build-spec.md`` section 3, Shape A --
+#: scene spine). Module-scoped so the class body carries only the reference,
+#: not the 40-line authoring block; this is FILE-LOCAL (no cross-module
+#: sharing per the spec's "no inheritance or shared defaults" rule -- the plan
+#: is FULLY DECLARED here and the class assigns the whole tuple, never a
+#: partial override). scene_open + scene_beat + scene_character all WIDE +
+#: required=always; portrait per subject at the engine's own aspect
+#: (inherit_engine), not required (character portraits are consumed only when
+#: a beat names a cast row). Nothing reads the plan at S1 -- S2 wires it in.
+_WAN_I2V_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
+
+
 @register
 class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     """The wan_i2v image->video adapter (in-process default; sidecar_optional)."""
@@ -79,6 +117,8 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: Still-aspect identity (2026-06-17): Wan I2V renders 16:9, so the director
     #: mints a WIDE init still (non-HuMo, non-mesh-portrait).
     render_aspect = "wide"
+    #: S1 per-model still plan (see ``_WAN_I2V_STILL_PLAN`` above).
+    still_plan = _WAN_I2V_STILL_PLAN
     # Animate a still into motion -- the roles that can supply an init image
     # (music visual, character). (retired_role_a/retired_role_b removed
     # 2026-07-01, rip-sfx-broll.)

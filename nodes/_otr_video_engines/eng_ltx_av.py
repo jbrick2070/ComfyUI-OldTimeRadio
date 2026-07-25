@@ -47,6 +47,7 @@ import logging
 import os
 
 from .._otr_shared import av_dims as _AVD
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
@@ -1108,6 +1109,62 @@ class _LtxAvBase(_MC.MotionEngineBase):
         }
 
 
+#: S1 (2026-07-25) per-model still plan for ltx_audio_in (spec section 3,
+#: Shape A -- scene spine with an audio-conditioned LTX twist).
+#: FILE-LOCAL, fully declared. Base scene spine (scene_open + scene_beat +
+#: scene_character all WIDE + required=always) plus two extra rows the spec
+#: calls out for this engine specifically: (1) a WIDE radio face per
+#: bookend role, required=when_engine_talking (announcer/music bookends
+#: get a scene-radio face when the engine's ``wants_talking_prompt``
+#: hook fires); (2) a cast portrait on character beats,
+#: required=when_engine_talking. Nothing reads the plan at S1.
+_LTX_AUDIO_IN_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+    # Per spec section 3: '+ WIDE radio face per bookend role,
+    # required=when_engine_talking'. A WIDE face still per bookend role
+    # (announcer_visual / music_visual) fed into I2V when the engine talks.
+    StillPlanRow(kind="scene_character", cardinality="per_bookend_role",
+                 target_class="scene", aspect="wide",
+                 required="when_engine_talking",
+                 framing_geometry=(
+                     "Wide radio-face framing for the announcer/music "
+                     "bookend; period broadcast host at the microphone."),
+                 style_tail_policy="full"),
+    # Per spec section 3: '+ cast portrait on character beats,
+    # required=when_engine_talking'. The cast portrait feeds the I2V head on
+    # character beats when the engine talks.
+    StillPlanRow(kind="portrait", cardinality="per_recurring_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="when_engine_talking",
+                 framing_geometry=(
+                     "Face-forward portrait framing for a character beat; "
+                     "head and upper body of the named cast subject."),
+                 style_tail_policy="full"),
+)
+
+
 @register
 class LtxAudioInEngine(_LtxAvBase):
     """LTX AUDIO-IN -- the ONE audio-in LTX lane (operator 2026-06-26).
@@ -1137,6 +1194,10 @@ class LtxAudioInEngine(_LtxAvBase):
 
     name = "ltx_audio_in"
     family = "audio_conditioned_video"   # agnostic -- NOT audio_driven_face
+    #: S1 per-model still plan (see ``_LTX_AUDIO_IN_STILL_PLAN`` above --
+    #: scene spine + wide-radio-face-per-bookend + cast-portrait-per-
+    #: recurring-subject, both extras required when the engine talks).
+    still_plan = _LTX_AUDIO_IN_STILL_PLAN
     roles = ("announcer_visual", "music_visual", "character_video")
     # the per-role DEFAULT for the music + announcer bookends (inheriting the slot
     # the deleted ltx_av_music engine held). default_roles must be subset of roles.

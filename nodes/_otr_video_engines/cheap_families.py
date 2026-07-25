@@ -23,8 +23,42 @@ from __future__ import annotations
 import logging
 
 from .registry import register
+from .._otr_shared.still_plan_helpers import StillPlanRow
 
 log = logging.getLogger("OTR.video.cheap_families")
+
+
+#: S1 (2026-07-25) per-model still plan for the cheap still-based families
+#: (still_motion / still_pan / still_flat / still_word). All Shape A --
+#: scene spine per spec section 3. FILE-LOCAL, fully declared. Note the
+#: spec's note in section 3: for the still_* engines, requiredness is
+#: DECLARED here, never derived from ``required_inputs`` (which would be a
+#: back door around the plan). Nothing reads the plan at S1 -- S2 wires it in.
+_CHEAP_FAMILY_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
 
 
 class _CheapFamilyBase:
@@ -195,6 +229,8 @@ class _CheapFamilyBase:
 class StillMotionFamily(_CheapFamilyBase):
     name = "still_motion"
     family = "static_motion"
+    #: S1 per-model still plan (Shape A -- see module constant above).
+    still_plan = _CHEAP_FAMILY_STILL_PLAN
     roles = ("announcer_visual", "music_visual", "character_video")
     # rip-sfx-broll (2026-07-01): its only default role (retired_role_a) was
     # removed. NO FALLBACKS (2026-07-02, Sprint A): still_motion lost its
@@ -227,6 +263,8 @@ class StillPanFamily(_CheapFamilyBase):
     ``_still_motion`` defaults True (the pan); contrast ``still_flat`` (flat hold)."""
     name = "still_pan"
     family = "static_image_gen"
+    #: S1 per-model still plan (Shape A).
+    still_plan = _CHEAP_FAMILY_STILL_PLAN
     # A plain still needs only text_prompt (supplied by EVERY role), so it is the
     # fast, universal "just a still" pick -- eligible in all roles. BUG-LOCAL-401:
     # music_visual was missing, so music_video_model='still_pan'
@@ -251,6 +289,8 @@ class StillFlatFamily(_CheapFamilyBase):
     gate); ``_still_motion=False`` selects the flat hold over the pan."""
     name = "still_flat"
     family = "static_image_gen"
+    #: S1 per-model still plan (Shape A).
+    still_plan = _CHEAP_FAMILY_STILL_PLAN
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()              # selectable peer; not an auto-default
     required_inputs = ("text_prompt",)
@@ -280,6 +320,8 @@ class StillWordFamily(_CheapFamilyBase):
     (``default_roles=()``)."""
     name = "still_word"
     family = "static_image_gen"
+    #: S1 per-model still plan (Shape A).
+    still_plan = _CHEAP_FAMILY_STILL_PLAN
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()              # selectable peer; never an auto-default
     required_inputs = ("text_prompt",)

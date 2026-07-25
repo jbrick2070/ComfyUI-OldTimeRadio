@@ -39,6 +39,7 @@ import os
 import re
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_story_brief_helpers import (
     append_sfx_audio_safety_clause,
     append_visual_safety_clause,
@@ -46,6 +47,72 @@ from .._otr_story_brief_helpers import (
 )
 
 _LOG = logging.getLogger("OTR.video.eng_cloud_video")
+
+
+#: S1 (2026-07-25) per-model still plans for the cloud video engines
+#: registered in this file (spec section 3, Shape A -- scene spine).
+#: FILE-LOCAL, fully declared: the plan tuple is the whole authority; no
+#: cross-module or cross-file sharing (per the spec's "no inheritance or
+#: shared defaults" rule -- reusing a Python variable within THIS module
+#: is not shared-defaults, the plan is fully declared by name here). Nothing
+#: reads the plan at S1 -- S2 wires it in.
+_CLOUD_VIDEO_SHAPE_A_BASE_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
+
+
+#: Same as ``_CLOUD_VIDEO_SHAPE_A_BASE_PLAN`` but portrait REQUIRED=always,
+#: for the audio-driven-face lane (``cloud_kling_avatar``): the provider
+#: consumes an init face image every beat, so the portrait is structural.
+_CLOUD_KLING_AVATAR_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="always",
+                 framing_geometry=(
+                     "Face-forward portrait framing; head and upper body of "
+                     "the named subject centered in the frame."),
+                 style_tail_policy="full"),
+)
 
 #: kling avatar mode COMBO -- the pin excludes combo options (S0), so the
 #: adapter ships the provider's documented std tier; env-overridable.
@@ -544,6 +611,9 @@ class CloudKlingAvatarEngine(_CloudVideoBase):
     family = "audio_driven_face"
     required_inputs = ("init_image", "audio_ref")
     reactivity = "required_audio_ref"
+    #: S1 per-model still plan -- portrait REQUIRED because Kling consumes an
+    #: init face every beat (audio-driven-face family; spec section 3).
+    still_plan = _CLOUD_KLING_AVATAR_PLAN
 
     def _mode(self) -> str:
         raw = os.environ.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT).strip()
@@ -584,6 +654,8 @@ class CloudSeedance2Engine(_CloudVideoBase):
     family = "audio_conditioned_video"
     required_inputs = ("init_image", "audio_ref", "text_prompt")
     reactivity = "required_audio_ref"
+    #: S1 per-model still plan (Shape A base).
+    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
     def _model_label(self) -> str:
         from .._otr_shared.cloud_model_ids import resolve_model_id
@@ -641,6 +713,8 @@ class CloudWanI2VEngine(_CloudVideoBase):
     family = "image_to_video"
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
+    #: S1 per-model still plan (Shape A base).
+    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
     def _model_selector(self) -> str:
         from .._otr_shared.cloud_model_ids import resolve_model_id
@@ -696,6 +770,10 @@ class CloudWanI2VAudioEngine(CloudWanI2VEngine):
     family = "audio_conditioned_video"
     required_inputs = ("init_image", "audio_ref", "text_prompt")
     reactivity = "required_audio_ref"
+    #: S1 per-model still plan (Shape A base) -- declared explicitly rather
+    #: than inherited from CloudWanI2VEngine so the audit sees each adapter
+    #: owning its own plan (spec section 6, "on each adapter").
+    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
     def _partner_inputs(self, request):
         inputs = super()._partner_inputs(request)
@@ -714,6 +792,8 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
     wants_provider_sfx = False
+    #: S1 per-model still plan (Shape A base).
+    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
     def _movement_amplitude(self) -> str:
         return self._choice(
@@ -758,6 +838,9 @@ class CloudViduQ2ProFast720pSfxEngine(CloudViduQ2ProFast720pEngine):
 
     name = "cloud_vidu_q2_pro_fast_720p_sfx"
     wants_provider_sfx = True
+    #: S1 per-model still plan (Shape A base) -- declared explicitly (see the
+    #: CloudWanI2VAudioEngine note above).
+    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
     def canonicalize(self, raw, request, profile):
         from .._otr_shared.cloud_media_canonical import (
@@ -803,6 +886,10 @@ class CloudWordRazzleEngine(_CloudVideoBase):
     family = "image_to_video"
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
+    #: S1 per-model still plan (Shape A base) -- the word-card init still is
+    #: minted by an image engine upstream (still_word / any scene still), so
+    #: the plan matches the standard scene-spine shape.
+    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
     def _razzle_prompt(self, request) -> str:
         """The world-motion + text-preservation prompt. The base motion clause

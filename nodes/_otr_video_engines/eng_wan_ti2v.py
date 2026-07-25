@@ -42,6 +42,7 @@ import os
 from . import motion_common as _MC
 from . import wan_shared as _WS
 from .._otr_shared.role_compat import ROLES
+from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import (
     _WAN_DEFAULT_NEGATIVE, ffprobe_clip_fields, validate_silent_clip_contract)
@@ -87,6 +88,39 @@ _TI2V_COST_REF_W = 1472
 _TI2V_COST_REF_H = 832
 
 
+#: S1 (2026-07-25) per-model still plan for wan_ti2v (spec section 3,
+#: Shape A -- scene spine). FILE-LOCAL, fully declared (no cross-module
+#: sharing per the spec's "no inheritance or shared defaults" rule).
+#: scene_open + scene_beat + scene_character all WIDE + required=always;
+#: portrait per subject at the engine's aspect (inherit_engine), not
+#: required. Nothing reads the plan at S1 -- S2 wires it in.
+_WAN_TI2V_STILL_PLAN = (
+    StillPlanRow(kind="scene_open", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide establishing shot; the scene an audience is "
+                     "entering."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_beat", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide continuity framing for the beat, matching the "
+                     "scene_open geometry."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="scene_character", cardinality="per_beat",
+                 target_class="scene", aspect="wide", required="always",
+                 framing_geometry=(
+                     "Wide framing that keeps the named character legible in "
+                     "the scene."),
+                 style_tail_policy="full"),
+    StillPlanRow(kind="portrait", cardinality="per_subject",
+                 target_class="portrait", aspect="inherit_engine",
+                 required="never",
+                 framing_geometry="",
+                 style_tail_policy="full"),
+)
+
+
 @register
 class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     """The wan_ti2v 5B image->video adapter (8GB tier; in-process, sidecar_optional)."""
@@ -96,6 +130,8 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: Still-aspect identity (2026-06-17): Wan TI2V renders 16:9, so the director
     #: mints a WIDE init still (non-HuMo, non-mesh-portrait).
     render_aspect = "wide"
+    #: S1 per-model still plan (see ``_WAN_TI2V_STILL_PLAN`` above).
+    still_plan = _WAN_TI2V_STILL_PLAN
     # FLEXIBLE (operator 2026-06-18): eligible for EVERY role -- role_compat is the
     # real gate (it admits wan_ti2v only where the role supplies the required
     # init_image: announcer/music/character/retired_role_a do; the pure background_

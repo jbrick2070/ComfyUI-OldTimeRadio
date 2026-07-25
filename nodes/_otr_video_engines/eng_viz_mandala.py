@@ -61,6 +61,10 @@ class VizMxcMandalaEngine:
     #: non-audio slot never triggers an image model (the operator's z_image complaint).
     accepts_still = False
     render_aspect = "wide"              # 16:9; no portrait geometry branch
+    #: S1 (2026-07-25) per-model still plan (spec section 3, Shape C --
+    #: "nothing"). Empty tuple = EXPLICIT "needs no images"; a missing
+    #: ``still_plan`` would be UNKNOWN and fail closed by the S1 audit.
+    still_plan = ()
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25                     # HARD-LOCK (matches the overlay + mux)
     engine_version = "1"
