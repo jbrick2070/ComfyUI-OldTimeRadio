@@ -35,14 +35,21 @@ mixed-policy episode with three heterogeneous engines -> prove each
 role's render_decisions and effective_engine equal the same role's
 single-engine baseline). Full suite 6434 passed / 27 skipped / 1 xfailed
 (+2 vs S0a); Bible 17 passed; audio byte-identical 7 passed. S0b
-IN-FLIGHT (started 2026-07-24 22:48 local) -- executing the routing
-freeze atomically per `docs/S0b_HANDOFF.md`: shared routing_state
-module + closed v3 policy + IS_CHANGED capture, seven consumers cut
-over to a single resolver, the frozen-routing prepass in
-otr_video_render_batch, LTX adapter mismatch gate, ~31 test literals
-migrated from policy_version=2 to 3, AST/source audit for stray env
-reads. The autonomous window kept the whole burst as one push before
-flipping DONE, per operator directive.**
+BLOCKED on a kibitz-scoped coder window (2026-07-24 22:50 local) --
+`docs/S0b_KIBITZ_NEEDED.md` filed instead of half-landing the routing
+freeze. The autonomous window that ran S0a-b hit the same
+"cross-module atomic refactor that cannot land as one atomic push in
+this window's remaining budget without breaking the
+routing-is-frozen-first invariant silently" judgment the PRIOR
+autonomous window did at `d6655690`; no S0b production code was
+touched, so the tree remains at the S0a + S0a-b fence. `S0b_HANDOFF.md`
+stays the site inventory; the KIBITZ_NEEDED doc names the
+two-strikes budget and the two options for the next window
+(atomic-with-time-budget vs green-between-consumers split, plus an
+r3+r4 local kibitz at CURRENT HEAD if either stalls). This window is
+proceeding to S1 (safe leaf per section 11 of the spec: schema + 31
+declarations + audit; nothing reads the plan) and then HALTING at
+S2 per operator.**
 
 **Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
 waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
