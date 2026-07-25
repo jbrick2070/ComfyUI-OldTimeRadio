@@ -631,11 +631,64 @@ def test_apply_engine_override_star_and_noenv(monkeypatch):
     assert out2 is led2                       # no env -> no rewrite, same obj
 
 
-def test_apply_engine_override_bad_spec_failsafe(monkeypatch):
+def test_apply_engine_override_bad_spec_fails_closed(monkeypatch):
+    """A malformed force map is TERMINAL (2026-07-25 route lock).
+
+    This inverts the old ``_failsafe`` contract deliberately. Logging
+    ``IGNORED (parse)`` and rendering the UNFORCED plan is a silent fallback:
+    the operator asks for a forced-route episode and gets an ordinary one,
+    with only a warning line to say so -- and the still spine is then
+    validated against routing nobody asked for.
+    """
     led = _two_shot_ledger()
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "garbage-without-equals")
-    out = rd.apply_engine_override(led)       # LOUD log; plan untouched
-    assert out["video"]["shots"][0]["engine_id"] == "stub_ok"
+    with pytest.raises(rd.RenderError) as exc:
+        rd.apply_engine_override(led)
+    assert "OTR_FORCE_ENGINE_MAP is malformed" in str(exc.value)
+    # the plan was NOT quietly rewritten on the way out
+    assert led["video"]["shots"][0]["engine_id"] == "stub_ok"
+
+
+def test_resolve_final_shot_engines_runs_both_mutations(monkeypatch):
+    """The route lock resolves force map AND radio-host redirect in one pass."""
+    led = _two_shot_ledger()
+    led["video"]["shots"][0]["role"] = "character_video"
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx_video")
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    out = rd.resolve_final_shot_engines(led)
+    assert out["video"]["shots"][0]["engine_id"] == "ltx_video"
+
+
+def test_resolve_final_shot_engines_redirects_humo_bookend(monkeypatch):
+    """An announcer_visual beat picked onto local HuMo is redirected BEFORE
+    the caller validates the still spine -- the ordering defect this pass
+    exists to close (kibitz per-beat-stills r1, both seats)."""
+    led = _two_shot_ledger()
+    shot = led["video"]["shots"][0]
+    shot["role"] = "announcer_visual"
+    shot["engine_id"] = "humo"
+    shot["family"] = "audio_driven_face"
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    rd.resolve_final_shot_engines(led)
+    assert shot["engine_id"] == rd._NEVER_HUMO_REDIRECT_ENGINE
+    # and it is IDEMPOTENT -- a second pass must not re-redirect or throw
+    rd.resolve_final_shot_engines(led)
+    assert shot["engine_id"] == rd._NEVER_HUMO_REDIRECT_ENGINE
+
+
+def test_resolve_final_shot_engines_humo_hosts_on_keeps_portrait(monkeypatch):
+    """With OTR_ENABLE_HUMO_HOSTS=1 the redirect is a no-op, so a portrait
+    HuMo bookend keeps its portrait engine through the lock."""
+    led = _two_shot_ledger()
+    shot = led["video"]["shots"][0]
+    shot["role"] = "announcer_visual"
+    shot["engine_id"] = "humo"
+    shot["family"] = "audio_driven_face"
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    rd.resolve_final_shot_engines(led)
+    assert shot["engine_id"] == "humo"
 
 
 # --------------------------------------------------------------------------- #

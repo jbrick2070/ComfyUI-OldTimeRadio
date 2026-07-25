@@ -192,3 +192,146 @@ production artifact, and this project's own doctrine reserves production-bug
 status for a reproduced failure. It should be described as a code-confirmed
 defect with a forced-route proof owed -- not as a live PBUG row -- until that
 leg runs.
+
+---
+
+# OPERATOR RULINGS -- 2026-07-25, same session, after reading this judgment
+
+These supersede "DECISIONS THE OPERATOR OWNS" above. Recorded so a later
+window does not reopen them.
+
+**R1. PING-PONG STAYS. Multi-clip-per-beat rendering is NOT built.**
+Operator: *"ping pong is fine"*, then *"ping pong is actually preferred"* --
+preferred behaviour, not a tolerated fallback. **CUT from this build: the
+coverage partitioner, the per-adapter legal-frame contract, the segment plan,
+per-segment audio slicing, concat/trim, and the `continuation_mode`
+descriptor field.** Still count stays ONE per beat. D1 is answered NO.
+
+**R2. IF a beat ever IS multi-clip: CHAIN, and REGENERATE as the fallback --
+never reuse.** Operator: *"my #1 preference for multi-clip beats: take the
+last frame and use it as the first for continuity; if that is not possible
+then we need a new still."* Fixed order of preference:
+1. chain -- last frame of clip k becomes the init still of clip k+1;
+2. if chaining is impossible (engine takes no init image, or last-frame
+   extraction fails), MINT A NEW STILL.
+Reuse-one-still is explicitly NOT the fallback. This ruling is DORMANT under
+R1 -- nothing renders multi-clip today -- but it is the policy of record the
+moment anything does.
+
+**R3. The route lock ships first and alone.** Done this session; see below.
+
+## The HuMo identity risk, and why R2 does not trip it today
+
+I recommended `reuse` for the audio-driven face family on identity-drift
+grounds (chaining a drifting last frame lets a character's face change WITHIN
+a beat -- the BUG-LOCAL-129 / 2026-06-30 "generic human host" class). R2
+chooses chain-then-regenerate. **That tension is presently moot:** under R1 no
+beat is multi-clip, and HuMo renders ONE clip and exact-fits it
+(`eng_humo.py:479-481`). If R1 is ever revisited the identity risk returns
+with it, and the reuse case should be re-put to the operator then -- with a
+live eyeball, not an argument.
+
+## NEW FINDING (code-confirmed; NOT a PBUG -- no live artifact yet)
+
+**Ping-pong extension plays audio-driven motion BACKWARDS.**
+
+The operator's own question surfaced this: *"it's key for audio -- when the
+still matches up to the audio, people are moving, that new movement needs to
+be picked up in the first still of the next clip."* Chasing it produced
+something sharper than the question:
+
+- `wrapper_bridge.extend_frames_to_target` (`:435-462`) builds a MIRROR
+  cycle: `cycle = np.concatenate([arr, arr[-2:0:-1]])`, period `2N-2`, tiled
+  and trimmed. The second half of every cycle is the render in REVERSE. The
+  docstring is explicit that the seamless loop is the intent.
+- `fit_frames_to_target` (`:466+`) calls that extender, and names its caller:
+  *"The capped render tiers (e.g. HuMo-14B's VRAM frame cap) need this."*
+- `eng_humo.py:479-481` -- CONFIRMED:
+  `if cap is not None and target_fc > 0: frames = _wb.fit_frames_to_target(frames, target_fc)`.
+
+**So on any VRAM-capped HuMo beat, a talking face's mouth runs forward, then
+backward, against forward audio.** For the WAN scene lanes the operator
+ratified, mirroring is decorative motion and fine. For an audio-driven
+lip-sync lane it is a sync defect, and the fix is not chaining -- it is
+"never mirror an audio-synced render: render the full length or fail closed."
+
+Status per the admission rule: STATIC finding at HEAD, no live production
+artifact, so NOT a PBUG row and it does not enter `PROD_BUG_LOG.md`. Needs one
+capped HuMo leg to reproduce. Flagged to the operator; his call whether it
+becomes a chunk.
+
+## LANDED THIS SESSION -- the route lock
+
+`nodes/_otr_video_engines/render_driver.py`:
+- NEW `resolve_final_shot_engines(ledger)` -- ONE pass applying the force-map
+  rewrite AND the radio-is-host redirect; idempotent by construction.
+- `apply_engine_override` now FAILS CLOSED on a malformed
+  `OTR_FORCE_ENGINE_MAP` (was: log `IGNORED (parse)`, render the unforced
+  plan).
+- `run_real_episode` calls the lock instead of the bare override, so a direct
+  caller stays correct on its own.
+
+`nodes/otr_video_render_batch.py`: calls the lock BEFORE
+`validate_and_repair_still_spine` -- the actual bug fix. The spine is now
+validated against the engine that will really render the beat.
+
+`tests/test_video_render_driver_additive.py`: the old `_bad_spec_failsafe`
+test is INVERTED to `_fails_closed` (deliberate contract change, documented
+in the test), plus three new route-lock tests (both mutations in one pass;
+HuMo bookend redirect + idempotency; `OTR_ENABLE_HUMO_HOSTS=1` keeps the
+portrait).
+
+No node, widget, link or schema change -- `workflows/otr_canonical.json` is
+untouched by this chunk.
+
+**Still OWED:** the forced-route LIVE proof. The defect is code-confirmed and
+now closed in code, but per this project's admission doctrine it is not a
+retired production bug until a real forced-route leg runs green. Render-window
+job.
+
+---
+
+## R2 REFINEMENT -- when reuse IS admissible (operator, same session)
+
+Operator, verbatim: *"for video, if beat is multi-clip we can't reuse the
+first still, unless you conditioned the first still to be the last still of
+the last clip as well."*
+
+This tightens R2 rather than changing it. The full policy for a multi-clip
+beat is now:
+
+1. **CHAIN** -- last frame of clip k becomes the init still of clip k+1.
+   First preference, always.
+2. **REUSE -- ONLY under a closed-loop condition.** One still may initialise
+   every clip *only if* that still is also conditioned to be the END state of
+   the final clip, so the beat closes back onto its own starting pose. Reuse
+   without that condition is forbidden, because clip k+1 would snap back to a
+   pose clip k had already moved away from -- a visible jump on every clip
+   boundary.
+3. **REGENERATE** -- mint a new still when neither of the above is possible.
+
+**Worth recording: this is exactly the principle ping-pong already exploits.**
+`extend_frames_to_target` builds the mirror cycle `[0,1,..,N-1,N-2,..,1]`
+precisely so the loop rejoins frame 1 -> 0 -> 1 with no hard seam
+(`wrapper_bridge.py:435-462`, docstring: *"the loop has NO hard seam (the
+cycle joins frame 1 -> 0 -> 1, symmetric)"*). The operator's loop-closure
+condition is the same insight generalised from frames to stills, which is a
+point in favour of the rule rather than a new risk.
+
+Still DORMANT under R1 (nothing renders multi-clip today). Policy of record
+for whenever something does.
+
+**R2 final framing (operator, same session):** *"visual continuity -- either
+continuous movement or jump cut to new still, either is fine, but continuous
+using last-to-first frame is preferred."*
+
+So both admissible outcomes are named, and REGENERATE is explicitly a
+legitimate editorial choice (a jump cut), not a failure state. Ranked:
+
+1. CHAIN (last frame -> first frame) -- continuous movement. PREFERRED.
+2. REGENERATE -- an honest jump cut to a new still. Acceptable.
+3. REUSE -- only under the closed-loop condition above; otherwise forbidden.
+
+What is NOT acceptable is an unconditioned reuse that snaps the subject back
+mid-beat, because that is neither continuous nor a deliberate cut -- it just
+reads as broken.

@@ -2749,7 +2749,11 @@ def run_real_episode(ledger, *, canvas=None,
             master_audio_path = _reresolve_master_audio(str(master_audio_path))
         except Exception:  # noqa: BLE001 - never block the render on re-resolve
             pass
-    ledger = apply_engine_override(ledger)
+    # THE ROUTE LOCK (2026-07-25): resolve force-map + radio-host redirect in ONE
+    # pass. Idempotent -- OTR_VideoRenderBatch already called this BEFORE the
+    # still-spine check, which is the point; this call keeps a direct
+    # run_real_episode caller (tests, harnesses) correct on its own.
+    ledger = resolve_final_shot_engines(ledger)
     rb = functools.partial(build_request_from_shot,
                            master_audio_path=master_audio_path)
     return run_episode(ledger, request_builder=rb, canvas=canvas)
@@ -2781,22 +2785,72 @@ def parse_engine_override(spec: str) -> dict:
     return out
 
 
+def resolve_final_shot_engines(ledger):
+    """THE ROUTE LOCK: resolve every shot's FINAL effective engine, once.
+
+    Both engine mutations in this build run here and nowhere else that matters:
+    the ``OTR_FORCE_ENGINE_MAP`` rewrite (:func:`apply_engine_override`) and
+    the radio-is-host redirect (:func:`_enforce_radio_is_host`). After this
+    returns, ``shot["engine_id"]`` / ``shot["family"]`` are the engine that
+    will actually render the beat.
+
+    WHY THIS EXISTS (2026-07-25, kibitz per-beat-stills r1; codex
+    ``gpt-5.6-sol`` high and agy ``Gemini 3.6 Flash (High)`` found the same
+    ordering defect independently, and the judge's anchor had it too):
+    ``otr_video_render_batch`` validated the still spine BEFORE either
+    mutation had run -- ``apply_engine_override`` fires inside
+    :func:`run_real_episode`, and ``_enforce_radio_is_host`` fires per shot
+    inside :func:`build_request_from_shot`, which is later still. So with a
+    force map set, or on any announcer/music beat whose picked engine is a
+    local HuMo, **the spine was validated against the PICKED engine and the
+    beat was rendered by a DIFFERENT one** -- the aspect/geometry mismatch
+    class this whole still-plans build exists to close.
+
+    Calling this before ``validate_and_repair_still_spine`` makes the spine
+    check see the real routing. It is IDEMPOTENT by construction -- the
+    override skips a shot already on its target engine, and the redirect
+    no-ops once the engine is no longer HuMo-family -- so the existing
+    downstream calls stay in place as defence in depth and cost nothing.
+
+    Mutates the ledger's own shot dicts in place (the established pattern for
+    both passes) and returns the ledger for call-site symmetry.
+    """
+    ledger = apply_engine_override(ledger)
+    for shot in ((ledger.get("video") or {}).get("shots") or []):
+        if isinstance(shot, dict):
+            _enforce_radio_is_host(shot)
+    return ledger
+
+
 def apply_engine_override(ledger):
     """Experiment knob (operator ask 2026-06-09: the all-LTX / forced-engine
     episodes): when ``OTR_FORCE_ENGINE_MAP`` is set, re-route each planned
     shot's ``engine_id``/``family`` by role BEFORE rendering, LOUDLY. NO
     FALLBACKS (2026-07-02): a forced engine that fails raises RenderError
     LOUD -- there is no degrade to a floor. Returns the (possibly
-    rewritten) ledger; a parse error logs LOUD and leaves the plan untouched
-    (fail-safe: the production plan renders rather than aborting)."""
+    rewritten) ledger.
+
+    FAIL CLOSED ON A MALFORMED MAP (2026-07-25, kibitz per-beat-stills r1 --
+    codex ``gpt-5.6-sol`` high and agy reached this independently, judge
+    concurring). This used to log ``IGNORED (parse)`` and render the UNFORCED
+    plan, which is a silent fallback: the operator asks for a forced-route
+    episode, gets an ordinary one, and the only trace is a warning line in a
+    long log. It is worse for the still spine specifically -- the spine is
+    validated against whatever routing this function leaves behind, so a
+    swallowed parse error means stills were minted for engines that are not
+    the ones that render. A malformed ``OTR_FORCE_ENGINE_MAP`` is operator
+    misconfiguration and it is now terminal, before any GPU time is spent."""
     spec = os.environ.get("OTR_FORCE_ENGINE_MAP", "").strip()
     if not spec:
         return ledger
     try:
         mapping = parse_engine_override(spec)
     except ValueError as exc:
-        _LOG.warning("[OTR video] OTR_FORCE_ENGINE_MAP IGNORED (parse): %s", exc)
-        return ledger
+        raise RenderError(
+            "OTR_FORCE_ENGINE_MAP is malformed and the forced-route episode "
+            "cannot be planned: %s -- fix the map or unset it. NO FALLBACK to "
+            "the unforced plan (a silently unforced render is "
+            "indistinguishable from a working one)." % exc) from exc
     section = (ledger.get("video") or {})
     n = 0
     try:

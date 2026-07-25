@@ -303,6 +303,15 @@ class OTRVideoRenderBatch:
         # may repair a stale pending path from its content-addressed pool, but
         # it never substitutes a different beat or a scene still for mesh
         # fodder.
+        # THE ROUTE LOCK, BEFORE the still-spine check (2026-07-25, kibitz
+        # per-beat-stills r1 -- codex gpt-5.6-sol high + agy, independently).
+        # The spine used to be validated against the PICKED engine while the
+        # force-map rewrite (run_real_episode) and the radio-is-host redirect
+        # (build_request_from_shot, per shot) rewrote the engine AFTERWARDS --
+        # so a forced-route or announcer/music-HuMo beat validated its stills
+        # against one engine and rendered on another. Resolve first, validate
+        # against the truth. Idempotent; run_real_episode calls it again.
+        ledger = _rd.resolve_final_shot_engines(ledger)
         _images = ledger.get("images") if isinstance(ledger, dict) else None
         _has_target_receipt = (
             isinstance(_images, dict)
