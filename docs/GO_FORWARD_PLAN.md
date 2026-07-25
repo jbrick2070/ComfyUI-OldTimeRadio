@@ -766,6 +766,24 @@ issues turn up go back to r2; if in doubt, restart at r2.** Concretely:
    re-grep; SW-1 writer re-survey waits for the TAIL). ENGINE_MATRIX is now a
    W6 SUB-STEP, not a separate precondition. Dedicated window; multi-day.
    SECOND ITEM in the rescoped order, after the WAN 8-GB contract.
+   **W2 CARRIES A NEW MANDATORY FIRST CHUNK (2026-07-25 consult, codex
+   `gpt-5.6-sol` high + Claude judge; record
+   `docs/2026-07-25-dormant-3d-rip-judgment.md`).** The operator asked whether
+   the dormant 3D talkers should be ripped; the answer is YES and W2 already
+   said so ("delete, NOT keep-dark"), so nothing was re-litigated. But a LIVE
+   fail-closed guard is hiding inside the dormant code:
+   `otr_image_director._is_3d_engine:109-119` raises for ANY non-empty
+   UNREGISTERED engine (covered at `tests/test_image_platform_c1.py:339-352`),
+   and neither OTR_VideoDirector nor the route freeze validates registry
+   membership -- so deleting the 3D lock path would silently delete a live
+   protection. **W2 chunk 1 is therefore a MIGRATION** of that validation to
+   the VideoDirector / route-freeze boundary, green and pushed on its own,
+   BEFORE any deletion. Also settled there: `triposr` goes as an unimplemented
+   scaffold (it never declared `requires_mesh_portrait`); the live mesh lane
+   (`mesh_stage`, `requires_mesh_fodder`, `directory_clip`, SilentComposite,
+   `portrait_ledger`) is NOT in scope; and W2 must pick its BOUNDARY explicitly
+   -- adapters only, or full lane retirement including the zero-declarer
+   capability and the `character_3d` family contract.
 2. **Randomizer Rolls Design A** --
    `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`. NO LONGER GATED --
    extensibility landed, and its `_otr_lane_specs` authority was ABSORBED by
