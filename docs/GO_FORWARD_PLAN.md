@@ -34,11 +34,15 @@ every OTHER engine's row byte-identical to fixture under clean configs;
 mixed-policy episode with three heterogeneous engines -> prove each
 role's render_decisions and effective_engine equal the same role's
 single-engine baseline). Full suite 6434 passed / 27 skipped / 1 xfailed
-(+2 vs S0a); Bible 17 passed; audio byte-identical 7 passed. S0b is next
--- scope note landed at `docs/S0b_HANDOFF.md` (routing freeze is 7
-modules + a new `_otr_shared/routing_state.py` + ~31 test literals +
-prepass reorder + LTX mismatch gate + AST audit; needs its own dedicated
-coder window per section 9 of the spec).**
+(+2 vs S0a); Bible 17 passed; audio byte-identical 7 passed. S0b
+IN-FLIGHT (started 2026-07-24 22:48 local) -- executing the routing
+freeze atomically per `docs/S0b_HANDOFF.md`: shared routing_state
+module + closed v3 policy + IS_CHANGED capture, seven consumers cut
+over to a single resolver, the frozen-routing prepass in
+otr_video_render_batch, LTX adapter mismatch gate, ~31 test literals
+migrated from policy_version=2 to 3, AST/source audit for stray env
+reads. The autonomous window kept the whole burst as one push before
+flipping DONE, per operator directive.**
 
 **Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
 waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
