@@ -335,3 +335,20 @@ legitimate editorial choice (a jump cut), not a failure state. Ranked:
 What is NOT acceptable is an unconditioned reuse that snaps the subject back
 mid-beat, because that is neither continuous nor a deliberate cut -- it just
 reads as broken.
+
+**Still-lane carve-out (operator, same session):** *"for the 'still' paths --
+easy, they can always use one still per beat, no continuity issues, no
+movement."*
+
+The `still_*` lanes are the trivial case: one still per beat, always, and the
+continuity question never arises because there is no movement to be
+continuous with. No chaining, no loop-closure condition, no regeneration
+decision. They are the third value in the same per-adapter field, and they
+need no policy beyond "one".
+
+This is worth stating because it is evidence FOR per-adapter ownership rather
+than a uniform rule: across three families the correct answer is already
+three different things -- `still_*` needs one still and nothing else, the
+audio-driven face family carries the identity constraint, and the scene i2v
+lanes are where chaining actually earns its keep. One central rule would have
+to special-case all three anyway.
