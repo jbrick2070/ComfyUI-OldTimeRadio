@@ -703,12 +703,28 @@ def _still_word_roles_from_policy(policy_json):
             from _otr_shared import role_slots as _rs  # type: ignore
     except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
         return set()
+    try:
+        from ._otr_shared.route_freeze import RouteFreezeError  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared.route_freeze import RouteFreezeError  # type: ignore
     roles = set()
     for role in _rs.ROLE_TO_VIDEO_SLOT:
         try:
             eng_id = _effective_prompt_engine_for_role(vm, role)
             if eng_id == "still_word":
                 roles.add(role)
+        except RouteFreezeError:
+            # A MALFORMED ROUTING ENVIRONMENT IS TERMINAL AND MUST PROPAGATE
+            # (2026-07-25 QA). This loop's broad catch predates the fail-closed
+            # force-map contract and was written when the resolver swallowed
+            # everything itself. Left alone it silently returns an EMPTY role
+            # set on a typo'd OTR_FORCE_ENGINE_MAP, so a still_word lane
+            # quietly mints the wrong prompt template and the episode succeeds
+            # with the wrong picture -- the exact "config error becomes a
+            # confident wrong render" class the single authority exists to
+            # kill. A bad SLOT still never blocks prompts; a bad ENVIRONMENT
+            # always does.
+            raise
         except Exception:  # noqa: BLE001 -- a bad slot never blocks prompts
             continue
     return roles

@@ -37,6 +37,8 @@ log = logging.getLogger("OTR")
 from ._otr_shared import gpu_residency as _lease
 from ._otr_shared import portrait_ledger as _pl
 from ._otr_shared import role_slots as _role_slots
+# Cold-import clean: route_freeze is stdlib-only at module scope.
+from ._otr_shared.route_freeze import RouteFreezeError as _RouteFreezeError
 from ._otr_story_brief_helpers import (
     append_visual_safety_clause,
     visual_safety_negative,
@@ -454,6 +456,17 @@ def still_consumer_capability(image_policy: dict, role: str):
         if not _vreg.is_registered(eng_id):
             return None
         return engine_consumes_still(_vreg.get_engine(eng_id))
+    except _RouteFreezeError:
+        # A MALFORMED ROUTING ENVIRONMENT IS TERMINAL AND MUST PROPAGATE
+        # (2026-07-25 QA). "Absence of proof" is the right third state for an
+        # unknown ROLE or an unregistered engine -- it is the wrong answer for
+        # a typo'd OTR_FORCE_ENGINE_MAP. Swallowed here, every role resolves to
+        # None and the operator is told "cannot prove an effective init-image
+        # consumer for role X", pointing them at their engine slots instead of
+        # at the env var they actually mistyped. Worse, an episode with no
+        # object of an affected role would raise nothing at all here and only
+        # die later at render -- defeating fail-closed-at-the-first-reader.
+        raise
     except Exception:  # noqa: BLE001 -- absence of proof is a real third state
         return None
 

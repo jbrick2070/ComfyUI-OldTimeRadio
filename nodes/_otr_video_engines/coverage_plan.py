@@ -137,15 +137,23 @@ def join_mode_for(contract: FrameContract, target_visible_frames: int) -> str:
     identity reference (HuMo) or interpolation endpoints (Veo ``lastFrame``) do
     not lock frame 0, so those lanes jump-cut rather than pretend.
     """
+    target = int(target_visible_frames)
     if not contract.supports_multi_clip:
         return JOIN_SINGLE
-    if contract.is_legal_length(int(target_visible_frames)):
+    if contract.is_legal_length(target):
         return JOIN_SINGLE
-    if contract.max_frames and int(target_visible_frames) <= int(contract.max_frames):
-        # Fits inside one render but not on the ladder -- still one clip; the
-        # tail trim (if allowed) handles the remainder.
-        if contract.allow_tail_trim:
-            return JOIN_SINGLE
+    # Fits inside ONE render but not on the ladder -- still one clip, with the
+    # tail trim covering the remainder. The existence check is load-bearing
+    # (2026-07-25 QA): this used to return SINGLE whenever the target was
+    # merely <= max_frames, but the smallest legal length AT OR ABOVE the
+    # target can still exceed the ceiling. A min=1 quantum=2 max=12 engine
+    # asked for 12 frames has no single legal render (the ladder is odd:
+    # 1,3,..,11) yet 11 + 1 covers it exactly as two clips -- and the old test
+    # declared it SINGLE, then refused it. Found by a differential sweep after
+    # the first two math fixes, missed by the panel.
+    if contract.allow_tail_trim \
+            and contract.smallest_legal_at_least(target) is not None:
+        return JOIN_SINGLE
     return (JOIN_CHAIN
             if contract.continuity == CONTINUITY_STRICT_FIRST_FRAME
             else JOIN_JUMP)
@@ -177,24 +185,73 @@ def _ladder_partition(total_render_frames, contract, count):
     return out
 
 
+def _candidate_totals(required, contract, count):
+    """Total render values worth trying for a TRIMMED cover, cheapest first.
+
+    For a ladder contract the total of ``count`` legal lengths is always
+    ``count*min + quantum*A``, so the reachable totals are exactly the values
+    congruent to ``count*min`` modulo ``quantum`` and bounded by ``count*max``.
+    That makes the smallest total at or above ``required`` fully determined --
+    exactly one candidate, nothing to guess.
+
+    A discrete menu is not an arithmetic progression, so there the reachable
+    totals are scanned upward. The scan is bounded by the largest menu entry:
+    trimming more than one whole segment's worth would mean the last segment
+    contributes nothing, which the validator rejects anyway.
+    """
+    required = int(required)
+    if contract.discrete_durations:
+        span = max(int(d) for d in contract.discrete_durations)
+        ceiling = count * span
+        return range(required, min(required + span, ceiling) + 1)
+    min_f, q = int(contract.min_frames), int(contract.quantum)
+    base = count * min_f
+    total = base if required <= base else (
+        base + -(-(required - base) // q) * q)        # ceil to the next step
+    if contract.max_frames and total > count * int(contract.max_frames):
+        return ()
+    return (total,)
+
+
 def _discrete_partition(total_render_frames, contract, count):
     """Exact split over a fixed duration menu (Veo's 4/6/8s), or None.
 
-    Small bounded search: the menus that exist in this build are three or four
-    entries, so an exhaustive descent is both fast and obviously correct.
+    MEMOIZED, and that is not an optimization -- it is a correctness-of-service
+    fix (2026-07-25 QA). The bare recursive descent explores up to
+    ``len(menu) ** count`` nodes, so with a four-value menu it took 18s at
+    count=14 and was still running past 20s at count=16. Since
+    :func:`partition_beat` walks counts up to ``max_segments`` (64), an
+    unsatisfiable target would hang the calling thread indefinitely rather than
+    refuse -- a render node that never returns is worse than one that fails.
+    Memoizing on ``(remaining, left)`` bounds the search to
+    ``total * count`` states, which is small and predictable.
     """
-    menu = sorted((int(d) for d in contract.discrete_durations), reverse=True)
+    menu = sorted({int(d) for d in contract.discrete_durations}, reverse=True)
+    if not menu:
+        return None
+    smallest = menu[-1]
+    memo = {}
 
     def _walk(remaining, left):
         if left == 0:
             return [] if remaining == 0 else None
+        # Bound the branch before recursing: `left` segments can cover at most
+        # left*largest and at least left*smallest.
+        if remaining < left * smallest or remaining > left * menu[0]:
+            return None
+        key = (remaining, left)
+        if key in memo:
+            return memo[key]
+        result = None
         for value in menu:
             if value > remaining:
                 continue
             rest = _walk(remaining - value, left - 1)
             if rest is not None:
-                return [value] + rest
-        return None
+                result = [value] + rest
+                break
+        memo[key] = result
+        return result
 
     return _walk(int(total_render_frames), count)
 
@@ -249,13 +306,34 @@ def partition_beat(target_visible_frames, contract, *, join_mode=None,
             return _build(target, mode, lengths, drop)
 
     # ---- exact failed; trim the tail if the contract permits it ----------- #
+    #
+    # THE SEARCH RANGE IS DERIVED, NOT GUESSED (2026-07-25 QA fix). This loop
+    # used to try only ``extra in range(1, quantum + 1)``, on the assumption
+    # that any shortfall could be bridged within one quantum step. That is
+    # false whenever ``count * min_frames`` overshoots the required total by
+    # more than one step -- which happens routinely just above ``max_frames``
+    # when ``min_frames`` is large relative to the gap. An adversarial sweep
+    # found 832 beats that WERE coverable by trimming and were refused anyway.
+    # Smallest repro: min=4 max=5 quantum=1 target=6, where [4, 4] with a
+    # 2-frame tail trim is a perfectly legal cover.
+    #
+    # The honest range comes from the ladder itself: for a given segment count
+    # the total render must be congruent to ``count * min_frames`` modulo the
+    # quantum, so the smallest legal total at or above the required total is
+    # fully determined. There is nothing left to guess.
     if contract.allow_tail_trim:
         for count in range(2, int(max_segments) + 1):
-            base = target + drop * (count - 1)
-            for extra in range(1, int(contract.quantum) + 1):
-                lengths = splitter(base + extra, contract, count)
-                if lengths is not None:
-                    return _build(target, mode, lengths, drop, trim_tail=extra)
+            required = target + drop * (count - 1)
+            for total in _candidate_totals(required, contract, count):
+                lengths = splitter(total, contract, count)
+                if lengths is None:
+                    continue
+                trim = total - required
+                # The trim comes off the LAST segment, which must still
+                # contribute at least one visible frame after its head drop.
+                if lengths[-1] - drop - trim < 1:
+                    continue
+                return _build(target, mode, lengths, drop, trim_tail=trim)
 
     raise CoveragePlanError(
         "no exact multi-clip cover of %d visible frame(s) exists for this "

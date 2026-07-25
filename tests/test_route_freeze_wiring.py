@@ -81,6 +81,36 @@ def test_redirected_bookend_gets_a_WIDE_still_not_a_decapitated_portrait(monkeyp
     assert policy["aspects"]["announcer_visual"] == "wide"
 
 
+def test_talking_also_describes_the_EFFECTIVE_engine(monkeypatch):
+    """`talking` carries the identical bug pattern `aspects` was fixed for.
+
+    Added 2026-07-25 by QA: a mutation test showed that reverting `talking` to
+    the PICKED engine left the ENTIRE suite green, so the second half of the
+    same fix shipped unproven. The failure it guards: an announcer beat picks a
+    lip-syncing HuMo that the radio-is-host guard redirects to the
+    `ltx_audio_in` console, which does not lip-sync. If `talking` still
+    described the picked engine, the image phase would keep minting
+    face-forward "talking" portraits for an engine that never moves a mouth.
+    """
+    from nodes._otr_video_engines import registry as _vreg
+
+    policy = _direct(monkeypatch, announcer="humo_1.7B")
+    effective = policy["effective_video_models"]["announcer_visual"]
+    assert effective == rd._NEVER_HUMO_REDIRECT_ENGINE
+
+    def _wants_talking(engine_id):
+        engine = _vreg.get_engine(engine_id)
+        hook = getattr(engine, "wants_talking_prompt", None)
+        return bool(hook()) if callable(hook) else False
+
+    # The stamped flag must describe the engine that actually renders, not the
+    # operator's pick -- whatever those two engines happen to declare.
+    assert policy["talking"]["announcer_visual"] == _wants_talking(effective)
+    if _wants_talking("humo_1.7B") != _wants_talking(effective):
+        # ...and when they genuinely differ, the pick must NOT be what shipped.
+        assert policy["talking"]["announcer_visual"] != _wants_talking("humo_1.7B")
+
+
 def test_hosts_on_keeps_the_portrait_still_for_a_portrait_humo(monkeypatch):
     """The other side of the same contract: with the toggle ON the redirect is
     a no-op, the portrait HuMo really does render, and a portrait still is

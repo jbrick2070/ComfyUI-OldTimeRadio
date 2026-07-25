@@ -2861,7 +2861,22 @@ def assert_frozen_route(ledger):
         role = str(shot.get("role") or _role_of_shot(shot) or "")
         expected = str(frozen.get(role) or "")
         actual = str(shot.get("engine_id") or "")
-        if expected and actual != expected:
+        if not expected:
+            # A shot whose role the freeze never covered (2026-07-25 QA). The
+            # docstring promises to catch ANY disagreement, and silently
+            # skipping an unmapped role is the one hole that promise had: the
+            # shot would render on whatever engine its row happens to carry,
+            # unverified. Unreachable through OTR_VideoDirector, which fails
+            # LOUD on an empty role before the freeze is taken -- so reaching
+            # here means a hand-built or tampered ledger, and guessing is
+            # exactly the wrong response to that.
+            raise RenderError(
+                "ROUTE EQUALITY: shot %s carries role %r, which the frozen "
+                "route does not cover (frozen roles: %s). A shot whose route "
+                "was never frozen cannot be verified, so it must not render. "
+                "NO FALLBACK." % (shot.get("shot_id"), role,
+                                  ", ".join(sorted(frozen)) or "<none>"))
+        if actual != expected:
             raise RenderError(
                 "ROUTE EQUALITY: shot %s (role=%s) carries engine %r but the "
                 "frozen route says %r. The plan and the shot rows disagree, so "
@@ -2876,7 +2891,11 @@ def assert_frozen_route(ledger):
                 "group. NO FALLBACK."
                 % (shot.get("shot_id"), actual, shot.get("group_id"), grp_engine))
 
-    _LOG.info(
+    # DEBUG, not INFO: this fires on every healthy episode and is verified
+    # twice per render (otr_video_render_batch calls the check, then
+    # run_real_episode calls it again as defence in depth). Success is not
+    # news; only a mismatch is, and that raises.
+    _LOG.debug(
         "[OTR.render_driver] ROUTE EQUALITY OK: %d shot(s) match the frozen "
         "route %r", len(section.get("shots") or ()), frozen)
     return True
@@ -2923,7 +2942,7 @@ def resolve_final_shot_engines(ledger):
     """
     if assert_frozen_route(ledger):
         return ledger
-    _LOG.info(
+    _LOG.debug(
         "[OTR.render_driver] no frozen route on this ledger (legacy / "
         "hand-built / soak path) -- resolving the effective engines here, as "
         "before the 2026-07-25 route freeze")
