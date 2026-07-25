@@ -27,8 +27,11 @@ inventory, the four-fall-through mechanism map with five named traps, and the
 31-engine parity matrix. **S0a DONE @ `33c4d8cf` (finished 2026-07-24 20:22
 local, wall 14m) -- 6432 passed / 27 skipped / 1 xfailed; Bible 17 passed;
 tests/fixtures/still_plan_head_parity.json (31 engines x 8 configurations)
-locks HEAD before S0b flips the routing. S0b IN-FLIGHT (started 2026-07-24
-20:22 local).**
+locks HEAD before S0b flips the routing. S0b is next -- scope note landed
+at `docs/S0b_HANDOFF.md` (routing freeze is 7 modules + a new
+`_otr_shared/routing_state.py` + ~31 test literals + prepass reorder + LTX
+mismatch gate + AST audit; needs its own dedicated coder window per section
+9 of the spec).**
 
 **Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
 waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
