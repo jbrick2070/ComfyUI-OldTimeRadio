@@ -1510,7 +1510,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # branch below reads shot["engine_id"] -- a caught announcer/music + HuMo
     # pick is redirected here so every downstream resolution (init_image,
     # canvas, audio) already sees the corrected engine.
-    _enforce_radio_is_host(shot)
+    #
+    # FROZEN ROUTE WINS (2026-07-25, chunk 1c). ~30 reads of shot["engine_id"]
+    # and shot["family"] follow in this function -- mesh-fodder routing, the
+    # scene-still vs portrait choice, the radio-face raise, the still_pan /
+    # ltx_audio_in branch, the portrait-vs-wide split, LTX-I2V init selection.
+    # They must all see the SAME engine the stills were minted for. When the
+    # ledger carries a frozen route, the row already holds it and re-deriving
+    # here could only introduce a disagreement, so we verify instead of mutate.
+    if not frozen_route_from_ledger(ledger):
+        _enforce_radio_is_host(shot)
     # Chunk A2 (visual-style TOTAL COVERAGE): resolve the episode's visual
     # style ONCE per shot, OUTSIDE any swallow (fail-loud law) -- the
     # console/music motion registers below read pack VALUES; the style id is
@@ -2785,6 +2794,94 @@ def parse_engine_override(spec: str) -> dict:
     return out
 
 
+def frozen_route_from_ledger(ledger):
+    """The frozen role -> effective-engine map ShotLock stamped, or ``{}``.
+
+    ``{}`` means this ledger never passed through the OTR_VideoDirector /
+    OTR_ShotLock freeze: a legacy fixture, or one of the two shipped HTTP entry
+    points (``/otr/video_render_single``, ``/otr/video_render_soak``) that build
+    a ledger by hand with no OTR_VideoDirector upstream. Those keep the historic
+    mutating behaviour -- see :func:`resolve_final_shot_engines`.
+    """
+    section = (ledger or {}).get("video") or {}
+    frozen = section.get("roles_effective")
+    return dict(frozen) if isinstance(frozen, dict) and frozen else {}
+
+
+def assert_frozen_route(ledger):
+    """VERIFY the frozen route instead of re-deriving it. Returns True if a
+    frozen route was present (and therefore verified), False if there is none.
+
+    Never mutates. Raises :class:`RenderError` on ANY disagreement:
+
+    * the routing ENVIRONMENT moved since the freeze, so the frozen map no
+      longer describes what will render;
+    * a shot's engine/family is not what the freeze said it would be;
+    * a shot disagrees with its own execution group.
+
+    WHY AN ASSERTION AND NOT A REPAIR (2026-07-25, chunk 1c). Repairing here is
+    what the old code did, and it is why the defect survived so long: the
+    render phase silently corrected a route the image phase had already planned
+    stills for, so the two phases disagreed and only the pixels showed it. If
+    the plan and the environment disagree at render time, the stills are
+    already wrong and no mutation of the shot rows can un-mint them. Fail loud,
+    before GPU time.
+    """
+    frozen = frozen_route_from_ledger(ledger)
+    if not frozen:
+        return False
+
+    section = (ledger or {}).get("video") or {}
+    try:
+        from .._otr_shared import route_freeze as _rf  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import route_freeze as _rf  # type: ignore
+
+    stamped_env = section.get("routing_env_snapshot")
+    if isinstance(stamped_env, dict) and stamped_env:
+        live_env = _rf.routing_env_snapshot()
+        if not _rf.snapshots_agree(stamped_env, live_env):
+            raise RenderError(
+                "ROUTE EQUALITY: the routing environment changed after the "
+                "plan was frozen (frozen %r, live %r). Every still and prompt "
+                "in this episode was planned for the frozen route, so "
+                "rendering the live one would render engines the image phase "
+                "never minted assets for. Re-run from OTR_VideoDirector. "
+                "NO FALLBACK." % (stamped_env, live_env))
+
+    groups_by_id = {}
+    for grp in section.get("execution_groups") or ():
+        if isinstance(grp, dict):
+            groups_by_id[str(grp.get("group_id") or "")] = str(
+                grp.get("engine_id") or "")
+
+    for shot in section.get("shots") or ():
+        if not isinstance(shot, dict):
+            continue
+        role = str(shot.get("role") or _role_of_shot(shot) or "")
+        expected = str(frozen.get(role) or "")
+        actual = str(shot.get("engine_id") or "")
+        if expected and actual != expected:
+            raise RenderError(
+                "ROUTE EQUALITY: shot %s (role=%s) carries engine %r but the "
+                "frozen route says %r. The plan and the shot rows disagree, so "
+                "the stills were minted for a different engine than the one "
+                "about to render. NO FALLBACK."
+                % (shot.get("shot_id"), role, actual, expected))
+        grp_engine = groups_by_id.get(str(shot.get("group_id") or ""))
+        if grp_engine and actual and grp_engine != actual:
+            raise RenderError(
+                "ROUTE EQUALITY: shot %s carries engine %r but its execution "
+                "group %r carries %r. A shot must never diverge from its own "
+                "group. NO FALLBACK."
+                % (shot.get("shot_id"), actual, shot.get("group_id"), grp_engine))
+
+    _LOG.info(
+        "[OTR.render_driver] ROUTE EQUALITY OK: %d shot(s) match the frozen "
+        "route %r", len(section.get("shots") or ()), frozen)
+    return True
+
+
 def resolve_final_shot_engines(ledger):
     """THE ROUTE LOCK: resolve every shot's FINAL effective engine, once.
 
@@ -2814,7 +2911,22 @@ def resolve_final_shot_engines(ledger):
 
     Mutates the ledger's own shot dicts in place (the established pattern for
     both passes) and returns the ledger for call-site symmetry.
+
+    SUPERSEDED BY THE FREEZE FOR OTR_VideoDirector-BUILT LEDGERS (chunk 1c).
+    When the ledger carries a frozen route (``video.roles_effective``, stamped
+    by ShotLock from OTR_VideoDirector's capture), this VERIFIES that route and
+    mutates NOTHING -- see :func:`assert_frozen_route`. The mutating body below
+    now runs only for ledgers that never met the freeze: legacy CPU fixtures
+    and the two hand-built HTTP entry points (``/otr/video_render_single``,
+    ``/otr/video_render_soak``). That branch is named and logged rather than
+    silent, because a fallback nobody can see is how the original defect hid.
     """
+    if assert_frozen_route(ledger):
+        return ledger
+    _LOG.info(
+        "[OTR.render_driver] no frozen route on this ledger (legacy / "
+        "hand-built / soak path) -- resolving the effective engines here, as "
+        "before the 2026-07-25 route freeze")
     ledger = apply_engine_override(ledger)
     for shot in ((ledger.get("video") or {}).get("shots") or []):
         if isinstance(shot, dict):

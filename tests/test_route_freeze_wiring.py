@@ -65,8 +65,8 @@ def test_redirected_bookend_gets_a_WIDE_still_not_a_decapitated_portrait(monkeyp
     ``ltx_audio_in`` console. Before chunk 1b the aspect map was derived from
     the PICKED portrait engine, so an 832x1216 portrait still was minted and the
     wide render centre-cropped it. ``eng_ltx_av.py:345-347`` records the outcome
-    verbatim: "the director defaulted to a 832x1216 PORTRAIT still that the wide
-    render then centre-cropped, lopping the subject's head off."
+    verbatim: OTR_VideoDirector "defaulted to a 832x1216 PORTRAIT still that the
+    wide render then centre-cropped, lopping the subject's head off."
 
     The aspect must now describe the engine that ACTUALLY renders.
     """
@@ -250,3 +250,130 @@ def test_both_nodes_share_one_fingerprint(monkeypatch):
     against an environment the other has already cached past."""
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_camera")
     assert vd.OTRVideoDirector.IS_CHANGED() == sl.OTRShotLock.IS_CHANGED()
+
+
+# ---------------------------------------------------------------------------
+# Chunk 1c -- the render-time EQUALITY ASSERTION
+# ---------------------------------------------------------------------------
+
+def _frozen_ledger(engine="ltx_audio_in", role="announcer_visual",
+                   frozen_engine=None, env=None):
+    """A ledger shaped like one ShotLock stamps after the 1b freeze."""
+    return {
+        "episode_id": "ep_eq",
+        "video": {
+            "roles_effective": {role: frozen_engine or engine},
+            "routing_env_snapshot": env if env is not None else {
+                "force_engine_map": "", "enable_humo_hosts": False},
+            "execution_groups": [
+                {"group_id": "grp_%s" % role, "kind": "consumer",
+                 "engine_id": engine, "depends_on": []}],
+            "shots": [
+                {"shot_id": "shot_b001", "role": role, "group_id": "grp_%s" % role,
+                 "engine_id": engine, "family": "", "target_frame_count": 25}],
+        },
+    }
+
+
+def test_a_frozen_route_is_verified_and_never_mutated(monkeypatch):
+    """The whole point of 1c: at render time we CHECK, we do not repair.
+
+    Repairing is what the old code did, and it is why the defect survived --
+    the render phase silently corrected a route the image phase had already
+    minted stills for, so the two disagreed and only the pixels showed it.
+    """
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    ledger = _frozen_ledger()
+    before = json.dumps(ledger, sort_keys=True)
+    assert rd.assert_frozen_route(ledger) is True
+    out = rd.resolve_final_shot_engines(ledger)
+    assert json.dumps(out, sort_keys=True) == before      # byte-identical
+
+
+def test_a_forced_map_does_NOT_rewrite_a_frozen_ledger(monkeypatch):
+    """A frozen plan is not re-forced at render.
+
+    Before 1c, setting the force map late would rewrite the shot rows here --
+    after the stills had already been minted for the frozen engine. The
+    environment guard catches it instead.
+    """
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    ledger = _frozen_ledger()
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_camera")
+    with pytest.raises(rd.RenderError, match="routing environment changed"):
+        rd.resolve_final_shot_engines(ledger)
+
+
+def test_shot_that_disagrees_with_the_frozen_route_is_terminal(monkeypatch):
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    ledger = _frozen_ledger(engine="humo", frozen_engine="ltx_audio_in")
+    with pytest.raises(rd.RenderError, match="frozen route says"):
+        rd.assert_frozen_route(ledger)
+
+
+def test_shot_that_diverges_from_its_group_is_terminal(monkeypatch):
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    ledger = _frozen_ledger()
+    ledger["video"]["execution_groups"][0]["engine_id"] = "wan_i2v"
+    with pytest.raises(rd.RenderError, match="execution group"):
+        rd.assert_frozen_route(ledger)
+
+
+def test_legacy_ledger_keeps_the_historic_mutating_behaviour(monkeypatch):
+    """The two shipped HTTP entry points (/otr/video_render_single and
+    /otr/video_render_soak) and the legacy CPU fixtures build ledgers by hand
+    with no OTR_VideoDirector upstream. A strict assertion would break paths
+    never in this contract, so the mutating branch survives -- NAMED and
+    logged, not silent."""
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    legacy = {
+        "video": {
+            "shots": [{"shot_id": "s1", "role": "announcer_visual",
+                       "engine_id": "humo", "family": ""}],
+        },
+    }
+    assert rd.assert_frozen_route(legacy) is False       # nothing to verify
+    rd.resolve_final_shot_engines(legacy)
+    # ...and the historic redirect still happens on that path
+    assert legacy["video"]["shots"][0]["engine_id"] == rd._NEVER_HUMO_REDIRECT_ENGINE
+
+
+def test_frozen_route_from_ledger_reads_only_a_real_map():
+    assert rd.frozen_route_from_ledger({}) == {}
+    assert rd.frozen_route_from_ledger({"video": {}}) == {}
+    assert rd.frozen_route_from_ledger({"video": {"roles_effective": {}}}) == {}
+    assert rd.frozen_route_from_ledger(
+        {"video": {"roles_effective": {"announcer_visual": "ltx_audio_in"}}}
+    ) == {"announcer_visual": "ltx_audio_in"}
+
+
+def test_build_request_from_shot_does_not_redirect_under_a_frozen_route(monkeypatch):
+    """~30 later reads of shot["engine_id"]/["family"] live in that function.
+
+    Under a frozen route the row already holds the effective engine, so
+    re-deriving could only introduce a disagreement with the minted stills.
+    """
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    # A frozen ledger whose row deliberately still says "humo": the old code
+    # would have rewritten it in place here.
+    ledger = _frozen_ledger(engine="humo", frozen_engine="humo")
+    shot = ledger["video"]["shots"][0]
+    try:
+        rd.build_request_from_shot(shot, ledger)
+    except Exception:  # noqa: BLE001 -- request building may fail for other reasons
+        pass
+    assert shot["engine_id"] == "humo"   # NOT mutated to ltx_audio_in
+
+
+def test_end_to_end_freeze_survives_the_render_boundary(monkeypatch):
+    """OTR_VideoDirector -> ShotLock -> render assertion: one route throughout."""
+    policy = _direct(monkeypatch, announcer="humo_1.7B")
+    patched = json.loads(_lock_with(policy)[0])
+    # ShotLock stamped the frozen route...
+    assert patched["video"]["roles_effective"]["announcer_visual"] == \
+        rd._NEVER_HUMO_REDIRECT_ENGINE
+    # ...and the render boundary verifies rather than re-derives it.
+    assert rd.assert_frozen_route(patched) is True
