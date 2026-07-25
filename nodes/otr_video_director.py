@@ -281,6 +281,23 @@ class OTRVideoDirector:
                                "(fp8/fp4 artifacts are OFF on ROCm/MPS "
                                "tiers).",
                 }),
+                # WAN 8GB launch contract (2026-07-24): the low-VRAM tier's
+                # render-length ceiling, appended LAST (widget slot 14) so no
+                # saved positional widget vector shifts (BUG-LOCAL-097).
+                "max_render_frames": ("INT", {
+                    "default": 0, "min": 0, "max": 240,
+                    "tooltip": (
+                        "Absolute per-clip RENDER-length ceiling in frames for "
+                        "local video engines (0 = unpinned = the engine max). "
+                        "The low-VRAM tier contract: the 8GB Wan profile pins "
+                        "17 so a beat renders 17 real frames and is "
+                        "ping-pong-extended to its full audio length, instead "
+                        "of requesting the beat's whole 177-frame span and "
+                        "dying in the VRAM cost model. Beat LENGTH is "
+                        "unchanged -- this caps what the engine renders, never "
+                        "what the episode plays."
+                    ),
+                }),
             },
         }
 
@@ -298,7 +315,8 @@ class OTRVideoDirector:
                seed_mode, request_seed,
                custom_models_json="{}",
                gate_in="",
-               device_policy="cuda", dtype_policy="fp8_ok"):
+               device_policy="cuda", dtype_policy="fp8_ok",
+               max_render_frames=0):
         warnings: list = []
         custom = self._parse_custom(custom_models_json, warnings)
         descriptors = _registry_descriptors()
@@ -336,6 +354,11 @@ class OTRVideoDirector:
             "policy_version": 2,
             "device_policy": str(device_policy or "cuda"),
             "dtype_policy": str(dtype_policy or "fp8_ok"),
+            # WAN 8GB launch contract (2026-07-24): the per-tier render-length
+            # ceiling rides the SAME v2 policy channel as device/dtype, so a
+            # production episode leg carries it without depending on the
+            # server's boot environment. 0 = unpinned (every shipped tier).
+            "max_render_frames": max(0, int(max_render_frames or 0)),
             "video_models": resolved_video,
             # Per-role still aspect, resolved from each slot's selected engine, so
             # the image node mints character stills to MATCH the chosen video

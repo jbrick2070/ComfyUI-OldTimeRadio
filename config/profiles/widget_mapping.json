@@ -402,6 +402,15 @@
         ]
       ]
     },
+    "video.max_render_frames": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_VideoDirector",
+          "max_render_frames"
+        ]
+      ]
+    },
     "image.dtype_policy": {
       "registry": null,
       "targets": [

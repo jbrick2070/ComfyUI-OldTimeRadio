@@ -527,6 +527,10 @@ def _flatten_profile_values(profile: dict) -> dict:
         flat["video.device_policy"] = vid["device_policy"]
     if "dtype_policy" in vid:
         flat["video.dtype_policy"] = vid["dtype_policy"]
+    # 2026-07-24 (WAN 8GB launch contract): OPTIONAL per-tier render-length
+    # ceiling. Absent = unpinned, so no other tier's applied widget vector moves.
+    if "max_render_frames" in vid:
+        flat["video.max_render_frames"] = vid["max_render_frames"]
     img = profile.get("image", {})
     if "dtype_policy" in img:
         flat["image.dtype_policy"] = img["dtype_policy"]

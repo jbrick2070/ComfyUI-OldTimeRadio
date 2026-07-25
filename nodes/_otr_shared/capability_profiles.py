@@ -130,6 +130,25 @@ _VIDEO_KEYS = {
     "device_policy": lambda v: v in _DEVICE_POLICIES,
     "dtype_policy": lambda v: v in _DTYPE_POLICIES,
 }
+#: OPTIONAL video keys (2026-07-24, WAN 8GB launch contract). A tier that does
+#: not declare one is UNPINNED -- absent behaves exactly as before, so adding a
+#: key here never churns the other profiles.
+#:
+#: ``max_render_frames`` is the tier's ABSOLUTE local-video render-length
+#: ceiling in frames (0 = unpinned = the engine's own max). It is the
+#: profile-carried twin of ``OTR_WAN_TI2V_MAX_FRAMES``: the low-VRAM launch
+#: contract has to reach a PRODUCTION episode leg, which is submitted to an
+#: already-booted server and therefore never sees ``launch.env``. Distinct from
+#: ``render.frame_budget``, which is the soak/single harness per-clip frame
+#: count (every 16GB tier declares 25 there and must NOT be capped to it).
+_VIDEO_OPTIONAL_KEYS = {
+    "max_render_frames": lambda v: (
+        isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 240),
+}
+#: section name -> its optional-key spec (missing = no optional keys).
+_SECTION_OPTIONAL_KEYS = {
+    "video": _VIDEO_OPTIONAL_KEYS,
+}
 _IMAGE_KEYS = {
     "dtype_policy": lambda v: v in _DTYPE_POLICIES,
 }
@@ -228,7 +247,8 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
         ("preflight", _PREFLIGHT_KEYS),
     ):
         sub = profile[sub_name]
-        unknown = set(sub) - set(sub_spec)
+        optional_spec = _SECTION_OPTIONAL_KEYS.get(sub_name, {})
+        unknown = set(sub) - set(sub_spec) - set(optional_spec)
         if unknown:
             raise ProfileError(f"profile {source}: unknown {sub_name} key(s) {sorted(unknown)!r}")
         missing = [k for k in sub_spec if k not in sub]
@@ -236,6 +256,11 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
             raise ProfileError(f"profile {source}: {sub_name} missing key(s) {missing!r}")
         for k, check in sub_spec.items():
             if not check(sub[k]):
+                raise ProfileError(f"profile {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
+        # Optional keys: absent is legal, present is validated (a typo'd value
+        # silently doing nothing is the drift class this whole validator kills).
+        for k, check in optional_spec.items():
+            if k in sub and not check(sub[k]):
                 raise ProfileError(f"profile {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
 
     # v2: the llm section (constructor-based validation; ONE enum truth).

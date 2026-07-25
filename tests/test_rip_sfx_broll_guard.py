@@ -175,7 +175,10 @@ def test_workflow_json_node87_matches_live_widget_model():
     # (+device_policy="cuda" appended at index 12, +dtype_policy="fp8_ok"
     # appended at index 13; both append-only, character_video_model stays
     # at index 2).
-    assert len(n87["widgets_values"]) == 14, n87["widgets_values"]
+    # WAN 8GB launch contract (2026-07-24): OLD pin 14 -> NEW pin 15
+    # (+max_render_frames=0 appended at index 14; append-only again, so every
+    # prior slot -- including character_video_model at index 2 -- is untouched).
+    assert len(n87["widgets_values"]) == 15, n87["widgets_values"]
     names87 = {i.get("name") for i in n87["inputs"]}
     # the per-role MODEL widgets are EXACTLY the six live ones -- a closed check
     # that catches any legacy model widget leaking back into the canonical JSON.

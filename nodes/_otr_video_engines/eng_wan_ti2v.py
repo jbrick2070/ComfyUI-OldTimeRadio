@@ -75,7 +75,9 @@ _TI2V_DEFAULT_CLIP = "umt5-xxl-encoder-Q5_K_M.gguf"
 # ping-pong-extends that short render up to the full target so the beat is FILLED
 # with motion. _TI2V_MIN_FRAMES is the motion floor (always >= this many 4n+1
 # frames of real motion); _TI2V_MAX_FRAMES is the absolute hard cap;
-# OTR_WAN_TI2V_MAX_FRAMES lets a tiny/8GB card pin a lower hard cap.
+# OTR_WAN_TI2V_MAX_FRAMES (server boot env) or the tier profile's
+# video.max_render_frames (ledger-stamped, the production channel) lets a
+# tiny/8GB card pin a lower hard cap.
 _TI2V_MIN_FRAMES = 17
 _TI2V_DEFAULT_FRAMES = 17
 _TI2V_MAX_FRAMES = 177
@@ -312,14 +314,27 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         beat's audio-derived ``target_frame_count`` frames fit under the ceiling --
         never react-to-OOM. The render then ping-pong-extends this (possibly short)
         render up to the full target so the beat is FILLED with motion. The motion
-        floor (17) always wins; ``OTR_WAN_TI2V_MAX_FRAMES`` pins an absolute hard
-        cap for a tiny/8GB card (default = the engine max, not 17)."""
+        floor (17) always wins; an absolute hard cap for a tiny/8GB card comes
+        from ``OTR_WAN_TI2V_MAX_FRAMES`` or, on a production leg, the tier's
+        ledger-stamped ``max_render_frames`` (default = the engine max, not 17)."""
         from . import wrapper_bridge as _wb
         target = int(target_frame_count or _TI2V_DEFAULT_FRAMES)
+        # Hard-cap resolution (2026-07-24 WAN 8GB launch contract). BEFORE this,
+        # the ONLY channel was the env pin -- which a production episode leg can
+        # never see, because it is submitted to an already-booted server and
+        # `launch.env` applies to the server process. An 8GB leg therefore
+        # inherited the 177-frame engine max, asked for a whole 7s beat, and died
+        # in the cost model (2026-07-23 wan_8gb__lumina_image__media_archive).
+        # Order: explicit env pin (operator override) -> the tier's
+        # profile-carried ceiling (ledger-stamped, the normal path) -> engine max.
+        _raw_env = (os.environ.get("OTR_WAN_TI2V_MAX_FRAMES") or "").strip()
         try:
-            hard_cap = int(os.environ.get(
-                "OTR_WAN_TI2V_MAX_FRAMES", str(_TI2V_MAX_FRAMES)))
+            hard_cap = int(_raw_env) if _raw_env else 0
         except (TypeError, ValueError):
+            hard_cap = 0
+        if hard_cap <= 0:
+            hard_cap = self.profile_max_render_frames()
+        if hard_cap <= 0:
             hard_cap = _TI2V_MAX_FRAMES
         hard_cap = max(_TI2V_MIN_FRAMES, min(hard_cap, _TI2V_MAX_FRAMES))
         target = max(1, min(target, hard_cap))

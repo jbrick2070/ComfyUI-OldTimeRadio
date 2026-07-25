@@ -110,7 +110,11 @@ def test_production_workflow_visual_structure_pinned():
     # S5 platform-portability (2026-07-10): OLD pin 12 -> NEW pin 14
     # (+device_policy="cuda" appended at index 12, +dtype_policy="fp8_ok"
     # appended at index 13; character_video_model stays at index 2).
-    assert len(wv87) == 14, wv87
+    # WAN 8GB launch contract (2026-07-24): OLD pin 14 -> NEW pin 15
+    # (+max_render_frames=0 appended at index 14 -- 0 = UNPINNED, so the saved
+    # canonical keeps today's behaviour and only a tier profile pins a ceiling).
+    assert len(wv87) == 15, wv87
+    assert wv87[14] == 0, "canonical must ship the render ceiling UNPINNED"
     assert wv87[2].startswith("viz_camera"), (
         "character_video_model must stay on the lean camera visualizer lane: %r"
         % wv87[2])

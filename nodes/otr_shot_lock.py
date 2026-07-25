@@ -1306,6 +1306,11 @@ class OTRShotLock:
             "policy_version": 2,
             "device_policy": str(policy.get("device_policy") or "cuda"),
             "dtype_policy": str(policy.get("dtype_policy") or "fp8_ok"),
+            # WAN 8GB launch contract (2026-07-24): the tier's render-length
+            # ceiling rides the ledger next to the device/dtype stamps, so the
+            # engine sees it on a production leg regardless of how the server
+            # was booted. 0 = unpinned. Beat frame targets are untouched.
+            "max_render_frames": max(0, int(policy.get("max_render_frames") or 0)),
             "canonical_canvas": {
                 "w": int(canvas.get("w") or 832),
                 "h": int(canvas.get("h") or 480),

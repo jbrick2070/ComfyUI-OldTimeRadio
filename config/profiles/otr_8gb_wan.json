@@ -52,7 +52,8 @@
   },
   "video": {
     "device_policy": "cuda",
-    "dtype_policy": "fp8_ok"
+    "dtype_policy": "fp8_ok",
+    "max_render_frames": 17
   },
   "image": {
     "dtype_policy": "fp8_ok"

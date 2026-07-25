@@ -2499,6 +2499,27 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
     return clip, out_shot, [eng], (clip_peak or _mc.vram_used_mb())
 
 
+def build_episode_render_policy(section):
+    """The v2 render policy handed to EVERY adapter's ``assert_usable`` /
+    ``prepare`` for this episode, read from the ShotLock-stamped ledger
+    ``video`` section. Pure; CPU-tested.
+
+    S4 platform-portability (2026-07-10) put the device/dtype truth here so an
+    adapter sees exactly what the directors emitted. WAN 8GB launch contract
+    (2026-07-24) adds ``max_render_frames``, the tier's absolute render-length
+    ceiling: a production episode leg is submitted to an already-booted server,
+    so a profile's ``launch.env`` can never reach the engine -- the ceiling has
+    to ride the ledger. 0 = unpinned, which is every shipped tier except the
+    8GB Wan profile, so no other lane's behaviour moves."""
+    section = section or {}
+    return {
+        "policy_version": 2,
+        "device_policy": str(section.get("device_policy") or "cuda"),
+        "dtype_policy": str(section.get("dtype_policy") or "fp8_ok"),
+        "max_render_frames": max(0, int(section.get("max_render_frames") or 0)),
+    }
+
+
 def run_episode(ledger, *, oom_shot_id=None,
                 oom_engines=frozenset(), assets=None, frame_count=25,
                 canvas=None, request_builder=None):
@@ -2519,11 +2540,7 @@ def run_episode(ledger, *, oom_shot_id=None,
     # assert_usable/prepare (was hardcoded {} at every call).
     from .._otr_shared.host_caps import build_host_caps
     _episode_host_caps = build_host_caps()
-    _episode_profile = {
-        "policy_version": 2,
-        "device_policy": str(section.get("device_policy") or "cuda"),
-        "dtype_policy": str(section.get("dtype_policy") or "fp8_ok"),
-    }
+    _episode_profile = build_episode_render_policy(section)
     clips, new_shots, trace = {}, [], []
     # S-C C1 (audio_motion_profile): per-shot resolved conditioning-WAV rows
     # (the per-line voice clip OR the read-only master slice) for the post-render

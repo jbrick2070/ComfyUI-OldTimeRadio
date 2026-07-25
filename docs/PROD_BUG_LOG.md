@@ -2675,3 +2675,39 @@ out until they independently meet the same production-only admission rule.
   portable rule
 - status: **LIVE-ADMITTED / ROOT-FIXED IN WORKTREE; helper regression GREEN;
   six-bank live requalification pending**
+
+## PBUG-20260723-02 -- the 8GB Wan tier's low-VRAM launch contract never reached a production leg
+- surfaced: 2026-07-23 overnight media qualification, matrix leg
+  `wan_8gb__lumina_image__media_archive` (`model_coverage_wan/receipts.json` +
+  `server_wan.log`; staged in `docs/2026-07-23-video-failure-inventory.md`)
+- symptom: terminal `FAIL` at `OTR_VideoRenderBatch` -- `wan_ti2v` received a
+  177-frame request while the cost model afforded 30 frames at the observed
+  free VRAM. No silent resize happened, which is correct; the requested
+  832x480 / 17-frame low-VRAM lane simply never applied to the leg
+- root cause: the 17-frame ceiling existed only in the profile's
+  `launch.env.OTR_WAN_TI2V_MAX_FRAMES`, and `eng_wan_ti2v._floor_length` read
+  that env var as its ONLY channel. A production episode leg is submitted to an
+  ALREADY-BOOTED server, so `launch.env` can never reach it -- any leg not
+  booted through `scripts/otr_headless_canonical.ps1 -Profile otr_8gb_wan`
+  inherited the 177-frame engine max. The profile's other declaration,
+  `render.frame_budget: 17`, maps to `OTR_VideoRenderBatch.frame_count`, which
+  is diagnostic-harness-only ("Ignored in mode=episode" per its own tooltip),
+  so the tier's contract was inert in production on both channels
+- fix: new OPTIONAL profile key `video.max_render_frames` (0/absent =
+  unpinned) travelling the same proven channel the device/dtype policy uses --
+  profile -> `OTR_VideoDirector.max_render_frames` widget (appended LAST,
+  canonical ships 0) -> v2 policy -> ShotLock ledger `video` section ->
+  `render_driver.build_episode_render_policy` -> `MotionEngineBase.prepare` ->
+  `_floor_length`. Env pin still outranks it; every other tier omits the key
+  and is byte-for-byte unchanged. Beat frame targets are untouched: the ceiling
+  caps what the ENGINE renders (then ping-pong-extended to the beat's full
+  audio length), never what the episode plays
+- verify idea: with free VRAM affording ~30 frames at 832x480, a 177-frame beat
+  must raise `MotionBudgetError` UNPINNED and return 17 with the tier ceiling
+  on the ledger; and an unpinned tier must still return 177 (no lane capped by
+  the fix). Covered by `tests/test_remaining_video_contracts.py`
+- bible-worthy: yes -- the portable rule is that a contract declared only in a
+  process-launch environment cannot bind work submitted to an already-running
+  server; a per-tier constraint has to ride the artifact the run loads
+- status: **ROOT-FIXED + suite/contract GREEN; live 8GB requalification leg
+  still owed (no GPU run authorized in this window)**

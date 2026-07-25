@@ -400,9 +400,16 @@ class MotionEngineBase:
     #: (cold-import clean). See docs/2026-06-18-coverage-arch-wiring/.
     accepts_still = True
 
+    #: The ledger-stamped v2 render policy for the CURRENT episode, captured on
+    #: ``prepare`` (WAN 8GB launch contract, 2026-07-24). Class-level default so
+    #: an engine used without ``prepare`` (unit fixtures, single-shot probes)
+    #: reads an empty policy = unpinned.
+    _active_profile: dict = {}
+
     def __init__(self):
         self._loaded = False
         self._patchers = []
+        self._active_profile = {}
 
     # load / unload bracket residency; the heavy import + wrapper load is the
     # CW-6 GPU-smoke slice, added per engine (lazy, never at module scope).
@@ -416,7 +423,12 @@ class MotionEngineBase:
     def prepare(self, host_caps, profile, session_ctx):
         """Take the SHARED single-heavy-engine lease (AS-3) BEFORE loading
         weights, then load. FAIL CLOSED: a held lease or a failed load raises and
-        the lease is never stranded."""
+        the lease is never stranded.
+
+        Also captures the episode's v2 render policy (WAN 8GB launch contract,
+        2026-07-24) so an engine can read its tier's ``max_render_frames``
+        ceiling at render time. Read-only; never mutated."""
+        self._active_profile = dict(profile or {})
         lease = _GR.acquire(
             timeout_s=float(os.getenv("OTR_GPU_LEASE_TIMEOUT_S", "120")))
         try:
@@ -426,6 +438,21 @@ class MotionEngineBase:
             raise
         return {"engine_id": self.name, "lease": lease,
                 "patchers": self._patchers}
+
+    def profile_max_render_frames(self):
+        """The tier's ABSOLUTE render-length ceiling in frames from the captured
+        v2 policy, or 0 when unpinned (WAN 8GB launch contract, 2026-07-24).
+
+        This is the profile-carried twin of a per-engine ``*_MAX_FRAMES`` env
+        pin: a production episode leg is submitted to an already-booted server,
+        so ``launch.env`` cannot reach it -- the ceiling has to travel
+        profile -> director widget -> ledger -> here. Never raises; a malformed
+        stamp reads as unpinned rather than failing a render."""
+        try:
+            return max(0, int((self._active_profile or {}).get(
+                "max_render_frames") or 0))
+        except (TypeError, ValueError):
+            return 0
 
     def teardown(self, prepared):
         """Detach every tracked patcher (V-4), drop residency, RELEASE the lease,
