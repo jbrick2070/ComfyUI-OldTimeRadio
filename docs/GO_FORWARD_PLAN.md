@@ -49,7 +49,18 @@ two-strikes budget and the two options for the next window
 r3+r4 local kibitz at CURRENT HEAD if either stalls). This window is
 proceeding to S1 (safe leaf per section 11 of the spec: schema + 31
 declarations + audit; nothing reads the plan) and then HALTING at
-S2 per operator. S1 IN-FLIGHT (started 2026-07-24 22:54 local).**
+S2 per operator. S1 DONE @ `a98b1d5d` (finished 2026-07-24 23:19 local,
+wall 25m) -- new `nodes/_otr_shared/still_plan_helpers.py`
+(schema + `resolve_row_aspect` + audit helpers, stdlib-only, cold-import
+clean), 31 per-engine `still_plan` class attributes across 16 adapter
+files covering Shape A (26 engines including the audio-driven-face,
+LTX-I2V, and LTX-audio-in variants), Shape B (mesh_stage), Shape C (4
+visualizers with explicit `()`), and new
+`tests/test_still_plan_audit.py` (6 tests, 265 lines) with the
+`CAPABILITIES == all_engine_names() == valid-plan owners` invariant.
+Full suite 6440 passed / 27 skipped / 1 xfailed (+6 vs S0a-b);
+Bible 17 passed; audio byte-identical 7 passed. HALTING here per
+operator (`docs/S2_EYEBALL_REQUEST.md` filed next).**
 
 **Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
 waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
