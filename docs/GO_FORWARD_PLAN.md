@@ -49,7 +49,7 @@ two-strikes budget and the two options for the next window
 r3+r4 local kibitz at CURRENT HEAD if either stalls). This window is
 proceeding to S1 (safe leaf per section 11 of the spec: schema + 31
 declarations + audit; nothing reads the plan) and then HALTING at
-S2 per operator.**
+S2 per operator. S1 IN-FLIGHT (started 2026-07-24 22:54 local).**
 
 **Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
 waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
