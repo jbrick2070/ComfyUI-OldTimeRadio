@@ -210,33 +210,75 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- MULTI-CLIP COVERAGE: CHUNK 1 DONE, CHUNK 2 NEXT
+## CURRENT STEP -- MULTI-CLIP COVERAGE: CHUNKS 1-3 DONE, CHUNK 3b NEXT
 
-**Updated 2026-07-25 (afternoon), HEAD `49944fb1`.** r4 CONVERGED (both seats
-yes-with-fixes, `48e02241`) and a six-way grounded Sonnet fan-out ran before
-code by operator direction. **Chunk 1 SHIPPED as three green pushed parts:**
-`933a78ba` (1a, the ONE route-freeze authority -- four mirrors collapsed onto
-`nodes/_otr_shared/route_freeze.py`, malformed force map now terminal
-everywhere), `9006b76d` (1b, the freeze at node 87 + ImageDirector forwarding +
-ShotLock consumption + `IS_CHANGED` -- **and the DECAPITATION fix: `aspects`
-now describes the EFFECTIVE engine**), `49944fb1` (1c, render-time equality --
-verify, never repair; the legacy branch for the two hand-built HTTP entry
-points is NAMED and logged). Suite **6504 passed / 27 skipped / 1 xfailed**;
-Bible 17; canonical byte-identical `5377914B` throughout.
+**Updated 2026-07-25 (afternoon), HEAD `bfacec2b`.** r4 CONVERGED (both seats
+yes-with-fixes, `48e02241`), a six-way grounded Sonnet fan-out ran before code
+by operator direction, and **SIX green chunks shipped and pushed**. Suite
+6454 -> **6769 passed / 27 skipped / 1 xfailed**; Bible 17; canonical
+byte-identical `5377914B` across every one (no node/widget/input/link change
+anywhere in chunks 1-3).
+
+| chunk | commit | what landed |
+|---|---|---|
+| 1a | `933a78ba` | `nodes/_otr_shared/route_freeze.py` = the ONE route authority; FOUR mirrors collapsed onto it; malformed force map now TERMINAL at every reader |
+| 1b | `9006b76d` | the freeze at node 87 + ImageDirector forwarding + ShotLock consumption + `IS_CHANGED`; **the DECAPITATION fix** |
+| 1c | `49944fb1` | render-time equality: verify, never repair; legacy branch NAMED and logged |
+| 2 | `ffc14693` | `frame_contract.py` (`FrameContract` + continuity) + the roster audit for the swallowed-import blindspot |
+| 3 | `bfacec2b` | `coverage_plan.py` -- the exact-sum partitioner (pure core) |
 
 **THE r3/r4 PLAN WAS WRONG ABOUT WHERE THE FREEZE GOES, and the correction is
 the durable lesson:** node ids are NOT execution order. There is no `89 -> 90`
 edge in `otr_canonical.json` -- MetaBrief (89) and ShotLock (90) are
 INDEPENDENT branches that reconverge only at 91, so a freeze at ShotLock can
 never inform the image phase. Node 87 (VideoDirector) is the unique common
-ancestor. Verify a claimed node ORDER against the link list, never the ids.
+ancestor. **Verify a claimed node ORDER against the link list, never the ids.**
 
-**NEXT: chunk 2** (declaration surface -- `FrameContract` = min/max/quantum/
-discrete_durations/allow_tail_trim + continuity token on the `VideoEngine`
-Protocol at `registry.py:51-98`, plus the roster audit at the BOTTOM of
-`_otr_video_engines/__init__.py` after all guarded imports; all adapters
-`single_only`), then chunks 3-7 in the r3 order. **Chunk 7 is the `ltx_8gb`
-169-frame LIVE slice** and needs a selective box reset per CLAUDE.md section 4.
+**THE DECAPITATION BUG IS FIXED (1b) and it was LIVE under the DEFAULT
+environment** -- not latent. A portrait HuMo picked for `announcer_visual` with
+`OTR_ENABLE_HUMO_HOSTS` unset redirects to the WIDE `ltx_audio_in`, but
+`aspects` was derived from the PICKED portrait engine, so a portrait still was
+minted and the wide render centre-cropped it. `eng_ltx_av.py:345-347` had
+recorded that exact outcome verbatim. Pinned by
+`test_redirected_bookend_gets_a_WIDE_still_not_a_decapitated_portrait`.
+
+**NEXT -- chunk 3b, then 4-7 in the r3 order:**
+
+1. **3b (next):** stamp the `CoveragePlan` durably in the ledger and validate
+   it at BOTH wire boundaries (ShotLock before serialization, RenderBatch
+   before execution). The pure core is landed at `bfacec2b`; this is its
+   wiring. Do NOT make the legacy `ShotRow` authoritative (r3 judged).
+   ShotLock must stamp `sections={"video": video_section}` and the dispatcher
+   must stamp BOTH updated `video` and `images`, or the plan vanishes from the
+   durable ledger and cannot support replay.
+2. **4:** jump-still image-phase consumer (ShotLock patches jump-still requests
+   into `script_json` -> dispatcher merges into `objects` +
+   `required_scene_targets` -> the spine validates EVERY jump segment).
+   **Without this a jump cut has no still at all.**
+3. **5:** beat-session lifecycle -- reusable MODEL/CLIP/VAE handles, teardown
+   in ONE outer `finally`, assert LOADER-call count (not `prepare` count).
+   r4 settled the shape: `wrapper_bridge.run_graph` does NOT gain a
+   prepared-handles parameter; the adapter owns the handles and each segment
+   graph takes them as literals, omitting its loader nodes. The continuity
+   token must include recipe + weight identity so handles cannot survive a
+   recipe change.
+4. **6:** terminal transaction INSIDE the render loop (segment N+1 needs
+   segment N's terminal frame synchronously, so it cannot wait for the
+   post-episode pass) + transactional assembly + a new ffprobe helper with
+   `-count_frames` (`wan_shared.py:52-123` collects neither frame count nor
+   dimensions).
+5. **7:** the `ltx_8gb` LIVE slice at a 169-frame beat + a 162-frame CPU
+   tail-trim case. **Needs a selective box reset per CLAUDE.md section 4** --
+   kill by CommandLine via CIM, never a blanket python kill.
+6. **8 (later):** the pause map (RANKS legal cut points, never chooses them);
+   then further adapters; audio lanes LAST.
+
+**A REAL ARITHMETIC LIMIT found building chunk 3, carry it forward:** chaining
+`8n+1` segments always assembles to `8m+1` visible frames, so a beat whose
+target is not congruent to 1 mod 8 has NO exact cover on that ladder and the
+partitioner REFUSES rather than drift. Those beats need `allow_tail_trim` --
+which is why it lives in the adapter's declaration, not in the assembler. The
+169-frame acceptance case works precisely because 169 mod 8 == 1.
 
 ## SUPERSEDED -- the r4 gate (now closed; kept for the arc record)
 

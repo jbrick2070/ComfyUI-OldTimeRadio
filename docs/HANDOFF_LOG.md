@@ -42,14 +42,46 @@ plus a final all-Sonnet fan-out before code.
   byte-identical `5377914B` across all three (no node/widget/link change).
 - One regression caught and fixed first try: the legacy-name audit flagged a
   bare "director" in my comments; named the real node instead.
-Current step: coverage chunk 2 (declaration surface: `FrameContract` +
-continuity token on the VideoEngine Protocol + roster audit), then 3-7.
-Next: CODER A -- chunk 2. Chunk 7 is the `ltx_8gb` 169-frame LIVE slice and
-needs a box reset per CLAUDE.md section 4.
+- `ffc14693` **chunk 2**: the declaration surface. New
+  `_otr_video_engines/frame_contract.py` (frozen `FrameContract` +
+  the closed continuity vocabulary) + the optional `frame_contract()` hook on
+  the `VideoEngine` Protocol. Every adapter is `single_only` until it opts in,
+  pinned by a test that walks the LIVE registry and asserts nobody has --
+  so chunk 2 changes no behaviour. Contracts that lie are not constructible
+  (discrete durations without tail trim; multi-clip without a ceiling). Plus
+  `registry.audit_engine_roster()` for the swallowed-import blindspot both r2
+  seats found: every adapter import is wrapped in a bare `except: pass`, so a
+  broken adapter silently vanishes from every dropdown and a post-registration
+  audit cannot see the hole. It runs at the BOTTOM of `__init__.py` (inside
+  registry.py it would report every not-yet-imported adapter as missing) and
+  LOGS rather than raises -- the hard gate is a test. Current tree: zero drift.
+- `bfacec2b` **chunk 3**: the partitioner (`coverage_plan.py`), pure core.
+  Exact-sum or terminal refusal -- a `single_only` engine over its cap raises
+  instead of ping-ponging, loop-filling or holding a frame. **Found a real
+  arithmetic limit and pinned it rather than papering over it:** chaining
+  `8n+1` segments always assembles to `8m+1` visible frames, so a beat not
+  congruent to 1 mod 8 has NO exact cover on that ladder and needs
+  `allow_tail_trim` -- which is why that flag belongs in the adapter's
+  declaration, not the assembler. 169 works precisely because 169 mod 8 == 1.
+  Solved for segment COUNT rather than greedy-largest-first, because greedy
+  strands an illegal remainder (pinned at 313).
+- Suite 6454 -> **6769 passed** / 27 skipped / 1 xfailed; Bible 17; canonical
+  byte-identical `5377914B` across all six chunks.
+- Two regressions, both caught and fixed on the FIRST correction, no third
+  swing needed: the legacy-name audit flagged a bare "director" in my comments
+  (named the real node instead), and two chunk-3 tests asserted a coverage that
+  the `8n+1` ladder cannot produce (the code was right, the tests were wrong --
+  rewrote them to pin the true limit in both directions).
+Current step: coverage chunk 3b -- stamp the `CoveragePlan` durably in the
+ledger and validate it at BOTH wire boundaries. Then 4-7.
+Next: CODER A -- 3b, then 4 (jump-still image consumer; without it a jump cut
+has NO still), 5 (beat-session lifecycle), 6 (terminal transaction + assembly
++ an ffprobe helper with `-count_frames`), 7 (the `ltx_8gb` 169-frame LIVE
+slice -- needs a selective box reset per CLAUDE.md section 4).
 Models: Claude Opus (rung 4) + 1 kibitz r4 (codex `gpt-5.6-sol` high + agy
 Gemini 3.6 Flash High, both pins verified) + a 6-agent Sonnet fan-out. $0
 OpenRouter.
-Commits: 48e02241, 933a78ba, 9006b76d, 49944fb1
+Commits: 48e02241, 933a78ba, 9006b76d, 49944fb1, 31b711d6, ffc14693, bfacec2b
 
 ## 2026-07-25 11:30 -- HEAD 3bedb2fe (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: the still-plans block was SUPERSEDED mid-session by a new operator
