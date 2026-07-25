@@ -3,6 +3,73 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-25 (overnight) -- HEAD 5dd74f93 (v2.0-alpha) -- CODER WINDOW A (Opus)
+Did: ran the convergence gate, LANDED S1b, then ran the operator-authorised
+NEW R1 and judged it. 4060 was DOWN (/v1/models timed out twice) so rung 1 was
+unavailable all session; said so and proceeded rather than blocking.
+- `562f9c85` r4 input doc: the corrected plan + TWO findings I added by
+  grounding S1b against the real producer instead of the inventory doc.
+  (1) GEOMETRY vs LOOK -- the inventory records COMPOSED strings, and chunk A1
+  splits geometry (Python, engine-safety) from LOOK (pack-owned). Transplanting
+  verbatim would have hard-coded the sci_fi_radio look into all 31 engines.
+  (2) `portrait` has THREE runtime geometries but all 27 portrait rows declared
+  `aspect="inherit_engine"` with ONE static string -- a naive per-kind paste
+  would have shipped PORTRAIT_GEOMETRY to ~20 WIDE engines and re-introduced
+  the 2026-06-17 decapitation defect.
+- `8403ab58` r4 judgment. agy CONVERGED (3 must-fix, all already listed);
+  codex `gpt-5.6-sol` high did NOT (10, several new). PANEL SPLIT on the
+  ltx_audio_in bookend row -- codex won on evidence: production emits
+  `kind="portrait"` / `source="ltx_radio_face"` at
+  otr_meta_brief_image_prompt.py:1782-1790 via build_radio_host_prompt(meta,
+  "wide", "ltx_radio_mouth"), so agy's "3-way runtime switch" objection was a
+  misread (radio_host_style is a LITERAL at that site). Discarded out loud.
+- `69328cec` **S1b LANDED**: 57 rows / 12 adapters now carry the producer's
+  real GEOMETRY constants. Corrected the misdeclared bookend row to
+  portrait/portrait/wide. SPLIT `_HUMO_STILL_PLAN` (one plan object had served
+  four engines across TWO shipped aspects). New fence
+  tests/test_still_plan_layer2_parity.py: 4 DRIFT invariants, never prose.
+  Suite 6444 / Bible 17 / canonical byte-identical 5377914B.
+- `5dd74f93` r4b re-run. BOTH seats INDEPENDENTLY corrected ME, both adopted:
+  "same push burst" was too weak (it authorised the local-only commit
+  CLAUDE.md sec-7 forbids) -> S0b-core + S0c are ONE ATOMIC COMMIT; and the
+  style_tail question must be locked before build. codex also caught that my
+  exact-equality fence CANNOT survive S5 -- it is now documented as a
+  TRANSITIONAL gate to be REPLACED, never deleted.
+- `ae01d38e` + judgment: the operator said mid-session "run a new R1 so we get
+  a good lean clean architecture" then went to bed. **BOTH R1 SEATS
+  INDEPENDENTLY SAID CUT THE 31-PLAN TABLE.** Judge call: codex's Option C
+  (frozen routing + a compact per-adapter descriptor + one materializer + a
+  separate prompt hook) over agy's Option B (one central function), because a
+  central `engine_requires_still()` recreates the central-authority shape this
+  build exists to kill, and the operator's directive requires per-adapter
+  ownership. `style_tail_policy` leaves the structural contract entirely.
+  Discarded agy's claim that the geometry constants live in render_driver.py
+  and that there are six -- there are EIGHT, in otr_meta_brief_image_prompt.py
+  and _otr_story_brief_helpers.py.
+- NEW from the R1, grounded: **freezing ltx_resolved is NOT
+  behaviour-preserving** -- eng_ltx_av.py:402-405 documents per-beat operator
+  recipe switching, which the freeze would silently make episode-scoped. I had
+  read that docstring earlier and missed the implication. OPERATOR DECISION
+  FLAGGED with a stated default. Also: malformed routing config currently FALLS
+  BACK against the fail-closed law (dispatcher :377-394, render_driver
+  :2784-2799 logs and IGNORES); `+ Add Custom Model` has no still contract.
+Deliberately did NOT tear anything down: the operator was asleep, and a
+teardown of landed green code across 12 adapters + a schema module + 2 test
+files is hard to unwind and rests on a decision that also needs his ruling.
+Doctrine lesson: the routing freeze was ALWAYS the bug fix and should have gone
+FIRST -- S0a/S1/S1b landed against a structure the arc then cut. S1b still
+earned its keep (it improved every prompt at HEAD, and its measurement is what
+the R1 rests on), but the ordering was wrong.
+Current step: operator ratifies the cut + rules on the LTX per-beat recipe
+question; then ONE consolidated Option-C spec; then the routing freeze ALONE
+with its live proof.
+Next: CODER A. No code until the cut is ratified.
+Models: Claude Opus (rung 4) + three kibitz rounds (r4, r4b, R1), all codex
+`gpt-5.6-sol` high + agy Gemini 3.6 Flash (High), pins verified every round,
+`--driver claude` so no Claude pool was spent on the panel. 4060 DOWN. $0 spent
+on OpenRouter -- the R1 ran on the local panel per CLAUDE.md sec-8.
+Commits: 562f9c85, 8403ab58, 69328cec, ae01d38e, 5dd74f93 (+ this handoff)
+
 ## 2026-07-25 -- HEAD 79fe4d3f (v2.0-alpha) -- CODER WINDOW A (Opus)
 Did: resumed after the prior window was killed mid-stream. Kickoff baseline was
 STALE (said 90e52f13 / "r1 launched"; real HEAD 79fe4d3f with the arc converged

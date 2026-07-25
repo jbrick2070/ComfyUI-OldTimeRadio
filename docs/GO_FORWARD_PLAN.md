@@ -200,30 +200,56 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- PER-MODEL STILL PLANS: S1b DONE; S0b-core is GATED on a NEW R1
+## CURRENT STEP -- STILL PLANS: the R1 CUT THE TABLE. OPERATOR RATIFICATION NEEDED.
 
-**AMENDED ORDER (2026-07-25 r4 judgment):**
-`S1b (DONE) -> S0b-core (+S0c in the SAME PUSH BURST) -> S2 -> S3 -> S5 -> S4`.
+**The R1 arc round the operator authorised on 2026-07-25 has been RUN and
+JUDGED. Both seats independently said CUT the 31-plan table.** Judgment of
+record: `docs/2026-07-25-still-plans-r1-lean-judgment.md`. Nothing was torn
+down -- the tree is GREEN at `5dd74f93` with S1b landed.
 
-**GATE -- READ BEFORE OPENING S0b-core.** A 2026-07-25 r4 defect sweep split
-the panel: agy CONVERGED (three must-fix, all already listed) but codex
-`gpt-5.6-sol` high did NOT (ten must-fix, several new and grounded-confirmed,
-one of them a MISDECLARED row in already-landed S1 code). The operator's
-response was to authorise a **NEW R1 ARC ROUND on the lean architecture**
-("run a new R1 so we get a good lean, clean architecture"). Brief:
-`docs/2026-07-25-still-plans-r1-lean-architecture.md`. Judgment of the r4
-sweep: `docs/2026-07-25-still-plans-r4-judgment.md`.
+**THE ANSWER (judge call: codex's Option C over agy's Option B).** Frozen
+effective routing + a COMPACT per-adapter capability descriptor
+(`still_mode = scene|mesh|none` plus narrow activation flags and aspect) + ONE
+pure materializer + a SEPARATE per-engine layer-2 prompt hook. The seven-field
+`StillPlanRow`, its closed enums and the 31 copied declarations are CUT.
+`style_tail_policy` leaves the structural contract entirely -- tail selection
+stays in the prompt composer. Option C beat Option B because agy's single
+central `engine_requires_still()` recreates the very central-authority shape
+this build exists to kill, and because the operator's own directive ("each
+video path has its own customized still operations") requires per-adapter
+ownership.
 
-**S0b-core does NOT open until that R1 is judged**, because the R1 asks
-whether the 31-plan table should be finished or DELETED, and S2's whole scope
-(seven consumers cut over atomically) shrinks or vanishes with the answer.
-S1b was safe to land ahead of it either way: it is pure parity against the
-producer's own constants, so it improves prompts under EVERY option and
-reverses nothing.
+**THE OLD ORDER IS DEAD.** `S0b-core -> S2 -> S3 -> S5 -> S4` and the
+seven-consumer atomic cutover are superseded. **New order:**
 
-The three r3 corrections plus the accepted r4 corrections are folded into the
-r4 judgment doc; that document is the plan of record for S0b-core and after.
-Per-chunk detail below.
+1. **OPERATOR RATIFIES THE CUT** -- it makes landed green code a teardown
+   target, so it is a ratification, not a coder call. Also rule on the LTX
+   per-beat recipe question below.
+2. **ONE consolidated build spec** (Option C descriptor + materializer +
+   prompt hook + explicit teardown list + every accepted r4/r4b/R1
+   correction). Both r4 passes and both R1 seats asked for this. Mark the
+   locked spec, the corrected plan and both judgments history-only.
+3. **The ROUTING FREEZE, first and alone,** with the forced-route live proof.
+   It is the ACTUAL bug fix (`otr_video_render_batch.py:322` validates the
+   spine before `render_driver.py:2784` applies the override) and it ships
+   independent of the table question.
+4. Then descriptor + materializer, then the teardown, then the prompt hook.
+
+**OPERATOR DECISION NEEDED -- the LTX per-beat recipe capability.** Freezing
+`ltx_resolved` is NOT behaviour-preserving. `eng_ltx_av.py:402-405` documents
+the current contract verbatim: "Read fresh every call (an operator flips
+daily<->hero per beat by swapping `OTR_LTX_AV_UNET` / `OTR_LTX_AV_RECIPE`)."
+The freeze would silently make the recipe episode-scoped. Either (a) accept
+episode-scoped and DELETE the contrary docstring contract, or (b) keep per-beat
+switching via an explicit SHOT-OWNED field instead of ambient env. Default if
+unruled: (a) -- a frozen state whose recipe changes mid-episode is not frozen
+-- but it removes an advertised capability, so it is the operator's call.
+
+**Doctrine lesson from this arc, for the log:** the routing freeze was always
+the bug fix and should have gone FIRST. The inherited order put the table's
+characterization (S0a) and declaration (S1/S1b) ahead of it, so two chunks
+landed against a structure the arc then cut. S1b still earned its keep -- see
+the judgment's honest accounting -- but the ordering was wrong.
 
 ~~**S1b**~~ -- **DONE @ `69328cec`** (2026-07-25; suite 6444 passed / 27
 skipped / 1 xfailed; Bible 17; AST/BOM/zero-byte/UTF-8/ASCII clean on 13 files;
@@ -610,7 +636,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "still-plans" | WAN 8-GB contract DONE @ `f914f0a4`. S0a / S0a-b / S1 / **S1b DONE @ `69328cec`**; S0b filed BLOCKED. **NEXT: judge the NEW R1 (`docs/2026-07-25-still-plans-r1-lean-architecture.md`) -- does the 31-plan table get finished or DELETED -- THEN S0b-core (+S0c same push burst) -> S2 -> S3 -> S5 -> S4.** Plan of record for those chunks is `docs/2026-07-25-still-plans-r4-judgment.md`, NOT section 11 of the locked spec (which predates S1b/S5/S0c). | Claude codes + judges; Qwen triages (4060 was DOWN 2026-07-25); kibitz = codex `gpt-5.6-sol` high + agy | **GATED: no S0b-core code until the R1 is judged** | multi-day |
+| CODER A "still-plans" | WAN 8-GB contract DONE @ `f914f0a4`. S0a / S0a-b / S1 / **S1b DONE @ `69328cec`**; S0b filed BLOCKED and now SUPERSEDED. **The R1 CUT the 31-plan table (both seats). NEXT: operator ratifies the cut + rules on the LTX per-beat recipe question, THEN one consolidated Option-C spec, THEN the routing freeze ALONE with its live proof, then descriptor + materializer, teardown, prompt hook.** Plan of record: `docs/2026-07-25-still-plans-r1-lean-judgment.md`. The locked spec's section 11, the corrected plan and the r4 judgment are HISTORY for the cut chunks. | Claude codes + judges; Qwen triages (4060 was DOWN 2026-07-25); kibitz = codex `gpt-5.6-sol` high + agy | **GATED on operator ratification of the cut** | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
