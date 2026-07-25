@@ -950,18 +950,39 @@ def test_dispatch_renders_forced_ltx_announcer_radio_face(
     assert row["path"].replace("\\", "/").endswith(".png")
 
 
-def test_effective_engine_after_force_map_failsafe(monkeypatch):
+def test_effective_engine_after_force_map_fails_closed(monkeypatch):
+    """A malformed force map is TERMINAL at the image phase too.
+
+    CONTRACT INVERTED 2026-07-25 (multi-clip coverage chunk 1a), deliberately:
+    this test used to assert a "fail-safe" that returned the UNFORCED engine on
+    a malformed spec. That was the bug, not the safety net. ``57f4983a`` had
+    already made the identical condition terminal in
+    ``render_driver.apply_engine_override`` -- so the old behaviour meant the
+    operator asked for a forced-route episode, the image phase quietly spent
+    ~10 minutes minting stills for the UNFORCED plan, and only then did render
+    die on the same malformed map. Failing at the first reader is strictly
+    cheaper and strictly honester. Same precedent as the ``_bad_spec_failsafe``
+    inversion in the route-lock chunk.
+    """
     import nodes._otr_video_engines  # noqa: F401
+    from nodes._otr_shared.route_freeze import RouteFreezeError
+
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     assert disp._effective_engine_after_force_map("character_video", "humo") == "humo"
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_mandala")
     assert disp._effective_engine_after_force_map(
         "character_video", "humo") == "viz_mxc_mandala"
-    # unknown forced engine / malformed spec -> eng_id unchanged (fail-safe)
+    # unknown forced engine -> TERMINAL (was: eng_id unchanged)
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=not_a_real_engine")
-    assert disp._effective_engine_after_force_map("character_video", "humo") == "humo"
+    with pytest.raises(RouteFreezeError):
+        disp._effective_engine_after_force_map("character_video", "humo")
+    # malformed grammar -> TERMINAL (was: eng_id unchanged)
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "garbage-no-equals")
-    assert disp._effective_engine_after_force_map("character_video", "humo") == "humo"
+    with pytest.raises(RouteFreezeError):
+        disp._effective_engine_after_force_map("character_video", "humo")
+    # ...and the full effective-engine seam fails closed on the same input.
+    with pytest.raises(RouteFreezeError):
+        disp._effective_video_engine_for_role("announcer_visual", "humo")
 
 
 def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, tmp_path):

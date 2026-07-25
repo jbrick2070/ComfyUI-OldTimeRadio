@@ -918,20 +918,20 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
             engine_family, parse_engine_override)
 
     def _effective_cast_time_engine(role: str, eng_id: str) -> str:
-        eff = str(eng_id or "")
-        spec = os.environ.get("OTR_FORCE_ENGINE_MAP", "").strip()
-        if spec:
-            try:
-                mapping = parse_engine_override(spec)
-                eff = mapping.get(str(role or "")) or mapping.get("*") or eff
-            except Exception as exc:  # noqa: BLE001 - render logs the same parse issue
-                log.warning("[OTR_ShotLock] OTR_FORCE_ENGINE_MAP ignored in "
-                            "cast-time preflight: %s", exc)
-        if (os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") != "1"
-                and _is_never_humo_video_role(str(role or ""))
-                and _radio_is_host_redirect_applies(eff)):
-            return "ltx_audio_in"
-        return eff
+        """DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a).
+
+        This was the THIRD independent copy of force-map + radio-host redirect.
+        It hard-coded the redirect target as the bare literal ``"ltx_audio_in"``
+        instead of ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, and it
+        SWALLOWED a malformed force map with only a warning while the render
+        path treats the identical condition as terminal (``57f4983a``) -- so a
+        typo'd map passed cast-time preflight against the UNFORCED plan and
+        then died at render. It is now fail-closed with everything else."""
+        try:
+            from ._otr_shared import route_freeze as _rf  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared import route_freeze as _rf  # type: ignore
+        return _rf.effective_engine_for_role(str(role or ""), str(eng_id or ""))
 
     def _is_deferred_image_gap(exc):
         msg = str(exc)

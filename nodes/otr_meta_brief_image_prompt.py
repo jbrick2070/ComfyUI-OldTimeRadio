@@ -501,9 +501,13 @@ def _effective_announcer_family(video_models) -> str:
 def _effective_prompt_engine_for_role(video_models, role: str) -> str:
     """VIDEO engine MetaBrief should plan stills against for ``role``.
 
-    This mirrors the image dispatcher's effective-engine seam: selected per-role
-    engine, then force-map, then the radio-is-host HuMo redirect. A failure keeps
-    the selected id (or empty), which is the fail-safe image-prompt behavior."""
+    Selected per-role engine, then force-map, then the radio-is-host HuMo
+    redirect -- resolved through the ONE route-freeze authority
+    (``_otr_shared.route_freeze``, 2026-07-25 chunk 1a) rather than this
+    module's own former mirror of the dispatcher's seam. A resolver-import
+    failure keeps the selected id (or empty), which is the fail-safe
+    image-prompt behavior; a MALFORMED force map is terminal and propagates,
+    because minting prompts for a plan that cannot render is not a fail-safe."""
     try:
         try:
             from ._otr_shared import role_slots as _rs  # type: ignore
@@ -515,15 +519,10 @@ def _effective_prompt_engine_for_role(video_models, role: str) -> str:
     if not eng_id:
         return ""
     try:
-        try:
-            from .otr_image_gen_dispatcher import (  # type: ignore
-                _effective_video_engine_for_role)
-        except ImportError:  # pragma: no cover -- flat test imports
-            from otr_image_gen_dispatcher import (  # type: ignore
-                _effective_video_engine_for_role)
-        return str(_effective_video_engine_for_role(role, eng_id) or eng_id)
-    except Exception:  # noqa: BLE001 -- legacy/unforced run: keep the pick
-        return eng_id
+        from ._otr_shared import route_freeze as _rf  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import route_freeze as _rf  # type: ignore
+    return str(_rf.effective_engine_for_role(role, eng_id) or eng_id)
 
 
 def _engine_wants_talking_prompt(engine_id: str) -> bool:

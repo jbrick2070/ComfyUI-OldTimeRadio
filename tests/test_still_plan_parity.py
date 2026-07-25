@@ -116,8 +116,15 @@ _CONFIGURATIONS = (
       "announcer_visual=cloud_kling_avatar,music_visual=cloud_kling_avatar"}),
     ("ltx_i2v_off", {"OTR_ENABLE_LTX_I2V": "0"}),
     ("ia2v_non_talking", {"OTR_LTX_AV_RECIPE": "distilled_native"}),
-    ("malformed_force_map", {"OTR_FORCE_ENGINE_MAP": "not-a-role-pair"}),
 )
+
+#: A malformed force map USED to be a matrix configuration that "fell through"
+#: to the unforced plan and therefore produced ordinary rows. As of 2026-07-25
+#: (multi-clip coverage chunk 1a) it is TERMINAL at every consumer, so it can
+#: no longer produce a row to compare -- it is asserted as a raise instead, by
+#: :func:`test_malformed_force_map_is_terminal_everywhere` below. Kept here as
+#: data so the intent survives the config's removal from the matrix.
+_MALFORMED_FORCE_MAP_ENV = {"OTR_FORCE_ENGINE_MAP": "not-a-role-pair"}
 
 
 #: The three video roles ShotLock will emit for our corpus, and the beat each
@@ -461,6 +468,37 @@ def test_required_scene_targets_receipts_match_head():
     assert got == fixture["required_scene_targets_by_engine"]
 
 
+def test_malformed_force_map_is_terminal_everywhere():
+    """A malformed ``OTR_FORCE_ENGINE_MAP`` fails CLOSED at every reader.
+
+    Replaces the old ``malformed_force_map`` matrix configuration (2026-07-25,
+    multi-clip coverage chunk 1a). That configuration existed because the
+    image-phase mirrors SWALLOWED a parse error and fell through to the
+    unforced plan, so a malformed map still produced ordinary plan rows to
+    compare. ``render_driver.apply_engine_override`` had already been made
+    terminal on the identical input (``57f4983a``), so the two halves of the
+    pipeline disagreed about whether a typo was fatal. They no longer do: the
+    single authority (``_otr_shared.route_freeze``) is fail-closed, and this
+    test pins that a malformed map can never again yield a silently unforced
+    plan. There is nothing to compare because there is no plan.
+    """
+    from nodes._otr_shared import route_freeze as _rf
+    from nodes._otr_video_engines import render_driver as _rd
+
+    with _env_override(_MALFORMED_FORCE_MAP_ENV):
+        # The shared authority.
+        with pytest.raises(_rf.RouteFreezeError):
+            _rf.effective_engine_for_role("announcer_visual", "humo")
+        with pytest.raises(_rf.RouteFreezeError):
+            _rf.freeze_role_engines({"announcer_video_model": {"engine_id": "humo"}})
+        # The render-side authority stays terminal on the same input, so the
+        # image phase and the render phase now agree by construction.
+        with pytest.raises(_rd.RenderError):
+            _rd.apply_engine_override(
+                {"video": {"shots": [{"shot_id": "s1", "role": "announcer_visual",
+                                      "engine_id": "humo"}]}})
+
+
 def test_special_cases_match_head():
     """Named observations against malformed / stale policy inputs. S0b's
     routing freeze changes some of these on purpose (v1 rejection tightens
@@ -501,14 +539,13 @@ def test_special_cases_match_head():
 #: ``force_bookends_cloud_kling``, ``ia2v_non_talking`` inclusion is fine
 #: because it doesn't redirect) redirect all/some slots onto another
 #: engine by design, so isolation across the redirect is EXPECTED to fail.
-#: ``malformed_force_map`` falls through to no override in
-#: ``_effective_engine_after_force_map``, so it stays in the clean set.
+#: ``malformed_force_map`` was in this set while it fell through to no
+#: override; it is TERMINAL as of chunk 1a and has left the matrix entirely.
 _ISOLATION_CLEAN_CONFIGS = (
     "default",
     "hosts_on",
     "ltx_i2v_off",
     "ia2v_non_talking",
-    "malformed_force_map",
 )
 
 

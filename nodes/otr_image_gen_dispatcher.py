@@ -381,19 +381,22 @@ def _effective_engine_after_force_map(role: str, eng_id: str) -> str:
     2026-07-01). The still dispatcher runs BEFORE that render-time override, so
     without this it resolves the stale node-87 pick (e.g. humo) and mints a full
     Flux still that the forced no-still visualizer (e.g. ``*=viz_mxc_mandala``)
-    then ignores -- a wasted ~10 min image-gen pass per episode. Unset env or any
-    parse error -> ``eng_id`` unchanged (byte-identical to a normal run, where the
-    env is unset). Pure except for the env read + a lazy import."""
-    spec = os.environ.get("OTR_FORCE_ENGINE_MAP", "").strip()
-    if not spec:
-        return eng_id
+    then ignores -- a wasted ~10 min image-gen pass per episode.
+
+    DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a):
+    ``_otr_shared.route_freeze``. This function used to re-parse the env itself
+    and SWALLOW a malformed map (``except Exception: return eng_id``), which is
+    the silent-unforced defect ``render_driver.apply_engine_override`` was made
+    terminal for at ``57f4983a`` -- the image phase would spend ~10 minutes
+    minting stills for a plan that was going to die at render anyway. It is now
+    FAIL-CLOSED at the first reader. Unset env -> ``eng_id`` unchanged."""
     try:
-        from ._otr_video_engines.render_driver import parse_engine_override
-        mapping = parse_engine_override(spec)
-    except Exception:  # noqa: BLE001 - never block dispatch on a bad override
-        return eng_id
-    forced = mapping.get(role) or mapping.get("*")
-    return forced or eng_id
+        from ._otr_shared import route_freeze as _rf  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import route_freeze as _rf  # type: ignore
+    snap = _rf.routing_env_snapshot()
+    mapping = _rf.parse_force_map(snap.get("force_engine_map", ""))
+    return _rf.forced_engine_for_role(role, mapping) or eng_id
 
 
 def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
@@ -409,20 +412,18 @@ def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
        off. Partner/cloud engines stay cloud.
 
     Unknown engines or import failures keep the input id (fail-safe: mint the
-    still rather than quietly skipping an asset that render might need)."""
-    role_s = str(role or "")
-    eff = _effective_engine_after_force_map(role_s, str(eng_id or ""))
-    if os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
-        return eff
-    if role_s not in ("announcer_visual", "music_visual"):
-        return eff
+    still rather than quietly skipping an asset that render might need).
+
+    DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a). It used
+    to hard-code the redirect target as the bare literal ``"ltx_audio_in"``
+    rather than reading ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, so a
+    rename of that constant would have silently desynced the image phase from
+    the render phase. The target now comes from the constant itself."""
     try:
-        from ._otr_video_engines.render_driver import _radio_is_host_redirect_applies
-        if _radio_is_host_redirect_applies(eff):
-            return "ltx_audio_in"
-    except Exception:  # noqa: BLE001 -- fail-safe: keep the selected id
-        return eff
-    return eff
+        from ._otr_shared import route_freeze as _rf  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import route_freeze as _rf  # type: ignore
+    return _rf.effective_engine_for_role(str(role or ""), str(eng_id or ""))
 
 
 def still_consumer_capability(image_policy: dict, role: str):
