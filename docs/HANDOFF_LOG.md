@@ -3,6 +3,54 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-25 (afternoon) -- HEAD 49944fb1 (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: r4 CONVERGED and CHUNK 1 SHIPPED IN THREE GREEN PUSHED PARTS. Operator
+went to yoga mid-session and authorised full autonomy ("all chunks waves"),
+plus a final all-Sonnet fan-out before code.
+- **r4 (`48e02241`): both seats yes-with-fixes.** codex's decisive find, which
+  I verified myself by walking the canonical link list: **node ids are NOT
+  execution order.** There is no `89 -> 90` edge -- MetaBrief (89) and ShotLock
+  (90) are INDEPENDENT branches reconverging only at 91. So the r3 plan's
+  premise was wrong: a ShotLock freeze can NEVER inform the image phase.
+  Node 87 (VideoDirector) is the unique common ancestor and is the only
+  correct freeze point. Overruled agy on one point: its fix would have routed
+  the LOCK through the dispatcher mirror, which swallows a malformed force map
+  and would have regressed `57f4983a`.
+- **Six-way Sonnet fan-out (operator-directed) changed the plan four times:**
+  (FO-1) VideoDirector has no env reads at all, so "compute the freeze there"
+  as specified would either break its cold-import contract or become a FOURTH
+  mirror -> extract a shared authority instead; (FO-2) of codex's six
+  route-derived values only `aspects` was urgent -- and it is a LIVE
+  DEFAULT-ENV BUG, three others were already effective-aware; (FO-3) the
+  equality assertion would have broken two shipped HTTP entry points and ~14
+  test assertions; (FO-4) chunk 1 must be three commits, not one.
+- `933a78ba` **1a**: new `_otr_shared/route_freeze.py` is THE one authority.
+  FOUR copies of force-map + radio-redirect collapse onto it; TWO had
+  hard-coded `"ltx_audio_in"` instead of `_NEVER_HUMO_REDIRECT_ENGINE` and TWO
+  swallowed a malformed force map the render path calls terminal. Inverted the
+  "failsafe" contract on purpose -- the old fail-safe WAS the bug.
+- `9006b76d` **1b**: the freeze at node 87 (+ ImageDirector forwarding, key by
+  key; ShotLock guards env drift and mints groups/preflight/shots from ONE
+  value; `IS_CHANGED` on both ends). **THE DECAPITATION BUG IS FIXED** --
+  `aspects` was derived from the PICKED portrait HuMo while the render
+  redirected to the WIDE `ltx_audio_in`, so the still was minted portrait and
+  centre-cropped. `eng_ltx_av.py:345-347` documents that exact outcome.
+- `49944fb1` **1c**: render-time equality -- verify, never repair. The legacy
+  mutating branch survives for the two hand-built HTTP entry points and legacy
+  fixtures, NAMED and logged, which is why zero test inversions were needed.
+- Suite 6454 -> **6504 passed** / 27 skipped / 1 xfailed; Bible 17; canonical
+  byte-identical `5377914B` across all three (no node/widget/link change).
+- One regression caught and fixed first try: the legacy-name audit flagged a
+  bare "director" in my comments; named the real node instead.
+Current step: coverage chunk 2 (declaration surface: `FrameContract` +
+continuity token on the VideoEngine Protocol + roster audit), then 3-7.
+Next: CODER A -- chunk 2. Chunk 7 is the `ltx_8gb` 169-frame LIVE slice and
+needs a box reset per CLAUDE.md section 4.
+Models: Claude Opus (rung 4) + 1 kibitz r4 (codex `gpt-5.6-sol` high + agy
+Gemini 3.6 Flash High, both pins verified) + a 6-agent Sonnet fan-out. $0
+OpenRouter.
+Commits: 48e02241, 933a78ba, 9006b76d, 49944fb1
+
 ## 2026-07-25 11:30 -- HEAD 3bedb2fe (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: the still-plans block was SUPERSEDED mid-session by a new operator
 requirement, two code chunks landed green, and a fresh r1->r2->r3 arc was run

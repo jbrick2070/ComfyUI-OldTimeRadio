@@ -210,7 +210,35 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- MULTI-CLIP BEAT COVERAGE. r4 CONVERGENCE, THEN BUILD.
+## CURRENT STEP -- MULTI-CLIP COVERAGE: CHUNK 1 DONE, CHUNK 2 NEXT
+
+**Updated 2026-07-25 (afternoon), HEAD `49944fb1`.** r4 CONVERGED (both seats
+yes-with-fixes, `48e02241`) and a six-way grounded Sonnet fan-out ran before
+code by operator direction. **Chunk 1 SHIPPED as three green pushed parts:**
+`933a78ba` (1a, the ONE route-freeze authority -- four mirrors collapsed onto
+`nodes/_otr_shared/route_freeze.py`, malformed force map now terminal
+everywhere), `9006b76d` (1b, the freeze at node 87 + ImageDirector forwarding +
+ShotLock consumption + `IS_CHANGED` -- **and the DECAPITATION fix: `aspects`
+now describes the EFFECTIVE engine**), `49944fb1` (1c, render-time equality --
+verify, never repair; the legacy branch for the two hand-built HTTP entry
+points is NAMED and logged). Suite **6504 passed / 27 skipped / 1 xfailed**;
+Bible 17; canonical byte-identical `5377914B` throughout.
+
+**THE r3/r4 PLAN WAS WRONG ABOUT WHERE THE FREEZE GOES, and the correction is
+the durable lesson:** node ids are NOT execution order. There is no `89 -> 90`
+edge in `otr_canonical.json` -- MetaBrief (89) and ShotLock (90) are
+INDEPENDENT branches that reconverge only at 91, so a freeze at ShotLock can
+never inform the image phase. Node 87 (VideoDirector) is the unique common
+ancestor. Verify a claimed node ORDER against the link list, never the ids.
+
+**NEXT: chunk 2** (declaration surface -- `FrameContract` = min/max/quantum/
+discrete_durations/allow_tail_trim + continuity token on the `VideoEngine`
+Protocol at `registry.py:51-98`, plus the roster audit at the BOTTOM of
+`_otr_video_engines/__init__.py` after all guarded imports; all adapters
+`single_only`), then chunks 3-7 in the r3 order. **Chunk 7 is the `ltx_8gb`
+169-frame LIVE slice** and needs a selective box reset per CLAUDE.md section 4.
+
+## SUPERSEDED -- the r4 gate (now closed; kept for the arc record)
 
 **Operator requirement of record (2026-07-25):** *"we need as much video to
 capture the beat... we need enough clips per the beat for MOVING video."*
