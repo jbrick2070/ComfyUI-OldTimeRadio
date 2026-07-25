@@ -1,5 +1,15 @@
 # OTR Go-Forward Plan
 
+**Updated:** 2026-07-25 (midday) -- **THE STILL-PLANS BLOCK IS SUPERSEDED BY
+THE MULTI-CLIP COVERAGE BLOCK.** Operator reversed the "ping-pong is fine"
+ruling once the mechanism was on the table: he wants each beat covered by
+enough REAL rendered clips for moving video (chain last->first preferred, jump
+cut acceptable). TWO CODE CHUNKS LANDED AND GREEN: the route lock
+(`57f4983a`) and the lip-sync no-mirror fix (`a1d810f1`). A fresh `r1 -> r2 ->
+r3` kibitz arc is JUDGED (three judgment docs); **r4 convergence is the only
+round still owed before code.** HEAD `3bedb2fe`; suite 6454/27/1; Bible 17;
+canonical `5377914B` (untouched). See CURRENT STEP.
+
 **Updated:** 2026-07-25 (late) -- CODER A still-plans: **S1b LANDED @
 `69328cec`** (suite 6444 / Bible 17 / canonical `5377914B`), r4 defect sweep
 JUDGED (agy converged, codex did not), and a **NEW R1 ARC ROUND on the lean
@@ -200,7 +210,79 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- STILL PLANS: the R1 CUT THE TABLE. OPERATOR RATIFICATION NEEDED.
+## CURRENT STEP -- MULTI-CLIP BEAT COVERAGE. r4 CONVERGENCE, THEN BUILD.
+
+**Operator requirement of record (2026-07-25):** *"we need as much video to
+capture the beat... we need enough clips per the beat for MOVING video."*
+Chain (last frame -> next clip's first) PREFERRED; jump cut acceptable; reuse
+only if loop-closed; `still_*` lanes are one still; **audio lanes cut at
+phrase boundaries, never arbitrary.** Per-adapter: its own PROMPTS + frame
+numbers. Shared: ONE splitter, ONE assembler (operator's own division).
+
+**Arc status: r1, r2, r3 JUDGED and pushed. r4 convergence is OWED before any
+code on this block.** Judgments of record:
+`docs/2026-07-25-multiclip-coverage-r1-judgment.md`, `-r2-judgment.md`,
+`-r3-judgment.md`. Runs under `kibitz-runs/2026-07-25-multiclip-coverage*/`.
+
+**LANDED AND GREEN this session (both pushed, HEAD == origin):**
+- `57f4983a` **route lock** -- `resolve_final_shot_engines` applies the force
+  map AND the radio-host redirect in ONE idempotent pass BEFORE
+  `validate_and_repair_still_spine`; malformed `OTR_FORCE_ENGINE_MAP` now
+  FAILS CLOSED (was: log `IGNORED (parse)` and render the unforced plan).
+- `a1d810f1` **lip-sync no-mirror** -- `fit_frames_to_target(...,
+  allow_mirror=False)` + `MirrorExtensionForbidden`; HuMo (`audio_driven_face`)
+  can no longer mirror a short capped render. Trimming stays legal. Operator:
+  *"no render backwards, that doesn't work."*
+
+**THE BUILD ORDER (r3-judged, 8 chunks). Chunk 1 is the biggest single win:**
+1. **Hoist the route freeze into `OTRShotLock.lock`** (after policy
+   validation, before `build_execution_plan`, `otr_shot_lock.py:1091-1142`) +
+   `IS_CHANGED` over every captured env var + render-time
+   `resolve_final_shot_engines` becomes an EQUALITY ASSERTION. Retires the
+   MetaBrief/dispatcher effective-engine MIRRORS. Independently shippable.
+2. Declaration surface (`FrameContract` = min/max/quantum/discrete/
+   allow_tail_trim + continuity token on the `VideoEngine` Protocol,
+   `registry.py:51-98`) + roster audit at the BOTTOM of
+   `_otr_video_engines/__init__.py` after all guarded imports. All adapters
+   `single_only`.
+3. Partitioner + `CoveragePlan`, durably stamped, validated at BOTH boundaries
+   (do NOT make legacy `ShotRow` authoritative -- judged).
+4. Jump-still image-phase consumer (ShotLock patches requests -> dispatcher
+   merges into `objects` + `required_scene_targets` -> spine validates every
+   jump segment). **Without this a jump cut has no still at all.**
+5. Beat-session lifecycle: reusable MODEL/CLIP/VAE handles, teardown in one
+   outer `finally`, assert LOADER-call count (not `prepare` count).
+6. Terminal transaction INSIDE the render loop + transactional assembly + a
+   new ffprobe helper with `-count_frames`.
+7. **`ltx_8gb` live slice at a 169-frame beat** (`161 + (9-1)`): >= 2
+   forward-only clips, one heavy load, no ping-pong, `RESULT SUCCESS` +
+   `obs_publish OK` + asset on disk. Plus a 162-frame CPU tail-trim case.
+8. Later: the pause map (RANKS legal cut points, never chooses them); then
+   further adapters; audio lanes last.
+
+**Named test files (r3-judged):** `tests/test_multiclip_coverage_plan.py`,
+`tests/test_ltx_8gb_multiclip.py`,
+`tests/test_multiclip_transactional_assembly.py`; extend
+`tests/test_workflow_json_wiring_invariants.py` and
+`tests/test_capability_profiles.py:384`. **KEEP `tests/test_clip_fill.py`** --
+the mirror helper stays legal for `still_*`/decorative lanes; add a pin that
+the `ltx_8gb` coverage path never calls it.
+
+**Canonical JSON:** no chunk in 1-7 should touch it. Confirm at r4.
+
+### The still-plans block -- SUPERSEDED, not deleted
+
+The 31-plan table cut (both R1 seats) still stands as analysis, and S0a /
+S0a-b / S1 / S1b remain landed and green. But the coverage block now owns the
+same seams (effective engine, still requiredness, per-engine prompts), so the
+still-plans chunk order (`S0b-core -> S2 -> S3 -> S5 -> S4`) is PARKED and
+must NOT be resumed as-is. Records:
+`docs/2026-07-25-still-plans-r1-lean-judgment.md` +
+`docs/2026-07-25-per-beat-stills-r1-judgment.md` (which carries every operator
+ruling verbatim). A later window folds the surviving descriptor work into the
+coverage block rather than running it standalone.
+
+## SUPERSEDED -- STILL PLANS: the R1 CUT THE TABLE (history; see above)
 
 **The R1 arc round the operator authorised on 2026-07-25 has been RUN and
 JUDGED. Both seats independently said CUT the 31-plan table.** Judgment of
@@ -387,6 +469,35 @@ receipt under `tmp/`.
 MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
 That split is why the two eyeball-era entries below are PARKED rather than
 listed as live.
+
+- **The route lock is ONE NODE TOO LATE for the image phase** (found
+  2026-07-25, r3, both seats, node order confirmed against the canonical JSON:
+  `87 VideoDirector -> 88 ImageDirector -> 89 MetaBrief -> 90 ShotLock ->
+  91 ImageGenDispatcher -> 92 VideoRenderBatch`). `resolve_final_shot_engines`
+  runs at node 92, but stills are minted at 91 and image PROMPTS at 89. The
+  landed fix closed the spine-validation gap; the image phase still relies on
+  its own MIRROR (`otr_meta_brief_image_prompt._effective_prompt_engine_for_role`,
+  whose docstring says it "mirrors the image dispatcher's effective-engine
+  seam"). **Chunk 1 of the coverage block is the fix.** Note node 89 precedes
+  node 90, so hoisting to ShotLock still does not put MetaBrief downstream of
+  the authority -- that needs a VideoDirector-time freeze and is NOT in scope.
+- **THREE silent coverage mechanisms exist, not one** (found 2026-07-25, r1,
+  codex): engine mirror/ping-pong (`wrapper_bridge.py:435`, used by
+  `eng_wan_ti2v.py:521` and `eng_ltx_8gb.py:426`), composite loop-fill
+  (`otr_silent_composite.py:244`), and held-last-frame. All three must be out
+  of the moving-video lanes or the boomerang just relocates.
+- **`ltx_av` underruns long beats** (found 2026-07-25, r2, codex; confirmed).
+  It caps at `_LTX_AV_MAX_FRAMES` (`eng_ltx_av.py:58`, default 497,
+  env-overridable) and clamps at `:950-953`. It is NOT "renders to target
+  natively" as three earlier docs claimed.
+- **Ping-pong on a capped HuMo beat played lip sync BACKWARDS** -- FIXED in
+  code @ `a1d810f1`, but the finding is STATIC (no live artifact), so it is
+  NOT a PBUG row. A capped-14B leg would reproduce it. Kept here so the live
+  proof is not forgotten.
+- **`_should_loop_fill` names the permanent fix and it is now being built**
+  (`otr_silent_composite.py:244-266`): *"The real fix is phrase-chunking
+  (render the beat's correct duration so it never underruns) -- tracked as a
+  follow-up."* The coverage block IS that follow-up.
 
 - **`scifi_news` P0 convergence defect** -- both 120w and 320w legs fail in P0
   after two attempts on non-literal fact source spans; provider/model
@@ -636,7 +747,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "still-plans" | WAN 8-GB contract DONE @ `f914f0a4`. S0a / S0a-b / S1 / **S1b DONE @ `69328cec`**; S0b filed BLOCKED and now SUPERSEDED. **The R1 CUT the 31-plan table (both seats). NEXT: operator ratifies the cut + rules on the LTX per-beat recipe question, THEN one consolidated Option-C spec, THEN the routing freeze ALONE with its live proof, then descriptor + materializer, teardown, prompt hook.** Plan of record: `docs/2026-07-25-still-plans-r1-lean-judgment.md`. The locked spec's section 11, the corrected plan and the r4 judgment are HISTORY for the cut chunks. | Claude codes + judges; Qwen triages (4060 was DOWN 2026-07-25); kibitz = codex `gpt-5.6-sol` high + agy | **GATED on operator ratification of the cut** | multi-day |
+| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED (see CURRENT STEP). **This session: route lock `57f4983a` + lip-sync no-mirror `a1d810f1` LANDED GREEN; r1/r2/r3 arc JUDGED.** NEXT = **r4 convergence at HEAD, then build chunks 1-7 in order** (route freeze into ShotLock -> declaration surface + roster audit -> partitioner/CoveragePlan -> jump-still image consumer -> beat-session lifecycle -> terminal transaction + assembly -> `ltx_8gb` 169-frame live slice). Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; **4060 skill is UP again** (rung 1, read-only first-pass triage); kibitz = codex `gpt-5.6-sol` high + agy | **r4 must converge at HEAD before chunk 1** | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
@@ -683,9 +794,11 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-25 @ `69328cec`, S1b): full Windows suite
-  `6444 passed / 27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped /
-  3 xfailed`; canonical `5377914B`. Detail in HANDOFF_LOG.
+- Current whole-tree receipt (2026-07-25 @ `a1d810f1`, lip-sync no-mirror):
+  full Windows suite `6454 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; canonical `5377914B` (byte-identical --
+  neither code chunk this session touched a node, widget, link or schema).
+  Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
   AST/JSON/BOM/zero-byte checks, commit, push, verify
   `HEAD == origin/v2.0-alpha`.

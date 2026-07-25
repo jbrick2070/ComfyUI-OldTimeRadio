@@ -3,6 +3,60 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-25 11:30 -- HEAD 3bedb2fe (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: the still-plans block was SUPERSEDED mid-session by a new operator
+requirement, two code chunks landed green, and a fresh r1->r2->r3 arc was run
+and judged. Started the day expecting to ratify the 31-plan-table cut.
+- Operator did NOT ratify; he sent the architecture to the panel instead, then
+  fed in five successive clarifications ending at the real requirement:
+  **enough REAL rendered clips to cover a beat with MOVING video** (chain
+  last->first preferred, jump cut fine, reuse only if loop-closed, `still_*`
+  one still, audio lanes cut at PHRASE boundaries). His own split of ownership:
+  each model declares its own PROMPTS + frame numbers; the splitter and
+  assembler are SHARED. He reversed an earlier "ping-pong is fine" ruling once
+  the mechanism was actually on the table.
+- **BOTH SEATS INDEPENDENTLY KILLED THE PREMISE the round was built on** (mine
+  and his): nothing renders >1 clip per beat today (`render_driver.py:2627`),
+  WAN fills beats by PING-PONG (`eng_wan_ti2v.py:521-535`), and Veo's
+  `last_frame` is first/last INTERPOLATION inside one clip, not chaining
+  (`eng_google_veo_video.py:277-293`). Multi-clip is a NEW capability.
+- `57f4983a` **route lock**: `resolve_final_shot_engines` runs force map AND
+  radio-host redirect in ONE idempotent pass BEFORE the still-spine check;
+  malformed `OTR_FORCE_ENGINE_MAP` now FAILS CLOSED. Inverted the old
+  `_bad_spec_failsafe` test on purpose -- the old contract WAS the bug.
+- `a1d810f1` **lip-sync no-mirror**: found by chasing the operator's audio
+  question -- `extend_frames_to_target` builds a MIRROR cycle, and
+  `eng_humo.py:479-481` ran capped HuMo beats through it, so a talking mouth
+  played forwards then BACKWARDS against forward audio. `allow_mirror=False` +
+  `MirrorExtensionForbidden`; trimming stays legal. Scoped the lane inventory
+  first: only HuMo could reach the mirror, so I did NOT spend a 4-round arc on
+  a one-call-site fix and said so.
+- **THE FIND OF THE DAY:** `otr_silent_composite.py:244-266` already exempts
+  `audio_driven_face` from loop-fill for exactly the operator's reason, and
+  names the permanent fix: *"The real fix is phrase-chunking... tracked as a
+  follow-up."* The coverage block IS that 2026-06-30 follow-up. Also: THREE
+  silent coverage mechanisms exist, not one.
+- r1/r2/r3 judged (3 docs). Judge calls that beat both seats: the pause map
+  RANKS legal cut points and never chooses them (kills agy's quantum
+  objection AND codex's DSP dependency, and defers the pause map off the
+  critical path); contain multi-clip inside `render_shot` so the manifest/SFX/
+  captions/timeline never learn (neutralises codex's SFX-stacking must-fix).
+- **r3 found MY OWN `57f4983a` is one node too late** -- canonical order is
+  87 VideoDirector / 88 ImageDirector / 89 MetaBrief / 90 ShotLock /
+  91 ImageGenDispatcher / 92 VideoRenderBatch, and the lock sits at 92 while
+  stills mint at 91. That is why MetaBrief carries an effective-engine MIRROR.
+  Chunk 1 hoists the freeze into ShotLock and retires the mirrors.
+- Caught a codex PIN DRIFT to `gpt-5.5` on the first launch and killed it
+  before it spent the round; every later round pinned + verified.
+Current step: r4 convergence on the multi-clip coverage block at HEAD, then
+build chunks 1-7 (route freeze into ShotLock first).
+Next: CODER A -- run r4, then chunk 1. No code on the block before r4.
+Models: Claude Opus (rung 4) + 5 kibitz rounds (codex `gpt-5.6-sol` high + agy
+Gemini 3.6 Flash High, pins verified each round, `--driver claude`). 4060 skill
+came UP mid-session; not yet used. $0 on OpenRouter.
+Commits: 6bb1a9cf, 57f4983a, ec2760a2, a1d810f1, 2d2f7f90, 81f9c2a3, d3308e43,
+3bedb2fe (+ this handoff)
+
 ## 2026-07-25 (overnight) -- HEAD 5dd74f93 (v2.0-alpha) -- CODER WINDOW A (Opus)
 Did: ran the convergence gate, LANDED S1b, then ran the operator-authorised
 NEW R1 and judged it. 4060 was DOWN (/v1/models timed out twice) so rung 1 was
