@@ -178,18 +178,38 @@ check or from `required_inputs`/`uses_still`. The line "never a scene still"
 above is true of the MESHER'S INPUT and false of the validator. If the plan
 drops the plate's scene-slot role, the plate's requirement disappears.
 
-**TRAP 3 -- `ltx_video` requires NO scene still today.** It declares
-`accepts_still = True` (so the producer enumerates one and the dispatcher
-mints it) but its family is `text_to_video`, it has no `init_image` in
-`required_inputs`, and it is not `provider_side` -- so the validator returns
-False. The six `google_*` t2v engines DO reach True, via `provider_side`.
-So "t2v engines declare `accepts_still=True`; still enumerated per beat"
-covers both, while their REQUIRED column differs: `ltx_video` is
-`required=False`, `google_*` is `required=True`. Transplanting them as one
-row changes behaviour on the `ltx_video` lane.
+**TRAP 3 -- `_still_spine_requires_scene` is NOT the complete oracle for
+"required". Two more gates live in the init-selection branch, and BOTH
+default ON.** Corrected 2026-07-25 after a kibitz r2 grounding (codex
+`gpt-5.6-sol` high); the first version of this entry read the helper as
+authoritative and was wrong.
 
-**TRAP 4 -- the portrait requirement is keyed on FAMILY, in a sixth place.**
-`validate_and_repair_still_spine` requires a portrait row via
+- **`ltx_video` -- the LTX-I2V gate.** The helper returns False for it
+  (family `text_to_video`, no `init_image` in `required_inputs`, not
+  `provider_side`). But `render_driver.py:1801-1817` requires the beat's
+  scene still whenever `OTR_ENABLE_LTX_I2V` is set, and it **defaults to
+  "1"** -- `os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"`. A missing
+  still raises `RenderError` with "NO FALLBACK to text-only rendering".
+  So `ltx_video` is `required=True` in the default environment, by a
+  mechanism the helper cannot see. This is the fifth mechanism.
+- **`ltx_audio_in` -- the IA2V portrait gate.** `render_driver.py:1709-1721`
+  computes `_s4_portrait = (engine == "ltx_audio_in" and role ==
+  "character_video" and _ia2v_talking_register_active(engine))`, and with no
+  portrait in the ledger raises "IA2V TALKING register: character beat ...
+  has NO portrait -- NO FALLBACK to the wide scene still (face too small to
+  lip-sync; proof7 A/B 2026-07-02)". So `ltx_audio_in` requires a real cast
+  PORTRAIT on character beats under the talking recipe, deliberately
+  vertical into the wide canvas (center-crop covers it; "no pillarbox, no
+  squash"). This is the sixth mechanism.
+
+Consequence: a plan row's `required` column may not be transplanted from
+`_still_spine_requires_scene` alone. The parity fixture must freeze THREE
+outputs per engine -- objects the producer authors, targets the dispatcher
+materializes, and assets the render path actually validates or raises on --
+because those three disagree for `ltx_video` and `ltx_audio_in` today.
+
+**TRAP 4 -- the HuMo portrait requirement is keyed on FAMILY, in a seventh
+place.** `validate_and_repair_still_spine` requires a portrait row via
 `if family == "audio_driven_face"`, not via any engine declaration. That
 covers `humo`, `humo_1.7B`, `humo_1.7B_169`, `humo_14B_169` and
 `cloud_kling_avatar`, all of which return scene=False on the face branch.
@@ -266,3 +286,63 @@ from. Whether HuMo should still mint that scene still is a SEPARATE
 operator decision, deliberately not folded into the migration.
 
 Regenerate this addendum with `tmp/_kbA_sp_branches.py` (throwaway probe).
+
+## PARITY MATRIX 2026-07-25 -- what the producer actually emits, per engine
+
+Captured at HEAD `90e52f13` by driving the real producer
+(`derive_image_prompts`) once per registered internal engine, with every video
+role set to that engine and the director's own `_role_aspects` / `_role_talking`
+maps fed in. Default environment. Pure CPU. Probe: `tmp/_kbA_sp_parity.py`,
+full record `tmp/_kbA_sp_parity.json`.
+
+### The producer is very nearly ENGINE-INVARIANT
+
+27 of 31 engines produce the IDENTICAL fingerprint: 4 required targets
+(`still_b000_music_open`, `still_b001`, `still_b002`, `still_b005`), object
+kinds `portrait` + `scene_open` + `scene_beat` + `scene_character`, dims
+1472x832 and 832x480. Only three shapes exist in the whole registry:
+
+| Shape | Engines | Required targets | Object kinds |
+|---|---|---|---|
+| scene spine | 26 | 4 | portrait, scene_open, scene_beat, scene_character |
+| mesh fork | `mesh_stage` | 8 | mesh_fodder, scene_background_plate, portrait |
+| nothing | the 4 `viz_*` | 0 | none |
+
+`humo` and `humo_1.7B` are the ONLY engines whose objects include the
+832x1216 PORTRAIT dim; their `_169` wide siblings mint 832x480 instead, which
+is the 2026-06-17 nugget holding exactly as recorded.
+
+This is the strongest argument for the operator's simplicity directive: the
+per-engine variation the five-authority scatter exists to express is, in
+practice, three shapes and one aspect knob. The plan table should be boring.
+
+### The picked-vs-effective defect, measured
+
+In the DEFAULT environment (`OTR_ENABLE_HUMO_HOSTS` unset) the bookend
+redirect fires for all four HuMo variants:
+
+| Picked | Roles redirected | Effective engine | `_role_aspects` still says |
+|---|---|---|---|
+| `humo` | announcer_visual, music_visual | `ltx_audio_in` | portrait |
+| `humo_1.7B` | announcer_visual, music_visual | `ltx_audio_in` | portrait |
+| `humo_1.7B_169` | announcer_visual, music_visual | `ltx_audio_in` | wide |
+| `humo_14B_169` | announcer_visual, music_visual | `ltx_audio_in` | wide |
+
+`humo` and `humo_1.7B` are therefore minting PORTRAIT-aspect bookend stills
+for a renderer that is WIDE. No other engine in the registry has a
+picked != effective row in the default environment.
+
+**This is why exact HEAD parity and effective-engine resolution cannot both
+be unconditional.** Resolving the plan from the effective engine CHANGES
+those two rows from portrait to wide -- which is the bug fix, and therefore
+a behaviour change that a "no exceptions" HEAD fixture would forbid. The
+fixture must be split:
+
+1. **Unforced byte-parity** -- every engine whose picked == effective for all
+   three roles. Exact, no exceptions, this is the safety net.
+2. **Named corrections** -- the four HuMo rows above, recorded individually
+   with their before/after dims, gated on the operator's eyeball because
+   minted still dimensions change on a shipped lane.
+
+A migration that hides case 2 inside case 1 is a behaviour change wearing a
+refactor's coat; a migration that skips case 2 ships the bug.
