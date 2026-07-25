@@ -352,3 +352,53 @@ three different things -- `still_*` needs one still and nothing else, the
 audio-driven face family carries the identity constraint, and the scene i2v
 lanes are where chaining actually earns its keep. One central rule would have
 to special-case all three anyway.
+
+---
+
+# R1 IS REVERSED -- MULTI-CLIP COVERAGE IS WANTED (operator, same session)
+
+Operator, verbatim: *"we need as much video to capture the beat. If that means
+using last frame to first frame of next clip (preferred for continuity) or
+jump-cut style new clip, either is fine. We need enough clips per the beat for
+moving video."*
+
+**This supersedes R1 above.** The earlier *"ping pong is fine / actually
+preferred"* was answering "do we build multi-clip rendering?" while I was still
+describing coverage as a still-count problem. With the mechanism now correctly
+on the table -- boomerang fill is the CURRENT behaviour, not real coverage --
+the operator's answer changes: he wants **enough genuinely rendered clips to
+cover the beat with MOVING video.**
+
+Restated requirement of record:
+
+- A beat is covered by as many rendered clips as it takes. Mirror-extension is
+  no longer the coverage answer.
+- **CHAIN (last frame -> first frame of the next clip) is PREFERRED** for
+  continuity.
+- **JUMP CUT (a fresh still for the next clip) is acceptable** -- an honest
+  editorial cut, not a failure.
+- REUSE stays forbidden unless loop-closed (R2 refinement, unchanged).
+- `still_*` lanes stay trivially one still per beat (carve-out, unchanged).
+
+**Consequences, stated honestly:** this restores the whole block R1 had cut --
+a per-adapter legal-frame contract, a shared partitioner, per-segment audio
+slicing for audio-conditioned lanes, chain-frame extraction and validation,
+concat/trim into one canonical beat clip, and the one-row-per-beat manifest
+preserved with subclip receipts beneath it. codex sized it as multi-day and
+that estimate stands. It is a BLOCK, not a chunk.
+
+**What survives from the work already done, unaffected by the reversal:**
+- The ROUTE LOCK (`57f4983a`) -- it is the precondition for any coverage
+  planning, because the clip count depends on the effective engine.
+- The LIP-SYNC NO-MIRROR fix (`a1d810f1`) -- and the reversal makes it MORE
+  correct, not less: mirroring was the wrong answer on audio lanes, and now
+  real clips are the right answer everywhere the operator wants moving video.
+- Every panel finding about coverage arithmetic: `max_render_frames` is a
+  render WORKLOAD ceiling, `_floor_length` reads LIVE free VRAM, so the clip
+  count can NOT be `ceil(target / max_render_frames)` and can NOT be computed
+  from a VRAM reading taken before the image phase. That constraint is now
+  load-bearing for the build rather than academic.
+
+**Next: a fresh r1 -> r4 arc on the multi-clip coverage block**, per the
+operator's standing authorisation ("if you need to r1-r4 fresh do it") and the
+STANDING RE-GROUND GATE. No code on this block before r4 converges at HEAD.
