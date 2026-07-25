@@ -3,7 +3,7 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-07-25 (afternoon) -- HEAD 49944fb1 (v2.0-alpha) -- WINDOW CODER A (Opus)
+## 2026-07-25 (afternoon) -- HEAD bfacec2b (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: r4 CONVERGED and CHUNK 1 SHIPPED IN THREE GREEN PUSHED PARTS. Operator
 went to yoga mid-session and authorised full autonomy ("all chunks waves"),
 plus a final all-Sonnet fan-out before code.
