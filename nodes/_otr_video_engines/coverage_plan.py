@@ -1,0 +1,355 @@
+"""THE PARTITIONER: how many real clips cover one beat, and exactly how long.
+
+Multi-clip beat coverage (2026-07-25, chunk 3). The operator's requirement is
+that a beat be covered by enough REAL rendered clips to be moving video --
+chain (segment N+1 begins on segment N's terminal frame) preferred, jump cut
+acceptable, and NEVER a mirror/ping-pong or a held last frame.
+
+PURE AND STATIC. This module reads no environment, no VRAM, no clock, and no
+registry. It takes a beat's visible frame target and one
+:class:`~.frame_contract.FrameContract` and returns a :class:`CoveragePlan`.
+That is a hard requirement, not a style preference: stills are minted BEFORE
+the render phase, so a partition that depended on runtime state would be one
+the image phase could not have planned stills for.
+
+THE SEAM ARITHMETIC, which is the subtle part. Under CHAIN the successor's
+first frame IS the predecessor's terminal frame, so concatenating both whole
+would show that frame twice. Each successor therefore drops its head frame,
+and the invariant every plan must satisfy is::
+
+    sum(render_frames - drop_head - trim_tail) == target_visible_frames
+
+exactly. Not approximately. A beat whose assembled length drifts from its
+audio is the defect this build exists to remove, so an inexact plan is a
+terminal error rather than a rounding.
+
+WHY A SEARCH AND NOT A GREEDY WALK. Legal lengths form the arithmetic ladder
+``min + k*quantum``, so taking the largest legal chunk first can strand a
+remainder that is not itself legal (an ``8n+1`` engine covering 170 visible
+frames strands 1 frame, and 1 is not a legal render). Solving for the segment
+COUNT first always finds an exact partition when one exists.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from .frame_contract import (
+    CONTINUITY_STRICT_FIRST_FRAME,
+    FrameContract,
+)
+
+#: Segment N+1 begins exactly on segment N's terminal frame. Preferred.
+JOIN_CHAIN = "chain"
+#: Segments are independent renders butted together. Legal and honest for any
+#: engine that cannot lock frame 0.
+JOIN_JUMP = "jump"
+#: One render, the whole beat. Every single_only engine.
+JOIN_SINGLE = "single"
+
+JOIN_MODES = (JOIN_CHAIN, JOIN_JUMP, JOIN_SINGLE)
+
+
+class CoveragePlanError(ValueError):
+    """A beat cannot be covered exactly by this adapter's frame contract."""
+
+
+@dataclass(frozen=True)
+class CoverageSegment:
+    """One real render call inside a beat.
+
+    ``render_frames``  what the adapter is asked to render (always legal).
+    ``drop_head``      frames removed from the FRONT at assembly. 1 for a
+                       chained successor (it duplicates its predecessor's
+                       terminal frame), else 0.
+    ``trim_tail``      frames removed from the END at assembly. Non-zero only
+                       when the contract allows tail trimming and the ladder
+                       cannot land on the target exactly.
+    ``index``          0-based position within the beat.
+    """
+
+    index: int
+    render_frames: int
+    drop_head: int = 0
+    trim_tail: int = 0
+
+    @property
+    def visible_frames(self) -> int:
+        """What this segment actually contributes to the assembled beat."""
+        return int(self.render_frames) - int(self.drop_head) - int(self.trim_tail)
+
+
+@dataclass(frozen=True)
+class CoveragePlan:
+    """The complete, durable description of how one beat gets covered."""
+
+    target_visible_frames: int
+    join_mode: str
+    segments: tuple = field(default_factory=tuple)
+
+    @property
+    def segment_count(self) -> int:
+        return len(self.segments)
+
+    @property
+    def total_visible_frames(self) -> int:
+        return sum(s.visible_frames for s in self.segments)
+
+    @property
+    def is_multi_clip(self) -> bool:
+        return len(self.segments) > 1
+
+    def to_dict(self) -> dict:
+        """JSON-safe form for the durable ledger stamp."""
+        return {
+            "target_visible_frames": int(self.target_visible_frames),
+            "join_mode": str(self.join_mode),
+            "segments": [
+                {"index": int(s.index), "render_frames": int(s.render_frames),
+                 "drop_head": int(s.drop_head), "trim_tail": int(s.trim_tail)}
+                for s in self.segments
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data) -> "CoveragePlan":
+        data = data or {}
+        return cls(
+            target_visible_frames=int(data.get("target_visible_frames") or 0),
+            join_mode=str(data.get("join_mode") or JOIN_SINGLE),
+            segments=tuple(
+                CoverageSegment(
+                    index=int(row.get("index") or 0),
+                    render_frames=int(row.get("render_frames") or 0),
+                    drop_head=int(row.get("drop_head") or 0),
+                    trim_tail=int(row.get("trim_tail") or 0),
+                )
+                for row in (data.get("segments") or ())
+            ),
+        )
+
+
+def join_mode_for(contract: FrameContract, target_visible_frames: int) -> str:
+    """Which join a beat gets, from the adapter's own declaration.
+
+    ``single`` unless the adapter opted in to multi-clip AND the beat actually
+    exceeds one legal render. Only ``strict_first_frame`` earns a chain: a soft
+    identity reference (HuMo) or interpolation endpoints (Veo ``lastFrame``) do
+    not lock frame 0, so those lanes jump-cut rather than pretend.
+    """
+    if not contract.supports_multi_clip:
+        return JOIN_SINGLE
+    if contract.is_legal_length(int(target_visible_frames)):
+        return JOIN_SINGLE
+    if contract.max_frames and int(target_visible_frames) <= int(contract.max_frames):
+        # Fits inside one render but not on the ladder -- still one clip; the
+        # tail trim (if allowed) handles the remainder.
+        if contract.allow_tail_trim:
+            return JOIN_SINGLE
+    return (JOIN_CHAIN
+            if contract.continuity == CONTINUITY_STRICT_FIRST_FRAME
+            else JOIN_JUMP)
+
+
+def _ladder_partition(total_render_frames, contract, count):
+    """Split ``total_render_frames`` into exactly ``count`` legal lengths.
+
+    Legal lengths are ``min + quantum*a`` with ``0 <= a <= a_max``, so a split
+    exists iff the residue is divisible by ``quantum`` and the required number
+    of quantum steps fits inside ``count`` segments. Fills each segment toward
+    the ceiling in order, which keeps the plan deterministic and puts the short
+    segment last -- where a viewer expects a beat to end.
+    """
+    min_f, q = int(contract.min_frames), int(contract.quantum)
+    residue = int(total_render_frames) - count * min_f
+    if residue < 0 or residue % q:
+        return None
+    steps = residue // q
+    max_steps_each = (((int(contract.max_frames) - min_f) // q)
+                      if contract.max_frames else steps)
+    if max_steps_each < 0 or steps > count * max_steps_each:
+        return None
+    out = []
+    for _ in range(count):
+        take = min(steps, max_steps_each)
+        out.append(min_f + take * q)
+        steps -= take
+    return out
+
+
+def _discrete_partition(total_render_frames, contract, count):
+    """Exact split over a fixed duration menu (Veo's 4/6/8s), or None.
+
+    Small bounded search: the menus that exist in this build are three or four
+    entries, so an exhaustive descent is both fast and obviously correct.
+    """
+    menu = sorted((int(d) for d in contract.discrete_durations), reverse=True)
+
+    def _walk(remaining, left):
+        if left == 0:
+            return [] if remaining == 0 else None
+        for value in menu:
+            if value > remaining:
+                continue
+            rest = _walk(remaining - value, left - 1)
+            if rest is not None:
+                return [value] + rest
+        return None
+
+    return _walk(int(total_render_frames), count)
+
+
+def partition_beat(target_visible_frames, contract, *, join_mode=None,
+                   max_segments=64) -> CoveragePlan:
+    """THE ENTRY POINT: cover ``target_visible_frames`` exactly.
+
+    Raises :class:`CoveragePlanError` when no exact cover exists, rather than
+    returning a plan whose assembled length would drift from the beat's audio.
+    """
+    target = int(target_visible_frames)
+    if target < 1:
+        raise CoveragePlanError(
+            "target_visible_frames must be >= 1, got %r" % (target_visible_frames,))
+
+    mode = join_mode or join_mode_for(contract, target)
+    if mode not in JOIN_MODES:
+        raise CoveragePlanError("unknown join_mode %r" % (mode,))
+
+    # ---- one render, the whole beat -------------------------------------- #
+    if mode == JOIN_SINGLE:
+        if contract.is_legal_length(target):
+            return CoveragePlan(target, mode,
+                                (CoverageSegment(0, target),))
+        if contract.allow_tail_trim:
+            render = contract.smallest_legal_at_least(target)
+            if render is not None:
+                return CoveragePlan(
+                    target, mode,
+                    (CoverageSegment(0, render, trim_tail=render - target),))
+        raise CoveragePlanError(
+            "beat of %d visible frame(s) is not a legal single render for this "
+            "contract (min=%s max=%s quantum=%s discrete=%s allow_tail_trim=%s) "
+            "and the adapter has not opted in to multi-clip coverage"
+            % (target, contract.min_frames, contract.max_frames,
+               contract.quantum, contract.discrete_durations,
+               contract.allow_tail_trim))
+
+    # ---- multi-clip ------------------------------------------------------- #
+    # Under CHAIN every successor duplicates its predecessor's terminal frame,
+    # so covering `target` visible frames with k segments requires rendering
+    # `target + (k - 1)` frames in total.
+    drop = 1 if mode == JOIN_CHAIN else 0
+    splitter = (_discrete_partition if contract.discrete_durations
+                else _ladder_partition)
+
+    for count in range(2, int(max_segments) + 1):
+        total_render = target + drop * (count - 1)
+        lengths = splitter(total_render, contract, count)
+        if lengths is not None:
+            return _build(target, mode, lengths, drop)
+
+    # ---- exact failed; trim the tail if the contract permits it ----------- #
+    if contract.allow_tail_trim:
+        for count in range(2, int(max_segments) + 1):
+            base = target + drop * (count - 1)
+            for extra in range(1, int(contract.quantum) + 1):
+                lengths = splitter(base + extra, contract, count)
+                if lengths is not None:
+                    return _build(target, mode, lengths, drop, trim_tail=extra)
+
+    raise CoveragePlanError(
+        "no exact multi-clip cover of %d visible frame(s) exists for this "
+        "contract (min=%s max=%s quantum=%s discrete=%s allow_tail_trim=%s) "
+        "within %d segments -- refusing to emit a plan whose assembled length "
+        "would drift from the beat audio"
+        % (target, contract.min_frames, contract.max_frames, contract.quantum,
+           contract.discrete_durations, contract.allow_tail_trim, max_segments))
+
+
+def _build(target, mode, lengths, drop, trim_tail=0):
+    segments = []
+    for index, render in enumerate(lengths):
+        segments.append(CoverageSegment(
+            index=index,
+            render_frames=int(render),
+            drop_head=(drop if index else 0),
+            trim_tail=(int(trim_tail) if index == len(lengths) - 1 else 0),
+        ))
+    plan = CoveragePlan(target, mode, tuple(segments))
+    validate_coverage_plan(plan, None)   # arithmetic self-check, contract-free
+    return plan
+
+
+def validate_coverage_plan(plan: CoveragePlan, contract):
+    """Validate a plan at a BOUNDARY. Raises :class:`CoveragePlanError`.
+
+    Called on BOTH sides of the wire -- where the plan is serialized and again
+    before it is executed -- because a plan that survives serialization but not
+    execution is exactly the class of defect a durable stamp is supposed to
+    prevent. ``contract`` may be ``None`` to check the arithmetic alone.
+    """
+    if not plan.segments:
+        raise CoveragePlanError("coverage plan has no segments")
+    if plan.join_mode not in JOIN_MODES:
+        raise CoveragePlanError("unknown join_mode %r" % (plan.join_mode,))
+
+    for index, seg in enumerate(plan.segments):
+        if seg.index != index:
+            raise CoveragePlanError(
+                "segment %d carries index %d -- segment order is the assembly "
+                "order and must be dense and ascending" % (index, seg.index))
+        if seg.render_frames < 1:
+            raise CoveragePlanError(
+                "segment %d renders %d frame(s)" % (index, seg.render_frames))
+        if seg.drop_head < 0 or seg.trim_tail < 0:
+            raise CoveragePlanError(
+                "segment %d has a negative trim" % index)
+        if seg.visible_frames < 1:
+            raise CoveragePlanError(
+                "segment %d contributes %d visible frame(s) after trims -- a "
+                "segment that contributes nothing must not be rendered"
+                % (index, seg.visible_frames))
+        expected_head = (1 if (plan.join_mode == JOIN_CHAIN and index) else 0)
+        if seg.drop_head != expected_head:
+            raise CoveragePlanError(
+                "segment %d drops %d head frame(s), expected %d for join_mode "
+                "%r -- under a chain every successor drops exactly the "
+                "duplicated terminal frame, and nothing else may"
+                % (index, seg.drop_head, expected_head, plan.join_mode))
+
+    if plan.join_mode == JOIN_SINGLE and plan.segment_count != 1:
+        raise CoveragePlanError(
+            "join_mode 'single' with %d segments" % plan.segment_count)
+
+    total = plan.total_visible_frames
+    if total != int(plan.target_visible_frames):
+        raise CoveragePlanError(
+            "coverage plan assembles to %d visible frame(s) but the beat "
+            "target is %d. The assembled clip would drift from the beat audio; "
+            "a plan is exact or it is not a plan."
+            % (total, plan.target_visible_frames))
+
+    if contract is not None:
+        for seg in plan.segments:
+            if not contract.is_legal_length(seg.render_frames):
+                raise CoveragePlanError(
+                    "segment %d renders %d frame(s), which this adapter cannot "
+                    "accept (min=%s max=%s quantum=%s discrete=%s)"
+                    % (seg.index, seg.render_frames, contract.min_frames,
+                       contract.max_frames, contract.quantum,
+                       contract.discrete_durations))
+        if plan.is_multi_clip and not contract.supports_multi_clip:
+            raise CoveragePlanError(
+                "a %d-segment plan was built for an adapter that has not opted "
+                "in to multi-clip coverage" % plan.segment_count)
+        if plan.join_mode == JOIN_CHAIN \
+                and contract.continuity != CONTINUITY_STRICT_FIRST_FRAME:
+            raise CoveragePlanError(
+                "join_mode 'chain' requires continuity %r, but this adapter "
+                "declares %r -- it cannot guarantee that a successor begins on "
+                "its predecessor's terminal frame, so this beat must jump cut"
+                % (CONTINUITY_STRICT_FIRST_FRAME, contract.continuity))
+        if any(s.trim_tail for s in plan.segments) and not contract.allow_tail_trim:
+            raise CoveragePlanError(
+                "plan trims a tail but the adapter declares allow_tail_trim=False")
+    return plan
