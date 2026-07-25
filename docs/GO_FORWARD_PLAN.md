@@ -27,12 +27,16 @@ inventory, the four-fall-through mechanism map with five named traps, and the
 31-engine parity matrix. **S0a DONE @ `33c4d8cf` (finished 2026-07-24 20:22
 local, wall 14m) -- 6432 passed / 27 skipped / 1 xfailed; Bible 17 passed;
 tests/fixtures/still_plan_head_parity.json (31 engines x 8 configurations)
-locks HEAD before S0b flips the routing. S0a-b IN-FLIGHT (started
-2026-07-24 22:30 local) -- isolation property test amendment (mutate one
-engine, prove others' rows byte-identical; mixed-policy episode, prove
-per-role render_decisions match single-engine baselines) before S0b runs.
-S0b is next -- scope note landed at `docs/S0b_HANDOFF.md` (routing freeze
-is 7 modules + a new `_otr_shared/routing_state.py` + ~31 test literals +
+locks HEAD before S0b flips the routing. S0a-b DONE @ `e60185a0`
+(finished 2026-07-24 22:48 local, wall 18m) -- isolation property test
+amendment (two new tests: mutate one engine's still-plan proxies -> prove
+every OTHER engine's row byte-identical to fixture under clean configs;
+mixed-policy episode with three heterogeneous engines -> prove each
+role's render_decisions and effective_engine equal the same role's
+single-engine baseline). Full suite 6434 passed / 27 skipped / 1 xfailed
+(+2 vs S0a); Bible 17 passed; audio byte-identical 7 passed. S0b is next
+-- scope note landed at `docs/S0b_HANDOFF.md` (routing freeze is 7
+modules + a new `_otr_shared/routing_state.py` + ~31 test literals +
 prepass reorder + LTX mismatch gate + AST audit; needs its own dedicated
 coder window per section 9 of the spec).**
 
