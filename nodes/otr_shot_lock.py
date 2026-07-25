@@ -1067,6 +1067,48 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
             "request to an engine)" % (effective_engine, fam, missing))
 
 
+def _stamp_coverage_plan(shot):
+    """Attach this beat's durable ``coverage_plan`` to its shot row (chunk 3b).
+
+    Resolves the shot's engine to its declared :class:`FrameContract` and
+    partitions the beat's ``target_frame_count`` into legal render segments.
+    Validated here, at the plan boundary, so a plan that cannot be executed
+    never reaches the wire.
+
+    FAIL-CLOSED ON A REAL PARTITION FAILURE, tolerant of an ABSENT one. A
+    :class:`CoveragePlanError` means the adapter genuinely cannot cover this
+    beat -- for a ``single_only`` engine that means the beat exceeds its cap,
+    which today is answered by ping-pong, loop-fill or a held frame, i.e. the
+    three silent mechanisms this build removes. That must surface, so it
+    propagates. An engine that is simply not registered yet (a custom slot, a
+    test stub) gets NO plan rather than a guessed one: the row stays absent and
+    the render path behaves exactly as it did before 3b.
+    """
+    target = int(shot.get("target_frame_count") or 0)
+    if target < 1:
+        return                      # a zero-length beat has nothing to cover
+    engine_id = str(shot.get("engine_id") or "")
+    if not engine_id:
+        return
+    try:
+        from ._otr_video_engines import registry as _vreg_local  # type: ignore
+        from ._otr_video_engines import frame_contract as _fc  # type: ignore
+        from ._otr_video_engines import coverage_plan as _cp  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import registry as _vreg_local  # type: ignore
+        from _otr_video_engines import frame_contract as _fc  # type: ignore
+        from _otr_video_engines import coverage_plan as _cp  # type: ignore
+    if not _vreg_local.is_registered(engine_id):
+        return
+    try:
+        contract = _fc.frame_contract_for(_vreg_local.get_engine(engine_id))
+    except Exception:  # noqa: BLE001 -- an unbuildable engine gets no plan
+        return
+    plan = _cp.partition_beat(target, contract)
+    _cp.validate_coverage_plan(plan, contract)
+    shot["coverage_plan"] = plan.to_dict()
+
+
 def build_execution_plan(beats, budget, creative, policy, ledger=None):
     """Build DAG-validated ``execution_groups`` + per-shot rows.
 
@@ -1166,6 +1208,18 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
             "degradation_trail": [],
             "creative": {k: v for k, v in cre.items() if k != "request_hash"},
         })
+        # THE DURABLE COVERAGE PLAN (2026-07-25, multi-clip chunk 3b).
+        # How many REAL clips cover this beat, exactly how long each render is,
+        # and how they join -- computed HERE, at plan time, from the adapter's
+        # own static FrameContract, and stamped on the row so the render phase
+        # executes a plan rather than inventing one. A wire-only plan would be
+        # useless (r3): it must ride the durable ledger or it cannot support
+        # replay, and the render boundary would have nothing to validate.
+        #
+        # INERT TODAY BY CONSTRUCTION: every adapter still resolves to
+        # frame_contract.SINGLE_ONLY, whose ladder accepts any length, so every
+        # beat gets a one-segment plan that renders exactly as it does now.
+        _stamp_coverage_plan(shots[-1])
     return groups, shots
 
 

@@ -2901,6 +2901,68 @@ def assert_frozen_route(ledger):
     return True
 
 
+def assert_coverage_plans(ledger):
+    """THE SECOND BOUNDARY: re-validate every stamped coverage plan (chunk 3b).
+
+    ShotLock validated each plan when it built it; this validates the same
+    plans again after they have crossed the wire, immediately before execution.
+    Validating at both ends is the point -- a plan that survives serialization
+    but not execution is precisely the class of defect a durable stamp is
+    supposed to prevent, and only a second check at the far end can catch a
+    ledger that was hand-edited, replayed from an older revision, or produced
+    by a ShotLock built against a different contract.
+
+    Re-validated AGAINST THE LIVE CONTRACT, not just for internal arithmetic:
+    an adapter whose declared frame contract changed since the plan was made
+    (a version bump, a re-registered engine) must not silently execute a plan
+    its current contract would reject.
+
+    Shots with no stamped plan are skipped -- see
+    ``otr_shot_lock._stamp_coverage_plan`` for when that is legitimate.
+    """
+    try:
+        from . import coverage_plan as _cp  # type: ignore
+        from . import frame_contract as _fc  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        import coverage_plan as _cp  # type: ignore
+        import frame_contract as _fc  # type: ignore
+
+    checked = 0
+    for shot in ((ledger or {}).get("video") or {}).get("shots") or ():
+        if not isinstance(shot, dict):
+            continue
+        raw = shot.get("coverage_plan")
+        if not isinstance(raw, dict) or not raw:
+            continue
+        plan = _cp.CoveragePlan.from_dict(raw)
+        target = int(shot.get("target_frame_count") or 0)
+        if target and int(plan.target_visible_frames) != target:
+            raise RenderError(
+                "COVERAGE PLAN: shot %s carries a plan for %d visible frame(s) "
+                "but the beat's target is %d. The plan and the beat disagree, "
+                "so the assembled clip would drift from the beat audio. "
+                "NO FALLBACK." % (shot.get("shot_id"),
+                                  plan.target_visible_frames, target))
+        contract = None
+        engine_id = str(shot.get("engine_id") or "")
+        if engine_id and _vreg.is_registered(engine_id):
+            try:
+                contract = _fc.frame_contract_for(_vreg.get_engine(engine_id))
+            except Exception:  # noqa: BLE001 -- arithmetic-only check instead
+                contract = None
+        try:
+            _cp.validate_coverage_plan(plan, contract)
+        except _cp.CoveragePlanError as exc:
+            raise RenderError(
+                "COVERAGE PLAN: shot %s carries a plan its adapter (%s) cannot "
+                "execute: %s. NO FALLBACK."
+                % (shot.get("shot_id"), engine_id or "?", exc)) from exc
+        checked += 1
+    if checked:
+        _LOG.debug("[OTR.render_driver] COVERAGE PLANS OK: %d shot(s)", checked)
+    return checked
+
+
 def resolve_final_shot_engines(ledger):
     """THE ROUTE LOCK: resolve every shot's FINAL effective engine, once.
 
@@ -2940,8 +3002,12 @@ def resolve_final_shot_engines(ledger):
     ``/otr/video_render_soak``). That branch is named and logged rather than
     silent, because a fallback nobody can see is how the original defect hid.
     """
+    # The coverage plans are validated on BOTH paths -- a hand-built ledger
+    # that carries a plan is held to it just as a frozen one is (chunk 3b).
     if assert_frozen_route(ledger):
+        assert_coverage_plans(ledger)
         return ledger
+    assert_coverage_plans(ledger)
     _LOG.debug(
         "[OTR.render_driver] no frozen route on this ledger (legacy / "
         "hand-built / soak path) -- resolving the effective engines here, as "
