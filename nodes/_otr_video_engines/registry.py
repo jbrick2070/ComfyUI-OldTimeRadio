@@ -44,6 +44,7 @@ __all__ = [
     "default_engine_for_role",
     "assert_usable",
     "descriptor_for_engine",
+    "audit_engine_roster",
 ]
 
 
@@ -88,6 +89,15 @@ class VideoEngine(Protocol):
     required_inputs: tuple
     invocable: bool
     invocability_reason: str
+
+    # --- multi-clip coverage declaration (2026-07-25, chunk 2; OPTIONAL) ---
+    # ``frame_contract`` declares the STATIC legal render lengths and the
+    # continuity mode (see :mod:`frame_contract`). It is optional and adapters
+    # duck-type as always: an adapter that declares nothing resolves to
+    # ``frame_contract.SINGLE_ONLY`` -- one render per beat, no chaining, i.e.
+    # exactly today's behaviour. Multi-clip is opt-in and provable PER ENGINE;
+    # it is never inherited by default.
+    def frame_contract(self): ...
 
     # --- render lifecycle (CW-4+ adapters implement; not called by registry) ---
     def assert_usable(self, host_caps, profile, request_template=None): ...
@@ -561,3 +571,39 @@ __all__.append("CAPABILITIES")
 # all_engine_names() (validation is the operator's MANUAL process, never a code
 # gate). The "+ Add Custom Model" sentinel remains the escape hatch.
 # ---------------------------------------------------------------------------
+
+
+def audit_engine_roster():
+    """Compare the EXPECTED roster against what actually registered.
+
+    THE IMPORT-AUDIT BLINDSPOT (2026-07-25, chunk 2; both kibitz r2 seats found
+    this independently). Every adapter import in
+    ``_otr_video_engines/__init__.py`` is wrapped in
+    ``try: ... except Exception: pass`` so a packaging quirk can never break the
+    namespace import. The cost is that a BROKEN adapter fails silently: it never
+    registers, it vanishes from the dropdown, and nothing says so. A
+    post-registration audit that only walks the registry cannot see the hole
+    either -- the missing engine is missing from both sides.
+
+    :data:`CAPABILITIES` is the independent expected roster, maintained by hand
+    next to each engine, so it survives an import failure and can be compared
+    against reality.
+
+    Returns ``{"missing": (...), "unexpected": (...)}``:
+
+    * ``missing`` -- declared in CAPABILITIES but NOT registered. Almost always
+      a swallowed import error, i.e. a real break.
+    * ``unexpected`` -- registered but undeclared. The registry-consistency
+      invariant already forbids this (C0, "registry IS the menu").
+
+    Pure and side-effect-free. It REPORTS; ``tests/test_frame_contract.py``
+    turns a non-empty result into a CI failure, and production logs it rather
+    than refusing to boot -- a box with one broken adapter must still render
+    with the other thirty.
+    """
+    expected = frozenset(CAPABILITIES)
+    registered = frozenset(all_engine_names())
+    return {
+        "missing": tuple(sorted(expected - registered)),
+        "unexpected": tuple(sorted(registered - expected)),
+    }

@@ -207,3 +207,46 @@ try:  # pragma: no cover - trivial guard
     from . import eng_google_vid_sfx as _eng_google_vid_sfx  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
+
+
+# ---------------------------------------------------------------------------
+# ROSTER AUDIT -- runs LAST, after every guarded adapter import above.
+# ---------------------------------------------------------------------------
+# Multi-clip coverage chunk 2 (2026-07-25). Position matters and is the whole
+# point: this must sit at the BOTTOM of this module, not inside registry.py.
+# Run from inside the registry it would report every not-yet-imported adapter
+# as missing, because the imports above are what populate it.
+#
+# Every adapter import in this file is deliberately wrapped in a bare
+# ``except Exception: pass`` so a packaging quirk can never break the namespace
+# import. The price is that a BROKEN adapter disappears silently -- it never
+# registers, it vanishes from the per-role dropdown, and nothing anywhere says
+# so. registry.CAPABILITIES is the independent expected roster that survives
+# such a failure, so comparing the two is the only way to see the hole.
+#
+# LOG, never raise: a box with one broken adapter must still render with the
+# other thirty. CI enforcement is a test (tests/test_frame_contract.py), which
+# is the right place for a hard gate.
+try:  # pragma: no cover - trivial guard
+    from . import registry as _registry_for_audit
+
+    _roster = _registry_for_audit.audit_engine_roster()
+    if _roster["missing"]:
+        import logging as _logging
+
+        _logging.getLogger("OTR").error(
+            "[OTR video] ROSTER AUDIT: %d declared engine(s) FAILED TO "
+            "REGISTER: %s -- their adapter import raised and was swallowed by "
+            "the guards above, so they are silently absent from every per-role "
+            "dropdown. This is a real break, not a warning.",
+            len(_roster["missing"]), ", ".join(_roster["missing"]))
+    if _roster["unexpected"]:
+        import logging as _logging
+
+        _logging.getLogger("OTR").warning(
+            "[OTR video] ROSTER AUDIT: %d engine(s) registered without a "
+            "CAPABILITIES row: %s -- 'registry IS the menu' requires a row per "
+            "registered engine.",
+            len(_roster["unexpected"]), ", ".join(_roster["unexpected"]))
+except Exception:  # noqa: BLE001 -- the audit must never break the import
+    pass
