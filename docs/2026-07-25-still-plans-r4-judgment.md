@@ -232,3 +232,100 @@ defect it names is closed by the burst rule.
 - **codex should-fix #1 (`+ Add Custom Model` v3 semantics)** -- real, but it
   is a custom-model-registration question that reaches beyond this build's
   scope. Recorded for the planner window, not folded into S0b-core.
+
+---
+
+# ADDENDUM -- r4b re-run judgment (same night, at `ae01d38e`)
+
+The r4 above was folded into this document and re-run as a second r4 pass
+(`kibitz-runs/2026-07-25-still-plans-r4b-amended/r4/`). Same pins, both
+verified: codex `gpt-5.6-sol` high, agy `Gemini 3.6 Flash (High)`,
+`--driver claude`.
+
+**Architecture and chunk ordering are now CONVERGED.** agy: "the plan has
+converged on architecture and chunk ordering" with four specification gaps.
+codex still says not-build-ready, but every remaining codex item is
+SPECIFICATION COMPLETENESS (publish one consolidated spec; name exact schema
+field types; define the row-matching contract), not an architectural
+objection. That is a different class of "no" from the first r4, which found a
+misdeclared row in landed code.
+
+## Both seats INDEPENDENTLY corrected ME. Both corrections adopted.
+
+1. **"Same push burst" was too weak. S0b-core + S0c must be ONE ATOMIC
+   COMMIT.** codex #7 and agy #3 reached this separately. codex's argument is
+   the sharper one: a "burst" of two local commits contradicts `CLAUDE.md`
+   section 7, which requires every green commit to be pushed immediately -- so
+   the burst formulation quietly authorises exactly the local-only commit the
+   git policy exists to forbid. agy adds that the intermediate commit would
+   carry frozen `ltx_resolved` WITHOUT the mismatch gate and would therefore
+   fail its own test run, leaving a broken state in history.
+   **SUPERSEDES the "same push burst" judge call above:** S0b-core and the
+   S0c mismatch gate are authored, tested and committed as ONE commit. S0c
+   survives only as an internal review/test boundary, with no commit of its
+   own. This is also closer to the operator's "do NOT half-land" directive
+   than my own formulation was.
+
+2. **The `style_tail_policy` question must be LOCKED before build, and the
+   lock is the exemption.** codex #6 and agy #1 both refuse to let the row
+   carry a false declaration into S2. agy supplies the concrete contract, which
+   I adopt: the row KEEPS `style_tail_policy="full"` for closed-schema
+   compliance, and **S2's composer MUST exempt `source="ltx_radio_face"`
+   objects from era-tail and grade-tail appending**, honouring
+   `build_radio_host_prompt`'s early return. No new enum token. Composed-output
+   coverage must prove the warm early-return path survives S2 and S5. The
+   operator decision flagged earlier is thereby resolved in the
+   no-behaviour-change direction without needing him to rule.
+
+## NEW from r4b that I had missed (adopted)
+
+3. **My S1b fence cannot survive S5** (codex #3). `test_still_plan_layer2_
+   parity.py` asserts EXACT EQUALITY between a row's text and the producer
+   constant, while S5 exists to add per-engine text to that same field. Both
+   cannot hold. Adopted: exact equality is an explicitly TRANSITIONAL S1b/S2
+   gate, and at S5 invariant 1 is REPLACED -- not deleted -- by "the required
+   geometry remains an exact ORDERED SEGMENT, and only the S5-table-approved
+   addition may follow it". The test's own docstring now carries that lifetime
+   note so a future window replaces the fence instead of deleting it.
+4. **S2's scope wording was ambiguous** (codex #2). "S2 stays the FOUR ROLE-
+   CELLS and nothing else" reads as shrinking the cutover, which contradicts
+   the atomic seven-consumer requirement. Corrected wording: **S2's
+   IMPLEMENTATION scope is the complete atomic cutover of all seven consumers;
+   the four HuMo bookend role-cells are the only permitted BEHAVIOURAL parity
+   delta.**
+5. **Row matching must be a defined contract** (codex #4). `eng_ltx_av.py` now
+   holds THREE portrait rows with different cardinalities, and production emits
+   both cast portraits and `source="ltx_radio_face"` portraits. S2 needs ONE
+   pure applicability/matching function over (kind, cardinality) that FAILS on
+   collision rather than picking the first match.
+6. **`resolve_row_aspect`'s rejection needs an exact contract** (agy #2): raise
+   `ValueError` naming the engine and the missing field, not a bare raise.
+
+## Discarded from r4b, with the reason
+
+- **codex #4's sub-claim that the draft test maps every
+  `required="when_engine_talking"` portrait to talking geometry is STALE.** It
+  is true of the version the panel was handed and false at HEAD: the
+  `per_bookend_role` case is checked FIRST in
+  `_expected_portrait_geometry`, precisely so the bookend row resolves to
+  `WIDE_PORTRAIT_GEOMETRY` and only the recurring cast row gets
+  `TALKING_PORTRAIT_GEOMETRY`. The fix codex asks for was already in the
+  commit that landed. The surrounding must-fix (define the matching contract
+  for S2) stands.
+
+## The one ask BOTH rounds now make, and its sequencing
+
+Both seats, in both r4 passes, want ONE consolidated build spec replacing the
+scattered set (`locked-build-spec` section 11 predates S1b/S5/S0c; GO_FORWARD
+carried stale instructions; this judgment plus the corrected plan are two more
+files). That is the right artifact and it is owed.
+
+**It is deliberately NOT written yet.** The NEW R1 arc round
+(`docs/2026-07-25-still-plans-r1-lean-architecture.md`) asks whether the
+31-plan table is finished or DELETED, and S2's and S5's sections of a
+consolidated spec are exactly what that answer rewrites. Writing the spec
+before judging the R1 would produce a confident document that the next round
+invalidates -- the same failure mode the standing re-ground gate exists to
+prevent. **Sequence: judge the R1, then publish ONE consolidated spec carrying
+the R1 architecture answer plus every accepted r4/r4b correction, then open
+S0b-core.**

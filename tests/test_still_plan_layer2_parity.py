@@ -40,6 +40,17 @@ judges prose, so none of them can collide with THE LAW:
    regrowing -- and it is also the spec's own "no inheritance or shared
    defaults" rule, made executable.
 
+**LIFETIME -- READ BEFORE S5 (kibitz r4b, codex `gpt-5.6-sol` high).**
+Invariant 1 is EXACT EQUALITY, and that is deliberately a TRANSITIONAL gate
+for S1b and S2 only. S5's whole purpose is to give each engine its own
+customised layer-2 text, i.e. permitted per-engine ADDITIONS to this same
+field -- so exact equality and S5 cannot both hold. When S5 lands, invariant 1
+must be REPLACED (not deleted) by the weaker-but-still-sharp pair: the
+producer's required geometry remains an exact ORDERED SEGMENT of the row's
+text, and the only thing following it is the addition approved for that engine
+in S5's per-engine table. Deleting the fence instead of replacing it would give
+back exactly the silent-degradation freedom S1b closed.
+
 Pure CPU: no ComfyUI runtime, no GPU, no image model, no LLM. Nothing reads
 the plan for production at S1b either -- S2 wires it in.
 """

@@ -1,5 +1,12 @@
 # OTR Go-Forward Plan
 
+**Updated:** 2026-07-25 (late) -- CODER A still-plans: **S1b LANDED @
+`69328cec`** (suite 6444 / Bible 17 / canonical `5377914B`), r4 defect sweep
+JUDGED (agy converged, codex did not), and a **NEW R1 ARC ROUND on the lean
+architecture is IN FLIGHT by operator directive**. S0b-core is GATED on that
+R1. Amended order: `S1b (DONE) -> S0b-core (+S0c same push burst) -> S2 -> S3
+-> S5 -> S4`. See CURRENT STEP.
+
 **Updated:** 2026-07-25 -- CODER A still-plans: r3 panel (codex
 `gpt-5.6-sol` high + agy Gemini 3.6 Flash High) + Claude grounding.
 Chunk order corrected to S1b -> S0b-core -> S2 -> S3/S0c -> S5 -> S4.
@@ -193,23 +200,48 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- PER-MODEL STILL PLANS: S1b, then S0b-core, then S2
+## CURRENT STEP -- PER-MODEL STILL PLANS: S1b DONE; S0b-core is GATED on a NEW R1
 
-The r1->r5 arc converged and S1 landed, but a 2026-07-25 r3 panel + Claude
-grounding found FOUR corrections that must be made before any wiring. The
-chunk order is now:
+**AMENDED ORDER (2026-07-25 r4 judgment):**
+`S1b (DONE) -> S0b-core (+S0c in the SAME PUSH BURST) -> S2 -> S3 -> S5 -> S4`.
 
-**S1b (NEW, do first -- pure parity, blocked on nothing).** S1's
-`framing_geometry` strings are PARAPHRASES, not transplants, and spec section
-5 makes that field the layer-2 prompt TEXT ("authored TEXT -- the ONE free
-field"). Wiring S1 as it stands would silently degrade every prompt in the
-system. Concretely lost against `docs/STILL_PLAN_SEED_INVENTORY.md`:
-`mesh_fodder` dropped the entire clay-blob clause (unbroken silhouette, plain
-seamless mid-grey backdrop, no props, even diffuse frontal light);
-`scene_background_plate` dropped "no people, no subject, no characters";
-`portrait` dropped "never crop the top of the head" and is the EMPTY STRING on
-19 engines. S1b restores every clause VERBATIM from the inventory. The S0a
-fixture must stay green -- this is transcription, not design.
+**GATE -- READ BEFORE OPENING S0b-core.** A 2026-07-25 r4 defect sweep split
+the panel: agy CONVERGED (three must-fix, all already listed) but codex
+`gpt-5.6-sol` high did NOT (ten must-fix, several new and grounded-confirmed,
+one of them a MISDECLARED row in already-landed S1 code). The operator's
+response was to authorise a **NEW R1 ARC ROUND on the lean architecture**
+("run a new R1 so we get a good lean, clean architecture"). Brief:
+`docs/2026-07-25-still-plans-r1-lean-architecture.md`. Judgment of the r4
+sweep: `docs/2026-07-25-still-plans-r4-judgment.md`.
+
+**S0b-core does NOT open until that R1 is judged**, because the R1 asks
+whether the 31-plan table should be finished or DELETED, and S2's whole scope
+(seven consumers cut over atomically) shrinks or vanishes with the answer.
+S1b was safe to land ahead of it either way: it is pure parity against the
+producer's own constants, so it improves prompts under EVERY option and
+reverses nothing.
+
+The three r3 corrections plus the accepted r4 corrections are folded into the
+r4 judgment doc; that document is the plan of record for S0b-core and after.
+Per-chunk detail below.
+
+~~**S1b**~~ -- **DONE @ `69328cec`** (2026-07-25; suite 6444 passed / 27
+skipped / 1 xfailed; Bible 17; AST/BOM/zero-byte/UTF-8/ASCII clean on 13 files;
+canonical byte-identical `5377914B`; pushed, HEAD == origin). 57 rows across 12
+adapters now carry the producer's real layer-2 GEOMETRY constants instead of
+S1's paraphrases. Detail in `docs/HANDOFF_LOG.md`.
+
+**CORRECTION to this file's own earlier instruction (do NOT re-derive the old
+one).** S1b did NOT "restore every clause VERBATIM from the inventory". The
+seed inventory records COMPOSED output strings, and the producer splits
+GEOMETRY (Python-owned engine-safety framing) from LOOK (pack-owned:
+`VisualStyle.portrait_look` / `portrait_look_talking` / `plate_look`) at chunk
+A1 (`otr_meta_brief_image_prompt.py:96-104`). Restoring the composed strings
+would have hard-coded the `sci_fi_radio` pack's look into all 31 engines,
+against spec section 4 ("a plan may only contribute layer 2 ... it may never
+decide style"). **The transplant source is the eight named `*_GEOMETRY` /
+`STILL_FRAMING_*` constants, never the inventory's composed text.** Both agy
+and this window's grounding reached that independently.
 
 **S0b-core (corrected).** Land the routing freeze atomically. THREE
 corrections to `docs/S0b_KIBITZ_NEEDED.md` before it is built:
@@ -349,6 +381,37 @@ listed as live.
   rendering" on that same state. Two contradictory policies; whichever fires
   first wins. Static finding at HEAD -- needs a live reproduction before it
   becomes a PBUG row.
+- **`style_tail_policy` closed enum cannot express a SHIPPED path** (found
+  2026-07-25 by this window, missed by both r4 panelists; grounded).
+  `VALID_STYLE_TAIL_POLICIES` has two tokens, `full` and `minimal_clean`, but
+  `build_radio_host_prompt`'s `ltx_radio_mouth` branch
+  (`otr_meta_brief_image_prompt.py:394-401`) RETURNS EARLY with
+  `"%s, warm dramatic lighting"`, skipping BOTH
+  `finish_visual_prompt(..., era_profile="still")` and the `image_grade_tail`
+  append -- deliberately, per the 2026-07-02 operator look direction (the brief
+  palette plus the grade tail rendered the talking-radio bookend dark, blue and
+  murky). The `ltx_audio_in` bookend row nonetheless declares
+  `style_tail_policy="full"`. **OPERATOR DECISION FLAGGED** (adding an enum
+  token is explicitly an operator call, never a coder's): either add a third
+  token for "canonical warm, no era tail, no grade tail", or ratify that the
+  `ltx_radio_face` path is EXEMPT from the plan's style-tail authority.
+  Default if unruled: the exemption, because it changes no behaviour. S1b did
+  NOT touch `style_tail_policy`. S2 must not treat the plan as the style-tail
+  authority for that path.
+- **`wants_talking_prompt()` escapes any routing freeze** (r4 codex, grounded).
+  It calls `_recipe_config(self._recipe())` and `_recipe()`
+  (`eng_ltx_av.py:402-432`) re-reads `OTR_LTX_AV_RECIPE` / `OTR_LTX_AV_SHARP` /
+  the UNET name on EVERY call by documented design ("Read fresh every call").
+  So a `required="when_engine_talking"` row evaluated through the hook re-reads
+  the environment after capture. S0b-core needs ONE shared `row_is_active(...)`
+  evaluator over captured state, with the talking result inside `ltx_resolved`.
+- **`provider_side` is a THREE-part rule, not an attribute** (r4 codex,
+  grounded). `_is_cloud_video_engine` (`render_driver.py:1274-1295`) accepts a
+  `cloud_` id prefix OR the attribute OR `node_key.startswith("cloud_")`.
+  `cloud_kling_avatar` has no `provider_side` attribute and is caught by the id
+  prefix alone, so an `engine_facts` builder using a bare `getattr` would
+  classify it local and let the radio-host redirect send a cloud avatar to
+  local LTX. Needs a regression on picked AND forced `cloud_kling_avatar`.
 - **Four env-read sites missing from the S0b inventory** (r3 panel, grounded):
   `eng_ltx_video.py:541-564` (`OTR_ENABLE_LTX_I2V`), `render_driver.py:1176-1203`
   and `otr_meta_brief_image_prompt.py:297-300` (`OTR_ENABLE_HUMO_HOSTS`), and
@@ -547,7 +610,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "still-plans" | WAN 8-GB contract DONE @ `f914f0a4`; the r1->r5 still-plan arc DONE and CONVERGED @ `84328aa1`. **NEXT: execute `docs/2026-07-25-still-plans-locked-build-spec.md` in order -- S0a, S0b, S1, S2, S3, then S4 live.** No further panel round is owed. | Claude codes, Qwen triages, codex on 3rd strike | UNGATED (S2 needs the operator eyeball) | multi-day |
+| CODER A "still-plans" | WAN 8-GB contract DONE @ `f914f0a4`. S0a / S0a-b / S1 / **S1b DONE @ `69328cec`**; S0b filed BLOCKED. **NEXT: judge the NEW R1 (`docs/2026-07-25-still-plans-r1-lean-architecture.md`) -- does the 31-plan table get finished or DELETED -- THEN S0b-core (+S0c same push burst) -> S2 -> S3 -> S5 -> S4.** Plan of record for those chunks is `docs/2026-07-25-still-plans-r4-judgment.md`, NOT section 11 of the locked spec (which predates S1b/S5/S0c). | Claude codes + judges; Qwen triages (4060 was DOWN 2026-07-25); kibitz = codex `gpt-5.6-sol` high + agy | **GATED: no S0b-core code until the R1 is judged** | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
@@ -594,9 +657,9 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-24): full Windows suite `6403 passed /
-  27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`.
-  Detail in HANDOFF_LOG.
+- Current whole-tree receipt (2026-07-25 @ `69328cec`, S1b): full Windows suite
+  `6444 passed / 27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped /
+  3 xfailed`; canonical `5377914B`. Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
   AST/JSON/BOM/zero-byte checks, commit, push, verify
   `HEAD == origin/v2.0-alpha`.
