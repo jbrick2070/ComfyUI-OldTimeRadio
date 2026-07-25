@@ -107,3 +107,51 @@ regression, canonical workflow validator/round-trip/link-widget audit, then a
 selective fresh headless run. A fix is not closed until the relevant live case
 returns `RESULT SUCCESS`, the server logs `obs_publish OK`, and the expected file
 exists under the ledger-owned episode root plus `otr/obs`.
+
+## 2026-07-25 -- enumeration EXCLUDED as the cause of the three still-spine rows
+
+Chunk C0 of the engine image-contract block. The standing theory for
+`still_word__flux2_klein__original`, `mesh_stage__lumina_image__public_domain`
+and `ltx23_16gb_video__flux_gen1__scifi_news_pro` was that the image phase never
+enumerated the target the engine demanded (notably the injected opening beat
+`b000_music_open`, and mesh fodder for the opening object). That theory is now
+DISPROVEN at HEAD, by driving the real seam rather than reading it:
+
+- Every scene-still consumer tested (`still_word`, `ltx_video`, `wan_ti2v`,
+  `humo`) REQUIRES `still_b000_music_open` plus a per-beat still for every
+  ordinary beat.
+- `mesh_stage` REQUIRES both `meshfodder_<beat>` and `plate_<beat>` for every
+  beat including the opening one, and requires no plain scene still at all.
+- Every visualizer (`viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera`,
+  `viz_green`) requires zero image targets, so an all-procedural episode still
+  invokes no image model.
+- Every required target id also has an authored object behind it, so the
+  manifest is satisfiable rather than merely well-formed.
+
+Pinned permanently by `tests/test_still_spine_engine_coverage.py` (15 cases,
+pure CPU). Two related facts grounded in the same pass, both worth keeping:
+
+- `apply_fresh_cap` (`nodes/otr_image_gen_dispatcher.py:250`) has NO production
+  caller -- only a helper test. It cannot have truncated a mint, and it is a
+  deletion candidate rather than a knob to wire.
+- `ImageRequest` (`nodes/_otr_image_engines/schemas.py`) is `_Forbid`-strict
+  with `width`/`height` and no `kind` / `beat_id` / `char_id`, while the
+  dispatcher sends a raw dict carrying all of those plus `w`/`h` -- i.e. that
+  boundary is not schema-validated today. Separate defect, fix scheduled in the
+  contract block's C4.
+
+REMAINING suspect surface for the three rows, in the order to test them:
+(1) the legs predate `f150213f`, so they reached the engine instead of the
+pre-dispatch validator -- in which case the rows are already closed and should
+be retired with that evidence; (2) the effective engine differed at image time
+via `OTR_FORCE_ENGINE_MAP` or the `_radio_is_host_redirect_applies` bookend
+redirect that the matrix harness may have set; (3) materialization -- the
+target was enumerated and authored but the file never landed; (4) the shot-id
+scheme (`shot_lock` mints `shot_<beat_id>`, so the opening shot should be
+`shot_b000_music_open`, but the live row names `shot_music_opening_001`, which
+matches neither current scheme -- the strongest hint that these rows are from
+an older code path).
+
+Per the operator's admission rule, no fix may claim these rows until one is
+reproduced at HEAD. Nothing here is a new PBUG: it is evidence narrowing an
+existing staged inventory.
