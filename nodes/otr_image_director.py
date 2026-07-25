@@ -140,6 +140,22 @@ def three_d_locked_slots(video_policy: dict) -> set:
     via :func:`_is_3d_engine` when an engine's capability cannot be read
     (fail-closed, 3D plan section 3)."""
     vm = (video_policy or {}).get("video_models") or {}
+    # THE EFFECTIVE ROUTE WINS (2026-07-25 QA). This resolved the PICKED engine,
+    # so a force map that routes a role ONTO a mesh-portrait engine left the
+    # slot unlocked and the fail-closed "no per-beat mesh rebuild" guard never
+    # fired -- the identical picked-vs-effective defect class that produced the
+    # decapitation bug in `aspects`. Its sibling
+    # `mesh_fodder_roles_from_video_policy` below already resolved effective;
+    # this one did not.
+    #
+    # HONEST STATUS: DORMANT, not live. No currently registered engine declares
+    # `requires_mesh_portrait` -- the three that do (triposg_talk,
+    # hunyuan3d_talk, trellis_talk in eng_character_3d.py) were UNREGISTERED
+    # 2026-06-29, so this returns an empty set on every real run today and no
+    # force map can trigger it. It is fixed now because the trap re-arms itself
+    # the moment a 3D talker is re-registered, and because a derived value
+    # reading the picked engine is exactly what this build exists to eliminate.
+    effective = (video_policy or {}).get("effective_video_models") or {}
     # Each IMAGE slot is locked if ANY of its paired ROLES' video engine
     # requires a mesh portrait. character_image_model pairs with the
     # character lane (rip-sfx-broll 2026-07-01 removed the retired_role_a /
@@ -153,7 +169,8 @@ def three_d_locked_slots(video_policy: dict) -> set:
     locked = set()
     for img_slot, roles in img_slot_roles.items():
         for role in roles:
-            engine_id = _role_slots.engine_id_for_role(vm, role)
+            engine_id = (str(effective.get(role) or "")
+                         or _role_slots.engine_id_for_role(vm, role))
             if _is_3d_engine(engine_id, slot=_role_slots.slot_for_role(role)):
                 locked.add(img_slot)
                 break

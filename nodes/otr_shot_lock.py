@@ -720,8 +720,19 @@ def derive_creative_directives(
     still_capabilities = None
     if video_policy is not None:
         try:
+            from ._otr_shared.route_freeze import RouteFreezeError
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared.route_freeze import RouteFreezeError
+        try:
             from .otr_image_gen_dispatcher import still_consumer_capabilities
             still_capabilities = still_consumer_capabilities(video_policy)
+        except RouteFreezeError:
+            # A MALFORMED ROUTING ENVIRONMENT IS TERMINAL (2026-07-25 QA, third
+            # swallow site found). "Uncertainty retains authoring" is the right
+            # answer for an incomplete policy -- it is the wrong answer for a
+            # typo'd OTR_FORCE_ENGINE_MAP, which would silently fall back to
+            # authoring every character beat as though capability were unknown.
+            raise
         except Exception:  # noqa: BLE001 -- uncertainty retains authoring
             still_capabilities = None
     char_beats = [

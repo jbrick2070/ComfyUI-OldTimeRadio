@@ -22,6 +22,13 @@ import json
 import logging
 import re
 
+# A malformed routing environment is terminal at every reader (2026-07-25).
+# route_freeze is stdlib-only at module scope, so this stays cold-import clean.
+try:
+    from ._otr_shared.route_freeze import RouteFreezeError as _RouteFreezeError
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared.route_freeze import RouteFreezeError as _RouteFreezeError
+
 log = logging.getLogger("OTR")
 
 def _content_hash(obj) -> str:
@@ -469,6 +476,11 @@ def _still_consumer_capabilities(video_models):
         except ImportError:  # pragma: no cover -- flat test imports
             from otr_image_gen_dispatcher import still_consumer_capabilities  # type: ignore
         return still_consumer_capabilities({"video_models": video_models})
+    except _RouteFreezeError:
+        # A MALFORMED ROUTING ENVIRONMENT IS TERMINAL (2026-07-25 QA, fourth
+        # swallow site). Uncertainty legitimately retains legacy authoring; a
+        # mistyped OTR_FORCE_ENGINE_MAP is not uncertainty.
+        raise
     except Exception:  # noqa: BLE001 -- uncertainty retains legacy authoring
         return None
 
@@ -703,17 +715,13 @@ def _still_word_roles_from_policy(policy_json):
             from _otr_shared import role_slots as _rs  # type: ignore
     except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
         return set()
-    try:
-        from ._otr_shared.route_freeze import RouteFreezeError  # type: ignore
-    except ImportError:  # pragma: no cover -- flat test imports
-        from _otr_shared.route_freeze import RouteFreezeError  # type: ignore
     roles = set()
     for role in _rs.ROLE_TO_VIDEO_SLOT:
         try:
             eng_id = _effective_prompt_engine_for_role(vm, role)
             if eng_id == "still_word":
                 roles.add(role)
-        except RouteFreezeError:
+        except _RouteFreezeError:
             # A MALFORMED ROUTING ENVIRONMENT IS TERMINAL AND MUST PROPAGATE
             # (2026-07-25 QA). This loop's broad catch predates the fail-closed
             # force-map contract and was written when the resolver swallowed

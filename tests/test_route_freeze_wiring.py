@@ -407,3 +407,96 @@ def test_end_to_end_freeze_survives_the_render_boundary(monkeypatch):
         rd._NEVER_HUMO_REDIRECT_ENGINE
     # ...and the render boundary verifies rather than re-derives it.
     assert rd.assert_frozen_route(patched) is True
+
+
+# ---------------------------------------------------------------------------
+# QA round 2 -- every reader fails closed, no exceptions
+# ---------------------------------------------------------------------------
+
+_BAD_MAP = "not-a-role-pair"
+
+
+def test_creative_directives_do_not_swallow_a_malformed_force_map(monkeypatch):
+    """THIRD swallow site, found by the local agy panel after the Sonnet pass.
+
+    ``derive_creative_directives`` asked the dispatcher for still capabilities
+    inside a broad ``except Exception: still_capabilities = None``. "Uncertainty
+    retains authoring" is right for an INCOMPLETE policy and wrong for a typo'd
+    OTR_FORCE_ENGINE_MAP: the lock would quietly author every character beat as
+    though capability were unknown, on a plan that cannot render.
+    """
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", _BAD_MAP)
+    beats = [{"beat_id": "b001", "role": "character_video", "char_id": "c1",
+              "dur_s": 2.0}]
+    policy = {"policy_version": 2,
+              "video_models": _resolved("humo", "humo", "humo")}
+    with pytest.raises(rf.RouteFreezeError):
+        sl.derive_creative_directives(beats, {}, {}, video_policy=policy)
+
+
+def test_meta_brief_capability_probe_does_not_swallow_a_malformed_force_map(monkeypatch):
+    """FOURTH swallow site, same round, same shape."""
+    from nodes import otr_meta_brief_image_prompt as mbp
+
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", _BAD_MAP)
+    with pytest.raises(rf.RouteFreezeError):
+        mbp._still_consumer_capabilities(_resolved("humo", "humo", "humo"))
+
+
+def test_still_word_roles_do_not_swallow_a_malformed_force_map(monkeypatch):
+    """FIRST swallow site (Sonnet pass) -- kept as a standing guard."""
+    from nodes import otr_meta_brief_image_prompt as mbp
+
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", _BAD_MAP)
+    policy = json.dumps({"video_models": _resolved("humo", "humo", "humo")})
+    with pytest.raises(rf.RouteFreezeError):
+        mbp._still_word_roles_from_policy(policy)
+
+
+def test_still_consumer_capability_does_not_swallow_a_malformed_force_map(monkeypatch):
+    """SECOND swallow site (Sonnet pass) -- kept as a standing guard."""
+    from nodes import otr_image_gen_dispatcher as disp
+
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", _BAD_MAP)
+    policy = {"video_models": _resolved("humo", "humo", "humo")}
+    with pytest.raises(rf.RouteFreezeError):
+        disp.still_consumer_capability(policy, "character_video")
+
+
+def test_three_d_lock_reads_the_EFFECTIVE_engine(monkeypatch):
+    """A derived value that still read the PICKED engine (agy, QA round 2).
+
+    DORMANT, and the finding is recorded honestly as such: no registered engine
+    declares ``requires_mesh_portrait`` today -- the three that do were
+    unregistered 2026-06-29 -- so this cannot fire on a real run. The reported
+    reproducing input (forcing ``mesh_stage``) does NOT actually reproduce,
+    because ``mesh_stage`` never declared that attribute. The trap is that it
+    re-arms the moment a 3D talker is re-registered, so the resolution order is
+    fixed now: effective first, picked only as the fallback.
+    """
+    from nodes import otr_image_director as idir
+
+    calls = []
+
+    def _fake_is_3d(engine_id, slot=None):
+        calls.append(engine_id)
+        return engine_id == "hunyuan3d_talk"
+
+    monkeypatch.setattr(idir, "_is_3d_engine", _fake_is_3d)
+    policy = {
+        "video_models": _resolved("wan_i2v", "wan_i2v", "wan_i2v"),
+        "effective_video_models": {"character_video": "hunyuan3d_talk"},
+    }
+    locked = idir.three_d_locked_slots(policy)
+    assert "character_image_model" in locked, (
+        "the lock must follow the engine that actually renders; it saw %r" % calls)
+
+
+def test_three_d_lock_falls_back_to_the_picked_engine_without_a_freeze(monkeypatch):
+    """A pre-1b policy keeps its old meaning exactly."""
+    from nodes import otr_image_director as idir
+
+    monkeypatch.setattr(idir, "_is_3d_engine",
+                        lambda engine_id, slot=None: engine_id == "hunyuan3d_talk")
+    policy = {"video_models": _resolved("wan_i2v", "wan_i2v", "hunyuan3d_talk")}
+    assert "character_image_model" in idir.three_d_locked_slots(policy)
