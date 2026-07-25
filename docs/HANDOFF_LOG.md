@@ -3,6 +3,66 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-25 (evening) -- HEAD 00339e32 (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: closed out chunk 3b, ran TWO adversarial QA rounds over everything shipped
+today, and settled the operator's dormant-3D question with codex.
+- `00339e32` **chunk 3b**: the `CoveragePlan` now rides the shot row and is
+  validated at BOTH wire boundaries -- ShotLock at plan time, and
+  `render_driver.assert_coverage_plans` before execution, re-checked against
+  the LIVE contract so an adapter whose declaration moved cannot silently
+  execute a stale plan. Behaviour-inert and pinned as such.
+- **QA ROUND 1 (`6dc39f1f`) -- six-lens Sonnet fan-out, operator-directed.**
+  Found SIX real defects in code that was already green and already pushed.
+  THREE were partitioner math, all found by brute-force differential testing
+  rather than reading: a tail-trim search capped at one quantum (832 coverable
+  beats refused), an unmemoized recursion that HUNG rather than refused (18s at
+  count=14, still running past 20s at 16), and -- found by my OWN sweep after
+  fixing those two, missed by all six agents -- `join_mode_for` claiming SINGLE
+  for targets no single render can cover (202 refusals in an 18k sweep). The
+  sweep now runs 18,336 differential calls with 0 false refusals and 0
+  invariant breaks, and lives in the suite.
+  TWO were swallowed fail-closed sites: chunk 1a's terminal contract was being
+  absorbed by pre-existing broad `except Exception` blocks, each of which
+  individually defeated the entire chunk.
+  ONE was an unproven fix: MUTATION TESTING showed that reverting `talking` to
+  the picked engine left the WHOLE suite green -- the decapitation fix's twin
+  had shipped with zero coverage. Also proved two "exhaustive" sweep tests were
+  theatre (112 of 128 targets asserted nothing).
+- **QA ROUND 2 (`0bc863f4`) -- local agy panel.** Found TWO MORE swallowed
+  fail-closed sites (`derive_creative_directives`,
+  `_still_consumer_capabilities`), bringing the day's total to FOUR, plus a
+  dormant picked-vs-effective trap in `three_d_locked_slots`. I overruled one
+  of its reproducing inputs: the `mesh_stage` repro does not reproduce, because
+  `mesh_stage` never declared `requires_mesh_portrait`. Fixed and labelled
+  DORMANT rather than claimed live.
+- **DORMANT 3D CONSULT (`624b53e0`)** -- operator asked whether to rip the
+  unregistered 3D talkers. Answer: YES, and lean-mean **W2 already said so** in
+  writing ("delete, NOT keep-dark"), so nothing was re-litigated -- it belongs
+  to CODER D behind the operator's own pinned r2->r3->r4, not to this window.
+  **The one new fact: a LIVE guard is hiding in the dormant code.**
+  `otr_image_director._is_3d_engine:109-119` raises for ANY non-empty
+  UNREGISTERED engine (covered at `test_image_platform_c1.py:339-352`), and
+  neither VideoDirector nor the route freeze validates registry membership --
+  so a straight delete would silently remove a live protection. W2 chunk 1 is
+  now a MIGRATION, recorded in GO_FORWARD. codex also corrected MY brief: five
+  test files hard-depend on the dormant modules, not three (my inventory
+  classifier missed multi-line import continuations).
+- The 4060 pass ran and produced NOTHING usable: ten findings, all rejected on
+  grounding (claimed non-determinism in a per-call memo over a sorted menu,
+  "infinite recursion" in a loop bounded by a decrementing counter, an
+  exact-sum violation from fabricated arithmetic). Fluent, plausible,
+  code-ungrounded -- exactly the advisory-only failure mode the skill warns of.
+- Suite 6454 -> **6591 passed** / 27 skipped / 1 xfailed; Bible 17; canonical
+  byte-identical `5377914B` across all nine commits.
+Current step: coverage chunk 4 (jump-still image-phase consumer -- without it a
+jump cut has NO still). Then 5, 6, 7.
+Next: CODER A -- chunk 4. Chunk 7 is the `ltx_8gb` 169-frame LIVE slice and
+needs a selective box reset per CLAUDE.md section 4.
+Models: Claude Opus (rung 4) + 1 kibitz r4 + 1 codex consult (`gpt-5.6-sol`
+high, pins verified) + a 6-agent Sonnet fan-out + 1 agy pass + 1 4060 pass
+(no value). $0 OpenRouter.
+Commits: 6dc39f1f, 0bc863f4, 624b53e0, 00339e32
+
 ## 2026-07-25 (afternoon) -- HEAD bfacec2b (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: r4 CONVERGED and CHUNK 1 SHIPPED IN THREE GREEN PUSHED PARTS. Operator
 went to yoga mid-session and authorised full autonomy ("all chunks waves"),

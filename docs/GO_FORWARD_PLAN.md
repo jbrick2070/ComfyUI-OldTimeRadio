@@ -210,7 +210,52 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- MULTI-CLIP COVERAGE: CHUNKS 1-3 DONE, CHUNK 3b NEXT
+## CURRENT STEP -- MULTI-CLIP COVERAGE: CHUNKS 1-3b DONE, CHUNK 4 NEXT
+
+**Updated 2026-07-25 (evening), HEAD `00339e32`.** Chunks 1a/1b/1c/2/3/3b are
+LANDED, GREEN and PUSHED, plus a two-round adversarial QA that found and fixed
+NINE real defects. Suite 6454 -> **6591 passed / 27 skipped / 1 xfailed**;
+Bible 17; canonical byte-identical `5377914B` across every commit.
+
+| chunk | commit | what landed |
+|---|---|---|
+| 1a | `933a78ba` | `_otr_shared/route_freeze.py` = THE route authority; four mirrors collapsed; malformed force map TERMINAL everywhere |
+| 1b | `9006b76d` | the freeze at node 87 + forwarding + ShotLock consumption + `IS_CHANGED`; **the DECAPITATION fix** |
+| 1c | `49944fb1` | render-time equality: verify, never repair; legacy branch NAMED |
+| 2 | `ffc14693` | `frame_contract.py` + the roster audit (swallowed-import blindspot) |
+| 3 | `bfacec2b` | `coverage_plan.py` -- the exact-sum partitioner (pure core) |
+| QA1 | `6dc39f1f` | 3 partitioner math defects + 2 swallowed fail-closed sites + the unproven `talking` half |
+| QA2 | `0bc863f4` | 2 MORE swallowed fail-closed sites + the dormant 3D picked-vs-effective trap |
+| 3b | `00339e32` | the `CoveragePlan` rides the ledger, validated at BOTH wire boundaries |
+
+**THE QA ROUNDS ARE THE STORY OF THIS SESSION AND THE LESSON IS PORTABLE.**
+A six-lens Sonnet fan-out plus an agy pass found NINE defects in code that was
+already green, already reviewed by a 4-round kibitz arc, and already pushed:
+- **FOUR swallowed fail-closed sites.** Chunk 1a made a malformed
+  `OTR_FORCE_ENGINE_MAP` terminal; four pre-existing broad `except Exception`
+  blocks silently absorbed it, each one individually defeating the entire
+  chunk. **When you make something newly terminal, grep every caller for a
+  broad catch in the SAME change** -- the suite will not tell you.
+- **THREE partitioner math defects**, all found by brute-force differential
+  testing against an independent reference, none by reading: a tail-trim search
+  capped at one quantum (832 coverable beats refused), an unmemoized recursion
+  that HUNG instead of refusing, and a `join_mode_for` that claimed SINGLE for
+  targets no single render can cover. **A pure algorithm deserves a
+  differential sweep, not a code review.** The standing sweep now lives in
+  `tests/test_multiclip_coverage_plan.py`.
+- **Mutation testing found an unproven fix.** Reverting `talking` to the picked
+  engine left the WHOLE suite green -- the decapitation fix's twin had shipped
+  with zero coverage. **A green suite is not proof a fix is proven.**
+- **Two "exhaustive" sweep tests were theatre**: 112 of 128 targets asserted
+  nothing, and corrupting the chain arithmetic left both passing.
+
+**THE DURABLE ARCHITECTURAL LESSON:** node ids are NOT execution order. There
+is no `89 -> 90` edge in `otr_canonical.json` -- MetaBrief (89) and ShotLock
+(90) are INDEPENDENT branches reconverging only at 91, so a freeze at ShotLock
+can never inform the image phase. Node 87 is the unique common ancestor.
+**Verify a claimed node ORDER against the link list, never the ids.**
+
+## SUPERSEDED -- the chunk 1-3 detail (kept for the arc record)
 
 **Updated 2026-07-25 (afternoon), HEAD `bfacec2b`.** r4 CONVERGED (both seats
 yes-with-fixes, `48e02241`), a six-way grounded Sonnet fan-out ran before code
@@ -242,16 +287,15 @@ minted and the wide render centre-cropped it. `eng_ltx_av.py:345-347` had
 recorded that exact outcome verbatim. Pinned by
 `test_redirected_bookend_gets_a_WIDE_still_not_a_decapitated_portrait`.
 
-**NEXT -- chunk 3b, then 4-7 in the r3 order:**
+**NEXT -- chunk 4, then 5-7 in the r3 order:**
 
-1. **3b (next):** stamp the `CoveragePlan` durably in the ledger and validate
-   it at BOTH wire boundaries (ShotLock before serialization, RenderBatch
-   before execution). The pure core is landed at `bfacec2b`; this is its
-   wiring. Do NOT make the legacy `ShotRow` authoritative (r3 judged).
-   ShotLock must stamp `sections={"video": video_section}` and the dispatcher
-   must stamp BOTH updated `video` and `images`, or the plan vanishes from the
-   durable ledger and cannot support replay.
-2. **4:** jump-still image-phase consumer (ShotLock patches jump-still requests
+1. ~~**3b**~~ -- DONE @ `00339e32`. The `CoveragePlan` is stamped on every shot
+   row and validated at both wire boundaries (ShotLock at plan time,
+   `render_driver.assert_coverage_plans` before execution, re-checked against
+   the LIVE contract). Behaviour-inert and pinned as such: every adapter is
+   still `SINGLE_ONLY`, so every beat gets a one-segment plan. The legacy
+   `ShotRow` was NOT made authoritative (r3 judged).
+2. **4 (NEXT):** jump-still image-phase consumer (ShotLock patches jump-still requests
    into `script_json` -> dispatcher merges into `objects` +
    `required_scene_targets` -> the spine validates EVERY jump segment).
    **Without this a jump cut has no still at all.**
