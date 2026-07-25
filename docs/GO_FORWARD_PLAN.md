@@ -1,5 +1,26 @@
 # OTR Go-Forward Plan
 
+**Updated:** 2026-07-25 -- **WAN 8-GB LOW-VRAM LAUNCH CONTRACT IS DONE @
+`f914f0a4`** (first item of the rescoped order, CODER A). The 8-GB tier's
+render ceiling now travels profile -> `OTR_VideoDirector.max_render_frames`
+(appended widget, canonical ships 0 = unpinned) -> v2 policy -> ShotLock ledger
+-> `render_driver.build_episode_render_policy` -> `MotionEngineBase.prepare` ->
+`eng_wan_ti2v._floor_length`, because `launch.env` can never reach a leg
+submitted to an already-booted server. Only `otr_8gb_wan` declares the new
+OPTIONAL key `video.max_render_frames`, so every other tier -- including the
+qualified 16-GB WAN lane -- is unchanged. Canonical `A66A416B` -> `5377914B`;
+11 variants + 4 paired `.env.json` hashes regenerated. Record:
+`PBUG-20260723-02`. Live 8-GB requalification leg still OWED.
+**NEW OPERATOR BLOCK 2026-07-25 -- PER-ENGINE IMAGE CONTRACT** (operator: "each
+video engine needs a separate set of instructions and prompts about what kind of
+images it needs; the image gen dropdown stays separate"). C0 LANDED @
+`9d1874f1` (test-only) and it DISPROVED the standing theory: the image phase
+already enumerates the opening beat and the mesh fodder/plate pair for every
+failing engine, and `viz_*` correctly requires zero images. Plan of record +
+r2/r3 judgments live in `kibitz-runs/2026-07-24-engine-image-contract/`
+(gitignored, local). **r4 is still owed before any contract chunk executes.**
+See the block entry below.
+
 **Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
 waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
 bundle under `user_packs/source_banks/<id>/`, runs
@@ -169,13 +190,32 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- WAN 8-GB contract, then the lean-mean front
+## CURRENT STEP -- the per-engine IMAGE CONTRACT block (r4, then C2a)
 
-Operator rescope 2026-07-24. The coder slot is FREE and the order is fixed:
+Operator rescope 2026-07-24, amended 2026-07-25 by the new image-contract
+block. Item 1 is DONE; the live order is now:
 
-1. **WAN 8-GB low-VRAM launch contract** -- make the 8-GB profile carry its
-   actual 832x480 / 17-frame launch contract instead of falling back to the
-   177-frame default. Pure coding; no GPU needed to write it.
+0. **PER-ENGINE IMAGE CONTRACT (NEW, operator 2026-07-25).** C0 landed
+   test-only @ `9d1874f1`. NEXT: an **r4 convergence at current HEAD** (the
+   standing gate -- nothing has executed against the plan yet), then **C2a**:
+   snapshot `OTR_FORCE_ENGINE_MAP` / `OTR_ENABLE_HUMO_HOSTS` /
+   `OTR_ENABLE_LTX_I2V` + `canvas.fps` ONCE into the video policy, forward
+   through `OTR_ImageDirector`, persist in the ShotLock ledger, and make all
+   three phases read the snapshot instead of re-reading the environment. C2a is
+   a standalone correctness fix (the image and render phases can resolve
+   DIFFERENT engines for one episode today) and is a live candidate explanation
+   for the 2026-07-23 still-spine rows. Then C1 (contract module + adapter
+   declarations + FROZEN parity fixture captured at `f914f0a4`), C2, C3, C4, C5.
+   Detail: `kibitz-runs/2026-07-24-engine-image-contract/r2/final.md` +
+   `r3/final.md`. HARD acceptance: the golden-nugget inventory (operator
+   2026-07-25) -- HuMo portrait vs 16:9 wide, lips vs no-lips, mesh isolated
+   subject + plate, radio bookends, `still_*` needing a base still, `viz_*`
+   needing NO images -- migrates as declared data with a test per row, and a
+   frozen fixture proves the contract reproduces every current decision.
+
+1. ~~**WAN 8-GB low-VRAM launch contract**~~ -- DONE @ `f914f0a4`
+   (`PBUG-20260723-02`). The live 8-GB requalification leg is still owed and
+   belongs to a render window.
 2. **LEAN-MEAN FRONT** (`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 ->
    W5+SW4 -> C1-C5`), with `docs/ENGINE_MATRIX.md` folded in as a W6 sub-step.
 3. **Randomizer A -> `dynamic_story`.**

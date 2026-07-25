@@ -3,6 +3,52 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-25 01:30 -- HEAD 9d1874f1 (v2.0-alpha) -- CODER WINDOW A (Opus)
+Did: landed the WAN 8-GB low-VRAM launch contract @ `f914f0a4`, then opened the
+NEW operator block (per-engine image contract) and landed its C0 @ `9d1874f1`.
+WAN 8-GB: the tier's 17-frame ceiling existed only in `launch.env`, which a
+production leg can never see (it is submitted to an already-booted server), and
+`render.frame_budget` maps to a harness-only widget ignored in mode=episode --
+so the contract was inert on BOTH channels and the leg inherited the 177-frame
+engine max. New OPTIONAL profile key `video.max_render_frames` now rides the
+same channel device/dtype policy uses: profile -> `OTR_VideoDirector.
+max_render_frames` (appended widget, canonical ships 0) -> v2 policy -> ShotLock
+ledger -> `build_episode_render_policy` -> `MotionEngineBase.prepare` ->
+`eng_wan_ti2v._floor_length`. Deliberately did NOT reuse `render.frame_budget`:
+every 16GB tier declares 25 there, so wiring it would have capped the QUALIFIED
+16GB WAN lane to 1s renders. Canonical A66A416B -> 5377914B, 11 variants + 4
+paired .env.json hashes regenerated, two node-87 widget-count pins 14 -> 15.
+Record PBUG-20260723-02; live 8GB requalification still owed.
+IMAGE CONTRACT (new block, operator 2026-07-25: "each video engine needs a
+separate set of instructions and prompts about what kind of images it needs;
+the image gen dropdown stays separate"). Ran a kibitz r2 + r3 (codex
+gpt-5.6-sol high; agy delivered r2 but FAILED in r3 -- one-agent round, recorded).
+Had to kill and relaunch the arc once: codex auto-resolved to gpt-5.5, the exact
+stale-cache drift CLAUDE.md section 8 warns about -- pin KIBITZ_CODEX_MODEL.
+C0 (test-only, `9d1874f1`) DISPROVED the standing theory: the producer already
+requires the opening beat for every still-consuming engine and the mesh
+fodder/plate pair for every mesh beat, and viz_* requires zero images. So
+enumeration is EXCLUDED as the cause of the three 2026-07-23 still-spine rows;
+remaining suspects are recorded in the failure inventory (older code path /
+env-routing divergence / materialization / shot-id scheme).
+Three things grounded on the way that must not be lost: `still_*` engines
+consume a scene still while declaring only text_prompt in required_inputs (so
+requiredness must be DECLARED, never derived); the lips capability is a HOOK the
+director CALLS (a getattr truthiness test would invert lips/no-lips for every
+engine); `apply_fresh_cap` has no production caller; and `ImageRequest` is
+_Forbid-strict without kind/beat_id/char_id while the dispatcher sends exactly
+those -- that boundary is unvalidated today.
+Current step: image-contract block -- r4 convergence at HEAD is OWED before any
+contract chunk executes, then C2a (snapshot OTR_FORCE_ENGINE_MAP /
+OTR_ENABLE_HUMO_HOSTS / OTR_ENABLE_LTX_I2V + canvas.fps once into the policy and
+ledger; today the image and render phases can resolve DIFFERENT engines for one
+episode), then C1..C5 per the r3 judgment.
+Next: CODER A (or its successor) runs r4, then C2a. Plan of record:
+`kibitz-runs/2026-07-24-engine-image-contract/{r2,r3}/final.md` (gitignored).
+Models: Claude Opus (rung 4) + kibitz r2/r3 (codex gpt-5.6-sol high, agy Gemini
+3.6 Flash High -- agy absent in r3).
+Commits: f914f0a4, 9d1874f1, plus this handoff.
+
 ## 2026-07-24 16:45 -- HEAD 36da1f9f (v2.0-alpha) -- OPERATOR RE-GROUND GATE (Opus)
 Did: added a STANDING RE-GROUND GATE to GO_FORWARD. No code touched.
 THE OPERATOR'S CALL: every remaining big block gets a kibitz arc before it
