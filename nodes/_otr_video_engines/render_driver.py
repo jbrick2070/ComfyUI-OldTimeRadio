@@ -718,6 +718,50 @@ def jump_segment_still_path(ledger, shot, segment_index):
             "FALLBACK." % (shot.get("shot_id"), index))
     if index == 0:
         return None
+
+    # ONLY A *JUMP* SEGMENT OWNS A STILL (2026-07-26, chunk 7a QA panel).
+    #
+    # This function is the DEMAND side of a mint that happens in
+    # ``otr_shot_lock._stamp_coverage_plan``, and until multi-clip went live it
+    # had never been asked about a real beat. The moment it was, it refused
+    # every one: it treated "segment index >= 1" as "this is a jump segment",
+    # which is only one of the two ways a beat gets a second clip.
+    #
+    # A CHAINED successor is the other, and it deliberately owns no still --
+    # ``render_beat_coverage``'s own loop says so in as many words ("a chained
+    # successor does not get a minted still at all -- it begins on the real
+    # frame its predecessor ended on") and overwrites ``asset_refs["init_image"]``
+    # with the extracted terminal frame right after this request is built.
+    # ``coverage_plan.jump_still_requests`` agrees and returns nothing for a
+    # CHAIN plan. So the mint correctly stamped no request, and the demand
+    # correctly raised for its absence, and between them an ordinary 8-second
+    # beat on wan_i2v / wan_ti2v / ltx_8gb / ltx_video died at segment 1.
+    #
+    # Two policies over one state, the third instance of this exact shape in
+    # this feature. The fix is the same as the other two: ask the SAME
+    # questions the mint asked, in the same order, off the same durable facts.
+    plan_raw = shot.get("coverage_plan")
+    if isinstance(plan_raw, dict) and plan_raw:
+        try:
+            from . import coverage_plan as _cp_local  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            import coverage_plan as _cp_local  # type: ignore
+        join_mode = str(plan_raw.get("join_mode") or "")
+        if join_mode and join_mode != _cp_local.JOIN_JUMP:
+            return None
+    # ...and a lane the still spine never asks a scene still of was never
+    # minted one either (``_stamp_coverage_plan`` returns before minting when
+    # ``_lane_consumes_a_still`` is false, and that predicate delegates to the
+    # very function called here). An audio_driven_face beat renders from its
+    # portrait, not from a per-segment scene still, so there is nothing to
+    # demand -- and demanding it killed every HuMo beat over its cap, which for
+    # the 49-frame humo_14B_169 tier is very nearly all of them.
+    if not _still_spine_requires_scene(
+            shot, str(shot.get("engine_id") or ""),
+            engine_family(str(shot.get("engine_id") or ""),
+                          str(shot.get("family") or ""))):
+        return None
+
     requests = _jump_still_requests_for_shot(shot)
     request = next((row for row in requests
                     if int(row.get("segment_index") or 0) == index), None)

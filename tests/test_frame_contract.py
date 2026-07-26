@@ -91,11 +91,11 @@ def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
             engine = vreg.get_engine(name)
         except Exception:  # noqa: BLE001 -- unbuildable engines are not our subject
             continue
-        contract = fc.frame_contract_for(engine)
         (splittable if fc.can_split(engine) else unbounded).append(name)
-        # can_split is exactly "has a ceiling", never a stored opinion.
-        assert fc.can_split(engine) == bool(contract.max_frames
-                                            or contract.discrete_frames), name
+    # NOT ``assert can_split(e) == bool(e.max_frames or e.discrete_frames)``.
+    # That line was here and a QA panel called it: it re-executes can_split's
+    # own body and compares it to the call, so it cannot fail for any engine
+    # ever. The real check is the literal set below.
     assert splittable, "no engine declares a ceiling -- the sweep is vacuous"
     assert unbounded, "no engine is unbounded -- the sweep is vacuous"
     # The unbounded set is exactly the lanes that synthesise frames on demand.

@@ -1155,6 +1155,43 @@ def _stamp_coverage_plan(shot, beat_id):
         return
     plan = _cp.partition_beat(target, contract)
     _cp.validate_coverage_plan(plan, contract)
+
+    # AN AUDIO-DRIVEN LANE CANNOT BE SPLIT YET, AND SAYS SO (2026-07-26,
+    # chunk 7a QA panel). A lane that REQUIRES an audio_ref generates its
+    # frames FROM that audio -- HuMo animates a mouth against speech. Splitting
+    # such a beat into segments needs each segment to receive its own slice of
+    # that speech, and nothing in this build slices it: ``_voice_audio_for_line``
+    # takes a line and returns one path, with no segment index anywhere in its
+    # signature or its callers.
+    #
+    # So a split HuMo beat would hand EVERY segment the whole line from its
+    # start, and the assembled clip would speak the opening syllables three
+    # times over while the audio ran on. That is a sync defect that ships as a
+    # finished episode -- the exact failure class this build exists to remove,
+    # and worse than the refusal because nothing in the log would say so.
+    #
+    # Refusing here is not a new gate; it is the SAME refusal moved earlier and
+    # given a reason. ``humo_14B_169`` already raised ``MirrorExtensionForbidden``
+    # at render time for any beat past its 49-frame cap -- after the GPU work,
+    # with a message about mirroring. This one lands at plan time, names the
+    # beat, and says what is actually missing.
+    if plan.is_multi_clip:
+        try:
+            engine_obj = _vreg_local.get_engine(engine_id)
+        except Exception:  # noqa: BLE001
+            engine_obj = None
+        required = tuple(getattr(engine_obj, "required_inputs", ()) or ())
+        if "audio_ref" in required:
+            raise _cp.CoveragePlanError(
+                "beat %s needs %d clips on %s (%d frames, cap %s), but %s "
+                "renders frames FROM its audio_ref and nothing in this build "
+                "slices that audio per segment -- every segment would receive "
+                "the whole line from its start and the assembled beat would "
+                "repeat the opening syllables. NO FALLBACK: per-segment audio "
+                "is the prerequisite, not a workaround."
+                % (beat_id, plan.segment_count, engine_id, target,
+                   contract.max_frames or "none", engine_id))
+
     shot["coverage_plan"] = plan.to_dict()
     if not _lane_consumes_a_still(shot, engine_id):
         return
@@ -1275,9 +1312,17 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
         # useless (r3): it must ride the durable ledger or it cannot support
         # replay, and the render boundary would have nothing to validate.
         #
-        # INERT TODAY BY CONSTRUCTION: every adapter still resolves to
+        # NO LONGER INERT (chunk 7a, 2026-07-26). This comment used to end
+        # "INERT TODAY BY CONSTRUCTION: every adapter still resolves to
         # frame_contract.SINGLE_ONLY, whose ladder accepts any length, so every
-        # beat gets a one-segment plan that renders exactly as it does now.
+        # beat gets a one-segment plan that renders exactly as it does now."
+        # That was true for chunks 3b through 6 and stopped being true in the
+        # commit that gave all 31 adapters real ladders. A beat past its
+        # engine's cap now genuinely partitions into multiple clips here, and a
+        # beat off the quantum grid gets a render length its adapter accepts
+        # rather than the one the beat asked for. Left in place as a correction
+        # rather than deleted: a reader who remembers the old promise should
+        # find out here that it expired, not by trusting it.
         _stamp_coverage_plan(shots[-1], b["beat_id"])
     return groups, shots
 

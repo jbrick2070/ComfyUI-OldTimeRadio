@@ -256,14 +256,119 @@ def test_every_engine_with_a_safe_render_cap_declares_it_as_its_ceiling():
     will render". An engine that has one and declares a different ceiling is
     telling the planner two different numbers.
     """
+    checked = []
     for name, engine in _engines():
         cap = getattr(engine, "safe_render_frames", None)
         if cap is None:
             continue
+        checked.append(name)
         declared = fc.frame_contract_for(engine).max_frames
         assert declared == int(cap), (
             "%s renders at most safe_render_frames=%s but declares "
             "max_frames=%s" % (name, cap, declared))
+    # THE TRIPWIRE. Exactly one engine carries a cap today. If the mechanism is
+    # ever renamed or refactored away, this loop would run zero times and go on
+    # reporting green across all 31 engines while checking nothing -- the shape
+    # two "exhaustive" sweeps in this build already turned out to have.
+    assert checked == ["humo_14B_169"], (
+        "the safe_render_frames sweep checked %r. If a tier gained or lost a "
+        "cap that is fine -- update this list. If it is EMPTY, the mechanism "
+        "moved and this test is now theatre." % (checked,))
+
+
+def test_the_whole_second_cloud_lanes_declare_a_25_frame_quantum():
+    """The fourth defect this chunk fixed, which nothing else pins.
+
+    ``_CloudVideoBase._duration_seconds`` returns ``int`` SECONDS -- from an env
+    override or from ceiling-dividing the beat's frames by the canvas rate. So
+    at 25 fps these lanes can only ever request 25, 50, 75... frames, and a
+    contract claiming ``quantum=1`` advertises 24 lengths out of every 25 that
+    no request can produce.
+
+    The generic roster sweep cannot catch a regression here: the ceiling-on-the-
+    ladder check is satisfied by quantum 1 and quantum 25 alike (375-100 is
+    divisible by both), so reverting any of these to the dataclass default would
+    leave the whole suite green. Hence a named test.
+
+    ``cloud_kling_avatar`` is deliberately excluded and deliberately quantum 1:
+    it sends NO duration at all. Its clip is as long as the sound file, which is
+    a real fractional duration rather than a whole-second menu.
+    """
+    WHOLE_SECOND = {
+        "cloud_seedance_2": (100, 375),
+        "cloud_wan_i2v": (50, 375),
+        "cloud_wan_i2v_audio": (50, 375),
+        "cloud_vidu_q2_pro_fast_720p": (25, 250),
+        "cloud_vidu_q2_pro_fast_720p_sfx": (25, 250),
+    }
+    for name, (lo, hi) in WHOLE_SECOND.items():
+        c = fc.frame_contract_for(vreg.get_engine(name))
+        assert c.quantum == 25, (
+            "%s requests whole seconds, so only multiples of 25 frames are "
+            "reachable, but it declares quantum=%s" % (name, c.quantum))
+        assert (c.min_frames, c.max_frames) == (lo, hi), name
+        # Every legal length is a whole number of seconds. This is the property
+        # quantum=25 exists to state; assert it rather than the field alone.
+        assert all(n % 25 == 0 for n in c.legal_lengths()), name
+
+    kling = fc.frame_contract_for(vreg.get_engine("cloud_kling_avatar"))
+    assert kling.quantum == 1, (
+        "cloud_kling_avatar sends no duration -- its length is the sound "
+        "file's, which is not a whole-second menu")
+
+
+def test_a_negative_native_fps_is_rejected():
+    """The one new validation branch in FrameContract, exercised both ways.
+
+    Shipped in this chunk with no test until the QA panel said so. A rate below
+    zero is not a rate; the seconds column of the matrix divides by it.
+    """
+    with pytest.raises(fc.FrameContractError, match="native_fps"):
+        fc.FrameContract(native_fps=-1)
+    assert fc.FrameContract(native_fps=0).native_fps == 0    # canvas-rate
+    assert fc.FrameContract(native_fps=25).native_fps == 25
+
+
+def test_the_LTX_ceilings_do_not_silently_follow_their_env_overrides():
+    """Two of the three at-risk env vars had no check at all.
+
+    ``test_an_env_override_may_not_silently_move_a_declared_ceiling`` covers
+    ``OTR_LTX_AV_MAX_FRAMES`` because that one resolves at IMPORT, so a
+    mismatch is visible as a constant. The other two -- ``OTR_LTX_MAX_FRAMES``
+    and ``OTR_LTX_8GB_MAX_FRAMES`` -- are read at RENDER time, so nothing at
+    import can see them and there was nothing to compare.
+
+    What CAN be pinned, and is what actually matters: the declared ceiling is a
+    LITERAL and is NOT the env-overridable ``*_DEFAULT`` constant. If someone
+    "tidies" the declaration to read the default, the contract silently starts
+    tracking the environment and the image phase plans against a number that
+    can move underneath it.
+    """
+    from nodes._otr_video_engines import eng_ltx_8gb as _l8
+    from nodes._otr_video_engines import eng_ltx_video as _lv
+
+    assert fc.frame_contract_for(vreg.get_engine("ltx_video")).max_frames == 169
+    assert fc.frame_contract_for(vreg.get_engine("ltx_8gb")).max_frames == 161
+    # They happen to be equal today -- that is the point. Equality is fine;
+    # IDENTITY with the mutable default would mean the contract had been rewired
+    # to follow it.
+    assert _lv._LTX_MAX_FRAMES_DEFAULT == 169
+    assert _l8._LTX8_MAX_FRAMES_DEFAULT == 161
+    assert "_LTX_MAX_FRAMES_DEFAULT" not in _contract_source("eng_ltx_video.py")
+    assert "_LTX8_MAX_FRAMES_DEFAULT" not in _contract_source("eng_ltx_8gb.py")
+
+
+def _contract_source(filename):
+    """The text of a module's ``frame_contract = FrameContract(...)`` block."""
+    import pathlib
+    import re
+    path = (pathlib.Path(__file__).resolve().parents[1]
+            / "nodes" / "_otr_video_engines" / filename)
+    text = path.read_text(encoding="utf-8")
+    match = re.search(r"frame_contract = FrameContract\((.*?)\n    \)",
+                      text, re.S)
+    assert match, "no frame_contract declaration found in %s" % filename
+    return match.group(1)
 
 
 def test_the_sfx_lanes_share_their_base_adapters_ladder_object():
