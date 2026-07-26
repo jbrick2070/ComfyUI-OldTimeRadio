@@ -52,9 +52,20 @@ def _parse_fps(rate):
 def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
     """Probe a clip's stream + color contract (read-only). Returns
     ``{codec_types, video_codec, pix_fmt, color_space, color_primaries,
-    color_transfer, fps}``. Raises a NAMED GraphExecutionError on an ffprobe
-    failure (a missing ffprobe is a broken install, same class as the encoder's
-    missing-ffmpeg)."""
+    color_transfer, fps, width, height}``. Raises a NAMED GraphExecutionError
+    on an ffprobe failure (a missing ffprobe is a broken install, same class as
+    the encoder's missing-ffmpeg).
+
+    ``width``/``height`` joined the query for multi-clip coverage chunk 6
+    (2026-07-26). They cost nothing -- they come out of the SAME stream read --
+    and the assembler needs them: segments of one beat that differ in canvas
+    concatenate into a clip that changes size partway through, which no
+    downstream consumer expects and the mux will not tell you about. They are
+    absent from an audio-only stream, so they read as 0 rather than raising.
+
+    This helper deliberately does NOT count frames: it runs on EVERY emitted
+    clip, and counting means decoding. Use :func:`ffprobe_counted_frames` at
+    the assembly boundary, where the cost is paid once and the truth matters."""
     import json as _json
     import subprocess as _sp
 
@@ -63,7 +74,8 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
         proc = _sp.run(
             [ffprobe, "-v", "error", "-show_entries",
              "stream=codec_type,codec_name,pix_fmt,color_primaries,"
-             "color_transfer,color_space,avg_frame_rate,r_frame_rate",
+             "color_transfer,color_space,avg_frame_rate,r_frame_rate,"
+             "width,height",
              "-of", "json", path],
             stdout=_sp.PIPE, stderr=_sp.PIPE)
     except FileNotFoundError as exc:
@@ -85,7 +97,63 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
         "color_primaries": v.get("color_primaries"),
         "color_transfer": v.get("color_transfer"),
         "fps": _parse_fps(rate),
+        "width": int(v.get("width") or 0),
+        "height": int(v.get("height") or 0),
     }
+
+
+def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
+    """The DECODED frame count of ``path`` -- the only count that cannot lie.
+
+    Multi-clip coverage chunk 6 (2026-07-26). A container's ``nb_frames``
+    header is metadata: it is what the muxer WROTE, not what a decoder will
+    read back, and a concatenated clip can carry a header that disagrees with
+    its own picture data. Once a beat is assembled from several rendered
+    segments, "did the assembly produce exactly the frames the plan promised"
+    is the whole question, and a header cannot answer it. ``-count_frames``
+    decodes and counts.
+
+    THIS IS EXPENSIVE BY DESIGN -- it decodes the file. Call it at the
+    assembly/verification boundary, once per assembled beat. Never per clip in
+    the render loop; :func:`ffprobe_clip_fields` is the cheap per-clip probe.
+
+    Raises a NAMED GraphExecutionError when ffprobe is missing, fails, or
+    reports something that is not a frame count. It never guesses: an
+    unreadable count is a failed verification, not a zero.
+    """
+    import json as _json
+    import subprocess as _sp
+
+    from . import wrapper_bridge as _wb
+    try:
+        proc = _sp.run(
+            [ffprobe, "-v", "error", "-count_frames", "-select_streams", "v:0",
+             "-show_entries", "stream=nb_read_frames", "-of", "json", path],
+            stdout=_sp.PIPE, stderr=_sp.PIPE)
+    except FileNotFoundError as exc:
+        raise _wb.GraphExecutionError("ffprobe not found: %s" % exc)
+    if proc.returncode != 0:
+        raise _wb.GraphExecutionError(
+            "ffprobe -count_frames failed for %r: %s"
+            % (path, proc.stderr.decode("utf-8", "replace")[:300]))
+    data = _json.loads(proc.stdout.decode("utf-8", "replace") or "{}")
+    streams = data.get("streams") or []
+    if not streams:
+        raise _wb.GraphExecutionError(
+            "ffprobe -count_frames found NO video stream in %r -- there is "
+            "nothing to count, so the assembled beat cannot be verified" % path)
+    raw = streams[0].get("nb_read_frames")
+    try:
+        counted = int(raw)
+    except (TypeError, ValueError):
+        raise _wb.GraphExecutionError(
+            "ffprobe -count_frames reported nb_read_frames=%r for %r, which is "
+            "not a count. NO GUESS -- an unreadable count is a failed "
+            "verification, not a zero." % (raw, path))
+    if counted < 0:
+        raise _wb.GraphExecutionError(
+            "ffprobe -count_frames reported %d frames for %r" % (counted, path))
+    return counted
 
 
 def validate_silent_clip_contract(fields, expected_fps):
@@ -316,7 +384,7 @@ class WanInitImageMixin:
 
     @staticmethod
     def _comfy_root():
-        """ComfyUI install root (…/custom_nodes/OTR/nodes/_otr_video_engines ->
+        """ComfyUI install root (.../custom_nodes/OTR/nodes/_otr_video_engines ->
         up four)."""
         here = os.path.abspath(__file__)
         repo_root = os.path.dirname(os.path.dirname(os.path.dirname(here)))
@@ -324,6 +392,7 @@ class WanInitImageMixin:
 
 
 __all__ = [
-    "_parse_fps", "ffprobe_clip_fields", "validate_silent_clip_contract",
+    "_parse_fps", "ffprobe_clip_fields", "ffprobe_counted_frames",
+    "validate_silent_clip_contract",
     "WanInitImageMixin", "_WAN_DEFAULT_NEGATIVE",
 ]

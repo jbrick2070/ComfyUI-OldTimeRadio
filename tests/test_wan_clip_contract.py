@@ -137,3 +137,76 @@ def test_real_encoded_clip_satisfies_contract():
     finally:
         if os.path.exists(out):
             os.remove(out)
+
+
+# --------------------------------------------------------------------------- #
+# Multi-clip coverage chunk 6: geometry + the DECODED frame count
+# --------------------------------------------------------------------------- #
+from nodes._otr_video_engines.wan_shared import (  # noqa: E402
+    ffprobe_counted_frames,
+)
+from nodes._otr_video_engines import wrapper_bridge as _wb_mod  # noqa: E402
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="needs ffmpeg + ffprobe")
+def test_the_probe_reports_the_clip_GEOMETRY():
+    """Segments of one beat that differ in canvas concatenate into a clip that
+    changes size partway through, and the mux will not mention it."""
+    import numpy as np
+
+    frames = [np.zeros((64, 96, 3), dtype=np.uint8) for _ in range(4)]
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, "geom.mp4")
+        path, _n = wb.encode_frames_to_silent_mp4(frames, out, 25)
+        fields = ffprobe_clip_fields(path)
+    assert (fields["width"], fields["height"]) == (96, 64)
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="needs ffmpeg + ffprobe")
+def test_counted_frames_counts_what_a_decoder_actually_reads():
+    import numpy as np
+
+    frames = [np.zeros((64, 96, 3), dtype=np.uint8) for _ in range(7)]
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, "counted.mp4")
+        path, n = wb.encode_frames_to_silent_mp4(frames, out, 25)
+        assert ffprobe_counted_frames(path) == 7 == n
+
+
+def test_counted_frames_REFUSES_an_unreadable_count(monkeypatch):
+    """NO GUESS: an unreadable count is a failed verification, not a zero.
+
+    A zero would sail straight into an assembly check as 'the beat produced no
+    frames', which is a different and much more confusing failure than 'the
+    count could not be read'.
+    """
+    class _Proc:
+        returncode = 0
+        stdout = b'{"streams": [{"nb_read_frames": "N/A"}]}'
+        stderr = b""
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: _Proc())
+    with pytest.raises(_wb_mod.GraphExecutionError, match="not a count"):
+        ffprobe_counted_frames("whatever.mp4")
+
+
+def test_counted_frames_REFUSES_a_file_with_no_video_stream(monkeypatch):
+    class _Proc:
+        returncode = 0
+        stdout = b'{"streams": []}'
+        stderr = b""
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: _Proc())
+    with pytest.raises(_wb_mod.GraphExecutionError, match="NO video stream"):
+        ffprobe_counted_frames("whatever.mp4")
+
+
+def test_counted_frames_raises_NAMED_when_ffprobe_fails(monkeypatch):
+    class _Proc:
+        returncode = 1
+        stdout = b""
+        stderr = b"moov atom not found"
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: _Proc())
+    with pytest.raises(_wb_mod.GraphExecutionError, match="count_frames failed"):
+        ffprobe_counted_frames("whatever.mp4")
