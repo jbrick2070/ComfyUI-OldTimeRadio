@@ -191,3 +191,110 @@ def test_CONTROL_no_externals_behaves_exactly_as_before():
     assert wb.run_graph(graph, terminal="d") == (10,)
     assert wb.run_graph(graph, external_results=None, on_result=None,
                         terminal="d") == (10,)
+
+
+# =========================================================================== #
+# QA fan-out follow-ups (2026-07-26). Each closes a defect or a coverage hole
+# the post-code panel found in the code above, AFTER it was already pushed.
+# =========================================================================== #
+
+
+# --- C-2: `terminal` must name something this graph PRODUCES --------------- #
+def test_terminal_naming_an_external_only_id_is_REFUSED():
+    """An external is an INPUT the caller already owns, never the output.
+
+    `terminal` used to be validated against `results`, which is seeded with the
+    externals -- so a graph whose real terminal was missing or mistyped returned
+    SUCCESSFULLY, handing the caller back its own handle tuple as if it were a
+    render.
+    """
+    graph = {"d": {"class": _Double, "inputs": {"x": W("ckpt", 0)}}}
+    with pytest.raises(wb.GraphExecutionError) as e:
+        wb.run_graph(graph, external_results={"ckpt": ("MODEL",)},
+                     terminal="ckpt")
+    msg = str(e.value)
+    assert "ckpt" in msg and "external result" in msg
+
+
+def test_terminal_naming_nothing_at_all_is_REFUSED():
+    graph = {"d": {"class": _Double, "inputs": {"x": 2}}}
+    with pytest.raises(wb.GraphExecutionError) as e:
+        wb.run_graph(graph, terminal="typo")
+    assert "typo" in str(e.value) and "not in the graph" in str(e.value)
+
+
+def test_CONTROL_terminal_naming_a_real_graph_node_still_returns_it():
+    graph = {"d": {"class": _Double, "inputs": {"x": W("ckpt", 0)}}}
+    assert wb.run_graph(graph, external_results={"ckpt": (4,)},
+                        terminal="d") == (8,)
+
+
+# --- C-5: a missing wire source is NAMED, not a bare KeyError -------------- #
+def test_a_missing_wire_source_is_a_NAMED_error_not_a_bare_KeyError():
+    """Called directly: `run_graph`'s topo check catches this first, so the
+    only way to exercise the resolver's own guard is to invoke it."""
+    with pytest.raises(wb.GraphExecutionError) as e:
+        wb._resolve_value(W("ghost", 0), {})
+    msg = str(e.value)
+    assert "ghost" in msg and "no result" in msg
+
+
+def test_CONTROL_a_present_wire_source_still_resolves():
+    assert wb._resolve_value(W("ckpt", 1), {"ckpt": ("a", "b")}) == "b"
+
+
+def test_CONTROL_a_short_output_tuple_keeps_its_own_slot_message():
+    with pytest.raises(wb.GraphExecutionError) as e:
+        wb._resolve_value(W("ckpt", 5), {"ckpt": ("only-one",)})
+    assert "slot 5 unavailable" in str(e.value)
+
+
+# --- the `keep=` coverage hole (mutation survivor) ------------------------- #
+def test_the_callers_keep_set_SURVIVES_alongside_externals():
+    """`keep |= set(ext)` must UNION, never overwrite.
+
+    Production calls `run_graph(..., keep={"ckpt","modelsampling",terminal},
+    free_after_use=True)`. Overwriting `keep` with the externals would silently
+    drop every id the caller asked to retain -- freeing the MODEL patcher before
+    the post-loop teardown grab. The whole suite passed under that mutation
+    because no test combined a caller `keep` with externals.
+    """
+    graph = {"a": {"class": _Add, "inputs": {"a": W("ext", 0), "b": 1}},
+             "d": {"class": _Double, "inputs": {"x": W("a", 0)}}}
+    res = wb.run_graph(graph, external_results={"ext": (1,)},
+                       keep={"a"}, free_after_use=True)
+    assert res["a"] == (2,), "the caller's keep was discarded"
+    assert res["ext"] == (1,)
+    assert res["d"] == (4,)
+
+
+def test_CONTROL_without_an_explicit_keep_an_intermediate_still_frees():
+    """The companion: proves the test above detects `keep`, rather than just
+    asserting that nothing is ever freed.
+
+    Deliberately asserts ONLY the ordinary intermediate's fate. An earlier draft
+    also asserted the external survived here -- which made it a second test of
+    the FEATURE, so removing `keep |= set(ext)` broke it and it stopped
+    controlling for anything. A control must fail under OVER-tightening and pass
+    under correct behaviour, never mirror the feature it is supposed to bound.
+    """
+    graph = {"a": {"class": _Add, "inputs": {"a": W("ext", 0), "b": 1}},
+             "d": {"class": _Double, "inputs": {"x": W("a", 0)}}}
+    res = wb.run_graph(graph, external_results={"ext": (1,)},
+                       free_after_use=True)
+    assert "a" not in res, "the keep logic stopped an ordinary intermediate freeing"
+    assert res["d"] == (4,)
+
+
+# --- T-3: the repeated-run test could not observe internal eviction -------- #
+def test_the_same_external_survives_repeated_runs_OBSERVED_INTERNALLY():
+    """The original used `terminal=`, so it only ever saw the returned scalar
+    and could not tell whether the external had been evicted mid-run."""
+    handles = {"ckpt": (5,)}
+    for _ in range(3):
+        graph = {"d": {"class": _Double, "inputs": {"x": W("ckpt", 0)}},
+                 "t": {"class": _Double, "inputs": {"x": W("d", 0)}}}
+        res = wb.run_graph(graph, external_results=handles, free_after_use=True)
+        assert res["ckpt"] == (5,), "the handle was evicted during the run"
+        assert res["t"] == (20,)
+    assert handles == {"ckpt": (5,)}

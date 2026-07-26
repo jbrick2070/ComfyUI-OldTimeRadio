@@ -155,7 +155,20 @@ def _resolve_value(val, results):
     """Resolve Wires in an input value to concrete node outputs (recursing
     containers); literals pass through. Wire is matched BEFORE generic tuple."""
     if isinstance(val, Wire):
-        out = results[val.src]
+        # The LOOKUP has to be inside the guard too. It used to sit outside, so
+        # a source missing from ``results`` raised a bare KeyError instead of
+        # the NAMED GraphExecutionError this module promises -- and "a source
+        # went missing mid-graph" is exactly the failure class the beat-scoped
+        # loader hoist had to fix once already (segment 0's cleanup evicting a
+        # handle segment 1 still needed). Losing the name there costs the next
+        # person the diagnosis.
+        try:
+            out = results[val.src]
+        except KeyError:
+            raise GraphExecutionError(
+                "wire source %r has no result -- it was never executed, is not "
+                "an external result, or its output was already freed"
+                % (val.src,))
         try:
             return out[val.slot]
         except (TypeError, IndexError, KeyError):
@@ -411,8 +424,19 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
             if did_free:
                 _soft_free()
     if terminal is not None:
-        if terminal not in results:
-            raise GraphExecutionError("terminal node %r not in graph" % terminal)
+        # Validate against GRAPH, not results. `results` is seeded with the
+        # externals, so checking membership there let an id that exists ONLY in
+        # external_results masquerade as the terminal: a graph whose real
+        # terminal was missing or mistyped returned SUCCESSFULLY, handing back
+        # the caller's own handle tuple instead of a rendered output. A terminal
+        # names something this graph PRODUCES.
+        if terminal not in graph:
+            raise GraphExecutionError(
+                "terminal node %r is not in the graph%s"
+                % (terminal,
+                   " (it is an external result -- externals are inputs the "
+                   "caller already owns, never this graph's output)"
+                   if terminal in ext else ""))
         return results[terminal]
     return results
 
