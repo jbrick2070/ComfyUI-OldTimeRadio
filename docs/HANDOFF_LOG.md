@@ -3,6 +3,81 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 (overnight, remote Cowork) -- HEAD 07a84627 (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: **settled the 7b architecture fork with an r2->r3 kibitz arc, then landed
+the two slices the arc proved were safe.** Operator was asleep; ran Variant A of
+`docs/2026-07-27-next-window-prompt-nogpu.md` and skipped its "STOP until I
+confirm" gate on the operator's standing "code while I sleep, don't stop".
+
+Suite 6913 -> **6925 passed / 27 skipped / 1 xfailed**. Bible 17. Canonical
+`5377914B` byte-identical throughout. Four commits, all pushed, HEAD == origin
+verified after each: `6bde4b36` problem statement, `499541b6` slice 7b-1,
+`07a84627` slice 7b-6 + the judgment, plus this handoff.
+
+**THE DECISION: neither A nor B.** Full reasoning in
+`docs/2026-07-27-multiclip-7b-fork-judgment.md`; CURRENT STEP carries the
+summary and the order. The short version is that the fork's framing was wrong:
+`render_driver.py:2952-2958` already makes the divergence terminal on the
+multi-segment path by comparing rendered OUTPUT to the plan, which catches all
+fifteen env vars, the profile, the boomerang and the provider clamps in ONE
+predicate without enumerating any of them. Option A enumerates inputs and would
+be permanently one variable behind; Option B's real value shrinks to moving an
+existing refusal earlier than the GPU work. The actual gap is that the
+single-segment path -- **the only path production runs** -- has no proof at all.
+
+**LANDED.** `499541b6` 7b-1: `eng_ltx_av` parsed four env vars at module scope
+with bare `int()`/`float()`, so a typo raised `ValueError` during import, the
+adapter never registered, and `frame_contract_for` answers `SINGLE_ONLY` for an
+adapter it cannot reach -- one typo silently deleted an engine and reverted its
+lane to unbounded single-clip, with nothing in the log naming the variable.
+Fixed all four, not just the one the panel named. `07a84627` 7b-6: the
+boomerang tripwire, pinning that `ltx_video` declares 169 and returns 193 by
+default, so the deferral to 7c is conscious.
+
+**FOUR BLOCKERS, ALL VERIFIED, ALL IN THE WAY OF THE RESOLVER** -- B1 the
+canonical workflow never wired `max_render_frames` (node 87 has no input
+descriptor, just an unbound trailing widget value, so Option B's whole channel
+is dead in the real workflow); B2 `ShotLock.IS_CHANGED` fingerprints only the
+two ROUTING env vars, so a frame-cap change serves a STALE cached plan; B3 both
+plan boundaries swallow the exceptions 7b wants terminal; B4 `frame_count` is
+`round(duration*fps)` for 13 of 31 engines. Order and line numbers in CURRENT
+STEP. **I stopped coding rather than build on any of them** -- every remaining
+slice had a precondition that was not met, and the arc's job was to find that.
+
+**THE ARC REFUTED ME TWICE AND WAS RIGHT BOTH TIMES.** I claimed live VRAM
+silently shortens renders; codex r2 pointed at `compute_real_frame_budget`,
+which S4 rewrote on 2026-07-10 to RAISE instead -- its docstring says so in as
+many words. I then built the whole r3 plan around an ASK-vs-plan trim_tail
+coupling on the single path; codex r3 pointed at `segment_render_frames`, whose
+docstring says it answers from the plan "for EVERY index, segment 0 included".
+Both verified, both struck. **Write the anchor first and then let the panel
+shoot at it -- including at the anchor.** I also predicted in the anchor, before
+the fan-out, that neither seat would find `render_driver.py:2952`; both missed
+it, which is why the driver's own read still has to happen.
+
+Rejected from the panel, with reasons: clamping the boomerang to the ceiling
+(`test_loop_source_length_no_freeze_shortfall` pins the OPPOSITE for exactly
+target=169 and names the freeze bug it exists for -- clamping trades a declared-
+ceiling violation for a returning visible-freeze); re-partitioning a plan against
+a forced engine at render time (silent re-plan after the stills are minted; agy
+itself reversed this by r3); and adding a second force-map check
+(`test_the_legacy_path_validates_the_plan_against_the_FINAL_engine` already
+covers it end to end).
+
+**PROCESS DEFECT WORTH MORE THAN A FINDING.** The r2 codex seat silently ran
+`gpt-5.5` instead of the `gpt-5.6-sol` of record, because kibitz's
+`CODEX_MODEL_PREFERENCE` tuple was stale against a catalog that already carried
+`gpt-5.6-sol`/`-luna`/`-terra`. Its auto-pick fallback would not have saved it
+either -- highest `gpt-5*` by reverse sort selects `-terra`, alphabetically last
+rather than strongest. Root-caused in `kibitz/scripts/kibitz.py` and pinned via
+`KIBITZ_CODEX_MODEL`; r3 confirms `gpt-5.6-sol`, and the r3 seat found four
+blockers the r2 seat did not -- so the downgrade was costing real review depth,
+not just a version string. **`kibitz/` is UNTRACKED in this repo: the fix is in
+NO commit and dies with a fresh clone. It belongs upstream in the skill.**
+
+Not done, deliberately: 7c (the arc settled that the blockers come first) and
+7d (no GPU this window; nothing has still rendered through this machine).
+
 ## 2026-07-26 (remote Cowork) -- HEAD 42db9af9 (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: **chunk 7a -- all 31 engines declare a frame contract, and the per-engine
 opt-in is deleted.** Two commits, two adversarial QA panels, six real defects

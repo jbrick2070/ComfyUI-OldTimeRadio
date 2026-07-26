@@ -155,7 +155,72 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- MULTI-CLIP COVERAGE: 1-6 + **7a** DONE, **7b NEXT**
+## CURRENT STEP -- MULTI-CLIP: 7b FORK **SETTLED**; FOUR BLOCKERS ARE NEXT
+
+**Updated 2026-07-27 (overnight, remote Cowork), HEAD `07a84627` == origin.**
+Suite **6925 passed / 27 skipped / 1 xfailed**; Bible 17; canonical `5377914B`
+byte-identical. Read `docs/2026-07-27-multiclip-7b-fork-judgment.md` FIRST --
+it is the authority for this step and it supersedes the A-vs-B framing in
+`docs/2026-07-26-chunk-7b-window-prompt.md` and
+`docs/2026-07-27-next-window-prompt-nogpu.md`.
+
+**THE FORK IS DECIDED. Neither A nor B.** Option A (refuse on
+env-vs-declaration) is CUT: it breaks six documented operator-knob tests, cannot
+reach `OTR_ACTIVE_PROFILE`, and enumerates its inputs forever. Option B is
+DEMOTED from "the fix" to "an optimisation", because `render_driver.py:2952-2958`
+**already makes the divergence terminal on the multi-segment path** by comparing
+the rendered OUTPUT to the plan -- one predicate that catches all fifteen env
+vars, the profile ceiling, the boomerang and the provider clamps without
+enumerating any of them. What is missing is that same proof on the
+SINGLE-segment path, which is the only path production runs today.
+
+**LANDED THIS WINDOW (both green, pushed, mutation-proven):**
+`499541b6` 7b-1 -- a malformed env value may no longer take `eng_ltx_av`'s
+IMPORT down (a `ValueError` at module scope meant the adapter never registered
+and `frame_contract_for` answered `SINGLE_ONLY` for it, so one typo silently
+removed an engine). `07a84627` 7b-6 -- the boomerang tripwire: `ltx_video`
+declares 169 and returns 193 by default, deferred to 7c ON PURPOSE with tests
+that say so and tell the 7c author to delete them rather than relax them.
+
+**DO NOT START THE RESOLVER YET. FOUR BLOCKERS, ALL VERIFIED AGAINST SOURCE**
+(detail + line numbers in the judgment, section 7b):
+
+1. **B1 -- `max_render_frames` is NOT WIRED in the canonical workflow.** Node 87
+   has no input descriptor for it; only an unbound trailing `0` in
+   `widgets_values`. The entire profile-ceiling channel Option B rests on is
+   dead in `otr_canonical.json` today. Fix it IN that file, same commit.
+2. **B2 -- ComfyUI serves a STALE plan across a frame-cap env change.**
+   `OTR_ShotLock.IS_CHANGED` fingerprints only the two ROUTING env vars.
+   `route_freeze.py:46-48` already warns about exactly this.
+3. **B3 -- both plan boundaries SWALLOW what 7b intends to make terminal**
+   (`otr_shot_lock.py:1150-1155`, `render_driver.py:3430-3438`). Chunk 1a's
+   lesson, with the two catches already located.
+4. **B4 -- `frame_count` is `round(duration*fps)` for 13 of 31 engines**, so the
+   output proof is decorative for provider lanes. `ffprobe_counted_frames`
+   already exists in `wan_shared.py`; this is wiring, not new capability.
+
+**ORDER: B1 -> B4 (+ the `if got` fail-open, same predicate) -> the resolver
+(with B3 fixed in the same change) -> the stamp (+ B2) -> the single-segment
+proof -> the boundary comparison.** The single-segment proof must come AFTER
+the resolver: on an 8GB box with `OTR_WAN_TI2V_MAX_FRAMES=49` it would refuse a
+177-frame beat with no remedy available until the plan can say 49.
+
+**TWO DRIVER CLAIMS WERE REFUTED BY THE PANEL AND BOTH REFUTATIONS VERIFIED.**
+Live VRAM does NOT silently shorten a render (S4 killed that 2026-07-10;
+`compute_real_frame_budget` RAISES `MotionBudgetError`), and the single path
+ALREADY asks for `plan.segments[0].render_frames` via `segment_render_frames`,
+so the trim_tail coupling the r3 plan was built around does not exist.
+
+**PROCESS -- CHECK THIS EVERY ARC.** The r2 codex seat silently ran `gpt-5.5`:
+kibitz's `CODEX_MODEL_PREFERENCE` tuple was stale against a catalog that already
+had `gpt-5.6-sol`. Root-caused in `kibitz/scripts/kibitz.py` and pinned via
+`KIBITZ_CODEX_MODEL`; r3 confirms `gpt-5.6-sol`, and the r3 seat found things
+the r2 seat did not. **`kibitz/` is UNTRACKED here, so that fix is in no commit
+and will not survive a fresh clone -- it belongs upstream in the skill.**
+
+---
+
+## SUPERSEDED -- MULTI-CLIP COVERAGE: 1-6 + **7a** DONE, **7b NEXT**
 
 **Updated 2026-07-26 (remote Cowork), HEAD `42db9af9`.** Chunks 1a/1b/1c/2/3/
 3b/4/**5/6a/6b/6c/6d/7a** are LANDED, GREEN and PUSHED, plus NINE adversarial QA
