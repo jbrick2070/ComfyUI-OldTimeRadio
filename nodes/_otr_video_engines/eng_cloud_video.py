@@ -39,6 +39,7 @@ import os
 import re
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from . import frame_contract as _fc
 from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_story_brief_helpers import (
@@ -48,6 +49,11 @@ from .._otr_story_brief_helpers import (
 )
 
 _LOG = logging.getLogger("OTR.video.eng_cloud_video")
+
+#: The canvas rate word_razzle's discrete menu is expressed at -- the same 25
+#: its contract declares as ``native_fps``. Named so the seconds<->frames
+#: conversion in ``_duration_seconds`` reads off one number, not a literal.
+_RAZZLE_FPS = 25
 
 
 #: S1 (2026-07-25) per-model still plans for the cloud video engines
@@ -977,10 +983,32 @@ class CloudWordRazzleEngine(_CloudVideoBase):
         supported 5s / 8s tiers; env OTR_CLOUD_PIXVERSE_DURATION overrides."""
         env = os.environ.get("OTR_CLOUD_PIXVERSE_DURATION", "").strip()
         if env:
+            # THE ENV MAY NOT LEAVE THE MENU (chunk 7b, 2026-07-26). This
+            # branch used to `return int(env)` outright, skipping the 5/8 bucket
+            # ladder every other path goes through -- so an operator could send
+            # Pixverse a 20-second ask that this adapter's own declared
+            # ``discrete_frames=(125, 200)`` says is impossible, and the
+            # coverage plan had already partitioned the beat over 5s/8s clips.
+            # A non-integer was silently swallowed here too, the only duration
+            # env in this file that failed quietly rather than loud.
+            legal = sorted(
+                int(d) // _RAZZLE_FPS for d in type(self).frame_contract.discrete_frames)
             try:
-                return int(env)
-            except ValueError:
-                pass
+                secs = int(env)
+            except ValueError as exc:
+                raise _fc.ContractEnvConflict(
+                    "%s: OTR_CLOUD_PIXVERSE_DURATION=%r is not a whole number "
+                    "of seconds. Pixverse serves %s s and nothing between them."
+                    % (self.name, env, legal)) from exc
+            if secs not in legal:
+                raise _fc.ContractEnvConflict(
+                    "%s: OTR_CLOUD_PIXVERSE_DURATION=%d is not on Pixverse's "
+                    "menu %s s, which this adapter declares as "
+                    "discrete_frames=%r at %d fps. The beat was already "
+                    "partitioned over those lengths. NO FALLBACK."
+                    % (self.name, secs, legal,
+                       type(self).frame_contract.discrete_frames, _RAZZLE_FPS))
+            return secs
         canvas = _req_get(request, "canvas") or {}
         c_get = canvas.get if isinstance(canvas, dict) else (
             lambda k, d=None: getattr(canvas, k, d))

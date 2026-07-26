@@ -101,33 +101,98 @@ via `motion_common.profile_max_render_frames()`. It lives outside
 **No `OTR_*FPS*` variable exists anywhere.** Every engine's rate is a hardcoded
 class constant. That is worth knowing and worth keeping true.
 
-## 7b -- the scope
+## 7b -- OPEN DECISION, and why it is not mine to make
 
-**One shared refusal, not fifteen.** An engine whose environment disagrees with
-its declared static contract must fail LOUD, before any GPU work, naming the
-variable and both numbers. A contract that moves with the environment is a
-partition the image phase could not have planned for -- stills are minted
-against the contract before the render phase begins.
+**I tried the obvious 7b and it was wrong. Read this before rebuilding it.**
 
-Design notes, offered not imposed:
+The plan said: an engine whose environment disagrees with its declared contract
+must fail LOUD. I built exactly that -- one shared `assert_env_agrees` helper,
+wired into all five frame-count env vars -- and the suite came back with six
+failures that were not bugs:
 
-* The refusal wants one helper both the engines and a suite-wide test can call,
-  so "the env agrees with the contract" is asked once and answered once.
-* `OTR_LTX_AV_MAX_FRAMES` resolves at IMPORT, so its check can be a module-level
-  assertion. The others resolve per render and need a render-time gate.
-* `OTR_WAN_TI2V_MAX_FRAMES` is already clamped correctly -- the fix there is to
-  make it refuse rather than silently lower, or to declare that lowering is
-  legal. Pick one and say why.
-* `OTR_LTX_LOOP_VIA_REVERSE` is the ugly one: it is ON by default and already
-  makes `ltx_video` return `2N-1` frames, so `ltx_video` violates its own
-  declared 169 ceiling **today, with no env set**. That is arguably 7c's
-  (it is a fallback), but the contract is wrong until one of them lands. Decide
-  explicitly and record the decision.
-* `OTR_FORCE_ENGINE_MAP` swapping in an engine whose contract cannot execute the
-  already-stamped plan is a real hole. `resolve_final_shot_engines` already runs
-  `assert_coverage_plans` AFTER the override (that ordering was a QA4 fix), so
-  the plan IS re-validated against the forced engine -- confirm that, and if it
-  holds, say so rather than adding a second check.
+```
+tests/test_look_qa_round5.py::TestLtxFrameCap::test_cap_env_override_respected
+tests/test_look_qa_round5.py::TestLtxFrameCap::test_below_floor_env_clamps
+tests/test_look_qa_round5.py::TestLtxFrameCap::test_cap_below_floor_wins
+tests/test_look_qa_round5.py::TestLtxFrameCap::test_non_8n1_cap_snaps_down_below_cap
+tests/test_remaining_video_contracts.py::test_wan_ti2v_ceiling_precedence_and_no_change_when_unpinned
+tests/test_wan_ti2v.py::test_floor_max_override_is_an_absolute_hard_cap
+```
+
+Every one asserts that an operator CAN lower a cap from the environment. That
+is not an accident of old tests -- it is a documented, production-used
+capability. `eng_ltx_8gb.py`'s own module docstring lists
+`OTR_LTX_8GB_MAX_FRAMES` as a normal override for VRAM-constrained boxes, and
+`test_floor_max_override_is_an_absolute_hard_cap` was written FOR the
+2026-07-24 WAN 8GB launch contract, after an 8GB leg inherited the 177-frame
+engine max, asked for a whole 7-second beat, and died in the cost model.
+
+So a blanket refusal fixes a silent divergence by breaking a real lane. I
+reverted it rather than rewrite six tests to agree with me -- that is the
+"my test agreed with the bug" failure mode from chunk 6, in a bigger costume.
+
+### The actual fork
+
+The problem is NOT that env overrides exist. It is that **the plan cannot see
+them.** `otr_shot_lock._stamp_coverage_plan` calls `frame_contract_for(engine)`
+and gets the static literal, partitions the beat, and mints a still per jump
+segment. The renderer then reads the environment and gets a different ceiling.
+Both halves are internally consistent, which is exactly why it is silent.
+
+Two ways out:
+
+**(A) REFUSE.** Env != declaration is terminal. Simple, matches "it either works
+or it fails" read literally. Cost: the 8GB tier loses its knob, and an operator
+who wants a lower cap must edit the adapter -- which means editing a file the
+repo treats as a hardware-independent declaration.
+
+**(B) RESOLVE ONCE, AT PLAN TIME, AND STAMP IT.** The env is read exactly once,
+where the plan is built, and the resolved ceiling is frozen into the coverage
+plan the same way `render_frames` already is. Both phases then read the SAME
+number, so the divergence becomes unconstructible rather than detected. The
+operator keeps every knob. The contract stays static in the sense that matters
+-- one authority, read once, before the stills are minted.
+
+**I lean hard toward (B)**, and I want to say why rather than just assert it: it
+is the same fix this build has applied five times now -- "make them the same
+call, not two calls that happen to match". (A) detects the disagreement; (B)
+removes the second policy that creates it. But (B) changes what a
+`FrameContract` MEANS -- from "the literal in the adapter" to "the literal, as
+resolved for this box, frozen at plan time" -- and it touches the plan schema.
+That is an architecture decision with your name on it, not a coding step, so it
+is here instead of in a commit.
+
+**If (B):** the shape is roughly a `resolve_contract_for(engine, env, profile)`
+that runs in `_stamp_coverage_plan`, a `contract` block added to the stamped
+plan dict, and `assert_coverage_plans` validating against the STAMPED contract
+rather than re-resolving. Note this also subsumes the `OTR_ACTIVE_PROFILE` /
+`profile_max_render_frames()` case below, which (A) cannot reach at all.
+
+### What DID land (`efe4ca4d`..)
+
+Only the one refusal that is fork-independent: **`OTR_CLOUD_PIXVERSE_DURATION`
+may not leave Pixverse's fixed 5s/8s menu.** A menu is not a ceiling -- there is
+no reading of "5 or 8" under which 20 is a smaller ask -- so this needed no
+decision. It also fixed the silent `except ValueError: pass` that swallowed a
+malformed pin. `tests/test_word_razzle_duration_menu.py`, 22 cases.
+
+### Still open under either branch
+
+* **`OTR_LTX_LOOP_VIA_REVERSE`** is ON by default and makes `ltx_video` return
+  `2N-1` frames -- a 169-frame ask comes back as 193, because the loop floor is
+  97 and `2*97-1 = 193`. So `ltx_video` violates its own declared 169 ceiling
+  **today, with no env set at all.** It is a loop-fill fallback, so it is 7c's
+  to delete -- but the contract is wrong until one of them lands, and that
+  should be a conscious choice rather than a thing nobody wrote down.
+* **`OTR_ACTIVE_PROFILE`** reaches the same `wan_ti2v` ceiling through
+  `motion_common.profile_max_render_frames()`. The plan does not see it either.
+  Branch (B) covers it; branch (A) does not, because the profile ceiling is the
+  NORMAL 8GB path and refusing it breaks that tier outright.
+* **`OTR_FORCE_ENGINE_MAP`** swapping in an engine whose contract cannot execute
+  the already-stamped plan. `resolve_final_shot_engines` runs
+  `assert_coverage_plans` AFTER the override (a QA4 fix), so the plan IS
+  re-validated against the forced engine -- **verify that still holds** and if
+  it does, say so in a test rather than adding a second check.
 
 ## Then 7c and 7d
 
