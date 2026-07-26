@@ -593,6 +593,49 @@ def ffmpeg_lavfi_floor_cmd(out_path, width, height, fps, frame_count,
     ] + _bt709_encode_args(crf) + [out_path]
 
 
+def ffmpeg_terminal_frame_cmd(clip_path, out_path, *, ffmpeg="ffmpeg"):
+    """ffmpeg arg list: a rendered clip -> ONE image file holding its LAST frame.
+
+    Multi-clip coverage chunk 6c (2026-07-26). A CHAIN successor begins exactly
+    on its predecessor's terminal frame, and segment N+1 needs that frame
+    SYNCHRONOUSLY -- inside the render loop, not from a post-episode pass. This
+    is the seam that produces it.
+
+    DECODES THE WHOLE CLIP ON PURPOSE, rather than seeking with ``-sseof``.
+    ``-update 1`` rewrites the same output file for every decoded frame, so the
+    file that survives IS the last frame -- exactly, for any clip, including a
+    9-frame segment where a one-second tail seek has nothing to land on and a
+    non-seekable container where it lands somewhere else entirely. A segment is
+    tens of frames; a wrong "last" frame is a visible jump at every cut.
+    """
+    return [
+        ffmpeg, "-y", "-i", clip_path,
+        "-an",                                # V-1: never carry audio around
+        "-update", "1", "-f", "image2", out_path,
+    ]
+
+
+def extract_terminal_frame(clip_path, out_path, *, ffmpeg="ffmpeg"):
+    """Write ``clip_path``'s LAST frame to ``out_path`` and PROVE it landed.
+
+    Returns ``out_path``. Raises a NAMED :class:`GraphExecutionError` if ffmpeg
+    fails, or if it exits 0 having written nothing usable -- ffmpeg reports
+    success for an input it decoded zero frames from, and a 0-byte file handed
+    on as the next segment's init image is a black frame at the cut with a
+    clean exit code in front of it. Asset existence proves completion, never
+    the return code.
+    """
+    run_ffmpeg(ffmpeg_terminal_frame_cmd(clip_path, out_path, ffmpeg=ffmpeg))
+    if not os.path.exists(out_path) or os.path.getsize(out_path) <= 0:
+        raise GraphExecutionError(
+            "terminal-frame extraction produced no usable image for %r (ffmpeg "
+            "exited 0 but wrote %s). The next segment would have begun on "
+            "nothing. NO FALLBACK."
+            % (clip_path,
+               "no file" if not os.path.exists(out_path) else "0 bytes"))
+    return out_path
+
+
 def run_ffmpeg(cmd):
     """Run an ffmpeg command (no stdin); raise a NAMED GraphExecutionError on a
     non-zero exit or a missing ffmpeg. Returns ``cmd`` on success."""
@@ -676,6 +719,7 @@ __all__ = [
     "quantize_frames_4n1", "even_dim", "images_to_uint8",
     "extend_frames_to_target",
     "ffmpeg_silent_mp4_cmd", "ffmpeg_still_motion_cmd", "ffmpeg_lavfi_floor_cmd",
+    "ffmpeg_terminal_frame_cmd", "extract_terminal_frame",
     "run_ffmpeg", "encode_frames_to_silent_mp4",
     "comfy_input_dir", "stage_into_comfy_input",
 ]

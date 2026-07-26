@@ -28,7 +28,13 @@ def _in_tree_tmp_dir():
 
 
 def otr_engine_tmp_mp4(prefix: str) -> str:
-    """Reserve a unique in-tree .mp4 path and return it. The path does NOT exist
+    """Reserve a unique in-tree ``.mp4`` path. See :func:`otr_engine_tmp_path`,
+    which this has always been -- the suffix is now the parameter it implied."""
+    return otr_engine_tmp_path(prefix, ".mp4")
+
+
+def otr_engine_tmp_path(prefix: str, suffix: str = ".mp4") -> str:
+    """Reserve a unique in-tree path and return it. The path does NOT exist
     on return (matches the legacy tempfile.mktemp semantics the call sites relied
     on); the caller's ffmpeg/encoder creates it. Fail-closed in production: if the
     in-tree tmp dir cannot be resolved, only OTR_TEST_MODE permits the tempfile
@@ -40,7 +46,7 @@ def otr_engine_tmp_mp4(prefix: str) -> str:
             d = None  # tempfile default dir, tests only
         else:
             raise RuntimeError(
-                "otr_engine_tmp_mp4: cannot resolve the in-tree tmp dir and "
+                "otr_engine_tmp_path: cannot resolve the in-tree tmp dir and "
                 "OTR_TEST_MODE is unset -- refusing to leak to the system temp "
                 "dir (R1). Check comfy_output_dir()/otr_shared_tmp_dir().")
     # mkstemp reserves a unique name atomically; unlink so we hand back a
@@ -49,7 +55,7 @@ def otr_engine_tmp_mp4(prefix: str) -> str:
     # would also be fine -- this just removes any future dependency on -y and
     # avoids a 0-byte .mp4 lingering if a writer fails before its first frame
     # (roundtable MUST-FIX #1; the claimed ffmpeg hang does NOT occur today).
-    fd, path = tempfile.mkstemp(suffix=".mp4", prefix=prefix, dir=d)
+    fd, path = tempfile.mkstemp(suffix=suffix, prefix=prefix, dir=d)
     os.close(fd)
     try:
         os.unlink(path)
