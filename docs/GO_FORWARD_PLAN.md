@@ -155,7 +155,65 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- MULTI-CLIP: 7b FORK **SETTLED**; FOUR BLOCKERS ARE NEXT
+## CURRENT STEP -- 7b BLOCKERS: THREE LANDED; **THE CANVAS IS THE 7d BLOCKER**
+
+**Updated 2026-07-27 (overnight, remote Cowork), HEAD `8f41af27` == origin.**
+Suite **6983 passed / 27 skipped / 1 xfailed**; Bible 17; link validator 0
+violations; canonical `9872624A` (moved by C1, intentionally).
+**Read `docs/2026-07-27-7b-blockers-arc-judgment.md` FIRST** -- full r1-r4 arc,
+8 agent calls, and the authority for this step.
+
+**LANDED:** `7f4644a1` C1 (node 87's `max_render_frames` descriptor -- the
+profile-ceiling channel was dead at its first hop), `ac609d25` C2 (the
+plan-vs-output proof's fail-OPEN predicate), `8f41af27` C1b (the same dead
+widget in ALL ELEVEN variant workflows). All mutation-proven, C2/C1b with
+controls.
+
+**THE FINDING THAT MATTERED MOST:** `variants/otr_8gb_wan.json` carried an
+orphan widget value of **17**, not the harmless `0` -- matching
+`config/profiles/otr_8gb_wan.json:56`, the ONLY shipped profile pinning
+`max_render_frames`. The WAN 8GB ceiling had been configured and silently
+ignored since it shipped. Found because the wiring script REFUSED an
+unexpected value rather than assuming one.
+
+**GPU IS PROVEN.** The server path is a JUNCTION to this repo (identical
+SHA-256, same HEAD) -- every "live proof" in this build rested on that and it
+was unverified until now. First live render of this architecture PASSED:
+`ltx_8gb`, 25 frames, 20.8s, `frame_count=25` exactly, VRAM 3004 MB. That is
+`7d-preflight`, NOT qualification.
+
+**NEXT, AND IT IS A HARD 7d BLOCKER -- O1, THE CANVAS.** Both seats
+independently. `build_request_from_shot` overwrites the canvas to `1472x832`
+for every non-face engine (`render_driver.py:2268-2273`), with deliberate
+per-engine branches after it for `ltx_video` and `ltx_av` but **none for
+`ltx_8gb`**; `OTR_VideoRenderBatch` passes no canvas
+(`otr_video_render_batch.py:372-373`) and `build_request` hard-codes 25 fps.
+So `otr_8gb_ltx`'s 512x288 render canvas is displaced by 1472x832 on the tier
+that exists precisely because 8GB cannot afford the big canvas. Deliberately
+NOT fixed overnight: the two seats prescribe different remedies, the
+surrounding comments document per-engine canvases that exist for real quality
+reasons (BUG-LOCAL-412, "LTX-2B re-noises into mush at 1472x832"), and it is a
+hot path every engine traverses. Likely shape: an `ltx_8gb` branch consuming
+the already-stamped `ledger.video.canonical_canvas`
+(`otr_shot_lock.py:1537-1541`); no new widget is needed.
+
+**THREE MORE OPEN, all verified (detail in the judgment):** O2 a THIRD
+validation bypass -- exported `run_episode` renders without
+`resolve_final_shot_engines`/`assert_coverage_plans` and the soak calls it
+directly; O3 `run_graph` cannot accept preloaded results, so 7c's loader
+removal has a required 6-step order; O4 the 169-frame seam needs
+`opening_duration_sec`/`crossfade_ms` accepted by the profile schema
+(`render.frame_budget` is INERT in episode mode -- it is not the mechanism).
+
+**ORDER:** O1 canvas -> C3 (per-ENGINE policy registry, alias-resolved, equal
+to `registry.all_engine_names()`; typed `UnresolvableEngineError` vs
+`InvalidEngineConfigError` at all three swallow sites) -> C4a receipt as a
+SIBLING of `coverage_plan`, one builder for BOTH paths -> C5a offline
+preflight tests -> O2 -> C6 -> O4 -> **7c** -> C4b -> **7d**.
+
+---
+
+## SUPERSEDED -- 7b FORK SETTLED; FOUR BLOCKERS ARE NEXT
 
 **Updated 2026-07-27 (overnight, remote Cowork), HEAD `07a84627` == origin.**
 Suite **6925 passed / 27 skipped / 1 xfailed**; Bible 17; canonical `5377914B`

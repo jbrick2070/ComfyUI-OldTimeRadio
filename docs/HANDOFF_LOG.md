@@ -3,6 +3,79 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 (overnight, remote Cowork) -- HEAD 8f41af27 (v2.0-alpha) -- WINDOW CODER A (Opus), SESSION 2
+Did: **a full r1->r4 kibitz arc on the four 7b blockers, then landed three
+slices off it -- and proved the GPU.** Operator asked for /kibitz on the
+blockers so GPU testing could start, optimising for the cleanest end-state
+architecture. 8 agent calls (agy + codex `gpt-5.6-sol`, pinned and verified
+every round). Authority: `docs/2026-07-27-7b-blockers-arc-judgment.md`.
+
+Suite **6925 -> 6983 passed / 27 skipped / 1 xfailed**. Bible 17. Link
+validator 0 violations. Commits: `c8cf0b07` (r1 fold-in), `7f4644a1` C1,
+`ac609d25` C2, `8f41af27` C1b, plus this handoff. HEAD == origin after each.
+
+**THE GPU IS PROVEN, AND ONE ASSUMPTION UNDER IT WAS NEVER CHECKED.** The
+headless server loads the node from `C:\Users\jeffr\ComfyUI-Installs\...`, not
+from this repo. It is a **junction** -- identical SHA-256, same git HEAD -- so
+live results are valid. Every "live proof" in this build has rested on that and
+nobody had verified it. First live render of the multi-clip architecture:
+`ltx_8gb`, 25 frames, 20.8s, `frame_count=25` exactly as asked, VRAM 3004 MB.
+Labelled `7d-preflight`, NOT qualification -- codex correctly pointed out that
+7c still owns two of 7d's own acceptance properties.
+
+**LANDED.** C1 `7f4644a1`: node 87's `max_render_frames` input descriptor. The
+widget VALUE was present as `widgets_values[14]`; the descriptor never was, so
+the 8GB ceiling channel was severed at its first hop. C2 `ac609d25`: the
+plan-vs-output proof read `if got and got != ...`, so a clip reporting 0 -- or
+omitting `frame_count`, which defaults to 0 -- skipped the check and got
+assembled. C1b `8f41af27`: the same dead widget in ALL ELEVEN variants.
+
+**C1b IS THE ONE TO REMEMBER.** It came from an agy r4 *verify-at-build* line,
+not a MUST-FIX. `variants/otr_8gb_wan.json`'s orphan value was **17**, not the
+harmless 0 -- matching `config/profiles/otr_8gb_wan.json:56`, the only shipped
+profile that pins `max_render_frames`. So the WAN 8GB ceiling was deliberately
+configured and silently ignored since it shipped: exactly the failure
+`test_floor_max_override_is_an_absolute_hard_cap` was written after. **It was
+found because the wiring script REFUSED an unexpected value instead of assuming
+one** -- I had coded the precondition as "trailing value must be 0", it hit 17,
+and stopped. Fixing only the canonical would have left it live.
+
+**Mutation proofs had CONTROLS this session.** C2: restoring the fail-open
+fails all six unreadable cases while the honest-count and wrong-but-readable
+tests still PASS -- so the tests are specific, not a blanket refusal. I also
+nearly shipped a decorative C1 test: the first mutation run reported only one
+failure, so I re-ran isolated rather than assuming, and confirmed
+`test_every_widget_value_has_an_input_descriptor[87] FAILED` with 14-vs-15
+counts. **Re-run the mutation isolated when the guard output is filtered.**
+
+**STOPPED SHORT OF THE CANVAS FIX ON PURPOSE.** Both seats independently found
+it and it IS the 7d blocker: `build_request_from_shot` overwrites the canvas to
+1472x832 for every non-face engine (`render_driver.py:2268-2273`), with
+deliberate per-engine branches after for `ltx_video`/`ltx_av` but none for
+`ltx_8gb`, so the 8GB tier's 512x288 is displaced on the tier that exists
+because 8GB cannot afford the big canvas. Not fixed because the two seats
+prescribe DIFFERENT remedies, the surrounding comments document per-engine
+canvases that exist for real quality reasons (BUG-LOCAL-412), and it is a hot
+path every engine traverses. That is a rested decision, not a 6am one.
+
+**Three more open, all verified:** a THIRD validation bypass (exported
+`run_episode` skips `resolve_final_shot_engines`/`assert_coverage_plans`, and
+the soak calls it directly); `run_graph` cannot accept preloaded results, so
+7c's loader removal has a required 6-step order; and the 169-frame seam needs
+`opening_duration_sec`/`crossfade_ms` in the profile schema -- **`render.frame_budget`
+is INERT in episode mode and is NOT the mechanism**, which refuted my own claim.
+
+**Score: the arc refuted THREE of my load-bearing claims and I refuted FOUR of
+the panel's, all verified against source.** Mine: live VRAM shortening, the
+trim_tail coupling, the frame_budget cap. Theirs: clamp the boomerang (would
+reintroduce a freeze the roundtable already caught), re-partition against a
+forced engine, `FrameContract` needs `to_dict`, and -- the sharpest -- raise
+`ltx_8gb`'s ceiling to 169 so the opening beat stays single-segment, which
+inverts the objective: 169 is chosen BECAUSE it splits `[161,9]`.
+
+Also: the registry probe showed **all viz engines -- the canonical defaults --
+have no ceiling**, so the default route can never exercise multi-clip at all.
+
 ## 2026-07-27 (overnight, remote Cowork) -- HEAD 07a84627 (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: **settled the 7b architecture fork with an r2->r3 kibitz arc, then landed
 the two slices the arc proved were safe.** Operator was asleep; ran Variant A of
