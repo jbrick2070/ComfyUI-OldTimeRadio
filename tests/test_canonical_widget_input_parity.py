@@ -126,3 +126,111 @@ def test_the_descriptor_matches_what_the_node_class_declares():
         "device_policy / dtype_policy); got %r" % (desc.get("shape"),))
     assert desc.get("widget", {}).get("name") == "max_render_frames"
     assert desc.get("link") is None, "the widget must not arrive pre-linked"
+
+
+# ---------------------------------------------------------------------------
+# C1b -- the SHIPPED VARIANTS had the identical defect (2026-07-27)
+# ---------------------------------------------------------------------------
+#
+# C1 wired the canonical and stopped there. A verify-at-build item from the r4
+# panel asked whether the variants carried the same node -- they did, all
+# eleven of them, including the two 8GB tiers this ceiling exists FOR.
+#
+# The worst instance was ``variants/otr_8gb_wan.json``: its orphan trailing
+# widget value was not the harmless 0 default but a REAL **17**, matching
+# ``config/profiles/otr_8gb_wan.json`` -- the only shipped profile that pins
+# ``max_render_frames`` at all. So the WAN 8GB launch contract's ceiling had
+# been deliberately configured and silently ignored, because the value had no
+# descriptor to arrive through. That is the precise failure
+# ``test_floor_max_override_is_an_absolute_hard_cap`` was written after: an 8GB
+# leg inheriting the 177-frame engine max and dying in the cost model.
+#
+# Guarding the canonical alone would have left that live.
+
+VARIANTS_DIR = REPO_ROOT / "workflows" / "variants"
+
+
+def _graph_workflows():
+    """Every tracked workflow that is a real litegraph (has ``nodes``).
+
+    The ``*.env.json`` siblings are API/env dumps with no ``nodes`` array and
+    are correctly excluded rather than special-cased by filename.
+    """
+    out = []
+    for path in sorted(list(VARIANTS_DIR.glob("*.json"))
+                       + [CANONICAL]):
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if isinstance(data.get("nodes"), list):
+            out.append(path)
+    return out
+
+
+@pytest.mark.parametrize(
+    "wf_path", _graph_workflows(), ids=lambda p: p.name)
+def test_every_workflow_has_widget_input_parity(wf_path):
+    """No shipped graph may carry a widget value with no descriptor."""
+    with open(wf_path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    offenders = []
+    for node in data.get("nodes") or []:
+        values = node.get("widgets_values")
+        if not isinstance(values, list):
+            continue
+        winputs = [i for i in (node.get("inputs") or []) if i.get("widget")]
+        if len(winputs) != len(values):
+            offenders.append((node.get("id"), node.get("type"),
+                              len(winputs), len(values)))
+    assert not offenders, (
+        "%s carries unwired widget value(s): %r -- each is a value the node "
+        "class accepts and the graph stores with nothing connecting the two"
+        % (wf_path.name, offenders))
+
+
+@pytest.mark.parametrize(
+    "wf_path",
+    [p for p in _graph_workflows() if p.parent.name == "variants"],
+    ids=lambda p: p.name)
+def test_every_variant_director_carries_max_render_frames(wf_path):
+    """THE MUTATION TARGET for C1b. Strip the descriptor from any variant and
+    that variant fails BY NAME."""
+    with open(wf_path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    directors = [n for n in (data.get("nodes") or [])
+                 if str(n.get("type") or "") == "OTR_VideoDirector"]
+    if not directors:
+        pytest.skip("%s has no OTR_VideoDirector" % wf_path.name)
+    for node in directors:
+        names = [i.get("name") for i in _widget_inputs(node)]
+        assert "max_render_frames" in names, (
+            "%s node %s has no max_render_frames descriptor -- this tier's "
+            "render-length ceiling cannot reach the ledger. Descriptors: %r"
+            % (wf_path.name, node.get("id"), names))
+        assert names[-1] == "max_render_frames", (
+            "%s: max_render_frames must stay LAST so widgets_values remains "
+            "positionally stable (BUG-LOCAL-097); got %r"
+            % (wf_path.name, names))
+
+
+def test_the_wan_8gb_variant_still_carries_its_real_17_frame_ceiling():
+    """The value, not just the descriptor.
+
+    ``config/profiles/otr_8gb_wan.json`` is the ONLY shipped profile pinning
+    ``max_render_frames``, and it pins 17. If this ever reads 0 again, someone
+    'fixed' a parity failure by deleting the value instead of wiring it, and
+    the 8GB WAN tier has silently lost its cap for the second time.
+    """
+    wf = VARIANTS_DIR / "otr_8gb_wan.json"
+    with open(wf, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    node = next(n for n in data["nodes"]
+                if str(n.get("type") or "") == "OTR_VideoDirector")
+    names = [i.get("name") for i in _widget_inputs(node)]
+    idx = names.index("max_render_frames")
+    assert node["widgets_values"][idx] == 17, (
+        "otr_8gb_wan.json should pin max_render_frames=17 to match "
+        "config/profiles/otr_8gb_wan.json; got %r"
+        % (node["widgets_values"][idx],))
