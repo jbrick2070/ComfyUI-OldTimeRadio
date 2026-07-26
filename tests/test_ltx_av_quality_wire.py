@@ -277,7 +277,8 @@ def test_clip_from_raw_vram_peak_none_off_box():
 def test_render_shot_prefers_clip_peak(monkeypatch):
     import nodes._otr_video_engines.render_driver as rd
 
-    def fake(engine_name, request, *, force_oom, host_caps=None, profile=None):
+    def fake(engine_name, request, *, force_oom, host_caps=None, profile=None,
+             segment=None):
         return {"vram_peak_mb": 9999}
 
     monkeypatch.setattr(rd, "_render_one", fake)
@@ -289,7 +290,8 @@ def test_render_shot_prefers_clip_peak(monkeypatch):
 def test_render_shot_falls_back_when_no_clip_peak(monkeypatch):
     import nodes._otr_video_engines.render_driver as rd
 
-    def fake(engine_name, request, *, force_oom, host_caps=None, profile=None):
+    def fake(engine_name, request, *, force_oom, host_caps=None, profile=None,
+             segment=None):
         return {"path": "x"}
 
     monkeypatch.setattr(rd, "_render_one", fake)

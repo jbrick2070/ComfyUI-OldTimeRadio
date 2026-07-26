@@ -2496,7 +2496,7 @@ def _assert_family_inputs_satisfiable(engine_name, request):
 
 
 def _render_one(engine_name, request, *, force_oom, host_caps=None,
-                profile=None):
+                profile=None, segment=None):
     """Attempt ONE candidate engine: assert_usable -> prepare -> render_clip ->
     canonicalize, always teardown. ``force_oom`` raises BEFORE any work (the
     soak's deterministic mid-episode OOM -- it precedes the family-input check
@@ -2507,7 +2507,24 @@ def _render_one(engine_name, request, *, force_oom, host_caps=None,
     REAL host facts (build_host_caps) + the ledger-stamped v2 device/dtype
     policy down to the adapter boundary -- the empty-dict boundary here was
     the campaign's most consequential wiring catch. ``None`` (direct debug
-    callers) degrades to the old empty dicts."""
+    callers) degrades to the old empty dicts.
+
+    CHUNK 5 (2026-07-26): the prepare/teardown bracket now belongs to a
+    :class:`beat_session.BeatSession`. ``segment`` is a
+    :class:`beat_session.SegmentSlot` -- the beat's OPEN session plus WHICH
+    segment this render is -- when a caller is walking a coverage plan. Every
+    segment then renders from the handles the first one loaded, and the
+    teardown happens once, in that caller's outer ``finally``. The slot is one
+    argument rather than three so that "a session with no segment index" is a
+    state nobody can construct; the session itself refuses anything that is
+    not the next segment, in range, on the beat the slot claims.
+
+    Passing no session keeps the historical bracket: one prepare, one render,
+    one teardown, in that order, with teardown gated on handles having been
+    taken. ONE deliberate delta -- ``prepare`` now receives a populated
+    ``session_ctx`` (``beat_id``/``segment_count``/``multi_clip``) where it
+    used to receive ``{}``, so an adapter can size for four clips before it
+    loads. Every shipped adapter accepts and ignores that argument today."""
     if force_oom:
         raise OomSignal("forced soak OOM on %s" % engine_name)
     _assert_family_inputs_satisfiable(engine_name, request)
@@ -2516,32 +2533,44 @@ def _render_one(engine_name, request, *, force_oom, host_caps=None,
     eng = _vreg.get_engine(engine_name)
     _caps = host_caps if host_caps is not None else {}
     _prof = profile if profile is not None else {}
-    prepared = None
     try:
-        # M3 delta (d): pass the request as the assert_usable template so an
-        # engine that validates request-shaped inputs (the LTX-AV av_dims gate
-        # on request.canvas) sees the real canvas. Guarded -- a legacy adapter
-        # whose assert_usable predates the request_template kwarg keeps working
-        # (TypeError -> retry without it); real usability rejections raise
-        # EngineUnusable, never TypeError, so this never masks one.
-        try:
-            eng.assert_usable(host_caps=_caps, profile=_prof,
-                              request_template=request)
-        except TypeError:
-            eng.assert_usable(host_caps=_caps, profile=_prof)
-        prepared = eng.prepare(host_caps=_caps, profile=_prof, session_ctx={})
+        from . import beat_session as _bs  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        import beat_session as _bs  # type: ignore
+    # M3 delta (d): pass the request as the assert_usable template so an
+    # engine that validates request-shaped inputs (the LTX-AV av_dims gate
+    # on request.canvas) sees the real canvas. Guarded -- a legacy adapter
+    # whose assert_usable predates the request_template kwarg keeps working
+    # (TypeError -> retry without it); real usability rejections raise
+    # EngineUnusable, never TypeError, so this never masks one.
+    #
+    # It runs PER SEGMENT, before the handles are touched: it validates THIS
+    # request against the engine, and a later segment's canvas is not the
+    # first one's.
+    try:
+        eng.assert_usable(host_caps=_caps, profile=_prof,
+                          request_template=request)
+    except TypeError:
+        eng.assert_usable(host_caps=_caps, profile=_prof)
+    if segment is not None:
+        if getattr(segment.session, "engine", None) is not eng:
+            raise RenderError(
+                "beat session holds engine %r but this segment renders on "
+                "%r -- one session, one engine. Reusing handles across a "
+                "route change is how a beat ends up half in one model and "
+                "half in another. NO FALLBACK."
+                % (getattr(getattr(segment.session, "engine", None),
+                           "name", "?"), engine_name))
+        prepared = segment.begin()
         raw = eng.render_clip(request, prepared)
         return eng.canonicalize(raw, request, _prof)
-    finally:
-        if prepared is not None:
-            try:
-                eng.teardown(prepared)
-            except Exception:            # noqa: BLE001 - teardown best-effort
-                pass
+    with _bs.BeatSession(eng, host_caps=_caps, profile=_prof) as sess:
+        raw = eng.render_clip(request, sess.prepared)
+        return eng.canonicalize(raw, request, _prof)
 
 
 def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
-                host_caps=None, profile=None):
+                host_caps=None, profile=None, segment=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
     2026-06-16 'this is art, not a space shuttle'; hardened 2026-07-02 NO
     fallbacks / NO auto-defaults directive): a HARD render failure RAISES
@@ -2556,7 +2585,8 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
     force = (sid == oom_shot_id and eng in (oom_engines or frozenset()))
     try:
         clip = _render_one(eng, request, force_oom=force,
-                           host_caps=host_caps, profile=profile)
+                           host_caps=host_caps, profile=profile,
+                           segment=segment)
     except Exception as exc:              # noqa: BLE001 - no fallback: fail LOUD
         kind = _rt.FailureKind.OOM if force else classify_failure(exc)
         _LOG.error(
