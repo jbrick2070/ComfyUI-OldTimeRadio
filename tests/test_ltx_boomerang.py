@@ -87,3 +87,65 @@ def test_env_parse(monkeypatch, val, expect):
 def test_env_invalid_falls_back_to_default(monkeypatch):
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "banana")
     assert LtxVideoEngine()._loop_via_reverse() is True   # LOUD warn + default
+
+
+# ---- THE DEFERRAL TRIPWIRE (chunk 7b, 2026-07-27) ---------------------------
+#
+# ltx_video declares max_frames=169 (eng_ltx_video.py:396-403) and, with NO
+# environment variable set at all, returns 193 frames for a 169-frame ask. The
+# declaration is therefore false TODAY, before any operator touches anything.
+#
+# 7b deliberately does NOT fix it, and this test is what makes that a conscious
+# choice rather than an oversight nobody wrote down. The obvious repair --
+# clamping 2*src-1 down to the ceiling -- was proposed by an r2 kibitz seat and
+# REJECTED, because test_loop_source_length_no_freeze_shortfall above pins the
+# opposite direction for exactly this target: the mirror must always COVER the
+# beat window or the composite freeze-fills the tail, which is the 169 -> 161
+# shortfall the roundtable already caught once. Clamping trades a declared-
+# ceiling violation for a returning visible-freeze bug.
+#
+# The boomerang is a loop-fill fallback, so it belongs to 7c's rip. When 7c
+# deletes it, THIS TEST WILL FAIL -- that is intended. The 7c author should
+# delete it in the same commit that removes the boomerang, and should not
+# "fix" it by loosening the assertion.
+
+def test_the_boomerang_violates_its_own_declared_ceiling_TODAY():
+    """A documented, deliberately-deferred contract violation. See the note above.
+
+    Not an xfail: it passes now because it asserts what the code currently
+    does. It is a tripwire for 7c, not a known-fail.
+    """
+    from nodes._otr_video_engines import frame_contract as fc
+    from nodes._otr_video_engines import registry as vreg
+
+    declared = fc.frame_contract_for(vreg.get_engine("ltx_video")).max_frames
+    assert declared == 169, (
+        "this tripwire is written against a declared 169 ceiling; the "
+        "declaration moved to %r, so re-derive the numbers below" % (declared,))
+
+    # No env set anywhere -- this is the DEFAULT path, not an operator override.
+    src = _ltx_loop_source_length(declared, 25)
+    output_frames = 2 * src - 1
+
+    assert src == 97, src
+    assert output_frames == 193, output_frames
+    assert output_frames > declared, (
+        "the boomerang no longer overshoots the declared ceiling -- if 7c "
+        "removed the loop-fill, DELETE this tripwire in that same commit "
+        "rather than relaxing it")
+
+
+def test_the_boomerang_is_on_by_default_which_is_why_the_violation_is_reachable():
+    """The overshoot above is not an opt-in path; it is the shipped default.
+
+    ``_LOOP_VIA_REVERSE_DEFAULT`` is True (eng_ltx_video.py:412), so every
+    ltx_video beat that takes the loop path renders 2N-1. If this ever becomes
+    False the violation stops being reachable by default and the tripwire above
+    is measuring a path nobody runs.
+    """
+    import os
+
+    if os.environ.get("OTR_LTX_LOOP_VIA_REVERSE"):
+        pytest.skip("box pins OTR_LTX_LOOP_VIA_REVERSE; the default is what "
+                    "this test is about")
+    assert LtxVideoEngine()._loop_via_reverse() is True
