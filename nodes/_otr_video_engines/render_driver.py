@@ -2949,8 +2949,37 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
             # much later as an assembly count mismatch, which reads as an
             # assembler bug rather than as the engine returning fewer frames
             # than it was asked for.
-            got = int((clip or {}).get("frame_count") or 0)
-            if got and got != int(segment.render_frames):
+            # A SEGMENT THAT CANNOT SAY WHAT IT PRODUCED IS NOT ASSEMBLABLE
+            # (2026-07-27, chunk 7b C2; found by the blockers kibitz arc).
+            # This read `got = int(clip.get("frame_count") or 0)` followed by
+            # `if got and got != ...`, so a clip reporting 0 -- or omitting the
+            # field entirely -- SKIPPED the check and was assembled anyway.
+            # `CanonicalClip.frame_count` defaults to 0 (``schemas.py:233``),
+            # so "absent" and "zero" are the same value here and neither is a
+            # length. That is a fail-OPEN guard inside a fail-closed function:
+            # the exact shape of the four swallowed fail-closed sites chunk 1a's
+            # QA panel found, arriving through a different door.
+            #
+            # The count is the whole basis of the plan-vs-output proof, so an
+            # unreadable one is a FAILED verification, not a pass -- the same
+            # rule `wan_shared.ffprobe_counted_frames` already states for the
+            # assembly boundary ("NO GUESS -- an unreadable count is a failed
+            # verification, not a zero").
+            raw_count = (clip or {}).get("frame_count")
+            try:
+                got = int(raw_count)
+            except (TypeError, ValueError):
+                got = None
+            if got is None or got < 1:
+                raise RenderError(
+                    "shot %s segment %d returned frame_count=%r, which is not a "
+                    "length. The plan asked for %d frame(s) and the segment "
+                    "cannot say what it produced, so the beat cannot be proven "
+                    "against its own audio. NO FALLBACK -- an unreadable count "
+                    "is a failed verification, not a zero."
+                    % (shot.get("shot_id"), index, raw_count,
+                       int(segment.render_frames)))
+            if got != int(segment.render_frames):
                 raise RenderError(
                     "shot %s segment %d rendered %d frame(s) but its plan asked "
                     "for %d. NO FALLBACK -- assembling a short segment would "

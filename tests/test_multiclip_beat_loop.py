@@ -462,3 +462,112 @@ def test_a_segment_that_keeps_NO_frames_is_refused_not_clamped():
         wb.ffmpeg_concat_segments_cmd([("a.mp4", 0, 0)], "out.mp4")
     with pytest.raises(wb.GraphExecutionError, match="NO CLAMP"):
         wb.ffmpeg_concat_segments_cmd([("a.mp4", -1, 5)], "out.mp4")
+
+
+# ---------------------------------------------------------------------------
+# C2 (2026-07-27): a segment that cannot SAY what it produced is not assemblable
+# ---------------------------------------------------------------------------
+#
+# The per-segment length check read
+#     got = int((clip or {}).get("frame_count") or 0)
+#     if got and got != int(segment.render_frames):
+# so a clip reporting 0 -- or omitting the field -- skipped the check entirely
+# and was assembled anyway. `CanonicalClip.frame_count` DEFAULTS to 0
+# (schemas.py:233), so "absent" and "zero" are the same value and neither is a
+# length. A fail-OPEN guard inside a fail-closed function.
+#
+# This matters most for the lanes nobody can smoke-test cheaply: four provider
+# canonicalizers derive frame_count as round(duration_s * fps), so a provider
+# returning a zero/absent duration produced a zero count that sailed straight
+# through the proof and into the assembly.
+
+
+class _BadCountStub(_BeatStub):
+    """Writes a REAL clip of the right length but MISREPORTS the count.
+
+    Deliberately still writes the correct number of frames: the point is that
+    the driver must not trust an unreadable *report*, even when the file behind
+    it happens to be fine. Otherwise the test would be proving the assembler,
+    not the guard.
+    """
+
+    def __init__(self, tmpdir, bad_value, omit=False):
+        super().__init__(tmpdir)
+        self.bad_value = bad_value
+        self.omit = omit
+
+    def render_clip(self, request, prepared):
+        out = super().render_clip(request, prepared)
+        if self.omit:
+            out.pop("frame_count", None)
+        else:
+            out["frame_count"] = self.bad_value
+        return out
+
+
+@pytest.mark.parametrize("bad_value,omit,label", [
+    (0, False, "zero"),
+    (None, False, "None"),
+    ("", False, "empty string"),
+    ("not-a-number", False, "non-numeric"),
+    (-3, False, "negative"),
+    (None, True, "field absent entirely"),
+])
+def test_an_unreadable_segment_frame_count_is_TERMINAL(monkeypatch, bad_value,
+                                                       omit, label):
+    """THE MUTATION TARGET. Restore `if got and got != ...` and every one of
+    these assembles silently instead of raising."""
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BadCountStub(tmp, bad_value, omit=omit)
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_JUMP, [
+            {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+        ], 50)
+        with pytest.raises(rd.RenderError) as exc:
+            rd.render_beat_coverage(_shot(plan), {},
+                                    request_builder=_request_builder)
+        msg = str(exc.value)
+        assert "is not a length" in msg, (
+            "the refusal for %s must name the unreadable count, not fall "
+            "through to the generic mismatch message: %s" % (label, msg))
+        assert "shot_b001" in msg and "segment 0" in msg, msg
+
+
+def test_a_HONEST_count_still_passes_after_the_C2_tightening(monkeypatch):
+    """The guard must not have become a blanket refusal.
+
+    Pairs with the parametrized test above: without this, tightening the
+    predicate to `raise` unconditionally would also go green.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_JUMP, [
+            {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+        ], 50)
+        clip, _shot_out, _att, _used = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+        assert clip["frame_count"] == 50
+        assert eng.seen_frames == [25, 25]
+
+
+def test_a_WRONG_but_readable_count_still_names_the_mismatch(monkeypatch):
+    """The pre-existing mismatch path must survive the tightening -- a readable
+    count that disagrees still gets the 'asked for' message, not the new one."""
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BadCountStub(tmp, 24)          # readable, but one short
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_JUMP, [
+            {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+        ], 50)
+        with pytest.raises(rd.RenderError) as exc:
+            rd.render_beat_coverage(_shot(plan), {},
+                                    request_builder=_request_builder)
+        msg = str(exc.value)
+        assert "rendered 24 frame(s) but its plan asked for 25" in msg, msg
+        assert "is not a length" not in msg, (
+            "a readable-but-wrong count must take the mismatch path, not the "
+            "unreadable-count path: %s" % msg)
