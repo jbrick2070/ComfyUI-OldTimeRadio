@@ -156,6 +156,80 @@ def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
     return counted
 
 
+def assemble_beat_segments(segments, out_path, *, expect_frames, expect_fps,
+                           ffmpeg="ffmpeg", ffprobe="ffprobe"):
+    """Assemble rendered SEGMENTS into ONE beat clip -- TRANSACTIONALLY.
+
+    Multi-clip coverage chunk 6d (2026-07-26). ``segments`` is a sequence of
+    ``(path, drop_head, keep_frames)`` in play order. Returns ``out_path``.
+
+    TRANSACTIONAL means the caller never receives a half-right beat. Three
+    things are proven about the assembled file BEFORE it is handed back, and
+    any of them failing removes the output and raises:
+
+    * every segment shares ONE canvas -- segments that differ in size
+      concatenate into a clip that changes dimensions partway through, which
+      no downstream consumer expects and the mux will not mention;
+    * the assembled clip DECODES to exactly ``expect_frames`` frames, counted
+      with ``-count_frames`` rather than read off a container header the muxer
+      wrote;
+    * it still honours the silent-clip contract (bt709 / yuv420p / one video
+      stream / no audio), because an assembled beat is a CanonicalClip like
+      any other and the mux is entitled to assume that.
+
+    The partitioner refuses a plan whose segments cannot sum to the beat
+    exactly. This is the other end of that promise: it proves the RENDER kept
+    it. Without the count, "the plan was exact" and "the video is the right
+    length" are two different claims and only one of them was ever checked.
+    """
+    import os as _os
+
+    from . import wrapper_bridge as _wb
+    rows = [(str(p), int(d), int(k)) for p, d, k in segments]
+    if not rows:
+        raise _wb.GraphExecutionError(
+            "beat assembly was handed NO segments")
+
+    geometries = {}
+    for path, _drop, _keep in rows:
+        fields = ffprobe_clip_fields(path, ffprobe=ffprobe)
+        geometries.setdefault((fields["width"], fields["height"]), []).append(path)
+    if len(geometries) > 1:
+        raise _wb.GraphExecutionError(
+            "beat assembly refuses segments with MIXED canvases %r -- the "
+            "assembled clip would change size partway through the beat. NO "
+            "FALLBACK (no silent rescale)."
+            % ({"%dx%d" % k: v for k, v in geometries.items()},))
+
+    _wb.run_ffmpeg(_wb.ffmpeg_concat_segments_cmd(rows, out_path, ffmpeg=ffmpeg))
+    try:
+        if not _os.path.exists(out_path) or _os.path.getsize(out_path) <= 0:
+            raise _wb.GraphExecutionError(
+                "beat assembly produced no usable clip at %r (ffmpeg exited 0 "
+                "but wrote %s)" % (out_path,
+                                   "no file" if not _os.path.exists(out_path)
+                                   else "0 bytes"))
+        counted = ffprobe_counted_frames(out_path, ffprobe=ffprobe)
+        if counted != int(expect_frames):
+            raise _wb.GraphExecutionError(
+                "beat assembly produced %d frame(s) but the coverage plan "
+                "promised %d. The segments rendered and the beat still came "
+                "out the wrong length, so the clip would drift against its own "
+                "audio. NO FALLBACK -- a header would have said this was fine."
+                % (counted, int(expect_frames)))
+        validate_silent_clip_contract(
+            ffprobe_clip_fields(out_path, ffprobe=ffprobe), expect_fps)
+    except Exception:
+        # TRANSACTIONAL: a beat that failed verification must not survive on
+        # disk, or the next pass finds a plausible file and trusts it.
+        try:
+            _os.unlink(out_path)
+        except OSError:
+            pass
+        raise
+    return out_path
+
+
 def validate_silent_clip_contract(fields, expected_fps):
     """PURE: assert a probed clip honours the OTR silent-clip contract -- EXACTLY
     one video stream, NO audio (V-1), h264 / yuv420p / bt709 colorspace, and the
@@ -393,6 +467,6 @@ class WanInitImageMixin:
 
 __all__ = [
     "_parse_fps", "ffprobe_clip_fields", "ffprobe_counted_frames",
-    "validate_silent_clip_contract",
+    "assemble_beat_segments", "validate_silent_clip_contract",
     "WanInitImageMixin", "_WAN_DEFAULT_NEGATIVE",
 ]

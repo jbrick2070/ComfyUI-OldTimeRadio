@@ -764,37 +764,46 @@ def segment_render_frames(shot, segment_index):
     this build keeps having to remove. A segment's length is not derivable from
     the shot row; it is in the plan, so it is read from the plan.
 
-    Returns the beat's own ``target_frame_count`` for segment 0 and for a shot
-    with no plan, which is every beat today and every single-clip beat forever.
+    Returns the beat's own ``target_frame_count`` only when the shot carries no
+    plan at all -- which is every beat today. When a plan exists it answers
+    from the plan for EVERY index, segment 0 included.
 
     ``render_frames``, deliberately, NOT the visible count: the engine renders
     that many, and ``drop_head`` / ``trim_tail`` are the assembler's business.
     """
     beat_frames = int(shot.get("target_frame_count") or 0)
     index = int(segment_index or 0)
+    raw = shot.get("coverage_plan")
+    if isinstance(raw, dict) and raw:
+        # THE PLAN WINS FOR EVERY SEGMENT, INDEX 0 INCLUDED (corrected
+        # 2026-07-26 by the chunk-6c loop's own end-to-end test). An earlier
+        # draft short-circuited index 0 to the BEAT's length, which is right
+        # for a single-clip beat and wrong for the first segment of a
+        # multi-segment one: segment 0 of a two-segment 50-frame beat would
+        # have rendered all 50 frames and then been concatenated with segment 1
+        # on top of them. It read as a harmless special case because for a
+        # single-clip plan the two numbers are equal.
+        try:
+            from . import coverage_plan as _cp  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            import coverage_plan as _cp  # type: ignore
+        plan = _cp.CoveragePlan.from_dict(raw)
+        for segment in plan.segments:
+            if int(segment.index) == index:
+                return int(segment.render_frames)
+        raise RenderError(
+            "shot %s was asked for segment %d but its coverage plan covers "
+            "segment(s) %r. NO FALLBACK."
+            % (shot.get("shot_id"), index,
+               [int(s.index) for s in plan.segments]))
     if index <= 0:
         return beat_frames
-    raw = shot.get("coverage_plan")
-    if not isinstance(raw, dict) or not raw:
-        raise RenderError(
-            "shot %s was asked for segment %d but carries no coverage_plan, so "
-            "there is nothing that says how long that segment is. A segment "
-            "request without a plan is a caller bug. NO FALLBACK to the beat's "
-            "length -- that renders the WHOLE beat under a segment's name."
-            % (shot.get("shot_id"), index))
-    try:
-        from . import coverage_plan as _cp  # type: ignore
-    except ImportError:  # pragma: no cover -- flat test imports
-        import coverage_plan as _cp  # type: ignore
-    plan = _cp.CoveragePlan.from_dict(raw)
-    for segment in plan.segments:
-        if int(segment.index) == index:
-            return int(segment.render_frames)
     raise RenderError(
-        "shot %s was asked for segment %d but its coverage plan covers "
-        "segment(s) %r. NO FALLBACK."
-        % (shot.get("shot_id"), index,
-           [int(s.index) for s in plan.segments]))
+        "shot %s was asked for segment %d but carries no coverage_plan, so "
+        "there is nothing that says how long that segment is. A segment "
+        "request without a plan is a caller bug. NO FALLBACK to the beat's "
+        "length -- that renders the WHOLE beat under a segment's name."
+        % (shot.get("shot_id"), index))
 
 
 def validate_and_repair_still_spine(ledger):
@@ -2766,6 +2775,138 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
     return clip, out_shot, [eng], (clip_peak or _mc.vram_used_mb())
 
 
+def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
+                         canvas=None, oom_engines=frozenset(),
+                         oom_shot_id=None, host_caps=None, profile=None):
+    """Render ONE BEAT -- as one clip, or as its plan's segments assembled.
+
+    Multi-clip coverage chunk 6c/6d (2026-07-26). This is the loop the whole
+    block has been building toward, and the shape of it is the point:
+
+    * ONE :class:`beat_session.BeatSession` wraps every segment, so the beat
+      loads its weights once and releases them once, in one outer ``finally``;
+    * each segment gets its OWN request (``segment_index=``), which carries its
+      own still and its own length;
+    * the TERMINAL TRANSACTION happens INSIDE the loop -- a CHAIN successor
+      begins on the frame its predecessor just ended on, extracted immediately
+      after that segment renders, because segment N+1 cannot wait for a
+      post-episode pass to learn where it starts;
+    * the segments are assembled and PROVEN before the beat is handed back.
+
+    A beat with no plan, or a single-clip plan, takes the historical path
+    exactly: one request, one ``render_shot``, no session threaded, nothing
+    assembled. That is every beat today.
+
+    Returns ``(clip, out_shot, attempts, vram_used_mb)`` -- the same tuple
+    :func:`render_shot` returns, because the caller must not care how many
+    renders it took to make one beat.
+    """
+    try:
+        from . import beat_session as _bs  # type: ignore
+        from . import coverage_plan as _cp  # type: ignore
+        from . import wan_shared as _ws  # type: ignore
+        from . import wrapper_bridge as _wb2  # type: ignore
+        from ._tmp import otr_engine_tmp_path as _tmp_path  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        import beat_session as _bs  # type: ignore
+        import coverage_plan as _cp  # type: ignore
+        import wan_shared as _ws  # type: ignore
+        import wrapper_bridge as _wb2  # type: ignore
+        from _tmp import otr_engine_tmp_path as _tmp_path  # type: ignore
+
+    raw_plan = shot.get("coverage_plan")
+    plan = None
+    if isinstance(raw_plan, dict) and raw_plan:
+        plan = _cp.CoveragePlan.from_dict(raw_plan)
+    if plan is None or not plan.is_multi_clip:
+        # THE HISTORICAL PATH, byte for byte. The caller has usually already
+        # built this request (it needs it for the trace and the audio-motion
+        # profile), so it is used as-is rather than rebuilt -- rebuilding it
+        # here would be a second derivation of one request.
+        single = request if request is not None else request_builder(
+            shot, ledger, canvas=canvas)
+        return render_shot(shot, single, oom_engines=oom_engines,
+                           oom_shot_id=oom_shot_id, host_caps=host_caps,
+                           profile=profile)
+
+    if request_builder is None:
+        raise RenderError(
+            "shot %s carries a %d-segment coverage plan but no request builder "
+            "was passed, so its segments cannot be given their own stills and "
+            "lengths. A synthetic single-request caller cannot drive a "
+            "multi-clip beat. NO FALLBACK."
+            % (shot.get("shot_id"), plan.segment_count))
+    engine_id = str(shot.get("engine_id") or "")
+    if not _vreg.is_registered(engine_id):
+        raise RenderError(
+            "shot %s carries a %d-segment coverage plan but engine %r is not "
+            "registered, so there is nothing to open a beat session on."
+            % (shot.get("shot_id"), plan.segment_count, engine_id))
+    engine = _vreg.get_engine(engine_id)
+    beat_id = str(shot.get("beat_id") or shot.get("shot_id") or "")
+    chains = plan.join_mode == _cp.JOIN_CHAIN
+
+    rendered = []            # (path, drop_head, keep_frames) in play order
+    out_shot = dict(shot)
+    attempts = []
+    used = 0
+    terminal = None
+    with _bs.BeatSession(engine, host_caps=host_caps, profile=profile,
+                         beat_id=beat_id,
+                         segment_count=plan.segment_count) as session:
+        for position, segment in enumerate(plan.segments):
+            index = int(segment.index)
+            request = request_builder(shot, ledger, canvas=canvas,
+                                      segment_index=index)
+            if chains and terminal:
+                # THE TERMINAL TRANSACTION. A chained successor does not get a
+                # minted still at all -- it begins on the real frame its
+                # predecessor ended on, which is what makes it a chain rather
+                # than a jump with extra steps.
+                if isinstance(request, dict):
+                    request["init_image"] = terminal
+                    obs = request.get("observability")
+                    if isinstance(obs, dict):
+                        obs["init_source"] = "chain_terminal_frame"
+                        obs["init_image"] = os.path.basename(terminal)
+            clip, out_shot, attempts, used = render_shot(
+                shot, request, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
+                host_caps=host_caps, profile=profile,
+                segment=_bs.SegmentSlot(session, index, beat_id))
+            path = str((clip or {}).get("path") or "")
+            if not path:
+                raise RenderError(
+                    "shot %s segment %d rendered no clip path, so the beat "
+                    "cannot be assembled. NO FALLBACK."
+                    % (shot.get("shot_id"), index))
+            rendered.append((path, int(segment.drop_head),
+                             int(segment.render_frames)
+                             - int(segment.drop_head)
+                             - int(segment.trim_tail)))
+            if chains and position + 1 < len(plan.segments):
+                terminal = _wb2.extract_terminal_frame(
+                    path, _tmp_path("otr_terminal_", ".png"))
+
+    assembled = _ws.assemble_beat_segments(
+        rendered, _tmp_path("otr_beat_", ".mp4"),
+        expect_frames=int(plan.target_visible_frames),
+        expect_fps=int((clip or {}).get("fps") or 25))
+    beat_clip = dict(clip or {})
+    beat_clip["path"] = assembled
+    beat_clip["frame_count"] = int(plan.target_visible_frames)
+    # Say so on the clip itself: a beat made of four renders is not the same
+    # artifact as a beat made of one, and the receipt should not have to be
+    # reverse-engineered from a log.
+    beat_clip["segment_count"] = int(plan.segment_count)
+    beat_clip["join_mode"] = str(plan.join_mode)
+    _LOG.warning(
+        "[OTR video] BEAT %s assembled from %d %s segment(s) -> %d frame(s) "
+        "at %s", beat_id or shot.get("shot_id"), plan.segment_count,
+        plan.join_mode, plan.target_visible_frames,
+        os.path.basename(assembled))
+    return beat_clip, out_shot, attempts, used
+
+
 def build_episode_render_policy(section):
     """The v2 render policy handed to EVERY adapter's ``assert_usable`` /
     ``prepare`` for this episode, read from the ShotLock-stamped ledger
@@ -2892,8 +3033,15 @@ def run_episode(ledger, *, oom_shot_id=None,
                 })
         except Exception:  # noqa: BLE001 -- profiling collection is never fatal
             pass
-        clip, out_shot, attempts, used = render_shot(
-            shot, request, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
+        # ONE BEAT, however many renders it takes (2026-07-26, chunks 6c/6d).
+        # A shot with no coverage plan or a single-clip one goes straight to
+        # render_shot with the request already built above -- unchanged. A
+        # multi-segment plan opens ONE beat session, renders each segment from
+        # its own request, chains terminal frames inside the loop, and assembles
+        # the result before it comes back.
+        clip, out_shot, attempts, used = render_beat_coverage(
+            shot, ledger, request=request, request_builder=request_builder,
+            canvas=canvas, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
             host_caps=_episode_host_caps, profile=_episode_profile)
         # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
         # raises RenderError; there are no runtime fallback decisions and no

@@ -215,7 +215,12 @@ def test_a_segment_request_carries_the_SEGMENTS_length_not_the_BEATS():
     the whole beat's duration."""
     shot = _planned_shot()
     assert rd.segment_render_frames(shot, 1) == 61
-    assert rd.segment_render_frames(shot, 0) == 120
+    # And segment 0 is a SEGMENT too. It reads as a harmless special case
+    # because for a single-clip plan the segment's length and the beat's are
+    # equal -- but here segment 0 renders 61 of the beat's 120 frames, and
+    # short-circuiting it to 120 would render the whole beat and then
+    # concatenate segment 1 on top of it.
+    assert rd.segment_render_frames(shot, 0) == 61
 
 
 def test_a_single_clip_beat_keeps_the_beats_own_length():

@@ -593,6 +593,42 @@ def ffmpeg_lavfi_floor_cmd(out_path, width, height, fps, frame_count,
     ] + _bt709_encode_args(crf) + [out_path]
 
 
+def ffmpeg_concat_segments_cmd(segments, out_path, *, ffmpeg="ffmpeg", crf=18):
+    """ffmpeg arg list: several rendered SEGMENTS -> ONE silent bt709 beat clip.
+
+    Multi-clip coverage chunk 6d (2026-07-26). ``segments`` is a sequence of
+    ``(path, drop_head, keep_frames)``: the assembler drops ``drop_head`` frames
+    from the front of that segment and keeps exactly ``keep_frames`` after it.
+
+    FRAME-EXACT BY SELECTION, not by time. Every trim is expressed as
+    ``select='between(n, first, last)'`` over the frame INDEX -- a
+    seconds-based trim rounds, and rounding a beat's length is the drift the
+    exact-sum partitioner exists to refuse. ``setpts`` restamps each kept run
+    so concat sees contiguous timestamps.
+
+    The output goes through the SAME ``_bt709_encode_args`` tail as every other
+    OTR clip, so an assembled beat is a CanonicalClip like any other -- not a
+    special case the mux has to know about.
+    """
+    rows = [(str(p), max(0, int(d)), max(1, int(k))) for p, d, k in segments]
+    if not rows:
+        raise GraphExecutionError(
+            "concat was handed NO segments -- an assembled beat with nothing "
+            "in it is not a beat")
+    args = [ffmpeg, "-y"]
+    for path, _drop, _keep in rows:
+        args += ["-i", path]
+    chains = []
+    for i, (_path, drop, keep) in enumerate(rows):
+        chains.append(
+            "[%d:v]select='between(n\\,%d\\,%d)',setpts=N/FRAME_RATE/TB[v%d]"
+            % (i, drop, drop + keep - 1, i))
+    joined = "".join("[v%d]" % i for i in range(len(rows)))
+    graph = ";".join(chains) + ";" + joined + "concat=n=%d:v=1:a=0[out]" % len(rows)
+    args += ["-filter_complex", graph, "-map", "[out]"]
+    return args + _bt709_encode_args(crf) + [out_path]
+
+
 def ffmpeg_terminal_frame_cmd(clip_path, out_path, *, ffmpeg="ffmpeg"):
     """ffmpeg arg list: a rendered clip -> ONE image file holding its LAST frame.
 
