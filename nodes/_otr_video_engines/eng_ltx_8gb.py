@@ -99,14 +99,52 @@ LtxSessionConfig = namedtuple("LtxSessionConfig", (
 ))
 
 
+class FileReceiptUnavailable(RuntimeError):
+    """A resolved model file could not be stat'ed. Internal to this adapter --
+    ``resolve_session_config`` converts it into a NAMED ``EngineUnusable``."""
+
+
+def _same_file(a, b):
+    """True when two path SPELLINGS name the same file on disk.
+
+    ``os.path.abspath`` normalises separators and resolves relative paths, but
+    it does NOT fold case and does NOT resolve junctions or symlinks. On Windows
+    both matter: NTFS is case-insensitive, and this build reaches its own repo
+    through a JUNCTION, with `extra_model_paths.yaml` the standard way a shared
+    model store gets aliased. Comparing ``abspath`` strings therefore REFUSES
+    correct configurations -- ``C:\\Models\\x`` vs ``c:\\models\\x`` is the same
+    file and compares unequal.
+
+    ``os.path.samefile`` is the real test (it compares what the OS resolves to,
+    reparse points included) but it RAISES when either side is missing, so it
+    cannot stand alone. Fall back to ``normcase(realpath(...))``, which folds
+    case and resolves links without requiring the file to exist."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return (os.path.normcase(os.path.realpath(a))
+                == os.path.normcase(os.path.realpath(b)))
+
+
 def _file_receipt(path):
     """A BOUNDED, stable receipt for a model file: (basename, size, mtime_ns).
 
     Deliberately NOT a content hash: the identity is re-read before every
     segment, and hashing a 6.34 GiB checkpoint per segment would cost more than
     the render. Size + mtime catches a swapped or rebuilt weight, which is the
-    drift this is guarding against."""
-    st = os.stat(path)
+    drift this is guarding against.
+
+    Raises ``FileReceiptUnavailable`` rather than a raw ``OSError`` when the file
+    vanishes between resolution and stat (a concurrent re-download, a cleanup, an
+    AV quarantine) -- the caller turns it into the same NAMED refusal every other
+    failure in this path produces."""
+    try:
+        st = os.stat(path)
+    except OSError as exc:
+        raise FileReceiptUnavailable(
+            "%s could not be stat'ed after it resolved (%s: %s) -- it moved or "
+            "was removed between resolution and receipt"
+            % (path, type(exc).__name__, exc))
     return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
 
 
@@ -249,8 +287,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         by_token = self._resolve_model_file(categories, token, env_dir)
         explicit = os.environ.get(env_explicit) if env_explicit else None
         if explicit:
-            if by_token is None or (os.path.abspath(explicit)
-                                    != os.path.abspath(by_token)):
+            if by_token is None or not _same_file(explicit, by_token):
                 raise EngineUnusable(
                     self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
                     "%s=%r names a file the loader will NOT load: the graph passes "
@@ -290,12 +327,19 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "text encoder, so the shared t5xxl_fp16 must be on disk (offline "
                 "invariant, no runtime fetch); fix OTR_LTX_8GB_T5_NAME / "
                 "OTR_LTX_8GB_T5_DIR" % self._t5_name(), kind="video")
+        try:
+            ckpt_receipt = _file_receipt(ckpt)
+            t5_receipt = _file_receipt(t5)
+        except FileReceiptUnavailable as exc:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "ltx_8gb %s" % (exc,), kind="video")
         return LtxSessionConfig(
             engine=self.name, recipe=RECIPE_LTX8_I2V,
             ckpt_token=self._ckpt_name(), ckpt_path=ckpt,
-            ckpt_receipt=_file_receipt(ckpt),
+            ckpt_receipt=ckpt_receipt,
             t5_token=self._t5_name(), t5_path=t5,
-            t5_receipt=_file_receipt(t5),
+            t5_receipt=t5_receipt,
             t5_device=self._t5_device(), tiled_vae=self._tiled_vae(),
             steps=cfg["steps"], cfg=cfg["cfg"], sampler=cfg["sampler"],
             max_shift=cfg["max_shift"], base_shift=cfg["base_shift"],
