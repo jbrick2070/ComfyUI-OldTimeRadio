@@ -3,6 +3,72 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-26 22:40 -- HEAD d708408d (v2.0-alpha) -- WINDOW CODER A, SESSION 4
+Did: pushed B1b-0 (b214481b, the regression net ltx_8gb never had) and B1b
+  (d708408d, the loader hoist). The post-code panel on the NET killed the
+  previous session's own acceptance criterion: the two assertions it declared
+  would FLIP under the hoist structurally could not, so nothing in it would
+  have gone red against a hoist that silently did nothing. Corrected before
+  writing the hoist. B1b then hoisted the CHECKPOINT ONLY into prepare() and
+  moved the 4 GiB integrity floor into a shared helper called BEFORE the lease.
+Current step: B3 + B4 -- the LTX-only effective contract, then delete ping-pong
+  with the WAN max_render_frames regression in the same commit.
+Next: B3+B4, then B5+B6, prequalify 512x288, 7d. CODER A.
+Models: Claude + 3 Sonnet lenses + 2 agy (kibitz, Gemini 3.6 Flash High). $0
+  external. No codex spend this session -- the design was already panel-decided
+  in the 8gb judgment and no fix needed a second attempt.
+Commits: b214481b, d708408d. Records: docs/2026-07-26-b1b0-qa-findings.md,
+  docs/2026-07-26-b1b-hoist-qa-findings.md.
+
+### Detail
+
+**THE NET COULD NOT SEE THE THING IT WAS BUILT FOR.** `test_THE_LOAD_COUNT_...`
+was written to state the defect as a number and flip 3 -> 1. It cannot: under
+the decided design `_build_graph` stays conditional, and that test hands
+`render_clip` a HAND-BUILT `prepared = {"patchers": []}` with no
+`external_results`, so it stays on the unsupplied branch forever. Same for
+`test_the_graph_carries_ITS_OWN_loader_nodes_today`. The Sonnet over-pinning
+lens and agy reached that independently. Editing the literal `3` to `1` when the
+hoist landed would have produced a red that looked like a broken hoist and was
+actually a harness gap. Both are now CONTROLS with docstrings that say so;
+EXACTLY ONE assertion flipped (`external_results` appearing in the executor
+kwargs); and the 1-load proof was written WITH the hoist, calling `prepare()`.
+
+**THE FLOOR WAS THE REAL BLOCKER AND ITS POSITION IS THE FIX.** `assert_usable`
+owns the 4 GiB checkpoint-integrity floor and runs PER SEGMENT, after
+`BeatSession` opens -- so moving the real load into `prepare()` put it ahead of
+the only size check in the adapter, and `resolve_session_config` proves
+existence and takes a receipt but never size. It is now a shared helper, called
+BEFORE `super().prepare()` takes the cross-process lease. Two mutants pin the
+POSITION (`FLOOR_runs_AFTER_the_lease_is_taken`,
+`FLOOR_dropped_from_prepare_entirely`), not just the presence.
+
+**THE PANEL ALSO FOUND A REAL COVERAGE HOLE IN THE NET:** prompt polarity was
+never pinned on any hop. A positive/negative swap renders the negative prompt --
+it does not crash, does not shorten the clip, and no forward test could see it
+because the fakes never inspect what they are handed. And `_ltx8_frame_length`
+had ZERO coverage anywhere in the suite, though B3/B4 rest on its `8n+1` snap.
+Both closed.
+
+**Mutation: 29 mutants, 27 defect + 2 CONTROL, all proven**, both baselines
+asserted failed=0. The CONTROL mutants are new this session -- they move values
+the recipe is entitled to move (its step count, its default checkpoint name) and
+must break nothing, which is what proves the new assertions compare against the
+resolver instead of secretly pinning literals.
+
+**Raised by the panel, out of scope, recorded so it is not lost:**
+`MotionEngineBase` has no re-entrancy guard, so a second `prepare()` on one
+engine instance with no teardown between blocks the full 120s lease timeout
+rather than failing fast (the owner PID is this same live process, so the
+stale-lock reclaim never fires). And the checkpoint's embedded VAE at slot 2 has
+never been handed to `_detach_patchers`, here or in any sibling adapter. Both
+are family-wide, both pre-date the hoist; they belong in one ticket across the
+engine family, not in an `ltx_8gb` chunk.
+
+**PROCESS, and it cost an hour:** the three Sonnet lenses on B1b-0 ran
+SEQUENTIALLY. Fan-out lenses go out in ONE block -- ~20 minutes concurrent
+instead of ~50 serialized. Nothing about the findings changed; only the clock.
+
 ## 2026-07-26 15:40 -- HEAD 095be05b (v2.0-alpha) -- WINDOW CODER A, SESSION 3c
 Did: closed the identity lie on BOTH remaining channels, with the operator's
   fan-out-BEFORE-and-AFTER discipline on each. 823b9929 routed _ckpt_path /

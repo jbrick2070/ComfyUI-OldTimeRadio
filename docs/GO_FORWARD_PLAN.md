@@ -1,8 +1,32 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-26 (remote Cowork, CODER A session 3) -- **THREE KIBITZ
-ARCS JUDGED AND EIGHT GREEN CHUNKS PUSHED. HEAD == origin `095be05b`; suite 7071
-passed / 27 skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
+**Updated:** 2026-07-26 (remote Cowork, CODER A session 4) -- **B1b-0 AND B1b ARE
+IN. THE LOADERS ARE HOISTED. HEAD == origin `d708408d`; suite 7097 passed / 27
+skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
+
+**THE HOIST IS DONE AND THE 4 GiB FLOOR MOVED WITH IT.** `Ltx8gbEngine.prepare()`
+now runs a loader-only mini-graph and hands the checkpoint to every segment
+through `external_results`; `_build_graph` omits the definitions of ids the
+caller supplied and keeps every wire. CHECKPOINT ONLY -- the T5 stays
+per-segment by decision. The floor is a shared helper called BEFORE
+`super().prepare()` takes the lease.
+
+**THE QA PANEL KILLED THE PREVIOUS SESSION'S OWN ACCEPTANCE CRITERION.** The
+B1b-0 net declared two assertions would FLIP under the hoist. Two independent
+seats proved neither could: `_build_graph` stays conditional, and every test in
+that file hands `render_clip` a hand-built prepared dict with no
+`external_results`, so they all stay on the unsupplied branch. **Nothing in the
+net would have gone red against a hoist that silently did nothing.** Corrected
+before the hoist: every one of those tests is a CONTROL, exactly ONE assertion
+flipped, and the 1-load proof was written WITH the hoist. Records:
+`docs/2026-07-26-b1b0-qa-findings.md`, `docs/2026-07-26-b1b-hoist-qa-findings.md`.
+
+**NEXT = B3 + B4.** See CURRENT STEP.
+
+---
+
+**Superseded header (2026-07-26, session 3) -- THREE KIBITZ ARCS JUDGED AND
+EIGHT GREEN CHUNKS PUSHED at `095be05b`; suite 7071.**
 
 **THE DISCIPLINE THAT PAID:** the operator required a fan-out BEFORE each fix as
 well as after. Before the single-clip fix it killed MY OWN proposal (a wholesale
@@ -198,9 +222,37 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **B1b: HOIST THE LOADERS** (8 GB -> 1080p build)
+## CURRENT STEP -- **B3 + B4: the LTX-only effective contract, then delete ping-pong**
 
-**HEAD == origin `095be05b`.** Suite 7071 / Bible 17 / canonical `9872624A`.
+**HEAD == origin `d708408d`.** Suite 7097 / Bible 17 / canonical `9872624A`.
+Authorities, read ALL THREE first: `docs/2026-07-26-8gb-1080p-arc-judgment.md`
+(the architecture), `docs/2026-07-26-o1-canvas-arc-judgment.md` (the canvas seam)
+and `docs/2026-07-26-dir-override-arc-judgment.md`.
+
+**DONE:** B1a `8caf3516`, B2a `55c8a811`, B2b `582dfbd8`, the post-code QA fixes
+`ea1652f9` / `f33c5e15` / `fdeee600`, QA-4 `823b9929`, the `*_DIR` tripwire
+`095be05b`, **B1b-0 `b214481b`** (the regression net `ltx_8gb` never had) and
+**B1b `d708408d`** (the hoist itself + the 4 GiB floor as a shared helper).
+
+**B3 + B4 (NEXT) -- the LTX-only effective contract, then delete ping-pong.**
+`max_render_frames` is NOT a planning cap: WAN reads 17, renders short, then
+PING-PONGS to the beat length, so applying it before `partition_beat()` would
+turn every WAN beat into a pile of 17-frame renders. Scope the effective
+contract strictly to `engine_id == "ltx_8gb"`; a WAN regression proving
+`max_render_frames=17` does not move its coverage-plan topology ships in the
+SAME commit. B4 only AFTER B3: `render_driver.py:2982` already hard-asserts
+`got == segment.render_frames`, and ping-pong is what currently hides a
+non-`8n+1` segment. Ripping ping-pong is LANE-SPECIFIC -- load-bearing for WAN.
+`tests/test_ltx_8gb_graph_and_loads.py::test_the_frame_length_ladder_...` now
+pins the `8n+1` snap that B4 makes terminal (it had ZERO coverage before B1b-0).
+
+**THEN, in order:** B5+B6, prequalify 512x288, 7d.
+
+---
+
+## SUPERSEDED -- B1b (DONE @ `d708408d`)
+
+**HEAD == origin `095be05b` at entry.** Suite 7071 / Bible 17 / canonical `9872624A`.
 Authorities, read ALL THREE first: `docs/2026-07-26-8gb-1080p-arc-judgment.md`
 (the architecture), `docs/2026-07-26-o1-canvas-arc-judgment.md` (the canvas
 seam + the five channels) and `docs/2026-07-26-dir-override-arc-judgment.md`
