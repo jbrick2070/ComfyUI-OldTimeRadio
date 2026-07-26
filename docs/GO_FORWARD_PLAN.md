@@ -196,7 +196,28 @@ Authorities, read BOTH first: `docs/2026-07-26-8gb-1080p-arc-judgment.md`
 (the architecture) and `docs/2026-07-26-o1-canvas-arc-judgment.md` (the canvas
 seam + the five channels). They supersede the 7b judgment's O1/O4 framing.
 
-**DONE:** B1a `8caf3516`, B2a `55c8a811`, B2b `582dfbd8`.
+**DONE:** B1a `8caf3516`, B2a `55c8a811`, B2b `582dfbd8`, plus the POST-CODE QA
+fixes `ea1652f9` / `f33c5e15` / `fdeee600`.
+
+**THE QA FAN-OUT DID NOT RUN BEFORE THOSE FIRST THREE PUSHES. It should have.**
+The operator caught the omission; running it afterwards found FIVE code defects
+and six test defects in code that was green, mutation-proven with controls, and
+already on origin -- the sixth time a panel has done that in this project. All
+five are now fixed (`docs/2026-07-26-b1b2-qa-findings.md` has the full list and
+status). Two could break production: a path guard that falsely REFUSED correct
+configs (`abspath` folds neither case nor junctions, and this box runs through a
+junction), and a raising baseline identity read that STRANDED the GPU lease for
+the life of the server (when `__enter__` raises, `__exit__` never runs).
+**Run the fan-out BEFORE the push, not after.**
+
+**STILL OPEN from that QA, and it is the real close of the identity-lie defect:**
+`resolve_session_config()` is reachable only from `session_identity()`, which
+`BeatSession` calls only `if self.is_multi_segment`. So the bug B2a exists to
+close is still fully open on the SINGLE-CLIP path -- the common case --
+because `assert_usable()` still uses the old `_ckpt_path()`. Proved live by the
+QA lens: green preflight, raising resolver, same environment. Route
+`assert_usable` through the one resolver and retire `_ckpt_path`/`_t5_path`.
+Own chunk, before or alongside B1b.
 
 **B1b (NEXT) -- the weights are still not shared.** `BeatSession` now OPENS a
 multi-segment session, but `Ltx8gbEngine.load()` only resolves node CLASSES and

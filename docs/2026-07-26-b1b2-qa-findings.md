@@ -156,3 +156,70 @@ because a raise there is inside the `with` suite and `__exit__` still runs.
 5. The structural one: route `assert_usable` through the single resolver and
    retire `_ckpt_path`/`_t5_path`, so the guard protects the single-clip path
    too. Own chunk; it is the real close of the identity-lie defect.
+
+
+---
+
+# STATUS -- 2026-07-26, same session
+
+**All five CODE defects are FIXED, mutation-proven with controls, and pushed.**
+Suite 7023 -> **7045 passed** / 27 skipped / 1 xfailed. Bible 17. Canonical
+byte-identical `9872624A` throughout.
+
+| # | What | Commit |
+|---|---|---|
+| C-1 | path guard falsely refusing correct configs (`_same_file`: samefile + normcase/realpath fallback) | `ea1652f9` |
+| C-4 | `_file_receipt`'s unguarded `os.stat` -> named `EngineUnusable` | `ea1652f9` |
+| T-1 | the misnamed control that let C-1 through -> three real controls (separator, CASE, redundant spelling) + a direct fallback unit test | `ea1652f9` |
+| T-6 | env-clean fixtures completed (6 vars were leaking the host env in) | `ea1652f9` |
+| C-3 | a raising baseline identity read stranding the GPU lease for the life of the server | `f33c5e15` |
+| C-2 | `terminal` validated against `results` -> validated against `graph` | `fdeee600` |
+| C-5 | `_resolve_value`'s lookup outside its guard -> NAMED error | `fdeee600` |
+| T-3 | repeated-runs test could not observe internal eviction | `fdeee600` |
+| `keep=` | the mutation survivor with real teeth -- now covered | `fdeee600` |
+
+**Mutation results, every fix, zero controls broken:** reverting C-1 to
+`abspath` FAILS the new case control (the direct proof the fix is real);
+`samefile` without its fallback and the fallback without `normcase` each fail
+their own test; removing the C-3 unwind fails the teardown assertion and
+narrowing `BaseException` to `Exception` fails the interrupt case; `terminal`
+against `results` again, the lookup back outside the guard, `keep` overwritten
+instead of unioned, and externals not kept at all each fail exactly their own
+test.
+
+**Two process notes worth keeping.**
+
+1. The first C-4 test monkeypatched `os.stat`, which is process-wide -- it broke
+   pytest's own traceback machinery with an INTERNALERROR. Model the real race
+   (a resolver returning a genuinely absent path); never patch the interpreter
+   out from under the runner.
+2. The first version of
+   `test_CONTROL_without_an_explicit_keep_an_intermediate_still_frees` ALSO
+   asserted the external survived -- which made it a second test of the feature,
+   so deleting `keep |= set(ext)` broke it and the harness correctly reported
+   `CONTROLS_broken`. **A control must fail under OVER-tightening and pass under
+   correct behaviour; it must never mirror the feature it bounds.** Caught by
+   the mutation harness, not by review -- which is the argument for running the
+   harness on the controls too, not just the fixes.
+
+## STILL OPEN -- the structural one, and it is its own chunk
+
+`resolve_session_config()` is reachable ONLY from `session_identity()`, which
+`BeatSession` calls ONLY `if self.is_multi_segment`. So the identity-lie defect
+B2a was written to close **remains fully open on the single-clip path -- the
+common case.** `assert_usable()` still uses the old `_ckpt_path()` (existence +
+size floor, no token cross-check). The QA lens reproduced it live: with
+`OTR_LTX_8GB_CKPT` pointed at a decoy clearing the 4 GiB floor, `assert_usable()`
+returned green while `resolve_session_config()` correctly raised, same
+environment.
+
+Closing it means routing `assert_usable` through the ONE resolver and retiring
+`_ckpt_path`/`_t5_path` as competing authorities (codex CUT 1). Two resolvers
+over one fact is the exact pattern chunk 4's lesson names, so this is not
+cosmetic -- it is the actual close of the defect.
+
+Also still open, lower: `_file_receipt` returning a list instead of a tuple
+survives the suite; `mtime_ns` is never isolated from size in any drift test;
+the `*_DIR` directory-override axis is uncovered; and
+`test_a_malformed_render_knob_fails_before_any_file_work` still oversells its
+name (reordering the method survives).

@@ -3,6 +3,74 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-26 12:05 -- HEAD fdeee600 (v2.0-alpha) -- WINDOW CODER A, SESSION 3b
+Did: ran the POST-CODE QA fan-out that should have run before the session-3
+  pushes and did not -- operator caught the omission. codex gpt-5.6-sol + agy
+  Gemini 3.6 Flash High via kibitz, plus FOUR Sonnet lenses. It found FIVE code
+  defects and six test defects in already-green, already-pushed code. Fixed all
+  five: ea1652f9 (C-1 path guard + C-4 stat + the misnamed control + env leak),
+  f33c5e15 (C-3 stranded GPU lease), fdeee600 (C-2 terminal + C-5 named error +
+  the keep= coverage hole).
+Current step: unchanged -- B1b, plus a new chunk ahead of it (route
+  assert_usable through the one resolver; the identity-lie fix currently
+  protects only multi-segment beats).
+Next: close the single-clip resolver gap, then B1b. CODER A.
+Models: Claude + 1 kibitz round (2 calls) + 4 Sonnet lenses. $0 external.
+Commits: 5799544e, ea1652f9, f33c5e15, fdeee600.
+
+### Detail
+
+**THE PROCESS MISS IS THE HEADLINE.** The kickoff said "fan out for QA before
+each push". I pushed three chunks without it, and only ran it when the operator
+asked whether it had happened. It then found, in code that was green,
+mutation-proven WITH controls, and already on origin:
+
+**C-1, a live FALSE REFUSAL.** The new path guard compared with
+`os.path.abspath`, which folds neither case nor junctions. NTFS is
+case-insensitive and this box reaches its own repo through a junction, so
+`C:\Models\x` vs `c:\models\x` -- the SAME file -- raised MALFORMED_CONFIG on
+every multi-segment beat. A guard written to stop the receipt describing the
+wrong weight was refusing the right one. Found by all four sources
+independently. **It shipped because the control test was named
+`..._case_and_separator_tolerant` and only varied the SEPARATOR** -- the name
+promised exactly the coverage that was missing.
+
+**C-3, a stranded GPU lease.** `BeatSession.open()` reads the identity a second
+time AFTER `prepare()` has taken the cross-process lease. B2b made that read do
+file I/O, so it can now raise -- and when `__enter__` raises, Python never calls
+`__exit__`, so teardown and the lease release never ran. The owner is the live
+ComfyUI process, so the PID-liveness reclaim could not help either: every later
+heavy render blocked its full timeout until someone killed the server by hand.
+None of the 38 existing beat-session tests construct an engine whose identity
+succeeds once then raises.
+
+Also C-2 (`terminal` validated against `results`, which is now seeded with
+externals -- so a mistyped terminal returned the caller's own handle as if it
+were a render), C-5 (a missing wire source lost its NAMED error), and the
+`keep=` mutation survivor: `keep |= set(ext)` -> `keep = set(ext)` passed the
+ENTIRE suite while silently discarding the caller's keep on every production
+call, freeing the MODEL patcher before teardown grabs it. `keep=` had zero
+direct coverage anywhere.
+
+**TWO TESTING LESSONS, both learned the hard way this session.**
+The first C-4 test monkeypatched `os.stat` -- process-wide -- and broke pytest's
+own traceback machinery with an INTERNALERROR. Model the real race; never patch
+the interpreter out from under the runner. And my first "control" for the `keep`
+fix ALSO asserted the feature, so deleting the fix broke the control and the
+harness reported CONTROLS_broken. **A control must fail under OVER-tightening
+and pass under correct behaviour -- never mirror the feature it bounds.** Caught
+by the mutation harness, not by review, which is the argument for running the
+harness against the controls too.
+
+**STILL OPEN, and it is the real close of the defect B2a was written for:**
+`resolve_session_config` runs ONLY for multi-segment beats, so the identity-lie
+bug is still fully open on the single-clip path. `assert_usable` still uses the
+old `_ckpt_path()`. The QA lens proved it live -- green preflight, raising
+resolver, same environment.
+
+Suite 7023 -> 7045 passed / 27 skipped / 1 xfailed. Bible 17. Canonical
+byte-identical 9872624A throughout.
+
 ## 2026-07-26 10:10 -- HEAD 582dfbd8 (v2.0-alpha) -- WINDOW CODER A, SESSION 3
 Did: two full kibitz arcs (r1-r4 each, 16 agent calls, codex gpt-5.6-sol high +
   agy Gemini 3.6 Flash High verified every round) plus ONE operator-requested
