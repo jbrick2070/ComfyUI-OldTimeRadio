@@ -256,21 +256,47 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return os.environ.get("OTR_LTX_8GB_T5_NAME") or _LTX8_DEFAULT_T5
 
     def _ckpt_path(self):
-        """Resolved checkpoint path: explicit ``OTR_LTX_8GB_CKPT`` wins, else
-        folder_paths / the checkpoints category (honours extra_model_paths). ``None``
-        when absent everywhere (the offline invariant -- no runtime fetch)."""
-        explicit = os.environ.get("OTR_LTX_8GB_CKPT")
-        if explicit:
-            return explicit if os.path.exists(explicit) else None
-        return self._resolve_model_file(
-            ("checkpoints",), self._ckpt_name(), "OTR_LTX_8GB_CKPT_DIR")
+        """Resolved checkpoint path, by the LOADER'S token. ``None`` when absent
+        everywhere (the offline invariant -- no runtime fetch).
+
+        DELEGATES to :meth:`_loader_token_path`, which is the ONE place the
+        explicit-override-vs-token question is decided. It used to short-circuit
+        on ``OTR_LTX_8GB_CKPT`` after a bare existence check, which made this the
+        SECOND authority on which file is the checkpoint -- and the one
+        ``assert_usable`` consulted, so the whole single-clip path (the common
+        case) validated one file while ``_build_graph`` handed the loader a bare
+        basename that resolves to another. Two resolvers over one fact.
+
+        Consequence worth knowing: unlike its five sibling adapters' ``_ckpt_path``,
+        this one can RAISE ``EngineUnusable`` -- because this is the only adapter
+        with an explicit-full-path override to contradict. The shared naming
+        convention (wan_shared) is preserved; only the AUTHORITY moved."""
+        return self._loader_token_path(
+            ("checkpoints",), self._ckpt_name(), "OTR_LTX_8GB_CKPT_DIR",
+            env_explicit="OTR_LTX_8GB_CKPT")
 
     def _t5_path(self):
-        return self._resolve_model_file(
+        """Resolved T5 path, by the loader's token. Behaviourally identical to
+        the previous direct ``_resolve_model_file`` call -- there is no
+        explicit-full-path override for the T5, so nothing can contradict the
+        token here. Delegated for symmetry, so a future ``OTR_LTX_8GB_T5``
+        cannot reopen the identity lie on this side by forgetting the guard."""
+        return self._loader_token_path(
             ("text_encoders", "clip"), self._t5_name(), "OTR_LTX_8GB_T5_DIR")
 
     def _installed(self):
-        return self._ckpt_path() is not None
+        """Is the checkpoint present? A PREDICATE -- it may not raise.
+
+        Every sibling adapter's ``_installed`` returns a bare bool and callers
+        treat it as one (``load`` gates on ``not self._installed()``). Now that
+        ``_ckpt_path`` can refuse a contradictory override, that refusal has to
+        become False here rather than escaping from a predicate. The operator
+        still gets the precise message: ``assert_usable`` runs BEFORE ``load``
+        on every real render path and raises the named MALFORMED_CONFIG there."""
+        try:
+            return self._ckpt_path() is not None
+        except EngineUnusable:
+            return False
 
     # ---- the FROZEN session config (B2) ----
     def _loader_token_path(self, categories, token, env_dir, env_explicit=None):
@@ -279,11 +305,25 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         ``_build_graph`` hands ``CheckpointLoaderSimple`` / ``CLIPLoader`` a BARE
         BASENAME, which ComfyUI resolves through ``folder_paths``. So the file the
         graph loads is whatever that TOKEN resolves to -- never an absolute path
-        an env var happens to name. ``_ckpt_path()`` short-circuits on the explicit
-        ``OTR_LTX_8GB_CKPT``, which means a receipt taken from it can describe a
-        DIFFERENT file than the one that loads: the preflight passes, the identity
-        is a lie, and the beat renders from a weight nobody recorded. Resolve by
-        token here, and make a disagreeing override terminal rather than silent."""
+        an env var happens to name. An explicit override that names a DIFFERENT
+        file would make the receipt describe one weight while the render used
+        another: preflight green, identity a lie. Resolve by token here, and make
+        a disagreeing override terminal rather than silent.
+
+        THIS IS THE ONE AUTHORITY. ``_ckpt_path`` / ``_t5_path`` delegate to it,
+        and ``resolve_session_config`` reaches the same answer through them, so
+        the single-clip path (via ``assert_usable`` -> ``_ckpt_path``) and the
+        multi-segment path (via ``session_identity`` -> ``resolve_session_config``)
+        can no longer disagree about which file is the checkpoint.
+
+        KNOWN GAP, deliberately not closed here (see
+        docs/2026-07-26-b1b2-qa-findings.md): ``_resolve_model_file`` lets
+        ``*_DIR`` win on existence alone, so a directory override can satisfy
+        this resolver while still being invisible to the loader, which only ever
+        sees the bare token. That is the same defect class one level up and it
+        needs its own decision about whether ``*_DIR`` is a supported channel at
+        all -- folding it in here would newly refuse a currently-working
+        operator pattern."""
         by_token = self._resolve_model_file(categories, token, env_dir)
         explicit = os.environ.get(env_explicit) if env_explicit else None
         if explicit:
