@@ -169,20 +169,28 @@ def _resolve_value(val, results):
     return val
 
 
-def _topo_order(graph):
+def _topo_order(graph, external_keys=None):
     """Deterministic Kahn topo-sort of node ids by their Wire dependencies.
 
     Raises GraphExecutionError on a dangling Wire source or a cycle. Ties break
-    on the sorted node id, so execution order is reproducible (determinism)."""
+    on the sorted node id, so execution order is reproducible (determinism).
+
+    ``external_keys`` are ids whose outputs are supplied by the CALLER rather
+    than produced by this graph (the beat-scoped loader handles a multi-segment
+    session hoists out of its per-segment graphs). They are legal Wire sources
+    and start out SATISFIED, but they are never scheduled -- there is nothing to
+    execute. Without seeding ``satisfied`` a segment graph that omits its loader
+    nodes has no ready node on the first pass and reports a phantom cycle."""
+    external_keys = set(external_keys or ())
     deps = {nid: set() for nid in graph}
     for nid, node in graph.items():
         for val in (node.get("inputs") or {}).values():
             for w in _iter_wires(val):
-                if w.src not in graph:
+                if w.src not in graph and w.src not in external_keys:
                     raise GraphExecutionError(
                         "node %r wires from unknown source %r" % (nid, w.src))
                 deps[nid].add(w.src)
-    order, satisfied, remaining = [], set(), set(graph)
+    order, satisfied, remaining = [], set(external_keys), set(graph)
     while remaining:
         ready = sorted(n for n in remaining if deps[n] <= satisfied)
         if not ready:
@@ -299,7 +307,7 @@ def reclaim_idle_models(reason=""):
 
 
 def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
-              keep=None):
+              keep=None, external_results=None, on_result=None):
     """Execute a declarative node graph in dependency order; return the results.
 
     ``graph`` maps ``node_id -> {"class": <class|name>, "inputs": {name: literal |
@@ -316,11 +324,36 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
     so a big intermediate (e.g. the umt5 CLIP / whisper encoder) is freed before
     the sampler instead of pinning the whole graph resident (the A-S7.5
     single-resident-engine VRAM ceiling). ``keep`` is the set of node ids never
-    freed (the terminal + the MODEL nodes an engine retains for V-4 teardown)."""
+    freed (the terminal + the MODEL nodes an engine retains for V-4 teardown).
+
+    ``external_results`` maps node id -> an ALREADY-PRODUCED output tuple the
+    caller owns (a BeatSession's beat-scoped MODEL/CLIP/VAE handles). Those ids
+    are legal Wire sources, are never executed, and are added to ``keep`` so a
+    ``free_after_use`` pass cannot evict a handle the NEXT segment still needs --
+    without that the first segment's cleanup drops them and segment 1 dies on
+    "output slot unavailable". An id present in both ``graph`` and
+    ``external_results`` is a NAMED error, not a silent precedence rule. Values
+    are normalised to tuples exactly like an executed node's output. This stays
+    ENGINE-AGNOSTIC: it knows nothing about which ids or arities any adapter
+    hoists -- that contract belongs to the adapter's ``prepare()``.
+
+    ``on_result(node_id, out_tuple)`` fires immediately after each EXECUTED
+    node's output is normalised (never for an external), so a caller can
+    register a detachable handle the moment it exists. A raising callback is
+    surfaced NAMED and aborts the graph -- the caller is telling us it cannot
+    take ownership, which is a reason to unwind, not to continue."""
     classes = classes or {}
     keep = set(keep or ())
     if terminal is not None:
         keep.add(terminal)
+    ext = {}
+    for nid, out in (external_results or {}).items():
+        if nid in graph:
+            raise GraphExecutionError(
+                "external result %r collides with a node in the graph -- "
+                "the caller and the graph both claim to produce it" % (nid,))
+        ext[nid] = out if isinstance(out, tuple) else (out,)
+    keep |= set(ext)
     # Remaining-consumer count per source node (for free_after_use).
     node_srcs = {}
     remaining = {nid: 0 for nid in graph}
@@ -332,8 +365,8 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
         node_srcs[nid] = srcs
         for s in srcs:
             remaining[s] = remaining.get(s, 0) + 1
-    results = {}
-    for nid in _topo_order(graph):
+    results = dict(ext)
+    for nid in _topo_order(graph, external_keys=set(ext)):
         node = graph[nid]
         cls = node.get("class")
         if isinstance(cls, str):
@@ -361,6 +394,13 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
                 "node %r (%s) raised %s: %s"
                 % (nid, fn_name, type(exc).__name__, exc))
         results[nid] = out if isinstance(out, tuple) else (out,)
+        if on_result is not None:
+            try:
+                on_result(nid, results[nid])
+            except Exception as exc:  # noqa: BLE001 -- surfaced NAMED
+                raise GraphExecutionError(
+                    "node %r on_result callback raised %s: %s"
+                    % (nid, type(exc).__name__, exc))
         if free_after_use:
             did_free = False
             for s in node_srcs.get(nid, ()):
