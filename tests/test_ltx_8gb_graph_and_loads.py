@@ -45,8 +45,10 @@ import shutil
 import pytest
 
 from nodes._otr_video_engines import eng_ltx_8gb as m
+from nodes._otr_video_engines import motion_common as mc
 from nodes._otr_video_engines import wrapper_bridge as wb
 from nodes._otr_video_engines.eng_ltx_8gb import Ltx8gbEngine
+from nodes._otr_video_engines.registry import EngineUnusable
 
 _HAS_FFMPEG = shutil.which("ffmpeg") is not None
 
@@ -622,5 +624,315 @@ def test_the_executor_is_called_with_the_current_keep_contract(staged,
 
     assert seen["kwargs"]["free_after_use"] is True
     assert seen["kwargs"]["keep"] == {"ckpt", "modelsampling", eng._TERMINAL}
-    assert "external_results" not in seen["kwargs"]   # -> supplied after B1b
+    # THE FLIP: pre-B1b this kwarg was absent. It is now always forwarded, and
+    # it is None exactly when the caller prepared nothing -- which is why the
+    # loader nodes are still in the graph on the very next line.
+    assert seen["kwargs"]["external_results"] is None
     assert "ckpt" in seen["graph"] and "clip" in seen["graph"]
+
+
+# --- B1b: the beat-scoped loader hoist ------------------------------------- #
+class _LeaseSpy:
+    """Records the shared single-heavy-engine lease instead of taking it.
+
+    A unit test that took the real cross-process lease would block a live
+    render, and a stranded one blocks every later beat for its full 120s
+    timeout. Recording it is also what lets these tests assert WHEN it was
+    taken, which is the whole point of the ordering.
+
+    Patched onto the three lease FUNCTIONS of the gpu-resources module, never
+    over the module itself: the same module owns `nvml_available`, which the
+    VRAM peak probe calls on every render.
+    """
+
+    def __init__(self):
+        self.acquired = 0
+        self.released = []
+        self.waits = 0
+
+    def acquire(self, timeout_s=None):
+        self.acquired += 1
+        return "LEASE-%d" % self.acquired
+
+    def release(self, lease):
+        self.released.append(lease)
+
+    def wait_until_stable(self, attempts=3, sleep_s=2.0):
+        self.waits += 1
+
+
+class _Rig:
+    def __init__(self, eng, counter, fakes, lease, ckpt):
+        self.eng = eng
+        self.counter = counter
+        self.fakes = fakes
+        self.lease = lease
+        self.ckpt = ckpt
+
+
+@pytest.fixture
+def hoistable(tmp_path, monkeypatch):
+    """An engine that can actually run `prepare()` on a box with no ComfyUI.
+
+    Three substitutions, each deliberate and each leaving the code under test
+    intact: model files resolve inside `tmp_path` through the same
+    `_resolve_model_file` seam the session-config suite uses; node classes come
+    back as fakes so `load()` does not need a live ComfyUI registry; and the
+    GPU lease is recorded rather than taken.
+
+    The 4 GiB checkpoint floor is lowered to 1 KiB so a fixture does not have
+    to write 4 GiB. Its VALUE is not what these tests are about -- its POSITION
+    is, and `test_the_checkpoint_FLOOR_is_checked_BEFORE_the_lease_and_the_load`
+    proves that against this same lowered floor.
+    """
+    np = pytest.importorskip("numpy")
+    models = tmp_path / "models"
+    models.mkdir()
+    ckpt = models / m._LTX8_DEFAULT_CKPT
+    ckpt.write_bytes(b"c" * 4096)
+    (models / m._LTX8_DEFAULT_T5).write_bytes(b"t" * 1024)
+    monkeypatch.setattr(m, "_LTX8_CKPT_MIN_BYTES", 1024)
+
+    counter = _Counter()
+    fakes = _ltx8_fakes(np, counter, n=9)
+    monkeypatch.setattr(wb, "resolve_graph_classes", lambda candidates: fakes)
+    lease = _LeaseSpy()
+    monkeypatch.setattr(mc._GR, "acquire", lease.acquire)
+    monkeypatch.setattr(mc._GR, "release", lease.release)
+    monkeypatch.setattr(mc._GR, "wait_until_stable", lease.wait_until_stable)
+
+    eng = Ltx8gbEngine()
+    monkeypatch.setattr(
+        eng, "_resolve_model_file",
+        lambda categories, name, env_dir: (
+            str(models / name) if (models / name).exists() else None))
+    return _Rig(eng, counter, fakes, lease, ckpt)
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_prepare_loads_the_checkpoint_ONCE_for_the_whole_beat(hoistable, staged):
+    """THE PAYOFF, and the debt the pre-hoist net named and could not pay.
+
+    Three renders through ONE prepared session, exactly as three segments of a
+    beat do -- but this `prepared` came from `prepare()`, so it carries the
+    hoisted handle and the graph omits the loader. One checkpoint load for the
+    beat instead of three, which at 6.34 GiB is the difference the whole chunk
+    exists for.
+
+    The other counts are what make the 1 mean something. `clip` stays at 3
+    because the T5 is deliberately NOT hoisted; `decode` and `sample` stay at 3
+    because three segments really rendered. A hoist that accidentally rendered
+    once would show 1 everywhere and would be caught here, not on the GPU.
+    """
+    rig = hoistable
+    prepared = rig.eng.prepare({}, {}, {})
+    made = []
+    try:
+        for _ in range(3):
+            made.append(pathlib.Path(
+                rig.eng.render_clip(_request(staged), prepared)["out_path"]))
+        assert rig.counter.calls["ckpt"] == 1            # the whole point
+        assert rig.counter.calls["clip"] == 3            # T5 NOT hoisted
+        assert rig.counter.calls["modelsampling"] == 3   # a cheap clone
+        assert rig.counter.calls["decode"] == 3          # three real renders
+        assert rig.counter.calls["sample"] == 3
+    finally:
+        for p in made:
+            p.unlink(missing_ok=True)
+        rig.eng.teardown(prepared)
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_the_hoisted_checkpoint_is_harvested_in_prepare_and_detached_once(
+        hoistable, staged):
+    """A hoisted MODEL that nothing harvests is VRAM held for the life of the
+    ComfyUI process. `prepare()` registers it the moment it lands -- before it
+    has returned, and before any render -- so a failure between `prepare()` and
+    the first `render_clip` (the baseline identity read is one) still has an
+    owner for it.
+
+    Then three renders must add three ModelSampling clones and NOT a second
+    checkpoint entry: teardown detaches every entry, and detaching one patcher
+    four times is not a no-op.
+    """
+    rig = hoistable
+    prepared = rig.eng.prepare({}, {}, {})
+    assert [p.tag for p in prepared["patchers"]] == ["ckpt"]
+    ckpt_model = prepared["patchers"][0]
+    # The harvested patcher must be the SAME OBJECT the segments will render
+    # through. A copy would detach something no render ever used.
+    assert ckpt_model is prepared["external_results"]["ckpt"][0]
+    made = []
+    try:
+        for _ in range(3):
+            made.append(pathlib.Path(
+                rig.eng.render_clip(_request(staged), prepared)["out_path"]))
+        assert sorted(p.tag for p in prepared["patchers"]) == [
+            "ckpt", "modelsampling", "modelsampling", "modelsampling"]
+        assert sum(1 for p in prepared["patchers"] if p is ckpt_model) == 1
+    finally:
+        for p in made:
+            p.unlink(missing_ok=True)
+        rig.eng.teardown(prepared)
+    assert ckpt_model.detached == 1
+    assert prepared["patchers"] == []
+    assert "external_results" not in prepared
+    assert rig.lease.released == ["LEASE-1"]
+
+
+def test_the_segment_graph_OMITS_the_loader_the_caller_supplied():
+    """The other half of the hoist, and the one the pre-hoist net could not
+    reach: with a handle supplied, the `ckpt` DEFINITION is gone while every
+    wire that reads it stays. Omitting is not an optimisation -- `run_graph`
+    REFUSES a graph that also defines an id the caller supplied.
+
+    `clip` must still be here. The T5 is not hoisted, and a hoist that took it
+    too would pin ~9 GB for the whole beat.
+    """
+    eng = Ltx8gbEngine()
+    plan = eng._build_render_request(
+        {"asset_refs": {"init_image": "p"},
+         "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
+    g = eng._build_graph({"text_prompt": "x"}, "p.png", plan, 9, 512, 288,
+                         external_results={"ckpt": (object(), object(), object())})
+
+    assert "ckpt" not in g
+    assert "clip" in g
+    assert g["modelsampling"]["inputs"]["model"] == wb.Wire("ckpt", 0)
+    assert g["img2vid"]["inputs"]["vae"] == wb.Wire("ckpt", 2)
+    assert g["decode"]["inputs"]["vae"] == wb.Wire("ckpt", 2)
+    order = wb._topo_order(g, external_keys={"ckpt"})
+    assert "ckpt" not in order and order[-1] == eng._TERMINAL
+
+
+def test_the_checkpoint_FLOOR_is_checked_BEFORE_the_lease_and_the_load(
+        hoistable):
+    """The blocker this chunk had to clear, proved by ORDER rather than by the
+    refusal alone.
+
+    The 4 GiB floor is the only check that tells a truncated download from the
+    real all-in-one, and it lived in `assert_usable` -- which runs PER SEGMENT,
+    after the session is already open. Hoisting the load into `prepare()` moved
+    the real load ahead of it. So: the loader must never have run, and the
+    cross-process lease must never have been taken (C-3: a raise after the
+    lease strands it for the life of the server).
+    """
+    rig = hoistable
+    rig.ckpt.write_bytes(b"c" * 8)
+
+    with pytest.raises(EngineUnusable) as excinfo:
+        rig.eng.prepare({}, {}, {})
+
+    assert "is only 8 bytes" in str(excinfo.value)
+    assert "re-fetch" in str(excinfo.value)
+    assert rig.lease.acquired == 0, "refused AFTER taking the lease -- C-3"
+    assert "ckpt" not in rig.counter.calls, "the loader ran before the floor"
+
+
+def test_assert_usable_still_owns_the_same_floor_with_the_same_message(
+        hoistable):
+    """CONTROL on the extraction. The floor moved into a shared helper; the
+    single-clip preflight must still raise it, with the same reason and the
+    same wording, and still AFTER the missing-file verdict."""
+    rig = hoistable
+    rig.ckpt.write_bytes(b"c" * 8)
+
+    with pytest.raises(EngineUnusable) as excinfo:
+        rig.eng.assert_usable({}, {})
+
+    assert "is only 8 bytes" in str(excinfo.value)
+    assert "0.9.8 distilled 2B all-in-one" in str(excinfo.value)
+
+
+def test_an_honest_checkpoint_still_PREPARES(hoistable):
+    """CONTROL. A tightening that also refuses honest input is not a fix: the
+    floor, the arity gate and the tripwire must all wave a good config
+    through."""
+    rig = hoistable
+    prepared = rig.eng.prepare({}, {}, {})
+    try:
+        assert rig.counter.calls["ckpt"] == 1
+        assert set(prepared["external_results"]) == {"ckpt"}
+        assert len(prepared["external_results"]["ckpt"]) == 3
+        assert rig.lease.acquired == 1
+    finally:
+        rig.eng.teardown(prepared)
+
+
+def test_a_FAILING_hoist_releases_the_lease_and_reraises_the_cause(hoistable):
+    """`prepare()` takes the lease before it loads, so anything that raises
+    after that point must give it back or every later beat blocks its full
+    timeout. And the error the caller sees must be the CAUSE -- the teardown
+    call is wrapped precisely so a raising `unload()` cannot replace it."""
+    rig = hoistable
+    rig.fakes["ckpt"] = _mk(
+        lambda self, **k: (_ for _ in ()).throw(
+            RuntimeError("checkpoint vanished mid-load")))
+
+    with pytest.raises(wb.GraphExecutionError, match="vanished mid-load"):
+        rig.eng.prepare({}, {}, {})
+
+    assert rig.lease.released == ["LEASE-1"]
+
+
+def test_a_RAISING_unload_cannot_mask_the_hoist_failure(hoistable,
+                                                        monkeypatch):
+    """The reason the teardown call inside `prepare()` has its own try/except.
+    `unload()` is engine-overridable; one that raises during the unwind would
+    otherwise become the exception the operator sees, and the real cause -- the
+    thing that actually broke the beat -- would never be reported."""
+    rig = hoistable
+    rig.fakes["ckpt"] = _mk(
+        lambda self, **k: (_ for _ in ()).throw(RuntimeError("the real cause")))
+    monkeypatch.setattr(
+        type(rig.eng), "unload",
+        lambda self: (_ for _ in ()).throw(RuntimeError("noisy unload")))
+
+    with pytest.raises(wb.GraphExecutionError, match="the real cause"):
+        rig.eng.prepare({}, {}, {})
+
+
+def test_prepare_REFUSES_a_checkpoint_that_yields_too_few_outputs(hoistable):
+    """The 0.9.8 all-in-one must give MODEL(0), CLIP(1) and the embedded
+    VAE(2); the segment graph wires slot 2. A two-output checkpoint would sail
+    through `prepare()` and fail deep inside the first segment's `img2vid`
+    instead, with nothing naming the cause.
+
+    The handle it DID produce must still be detached -- which is what proves
+    `on_result` takes ownership as each output lands rather than after the
+    graph returns."""
+    rig = hoistable
+    short = _FakeModel("short")
+    rig.fakes["ckpt"] = _mk(lambda self, **k: (short, object()))
+
+    with pytest.raises(wb.GraphExecutionError, match="returned 2 output"):
+        rig.eng.prepare({}, {}, {})
+
+    assert short.detached == 1, (
+        "the loaded MODEL was never detached -- on_result did not take "
+        "ownership before the refusal, so this is a live VRAM leak")
+    assert rig.lease.released == ["LEASE-1"]
+
+
+def test_teardown_clears_the_external_handles_BEFORE_the_base_runs(hoistable,
+                                                                   monkeypatch):
+    """Ordering, not just end state. The base teardown detaches, unloads,
+    releases the lease and then waits for machine-wide VRAM to settle. If
+    `external_results` were still holding the MODEL and the embedded VAE
+    through that sequence, the stability wait would be watching its own
+    referent."""
+    rig = hoistable
+    seen = {}
+    base = mc.MotionEngineBase.teardown
+
+    def _spy(self, prepared):
+        seen["had_external"] = "external_results" in (prepared or {})
+        return base(self, prepared)
+
+    monkeypatch.setattr(mc.MotionEngineBase, "teardown", _spy)
+    prepared = rig.eng.prepare({}, {}, {})
+    assert "external_results" in prepared
+
+    rig.eng.teardown(prepared)
+    assert seen["had_external"] is False
+    assert rig.lease.released == ["LEASE-1"]

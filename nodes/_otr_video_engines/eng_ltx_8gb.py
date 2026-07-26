@@ -510,6 +510,35 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         }
 
     # ---- usability (fail-closed BEFORE any forward; ordinary preflight ONLY) ----
+    def _assert_checkpoint_integrity(self, ckpt):
+        """The 4 GiB checkpoint floor -- the ONE place it lives (B1b).
+
+        It used to live inline in ``assert_usable``, and that was sound only
+        while the weights loaded inside ``render_clip``. ``assert_usable`` runs
+        PER SEGMENT inside ``render_driver._render_one``, which is AFTER
+        ``BeatSession`` has opened the session -- so once B1b moved the real
+        ``CheckpointLoaderSimple`` execution into ``prepare()``, the load
+        overtook the only size check in the adapter. A truncated or wrong file
+        would reach the loader first and the operator would get a deep loader
+        traceback instead of the named refusal that tells them to re-fetch.
+        ``resolve_session_config`` does not close this: it proves the file
+        EXISTS and takes its receipt, never its size.
+
+        Same reason code, same message, same ordering -- it still fires after
+        the missing-file verdict and before the T5 verdict. The only change is
+        that ``prepare()`` calls it too, before it loads anything."""
+        try:
+            size = os.path.getsize(ckpt)
+        except OSError:
+            size = 0
+        if size < _LTX8_CKPT_MIN_BYTES:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "ltx_8gb checkpoint %r is only %d bytes (< %d floor) -- this is not "
+                "the 0.9.8 distilled 2B all-in-one weight; re-fetch via "
+                "scripts/download_ltx_0_9_8.ps1"
+                % (ckpt, size, _LTX8_CKPT_MIN_BYTES), kind="video")
+
     def assert_usable(self, host_caps, profile, request_template=None):
         """Ordinary asset preflight -- NO VRAM/NVML/vendor gate, NO fallback
         (operator directive 2026-07-20). Fail CLOSED on a bad render knob, then a
@@ -524,17 +553,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "register its folder in extra_model_paths.yaml -- OTR_LTX_8GB_CKPT "
                 "only names a file, it cannot make the loader find one"
                 % self._ckpt_name(), kind="video")
-        try:
-            size = os.path.getsize(ckpt)
-        except OSError:
-            size = 0
-        if size < _LTX8_CKPT_MIN_BYTES:
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "ltx_8gb checkpoint %r is only %d bytes (< %d floor) -- this is not "
-                "the 0.9.8 distilled 2B all-in-one weight; re-fetch via "
-                "scripts/download_ltx_0_9_8.ps1"
-                % (ckpt, size, _LTX8_CKPT_MIN_BYTES), kind="video")
+        self._assert_checkpoint_integrity(ckpt)
         if self._t5_path() is None:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
@@ -584,10 +603,24 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         })
         return base
 
-    def _build_graph(self, request, image_name, plan, length, width, height):
+    def _build_graph(self, request, image_name, plan, length, width, height,
+                     external_results=None):
         """The declarative LTX 0.9.8 distilled I2V graph (wrapper_bridge.run_graph
         format). The 0.9.8 all-in-one gives MODEL(0)+embedded VAE(2); the T5 is the
-        separate CLIPLoader (device cpu on the 8GB tier)."""
+        separate CLIPLoader (device cpu on the 8GB tier).
+
+        ``external_results`` names the ids the CALLER already produced and owns
+        for the whole beat (B1b: ``prepare()`` loads the checkpoint once). Those
+        node DEFINITIONS are omitted while every wire that reads them stays --
+        the executor resolves them from the caller's handles instead. Omitting
+        rather than leaving them is not an optimisation: ``run_graph`` REFUSES a
+        graph that also defines an id the caller supplied, because then two
+        parties claim to produce one output.
+
+        Conditional on purpose. A caller that prepared nothing -- the
+        single-clip path, which is what production runs today, and every
+        sibling test that hand-builds ``prepared={"patchers": []}`` -- gets the
+        loader nodes exactly as before."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         get = request.get if isinstance(request, dict) else (
@@ -596,7 +629,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         positive = get("text_prompt") or "subtle natural motion, cinematic light"
         negative = (get("negative_prompt")
                     or os.environ.get("OTR_LTX_8GB_NEGATIVE", _LTX8_DEFAULT_NEGATIVE))
-        return {
+        graph = {
             "ckpt": {"class": "ckpt", "inputs": {"ckpt_name": self._ckpt_name()}},
             "clip": {"class": "clip",
                      "inputs": {"clip_name": self._t5_name(), "type": "ltxv",
@@ -636,12 +669,16 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                                   "latent_image": W("img2vid", 2)}},
             "decode": {"class": "decode", "inputs": self._decode_inputs(W)},
         }
+        for nid in set(external_results or ()):
+            graph.pop(nid, None)
+        return graph
 
     # ---- residency ----
     def load(self):
         """Fail CLOSED until installed, then resolve the installed ComfyUI node
-        classes (0.9.8 core LTX nodes). Weights load when the loader nodes execute
-        in render_clip."""
+        classes (0.9.8 core LTX nodes). Resolves CLASSES only -- no weights. The
+        checkpoint's weights load in :meth:`prepare` (once per beat); the T5's
+        load when its ``CLIPLoader`` executes inside each segment's graph."""
         if not self._installed():
             raise RuntimeError(
                 "ltx_8gb not installed: checkpoint %r missing -- fetch it via "
@@ -650,12 +687,135 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
         self._loaded = True
 
+    def prepare(self, host_caps, profile, session_ctx):
+        """Load the CHECKPOINT ONCE PER BEAT instead of once per segment (B1b).
+
+        ``BeatSession`` calls this at the top of a multi-segment beat. Before
+        B1b it only resolved node CLASSES, so every segment's graph re-executed
+        ``CheckpointLoaderSimple`` and re-read 6.34 GiB from disk -- "one model
+        load per beat" was the design and not the behaviour. Now a LOADER-ONLY
+        mini-graph runs here and its results become
+        ``prepared["external_results"]``, which ``render_clip`` forwards and
+        ``_build_graph`` omits the definition for.
+
+        THE CHECKPOINT ONLY. The T5 ``CLIPLoader`` is deliberately left in the
+        segment graph: the pos/neg encodes happen per segment either way, so
+        hoisting the loader would buy wall-clock while pinning ~9 GB of
+        ``t5xxl_fp16`` resident for the whole beat -- a guaranteed OOM on an
+        8 GB tier under ``OTR_LTX_8GB_T5_DEVICE=default``. ``ModelSamplingLTXV``
+        stays per segment too: it is a cheap clone+patch of an already-resident
+        MODEL, and it is correctly per-render.
+
+        ORDER MATTERS, and each step is here because of a specific defect:
+
+        1. Resolve the frozen config and check the checkpoint's SIZE **before**
+           ``super().prepare()``. The floor is the only thing that distinguishes
+           the real 2B all-in-one from a truncated download, and its old home
+           (``assert_usable``) now runs after this. Doing it first also means a
+           bad checkpoint is refused BEFORE the cross-process GPU lease is
+           taken -- the C-3 lesson: a raise after the lease strands it for the
+           life of the server.
+        2. ``super().prepare()`` takes the lease and resolves classes.
+        3. Execute the mini-graph, registering each detachable handle through
+           ``on_result`` as it lands, so a failure mid-hoist still has an owner
+           for everything already loaded.
+        4. On ANY failure, tear down what we took and re-raise. The teardown
+           call is itself wrapped, because ``teardown`` -> ``unload`` is
+           engine-overridable and a raising unload must not replace the real
+           error with its own.
+        """
+        from . import wrapper_bridge as _wb
+        cfg = self.resolve_session_config(profile)
+        self._assert_checkpoint_integrity(cfg.ckpt_path)
+        prepared = super().prepare(host_caps, profile, session_ctx)
+        try:
+            classes = getattr(self, "_classes", None) \
+                or _wb.resolve_graph_classes(self._node_candidates())
+            bucket = prepared.setdefault("patchers", self._patchers)
+            seen = {id(p) for p in bucket}
+
+            def _register(nid, out):
+                """Take ownership the moment a handle exists (not after the
+                graph returns): if a later node raises, run_graph never returns
+                a results dict, and an unregistered patcher is VRAM nothing
+                will ever detach.
+
+                SLOT 0 ONLY, and deliberately. ``CheckpointLoaderSimple``
+                returns (MODEL, CLIP, VAE); the MODEL is the ``ModelPatcher``
+                that ``_detach_patchers`` knows how to unwind. The duck-typed
+                ``detach`` check is what keeps that honest rather than a
+                positional assumption -- a slot that cannot detach is not
+                something teardown can own. The embedded VAE is not tracked
+                here, which matches every sibling adapter; see ``teardown``."""
+                model = out[0] if out else None
+                if (model is not None and id(model) not in seen
+                        and callable(getattr(model, "detach", None))):
+                    bucket.append(model)
+                    seen.add(id(model))
+
+            results = _wb.run_graph(
+                {"ckpt": {"class": "ckpt",
+                          "inputs": {"ckpt_name": cfg.ckpt_token}}},
+                classes, on_result=_register)
+            out = results.get("ckpt") or ()
+            if len(out) < 3:
+                raise _wb.GraphExecutionError(
+                    "ltx_8gb hoisted checkpoint %r returned %d output(s); the "
+                    "0.9.8 all-in-one must give MODEL(0), CLIP(1) and the "
+                    "embedded VAE(2) -- the segment graph wires slot 2"
+                    % (cfg.ckpt_token, len(out)))
+            prepared["external_results"] = results
+        except BaseException:
+            try:
+                self.teardown(prepared)
+            except BaseException:          # noqa: BLE001 -- never mask the cause
+                pass
+            raise
+        return prepared
+
+    def teardown(self, prepared):
+        """Drop the beat-scoped handles BEFORE delegating, then the base runs.
+
+        ``prepared["external_results"]`` holds strong references to the hoisted
+        MODEL and to the checkpoint's embedded VAE. The base teardown detaches
+        the patchers, unloads, releases the lease and then waits for
+        machine-wide VRAM to settle -- and every one of those steps would run
+        with this dict still pinning the very tensors it is trying to reclaim,
+        so the stability wait would be watching its own referent. Clearing
+        first costs nothing.
+
+        Scope, so this is not read as more than it is: the DETACH covers the
+        MODEL patcher, which is what the harvest registers. The embedded VAE at
+        slot 2 has never been handed to ``_detach_patchers`` -- not here and
+        not in any sibling adapter -- so clearing this dict drops its last
+        reference from the beat rather than reclaiming it explicitly. That gap
+        is family-wide and pre-dates the hoist (which, if anything, shrinks it:
+        one VAE load per beat instead of one per segment). Separate ticket.
+
+        Never raises out of teardown (it is a finally-path)."""
+        if isinstance(prepared, dict):
+            prepared.pop("external_results", None)
+        return super().teardown(prepared)
+
     def render_clip(self, request, prepared):
         """Drive ONE image->video clip via the in-process LTX 0.9.8 graph: stage the
         init image (no silent stretch, N9), execute the graph, encode the decoded
         IMAGE batch to a SILENT bt709 clip (V-1), CLIP-FILL to the beat window,
         retain the MODEL patcher for V-4 teardown, and thread the measured VRAM peak
-        into the recipe receipt. M7 ffprobe-proves the silent-clip contract."""
+        into the recipe receipt. M7 ffprobe-proves the silent-clip contract.
+
+        ``prepared["external_results"]`` (B1b) carries the beat-scoped handles
+        :meth:`prepare` loaded. They are forwarded to the executor and their
+        node definitions are omitted from the graph. A caller that prepared
+        nothing renders exactly as before -- the single-clip path, which is
+        what production runs today, and every sibling test that hand-builds
+        ``prepared={"patchers": []}``.
+
+        The per-render patcher harvest below deliberately still names ``ckpt``.
+        It is a no-op on the hoisted path (``prepare`` already put that handle
+        in the SAME bucket, so the id-dedupe skips it) and it is load-bearing
+        on the unprepared one, where the checkpoint is still loaded here and
+        nothing else would ever hand it to teardown."""
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
         plan = self._build_render_request(request)            # pure, CPU-tested
@@ -669,7 +829,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             request, plan["init_image"], width, height)
         cap = self._resolve_render_config()["max_frames"]
         length = _ltx8_frame_length(plan["target_frame_count"], cap)
-        graph = self._build_graph(request, image_name, plan, length, width, height)
+        ext = (prepared or {}).get("external_results") \
+            if isinstance(prepared, dict) else None
+        graph = self._build_graph(request, image_name, plan, length, width, height,
+                                  external_results=ext)
         # free_after_use: the T5 text-encode frees before the sampler; the checkpoint
         # (MODEL + embedded VAE) + the model-sampling patch + the terminal are kept.
         # The NVML peak probe spans the whole render window (telemetry only -- no
@@ -678,6 +841,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         try:
             results = _wb.run_graph(
                 graph, classes, free_after_use=True,
+                external_results=ext,
                 keep={"ckpt", "modelsampling", self._TERMINAL})
             images = results[self._TERMINAL][0]               # VAEDecode IMAGE batch
         finally:
