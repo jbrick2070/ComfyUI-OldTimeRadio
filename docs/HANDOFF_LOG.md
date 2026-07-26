@@ -3,9 +3,33 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-07-26 (overnight) -- HEAD a888c423 (v2.0-alpha) -- WINDOW CODER A (Opus)
-Did: shipped FIVE green pushed chunks -- the two unrun chunk-4 QA lenses, then
-coverage chunk 5 and the first half of chunk 6.
+## 2026-07-26 (overnight) -- HEAD a818b5d1 (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: shipped SIX green pushed chunks -- the two unrun chunk-4 QA lenses, then
+coverage chunk 5 and the first half of chunk 6, then a QA round over the three
+commits that had not been reviewed by anyone (operator asked for it by name).
+- `a818b5d1` **QA6 -- Sonnet lens + agy panel over QA4, 6a and 6b.** Six
+  findings accepted, four rejected. The two that mattered were both in the
+  per-segment seam and both DORMANT-until-6c, which is exactly when they would
+  have been most expensive: (1) the seam swapped the init IMAGE and left the
+  LENGTH alone, so a request for segment 1 of a 120-frame beat carried segment
+  1's picture and the whole beat's duration -- there is now a
+  `segment_render_frames` that reads the segment's own `render_frames` off the
+  stamped plan, and refuses rather than falling back to the beat's length;
+  (2) the override was unconditional, so a mesh lane's subject-isolated FODDER
+  would have been clobbered by its segment still -- which is the clay blob the
+  guard nine lines above it exists to prevent, arriving through a second door.
+  Both mutation-proven. Also from agy: a pathless DUPLICATE receipt entry used
+  to `break` and hide the materialized row two entries later (now `continue`);
+  a negative or non-numeric `segment_index` now fails closed NAMED instead of
+  silently reading as segment 0; and the still-lane guardrail no longer skips
+  an unbuildable engine in silence. REJECTED with reasons: agy's claim that a
+  jump segment RAISES in an earlier beat-still branch (the spine guarantees the
+  beat still exists for any lane that mints jump requests -- that is QA3's
+  one-predicate design), its proposed fix of bypassing lines 1771-1948 (those
+  branches decide canvas and portrait-vs-wide, not just the still), an
+  `IndexError` in `ffprobe_counted_frames` (already guarded), and its
+  recommendation to CUT the second `assert_coverage_plans` (it is the
+  pre-existing, documented defence-in-depth double call).
 - **The two lenses the operator asked for first.** Image-phase capability
   gating and operator-intent, run read-only against `4faabe0e`. Judged: the
   ordering defect was real and is `b0e383f5` **QA4** -- on the LEGACY route
@@ -58,10 +82,15 @@ coverage chunk 5 and the first half of chunk 6.
   `_still_index` -- which filters to `scene_*` kinds keyed BY BEAT and would
   therefore have handed EVERY segment segment-0's still. The differential test
   demonstrates that rather than asserting it.
-- Suite 6634 -> 6636 -> 6668 -> 6675 -> 6680 -> **6687 passed** / 27 skipped /
-  1 xfailed; Bible 17; canonical byte-identical `5377914B` across all five
-  commits; hygiene clean (it also caught a pre-existing non-ASCII character in
-  `wan_shared.py`, fixed in passing).
+- Suite 6634 -> 6636 -> 6668 -> 6675 -> 6680 -> 6687 -> **6696 passed** / 27
+  skipped / 1 xfailed; Bible 17; canonical byte-identical `5377914B` across all
+  six commits; hygiene clean (it also caught a pre-existing non-ASCII character
+  in `wan_shared.py`, fixed in passing).
+- DOCTRINE, earned twice tonight: **every chunk gets a panel before the next
+  one builds on it.** QA6 only happened because the operator asked what had not
+  been reviewed -- and it found two defects in the seam chunk 6c is about to
+  build against. A chunk that is "obviously right" is exactly the one whose
+  panel gets skipped.
 Current step: coverage chunk 6c -- the per-segment render loop, with the
 terminal transaction INSIDE it. Then 6d (transactional assembly, verified with
 the 6a helpers), then chunk 7.
@@ -70,9 +99,9 @@ GO_FORWARD's CURRENT STEP; do not re-invent them. Chunk 7 must also carry the
 three grounded requirements now written down there (static FrameContract, a
 declared `session_identity`, and NO ping-pong CLIP-FILL on a coverage-planned
 segment).
-Models: Claude Opus (rung 4) + 3 Sonnet QA lenses + 1 agy panel (rung 2, $0).
+Models: Claude Opus (rung 4) + 4 Sonnet QA lenses + 2 agy panels (rung 2, $0).
 No Codex, no OpenRouter -- $0 external spend.
-Commits: b0e383f5, 4fa992e6, 451309de, 3a76c47a, a888c423
+Commits: b0e383f5, 4fa992e6, 451309de, 3a76c47a, a888c423, a818b5d1
 
 ## 2026-07-26 00:30 -- HEAD 4faabe0e (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: shipped coverage CHUNK 4 (the jump-still image-phase consumer) and its QA
