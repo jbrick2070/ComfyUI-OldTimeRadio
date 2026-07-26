@@ -1,15 +1,20 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-26 (overnight) -- **CHUNKS 5 AND 6 ARE COMPLETE.** Nine
-green chunks pushed this session: QA4 (`b0e383f5`), the beat session
+**Updated:** 2026-07-26 (remote Cowork) -- **CHUNKS 5, 6 AND 7a ARE COMPLETE.**
+Eleven green chunks pushed this session: QA4 (`b0e383f5`), the beat session
 (`4fa992e6`) + its QA (`451309de`), the ffprobe helpers (`3a76c47a`), the
 per-segment init image by object id (`a888c423`), QA6 over those three
 (`a818b5d1`), the terminal-frame extractor (`4d5795b1`), the per-segment render
-loop + transactional assembly (`5845e635`), and QA7 over the loop
-(`a05b5ac6`). HEAD == origin `a05b5ac6`; suite **6723 passed / 27 skipped /
-1 xfailed**; Bible 17; canonical `5377914B` (byte-identical -- no chunk in 1-7
-touches it). **NEXT = chunk 7, the first adapter opt-in + the LIVE slice.**
-See CURRENT STEP.
+loop + transactional assembly (`5845e635`), QA7 over the loop (`a05b5ac6`),
+**the 31-engine frame-contract sweep with the opt-in deleted (`e90dedf1`), and
+the two live-path defects its QA panel found (`42db9af9`)**. HEAD == origin
+`42db9af9`; suite **6891 passed / 27 skipped / 1 xfailed**; canonical
+`5377914B` (byte-identical -- no chunk in 1-7 touches it).
+
+**NEXT = chunk 7b.** Chunk 7a landed the per-engine frame contracts and DELETED
+the opt-in entirely (operator ruling: everything gets an equal term). See
+CURRENT STEP -- the "first adapter opt-in" step no longer exists, and
+`docs/ENGINE_MATRIX.md` is now the generated per-model requirements record.
 
 **OPERATOR RESCOPE 2026-07-24 (supersedes the older queue everywhere in this
 file):** the 45-word scene matrix, the 54-case visual-style sweep and the
@@ -150,41 +155,87 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- MULTI-CLIP COVERAGE: 1-6 DONE, **CHUNK 7 NEXT**
+## CURRENT STEP -- MULTI-CLIP COVERAGE: 1-6 + **7a** DONE, **7b NEXT**
 
-**Updated 2026-07-26 (overnight), HEAD `a05b5ac6`.** Chunks 1a/1b/1c/2/3/3b/4/
-**5/6a/6b/6c/6d** are LANDED, GREEN and PUSHED, plus seven adversarial QA
-rounds. Suite 6454 -> **6723 passed / 27 skipped / 1 xfailed**; Bible 17;
-canonical byte-identical `5377914B` across every commit.
+**Updated 2026-07-26 (remote Cowork), HEAD `42db9af9`.** Chunks 1a/1b/1c/2/3/
+3b/4/**5/6a/6b/6c/6d/7a** are LANDED, GREEN and PUSHED, plus NINE adversarial QA
+rounds. Suite 6454 -> **6891 passed / 27 skipped / 1 xfailed**; canonical
+byte-identical `5377914B` across every commit.
 
-**THE WHOLE MACHINE IS BUILT AND NOTHING HAS RENDERED THROUGH IT.** Every seam
-exists and is proven by the suite -- including an end-to-end test where a stub
-engine writes REAL mp4s and the loop, the chain handoff and the assembly all
-run against actual ffmpeg. But no ADAPTER has opted in, so in production every
-beat is still a one-segment beat taking the historical path. **Chunk 7 is where
-this build first does something**, and it is a LIVE GPU leg, not a code chunk:
+**7a IS DONE AND IT CHANGED THE PLAN'S SHAPE. READ THIS BEFORE 7b.**
 
-1. **Opt `ltx_8gb` in.** Declare a STATIC `frame_contract()` (min 9, quantum 8,
-   a hard max) -- the contract is pure by contract and
-   `_resolve_render_config()["max_frames"]` reads the environment, so the
-   declaration cannot be derived from it. Declare `session_identity()` (engine
-   + recipe + weight names) or `BeatSession` will REFUSE to reuse handles
-   across segments -- that refusal is the design, not a bug.
-2. **Kill the ping-pong for a planned segment.** `eng_ltx_8gb.py:426-437`
-   CLIP-FILL ping-pong-extends a short render to the beat target. For a
-   coverage-planned segment the plan already sized the render to a legal
-   length, so extending it re-introduces exactly the boomerang this block
-   removes. Same for `eng_wan_ti2v.py:521-533` when Wan opts in.
-3. **The adapter-side half of chunk 5** (r4's shape, still owed): each segment
-   graph takes the prepared handles as LITERALS and omits its loader nodes.
-   The driver already holds them for the whole beat.
-4. **Then the live slice:** a 169-frame beat (`161 + (9-1)`, and 169 mod 8 == 1
-   is why that number) -- >= 2 forward-only clips, ONE heavy load, no ping-pong
-   -- plus a 162-frame CPU tail-trim case. Acceptance is `RESULT SUCCESS` +
+The plan below said chunk 7 begins by opting `ltx_8gb` in. **There is no longer
+anything to opt in to.** The operator's ruling (2026-07-26, verbatim): *"this
+architecture should work with all video and still models. There's no gate with
+opt in or opt out. If there is, we need to remove that. Everything gets an
+equal term... I don't like any hidden opt-ins. It either works or it fails."*
+
+So `supports_multi_clip` is DELETED from `FrameContract`, from `join_mode_for`
+and from `validate_coverage_plan`. All 31 registered engines carry a static
+`FrameContract` (`docs/ENGINE_MATRIX.md`, generated, with a `--check` drift
+gate in the suite). Multi-clip is universal; the only thing still EARNED per
+engine is the CHAIN, via `continuity=strict_first_frame`.
+
+**Landed in `e90dedf1` + `42db9af9`:**
+
+| | |
+|---|---|
+| all 31 contracts | min/max/quantum/discrete_frames/native_fps/allow_tail_trim/continuity |
+| `discrete_durations` -> `discrete_frames` | the field is FRAMES; the old name invited a seconds substitution no validator can catch |
+| `+ native_fps` | so the rate those frames are counted at is stated, not implied |
+| `supports_multi_clip(engine)` -> `can_split(engine)` | derived arithmetic ("has a ceiling"), not a stored opinion |
+| `docs/ENGINE_MATRIX.md` | aspect, resolution contract, seconds per clip, prompt contract, still requirements, continuity, provider-side |
+| `tests/test_engine_contract_roster.py` | a registered engine with no contract fails BY NAME |
+| `tests/test_multiclip_goes_live.py` | the multi-segment path driven with REAL engines, no stubs |
+
+**Two QA panels found six real defects in already-green, mutation-proven code.**
+Four in the declarations (no multi-clip escape for over-cap beats; Veo declared
+at the provider's 24 fps when clips are counted at the canvas's 25;
+`humo_14B_169` inheriting a 177 ceiling when its real cap is 49; cloud lanes
+claiming `quantum=1` when only whole seconds are reachable). Two when multi-clip
+went live (`jump_segment_still_path` demanded a still for every segment >= 1,
+killing all four chain engines and every HuMo beat past its cap; audio-driven
+lanes would have shipped garbled lip-sync because nothing slices audio per
+segment). **The stubs passed all six.** Keep the panel before every push.
+
+**CHUNK 7 IS NOW 7b / 7c / 7d:**
+
+1. **7b -- the env-vs-contract refusal.** Three ceilings are still
+   env-overridable at RENDER time while the contract asserts a literal:
+   `OTR_LTX_MAX_FRAMES`, `OTR_LTX_8GB_MAX_FRAMES`, `OTR_LTX_AV_MAX_FRAMES`.
+   A contract that moves with the environment is a partition the image phase
+   could not have planned for. The engine must REFUSE when they disagree, not
+   quietly re-plan. (The declarations are already literals and a test pins that
+   they do not read the `*_DEFAULT` constants -- what is missing is the runtime
+   refusal.)
+2. **7c -- rip the fallbacks.** `extend_frames_to_target` ping-pong
+   (`eng_wan_ti2v.py:521-533`, `eng_ltx_8gb.py:426-437`), composite loop-fill
+   (`otr_silent_composite._should_loop_fill`), held-last-frame. **Add to the
+   list, found by 7a's audit:** the provider-side clamps --
+   `_CloudVideoBase._duration_seconds` ends `max(min_s, min(max_s, secs))`,
+   `word_razzle` does `8 if secs > 5 else 5`, and Veo's `_duration_s` discards
+   the requested length outright at 1080p/4k. Same defect as the ping-pong,
+   provider side. **Also 7c:** `trim_tail` is computed on single-segment plans
+   and never applied, because `render_beat_coverage` early-returns to the
+   historical path. That is PRE-EXISTING drift the composite absorbs (wan_i2v
+   already quantized 50 to 53 and shipped 53) -- wiring the trim and removing
+   the absorption belong together.
+3. **7c also owes:** the adapter-side half of chunk 5 (r4's shape) -- each
+   segment graph takes the prepared handles as LITERALS and omits its loader
+   nodes; and `ltx_video`'s boomerang loop, which returns `2N-1` frames by
+   default and is unchecked against its 169 ceiling.
+4. **7d -- the live slice.** A 169-frame beat (`161 + (9-1)`; 169 mod 8 == 1 is
+   why that number) -- >= 2 forward-only clips, ONE heavy load, no ping-pong --
+   plus a 162-frame CPU tail-trim case. Acceptance is `RESULT SUCCESS` +
    `obs_publish OK` + the asset on disk, confirmed with Test-Path. **Needs a
    selective box reset per CLAUDE.md section 4: kill by CommandLine via CIM,
    never a blanket python kill -- that severs the MCP pythons and, in a remote
    window, the bridge you are watching through.**
+
+**NOTHING HAS STILL RENDERED THROUGH IT.** 7a drove multi-clip end to end
+through the planner and the request builder with real engines, and that is what
+caught the two live-path defects. But no GPU leg has run. 7d is where it first
+does.
 
 **THE SEAMS CHUNK 7 BUILDS ON (landed, do not re-invent):**
 

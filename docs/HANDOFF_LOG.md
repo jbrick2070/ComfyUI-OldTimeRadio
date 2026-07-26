@@ -3,6 +3,104 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-26 (remote Cowork) -- HEAD 42db9af9 (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: **chunk 7a -- all 31 engines declare a frame contract, and the per-engine
+opt-in is deleted.** Two commits, two adversarial QA panels, six real defects
+found in code that was already green and already mutation-proven.
+
+Operator ruling that reshaped the plan, verbatim: *"this architecture should
+work with all video and still models. There's no gate with opt in or opt out.
+If there is, we need to remove that. Everything gets an equal term... I don't
+like any hidden opt-ins. It either works or it fails."* Plus: record the
+per-model requirements so the new architecture can be checked against them.
+
+**The audit came first.** Before writing anything I probed all 31 registered
+engines for what was already recorded. `family`, `render_aspect`,
+`required_inputs` and `still_plan` were declared on every one -- the still
+requirements the operator asked about already existed, and richly. What did NOT
+exist: a frame contract (0 of 31), any continuity declaration, and any clip
+duration outside call-site kwargs. Resolution turned out not to be a static
+per-engine fact at all -- the local lanes negotiate it per render from the
+canvas and the profile -- so the matrix records the mechanism instead of
+inventing a number the code never promised.
+
+- `e90dedf1` **the declaration sweep.** All 31 engines carry a static
+  `FrameContract`. `supports_multi_clip` deleted from the dataclass, from
+  `join_mode_for` and from `validate_coverage_plan`; `supports_multi_clip(engine)`
+  replaced by `can_split(engine)`, which is derived arithmetic ("has a ceiling")
+  rather than a stored opinion that could disagree with one. `can_chain()` now
+  rests on continuity alone -- splitting is universal, the seamless join is the
+  one thing still earned per engine. Renamed `discrete_durations` ->
+  `discrete_frames` because the field is compared against frame counts while
+  every provider publishes its menu in seconds, and `(4, 6, 8)` is a perfectly
+  well-formed frame menu no validator can reject. Added `native_fps` so the
+  rate those frames are counted at is stated rather than implied. New:
+  `tools/engine_matrix.py` + generated `docs/ENGINE_MATRIX.md` with a `--check`
+  drift gate wired into the suite, and `tests/test_engine_contract_roster.py`,
+  which asks the LIVE registry so an engine registered without a contract fails
+  BY NAME instead of silently resolving to `SINGLE_ONLY`.
+- `42db9af9` **what the second panel found when multi-clip went live.**
+
+**FIRST PANEL -- four defects, all confirmed against real code before acting:**
+1. Declaring ceilings while the opt-in stayed shut made an ordinary 8-second
+   beat fatal: 200 frames on `wan_i2v` (max 177) had no legal single render and
+   no multi-clip escape, so `partition_beat` refused and took the whole
+   episode's plan-build with it. My 7a/7b split was wrong -- the ceilings and
+   the opt-in's removal are one change, because separately each is a build that
+   does not work.
+2. I declared Veo at the PROVIDER's rate. 4/6/8 s x `OUTPUT_FPS` 24 = 96/144/192
+   looked right and is unreachable: `canonicalize()` resamples to the canvas fps
+   and counts `duration_s * 25`, so an 8-second Veo clip measures 200 frames and
+   192 never occurs. Corrected to 100/150/200 at 25, with BOTH wrong answers
+   pinned out by test. Omni likewise 75-250, whose old 240 ceiling would have
+   refused any clip past 9.6 s inside its own advertised range.
+3. `humo_14B_169` inherited a 177 ceiling and its real cap is 49 -- it sets
+   `safe_render_frames = 49` while its three siblings are `None`. It now
+   declares its own contract, and a general test pins
+   `safe_render_frames == max_frames` so the next capped tier cannot repeat it.
+4. The cloud lanes declared `quantum=1` while `_duration_seconds` only ever
+   emits whole seconds. Now 25 (except `cloud_kling_avatar`, correctly 1 -- its
+   length is real audio duration, not a menu).
+
+**SECOND PANEL -- the multi-segment path had never met a real engine.** Chunks
+3-6 built it and tested every piece with STUBS, because no adapter could reach
+it. The moment real ladders made it live it refused every beat, and the defect
+was the same shape three times over: the MINT and the DEMAND asked different
+questions about one state. `jump_still_requests` mints nothing for a CHAIN plan;
+`_stamp_coverage_plan` mints nothing for a lane the still spine never asks a
+scene still of; `jump_segment_still_path` demanded one for EVERY segment >= 1
+and raised "NO FALLBACK" when it was missing. Six of seven sampled engines died
+at segment 1 -- all four chain-capable local engines and every HuMo beat past
+its cap -- AFTER segment 0 had already rendered on the GPU. The demand now asks
+the same two questions the mint asked, off the same durable facts.
+
+Also from that panel: an audio-driven lane now refuses at PLAN time with the
+reason, because nothing slices audio per segment and a split HuMo beat would
+have spoken the opening syllables once per segment -- a sync defect that ships
+as a finished episode. Not a new gate: `humo_14B_169` already raised at render
+time past its cap; the refusal moved earlier and now names what is missing.
+
+**On the tests themselves.** The panel caught that the cloud `quantum=25` fix
+had NO test and the generic sweep could not catch it ((375-100) is divisible by
+1 and 25 alike); that one assertion re-executed `can_split`'s own body and
+compared it to the call, so it could never fail; that the `safe_render_frames`
+sweep had no vacuity tripwire; that `native_fps < 0` shipped untested; and that
+two of the three named env-override risks had no check at all. All closed.
+
+My own mutation harness had already caught one vacuous assertion before either
+panel ran -- a test that computed its expected value via
+`contract.smallest_legal_at_least(target)`, i.e. from the very declaration
+under test, so deleting that declaration moved both sides together. It is a
+literal now. Thirteen mutations at the end; all thirteen caught, zero toothless.
+
+Suite 6723 -> **6891 passed / 27 skipped / 1 xfailed**. HEAD == origin
+`42db9af9`. Other windows' dirty `tmp/*.ps1` preserved untouched throughout.
+
+Next: **7b** (the env-vs-contract refusal), then **7c** (rip the fallbacks --
+and the audit added the provider-side clamps to that list, plus the unapplied
+`trim_tail` on the single-segment path), then **7d**, the live GPU slice.
+Nothing has rendered through this machine yet.
+
 ## 2026-07-26 (overnight) -- HEAD a05b5ac6 (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: shipped NINE green pushed chunks -- the two unrun chunk-4 QA lenses, then
 coverage chunk 5 and ALL of chunk 6, with a QA panel over every one of them.
