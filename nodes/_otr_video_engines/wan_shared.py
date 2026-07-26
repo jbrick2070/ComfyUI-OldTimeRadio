@@ -297,6 +297,23 @@ class WanInitImageMixin:
         if base:
             cand = os.path.join(base, name)
             return cand if os.path.exists(cand) else None
+        return self._resolve_model_file_by_token(categories, name)
+
+    def _resolve_model_file_by_token(self, categories, name):
+        """Where the LOADER would find ``name`` -- ``folder_paths`` then the
+        standard ``models/<category>/`` layout, IGNORING any ``*_DIR`` override.
+
+        Split out of :meth:`_resolve_model_file` (which still calls it, so no
+        existing caller's behaviour changes) because the two questions are not
+        the same question. A ``*_DIR`` override wins there on file EXISTENCE
+        ALONE and never consults ``folder_paths`` -- but the graphs hand their
+        loader nodes a BARE TOKEN, and ComfyUI resolves that through
+        ``folder_paths``. So a directory override can satisfy a preflight while
+        being invisible to the loader that actually loads the weights.
+
+        An adapter that wants to CHECK its override against reality asks this;
+        an adapter that just wants the historical answer keeps asking
+        ``_resolve_model_file``."""
         for category in categories:
             try:
                 import folder_paths            # ComfyUI runtime only

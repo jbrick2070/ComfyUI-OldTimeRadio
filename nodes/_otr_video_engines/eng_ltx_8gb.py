@@ -37,12 +37,21 @@ the ComfyUI node registry are imported LAZILY inside load / render_clip. UTF-8, 
 
 Config (env; all optional): ``OTR_LTX_8GB_CKPT`` explicit checkpoint path;
 ``OTR_LTX_8GB_CKPT_NAME`` / ``OTR_LTX_8GB_T5_NAME`` loader basenames;
-``OTR_LTX_8GB_CKPT_DIR`` / ``OTR_LTX_8GB_T5_DIR`` dir overrides; ``OTR_LTX_8GB_STEPS``
+``OTR_LTX_8GB_CKPT_DIR`` / ``OTR_LTX_8GB_T5_DIR`` DEPRECATED dir overrides (see
+the paragraph below before reaching for either); ``OTR_LTX_8GB_STEPS``
 (default 8) / ``OTR_LTX_8GB_CFG`` (1.0) / ``OTR_LTX_8GB_SAMPLER`` (euler) /
 ``OTR_LTX_8GB_MAX_SHIFT`` (2.05) / ``OTR_LTX_8GB_BASE_SHIFT`` (0.95) /
 ``OTR_LTX_8GB_TERMINAL`` (0.1) / ``OTR_LTX_8GB_MAX_FRAMES`` (cap; 8n+1) /
 ``OTR_LTX_8GB_T5_DEVICE`` (default cpu) / ``OTR_LTX_8GB_TILED_VAE`` (default off) /
 ``OTR_LTX_8GB_NEGATIVE``.
+
+``OTR_LTX_8GB_CKPT`` and the two ``*_DIR`` overrides are CHECKED against the
+loader's own token resolution and REFUSE with MALFORMED_CONFIG when they
+disagree. The graph passes ComfyUI a BARE BASENAME, so a path an env var names
+was never what actually rendered -- honouring it silently would make the receipt
+describe one weight while the render used another. To point this build at a
+model store, register the folder in ``extra_model_paths.yaml``: that is the
+channel that reaches the loader.
 """
 from __future__ import annotations
 
@@ -276,11 +285,12 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             env_explicit="OTR_LTX_8GB_CKPT")
 
     def _t5_path(self):
-        """Resolved T5 path, by the loader's token. Behaviourally identical to
-        the previous direct ``_resolve_model_file`` call -- there is no
-        explicit-full-path override for the T5, so nothing can contradict the
-        token here. Delegated for symmetry, so a future ``OTR_LTX_8GB_T5``
-        cannot reopen the identity lie on this side by forgetting the guard."""
+        """Resolved T5 path, by the loader's token. There is no
+        explicit-full-path override for the T5, so ``OTR_LTX_8GB_T5_DIR`` is the
+        ONLY channel that can contradict the token on this side -- and the
+        directory tripwire in ``_loader_token_path`` is what catches it.
+        Delegated for symmetry, so a future ``OTR_LTX_8GB_T5`` cannot reopen the
+        identity lie here by forgetting the guard."""
         return self._loader_token_path(
             ("text_encoders", "clip"), self._t5_name(), "OTR_LTX_8GB_T5_DIR")
 
@@ -316,15 +326,46 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         multi-segment path (via ``session_identity`` -> ``resolve_session_config``)
         can no longer disagree about which file is the checkpoint.
 
-        KNOWN GAP, deliberately not closed here (see
-        docs/2026-07-26-b1b2-qa-findings.md): ``_resolve_model_file`` lets
-        ``*_DIR`` win on existence alone, so a directory override can satisfy
-        this resolver while still being invisible to the loader, which only ever
-        sees the bare token. That is the same defect class one level up and it
-        needs its own decision about whether ``*_DIR`` is a supported channel at
-        all -- folding it in here would newly refuse a currently-working
-        operator pattern."""
+        BOTH override channels are checked against the loader's own answer: the
+        explicit path (``env_explicit``) and the directory (``env_dir``). The
+        directory one is a DEPRECATION TRIPWIRE, not a feature -- ``*_DIR`` has
+        only ever affected preflight, never which weights load, and nothing in
+        the shipped configuration sets it. It refuses loudly and points at
+        ``extra_model_paths.yaml``, which is the channel that does reach the
+        loader and is already live on this box. If the tripwire never fires,
+        delete the variable and this branch.
+
+        SCOPED TO THIS ADAPTER on purpose. ``eng_wan_ti2v`` / ``eng_wan_i2v``
+        carry the same lie (their loaders also take bare tokens), but their test
+        suites use ``*_DIR`` as the mock seam for a no-ComfyUI box
+        (``tests/test_wan_loader_preflight.py`` says so in its own docstring), so
+        fixing them means migrating those fixtures first. Separate chunk."""
         by_token = self._resolve_model_file(categories, token, env_dir)
+        # A ``*_DIR`` override wins in _resolve_model_file on EXISTENCE ALONE and
+        # never consults folder_paths -- but the graph hands the loader the bare
+        # token, which ComfyUI resolves through folder_paths. So a directory
+        # override can satisfy this preflight while being invisible to the loader
+        # that actually loads the weights: the same identity lie as the explicit
+        # path, one level up. Ask what the LOADER would find and require the two
+        # to agree. Only fires when the operator actually set a *_DIR.
+        if os.environ.get(env_dir):
+            loader_would_load = self._resolve_model_file_by_token(categories, token)
+            if loader_would_load is None or not _same_file(by_token or "",
+                                                           loader_would_load):
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                    "%s=%r does not change which weights load. The graph asks "
+                    "ComfyUI for the bare name %r, which resolves to %s -- not to "
+                    "your directory. That is this build's bug, not your setup: the "
+                    "variable has only ever affected the preflight check, never the "
+                    "render. Register your folder in extra_model_paths.yaml (the "
+                    "channel that does reach the loader) or move the file under "
+                    "models/, then unset %s. Stopping now rather than spending a "
+                    "render on weights you did not choose."
+                    % (env_dir, os.environ.get(env_dir), token,
+                       repr(loader_would_load) if loader_would_load
+                       else "nothing at all on this box",
+                       env_dir), kind="video")
         explicit = os.environ.get(env_explicit) if env_explicit else None
         if explicit:
             if by_token is None or not _same_file(explicit, by_token):
@@ -365,8 +406,11 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "ltx_8gb text encoder %r absent -- the 0.9.8 checkpoint carries no "
                 "text encoder, so the shared t5xxl_fp16 must be on disk (offline "
-                "invariant, no runtime fetch); fix OTR_LTX_8GB_T5_NAME / "
-                "OTR_LTX_8GB_T5_DIR" % self._t5_name(), kind="video")
+                "invariant, no runtime fetch); drop it in models/text_encoders or "
+                "register its folder in extra_model_paths.yaml, and fix "
+                "OTR_LTX_8GB_T5_NAME if the basename differs. Do not reach for "
+                "OTR_LTX_8GB_T5_DIR -- it never reached the loader and is now "
+                "refused" % self._t5_name(), kind="video")
         try:
             ckpt_receipt = _file_receipt(ckpt)
             t5_receipt = _file_receipt(t5)
@@ -476,8 +520,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "ltx_8gb checkpoint %r not found; fetch it via "
-                "scripts/download_ltx_0_9_8.ps1 (or set OTR_LTX_8GB_CKPT / drop it "
-                "in models/checkpoints)" % self._ckpt_name(), kind="video")
+                "scripts/download_ltx_0_9_8.ps1, drop it in models/checkpoints, or "
+                "register its folder in extra_model_paths.yaml -- OTR_LTX_8GB_CKPT "
+                "only names a file, it cannot make the loader find one"
+                % self._ckpt_name(), kind="video")
         try:
             size = os.path.getsize(ckpt)
         except OSError:
@@ -494,8 +540,11 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "ltx_8gb text encoder %r absent -- the 0.9.8 checkpoint carries no "
                 "text encoder, so the shared t5xxl_fp16 must be on disk (offline "
-                "invariant, no runtime fetch); fix OTR_LTX_8GB_T5_NAME / "
-                "OTR_LTX_8GB_T5_DIR" % self._t5_name(), kind="video")
+                "invariant, no runtime fetch); drop it in models/text_encoders or "
+                "register its folder in extra_model_paths.yaml, and fix "
+                "OTR_LTX_8GB_T5_NAME if the basename differs. Do not reach for "
+                "OTR_LTX_8GB_T5_DIR -- it never reached the loader and is now "
+                "refused" % self._t5_name(), kind="video")
         return self.name
 
     # ---- in-process graph spec (0.9.8 distilled; discovery + smoke verified) ----
