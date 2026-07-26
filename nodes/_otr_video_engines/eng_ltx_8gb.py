@@ -301,6 +301,33 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             max_shift=cfg["max_shift"], base_shift=cfg["base_shift"],
             terminal=cfg["terminal"], max_frames=cfg["max_frames"])
 
+    def session_identity(self):
+        """What this adapter's HANDLES are -- engine, recipe, weights.
+
+        ``BeatSession`` REFUSES a multi-segment beat from an engine that cannot
+        answer this (``SessionIdentityUnavailable``, no fallback), because
+        nothing could then prove segment N renders with the model segment 1
+        loaded. Until this existed, every multi-segment beat was refused for
+        every engine in the roster.
+
+        Deliberately PRE-LOAD STABLE: it is read once before the weights land,
+        again after ``prepare()``, and before every segment, so it may only
+        describe things that do not change across the load. It carries the
+        model-sampling shifts because those are baked into the hoisted patcher,
+        and it EXCLUDES per-segment state -- prompt, seed, frame count, canvas --
+        along with ``tiled_vae``, which selects the decode NODE CLASS rather than
+        anything about the handles.
+
+        Not cached, by design: the whole job is to notice a weight that MOVED,
+        so the receipts are re-stat'ed on every ask (two stats, not a hash)."""
+        cfg = self.resolve_session_config()
+        return (cfg.engine, cfg.recipe,
+                cfg.ckpt_token, repr(cfg.ckpt_receipt),
+                cfg.t5_token, repr(cfg.t5_receipt),
+                cfg.t5_device,
+                "max_shift=%s" % (cfg.max_shift,),
+                "base_shift=%s" % (cfg.base_shift,))
+
     def _tiled_vae(self):
         """Whether to decode through ``VAEDecodeTiled`` (default OFF: 0.9.8 core
         VAEDecode handles the 8GB peak at the smoke canvas; C3 tuning may flip this
