@@ -3,7 +3,21 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-07-27 (overnight, remote Cowork) -- HEAD 8f41af27 (v2.0-alpha) -- WINDOW CODER A (Opus), SESSION 2
+## 2026-07-27 06:45 -- HEAD 0d148ba5 (v2.0-alpha) -- WINDOW CODER A, SESSION 2
+Did: full r1->r4 kibitz arc on the four 7b blockers (8 agent calls); landed C1
+  (canonical `max_render_frames` descriptor), C2 (plan-vs-output fail-open),
+  C1b (the same dead widget in all 11 variants, incl. the WAN 8GB 17-frame
+  ceiling); proved the GPU live and confirmed the server path is a junction.
+Current step: O1 -- the canvas. `build_request_from_shot` overwrites every
+  non-face engine to 1472x832 with no `ltx_8gb` branch, displacing the 8GB
+  tier's 512x288. Hard 7d blocker, deliberately left for a rested decision.
+Next: O1 canvas -> C3 per-engine policy registry + typed taxonomy. CODER A.
+Models: Claude + 1 full kibitz arc (codex gpt-5.6-sol high + agy Gemini 3.6
+  Flash High), 8 calls, $0 external.
+Commits: c8cf0b07, 7f4644a1, ac609d25, 8f41af27, 0d148ba5.
+
+### Detail
+
 Did: **a full r1->r4 kibitz arc on the four 7b blockers, then landed three
 slices off it -- and proved the GPU.** Operator asked for /kibitz on the
 blockers so GPU testing could start, optimising for the cleanest end-state
