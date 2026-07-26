@@ -3,6 +3,83 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-26 10:10 -- HEAD 582dfbd8 (v2.0-alpha) -- WINDOW CODER A, SESSION 3
+Did: two full kibitz arcs (r1-r4 each, 16 agent calls, codex gpt-5.6-sol high +
+  agy Gemini 3.6 Flash High verified every round) plus ONE operator-requested
+  Fable pass on the viewer question; then three green chunks -- B1a `8caf3516`
+  (run_graph external_results + on_result), B2a `55c8a811`
+  (resolve_session_config), B2b `582dfbd8` (ltx_8gb session_identity).
+Current step: B1b -- hoist the loaders into prepare(). BeatSession now OPENS a
+  multi-segment session but the weights are still re-loaded per segment.
+Next: B1b -> B3+B4 -> B5+B6 -> prequalify 512x288 -> 7d (237-frame beat). CODER A.
+Models: Claude + 2 kibitz arcs (16 calls) + 1 Fable. $0 external.
+Commits: 78df72b9, 6c345e06, 8caf3516, 55c8a811, 582dfbd8.
+
+### Detail
+
+**O1 WAS NEVER THE ONLY 7d BLOCKER, and finding that out was the session.**
+`session_identity` appeared in exactly ONE file -- `beat_session.py` -- and no
+adapter declared it, so `BeatSession.open()` refused EVERY multi-segment beat
+for all 31 engines, before the weights land, no fallback. A 169- or 237-frame
+beat was rejected before the render canvas was ever consulted. Lifted for
+`ltx_8gb` at `582dfbd8`.
+
+**THE PANEL KILLED FIVE OF MY CLAIMS, and one of them was my whole argument.**
+I had priced the canvas failure through `compute_real_frame_budget` -- 43 GB at
+1472x832, 12.4 GB at 512x288. That gate is called by exactly ONE engine,
+`eng_wan_ti2v.py:399`. `eng_ltx_8gb` declares "NO VRAM/NVML/vendor gate" and
+treats its NVML probe as telemetry only: *"the operator's tier JSON owns the OOM
+budget."* So the real failure at 1472x832 x 161 frames is a CUDA OOM mid-render,
+not a clean refusal -- worse, not better -- and the engine explicitly delegates
+its budget to the tier JSON whose canvas never arrives. Also refuted: "22 of 23
+stamps are wrong" (the two 16GB LTX profiles are correct, because their engines
+have branches), "1472x832 is the deliverable" (`composite_w/h` maps 1920x1080),
+and my acceptance oracle, which compared a stamp against a value derived from
+the same request -- circular.
+
+**I ALSO CAUGHT MYSELF ONCE, BEFORE THE PANEL SAW IT.** The 7d-preflight that
+"proved the GPU" ran at 832x480, not 1472x832: `render_single` is a FIFTH canvas
+channel (`OTR_VIDEO_RENDER_CANVAS`) and never calls `build_request_from_shot`.
+The harness that proved the GPU renders at a different canvas than the
+production path it was proving. Correction filed against the 7b judgment.
+
+**THE CROSS-TIER TRAP.** I was about to reuse `max_render_frames` as the segment
+cap. It is not a planning cap: WAN reads 17, renders short, then PING-PONGS to
+the beat length, so applying it before `partition_beat()` would have turned every
+WAN beat into a pile of 17-frame renders and silently rewritten the tier
+`PBUG-20260723-02` just fixed. Corollary that settles the operator's question:
+ripping ping-pong is LANE-SPECIFIC -- a correctness hole for `ltx_8gb` (a short
+render passes the count gate wearing a planned length), load-bearing for WAN.
+
+**THE OPERATOR'S 512x288 WAS RIGHT ALL ALONG.** Four sources agree.
+512x288 and 1024x576 are the only exact-16:9 /32-clean rungs; 832x480 is 26:15
+and pillarboxes to 1872x1080. Fable settled the choice between the two:
+*"Softness is a state; a motion reset is an event... soft reads as OLD, stutter
+reads as BROKEN."* My earlier instinct to "correct" the profile up to 832x480
+would have put side bars on every episode.
+
+**AN OPEN BLOCKER DISAPPEARED.** Acceptance moves from 169 to 237 -- the
+canonical assembler already ships `opening_duration_sec=10` / `crossfade_ms=500`,
+which yields `round((10-0.5)*25) = 237`. At a 65 cap: `[65,65,65,49]` -> 241
+chained -> trim 4 -> 237, every segment `8n+1` (arithmetic verified). That CUTS
+O4's profile-schema work entirely, and 237 is a stronger test than 169 because it
+exercises tail trim.
+
+**MUTATION DISCIPLINE PAID TWICE.** The first B1a mutation run reported failed=0
+for every mutant -- the KNOWN-FAIL-GUARD intercepts pytest's short summary and
+prints its own nodeid block, so the harness was blind, not the fix unproven.
+Re-ran isolated, fixed the parser, then trusted it. And I caught a decorative
+test of my own before it shipped: a `free_after_use` case whose assertion was
+`assert res == (0,) or True`. Every mutation since carries controls; all 8
+across B1a/B2a broke ONLY their targeted test and ZERO controls.
+
+**Bridge dropped mid-session** and recovered; nothing was lost because the last
+green chunk was already pushed -- which is the actual argument for the push rule.
+
+Suite 6983 -> 7023 passed / 27 skipped / 1 xfailed. Bible 17. Canonical
+byte-identical `9872624A` throughout (no node/widget/link touched).
+Bug Bible promotion of `PBUG-20260723-02` DEFERRED by the operator to build end.
+
 ## 2026-07-27 06:45 -- HEAD 0d148ba5 (v2.0-alpha) -- WINDOW CODER A, SESSION 2
 Did: full r1->r4 kibitz arc on the four 7b blockers (8 agent calls); landed C1
   (canonical `max_render_frames` descriptor), C2 (plan-vs-output fail-open),

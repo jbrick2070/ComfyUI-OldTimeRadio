@@ -1,7 +1,41 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-26 (remote Cowork) -- **CHUNKS 5, 6 AND 7a ARE COMPLETE.**
-Eleven green chunks pushed this session: QA4 (`b0e383f5`), the beat session
+**Updated:** 2026-07-26 (remote Cowork, CODER A session 3) -- **TWO KIBITZ ARCS
+JUDGED AND THREE GREEN CHUNKS PUSHED. HEAD == origin `582dfbd8`; suite 7023
+passed / 27 skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
+
+**THE HEADLINE: O1 (the canvas) WAS NEVER THE ONLY 7d BLOCKER.**
+`session_identity` appeared in exactly ONE file (`beat_session.py`) and NO
+adapter declared it, so `BeatSession.open()` refused EVERY multi-segment beat
+for all 31 engines -- before the weights land, no fallback. A 169- or 237-frame
+beat was rejected before the render canvas was ever consulted. That refusal is
+now lifted for `ltx_8gb` (`582dfbd8`).
+
+**Landed this session:** `8caf3516` B1a (`run_graph` learns `external_results`
++ `on_result`), `55c8a811` B2a (`resolve_session_config` -- one frozen
+resolution, and the receipt stops describing a weight the loader never loads),
+`582dfbd8` B2b (`ltx_8gb` declares `session_identity`). All three
+mutation-proven WITH controls. Judgments: `docs/2026-07-26-o1-canvas-arc-judgment.md`
+and `docs/2026-07-26-8gb-1080p-arc-judgment.md` -- **read both before coding.**
+
+**CANVAS DECIDED: 512x288.** Four independent sources. It is the only exact-16:9
+/32-clean rung besides 1024x576, and Fable's viewer call settles the choice
+between them: softness is a STATE viewers habituate to, a motion reset is an
+EVENT they never do. 832x480 is 26:15 and would pillarbox to 1872x1080. The
+tier file was right all along.
+
+**ACCEPTANCE IS 237, NOT 169 -- and that CUTS O4 entirely.** The canonical
+`OTR_EpisodeAssembler` already ships `opening_duration_sec=10.0` /
+`crossfade_ms=500`, so it produces `round((10-0.5)*25) = 237`. At a 65 cap:
+`[65,65,65,49]` -> 241 chained -> trim 4 -> 237, every segment `8n+1` (verified).
+No profile-schema or widget-mapping work is needed for the opening beat.
+
+**NEXT = B1b**, then B3+B4, B5+B6, prequalification, 7d. See CURRENT STEP.
+
+---
+
+**Superseded header (2026-07-26 earlier) -- CHUNKS 5, 6 AND 7a ARE COMPLETE.**
+Eleven green chunks pushed that session: QA4 (`b0e383f5`), the beat session
 (`4fa992e6`) + its QA (`451309de`), the ffprobe helpers (`3a76c47a`), the
 per-segment init image by object id (`a888c423`), QA6 over those three
 (`a818b5d1`), the terminal-frame extractor (`4d5795b1`), the per-segment render
@@ -155,7 +189,60 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- 7b BLOCKERS: THREE LANDED; **THE CANVAS IS THE 7d BLOCKER**
+## CURRENT STEP -- **B1b: HOIST THE LOADERS** (8 GB -> 1080p build)
+
+**HEAD == origin `582dfbd8`.** Suite 7023 / Bible 17 / canonical `9872624A`.
+Authorities, read BOTH first: `docs/2026-07-26-8gb-1080p-arc-judgment.md`
+(the architecture) and `docs/2026-07-26-o1-canvas-arc-judgment.md` (the canvas
+seam + the five channels). They supersede the 7b judgment's O1/O4 framing.
+
+**DONE:** B1a `8caf3516`, B2a `55c8a811`, B2b `582dfbd8`.
+
+**B1b (NEXT) -- the weights are still not shared.** `BeatSession` now OPENS a
+multi-segment session, but `Ltx8gbEngine.load()` only resolves node CLASSES and
+the graph still carries its own `ckpt`/`clip` nodes, so every segment
+re-executes `CheckpointLoaderSimple` + `CLIPLoader`. Hoist them: `prepare()`
+runs them ONCE off the frozen config into `prepared["external_results"]`,
+`_build_graph` OMITS those three ids and keeps its wires, `render_clip` passes
+`external_results` through. **Transaction in the same slice** --
+`motion_common.prepare()` releases only the GPU lease today, so a
+ckpt-loads-then-T5-fails path strands a patcher; use `on_result` to register
+each handle as it lands and unwind in REVERSE. Remove per-segment patcher
+discovery from `render_clip`. Prove exactly ONE checkpoint load, ONE T5 load,
+ONE model-sampling construction per multi-segment beat.
+
+**THEN, in order:**
+
+- **B3 + B4** -- the LTX-only effective contract, then delete ping-pong.
+  **`max_render_frames` is NOT a planning cap**: WAN reads 17, renders short,
+  then PING-PONGS to the beat length, so applying it before `partition_beat()`
+  would turn every WAN beat into a pile of 17-frame renders. Scope the effective
+  contract strictly to `engine_id == "ltx_8gb"`; a WAN regression proving
+  `max_render_frames=17` does not move its coverage-plan topology ships in the
+  same commit. B4 only AFTER B3: `render_driver.py:2982` already hard-asserts
+  `got == segment.render_frames`, and ping-pong is what currently hides a
+  non-`8n+1` segment. Ripping ping-pong is LANE-SPECIFIC -- load-bearing for WAN.
+- **B5 + B6** -- canvas seam fail-closed (positive, /32, exactly 16:9, 25 fps),
+  validated BEFORE `BeatSession` opens (today `render_driver.py:2902-2905`
+  loads first and `assert_usable` runs at `:2760-2765`). Do NOT touch
+  `wan_shared._dims`. B6: the profile schema accepts only `device_policy` /
+  `dtype_policy` / `max_render_frames`, so T5 device / tiled VAE / sampling have
+  no channel -- freeze the MEASURED selection into a versioned recipe in CODE,
+  env demoted to prequalification-only.
+- **Prequalify** 512x288 on the 16 GB box: fresh boot per cell, canonical path
+  only, `fraction = 8192.0 / detected_total_mib` set before CUDA init, probe
+  started BEFORE `BeatSession`. Label it PREQUALIFICATION.
+- **7d** -- the canonical 237-frame opening beat.
+
+**OPEN, deferred by operator (2026-07-26): the Bug Bible update.**
+`PBUG-20260723-02` declares itself bible-worthy but has no `BUG_BIBLE.yaml`
+entry, and that one rule -- a contract declared only in a process-launch
+environment cannot bind work submitted to an already-running server -- has now
+explained C1, C1b, the canvas, and the 8 GB levers. Do it when the build lands.
+
+---
+
+## SUPERSEDED -- 7b BLOCKERS: THREE LANDED; the canvas framing (see above)
 
 **Updated 2026-07-27 (overnight, remote Cowork), HEAD `8f41af27` == origin.**
 Suite **6983 passed / 27 skipped / 1 xfailed**; Bible 17; link validator 0
