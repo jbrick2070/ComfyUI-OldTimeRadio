@@ -166,7 +166,27 @@ class BeatSession:
             host_caps=self.host_caps, profile=self.profile,
             session_ctx=self.session_ctx())
         if self.is_multi_segment:
-            self.identity = session_identity(self.engine)
+            try:
+                self.identity = session_identity(self.engine)
+            except BaseException:
+                # THE BASELINE READ HAPPENS AFTER prepare(), so by now the heavy
+                # handles AND the cross-process GPU lease are already held. A
+                # raise here leaves through __enter__ -- and when __enter__
+                # raises, Python NEVER calls __exit__, so close(), teardown()
+                # and the lease release in teardown's own finally would all be
+                # skipped. The lease owner is the LIVE ComfyUI process, so the
+                # stale-lock reclaim (PID-liveness) cannot free it either: every
+                # later heavy render then blocks its full timeout until someone
+                # kills the server or deletes the lock dir by hand.
+                #
+                # This became reachable when session_identity() started doing
+                # real file I/O (it re-stats the weights on every ask, by
+                # design). Tear down what we took, THEN re-raise unchanged --
+                # close() is idempotent and never raises, so it cannot mask the
+                # original failure. BaseException on purpose: a KeyboardInterrupt
+                # in this window strands the lease exactly the same way.
+                self.close()
+                raise
         return self.prepared
 
     def begin_segment(self, index, owner=None):
