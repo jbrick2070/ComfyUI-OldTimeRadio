@@ -3,10 +3,51 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-07-26 (overnight) -- HEAD a818b5d1 (v2.0-alpha) -- WINDOW CODER A (Opus)
-Did: shipped SIX green pushed chunks -- the two unrun chunk-4 QA lenses, then
-coverage chunk 5 and the first half of chunk 6, then a QA round over the three
-commits that had not been reviewed by anyone (operator asked for it by name).
+## 2026-07-26 (overnight) -- HEAD a05b5ac6 (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: shipped NINE green pushed chunks -- the two unrun chunk-4 QA lenses, then
+coverage chunk 5 and ALL of chunk 6, with a QA panel over every one of them.
+**CHUNKS 1-6 ARE COMPLETE.** The whole multi-clip machine exists and nothing
+has rendered through it yet; chunk 7 (the `ltx_8gb` opt-in + the live slice) is
+where it first does.
+- `4d5795b1` **6c-1, the terminal frame** -- what a CHAIN successor begins on.
+  Decodes the whole clip with `-update 1` rather than seeking with `-sseof`,
+  because a tail seek has nothing to land on in a 9-frame segment, and PROVES
+  the file landed (ffmpeg exits 0 for an input it decoded zero frames from, and
+  a 0-byte PNG handed to the next segment is a black frame at the cut with a
+  clean exit code in front of it). `otr_engine_tmp_path` generalises the
+  in-tree allocator so a PNG lands in the same janitor-swept tier as the mp4s.
+- `5845e635` **6c/6d, the loop and the assembly, in ONE commit** because a loop
+  that renders N segments nobody assembles is the half-landing chunk 4 warned
+  about. `render_beat_coverage` opens ONE BeatSession per beat, builds a
+  per-segment request, chains the terminal frame INSIDE the loop, and assembles
+  transactionally: one shape, the exact DECODED frame count, the silent-clip
+  contract, and the output deleted if any check fails. `run_episode` calls it
+  for every beat; a no-plan or single-clip beat takes the historical path.
+  **Building it caught a real defect in QA6's own fix**: `segment_render_frames`
+  short-circuited index 0 to the BEAT's length, so segment 0 of a two-segment
+  50-frame beat would have rendered all 50 and then had segment 1 concatenated
+  on top. It read as a harmless special case because for a single-clip plan the
+  two numbers are equal.
+- `a05b5ac6` **QA7 (Sonnet + agy over 6c/6d).** Eight findings accepted, two
+  rejected. **The one that mattered: the chain terminal frame was written to a
+  top-level `request["init_image"]` that NO production code reads** --
+  `build_request` puts it at `asset_refs["init_image"]` and every adapter and
+  `_present_request_tokens` read it there. A chained successor would have
+  silently rendered from its ORIGINAL still and the beat would have jumped at
+  every cut it claimed to chain across. **The test agreed with the bug because
+  the test's own request builder used the same wrong key** -- the stub was
+  checking my belief, not production's. Also: the concat moved INSIDE the
+  transaction (it was outside, so the one failure most likely to leave a
+  partial file was the one the cleanup did not cover); a short segment is now
+  named at the segment instead of surfacing later as an assembly count
+  mismatch; the beat reports its PEAK VRAM, not its last segment's;
+  `max(1, keep)` became a refusal; the assembly checks fps and pixel format,
+  not just canvas; and the historical-path test now uses a REAL one-segment
+  stamped plan, because ShotLock stamps one on every beat and the old test
+  only covered the absent-key half of the branch every beat takes. REJECTED
+  with reasons: deleting intermediate segment files on failure (the janitor
+  owns that tier, and the only artifacts of a failed beat are what you
+  diagnose from), and a SAR-mismatch check both seats agreed was speculative.
 - `a818b5d1` **QA6 -- Sonnet lens + agy panel over QA4, 6a and 6b.** Six
   findings accepted, four rejected. The two that mattered were both in the
   per-segment seam and both DORMANT-until-6c, which is exactly when they would
@@ -82,30 +123,36 @@ commits that had not been reviewed by anyone (operator asked for it by name).
   `_still_index` -- which filters to `scene_*` kinds keyed BY BEAT and would
   therefore have handed EVERY segment segment-0's still. The differential test
   demonstrates that rather than asserting it.
-- Suite 6634 -> 6636 -> 6668 -> 6675 -> 6680 -> 6687 -> **6696 passed** / 27
-  skipped / 1 xfailed; Bible 17; canonical byte-identical `5377914B` across all
-  six commits; hygiene clean (it also caught a pre-existing non-ASCII character
-  in `wan_shared.py`, fixed in passing).
+- Suite 6634 -> ... -> **6723 passed** / 27 skipped / 1 xfailed; Bible 17;
+  canonical byte-identical `5377914B` across all nine commits; hygiene clean
+  (it also caught a pre-existing non-ASCII character in `wan_shared.py`, fixed
+  in passing).
+- **STOPPED BEFORE CHUNK 7 DELIBERATELY.** Chunk 7 is a LIVE GPU leg, not a
+  code chunk: it needs a selective box reset, and in a remote window a blanket
+  python kill severs the very bridge the session is watching through. Chunk 6
+  is a clean, complete, fully QA'd stopping point; starting a live render at
+  the end of a long unattended session is how you get a half-finished leg
+  nobody was watching.
 - DOCTRINE, earned twice tonight: **every chunk gets a panel before the next
   one builds on it.** QA6 only happened because the operator asked what had not
   been reviewed -- and it found two defects in the seam chunk 6c is about to
   build against. A chunk that is "obviously right" is exactly the one whose
   panel gets skipped.
-Current step: coverage chunk 6c -- the per-segment render loop, with the
-terminal transaction INSIDE it. Then 6d (transactional assembly, verified with
-the 6a helpers), then chunk 7.
-Next: CODER A -- 6c. Every seam it needs is landed and tabulated in
-GO_FORWARD's CURRENT STEP; do not re-invent them. Chunk 7 must also carry the
-three grounded requirements now written down there (static FrameContract, a
-declared `session_identity`, and NO ping-pong CLIP-FILL on a coverage-planned
-segment). This whole session ran REMOTE (cloud Cowork), so GO_FORWARD's Window
+Current step: chunk 7 -- the FIRST adapter opt-in and the LIVE 169-frame slice.
+Next: CODER A -- chunk 7, in the four steps now written into GO_FORWARD's
+CURRENT STEP (static FrameContract; a declared `session_identity`; NO ping-pong
+CLIP-FILL on a planned segment; the segment graph taking the prepared handles
+as literals -- the adapter-side half of chunk 5 that r4 specified and the
+driver-side half already honours). Then the live leg, with a selective box
+reset per CLAUDE.md section 4. This whole session ran REMOTE (cloud Cowork), so GO_FORWARD's Window
 packing now carries a "REMOTE / cloud Cowork session" block: file tools hit the
 container not Windows, the `/mnt/user-data/uploads/` snapshot LAGS and must
 never be read, the bridge can drop mid-edit, and the suite needs a detached
 launch because of the 60s call ceiling.
-Models: Claude Opus (rung 4) + 4 Sonnet QA lenses + 2 agy panels (rung 2, $0).
+Models: Claude Opus (rung 4) + 5 Sonnet QA lenses + 3 agy panels (rung 2, $0).
 No Codex, no OpenRouter -- $0 external spend.
-Commits: b0e383f5, 4fa992e6, 451309de, 3a76c47a, a888c423, a818b5d1
+Commits: b0e383f5, 4fa992e6, 451309de, 3a76c47a, a888c423, a818b5d1,
+4d5795b1, 5845e635, a05b5ac6
 
 ## 2026-07-26 00:30 -- HEAD 4faabe0e (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: shipped coverage CHUNK 4 (the jump-still image-phase consumer) and its QA
