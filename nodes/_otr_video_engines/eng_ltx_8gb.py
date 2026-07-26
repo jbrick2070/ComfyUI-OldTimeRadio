@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections import namedtuple
 
 from . import motion_common as _MC
 from . import wan_shared as _WS
@@ -80,6 +81,33 @@ _LTX8_DEFAULT_NEGATIVE = (
 
 #: The defined recipe-receipt string threaded into the manifest (S-B/E5).
 RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass"
+
+#: The FROZEN per-beat resolution (B2). Everything a beat's HANDLES depend on,
+#: read exactly ONCE and passed by value to identity, prepare, assert_usable and
+#: graph construction. It exists because three accessors used to re-read
+#: ``os.environ`` independently, and because ``BeatSession`` asks for the session
+#: identity BEFORE ``prepare()`` installs the active profile -- so an identity
+#: derived from live state would describe different things before and after the
+#: load, which is exactly the drift the identity is supposed to detect.
+LtxSessionConfig = namedtuple("LtxSessionConfig", (
+    "engine", "recipe",
+    "ckpt_token", "ckpt_path", "ckpt_receipt",
+    "t5_token", "t5_path", "t5_receipt",
+    "t5_device", "tiled_vae",
+    "steps", "cfg", "sampler", "max_shift", "base_shift", "terminal",
+    "max_frames",
+))
+
+
+def _file_receipt(path):
+    """A BOUNDED, stable receipt for a model file: (basename, size, mtime_ns).
+
+    Deliberately NOT a content hash: the identity is re-read before every
+    segment, and hashing a 6.34 GiB checkpoint per segment would cost more than
+    the render. Size + mtime catches a swapped or rebuilt weight, which is the
+    drift this is guarding against."""
+    st = os.stat(path)
+    return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
 
 
 def _ltx8_frame_length(target_frame_count, cap):
@@ -205,6 +233,73 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
     def _installed(self):
         return self._ckpt_path() is not None
+
+    # ---- the FROZEN session config (B2) ----
+    def _loader_token_path(self, categories, token, env_dir, env_explicit=None):
+        """Where the LOADER NODE will actually find ``token``.
+
+        ``_build_graph`` hands ``CheckpointLoaderSimple`` / ``CLIPLoader`` a BARE
+        BASENAME, which ComfyUI resolves through ``folder_paths``. So the file the
+        graph loads is whatever that TOKEN resolves to -- never an absolute path
+        an env var happens to name. ``_ckpt_path()`` short-circuits on the explicit
+        ``OTR_LTX_8GB_CKPT``, which means a receipt taken from it can describe a
+        DIFFERENT file than the one that loads: the preflight passes, the identity
+        is a lie, and the beat renders from a weight nobody recorded. Resolve by
+        token here, and make a disagreeing override terminal rather than silent."""
+        by_token = self._resolve_model_file(categories, token, env_dir)
+        explicit = os.environ.get(env_explicit) if env_explicit else None
+        if explicit:
+            if by_token is None or (os.path.abspath(explicit)
+                                    != os.path.abspath(by_token)):
+                raise EngineUnusable(
+                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                    "%s=%r names a file the loader will NOT load: the graph passes "
+                    "the basename %r, which resolves to %r. An explicit path can "
+                    "only be honoured when it IS the token's resolution -- "
+                    "otherwise the receipt describes one weight and the render "
+                    "uses another. Point %s at the registered file, or drop it and "
+                    "use %s."
+                    % (env_explicit, explicit, token, by_token, env_explicit,
+                       env_dir), kind="video")
+        return by_token
+
+    def resolve_session_config(self, profile=None):
+        """Resolve, ONCE, every input a beat's handles depend on. Fail CLOSED.
+
+        Called BEFORE the first ``session_identity()`` check and reused for
+        ``prepare``, per-segment usability and graph construction, so no two
+        readers can disagree. ``profile`` is accepted now and consulted for the
+        levers once they have a profile channel (B6); today it is recorded so the
+        signature does not have to change under callers later."""
+        cfg = self._resolve_render_config()          # range-checked, fail-closed
+        ckpt = self._loader_token_path(
+            ("checkpoints",), self._ckpt_name(), "OTR_LTX_8GB_CKPT_DIR",
+            env_explicit="OTR_LTX_8GB_CKPT")
+        if ckpt is None:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "ltx_8gb checkpoint %r not found; fetch it via "
+                "scripts/download_ltx_0_9_8.ps1 (or drop it in models/checkpoints)"
+                % self._ckpt_name(), kind="video")
+        t5 = self._loader_token_path(
+            ("text_encoders", "clip"), self._t5_name(), "OTR_LTX_8GB_T5_DIR")
+        if t5 is None:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "ltx_8gb text encoder %r absent -- the 0.9.8 checkpoint carries no "
+                "text encoder, so the shared t5xxl_fp16 must be on disk (offline "
+                "invariant, no runtime fetch); fix OTR_LTX_8GB_T5_NAME / "
+                "OTR_LTX_8GB_T5_DIR" % self._t5_name(), kind="video")
+        return LtxSessionConfig(
+            engine=self.name, recipe=RECIPE_LTX8_I2V,
+            ckpt_token=self._ckpt_name(), ckpt_path=ckpt,
+            ckpt_receipt=_file_receipt(ckpt),
+            t5_token=self._t5_name(), t5_path=t5,
+            t5_receipt=_file_receipt(t5),
+            t5_device=self._t5_device(), tiled_vae=self._tiled_vae(),
+            steps=cfg["steps"], cfg=cfg["cfg"], sampler=cfg["sampler"],
+            max_shift=cfg["max_shift"], base_shift=cfg["base_shift"],
+            terminal=cfg["terminal"], max_frames=cfg["max_frames"])
 
     def _tiled_vae(self):
         """Whether to decode through ``VAEDecodeTiled`` (default OFF: 0.9.8 core
