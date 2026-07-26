@@ -3,6 +3,57 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-26 00:30 -- HEAD 4faabe0e (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: shipped coverage CHUNK 4 (the jump-still image-phase consumer) and its QA
+round. Without it a jump cut had NO still -- the image phase mints exactly one
+still per beat, so every segment after the first would have rendered from
+nothing.
+- `583b3ea3` **chunk 4**, three seams, one commit because a partial landing
+  leaves a hole (requests nobody honours). New pure authority
+  `coverage_plan.jump_still_requests` / `jump_still_object_id`; ShotLock stamps
+  `shot["jump_still_requests"]` durably where beat_id is authoritative; the
+  dispatcher's `merge_jump_still_requests` folds them into `objects` +
+  `required_scene_targets` BEFORE the existing id/duplicate validation so the
+  merged rows meet the producer's own contract; the spine proves every segment
+  by object id with NO repair-by-substitution. Ids are minted ONCE and READ
+  twice -- never re-derived -- because a shot's beat id passes through
+  `_canonical_visual_beat_id` and an image object's does not.
+- **QA ROUND 3 (`4faabe0e`)** -- two Sonnet lenses + an operator-run panel.
+  FIVE findings judged, FOUR fixed, ONE rejected. The important one: the merge
+  inferred "no scene object and no required target means this lane consumes no
+  still" and skipped, while the spine demanded every STAMPED request back
+  regardless -- two policies over one state, and the inference did not avoid
+  the failure, it moved it to the render boundary and made the message a lie.
+  Root fix is neither side: `_lane_consumes_a_still` asks
+  `render_driver._still_spine_requires_scene`, the SPINE'S OWN predicate, at
+  the mint, so the disagreement is unconstructible. Also: the minter now
+  validates its plan (a replayed `from_dict` plan with non-dense indices minted
+  two requests carrying ONE object id, and a first segment with `index=7` minted
+  a phantom segment-0 request); `jump_still_object_id` refuses a falsy beat id
+  (all eight collapsed to one shared id); and the `OTR_TEST_MODE` receipt
+  bypass -- which skips the WHOLE spine validator -- can no longer wave a shot
+  carrying jump requests through, extracted to `_legacy_receipt_bypass_allowed`
+  so the decision has a name.
+- REJECTED, with reasons: the panel's "`build_request_from_shot` feeds every
+  segment segment-0's still" is real but is NOT chunk-4 scope -- there is no
+  per-segment render loop yet, so nothing renders segment 1. Recorded in
+  GO_FORWARD as a HARD chunk-6 carry-forward instead. Half-rejected: a cloned
+  bookend segment does drop off seed 4242, but "destroys reproducibility" is
+  wrong (request-hash seeds derive from stable inputs); what it loses is the
+  shared canonical LOOK, which is what cutting means -- now a documented
+  decision with a pin rather than a side effect.
+- Suite 6591 -> 6618 -> **6634 passed** / 27 skipped / 1 xfailed; Bible 17;
+  canonical byte-identical `5377914B` across both commits; hygiene clean.
+Current step: coverage chunk 5 (beat-session lifecycle -- reusable
+MODEL/CLIP/VAE handles, teardown in ONE outer finally, assert LOADER-call
+count). Then 6, then the 7 live slice.
+Next: CODER A -- chunk 5. Chunk 6 must resolve per-segment `init_image` BY
+OBJECT ID off the stamp, never via `_still_index`. Chunk 7 is the `ltx_8gb`
+169-frame LIVE slice and needs a selective box reset per CLAUDE.md section 4.
+Models: Claude Opus (rung 4) + 2 Sonnet QA agents + 1 operator-run panel. No
+Codex, no OpenRouter -- $0 external spend.
+Commits: 583b3ea3, 4faabe0e
+
 ## 2026-07-25 (evening) -- HEAD 00339e32 (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: closed out chunk 3b, ran TWO adversarial QA rounds over everything shipped
 today, and settled the operator's dormant-3D question with codex.

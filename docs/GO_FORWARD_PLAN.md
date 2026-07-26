@@ -1,60 +1,14 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-25 (midday) -- **THE STILL-PLANS BLOCK IS SUPERSEDED BY
-THE MULTI-CLIP COVERAGE BLOCK.** Operator reversed the "ping-pong is fine"
-ruling once the mechanism was on the table: he wants each beat covered by
-enough REAL rendered clips for moving video (chain last->first preferred, jump
-cut acceptable). TWO CODE CHUNKS LANDED AND GREEN: the route lock
-(`57f4983a`) and the lip-sync no-mirror fix (`a1d810f1`). A fresh `r1 -> r2 ->
-r3` kibitz arc is JUDGED (three judgment docs); **r4 convergence is the only
-round still owed before code.** HEAD `3bedb2fe`; suite 6454/27/1; Bible 17;
-canonical `5377914B` (untouched). See CURRENT STEP.
+**Updated:** 2026-07-26 -- **MULTI-CLIP COVERAGE CHUNK 4 IS DONE, QA'd AND
+PUSHED.** The jump-still image-phase consumer landed at `583b3ea3` and its QA
+fixes at `4faabe0e`. HEAD == origin `4faabe0e`; suite **6634 passed / 27
+skipped / 1 xfailed**; Bible 17; canonical `5377914B` (byte-identical -- no
+chunk in 1-7 touches it). **NEXT = chunk 5, the beat-session lifecycle.**
+Four stale "Updated" headers were trimmed here on 2026-07-26; their forward
+content already lives in the rescoped order, OPEN BUGS and the tombstones.
+See CURRENT STEP.
 
-**Updated:** 2026-07-25 (late) -- CODER A still-plans: **S1b LANDED @
-`69328cec`** (suite 6444 / Bible 17 / canonical `5377914B`), r4 defect sweep
-JUDGED (agy converged, codex did not), and a **NEW R1 ARC ROUND on the lean
-architecture is IN FLIGHT by operator directive**. S0b-core is GATED on that
-R1. Amended order: `S1b (DONE) -> S0b-core (+S0c same push burst) -> S2 -> S3
--> S5 -> S4`. See CURRENT STEP.
-
-**Updated:** 2026-07-25 -- CODER A still-plans: r3 panel (codex
-`gpt-5.6-sol` high + agy Gemini 3.6 Flash High) + Claude grounding.
-Chunk order corrected to S1b -> S0b-core -> S2 -> S3/S0c -> S5 -> S4.
-HEAD `79fe4d3f`; no production code touched this session.
-
-**Updated:** 2026-07-25 -- **WAN 8-GB LOW-VRAM LAUNCH CONTRACT IS DONE @
-`f914f0a4`** (first item of the rescoped order, CODER A). The 8-GB tier's
-render ceiling now travels profile -> `OTR_VideoDirector.max_render_frames`
-(appended widget, canonical ships 0 = unpinned) -> v2 policy -> ShotLock ledger
--> `render_driver.build_episode_render_policy` -> `MotionEngineBase.prepare` ->
-`eng_wan_ti2v._floor_length`, because `launch.env` can never reach a leg
-submitted to an already-booted server. Only `otr_8gb_wan` declares the new
-OPTIONAL key `video.max_render_frames`, so every other tier -- including the
-qualified 16-GB WAN lane -- is unchanged. Canonical `A66A416B` -> `5377914B`;
-11 variants + 4 paired `.env.json` hashes regenerated. Record:
-`PBUG-20260723-02`. Live 8-GB requalification leg still OWED.
-**OPERATOR BLOCK -- PER-MODEL STILL PLANS (CODER A, live).** Spec of
-record: `docs/2026-07-25-still-plans-locked-build-spec.md`; grounding:
-`docs/STILL_PLAN_SEED_INVENTORY.md`. S0a / S0a-b / S1 are LANDED, S0b is
-FILED-BLOCKED, and the build is at the S2 gate -- per-chunk detail is in
-`docs/HANDOFF_LOG.md`, not here. The 2026-07-25 r3 panel (codex
-`gpt-5.6-sol` high + agy Gemini 3.6 Flash High, both pins verified) plus
-Claude's grounding CORRECTED the plan in four ways; see CURRENT STEP.
-
-**Updated:** 2026-07-24 -- **INDEPENDENT SOURCE BANKS v1 IS DONE. All seven
-waves LANDED @ `30358ad1`; the CODER E slot is FREE.** A client authors a
-bundle under `user_packs/source_banks/<id>/`, runs
-`scripts/otr_check.py bank <path> --activate`, restarts ComfyUI, and their bank
-is a selectable peer of the shipped six: discovered and integrity-checked,
-admitted in the ONE routing authority, free to own `fetch_source` /
-`interpret_source` via the reserved `"self"` entry point, reaching the network
-only through the bounded `nodes/_otr_feed_fetch.py` seam, and handed a COMPLETE
-ledger by the shared tail's cleanup pass (`nodes/_otr_ledger_cleanup.py`).
-Wave 7 was ASSESSED, not built: the `source_bank` COMBO already reads its
-choices live from the registry and a bank's own `default_story_model` picks its
-pack, so no node, widget, link or canonical-JSON change was ever needed --
-canonical is still byte-identical at `A66A416B` after all seven waves. Suite
-6403 / Bible 17. `docs/EXTENDING_OTR.md` is the client contract of record.
 **OPERATOR RESCOPE 2026-07-24 (supersedes the older queue everywhere in this
 file):** the 45-word scene matrix, the 54-case visual-style sweep and the
 WHOLE quick-wins block are CUT -- the operator wants coding, not matrices, and
@@ -73,50 +27,34 @@ contracts. Completed work is NEVER re-described here -- it moves to
 `docs/HANDOFF_LOG.md` (history) and `docs/PROD_BUG_LOG.md` (bugs) the session
 it ships. Doctrine lives in `docs/PRODUCTION_SPRINT_LESSONS.md`.
 
-## CURRENT VERIFIED HANDOFF -- 2026-07-24
+## CURRENT VERIFIED HANDOFF -- 2026-07-26
 
-This block is the current source of truth for the overnight qualification.
 Nothing in this file is an instruction to reset, stash, delete, or overwrite
 user changes.
 
-- Branch: `v2.0-alpha`; HEAD and origin are `30358ad1` (the seven extensibility
-  waves are `66e214ec`, `cc69e683`, `84945bc4`, `c97a0e91` + `8c45172d`,
-  `1504bb4c` + `3d97a130`, `30358ad1`; the six-bank no-prose-gate retirement
-  chunk is `314dd481` below). Per-wave detail lives in
-  `docs/HANDOFF_LOG.md`. The worktree is
-  CLEAN of task-owned changes -- what remains is `tmp/` scratch (including
-  another window's modified `tmp/_chain_720.ps1`, `tmp/_rearm_gate.ps1`,
-  `tmp/_status_bake.ps1` -- PRESERVE) and untracked campaign receipts (plus
-  `config/profiles/otr_sbcov_1..6.json`, intentionally untracked
-  coverage-campaign scratch; nothing in-repo references them, and untracked
-  `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier window).
-- LANDED @ `30358ad1` (2026-07-24; suite 6403 passed / 27 skipped / 1 xfailed;
-  Bible 17; AST/JSON/BOM/zero-byte/UTF-8 clean; canonical byte-identical;
-  pushed, HEAD == origin): wave 7, CLOSED BY ASSESSMENT. The `source_bank`
-  COMBO on `OTR_LedgerScriptWriter` already reads its choices live from the
-  routing registry, and waves 1-3 already made that registry own pack
-  directories BY BANK (`_Registry.pack_dirs`), so an activated client bank is
-  selectable with no new node, widget, link or canonical change. The chunk
-  shipped the missing PROOF (three pins that an activated bundle reaches
-  `INPUT_TYPES()["optional"]["source_bank"]`, that its widget value resolves to
-  a pack inside its own bundle, and that admitting a bank leaves the canonical
-  34-slot positional widget vector untouched) and fixed the one real defect:
-  `guide_ref` had NO runtime consumer, so the `+ Add Your Own` row answered a
-  click with a dead end while its own text still claimed "the simple_4 pass
-  runner does not exist yet". `require_runnable_bank` now appends the row's
-  `guide_ref`, and that text names the folder, the CLI, the restart and
-  `docs/EXTENDING_OTR.md` (new section 6: what the client sees in ComfyUI).
-- All seven extensibility waves and their per-wave findings are recorded in
-  `docs/HANDOFF_LOG.md`; `docs/EXTENDING_OTR.md` is the landed client contract.
+- Branch: `v2.0-alpha`; HEAD and origin are `4faabe0e`. Multi-clip coverage
+  chunks 1a/1b/1c/2/3/3b/4 are all landed and pushed; per-chunk detail lives in
+  `docs/HANDOFF_LOG.md`, not here. The worktree is CLEAN of task-owned changes
+  -- what remains is `tmp/` scratch (including another window's modified
+  `tmp/_chain_720.ps1`, `tmp/_rearm_gate.ps1`, `tmp/_status_bake.ps1` --
+  PRESERVE), untracked campaign receipts, `config/profiles/otr_sbcov_1..6.json`
+  (intentionally untracked coverage-campaign scratch) and untracked
+  `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier window.
+- LANDED @ `583b3ea3` + `4faabe0e` (2026-07-25/26; suite 6591 -> 6618 -> **6634
+  passed / 27 skipped / 1 xfailed**; Bible 17; AST/BOM/zero-byte/UTF-8/ASCII
+  clean; canonical byte-identical; pushed, HEAD == origin): **coverage chunk 4,
+  the jump-still image-phase consumer**, plus its QA round. Without it a jump
+  cut had NO still -- the image phase mints one still per beat, so every
+  segment after the first would have rendered from nothing.
+- Verification: full Windows OTR suite `6634 passed, 27 skipped, 1 xfailed`;
+  Bug Bible `17 passed, 24 skipped, 3 xfailed`.
+- Canonical workflow byte-identical at SHA-256
+  `5377914B14911B7362D2516BAD3008BB6EF6ACB87C6E13C77C3D4C0D9D8A8C39`.
 - Prior root fix at `f150213f`: `nodes/_otr_video_engines/render_driver.py` requires
   an authoritative scene-target manifest only for scene/mesh-consuming shots;
   visualizer-only `viz_mxc_cpu`, `viz_mxc_mandala`, and `viz_camera` lanes may
   execute without one. Regression coverage:
   `tests/test_ledger_cleanup_contracts.py`.
-- Verification: full Windows OTR suite `6403 passed, 27 skipped, 1 xfailed`;
-  Bug Bible `17 passed, 24 skipped, 3 xfailed`.
-- Canonical workflow byte-identical at SHA-256
-  `A66A416BFBCAD127356047043C8C07637BC50CACE2CD7D4E0436C7CD80B09CB4`.
 - Live media proof: isolated `media_archive@120w` passed with `RESULT SUCCESS`,
   `obs_publish OK`, and non-zero episode/OBS assets. In the monitored run
   `tmp/six_bank_sweep_20260723_205002_331`, `original`, `public_domain`,
@@ -210,11 +148,11 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- MULTI-CLIP COVERAGE: CHUNKS 1-3b DONE, CHUNK 4 NEXT
+## CURRENT STEP -- MULTI-CLIP COVERAGE: CHUNKS 1-4 DONE, CHUNK 5 NEXT
 
-**Updated 2026-07-25 (evening), HEAD `00339e32`.** Chunks 1a/1b/1c/2/3/3b are
-LANDED, GREEN and PUSHED, plus a two-round adversarial QA that found and fixed
-NINE real defects. Suite 6454 -> **6591 passed / 27 skipped / 1 xfailed**;
+**Updated 2026-07-26, HEAD `4faabe0e`.** Chunks 1a/1b/1c/2/3/3b/**4** are
+LANDED, GREEN and PUSHED, plus three adversarial QA rounds that found and fixed
+THIRTEEN real defects. Suite 6454 -> **6634 passed / 27 skipped / 1 xfailed**;
 Bible 17; canonical byte-identical `5377914B` across every commit.
 
 | chunk | commit | what landed |
@@ -227,6 +165,27 @@ Bible 17; canonical byte-identical `5377914B` across every commit.
 | QA1 | `6dc39f1f` | 3 partitioner math defects + 2 swallowed fail-closed sites + the unproven `talking` half |
 | QA2 | `0bc863f4` | 2 MORE swallowed fail-closed sites + the dormant 3D picked-vs-effective trap |
 | 3b | `00339e32` | the `CoveragePlan` rides the ledger, validated at BOTH wire boundaries |
+| 4 | `583b3ea3` | the jump-still image-phase consumer: ShotLock mints per-segment requests, the dispatcher merges them into `objects` + `required_scene_targets`, the spine proves every one |
+| QA3 | `4faabe0e` | ONE predicate decides whether a lane owes segment stills; the minter validates its plan; the `OTR_TEST_MODE` bypass can no longer wave a jump shot through |
+
+**CHUNK 4'S DURABLE LESSON -- TWO POLICIES OVER ONE STATE IS THE DEFECT, NOT
+THE SYMPTOM.** The QA panel found the merge inferring "no scene object and no
+required target means this lane consumes no still" and skipping, while the
+spine demanded every STAMPED request back regardless. The inference did not
+avoid the failure -- it moved it to the render boundary and made the message a
+lie. The fix was neither side: it was to ask the question ONCE, at the mint,
+using `render_driver._still_spine_requires_scene` -- the spine's own predicate
+-- so the disagreement is unconstructible rather than merely caught. **When two
+places must agree about one fact, make them the same call, not two calls that
+happen to match today.**
+
+Also settled and worth not relitigating: segment stills deliberately do NOT
+wear a `scene_*` kind (both beat-keyed lookups take the LAST matching scene
+row, so a scene-kinded segment still would shadow the beat's own image and
+segment 0 would render from the LAST segment's still); and a cloned bookend
+segment deliberately drops off the fixed 4242 seed onto the request-hash seed,
+which stays reproducible -- what it loses is the shared canonical LOOK across
+its own segments, which is what cutting means.
 
 **THE QA ROUNDS ARE THE STORY OF THIS SESSION AND THE LESSON IS PORTABLE.**
 A six-lens Sonnet fan-out plus an agy pass found NINE defects in code that was
@@ -287,19 +246,22 @@ minted and the wide render centre-cropped it. `eng_ltx_av.py:345-347` had
 recorded that exact outcome verbatim. Pinned by
 `test_redirected_bookend_gets_a_WIDE_still_not_a_decapitated_portrait`.
 
-**NEXT -- chunk 4, then 5-7 in the r3 order:**
+**NEXT -- chunk 5, then 6-7 in the r3 order:**
 
-1. ~~**3b**~~ -- DONE @ `00339e32`. The `CoveragePlan` is stamped on every shot
-   row and validated at both wire boundaries (ShotLock at plan time,
-   `render_driver.assert_coverage_plans` before execution, re-checked against
-   the LIVE contract). Behaviour-inert and pinned as such: every adapter is
-   still `SINGLE_ONLY`, so every beat gets a one-segment plan. The legacy
-   `ShotRow` was NOT made authoritative (r3 judged).
-2. **4 (NEXT):** jump-still image-phase consumer (ShotLock patches jump-still requests
-   into `script_json` -> dispatcher merges into `objects` +
-   `required_scene_targets` -> the spine validates EVERY jump segment).
-   **Without this a jump cut has no still at all.**
-3. **5:** beat-session lifecycle -- reusable MODEL/CLIP/VAE handles, teardown
+1. ~~**3b**~~ -- DONE @ `00339e32`.
+2. ~~**4**~~ -- DONE @ `583b3ea3` + QA `4faabe0e`. Still behaviour-inert by
+   construction (every adapter is `SINGLE_ONLY`, so nothing jump cuts yet) and
+   pinned as such.
+   **CARRY-FORWARD INTO CHUNK 6, HARD (found by the chunk-4 QA panel, judged
+   out of chunk-4 scope because no per-segment render loop exists yet): the
+   per-segment request builder MUST resolve `init_image` BY OBJECT ID off
+   `shot["jump_still_requests"]`, never through `render_driver._still_index`.**
+   `_still_index` filters to `kind.startswith("scene_")`, and segment stills
+   deliberately do not wear a scene kind, so a per-segment loop that reuses the
+   existing lookup would hand EVERY segment segment-0's still -- silently
+   re-creating the held-frame degradation chunks 3-4 exist to remove, with the
+   correct stills sitting unused on disk.
+3. **5 (NEXT):** beat-session lifecycle -- reusable MODEL/CLIP/VAE handles, teardown
    in ONE outer `finally`, assert LOADER-call count (not `prepare` count).
    r4 settled the shape: `wrapper_bridge.run_graph` does NOT gain a
    prepared-handles parameter; the adapter owns the handles and each segment
@@ -879,7 +841,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED (see CURRENT STEP). **This session: route lock `57f4983a` + lip-sync no-mirror `a1d810f1` LANDED GREEN; r1/r2/r3 arc JUDGED.** NEXT = **r4 convergence at HEAD, then build chunks 1-7 in order** (route freeze into ShotLock -> declaration surface + roster audit -> partitioner/CoveragePlan -> jump-still image consumer -> beat-session lifecycle -> terminal transaction + assembly -> `ltx_8gb` 169-frame live slice). Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; **4060 skill is UP again** (rung 1, read-only first-pass triage); kibitz = codex `gpt-5.6-sol` high + agy | **r4 must converge at HEAD before chunk 1** | multi-day |
+| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED (see CURRENT STEP). r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1a/1b/1c/2/3/3b/4 + three QA rounds are LANDED GREEN and PUSHED (HEAD `4faabe0e`).** NEXT = **chunk 5, then 6-7 in order** (beat-session lifecycle -> terminal transaction + assembly -> `ltx_8gb` 169-frame live slice). Chunk 6 carries the HARD per-segment `init_image`-by-object-id requirement from the chunk-4 QA panel -- see CURRENT STEP. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out for QA rounds (cheap, and it has found real defects in already-green code three times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
@@ -926,10 +888,10 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-25 @ `a1d810f1`, lip-sync no-mirror):
-  full Windows suite `6454 passed / 27 skipped / 1 xfailed`; Bug Bible
+- Current whole-tree receipt (2026-07-26 @ `4faabe0e`, coverage chunk 4 + QA):
+  full Windows suite `6634 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; canonical `5377914B` (byte-identical --
-  neither code chunk this session touched a node, widget, link or schema).
+  no chunk in the coverage block touches a node, widget, link or schema).
   Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
   AST/JSON/BOM/zero-byte checks, commit, push, verify
