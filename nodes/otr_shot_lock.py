@@ -1077,10 +1077,16 @@ def _lane_consumes_a_still(shot, engine_id):
     portrait-only face lane answers False and owes no per-segment stills, which
     is why its beats may jump cut without an image phase at all.
 
-    An engine the driver cannot classify (an unimportable module, a stub) is
-    treated as still-consuming: the safe direction is to demand a still and
-    fail loudly if it is missing, never to skip minting one a render then
-    needs.
+    THE UNCLASSIFIABLE CASE NEVER ARRIVES HERE (corrected 2026-07-26, QA4).
+    An earlier draft of this docstring promised that an engine the driver
+    cannot classify is treated as still-consuming. The code does not do that,
+    and does not need to: :func:`_stamp_coverage_plan` returns before it ever
+    asks, for any id the registry does not know, so an unimportable module or
+    a stub gets NO plan and NO requests rather than a guessed still. What the
+    delegated predicate answers for an unknown id is therefore not this mint's
+    contract. The correction is the point: a docstring describing a
+    fail-closed branch that does not exist is worse than no docstring, because
+    the next reader trusts it and stops looking.
     """
     try:
         from ._otr_video_engines.render_driver import (  # type: ignore

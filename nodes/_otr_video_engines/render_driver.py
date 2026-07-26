@@ -3068,11 +3068,19 @@ def resolve_final_shot_engines(ledger):
     silent, because a fallback nobody can see is how the original defect hid.
     """
     # The coverage plans are validated on BOTH paths -- a hand-built ledger
-    # that carries a plan is held to it just as a frozen one is (chunk 3b).
+    # that carries a plan is held to it just as a frozen one is (chunk 3b) --
+    # but ALWAYS AFTER the route is final (2026-07-26 QA4). On the frozen path
+    # the route arrived final, so the check runs immediately. On the legacy
+    # path it must WAIT for the two mutations below: a plan stamped for the
+    # PICKED engine and validated before the force map or the radio-host
+    # redirect swaps it is a plan checked against an engine that does not
+    # render the beat -- the same ordering defect this function's own
+    # docstring exists to close for the still spine, one contract further
+    # down. Checking early is not merely useless there, it is a false
+    # receipt: it reports COVERAGE PLANS OK for routing that no longer holds.
     if assert_frozen_route(ledger):
         assert_coverage_plans(ledger)
         return ledger
-    assert_coverage_plans(ledger)
     _LOG.debug(
         "[OTR.render_driver] no frozen route on this ledger (legacy / "
         "hand-built / soak path) -- resolving the effective engines here, as "
@@ -3081,6 +3089,7 @@ def resolve_final_shot_engines(ledger):
     for shot in ((ledger.get("video") or {}).get("shots") or []):
         if isinstance(shot, dict):
             _enforce_radio_is_host(shot)
+    assert_coverage_plans(ledger)
     return ledger
 
 

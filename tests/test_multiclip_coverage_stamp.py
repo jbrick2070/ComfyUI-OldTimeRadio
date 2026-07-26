@@ -196,3 +196,33 @@ def test_end_to_end_shotlock_to_render_boundary():
     _groups, shots = sl.build_execution_plan(beats, _budget(beats), {}, _policy())
     ledger = {"video": {"shots": shots}}
     assert rd.assert_coverage_plans(ledger) == len(shots)
+
+
+def test_the_legacy_path_validates_the_plan_against_the_FINAL_engine(monkeypatch):
+    """Resolve the route FIRST, then hold the plan to it (2026-07-26, QA4).
+
+    The legacy branch used to call ``assert_coverage_plans`` BEFORE
+    ``apply_engine_override`` and the radio-host redirect, so a plan stamped
+    for the PICKED engine was validated against that engine and then executed
+    by a DIFFERENT one -- the ordering defect chunk 1c closed for the still
+    spine, reintroduced one contract further down inside the very function
+    that closed it. Checking early is worse than not checking: it writes
+    COVERAGE PLANS OK for routing that no longer holds.
+    """
+    plan = cp.partition_beat(50, fc.SINGLE_ONLY)
+    ledger = _ledger_with(plan.to_dict())        # no roles_effective == legacy
+    assert rd.frozen_route_from_ledger(ledger) == {}
+    # The plan IS legal for the picked engine -- so an early check passes, and
+    # that is exactly what made the old order look correct.
+    assert rd.assert_coverage_plans(ledger) == 1
+
+    forced = vreg.get_engine("ltx_video")
+    narrow = fc.FrameContract(min_frames=9, max_frames=161, quantum=8)
+    monkeypatch.setattr(forced, "frame_contract", lambda: narrow, raising=False)
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx_video")
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+
+    with pytest.raises(rd.RenderError, match="cannot execute"):
+        rd.resolve_final_shot_engines(ledger)
+    # The force ran first: the refusal names the engine that actually renders.
+    assert ledger["video"]["shots"][0]["engine_id"] == "ltx_video"

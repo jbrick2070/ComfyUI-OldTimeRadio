@@ -242,3 +242,29 @@ def test_no_engine_registered_without_a_capabilities_row():
 
 def test_audit_is_pure():
     assert vreg.audit_engine_roster() == vreg.audit_engine_roster()
+
+
+def test_a_still_LANE_never_opts_in_to_multi_clip():
+    """``still_*`` lanes are ONE still -- operator directive, 2026-07-25.
+
+    Guardrail landed BEFORE the first opt-in (2026-07-26, QA4). Once adapters
+    may declare ``supports_multi_clip=True``, neither ``FrameContract`` nor
+    the partitioner can tell a still lane from a moving-video one -- a
+    contract copy-pasted onto ``still_pan`` would let the partitioner split it
+    and the minter mint a second still for a lane that owns exactly one. The
+    invariant holds vacuously today; this is what keeps it holding once it
+    stops being vacuous.
+    """
+    still_lanes = [n for n in vreg.all_engine_names() if n.startswith("still_")]
+    # A sweep over an empty roster asserts nothing. Pin that it is not empty --
+    # two "exhaustive" sweeps in this build turned out to be theatre.
+    assert still_lanes, "no still_* engines in the roster: this sweep is theatre"
+    offenders = []
+    for name in still_lanes:
+        try:
+            engine = vreg.get_engine(name)
+        except Exception:  # noqa: BLE001 -- unbuildable engines are not our subject
+            continue
+        if fc.supports_multi_clip(engine):
+            offenders.append(name)
+    assert offenders == []
