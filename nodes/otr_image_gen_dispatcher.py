@@ -546,9 +546,9 @@ def merge_jump_still_requests(ledger, objects, required_scene_targets):
         genuinely ambiguous and multi-clip mesh lanes are out of scope,
       * more than one candidate scene object for one beat,
       * a malformed request row, or an id that already exists,
-    all RAISE. A beat with no scene object AND no required target is a
-    visualizer lane that consumes no still at all; its segments need none
-    either, and that is reported rather than silently dropped.
+    all RAISE. There is no skip branch: whether a lane consumes a still at all
+    is decided ONCE at the mint, by the still spine's own predicate, so a
+    still-less visualizer lane never reaches here carrying requests.
 
     Returns ``(objects, required_scene_targets, report_lines)``; the inputs are
     never mutated.
@@ -621,22 +621,46 @@ def merge_jump_still_requests(ledger, objects, required_scene_targets):
                 "like. NO GUESS." % beat)
         base = scene_by_beat.get(beat)
         if base is None:
-            if beat in required_beats:
-                raise ImageRenderError(
-                    "beat %s owes a jump-segment still (%s) but the image "
-                    "phase minted no scene still to derive it from, while the "
-                    "beat's own still IS required. A jump cut with no still "
-                    "renders from nothing. NO FALLBACK." % (beat, oid))
-            report.append(
-                "jump-still: beat %s consumes no scene still (no required "
-                "target); segment %d needs none" % (beat, segment))
-            continue
+            # NO SILENT SKIP (2026-07-25 QA fix). This branch used to infer
+            # "no scene object and no required target means the lane consumes
+            # no still, so its segments need none" and drop the requests. That
+            # inference contradicted the still spine, which demands every
+            # STAMPED request back regardless -- so the episode died at the
+            # render boundary instead, with a message about a missing still
+            # nobody had decided to skip. The inference now happens ONCE, at
+            # the mint (``otr_shot_lock._lane_consumes_a_still``), using the
+            # spine's own predicate, so a still-less lane never carries
+            # requests to begin with. Arriving here therefore means the stamp
+            # and the image payload genuinely disagree about one beat, and
+            # guessing which is right is how a jump cut ends up rendering from
+            # nothing.
+            raise ImageRenderError(
+                "beat %s owes a jump-segment still (%s, segment %d) but the "
+                "image phase minted no scene still to derive it from%s. A jump "
+                "cut with no still renders from nothing. NO FALLBACK."
+                % (beat, oid, segment,
+                   "" if beat in required_beats
+                   else " -- and the beat is absent from required_scene_targets"
+                        ", so the stamp and the image payload disagree about "
+                        "whether this lane consumes a still at all"))
         if oid in existing_ids:
             raise ImageRenderError(
                 "jump-segment still %s already exists in the image payload; "
                 "refusing an ambiguous duplicate object." % oid)
         clone = dict(base)
         clone["object_id"] = oid
+        # THE FIXED-SEED LANES LOSE THEIR FIXED SEED HERE, DELIBERATELY.
+        # ``resolve_object_seed`` pins seed 4242 for ``kind == "scene_open"``
+        # and for the radio-face object ids, so that the BOOKEND is one
+        # canonical image run to run. Rewriting the kind and the id drops a
+        # segment out of both pins and onto the request-hash seed. That is the
+        # correct answer for a jump CUT -- segment 1 must not be segment 0's
+        # frame again -- and it does NOT cost reproducibility: the request-hash
+        # seed is derived from (request_seed, object_id, prompt_hash), all
+        # stable, so the same episode re-renders the same segment stills. What
+        # a bookend loses is only the shared canonical LOOK across its own
+        # segments, which is what cutting means. Stated because it was a side
+        # effect of the kind rewrite before it was a decision.
         clone["kind"] = _cp.JUMP_STILL_KIND
         clone["beat_id"] = beat
         clone["segment_index"] = segment

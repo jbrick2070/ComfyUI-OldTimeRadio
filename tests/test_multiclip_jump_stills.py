@@ -263,17 +263,37 @@ def test_two_candidate_scene_stills_for_one_beat_is_TERMINAL():
         gd.merge_jump_still_requests(_request_ledger(), ambiguous, _targets())
 
 
-def test_a_lane_that_consumes_no_still_needs_no_segment_stills():
-    """A visualizer beat: no scene object AND no required target.
+def test_a_stamp_the_image_payload_cannot_serve_is_TERMINAL():
+    """THE MERGE HAS NO SKIP BRANCH (2026-07-25 QA fix).
 
-    Reported rather than silently dropped -- the distinction between "this lane
-    genuinely needs none" and "the still went missing" is the required-target
-    receipt, not a guess.
+    It used to infer "no scene object and no required target means this lane
+    consumes no still" and drop the requests. The still spine demands every
+    STAMPED request back regardless, so that inference did not avoid the
+    failure -- it moved it to the render boundary and made the message a lie.
+    Whether a lane consumes a still is now decided once, at the mint; a stamp
+    arriving here that the payload cannot serve means the two genuinely
+    disagree, and picking a winner is how a jump cut renders from nothing.
     """
-    objects, targets, report = gd.merge_jump_still_requests(
-        _request_ledger(), [], [])
-    assert objects == [] and targets == []
-    assert report and "consumes no scene still" in report[0]
+    with pytest.raises(gd.ImageRenderError, match="disagree"):
+        gd.merge_jump_still_requests(_request_ledger(), [], [])
+
+
+def test_shotlock_never_stamps_a_lane_that_consumes_no_still(monkeypatch):
+    """The root fix: the contradiction is unconstructible, not merely caught.
+
+    An audio-reactive visualizer takes no init image, so its beats may jump cut
+    with no image phase at all -- and the mint asks the SPINE'S OWN predicate,
+    so the mint and the demand cannot drift apart.
+    """
+    _use_contract(monkeypatch, JUMP_CONTRACT, engine_id="viz_mxc_cpu")
+    beats = _beats()
+    _groups, shots = sl.build_execution_plan(
+        beats, _budget(beats, frames=99), {}, _policy(engine="viz_mxc_cpu"))
+    plan = cp.CoveragePlan.from_dict(shots[0]["coverage_plan"])
+    assert plan.join_mode == cp.JOIN_JUMP and plan.segment_count == 3
+    assert "jump_still_requests" not in shots[0]
+    # ...and the spine agrees it owes nothing, which is the whole point.
+    assert not sl._lane_consumes_a_still(shots[0], "viz_mxc_cpu")
 
 
 def test_a_malformed_request_stamp_is_TERMINAL():
@@ -465,3 +485,113 @@ def test_end_to_end_shotlock_to_dispatcher_to_spine(tmp_path, monkeypatch):
     proven = [row["path"] for row in receipt["validated"]
               if row["kind"] == cp.JUMP_STILL_KIND]
     assert len(proven) == len(stamped) == 2
+
+
+# ---------------------------------------------------------------------------
+# QA round 3 -- what the fan-out found, pinned so it cannot come back
+# ---------------------------------------------------------------------------
+
+def test_a_replayed_plan_with_non_dense_indices_cannot_mint_one_id_twice():
+    """Two segments, ONE object id -- they would share a still.
+
+    ``CoveragePlan.from_dict`` reconstructs whatever it is handed, so a
+    replayed or hand-edited ledger reaches the minter with a plan that never
+    passed a validator. Trusting each segment's raw ``.index`` positionally
+    made that silent.
+    """
+    broken = cp.CoveragePlan(30, cp.JOIN_JUMP, (
+        cp.CoverageSegment(0, 10), cp.CoverageSegment(2, 10),
+        cp.CoverageSegment(2, 10)))
+    with pytest.raises(cp.CoveragePlanError, match="dense and ascending"):
+        cp.jump_still_requests(broken, "b001")
+
+
+def test_a_plan_whose_first_segment_is_not_index_zero_mints_no_phantom():
+    """A ``segment_index=0`` request would orphan the beat's own still."""
+    broken = cp.CoveragePlan(30, cp.JOIN_JUMP, (
+        cp.CoverageSegment(7, 10), cp.CoverageSegment(0, 10),
+        cp.CoverageSegment(1, 10)))
+    with pytest.raises(cp.CoveragePlanError):
+        cp.jump_still_requests(broken, "b001")
+
+
+def test_an_unknown_join_mode_is_TERMINAL_not_silently_nothing_owed():
+    broken = cp.CoveragePlan(30, "chainn", (cp.CoverageSegment(0, 30),))
+    with pytest.raises(cp.CoveragePlanError, match="unknown join_mode"):
+        cp.jump_still_requests(broken, "b001")
+
+
+def test_an_empty_plan_is_TERMINAL_not_silently_nothing_owed():
+    with pytest.raises(cp.CoveragePlanError, match="no segments"):
+        cp.jump_still_requests(cp.CoveragePlan(30, cp.JOIN_JUMP, ()), "b001")
+
+
+@pytest.mark.parametrize("falsy", [None, 0, False, "", 0.0, [], (), {}])
+def test_every_falsy_beat_id_refuses_rather_than_collapsing_to_one_id(falsy):
+    """All eight used to mint the same ``jumpstill__s7``.
+
+    Two different beats sharing one still id is the collision the whole
+    read-never-re-derive design exists to prevent.
+    """
+    with pytest.raises(cp.CoveragePlanError, match="beat_id"):
+        cp.jump_still_object_id(falsy, 7)
+
+
+def test_a_cloned_bookend_segment_leaves_the_fixed_seed_DELIBERATELY():
+    """The radio bookend pins seed 4242 so it is ONE canonical image.
+
+    A jump segment must not be that same image again, so it drops onto the
+    request-hash seed -- and stays reproducible, because that seed is derived
+    from stable inputs. Pinned because it was a side effect of rewriting the
+    ``kind`` before it was a decision.
+    """
+    base = _objects(kind="scene_open")
+    targets = _targets(kind="scene_open")
+    objects, _t, _r = gd.merge_jump_still_requests(
+        _request_ledger(), base, targets)
+    segment = [obj for obj in objects if obj["kind"] == cp.JUMP_STILL_KIND][0]
+    base_seed = gd.resolve_object_seed({}, base[0]["object_id"],
+                                       base[0]["prompt_hash"], kind="scene_open")
+    segment_seed = gd.resolve_object_seed({}, segment["object_id"],
+                                          segment["prompt_hash"],
+                                          kind=segment["kind"])
+    assert base_seed == 4242
+    assert segment_seed != base_seed
+    # Deterministic, not random: the same episode re-renders the same still.
+    assert segment_seed == gd.resolve_object_seed(
+        {}, segment["object_id"], segment["prompt_hash"], kind=segment["kind"])
+
+
+def test_the_legacy_TEST_MODE_bypass_never_waves_a_jump_shot_through(
+        tmp_path, monkeypatch):
+    """The bypass predates chunk 4 and skips the WHOLE spine validator.
+
+    When chunk 4 put the per-segment checks inside that validator, the bypass
+    silently grew to cover them -- a fixture exercising the multi-clip handoff
+    would be waved through the one gate that proves it. A shot carrying
+    requests is now categorically ineligible.
+    """
+    from nodes import otr_video_render_batch as vrb
+    monkeypatch.setenv("OTR_TEST_MODE", "1")
+
+    # A legacy fixture with no receipt and no jump requests earns the bypass...
+    legacy = _spine_ledger(tmp_path)
+    legacy["images"].pop("required_scene_targets")
+    legacy["video"]["shots"][0].pop("jump_still_requests")
+    assert vrb._legacy_receipt_bypass_allowed(legacy) is True
+
+    # ...and the SAME fixture carrying per-segment requests does not.
+    jumping = _spine_ledger(tmp_path)
+    jumping["images"].pop("required_scene_targets")
+    assert jumping["video"]["shots"][0]["jump_still_requests"]
+    assert vrb._legacy_receipt_bypass_allowed(jumping) is False
+
+
+def test_the_bypass_is_test_mode_only(tmp_path, monkeypatch):
+    """Production never skips the spine, receipt or no receipt."""
+    from nodes import otr_video_render_batch as vrb
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    legacy = _spine_ledger(tmp_path)
+    legacy["images"].pop("required_scene_targets")
+    legacy["video"]["shots"][0].pop("jump_still_requests")
+    assert vrb._legacy_receipt_bypass_allowed(legacy) is False

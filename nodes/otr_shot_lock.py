@@ -1067,6 +1067,31 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
             "request to an engine)" % (effective_engine, fam, missing))
 
 
+def _lane_consumes_a_still(shot, engine_id):
+    """Does this shot's lane take a scene still at all? (2026-07-25, chunk 4.)
+
+    DELEGATES to ``render_driver._still_spine_requires_scene`` on purpose: that
+    is the predicate the still spine uses to DEMAND a beat's still back, so
+    asking it here means the mint and the demand are the same decision rather
+    than two that can drift apart. An audio-reactive visualizer or a
+    portrait-only face lane answers False and owes no per-segment stills, which
+    is why its beats may jump cut without an image phase at all.
+
+    An engine the driver cannot classify (an unimportable module, a stub) is
+    treated as still-consuming: the safe direction is to demand a still and
+    fail loudly if it is missing, never to skip minting one a render then
+    needs.
+    """
+    try:
+        from ._otr_video_engines.render_driver import (  # type: ignore
+            _still_spine_requires_scene, engine_family)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines.render_driver import (  # type: ignore
+            _still_spine_requires_scene, engine_family)
+    family = engine_family(engine_id, str(shot.get("family") or ""))
+    return bool(_still_spine_requires_scene(shot, engine_id, family))
+
+
 def _stamp_coverage_plan(shot, beat_id):
     """Attach this beat's durable ``coverage_plan`` to its shot row (chunk 3b).
 
@@ -1089,6 +1114,18 @@ def _stamp_coverage_plan(shot, beat_id):
     the first owes the image phase its own still. They are minted HERE, where
     ``beat_id`` is authoritative rather than re-derived, and stamped durably so
     the image dispatcher and the still spine can READ the ids.
+
+    ONLY FOR A LANE THAT ACTUALLY CONSUMES A STILL (2026-07-25 QA fix). The
+    question is asked with ``render_driver._still_spine_requires_scene`` -- the
+    SAME predicate the spine will use to demand the stills back. That identity
+    is the point. Minting unconditionally created a contradiction with a real
+    failure: for an audio-reactive visualizer beat (no scene object, no
+    required target) the image dispatcher correctly concluded the lane needs no
+    still and skipped, while the spine still demanded every stamped request and
+    raised ``RenderError`` before the first render. Two policies over one state,
+    whichever fires first wins -- the defect shape this build exists to remove.
+    One predicate, asked at the mint, and the disagreement cannot be
+    constructed.
     """
     target = int(shot.get("target_frame_count") or 0)
     if target < 1:
@@ -1113,6 +1150,8 @@ def _stamp_coverage_plan(shot, beat_id):
     plan = _cp.partition_beat(target, contract)
     _cp.validate_coverage_plan(plan, contract)
     shot["coverage_plan"] = plan.to_dict()
+    if not _lane_consumes_a_still(shot, engine_id):
+        return
     requests = _cp.jump_still_requests(
         plan, beat_id,
         role=str(shot.get("role") or ""),

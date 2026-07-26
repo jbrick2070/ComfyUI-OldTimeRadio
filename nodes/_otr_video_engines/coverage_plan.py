@@ -467,9 +467,19 @@ JUMP_STILL_ID_PREFIX = "jumpstill_"
 
 
 def jump_still_object_id(beat_id, segment_index) -> str:
-    """The durable object id of one jump segment's still. Pure."""
-    return "%s%s_s%d" % (JUMP_STILL_ID_PREFIX, str(beat_id or ""),
-                         int(segment_index))
+    """The durable object id of one jump segment's still. Pure.
+
+    REFUSES an empty beat id rather than minting one (2026-07-25 QA): every
+    falsy beat_id -- ``None``, ``0``, ``False``, ``""`` -- would otherwise
+    collapse to the same ``jumpstill__sN``, so two different beats would share
+    one still and neither would be what its segment planned for.
+    """
+    beat = str(beat_id or "")
+    if not beat:
+        raise CoveragePlanError(
+            "a jump-segment still id needs a beat_id; %r would collapse to an "
+            "id shared by every other unkeyed beat" % (beat_id,))
+    return "%s%s_s%d" % (JUMP_STILL_ID_PREFIX, beat, int(segment_index))
 
 
 def jump_still_requests(plan, beat_id, *, role="", engine_id="", char_id=""):
@@ -481,8 +491,24 @@ def jump_still_requests(plan, beat_id, *, role="", engine_id="", char_id=""):
     so minting a second still for it would orphan the first.
 
     Returns plain JSON-safe dicts because they ride the durable ledger.
+
+    THE PLAN IS VALIDATED BEFORE ANYTHING IS MINTED (2026-07-25 QA). This is a
+    boundary like every other in this module, and it is reached with plans that
+    did NOT come straight from :func:`partition_beat` -- a replayed ledger, a
+    hand-built fixture, an older revision -- via
+    :meth:`CoveragePlan.from_dict`, which reconstructs whatever it is handed
+    without checking it. Trusting ``segments[1:]`` and each segment's raw
+    ``.index`` positionally meant a plan with non-dense indices minted TWO
+    requests carrying ONE object id (two segments, one still), a plan whose
+    first segment had ``index=7`` minted a phantom ``segment_index=0`` request
+    for the still segment 0 already owns, and an unknown ``join_mode`` string
+    answered "nothing owed" silently -- which is the exact outcome this chunk
+    exists to make impossible.
     """
-    if plan is None or plan.join_mode != JOIN_JUMP or not plan.is_multi_clip:
+    if plan is None:
+        return ()
+    validate_coverage_plan(plan, None)
+    if plan.join_mode != JOIN_JUMP or not plan.is_multi_clip:
         return ()
     beat = str(beat_id or "")
     if not beat:

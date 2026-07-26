@@ -23,6 +23,37 @@ import os
 log = logging.getLogger("OTR")
 
 
+def _legacy_receipt_bypass_allowed(ledger):
+    """May this ledger skip the still-spine validator entirely? Pure.
+
+    The bypass exists for a small number of legacy CPU-only render-driver
+    fixtures that use synthetic ``X:\\`` paths and predate the image-dispatch
+    receipt. They do not exercise the production handoff, dedicated contract
+    tests cover the validator, and production (``OTR_TEST_MODE`` unset) stays
+    fail-closed.
+
+    A SHOT THAT OWES PER-SEGMENT STILLS IS CATEGORICALLY INELIGIBLE
+    (2026-07-25 QA fix, chunk 4). This bypass skips the WHOLE validator, so
+    when chunk 4 added the per-segment jump-still checks inside that same
+    validator, the bypass silently grew to cover them too -- nobody decided
+    that. A fixture carrying ``jump_still_requests`` is by definition
+    exercising the multi-clip handoff, which is exactly the thing that must not
+    be waved through the one gate that proves it.
+
+    Extracted from an inline condition so the decision has a name, and so a
+    test can pin it directly rather than by inference.
+    """
+    if os.environ.get("OTR_TEST_MODE", "0") != "1":
+        return False
+    images = ledger.get("images") if isinstance(ledger, dict) else None
+    if isinstance(images, dict) and isinstance(
+            images.get("required_scene_targets"), list):
+        return False
+    shots = ((ledger or {}).get("video") or {}).get("shots") or ()
+    return not any(isinstance(shot, dict) and shot.get("jump_still_requests")
+                   for shot in shots)
+
+
 def _build_render_engines_payload(manifest, vram_peak_mb):
     """Pure: the ``meta.render_engines`` payload. Preserves the existing keys
     (histogram / video_revision / by_role / vram_peak_mb) and ADDS the S-E5
@@ -312,12 +343,7 @@ class OTRVideoRenderBatch:
         # against one engine and rendered on another. Resolve first, validate
         # against the truth. Idempotent; run_real_episode calls it again.
         ledger = _rd.resolve_final_shot_engines(ledger)
-        _images = ledger.get("images") if isinstance(ledger, dict) else None
-        _has_target_receipt = (
-            isinstance(_images, dict)
-            and isinstance(_images.get("required_scene_targets"), list)
-        )
-        if os.environ.get("OTR_TEST_MODE", "0") == "1" and not _has_target_receipt:
+        if _legacy_receipt_bypass_allowed(ledger):
             # A small number of legacy CPU-only render-driver fixtures use
             # synthetic X:/ paths and predate the image-dispatch receipt. They
             # do not exercise the production handoff; the dedicated contract
