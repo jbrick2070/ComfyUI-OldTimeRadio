@@ -98,7 +98,11 @@ Next: CODER A -- 6c. Every seam it needs is landed and tabulated in
 GO_FORWARD's CURRENT STEP; do not re-invent them. Chunk 7 must also carry the
 three grounded requirements now written down there (static FrameContract, a
 declared `session_identity`, and NO ping-pong CLIP-FILL on a coverage-planned
-segment).
+segment). This whole session ran REMOTE (cloud Cowork), so GO_FORWARD's Window
+packing now carries a "REMOTE / cloud Cowork session" block: file tools hit the
+container not Windows, the `/mnt/user-data/uploads/` snapshot LAGS and must
+never be read, the bridge can drop mid-edit, and the suite needs a detached
+launch because of the 60s call ceiling.
 Models: Claude Opus (rung 4) + 4 Sonnet QA lenses + 2 agy panels (rung 2, $0).
 No Codex, no OpenRouter -- $0 external spend.
 Commits: b0e383f5, 4fa992e6, 451309de, 3a76c47a, a888c423, a818b5d1

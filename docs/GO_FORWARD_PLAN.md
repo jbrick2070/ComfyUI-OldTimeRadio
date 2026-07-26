@@ -884,7 +884,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED (see CURRENT STEP). r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1a/1b/1c/2/3/3b/4/5/6a/6b + five QA rounds are LANDED GREEN and PUSHED (HEAD `a888c423`).** NEXT = **6c (the per-segment render loop + the terminal transaction inside it), then 6d (transactional assembly), then 7** (`ltx_8gb` opt-in + the 169-frame live slice). The seams 6c must use are landed and tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
+| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED (see CURRENT STEP). r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1a/1b/1c/2/3/3b/4/5/6a/6b + six QA rounds are LANDED GREEN and PUSHED (HEAD `a818b5d1`).** NEXT = **6c (the per-segment render loop + the terminal transaction inside it), then 6d (transactional assembly), then 7** (`ltx_8gb` opt-in + the 169-frame live slice). The seams 6c must use are landed and tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
@@ -892,6 +892,32 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | ~~CODER E~~ | independent client-authored source banks v1 -- **ALL SEVEN WAVES DONE @ `30358ad1`**; slot RETIRED, do not reopen (deferred power-user tiers are a NEW block, not this one) | -- | -- | -- |
 | CODER F | **r3 + r4 arc per block FIRST**, then Randomizer A -> `dynamic_story`. For `dynamic_story` the arc is WIRING ONLY -- rev-5's design stays FINAL, do not rerun the design panels. | Claude codes + judges; kibitz = codex + agy | after D; NO code before r4 converges at HEAD | ~6-11 d |
 | CODER G "lean-mean tail" | **FULL `r2 -> r3 -> r4` arc FIRST, run HERE and not earlier** (every block before this one edits the writer this block splits), then SW1-SW3, C6, C7, W8 | Claude; kibitz = codex + agy; Fable single final epoch gate | after F; NO split before r4 converges at HEAD | multi-day |
+
+### If the window is a REMOTE / cloud Cowork session -- READ THIS FIRST
+
+Learned the hard way 2026-07-26. A Cowork session running IN THE CLOUD is not
+the same box as the repo, and two of CLAUDE.md's assumptions do not hold:
+
+- **Read/Write/Edit hit the CONTAINER, not the Windows files.** CLAUDE.md
+  section 1 ("the file tools are your primary editor") is written for an
+  on-computer session. In a remote window every read, edit and write goes
+  through Desktop Commander against
+  `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio`, and so
+  does git, the venv python and pytest. Everything else in CLAUDE.md holds.
+- **There is a LAGGING Linux snapshot at `/mnt/user-data/uploads/`.** Never
+  read the repo through it, and say so explicitly to every subagent: a prior
+  session's agents reported phantom corruption from that mount. Every quote in
+  a review must come from a Desktop Commander read of the Windows path.
+- **The bridge can drop mid-edit.** It did, once, for a few minutes. If the
+  `mcp__remote-devices__*` tools vanish, STOP -- do not retry in a loop and do
+  not leave a half-applied edit. Report what is on disk, uncommitted, and wait.
+  Nothing was lost when this happened because the last green chunk was already
+  pushed, which is the actual argument for pushing every chunk.
+- **The 60s MCP call ceiling.** The full suite takes ~110s, so launch it
+  detached (`Start-Process -FilePath 'powershell' -ArgumentList ...
+  -WindowStyle Hidden`) writing to a `tmp/` log + a `.done` marker, then poll.
+  PowerShell `*>` redirection writes UTF-16, so read results with
+  `Select-String`, not by eyeballing the raw file.
 
 Kickoff lines (paste as the FIRST message of the new window; swap the letter):
 
