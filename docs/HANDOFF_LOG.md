@@ -3,6 +3,64 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-26 15:40 -- HEAD 095be05b (v2.0-alpha) -- WINDOW CODER A, SESSION 3c
+Did: closed the identity lie on BOTH remaining channels, with the operator's
+  fan-out-BEFORE-and-AFTER discipline on each. 823b9929 routed _ckpt_path /
+  _t5_path through _loader_token_path so the SINGLE-CLIP gate (assert_usable)
+  and the multi-segment gate (session_identity) can no longer disagree about
+  which file is the checkpoint. 095be05b made a *_DIR override that the LOADER
+  cannot see terminal -- ComfyUI resolves the graph's bare basename through
+  folder_paths, and *_DIR never touched that channel, so it has never changed
+  which weights render.
+Current step: B1b -- hoist the loaders into prepare().
+Next: B1b, then B3+B4, B5+B6, prequalify 512x288, 7d. CODER A.
+Models: Claude + 2 kibitz rounds (codex gpt-5.6-sol + agy Gemini 3.6 Flash High)
+  + 2 Sonnet lenses + 1 Fable pass. $0 external.
+Commits: 823b9929, 095be05b. Judgment:
+  docs/2026-07-26-dir-override-arc-judgment.md.
+
+### Detail
+
+**THE PRE-CODE PANEL KILLED MY OWN PROPOSAL, TWICE.** For the single-clip gap I
+proposed routing `assert_usable` through `resolve_session_config`. The panel
+showed that would have silently dropped the 4 GiB checkpoint integrity floor --
+the resolver has no size check at all, and the floor had ZERO test coverage, so
+nothing would have failed. The shipped fix delegates only the RESOLUTION and
+leaves `assert_usable`'s body untouched, which keeps the floor alive by
+construction rather than by remembering to port it.
+
+For the `*_DIR` arc the panel supplied the evidence that scoped the change:
+`tests/test_wan_loader_preflight.py` says in its own docstring that the `*_DIR`
+envs are its MOCK SEAM for a box with no ComfyUI runtime. So the Wan adapters
+carry the identical lie but cannot be fixed until those fixtures migrate --
+`wan_shared` took an ADDITIVE split only (`_resolve_model_file_by_token` out,
+`_resolve_model_file` still calling it), and a control mutation proves Wan's
+DIR-wins precedence survived. The panel also refuted the obvious alternative,
+registering the folder from preflight via `folder_paths.add_model_folder_path`:
+ComfyUI ships no unregister, so a CHECK would have permanently mutated global
+process state for every later engine on the same server.
+
+**THE POST-CODE PANEL CAUGHT A DECORATIVE TEST OF MINE.** The `*_DIR` test that
+pins WHICH guard runs first pointed both env vars at the same decoy file. That
+makes the explicit guard's condition trivially false, so the test would have
+passed under the very branch swap it claimed to detect -- green, well-named, and
+proving nothing. Fixed with a third distinct decoy, and a new mutation that
+performs a REAL precedence swap now fails it. Two independent lenses (Sonnet,
+agy) also converged, without seeing each other, on three messages whose own
+remediation advice ("fix OTR_LTX_8GB_T5_DIR", "or set OTR_LTX_8GB_CKPT") led the
+operator straight into the new refusal. All three now name
+`extra_model_paths.yaml`, the channel that actually reaches the loader.
+
+**Mutation proof: 8 mutants, 0 control breaks** (`tmp/_kbA_dir_mutate.py`,
+baseline asserted failed=0 first so a blind harness cannot pass silently). Two
+of the eight name CONTROLS as their target, which is what proves the controls
+have teeth rather than merely being green.
+
+**Still open, deliberately:** the Wan adapters' copy of both lies (blocked on
+their fixtures); no test creates a real NTFS junction; live-box confirmation
+that `extra_model_paths.yaml` folders come back from `folder_paths.get_full_path`
+in-process.
+
 ## 2026-07-26 12:05 -- HEAD fdeee600 (v2.0-alpha) -- WINDOW CODER A, SESSION 3b
 Did: ran the POST-CODE QA fan-out that should have run before the session-3
   pushes and did not -- operator caught the omission. codex gpt-5.6-sol + agy

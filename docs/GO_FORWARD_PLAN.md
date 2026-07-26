@@ -1,8 +1,17 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-26 (remote Cowork, CODER A session 3) -- **TWO KIBITZ ARCS
-JUDGED AND THREE GREEN CHUNKS PUSHED. HEAD == origin `582dfbd8`; suite 7023
+**Updated:** 2026-07-26 (remote Cowork, CODER A session 3) -- **THREE KIBITZ
+ARCS JUDGED AND EIGHT GREEN CHUNKS PUSHED. HEAD == origin `095be05b`; suite 7071
 passed / 27 skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
+
+**THE DISCIPLINE THAT PAID:** the operator required a fan-out BEFORE each fix as
+well as after. Before the single-clip fix it killed MY OWN proposal (a wholesale
+delegation would have dropped the 4 GiB checkpoint floor); before the `*_DIR`
+fix it produced the evidence that scoped the change (the Wan suites use `*_DIR`
+as their mock seam) and refuted the register-the-folder design (ComfyUI ships no
+unregister). After each fix it found real defects in already-green code --
+including one of my own tests that was DECORATIVE: it claimed to detect a branch
+swap and would have passed under one.
 
 **THE HEADLINE: O1 (the canvas) WAS NEVER THE ONLY 7d BLOCKER.**
 `session_identity` appeared in exactly ONE file (`beat_session.py`) and NO
@@ -191,13 +200,16 @@ or block an episode. Same-story LLM cleanup is allowed.
 
 ## CURRENT STEP -- **B1b: HOIST THE LOADERS** (8 GB -> 1080p build)
 
-**HEAD == origin `582dfbd8`.** Suite 7023 / Bible 17 / canonical `9872624A`.
-Authorities, read BOTH first: `docs/2026-07-26-8gb-1080p-arc-judgment.md`
-(the architecture) and `docs/2026-07-26-o1-canvas-arc-judgment.md` (the canvas
-seam + the five channels). They supersede the 7b judgment's O1/O4 framing.
+**HEAD == origin `095be05b`.** Suite 7071 / Bible 17 / canonical `9872624A`.
+Authorities, read ALL THREE first: `docs/2026-07-26-8gb-1080p-arc-judgment.md`
+(the architecture), `docs/2026-07-26-o1-canvas-arc-judgment.md` (the canvas
+seam + the five channels) and `docs/2026-07-26-dir-override-arc-judgment.md`
+(which env channels can and cannot reach a loader). They supersede the 7b
+judgment's O1/O4 framing.
 
-**DONE:** B1a `8caf3516`, B2a `55c8a811`, B2b `582dfbd8`, plus the POST-CODE QA
-fixes `ea1652f9` / `f33c5e15` / `fdeee600`.
+**DONE:** B1a `8caf3516`, B2a `55c8a811`, B2b `582dfbd8`, the POST-CODE QA fixes
+`ea1652f9` / `f33c5e15` / `fdeee600`, QA-4 `823b9929` (the single-clip path), and
+`095be05b` (the `*_DIR` deprecation tripwire).
 
 **THE QA FAN-OUT DID NOT RUN BEFORE THOSE FIRST THREE PUSHES. It should have.**
 The operator caught the omission; running it afterwards found FIVE code defects
@@ -210,14 +222,19 @@ junction), and a raising baseline identity read that STRANDED the GPU lease for
 the life of the server (when `__enter__` raises, `__exit__` never runs).
 **Run the fan-out BEFORE the push, not after.**
 
-**STILL OPEN from that QA, and it is the real close of the identity-lie defect:**
-`resolve_session_config()` is reachable only from `session_identity()`, which
-`BeatSession` calls only `if self.is_multi_segment`. So the bug B2a exists to
-close is still fully open on the SINGLE-CLIP path -- the common case --
-because `assert_usable()` still uses the old `_ckpt_path()`. Proved live by the
-QA lens: green preflight, raising resolver, same environment. Route
-`assert_usable` through the one resolver and retire `_ckpt_path`/`_t5_path`.
-Own chunk, before or alongside B1b.
+**THE IDENTITY LIE IS NOW CLOSED ON BOTH PATHS.** `823b9929` routed
+`_ckpt_path` / `_t5_path` through `_loader_token_path`, the ONE authority, so the
+single-clip gate (`assert_usable`) and the multi-segment gate
+(`session_identity` -> `resolve_session_config`) can no longer disagree about
+which file is the checkpoint. The pre-code panel killed my own proposal first: a
+wholesale `assert_usable = resolve_session_config()` rewrite would have silently
+dropped the 4 GiB integrity floor, which had zero coverage. `095be05b` then
+closed the same lie one level up -- a `*_DIR` override that the LOADER cannot
+see is now terminal, because ComfyUI resolves the graph's bare basename through
+`folder_paths` and `*_DIR` never touched that channel. Scoped to `ltx_8gb`: the
+Wan suites still use `*_DIR` as their no-ComfyUI mock seam, so `wan_shared` took
+an additive split only. Both mutation-proven with controls that name controls as
+their targets.
 
 **B1b (NEXT) -- the weights are still not shared.** `BeatSession` now OPENS a
 multi-segment session, but `Ltx8gbEngine.load()` only resolves node CLASSES and
