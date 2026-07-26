@@ -101,11 +101,12 @@ class BeatSession:
                 prepared = s.begin_segment(i)
                 raw = eng.render_clip(request_for(seg), prepared)
 
-    ``prepare_calls`` / ``teardown_calls`` are counters the tests read. They
-    are NOT the acceptance: an adapter that loads lazily inside
-    ``render_clip`` would show one ``prepare`` and three loads, which is the
-    very failure this exists to prevent, so the acceptance counts LOADER calls
-    on the adapter itself. These counters only prove the bracket ran once.
+    There are deliberately NO call counters on this object (cut 2026-07-26 on
+    the QA panel's recommendation, and it was right): the acceptance counts
+    LOADER calls on the ADAPTER, because an adapter that loads lazily inside
+    ``render_clip`` shows one perfect ``prepare`` and three loads. A counter
+    here would have measured the bracket, which is the thing that is obviously
+    correct, instead of the loading, which is the thing that is not.
     """
 
     def __init__(self, engine, *, host_caps=None, profile=None, beat_id="",
@@ -118,8 +119,6 @@ class BeatSession:
         self.prepared = None
         self.identity = None
         self.segment_index = -1
-        self.prepare_calls = 0
-        self.teardown_calls = 0
         self._closed = False
 
     @property
@@ -147,8 +146,14 @@ class BeatSession:
                 "beat session for %r is already open -- a second open would "
                 "strand the first set of handles" % (self.beat_id or "?",))
         if self.is_multi_segment:
-            self.identity = session_identity(self.engine)
-            if self.identity is None:
+            # ASK BEFORE LOADING, BASELINE AFTER (2026-07-26, chunk-5 QA panel).
+            # The refusal has to come before the weights land -- refusing after
+            # a 10 GB load is not refusing. But the BASELINE is captured after
+            # prepare returns, because the identity must describe the handles
+            # that were actually loaded: an adapter that resolves "auto" to a
+            # concrete UNET during load would otherwise report drift against
+            # its own pre-load intention on segment 0.
+            if session_identity(self.engine) is None:
                 raise SessionIdentityUnavailable(
                     "engine %r would render %d segments from ONE set of "
                     "handles but declares no session_identity(), so nothing "
@@ -160,7 +165,8 @@ class BeatSession:
         self.prepared = self.engine.prepare(
             host_caps=self.host_caps, profile=self.profile,
             session_ctx=self.session_ctx())
-        self.prepare_calls += 1
+        if self.is_multi_segment:
+            self.identity = session_identity(self.engine)
         return self.prepared
 
     def begin_segment(self, index, owner=None):
@@ -196,19 +202,31 @@ class BeatSession:
                 "at prepare time, so a segment outside it renders from handles "
                 "sized for a different beat."
                 % (self.beat_id or "?", self.segment_count, index))
-        if index <= self.segment_index:
+        if index != self.segment_index + 1:
             raise SessionError(
-                "beat session for %r already served segment %d and was asked "
-                "for %d. Segments render forward, once each -- a repeat is a "
-                "retry this build does not do, and a step backwards is a loop "
-                "that lost its place."
+                "beat session for %r last served segment %d and was asked for "
+                "%d. Segments render CONTIGUOUSLY forward, once each: a repeat "
+                "is a retry this build does not do, a step backwards is a loop "
+                "that lost its place, and a forward JUMP silently drops a "
+                "segment the plan says the beat needs (2026-07-26 QA panel -- "
+                "the earlier check allowed 0 then 2)."
                 % (self.beat_id or "?", self.segment_index, index))
-        if owner is not None and self.beat_id and str(owner) != self.beat_id:
-            raise SessionError(
-                "beat session belongs to beat %r but segment %d claims beat "
-                "%r. One session, one beat: the same engine serves many beats, "
-                "so the engine check alone cannot catch a session held one "
-                "loop too long." % (self.beat_id, index, owner))
+        if owner is not None:
+            owner = str(owner)
+            if not self.beat_id:
+                # LATCH THE FIRST CLAIM (2026-07-26 QA panel). A session opened
+                # without a beat_id -- the single-clip path does exactly that --
+                # had nothing to compare against, so two beats could share one
+                # session unchecked. The first caller to name a beat defines the
+                # session's beat; every later claim is held to it.
+                self.beat_id = owner
+            elif owner != self.beat_id:
+                raise SessionError(
+                    "beat session belongs to beat %r but segment %d claims "
+                    "beat %r. One session, one beat: the same engine serves "
+                    "many beats, so the engine check alone cannot catch a "
+                    "session held one loop too long."
+                    % (self.beat_id, index, owner))
         if self.is_multi_segment:
             current = session_identity(self.engine)
             if current != self.identity:
@@ -228,8 +246,8 @@ class BeatSession:
 
         Teardown is best-effort by long-standing contract (a raise here would
         mask the real render error on the failure path), but it is LOGGED
-        rather than silently swallowed: a teardown that fails strands the GPU
-        lease, and a stranded lease is the next episode's mystery hang.
+        rather than silently swallowed: a teardown that fails is a reclaim
+        that did not happen, and the next heavy engine pays for it.
         """
         if self._closed:
             return
@@ -242,11 +260,10 @@ class BeatSession:
         except Exception:                # noqa: BLE001 -- teardown best-effort
             _LOG.exception(
                 "[OTR.beat_session] teardown FAILED for engine %r beat %r -- "
-                "the GPU lease may be stranded; the render result (or the "
-                "render error) is preserved",
+                "the render result (or the render error) is preserved. The "
+                "GPU lease itself is released in motion_common.teardown's own "
+                "finally, so it is not stranded by this",
                 getattr(self.engine, "name", "?"), self.beat_id or "?")
-        finally:
-            self.teardown_calls += 1
 
     def __enter__(self):
         self.open()

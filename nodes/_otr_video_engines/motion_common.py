@@ -459,14 +459,25 @@ class MotionEngineBase:
         then bounded stability-wait for machine-wide VRAM to settle (no ceiling --
         the reclaim already happened; this just absorbs teardown latency).
         Idempotent + never raises out of teardown. NEVER ``unload_all_models``
-        (V-4 / V-5)."""
-        self._detach_patchers(prepared)
-        self.unload()
+        (V-4 / V-5).
+
+        THE LEASE RELEASE SITS IN A ``finally`` (2026-07-26, chunk-5 QA panel,
+        agy Gemini 3.6 Flash High; grounded and confirmed). ``_detach_patchers``
+        is guarded per patcher, but ``unload()`` is OVERRIDDEN per engine, and
+        an override that raises used to leave this method before the release --
+        stranding the shared single-heavy-engine lease in global state. The NEXT
+        episode then blocks on ``acquire`` for its full 120s timeout and fails
+        for a reason that has nothing to do with it. Reclaim is best-effort;
+        the lease is not."""
         lease = (prepared or {}).get("lease")
         had_lease = lease is not None
-        _GR.release(lease)
-        if had_lease:
-            _GR.wait_until_stable(attempts=3, sleep_s=2.0)
+        try:
+            self._detach_patchers(prepared)
+            self.unload()
+        finally:
+            _GR.release(lease)
+            if had_lease:
+                _GR.wait_until_stable(attempts=3, sleep_s=2.0)
 
     @staticmethod
     def _detach_patchers(prepared):

@@ -2564,7 +2564,13 @@ def _render_one(engine_name, request, *, force_oom, host_caps=None,
         prepared = segment.begin()
         raw = eng.render_clip(request, prepared)
         return eng.canonicalize(raw, request, _prof)
-    with _bs.BeatSession(eng, host_caps=_caps, profile=_prof) as sess:
+    # Name the beat even on the single-clip path: the adapter's session_ctx
+    # and the teardown log both read better with a real id than with "?"
+    # (2026-07-26 QA panel).
+    _rid = (request.get("shot_id") if isinstance(request, dict)
+            else getattr(request, "shot_id", ""))
+    with _bs.BeatSession(eng, host_caps=_caps, profile=_prof,
+                         beat_id=str(_rid or "")) as sess:
         raw = eng.render_clip(request, sess.prepared)
         return eng.canonicalize(raw, request, _prof)
 

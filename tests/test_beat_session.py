@@ -237,7 +237,11 @@ def test_identity_is_RE_READ_per_segment_not_cached():
     with bs.BeatSession(eng, beat_id="b001", segment_count=3) as session:
         for index in range(3):
             session.begin_segment(index)
-    assert len(reads) == 4                # once at open, once per segment
+    # Once to prove the adapter CAN name its handles (before loading), once to
+    # take the baseline from the handles that actually loaded (after prepare),
+    # then once per segment. A cached identity would read twice and prove only
+    # that the beat started consistent.
+    assert len(reads) == 5
 
 
 def test_session_identity_reads_a_method_or_an_attribute_or_nothing():
@@ -443,7 +447,7 @@ def test_a_REPEATED_segment_is_refused():
     with bs.BeatSession(eng, beat_id="b001", segment_count=3) as session:
         session.begin_segment(0)
         session.begin_segment(1)
-        with pytest.raises(bs.SessionError, match="already served segment 1"):
+        with pytest.raises(bs.SessionError, match="last served segment 1"):
             session.begin_segment(1)
 
 
@@ -451,9 +455,23 @@ def test_a_BACKWARDS_segment_is_refused():
     eng = _StubEngine()
     with bs.BeatSession(eng, beat_id="b001", segment_count=3) as session:
         session.begin_segment(0)
-        session.begin_segment(2)
-        with pytest.raises(bs.SessionError, match="already served segment 2"):
-            session.begin_segment(1)
+        session.begin_segment(1)
+        with pytest.raises(bs.SessionError, match="last served segment 1"):
+            session.begin_segment(0)
+
+
+def test_a_FORWARD_JUMP_is_refused():
+    """0 then 2 silently drops segment 1 -- the plan said the beat needs it.
+
+    (2026-07-26 QA panel: the first draft only refused repeats and backwards
+    steps, so a loop that skipped a segment sailed through and the beat came
+    out short by one clip's worth of video.)
+    """
+    eng = _StubEngine()
+    with bs.BeatSession(eng, beat_id="b001", segment_count=3) as session:
+        session.begin_segment(0)
+        with pytest.raises(bs.SessionError, match="last served segment 0"):
+            session.begin_segment(2)
 
 
 def test_a_session_held_into_ANOTHER_BEAT_is_refused():
@@ -495,3 +513,99 @@ def test_the_driver_passes_the_owner_through_to_the_session(monkeypatch):
         with pytest.raises(rd.RenderError, match="fallbacks are disabled"):
             rd.render_shot(shot, {"shot_id": "s1"},
                            segment=bs.SegmentSlot(session, 1, "b002"))
+
+
+# ---------------------------------------------------------------------------
+# What the chunk-5 QA panel found (agy Gemini 3.6 Flash High, judged + fixed)
+# ---------------------------------------------------------------------------
+
+def test_the_identity_BASELINE_is_taken_AFTER_prepare():
+    """An adapter that resolves 'auto' to a real UNET while loading must not
+    then report drift against its own pre-load intention on segment 0."""
+    class _ResolvesOnLoad(_StubEngine):
+        name = "stub_resolves_on_load"
+
+        def load(self):
+            super().load()
+            self._identity = ("stub", "daily", "unet_resolved.safetensors")
+
+    eng = _ResolvesOnLoad(identity=("stub", "daily", "auto"))
+    with bs.BeatSession(eng, beat_id="b001", segment_count=3) as session:
+        session.begin_segment(0)          # would raise on a pre-load baseline
+        session.begin_segment(1)
+    assert session.identity == ("stub", "daily", "unet_resolved.safetensors")
+
+
+def test_the_refusal_still_comes_BEFORE_the_weights_land():
+    """Taking the baseline after prepare must not move the REFUSAL after it --
+    refusing once 10 GB is resident is not refusing."""
+    eng = _NoIdentityEngine()
+    with pytest.raises(bs.SessionIdentityUnavailable):
+        bs.BeatSession(eng, beat_id="b001", segment_count=3).open()
+    assert eng.load_calls == 0
+
+
+def test_a_session_with_NO_beat_id_LATCHES_the_first_beat_claimed():
+    """The single-clip path opens sessions with no beat_id, so 'no beat_id'
+    used to mean 'no owner check at all' -- two beats could share a session
+    unchecked. The first claim now defines the session's beat."""
+    eng = _StubEngine()
+    with bs.BeatSession(eng, segment_count=2) as session:
+        session.begin_segment(0, owner="b001")
+        assert session.beat_id == "b001"
+        with pytest.raises(bs.SessionError, match="belongs to beat 'b001'"):
+            session.begin_segment(1, owner="b002")
+
+
+def test_the_single_clip_path_names_its_beat(monkeypatch):
+    """So the adapter's session_ctx and the teardown log carry a real id."""
+    eng = _DriverStub()
+    _install(monkeypatch, eng)
+    rd._render_one(eng.name, {"shot_id": "shot_b007"}, force_oom=False)
+    assert eng.seen_ctx[0]["beat_id"] == "shot_b007"
+
+
+def test_a_request_that_is_not_a_dict_still_opens_a_session(monkeypatch):
+    """Requests are dicts or objects across this driver; neither may crash the
+    single-clip bracket."""
+    class _RequestObject:
+        shot_id = "shot_b009"
+
+    eng = _DriverStub()
+    _install(monkeypatch, eng)
+    rd._render_one(eng.name, _RequestObject(), force_oom=False)
+    assert eng.seen_ctx[0]["beat_id"] == "shot_b009"
+
+
+def test_a_raising_unload_still_RELEASES_the_gpu_lease(monkeypatch):
+    """THE LIVE ONE the panel found (motion_common.teardown).
+
+    ``unload()`` is overridden per engine. An override that raised used to
+    leave ``teardown`` before ``_GR.release(lease)``, so the shared
+    single-heavy-engine lease stayed held in global state and the NEXT episode
+    blocked on ``acquire`` for its whole 120s timeout, then failed for a reason
+    that had nothing to do with it. The reclaim is best-effort; the lease is
+    not.
+    """
+    from nodes._otr_video_engines import motion_common as mc
+
+    released = []
+    monkeypatch.setattr(mc._GR, "acquire", lambda timeout_s=0: "lease-1")
+    monkeypatch.setattr(mc._GR, "release", lambda lease: released.append(lease))
+    monkeypatch.setattr(mc._GR, "wait_until_stable",
+                        lambda **kwargs: None)
+
+    class _UnloadExplodes(mc.MotionEngineBase):
+        name = "stub_unload_explodes"
+
+        def load(self):
+            self._loaded = True
+
+        def unload(self):
+            raise RuntimeError("CUDA said no")
+
+    eng = _UnloadExplodes()
+    prepared = eng.prepare(host_caps={}, profile={}, session_ctx={})
+    with pytest.raises(RuntimeError, match="CUDA said no"):
+        eng.teardown(prepared)
+    assert released == ["lease-1"], "the lease was stranded by a failed unload"
