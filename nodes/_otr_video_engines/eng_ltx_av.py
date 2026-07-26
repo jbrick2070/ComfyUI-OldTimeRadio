@@ -54,16 +54,51 @@ from .registry import EngineUnusable, EngineUsabilityReason, register
 
 _LOG = logging.getLogger("OTR.eng_ltx_av")
 
+
+def _env_num(name, default, cast):
+    """``cast(os.environ[name])`` that can never take the IMPORT down.
+
+    THE DEFECT THIS REPLACES (2026-07-27, chunk 7b slice 1; both r2 kibitz
+    seats reached it independently). These four constants parsed the
+    environment at MODULE SCOPE with a bare ``int()`` / ``float()``, so a
+    malformed value did not fail a render closed with a named message -- it
+    raised ``ValueError`` while the module was still importing. This adapter
+    then never registered, and ``frame_contract.frame_contract_for`` resolves
+    an adapter it cannot reach to ``SINGLE_ONLY`` through its own swallowed
+    ``except Exception`` (``frame_contract.py:243-247``). Net effect of one
+    typo in one environment variable: the engine silently vanished and its
+    lane quietly reverted to unbounded single-clip behaviour, with nothing in
+    the log naming the variable.
+
+    LOUD warning plus the declared default instead. Deliberately NOT a
+    behaviour change for a WELL-FORMED value -- whether the environment may
+    move a declared ceiling at all is the 7b fork, settled separately in
+    ``docs/2026-07-27-multiclip-7b-fork-r3-coding-plan.md``. This slice fixes
+    only the crash, and keeps these names module-level VALUES because
+    ``tests/test_engine_contract_roster.py:184`` reads
+    ``_LTX_AV_MAX_FRAMES`` as one.
+    """
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return cast(default)
+    try:
+        return cast(str(raw).strip())
+    except (TypeError, ValueError):
+        _LOG.warning("[eng_ltx_av] invalid %s=%r -- using default %r",
+                     name, raw, default)
+        return cast(default)
+
+
 # --- frame + canvas grounding (LTX-AV lane only; snap UP, never copy Lane A) ---
 _LTX_AV_MIN_FRAMES = _AVD._LTX_MIN_FRAMES        # 9 (8n+1 floor)
-_LTX_AV_MAX_FRAMES = int(os.environ.get("OTR_LTX_AV_MAX_FRAMES", "497"))  # M0 initial
+_LTX_AV_MAX_FRAMES = _env_num("OTR_LTX_AV_MAX_FRAMES", 497, int)  # M0 initial
 _LTX_AV_NATIVE_W = 832
 _LTX_AV_NATIVE_H = 480
 # Default sampler recipe (the M0-proven 8-step distilled-ish base pass; cfg 3.0
 # matched the probe). All env-overridable; never shared with eng_ltx_video.
-_LTX_AV_STEPS = int(os.environ.get("OTR_LTX_AV_STEPS", "8"))
-_LTX_AV_CFG = float(os.environ.get("OTR_LTX_AV_CFG", "3.0"))
-_LTX_AV_I2V_STRENGTH = float(os.environ.get("OTR_LTX_AV_I2V_STRENGTH", "1.0"))
+_LTX_AV_STEPS = _env_num("OTR_LTX_AV_STEPS", 8, int)
+_LTX_AV_CFG = _env_num("OTR_LTX_AV_CFG", 3.0, float)
+_LTX_AV_I2V_STRENGTH = _env_num("OTR_LTX_AV_I2V_STRENGTH", 1.0, float)
 # ASCII-only negative (CLAUDE.md). One shared constant; cap 240 in the driver.
 _LTX_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, jpeg artifacts, distorted, deformed, "
