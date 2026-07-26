@@ -680,6 +680,61 @@ def _jump_still_requests_for_shot(shot):
     return tuple(out)
 
 
+def jump_segment_still_path(ledger, shot, segment_index):
+    """The init image for jump segment ``segment_index``, BY OBJECT ID.
+
+    THE HARD RULE OF CHUNK 6 (2026-07-26; found by the chunk-4 QA panel and
+    carried forward deliberately). A per-segment render must NEVER resolve its
+    init image through :func:`_still_index`. That index selects rows whose
+    ``kind`` starts with ``scene_`` and keys them BY BEAT, and a jump-segment
+    still deliberately wears ``jump_segment`` instead -- precisely so it stays
+    invisible to the beat-keyed consumers. A loop that reused the existing
+    lookup would therefore hand EVERY segment segment-0's still, silently
+    re-creating the held-frame degradation chunks 3-6 exist to remove, with the
+    correct stills sitting unused on disk and nothing in the log to say so.
+
+    ONE AUTHORITY. The id comes off the durable stamp ShotLock minted, and the
+    PATH comes off the still spine's own receipt -- the record the spine wrote
+    when it proved that exact object id was materialized. Not a second lookup
+    that happens to agree: the same fact, read once. If the spine did not prove
+    it, this raises rather than substituting anything.
+
+    ``segment_index`` 0 returns ``None``: segment 0 renders from the beat's own
+    scene still, which every existing branch already resolves.
+    """
+    index = int(segment_index or 0)
+    if index <= 0:
+        return None
+    requests = _jump_still_requests_for_shot(shot)
+    request = next((row for row in requests
+                    if int(row.get("segment_index") or 0) == index), None)
+    if request is None:
+        raise RenderError(
+            "shot %s has no jump-still request for segment %d, so that "
+            "segment has no still of its own to render from. NO FALLBACK to "
+            "the beat's still: putting the identical image at both ends of a "
+            "cut is the held-frame degradation this build removes."
+            % (shot.get("shot_id"), index))
+    object_id = str(request.get("object_id") or "")
+    receipt = (((ledger or {}).get("images") or {}).get("still_spine_receipt")
+               or {})
+    for entry in receipt.get("validated") or ():
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("object_id") or "") != object_id:
+            continue
+        path = str(entry.get("path") or "")
+        if not path:
+            break
+        return path
+    raise RenderError(
+        "shot %s segment %d needs jump-segment still %s, which the still-spine "
+        "receipt does not carry a materialized path for. The spine runs BEFORE "
+        "any render and refuses a shot whose segment stills are missing, so "
+        "reaching here means the receipt was rebuilt, replayed or bypassed. NO "
+        "FALLBACK." % (shot.get("shot_id"), index, object_id or "<missing>"))
+
+
 def validate_and_repair_still_spine(ledger):
     """Prove every still-consuming beat has an active, materialized input.
 
@@ -816,6 +871,11 @@ def validate_and_repair_still_spine(ledger):
                               "kind": str(segment_row.get("kind") or "jump_segment"),
                               "segment_index": int(
                                   request.get("segment_index") or 0),
+                              # The id the request minted and this pass just
+                              # PROVED. The per-segment render reads its init
+                              # image back by this id (chunk 6b) rather than
+                              # deriving a path a second time.
+                              "object_id": segment_oid,
                               "path": segment_path})
         if family == "audio_driven_face":
             portrait_row = _still_spine_row_for_portrait(rows, char_id)
@@ -1558,7 +1618,7 @@ def _cumulative_beat_start(ledger, shot, fps):
 
 
 def build_request_from_shot(shot, ledger, *, canvas=None,
-                            master_audio_path=""):
+                            master_audio_path="", segment_index=0):
     """A per-shot VideoRequest from the ShotLock-planned ledger (the REAL
     episode path). Resolves the character portrait (``init_image``) + the
     per-beat voice audio + the M4 ``text_prompt`` + the audio-derived
@@ -2001,6 +2061,18 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         else:
             _LOG.warning("[OTR.render_driver] per-beat audio: beat %s has no "
                          "start_s/dur_s on line -- HuMo will degrade LOUD", bid)
+    # JUMP SEGMENT N>0 BRINGS ITS OWN STILL (2026-07-26, chunk 6b). This runs
+    # LAST, after every branch above has resolved the BEAT's init image,
+    # because for a jump segment the beat's still is the wrong answer: it is
+    # the image segment 0 already rendered, and reusing it puts the identical
+    # frame at both ends of the cut. Resolved BY OBJECT ID off the stamp + the
+    # spine's receipt -- never through _still_index, which cannot see a
+    # jump_segment row at all. Segment 0 and every single-clip beat return None
+    # here and keep exactly the init image they had.
+    _segment_still = jump_segment_still_path(ledger, shot, segment_index)
+    if _segment_still:
+        init_image = _segment_still
+        init_source = "jump_segment_still"
     frame_count = int(shot.get("target_frame_count") or 0)
     req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
                         frame_count, canvas)
