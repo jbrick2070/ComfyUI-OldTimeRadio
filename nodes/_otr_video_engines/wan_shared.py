@@ -190,19 +190,31 @@ def assemble_beat_segments(segments, out_path, *, expect_frames, expect_fps,
         raise _wb.GraphExecutionError(
             "beat assembly was handed NO segments")
 
-    geometries = {}
+    # SHAPE, not just SIZE (2026-07-26 QA panel). Differing fps desynchronises
+    # the concatenated timestamps and differing pixel formats make the filter
+    # graph convert mid-beat; both are as invisible in a header as a size
+    # change and as visible on screen.
+    shapes = {}
     for path, _drop, _keep in rows:
         fields = ffprobe_clip_fields(path, ffprobe=ffprobe)
-        geometries.setdefault((fields["width"], fields["height"]), []).append(path)
-    if len(geometries) > 1:
+        key = (fields["width"], fields["height"], fields["fps"],
+               fields["pix_fmt"])
+        shapes.setdefault(key, []).append(path)
+    if len(shapes) > 1:
         raise _wb.GraphExecutionError(
-            "beat assembly refuses segments with MIXED canvases %r -- the "
-            "assembled clip would change size partway through the beat. NO "
-            "FALLBACK (no silent rescale)."
-            % ({"%dx%d" % k: v for k, v in geometries.items()},))
+            "beat assembly refuses segments of MIXED shape %r -- the assembled "
+            "clip would change canvas, frame rate or pixel format partway "
+            "through the beat. NO FALLBACK (no silent rescale or resample)."
+            % ({"%dx%d@%sfps %s" % k: v for k, v in shapes.items()},))
 
-    _wb.run_ffmpeg(_wb.ffmpeg_concat_segments_cmd(rows, out_path, ffmpeg=ffmpeg))
     try:
+        # The concat itself is INSIDE the transaction (2026-07-26 QA panel).
+        # It was outside, so an ffmpeg failure left whatever it had partially
+        # written sitting at ``out_path`` -- which is exactly the "a beat that
+        # failed must not survive on disk" promise this block makes, broken by
+        # the one failure most likely to produce a partial file.
+        _wb.run_ffmpeg(_wb.ffmpeg_concat_segments_cmd(rows, out_path,
+                                                      ffmpeg=ffmpeg))
         if not _os.path.exists(out_path) or _os.path.getsize(out_path) <= 0:
             raise _wb.GraphExecutionError(
                 "beat assembly produced no usable clip at %r (ffmpeg exited 0 "

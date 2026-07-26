@@ -56,7 +56,12 @@ class _BeatStub:
         import numpy as np
         index = int(request["segment_index"])
         frames = int(request["frames"])
-        self.seen_inits.append(request.get("init_image") or "")
+        # READ IT WHERE A REAL ADAPTER READS IT. ``build_request`` puts the init
+        # image at ``asset_refs["init_image"]``; an earlier version of this stub
+        # read a top-level key, which meant the stub agreed with a driver bug
+        # that wrote the terminal frame somewhere no engine looks.
+        self.seen_inits.append(
+            (request.get("asset_refs") or {}).get("init_image") or "")
         self.seen_frames.append(frames)
         # A distinct grey per segment, so the assembled beat is readable.
         level = 40 + index * 60
@@ -90,7 +95,10 @@ def _request_builder(shot, ledger, *, canvas=None, segment_index=0):
     length off the stamped plan, which is the seam chunk 6b/QA6 landed."""
     return {"shot_id": shot["shot_id"], "segment_index": int(segment_index),
             "frames": rd.segment_render_frames(shot, segment_index),
-            "init_image": "seg%d_still.png" % int(segment_index),
+            # The SAME shape build_request emits -- asset_refs, not a top-level
+            # key -- so the stub cannot agree with a driver that writes to the
+            # wrong place.
+            "asset_refs": {"init_image": "seg%d_still.png" % int(segment_index)},
             "observability": {}}
 
 
@@ -231,10 +239,18 @@ def test_a_single_clip_beat_takes_the_HISTORICAL_path(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp:
         eng = _BeatStub(tmp)
         _install(monkeypatch, eng)
+        # THE REAL SHAPE: ShotLock stamps a one-segment JOIN_SINGLE plan on
+        # EVERY beat, so the live branch is `is_multi_clip == False` with a real
+        # plan -- not an absent key. Testing only the absent-key half would have
+        # left the branch every beat actually takes uncovered (QA panel).
         shot = {"shot_id": "shot_b001", "engine_id": "stub_beat_engine",
-                "family": "abstract", "target_frame_count": 10}
+                "family": "abstract", "target_frame_count": 10,
+                "coverage_plan": _plan(cp.JOIN_SINGLE, [
+                    {"index": 0, "render_frames": 10, "drop_head": 0,
+                     "trim_tail": 0}], 10)}
         prebuilt = {"shot_id": "shot_b001", "segment_index": 0, "frames": 10,
-                    "init_image": "beat_still.png", "observability": {}}
+                    "asset_refs": {"init_image": "beat_still.png"},
+                    "observability": {}}
         clip, _s, _a, _u = rd.render_beat_coverage(
             shot, {}, request=prebuilt,
             request_builder=lambda *a, **k: pytest.fail(
@@ -289,7 +305,7 @@ def test_segments_with_MIXED_canvases_are_refused():
         wb.encode_frames_to_silent_mp4(
             [np.zeros((64, 96, 3), dtype=np.uint8)] * 5, b, 25)
         out = os.path.join(tmp, "beat.mp4")
-        with pytest.raises(wb.GraphExecutionError, match="MIXED canvases"):
+        with pytest.raises(wb.GraphExecutionError, match="MIXED shape"):
             ws.assemble_beat_segments([(a, 0, 5), (b, 0, 5)], out,
                                       expect_frames=10, expect_fps=25)
 
@@ -307,3 +323,142 @@ def test_the_assembled_beat_is_a_CanonicalClip_like_any_other():
         ws.assemble_beat_segments([(a, 0, 6)], out,
                                   expect_frames=6, expect_fps=25)
         ws.validate_silent_clip_contract(ws.ffprobe_clip_fields(out), 25)
+
+
+# ---------------------------------------------------------------------------
+# The failure paths (neither panel found these covered -- they were right)
+# ---------------------------------------------------------------------------
+
+def test_a_segment_that_RAISES_mid_beat_still_closes_the_session(monkeypatch):
+    """The session is a `with`, but nothing asserted it. A stranded GPU lease
+    is the next episode's mystery hang."""
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        real_render = eng.render_clip
+
+        def _boom(request, prepared):
+            if int(request["segment_index"]) == 1:
+                raise RuntimeError("segment 1 exploded")
+            return real_render(request, prepared)
+
+        eng.render_clip = _boom
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_JUMP, [
+            {"index": 0, "render_frames": 10, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 10, "drop_head": 0, "trim_tail": 0},
+        ], 20)
+        with pytest.raises(rd.RenderError, match="fallbacks are disabled"):
+            rd.render_beat_coverage(_shot(plan), {},
+                                    request_builder=_request_builder)
+        assert eng.teardown_calls == 1, "the beat session leaked its handles"
+        assert eng.load_calls == 1
+
+
+def test_a_segment_that_returns_NO_PATH_is_TERMINAL(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        eng.render_clip = lambda request, prepared: {"frame_count": 10,
+                                                     "fps": 25}
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_JUMP, [
+            {"index": 0, "render_frames": 10, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 10, "drop_head": 0, "trim_tail": 0},
+        ], 20)
+        with pytest.raises(rd.RenderError, match="rendered no clip path"):
+            rd.render_beat_coverage(_shot(plan), {},
+                                    request_builder=_request_builder)
+        assert eng.teardown_calls == 1
+
+
+def test_a_SHORT_segment_is_named_at_the_segment_not_at_the_assembly(monkeypatch):
+    """An engine that returns fewer frames than it was asked for used to
+    surface much later as an assembly count mismatch, which reads as an
+    assembler bug."""
+    import numpy as np
+
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+
+        def _short(request, prepared):
+            imgs = [np.zeros((64, 64, 3), dtype=np.uint8)] * 4
+            out = os.path.join(tmp, "short.mp4")
+            path, n = wb.encode_frames_to_silent_mp4(imgs, out, 25)
+            return {"path": path, "frame_count": n, "fps": 25}
+
+        eng.render_clip = _short
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_JUMP, [
+            {"index": 0, "render_frames": 10, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 10, "drop_head": 0, "trim_tail": 0},
+        ], 20)
+        with pytest.raises(rd.RenderError, match="rendered 4 frame"):
+            rd.render_beat_coverage(_shot(plan), {},
+                                    request_builder=_request_builder)
+        assert eng.teardown_calls == 1
+
+
+def test_the_beats_VRAM_peak_is_the_max_across_segments_not_the_last(monkeypatch):
+    """Taking whatever the final segment reported under-reports a beat whose
+    heaviest render was segment 0."""
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        peaks = iter([900, 100])
+        real = eng.render_clip
+        eng.render_clip = lambda rq, pr: dict(real(rq, pr),
+                                              vram_peak_mb=next(peaks))
+        plan = _plan(cp.JOIN_JUMP, [
+            {"index": 0, "render_frames": 10, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 10, "drop_head": 0, "trim_tail": 0},
+        ], 20)
+        _clip, _s, _a, used = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+        assert used == 900, "the beat reported its LAST segment's peak"
+
+
+def test_a_FAILED_CONCAT_leaves_nothing_behind(monkeypatch):
+    """The transaction covers the ffmpeg call itself, not only the checks
+    after it -- a failing concat is the failure most likely to leave a partial
+    file (QA panel)."""
+    import numpy as np
+
+    with tempfile.TemporaryDirectory() as tmp:
+        a = os.path.join(tmp, "a.mp4")
+        wb.encode_frames_to_silent_mp4(
+            [np.zeros((64, 64, 3), dtype=np.uint8)] * 5, a, 25)
+        out = os.path.join(tmp, "beat.mp4")
+
+        def _fake_run(cmd):
+            open(out, "wb").write(b"partial garbage")
+            raise wb.GraphExecutionError("ffmpeg failed rc=1: synthetic")
+
+        monkeypatch.setattr(wb, "run_ffmpeg", _fake_run)
+        with pytest.raises(wb.GraphExecutionError, match="synthetic"):
+            ws.assemble_beat_segments([(a, 0, 5)], out,
+                                      expect_frames=5, expect_fps=25)
+        assert not os.path.exists(out), (
+            "a partial file from a failed concat survived on disk")
+
+
+def test_segments_at_DIFFERENT_FPS_are_refused():
+    """Same canvas, different frame rate -- as invisible in a header as a size
+    change and as visible on screen."""
+    import numpy as np
+
+    with tempfile.TemporaryDirectory() as tmp:
+        a = os.path.join(tmp, "a.mp4")
+        b = os.path.join(tmp, "b.mp4")
+        frames = [np.zeros((64, 64, 3), dtype=np.uint8)] * 5
+        wb.encode_frames_to_silent_mp4(frames, a, 25)
+        wb.encode_frames_to_silent_mp4(frames, b, 30)
+        out = os.path.join(tmp, "beat.mp4")
+        with pytest.raises(wb.GraphExecutionError, match="MIXED shape"):
+            ws.assemble_beat_segments([(a, 0, 5), (b, 0, 5)], out,
+                                      expect_frames=10, expect_fps=25)
+
+
+def test_a_segment_that_keeps_NO_frames_is_refused_not_clamped():
+    with pytest.raises(wb.GraphExecutionError, match="NO CLAMP"):
+        wb.ffmpeg_concat_segments_cmd([("a.mp4", 0, 0)], "out.mp4")
+    with pytest.raises(wb.GraphExecutionError, match="NO CLAMP"):
+        wb.ffmpeg_concat_segments_cmd([("a.mp4", -1, 5)], "out.mp4")

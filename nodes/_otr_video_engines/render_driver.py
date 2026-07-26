@@ -2849,7 +2849,11 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     rendered = []            # (path, drop_head, keep_frames) in play order
     out_shot = dict(shot)
     attempts = []
-    used = 0
+    # The beat's PEAK, not its last segment's (2026-07-26 QA panel). Taking
+    # whatever the final segment happened to report under-reports a beat whose
+    # heaviest render was segment 1, which is the number the episode report
+    # exists to carry.
+    peak_used = 0
     terminal = None
     with _bs.BeatSession(engine, host_caps=host_caps, profile=profile,
                          beat_id=beat_id,
@@ -2863,22 +2867,52 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                 # minted still at all -- it begins on the real frame its
                 # predecessor ended on, which is what makes it a chain rather
                 # than a jump with extra steps.
+                #
+                # INTO ``asset_refs``, WHICH IS WHERE AN ENGINE LOOKS (corrected
+                # 2026-07-26 by the QA panel). ``build_request`` puts the init
+                # image at ``asset_refs["init_image"]``; every adapter and
+                # ``_present_request_tokens`` read it there and NOWHERE else. An
+                # earlier draft set a top-level ``request["init_image"]``, which
+                # no production code reads -- so a chained successor would have
+                # rendered from its ORIGINAL init image, silently, and the beat
+                # would have jumped at every cut it claimed to chain across.
+                # The stub in the test agreed with the bug because the test's
+                # own request builder used the same wrong key.
                 if isinstance(request, dict):
-                    request["init_image"] = terminal
+                    refs = request.get("asset_refs")
+                    if not isinstance(refs, dict):
+                        refs = {}
+                        request["asset_refs"] = refs
+                    refs["init_image"] = terminal
                     obs = request.get("observability")
                     if isinstance(obs, dict):
                         obs["init_source"] = "chain_terminal_frame"
                         obs["init_image"] = os.path.basename(terminal)
-            clip, out_shot, attempts, used = render_shot(
+            clip, out_shot, seg_attempts, seg_used = render_shot(
                 shot, request, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
                 host_caps=host_caps, profile=profile,
                 segment=_bs.SegmentSlot(session, index, beat_id))
+            attempts = list(attempts) + list(seg_attempts or ())
+            peak_used = max(int(peak_used), int(seg_used or 0))
             path = str((clip or {}).get("path") or "")
             if not path:
                 raise RenderError(
                     "shot %s segment %d rendered no clip path, so the beat "
                     "cannot be assembled. NO FALLBACK."
                     % (shot.get("shot_id"), index))
+            # CHECK THE LENGTH HERE, where the message can still name the
+            # segment (2026-07-26 QA panel). A short render otherwise surfaces
+            # much later as an assembly count mismatch, which reads as an
+            # assembler bug rather than as the engine returning fewer frames
+            # than it was asked for.
+            got = int((clip or {}).get("frame_count") or 0)
+            if got and got != int(segment.render_frames):
+                raise RenderError(
+                    "shot %s segment %d rendered %d frame(s) but its plan asked "
+                    "for %d. NO FALLBACK -- assembling a short segment would "
+                    "make the beat drift against its own audio."
+                    % (shot.get("shot_id"), index, got,
+                       int(segment.render_frames)))
             rendered.append((path, int(segment.drop_head),
                              int(segment.render_frames)
                              - int(segment.drop_head)
@@ -2904,7 +2938,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         "at %s", beat_id or shot.get("shot_id"), plan.segment_count,
         plan.join_mode, plan.target_visible_frames,
         os.path.basename(assembled))
-    return beat_clip, out_shot, attempts, used
+    return beat_clip, out_shot, attempts, peak_used
 
 
 def build_episode_render_policy(section):

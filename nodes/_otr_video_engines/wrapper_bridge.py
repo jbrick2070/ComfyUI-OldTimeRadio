@@ -610,11 +610,22 @@ def ffmpeg_concat_segments_cmd(segments, out_path, *, ffmpeg="ffmpeg", crf=18):
     OTR clip, so an assembled beat is a CanonicalClip like any other -- not a
     special case the mux has to know about.
     """
-    rows = [(str(p), max(0, int(d)), max(1, int(k))) for p, d, k in segments]
+    rows = [(str(p), int(d), int(k)) for p, d, k in segments]
     if not rows:
         raise GraphExecutionError(
             "concat was handed NO segments -- an assembled beat with nothing "
             "in it is not a beat")
+    # REFUSE, do not clamp (2026-07-26 QA panel, both seats). An earlier draft
+    # wrote ``max(1, int(k))``, which turned a segment that keeps zero or fewer
+    # frames -- a plan the partitioner would never emit -- into a segment that
+    # keeps exactly one, and then assembled a beat of the wrong length without
+    # a word. This build refuses clamps everywhere else; it refuses here too.
+    for i, (path, drop, keep) in enumerate(rows):
+        if drop < 0 or keep < 1:
+            raise GraphExecutionError(
+                "concat segment %d (%s) keeps %d frame(s) after dropping %d -- "
+                "a segment must keep at least one frame and cannot drop a "
+                "negative number. NO CLAMP." % (i, path, keep, drop))
     args = [ffmpeg, "-y"]
     for path, _drop, _keep in rows:
         args += ["-i", path]
