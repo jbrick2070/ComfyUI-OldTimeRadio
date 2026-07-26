@@ -3,6 +3,77 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-26 (overnight) -- HEAD a888c423 (v2.0-alpha) -- WINDOW CODER A (Opus)
+Did: shipped FIVE green pushed chunks -- the two unrun chunk-4 QA lenses, then
+coverage chunk 5 and the first half of chunk 6.
+- **The two lenses the operator asked for first.** Image-phase capability
+  gating and operator-intent, run read-only against `4faabe0e`. Judged: the
+  ordering defect was real and is `b0e383f5` **QA4** -- on the LEGACY route
+  path `resolve_final_shot_engines` validated the coverage plan BEFORE
+  `apply_engine_override` and the radio-host redirect, so a plan stamped for
+  the PICKED engine was checked against that engine and then executed by a
+  DIFFERENT one. That is chunk 1c's ordering defect reintroduced one contract
+  further down, inside the very function whose docstring closes it -- and
+  checking early is worse than not checking, because it logs COVERAGE PLANS OK
+  for routing that no longer holds. Mutation-proven (the new test fails without
+  the reorder). Also landed a guardrail that a `still_*` lane can never declare
+  `supports_multi_clip` -- put in place BEFORE the first opt-in, not after.
+  REJECTED with reasons: the "unregistered engine skips the spine guard" claim
+  (the mint returns early for unregistered ids, so the case never arrives --
+  the DOCSTRING was the thing that was wrong, and it is now corrected).
+- `4fa992e6` **chunk 5, the beat session.** One prepare/load per BEAT instead
+  of one per clip, one teardown in a single outer `finally`, and a named
+  IDENTITY (engine + recipe + weights) captured at open and re-proved before
+  every segment. A multi-segment session whose adapter cannot name its handles
+  is REFUSED at open, before the weights land: handles nobody can name are
+  handles nobody can invalidate. Wired as the ONLY lifecycle path, so a
+  single-clip beat is a one-segment session and behaviour is unchanged.
+  Mutation-proven. The acceptance counts LOADER calls, never `prepare` calls --
+  there is a test that builds a lazy-loading adapter showing one perfect
+  `prepare` and three loads, which is exactly what a prepare-count acceptance
+  would have blessed.
+- `451309de` **chunk 5 QA (agy Gemini 3.6 Flash High).** Five findings, four
+  accepted. **The important one is LIVE and PRE-EXISTING:**
+  `motion_common.teardown` detached patchers and called `unload()` BEFORE
+  releasing the GPU lease, and `unload()` is overridden per engine -- so an
+  override that raised stranded the shared single-heavy-engine lease and the
+  NEXT episode blocked on `acquire` for its full 120s timeout and failed for a
+  reason that had nothing to do with it. The release now sits in a `finally`.
+  Also: the identity BASELINE is now taken after `prepare` (an adapter that
+  resolves "auto" to a real UNET while loading was reporting drift against its
+  own pre-load intention), segments must be CONTIGUOUS (0 then 2 silently
+  dropped a segment), and a session with no `beat_id` LATCHES the first beat a
+  caller claims. Rejected: speculative dict/set identity normalisation. Took
+  its CUT recommendation -- the session's own call counters were measuring the
+  bracket, which is the obviously-correct part, so they are gone.
+  Also collapsed `session`/`segment_index`/`session_owner` into ONE
+  `SegmentSlot`, which makes "a session with no segment index" unconstructible
+  rather than merely validated.
+- `3a76c47a` **chunk 6a**: `ffprobe_clip_fields` learns `width`/`height` (free,
+  same stream read) and a NEW `ffprobe_counted_frames` runs `-count_frames`.
+  Deliberately two helpers: counting decodes, and the cheap probe runs on every
+  emitted clip. An unreadable count raises rather than returning 0.
+- `a888c423` **chunk 6b**, the chunk-4 carry-forward: a jump segment resolves
+  its init image BY OBJECT ID off the still-spine's own receipt, never through
+  `_still_index` -- which filters to `scene_*` kinds keyed BY BEAT and would
+  therefore have handed EVERY segment segment-0's still. The differential test
+  demonstrates that rather than asserting it.
+- Suite 6634 -> 6636 -> 6668 -> 6675 -> 6680 -> **6687 passed** / 27 skipped /
+  1 xfailed; Bible 17; canonical byte-identical `5377914B` across all five
+  commits; hygiene clean (it also caught a pre-existing non-ASCII character in
+  `wan_shared.py`, fixed in passing).
+Current step: coverage chunk 6c -- the per-segment render loop, with the
+terminal transaction INSIDE it. Then 6d (transactional assembly, verified with
+the 6a helpers), then chunk 7.
+Next: CODER A -- 6c. Every seam it needs is landed and tabulated in
+GO_FORWARD's CURRENT STEP; do not re-invent them. Chunk 7 must also carry the
+three grounded requirements now written down there (static FrameContract, a
+declared `session_identity`, and NO ping-pong CLIP-FILL on a coverage-planned
+segment).
+Models: Claude Opus (rung 4) + 3 Sonnet QA lenses + 1 agy panel (rung 2, $0).
+No Codex, no OpenRouter -- $0 external spend.
+Commits: b0e383f5, 4fa992e6, 451309de, 3a76c47a, a888c423
+
 ## 2026-07-26 00:30 -- HEAD 4faabe0e (v2.0-alpha) -- WINDOW CODER A (Opus)
 Did: shipped coverage CHUNK 4 (the jump-still image-phase consumer) and its QA
 round. Without it a jump cut had NO still -- the image phase mints exactly one

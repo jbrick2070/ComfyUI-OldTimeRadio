@@ -1,12 +1,12 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-26 -- **MULTI-CLIP COVERAGE CHUNK 4 IS DONE, QA'd AND
-PUSHED.** The jump-still image-phase consumer landed at `583b3ea3` and its QA
-fixes at `4faabe0e`. HEAD == origin `4faabe0e`; suite **6634 passed / 27
+**Updated:** 2026-07-26 (overnight) -- **CHUNK 5 IS DONE AND CHUNK 6 IS HALF
+LANDED.** Five green chunks pushed this session: a QA4 fix round, the beat
+session (`4fa992e6`) and its QA round (`451309de`), the ffprobe geometry +
+decoded-frame-count helper (`3a76c47a`), and the per-segment init image by
+object id (`a888c423`). HEAD == origin `a888c423`; suite **6687 passed / 27
 skipped / 1 xfailed**; Bible 17; canonical `5377914B` (byte-identical -- no
-chunk in 1-7 touches it). **NEXT = chunk 5, the beat-session lifecycle.**
-Four stale "Updated" headers were trimmed here on 2026-07-26; their forward
-content already lives in the rescoped order, OPEN BUGS and the tombstones.
+chunk in 1-7 touches it). **NEXT = chunk 6c, the per-segment render loop.**
 See CURRENT STEP.
 
 **OPERATOR RESCOPE 2026-07-24 (supersedes the older queue everywhere in this
@@ -32,21 +32,21 @@ it ships. Doctrine lives in `docs/PRODUCTION_SPRINT_LESSONS.md`.
 Nothing in this file is an instruction to reset, stash, delete, or overwrite
 user changes.
 
-- Branch: `v2.0-alpha`; HEAD and origin are `4faabe0e`. Multi-clip coverage
-  chunks 1a/1b/1c/2/3/3b/4 are all landed and pushed; per-chunk detail lives in
-  `docs/HANDOFF_LOG.md`, not here. The worktree is CLEAN of task-owned changes
+- Branch: `v2.0-alpha`; HEAD and origin are `a888c423`. Multi-clip coverage
+  chunks 1a/1b/1c/2/3/3b/4/**5/6a/6b** are all landed and pushed; per-chunk
+  detail lives in `docs/HANDOFF_LOG.md`, not here. The worktree is CLEAN of task-owned changes
   -- what remains is `tmp/` scratch (including another window's modified
   `tmp/_chain_720.ps1`, `tmp/_rearm_gate.ps1`, `tmp/_status_bake.ps1` --
   PRESERVE), untracked campaign receipts, `config/profiles/otr_sbcov_1..6.json`
   (intentionally untracked coverage-campaign scratch) and untracked
   `docs/_bakeoff_*.log.err` + `docs/otr-*.pdf` from an earlier window.
-- LANDED @ `583b3ea3` + `4faabe0e` (2026-07-25/26; suite 6591 -> 6618 -> **6634
-  passed / 27 skipped / 1 xfailed**; Bible 17; AST/BOM/zero-byte/UTF-8/ASCII
-  clean; canonical byte-identical; pushed, HEAD == origin): **coverage chunk 4,
-  the jump-still image-phase consumer**, plus its QA round. Without it a jump
-  cut had NO still -- the image phase mints one still per beat, so every
-  segment after the first would have rendered from nothing.
-- Verification: full Windows OTR suite `6634 passed, 27 skipped, 1 xfailed`;
+- LANDED overnight 2026-07-26 (suite 6634 -> 6636 -> 6668 -> 6675 -> 6680 ->
+  **6687 passed / 27 skipped / 1 xfailed**; Bible 17; AST/BOM/zero-byte/
+  UTF-8/ASCII clean; canonical byte-identical; each pushed, HEAD == origin):
+  `b0e383f5` QA4, `4fa992e6` **chunk 5 (the beat session)**, `451309de` its QA
+  round, `3a76c47a` **chunk 6a** (ffprobe geometry + `-count_frames`),
+  `a888c423` **chunk 6b** (per-segment init image by object id).
+- Verification: full Windows OTR suite `6687 passed, 27 skipped, 1 xfailed`;
   Bug Bible `17 passed, 24 skipped, 3 xfailed`.
 - Canonical workflow byte-identical at SHA-256
   `5377914B14911B7362D2516BAD3008BB6EF6ACB87C6E13C77C3D4C0D9D8A8C39`.
@@ -148,12 +148,38 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- MULTI-CLIP COVERAGE: CHUNKS 1-4 DONE, CHUNK 5 NEXT
+## CURRENT STEP -- MULTI-CLIP COVERAGE: 1-5 + 6a/6b DONE, **6c NEXT**
 
-**Updated 2026-07-26, HEAD `4faabe0e`.** Chunks 1a/1b/1c/2/3/3b/**4** are
-LANDED, GREEN and PUSHED, plus three adversarial QA rounds that found and fixed
-THIRTEEN real defects. Suite 6454 -> **6634 passed / 27 skipped / 1 xfailed**;
-Bible 17; canonical byte-identical `5377914B` across every commit.
+**Updated 2026-07-26 (overnight), HEAD `a888c423`.** Chunks 1a/1b/1c/2/3/3b/4/
+**5/6a/6b** are LANDED, GREEN and PUSHED, plus five adversarial QA rounds.
+Suite 6454 -> **6687 passed / 27 skipped / 1 xfailed**; Bible 17; canonical
+byte-identical `5377914B` across every commit.
+
+**WHAT CHUNK 6 STILL OWES -- 6c then 6d, in that order:**
+
+- **6c (NEXT): the per-segment render loop.** Walk a shot's `coverage_plan`
+  segments through ONE `beat_session.BeatSession`, passing a
+  `beat_session.SegmentSlot(session, index, beat_id)` per segment and
+  `segment_index=` into `build_request_from_shot` (both seams are landed and
+  tested -- 6c is the loop that uses them). The TERMINAL TRANSACTION belongs
+  INSIDE this loop: segment N+1 needs segment N's terminal frame
+  synchronously, so it cannot wait for the post-episode pass.
+- **6d: transactional assembly.** Assemble the segments into one beat clip,
+  then VERIFY with `wan_shared.ffprobe_counted_frames` (landed in 6a) that the
+  assembled clip carries exactly `plan.target_visible_frames`, and with
+  `ffprobe_clip_fields`' new `width`/`height` that no segment changed canvas
+  partway through. A container header cannot answer either question.
+
+**THE SEAMS 6c MUST USE (landed, do not re-invent):**
+
+| seam | where | contract |
+|---|---|---|
+| `BeatSession` | `beat_session.py` | ONE prepare/load per beat, ONE teardown in the outer `finally`; refuses a multi-segment beat whose adapter cannot name its handles |
+| `SegmentSlot` | `beat_session.py` | session + index + the beat the caller claims; segments must be CONTIGUOUS and forward |
+| `_render_one(..., segment=slot)` | `render_driver.py` | reuses the session's handles, does NOT tear down |
+| `build_request_from_shot(..., segment_index=N)` | `render_driver.py` | N>0 swaps in that segment's own still |
+| `jump_segment_still_path` | `render_driver.py` | resolves it BY OBJECT ID off the spine receipt -- **never `_still_index`** |
+| `ffprobe_counted_frames` | `wan_shared.py` | the decoded count, for the assembly boundary only (it decodes) |
 
 | chunk | commit | what landed |
 |---|---|---|
@@ -167,6 +193,11 @@ Bible 17; canonical byte-identical `5377914B` across every commit.
 | 3b | `00339e32` | the `CoveragePlan` rides the ledger, validated at BOTH wire boundaries |
 | 4 | `583b3ea3` | the jump-still image-phase consumer: ShotLock mints per-segment requests, the dispatcher merges them into `objects` + `required_scene_targets`, the spine proves every one |
 | QA3 | `4faabe0e` | ONE predicate decides whether a lane owes segment stills; the minter validates its plan; the `OTR_TEST_MODE` bypass can no longer wave a jump shot through |
+| QA4 | `b0e383f5` | the LEGACY route path validates the coverage plan AFTER the route is final (it was checking against the picked engine, then letting the force map swap it); a `still_*` lane can never opt in to multi-clip |
+| 5 | `4fa992e6` | **the beat session**: one load per beat, one teardown in the outer `finally`, a named identity (engine + recipe + weights) re-proved before every segment |
+| QA5 | `451309de` | the GPU lease releases even when an engine's `unload()` raises (**live pre-existing leak** -- a stranded lease hung the NEXT episode for 120s); segments must be contiguous; a session with no `beat_id` latches the first beat claimed |
+| 6a | `3a76c47a` | `ffprobe_clip_fields` learns `width`/`height`; new `ffprobe_counted_frames` (`-count_frames`) for the assembly boundary |
+| 6b | `a888c423` | a jump segment resolves its init image **BY OBJECT ID** off the spine receipt -- the chunk-4 carry-forward, with a differential test showing `_still_index` returning the wrong image |
 
 **CHUNK 4'S DURABLE LESSON -- TWO POLICIES OVER ONE STATE IS THE DEFECT, NOT
 THE SYMPTOM.** The QA panel found the merge inferring "no scene object and no
@@ -261,21 +292,31 @@ recorded that exact outcome verbatim. Pinned by
    existing lookup would hand EVERY segment segment-0's still -- silently
    re-creating the held-frame degradation chunks 3-4 exist to remove, with the
    correct stills sitting unused on disk.
-3. **5 (NEXT):** beat-session lifecycle -- reusable MODEL/CLIP/VAE handles, teardown
-   in ONE outer `finally`, assert LOADER-call count (not `prepare` count).
-   r4 settled the shape: `wrapper_bridge.run_graph` does NOT gain a
-   prepared-handles parameter; the adapter owns the handles and each segment
-   graph takes them as literals, omitting its loader nodes. The continuity
-   token must include recipe + weight identity so handles cannot survive a
-   recipe change.
-4. **6:** terminal transaction INSIDE the render loop (segment N+1 needs
-   segment N's terminal frame synchronously, so it cannot wait for the
-   post-episode pass) + transactional assembly + a new ffprobe helper with
-   `-count_frames` (`wan_shared.py:52-123` collects neither frame count nor
-   dimensions).
-5. **7:** the `ltx_8gb` LIVE slice at a 169-frame beat + a 162-frame CPU
-   tail-trim case. **Needs a selective box reset per CLAUDE.md section 4** --
-   kill by CommandLine via CIM, never a blanket python kill.
+3. ~~**5**~~ -- DONE @ `4fa992e6` + QA `451309de`. The driver-side half of the
+   r4 shape is landed (session owns the handles; `run_graph` did NOT gain a
+   prepared-handles parameter). **The ADAPTER-side half is still owed and
+   belongs to chunk 7**: "each segment graph takes the handles as literals,
+   omitting its loader nodes" is a per-adapter change, and `ltx_8gb` is the
+   first adapter that will need it.
+4. **6:** ~~6a ffprobe~~ DONE @ `3a76c47a`; ~~6b per-segment init image~~ DONE
+   @ `a888c423`. **6c (NEXT)** = the per-segment render loop + the terminal
+   transaction INSIDE it (segment N+1 needs segment N's terminal frame
+   synchronously, so it cannot wait for the post-episode pass). **6d** =
+   transactional assembly, verified with the 6a helpers.
+5. **7:** the FIRST adapter opt-in + the `ltx_8gb` LIVE slice at a 169-frame
+   beat + a 162-frame CPU tail-trim case. **Needs a selective box reset per
+   CLAUDE.md section 4** -- kill by CommandLine via CIM, never a blanket python
+   kill. Three things chunk 7 must carry, all grounded this session:
+   (a) `eng_ltx_8gb.frame_contract()` must declare a STATIC ladder -- the
+   contract is pure by contract, and `_resolve_render_config()["max_frames"]`
+   reads the environment, so the declaration cannot be derived from it;
+   (b) the adapter must declare `session_identity()` (engine + recipe + weight
+   names) or `BeatSession` will REFUSE to reuse handles across its segments --
+   that refusal is the design, not a bug;
+   (c) **the CLIP-FILL ping-pong at `eng_ltx_8gb.py:426-437` MUST NOT run for a
+   coverage-planned segment.** The plan already sized the render to a legal
+   length; extending it re-introduces exactly the boomerang this build removes.
+   The same applies to `eng_wan_ti2v.py:521-533` when Wan opts in.
 6. **8 (later):** the pause map (RANKS legal cut points, never chooses them);
    then further adapters; audio lanes LAST.
 
@@ -841,7 +882,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED (see CURRENT STEP). r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1a/1b/1c/2/3/3b/4 + three QA rounds are LANDED GREEN and PUSHED (HEAD `4faabe0e`).** NEXT = **chunk 5, then 6-7 in order** (beat-session lifecycle -> terminal transaction + assembly -> `ltx_8gb` 169-frame live slice). Chunk 6 carries the HARD per-segment `init_image`-by-object-id requirement from the chunk-4 QA panel -- see CURRENT STEP. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out for QA rounds (cheap, and it has found real defects in already-green code three times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
+| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED (see CURRENT STEP). r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1a/1b/1c/2/3/3b/4/5/6a/6b + five QA rounds are LANDED GREEN and PUSHED (HEAD `a888c423`).** NEXT = **6c (the per-segment render loop + the terminal transaction inside it), then 6d (transactional assembly), then 7** (`ltx_8gb` opt-in + the 169-frame live slice). The seams 6c must use are landed and tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
@@ -888,11 +929,11 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-26 @ `4faabe0e`, coverage chunk 4 + QA):
-  full Windows suite `6634 passed / 27 skipped / 1 xfailed`; Bug Bible
-  `17 passed / 24 skipped / 3 xfailed`; canonical `5377914B` (byte-identical --
-  no chunk in the coverage block touches a node, widget, link or schema).
-  Detail in HANDOFF_LOG.
+- Current whole-tree receipt (2026-07-26 overnight @ `a888c423`, coverage
+  chunks 5 + 6a + 6b and two QA rounds): full Windows suite `6687 passed /
+  27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`;
+  canonical `5377914B` (byte-identical -- no chunk in the coverage block
+  touches a node, widget, link or schema). Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
   AST/JSON/BOM/zero-byte checks, commit, push, verify
   `HEAD == origin/v2.0-alpha`.
