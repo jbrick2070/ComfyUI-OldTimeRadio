@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 from .registry import register
+from .frame_contract import FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_google_api.client import (
     GoogleAPIError,
@@ -33,6 +34,10 @@ from .._otr_story_brief_helpers import append_visual_safety_clause
 DEFAULT_MODEL = "gemini-omni-flash-preview"
 SUPPORTED_MODELS = (DEFAULT_MODEL,)
 OUTPUT_DURATION_RANGE_S = (3, 10)
+#: The rate a delivered clip is COUNTED at -- the canvas's, not OUTPUT_FPS
+#: below. ``canonicalize()`` resamples to ``canvas.fps`` before anything reads
+#: a frame count. See the matching note in ``eng_google_veo_video.py``.
+CANVAS_FPS = 25
 OUTPUT_RESOLUTION = "720p"
 OUTPUT_FPS = 24
 _TIMEOUT_S = 900
@@ -350,6 +355,27 @@ class GoogleOmniVideoEngine:
     """Registered as ``google_omni_video``. Direct Omni text-to-video, BYO key."""
 
     name = "google_omni_video"
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). OUTPUT_DURATION_RANGE_S is
+    #: (3, 10) SECONDS; at the CANVAS rate of 25 that is 75-250 frames.
+    #:
+    #: NOT ``* OUTPUT_FPS`` (24), which is what this declared until the chunk-7a
+    #: QA panel corrected it. ``canonicalize()`` below resamples to
+    #: ``canvas.fps`` and then counts ``duration_s * asset.fps`` at that same
+    #: rate, so a 10-second Omni clip measures 250 frames, not 240 -- and the
+    #: old ceiling of 240 would have refused any clip longer than 9.6 s, inside
+    #: the provider's own advertised range.
+    #:
+    #: A range, not a menu: the provider picks the actual length inside it,
+    #: which is exactly why allow_tail_trim is required rather than optional.
+    #: CONTINUITY none -- this lane is text-only, with no image input a
+    #: successor segment could begin from.
+    frame_contract = FrameContract(
+        min_frames=OUTPUT_DURATION_RANGE_S[0] * CANVAS_FPS,
+        max_frames=OUTPUT_DURATION_RANGE_S[1] * CANVAS_FPS,
+        quantum=1,
+        native_fps=CANVAS_FPS,
+        allow_tail_trim=True,
+    )
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()
     commercial_clean = True

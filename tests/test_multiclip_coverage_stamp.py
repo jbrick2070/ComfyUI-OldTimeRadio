@@ -64,24 +64,65 @@ def test_the_stamp_is_json_serializable():
         cp.CoveragePlan.from_dict(shots[0]["coverage_plan"])
 
 
-def test_chunk_3b_is_behaviour_inert_today():
-    """Every adapter is still single_only, so every beat is ONE clip.
+def test_the_plan_snaps_to_the_adapters_REAL_ladder(monkeypatch):
+    """The stamped plan renders a length the adapter can actually accept.
 
-    If this ever fails, an adapter opted in to multi-clip without its own live
-    proof -- which is the failure mode the per-adapter declaration exists to
-    prevent, and it must be caught here rather than on a render.
+    REPLACES ``test_chunk_3b_is_behaviour_inert_today`` (chunk 7a,
+    2026-07-26). That test asserted ``seg.render_frames == target_frame_count``
+    and passed for one reason only: no adapter declared a ladder, so every
+    engine resolved to SINGLE_ONLY, where every length is legal. It was
+    measuring the ABSENCE of declarations, not a property of the build -- and
+    it would have gone on passing while the plan promised wan_i2v a 50-frame
+    render that ``_floor_length`` was quietly snapping to 53 behind its back.
+    Two policies over one state, which is the defect this build exists to
+    remove.
+
+    What is true now, and worth pinning: 50 visible frames on a 4n+1 ladder
+    with min 33 has no exact single render, so the planner renders the
+    SMALLEST LEGAL length at or above it (53) and trims the excess (3). The
+    beat still gets EXACTLY the frames its audio asked for -- that is the
+    invariant -- but the render length is now the adapter's number rather than
+    the planner's wish.
+
+    THE EXPECTED NUMBER IS A LITERAL, ON PURPOSE. Writing it as
+    ``contract.smallest_legal_at_least(target)`` reads better and proves
+    nothing: it sources the expectation from the very declaration under test,
+    so deleting wan_i2v's contract moves both sides together and the test goes
+    on passing against an open ladder. A mutation run caught exactly that, in
+    this test, before it shipped. 50 visible frames must render 53 -- say 53.
     """
     beats = _beats(n=3)
     _groups, shots = sl.build_execution_plan(beats, _budget(beats), {}, _policy())
+    contract = fc.frame_contract_for(vreg.get_engine("wan_i2v"))
     for shot in shots:
+        assert shot["target_frame_count"] == 50           # the fixture's beat
         plan = cp.CoveragePlan.from_dict(shot["coverage_plan"])
         assert plan.join_mode == cp.JOIN_SINGLE
         assert plan.segment_count == 1
         assert plan.is_multi_clip is False
-        # ...and the single segment renders exactly the beat, no trims.
         seg = plan.segments[0]
-        assert seg.render_frames == shot["target_frame_count"]
-        assert seg.drop_head == 0 and seg.trim_tail == 0
+        # 33 + 4*5 = 53, the smallest length on wan_i2v's ladder at or above 50.
+        assert seg.render_frames == 53
+        assert contract.is_legal_length(seg.render_frames)
+        # ...and the VISIBLE frames still equal the beat exactly.
+        assert plan.total_visible_frames == 50
+        assert seg.drop_head == 0
+        assert seg.trim_tail == 3
+
+
+def test_a_beat_that_IS_a_legal_length_is_rendered_untrimmed():
+    """The snap is smallest-legal-at-or-above, not blanket round-up.
+
+    53 is on wan_i2v's ladder (33 + 4*5), so a 53-frame beat must render
+    exactly 53 with nothing trimmed. Without this, the test above would still
+    pass if the planner always added a segment's worth of padding.
+    """
+    beats = _beats(n=1)
+    _groups, shots = sl.build_execution_plan(
+        beats, _budget(beats, frames=53), {}, _policy())
+    plan = cp.CoveragePlan.from_dict(shots[0]["coverage_plan"])
+    assert plan.segments[0].render_frames == 53
+    assert plan.segments[0].trim_tail == 0
 
 
 def test_a_zero_length_beat_gets_no_plan():
@@ -98,17 +139,48 @@ def test_an_unregistered_engine_gets_no_plan_rather_than_a_guess():
     assert all("coverage_plan" not in s for s in shots)
 
 
-def test_a_beat_the_adapter_cannot_cover_is_TERMINAL_at_plan_time(monkeypatch):
-    """The whole point: a beat past a single_only cap must SURFACE.
+def test_a_beat_past_the_cap_is_COVERED_by_more_clips_not_refused():
+    """The 8-second beat that proved the opt-in had to go (chunk 7a QA panel).
 
-    Today that case is answered by ping-pong, loop-fill or a held frame -- the
-    three silent coverage mechanisms this build removes. Once an adapter
-    declares a real ceiling, exceeding it has to fail loudly at plan time,
-    before any GPU work, rather than quietly producing padded video.
+    This was ``test_a_beat_the_adapter_cannot_cover_is_TERMINAL_at_plan_time``
+    and it monkeypatched a capped contract onto wan_i2v to assert a refusal.
+    Then wan_i2v got a REAL cap of 177, and the refusal stopped being
+    hypothetical: an ordinary 200-frame beat -- eight seconds of dialogue --
+    raised ``CoveragePlanError`` out of ``build_execution_plan`` and took the
+    whole episode's plan down with it, because the ceiling was declared while
+    the multi-clip escape was still opt-in and nothing had opted in.
+
+    No monkeypatch here. wan_i2v's own declared ceiling, an ordinary beat
+    length, and the plan that must come back.
+    """
+    beats = _beats(n=1)
+    _groups, shots = sl.build_execution_plan(
+        beats, _budget(beats, frames=200), {}, _policy())
+    plan = cp.CoveragePlan.from_dict(shots[0]["coverage_plan"])
+    contract = fc.frame_contract_for(vreg.get_engine("wan_i2v"))
+    assert 200 > contract.max_frames, "the fixture must exceed the real cap"
+    assert plan.segment_count > 1
+    assert plan.total_visible_frames == 200
+    assert all(contract.is_legal_length(s.render_frames) for s in plan.segments)
+    # wan_i2v locks frame 0 to its init image, so this one earns a real chain
+    # rather than a jump cut -- and every successor drops the duplicated frame.
+    assert plan.join_mode == cp.JOIN_CHAIN
+    assert [s.drop_head for s in plan.segments] == [0] + [1] * (plan.segment_count - 1)
+
+
+def test_a_beat_that_NOTHING_can_cover_still_surfaces_at_plan_time(monkeypatch):
+    """Splitting made most beats coverable; it did not make refusal impossible.
+
+    An adapter that forbids the tail trim can only cover totals its ladder sums
+    to exactly. When there is no such sum, the plan must still fail LOUD at
+    plan time -- before any GPU work -- rather than fall back to ping-pong,
+    loop-fill or a held frame, which are the three silent mechanisms this build
+    exists to remove.
     """
     engine = vreg.get_engine("wan_i2v")
-    capped = fc.FrameContract(min_frames=9, max_frames=161, quantum=8)
-    monkeypatch.setattr(engine, "frame_contract", lambda: capped, raising=False)
+    picky = fc.FrameContract(min_frames=9, max_frames=9, quantum=1,
+                             allow_tail_trim=False)
+    monkeypatch.setattr(engine, "frame_contract", lambda: picky, raising=False)
 
     beats = _beats()
     with pytest.raises(cp.CoveragePlanError):
@@ -131,9 +203,24 @@ def _ledger_with(plan_dict, target=50, engine="wan_i2v"):
     }
 
 
+def _wan_plan(frames=50):
+    """A plan built from wan_i2v's OWN declared contract.
+
+    Chunk 7a, 2026-07-26: these boundary tests used to partition against
+    ``fc.SINGLE_ONLY`` while stamping ``engine_id="wan_i2v"`` on the ledger.
+    That worked only while wan_i2v declared nothing, so the two contracts
+    happened to be the same object. Now that it declares a real 4n+1 ladder,
+    a SINGLE_ONLY plan is simply an ILLEGAL plan for that engine -- so a test
+    named "accepts a sound plan" was building an unsound one and a test whose
+    setup asserts the plan is legal for the picked engine was asserting
+    something false. Build the plan from the engine the ledger names.
+    """
+    return cp.partition_beat(
+        frames, fc.frame_contract_for(vreg.get_engine("wan_i2v")))
+
+
 def test_render_boundary_accepts_a_sound_plan():
-    plan = cp.partition_beat(50, fc.SINGLE_ONLY)
-    assert rd.assert_coverage_plans(_ledger_with(plan.to_dict())) == 1
+    assert rd.assert_coverage_plans(_ledger_with(_wan_plan().to_dict())) == 1
 
 
 def test_render_boundary_rejects_a_plan_that_drifts_from_its_beat():
@@ -166,7 +253,8 @@ def test_render_boundary_rejects_a_plan_the_LIVE_contract_now_refuses(monkeypatc
     its CURRENT contract would reject -- so the second boundary re-validates
     against the live contract, not just the plan's own arithmetic.
     """
-    plan = cp.partition_beat(50, fc.SINGLE_ONLY)      # legal under an open ladder
+    plan = _wan_plan()                       # LEGAL under wan_i2v as declared
+    assert rd.assert_coverage_plans(_ledger_with(plan.to_dict())) == 1
     engine = vreg.get_engine("wan_i2v")
     narrow = fc.FrameContract(min_frames=9, max_frames=161, quantum=8)
     monkeypatch.setattr(engine, "frame_contract", lambda: narrow, raising=False)
@@ -209,7 +297,7 @@ def test_the_legacy_path_validates_the_plan_against_the_FINAL_engine(monkeypatch
     that closed it. Checking early is worse than not checking: it writes
     COVERAGE PLANS OK for routing that no longer holds.
     """
-    plan = cp.partition_beat(50, fc.SINGLE_ONLY)
+    plan = _wan_plan()
     ledger = _ledger_with(plan.to_dict())        # no roles_effective == legacy
     assert rd.frozen_route_from_ledger(ledger) == {}
     # The plan IS legal for the picked engine -- so an early check passes, and

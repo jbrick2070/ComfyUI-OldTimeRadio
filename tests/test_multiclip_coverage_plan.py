@@ -18,16 +18,14 @@ from nodes._otr_video_engines import frame_contract as fc
 
 
 LTX8 = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
-                        supports_multi_clip=True,
                         continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
 
 JUMPY = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
-                         supports_multi_clip=True,
                          continuity=fc.CONTINUITY_SOFT_REFERENCE)
 
 VEO = fc.FrameContract(min_frames=100, max_frames=200,
-                       discrete_durations=(100, 150, 200),
-                       allow_tail_trim=True, supports_multi_clip=True,
+                       discrete_frames=(100, 150, 200),
+                       allow_tail_trim=True,
                        continuity=fc.CONTINUITY_SOFT_REFERENCE)
 
 
@@ -71,7 +69,7 @@ def test_162_frames_needs_the_cpu_tail_trim_case():
     """The separate 162-frame case r3 asked for: one over the cap, and 162 is
     not on the 8n+1 ladder, so this exercises legal tail trimming."""
     trimmable = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
-                                 allow_tail_trim=True, supports_multi_clip=True,
+                                 allow_tail_trim=True,
                                  continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
     plan = cp.partition_beat(162, trimmable)
     assert plan.total_visible_frames == 162
@@ -129,7 +127,7 @@ def test_chain_sweep_with_tail_trim_covers_nearly_everything():
     assertion inside `_sweep` actually runs on hundreds of inputs.
     """
     trimmable = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
-                                 allow_tail_trim=True, supports_multi_clip=True,
+                                 allow_tail_trim=True,
                                  continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
     targets = list(range(9, 900, 7))
     plans, refusals = _sweep(trimmable, targets)
@@ -175,7 +173,7 @@ def test_an_8n_plus_1_chain_can_only_assemble_to_8m_plus_1(target):
 @pytest.mark.parametrize("target", [170, 200, 500])
 def test_tail_trim_covers_the_beats_the_bare_ladder_cannot(target):
     trimmable = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
-                                 allow_tail_trim=True, supports_multi_clip=True,
+                                 allow_tail_trim=True,
                                  continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
     plan = cp.partition_beat(target, trimmable)
     assert plan.total_visible_frames == target
@@ -187,7 +185,9 @@ def test_tail_trim_covers_the_beats_the_bare_ladder_cannot(target):
 # Join-mode selection comes from the adapter's own declaration
 # ---------------------------------------------------------------------------
 
-def test_single_only_engine_never_splits():
+def test_a_beat_that_FITS_never_splits():
+    """Splitting is for beats that overflow, not a thing that happens to
+    everyone now that the opt-in is gone. 17 is on this ladder, so one clip."""
     plan = cp.partition_beat(17, fc.FrameContract(min_frames=9, max_frames=161,
                                                   quantum=8))
     assert plan.join_mode == cp.JOIN_SINGLE
@@ -195,12 +195,68 @@ def test_single_only_engine_never_splits():
     assert plan.is_multi_clip is False
 
 
-def test_single_only_engine_over_its_cap_is_terminal():
+def test_an_engine_over_its_cap_SPLITS_rather_than_padding():
     """It must NOT silently ping-pong, loop-fill or hold a frame -- those are
-    exactly the three silent coverage mechanisms this build removes."""
-    single = fc.FrameContract(min_frames=9, max_frames=161, quantum=8)
-    with pytest.raises(cp.CoveragePlanError, match="not opted in to multi-clip"):
-        cp.partition_beat(400, single)
+    exactly the three silent coverage mechanisms this build removes.
+
+    REWRITTEN chunk 7a (2026-07-26). This was
+    ``test_single_only_engine_over_its_cap_is_terminal`` and asserted that a
+    beat past the cap RAISED, because an engine had to opt in to multi-clip and
+    this one had not. The operator deleted the opt-in -- "everything gets an
+    equal term" -- so the answer to a beat past the cap is no longer a refusal,
+    it is the second clip that multi-clip coverage exists to provide.
+
+    The invariant the old test was really defending is unchanged and is what is
+    asserted here: the beat gets its EXACT frame count out of real rendered
+    clips. No padding, no held frame. Only the mechanism changed.
+    """
+    contract = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
+                                allow_tail_trim=True,
+                                continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
+    plan = cp.partition_beat(400, contract)
+    assert plan.segment_count > 1
+    assert plan.total_visible_frames == 400
+    assert all(contract.is_legal_length(s.render_frames) for s in plan.segments)
+
+
+def test_a_chained_8n1_ladder_needs_the_TAIL_TRIM_to_reach_400():
+    """Why the test above carries ``allow_tail_trim=True``, written down.
+
+    The first draft of it omitted the flag and refused, which looked like a bug
+    in the partitioner and was not. On an 8n+1 ladder every segment is
+    ``9 + 8a``, and under CHAIN covering ``t`` visible frames with ``k``
+    segments requires rendering ``t + k - 1``. Setting those equal:
+    ``9k + 8S = 399 + k``, i.e. ``8(k + S) = 399`` -- and 399 is not divisible
+    by 8, for any segment count. So 400 visible frames has NO exact chained
+    cover on this ladder, and the refusal was correct.
+
+    The tail trim is what makes it coverable: render one step past and drop the
+    remainder. Pinning the refusal keeps the fix honest -- the flag is buying a
+    real capability, not papering over arithmetic nobody checked.
+    """
+    no_trim = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
+                               allow_tail_trim=False,
+                               continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
+    with pytest.raises(cp.CoveragePlanError, match="no exact multi-clip cover"):
+        cp.partition_beat(400, no_trim)
+
+
+def test_a_beat_no_amount_of_splitting_can_cover_is_STILL_terminal():
+    """The refusal did not go away -- it moved to where it is still true.
+
+    An engine that forbids the tail trim can only cover totals its ladder sums
+    to exactly. Give it a ladder whose every entry is odd and ask for an even
+    total that no combination reaches, and there is genuinely no honest plan --
+    so it raises rather than shipping a clip that drifts from the beat audio.
+    That is the property the pre-7a test was reaching for, stated in terms that
+    survive the opt-in's removal.
+    """
+    picky = fc.FrameContract(min_frames=9, max_frames=9, quantum=1,
+                             allow_tail_trim=False,
+                             continuity=fc.CONTINUITY_SOFT_REFERENCE)
+    # Only 9 is legal, so reachable totals are 9, 18, 27... 400 is not one.
+    with pytest.raises(cp.CoveragePlanError, match="no exact multi-clip cover"):
+        cp.partition_beat(400, picky)
 
 
 def test_a_beat_inside_one_render_stays_one_clip():
@@ -220,7 +276,7 @@ def test_discrete_duration_lane_partitions_over_its_menu():
     plan = cp.partition_beat(400, VEO)
     assert plan.total_visible_frames == 400
     for seg in plan.segments:
-        assert seg.render_frames in VEO.discrete_durations
+        assert seg.render_frames in VEO.discrete_frames
     cp.validate_coverage_plan(plan, VEO)
 
 
@@ -293,11 +349,21 @@ def test_a_nonpositive_target_is_rejected(target):
         cp.partition_beat(target, LTX8)
 
 
-def test_multi_segment_plan_rejected_for_single_only_contract():
+def test_multi_segment_plan_rejected_when_a_SEGMENT_is_off_the_ladder():
+    """REPLACES ``test_multi_segment_plan_rejected_for_single_only_contract``.
+
+    That test built a 2-segment plan and validated it against a contract with
+    no opt-in, expecting "not opted in". With the opt-in deleted there is no
+    such refusal -- and the check it was standing in for is still here and is
+    the one that matters: a plan is rejected when a SEGMENT asks the adapter
+    for a length the adapter cannot render. Same boundary, real reason.
+    """
     plan = cp.partition_beat(169, LTX8)
-    single = fc.FrameContract(min_frames=9, max_frames=161, quantum=8)
-    with pytest.raises(cp.CoveragePlanError, match="not opted in"):
-        cp.validate_coverage_plan(plan, single)
+    assert plan.segment_count > 1
+    narrower = fc.FrameContract(min_frames=9, max_frames=161, quantum=16,
+                                continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
+    with pytest.raises(cp.CoveragePlanError, match="cannot accept"):
+        cp.validate_coverage_plan(plan, narrower)
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +381,7 @@ def test_tail_trim_search_is_not_capped_at_one_quantum():
     trimming and were refused anyway. This is the smallest repro.
     """
     contract = fc.FrameContract(min_frames=4, max_frames=5, quantum=1,
-                                allow_tail_trim=True, supports_multi_clip=True,
+                                allow_tail_trim=True,
                                 continuity=fc.CONTINUITY_NONE)
     plan = cp.partition_beat(6, contract)
     assert plan.total_visible_frames == 6
@@ -327,7 +393,7 @@ def test_tail_trim_search_is_not_capped_at_one_quantum():
 def test_tail_trim_bridges_a_shortfall_larger_than_the_quantum():
     """The second repro from the same sweep: a 7-frame trim with quantum 2."""
     contract = fc.FrameContract(min_frames=10, max_frames=12, quantum=2,
-                                allow_tail_trim=True, supports_multi_clip=True,
+                                allow_tail_trim=True,
                                 continuity=fc.CONTINUITY_NONE)
     plan = cp.partition_beat(13, contract)
     assert plan.total_visible_frames == 13
@@ -341,7 +407,6 @@ def test_no_false_refusal_across_a_trimmable_sweep():
     for min_f, q, max_f in ((4, 1, 5), (9, 8, 161), (10, 2, 12), (1, 1, 3)):
         contract = fc.FrameContract(min_frames=min_f, max_frames=max_f,
                                     quantum=q, allow_tail_trim=True,
-                                    supports_multi_clip=True,
                                     continuity=fc.CONTINUITY_NONE)
         for target in range(min_f, max_f * 4):
             plan = cp.partition_beat(target, contract)
@@ -367,8 +432,8 @@ def test_discrete_partition_does_not_blow_up_exponentially():
     import time
 
     contract = fc.FrameContract(min_frames=96, max_frames=168,
-                                discrete_durations=(96, 120, 144, 168),
-                                allow_tail_trim=True, supports_multi_clip=True,
+                                discrete_frames=(96, 120, 144, 168),
+                                allow_tail_trim=True,
                                 continuity=fc.CONTINUITY_SOFT_REFERENCE)
     started = time.perf_counter()
     try:
@@ -381,13 +446,13 @@ def test_discrete_partition_does_not_blow_up_exponentially():
 
 def test_discrete_menu_still_partitions_correctly_after_memoization():
     contract = fc.FrameContract(min_frames=96, max_frames=168,
-                                discrete_durations=(96, 120, 144, 168),
-                                allow_tail_trim=True, supports_multi_clip=True,
+                                discrete_frames=(96, 120, 144, 168),
+                                allow_tail_trim=True,
                                 continuity=fc.CONTINUITY_SOFT_REFERENCE)
     plan = cp.partition_beat(480, contract)
     assert plan.total_visible_frames == 480
     for seg in plan.segments:
-        assert seg.render_frames in contract.discrete_durations
+        assert seg.render_frames in contract.discrete_frames
     cp.validate_coverage_plan(plan, contract)
 
 
@@ -396,7 +461,7 @@ def test_partition_terminates_quickly_for_a_long_beat():
     import time
 
     trimmable = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
-                                 allow_tail_trim=True, supports_multi_clip=True,
+                                 allow_tail_trim=True,
                                  continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
     started = time.perf_counter()
     plan = cp.partition_beat(7500, trimmable)
@@ -416,7 +481,7 @@ def test_join_mode_does_not_claim_SINGLE_for_an_uncoverable_target():
     jump-cut clips. 202 refusals in an 18k-call sweep traced to this one line.
     """
     contract = fc.FrameContract(min_frames=1, max_frames=12, quantum=2,
-                                allow_tail_trim=True, supports_multi_clip=True,
+                                allow_tail_trim=True,
                                 continuity=fc.CONTINUITY_SOFT_REFERENCE)
     assert contract.smallest_legal_at_least(12) is None      # the premise
     assert cp.join_mode_for(contract, 12) == cp.JOIN_JUMP
@@ -453,7 +518,7 @@ def test_no_false_refusals_across_a_differential_sweep():
                                  (fc.CONTINUITY_SOFT_REFERENCE, 0)):
             contract = fc.FrameContract(
                 min_frames=min_f, max_frames=max_f, quantum=q,
-                allow_tail_trim=trim, supports_multi_clip=True,
+                allow_tail_trim=trim,
                 continuity=continuity)
             lengths = contract.legal_lengths()
             reach = reachable(lengths, max_count)

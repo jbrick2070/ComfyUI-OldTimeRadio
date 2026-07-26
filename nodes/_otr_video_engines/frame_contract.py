@@ -18,10 +18,22 @@ loading a model:
   Engines without strict first-frame support get a JUMP CUT, which is legal and
   honest; silently pretending they chain is neither.
 
-EVERY ADAPTER IS ``single_only`` UNTIL IT PROVES OTHERWISE. An adapter that
-declares nothing resolves to :data:`SINGLE_ONLY`, so this whole module is inert
-until an adapter opts in. That is deliberate: the multi-clip path must be
-opt-in per engine and provable per engine, never inherited by default.
+EVERY ENGINE GETS THE SAME TERMS (chunk 7a, 2026-07-26). This module used to
+open with "EVERY ADAPTER IS ``single_only`` UNTIL IT PROVES OTHERWISE" and
+carried a ``supports_multi_clip`` flag that each adapter had to set for itself.
+The operator ended that design: "this architecture should work with all video
+and still models. There's no gate with opt in or opt out. If there is, we need
+to remove that. Everything gets an equal term... I don't like any hidden
+opt-ins. It either works or it fails."
+
+So the flag is gone and multi-clip is universal. What an adapter must still
+EARN, per engine and from evidence, is the CHAIN -- see :data:`CONTINUITY_MODES`
+below. An engine that cannot prove first-frame lock gets an honest jump cut,
+which is legal; it does not get a pretended seam.
+
+:data:`SINGLE_ONLY` survives as the resolution for an engine that declares
+NOTHING, and ``tests/test_engine_contract_roster.py`` fails by name if any
+registered engine ever resolves to it again.
 
 Cold-import clean: stdlib only, no registry import at module scope.
 """
@@ -64,17 +76,29 @@ class FrameContract:
     ``quantum``
         Legal lengths are ``min_frames + k * quantum``. An ``8n+1`` engine
         declares ``min_frames=9, quantum=8``. ``1`` means any length in range.
-    ``discrete_durations``
-        For providers that only accept a fixed menu of durations (Veo's 4/6/8
-        seconds). When non-empty this REPLACES the min/max/quantum arithmetic
-        and the lengths are exactly these values.
+    ``discrete_frames``
+        For providers that only accept a fixed menu of clip lengths (Veo's
+        4/6/8 SECONDS). When non-empty this REPLACES the min/max/quantum
+        arithmetic and the legal lengths are exactly these values.
+
+        THE UNIT IS FRAMES, NOT SECONDS. ``coverage_plan`` compares these
+        numbers against ``target_visible_frames`` directly, so a provider menu
+        expressed in seconds MUST be multiplied by :attr:`native_fps` at the
+        declaration site. Veo's 4/6/8 s at 24 fps declares ``(96, 144, 192)``.
+        The field was named ``discrete_durations`` until 2026-07-26; it was
+        renamed because the old name invited exactly that seconds-for-frames
+        substitution, and a validator cannot catch it -- ``(4, 6, 8)`` is a
+        perfectly well-formed frame menu, just a wrong one.
+    ``native_fps``
+        The frame rate these frame numbers are expressed at, or ``0`` for an
+        engine that renders at whatever the canvas asks for. Static and
+        informational: it is what lets the matrix report seconds, and what
+        tells a reader that a 24 fps provider is being planned against a
+        25 fps canvas. It is NOT read by the partitioner.
     ``allow_tail_trim``
         Whether the assembler may render the smallest covering length and trim
         the excess at canonicalization. Discrete-duration lanes REQUIRE this --
         4/6/8s durations cannot sum to an arbitrary beat.
-    ``supports_multi_clip``
-        The opt-in. False (the default) means this engine renders a beat in one
-        call and the partitioner must never split it.
     ``continuity``
         One of :data:`CONTINUITY_MODES`.
 
@@ -85,9 +109,9 @@ class FrameContract:
     min_frames: int = 1
     max_frames: int = 0            # 0 == "unbounded / not declared"
     quantum: int = 1
-    discrete_durations: tuple = field(default_factory=tuple)
+    discrete_frames: tuple = field(default_factory=tuple)
+    native_fps: int = 0            # 0 == "renders at the canvas rate"
     allow_tail_trim: bool = False
-    supports_multi_clip: bool = False
     continuity: str = CONTINUITY_NONE
 
     def __post_init__(self):
@@ -105,33 +129,29 @@ class FrameContract:
             raise FrameContractError(
                 "max_frames %r is below min_frames %r"
                 % (self.max_frames, self.min_frames))
-        if self.discrete_durations:
-            if any(int(d) < 1 for d in self.discrete_durations):
+        if int(self.native_fps) < 0:
+            raise FrameContractError(
+                "native_fps must be >= 0, got %r" % (self.native_fps,))
+        if self.discrete_frames:
+            if any(int(d) < 1 for d in self.discrete_frames):
                 raise FrameContractError(
-                    "discrete_durations must all be >= 1, got %r"
-                    % (self.discrete_durations,))
+                    "discrete_frames must all be >= 1, got %r"
+                    % (self.discrete_frames,))
             if not self.allow_tail_trim:
                 # A fixed menu of lengths cannot sum to an arbitrary beat, so
                 # without tail trimming there are beats this engine could never
                 # cover exactly -- that is a contract that lies.
                 raise FrameContractError(
-                    "discrete_durations requires allow_tail_trim=True: a fixed "
-                    "duration menu cannot sum to an arbitrary beat length")
-        if self.supports_multi_clip and not self.max_frames \
-                and not self.discrete_durations:
-            # Multi-clip exists to cover a beat LONGER than one render. An
-            # engine with no ceiling has nothing to split at.
-            raise FrameContractError(
-                "supports_multi_clip=True requires a declared max_frames (or "
-                "discrete_durations); an engine with no ceiling never splits")
+                    "discrete_frames requires allow_tail_trim=True: a fixed "
+                    "length menu cannot sum to an arbitrary beat length")
 
     # -- pure queries -------------------------------------------------- #
 
     def is_legal_length(self, n: int) -> bool:
         """True iff ``n`` is a length this adapter will accept in one call."""
         n = int(n)
-        if self.discrete_durations:
-            return n in tuple(int(d) for d in self.discrete_durations)
+        if self.discrete_frames:
+            return n in tuple(int(d) for d in self.discrete_frames)
         if n < int(self.min_frames):
             return False
         if self.max_frames and n > int(self.max_frames):
@@ -141,8 +161,8 @@ class FrameContract:
     def legal_lengths(self) -> tuple:
         """Every legal length, ascending. Empty when unbounded (nothing to
         enumerate -- callers must use :meth:`is_legal_length` instead)."""
-        if self.discrete_durations:
-            return tuple(sorted(int(d) for d in self.discrete_durations))
+        if self.discrete_frames:
+            return tuple(sorted(int(d) for d in self.discrete_frames))
         if not self.max_frames:
             return ()
         return tuple(range(int(self.min_frames), int(self.max_frames) + 1,
@@ -151,8 +171,8 @@ class FrameContract:
     def largest_legal_at_most(self, n: int):
         """The largest legal length <= ``n``, or None if there is none."""
         n = int(n)
-        if self.discrete_durations:
-            fits = [int(d) for d in self.discrete_durations if int(d) <= n]
+        if self.discrete_frames:
+            fits = [int(d) for d in self.discrete_frames if int(d) <= n]
             return max(fits) if fits else None
         if n < int(self.min_frames):
             return None
@@ -164,8 +184,8 @@ class FrameContract:
         """The smallest legal length >= ``n``, or None if it exceeds the
         ceiling. Used with ``allow_tail_trim`` to cover a remainder exactly."""
         n = max(int(n), int(self.min_frames))
-        if self.discrete_durations:
-            fits = [int(d) for d in self.discrete_durations if int(d) >= n]
+        if self.discrete_frames:
+            fits = [int(d) for d in self.discrete_frames if int(d) >= n]
             return min(fits) if fits else None
         steps = -(-(n - int(self.min_frames)) // int(self.quantum))  # ceil div
         candidate = int(self.min_frames) + steps * int(self.quantum)
@@ -174,9 +194,12 @@ class FrameContract:
         return candidate
 
 
-#: The default every adapter gets until it declares otherwise: ONE render per
-#: beat, no chaining. Nothing in the coverage path may split an engine that
-#: resolves to this.
+#: What an engine that declares NOTHING resolves to: unbounded, quantum 1, no
+#: chaining. Every length is legal, so it never splits and never refuses -- the
+#: pre-7a behaviour of the whole tree, kept as the honest answer for a stub, a
+#: custom slot, or an adapter that failed to import. No REGISTERED engine may
+#: resolve to it; ``tests/test_engine_contract_roster.py`` fails by name if one
+#: does.
 SINGLE_ONLY = FrameContract()
 
 
@@ -201,13 +224,25 @@ def frame_contract_for(engine) -> FrameContract:
     return value if isinstance(value, FrameContract) else SINGLE_ONLY
 
 
-def supports_multi_clip(engine) -> bool:
-    """True iff this adapter has opted in to multi-clip coverage."""
-    return bool(frame_contract_for(engine).supports_multi_clip)
+def can_split(engine) -> bool:
+    """True iff a beat could ever need more than one clip on this adapter.
+
+    REPLACES ``supports_multi_clip(engine)`` (chunk 7a, 2026-07-26), which read
+    a per-adapter opt-in flag that no longer exists. The question is no longer
+    "did this engine volunteer" -- every engine is in -- but the strictly
+    arithmetic "does this engine have a ceiling to exceed". An unbounded engine
+    (the visualizers, the still families, mesh_stage) accepts any length, so no
+    beat can ever overflow one render and no split can ever be needed.
+    """
+    contract = frame_contract_for(engine)
+    return bool(contract.max_frames or contract.discrete_frames)
 
 
 def can_chain(engine) -> bool:
-    """True iff segment N+1 may begin exactly on segment N's terminal frame."""
-    contract = frame_contract_for(engine)
-    return bool(contract.supports_multi_clip
-                and contract.continuity == CONTINUITY_STRICT_FIRST_FRAME)
+    """True iff segment N+1 may begin exactly on segment N's terminal frame.
+
+    The one thing still EARNED per adapter. Multi-clip is universal; a seamless
+    join is not, because only an engine that genuinely locks frame 0 to a
+    supplied image can deliver one. Everything else jump cuts, honestly.
+    """
+    return frame_contract_for(engine).continuity == CONTINUITY_STRICT_FIRST_FRAME

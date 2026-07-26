@@ -38,6 +38,7 @@ import os
 
 from . import motion_common as _MC
 from .._otr_shared.still_plan_helpers import StillPlanRow
+from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
 _THIS = os.path.abspath(__file__)
@@ -206,6 +207,22 @@ class HuMoEngine(_MC.MotionEngineBase):
     roles = ("character_video",)
     default_roles = ()
     required_inputs = ("audio_ref", "init_image")
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). ``_HUMO_MIN_FRAMES`` ..
+    #: ``_HUMO_MAX_FRAMES`` -- 33 is the legacy floor (below it has hung this
+    #: hardware) and 177 is the last empirically verified ceiling at 480x832
+    #: fp8. 4n+1 stride. Inherited by all four HuMo variants.
+    #: CONTINUITY: soft_reference. The graph wires LoadImage ->
+    #: WanHuMoImageToVideo ``ref_image``, NOT ``start_image``: per the Bug
+    #: Bible the reference is an identity hint, not a first-frame lock. These
+    #: beats take an honest jump cut rather than a pretended chain.
+    frame_contract = FrameContract(
+        min_frames=_HUMO_MIN_FRAMES,
+        max_frames=_HUMO_MAX_FRAMES,
+        quantum=4,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     commercial_clean = False            # license is profile data; verify-at-build
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"
@@ -721,6 +738,33 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     #: uncapped). render_clip renders at the cap then exact-fits to the audio
     #: target. env override: OTR_HUMO_14B_SAFE_FRAMES (after a higher-frame probe).
     safe_render_frames = _HUMO_14B_SAFE_RENDER_FRAMES
+
+    #: ITS OWN LADDER, because its ceiling is its own (chunk 7a QA panel,
+    #: 2026-07-26). This tier inherited HuMoEngine's ``max_frames=177`` for
+    #: exactly as long as it took a panel to read ``render_clip``, which does
+    #: ``render_max = cap if cap is not None else _HUMO_MAX_FRAMES`` -- and
+    #: ``cap`` is ``safe_render_frames`` = 49 HERE and None on all three
+    #: siblings. So the inherited contract advertised 3.6x the frames this
+    #: engine will actually render, and any beat over 49 frames raises
+    #: ``MirrorExtensionForbidden`` today (mirroring an audio-synced lane would
+    #: play the mouth backwards, which is correctly forbidden rather than
+    #: worked around).
+    #:
+    #: This is the inheritance trap the roster audit was written to look for and
+    #: did not catch: the audit checks each contract against ITSELF, never
+    #: against the subclass's runtime behaviour. A subclass that changes what it
+    #: renders must change what it declares, and 49 is the number.
+    #:
+    #: 49 = 4*12+1, so it is on the shared 4n+1 ladder and the quantum is
+    #: unchanged. min stays 33: below that has hung this hardware.
+    frame_contract = FrameContract(
+        min_frames=_HUMO_MIN_FRAMES,
+        max_frames=_HUMO_14B_SAFE_RENDER_FRAMES,
+        quantum=4,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
 
     def _cfg(self):
         # Inherit the 14B distill cfg (1.0); a 16:9 tuning hook is available via

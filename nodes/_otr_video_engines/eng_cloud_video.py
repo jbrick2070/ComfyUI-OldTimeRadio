@@ -39,6 +39,7 @@ import os
 import re
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_story_brief_helpers import (
     append_sfx_audio_safety_clause,
@@ -618,6 +619,18 @@ class CloudKlingAvatarEngine(_CloudVideoBase):
 
     name = "cloud_kling_avatar"
     node_key = "cloud_kling_avatar"
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). Kling sends NO duration parameter at all --
+    #: the clip is as long as the sound_file, which _audio_input
+    #: bounds at min_duration_s=2.0 / max_duration_s=300.0.
+    #: 2-300 s at the 25 fps canvas rate = 50-7500 frames.
+    frame_contract = FrameContract(
+        min_frames=50,
+        max_frames=7500,
+        quantum=1,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     family = "audio_driven_face"
     required_inputs = ("init_image", "audio_ref")
     reactivity = "required_audio_ref"
@@ -660,6 +673,18 @@ class CloudSeedance2Engine(_CloudVideoBase):
     """ByteDance Seedance 2 reference row: music/b-roll reactive default."""
 
     name = "cloud_seedance_2"
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). OTR_CLOUD_SEEDANCE_DURATION, default 7 s,
+    #: clamped to 4-15 s at the call site. That clamp is 7c's to
+    #: delete; this ladder is what refuses in its place.
+    #: 4-15 s at the 25 fps canvas rate = 100-375 frames.
+    frame_contract = FrameContract(
+        min_frames=100,
+        max_frames=375,
+        quantum=25,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     node_key = "cloud_seedance_2"
     family = "audio_conditioned_video"
     required_inputs = ("init_image", "audio_ref", "text_prompt")
@@ -720,6 +745,18 @@ class CloudWanI2VEngine(_CloudVideoBase):
 
     name = "cloud_wan_i2v"
     node_key = "cloud_wan_i2v"
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). OTR_CLOUD_WAN_DURATION, default 5 s, clamped
+    #: to 2-15 s at the call site. Inherited by cloud_wan_i2v_audio,
+    #: which sends the same provider duration.
+    #: 2-15 s at the 25 fps canvas rate = 50-375 frames.
+    frame_contract = FrameContract(
+        min_frames=50,
+        max_frames=375,
+        quantum=25,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     family = "image_to_video"
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
@@ -797,6 +834,18 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
     """Vidu Q2 pro-fast image-to-video, fixed to the cheap 720p tier."""
 
     name = "cloud_vidu_q2_pro_fast_720p"
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). OTR_CLOUD_VIDU_Q2_DURATION, default 5 s,
+    #: clamped to 1-10 s at the call site. Inherited by the _sfx
+    #: variant, which differs only in keeping the provider audio.
+    #: 1-10 s at the 25 fps canvas rate = 25-250 frames.
+    frame_contract = FrameContract(
+        min_frames=25,
+        max_frames=250,
+        quantum=25,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     node_key = "cloud_vidu_q2_i2v"
     family = "image_to_video"
     required_inputs = ("init_image", "text_prompt")
@@ -892,6 +941,17 @@ class CloudWordRazzleEngine(_CloudVideoBase):
     """word_razzle: animate a word-card still into a living period poster."""
 
     name = "word_razzle"
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). Pixverse serves a fixed
+    #: TWO-ENTRY menu, 5 s or 8 s -- `_duration_seconds` ends
+    #: `return 8 if secs > 5 else 5`, so a 12-second beat silently
+    #: becomes an 8-second clip today. As frames at the 25 fps canvas
+    #: rate: 5 s = 125, 8 s = 200.
+    frame_contract = FrameContract(
+        discrete_frames=(125, 200),
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     node_key = "cloud_pixverse_i2v"
     family = "image_to_video"
     required_inputs = ("init_image", "text_prompt")

@@ -26,6 +26,7 @@ import os
 
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .frame_contract import FrameContract
 
 _LOG = logging.getLogger("OTR.video.viz_mxc")
 
@@ -56,6 +57,18 @@ class VizMxcCpuEngine:
     still_plan = ()
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25                     # HARD-LOCK (matches the overlay + mux)
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). UNBOUNDED -- a procedural
+    #: visualizer synthesises frames indefinitely at ``target_fps``, so there
+    #: is no ceiling and no split. CONTINUITY none: nothing here consumes a
+    #: supplied first frame, which is exactly why these beats may jump cut
+    #: without owing the image phase a still at all.
+    frame_contract = FrameContract(
+        min_frames=1,
+        max_frames=0,
+        quantum=1,
+        native_fps=25,
+        allow_tail_trim=True,
+    )
     engine_version = "1"
     fallback_engine = None              # NO FALLBACKS: a failed beat fails LOUD
 

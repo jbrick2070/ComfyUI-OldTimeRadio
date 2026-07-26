@@ -32,13 +32,13 @@ from nodes._otr_video_engines import render_driver as rd
 #: rather than pretending to chain.
 JUMP_CONTRACT = fc.FrameContract(
     min_frames=9, max_frames=41, quantum=8,
-    supports_multi_clip=True, continuity=fc.CONTINUITY_SOFT_REFERENCE)
+    continuity=fc.CONTINUITY_SOFT_REFERENCE)
 
 #: The same ladder with a strict first-frame lock. It CHAINS, so its successors
 #: begin on a real rendered frame and owe the image phase nothing.
 CHAIN_CONTRACT = fc.FrameContract(
     min_frames=9, max_frames=41, quantum=8,
-    supports_multi_clip=True, continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
+    continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
 
 
 def _use_contract(monkeypatch, contract, engine_id="wan_i2v"):

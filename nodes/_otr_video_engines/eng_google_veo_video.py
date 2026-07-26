@@ -20,6 +20,7 @@ import time
 from pathlib import Path
 
 from .registry import register
+from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_google_api.client import (
     GoogleAPIError,
@@ -39,6 +40,25 @@ SUPPORTED_MODELS = (
 )
 SUPPORTED_ASPECTS = ("16:9", "9:16")
 SUPPORTED_DURATIONS_S = (4, 6, 8)
+#: THE CANVAS FRAME RATE, not Veo's. ``OUTPUT_FPS`` above is 24, which is what
+#: Veo GENERATES at -- and it is the wrong number for a FrameContract.
+#:
+#: Corrected 2026-07-26 by the chunk-7a QA panel, which caught this declared as
+#: (96, 144, 192) = 4/6/8 s * 24. The reasoning behind that was "Veo runs at 24
+#: fps, so its frames are 24ths of a second" -- true, and irrelevant, because
+#: nothing in this build ever counts a Veo frame at 24 fps. ``canonicalize()``
+#: below passes ``canvas.fps`` (25) into ``canonicalize_video``, whose ffmpeg
+#: ``fps=`` filter is a real duration-preserving resample, and then computes
+#: ``frame_count = duration_s * asset.fps`` with ``asset.fps`` fixed at that
+#: same 25. So a delivered 8-second Veo clip is 200 frames by the time anything
+#: in the coverage path can see it, and 192 is not merely unusual -- it is
+#: UNREACHABLE. A contract listing it would refuse every real Veo beat.
+#:
+#: The provider's rate matters for what Veo renders. The CANVAS rate is what
+#: the partitioner counts. Those are different questions and this is the one
+#: the contract answers.
+CANVAS_FPS = 25
+SUPPORTED_FRAMES = tuple(s * CANVAS_FPS for s in SUPPORTED_DURATIONS_S)
 SUPPORTED_RESOLUTIONS = ("720p", "1080p", "4k")
 LITE_UNSUPPORTED_RESOLUTIONS = ("4k",)
 REFERENCE_IMAGE_MODELS = (
@@ -480,6 +500,25 @@ class GoogleVeoVideoEngine:
     """Registered as ``google_veo_video``. Direct Veo video, BYO key."""
 
     name = "google_veo_video"
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). A fixed menu, not a range:
+    #: SUPPORTED_FRAMES = 100/150/200, which is Veo's published 4/6/8 SECOND
+    #: menu counted at the CANVAS rate the clip is resampled to before anything
+    #: reads its length. See the SUPPORTED_FRAMES comment above for why this is
+    #: 25 and not Veo's own OUTPUT_FPS of 24.
+    #:
+    #: CONTINUITY soft_reference. Veo does accept a first frame
+    #: (``instance["image"]``) and a chain would be plausible -- but plausible
+    #: is not proven: the returned frame 0 is GENERATED from that image rather
+    #: than being it, and this lane does not even require an init image
+    #: (``required_inputs = ("text_prompt",)``). A wrong strict claim buys a
+    #: visible jump at a join the plan promised was seamless. A jump cut is
+    #: honest. Revisit only with a live leg that measures the seam.
+    frame_contract = FrameContract(
+        discrete_frames=SUPPORTED_FRAMES,
+        native_fps=CANVAS_FPS,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()
     commercial_clean = True

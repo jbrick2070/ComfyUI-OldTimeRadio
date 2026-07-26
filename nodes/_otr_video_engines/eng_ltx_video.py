@@ -52,6 +52,7 @@ import os
 
 from . import motion_common as _MC
 from .._otr_shared.still_plan_helpers import StillPlanRow
+from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
 _LOG = logging.getLogger("OTR.video.eng_ltx_video")
@@ -385,6 +386,22 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     default_roles = ()
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
     required_inputs = ("text_prompt",)
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). 8n+1: 9 .. 169 (8*20+1 is
+    #: 161; 169 = 8*21+1 is the live-DECODE-PROVEN ceiling on this box).
+    #: max_frames is the LITERAL 169, deliberately NOT ``OTR_LTX_MAX_FRAMES``
+    #: -- today an over-ask is silently capped with a warning and the shortfall
+    #: becomes a composite hold-last-frame. That capping path is 7c's to delete;
+    #: this declaration is what replaces it.
+    #: CONTINUITY: the i2v graph uses LTXVImgToVideoConditionOnly at
+    #: strength=1.0, which locks frame 0 to the supplied still (BUG-LOCAL-095).
+    frame_contract = FrameContract(
+        min_frames=9,
+        max_frames=169,
+        quantum=8,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_STRICT_FIRST_FRAME,
+    )
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"

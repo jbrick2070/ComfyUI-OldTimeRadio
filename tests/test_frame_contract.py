@@ -16,12 +16,23 @@ from nodes._otr_video_engines import registry as vreg
 
 
 # ---------------------------------------------------------------------------
-# The default: every adapter is single_only until it proves otherwise
+# The default: what an adapter that declares NOTHING resolves to
+#
+# It is no longer "single_only until it proves otherwise" -- chunk 7a deleted
+# the ``supports_multi_clip`` opt-in on the operator's ruling that every engine
+# gets equal terms. SINGLE_ONLY survives as the answer for a stub or an adapter
+# that failed to import: unbounded, so every length is legal, so it never
+# splits and never refuses. No REGISTERED engine may resolve to it -- that is
+# tests/test_engine_contract_roster.py's job, and it fails by name.
 # ---------------------------------------------------------------------------
 
-def test_default_contract_is_single_only():
-    assert fc.SINGLE_ONLY.supports_multi_clip is False
+def test_the_undeclared_default_is_unbounded_and_never_chains():
+    assert fc.SINGLE_ONLY.max_frames == 0
     assert fc.SINGLE_ONLY.continuity == fc.CONTINUITY_NONE
+    # Unbounded means no beat can ever overflow one render, so there is
+    # nothing to split -- which is what the old opt-in flag was really saying.
+    assert fc.SINGLE_ONLY.is_legal_length(1)
+    assert fc.SINGLE_ONLY.is_legal_length(100000)
 
 
 def test_an_adapter_that_declares_nothing_is_single_only():
@@ -29,7 +40,7 @@ def test_an_adapter_that_declares_nothing_is_single_only():
         pass
 
     assert fc.frame_contract_for(_Bare()) == fc.SINGLE_ONLY
-    assert fc.supports_multi_clip(_Bare()) is False
+    assert fc.can_split(_Bare()) is False
     assert fc.can_chain(_Bare()) is False
 
 
@@ -48,7 +59,6 @@ def test_a_broken_declaration_degrades_to_single_only():
 
 def test_declaration_may_be_a_method_or_an_attribute():
     contract = fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
-                                supports_multi_clip=True,
                                 continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
 
     class _Method:
@@ -62,22 +72,37 @@ def test_declaration_may_be_a_method_or_an_attribute():
     assert fc.frame_contract_for(_Attr()) == contract
 
 
-def test_EVERY_REGISTERED_ENGINE_IS_SINGLE_ONLY_TODAY():
-    """Chunk 2 adds the surface and changes NO behaviour.
+def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
+    """The inverse of what this asserted through chunk 6.
 
-    Multi-clip is opt-in and provable per engine. If this ever fails, an
-    adapter opted in without its own live proof -- which is the failure mode
-    the whole per-adapter declaration exists to prevent.
+    It used to be ``test_EVERY_REGISTERED_ENGINE_IS_SINGLE_ONLY_TODAY``, which
+    passed because no adapter had set ``supports_multi_clip``. Chunk 7a deleted
+    that flag: multi-clip is universal now, and the only question left is
+    arithmetic -- does this engine have a ceiling a beat could exceed.
+
+    So the assertion flips. Every engine with a real ceiling can split; the
+    unbounded lanes (visualizers, still families, mesh_stage) cannot need to,
+    because no length is ever illegal for them. An unbounded engine reporting
+    ``can_split`` would mean a ceiling appeared without a declaration.
     """
-    optedin = []
-    for name in vreg.all_engine_names():
+    splittable, unbounded = [], []
+    for name in sorted(vreg.all_engine_names()):
         try:
             engine = vreg.get_engine(name)
         except Exception:  # noqa: BLE001 -- unbuildable engines are not our subject
             continue
-        if fc.supports_multi_clip(engine):
-            optedin.append(name)
-    assert optedin == []
+        contract = fc.frame_contract_for(engine)
+        (splittable if fc.can_split(engine) else unbounded).append(name)
+        # can_split is exactly "has a ceiling", never a stored opinion.
+        assert fc.can_split(engine) == bool(contract.max_frames
+                                            or contract.discrete_frames), name
+    assert splittable, "no engine declares a ceiling -- the sweep is vacuous"
+    assert unbounded, "no engine is unbounded -- the sweep is vacuous"
+    # The unbounded set is exactly the lanes that synthesise frames on demand.
+    assert set(unbounded) == {
+        "mesh_stage", "still_flat", "still_motion", "still_pan", "still_word",
+        "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
+    }, sorted(unbounded)
 
 
 # ---------------------------------------------------------------------------
@@ -99,23 +124,38 @@ def test_impossible_bounds_are_rejected(kwargs):
         fc.FrameContract(**kwargs)
 
 
-def test_discrete_durations_require_tail_trim():
+def test_discrete_frames_require_tail_trim():
     """A fixed duration menu cannot sum to an arbitrary beat.
 
     Veo's 4/6/8s durations are the real case: without trimming there are beat
     lengths this engine could never cover exactly, so the contract would lie.
     """
     with pytest.raises(fc.FrameContractError):
-        fc.FrameContract(discrete_durations=(100, 150, 200),
+        fc.FrameContract(discrete_frames=(100, 150, 200),
                          allow_tail_trim=False)
-    fc.FrameContract(discrete_durations=(100, 150, 200), allow_tail_trim=True)
+    fc.FrameContract(discrete_frames=(100, 150, 200), allow_tail_trim=True)
 
 
-def test_multi_clip_requires_a_ceiling():
-    """Multi-clip exists to cover a beat LONGER than one render. An engine with
-    no ceiling has nothing to split at, so the declaration is incoherent."""
-    with pytest.raises(fc.FrameContractError):
-        fc.FrameContract(supports_multi_clip=True, max_frames=0)
+def test_only_a_ceiling_makes_an_engine_splittable():
+    """Replaces ``test_multi_clip_requires_a_ceiling`` (chunk 7a).
+
+    That test asserted a CONSTRUCTION error: declaring ``supports_multi_clip``
+    without a ceiling raised, because opting in to splitting with nothing to
+    split at was incoherent. With the opt-in deleted the incoherent state is
+    unconstructible rather than rejected -- splittability is now derived from
+    the ceiling instead of stored alongside it, so the two cannot disagree.
+    """
+    unbounded = fc.FrameContract(min_frames=1, max_frames=0, quantum=1)
+    bounded = fc.FrameContract(min_frames=9, max_frames=161, quantum=8)
+    menu = fc.FrameContract(discrete_frames=(100, 200), allow_tail_trim=True)
+
+    class _Eng:
+        def __init__(self, contract):
+            self.frame_contract = contract
+
+    assert fc.can_split(_Eng(unbounded)) is False
+    assert fc.can_split(_Eng(bounded)) is True
+    assert fc.can_split(_Eng(menu)) is True
 
 
 def test_contract_is_frozen():
@@ -131,7 +171,6 @@ def test_contract_is_frozen():
 @pytest.fixture
 def ltx8():
     return fc.FrameContract(min_frames=9, max_frames=161, quantum=8,
-                            supports_multi_clip=True,
                             continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
 
 
@@ -180,7 +219,7 @@ def test_the_169_frame_acceptance_case_decomposes(ltx8):
 
 def test_discrete_duration_lane_covers_by_trimming():
     veo = fc.FrameContract(min_frames=100, max_frames=200,
-                           discrete_durations=(100, 150, 200),
+                           discrete_frames=(100, 150, 200),
                            allow_tail_trim=True)
     assert veo.legal_lengths() == (100, 150, 200)
     assert veo.largest_legal_at_most(175) == 150
@@ -196,8 +235,7 @@ def test_only_strict_first_frame_earns_a_chain():
     def _with(mode):
         class _E:
             frame_contract = fc.FrameContract(
-                min_frames=9, max_frames=161, quantum=8,
-                supports_multi_clip=True, continuity=mode)
+                min_frames=9, max_frames=161, quantum=8, continuity=mode)
         return _E()
 
     assert fc.can_chain(_with(fc.CONTINUITY_STRICT_FIRST_FRAME)) is True
@@ -207,13 +245,30 @@ def test_only_strict_first_frame_earns_a_chain():
     assert fc.can_chain(_with(fc.CONTINUITY_NONE)) is False
 
 
-def test_single_only_engine_never_chains():
-    class _E:
+def test_the_chain_is_the_only_thing_still_EARNED_per_engine():
+    """Replaces ``test_single_only_engine_never_chains`` (chunk 7a).
+
+    That test built an engine declaring ``strict_first_frame`` WITHOUT the
+    opt-in and asserted it still could not chain -- the flag outranked the
+    continuity mode. With the opt-in deleted, continuity is the whole answer:
+    an engine that declares first-frame lock chains, and one that does not,
+    jump cuts. Splitting is universal; the seamless join is what must be earned.
+    """
+    class _Strict:
         frame_contract = fc.FrameContract(
             min_frames=9, max_frames=161, quantum=8,
-            continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)   # but no opt-in
+            continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
 
-    assert fc.can_chain(_E()) is False
+    class _Soft:
+        frame_contract = fc.FrameContract(
+            min_frames=9, max_frames=161, quantum=8,
+            continuity=fc.CONTINUITY_SOFT_REFERENCE)
+
+    assert fc.can_chain(_Strict()) is True
+    assert fc.can_chain(_Soft()) is False
+    # Both may split -- that is no longer the differentiator.
+    assert fc.can_split(_Strict()) is True
+    assert fc.can_split(_Soft()) is True
 
 
 # ---------------------------------------------------------------------------
@@ -244,35 +299,42 @@ def test_audit_is_pure():
     assert vreg.audit_engine_roster() == vreg.audit_engine_roster()
 
 
-def test_a_still_LANE_never_opts_in_to_multi_clip():
+def test_a_still_LANE_is_ONE_still_because_it_is_UNBOUNDED_not_because_it_is_special():
     """``still_*`` lanes are ONE still -- operator directive, 2026-07-25.
 
-    Guardrail landed BEFORE the first opt-in (2026-07-26, QA4). Once adapters
-    may declare ``supports_multi_clip=True``, neither ``FrameContract`` nor
-    the partitioner can tell a still lane from a moving-video one -- a
-    contract copy-pasted onto ``still_pan`` would let the partitioner split it
-    and the minter mint a second still for a lane that owns exactly one. The
-    invariant holds vacuously today; this is what keeps it holding once it
-    stops being vacuous.
+    THE GUARDRAIL IS GONE AND THE INVARIANT IS STRONGER FOR IT (chunk 7a,
+    2026-07-26). This test used to assert that no ``still_*`` engine had set
+    ``supports_multi_clip`` -- a name-prefix special case defending against a
+    copy-pasted opt-in. The operator removed the opt-in outright: "there's no
+    gate with opt in or opt out... everything gets an equal term."
+
+    Which leaves the invariant resting on arithmetic instead of on a rule about
+    what an engine is called. A still lane declares NO CEILING, so every length
+    is a legal single render, so ``partition_beat`` returns one segment for
+    every beat there has ever been -- and one segment mints one still. A
+    prefix check could be defeated by renaming an engine. This cannot: to split
+    a still lane you would have to give it a ceiling it does not have.
     """
     still_lanes = [n for n in vreg.all_engine_names() if n.startswith("still_")]
     # A sweep over an empty roster asserts nothing. Pin that it is not empty --
     # two "exhaustive" sweeps in this build turned out to be theatre.
     assert still_lanes, "no still_* engines in the roster: this sweep is theatre"
-    offenders = []
-    skipped = []
+    bounded, skipped = [], []
     for name in still_lanes:
         try:
             engine = vreg.get_engine(name)
         except Exception:  # noqa: BLE001 -- record it, never swallow it
             skipped.append(name)
             continue
-        if fc.supports_multi_clip(engine):
-            offenders.append(name)
-    assert offenders == []
+        if fc.can_split(engine):
+            bounded.append(name)
+    assert bounded == [], (
+        "these still_* lanes declare a ceiling, so a long enough beat would "
+        "split them into segments and mint a second still for a lane that owns "
+        "exactly one: %r" % (bounded,))
     # A still lane that cannot be BUILT cannot be CHECKED, and a guardrail that
     # quietly skips its subject is the same theatre in a different costume
     # (2026-07-26 QA panel). If one of these stops constructing, say so.
     assert skipped == [], (
-        "these still_* engines could not be built, so the multi-clip guardrail "
+        "these still_* engines could not be built, so the one-still invariant "
         "never actually checked them: %r" % (skipped,))

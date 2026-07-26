@@ -24,6 +24,7 @@ import logging
 
 from .registry import register
 from .._otr_shared.still_plan_helpers import StillPlanRow
+from .frame_contract import FrameContract
 
 log = logging.getLogger("OTR.video.cheap_families")
 
@@ -84,6 +85,21 @@ class _CheapFamilyBase:
     invocability_reason = ""
     family = "abstract"
     required_inputs: tuple = ()
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). UNBOUNDED, and that is a
+    #: real declaration rather than a shrug: ``_frame_count(request, fps)``
+    #: derives the length from the beat's own duration, so any length at any
+    #: rate is legal and there is nothing to split. ``max_frames=0`` means no
+    #: ceiling, and an engine with no ceiling never needs a second clip.
+    #: CONTINUITY none -- a cheap family paints its OWN still on every frame
+    #: and has no mechanism that would consume a predecessor's terminal frame.
+    #: Inherited by still_motion / still_pan / still_flat / still_word AND by
+    #: mesh_stage, whose camera walk is equally unbounded.
+    frame_contract = FrameContract(
+        min_frames=1,
+        max_frames=0,
+        quantum=1,
+        allow_tail_trim=True,
+    )
     engine_version = "1"
     #: True when this family animates a provided still (asset_refs.init_image /
     #: still) with a pan; False families always synthesize a procedural

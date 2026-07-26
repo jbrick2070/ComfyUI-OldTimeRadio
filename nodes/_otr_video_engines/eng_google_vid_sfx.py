@@ -21,6 +21,7 @@ from pathlib import Path
 from . import eng_google_omni_video as _omni
 from . import eng_google_veo_video as _veo
 from .registry import register
+from .frame_contract import FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_google_api.client import GoogleAPIRequestShapeError
 from .._otr_story_brief_helpers import append_sfx_audio_safety_clause
@@ -445,6 +446,18 @@ class _GoogleVidSfxBase:
 
 
 class _GoogleVeoSfxEngine(_GoogleVidSfxBase):
+    """Veo SFX lanes: the Veo ladder, reached through the shared base."""
+
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). Read from the Veo adapter
+    #: rather than restated, so the two can never drift: these lanes call
+    #: _veo._duration_s and get exactly that menu. Inherited by
+    #: google_vid_sfx_veo_lite / _fast / _pro.
+    frame_contract = FrameContract(
+        discrete_frames=_veo.SUPPORTED_FRAMES,
+        native_fps=_veo.CANVAS_FPS,
+        allow_tail_trim=True,
+        continuity=_veo.CONTINUITY_SOFT_REFERENCE,
+    )
     accepts_reference_images = True
     accepts_last_frame = True
 
@@ -478,6 +491,17 @@ class _GoogleVeoSfxEngine(_GoogleVidSfxBase):
 
 
 class _GoogleOmniSfxEngine(_GoogleVidSfxBase):
+    """Omni SFX lane: the Omni range, reached through the shared base."""
+
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). Read from the Omni
+    #: adapter rather than restated. Inherited by google_vid_sfx_omni.
+    frame_contract = FrameContract(
+        min_frames=_omni.OUTPUT_DURATION_RANGE_S[0] * _omni.CANVAS_FPS,
+        max_frames=_omni.OUTPUT_DURATION_RANGE_S[1] * _omni.CANVAS_FPS,
+        quantum=1,
+        native_fps=_omni.CANVAS_FPS,
+        allow_tail_trim=True,
+    )
     accepts_reference_images = True
 
     def render_clip(self, request, prepared):  # noqa: ARG002

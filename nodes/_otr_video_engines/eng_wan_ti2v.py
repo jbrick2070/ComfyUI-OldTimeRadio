@@ -43,6 +43,7 @@ from . import motion_common as _MC
 from . import wan_shared as _WS
 from .._otr_shared.role_compat import ROLES
 from .._otr_shared.still_plan_helpers import StillPlanRow
+from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import (
     _WAN_DEFAULT_NEGATIVE, ffprobe_clip_fields, validate_silent_clip_contract)
@@ -147,6 +148,19 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     roles = ROLES
     default_roles = ()
     required_inputs = ("init_image",)
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). ``_TI2V_MIN_FRAMES`` /
+    #: ``_TI2V_MAX_FRAMES`` are this adapter's own named constants; the 4-frame
+    #: quantum is Wan's 4n+1 latent stride (17 = 4*4+1, 177 = 4*44+1).
+    #: CONTINUITY: the graph wires LoadImage -> Wan22ImageToVideoLatent
+    #: ``start_image``, a hard first-frame lock.
+    frame_contract = FrameContract(
+        min_frames=_TI2V_MIN_FRAMES,
+        max_frames=_TI2V_MAX_FRAMES,
+        quantum=4,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_STRICT_FIRST_FRAME,
+    )
     commercial_clean = True             # GGUF + VAE are Apache-2.0 (see MODEL_MANIFEST)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"

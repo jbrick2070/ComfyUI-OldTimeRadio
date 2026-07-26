@@ -53,6 +53,7 @@ from . import motion_common as _MC
 from . import wan_shared as _WS
 from .._otr_shared.role_compat import ROLES
 from .._otr_shared.still_plan_helpers import StillPlanRow
+from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
@@ -148,6 +149,21 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     roles = ROLES
     default_roles = ()
     required_inputs = ("init_image",)
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). 8n+1: 9 .. 161 (8*20+1).
+    #: max_frames is the LITERAL 161, not ``_LTX8_MAX_FRAMES_DEFAULT`` read
+    #: through ``OTR_LTX_8GB_MAX_FRAMES`` -- a contract that moves with the
+    #: environment is not a contract. When the env disagrees with this number
+    #: the engine must REFUSE, not quietly re-plan (enforced in chunk 7b).
+    #: CONTINUITY: LoadImage -> LTXVImgToVideo(image, strength=1.0) hard-pins
+    #: the still into the latent's first frame.
+    frame_contract = FrameContract(
+        min_frames=9,
+        max_frames=161,
+        quantum=8,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_STRICT_FIRST_FRAME,
+    )
     # LTX-Video 0.9.x Open Weights License (Lightricks; HF license:other) -- commercial
     # use permitted below the revenue threshold (same revenue-capped community model
     # already treated as clean elsewhere; same LTX family as ltx_video/ltx_av).

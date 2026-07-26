@@ -132,14 +132,26 @@ class CoveragePlan:
 def join_mode_for(contract: FrameContract, target_visible_frames: int) -> str:
     """Which join a beat gets, from the adapter's own declaration.
 
-    ``single`` unless the adapter opted in to multi-clip AND the beat actually
-    exceeds one legal render. Only ``strict_first_frame`` earns a chain: a soft
-    identity reference (HuMo) or interpolation endpoints (Veo ``lastFrame``) do
-    not lock frame 0, so those lanes jump-cut rather than pretend.
+    ``single`` whenever the beat fits in ONE legal render. Only
+    ``strict_first_frame`` earns a chain: a soft identity reference (HuMo) or
+    interpolation endpoints (Veo ``lastFrame``) do not lock frame 0, so those
+    lanes jump-cut rather than pretend.
+
+    THE OPT-IN IS GONE (chunk 7a, 2026-07-26). This used to open with
+    ``if not contract.supports_multi_clip: return JOIN_SINGLE`` -- every engine
+    was single_only until it individually proved otherwise. The operator's
+    ruling ended that: "there's no gate with opt in or opt out... I don't like
+    any hidden opt-ins. It either works or it fails."
+
+    The half-measure was worse than either end state, and a QA panel proved it
+    on real code: once engines declared real ceilings while the opt-in stayed
+    shut, an ordinary 8-second beat on wan_i2v (max 177 frames) had no legal
+    single render AND no multi-clip escape, so ``partition_beat`` refused and
+    took the whole episode's plan-build down with it. Declaring a ceiling
+    without granting the second clip removes the fallback and withholds the
+    replacement. The two belong in one change.
     """
     target = int(target_visible_frames)
-    if not contract.supports_multi_clip:
-        return JOIN_SINGLE
     if contract.is_legal_length(target):
         return JOIN_SINGLE
     # Fits inside ONE render but not on the ladder -- still one clip, with the
@@ -200,8 +212,8 @@ def _candidate_totals(required, contract, count):
     contributes nothing, which the validator rejects anyway.
     """
     required = int(required)
-    if contract.discrete_durations:
-        span = max(int(d) for d in contract.discrete_durations)
+    if contract.discrete_frames:
+        span = max(int(d) for d in contract.discrete_frames)
         ceiling = count * span
         return range(required, min(required + span, ceiling) + 1)
     min_f, q = int(contract.min_frames), int(contract.quantum)
@@ -226,7 +238,7 @@ def _discrete_partition(total_render_frames, contract, count):
     Memoizing on ``(remaining, left)`` bounds the search to
     ``total * count`` states, which is small and predictable.
     """
-    menu = sorted({int(d) for d in contract.discrete_durations}, reverse=True)
+    menu = sorted({int(d) for d in contract.discrete_frames}, reverse=True)
     if not menu:
         return None
     smallest = menu[-1]
@@ -286,9 +298,10 @@ def partition_beat(target_visible_frames, contract, *, join_mode=None,
         raise CoveragePlanError(
             "beat of %d visible frame(s) is not a legal single render for this "
             "contract (min=%s max=%s quantum=%s discrete=%s allow_tail_trim=%s) "
-            "and the adapter has not opted in to multi-clip coverage"
+            "and JOIN_SINGLE was forced by the caller, so there is no second "
+            "clip to cover the remainder"
             % (target, contract.min_frames, contract.max_frames,
-               contract.quantum, contract.discrete_durations,
+               contract.quantum, contract.discrete_frames,
                contract.allow_tail_trim))
 
     # ---- multi-clip ------------------------------------------------------- #
@@ -296,7 +309,7 @@ def partition_beat(target_visible_frames, contract, *, join_mode=None,
     # so covering `target` visible frames with k segments requires rendering
     # `target + (k - 1)` frames in total.
     drop = 1 if mode == JOIN_CHAIN else 0
-    splitter = (_discrete_partition if contract.discrete_durations
+    splitter = (_discrete_partition if contract.discrete_frames
                 else _ladder_partition)
 
     for count in range(2, int(max_segments) + 1):
@@ -341,7 +354,7 @@ def partition_beat(target_visible_frames, contract, *, join_mode=None,
         "within %d segments -- refusing to emit a plan whose assembled length "
         "would drift from the beat audio"
         % (target, contract.min_frames, contract.max_frames, contract.quantum,
-           contract.discrete_durations, contract.allow_tail_trim, max_segments))
+           contract.discrete_frames, contract.allow_tail_trim, max_segments))
 
 
 def _build(target, mode, lengths, drop, trim_tail=0):
@@ -415,11 +428,12 @@ def validate_coverage_plan(plan: CoveragePlan, contract):
                     "accept (min=%s max=%s quantum=%s discrete=%s)"
                     % (seg.index, seg.render_frames, contract.min_frames,
                        contract.max_frames, contract.quantum,
-                       contract.discrete_durations))
-        if plan.is_multi_clip and not contract.supports_multi_clip:
-            raise CoveragePlanError(
-                "a %d-segment plan was built for an adapter that has not opted "
-                "in to multi-clip coverage" % plan.segment_count)
+                       contract.discrete_frames))
+        # THE OPT-IN CHECK LIVED HERE (removed chunk 7a, 2026-07-26). It read
+        # ``if plan.is_multi_clip and not contract.supports_multi_clip: raise``.
+        # Multi-clip is now universal, so there is nothing left to opt in to --
+        # what an adapter still has to earn is the CHAIN, and that is the next
+        # check, gated on a continuity mode it must declare and prove.
         if plan.join_mode == JOIN_CHAIN \
                 and contract.continuity != CONTINUITY_STRICT_FIRST_FRAME:
             raise CoveragePlanError(

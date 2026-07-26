@@ -42,6 +42,7 @@ import os
 from . import motion_common as _MC
 from . import wan_shared as _WS
 from .._otr_shared.still_plan_helpers import StillPlanRow
+from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 # Re-export the shared M7 clip-contract helpers so render_clip below and the
 # existing test imports (``from ...eng_wan_i2v import validate_silent_clip_contract``)
@@ -136,6 +137,20 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_SIDECAR_OPTIONAL
     target_fps = 25
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). ``_WAN_MIN_FRAMES`` /
+    #: ``_WAN_MAX_FRAMES`` are the adapter's own named constants; the 4-frame
+    #: quantum is Wan's 4n+1 latent stride (33 = 4*8+1, 177 = 4*44+1).
+    #: CONTINUITY: the graph wires LoadImage -> WanImageToVideo ``start_image``
+    #: (see ``_build_graph``), which IS a hard first-frame lock, so a successor
+    #: segment may begin exactly on its predecessor's terminal frame.
+    frame_contract = FrameContract(
+        min_frames=_WAN_MIN_FRAMES,
+        max_frames=_WAN_MAX_FRAMES,
+        quantum=4,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_STRICT_FIRST_FRAME,
+    )
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):

@@ -48,6 +48,7 @@ import os
 
 from .._otr_shared import av_dims as _AVD
 from .._otr_shared.still_plan_helpers import StillPlanRow
+from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
 
@@ -1225,6 +1226,24 @@ class LtxAudioInEngine(_LtxAvBase):
     # the deleted ltx_av_music engine held). default_roles must be subset of roles.
     default_roles = ("music_visual", "announcer_visual")
     required_inputs = ("text_prompt", "audio_ref", "init_image")
+    #: THE FRAME LADDER (chunk 7a, 2026-07-26). 8n+1: 9 .. 497 (8*61+1).
+    #: The LITERAL 497, not ``_LTX_AV_MAX_FRAMES`` -- that constant is
+    #: ``int(os.environ.get("OTR_LTX_AV_MAX_FRAMES", "497"))``, resolved at
+    #: IMPORT, so binding the contract to it would let the environment rewrite
+    #: a declaration the image phase already planned against. Env disagreement
+    #: is a REFUSAL in 7b, never a silent re-plan.
+    #: CONTINUITY: soft_reference, not strict. The i2v strength is
+    #: recipe-dependent (0.7 ia2v motion pass / 0.75 sharp / 1.0 base), so
+    #: frame 0 is a hard pin in some recipes and a soft anchor in others. A
+    #: contract that is only sometimes true is a jump cut.
+    frame_contract = FrameContract(
+        min_frames=9,
+        max_frames=497,
+        quantum=8,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     accepts_still = True                 # mint a still for EVERY shot (bookends incl.)
     fallback_engine = None               # NO FALLBACKS (547671d): fail LOUD
     _is_talk = True                      # I2V branch: condition on the still + audio
