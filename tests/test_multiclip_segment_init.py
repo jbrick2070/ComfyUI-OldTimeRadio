@@ -152,3 +152,138 @@ def test_the_BEAT_KEYED_lookup_would_have_returned_the_WRONG_image():
     assert beat_keyed not in by_object_id, (
         "the beat-keyed lookup and the per-segment lookup agree, so this test "
         "no longer demonstrates anything -- check the fixture")
+
+
+# ---------------------------------------------------------------------------
+# What the QA4/6a/6b panel found (Sonnet lens + agy, judged and fixed)
+# ---------------------------------------------------------------------------
+
+def test_a_DUPLICATE_receipt_entry_with_no_path_does_not_hide_the_real_one():
+    """agy's find: the search used to give up on the first pathless match.
+
+    A receipt can carry more than one entry for an object id -- a placeholder
+    written before the materialized row. Breaking there refused a still that
+    WAS proven, two entries later.
+    """
+    ledger = _ledger()
+    shot = ledger["video"]["shots"][0]
+    validated = ledger["images"]["still_spine_receipt"]["validated"]
+    placeholder = {"shot_id": "shot_b001", "beat_id": "b001",
+                   "engine_id": "wan_i2v", "kind": cp.JUMP_STILL_KIND,
+                   "segment_index": 1,
+                   "object_id": cp.jump_still_object_id("b001", 1),
+                   "path": ""}
+    validated.insert(0, placeholder)
+    assert rd.jump_segment_still_path(ledger, shot, 1) == "/stills/seg1.png"
+
+
+def test_a_NEGATIVE_segment_index_is_TERMINAL_not_segment_zero():
+    """It used to read as 'segment 0' and hand back the BEAT's still -- an
+    off-by-one rendering the wrong image with no complaint."""
+    ledger = _ledger()
+    shot = ledger["video"]["shots"][0]
+    with pytest.raises(rd.RenderError, match="negative index"):
+        rd.jump_segment_still_path(ledger, shot, -1)
+
+
+def test_a_NON_NUMERIC_segment_index_raises_a_NAMED_error():
+    ledger = _ledger()
+    shot = ledger["video"]["shots"][0]
+    with pytest.raises(rd.RenderError, match="not a segment number"):
+        rd.jump_segment_still_path(ledger, shot, "auto")
+
+
+# ---------------------------------------------------------------------------
+# The LENGTH half of a segment request
+# ---------------------------------------------------------------------------
+
+def _planned_shot():
+    plan = {"target_visible_frames": 120, "join_mode": "jump",
+            "segments": [
+                {"index": 0, "render_frames": 61, "drop_head": 0, "trim_tail": 0},
+                {"index": 1, "render_frames": 61, "drop_head": 1, "trim_tail": 1},
+            ]}
+    shot = _shot(segments=(1,))
+    shot["target_frame_count"] = 120
+    shot["coverage_plan"] = plan
+    return shot
+
+
+def test_a_segment_request_carries_the_SEGMENTS_length_not_the_BEATS():
+    """The first draft swapped the init IMAGE and left the LENGTH alone, so a
+    request for segment 1 of a 120-frame beat carried segment 1's picture and
+    the whole beat's duration."""
+    shot = _planned_shot()
+    assert rd.segment_render_frames(shot, 1) == 61
+    assert rd.segment_render_frames(shot, 0) == 120
+
+
+def test_a_single_clip_beat_keeps_the_beats_own_length():
+    shot = _shot()
+    shot["target_frame_count"] = 50
+    assert rd.segment_render_frames(shot, 0) == 50
+
+
+def test_a_segment_request_against_a_shot_with_NO_plan_is_TERMINAL():
+    """NO FALLBACK to the beat's length -- that renders the WHOLE beat under a
+    segment's name."""
+    shot = _shot()
+    shot["target_frame_count"] = 120
+    with pytest.raises(rd.RenderError, match="no coverage_plan"):
+        rd.segment_render_frames(shot, 1)
+
+
+def test_a_segment_the_plan_does_not_cover_is_TERMINAL():
+    shot = _planned_shot()
+    with pytest.raises(rd.RenderError, match="covers segment"):
+        rd.segment_render_frames(shot, 5)
+
+
+# ---------------------------------------------------------------------------
+# A fodder lane keeps its fodder
+# ---------------------------------------------------------------------------
+
+def test_a_MESH_FODDER_lane_is_not_clobbered_by_its_segment_still():
+    """mesh_stage is family=image_to_video, so it IS in _SCENE_INIT_FAMILIES
+    and DOES get per-segment stills minted -- but its init image is the
+    subject-isolated FODDER and the segment still is its background plate.
+    Overwriting the fodder meshes the whole environment: the clay blob, in
+    through a second door.
+
+    This pins the RESOLVER still returns the segment still (it is a real,
+    proven asset); the guard that keeps it out of ``init_image`` for a fodder
+    lane lives in ``build_request_from_shot``.
+    """
+    ledger = _ledger()
+    shot = ledger["video"]["shots"][0]
+    shot["engine_id"] = "mesh_stage"
+    # The RESOLVER still returns it -- it is a real, proven asset.
+    assert rd.jump_segment_still_path(ledger, shot, 1) == "/stills/seg1.png"
+
+
+def test_the_DRIVER_keeps_the_fodder_for_a_mesh_lane(monkeypatch):
+    """And the guard that keeps it out of ``init_image`` lives in the driver."""
+    ledger = _ledger()
+    ledger["meta"] = {"episode_title": "T", "logline": "L"}
+    ledger["lines"] = [{"line_id": "b001", "char_id": "c1",
+                        "speaker_role": "char_voice", "text": "Hello.",
+                        "start_s": 0.0, "dur_s": 2.0}]
+    ledger["images"]["images"].append(
+        {"object_id": "c1", "kind": "mesh_fodder", "beat_id": "b001",
+         "mesh_subject_id": "c1", "path": "/stills/fodder.png"})
+    shot = dict(ledger["video"]["shots"][0])
+    shot["engine_id"] = "mesh_stage"
+    shot["family"] = "image_to_video"
+    shot["source_line_ids"] = ["b001"]
+    shot["creative"] = {}
+    shot["coverage_plan"] = {
+        "target_visible_frames": 50, "join_mode": "jump",
+        "segments": [
+            {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+        ]}
+
+    req = rd.build_request_from_shot(shot, ledger, segment_index=1)
+    assert req["observability"]["init_source"] != "jump_segment_still", (
+        "the segment still clobbered the mesh fodder -- that meshes the whole "
+        "environment (the clay blob), in through a second door")

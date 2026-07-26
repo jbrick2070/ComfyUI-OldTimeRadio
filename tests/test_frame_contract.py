@@ -260,11 +260,19 @@ def test_a_still_LANE_never_opts_in_to_multi_clip():
     # two "exhaustive" sweeps in this build turned out to be theatre.
     assert still_lanes, "no still_* engines in the roster: this sweep is theatre"
     offenders = []
+    skipped = []
     for name in still_lanes:
         try:
             engine = vreg.get_engine(name)
-        except Exception:  # noqa: BLE001 -- unbuildable engines are not our subject
+        except Exception:  # noqa: BLE001 -- record it, never swallow it
+            skipped.append(name)
             continue
         if fc.supports_multi_clip(engine):
             offenders.append(name)
     assert offenders == []
+    # A still lane that cannot be BUILT cannot be CHECKED, and a guardrail that
+    # quietly skips its subject is the same theatre in a different costume
+    # (2026-07-26 QA panel). If one of these stops constructing, say so.
+    assert skipped == [], (
+        "these still_* engines could not be built, so the multi-clip guardrail "
+        "never actually checked them: %r" % (skipped,))

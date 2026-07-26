@@ -702,8 +702,21 @@ def jump_segment_still_path(ledger, shot, segment_index):
     ``segment_index`` 0 returns ``None``: segment 0 renders from the beat's own
     scene still, which every existing branch already resolves.
     """
-    index = int(segment_index or 0)
-    if index <= 0:
+    try:
+        index = int(segment_index or 0)
+    except (TypeError, ValueError) as exc:
+        raise RenderError(
+            "shot %s was asked for segment_index %r, which is not a segment "
+            "number. Every other refusal in this module is NAMED; a bare "
+            "ValueError from a coercion is not." % (shot.get("shot_id"),
+                                                    segment_index)) from exc
+    if index < 0:
+        raise RenderError(
+            "shot %s was asked for segment %d. A negative index used to read "
+            "as 'segment 0' and silently hand back the BEAT's still, which is "
+            "an off-by-one rendering the wrong image with no complaint. NO "
+            "FALLBACK." % (shot.get("shot_id"), index))
+    if index == 0:
         return None
     requests = _jump_still_requests_for_shot(shot)
     request = next((row for row in requests
@@ -725,7 +738,12 @@ def jump_segment_still_path(ledger, shot, segment_index):
             continue
         path = str(entry.get("path") or "")
         if not path:
-            break
+            # KEEP LOOKING, do not give up here (2026-07-26 QA panel). A
+            # receipt can carry more than one entry for an object id -- an
+            # unmaterialized placeholder written before the materialized row.
+            # Breaking on the first pathless match refused a still that WAS
+            # proven, two entries later.
+            continue
         return path
     raise RenderError(
         "shot %s segment %d needs jump-segment still %s, which the still-spine "
@@ -733,6 +751,50 @@ def jump_segment_still_path(ledger, shot, segment_index):
         "any render and refuses a shot whose segment stills are missing, so "
         "reaching here means the receipt was rebuilt, replayed or bypassed. NO "
         "FALLBACK." % (shot.get("shot_id"), index, object_id or "<missing>"))
+
+
+def segment_render_frames(shot, segment_index):
+    """How many frames segment ``segment_index`` renders, off the STAMPED plan.
+
+    The other half of "build one segment's request" (2026-07-26 QA panel). The
+    first draft of the per-segment seam swapped the init IMAGE and left the
+    LENGTH alone, so a request for segment 1 of a 120-frame beat carried the
+    init image of segment 1 and the frame count of the whole beat -- correct
+    picture, wrong duration, and the two disagreeing is precisely the shape
+    this build keeps having to remove. A segment's length is not derivable from
+    the shot row; it is in the plan, so it is read from the plan.
+
+    Returns the beat's own ``target_frame_count`` for segment 0 and for a shot
+    with no plan, which is every beat today and every single-clip beat forever.
+
+    ``render_frames``, deliberately, NOT the visible count: the engine renders
+    that many, and ``drop_head`` / ``trim_tail`` are the assembler's business.
+    """
+    beat_frames = int(shot.get("target_frame_count") or 0)
+    index = int(segment_index or 0)
+    if index <= 0:
+        return beat_frames
+    raw = shot.get("coverage_plan")
+    if not isinstance(raw, dict) or not raw:
+        raise RenderError(
+            "shot %s was asked for segment %d but carries no coverage_plan, so "
+            "there is nothing that says how long that segment is. A segment "
+            "request without a plan is a caller bug. NO FALLBACK to the beat's "
+            "length -- that renders the WHOLE beat under a segment's name."
+            % (shot.get("shot_id"), index))
+    try:
+        from . import coverage_plan as _cp  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        import coverage_plan as _cp  # type: ignore
+    plan = _cp.CoveragePlan.from_dict(raw)
+    for segment in plan.segments:
+        if int(segment.index) == index:
+            return int(segment.render_frames)
+    raise RenderError(
+        "shot %s was asked for segment %d but its coverage plan covers "
+        "segment(s) %r. NO FALLBACK."
+        % (shot.get("shot_id"), index,
+           [int(s.index) for s in plan.segments]))
 
 
 def validate_and_repair_still_spine(ledger):
@@ -2069,11 +2131,34 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # spine's receipt -- never through _still_index, which cannot see a
     # jump_segment row at all. Segment 0 and every single-clip beat return None
     # here and keep exactly the init image they had.
+    #
+    # NOT FOR A FODDER LANE (2026-07-26 QA panel, both seats). mesh_stage is
+    # family=image_to_video, so it IS in _SCENE_INIT_FAMILIES and DOES get
+    # per-segment stills minted -- but its init image is the subject-isolated
+    # FODDER, and the segment still is its background plate. Overwriting the
+    # fodder here would mesh the whole environment: the clay blob the guard at
+    # the scene-init branch above exists to prevent, arriving by a second door.
     _segment_still = jump_segment_still_path(ledger, shot, segment_index)
-    if _segment_still:
+    if _segment_still and not _requires_fodder:
+        # LOUD, because several branches above already logged the BEAT's still
+        # as this shot's init image and that trail is now wrong. An operator
+        # reading the log during the first multi-clip debugging session must
+        # see the swap, not infer it.
+        _LOG.warning(
+            "[OTR.render_driver] JUMP SEGMENT %d of shot %s conditions on its "
+            "OWN still %s (was %s) -- resolved by object id off the still-spine "
+            "receipt", int(segment_index or 0), shot.get("shot_id"),
+            os.path.basename(_segment_still),
+            os.path.basename(init_image) if init_image else "<none>")
         init_image = _segment_still
         init_source = "jump_segment_still"
-    frame_count = int(shot.get("target_frame_count") or 0)
+    elif _segment_still:
+        _LOG.warning(
+            "[OTR.render_driver] JUMP SEGMENT %d of shot %s KEEPS its mesh "
+            "fodder as init_image; its segment still %s is the background "
+            "plate, not the mesh subject", int(segment_index or 0),
+            shot.get("shot_id"), os.path.basename(_segment_still))
+    frame_count = segment_render_frames(shot, segment_index)
     req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
                         frame_count, canvas)
     # 3D image streams (chunk 5): hand the mesher the STABLE subject id so its
