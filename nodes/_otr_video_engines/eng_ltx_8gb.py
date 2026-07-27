@@ -51,7 +51,7 @@ on a production leg:
   (see the paragraph below before reaching for either); and
   ``OTR_LTX_8GB_MAX_FRAMES`` (render-length ceiling; 8n+1) -- a CEILING, not a
   recipe value, so it keeps its channel and its fail-closed range check.
-* FROZEN IN CODE as ``LTX8_RECIPE_V1``, ignored-with-a-warning otherwise:
+* FROZEN IN CODE as ``LTX8_RECIPE`` (v2, measured), ignored-with-a-warning:
   ``OTR_LTX_8GB_STEPS`` / ``_CFG`` / ``_SAMPLER`` / ``_MAX_SHIFT`` /
   ``_BASE_SHIFT`` / ``_TERMINAL`` / ``_T5_DEVICE`` / ``_TILED_VAE`` /
   ``_NEGATIVE`` / ``_VAE_TILE`` / ``_VAE_OVERLAP`` / ``_VAE_TEMPORAL`` /
@@ -129,7 +129,7 @@ _LTX8_DEFAULT_NEGATIVE = (
 #: leave the recipe invisible to every consumer that matters -- an unowned
 #: ledger field in all but name. It is also `cfg.recipe` in `session_identity`,
 #: so a version bump moves the identity for free.
-RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v1"
+RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v2"
 
 #: THE CONSENT ACT that re-opens the recipe knobs (B6). One explicit env var,
 #: the same shape as the client-bank build's `--activate`: an operator who
@@ -196,6 +196,68 @@ LTX8_RECIPE_V1 = {
     "vae_temporal": 16,
     "vae_temporal_overlap": 8,
 }
+
+#: THE ACTIVE ltx_8gb RECIPE, v2 -- MEASURED, 2026-07-27 (prequalification).
+#:
+#: v1 was today's shipped defaults, stated honestly as such. This is the
+#: measured selection that replaces it, from a four-cell sweep at the
+#: production canvas 512x288 -- the first time this tier ever rendered live at
+#: its own declared canvas. Every cell was a full canonical leg
+#: (`RESULT SUCCESS` + `obs_publish OK` + the asset on disk), and the peaks
+#: below are the adapter's own render-phase `vram_peak_mb`:
+#:
+#:   cell  t5_device  tiled_vae   shots   min MB   max MB   SPREAD   wall
+#:   A     cpu        False          11     8662    10859     2197    842s
+#:   B     default    False          12    11163    16127     4964    744s
+#:   C     cpu        True           10     8241     8278       37    824s  <-
+#:   D     default    True           11    11062    16086     5024    765s
+#:
+#: WHAT CHANGED FROM v1, AND WHY -- `tiled_vae` False -> True.
+#: v1 kept tiled decode off because core `VAEDecode` "handles the 8 GB peak at
+#: the smoke canvas". It does; it just costs 2.6 GB more to do it. The
+#: decisive column is not the minimum, it is the SPREAD: with tiled decode ON
+#: the peak is flat at 8241-8278 MB across every clip length the sweep
+#: produced (17 to 161 frames), while OFF it climbs with length -- 8662 MB at
+#: len=33 up to 10859 MB at len=161. An 8 GB tier needs a ceiling a long beat
+#: cannot grow through, and only tiled decode gives one. It costs no wall
+#: clock (824s vs 842s, inside the noise of a different episode).
+#:
+#: WHAT DID NOT CHANGE -- `t5_device` stays "cpu", now with a number behind
+#: the rationale rather than an argument. On GPU the peak lands at 16.0-16.1 GB
+#: on a 16.3 GB card, so an 8 GB box does not render at all. v1 called this
+#: load-bearing rather than an optimisation; the sweep agrees.
+#:
+#: HONEST LIMIT OF THIS MEASUREMENT: `VramPeakProbe` samples MACHINE-WIDE NVML
+#: usage, and the sweep ran unclamped, so these absolutes include whatever else
+#: was resident and are NOT a proof that the winner fits in 8 GB. What they
+#: support is the RANKING, which is what selects a recipe. A clamped
+#: confirmation of the winner is still owed -- see GO_FORWARD.
+#:
+#: v1 IS KEPT, NOT EDITED. Receipts stamped `..._v1` are on disk in this
+#: repo's own episode tree; a v1 dict that had been mutated into v2's values
+#: would make those receipts uninterpretable and would quietly rewrite what
+#: the regression fixtures pin.
+LTX8_RECIPE_V2 = {
+    "steps": 8,
+    "cfg": 1.0,
+    "max_shift": 2.05,
+    "base_shift": 0.95,
+    "terminal": 0.1,
+    "sampler": "euler",
+    "t5_device": "cpu",
+    "tiled_vae": True,
+    "negative": _LTX8_DEFAULT_NEGATIVE,
+    "vae_tile": 512,
+    "vae_overlap": 64,
+    "vae_temporal": 16,
+    "vae_temporal_overlap": 8,
+}
+
+#: THE ONE NAME EVERY CONSUMER READS. Bumping a recipe is repointing this and
+#: the version inside `RECIPE_LTX8_I2V` -- never editing a versioned dict in
+#: place. Kept as a separate binding so `LTX8_RECIPE_V1` stays readable as
+#: history and the diff of a future v3 is one line plus a new dict.
+LTX8_RECIPE = LTX8_RECIPE_V2
 
 #: The env var each frozen field was read from, kept so the demotion can NAME
 #: what it is ignoring. Presence is all this map is used for outside
@@ -674,15 +736,19 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "base_shift=%s" % (cfg.base_shift,))
 
     def _tiled_vae(self):
-        """Whether to decode through ``VAEDecodeTiled`` (default OFF: 0.9.8 core
-        VAEDecode handles the 8GB peak at the smoke canvas; C3 tuning may flip this
-        via env if a larger canvas needs it). Truthy {1,true,yes,on} enables it."""
+        """Whether to decode through ``VAEDecodeTiled`` (v2: ON, measured).
+
+        v1 kept this off on the grounds that core ``VAEDecode`` handles the
+        peak at the smoke canvas. The 2026-07-27 sweep showed it does -- for
+        2.6 GB more, and with a peak that GROWS with clip length (8662 MB at
+        len=33 to 10859 MB at len=161) instead of staying flat at 8241-8278 MB.
+        Truthy {1,true,yes,on} enables it under the consent act."""
         if not _prequalification_active():
-            return bool(LTX8_RECIPE_V1["tiled_vae"])
+            return bool(LTX8_RECIPE["tiled_vae"])
         # The prequalification DEFAULT is the frozen value, not a literal: a
         # sweep that opens the knobs but re-exports only some of them must
         # measure the recipe it is validating, not a third configuration.
-        dflt = "1" if LTX8_RECIPE_V1["tiled_vae"] else "0"
+        dflt = "1" if LTX8_RECIPE["tiled_vae"] else "0"
         # `or dflt`, not `get(name, dflt)`: an exported-but-EMPTY var would
         # otherwise read as "" -- not truthy -- and force the knob OFF against
         # a frozen default of ON. Every other accessor treats empty as unset.
@@ -693,7 +759,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """T5 CLIPLoader device: default ``cpu`` for the 8GB tier (t5xxl_fp16 alone
         is ~9 GB, so it encodes on CPU first, then diffusion runs on the GPU). The
         offload-on-vs-off VRAM measurement (C3) may flip this via OTR_LTX_8GB_T5_DEVICE."""
-        frozen = str(LTX8_RECIPE_V1["t5_device"])
+        frozen = str(LTX8_RECIPE["t5_device"])
         if not _prequalification_active():
             return frozen
         dev = (os.environ.get("OTR_LTX_8GB_T5_DEVICE") or frozen).strip().lower()
@@ -707,7 +773,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         gone is the ``os.environ`` fallback: it made two boxes render visibly
         different clips from the same episode while both stamped the same
         recipe receipt, which is the whole defect this chunk closes."""
-        frozen = str(LTX8_RECIPE_V1["negative"])
+        frozen = str(LTX8_RECIPE["negative"])
         if not _prequalification_active():
             return frozen
         return os.environ.get("OTR_LTX_8GB_NEGATIVE") or frozen
@@ -768,7 +834,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                     "to an already-booted server, so its recipe may not depend "
                     "on how that server started (PBUG-20260723-02).",
                     RECIPE_LTX8_I2V, ", ".join(ignored), PREQUALIFICATION_ENV)
-            # SPELLED OUT rather than `dict(LTX8_RECIPE_V1)` so BOTH legs return
+            # SPELLED OUT rather than `dict(LTX8_RECIPE)` so BOTH legs return
             # the SAME KEY SET. The recipe dict also carries `t5_device` and
             # `tiled_vae`, whose owners are `_t5_device()` / `_tiled_vae()`;
             # passing them through here on the production leg only would give
@@ -776,13 +842,13 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             # reader to write `cfg["t5_device"]` would get a KeyError that only
             # reproduces under prequalification.
             return {
-                "steps": LTX8_RECIPE_V1["steps"],
-                "cfg": LTX8_RECIPE_V1["cfg"],
-                "max_shift": LTX8_RECIPE_V1["max_shift"],
-                "base_shift": LTX8_RECIPE_V1["base_shift"],
-                "terminal": LTX8_RECIPE_V1["terminal"],
+                "steps": LTX8_RECIPE["steps"],
+                "cfg": LTX8_RECIPE["cfg"],
+                "max_shift": LTX8_RECIPE["max_shift"],
+                "base_shift": LTX8_RECIPE["base_shift"],
+                "terminal": LTX8_RECIPE["terminal"],
                 "max_frames": max_frames,
-                "sampler": LTX8_RECIPE_V1["sampler"],
+                "sampler": LTX8_RECIPE["sampler"],
             }
 
         # PREQUALIFICATION: the knobs are open, every value is range-checked as
@@ -803,15 +869,15 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "a measurement run, not a production contract.",
                 PREQUALIFICATION_ENV, ", ".join(honoured), RECIPE_LTX8_I2V)
         return {
-            "steps": _num("OTR_LTX_8GB_STEPS", LTX8_RECIPE_V1["steps"],
+            "steps": _num("OTR_LTX_8GB_STEPS", LTX8_RECIPE["steps"],
                           1, 100, int),
-            "cfg": _num("OTR_LTX_8GB_CFG", LTX8_RECIPE_V1["cfg"],
+            "cfg": _num("OTR_LTX_8GB_CFG", LTX8_RECIPE["cfg"],
                         0.0, 30.0, float),
             "max_shift": _num("OTR_LTX_8GB_MAX_SHIFT",
-                              LTX8_RECIPE_V1["max_shift"], 0.0, 100.0, float),
+                              LTX8_RECIPE["max_shift"], 0.0, 100.0, float),
             "base_shift": _num("OTR_LTX_8GB_BASE_SHIFT",
-                               LTX8_RECIPE_V1["base_shift"], 0.0, 100.0, float),
-            "terminal": _num("OTR_LTX_8GB_TERMINAL", LTX8_RECIPE_V1["terminal"],
+                               LTX8_RECIPE["base_shift"], 0.0, 100.0, float),
+            "terminal": _num("OTR_LTX_8GB_TERMINAL", LTX8_RECIPE["terminal"],
                              0.0, 0.99, float),
             "max_frames": max_frames,
             "sampler": sampler,
@@ -911,7 +977,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             Range-checked through the SAME helper as every other knob, so a
             mistyped value stops a sweep instead of being quietly replaced by
             the default it was meant to be measured against."""
-            dflt = int(LTX8_RECIPE_V1[key])
+            dflt = int(LTX8_RECIPE[key])
             if not _prequalification_active():
                 return dflt
             lo, hi = _VAE_TILE_BOUNDS[key]

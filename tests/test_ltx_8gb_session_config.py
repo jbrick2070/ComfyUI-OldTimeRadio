@@ -80,7 +80,7 @@ def test_resolves_every_field_the_handles_depend_on(eng):
     assert cfg.t5_token == m._LTX8_DEFAULT_T5
     assert cfg.ckpt_path.endswith(m._LTX8_DEFAULT_CKPT)
     assert cfg.t5_device == "cpu"          # load-bearing on 8GB, not an option
-    assert cfg.tiled_vae is False
+    assert cfg.tiled_vae is True           # v2, measured: flat 8.2 GB peak
     assert cfg.steps == 8 and cfg.cfg == 1.0 and cfg.sampler == "euler"
     assert cfg.max_frames == m._LTX8_MAX_FRAMES_DEFAULT
 
@@ -254,7 +254,7 @@ def test_a_malformed_recipe_knob_is_IGNORED_on_a_production_leg(
     monkeypatch.setenv("OTR_LTX_8GB_STEPS", "not-a-number")
     with caplog.at_level("WARNING"):
         cfg = eng.resolve_session_config()
-    assert cfg.steps == m.LTX8_RECIPE_V1["steps"]          # the frozen value
+    assert cfg.steps == m.LTX8_RECIPE["steps"]             # the frozen value
     assert "OTR_LTX_8GB_STEPS" in caplog.text              # named, not silent
 
 
@@ -290,10 +290,14 @@ def test_tiled_vae_is_captured_at_resolution_time_under_prequalification(
 
 
 def test_tiled_vae_does_NOT_bind_on_a_production_leg(eng, monkeypatch):
-    """Same env, no consent act: the frozen decoder wins."""
-    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
+    """Same env, no consent act: the frozen decoder wins.
+
+    The env value must OPPOSE the frozen one -- "1" against v2's frozen True
+    would pass whether the environment bound or not."""
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")
     assert eng.resolve_session_config().tiled_vae is \
-        m.LTX8_RECIPE_V1["tiled_vae"]
+        m.LTX8_RECIPE["tiled_vae"]
+    assert m.LTX8_RECIPE["tiled_vae"] is True
 
 
 def test_profile_argument_is_accepted_today_without_changing_the_result(eng):

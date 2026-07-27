@@ -10,7 +10,7 @@ therefore whatever the box happened to boot with -- possibly a sweep from weeks
 ago -- and nothing in the published episode said which.
 
 THE FIX, in the shape that Bible rule demands: CODE binds on every leg.
-``LTX8_RECIPE_V1`` is the recipe; the env vars bind ONLY under an explicit
+``LTX8_RECIPE`` (v2, measured) is the recipe; env vars bind ONLY under explicit
 ``OTR_LTX_8GB_PREQUALIFICATION`` consent act, which is what a measurement sweep
 sets and a production box never does.
 
@@ -46,28 +46,50 @@ def eng():
 # --- the frozen recipe binds on a production leg --------------------------- #
 def test_every_frozen_field_wins_when_no_consent_act_is_present(eng, monkeypatch):
     """The core contract: set EVERY knob to something else, get the recipe."""
+    # Every override must DIFFER from the frozen value or the assertion below
+    # cannot tell "the recipe won" from "the environment won" -- which is what
+    # `tiled_vae: "1"` became the moment v2 froze tiled decode ON.
     for key, env in m._RECIPE_ENV_KEYS.items():
         monkeypatch.setenv(env, {"sampler": "dpmpp_2m", "t5_device": "default",
-                                 "tiled_vae": "1"}.get(key, "7"))
+                                 "tiled_vae": "0"}.get(key, "7"))
+    assert m.LTX8_RECIPE["tiled_vae"] is True, (
+        "this test's tiled_vae override is chosen to oppose the frozen value; "
+        "if v3 turns tiled decode off, flip the override to '1'")
 
     cfg = eng._resolve_render_config()
     for key in ("steps", "cfg", "max_shift", "base_shift", "terminal",
                 "sampler"):
-        assert cfg[key] == m.LTX8_RECIPE_V1[key], key
-    assert eng._t5_device() == m.LTX8_RECIPE_V1["t5_device"]
-    assert eng._tiled_vae() is m.LTX8_RECIPE_V1["tiled_vae"]
+        assert cfg[key] == m.LTX8_RECIPE[key], key
+    assert eng._t5_device() == m.LTX8_RECIPE["t5_device"]
+    assert eng._tiled_vae() is m.LTX8_RECIPE["tiled_vae"]
 
 
 def test_the_two_load_bearing_values_are_pinned_BY_VALUE(eng):
-    """These two are not taste. ``t5xxl_fp16`` alone is ~9 GB, so the T5 encodes
-    on CPU or the 8 GB box does not render at all; tiled decode is OFF because
-    core ``VAEDecode`` handles the peak at the smoke canvas. A silent flip of
-    either is a tier that stops working, so pin the literals, not just the
-    round-trip through the dict."""
-    assert m.LTX8_RECIPE_V1["t5_device"] == "cpu"
-    assert m.LTX8_RECIPE_V1["tiled_vae"] is False
+    """These two are not taste, and since v2 both are MEASURED (2026-07-27).
+
+    ``t5xxl_fp16`` alone is ~9 GB: on GPU the sweep peaked at 16.0-16.1 GB of a
+    16.3 GB card, so the T5 encodes on CPU or the 8 GB box does not render at
+    all. Tiled decode is ON because it holds the peak FLAT at 8241-8278 MB
+    across every clip length, where untiled climbs 8662 -> 10859 MB from
+    len=33 to len=161. A silent flip of either is a tier that stops working,
+    so pin the literals, not just the round-trip through the dict."""
+    assert m.LTX8_RECIPE["t5_device"] == "cpu"
+    assert m.LTX8_RECIPE["tiled_vae"] is True
     assert eng._t5_device() == "cpu"
-    assert eng._tiled_vae() is False
+    assert eng._tiled_vae() is True
+
+
+def test_v1_is_preserved_unmutated_so_its_receipts_stay_interpretable():
+    """Episodes stamped ``..._v1`` exist on disk in this repo's own tree. A v1
+    dict edited into v2's values would make those receipts describe a render
+    that never happened -- so v1 is kept, not overwritten, and a future v3 adds
+    a dict rather than mutating one."""
+    assert m.LTX8_RECIPE_V1["tiled_vae"] is False   # what v1 actually shipped
+    assert m.LTX8_RECIPE_V1["t5_device"] == "cpu"
+    assert m.LTX8_RECIPE is m.LTX8_RECIPE_V2
+    assert m.LTX8_RECIPE_V1 is not m.LTX8_RECIPE_V2
+    # Same key set, or the two are not comparable as recipe versions.
+    assert set(m.LTX8_RECIPE_V1) == set(m.LTX8_RECIPE_V2)
 
 
 def test_the_recipe_string_carries_its_own_version_and_rides_the_receipt(eng):
@@ -75,7 +97,7 @@ def test_the_recipe_string_carries_its_own_version_and_rides_the_receipt(eng):
     ``otr_credits_roll`` -> a published episode. A bare version constant that
     never reached that string would be an unowned ledger field in all but
     name -- and it is ``cfg.recipe``, so a bump moves the session identity."""
-    assert m.RECIPE_LTX8_I2V.endswith("_v1")
+    assert m.RECIPE_LTX8_I2V.endswith("_v2")
     assert "ltx098" in m.RECIPE_LTX8_I2V and "distilled" in m.RECIPE_LTX8_I2V
 
 
@@ -85,12 +107,15 @@ def test_the_knobs_bind_again_under_prequalification(eng, monkeypatch):
     monkeypatch.setenv("OTR_LTX_8GB_STEPS", "12")
     monkeypatch.setenv("OTR_LTX_8GB_TERMINAL", "0.25")
     monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "default")
-    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
+    # "0" against a frozen True -- the override has to OPPOSE the recipe or
+    # this asserts nothing about the consent act.
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")
 
     cfg = eng._resolve_render_config()
     assert cfg["steps"] == 12 and cfg["terminal"] == 0.25
     assert eng._t5_device() == "default"
-    assert eng._tiled_vae() is True
+    assert eng._tiled_vae() is False
+    assert m.LTX8_RECIPE["tiled_vae"] is True        # ... and it opposed it
 
 
 @pytest.mark.parametrize("spelling", ("1", "true", "TRUE", "Yes", "on", " 1 "))
@@ -109,7 +134,7 @@ def test_a_PRESENT_but_non_consenting_value_still_gets_the_frozen_recipe(
     anything that is not an ordinary yes -- is a production box."""
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, spelling)
     monkeypatch.setenv("OTR_LTX_8GB_STEPS", "12")
-    assert eng._resolve_render_config()["steps"] == m.LTX8_RECIPE_V1["steps"]
+    assert eng._resolve_render_config()["steps"] == m.LTX8_RECIPE["steps"]
 
 
 # --- the inversion: outside prequalification, NEVER PARSE ------------------ #
@@ -121,8 +146,8 @@ def test_a_malformed_knob_cannot_kill_a_leg_it_cannot_influence(eng, monkeypatch
     monkeypatch.setenv("OTR_LTX_8GB_CFG", "definitely-not-a-float")
     monkeypatch.setenv("OTR_LTX_8GB_SAMPLER", "a_sampler_that_does_not_exist")
     cfg = eng._resolve_render_config()
-    assert cfg["steps"] == m.LTX8_RECIPE_V1["steps"]
-    assert cfg["sampler"] == m.LTX8_RECIPE_V1["sampler"]
+    assert cfg["steps"] == m.LTX8_RECIPE["steps"]
+    assert cfg["sampler"] == m.LTX8_RECIPE["sampler"]
 
 
 def test_the_same_malformed_knob_IS_terminal_under_prequalification(
@@ -155,7 +180,7 @@ def test_max_frames_is_absent_from_the_frozen_recipe(eng):
     """It is a render-length CEILING, not a recipe value: B3 gave it a profile
     -> ledger channel and B4's pre-render refusal reads it to make a
     plan-vs-box disagreement terminal. Folding it in would silence that."""
-    assert "max_frames" not in m.LTX8_RECIPE_V1
+    assert "max_frames" not in m.LTX8_RECIPE
     assert "OTR_LTX_8GB_MAX_FRAMES" not in m._RECIPE_ENV_KEYS.values()
 
 
@@ -197,7 +222,7 @@ def test_every_frozen_field_has_a_named_env_var_and_vice_versa():
     """Drift guard on the demotion notice. Add a field to the recipe and forget
     its entry here and the operator is never told that knob is being ignored --
     a silent no-op knob is the complaint B3 already collected once."""
-    assert set(m._RECIPE_ENV_KEYS) == set(m.LTX8_RECIPE_V1)
+    assert set(m._RECIPE_ENV_KEYS) == set(m.LTX8_RECIPE)
 
 
 # --- the operator is told, exactly once, in the right direction ------------ #
@@ -249,13 +274,13 @@ def test_the_negative_prompt_no_longer_comes_from_the_environment(
     """It is a render input: two boxes with different stale values produced
     visibly different clips and both stamped the same recipe receipt."""
     monkeypatch.setenv("OTR_LTX_8GB_NEGATIVE", "a stale sweep's negative")
-    assert eng._negative_prompt() == m.LTX8_RECIPE_V1["negative"]
+    assert eng._negative_prompt() == m.LTX8_RECIPE["negative"]
 
     plan = eng._build_render_request(
         {"asset_refs": {"init_image": "p"},
          "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
     graph = eng._build_graph({"text_prompt": "x"}, "p.png", plan, 9, 512, 288)
-    assert graph["neg"]["inputs"]["text"] == m.LTX8_RECIPE_V1["negative"]
+    assert graph["neg"]["inputs"]["text"] == m.LTX8_RECIPE["negative"]
 
 
 def test_the_SHOT_still_owns_its_own_negative_prompt(eng, monkeypatch):
@@ -290,11 +315,11 @@ def test_the_tiled_decode_GEOMETRY_is_frozen_too(eng, monkeypatch):
     monkeypatch.setattr(eng, "_tiled_vae", lambda: True)
 
     inputs = eng._decode_inputs(lambda node, slot: (node, slot))
-    assert inputs["tile_size"] == m.LTX8_RECIPE_V1["vae_tile"]
-    assert inputs["overlap"] == m.LTX8_RECIPE_V1["vae_overlap"]
-    assert inputs["temporal_size"] == m.LTX8_RECIPE_V1["vae_temporal"]
+    assert inputs["tile_size"] == m.LTX8_RECIPE["vae_tile"]
+    assert inputs["overlap"] == m.LTX8_RECIPE["vae_overlap"]
+    assert inputs["temporal_size"] == m.LTX8_RECIPE["vae_temporal"]
     assert inputs["temporal_overlap"] == \
-        m.LTX8_RECIPE_V1["vae_temporal_overlap"]
+        m.LTX8_RECIPE["vae_temporal_overlap"]
 
 
 def test_the_tiled_decode_geometry_reopens_under_prequalification(
@@ -362,29 +387,30 @@ def test_EVERY_stamp_goes_through_the_receipt_helper(eng):
 
 
 # --- the prequalification DEFAULTS follow the recipe, not a literal -------- #
-# Dormant while v1's literals happen to coincide with the frozen values, which
-# is exactly why these are pinned: a measured v2 is when they diverge, and a
-# sweep that re-exports only SOME knobs must still measure the recipe it is
-# validating rather than a third configuration.
+# These were dormant under v1, whose literals coincided with the frozen values.
+# v2 (measured, 2026-07-27) is the divergence they were written for: it flipped
+# tiled_vae to True, so each patch below now sets the OPPOSITE of the shipped
+# value -- otherwise the assertion cannot distinguish "followed the recipe"
+# from "returned a literal that happens to match".
 def test_the_t5_device_prequalification_default_tracks_the_recipe(
         eng, monkeypatch):
-    monkeypatch.setitem(m.LTX8_RECIPE_V1, "t5_device", "default")
+    monkeypatch.setitem(m.LTX8_RECIPE, "t5_device", "default")
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")     # knob open, not set
     assert eng._t5_device() == "default"
 
 
 def test_the_tiled_vae_prequalification_default_tracks_the_recipe(
         eng, monkeypatch):
-    monkeypatch.setitem(m.LTX8_RECIPE_V1, "tiled_vae", True)
+    monkeypatch.setitem(m.LTX8_RECIPE, "tiled_vae", False)
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")     # knob open, not set
-    assert eng._tiled_vae() is True
+    assert eng._tiled_vae() is False
 
 
 def test_an_out_of_whitelist_t5_device_falls_back_to_the_RECIPE(
         eng, monkeypatch):
     """The clamp exists so a typo cannot hand ComfyUI a device string it will
     fail on mid-load; it must clamp to the recipe, not to a literal."""
-    monkeypatch.setitem(m.LTX8_RECIPE_V1, "t5_device", "default")
+    monkeypatch.setitem(m.LTX8_RECIPE, "t5_device", "default")
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "cuda:7")
     assert eng._t5_device() == "default"
@@ -422,9 +448,9 @@ def test_a_tile_geometry_below_the_NODE_S_OWN_floor_is_refused(
 def test_every_geometry_knob_has_bounds_and_every_bound_has_a_knob():
     """Drift guard: add a geometry key and forget its bounds and `_i` raises
     KeyError mid-render instead of refusing by name."""
-    assert set(m._VAE_TILE_BOUNDS) <= set(m.LTX8_RECIPE_V1)
+    assert set(m._VAE_TILE_BOUNDS) <= set(m.LTX8_RECIPE)
     for key, (lo, hi) in m._VAE_TILE_BOUNDS.items():
-        assert lo <= int(m.LTX8_RECIPE_V1[key]) <= hi, key
+        assert lo <= int(m.LTX8_RECIPE[key]) <= hi, key
 
 
 def test_an_exported_but_EMPTY_tiled_vae_still_gets_the_frozen_default(
@@ -432,7 +458,7 @@ def test_an_exported_but_EMPTY_tiled_vae_still_gets_the_frozen_default(
     """`get(name, dflt)` returns "" for an exported-empty var, which is not
     truthy -- so the knob would read OFF against a frozen default of ON. Every
     other accessor treats empty as unset; this one must too."""
-    monkeypatch.setitem(m.LTX8_RECIPE_V1, "tiled_vae", True)
+    monkeypatch.setitem(m.LTX8_RECIPE, "tiled_vae", True)
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "")
     assert eng._tiled_vae() is True

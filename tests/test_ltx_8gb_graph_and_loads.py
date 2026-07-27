@@ -171,7 +171,9 @@ def test_node_candidates_are_the_discovery_verified_core_LTX_nodes():
     assert cand["sched"] == ("LTXVScheduler",)
     assert cand["sampler"] == ("KSamplerSelect",)
     assert cand["sample"] == ("SamplerCustom",)
-    assert cand["decode"] == ("VAEDecode",)          # tiled has its own test
+    # v2 froze tiled decode ON (measured 2026-07-27), so the DEFAULT decode
+    # class is the tiled one. Still a core class -- no vendor gate.
+    assert cand["decode"] == ("VAEDecodeTiled",)
 
 
 def test_the_decode_CLASS_and_its_INPUTS_are_chosen_by_the_same_switch(
@@ -191,6 +193,10 @@ def test_the_decode_CLASS_and_its_INPUTS_are_chosen_by_the_same_switch(
     # property under test is that the two readers AGREE, which needs a knob that
     # can actually move. A production leg's freeze has its own test below.
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    # Set the flag EXPLICITLY in both directions. Leaving it unset would take
+    # the recipe default, which v2 flipped to True -- so the "plain" half would
+    # silently become a second tiled assertion.
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")
     assert eng._node_candidates()["decode"] == ("VAEDecode",)
     plain = eng._build_graph({}, "p.png", plan, 9, 512, 288)["decode"]["inputs"]
     assert set(plain) == {"samples", "vae"}
@@ -209,18 +215,23 @@ def test_a_production_leg_decodes_through_the_FROZEN_class_whatever_the_env_says
     An episode is submitted to an ALREADY-BOOTED server (PBUG-20260723-02), so
     `OTR_LTX_8GB_TILED_VAE` in that server's environment is whatever the box was
     started with -- possibly months ago, possibly by a different sweep. It must
-    not decide which decoder a published render used. Both readers stay on
-    `VAEDecode`, so they still agree; the freeze does not split them."""
+    not decide which decoder a published render used. Both readers follow the
+    RECIPE, so they still agree; the freeze does not split them.
+
+    v2 (measured 2026-07-27) froze tiled decode ON, so the env value here is
+    "0" -- it has to oppose the recipe or this proves nothing."""
     eng = Ltx8gbEngine()
     plan = eng._build_render_request(
         {"asset_refs": {"init_image": "p"},
          "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
-    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")     # no prequalification
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")     # no prequalification
 
-    assert eng._tiled_vae() is False
-    assert eng._node_candidates()["decode"] == ("VAEDecode",)
+    assert m.LTX8_RECIPE["tiled_vae"] is True            # what it opposes
+    assert eng._tiled_vae() is True
+    assert eng._node_candidates()["decode"] == ("VAEDecodeTiled",)
     inputs = eng._build_graph({}, "p.png", plan, 9, 512, 288)["decode"]["inputs"]
-    assert set(inputs) == {"samples", "vae"}
+    assert set(inputs) == {"samples", "vae", "tile_size", "overlap",
+                           "temporal_size", "temporal_overlap"}
 
 
 # --- the graph shape ------------------------------------------------------- #
@@ -338,7 +349,7 @@ def test_the_RESOLVED_RECIPE_VALUES_reach_the_nodes_that_consume_them(
     # match and the test would be back where it started.
     for key in ("steps", "cfg", "max_shift", "base_shift", "terminal",
                 "sampler"):
-        assert cfg[key] != m.LTX8_RECIPE_V1[key], key
+        assert cfg[key] != m.LTX8_RECIPE[key], key
 
     plan = eng._build_render_request(
         {"asset_refs": {"init_image": "p"},
