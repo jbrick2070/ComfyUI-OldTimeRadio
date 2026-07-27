@@ -25,14 +25,34 @@ the M7 silent-clip contract proof are SHARED with wan_i2v via :mod:`wan_shared`;
 the loaders, node candidates and the 5B graph below are engine-specific. Import-time
 is cold-import clean (V-12). UTF-8, no BOM, ASCII-only.
 
-Config (env): ``OTR_ENABLE_WAN_TI2V`` opt-in flag; ``OTR_WAN_TI2V_CKPT`` the GGUF
-(or safetensors) UNET path the load probe checks; ``OTR_WAN_TI2V_LOADER``
-gguf|safetensors (else inferred from the unet extension); ``OTR_WAN_TI2V_UNET_NAME``
-/ ``OTR_WAN_TI2V_CLIP_NAME`` / ``OTR_WAN_TI2V_VAE_NAME`` loader basenames;
-``OTR_WAN_TI2V_CLIP_DIR`` / ``OTR_WAN_TI2V_VAE_DIR`` / ``OTR_WAN_TI2V_UNET_DIR`` dir
-overrides; ``OTR_WAN_TI2V_SHIFT`` (ModelSamplingSD3 sigma shift, default 5.0 for the
-5B) / ``OTR_WAN_TI2V_STEPS`` / ``OTR_WAN_TI2V_CFG`` / ``OTR_WAN_TI2V_SAMPLER`` /
-``OTR_WAN_TI2V_SCHEDULER`` / ``OTR_WAN_TI2V_NEGATIVE``.
+Config (env). READ THE SPLIT -- since the WAN recipe freeze (2026-07-27) the
+render knobs do NOT bind on a production leg:
+
+* STILL LIVE, every leg -- ASSET LOCATION and the render-length CEILING, never
+  the recipe: ``OTR_ENABLE_WAN_TI2V`` (vestigial opt-in flag);
+  ``OTR_WAN_TI2V_CKPT`` the GGUF (or safetensors) UNET path the load probe
+  checks; ``OTR_WAN_TI2V_UNET_NAME`` / ``OTR_WAN_TI2V_CLIP_NAME`` /
+  ``OTR_WAN_TI2V_VAE_NAME`` loader basenames; ``OTR_WAN_TI2V_LOADER`` /
+  ``OTR_WAN_TI2V_CLIP_LOADER`` gguf|safetensors (else INFERRED from the
+  resolved basename -- they stay live WITH the names they follow, because
+  freezing the loader class while its filename still moved would give one fact
+  two owners); ``OTR_WAN_TI2V_CLIP_DIR`` / ``OTR_WAN_TI2V_VAE_DIR`` /
+  ``OTR_WAN_TI2V_UNET_DIR`` dir overrides; and ``OTR_WAN_TI2V_MAX_FRAMES``,
+  which is a CEILING rather than a recipe value and is the shipped 8GB tier's
+  ``launch.env`` channel (``config/profiles/otr_8gb_wan.json``).
+* FROZEN IN CODE as ``WAN_TI2V_RECIPE``, ignored-with-a-warning:
+  ``OTR_WAN_TI2V_STEPS`` / ``_CFG`` / ``_SHIFT`` / ``_SAMPLER`` / ``_SCHEDULER``
+  / ``_NEGATIVE`` / ``_TILED_VAE`` / ``_VAE_TILE`` / ``_VAE_OVERLAP`` /
+  ``_VAE_TEMPORAL`` / ``_VAE_TEMPORAL_OVERLAP``. Their defaults live in that
+  dict, not here, so this list cannot drift from the values.
+* THE CONSENT ACT: set ``OTR_WAN_TI2V_PREQUALIFICATION=1`` and the frozen knobs
+  bind again, range-checked and fail-closed, for a MEASUREMENT run -- whose
+  clips stamp a ``+prequalification`` recipe receipt so a sweep artifact is
+  never mistaken for a production one.
+
+Why the freeze: a production episode is submitted to an ALREADY-BOOTED server,
+so a knob exported at launch cannot bind the work (``PBUG-20260723-02``). Code
+binds on every leg; an environment cannot.
 """
 from __future__ import annotations
 
@@ -40,6 +60,7 @@ import logging
 import os
 
 from . import motion_common as _MC
+from . import wan_recipe as _WR
 from . import wan_shared as _WS
 from .._otr_shared.role_compat import ROLES
 from .._otr_shared.still_plan_helpers import StillPlanRow
@@ -87,6 +108,87 @@ _TI2V_MAX_FRAMES = 177
 #: (matches OTR_VIDEO_LANDSCAPE_CANVAS / the cost-model telemetry reference).
 _TI2V_COST_REF_W = 1472
 _TI2V_COST_REF_H = 832
+
+#: The defined recipe-receipt string threaded into the manifest.
+#:
+#: THE VERSION LIVES IN THE STRING, not in a separate constant. This value rides
+#: ``_clip_from_raw`` -> the manifest row -> the render-batch receipt ->
+#: ``stamp_durable(meta.render_engines)``, so it is what a PUBLISHED EPISODE's
+#: DURABLE LEDGER can be asked "which recipe rendered you". Before this chunk a
+#: WAN clip stamped ``recipe: None`` -- there was not even a wrong receipt to
+#: catch a drift with. A bare version constant that never reached this string
+#: would leave the recipe invisible to every consumer that matters.
+RECIPE_WAN_TI2V = "wan22_ti2v_5b_i2v_single_pass_v1"
+
+#: THE CONSENT ACT that re-opens this adapter's recipe knobs. PER ADAPTER, not
+#: shared with ``wan_i2v``: one switch for both tiers would stamp a
+#: ``+prequalification`` receipt on a clip that had rendered with the frozen
+#: recipe, and a receipt that lies in the safer direction still lies.
+PREQUALIFICATION_ENV = "OTR_WAN_TI2V_PREQUALIFICATION"
+
+#: THE FROZEN wan_ti2v RECIPE, v1 (LANE 1, 2026-07-27).
+#:
+#: WHAT v1 IS, STATED HONESTLY: these are TODAY'S SHIPPED DEFAULTS, lifted
+#: verbatim from the env fallbacks they replace -- NOT a measured selection.
+#: No WAN sweep has run. Freezing them is behaviour-preserving on any box that
+#: set nothing, and it is reversible: a prequalification run measures and
+#: produces v2 (bump the version INSIDE ``RECIPE_WAN_TI2V`` and add a new dict;
+#: never edit a versioned dict in place, or receipts already on disk stop being
+#: interpretable).
+#:
+#: ``max_frames`` IS DELIBERATELY NOT HERE. It is a render-length CEILING, and
+#: unlike the ltx tier's it is a LIVE SHIPPED CHANNEL: ``otr_8gb_wan.json`` sets
+#: both ``launch.env.OTR_WAN_TI2V_MAX_FRAMES`` and ``video.max_render_frames``.
+#: Folding it into the recipe would silently retire the 8GB tier's launch
+#: contract (``PBUG-20260723-02``, the bug this freeze descends from).
+WAN_TI2V_RECIPE_V1 = {
+    "steps": 30,
+    "cfg": 5.0,
+    #: ModelSamplingSD3 sigma shift; 5.0 is the 5B value (the 14B uses 8.0).
+    "shift": 5.0,
+    "sampler": "euler",
+    "scheduler": "simple",
+    #: The negative conditioning text. A RENDER INPUT, so it belongs here for
+    #: the same reason the samplers do: read from ``os.environ`` it made two
+    #: boxes produce visibly different clips that both stamped the same receipt.
+    #: This adapter has no per-shot negative channel -- ``_build_graph`` reads
+    #: only this -- so before the freeze the server's boot was its SOLE author.
+    "negative": _WAN_DEFAULT_NEGATIVE,
+    #: Tiled decode is ON for this tier: the video-VAE decode is a top VRAM-peak
+    #: driver at 8GB. (The ltx tier measured the same direction on 2026-07-27 --
+    #: tiled holds the peak FLAT across clip length where untiled climbs with it.
+    #: That is ltx's measurement, not this adapter's, so it is context for a
+    #: future WAN sweep and not a claim about these numbers.)
+    "tiled_vae": True,
+    #: The tiled-decode geometry, frozen with the flag that reaches it: the day
+    #: a measured v2 changes tiling is the day four boot-environment values
+    #: would otherwise start deciding what a published clip looks like.
+    "vae_tile": 256,
+    "vae_overlap": 64,
+    "vae_temporal": 16,
+    "vae_temporal_overlap": 8,
+}
+
+#: THE ONE NAME EVERY CONSUMER READS. Bumping a recipe is repointing this and
+#: the version inside ``RECIPE_WAN_TI2V`` -- never editing a versioned dict.
+WAN_TI2V_RECIPE = WAN_TI2V_RECIPE_V1
+
+#: The env var each frozen field was read from, kept so the demotion can NAME
+#: what it is ignoring. Presence is all this map is used for outside the consent
+#: act -- see ``wan_recipe.ignored_override_keys``.
+_RECIPE_ENV_KEYS = {
+    "steps": "OTR_WAN_TI2V_STEPS",
+    "cfg": "OTR_WAN_TI2V_CFG",
+    "shift": "OTR_WAN_TI2V_SHIFT",
+    "sampler": "OTR_WAN_TI2V_SAMPLER",
+    "scheduler": "OTR_WAN_TI2V_SCHEDULER",
+    "negative": "OTR_WAN_TI2V_NEGATIVE",
+    "tiled_vae": "OTR_WAN_TI2V_TILED_VAE",
+    "vae_tile": "OTR_WAN_TI2V_VAE_TILE",
+    "vae_overlap": "OTR_WAN_TI2V_VAE_OVERLAP",
+    "vae_temporal": "OTR_WAN_TI2V_VAE_TEMPORAL",
+    "vae_temporal_overlap": "OTR_WAN_TI2V_VAE_TEMPORAL_OVERLAP",
+}
 
 
 #: S1 (2026-07-25) per-model still plan for wan_ti2v (spec section 3,
@@ -275,11 +377,34 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 else "safetensors")
 
     def _tiled_vae(self):
-        """Whether to decode through ``VAEDecodeTiled`` (the floor default ON: the
-        video-VAE decode is a top VRAM-peak driver at 8GB). ``OTR_WAN_TI2V_TILED_VAE``
-        falsey {0,false,no,off} forces the plain ``VAEDecode``."""
-        return (os.environ.get("OTR_WAN_TI2V_TILED_VAE", "1").strip().lower()
-                not in ("0", "false", "no", "off"))
+        """Whether to decode through ``VAEDecodeTiled`` (FROZEN ON: the video-VAE
+        decode is a top VRAM-peak driver at 8GB).
+
+        Under the consent act ``OTR_WAN_TI2V_TILED_VAE`` binds again and an
+        unrecognised value fails CLOSED rather than collapsing to False -- a
+        sweep must not be able to mistype the knob it is varying, decode the
+        other way, and stamp a receipt saying it had measured this one."""
+        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+            return bool(WAN_TI2V_RECIPE["tiled_vae"])
+        # The prequalification DEFAULT is the FROZEN value, not a literal: a
+        # sweep that opens the knobs but re-exports only some of them must
+        # measure the recipe it is validating, not a third configuration.
+        return _WR.config_flag(self, _RECIPE_ENV_KEYS["tiled_vae"],
+                               WAN_TI2V_RECIPE["tiled_vae"])
+
+    def _negative_prompt(self):
+        """The FROZEN negative conditioning.
+
+        This adapter has no per-shot negative channel -- ``_build_graph`` reads
+        this and nothing else -- so before the freeze the server's boot
+        environment was the SOLE author of the negative conditioning, and two
+        boxes rendered visibly different clips from the same episode while both
+        stamped the same (empty) receipt."""
+        frozen = str(WAN_TI2V_RECIPE["negative"])
+        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+            return frozen
+        return _WR.config_text(self, _RECIPE_ENV_KEYS["negative"], frozen,
+                               strip=False)
 
     def _node_candidates(self):
         """Ordered ComfyUI node-class candidates per graph node (CORE Wan 2.2
@@ -316,49 +441,58 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "vae": os.environ.get("OTR_WAN_TI2V_VAE_NAME", "wan2.2_vae.safetensors"),
         }
 
-    def _resolve_render_config(self):
-        """Parse + RANGE-CHECK the render knobs ONCE (shared by assert_usable and
-        _build_graph, 2026-06-18 roundtable). A bad env value fails CLOSED here with
-        a named MALFORMED_CONFIG, never a raw int()/float() crash mid-render. The
-        sampler/scheduler are validated against the cross-platform floor whitelist."""
-        def _num(env, dflt, lo, hi, cast):
-            raw = os.environ.get(env)
-            if raw is None or raw == "":
-                return cast(dflt)
-            try:
-                val = cast(raw)
-            except (TypeError, ValueError):
-                raise EngineUnusable(
-                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                    "%s=%r is not a valid number" % (env, raw), kind="video")
-            if not (lo <= val <= hi):
-                raise EngineUnusable(
-                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                    "%s=%s out of range [%s, %s]" % (env, val, lo, hi), kind="video")
-            return val
+    #: Why the portable-sampler whitelist exists, appended to its refusal so the
+    #: message still says WHY when the check itself lives in ``wan_recipe``.
+    _SAMPLER_HINT = (" -- wan_ti2v is the 8GB/Mac/AMD floor; "
+                     "uni_pc/sa_solver/MoEKSampler are not portable. Use a "
+                     "heavier engine for those.")
 
-        sampler = (os.environ.get("OTR_WAN_TI2V_SAMPLER")
-                   or self._DEFAULT_SAMPLER).strip()
-        if sampler not in self._PORTABLE_SAMPLERS:
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                "OTR_WAN_TI2V_SAMPLER=%r is not in the cross-platform floor whitelist "
-                "%s -- wan_ti2v is the 8GB/Mac/AMD floor; uni_pc/sa_solver/MoEKSampler "
-                "are not portable. Use a heavier engine for those."
-                % (sampler, sorted(self._PORTABLE_SAMPLERS)), kind="video")
-        scheduler = (os.environ.get("OTR_WAN_TI2V_SCHEDULER")
-                     or self._DEFAULT_SCHEDULER).strip()
-        if scheduler not in self._PORTABLE_SCHEDULERS:
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                "OTR_WAN_TI2V_SCHEDULER=%r is not in the floor whitelist %s"
-                % (scheduler, sorted(self._PORTABLE_SCHEDULERS)), kind="video")
+    def _resolve_render_config(self):
+        """The FROZEN render knobs (shared by assert_usable and _build_graph).
+
+        PRODUCTION: the recipe binds whatever the server booted with, and
+        anything the environment is trying to say is NAMED and ignored -- named
+        because a knob that silently does nothing is a complaint this build has
+        already collected, and never PARSED because a stale malformed value must
+        not be able to kill a leg it cannot influence.
+
+        PREQUALIFICATION: the knobs are open, every value is range-checked and
+        fails CLOSED with a named MALFORMED_CONFIG, and each honoured override
+        is announced so a sweep's log says what it actually measured."""
+        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+            _WR.warn_ignored(_LOG, self.name, RECIPE_WAN_TI2V,
+                             _WR.ignored_override_keys(_RECIPE_ENV_KEYS),
+                             PREQUALIFICATION_ENV)
+            # SPELLED OUT rather than a dict slice so BOTH legs return the SAME
+            # KEY SET: the recipe also carries the tiled-decode fields, whose
+            # owners are _tiled_vae() / _vaedecode_inputs(), and a return shape
+            # that varied by mode would hand the next reader a KeyError that
+            # only reproduces under the consent act.
+            return {
+                "steps": WAN_TI2V_RECIPE["steps"],
+                "cfg": WAN_TI2V_RECIPE["cfg"],
+                "shift": WAN_TI2V_RECIPE["shift"],
+                "sampler": WAN_TI2V_RECIPE["sampler"],
+                "scheduler": WAN_TI2V_RECIPE["scheduler"],
+            }
+        _WR.warn_honoured(_LOG, self.name, RECIPE_WAN_TI2V,
+                          _WR.ignored_override_keys(_RECIPE_ENV_KEYS),
+                          PREQUALIFICATION_ENV)
+        _num = _WR.config_number
         return {
-            "steps": _num("OTR_WAN_TI2V_STEPS", 30, 1, 100, int),
-            "cfg": _num("OTR_WAN_TI2V_CFG", 5.0, 0.0, 30.0, float),
-            "shift": _num("OTR_WAN_TI2V_SHIFT", 5.0, 0.1, 20.0, float),
-            "sampler": sampler,
-            "scheduler": scheduler,
+            "steps": _num(self, _RECIPE_ENV_KEYS["steps"],
+                          WAN_TI2V_RECIPE["steps"], 1, 100, int),
+            "cfg": _num(self, _RECIPE_ENV_KEYS["cfg"],
+                        WAN_TI2V_RECIPE["cfg"], 0.0, 30.0, float),
+            "shift": _num(self, _RECIPE_ENV_KEYS["shift"],
+                          WAN_TI2V_RECIPE["shift"], 0.1, 20.0, float),
+            "sampler": _WR.config_text(
+                self, _RECIPE_ENV_KEYS["sampler"], WAN_TI2V_RECIPE["sampler"],
+                allowed=self._PORTABLE_SAMPLERS, hint=self._SAMPLER_HINT),
+            "scheduler": _WR.config_text(
+                self, _RECIPE_ENV_KEYS["scheduler"],
+                WAN_TI2V_RECIPE["scheduler"],
+                allowed=self._PORTABLE_SCHEDULERS),
         }
 
     def _floor_length(self, target_frame_count, width=None, height=None):
@@ -419,7 +553,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         sampler = cfg_knobs["sampler"]
         scheduler = cfg_knobs["scheduler"]
         positive = get("text_prompt") or "subtle natural motion"
-        negative = os.environ.get("OTR_WAN_TI2V_NEGATIVE", _WAN_DEFAULT_NEGATIVE)
+        negative = self._negative_prompt()               # frozen, fail-closed
         if self._loader_mode() == "gguf":
             unet_inputs = {"unet_name": names["unet"]}
         else:
@@ -461,21 +595,30 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
     def _vaedecode_inputs(self, W):
         """VAEDecode inputs; the tiled path adds the schema-verified tile/temporal
-        knobs (8GB floor defaults; temporal_size = frames decoded at a time = the
-        big video-VAE peak lever). All env-overridable."""
+        knobs (FROZEN; temporal_size = frames decoded at a time = the big
+        video-VAE peak lever)."""
         base = {"samples": W("ksampler", 0), "vae": W("vae", 0)}
         if not self._tiled_vae():
             return base
-        def _i(env, dflt):
-            try:
-                return int(os.environ.get(env, str(dflt)))
-            except (TypeError, ValueError):
+        def _i(key):
+            """The frozen geometry, env-overridable ONLY under the consent act.
+
+            Range-checked through the SAME helper as every other knob. It used
+            to swallow a bad value and substitute the default, which made these
+            four the only knobs on this adapter that failed OPEN -- a sweep
+            could mistype the value it was measuring, render at something else,
+            and stamp a receipt saying it had measured it."""
+            dflt = int(WAN_TI2V_RECIPE[key])
+            if not _WR.prequalification_active(PREQUALIFICATION_ENV):
                 return dflt
+            lo, hi = _WR.VAE_TILE_BOUNDS[key]
+            return _WR.config_number(self, _RECIPE_ENV_KEYS[key], dflt,
+                                     lo, hi, int)
         base.update({
-            "tile_size": _i("OTR_WAN_TI2V_VAE_TILE", 256),
-            "overlap": _i("OTR_WAN_TI2V_VAE_OVERLAP", 64),
-            "temporal_size": _i("OTR_WAN_TI2V_VAE_TEMPORAL", 16),
-            "temporal_overlap": _i("OTR_WAN_TI2V_VAE_TEMPORAL_OVERLAP", 8),
+            "tile_size": _i("vae_tile"),
+            "overlap": _i("vae_overlap"),
+            "temporal_size": _i("vae_temporal"),
+            "temporal_overlap": _i("vae_temporal_overlap"),
         })
         return base
 
@@ -557,10 +700,18 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # so _clip_from_raw stamps it -> the manifest vram_peak_mb receipt is populated
         # for the wan lane (was ALWAYS None: the peak was logged, never returned).
         # Required for the wan_8gb VRAM-acceptance telemetry.
-        return {"out_path": path, "frame_count": n, "vram_peak_mb": render_peak}
+        #
+        # `recipe` is the same shape of receipt for the render CONFIG: it rides
+        # _clip_from_raw -> the manifest row -> stamp_durable(meta.render_engines),
+        # so a published episode can be asked which recipe rendered it. It was
+        # None on every WAN clip until the freeze landed.
+        return {"out_path": path, "frame_count": n, "vram_peak_mb": render_peak,
+                "recipe": _WR.recipe_receipt(RECIPE_WAN_TI2V,
+                                             PREQUALIFICATION_ENV)}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)
 
 
-__all__ = ["WanTi2vEngine"]
+__all__ = ["WanTi2vEngine", "RECIPE_WAN_TI2V", "WAN_TI2V_RECIPE",
+           "PREQUALIFICATION_ENV"]

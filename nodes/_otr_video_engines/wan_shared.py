@@ -483,6 +483,14 @@ class WanInitImageMixin:
             # engine threaded into raw (None off the GPU box / when not measured).
             # The render batch reads clip.get("vram_peak_mb") for the manifest receipt.
             "vram_peak_mb": raw.get("vram_peak_mb"),
+            # The RECIPE receipt (LANE 1, 2026-07-27). Same shape and the same
+            # consumers as vram_peak_mb: it rides the manifest row into
+            # stamp_durable(meta.render_engines), which is how a published
+            # episode can be asked which render recipe produced it. Threaded
+            # HERE rather than copied into each WAN adapter because a passthrough
+            # written twice is a passthrough that drifts once. None for a raw
+            # that did not carry it -- every consumer already uses clip.get().
+            "recipe": raw.get("recipe"),
         }
 
     @staticmethod

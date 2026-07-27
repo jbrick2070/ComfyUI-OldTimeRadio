@@ -191,8 +191,13 @@ def test_m8_rejects_a_wrong_but_present_vae(tmp_path, monkeypatch):
 # CLIP-FILL frame budgeting (2026-06-18 -- supersedes the static 17-frame floor)
 # --------------------------------------------------------------------------- #
 def _clear_floor_env(monkeypatch):
+    # OTR_WAN_TI2V_PREQUALIFICATION is cleared with the rest so every test in
+    # this file states which leg it is on: unset here means the PRODUCTION leg,
+    # where the frozen recipe binds. A stray consent var in the parent process
+    # would otherwise silently change what these tests mean.
     for k in ("OTR_WAN_TI2V_SAMPLER", "OTR_WAN_TI2V_SCHEDULER", "OTR_WAN_TI2V_STEPS",
               "OTR_WAN_TI2V_CFG", "OTR_WAN_TI2V_SHIFT", "OTR_WAN_TI2V_MAX_FRAMES",
+              "OTR_WAN_TI2V_PREQUALIFICATION",
               "OTR_VIDEO_COST_OVERHEAD_MB", "OTR_VIDEO_COST_PER_FRAME_MB",
               "OTR_VIDEO_BUDGET_MARGIN"):
         monkeypatch.delenv(k, raising=False)
@@ -275,30 +280,52 @@ def test_graph_default_sampler_is_euler(monkeypatch):
     assert g["ksampler"]["inputs"]["sampler_name"] == "euler"
 
 
-def test_non_portable_sampler_fails_closed(monkeypatch):
-    # uni_pc/sa_solver/MoEKSampler are not cross-platform -> fail closed (the
-    # resolver runs before the install checks, so no staging needed).
+def test_non_portable_sampler_fails_closed_under_the_consent_act(monkeypatch):
+    # uni_pc/sa_solver/MoEKSampler are not cross-platform -> fail closed. Since
+    # the recipe freeze this check lives INSIDE the consent act: on a production
+    # leg the knob cannot bind at all, so there is nothing to refuse.
     _clear_floor_env(monkeypatch)
     monkeypatch.setenv("OTR_ENABLE_WAN_TI2V", "1")
+    monkeypatch.setenv("OTR_WAN_TI2V_PREQUALIFICATION", "1")
     monkeypatch.setenv("OTR_WAN_TI2V_SAMPLER", "uni_pc")
     with pytest.raises(EngineUnusable) as exc:
         WanTi2vEngine().assert_usable(host_caps={}, profile={})
     assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
+    # The adapter's own reason for the whitelist survives the move into the
+    # shared helper -- a refusal that cannot say why sends the operator hunting.
+    assert "8GB/Mac/AMD floor" in str(exc.value)
 
 
-def test_out_of_range_steps_fails_closed(monkeypatch):
+def test_out_of_range_steps_fails_closed_under_the_consent_act(monkeypatch):
     _clear_floor_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_PREQUALIFICATION", "1")
     monkeypatch.setenv("OTR_WAN_TI2V_STEPS", "999")
     with pytest.raises(EngineUnusable) as exc:
         WanTi2vEngine()._resolve_render_config()
     assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
 
 
-def test_non_numeric_cfg_fails_closed(monkeypatch):
+def test_non_numeric_cfg_fails_closed_under_the_consent_act(monkeypatch):
     _clear_floor_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_PREQUALIFICATION", "1")
     monkeypatch.setenv("OTR_WAN_TI2V_CFG", "high")
     with pytest.raises(EngineUnusable):
         WanTi2vEngine()._resolve_render_config()
+
+
+def test_a_stale_malformed_knob_can_NOT_kill_a_production_leg(monkeypatch):
+    """PBUG-20260723-02 wearing the opposite mask.
+
+    A long-booted server may carry a stale `OTR_WAN_TI2V_CFG=high` in its
+    environment. On a production leg that value has NO EFFECT on the render --
+    the recipe is frozen -- so parsing it just to reject it would kill a leg
+    over a knob it does not influence. Named in a warning, never parsed."""
+    _clear_floor_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_CFG", "high")
+    monkeypatch.setenv("OTR_WAN_TI2V_STEPS", "999")
+    monkeypatch.setenv("OTR_WAN_TI2V_SAMPLER", "uni_pc")
+    cfg = WanTi2vEngine()._resolve_render_config()
+    assert cfg["cfg"] == 5.0 and cfg["steps"] == 30 and cfg["sampler"] == "euler"
 
 
 # --------------------------------------------------------------------------- #
@@ -307,7 +334,10 @@ def test_non_numeric_cfg_fails_closed(monkeypatch):
 def _clear_clip_vae_env(monkeypatch):
     for k in ("OTR_WAN_TI2V_CLIP_NAME", "OTR_WAN_TI2V_CLIP_LOADER",
               "OTR_WAN_TI2V_TILED_VAE", "OTR_WAN_TI2V_LOADER",
-              "OTR_WAN_TI2V_UNET_NAME", "OTR_WAN_TI2V_CKPT"):
+              "OTR_WAN_TI2V_UNET_NAME", "OTR_WAN_TI2V_CKPT",
+              "OTR_WAN_TI2V_PREQUALIFICATION",
+              "OTR_WAN_TI2V_VAE_TILE", "OTR_WAN_TI2V_VAE_OVERLAP",
+              "OTR_WAN_TI2V_VAE_TEMPORAL", "OTR_WAN_TI2V_VAE_TEMPORAL_OVERLAP"):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -365,14 +395,28 @@ def test_tiled_vae_inputs_have_temporal_knobs(monkeypatch):
     assert "temporal_overlap" in vd and "overlap" in vd
 
 
-def test_tiled_vae_can_be_disabled(monkeypatch):
+def test_tiled_vae_can_be_disabled_under_the_consent_act(monkeypatch):
+    # "0" OPPOSES the frozen True, so this test can still tell whether the
+    # environment or the recipe won. Before the freeze it read the env on every
+    # leg; now that channel exists only inside a measurement run.
     _clear_clip_vae_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_PREQUALIFICATION", "1")
     monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")
     eng = WanTi2vEngine()
     assert eng._tiled_vae() is False
     assert eng._node_candidates()["vaedecode"] == ("VAEDecode",)
     g = _graph(monkeypatch)
     assert "tile_size" not in g["vaedecode"]["inputs"]
+
+
+def test_tiled_vae_can_NOT_be_disabled_on_a_production_leg(monkeypatch):
+    # The control for the test above: same OPPOSING value, no consent act. The
+    # frozen recipe wins and the tiled decode node stays.
+    _clear_clip_vae_env(monkeypatch)
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")
+    eng = WanTi2vEngine()
+    assert eng._tiled_vae() is True
+    assert eng._node_candidates()["vaedecode"] == ("VAEDecodeTiled",)
 
 
 # --------------------------------------------------------------------------- #
