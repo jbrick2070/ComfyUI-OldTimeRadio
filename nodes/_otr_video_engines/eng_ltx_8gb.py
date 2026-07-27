@@ -81,6 +81,7 @@ import os
 from collections import namedtuple
 
 from . import motion_common as _MC
+from . import recipe_departures as _RD
 from . import wan_shared as _WS
 from .._otr_shared.role_compat import ROLES
 from .._otr_shared.still_plan_helpers import StillPlanRow
@@ -140,7 +141,11 @@ PREQUALIFICATION_ENV = "OTR_LTX_8GB_PREQUALIFICATION"
 #: What a MEASUREMENT run stamps onto its clips instead of the frozen name.
 #: See ``recipe_receipt`` -- a sweep's artifacts must be distinguishable from
 #: production's in the durable ledger, because they are not the same recipe.
-PREQUALIFICATION_RECIPE_SUFFIX = "+prequalification"
+#:
+#: SOURCED, not spelled (LANE 2): the same mark is stamped by the WAN adapters
+#: through their own lane, and two literals with one value is how a ledger grows
+#: two dialects. ``recipe_departures`` owns the format for every adapter.
+PREQUALIFICATION_RECIPE_SUFFIX = _RD.PREQUALIFICATION_SUFFIX
 
 #: THE FROZEN ltx_8gb RECIPE, v1 (B6, 2026-07-27).
 #:
@@ -325,22 +330,32 @@ def _ignored_override_keys():
                   if os.environ.get(env) not in (None, ""))
 
 
-def recipe_receipt():
+def recipe_receipt(departed=None):
     """The recipe string a rendered clip is STAMPED with.
 
     NOT simply ``RECIPE_LTX8_I2V``, and the difference is a ledger-integrity
     one. Under prequalification the knobs genuinely bind, so the clip on disk
-    may share NONE of v1's values -- while the receipt rides ``_clip_from_raw``
-    -> the manifest row -> ``stamp_durable(meta.render_engines)``, which is a
-    DURABLE ledger a published episode carries. Stamping the frozen name onto a
-    sweep artifact would make a measurement indistinguishable from production
-    in the one record that outlives the run.
+    may share NONE of the frozen values -- while the receipt rides
+    ``_clip_from_raw`` -> the manifest row ->
+    ``stamp_durable(meta.render_engines)``, which is a DURABLE ledger a
+    published episode carries. Stamping the frozen name onto a sweep artifact
+    would make a measurement indistinguishable from production in the one
+    record that outlives the run.
 
     So the consent act marks its own output. It also moves ``session_identity``
     (the recipe is element [1]), which is correct: a sweep segment and a
-    production segment must never be mistaken for the same session."""
+    production segment must never be mistaken for the same session -- and since
+    LANE 2, neither may two sweep CELLS.
+
+    ``departed`` is the mapping of knobs this cell actually changed. It is
+    OPTIONAL because a caller with no instance in hand (a test, a log line)
+    legitimately wants the bare mark, and REQUIRED IN PRACTICE at the two stamp
+    sites, which both go through ``Ltx8gbEngine._recipe_receipt`` --
+    ``test_EVERY_stamp_goes_through_the_receipt_helper`` is the source-level
+    guard that keeps them there. Passing nothing yields exactly the pre-LANE-2
+    receipt, so the fallback is the old behaviour rather than a new silence."""
     if _prequalification_active():
-        return RECIPE_LTX8_I2V + PREQUALIFICATION_RECIPE_SUFFIX
+        return RECIPE_LTX8_I2V + _RD.format_suffix(departed or {})
     return RECIPE_LTX8_I2V
 
 #: The FROZEN per-beat resolution (B2). Everything a beat's HANDLES depend on,
@@ -705,7 +720,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "ltx_8gb %s" % (exc,), kind="video")
         return LtxSessionConfig(
-            engine=self.name, recipe=recipe_receipt(),
+            engine=self.name, recipe=self._recipe_receipt(cfg),
             ckpt_token=self._ckpt_name(), ckpt_path=ckpt,
             ckpt_receipt=ckpt_receipt,
             t5_token=self._t5_name(), t5_path=t5,
@@ -809,6 +824,41 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if not _prequalification_active():
             return frozen
         return os.environ.get("OTR_LTX_8GB_NEGATIVE") or frozen
+
+    def _negative_for(self, shot_negative):
+        """The negative conditioning for THIS shot, and the one place that
+        decides it.
+
+        PRODUCTION: the per-shot value wins, unchanged. The director's channel
+        travels WITH the work, and B6 demoted only the server-boot channel.
+
+        UNDER THE CONSENT ACT IT IS TERMINAL, and that is a LANE 2 consequence
+        rather than new policy for its own sake. The receipt is SESSION-scoped:
+        ``session_identity`` is read before the weights land and again before
+        every segment, so it may only describe request-independent things, and
+        the recipe string is element [1] of it. That means the receipt can only
+        ever report what the RECIPE resolved. A sweep whose measured negative
+        was displaced per shot would render one conditioning and stamp a
+        receipt naming another -- the exact class of lie LANE 2 exists to
+        remove, and worse than the generic mark it replaces, because a specific
+        false claim is more credible than a vague true one.
+
+        Today ``render_driver`` never populates ``negative_prompt`` for a video
+        shot (grep: zero occurrences), so this cannot fire on the shipped path.
+        It is the tripwire for whoever wires that channel."""
+        frozen = self._negative_prompt()
+        if not shot_negative:
+            return frozen
+        if _prequalification_active() and shot_negative != frozen:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "a shot supplied its own negative_prompt during a %s=1 "
+                "measurement run, which would displace the negative this cell "
+                "is measuring -- the clip would render one conditioning and "
+                "stamp a receipt naming another. Clear the shot's "
+                "negative_prompt for the sweep, or sweep a different knob"
+                % PREQUALIFICATION_ENV, kind="video")
+        return shot_negative
 
     def _config_number(self, env, dflt, lo, hi, cast):
         """Parse + RANGE-CHECK one numeric env knob, or fail CLOSED by name.
@@ -915,6 +965,66 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "sampler": sampler,
         }
 
+    def _tile_geometry(self, key):
+        """One tiled-decode geometry value: frozen, or range-checked under the
+        consent act.
+
+        THE one implementation. ``_decode_inputs`` builds the graph from it and
+        ``_recipe_departures`` reports it, and two copies of one range check
+        with two failure modes is the exact defect this adapter already paid
+        for once (B6 finding 4)."""
+        dflt = int(LTX8_RECIPE[key])
+        if not _prequalification_active():
+            return dflt
+        lo, hi = _VAE_TILE_BOUNDS[key]
+        return self._config_number(_RECIPE_ENV_KEYS[key], dflt, lo, hi, int)
+
+    def _recipe_departures(self, knobs=None):
+        """Which frozen knobs THIS CELL actually changed. ``{}`` on production.
+
+        The four cells of the 2026-07-27 sweep all stamped one generic
+        ``+prequalification``, so a winning artifact could not prove which knob
+        values produced it: the ledger said a sweep ran, not which cell. This is
+        what makes the mark specific.
+
+        RESOLVED VALUES, not env presence. An operator who exports
+        ``OTR_LTX_8GB_STEPS=8`` when 8 is already frozen has changed nothing,
+        and a receipt claiming a departure there would describe a cell that does
+        not exist. Only a value that actually differs is named.
+
+        NOTHING IS PARSED ON A PRODUCTION LEG. The early return is the same
+        contract ``_ignored_override_keys`` holds: outside the consent act these
+        knobs cannot bind, so a stale malformed one must not be able to raise --
+        ``PBUG-20260723-02`` wearing the opposite mask. It also means the
+        production receipt is byte-identical to what B6 shipped.
+
+        THE TILE GEOMETRY IS ONLY REPORTED WHEN TILED DECODE IS ON, because a
+        knob the render never reached is not a departure that describes the
+        clip -- and reading it anyway would newly refuse a sweep whose stale
+        tile value has no effect on the cell it is measuring."""
+        if not _prequalification_active():
+            return {}
+        knobs = self._resolve_render_config() if knobs is None else knobs
+        resolved = {
+            "steps": knobs["steps"], "cfg": knobs["cfg"],
+            "max_shift": knobs["max_shift"], "base_shift": knobs["base_shift"],
+            "terminal": knobs["terminal"], "sampler": knobs["sampler"],
+            "t5_device": self._t5_device(),
+            "tiled_vae": self._tiled_vae(),
+            "negative": self._negative_prompt(),
+        }
+        if resolved["tiled_vae"]:
+            for key in _VAE_TILE_BOUNDS:
+                resolved[key] = self._tile_geometry(key)
+        return _RD.departures(LTX8_RECIPE, resolved)
+
+    def _recipe_receipt(self, knobs=None):
+        """THE stamp. Both stamp sites go through here and nowhere else --
+        ``test_EVERY_stamp_goes_through_the_receipt_helper`` pins it at the
+        source level, because a second stamp site that reached for the bare
+        constant would put an unmarked sweep clip into the durable ledger."""
+        return recipe_receipt(self._recipe_departures(knobs))
+
     # ---- usability (fail-closed BEFORE any forward; ordinary preflight ONLY) ----
     def _assert_checkpoint_integrity(self, ckpt):
         """The 4 GiB checkpoint floor -- the ONE place it lives (B1b).
@@ -996,24 +1106,17 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         base = {"samples": W("sample", 0), "vae": W("ckpt", 2)}
         if not self._tiled_vae():
             return base
-        def _i(key):
-            """The frozen geometry, env-overridable ONLY under the consent act.
-
-            These are render inputs like any other knob: reachable only while
-            tiled decode is on, which the frozen recipe keeps off -- so today
-            they are inert either way. They are gated anyway, because the day a
-            measured v2 turns tiled decode on is the day four boot-environment
-            values would otherwise start deciding what a published clip looks
-            like, with nothing naming them.
-
-            Range-checked through the SAME helper as every other knob, so a
-            mistyped value stops a sweep instead of being quietly replaced by
-            the default it was meant to be measured against."""
-            dflt = int(LTX8_RECIPE[key])
-            if not _prequalification_active():
-                return dflt
-            lo, hi = _VAE_TILE_BOUNDS[key]
-            return self._config_number(_RECIPE_ENV_KEYS[key], dflt, lo, hi, int)
+        # The frozen geometry, env-overridable ONLY under the consent act, and
+        # range-checked through the SAME helper as every other knob so a
+        # mistyped value stops a sweep instead of being quietly replaced by the
+        # default it was meant to be measured against.
+        #
+        # ``_tile_geometry`` is the ONE implementation (LANE 2). It used to be a
+        # closure here, and ``_recipe_departures`` would have needed a second
+        # copy to report what a sweep cell actually decoded with -- which is how
+        # this adapter grew two range checks with opposite failure modes the
+        # first time (B6 finding 4).
+        _i = self._tile_geometry
         base.update({
             "tile_size": _i("vae_tile"),
             "overlap": _i("vae_overlap"),
@@ -1046,7 +1149,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             lambda k, d=None: getattr(request, k, d))
         cfg = self._resolve_render_config()
         positive = get("text_prompt") or "subtle natural motion, cinematic light"
-        negative = get("negative_prompt") or self._negative_prompt()
+        negative = self._negative_for(get("negative_prompt"))
         graph = {
             "ckpt": {"class": "ckpt", "inputs": {"ckpt_name": self._ckpt_name()}},
             "clip": {"class": "clip",
@@ -1247,7 +1350,13 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # built, and it must never come after the GPU work -- a request this
         # adapter cannot render is knowable from pure numbers.
         target_frames = int(plan.get("target_frame_count") or 0)
-        cap = self._resolve_render_config()["max_frames"]
+        # Resolved ONCE and reused by the receipt stamp at the end of this
+        # method. Not an optimisation: on a measurement leg every resolve emits
+        # the "honouring X from the environment" warning, and a sweep's log is
+        # the evidence the sweep exists to produce -- the same line three times
+        # per clip is a line the operator stops reading.
+        knobs = self._resolve_render_config()
+        cap = knobs["max_frames"]
         contract = self.frame_contract
         rung = contract.smallest_legal_at_least(target_frames)
         if rung is None or rung > cap:
@@ -1340,7 +1449,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             _LOG.info("[OTR video] ltx_8gb VRAM render-phase peak %s MB @ %dx%d len=%d",
                       render_peak, width, height, n)
         return {"out_path": path, "frame_count": n,
-                "vram_peak_mb": render_peak, "recipe": recipe_receipt(),
+                "vram_peak_mb": render_peak,
+                "recipe": self._recipe_receipt(knobs),
                 "render_canvas": "%dx%d" % (int(width), int(height))}
 
     def canonicalize(self, raw, request, profile):

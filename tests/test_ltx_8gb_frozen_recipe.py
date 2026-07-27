@@ -24,7 +24,9 @@ from __future__ import annotations
 import pytest
 
 from nodes._otr_video_engines import eng_ltx_8gb as m
-from nodes._otr_video_engines.registry import EngineUnusable
+from nodes._otr_video_engines.registry import (
+    EngineUnusable, EngineUsabilityReason,
+)
 
 #: Every env var this module's freeze touches, plus the consent act itself. An
 #: incomplete list lets the HOST environment decide an outcome (QA finding T-6).
@@ -382,8 +384,14 @@ def test_EVERY_stamp_goes_through_the_receipt_helper(eng):
     src = inspect.getsource(m)
     assert 'recipe=RECIPE_LTX8_I2V' not in src
     assert '"recipe": RECIPE_LTX8_I2V' not in src
-    assert 'recipe=recipe_receipt()' in src
-    assert '"recipe": recipe_receipt()' in src
+    # LANE 2 moved the stamp onto the INSTANCE, because naming this cell's
+    # departures needs the resolved knobs. The guard moves with it: a stamp
+    # site calling the bare module helper would produce a receipt that says
+    # "a sweep ran" without saying which cell -- the defect LANE 2 closes.
+    assert 'recipe=self._recipe_receipt(' in src
+    assert '"recipe": self._recipe_receipt(' in src
+    assert 'recipe=recipe_receipt()' not in src
+    assert '"recipe": recipe_receipt()' not in src
 
 
 # --- the prequalification DEFAULTS follow the recipe, not a literal -------- #
@@ -503,3 +511,235 @@ def test_an_exported_but_EMPTY_tiled_vae_still_gets_the_frozen_default(
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "")
     assert eng._tiled_vae() is True
+
+
+# =========================================================================== #
+# LANE 2 -- the receipt names WHICH CELL, not merely that a sweep ran
+#
+# The four cells of the 2026-07-27 sweep all stamped one generic
+# "+prequalification", so a winning artifact could not prove which knob values
+# produced it. The winner was selected from a table kept OUTSIDE the ledger.
+# =========================================================================== #
+def test_a_production_receipt_is_UNCHANGED_by_lane_2(eng):
+    # Byte-identical to what B6 shipped. LANE 2 must be invisible on the leg
+    # that publishes episodes -- it only makes the MEASUREMENT mark specific.
+    assert eng._recipe_receipt() == m.RECIPE_LTX8_I2V
+    assert eng._recipe_departures() == {}
+
+
+def test_a_production_leg_computes_NO_departures_and_parses_NOTHING(
+        eng, monkeypatch):
+    """PBUG-20260723-02 wearing the opposite mask, one level up.
+
+    Naming departures means resolving values -- and resolving a stale malformed
+    knob on a leg it cannot influence is exactly the failure the freeze exists
+    to prevent. The departure walk must not reach the parser off the consent
+    act."""
+    monkeypatch.setenv("OTR_LTX_8GB_STEPS", "not-a-number")
+    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "cuda:7")
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "maybe")
+    assert eng._recipe_departures() == {}
+    assert eng._recipe_receipt() == m.RECIPE_LTX8_I2V
+
+
+def test_the_production_path_does_not_even_REACH_the_resolver(eng, monkeypatch):
+    """The early return is STRUCTURAL, not an optimisation, and the mutation
+    round is why this test exists: deleting it left the suite green, because
+    every accessor happens to return the frozen value on a production leg
+    anyway. That makes the guarantee depend on all nine accessors staying
+    correct forever, which is exactly the kind of promise this build does not
+    make. Detonating the resolver proves the production path cannot reach it --
+    so no future accessor can quietly start parsing on a leg it cannot bind.
+    It also keeps a production leg from emitting the demotion warning twice."""
+    def _detonate():
+        raise AssertionError(
+            "a production leg must not resolve knobs to name departures")
+    monkeypatch.setattr(eng, "_resolve_render_config", _detonate)
+    monkeypatch.setenv("OTR_LTX_8GB_STEPS", "12")
+    assert eng._recipe_departures() == {}
+    assert eng._recipe_receipt() == m.RECIPE_LTX8_I2V
+
+
+def test_a_sweep_cell_NAMES_the_knob_it_moved(eng, monkeypatch):
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")     # OPPOSES frozen True
+    assert m.LTX8_RECIPE["tiled_vae"] is True
+    assert eng._recipe_departures() == {"tiled_vae": False}
+    assert eng._recipe_receipt() == \
+        m.RECIPE_LTX8_I2V + "+prequalification[tiled_vae=off]"
+
+
+def test_TWO_DIFFERENT_CELLS_STAMP_DIFFERENT_RECEIPTS(eng, monkeypatch):
+    """The defect, stated as a test. Before LANE 2 both of these produced the
+    same string, so the durable ledger could not tell cell C from cell D."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")
+    cell_a = eng._recipe_receipt()
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
+    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "default")
+    cell_b = eng._recipe_receipt()
+    assert cell_a != cell_b
+    assert cell_a.startswith(m.RECIPE_LTX8_I2V)          # still greppable
+    assert cell_b.startswith(m.RECIPE_LTX8_I2V)
+    assert "t5_device=default" in cell_b
+
+
+def test_a_cell_that_moved_NOTHING_still_marks_itself(eng, monkeypatch):
+    # B6's contract is unchanged: a measurement run marks its own artifacts.
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    assert eng._recipe_receipt() == \
+        m.RECIPE_LTX8_I2V + m.PREQUALIFICATION_RECIPE_SUFFIX
+
+
+def test_re_exporting_a_knob_at_its_FROZEN_value_is_not_a_departure(
+        eng, monkeypatch):
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_STEPS", str(m.LTX8_RECIPE["steps"]))
+    assert eng._recipe_departures() == {}
+
+
+def test_the_tile_geometry_is_reported_only_when_tiled_decode_RAN(
+        eng, monkeypatch):
+    """A knob the render never reached is not a departure describing the clip.
+    v2 ships tiled ON, so turning it OFF is what hides the geometry."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_VAE_TILE", "1024")
+    assert m.LTX8_RECIPE["vae_tile"] != 1024
+    assert eng._recipe_departures()["vae_tile"] == 1024      # tiled is ON (v2)
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")
+    departed = eng._recipe_departures()
+    assert departed == {"tiled_vae": False}                  # geometry is gone
+
+
+#: Every tile knob, its env var, its graph input, and a legal OPPOSING value.
+#: ALL FOUR, because ``_decode_inputs`` hand-lists its four calls while
+#: ``_recipe_departures`` loops -- so the four are independently regressable on
+#: the graph side, and a cross-check that exercises one key cannot see a second
+#: implementation creeping back into the other three. That is precisely the gap
+#: LANE 1 found and closed for the WAN tile knobs.
+_TILE_XCHECK = [
+    ("vae_tile", "OTR_LTX_8GB_VAE_TILE", "tile_size", 1024),
+    ("vae_overlap", "OTR_LTX_8GB_VAE_OVERLAP", "overlap", 96),
+    ("vae_temporal", "OTR_LTX_8GB_VAE_TEMPORAL", "temporal_size", 64),
+    ("vae_temporal_overlap", "OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP",
+     "temporal_overlap", 12),
+]
+
+
+@pytest.mark.parametrize("key,env,graph_input,opposing", _TILE_XCHECK)
+def test_the_GRAPH_and_the_RECEIPT_read_the_same_tile_value(
+        eng, monkeypatch, key, env, graph_input, opposing):
+    """One implementation, proven by agreement rather than by inspection: the
+    decode inputs and the departure report must not be able to disagree about
+    what this cell actually decoded with."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv(env, str(opposing))
+    assert m.LTX8_RECIPE[key] != opposing
+    inputs = eng._decode_inputs(lambda node, slot: (node, slot))
+    assert inputs[graph_input] == opposing
+    assert eng._recipe_departures()[key] == opposing
+    # ...and every OTHER tile input stayed frozen, so a knob writing into the
+    # wrong slot is caught rather than averaged out.
+    for other_key, _e, other_input, _o in _TILE_XCHECK:
+        if other_input != graph_input:
+            assert inputs[other_input] == m.LTX8_RECIPE[other_key]
+
+
+def test_a_malformed_tile_value_stops_the_RECEIPT_path_too(eng, monkeypatch):
+    # The fail-closed proof previously only drove _decode_inputs. The departure
+    # walk calls the same helper, but "same helper" is an inference until a
+    # test drives the other caller.
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_VAE_TILE", "not-a-number")
+    with pytest.raises(EngineUnusable):
+        eng._recipe_departures()
+
+
+def test_a_swept_NEGATIVE_is_named_in_the_receipt_as_a_digest(eng, monkeypatch):
+    """The one free-form knob, driven end to end through the real adapter.
+
+    The shipped default is ~70 characters and full of commas, so a swept
+    negative always takes the digest path -- which means the pure-function
+    tests for that path had never been exercised against a real departure."""
+    import re
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_NEGATIVE", "a measured negative, with commas")
+    assert eng._recipe_departures()["negative"] == "a measured negative, with commas"
+    receipt = eng._recipe_receipt()
+    assert re.search(r"negative=#[0-9a-f]{8}", receipt)
+
+
+def test_a_shot_may_NOT_displace_the_negative_a_sweep_is_measuring(
+        eng, monkeypatch):
+    """Found by the pre-push fan-out (lens A).
+
+    ``_build_graph`` lets a per-shot ``negative_prompt`` win -- correct on a
+    production leg, and the reason B6 called this a demotion rather than a
+    removal. But the receipt is SESSION-scoped (it is element [1] of
+    ``session_identity``, read before the weights land and before every
+    segment), so it can only ever report what the RECIPE resolved. Under the
+    consent act a per-shot negative would therefore render one conditioning and
+    stamp a receipt naming another -- a specific false claim, which is worse
+    than the vague true one it replaced. Terminal instead."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_NEGATIVE", "the negative being measured")
+    plan = eng._build_render_request(
+        {"asset_refs": {"init_image": "p"},
+         "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
+    with pytest.raises(EngineUnusable) as exc:
+        eng._build_graph(
+            {"text_prompt": "x", "negative_prompt": "the shot's own negative"},
+            "p.png", plan, 9, 512, 288)
+    assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
+    assert "negative_prompt" in str(exc.value)
+
+
+def test_a_shot_negative_EQUAL_to_the_measured_one_is_not_a_conflict(
+        eng, monkeypatch):
+    # Nothing is displaced, so nothing is refused -- the guard names a real
+    # disagreement rather than the mere presence of the field.
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_NEGATIVE", "the same negative")
+    plan = eng._build_render_request(
+        {"asset_refs": {"init_image": "p"},
+         "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
+    graph = eng._build_graph(
+        {"text_prompt": "x", "negative_prompt": "the same negative"},
+        "p.png", plan, 9, 512, 288)
+    assert graph["neg"]["inputs"]["text"] == "the same negative"
+
+
+def test_the_SESSION_IDENTITY_now_separates_two_sweep_cells(
+        tmp_path, monkeypatch):
+    """Before LANE 2 both cells carried the same recipe element, so two sweep
+    segments were indistinguishable to `BeatSession` as well as to the ledger."""
+    from nodes._otr_video_engines import beat_session as bs
+
+    (tmp_path / m._LTX8_DEFAULT_CKPT).write_bytes(b"c" * 2048)
+    (tmp_path / m._LTX8_DEFAULT_T5).write_bytes(b"t" * 1024)
+    engine = m.Ltx8gbEngine()
+    monkeypatch.setattr(
+        engine, "_resolve_model_file",
+        lambda categories, name, env_dir: (
+            str(tmp_path / name) if (tmp_path / name).exists() else None))
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+
+    monkeypatch.setenv("OTR_LTX_8GB_STEPS", "12")
+    cell_a = bs.session_identity(engine)
+    monkeypatch.setenv("OTR_LTX_8GB_STEPS", "16")
+    cell_b = bs.session_identity(engine)
+    assert cell_a != cell_b
+    assert engine.resolve_session_config().recipe.endswith("[steps=16]")
+
+
+def test_the_named_receipt_reaches_the_canonical_clip_dict(eng, monkeypatch):
+    # The hop into stamp_durable(meta.render_engines): the ledger is where a
+    # sweep artifact has to be identifiable, not just the log.
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "default")
+    receipt = eng._recipe_receipt()
+    clip = eng._clip_from_raw(
+        {"out_path": "/x/y.mp4", "frame_count": 25, "recipe": receipt},
+        {"shot_id": "b001"})
+    assert clip["recipe"] == receipt
+    assert "t5_device=default" in clip["recipe"]
