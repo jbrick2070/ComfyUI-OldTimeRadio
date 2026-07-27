@@ -582,18 +582,36 @@ class LtxVideoEngine(_MC.MotionEngineBase):
 
     def _use_i2v(self, request) -> bool:
         """True iff the env flag is on AND the request carries an init image
-        that exists on disk. Flag on + missing/stale init = LOUD fallback to
-        the text path (never silent); flag off = text path, byte-identical."""
+        that exists on disk. Flag OFF = the text path, byte-identical. Flag ON
+        with a missing or stale init image REFUSES -- it does not degrade.
+
+        A4 (2026-07-27): this used to log and return False, which put two
+        contradictory policies over one state. ``render_driver`` already calls
+        that state terminal for the ledger path ("NO FALLBACK to text-only
+        rendering", render_driver.py:2146-2150), so whichever boundary the
+        request reached first decided whether a missing still killed the
+        episode or silently changed how it was rendered. The driver's check is
+        also weaker than this one: it only asks whether the still INDEX holds a
+        non-empty path, while this asks whether the file is on disk -- so a
+        STALE path passed the driver and degraded here, and requests built
+        through the older ledger-free ``build_request`` never met the driver's
+        check at all. One policy now, enforced at the boundary that can see the
+        file. The deliberate text-only render keeps its explicit opt-out.
+
+        Mirrors the shipped sibling contract in ``cheap_families``
+        (``_require_still``): a still-REQUIRED family refuses its floor rather
+        than shipping something that merely looks finished."""
         if not self._i2v_enabled():
             return False
         p = self._init_image_path(request)
         if p and os.path.exists(p):
             return True
-        _LOG.warning(
-            "[eng_ltx_video] LTX-I2V LOUD: i2v enabled (default since LK-1a) "
-            "but the request carries no on-disk init image (%r) -- falling "
-            "back to the text->video path", p)
-        return False
+        raise RuntimeError(
+            "%s has LTX-I2V enabled but the request carries no usable on-disk "
+            "init image (asset_refs still/init_image=%r) -- refusing the "
+            "text-only path (NO FALLBACKS). The image phase must mint this "
+            "beat's still before the video render; set OTR_ENABLE_LTX_I2V=0 "
+            "to render text-only deliberately." % (self.name, p))
 
     def _node_candidates_i2v(self):
         """The image-conditioned graph's node candidates (on the ACTIVE

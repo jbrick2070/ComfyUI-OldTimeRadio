@@ -232,6 +232,12 @@ def test_ltx_render_clip_to_silent_mp4(monkeypatch):
     # S5: pin single_pass -- this test exercises the FROZEN GGUF-mini
     # mechanics; the dev-unet auto default now routes to hq_two_stage (which
     # requires an init still and has its own tests).
+    # A4 (2026-07-27): this request carries no still, and it used to reach the
+    # text path through the silent i2v degrade that has now been removed. The
+    # test exercises sampler/encode mechanics, not the i2v decision, so it
+    # declares the text path with the shipped opt-out instead of arriving
+    # there by accident.
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "off")
     np = pytest.importorskip("numpy")
@@ -256,6 +262,9 @@ def test_ltx_render_clip_boomerang_default_on(monkeypatch):
     # BUG-LOCAL-117d: loop_via_reverse is the ltx_video DEFAULT -> render_clip
     # mirrors the decoded frames end-to-end (4 -> 2*4-1 = 7) through the encoder.
     # S5: pin single_pass (frozen mechanics; hq_two_stage has its own tests).
+    # A4 (2026-07-27): same as above -- stillless request, text path declared
+    # explicitly now that the silent i2v degrade is gone.
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     monkeypatch.delenv("OTR_LTX_LOOP_VIA_REVERSE", raising=False)
     np = pytest.importorskip("numpy")

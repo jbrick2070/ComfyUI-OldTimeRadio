@@ -337,11 +337,35 @@ def test_i2v_opt_out_restores_text_only(monkeypatch, tmp_path):
     assert eng._use_i2v(_i2v_req(str(p))) is False
 
 
-def test_i2v_flag_on_missing_init_falls_back_loud(monkeypatch):
+def test_i2v_flag_on_missing_init_REFUSES(monkeypatch):
+    """A4 (2026-07-27): this used to assert the silent degrade to text-only,
+    which is the state render_driver.py:2146-2150 already calls terminal
+    ("NO FALLBACK to text-only rendering"). Two policies over one state; the
+    adapter now holds the same one. A STALE path is the case the driver
+    cannot catch -- it only checks that the still index holds a non-empty
+    string, never that the file is there."""
     monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "1")
     eng = vreg.get_engine("ltx_video")
-    assert eng._use_i2v(_i2v_req()) is False                  # no init at all
-    assert eng._use_i2v(_i2v_req("Z:/nope/still.png")) is False  # stale path
+
+    with pytest.raises(RuntimeError) as no_init:
+        eng._use_i2v(_i2v_req())                              # no init at all
+    assert "NO FALLBACKS" in str(no_init.value)
+    assert "OTR_ENABLE_LTX_I2V=0" in str(no_init.value)
+
+    with pytest.raises(RuntimeError) as stale:
+        eng._use_i2v(_i2v_req("Z:/nope/still.png"))           # stale path
+    assert "Z:/nope/still.png" in str(stale.value)
+    assert "no usable on-disk init image" in str(stale.value)
+
+
+def test_i2v_opt_out_is_the_only_route_to_text_only(monkeypatch):
+    """The refusal must not be reachable when the operator has explicitly
+    opted out -- otherwise the escape hatch the error message names would
+    not exist, and a text-only render would be impossible."""
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
+    eng = vreg.get_engine("ltx_video")
+    assert eng._use_i2v(_i2v_req()) is False
+    assert eng._use_i2v(_i2v_req("Z:/nope/still.png")) is False
 
 
 def test_i2v_flag_on_with_init_engages(monkeypatch, tmp_path):
