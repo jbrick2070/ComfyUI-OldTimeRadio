@@ -3,6 +3,76 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 -- HEAD 8424f369 (v2.0-alpha) -- WINDOW CODER (LANE 2)
+Did: a measurement clip's receipt now names WHICH cell produced it --
+  71e231ec (ltx_8gb + the shared format in the new recipe_departures.py),
+  8424f369 (both WAN adapters). B6 made a sweep artifact distinguishable from
+  production; it left the four cells of the 2026-07-27 sweep indistinguishable
+  from EACH OTHER, so the winner was selected from a table kept outside the
+  ledger. Fixed a latent lie the fan-out found: the receipt is session-scoped
+  and cannot honestly report a per-shot negative, so under the consent act a
+  shot displacing the measured negative is now terminal. Also collapsed the
+  tile-geometry range check to one implementation on both ltx and wan_ti2v.
+Current step: OPERATOR'S PICK -- the remote no-GPU queue is drained of its
+  obvious items. What remains wants a ruling (ShotRow wire-or-demote, the
+  by_engine roll-up) or a GPU (clamped v2 confirmation, a WAN sweep, 7d).
+Next: operator decides. 7d stays PARKED.
+Models: Claude codes + judges; 3 Sonnet QA lenses pre-push. $0 external -- no
+  codex, no agy, no cloud roundtable; two-strikes never invoked.
+Commits: 71e231ec, 8424f369. Suite 7291 -> 7346; Bible 17; canonical 9872624A
+  byte-identical. Record:
+  docs/2026-07-27-lane2-prequalification-receipt-qa-findings.md.
+
+### Detail
+
+**THE MUTATION ROUNDS BEAT THE PANELS AGAIN -- THIRD CHUNK RUNNING.** Three QA
+lenses cleared the change; mutation then found four more real defects. Two are
+worth naming as doctrine, because they are the same shape every time:
+
+1. **An exception TYPE asserted without its message.** `pytest.raises(KeyError)`
+   passed with the named drift guard DELETED, because the dict comprehension one
+   line below raises the same type incidentally on the same input. The test
+   proved nothing about the guard it was written for.
+2. **A test that verifies a thing it also CONSTRUCTS.** The digest test was
+   satisfied by `"#" + text[:8]` -- a truncation wearing a costume, passing the
+   test named for refusing one, on every assertion it made.
+
+Plus: a production-path guard that could be deleted with the suite staying green
+(every accessor returns the frozen value anyway, so the guarantee silently
+depended on nine accessors staying correct -- now proven by DETONATING the
+resolver), and a `negative` departure that could be dropped from wan_ti2v
+because only the wan_i2v twin of that test existed.
+
+**AND ONE OF MY OWN CONTROLS WENT RED, which taught the opposite of what it
+looked like.** A control that fails tells you nothing about the harness and
+everything about the control: it renamed a dict at its assignment and left three
+readers on the old name -- a broken mutant wearing a control's label. Replaced
+with a genuine no-op.
+
+**THE LATENT LIE, in full, because the reasoning generalises.** `_build_graph`
+lets a per-shot negative_prompt win -- correct in production, and why B6 called
+the negative a demotion rather than a removal. But the receipt is SESSION-scoped:
+element [1] of session_identity, read before the weights land and again before
+every segment, so it may only describe request-independent things. A sweep
+varying the negative would therefore have rendered one conditioning and stamped
+a receipt naming another -- a SPECIFIC false claim, worse than the vague true one
+it replaced because it is more credible. Making the receipt request-aware was
+rejected: it would differ between the two stamp sites (one has a request, one
+does not) and refuse every multi-segment sweep beat on identity drift. Terminal
+under the consent act instead; production untouched.
+
+**RECORDED, NOT FIXED:** `by_engine.setdefault` keeps only the first clip's
+receipt per engine, which LANE 2 makes newly lossy. Not a ledger hole --
+per_clip keeps every clip in full, and a sweep runs one episode per cell -- and
+it is pre-existing code outside the adapter lane. It already loses per-shot
+render_canvas the same way, reachable today. In OPEN BUGS with that reasoning.
+
+**THE BRIDGE DROPPED during the handoff write.** Nothing was lost: both code
+chunks were already pushed with HEAD == origin verified, and the failed
+`edit_block` did not half-apply -- HANDOFF_LOG was byte-unchanged when the
+bridge returned. That is the second time this has happened in a remote window
+and the second time push-every-green-chunk is what made it a non-event.
+
 ## 2026-07-27 -- HEAD 3acc7fed (v2.0-alpha) -- WINDOW CODER (LANE 1)
 Did: froze BOTH WAN render recipes in code, mirroring B6 one tier over --
   71753cb4 wan_ti2v (11 knobs), 3acc7fed wan_i2v (the six that were read INLINE

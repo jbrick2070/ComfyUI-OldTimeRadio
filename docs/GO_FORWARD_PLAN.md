@@ -1,6 +1,55 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-27 (remote Cowork, CODER window) -- **LANE 1 IS DONE. BOTH
+**Updated:** 2026-07-27 (remote Cowork, CODER window) -- **LANE 1 AND LANE 2 ARE
+DONE. EVERY VIDEO RECIPE IN THE BUILD NOW BINDS FROM CODE, AND A MEASUREMENT
+CLIP SAYS WHICH CELL PRODUCED IT.** HEAD == origin `8424f369`; suite **7346
+passed / 27 skipped / 1 xfailed**; Bible 17; canonical `9872624A`
+byte-identical.
+
+**LANE 2 CLOSED THE RECEIPT'S OTHER HALF.** B6 made a sweep artifact
+distinguishable from production; it left the four cells of the 2026-07-27 sweep
+indistinguishable from EACH OTHER, all stamping one generic
+`+prequalification`, so the winner was selected from a table kept outside the
+ledger that outlives the run. A cell now names its departures --
+`..._v2+prequalification[tiled_vae=off]` -- on all three adapters
+(`71e231ec` ltx_8gb + the shared format, `8424f369` both WAN).
+
+Rules the implementation holds, and the next window must not undo: RESOLVED
+values never env presence (re-exporting a knob at its frozen value is not a
+departure); only knobs that actually BOUND the render (tile geometry is
+reported only when tiled decode ran); a production receipt byte-identical to
+B6's, on a path that never reaches the resolver at all; per-entry bounds
+(prose becomes a digest) but NEVER a truncated list, because a silent cap
+destroys exactly the distinguishability the chunk exists for.
+
+**THE FORMAT HAS ONE HOME** -- `nodes/_otr_video_engines/recipe_departures.py`,
+pure, imported by both lanes. `eng_ltx_8gb` reaching into `wan_recipe` would be
+the cross-lane coupling this build keeps paying for, and one consumer chain
+reads both, so two implementations would grow two dialects in the ledger.
+
+**THE FAN-OUT FOUND A LATENT LIE AND IT IS NOW STRUCTURALLY IMPOSSIBLE.**
+`_build_graph` lets a per-shot `negative_prompt` win -- correct in production,
+and why B6 called the negative a demotion rather than a removal. But the receipt
+is SESSION-scoped (element [1] of `session_identity`, read before the weights
+land and before every segment), so it can only report what the RECIPE resolved.
+A sweep varying the negative would have rendered one conditioning and stamped a
+receipt naming another. Under the consent act that displacement is now TERMINAL;
+production is untouched. Making the receipt request-aware instead was rejected:
+it would differ between the two stamp sites and refuse every multi-segment sweep
+beat on identity drift.
+
+**THE MUTATION ROUNDS BEAT THE PANELS AGAIN, AND THE PATTERN IS NOW A RULE.**
+Three lenses cleared the change; mutation then found four more defects,
+including a `pytest.raises(KeyError)` that passed with its named guard deleted
+(the line below raises the same type incidentally) and a digest test that
+`"#" + text[:8]` satisfied on every assertion. **A test that verifies a thing it
+also constructs, and an exception type asserted without its message, are this
+build's two most reliable blind spots.** Record:
+`docs/2026-07-27-lane2-prequalification-receipt-qa-findings.md`.
+
+---
+
+**Superseded header (2026-07-27, CODER window) -- LANE 1 IS DONE. BOTH
 WAN ADAPTERS NOW BIND THEIR RECIPE FROM CODE, AND A WAN CLIP FINALLY STAMPS A
 RECEIPT.** HEAD == origin `3acc7fed`; suite **7291 passed / 27 skipped / 1
 xfailed**; Bible 17; canonical `9872624A` byte-identical (no node, widget, link
@@ -381,7 +430,47 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **LANE 2: the per-cell prequalification receipt (no GPU)**
+## CURRENT STEP -- **OPERATOR'S PICK. The remote no-GPU queue is drained of
+## its obvious items; what remains needs a ruling or a GPU.**
+
+**LANE 1 AND LANE 2 ARE DONE** (see the header). **7d IS STILL PARKED** until
+the operator is at the desk -- his call, recorded in
+`docs/TRAVEL_RELAY_PROTOCOL.md`. Do not start it from a remote window.
+
+Every video adapter now binds its recipe from code and marks its measurement
+artifacts specifically. What is left in the remote-safe queue is smaller and
+each item wants a decision rather than a coder's judgement:
+
+1. **`schemas.py`'s `ShotRow` -- wire it or demote it IN WRITING.** A closed
+   model (`extra="forbid"`) that no boundary enforces, missing `beat_id`,
+   `role`, `char_id`, `start_s`, `dur_s`, `coverage_plan` and
+   `coverage_contract`. Not a live break -- nothing validates a real ledger
+   through it -- but other docs in this tree cite it as a live safety net, and
+   any future `model_validate` at any boundary would hard-fail every real shot.
+   Suite-provable either way; the DECISION (complete it vs. demote it) is the
+   whole chunk.
+2. **The credits-card display gap.** The recipe reaches the durable ledger but
+   `_draw_models` never reads `video_suffix` -- one write, zero readers. Belongs
+   to whoever owns the credits card, and note the LANE 2 rider below before
+   wiring it.
+3. **The `by_engine` roll-up** (new OPEN BUG below) -- a one-line decision about
+   whether a lossy summary beside a lossless one is worth changing.
+
+**THE HIGHER-VALUE WORK IS THE OPERATOR'S SEQUENCE**, and none of it is remote:
+the clamped confirmation of ltx recipe v2, a WAN prequalification sweep (the
+mechanism is now built and named on both WAN tiers, and no WAN sweep has ever
+run -- both v1 dicts are today's shipped defaults, stated honestly as such),
+then 7d.
+
+**IF A NEXT WINDOW TAKES A CODER LANE ANYWAY, carry these two forward:** run the
+mutation round even after a QA fan-out has cleared the change -- it has now
+found real defects the lenses missed on three consecutive chunks -- and treat a
+test that verifies a thing it also CONSTRUCTS, or an exception type asserted
+without its message, as presumed decorative until proven otherwise.
+
+---
+
+## SUPERSEDED -- LANE 2 (DONE @ `71e231ec` and `8424f369`)
 
 **LANE 1 IS DONE** (see the header). **7d IS STILL PARKED** until the operator
 is back at the desk -- his call, recorded in `docs/TRAVEL_RELAY_PROTOCOL.md`.
@@ -1337,14 +1426,28 @@ listed as live.
   `VramPeakProbe` is machine-wide, so the absolutes are not an 8 GB fit proof.
   Re-run the WINNER alone with `OTR_HEADLESS_RESERVE_VRAM_GB=8` once the writer
   question above is settled. The RANKING does not need re-proving.
-- **All prequalification cells share ONE receipt** (found 2026-07-27, kibitz
-  codex; verified). `recipe_receipt()` returns a single generic
-  `+prequalification` suffix, so a winning artifact cannot prove which knob
-  values produced it -- the ledger says a sweep ran, not which cell. Deliberately
-  NOT bundled into `dcdcccde`: it touches `session_identity` and several call
-  sites, so it is its own chunk. Shape: name the DEPARTURES from the frozen
-  recipe in the suffix, e.g. `..._v2+prequalification[tiled_vae=off]`. No
-  workflow schema work -- the receipt is a string on the manifest row.
+- ~~**All prequalification cells share ONE receipt**~~ -- **CLOSED by LANE 2**
+  @ `71e231ec` + `8424f369`, on all three adapters. Record:
+  `docs/2026-07-27-lane2-prequalification-receipt-qa-findings.md`.
+- **The `by_engine` roll-up keeps only the FIRST clip's receipt per engine**
+  (found 2026-07-27, LANE 2 fan-out lens C; verified at
+  `nodes/otr_video_render_batch.py:87`, `by_engine.setdefault(eng, receipt)`).
+  Pre-LANE-2 this lost nothing, because every sweep clip on one engine stamped
+  the same string; now the strings legitimately differ per cell, so the summary
+  discards distinguishing data. **NOT a hole in the ledger** -- `per_clip`
+  (line 85) keeps every clip's receipt in full, and the 2026-07-27 sweep ran one
+  EPISODE per cell, so a real sweep ledger carries one recipe anyway. Also
+  pre-existing and outside the adapter lane, which is why LANE 2 left it. Note
+  it already loses per-shot `render_canvas` the same way, which is reachable
+  TODAY on any episode mixing aspect ratios on one engine. Decide whether a
+  lossy summary beside a lossless one is worth changing, or write down that it
+  is not.
+- **RIDER on the credits-card display gap (LANE 2 fan-out lens C).** When
+  whoever owns the card wires `video_suffix` into `_draw_models`, note that
+  `_row()` right-aligns with no clamp, truncation or wrapping. A LANE 2 receipt
+  is ~90 characters against a layout sized for short engine ids, so it would
+  overrun the label in the same row. The clamp is part of that chunk, not this
+  one.
 
 - **The `ltx_8gb` render-length ceiling has TWO owners that only agree by
   coincidence** (found 2026-07-27, B6 panel, two lenses independently; grounded
@@ -1805,11 +1908,14 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-27 @ `3acc7fed`, LANE 1 landed):
-  full Windows suite `7291 passed / 27 skipped / 1 xfailed`; Bug Bible
+- Current whole-tree receipt (2026-07-27 @ `8424f369`, LANE 1 + LANE 2 landed):
+  full Windows suite `7346 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; canonical
   `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`
-  byte-identical; AST/BOM/zero-byte/UTF-8/ASCII clean on all six touched files.
+  byte-identical; AST/BOM/zero-byte/UTF-8/ASCII clean on every touched file.
+- Prior receipt (2026-07-27 @ `3acc7fed`, LANE 1 landed):
+  full Windows suite `7291 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; canonical `9872624A` byte-identical.
 - Prior receipt (2026-07-27 @ `a0141cdd`, B3 + B4 + B5 landed):
   full Windows suite `7158 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; canonical `9872624A` (byte-identical --
