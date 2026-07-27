@@ -54,6 +54,7 @@ from . import motion_common as _MC
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 _LOG = logging.getLogger("OTR.video.eng_ltx_video")
 
@@ -1235,6 +1236,11 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                              "decoded -- skipping mirror", len(frames))
         out_path = otr_engine_tmp_mp4("otr_ltx_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
+        # M7 (added 2026-07-27): prove the silent-clip contract on what was
+        # actually written. The bug report listed this adapter among the four
+        # that already probed; a mechanical sweep of every encoder found it did
+        # not, on either recipe path.
+        validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         return {"out_path": path, "frame_count": n,
                 "ltx_loop_via_reverse": bool(loop_via_reverse)}
 
@@ -1296,6 +1302,8 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         out_path = otr_engine_tmp_mp4("otr_ltx_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path,
                                                   self.target_fps)
+        # M7: the hq_two_stage path emits its own mp4 and owes the same proof.
+        validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         return {"out_path": path, "frame_count": n,
                 "ltx_recipe": RECIPE_HQ_TWO_STAGE,
                 "ltx_loop_via_reverse": bool(loop_via_reverse)}

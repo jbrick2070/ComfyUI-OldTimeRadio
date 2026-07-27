@@ -204,3 +204,79 @@ def test_the_encoder_still_accepts_what_the_real_converter_produces():
         out = os.path.join(tmp, "ok.mp4")
         _path, n = wb.encode_frames_to_silent_mp4(converted, out, 25)
         assert n == 2
+
+
+# ---------------------------------------------------------------------------
+# The frame_count asymmetry (2026-07-27): an adapter that ENCODES a clip must
+# also PROVE it.
+#
+# CanonicalClip.frame_count is documented as "the integer timing authority",
+# but it is decode-counted truth only for assembled multi-segment beats -- for
+# a single-render beat it is whatever the adapter declared. Four of the seven
+# adapters that emit an mp4 never ffprobed what they wrote, so their clips
+# reached the ledger entirely self-declared. The two derivations agree today
+# only because every producer pipes exact bytes, which is a property of the
+# current producers rather than a contract anything enforced.
+# ---------------------------------------------------------------------------
+
+def test_every_adapter_that_encodes_a_clip_also_proves_it():
+    """Derived from the SOURCE, not from a hand-kept list -- which is the whole
+    point. The bug report named two adapters (eng_humo, eng_ltx_av) and listed
+    eng_ltx_video among those that already probed; sweeping every encoder found
+    eng_ltx_video did NOT, on either of its two recipe paths, and that
+    eng_still_parallax was missing from the report altogether. The next adapter
+    that encodes without proving fails HERE, by name."""
+    import pathlib
+
+    engines = (pathlib.Path(__file__).resolve().parents[1]
+               / "nodes" / "_otr_video_engines")
+    encoders, provers = set(), set()
+    for path in sorted(engines.glob("eng_*.py")):
+        src = path.read_text(encoding="utf-8")
+        if "encode_frames_to_silent_mp4(" in src:
+            encoders.add(path.name)
+        if "validate_silent_clip_contract(" in src:
+            provers.add(path.name)
+
+    assert encoders, "found no encoders at all -- the sweep is broken"
+    assert encoders - provers == set(), sorted(encoders - provers)
+
+
+def test_the_proof_runs_AFTER_the_encode_in_every_adapter():
+    """Order matters: ffprobing before the file is written would raise on a
+    path that does not exist yet, which is a different failure wearing the
+    same name. Pinned per encode site, not per file.
+
+    The pairing is asserted in BOTH directions, and the second direction was
+    added because the mutation round caught the first version of this test
+    being decorative: checking only that some proof FOLLOWS each encode stays
+    green when a proof is inserted BEFORE one, which is the exact ordering
+    defect the test is named for."""
+    import pathlib
+    import re
+
+    engines = (pathlib.Path(__file__).resolve().parents[1]
+               / "nodes" / "_otr_video_engines")
+    checked = 0
+    for path in sorted(engines.glob("eng_*.py")):
+        src = path.read_text(encoding="utf-8")
+        encodes = [m.start() for m
+                   in re.finditer(r"encode_frames_to_silent_mp4\(", src)]
+        proofs = [m.start() for m
+                  in re.finditer(r"validate_silent_clip_contract\(", src)]
+        if not encodes:
+            continue
+        assert len(proofs) >= len(encodes), (
+            "%s: %d encode site(s) but only %d proof(s)"
+            % (path.name, len(encodes), len(proofs)))
+        for encode_at in encodes:
+            assert any(p > encode_at for p in proofs), (
+                "%s: an encode at offset %d has no proof after it"
+                % (path.name, encode_at))
+            checked += 1
+        for proof_at in proofs:
+            assert any(e < proof_at for e in encodes), (
+                "%s: a proof at offset %d runs before any encode -- it would "
+                "ffprobe a path that does not exist yet"
+                % (path.name, proof_at))
+    assert checked >= 7, checked

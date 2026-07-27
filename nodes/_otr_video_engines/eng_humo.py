@@ -40,6 +40,7 @@ from . import motion_common as _MC
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
@@ -528,6 +529,16 @@ class HuMoEngine(_MC.MotionEngineBase):
         # next soak beat starts (no cross-beat accumulation). LOUD; no
         # unload_all_models (V-4/V-5).
         _wb.reclaim_idle_models(reason="humo post-decode")
+        # M7 (added 2026-07-27): PROVE the silent-clip color/stream contract on
+        # the emitted mp4 before canonicalize self-declares it -- ffprobe is the
+        # source of truth, the hardcoded dict is not. Four siblings (wan_i2v,
+        # wan_ti2v, ltx_8gb, ltx_video) have carried this line; this adapter and
+        # eng_ltx_av did not, so their clips reached the ledger entirely
+        # self-declared while CanonicalClip.frame_count is documented as "the
+        # integer timing authority". The two derivations agree today only
+        # because every producer pipes exact bytes -- a property of the current
+        # producers, not a contract anything enforced.
+        validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         return {"out_path": path, "frame_count": n}
 
     def canonicalize(self, raw, request, profile):

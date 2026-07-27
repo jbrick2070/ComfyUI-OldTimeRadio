@@ -51,6 +51,7 @@ from .._otr_shared.still_plan_helpers import StillPlanRow
 from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 _LOG = logging.getLogger("OTR.eng_ltx_av")
 
@@ -1037,6 +1038,11 @@ class _LtxAvBase(_MC.MotionEngineBase):
         frames = _wb.images_to_uint8(images)
         out_path = otr_engine_tmp_mp4("otr_ltx_av_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
+        # M7 (added 2026-07-27): see the twin comment in eng_humo. This adapter
+        # and eng_humo were the two of six that returned a fully self-declared
+        # dict, so nothing ffprobed what they actually wrote before the ledger
+        # recorded it.
+        validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         # S-B/E5: thread the recipe receipt into the raw so the episode report +
         # the ledger recipe-stamp self-document the fit (recipe / quant / LoRA /
         # canvas / audio source) alongside the measured peak.

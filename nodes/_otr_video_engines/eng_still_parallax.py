@@ -39,6 +39,7 @@ import os
 
 from .cheap_families import _CheapFamilyBase
 from .registry import EngineUnusable, EngineUsabilityReason
+from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 _LOG = logging.getLogger("OTR.video.eng_still_parallax")
 
@@ -293,6 +294,11 @@ class StillParallaxEngine(_CheapFamilyBase):
             np.asarray(img, dtype="uint8"), depth01, n, _amp_px())
         out_path = otr_engine_tmp_mp4("otr_parallax_")
         path, n_out = _wb.encode_frames_to_silent_mp4(frames, out_path, fps)
+        # M7 (added 2026-07-27): a still-derived clip is still a clip, and it
+        # goes through the same encoder, so it owes the same proof. This
+        # adapter was absent from the bug report's list entirely; the
+        # mechanical sweep of every encoder found it.
+        validate_silent_clip_contract(ffprobe_clip_fields(path), fps)
         return self._floor_clip(request, path, fps, n_out)
 
 
