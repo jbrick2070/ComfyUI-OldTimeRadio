@@ -159,3 +159,48 @@ def test_the_mp4_allocator_is_unchanged(monkeypatch, tmp_path):
     path = engine_tmp.otr_engine_tmp_mp4("otr_clip_")
     assert path.endswith(".mp4")
     assert str(shared) in path
+
+
+# ---------------------------------------------------------------------------
+# A5-lite (2026-07-27): the encoder boundary asserts its dtype.
+#
+# Cut as a LIVE bug -- every producer feeds an exact-size uint8 buffer through
+# images_to_uint8, and ffmpeg raises on a short write. The residual this closes
+# is a future wider-dtype caller: the rawvideo pipe is 8-bit, so float32 sends
+# four times the bytes for the same frames, and the frame_count the encoder
+# returns is taken from the ARRAY rather than from what ffmpeg wrote -- so that
+# clip would carry a clean receipt describing a length it does not have.
+# ---------------------------------------------------------------------------
+
+def test_the_encoder_refuses_a_non_uint8_batch():
+    import numpy as np
+
+    frames = np.zeros((4, 8, 8, 3), dtype=np.float32)
+    with pytest.raises(wb.GraphExecutionError) as excinfo:
+        wb.encode_frames_to_silent_mp4(frames, "unused.mp4", 25)
+    message = str(excinfo.value)
+    assert "uint8" in message
+    assert "float32" in message
+    assert "4x the bytes" in message
+    assert "images_to_uint8" in message
+
+
+def test_the_encoder_still_accepts_what_the_real_converter_produces():
+    """The refusal must not reject the shipped path. images_to_uint8 is the
+    converter every producer goes through, so its OUTPUT is the contract --
+    asserted here rather than a hand-made uint8 array, so a change to the
+    converter's dtype shows up as a failure instead of a silent divergence."""
+    import numpy as np
+
+    torch = pytest.importorskip("torch")
+    images = torch.zeros((2, 8, 8, 3), dtype=torch.float32)
+    converted = wb.images_to_uint8(images)
+    assert converted.dtype == np.uint8
+    # Shape/dtype are accepted: the encode itself needs ffmpeg, so drive only
+    # the guards by pointing at a path ffmpeg would refuse to write.
+    if not _HAS_FFMPEG:
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, "ok.mp4")
+        _path, n = wb.encode_frames_to_silent_mp4(converted, out, 25)
+        assert n == 2

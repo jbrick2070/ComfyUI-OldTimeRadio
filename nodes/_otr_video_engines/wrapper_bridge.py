@@ -774,6 +774,21 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg", crf=1
     if frames.ndim != 4 or frames.shape[-1] != 3:
         raise GraphExecutionError(
             "expected (B,H,W,3) uint8 frames, got shape %r" % (frames.shape,))
+    # A5-lite (2026-07-27): the SHAPE was checked and the dtype was not, while
+    # the docstring promised uint8. Not a live bug -- every producer feeds an
+    # exact-size uint8 buffer through images_to_uint8, and ffmpeg raises on a
+    # short write. The residual is a future wider-dtype caller: the rawvideo
+    # pipe is 8-bit, so float32 sends 4x the bytes for the same frames and
+    # ffmpeg consumes them as a different number of frames -- and the count
+    # returned below comes from the ARRAY, not from what ffmpeg wrote, so the
+    # receipt would be clean and wrong. One assert closes it.
+    if frames.dtype != np.uint8:
+        raise GraphExecutionError(
+            "expected uint8 frames, got dtype %r (%d bytes per sample): the "
+            "rawvideo pipe is 8-bit, so this would send %dx the bytes and the "
+            "returned frame_count would describe the array rather than the "
+            "clip. Convert with images_to_uint8 first."
+            % (frames.dtype, frames.dtype.itemsize, frames.dtype.itemsize))
     b, h, w, _ = frames.shape
     cmd = ffmpeg_silent_mp4_cmd(out_path, w, h, fps, ffmpeg=ffmpeg, crf=crf)
     try:
