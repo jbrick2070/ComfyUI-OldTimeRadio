@@ -3,6 +3,81 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 09:40 -- HEAD 906031be (v2.0-alpha) -- WINDOW CODER A, SESSION 5c
+Did: pushed B6 (906031be) -- the ltx_8gb render recipe is FROZEN IN CODE as
+  LTX8_RECIPE_V1; its env vars bind only under an explicit
+  OTR_LTX_8GB_PREQUALIFICATION consent act, and outside it they are NAMED in a
+  warning and never PARSED. Resolved the operator fork as (a) freeze today's
+  defaults, with the code stating plainly that these are shipped defaults and
+  not a measured selection. Answered the open "what marks a prequalification
+  run" question with an explicit env var, never an ambient condition.
+  A sweep now stamps a "+prequalification" recipe receipt so a measurement
+  artifact is not mistaken for a published render in meta.render_engines.
+Current step: prequalify 512x288 -- a GPU step, so a RENDER window owns it, not
+  a coder window. The CODER A 8GB code block is COMPLETE.
+Next: boot with OTR_LTX_8GB_PREQUALIFICATION=1, measure T5 device on/off and
+  tiled decode on/off at 512x288, freeze the winner as recipe v2 (bump the
+  version inside the RECIPE_LTX8_I2V string -- it moves the session identity for
+  free), then 7d, the canonical 237-frame opening beat. RENDER, then CODER A.
+Models: Claude + 5 Sonnet lenses. $0 external. No codex, no agy, no cloud
+  roundtable; two-strikes never invoked (no fix needed a third attempt).
+Commits: 906031be. Record: docs/2026-07-27-b6-qa-findings.md. Suite 7158 ->
+  7213; Bible 17; canonical 9872624A byte-identical.
+
+### Detail
+
+**THE PANEL FOUND THE HOLE IN THE FREEZE ITSELF.** The first draft demoted the
+sampling knobs and left `OTR_LTX_8GB_NEGATIVE` -- a render input, read straight
+from `os.environ` on every leg -- plus four tiled decode-geometry vars, still
+binding from the server's boot. Two independent lenses found it separately, and
+a third traced the ledger: the draft stamped the SAME recipe receipt on a
+prequalification sweep as on production, so the two were indistinguishable in
+`stamp_durable(meta.render_engines)`. Grounding confirmed all three against the
+real files. The negative-prompt hole was the worst of them --
+`render_driver.build_request_from_shot` never populates `negative_prompt` for
+video shots, so the boot environment was the SOLE author of that conditioning.
+
+**THE FIX FOR THE GEOMETRY THEN CREATED ITS OWN DEFECT,** which is why the
+post-fix panel exists: gating the four tile vars left a SECOND range-check
+implementation that swallowed a bad value and substituted the default, where
+every sibling knob raises MALFORMED_CONFIG. A sweep could mistype the value it
+was measuring, render at something else, and stamp a receipt saying it had
+measured it. Collapsed into one `_config_number` shared by both, plus
+`_VAE_TILE_BOUNDS` from the live /object_info capture so a value under the
+node's own floor is refused by name instead of dying inside ComfyUI.
+
+**SIX DECORATIVE TESTS CAUGHT.** Neither warning's DIRECTION was pinned -- both
+bodies name the knob, both interpolate the recipe, and both contain the
+substring "PREQUALIFICATION" because it is inside the env var's own name, so
+swapping them stayed green. The recipe-delivery test had become a comparison of
+the resolver against itself (post-freeze a clean env returns the frozen
+constants, so a hard-coded literal in `_build_graph` compares EQUAL) -- its own
+docstring claimed to catch exactly that. `assert "FROZEN" not in caplog.text`
+was vacuous. Three `_ENVS` scrub lists claimed completeness they did not have;
+each now carries a test asserting it covers `_RECIPE_ENV_KEYS`.
+
+**THREE PANEL CLAIMS DISCARDED after grounding,** with reasons recorded: the
+ceiling's two owners (real, but pinning the profile changes how a 237-frame
+beat partitions -- a production decision on the eve of 7d, so it is an OPEN BUG
+with the shape written into the preset's own `_ceiling_note`); the credits card
+never drawing the recipe (real, but a DISPLAY gap -- the durable ledger does
+carry it -- so the docstring was narrowed to claim only what is true); and
+rewriting the arc judgment's "MEASURED" wording (refused -- a judgment is a
+record of what was decided, not a living doc, and rewriting it would destroy
+the evidence that the ordering was departed from).
+
+**Mutation:** two rounds, 13/13 and 10/10 real mutants caught, all four CONTROL
+(semantically equivalent) mutants survived -- the harness discriminates rather
+than reporting red on everything.
+
+**Scouted for a future chunk, nothing touched:** both WAN adapters carry the
+whole pre-B6 defect. `eng_wan_ti2v` reads loader class, tiled-VAE class, all
+three weight NAMES, sampler, scheduler, steps, cfg, shift, negative and four
+VAE-tile vars from the environment; `eng_wan_i2v` reads six INLINE in
+`_build_graph` with bare `int()`/`float()` -- no range check, no named refusal.
+Neither emits a recipe receipt at all, so a WAN clip stamps `recipe: None`:
+there is not even a wrong receipt to catch the drift with.
+
 ## 2026-07-27 05:30 -- HEAD a0141cdd (v2.0-alpha) -- WINDOW CODER A, SESSION 5b
 Did: pushed B5 (a0141cdd) -- ltx_8gb now declares its own render canvas
   (512x288) as a static class attribute, build_request_from_shot consumes the

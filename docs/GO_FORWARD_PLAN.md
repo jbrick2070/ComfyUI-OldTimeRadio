@@ -1,9 +1,21 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-27 (remote Cowork, CODER A session 5) -- **B3, B4 AND B5 ARE
-IN. THE TIER CEILING PLANS, THE PING-PONG IS GONE, AND THE 8 GB TIER RENDERS AT
-THE CANVAS IT DECLARES. HEAD == origin `a0141cdd`; suite 7158 passed / 27
-skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
+**Updated:** 2026-07-27 (remote Cowork, CODER A session 5b) -- **B3, B4, B5 AND
+B6 ARE IN. THE TIER CEILING PLANS, THE PING-PONG IS GONE, THE 8 GB TIER RENDERS
+AT THE CANVAS IT DECLARES, AND ITS RECIPE IS FROZEN IN CODE. Suite 7213 passed
+/ 27 skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
+
+**B6 FROZE THE RECIPE AND THE PANEL FOUND THE HOLE IN THE FREEZE ITSELF.** The
+first draft demoted the sampling knobs and left `OTR_LTX_8GB_NEGATIVE` -- a
+render input, read straight from `os.environ` on every leg -- plus four tiled
+decode-geometry vars, still binding from the server's boot. Two independent
+lenses found it separately. Worse, the draft stamped the SAME recipe receipt on
+a prequalification sweep as on production, so a measurement artifact and a
+published one were indistinguishable in `meta.render_engines`. All closed, and
+the fix for the geometry then created its own defect -- a second range-check
+implementation that failed OPEN where every sibling knob fails closed -- caught
+by the post-fix lens and collapsed into one `_config_number`. Record:
+`docs/2026-07-27-b6-qa-findings.md`.
 
 **B5 CLOSED O1, AND THE PANEL SENT THE FIRST DESIGN BACK.** The draft read the
 profile's 512x288 off `video.canonical_canvas`; it was green and
@@ -269,37 +281,49 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **B6: freeze the recipe in CODE (ONE OPEN QUESTION FIRST)**
+## CURRENT STEP -- **prequalify 512x288 (GPU), then 7d**
 
-**HEAD == origin `a0141cdd`.** Suite 7158 / Bible 17 / canonical `9872624A`.
+**B6 IS IN.** The `ltx_8gb` recipe is FROZEN IN CODE. Next is the first GPU
+step of this block -- and it is a RENDER-window job, not a coder-window one.
 
-**B6 IS BLOCKED ON A DEFINITION, NOT ON CODE, AND THE BLOCKER IS THE JUDGMENT'S
-OWN ORDERING.** B6 says: *"Freeze the MEASURED T5 / tiling / sampling selection
-into a versioned `ltx_8gb` recipe in CODE, and demote the env vars to
-prequalification-only,"* logging a WARNING whenever an override is honoured
-there. But section 7 of the same judgment orders the work *"Build mechanics
-first, MEASURE second, freeze the recipe third, run canonical acceptance
-last"* -- and **no measurement has happened.** Prequalification is the step
-AFTER this one, and no GPU run is authorised in a coder window.
+**HOW THE B6 FORK WAS RESOLVED: option (a), freeze what ships today.** The
+judgment orders "mechanics first, MEASURE second, freeze third" and no
+measurement had happened, so there was no measured selection to freeze. Option
+(a) was taken because it is behaviour-preserving on any box that set nothing
+and fully reversible -- prequalification measures and produces v2. **The code
+says so in its own words rather than implying a measurement it does not have:**
+`LTX8_RECIPE_V1`'s comment states plainly that these are today's shipped
+defaults, each with a recorded reason (the T5 offloads to CPU because
+`t5xxl_fp16` alone is ~9 GB -- load-bearing, not an optimisation; tiled decode
+is OFF because core `VAEDecode` handles the 8 GB peak at the smoke canvas).
+`docs/2026-07-26-8gb-1080p-arc-judgment.md:188` says "MEASURED"; it was NOT
+rewritten to match what shipped, because a judgment is a record of what was
+decided, not a living doc -- the departure is recorded here and in the code.
 
-So B6 as written cannot be executed yet: there is no measured selection to
-freeze. Two ways forward, and it is an operator call which:
+**THE "PREQUALIFICATION SIGNAL" QUESTION IS ANSWERED: an explicit env var,
+`OTR_LTX_8GB_PREQUALIFICATION`, truthy `{1,true,yes,on}`.** Deliberately NOT
+"the absence of an episode ledger" or any other ambient condition: a signal you
+can arrive at by accident is one a production leg can arrive at by accident.
+Present-but-falsy (`0`, empty, `no`) is a production leg.
 
-- **(a) Freeze what ships today** -- the current defaults ARE decided values
-  with recorded reasons (T5 offloads to CPU because `t5xxl_fp16` alone is ~9 GB,
-  documented as load-bearing rather than an optimisation; tiled VAE defaults OFF
-  because core `VAEDecode` handles the 8 GB peak at the smoke canvas). Version
-  them as `ltx_8gb` recipe v1, demote the env vars, and let prequalification
-  produce v2 if it measures something better. B6 becomes buildable now.
-- **(b) Defer B6 until after prequalification**, run the 512x288
-  prequalification first against the current env-driven knobs, and freeze the
-  measured result. Matches the judgment's ordering literally; leaves the env
-  channel live through one more step.
+Two rules B6 established that the next window must not undo:
 
-**Also unspecified either way: what marks a run as "prequalification".** The
-demotion needs a signal the code can read -- an explicit env, or the absence of
-an episode ledger. Do not invent one silently; it decides whether an operator's
-knob works on a production leg.
+- **A knob that cannot bind is IGNORED, never FATAL.** Outside the consent act
+  the demoted vars are named in a warning and NEVER PARSED. The first draft
+  parsed then discarded, which meant a stale `OTR_LTX_8GB_STEPS=not-a-number`
+  in a long-booted server's environment would kill a leg over a value with no
+  effect on it -- `PBUG-20260723-02` wearing the opposite mask.
+- **A run under the consent act MARKS ITS OWN ARTIFACTS.** A prequalification
+  clip stamps `..._v1+prequalification`, because `recipe` rides the manifest
+  into `stamp_durable(meta.render_engines)` and a sweep artifact must never be
+  mistaken for a production one in the record that outlives the run.
+
+**WHAT PREQUALIFICATION ACTUALLY DOES NOW:** boot with
+`OTR_LTX_8GB_PREQUALIFICATION=1` and the knobs bind again, range-checked and
+fail-closed exactly as before, with every honoured override logged. Measure T5
+device on/off and tiled decode on/off at 512x288, then freeze the winner as
+`LTX8_RECIPE_V1` v2 -- bump the version IN the `RECIPE_LTX8_I2V` string, which
+moves the session identity for free. Record: `docs/2026-07-27-b6-qa-findings.md`.
 
 **A SECOND FACT THAT BEARS ON THE ORDERING (B5 panel, verified):**
 `render_single` and both HTTP entry points never reach the canvas seam -- they
@@ -1084,6 +1108,43 @@ MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
 That split is why the two eyeball-era entries below are PARKED rather than
 listed as live.
 
+- **The `ltx_8gb` render-length ceiling has TWO owners that only agree by
+  coincidence** (found 2026-07-27, B6 panel, two lenses independently; grounded
+  against the real files). The coverage PLANNER reads
+  `config/profiles/otr_8gb_ltx.json` `video.max_render_frames` -- the channel
+  B3 built, and `ltx_8gb` is the sole member of `PLANNING_CAP_ENGINES`. The
+  ADAPTER's own pre-render refusal reads `OTR_LTX_8GB_MAX_FRAMES`. Today both
+  land on 161 (profile unpinned, env unset), so nothing breaks. But
+  `workflows/variants/otr_8gb_ltx.env.json` ships `OTR_LTX_8GB_MAX_FRAMES=97`
+  and NOTHING currently reads that file. The day a launcher honours it without
+  also pinning the profile, the planner emits a 98-161 frame segment and the
+  adapter refuses it MID-EPISODE -- after the stills are minted and, on a
+  multi-segment beat, after the 6.34 GiB checkpoint is hoisted. **Deliberately
+  NOT fixed in B6:** pinning the profile to 97 changes how a 237-frame beat
+  partitions, which is a production planning decision on the eve of 7d, not a
+  cleanup. The preset now carries a `_ceiling_note` saying do not export it
+  alone. Compare WAN, which B3 wired correctly: `otr_8gb_wan.json` sets BOTH
+  `launch.env.OTR_WAN_TI2V_MAX_FRAMES` and `video.max_render_frames`.
+- **The recipe reaches the ledger but never the credits CARD** (found
+  2026-07-27, B6 panel, lens C; traced hop by hop). `otr_credits_roll`
+  `_recipe_suffix` builds `models["video_suffix"]` from the clip's recipe --
+  and `_draw_models` never reads it; repo-wide, `video_suffix` has one write
+  and zero readers, and `tests/test_credits_roll_spec.py` supplies `recipe` in
+  its fixture without asserting it is drawn. Not a hole in the ledger --
+  `stamp_durable(meta.render_engines)` genuinely carries it -- so this is a
+  DISPLAY gap. The adapter docstring was narrowed to claim only what is true.
+  Fixing the renderer belongs to whoever owns the credits card.
+- **The WAN adapters have the whole pre-B6 defect, unfrozen** (scouted
+  2026-07-27, B6 panel, lens E; scouting only, nothing touched). `eng_wan_ti2v`
+  reads loader class, tiled-VAE class, all three weight NAMES, sampler,
+  scheduler, steps, cfg, shift, negative and four VAE-tile vars from the
+  environment; `eng_wan_i2v` reads six of its own INLINE in `_build_graph` with
+  bare `int()`/`float()` -- no range check, no named MALFORMED_CONFIG -- under
+  un-namespaced `OTR_WAN_*` names. And neither WAN adapter emits a `recipe`
+  receipt at all, so a WAN clip stamps `recipe: None`: there is not even a
+  wrong receipt to catch the drift with. This is the same `PBUG-20260723-02`
+  shape B6 just closed for LTX, one tier over.
+
 - **The route lock is ONE NODE TOO LATE for the image phase** (found
   2026-07-25, r3, both seats, node order confirmed against the canonical JSON:
   `87 VideoDirector -> 88 ImageDirector -> 89 MetaBrief -> 90 ShotLock ->
@@ -1425,7 +1486,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED. r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1-7a COMPLETE plus nine QA rounds; then the 8GB block: B1a, B2a, B2b, QA-4, the `*_DIR` tripwire, B1b-0, B1b, and now B3 + B4 + B5. All LANDED GREEN and PUSHED (HEAD `a0141cdd`, suite 7158).** NEXT = **B6**, which is BLOCKED on an operator call -- there is no measured selection to freeze yet and "prequalification-only" has no defined signal (see CURRENT STEP) -- then prequalify 512x288, then **7d** -- the canonical 237-frame opening beat, which is where a GPU first renders through this machine at its production canvas. Seams tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-26-8gb-1080p-arc-judgment.md` (the architecture), `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
+| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED. r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1-7a COMPLETE plus nine QA rounds; then the 8GB block: B1a, B2a, B2b, QA-4, the `*_DIR` tripwire, B1b-0, B1b, and now B3 + B4 + B5 + B6. All LANDED GREEN and PUSHED (suite 7213).** THE CODER-WINDOW BLOCK IS COMPLETE. NEXT = **prequalify 512x288** -- a GPU step, so a RENDER window owns it, not this one (boot with `OTR_LTX_8GB_PREQUALIFICATION=1`, measure T5 device and tiled decode, freeze the winner as recipe v2) -- then **7d** -- the canonical 237-frame opening beat, which is where a GPU first renders through this machine at its production canvas. Seams tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-26-8gb-1080p-arc-judgment.md` (the architecture), `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
