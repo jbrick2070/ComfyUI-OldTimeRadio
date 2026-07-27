@@ -1,6 +1,59 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-27 (remote Cowork, RENDER window) -- **PREQUALIFICATION IS
+**Updated:** 2026-07-27 (remote Cowork, CODER window) -- **LANE 1 IS DONE. BOTH
+WAN ADAPTERS NOW BIND THEIR RECIPE FROM CODE, AND A WAN CLIP FINALLY STAMPS A
+RECEIPT.** HEAD == origin `3acc7fed`; suite **7291 passed / 27 skipped / 1
+xfailed**; Bible 17; canonical `9872624A` byte-identical (no node, widget, link
+or schema touched -- LANE 1 CLOSES an env channel).
+
+`PBUG-20260723-02` is now closed on the WAN lane, one tier over from B6.
+`eng_wan_ti2v` read sampler, scheduler, steps, cfg, shift, negative, the
+tiled-VAE flag and four tile-geometry vars from the environment on every leg;
+`eng_wan_i2v` read six of its own INLINE in `_build_graph` with bare
+`int()`/`float()`, no range check and no named refusal. Both are frozen:
+`WAN_TI2V_RECIPE` (`71753cb4`) and `WAN_I2V_RECIPE` (`3acc7fed`), with the
+mechanism shared in `nodes/_otr_video_engines/wan_recipe.py` and the DATA per
+adapter. Record: `docs/2026-07-27-lane1-wan-recipe-freeze-qa-findings.md`.
+
+**THE RECEIPT HOLE IS CLOSED TOO.** A WAN clip stamped `recipe: None`, so there
+was not even a wrong receipt to catch a drift with. `render_clip` now threads
+`recipe_receipt()` through `_clip_from_raw` into
+`stamp_durable(meta.render_engines)`, and a measurement run marks its own
+artifacts with `+prequalification`.
+
+**PER-ADAPTER CONSENT VARS, NOT ONE SWITCH** (`OTR_WAN_TI2V_PREQUALIFICATION` /
+`OTR_WAN_I2V_PREQUALIFICATION`). One shared switch would open the other tier and
+stamp `+prequalification` on a clip that had rendered with its frozen recipe --
+a receipt that lies in the safer direction still lies.
+
+**WHAT LANE 1 DELIBERATELY DID NOT FREEZE, and it is not the same list as ltx's:**
+`OTR_WAN_TI2V_MAX_FRAMES` is a CEILING **and a live shipped channel** --
+`otr_8gb_wan.json` sets both `launch.env` and `video.max_render_frames`, so
+folding it in would have retired the 8 GB tier's launch contract. Weight names
+and their loader-class selectors stay live TOGETHER (the class is inferred from
+the basename; freezing one and not the other gives one fact two owners).
+`wan_i2v` keeps `uni_pc`, NOT the portable floor's `euler` -- the freeze
+preserves behaviour, it does not add policy.
+
+**THE MUTATION ROUND CAUGHT WHAT THREE QA LENSES MISSED, and the lesson is
+portable: 4 of 10 real mutants SURVIVED the first i2v pass.** A renamed consent
+constant was undetectable because the tests set the CONSTANT rather than the
+literal an operator types; `recipe` and `vram_peak_mb` could be dropped from
+`render_clip` because both were only ever checked on a HAND-BUILT raw (the test
+constructed the thing it was verifying); and `shift` had no production-leg test
+at all, so its consent-act test AGREED with the mutant. All fixed on BOTH
+adapters -- 30/30 real mutants caught across two rounds, 4 CONTROLs survived.
+
+**ONE REAL BUG FIXED ON THE WAY (pre-push fan-out, lens C):** `eng_wan_i2v`
+started an NVML probe, measured the render-window peak, logged it, and
+DISCARDED it -- NEWBUG-1's 2026-07-20 fix landed for `wan_ti2v` and never
+reached the sibling, so every `wan_i2v` clip reported `vram_peak_mb: None` and
+`render_shot` silently fell back to an instantaneous post-render read that can
+under-report, which then rolls up into the episode figure and the credits card.
+
+---
+
+**Superseded header (2026-07-27, RENDER window) -- PREQUALIFICATION IS
 DONE. THE `ltx_8gb` RECIPE IS MEASURED AND FROZEN AS v2.** HEAD == origin
 `dcdcccde`; suite **7226 passed / 27 skipped / 1 xfailed**; Bible 17; canonical
 `9872624A` byte-identical (no node, widget, link or schema touched).
@@ -328,7 +381,60 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **LANE 1: the WAN recipe freeze (no GPU)**
+## CURRENT STEP -- **LANE 2: the per-cell prequalification receipt (no GPU)**
+
+**LANE 1 IS DONE** (see the header). **7d IS STILL PARKED** until the operator
+is back at the desk -- his call, recorded in `docs/TRAVEL_RELAY_PROTOCOL.md`.
+Do not start it from a remote window.
+
+**LANE 2, the next default remote lane: name the DEPARTURES in the
+prequalification receipt.** Suite-provable end to end, no GPU, no operator
+judgment. It is already an OPEN BUG (found 2026-07-27 by the kibitz codex seat,
+verified): `recipe_receipt()` returns a single generic `+prequalification`
+suffix, so a winning sweep artifact cannot prove WHICH knob values produced it
+-- the ledger says a sweep ran, not which cell. Shape: name the departures from
+the frozen recipe, e.g. `..._v2+prequalification[tiled_vae=off]`. No workflow
+schema work; the receipt is a string on the manifest row.
+
+**IT IS CHEAPER NOW THAN WHEN IT WAS WRITTEN, and that is the reason to take it
+next.** It was deferred out of `dcdcccde` because it touches `session_identity`
+and several call sites. LANE 1 has since put the receipt behind ONE shared
+`wan_recipe.recipe_receipt(frozen, consent_env)`, and the same shape exists in
+`eng_ltx_8gb.recipe_receipt()`. Computing the departure list needs the resolved
+values and the frozen dict in one place, which is exactly what
+`_resolve_render_config` already returns on both WAN adapters.
+
+**THREE THINGS LANE 1 ESTABLISHED THAT LANE 2 MUST NOT UNDO:**
+
+- **A knob that cannot bind is IGNORED, never FATAL.** Outside the consent act
+  the demoted vars are NAMED and never PARSED. A departure list must be computed
+  from RESOLVED values under the consent act only -- computing it on a
+  production leg would re-introduce parsing of knobs that cannot bind.
+- **A run under the consent act MARKS ITS OWN ARTIFACTS**, and the mark rides
+  into `stamp_durable(meta.render_engines)`. Making the mark richer must not
+  make it absent on any path.
+- **PER-ADAPTER CONSENT, per-adapter receipt.** Three adapters now carry this
+  mechanism (`ltx_8gb`, `wan_ti2v`, `wan_i2v`). If LANE 2 hoists anything, hoist
+  the MECHANISM and leave the DATA where it is.
+
+**AND THE TEST TRAP THAT COST THE MOST TIME IN LANE 1 -- it will recur:** a test
+that sets the imported CONSTANT rather than the literal an operator types can
+never notice the adapter reading a var nobody sets; and a receipt checked only
+on a HAND-BUILT raw stays green when `render_clip` stops putting it there. Both
+survived three QA lenses and were caught only by mutation. Drive the real
+`render_clip` (`tests/test_wan_recipe_freeze.py` has an ffmpeg-free harness for
+it) and assert the DOCUMENTED literal.
+
+**OTHER REMOTE-SAFE LANES, if LANE 2 is not the operator's pick:** the
+`schemas.py` `ShotRow` decision (wire it or demote it in writing -- it is a
+closed model no boundary enforces, and other docs cite it as a live safety net),
+and the credits-card display gap (the recipe reaches the durable ledger but
+`_draw_models` never reads `video_suffix`). Both are in OPEN BUGS with their
+shapes already spelled out.
+
+---
+
+## SUPERSEDED -- LANE 1 (DONE @ `71753cb4` and `3acc7fed`)
 
 **PREQUALIFICATION IS DONE** (see the header). **7d IS PARKED** until the
 operator is back at the desk -- his call, recorded in
@@ -1266,16 +1372,24 @@ listed as live.
   `stamp_durable(meta.render_engines)` genuinely carries it -- so this is a
   DISPLAY gap. The adapter docstring was narrowed to claim only what is true.
   Fixing the renderer belongs to whoever owns the credits card.
-- **The WAN adapters have the whole pre-B6 defect, unfrozen** (scouted
-  2026-07-27, B6 panel, lens E; scouting only, nothing touched). `eng_wan_ti2v`
-  reads loader class, tiled-VAE class, all three weight NAMES, sampler,
-  scheduler, steps, cfg, shift, negative and four VAE-tile vars from the
-  environment; `eng_wan_i2v` reads six of its own INLINE in `_build_graph` with
-  bare `int()`/`float()` -- no range check, no named MALFORMED_CONFIG -- under
-  un-namespaced `OTR_WAN_*` names. And neither WAN adapter emits a `recipe`
-  receipt at all, so a WAN clip stamps `recipe: None`: there is not even a
-  wrong receipt to catch the drift with. This is the same `PBUG-20260723-02`
-  shape B6 just closed for LTX, one tier over.
+- ~~**The WAN adapters have the whole pre-B6 defect, unfrozen**~~ -- **CLOSED by
+  LANE 1** @ `71753cb4` + `3acc7fed`. Both recipes are frozen in code behind
+  per-adapter consent acts and both adapters stamp a receipt. Detail in
+  `docs/2026-07-27-lane1-wan-recipe-freeze-qa-findings.md` and HANDOFF_LOG.
+- **OPERATOR CALL FLAGGED (LANE 1, not taken by the coder): rename the
+  un-namespaced `OTR_WAN_*` knobs?** `eng_wan_i2v`'s six frozen knobs are
+  `OTR_WAN_STEPS` / `_CFG` / `_SHIFT` / `_SAMPLER` / `_SCHEDULER` / `_NEGATIVE`
+  -- no `I2V` namespace, unlike every sibling. LANE 1 left them alone on
+  purpose: renaming an operator-facing knob is an operator's call, and the
+  freeze already removed the power that made the missing namespace dangerous
+  (they cannot bind a production leg at all; they are consent-act-only now).
+  Default if unruled: leave them, because the risk they carried is gone and a
+  rename would silently break any operator muscle memory for a sweep.
+- **`eng_wan_i2v` threw away a VRAM peak it measured** -- FIXED @ `3acc7fed`,
+  recorded because the CLASS matters: NEWBUG-1's 2026-07-20 fix landed on
+  `wan_ti2v` and never reached its sibling, and nothing caught it for a week
+  because no test drove `wan_i2v.render_clip`'s RETURN. When a receipt fix lands
+  on one adapter, grep the siblings in the same change.
 
 - **The route lock is ONE NODE TOO LATE for the image phase** (found
   2026-07-25, r3, both seats, node order confirmed against the canonical JSON:
@@ -1691,7 +1805,12 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-27 @ `a0141cdd`, B3 + B4 + B5 landed):
+- Current whole-tree receipt (2026-07-27 @ `3acc7fed`, LANE 1 landed):
+  full Windows suite `7291 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; canonical
+  `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`
+  byte-identical; AST/BOM/zero-byte/UTF-8/ASCII clean on all six touched files.
+- Prior receipt (2026-07-27 @ `a0141cdd`, B3 + B4 + B5 landed):
   full Windows suite `7158 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; canonical `9872624A` (byte-identical --
   no chunk in the 8GB block touches a node, widget, link or schema; the

@@ -3,6 +3,66 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 -- HEAD 3acc7fed (v2.0-alpha) -- WINDOW CODER (LANE 1)
+Did: froze BOTH WAN render recipes in code, mirroring B6 one tier over --
+  71753cb4 wan_ti2v (11 knobs), 3acc7fed wan_i2v (the six that were read INLINE
+  in _build_graph with bare int()/float(), no range check, no named refusal).
+  Mechanism shared in the new wan_recipe.py, DATA per adapter, and a per-adapter
+  consent act so a sweep of one tier cannot stamp +prequalification on the
+  other. Closed the receipt hole: a WAN clip stamped recipe: None, now it stamps
+  a real one that rides into stamp_durable(meta.render_engines). Fixed a live
+  bug the fan-out found -- eng_wan_i2v measured an NVML render peak, logged it,
+  and discarded it (NEWBUG-1's fix landed on wan_ti2v in July and never reached
+  the sibling), so every wan_i2v clip reported vram_peak_mb: None.
+Current step: LANE 2 -- name the DEPARTURES in the prequalification receipt
+  (no GPU, suite-provable, already an OPEN BUG). 7d stays PARKED for the
+  operator.
+Next: LANE 2, or the operator picks another remote-safe lane (ShotRow wire-or-
+  demote; the credits-card display gap). CODER window.
+Models: Claude codes + judges; 3 Sonnet QA lenses pre-push. $0 external -- no
+  codex, no agy, no cloud roundtable; two-strikes never invoked.
+Commits: 71753cb4, 3acc7fed. Suite 7226 -> 7291; Bible 17; canonical 9872624A
+  byte-identical. Record: docs/2026-07-27-lane1-wan-recipe-freeze-qa-findings.md.
+
+### Detail
+
+**THE MUTATION ROUND CAUGHT WHAT THREE QA LENSES DID NOT, and that is the
+portable lesson of this session.** The pre-push fan-out found four real test
+gaps and two decorative tests of my own, all fixed before the push. Then the
+mutation round ran and **4 of 10 real mutants SURVIVED** the first wan_i2v pass:
+
+1. **A renamed consent constant was undetectable.** Every test set
+   `PREQUALIFICATION_ENV` -- the imported constant -- so renaming it renamed
+   what the test set too. An adapter reading a var no operator will ever set
+   stayed green. Tests now set the DOCUMENTED LITERAL an operator types. The
+   same hole existed on wan_ti2v and was fixed there too.
+2 and 3. **`recipe` and `vram_peak_mb` dropped from `render_clip` both
+   survived**, because the receipts were only ever checked on a HAND-BUILT raw.
+   The test constructed the thing it was verifying -- the chunk-6 shape where a
+   test's own builder agrees with the bug. Fixed with a test that drives the
+   real `render_clip` through an ffmpeg-free, GPU-free stub, for both adapters.
+4. **`shift` escaping back to an inline os.environ read survived**, because the
+   production-leg test set steps/cfg/sampler/negative and not shift, while the
+   consent-act test AGREED with the mutant.
+
+After the fixes: 20/20 and 10/10 real mutants caught, all 4 CONTROLs survived.
+
+**WHAT LANE 1 DELIBERATELY DID NOT FREEZE, because WAN is not ltx.**
+`OTR_WAN_TI2V_MAX_FRAMES` is a ceiling AND a live shipped channel --
+otr_8gb_wan.json sets both launch.env and video.max_render_frames -- so folding
+it into the recipe would have retired the 8 GB tier's launch contract, which is
+PBUG-20260723-02 itself. Weight names and their loader-class selectors stay live
+TOGETHER (the class is inferred from the basename; freezing one and not the
+other gives one fact two owners). wan_i2v keeps uni_pc rather than the portable
+floor's euler: the freeze preserves behaviour, it does not add policy. And the
+un-namespaced OTR_WAN_* names are left alone and FLAGGED -- renaming an
+operator-facing knob is the operator's call, and the freeze already removed the
+power that made the missing namespace dangerous.
+
+**HONEST LIMIT:** both v1 dicts are today's shipped defaults, NOT a measured
+selection -- no WAN sweep has run. The code says so in its own words. A
+prequalification run measures and produces v2.
+
 ## 2026-07-27 05:10 -- HEAD dcdcccde (v2.0-alpha) -- WINDOW RENDER
 Did: ran the prequalification sweep -- four full canonical legs at 512x288, the
   first time the 8 GB tier has ever rendered at its own declared canvas. Froze
