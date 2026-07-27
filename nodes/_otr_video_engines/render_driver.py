@@ -3432,6 +3432,21 @@ def assert_coverage_plans(ledger):
 
     Shots with no stamped plan are skipped -- see
     ``otr_shot_lock._stamp_coverage_plan`` for when that is legitimate.
+
+    ALSO RE-DERIVES THE EFFECTIVE CONTRACT (B3, 2026-07-26). The tier's
+    ``max_render_frames`` ceiling narrows what the PLANNER may emit for the
+    engines in ``frame_contract.PLANNING_CAP_ENGINES``, so the plan must be
+    re-validated against the NARROWED contract here, not the declared one -- a
+    161-frame segment is perfectly legal for ``ltx_8gb``'s declaration and
+    illegal under a tier that pinned 65. The narrowed contract is also stamped
+    beside the plan as ``shot["coverage_contract"]``, re-derived here with the
+    same two functions, and compared for EXACT equality. That comparison is
+    what catches the cases arithmetic cannot: a ceiling that moved between
+    plan time and render time, a receipt that appeared or vanished, and a shot
+    whose engine was swapped after the stamp by the legacy force-map path
+    (``resolve_final_shot_engines`` mutates and THEN calls this). A stamped
+    receipt against a re-derived ``None`` is a refusal, and it should be: the
+    plan was built under a ceiling the engine now rendering it does not honour.
     """
     try:
         from . import coverage_plan as _cp  # type: ignore
@@ -3439,6 +3454,13 @@ def assert_coverage_plans(ledger):
     except ImportError:  # pragma: no cover -- flat test imports
         import coverage_plan as _cp  # type: ignore
         import frame_contract as _fc  # type: ignore
+
+    # THE TIER CEILING, read ONCE off the ledger the plan rode in on, through
+    # the SAME normalizer ``otr_shot_lock._planning_ceiling`` stamped it with
+    # (B3). ``.get`` with no key present reads as unpinned, which is every
+    # hand-built fixture and both HTTP entry points.
+    ceiling = _fc.normalized_planning_ceiling(
+        ((ledger or {}).get("video") or {}).get("max_render_frames"))
 
     checked = 0
     for shot in ((ledger or {}).get("video") or {}).get("shots") or ():
@@ -3463,8 +3485,79 @@ def assert_coverage_plans(ledger):
                 contract = _fc.frame_contract_for(_vreg.get_engine(engine_id))
             except Exception:  # noqa: BLE001 -- arithmetic-only check instead
                 contract = None
+        # THE EFFECTIVE CONTRACT + ITS RECEIPT (B3), derived OUTSIDE the except
+        # above: that catch means "this adapter is unbuildable, fall back to an
+        # arithmetic-only check", and a misconfigured tier ceiling must not be
+        # absorbed into it. ``PlanningCapError`` is a ValueError and is NOT a
+        # ``CoveragePlanError``, so the narrow catch below would let it escape
+        # this boundary unformatted -- wrap it here, named.
+        effective = contract
+        expected = None
+        if contract is not None:
+            try:
+                effective = _fc.effective_frame_contract(
+                    engine_id, contract, ceiling)
+                expected = _fc.coverage_contract_receipt(
+                    engine_id, contract, ceiling)
+            except _fc.PlanningCapError as exc:
+                raise RenderError(
+                    "COVERAGE PLAN: shot %s cannot be checked against this "
+                    "tier's render-length ceiling: %s. NO FALLBACK."
+                    % (shot.get("shot_id"), exc)) from exc
+        raw_receipt = shot.get("coverage_contract")
+        if raw_receipt is not None and not (
+                isinstance(raw_receipt, dict) and raw_receipt):
+            raise RenderError(
+                "COVERAGE CONTRACT: shot %s carries a coverage_contract of %r, "
+                "which is not a receipt. An empty or malformed receipt is not "
+                "the same as no receipt -- one means nothing narrowed, the "
+                "other means the ledger is damaged. NO FALLBACK."
+                % (shot.get("shot_id"), raw_receipt))
+        stamped = raw_receipt or None
+        if contract is not None:
+            if stamped != expected:
+                raise RenderError(
+                    "COVERAGE CONTRACT: shot %s was planned under %r but this "
+                    "ledger re-derives %r for engine %r at ceiling %d. The plan "
+                    "was built against a contract that is no longer the one in "
+                    "force -- a moved tier ceiling, a re-declared adapter, or "
+                    "an engine swapped after the plan was stamped. NO FALLBACK."
+                    % (shot.get("shot_id"), stamped, expected,
+                       engine_id or "?", ceiling))
+        elif isinstance(stamped, dict):
+            # The adapter will not resolve here, so the full receipt cannot be
+            # re-derived -- but BOTH facts the receipt carries about its own
+            # provenance can still be held to the ledger: the ceiling it was
+            # planned under, and the engine it was planned FOR.
+            #
+            # THE ENGINE HALF WAS MISSING (2026-07-27, post-code panel, two
+            # seats independently, each with a live repro). Comparing only the
+            # ceiling let a stale ltx_8gb receipt ride a shot whose engine had
+            # been swapped to something unregistered: same ceiling, no
+            # contract to re-derive, and the fall-through validated the plan
+            # arithmetic-only -- a plan built for an 8n+1 ladder accepted for
+            # an engine never checked against any length. The registered-engine
+            # branch above compares the whole receipt, engine id included; this
+            # branch has to say the same thing with less information.
+            if str(stamped.get("engine_id") or "") != engine_id:
+                raise RenderError(
+                    "COVERAGE CONTRACT: shot %s was planned for engine %r but "
+                    "now carries %r, whose adapter cannot be resolved here. A "
+                    "plan built under one engine's ceiling may not be executed "
+                    "by another. NO FALLBACK."
+                    % (shot.get("shot_id"), stamped.get("engine_id"),
+                       engine_id or "?"))
+            if _fc.normalized_planning_ceiling(
+                    stamped.get("max_render_frames")) != ceiling:
+                raise RenderError(
+                    "COVERAGE CONTRACT: shot %s was planned under a "
+                    "render-length ceiling of %r but this ledger carries %d, "
+                    "and its adapter (%s) cannot be resolved here to re-derive "
+                    "the rest. NO FALLBACK."
+                    % (shot.get("shot_id"), stamped.get("max_render_frames"),
+                       ceiling, engine_id or "?"))
         try:
-            _cp.validate_coverage_plan(plan, contract)
+            _cp.validate_coverage_plan(plan, effective)
         except _cp.CoveragePlanError as exc:
             raise RenderError(
                 "COVERAGE PLAN: shot %s carries a plan its adapter (%s) cannot "

@@ -40,7 +40,7 @@ Cold-import clean: stdlib only, no registry import at module scope.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 
 #: Segment N+1 starts EXACTLY on segment N's terminal frame; the adapter
@@ -267,3 +267,153 @@ def can_chain(engine) -> bool:
     supplied image can deliver one. Everything else jump cuts, honestly.
     """
     return frame_contract_for(engine).continuity == CONTINUITY_STRICT_FIRST_FRAME
+
+
+# ---------------------------------------------------------------------------
+# THE EFFECTIVE CONTRACT (B3, 2026-07-26) -- a tier ceiling that PLANS
+# ---------------------------------------------------------------------------
+
+#: The ONLY engines whose tier-pinned ``max_render_frames`` is a coverage
+#: PLANNING cap. This is a deliberate allowlist of ONE, not a rollout.
+#:
+#: ``max_render_frames`` is NOT a general planning cap, and treating it as one
+#: would break a shipped tier. WAN reads 17 from ``config/profiles/
+#: otr_8gb_wan.json``, renders a short native clip, and PING-PONGS it up to the
+#: beat's full length (``eng_wan_ti2v._floor_length`` -> ``wrapper_bridge.
+#: extend_frames_to_target``); its beat length is unchanged by the ceiling. So
+#: narrowing WAN's contract before ``partition_beat`` would turn every WAN beat
+#: into a pile of 17-frame renders and silently rewrite the low-VRAM tier
+#: ``PBUG-20260723-02`` just fixed. ``ltx_8gb`` is the opposite case: it plans
+#: real coverage, so its ceiling belongs to the PLANNER.
+#:
+#: Adding an id here is a per-engine decision with a live proof attached, never
+#: a convenience. ``tests/test_multiclip_effective_contract.py`` pins WAN's
+#: topology as unmoved by a pinned ceiling.
+PLANNING_CAP_ENGINES = ("ltx_8gb",)
+
+
+class PlanningCapError(ValueError):
+    """A tier pinned a render-length ceiling no legal segment fits under.
+
+    Deliberately NOT a :class:`FrameContractError` (the declaration is fine)
+    and deliberately NOT a ``coverage_plan.CoveragePlanError`` (the beat is
+    coverable; the CONFIGURATION is not). It is a terminal operator-caused
+    condition: it names the ceiling, the engine and the floor it fell under,
+    and nothing catches it. A clamp to the nearest legal rung would be a silent
+    fallback -- the tier asked for something the adapter cannot render, and the
+    honest answer is to say so before any weights load.
+    """
+
+
+def normalized_planning_ceiling(value) -> int:
+    """THE ONE normalization of a ``max_render_frames`` value. 0 == unpinned.
+
+    Exists so the planner, the ledger stamp and the render boundary cannot
+    drift. Before this, ``max(0, int(x or 0))`` was written out at each site;
+    three literal copies of one rule is how the stamped receipt and the
+    re-derived one start disagreeing for reasons that have nothing to do with
+    the ceiling. Never raises -- a malformed stamp reads as UNPINNED, matching
+    ``motion_common.profile_max_render_frames``, because a ceiling nobody can
+    parse must not silently become a small number.
+    """
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def effective_frame_contract(engine_id, contract, max_render_frames):
+    """The contract the PLANNER must partition against, ceiling included.
+
+    Returns ``contract`` UNCHANGED for every engine outside
+    :data:`PLANNING_CAP_ENGINES`, for an unpinned ceiling, and for a ceiling at
+    or above the adapter's own declared maximum (a ceiling of 240 on an engine
+    that stops at 161 is not binding and must not pretend to be).
+
+    Otherwise it returns a copy narrowed to the largest LEGAL rung at or below
+    the ceiling -- ``9 + 8k`` for ``ltx_8gb``, so a ceiling of 100 yields 97,
+    not 100. Narrowing to the raw ceiling would emit segments the adapter
+    refuses; that is the failure this function exists to prevent, one level up.
+
+    CALL THIS OUTSIDE ANY BROAD ``except``. It raises
+    :class:`PlanningCapError`, which is a ``ValueError``, and both call sites
+    sit next to a pre-existing ``except Exception`` that means "this engine is
+    unbuildable, give it no plan". Folding the call into one of those turns a
+    loud misconfiguration into a beat with no coverage plan at all -- the same
+    shape as chunk 1a's four swallowed fail-closed sites, found here by three
+    independent reviewers before a line was written.
+
+    Pure. No environment, no registry, no I/O -- the image phase plans stills
+    against the same numbers, so this must answer identically at plan time and
+    at render time.
+    """
+    ceiling = normalized_planning_ceiling(max_render_frames)
+    if not ceiling or str(engine_id) not in PLANNING_CAP_ENGINES:
+        return contract
+    if contract.discrete_frames:
+        # A fixed provider menu has no ``max_frames`` to narrow -- lowering it
+        # would not change ``is_legal_length``, which consults the menu FIRST,
+        # so a "narrowed" discrete contract would be one that lies. No engine
+        # in the allowlist declares a menu; refusing beats inventing an answer
+        # for a combination that can only arrive by a future declaration.
+        #
+        # A ceiling at or above the whole menu is NOT binding, though, and the
+        # documented guarantee at the top of this function has to hold for the
+        # discrete shape too (2026-07-27, post-code panel): refusing there
+        # would fail a tier that never constrained the engine at all.
+        if ceiling >= max(int(d) for d in contract.discrete_frames):
+            return contract
+        raise PlanningCapError(
+            "%s declares a discrete frame menu %r, so a render-length ceiling "
+            "of %d has no legal rung to narrow to. A tier ceiling is only a "
+            "planning cap for a ladder contract."
+            % (engine_id, tuple(contract.discrete_frames), ceiling))
+    rung = contract.largest_legal_at_most(ceiling)
+    if rung is None:
+        raise PlanningCapError(
+            "tier ceiling max_render_frames=%d is below %s's shortest legal "
+            "render (%d frames), so no segment this adapter accepts fits under "
+            "it. NO FALLBACK -- clamping to an illegal length would emit a "
+            "plan the adapter refuses at render time, after the weights load."
+            % (ceiling, engine_id, int(contract.min_frames)))
+    if contract.max_frames and rung >= int(contract.max_frames):
+        return contract
+    return replace(contract, max_frames=int(rung))
+
+
+def coverage_contract_receipt(engine_id, contract, max_render_frames):
+    """The durable sibling receipt for a NARROWED contract, or ``None``.
+
+    ``None`` when nothing narrowed -- which is every engine outside
+    :data:`PLANNING_CAP_ENGINES`, every unpinned tier, and every non-binding
+    ceiling. That ``None`` is meaningful: the render boundary re-derives this
+    and requires EXACT equality, so a receipt appearing or disappearing between
+    plan time and render time is itself the refusal. A shot whose engine was
+    swapped after the stamp (the legacy force-map path) compares a stamped dict
+    against a re-derived ``None`` and fails closed, which is correct: the plan
+    was built under a ceiling the new engine's lane does not honour.
+
+    Carries the ceiling that CAUSED the narrowing, not just its result, so a
+    receipt read out of a stored ledger explains itself without the profile.
+
+    ``contract`` MUST be the adapter's DECLARED contract, never one already
+    narrowed by :func:`effective_frame_contract`. A narrowed contract narrows
+    to itself, compares equal, and returns ``None`` -- the receipt then
+    silently never exists and the render boundary has nothing to check. The
+    first draft of the stamp site made exactly that mistake by rebinding one
+    variable.
+    """
+    ceiling = normalized_planning_ceiling(max_render_frames)
+    effective = effective_frame_contract(engine_id, contract, ceiling)
+    if effective == contract:
+        return None
+    return {
+        "engine_id": str(engine_id),
+        "min_frames": int(effective.min_frames),
+        "max_frames": int(effective.max_frames),
+        "quantum": int(effective.quantum),
+        "native_fps": int(effective.native_fps),
+        "allow_tail_trim": bool(effective.allow_tail_trim),
+        "continuity": str(effective.continuity),
+        "max_render_frames": int(ceiling),
+    }

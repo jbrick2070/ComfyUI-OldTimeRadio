@@ -1098,13 +1098,46 @@ def _lane_consumes_a_still(shot, engine_id):
     return bool(_still_spine_requires_scene(shot, engine_id, family))
 
 
-def _stamp_coverage_plan(shot, beat_id):
+def _planning_ceiling(policy):
+    """The tier's render-length ceiling off the policy, normalized ONCE (B3).
+
+    ``lock()`` stamps this value onto the ledger and ``build_execution_plan``
+    plans against it; the render boundary then re-derives from what was
+    stamped. So the normalization has to be ONE rule rather than three literal
+    copies of ``max(0, int(x or 0))`` that a later edit can desynchronize --
+    which would make the stamped receipt and the re-derived one disagree for a
+    reason that has nothing to do with the ceiling. It delegates to
+    ``frame_contract.normalized_planning_ceiling``, the same function the
+    render side calls, so there is exactly one definition in the tree.
+    """
+    try:
+        from ._otr_video_engines import frame_contract as _fc  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import frame_contract as _fc  # type: ignore
+    return _fc.normalized_planning_ceiling(
+        (policy or {}).get("max_render_frames"))
+
+
+def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     """Attach this beat's durable ``coverage_plan`` to its shot row (chunk 3b).
 
     Resolves the shot's engine to its declared :class:`FrameContract` and
     partitions the beat's ``target_frame_count`` into legal render segments.
     Validated here, at the plan boundary, so a plan that cannot be executed
     never reaches the wire.
+
+    ``max_render_frames`` IS REQUIRED, keyword-only, and has no default (B3,
+    2026-07-26). It is the tier's render-length ceiling off the same ``policy``
+    dict the ledger stamp reads, and for the engines in
+    ``frame_contract.PLANNING_CAP_ENGINES`` it NARROWS the contract this beat
+    is partitioned against -- see :func:`frame_contract.effective_frame_contract`
+    for why that allowlist is one engine long and why WAN must stay out of it.
+    A default of 0 was proposed and rejected: it would let a caller that forgot
+    the ceiling plan silently unpinned, which is the exact silent-fallback
+    shape this build exists to remove. There is one caller; it passes the
+    value. When the ceiling narrows anything, the resulting contract is stamped
+    beside the plan as ``shot["coverage_contract"]`` and the render boundary
+    re-derives it and requires exact equality.
 
     FAIL-CLOSED ON A REAL PARTITION FAILURE, tolerant of an ABSENT one. A
     :class:`CoveragePlanError` means the adapter genuinely cannot cover this
@@ -1150,9 +1183,24 @@ def _stamp_coverage_plan(shot, beat_id):
     if not _vreg_local.is_registered(engine_id):
         return
     try:
-        contract = _fc.frame_contract_for(_vreg_local.get_engine(engine_id))
+        declared = _fc.frame_contract_for(_vreg_local.get_engine(engine_id))
     except Exception:  # noqa: BLE001 -- an unbuildable engine gets no plan
         return
+    # THE TIER CEILING PLANS (B3, 2026-07-26), and this call sits OUTSIDE the
+    # except above ON PURPOSE. It raises PlanningCapError for a ceiling no
+    # legal segment fits under, and that catch means "unbuildable engine, give
+    # it no plan" -- absorbing a misconfigured ceiling into it would produce a
+    # beat with NO coverage plan, indistinguishable in the log from an
+    # unregistered engine, which is chunk 1a's swallowed-fail-closed shape.
+    # Three independent reviewers named this line before it was written.
+    #
+    # ``declared`` STAYS BOUND to the static contract. Both derivations below
+    # take the DECLARED one: feeding the already-narrowed contract back into
+    # ``coverage_contract_receipt`` makes it compare equal to itself and return
+    # None, so the receipt would silently never be stamped and the render
+    # boundary would have nothing to check.
+    contract = _fc.effective_frame_contract(engine_id, declared,
+                                            max_render_frames)
     plan = _cp.partition_beat(target, contract)
     _cp.validate_coverage_plan(plan, contract)
 
@@ -1193,6 +1241,17 @@ def _stamp_coverage_plan(shot, beat_id):
                    contract.max_frames or "none", engine_id))
 
     shot["coverage_plan"] = plan.to_dict()
+    # THE SIBLING RECEIPT (B3). Present only when the tier ceiling actually
+    # narrowed something, and its ABSENCE is as load-bearing as its content:
+    # ``render_driver.assert_coverage_plans`` re-derives this with the same
+    # function and refuses on any difference, so a ceiling that appeared,
+    # vanished or moved between plan time and render time is terminal rather
+    # than silently re-planned. Stamped BEFORE the still-lane early return --
+    # whether a lane owes stills has nothing to do with what it may render.
+    receipt = _fc.coverage_contract_receipt(engine_id, declared,
+                                            max_render_frames)
+    if receipt is not None:
+        shot["coverage_contract"] = receipt
     if not _lane_consumes_a_still(shot, engine_id):
         return
     requests = _cp.jump_still_requests(
@@ -1216,6 +1275,14 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
     shots)`` after ``resolver.validate_execution_groups``.
     """
     video_models = (policy or {}).get("video_models") or {}
+    #: THE TIER RENDER-LENGTH CEILING (B3, 2026-07-26). Read ONCE here, off the
+    #: same ``policy`` object ``lock()`` stamps onto the ledger, and handed to
+    #: every ``_stamp_coverage_plan`` call. For the engines in
+    #: ``frame_contract.PLANNING_CAP_ENGINES`` it narrows what the partitioner
+    #: may emit; for every other engine -- WAN above all -- it is inert here and
+    #: stays an adapter-side native cap, which is what keeps the 8GB WAN tier's
+    #: 17-frame contract from becoming 17-frame BEATS.
+    max_render_frames = _planning_ceiling(policy)
     #: THE FROZEN ROUTE (2026-07-25, multi-clip coverage chunk 1b), stamped by
     #: OTR_VideoDirector. Absent on a pre-1b policy or a hand-built fixture, in
     #: which case this falls back to the PICKED slot map exactly as before.
@@ -1323,7 +1390,8 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
         # rather than the one the beat asked for. Left in place as a correction
         # rather than deleted: a reader who remembers the old promise should
         # find out here that it expired, not by trusting it.
-        _stamp_coverage_plan(shots[-1], b["beat_id"])
+        _stamp_coverage_plan(shots[-1], b["beat_id"],
+                             max_render_frames=max_render_frames)
     return groups, shots
 
 
@@ -1533,7 +1601,10 @@ class OTRShotLock:
             # ceiling rides the ledger next to the device/dtype stamps, so the
             # engine sees it on a production leg regardless of how the server
             # was booted. 0 = unpinned. Beat frame targets are untouched.
-            "max_render_frames": max(0, int(policy.get("max_render_frames") or 0)),
+            # ONE normalization (B3): the same helper build_execution_plan
+            # planned against, so the stamped ceiling and the planned ceiling
+            # cannot be two expressions that drift apart.
+            "max_render_frames": _planning_ceiling(policy),
             "canonical_canvas": {
                 "w": int(canvas.get("w") or 832),
                 "h": int(canvas.get("h") or 480),

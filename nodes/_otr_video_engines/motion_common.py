@@ -447,12 +447,21 @@ class MotionEngineBase:
         pin: a production episode leg is submitted to an already-booted server,
         so ``launch.env`` cannot reach it -- the ceiling has to travel
         profile -> director widget -> ledger -> here. Never raises; a malformed
-        stamp reads as unpinned rather than failing a render."""
+        stamp reads as unpinned rather than failing a render.
+
+        DELEGATES TO THE ONE NORMALIZER (2026-07-27, B3 post-code panel).
+        This used to be a third hand-copied ``max(0, int(x or 0))``, alongside
+        the ledger stamp and the planner. They agreed only because someone
+        copied carefully; the whole point of B3's single helper is that the
+        adapter-side cap and the planned ceiling can never read the same stamp
+        differently.
+        """
         try:
-            return max(0, int((self._active_profile or {}).get(
-                "max_render_frames") or 0))
-        except (TypeError, ValueError):
-            return 0
+            from . import frame_contract as _fc  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            import frame_contract as _fc  # type: ignore
+        return _fc.normalized_planning_ceiling(
+            (self._active_profile or {}).get("max_render_frames"))
 
     def teardown(self, prepared):
         """Detach every tracked patcher (V-4), drop residency, RELEASE the lease,

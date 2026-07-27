@@ -306,14 +306,20 @@ class OTRVideoDirector:
                     "default": 0, "min": 0, "max": 240,
                     "tooltip": (
                         "Absolute per-clip RENDER-length ceiling in frames for "
-                        "local video engines (0 = unpinned = the engine max). "
-                        "The low-VRAM tier contract: the 8GB Wan profile pins "
-                        "17 so a beat renders 17 real frames and is "
-                        "ping-pong-extended to its full audio length, instead "
-                        "of requesting the beat's whole 177-frame span and "
-                        "dying in the VRAM cost model. Beat LENGTH is "
-                        "unchanged -- this caps what the engine renders, never "
-                        "what the episode plays."
+                        "local video engines (0 = unpinned = the engine's own "
+                        "maximum). Beat LENGTH is never changed by it -- this "
+                        "caps what an engine renders, never what the episode "
+                        "plays. TWO LANES CONSUME IT DIFFERENTLY. ltx_8gb "
+                        "takes it as a COVERAGE-PLANNING cap: the beat is "
+                        "partitioned into real clips of at most this many "
+                        "frames and chained, so the ceiling decides how many "
+                        "clips cover the beat. The 8GB Wan tier takes it as an "
+                        "adapter-side NATIVE cap: it pins 17, renders 17 real "
+                        "frames, and ping-pong-extends them to the beat's "
+                        "audio length rather than requesting the whole "
+                        "177-frame span and dying in the VRAM cost model. A "
+                        "value at or above an engine's own maximum has no "
+                        "effect on that engine."
                     ),
                 }),
             },

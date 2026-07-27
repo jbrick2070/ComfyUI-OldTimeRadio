@@ -2706,6 +2706,18 @@ out until they independently meet the same production-only admission rule.
   must raise `MotionBudgetError` UNPINNED and return 17 with the tier ceiling
   on the ledger; and an unpinned tier must still return 177 (no lane capped by
   the fix). Covered by `tests/test_remaining_video_contracts.py`
+- UPDATE 2026-07-27 (B3): the "then ping-pong-extended to the beat's full audio
+  length" clause above is still exactly right for WAN and is now only HALF the
+  meaning of `video.max_render_frames`. For `ltx_8gb` -- the sole member of
+  `frame_contract.PLANNING_CAP_ENGINES` -- the same ledger key is a coverage
+  PLANNING cap: it narrows the contract `otr_shot_lock._stamp_coverage_plan`
+  partitions against, so the beat is covered by real chained clips of at most
+  that length instead of one short render padded out. WAN is deliberately
+  excluded, because applying it before `partition_beat()` would turn every WAN
+  beat into a pile of 17-frame renders and undo this very fix. Anyone reading
+  this entry as the definition of the key should read
+  `docs/2026-07-27-b3-qa-findings.md` and `frame_contract.effective_frame_contract`
+  alongside it
 - bible-worthy: yes -- the portable rule is that a contract declared only in a
   process-launch environment cannot bind work submitted to an already-running
   server; a per-tier constraint has to ride the artifact the run loads
