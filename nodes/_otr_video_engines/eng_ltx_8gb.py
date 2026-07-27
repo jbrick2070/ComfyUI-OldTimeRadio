@@ -236,6 +236,33 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: 16:9 (matches the menu suffix ``ltx_8gb (16:9)``): the director mints a WIDE
     #: init still (non-HuMo, non-mesh-portrait).
     render_aspect = "wide"
+    #: THE RENDER CANVAS, DECLARED STATICALLY (B5, 2026-07-27) -- beside the
+    #: frame contract, the aspect and the fps, because it is the same kind of
+    #: fact: what this adapter renders, decided per engine and readable without
+    #: loading anything.
+    #:
+    #: NOT a ledger read and NOT an env var, on the O1 canvas judgment's
+    #: explicit instruction. That judgment enumerated FIVE channels that name a
+    #: render canvas and found this tier's -- the profile's `render.canvas_w/h`
+    #: travelling to `video.canonical_canvas` -- to be the one DEAD channel: the
+    #: profile asked for 512x288, `build_request_from_shot` handed every
+    #: non-face engine 1472x832, and nothing on the render path ever read the
+    #: stamp. 8.3x the pixels, on the tier that exists because 8 GB cannot
+    #: afford them.
+    #:
+    #: 512x288 is the decided value (8gb judgment section 1, four independent
+    #: sources): with 1024x576 it is one of only two rungs that are BOTH exactly
+    #: 16:9 and /32-clean, and it scales 3.75x to the 1920x1080 deliverable with
+    #: zero pad area. 832x480 is 26:15 and would pillarbox.
+    #:
+    #: Reading it from the ledger instead would make an operator who forces this
+    #: engine onto another workflow -- the coverage matrix does exactly that
+    #: through `role_overrides` -- inherit that workflow's 26:15 canvas and
+    #: either pillarbox or be refused. A declaration cannot be displaced by
+    #: where it is pointed. `tests/test_ltx_8gb_canonical_canvas.py` pins the
+    #: profile's own `render.canvas_w/h` equal to this pair so the dead channel
+    #: cannot silently drift away from it.
+    render_canvas = (512, 288)
     #: S1 per-model still plan (see ``_LTX_8GB_STILL_PLAN`` above).
     still_plan = _LTX_8GB_STILL_PLAN
     # FLEXIBLE: eligible for every role -- role_compat is the real gate (it admits

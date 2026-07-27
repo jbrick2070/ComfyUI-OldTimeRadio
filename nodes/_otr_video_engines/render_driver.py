@@ -218,6 +218,90 @@ def build_full_ledger(section):
             "video": section}
 
 
+#: The latent-grid divisor every declared render canvas must respect. The
+#: ``ltx_av`` comment records 1280x720 failing exactly this gate live.
+_DECLARED_CANVAS_GRID = 32
+
+
+def declared_render_canvas(engine_id):
+    """The ``(w, h)`` an engine DECLARES it renders at, or ``None``.
+
+    THE DEFECT THIS CLOSES (O1). ``build_request_from_shot`` overwrites the
+    canvas to the shared landscape default for every non-face family, with
+    deliberate per-engine branches after it for ``ltx_video`` and
+    ``ltx_audio_in`` and NONE for ``ltx_8gb``. So the 8 GB tier rendered at
+    1472x832 -- 8.3x the pixels, on the tier that exists because 8 GB cannot
+    afford them -- while its own profile asked for 512x288.
+
+    THE CANVAS IS READ FROM THE ADAPTER, NOT FROM THE LEDGER, and that is the
+    whole point. The O1 canvas judgment enumerated five channels that name a
+    render canvas and found this tier's -- ``render.canvas_w/h`` travelling to
+    ``video.canonical_canvas`` -- to be the one DEAD channel, then ruled: the
+    engine "declares its render canvas STATICALLY ... not an env var, not a
+    ledger read, not a fourth inline branch."
+
+    The first draft of this function DID read the ledger stamp, and the
+    pre-push panel killed it with a case the design had not considered: the
+    coverage-matrix harness routes ``ltx_8gb`` onto the CANONICAL workflow
+    through profile ``role_overrides`` and never copies a canvas, so a
+    ledger-read design inherits that workflow's 26:15 canvas and must either
+    pillarbox or refuse an episode that renders today. A declaration cannot be
+    displaced by where it is pointed. What the profile channel still owes is a
+    DRIFT GUARD, not authority -- a test pinning the profile's canvas equal to
+    the declaration, which is where that check now lives.
+
+    Validates the DECLARATION itself: positive and /32 on both axes. This is a
+    code-integrity check in the shape of ``FrameContract.__post_init__``, not an
+    operator-facing gate -- an adapter that declares a canvas its own latent
+    grid cannot accept is a bug in the adapter, and it must not reach a render.
+
+    Pure: no ledger, no environment, no I/O. Called from
+    ``build_request_from_shot`` so the request carries the declared canvas, and
+    once in ``render_beat_coverage`` before ``BeatSession`` opens so a broken
+    declaration cannot cost a 6.34 GiB load first.
+    """
+    name = str(engine_id or "")
+    if not name or not _vreg.is_registered(name):
+        return None
+    try:
+        declared = getattr(_vreg.get_engine(name), "render_canvas", None)
+    except Exception:  # noqa: BLE001 -- an unbuildable engine declares nothing
+        return None
+    if declared is None:
+        return None
+    # A STRING IS INDEXABLE, which is why the shape is checked before the
+    # values: ``"512x288"[0:2]`` is ``"5", "1"``, so a stringly-typed
+    # declaration would sail through int() as 5x1 and be refused for the wrong
+    # reason, naming the latent grid instead of the real mistake.
+    if (isinstance(declared, (str, bytes))
+            or not isinstance(declared, (tuple, list))
+            or len(declared) != 2):
+        raise RenderError(
+            "CANVAS: engine %r declares render_canvas=%r, which is not a "
+            "(width, height) pair. NO FALLBACK -- a malformed declaration must "
+            "not fall through to the shared landscape default, which is the "
+            "defect this seam exists to close." % (name, declared))
+    try:
+        width, height = (int(declared[0]), int(declared[1]))
+    except (TypeError, ValueError) as exc:
+        raise RenderError(
+            "CANVAS: engine %r declares render_canvas=%r, which is not a "
+            "(width, height) pair. NO FALLBACK -- a malformed declaration must "
+            "not fall through to the shared landscape default, which is the "
+            "defect this seam exists to close." % (name, declared)) from exc
+    problems = []
+    if width < 1 or height < 1:
+        problems.append("both dimensions must be positive")
+    if width % _DECLARED_CANVAS_GRID or height % _DECLARED_CANVAS_GRID:
+        problems.append("both dimensions must be divisible by %d (the latent "
+                        "grid)" % _DECLARED_CANVAS_GRID)
+    if problems:
+        raise RenderError(
+            "CANVAS: engine %r declares an unrenderable render_canvas %dx%d -- "
+            "%s. NO FALLBACK." % (name, width, height, "; ".join(problems)))
+    return (width, height)
+
+
 def build_request(shot, assets, frame_count, canvas=None):
     """A SCHEMA-VALID ``VideoRequest`` dict per shot (deterministic: the seed
     is keyed to the shot id so render-twice is identical -- V-7).
@@ -2315,6 +2399,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         except (ValueError, AttributeError):
             _avw, _avh = 512, 288
         req["canvas"]["w"], req["canvas"]["h"] = _avw, _avh
+    # A DECLARED RENDER CANVAS WINS (B5, 2026-07-27). LAST in the chain on
+    # purpose: every write above is guarded by a mutually exclusive engine id
+    # or family, so nothing can clobber this and this clobbers nothing -- and
+    # being last means a future branch inserted above cannot silently displace
+    # it, which is precisely the defect (O1) this fixes. It reads the ADAPTER's
+    # own declaration rather than the family/aspect logic above, so the two
+    # mechanisms cannot disagree if a family mapping ever moves.
+    #
+    # Today exactly one adapter declares one (`ltx_8gb`, 512x288); `ltx_video`
+    # and `ltx_audio_in` keep their existing env branches until the general
+    # resolver lands, which is the O1 judgment's own scoping.
+    _declared = declared_render_canvas(str(shot.get("engine_id") or ""))
+    if _declared is not None:
+        req["canvas"]["w"], req["canvas"]["h"] = _declared
     _shot_role = str(shot.get("role") or "")
     if not _shot_role:
         # Resilience: older planned ledgers carry the role only inside
@@ -2887,6 +2985,20 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
             "registered, so there is nothing to open a beat session on."
             % (shot.get("shot_id"), plan.segment_count, engine_id))
     engine = _vreg.get_engine(engine_id)
+    # THE CANVAS IS JUDGED BEFORE THE WEIGHTS LOAD (B5, 2026-07-27).
+    #
+    # ``BeatSession`` below PREPARES -- it loads a 6.34 GiB checkpoint -- and
+    # the per-segment ``request_builder`` call that would otherwise surface a
+    # malformed declaration runs INSIDE that session. Same pure function the
+    # request builder calls, so the two boundaries cannot disagree about what
+    # a legal canvas is.
+    #
+    # Honestly stated: since B5 reads a STATIC declaration rather than the
+    # ledger, this can only fire on an adapter whose own declaration is broken
+    # -- it is not a per-episode condition. It stays because the ordering is
+    # the contract the judgment asked for, and because a broken declaration
+    # should cost nothing to discover.
+    declared_render_canvas(engine_id)
     beat_id = str(shot.get("beat_id") or shot.get("shot_id") or "")
     chains = plan.join_mode == _cp.JOIN_CHAIN
 
