@@ -205,11 +205,12 @@ def test_remote_backends_assert_lane_admission():
 # --------------------------------------------------------------------------
 
 def test_gguf_artifact_table_known_and_unknown():
-    name, size = gguf.gguf_artifact_for_quant("Q8_0")
+    name, size, sha = gguf.gguf_artifact_for_quant("Q8_0")
     assert name == "gemma-4-12b-it-Q8_0.gguf"
     assert size == gguf.EXPECTED_Q8_0_SIZE_BYTES
+    assert sha is not None and len(sha) == 64
     for quant in ("Q6_K", "Q4_K_M"):
-        fname, fsize = gguf.gguf_artifact_for_quant(quant)
+        fname, fsize, fsha = gguf.gguf_artifact_for_quant(quant)
         assert quant in fname and fname.endswith(".gguf")
     with pytest.raises(gguf.GGUFNativeConfigError, match="artifact-table"):
         gguf.gguf_artifact_for_quant("Q5_K")
@@ -536,3 +537,103 @@ def test_admission_runs_before_every_cache_read_in_source():
     assert gate < src.index("in _GGUF_DISPATCH_BACKENDS")
     assert gate < src.index('LLM_CACHE.get("gguf_load_key")')
     assert gate < src.index('LLM_CACHE.get("policy_key")')
+
+
+# --------------------------------------------------------------------------
+# A6 (2026-07-27): a GGUF artifact with no pinned integrity used to pass
+# readiness. Both checks were conditional on their own pin existing, so an
+# unpinned quant skipped integrity entirely -- on Q4_K_M, the quant the 8 GB
+# profile selects. The registry now carries measured pins, one table feeds
+# both the registry and the env-fallback path, and unpinned is a REFUSAL.
+# --------------------------------------------------------------------------
+
+def test_every_shipped_quant_is_pinned_or_absent_from_the_box():
+    """Q8_0 and Q4_K_M are pinned by measurement. Q6_K is deliberately
+    unpinned -- it has never been on this box -- and the test says so, so
+    that pinning it later is a deliberate edit rather than a surprise."""
+    pinned = {"Q8_0", "Q4_K_M"}
+    for quant, (name, size, sha) in gguf.GGUF_ARTIFACTS.items():
+        assert name.endswith(".gguf")
+        if quant in pinned:
+            assert isinstance(size, int) and size > 0, quant
+            assert isinstance(sha, str) and len(sha) == 64, quant
+            assert sha == sha.lower(), quant
+        else:
+            assert (size, sha) == (None, None), quant
+
+
+def test_q4_pin_is_the_quant_the_8gb_profile_selects():
+    """The A6 defect in one assertion: the artifact whose integrity was
+    unverifiable is the one the 8 GB tier picks. Its size must also be
+    clearly distinct from the Q8_0's, so a pin transcribed onto the wrong
+    row cannot pass."""
+    _q4_name, q4_size, q4_sha = gguf.gguf_artifact_for_quant("Q4_K_M")
+    _q8_name, q8_size, q8_sha = gguf.gguf_artifact_for_quant("Q8_0")
+    assert q4_size is not None and q8_size is not None
+    assert q4_size < q8_size
+    assert q4_sha != q8_sha
+
+
+def test_registry_row_carries_the_table_shas_not_a_none_slot():
+    """The gemma row used to graft sha=None onto every quant while building
+    its artifacts, which discarded any sha the table carried. One table,
+    read verbatim."""
+    row = gguf.gguf_row_for_repo(gguf.ROW_ID)
+    for quant, entry in gguf.GGUF_ARTIFACTS.items():
+        assert row.artifact_for_quant(quant) == entry
+
+
+def test_env_fallback_path_gets_the_same_sha_contract(monkeypatch, tmp_path):
+    """The no-load_config path hard-coded expected_sha = None, so pinning a
+    sha in the registry would have been decorative for every caller that
+    reaches the gemma env fallback. Source-level pin: it now unpacks three
+    values from the one table."""
+    import inspect
+
+    src = inspect.getsource(gguf.GGUFNativeBackend.load)
+    assert "expected_sha = None" not in src
+    assert "expected_name, expected_size, expected_sha" in src
+
+
+def test_unpinned_artifact_is_refused_not_loaded_unchecked(
+    monkeypatch, tmp_path,
+):
+    """A present-but-unpinned artifact is the exact A6 hole: the file exists,
+    so the missing-file check passes, and both integrity checks skip
+    themselves. It must refuse by name instead."""
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path))
+    monkeypatch.delenv("GEMMA4_12B_GGUF_PATH", raising=False)
+
+    target = (tmp_path / "LLM" / "converted" / "gemma-4-12b-it"
+              / "gemma-4-12b-it-Q6_K.gguf")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"GGUF" + b"\x00" * 64)  # a plausible partial download
+
+    with pytest.raises(gguf.GGUFNativeConfigError) as excinfo:
+        gguf.GGUFNativeBackend().load(
+            gguf.ROW_ID, gguf.gguf_row_for_repo(gguf.ROW_ID),
+            policy=lp.LLMRuntimePolicy(gguf_quant="Q6_K"),
+        )
+    message = str(excinfo.value)
+    assert "Unpinned" in message
+    assert "Q6_K" in message
+    assert "size" in message and "sha256" in message
+
+
+def test_pinned_quant_still_catches_a_short_file(monkeypatch, tmp_path):
+    """The other half of the row: with the size pinned, a non-zero SHORT
+    file is rejected as incomplete rather than loaded."""
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path))
+    monkeypatch.delenv("GEMMA4_12B_GGUF_PATH", raising=False)
+
+    name, size, _sha = gguf.gguf_artifact_for_quant("Q4_K_M")
+    target = tmp_path / "LLM" / "converted" / "gemma-4-12b-it" / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"GGUF" + b"\x00" * 1024)
+    assert target.stat().st_size < size
+
+    with pytest.raises(gguf.GGUFNativeConfigError, match="Incomplete"):
+        gguf.GGUFNativeBackend().load(
+            gguf.ROW_ID, gguf.gguf_row_for_repo(gguf.ROW_ID),
+            policy=lp.LLMRuntimePolicy(gguf_quant="Q4_K_M"),
+        )

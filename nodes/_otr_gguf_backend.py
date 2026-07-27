@@ -48,15 +48,37 @@ DEFAULT_OUTPUT_TOKENS_CAP = 512
 DEFAULT_N_BATCH = 512
 DEFAULT_N_GPU_LAYERS = -1
 
-# S1 platform-portability (2026-07-10): quant -> (filename, expected size)
-# artifact table. Known quants FAIL LOUD on a byte-size mismatch (truncated
-# or wrong file); entries whose size is None are absence-checked only (the
-# box has never carried them -- pin the size when one is first derived).
-# GEMMA4_12B_GGUF_PATH remains the explicit whole-path escape hatch.
-GGUF_ARTIFACTS: dict[str, tuple[str, int | None]] = {
-    "Q8_0": ("gemma-4-12b-it-Q8_0.gguf", EXPECTED_Q8_0_SIZE_BYTES),
-    "Q6_K": ("gemma-4-12b-it-Q6_K.gguf", None),
-    "Q4_K_M": ("gemma-4-12b-it-Q4_K_M.gguf", None),
+# S1 platform-portability (2026-07-10): quant -> (filename, expected size,
+# expected sha256). THE integrity authority for the gemma row -- one table,
+# read by the registry row and by the env-fallback path alike.
+#
+# A quant is PINNED when it carries BOTH a size and a sha. An unpinned quant
+# is now REFUSED at load rather than accepted unchecked (A6, 2026-07-27):
+# both integrity checks were conditional on their pin being present, so an
+# unpinned quant skipped integrity entirely and a truncated download was
+# reported ready -- on the very quant the 8 GB profile selects.
+# GEMMA4_12B_GGUF_PATH remains the explicit whole-path escape hatch, and a
+# file it names is outside this table by construction.
+#
+# Q8_0 and Q4_K_M were pinned 2026-07-27 by MEASUREMENT on this box, not by
+# transcription from a model card. Q4_K_M was hashed in all three copies
+# present -- the loader's own converted/gemma-4-12b-it path plus two unsloth
+# mirrors -- and all three agree byte for byte; the Q8_0 measurement
+# reproduced its already-pinned size exactly, which is what corroborates the
+# provenance of the set. Q6_K has never been on this box; pin it the same
+# way the first time it is, and never from a guess.
+GGUF_ARTIFACTS: dict[str, tuple[str, int | None, str | None]] = {
+    "Q8_0": (
+        "gemma-4-12b-it-Q8_0.gguf",
+        EXPECTED_Q8_0_SIZE_BYTES,
+        "74d2d4f0b5b08ca8589d1a5f50e689c0984469f3cedbdc7d67458c6e9e35496a",
+    ),
+    "Q6_K": ("gemma-4-12b-it-Q6_K.gguf", None, None),
+    "Q4_K_M": (
+        "gemma-4-12b-it-Q4_K_M.gguf",
+        7121860000,
+        "43fec98c5102b1c446b4ddd0a9439f1db3a2e1f2e0b8cd143ce1ea619a9403d6",
+    ),
 }
 
 _DLL_DIR_HANDLES: list[Any] = []
@@ -221,16 +243,15 @@ class GGUFRow:
 
 
 # The two shipped rows. gemma-4-12b (baseline, PASS) + Qwen3-8B (deferred
-# UNKNOWN until the live bakeoff pins size/sha/kv). The gemma artifacts reuse
-# the legacy GGUF_ARTIFACTS table (single source of truth) + a sha=None slot.
+# UNKNOWN until the live bakeoff pins size/sha/kv). The gemma row takes
+# GGUF_ARTIFACTS verbatim -- one table, one authority. It used to graft a
+# sha=None slot onto every gemma quant here, which silently discarded any
+# sha the table might carry (A6).
 GGUF_ROWS: tuple[GGUFRow, ...] = (
     GGUFRow(
         repo_id=ROW_ID,  # unsloth/gemma-4-12b-it-GGUF
         subdir="gemma-4-12b-it",
-        artifacts={
-            quant: (filename, size, None)
-            for quant, (filename, size) in GGUF_ARTIFACTS.items()
-        },
+        artifacts=dict(GGUF_ARTIFACTS),
         context_window=DEFAULT_CONTEXT_WINDOW,  # 4096
         kv_gb_per_1k=KV_GB_PER_1K_CTX,          # 0.7
         vram_fit_tier="PASS",
@@ -734,7 +755,7 @@ def _models_root() -> Path:
 
 
 def default_gguf_path(quant: str = "Q8_0") -> Path:
-    filename, _size = gguf_artifact_for_quant(quant)
+    filename, _size, _sha = gguf_artifact_for_quant(quant)
     return (
         _models_root()
         / "LLM"
@@ -744,9 +765,11 @@ def default_gguf_path(quant: str = "Q8_0") -> Path:
     )
 
 
-def gguf_artifact_for_quant(quant: str) -> tuple[str, int | None]:
-    """(filename, expected_size) for a policy gguf_quant. Unknown quants
-    FAIL LOUD -- the policy enum and this table must agree."""
+def gguf_artifact_for_quant(quant: str) -> tuple[str, int | None, str | None]:
+    """(filename, expected_size, expected_sha256) for a policy gguf_quant.
+    Unknown quants FAIL LOUD -- the policy enum and this table must agree.
+    The sha rides along so the env-fallback path gets the SAME integrity
+    contract as the registry path; it used to hard-code None there (A6)."""
     try:
         return GGUF_ARTIFACTS[quant]
     except KeyError:
@@ -969,8 +992,9 @@ class GGUFNativeBackend:
                     f"(operator directive: no silent local-LM/path fallback)."
                 )
             quant = _policy.gguf_quant
-            expected_name, expected_size = gguf_artifact_for_quant(quant)
-            expected_sha = None
+            expected_name, expected_size, expected_sha = (
+                gguf_artifact_for_quant(quant)
+            )
             model_path = resolve_gguf_path(quant)
             eff_n_ctx = _int_env("GEMMA4_12B_N_CTX", _policy.gguf_n_ctx)
             eff_n_batch = _int_env("GEMMA4_12B_N_BATCH", DEFAULT_N_BATCH)
@@ -992,6 +1016,30 @@ class GGUFNativeBackend:
                 + (f" Expected size: {expected_size} bytes."
                    if expected_size else "")
             )
+        # A6 (2026-07-27): an artifact with NO pinned integrity is refused,
+        # not accepted unchecked. Both checks below are conditional on their
+        # pin existing, so an unpinned quant skipped integrity entirely and a
+        # partial file was reported ready. Scoped to the artifact this table
+        # names: a GEMMA4_12B_GGUF_PATH override deliberately points at a file
+        # the table does not describe, and that override is an explicit
+        # operator act with its own name on it.
+        if model_path.name == expected_name:
+            _unpinned = [
+                _field for _field, _value in (
+                    ("size", expected_size), ("sha256", expected_sha),
+                ) if _value is None
+            ]
+            if _unpinned:
+                raise GGUFNativeConfigError(
+                    f"Unpinned {_label} {quant} artifact: {expected_name} has "
+                    f"no {' and no '.join(_unpinned)} in GGUF_ARTIFACTS, so a "
+                    f"truncated or substituted file cannot be detected and "
+                    f"this load would be unverified. Derive both from a "
+                    f"known-good copy (its Length and Get-FileHash -Algorithm "
+                    f"SHA256) and pin them -- never from a guess or a model "
+                    f"card."
+                )
+
         if (
             model_path.name == expected_name
             and expected_size is not None
