@@ -3,6 +3,69 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 05:10 -- HEAD dcdcccde (v2.0-alpha) -- WINDOW RENDER
+Did: ran the prequalification sweep -- four full canonical legs at 512x288, the
+  first time the 8 GB tier has ever rendered at its own declared canvas. Froze
+  the winner as recipe v2 (1fe7dc8c) and made both consent-act knobs fail
+  CLOSED (dcdcccde). Winner: t5_device=cpu, tiled_vae=ON -- chosen on SPREAD,
+  not minimum: tiled holds the peak flat at 8241-8278 MB across 17..161 frames
+  where untiled climbs 8662 -> 10859 MB. T5 on GPU peaks at 16.0-16.1 GB of a
+  16.3 GB card. Every cell RESULT SUCCESS + obs_publish OK + asset on disk.
+Current step: LANE 1, the WAN recipe freeze (no GPU), mirroring B6. 7d stays
+  PARKED until the operator is at the desk.
+Next: WAN recipe freeze; then the clamped confirmation of v2 and the per-cell
+  receipt chunk. CODER window (or Codex under the travel relay).
+Models: Claude + 1 kibitz panel (codex gpt-5.6-sol high + agy Gemini 3.6 Flash
+  High), invoked under the two-strikes law. $0 external beyond codex credits.
+Commits: 1fe7dc8c, dcdcccde. Suite 7213 -> 7226; Bible 17; canonical 9872624A
+  byte-identical. Record: kibitz-runs/2026-07-26-8gb-writer-ctx-blocker/r2/.
+
+### Detail
+
+**THE ASSIGNED STEP WAS BLOCKED BEFORE IT COULD START, AND THE PANEL RELOCATED
+THE PROBLEM.** Two legs died in `OTR_LedgerScriptWriter` -- first on the
+default `scifi_news` bank (`requested_output=2800` vs `provider_output_cap=512`,
+a known open row), then on `media_archive` (`prompt requires 2064 input tokens,
+context_cap=2048`). Switching banks was my one fix and it failed, so per the
+two-strikes directive I stopped and ran `/kibitz` before writing any code.
+Both seats independently reached the same diagnosis as my anchor: the 8 GB
+profile family pairs a 12B GGUF writer with a 2048 context that cannot fit the
+pipeline's own prompts, and raising ctx is the wrong fix because 4096 puts the
+writer near 9.5 GB on the card the tier exists for.
+
+**THE OPERATOR SUPPLIED THE ACTUAL ANSWER MID-SESSION:** there is no tier --
+whoever runs the workflow picks the LLM, and the 8gb/16gb variants will be the
+same canonical JSON saved with different dropdowns, no auto profile selection.
+Grounding that showed the canonical JSON ALREADY carries `gguf_n_ctx=4096` /
+Q8_0 / ceiling 14.5, and that passing `-Profile otr_8gb_ltx` silently replaces
+those widgets from the profile's `llm` block while the runner's echo prints
+only 16 role/slot/feature overrides. Running with `-Profile none` plus the
+shipped `OTR_FORCE_ENGINE_MAP` route authority unblocked the sweep immediately.
+
+**WHAT THE SWEEP PROVED BEYOND THE RECIPE.** B5 end to end: the canonical JSON's
+VideoDirector says 832x480 and the engine still rendered 512x288, because the
+canvas is a static declaration. B6's marking requirement: the ledger carries
+`+prequalification`, so a sweep artifact is not mistakable for a published one.
+And chunk 1a's fail-closed force map refused a JSON-shaped map BY NAME before
+anything rendered -- my formatting error, caught exactly where it should be.
+
+**SIX TESTS WENT DECORATIVE THE MOMENT THE DEFAULT FLIPPED.** Every override
+that said `tiled_vae=1` now AGREED with the frozen value, so it could no longer
+tell whether the recipe or the environment had won. Each now sets the OPPOSING
+value and asserts what it opposes. This is the same class the B6 panel caught,
+and it will recur on the WAN freeze -- it is written into the CURRENT STEP.
+
+**HONEST LIMIT, RECORDED IN CODE AND IN GO_FORWARD:** `VramPeakProbe` samples
+machine-wide NVML and the sweep ran unclamped (the profile-free writer is ~13 GB
+at Q8_0 and cannot coexist with an 8 GiB reservation), so the absolutes are not
+a proof of 8 GB fit. They support the RANKING, which is what selects a recipe.
+A clamped confirmation of the winner alone is owed.
+
+**NOT DONE, DELIBERATELY:** 7d (operator-parked), the profile ceiling pin (a
+production planning decision I flagged rather than took), and the per-cell
+receipt enrichment (touches `session_identity` and several call sites, so it is
+its own chunk rather than a rider on a green one).
+
 ## 2026-07-27 09:40 -- HEAD 906031be (v2.0-alpha) -- WINDOW CODER A, SESSION 5c
 Did: pushed B6 (906031be) -- the ltx_8gb render recipe is FROZEN IN CODE as
   LTX8_RECIPE_V1; its env vars bind only under an explicit

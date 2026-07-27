@@ -1,6 +1,53 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-27 (remote Cowork, CODER A session 5b) -- **B3, B4, B5 AND
+**Updated:** 2026-07-27 (remote Cowork, RENDER window) -- **PREQUALIFICATION IS
+DONE. THE `ltx_8gb` RECIPE IS MEASURED AND FROZEN AS v2.** HEAD == origin
+`dcdcccde`; suite **7226 passed / 27 skipped / 1 xfailed**; Bible 17; canonical
+`9872624A` byte-identical (no node, widget, link or schema touched).
+
+**THE 8 GB TIER RENDERED AT ITS OWN CANVAS FOR THE FIRST TIME.** Four full
+canonical legs at 512x288, each `RESULT SUCCESS` + `obs_publish OK` with the
+asset verified on disk. That also proves B5 end to end: the canonical JSON's
+VideoDirector says 832x480 and the engine still rendered 512x288, because the
+canvas is a static declaration. A declaration is not displaced by where it is
+pointed.
+
+| cell | t5_device | tiled_vae | shots | min MB | max MB | SPREAD | wall |
+|---|---|---|---:|---:|---:|---:|---:|
+| A | cpu | off | 11 | 8662 | 10859 | 2197 | 842s |
+| B | default | off | 12 | 11163 | 16127 | 4964 | 744s |
+| **C** | **cpu** | **ON** | 10 | **8241** | **8278** | **37** | 824s |
+| D | default | ON | 11 | 11062 | 16086 | 5024 | 765s |
+
+**THE DECISIVE COLUMN IS THE SPREAD, NOT THE MINIMUM.** With tiled decode ON
+the peak is flat across every clip length the sweep produced (17 to 161
+frames); OFF it climbs with length. An 8 GB tier needs a ceiling a long beat
+cannot grow through. It costs no wall clock. `t5_device` stays `cpu` and now
+has a number behind it: on GPU the peak sits at 16.0-16.1 GB of a 16.3 GB card.
+Landed `1fe7dc8c` (v2 + `LTX8_RECIPE`, v1 kept unmutated so `_v1` receipts stay
+interpretable) and `dcdcccde` (consent-act knobs fail CLOSED).
+
+**HONEST LIMIT, DO NOT LET A LATER WINDOW FORGET IT:** `VramPeakProbe` samples
+MACHINE-WIDE NVML and the sweep ran UNCLAMPED, so those absolutes are not a
+proof of 8 GB fit -- they support the RANKING, which is what selects a recipe.
+**A clamped confirmation of the winner is still owed** (see OPEN BUGS).
+
+**OPERATOR DIRECTION 2026-07-27, TWO CHANGES:**
+1. **Order is now WAN 8-GB -> Randomizer A -> `dynamic_story` -> SFX ->
+   LEAN-MEAN FRONT -> TAIL.** Lean-mean moves LAST on its own logic: it is a
+   deletion campaign whose value IS its file-and-line kill inventory, so it
+   should re-ground once against the final tree rather than rip first and
+   re-ground after two blocks land on freshly-rewired code. SFX carries its
+   Timeline Cue Ledger C0/C1 gate + the R4.1 refit as a precondition.
+2. **PROFILES ARE BEING RETIRED.** Operator: there is no tier -- whoever runs
+   the workflow picks the creative/technical LLM, and the 8gb/16gb variants
+   will be the SAME canonical JSON saved with different dropdowns, with no
+   auto profile selection. Treat `config/profiles/*.json` as legacy; do not
+   build new behaviour on the profile channel.
+
+---
+
+**Superseded header (2026-07-27, CODER A session 5b) -- B3, B4, B5 AND
 B6 ARE IN. THE TIER CEILING PLANS, THE PING-PONG IS GONE, THE 8 GB TIER RENDERS
 AT THE CANVAS IT DECLARES, AND ITS RECIPE IS FROZEN IN CODE. Suite 7213 passed
 / 27 skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
@@ -281,10 +328,37 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **prequalify 512x288 (GPU), then 7d**
+## CURRENT STEP -- **LANE 1: the WAN recipe freeze (no GPU)**
 
-**B6 IS IN.** The `ltx_8gb` recipe is FROZEN IN CODE. Next is the first GPU
-step of this block -- and it is a RENDER-window job, not a coder-window one.
+**PREQUALIFICATION IS DONE** (see the header). **7d IS PARKED** until the
+operator is back at the desk -- his call, recorded in
+`docs/TRAVEL_RELAY_PROTOCOL.md`: it is the next real milestone and it wants his
+eyes on it. Do not start it from a remote window.
+
+**LANE 1, the default remote lane: freeze the WAN recipes, mirroring B6.**
+Suite-provable end to end, no GPU, no operator judgment. `eng_wan_ti2v` reads
+loader class, tiled-VAE class, all three weight NAMES, sampler, scheduler,
+steps, cfg, shift, negative and four VAE-tile vars straight from the
+environment; `eng_wan_i2v` reads six INLINE in `_build_graph` with bare
+`int()`/`float()` -- no range check, no named refusal. Neither emits a `recipe`
+receipt at all, so a WAN clip stamps `recipe: None` and there is not even a
+wrong receipt to catch the drift with.
+
+**B6 + v2 ARE THE SHIPPED REFERENCE.** Read `docs/2026-07-27-b6-qa-findings.md`
+and `nodes/_otr_video_engines/eng_ltx_8gb.py`, and copy four things that were
+each earned by a panel finding: (1) the recipe is a versioned dict plus a
+single `LTX8_RECIPE`-style active binding -- NEVER edit a versioned dict in
+place, or existing receipts stop being interpretable; (2) the version lives IN
+the receipt string so it reaches the durable ledger and moves `session_identity`
+for free; (3) outside the consent act a demoted knob is NAMED, NEVER PARSED, so
+a stale malformed value cannot kill a leg it has no effect on; (4) inside the
+consent act every knob fails CLOSED by name -- `_config_number` and the
+`_TRUTHY`/`_FALSY`/`_T5_DEVICES` refusals, one rule with one implementation.
+
+**AND THE TEST TRAP THAT COST THE MOST TIME, which WAN will hit too:** when you
+flip a frozen default, every test whose override happened to AGREE with the new
+value goes decorative in silence. Six did on the v2 flip. Each override must
+OPPOSE the frozen value, and the test should assert what it opposes.
 
 **HOW THE B6 FORK WAS RESOLVED: option (a), freeze what ships today.** The
 judgment orders "mechanics first, MEASURE second, freeze third" and no
@@ -1107,6 +1181,64 @@ receipt under `tmp/`.
 MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
 That split is why the two eyeball-era entries below are PARKED rather than
 listed as live.
+
+- **THE 8 GB PROFILE FAMILY CANNOT RUN ITS OWN WRITER** (found 2026-07-27,
+  RENDER window; LIVE-REPRODUCED TWICE on two different banks, then confirmed
+  by a two-strikes kibitz panel -- codex `gpt-5.6-sol` high and agy
+  independently reached the same diagnosis). `config/profiles/otr_8gb_ltx.json`
+  pairs a 12B GGUF writer (`gemma-4-12b-it-Q4_K_M`, 6.63 GB of weights) with
+  `llm.gguf_n_ctx: 2048` under a declared `vram_ceiling_gb: 6.8`. The
+  pipeline's own smallest prompt needs **2064 input tokens** and P0 reserves
+  2800 output (`_P0_BASE_OUTPUT_TOKENS`), so the leg dies in
+  `OTR_LedgerScriptWriter` before any render. Live preflight, verbatim:
+  `Needed=8.13 GB (weights=6.63, kv=1.40 @ n_ctx=2048)`.
+  **ctx is the SYMPTOM; the writer MODEL is the cause** -- 4096 puts it near
+  9.4-9.5 GB, OOM on the very card the tier exists for. Every 2048-ctx profile
+  (`otr_8gb_ltx`, `otr_8gb_wan`, `8gb_lite`, `cpu_floor`, `otr_amd8_rocm`,
+  `otr_cloud_lanes`) is `status=draft` and every one pairs 2048 with the 12B;
+  the only `status=shipping` profile is `16gb_full` (4096 + Mistral-Nemo).
+  **NOT a one-line profile edit:** the GGUF registry ships exactly two rows
+  (`unsloth/gemma-4-12b-it-GGUF`, `unsloth/Qwen3-8B-GGUF`);
+  `google/gemma-2-2b-it` is in the TRANSFORMERS catalog, a different lane.
+  agy proposed it and was wrong on that point -- recorded so nobody re-derives
+  it. **Largely mooted by the operator's profile retirement** (see the header):
+  with no profile passed, the canonical JSON's own `gguf_n_ctx=4096` / Q8_0
+  binds and the leg runs -- which is exactly how all four sweep cells ran. Fix
+  the profiles or finish retiring them; do not leave both.
+- **The profile's `llm` section silently overrides the canonical JSON, and the
+  applied-overrides echo HIDES it** (found 2026-07-27, RENDER window;
+  grounded). `_otr_workflow_validator.py:377` exports
+  `os.environ["OTR_ACTIVE_PROFILE"]`, and the profile's `llm.*` values then win
+  over the widgets the operator set in `otr_canonical.json` -- which ships
+  `creative`/`technical` = `google/gemma-4-12b-it`, `gguf_n_ctx=4096`,
+  `gguf_quant=Q8_0`, `llm_vram_ceiling_gb=14.5`. `scripts/otr_api.py:817`
+  flattens only `role_overrides` / `slot_overrides` / `features` + two
+  `seed_policy` keys for the printed summary, so the run reports "16 overrides"
+  while ALSO having replaced the entire LLM configuration. The operator's
+  mental model (the workflow is the authority) is the correct one and the JSON
+  is already set up for it; the profile channel contradicts it invisibly.
+- **The 6.8 GB profile ceiling is DECORATIVE on the GGUF path** (found
+  2026-07-27, kibitz codex `gpt-5.6-sol` high; grounded). `_otr_model_loader.py`
+  dispatches and caches GGUF before the generic `check_vram_fit` block, and
+  `_otr_gguf_backend.py` checks PHYSICAL free VRAM instead of
+  `policy.vram_ceiling_gb`. On a 16 GiB box an 8.13 GB writer therefore passes
+  an "8 GB tier" boot -- which is why this surfaced as a context overflow
+  rather than a ceiling refusal. Enforce the policy ceiling inside GGUF
+  preflight, and test the case where physical free VRAM exceeds it.
+- **A CLAMPED confirmation of recipe v2 is owed** (RENDER window, 2026-07-27).
+  The sweep ran unclamped because the profile-free writer is gemma-4-12b at
+  Q8_0 (~13 GB), which cannot coexist with an 8 GiB reservation.
+  `VramPeakProbe` is machine-wide, so the absolutes are not an 8 GB fit proof.
+  Re-run the WINNER alone with `OTR_HEADLESS_RESERVE_VRAM_GB=8` once the writer
+  question above is settled. The RANKING does not need re-proving.
+- **All prequalification cells share ONE receipt** (found 2026-07-27, kibitz
+  codex; verified). `recipe_receipt()` returns a single generic
+  `+prequalification` suffix, so a winning artifact cannot prove which knob
+  values produced it -- the ledger says a sweep ran, not which cell. Deliberately
+  NOT bundled into `dcdcccde`: it touches `session_identity` and several call
+  sites, so it is its own chunk. Shape: name the DEPARTURES from the frozen
+  recipe in the suffix, e.g. `..._v2+prequalification[tiled_vae=off]`. No
+  workflow schema work -- the receipt is a string on the manifest row.
 
 - **The `ltx_8gb` render-length ceiling has TWO owners that only agree by
   coincidence** (found 2026-07-27, B6 panel, two lenses independently; grounded
