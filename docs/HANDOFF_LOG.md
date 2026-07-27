@@ -3,6 +3,98 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 02:05 -- HEAD 5929e19a (v2.0-alpha) -- WINDOW CODER A, SESSION 5
+Did: pushed B3 (b23fc035, the tier ceiling now narrows the coverage contract for
+  ltx_8gb ONLY, with the WAN topology regression in the same commit) and B4
+  (5929e19a, the ltx_8gb ping-pong deleted, _ltx8_frame_length deleted with it,
+  the ladder moved onto the engine's own frame_contract). Ran a fan-out BEFORE
+  and BEFORE-THE-PUSH on each chunk -- every lens in ONE block, concurrently.
+Current step: B5 + B6 -- the canvas seam fail-closed BEFORE BeatSession opens,
+  then freeze the measured recipe in CODE.
+Next: B5+B6, prequalify 512x288, then 7d (the canonical 237-frame beat, where a
+  GPU first renders through this machine). CODER A.
+Models: Claude + 10 Sonnet lenses + 4 agy (kibitz, Gemini 3.6 Flash High). $0
+  external. No codex spend -- the architecture was already panel-decided in the
+  8gb judgment and no fix needed a second attempt (two-strikes never invoked).
+Commits: b23fc035, 5929e19a. Records: docs/2026-07-27-b3-qa-findings.md,
+  docs/2026-07-27-b4-qa-findings.md. Suite 7097 -> 7134; Bible 17; canonical
+  9872624A byte-identical throughout.
+
+### Detail
+
+**THE PRE-CODE PANEL REFUSED THE JUDGMENT'S OWN B4 RECIPE AND IT WAS RIGHT.**
+The plan said: refuse when the ask exceeds the cap, delete the CLIP-FILL block,
+let an off-grid ask render short. Two seats independently showed that ships a
+REGRESSION. The old pad fired whenever the decode came up short FOR ANY REASON
+-- not just a cap disagreement -- and it LOGGED when it did. Delete it with only
+a cap refusal and a short clip flows into `otr_silent_composite`, which
+hard-loops it with `-stream_loop -1` AND suppresses its own underrun warning
+once loop-fill activates. A logged mirror traded for a silent jump-cut repeat,
+on the majority path. So what shipped is different: `_ltx8_frame_length` is
+DELETED (its snap-DOWN was the whole reason the pad had to exist), the ladder
+moved to `frame_contract.smallest_legal_at_least` -- the same object the planner
+partitions against -- and an off-grid ask now renders the next legal rung UP and
+trims the surplus in REAL frames. 100 renders 105 and keeps 100.
+
+**TWO OF AGY'S THREE B3 MUST-FIXES DID NOT SURVIVE GROUNDING.** Rejected: routing
+engine_id through `resolve_engine_id` inside the derivation (the registry gate
+already returns before it for any unregistered spelling, and a second
+normalization authority would make an id the registry REJECTS behave as
+ltx_8gb); and defaulting the new required parameter to 0 (that is the silent
+fallback shape this build removes -- and the claimed broken test callers do not
+exist, the only occurrence in tests/ is inside a docstring). Also rejected:
+comparing the receipt on every field EXCEPT engine_id. A plan built under one
+engine's ceiling and executed by another must refuse; that is what
+`test_the_legacy_path_validates_the_plan_against_the_FINAL_engine` already
+establishes one contract down.
+
+**THE POST-CODE PANELS FOUND SIX DEFECTS IN GREEN, MUTATION-PROVEN CODE.** B3:
+the unresolved-engine branch compared the ceiling but never the ENGINE (two
+seats, two live repros -- a stale ltx_8gb receipt on a swapped shot sailed
+through to an arithmetic-only check); a malformed receipt read as no receipt;
+the discrete-menu guard refused ceilings that never bound it, breaking the
+function's own documented guarantee; and `profile_max_render_frames` was a
+FOURTH hand-copied normalization that `eng_wan_ti2v` reads at render time -- in
+a test whose name promised "exactly one normalization" and never touched the
+site its own docstring cited. B4: the module docstring still advertised the
+ping-pong, and `_LTX8_MIN_FRAMES` could drift from the contract floor it
+duplicates. All fixed before the push.
+
+**AND ONE I CAUGHT MID-WRITE, which is the one worth remembering.** The first
+draft of the B3 stamp site rebound one variable and fed the ALREADY-NARROWED
+contract into `coverage_contract_receipt`. A narrowed contract narrows to
+itself, compares equal, returns None -- so the receipt would have silently never
+existed and the render boundary would have had nothing to check. Every test in
+the file would still have passed. It is now pinned by name.
+
+**MUTATION FOUND A HOLE THE TESTS COULD NOT SEE:** validating the plan against
+the NARROWED contract was unobservable, because the receipt equality fires first
+in every scenario the tests covered. The test that makes it load-bearing is a
+receipt-VALID ledger whose PLAN was tampered with -- the hand-edited or replayed
+case the second boundary exists for.
+
+**Totals: 26 mutants across both chunks** (22 defect all red, 4 controls all
+green, baselines and restores green). The controls move values the recipe is
+entitled to move -- the env cap default, WAN's default clip length, the recipe
+receipt string -- and prove the assertions read the DECLARED contract rather
+than secretly pinning an env knob.
+
+**Declined on purpose:** agy's test that `extract_terminal_frame` reads frame
+`target-1` from a TRIMMED clip. Both seats proved the trim cannot fire on a
+chained segment (every planned length is already legal, so the strict inequality
+is false, and the single-clip path never chains), so that test would assert a
+state production cannot construct.
+
+**PROCESS NOTE:** B3 is production-inert until a profile pins an ltx_8gb
+ceiling, and B3 shipped with "do not pin one before B4 lands" because the
+ping-pong laundered the disagreement. B4 has landed, so that constraint is
+lifted -- pinning the ceiling is now part of the prequalification step.
+
+**Harness gotcha worth not relosing:** a mutation harness that reads with
+universal newlines and writes with `newline=""` silently rewrites a CRLF file as
+LF, and the restore leaves a phantom modified file that `git diff` shows as
+empty. Read AND write with `newline=""`.
+
 ## 2026-07-26 22:40 -- HEAD d708408d (v2.0-alpha) -- WINDOW CODER A, SESSION 4
 Did: pushed B1b-0 (b214481b, the regression net ltx_8gb never had) and B1b
   (d708408d, the loader hoist). The post-code panel on the NET killed the

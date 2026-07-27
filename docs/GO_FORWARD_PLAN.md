@@ -1,8 +1,42 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-26 (remote Cowork, CODER A session 4) -- **B1b-0 AND B1b ARE
-IN. THE LOADERS ARE HOISTED. HEAD == origin `d708408d`; suite 7097 passed / 27
-skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
+**Updated:** 2026-07-27 (remote Cowork, CODER A session 5) -- **B3 AND B4 ARE IN.
+THE TIER CEILING PLANS, AND THE PING-PONG IS GONE FROM THE LTX LANE. HEAD ==
+origin `5929e19a`; suite 7134 passed / 27 skipped / 1 xfailed; Bible 17;
+canonical `9872624A` byte-identical.**
+
+**B3** made `max_render_frames` narrow the contract the coverage planner
+partitions against -- for `ltx_8gb` and nothing else. It is NOT a general
+planning cap: WAN reads 17, renders short, then ping-pongs to the beat length,
+so narrowing WAN before `partition_beat()` would turn every WAN beat into a pile
+of 17-frame renders and undo `PBUG-20260723-02`. The derivation is an allowlist
+of one, a `coverage_contract` receipt rides the shot beside the plan, and the
+render boundary re-derives it and refuses on any difference. **B4** deleted the
+`ltx_8gb` ping-pong, deleted `_ltx8_frame_length` with it, moved the ladder onto
+the engine's own `frame_contract`, and replaced the pad with two invariants.
+
+**THE PRE-CODE PANEL REFUSED THE JUDGMENT'S OWN B4 RECIPE, AND IT WAS RIGHT.**
+Deleting the pad with only a cap refusal in its place would have sent short
+clips to `otr_silent_composite`, which hard-loops them AND suppresses its own
+underrun warning once loop-fill activates -- a logged mirror traded for a
+SILENT jump-cut repeat, on the majority path. What shipped instead: an off-grid
+ask renders the next legal rung UP and trims the surplus in REAL frames (100
+renders 105, keeps 100), plus a pre-render refusal when no legal rung reaches
+the ask and a post-render `len(frames) != length` refusal. Records:
+`docs/2026-07-27-b3-qa-findings.md`, `docs/2026-07-27-b4-qa-findings.md`.
+
+**THE CONSTRAINT FROM B3 IS NOW LIFTED.** B3 shipped with "do not pin an LTX
+ceiling before B4 lands" because the ping-pong laundered the plan-vs-adapter
+frame-count disagreement. B4 landed. A profile may now pin
+`video.max_render_frames` on an `ltx_8gb` tier and the disagreement is terminal
+at both ends.
+
+**NEXT = B5 + B6.** See CURRENT STEP.
+
+---
+
+**Superseded header (2026-07-26, session 4) -- B1b-0 AND B1b; THE LOADERS ARE
+HOISTED.** HEAD `d708408d`; suite 7097; canonical `9872624A`.
 
 **THE HOIST IS DONE AND THE 4 GiB FLOOR MOVED WITH IT.** `Ltx8gbEngine.prepare()`
 now runs a loader-only mini-graph and hands the checkpoint to every segment
@@ -222,31 +256,64 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **B3 + B4: the LTX-only effective contract, then delete ping-pong**
+## CURRENT STEP -- **B5 + B6: the canvas seam fail-closed, then freeze the recipe**
 
-**HEAD == origin `d708408d`.** Suite 7097 / Bible 17 / canonical `9872624A`.
+**HEAD == origin `5929e19a`.** Suite 7134 / Bible 17 / canonical `9872624A`.
 Authorities, read ALL THREE first: `docs/2026-07-26-8gb-1080p-arc-judgment.md`
 (the architecture), `docs/2026-07-26-o1-canvas-arc-judgment.md` (the canvas seam)
 and `docs/2026-07-26-dir-override-arc-judgment.md`.
 
 **DONE:** B1a `8caf3516`, B2a `55c8a811`, B2b `582dfbd8`, the post-code QA fixes
 `ea1652f9` / `f33c5e15` / `fdeee600`, QA-4 `823b9929`, the `*_DIR` tripwire
-`095be05b`, **B1b-0 `b214481b`** (the regression net `ltx_8gb` never had) and
-**B1b `d708408d`** (the hoist itself + the 4 GiB floor as a shared helper).
+`095be05b`, B1b-0 `b214481b`, B1b `d708408d` (the hoist + the 4 GiB floor),
+**B3 `b23fc035`** (the LTX-only effective contract + the WAN topology
+regression) and **B4 `5929e19a`** (the ping-pong deleted, the ladder moved onto
+the contract, two invariants in its place).
 
-**B3 + B4 (NEXT) -- the LTX-only effective contract, then delete ping-pong.**
+**B5 (NEXT) -- the canvas seam, fail-closed.** Derive and validate `(w, h)` from
+`ledger.video.canonical_canvas` after route locking, thread it through every
+segment request, and SUPPRESS the `OTR_VIDEO_LANDSCAPE_CANVAS` overwrite when a
+stamp is present. Reject unless positive, /32, exactly 16:9, and 25 fps.
+**Validate BEFORE `BeatSession` opens** -- today `render_driver.py:2902-2905`
+opens the session (which prepares, i.e. LOADS) and per-segment `assert_usable`
+only runs later at `:2760-2765`, so after B1b that means loading a 6.34 GiB
+checkpoint before rejecting a bad canvas. **`wan_shared._dims` is NOT to be
+touched** -- editing a shared default to satisfy an LTX gate is the cross-lane
+damage this block exists to avoid, and the fallback is unreachable there anyway
+because a missing stamp is already terminal.
+
+**B6 -- freeze the measured recipe in CODE.** The profile schema accepts only
+`device_policy` / `dtype_policy` / `max_render_frames`, so T5 device, tiled VAE
+and sampling have NO end-to-end channel, and per `PBUG-20260723-02` the env vars
+cannot bind on a production leg either. Freeze the measured selection into a
+versioned `ltx_8gb` recipe in code and demote the env vars to
+prequalification-only, logging a WARNING whenever an override is honoured there.
+The generic `_get_engine_setting` accessor is CUT (it would preserve hidden
+production env channels).
+
+**THEN, in order:** prequalify 512x288 (fresh boot per cell, canonical path
+only, `fraction = 8192.0 / detected_total_mib` set BEFORE CUDA init, probe
+started BEFORE `BeatSession`; label it PREQUALIFICATION), then **7d** -- the
+canonical 237-frame opening beat, `[65,65,65,49]`, trim 4, `RESULT SUCCESS` +
+`obs_publish OK` + the asset on disk.
+
+**A PROFILE MAY NOW PIN AN LTX CEILING.** B3 landed with that blocked because
+the ping-pong laundered the plan-vs-adapter disagreement; B4 removed it. Pinning
+`video.max_render_frames` on `config/profiles/otr_8gb_ltx.json` is what makes B3
+reachable on a live leg at all -- it is currently production-inert. Do it as
+part of the prequalification step, not before, and remember
+`docs/ENGINE_MATRIX.md` reports the DECLARED contract only (see OPEN BUGS).
+
+---
+
+## SUPERSEDED -- B3 + B4 (DONE @ `b23fc035` and `5929e19a`)
+
 `max_render_frames` is NOT a planning cap: WAN reads 17, renders short, then
 PING-PONGS to the beat length, so applying it before `partition_beat()` would
-turn every WAN beat into a pile of 17-frame renders. Scope the effective
-contract strictly to `engine_id == "ltx_8gb"`; a WAN regression proving
-`max_render_frames=17` does not move its coverage-plan topology ships in the
-SAME commit. B4 only AFTER B3: `render_driver.py:2982` already hard-asserts
-`got == segment.render_frames`, and ping-pong is what currently hides a
-non-`8n+1` segment. Ripping ping-pong is LANE-SPECIFIC -- load-bearing for WAN.
-`tests/test_ltx_8gb_graph_and_loads.py::test_the_frame_length_ladder_...` now
-pins the `8n+1` snap that B4 makes terminal (it had ZERO coverage before B1b-0).
-
-**THEN, in order:** B5+B6, prequalify 512x288, 7d.
+turn every WAN beat into a pile of 17-frame renders. The effective contract was
+scoped strictly to `engine_id == "ltx_8gb"` and the WAN regression shipped in the
+same commit. Ripping ping-pong is LANE-SPECIFIC -- load-bearing for WAN, a
+correctness hole for LTX.
 
 ---
 
@@ -974,10 +1041,38 @@ listed as live.
   node 90, so hoisting to ShotLock still does not put MetaBrief downstream of
   the authority -- that needs a VideoDirector-time freeze and is NOT in scope.
 - **THREE silent coverage mechanisms exist, not one** (found 2026-07-25, r1,
-  codex): engine mirror/ping-pong (`wrapper_bridge.py:435`, used by
-  `eng_wan_ti2v.py:521` and `eng_ltx_8gb.py:426`), composite loop-fill
-  (`otr_silent_composite.py:244`), and held-last-frame. All three must be out
-  of the moving-video lanes or the boomerang just relocates.
+  codex). **UPDATED 2026-07-27 (B4):** mechanism 1, the engine
+  mirror/ping-pong (`wrapper_bridge.extend_frames_to_target`), is GONE from
+  `eng_ltx_8gb` -- pinned behaviourally by a test that detonates the helper and
+  renders successfully. It REMAINS in `eng_wan_ti2v`, deliberately and
+  permanently: WAN renders a short native clip on purpose and fills the beat
+  with it, which is the shipped 8GB tier contract `PBUG-20260723-02` protects.
+  Still open: composite loop-fill (`otr_silent_composite._should_loop_fill`,
+  which also SUPPRESSES its own underrun warning once it activates) and
+  held-last-frame. For `ltx_8gb` the composite path is now de facto
+  unreachable -- the adapter returns exactly the requested count or raises --
+  but not structurally impossible: `encode_frames_to_silent_mp4` reports the
+  size of the array it piped into ffmpeg rather than re-probing what ffmpeg
+  wrote, so an encode-side drop could still under-report. PRE-EXISTING; close
+  it when the assembly boundary is next opened.
+
+- **`schemas.py`'s `ShotRow` is a closed model that no boundary enforces**
+  (found 2026-07-27, B3 post-code panel; NEW). It declares
+  `extra="forbid"` and is missing `beat_id`, `role`, `char_id`, `start_s`,
+  `dur_s`, `coverage_plan` (since chunk 3b) and `coverage_contract` (B3).
+  Nothing validates a real ledger through it, so this is NOT a live break --
+  but other docs in this tree cite it as a live safety net, and a future
+  `VideoLedgerSection.model_validate(ledger["video"])` at any boundary would
+  hard-fail every real shot. Either wire it and complete it, or demote it in
+  writing. Do not widen it silently inside an unrelated chunk.
+
+- **`docs/ENGINE_MATRIX.md` reports the DECLARED contract only** (found
+  2026-07-27, B3 post-code panel; NEW). Correct today and consistent with its
+  own stated design (every number read from the live registry). But the moment
+  a profile pins an `ltx_8gb` ceiling, the matrix keeps printing `9-161 step 8`
+  for a tier whose real window is narrower, and the `--check` drift gate cannot
+  notice because it diffs the registry, which the effective contract never
+  touches. Owed at the prequalification step, not before.
 - **`ltx_av` underruns long beats** (found 2026-07-25, r2, codex; confirmed).
   It caps at `_LTX_AV_MAX_FRAMES` (`eng_ltx_av.py:58`, default 497,
   env-overridable) and clamps at `:950-953`. It is NOT "renders to target
@@ -1257,7 +1352,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED (see CURRENT STEP). r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1-6 COMPLETE + seven QA rounds, all LANDED GREEN and PUSHED (HEAD `a05b5ac6`).** NEXT = **chunk 7**: opt `ltx_8gb` in (static FrameContract + `session_identity`), kill the CLIP-FILL ping-pong for a planned segment, give the segment graph the prepared handles as literals, then the 169-frame LIVE slice. The whole machine is built and NOTHING has rendered through it -- chunk 7 is where it first does. Seams tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
+| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED. r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1-7a COMPLETE plus nine QA rounds; then the 8GB block: B1a, B2a, B2b, QA-4, the `*_DIR` tripwire, B1b-0, B1b, and now B3 + B4. All LANDED GREEN and PUSHED (HEAD `5929e19a`, suite 7134).** NEXT = **B5 + B6** (canvas seam fail-closed BEFORE `BeatSession` opens; then freeze the measured recipe in CODE), then prequalify 512x288, then **7d** -- the canonical 237-frame opening beat, which is where a GPU first renders through this machine. Seams tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-26-8gb-1080p-arc-judgment.md` (the architecture), `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
@@ -1330,11 +1425,12 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-26 overnight @ `a05b5ac6`, coverage
-  chunks 5 and 6 complete plus four QA rounds): full Windows suite `6723 passed
-  / 27 skipped / 1 xfailed`; Bug Bible `17 passed / 24 skipped / 3 xfailed`;
-  canonical `5377914B` (byte-identical -- no chunk in the coverage block
-  touches a node, widget, link or schema). Detail in HANDOFF_LOG.
+- Current whole-tree receipt (2026-07-27 @ `5929e19a`, B3 + B4 landed): full
+  Windows suite `7134 passed / 27 skipped / 1 xfailed`; Bug Bible `17 passed /
+  24 skipped / 3 xfailed`; canonical `9872624A` (byte-identical -- no chunk in
+  the 8GB block touches a node, widget, link or schema; the `max_render_frames`
+  TOOLTIP that B3 rewrote lives in Python `INPUT_TYPES`, never in the graph).
+  Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
   AST/JSON/BOM/zero-byte checks, commit, push, verify
   `HEAD == origin/v2.0-alpha`.
