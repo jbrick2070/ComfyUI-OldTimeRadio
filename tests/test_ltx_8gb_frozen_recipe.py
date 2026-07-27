@@ -406,14 +406,55 @@ def test_the_tiled_vae_prequalification_default_tracks_the_recipe(
     assert eng._tiled_vae() is False
 
 
-def test_an_out_of_whitelist_t5_device_falls_back_to_the_RECIPE(
-        eng, monkeypatch):
-    """The clamp exists so a typo cannot hand ComfyUI a device string it will
-    fail on mid-load; it must clamp to the recipe, not to a literal."""
+def test_an_out_of_whitelist_t5_device_STOPS_the_sweep(eng, monkeypatch):
+    """It used to clamp to the recipe. That kept a bad device string away from
+    ComfyUI -- right -- but it also let a sweep cell that typed ``cuda:7``
+    measure the FROZEN device while stamping a receipt claiming otherwise: a
+    measurement that did not happen, counted as one. Refusing BY NAME does both
+    jobs, and matches `_config_number`: one rule, fail closed."""
     monkeypatch.setitem(m.LTX8_RECIPE, "t5_device", "default")
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "cuda:7")
-    assert eng._t5_device() == "default"
+    with pytest.raises(EngineUnusable) as e:
+        eng._t5_device()
+    assert "OTR_LTX_8GB_T5_DEVICE" in str(e.value)
+    assert "cuda:7" in str(e.value)
+
+
+def test_a_production_leg_NEVER_parses_a_bad_t5_device(eng, monkeypatch):
+    """The CONTROL on the refusal above. Outside the consent act the knob is
+    not parsed at all, so a stale `cuda:7` in a long-booted server's
+    environment cannot kill a leg it has no effect on -- PBUG-20260723-02
+    wearing the opposite mask, which is what B6 exists to prevent."""
+    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "cuda:7")
+    assert eng._t5_device() == m.LTX8_RECIPE["t5_device"]
+
+
+@pytest.mark.parametrize("garbage", ("maybe", "2", "on-ish", "true-ish"))
+def test_an_unrecognised_tiled_vae_STOPS_the_sweep(eng, monkeypatch, garbage):
+    """`raw in _TRUTHY` meant anything unrecognised silently became OFF, so a
+    sweep could mistype the very knob it was varying, decode untiled, and
+    report that it had measured tiled decode."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", garbage)
+    with pytest.raises(EngineUnusable) as e:
+        eng._tiled_vae()
+    assert "OTR_LTX_8GB_TILED_VAE" in str(e.value)
+
+
+@pytest.mark.parametrize("no", ("0", "false", "no", "off", "OFF", " no "))
+def test_every_explicit_NO_spelling_is_accepted_not_refused(
+        eng, monkeypatch, no):
+    """The refusal must catch typos, not ordinary ways of saying no."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", no)
+    assert eng._tiled_vae() is False
+
+
+def test_a_production_leg_NEVER_parses_a_bad_tiled_vae(eng, monkeypatch):
+    """CONTROL, same shape as the t5_device one."""
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "maybe")
+    assert eng._tiled_vae() is m.LTX8_RECIPE["tiled_vae"]
 
 
 # --- one range-check implementation, not two ------------------------------- #

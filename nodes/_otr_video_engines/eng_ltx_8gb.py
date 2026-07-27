@@ -292,6 +292,13 @@ _VAE_TILE_BOUNDS = {
 }
 
 _TRUTHY = ("1", "true", "yes", "on")
+#: The explicit NO spellings. A consent-act knob must be recognisably yes or
+#: recognisably no -- "anything not yes means no" is how a typo becomes a
+#: silently different measurement.
+_FALSY = ("0", "false", "no", "off")
+#: The devices the T5 CLIPLoader may be pointed at. Anything else is a typo,
+#: and under the consent act a typo stops the sweep rather than clamping.
+_T5_DEVICES = ("cpu", "default")
 
 
 def _prequalification_active():
@@ -752,8 +759,22 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # `or dflt`, not `get(name, dflt)`: an exported-but-EMPTY var would
         # otherwise read as "" -- not truthy -- and force the knob OFF against
         # a frozen default of ON. Every other accessor treats empty as unset.
-        raw = os.environ.get("OTR_LTX_8GB_TILED_VAE") or dflt
-        return raw.strip().lower() in _TRUTHY
+        raw = (os.environ.get("OTR_LTX_8GB_TILED_VAE") or dflt).strip().lower()
+        if raw in _TRUTHY:
+            return True
+        if raw in _FALSY:
+            return False
+        # FAIL CLOSED under the consent act. Outside it this var is never
+        # parsed at all; inside it, it is a MEASUREMENT INPUT, and anything
+        # unrecognised used to collapse to False -- so a sweep could mistype
+        # the knob it was varying, decode untiled, and stamp a receipt saying
+        # it had measured tiled. Same rule as `_config_number`: one bad value
+        # stops the sweep instead of quietly becoming a third configuration.
+        raise EngineUnusable(
+            self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+            "OTR_LTX_8GB_TILED_VAE=%r is not a yes/no value (yes: %s; no: %s)"
+            % (os.environ.get("OTR_LTX_8GB_TILED_VAE"),
+               ", ".join(_TRUTHY), ", ".join(_FALSY)), kind="video")
 
     def _t5_device(self):
         """T5 CLIPLoader device: default ``cpu`` for the 8GB tier (t5xxl_fp16 alone
@@ -763,7 +784,18 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if not _prequalification_active():
             return frozen
         dev = (os.environ.get("OTR_LTX_8GB_T5_DEVICE") or frozen).strip().lower()
-        return dev if dev in ("cpu", "default") else frozen
+        if dev in _T5_DEVICES:
+            return dev
+        # FAIL CLOSED, not clamp-to-recipe. Clamping kept a bad device string
+        # away from ComfyUI, which was right, but it also meant a sweep cell
+        # that typed `cuda:7` measured the FROZEN device and stamped a receipt
+        # claiming otherwise -- the measurement equivalent of a render that did
+        # not happen being counted as one. Refusing by name does both jobs.
+        raise EngineUnusable(
+            self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+            "OTR_LTX_8GB_T5_DEVICE=%r is not one of %s"
+            % (os.environ.get("OTR_LTX_8GB_T5_DEVICE"),
+               ", ".join(_T5_DEVICES)), kind="video")
 
     def _negative_prompt(self):
         """The FROZEN negative conditioning (B6).
