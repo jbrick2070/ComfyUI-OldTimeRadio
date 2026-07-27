@@ -25,8 +25,15 @@ The graph (discovery-verified):
 
 Single-pass, NO upscaler (the 8GB routes stay single-pass; the internal x2 latent
 upscaler is the 16GB ltx_video route only). SILENT output (V-1); OTR master audio is
-muxed later by OTR_MasterAudioMux. Length is LTX's 8n+1 rule (min 9); a short render
-is ping-pong-extended (CLIP-FILL) to the beat window -- never a freeze-hold.
+muxed later by OTR_MasterAudioMux. Length is LTX's 8n+1 rule (min 9): an ask off
+that grid renders the next legal rung UP and the surplus is TRIMMED in real
+frames, so every frame delivered is a rendered frame in order. An ask this
+engine cannot reach -- past its declared 161 or past ``OTR_LTX_8GB_MAX_FRAMES``
+-- is REFUSED before anything is staged. There is no ping-pong on this lane
+(deleted B4, 2026-07-27): padding a short render back up to the ask let a
+render that did not happen pass the plan-vs-output count gate, and on a
+``strict_first_frame`` lane the next chained segment would have begun on a
+mirrored frame. WAN keeps its extension -- it renders short on purpose.
 
 Registered as a NORMAL selectable row: ``requires_flag=None``, empty ``default_roles``
 (selectable, not a default). ORDINARY preflight ONLY -- checkpoint + T5 present +
@@ -79,8 +86,15 @@ _LTX8_CKPT_MIN_BYTES = 4 * 1024 * 1024 * 1024
 
 #: LTX temporal length rule: 8n+1, floor 9 (the min the smoke decoded). Cap is a
 #: STATIC config (env OTR_LTX_8GB_MAX_FRAMES), never a live-VRAM adaptive resize
-#: (S4 platform-portability: the render never resizes itself; CLIP-FILL loops a
-#: short render up to the beat window instead).
+#: (S4 platform-portability: the render never resizes itself). A render that
+#: cannot reach the ask is REFUSED, not padded (B4, 2026-07-27).
+#:
+#: This number is ALSO declared on ``Ltx8gbEngine.frame_contract`` as
+#: ``min_frames``, and the contract is the authority every length decision goes
+#: through. This constant survives for ONE job: the lower bound
+#: ``_resolve_render_config`` range-checks ``OTR_LTX_8GB_MAX_FRAMES`` against.
+#: ``tests/test_ltx_8gb_graph_and_loads.py`` pins the two equal so they cannot
+#: drift into a config check that accepts a cap below the real floor.
 _LTX8_MIN_FRAMES = 9
 _LTX8_MAX_FRAMES_DEFAULT = 161            # 8*20+1; env-overridable per hardware
 _LTX8_DEFAULT_W = 832
@@ -157,16 +171,23 @@ def _file_receipt(path):
     return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
 
 
-def _ltx8_frame_length(target_frame_count, cap):
-    """The FINAL LTX 0.9.8 graph length for a shot's frame ask: floor to
-    ``_LTX8_MIN_FRAMES``, cap at ``cap`` (a static per-hardware ceiling), then snap
-    to LTX's 8n+1 rule. Pure; CPU-tested. NO decode-floor-raise (0.9.8 core VAEDecode
-    decodes the 9-frame minimum -- smoke-proven -- unlike the 2.3 tiled band)."""
-    length = max(_LTX8_MIN_FRAMES, int(target_frame_count or _LTX8_MIN_FRAMES))
-    cap = max(_LTX8_MIN_FRAMES, int(cap))
-    if length > cap:
-        length = cap
-    return ((length - 1) // 8) * 8 + 1
+# ``_ltx8_frame_length`` LIVED HERE and is DELETED (B4, 2026-07-27).
+#
+# It snapped an ask DOWN to the nearest legal 8n+1 length and clamped it to the
+# env cap, which is exactly why the CLIP-FILL ping-pong existed: something had
+# to put the missing frames back. Removing the pad without removing the
+# snap-down would have shipped a short clip instead.
+#
+# Its two jobs now have explicit owners, which is the whole point of retiring
+# it rather than leaving it dead:
+#   * the LADDER is owned by ``Ltx8gbEngine.frame_contract`` --
+#     ``smallest_legal_at_least`` walks the same 9 + 8k rungs the coverage
+#     planner partitions against, so the adapter and the planner cannot
+#     disagree about what a legal length is. It snaps UP, and ``render_clip``
+#     trims the surplus in REAL frames.
+#   * the CAP is owned by an explicit refusal in ``render_clip``, before
+#     anything is staged. An ask the engine cannot reach is an error, not a
+#     number to quietly shrink.
 
 
 #: S1 (2026-07-25) per-model still plan for ltx_8gb (spec section 3,
@@ -824,11 +845,27 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "ltx_8gb requires init_image (got %r)" % plan["init_image"])
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates())
+        # THE LENGTH IS DECIDED BEFORE ANYTHING IS STAGED (B4). The refusal
+        # below must not come after an init image has been written or a graph
+        # built, and it must never come after the GPU work -- a request this
+        # adapter cannot render is knowable from pure numbers.
+        target_frames = int(plan.get("target_frame_count") or 0)
+        cap = self._resolve_render_config()["max_frames"]
+        contract = self.frame_contract
+        rung = contract.smallest_legal_at_least(target_frames)
+        if rung is None or rung > cap:
+            raise _wb.GraphExecutionError(
+                "ltx_8gb was asked for %d frame(s); the shortest legal render "
+                "that covers it is %s and this engine may render at most %d "
+                "(declared max %d, OTR_LTX_8GB_MAX_FRAMES %d). NO FALLBACK -- "
+                "a short render padded back up to the ask is not a render of "
+                "the ask, and on a chained lane the next segment would begin "
+                "on a duplicated frame."
+                % (target_frames, rung, cap, int(contract.max_frames), cap))
         width, height = self._dims(request)
         image_name = self._materialize_init_image(
             request, plan["init_image"], width, height)
-        cap = self._resolve_render_config()["max_frames"]
-        length = _ltx8_frame_length(plan["target_frame_count"], cap)
+        length = rung
         ext = (prepared or {}).get("external_results") \
             if isinstance(prepared, dict) else None
         graph = self._build_graph(request, image_name, plan, length, width, height,
@@ -858,18 +895,46 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 bucket.append(model)
                 seen.add(id(model))
         frames = _wb.images_to_uint8(images)
-        # CLIP-FILL: ping-pong-extend the (possibly short) render up to the beat's
-        # audio-derived target so the composite fills the beat with motion instead of
-        # holding the last frame. A no-op when the native render already meets target.
-        target_frames = int(plan.get("target_frame_count") or 0)
+        # THE PING-PONG IS GONE (B4, 2026-07-27), and these two invariants are
+        # what it was standing in front of.
+        #
+        # It used to mirror-extend a short render up to the ask. That let a
+        # render the engine could not actually deliver PASS the plan-vs-output
+        # count gate (``render_driver``'s ``got != segment.render_frames``)
+        # wearing the right number: part real motion, part mirrored frames, and
+        # on this lane -- which declares ``strict_first_frame`` -- the next
+        # chained segment would begin on a MIRRORED tail frame. WAN keeps its
+        # extension: it renders short ON PURPOSE and fills the beat with it,
+        # which is the shipped 8GB tier contract (PBUG-20260723-02).
+        #
+        # 1. THE PIPELINE INVARIANT. The graph was asked for exactly ``length``
+        #    frames, so anything else is an under-delivery that the pad used to
+        #    absorb for ANY reason, not just a cap disagreement. Deleting the
+        #    pad without this would send a short clip on to the composite,
+        #    which loop-fills it with the warning suppressed -- trading a
+        #    logged mirror for a silent jump-cut repeat. Found by the pre-code
+        #    panel, and it is the reason this block is not simply deleted.
         n_native = len(frames)
-        if target_frames > n_native:
-            frames = _wb.extend_frames_to_target(frames, target_frames)
-            _LOG.warning(
-                "[OTR video] ltx_8gb CLIP-FILL: rendered %d frame(s) -> ping-pong "
-                "extended to %d (beat target %d) @ %dx%d so the beat is FILLED with "
-                "motion (no hold-last-frame freeze)",
-                n_native, len(frames), target_frames, width, height)
+        if n_native != length:
+            raise _wb.GraphExecutionError(
+                "ltx_8gb asked its graph for %d frame(s) and decoded %d. NO "
+                "FALLBACK -- padding the difference is how a render that did "
+                "not happen gets counted as one." % (length, n_native))
+        # 2. THE TAIL TRIM, in REAL frames. When the ask is off the 8n+1 grid
+        #    the engine renders the next legal rung UP and drops the excess,
+        #    which is what ``allow_tail_trim`` in its own contract declares.
+        #    Every frame delivered is a rendered frame in order -- no mirror,
+        #    no loop, no held frame. A target below the declared minimum is
+        #    left alone: the contract says 9 is the shortest thing this adapter
+        #    renders, and cutting below it would be inventing a length the
+        #    declaration forbids.
+        if length > target_frames >= int(contract.min_frames):
+            frames = frames[:target_frames]
+            _LOG.info(
+                "[OTR video] ltx_8gb tail trim: rendered %d real frame(s) "
+                "(nearest legal rung at or above the %d-frame ask) and kept "
+                "%d @ %dx%d",
+                length, target_frames, len(frames), width, height)
         out_path = otr_engine_tmp_mp4("otr_ltx_8gb_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # M7: PROVE the silent-clip color/stream contract on the emitted mp4.

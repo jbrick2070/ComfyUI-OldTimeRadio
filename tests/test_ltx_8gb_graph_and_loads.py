@@ -416,29 +416,44 @@ def test_the_forward_runs_with_the_checkpoint_supplied_EXTERNALLY():
 
 
 # --- the frame-length ladder ----------------------------------------------- #
-def test_the_frame_length_ladder_floors_caps_and_snaps_to_8n_plus_1():
-    """`_ltx8_frame_length` had ZERO coverage anywhere in the suite, and B3/B4
-    are built on it: once ping-pong is deleted a non-`8n+1` segment becomes a
-    hard RenderError, so the snap IS the contract rather than a nicety.
+def test_the_render_LENGTH_is_owned_by_the_declared_contract_now():
+    """`_ltx8_frame_length` is DELETED (B4) and its ladder job moved HERE.
 
-    Floor at the 9-frame legal minimum, clamp to the static per-hardware cap,
-    then snap DOWN to the ladder. Down, never up: rounding up would hand LTX a
-    length past the ceiling the tier's VRAM budget was chosen for.
+    The old helper snapped an ask DOWN and clamped it to the env cap, which is
+    precisely why the ping-pong existed -- something had to put the missing
+    frames back. The adapter now asks its OWN declared contract for the
+    smallest legal length at or above the ask, renders that many real frames,
+    and trims the surplus. Same rungs, opposite direction, and the rungs are
+    now the same object the coverage planner partitions against, so the two
+    cannot disagree about what a legal length is.
+
+    This test replaces the ladder test rather than deleting it: the arithmetic
+    still needs pinning, it just has a different owner.
     """
-    f = m._ltx8_frame_length
+    contract = m.Ltx8gbEngine.frame_contract
     assert m._LTX8_MIN_FRAMES == 9
-    assert f(0, 161) == 9 and f(None, 161) == 9      # floor, not a crash
-    assert f(5, 161) == 9                            # below the minimum
-    assert f(9, 161) == 9                            # already legal
-    assert f(16, 161) == 9                           # snaps DOWN
-    assert f(17, 161) == 17                          # 8*2+1
-    assert f(65, 161) == 65                          # 8*8+1
-    assert f(500, 161) == 161                        # the cap, itself 8n+1
-    assert f(500, 60) == 57                          # a cap off the ladder
-    assert f(500, 2) == 9                            # a cap under the floor
-    for target in range(1, 200):
-        n = f(target, 161)
-        assert n >= 9 and n <= 161 and (n - 1) % 8 == 0
+    # The module constant and the contract declare the same floor in two
+    # places. The constant now has exactly one job -- the lower bound
+    # `_resolve_render_config` range-checks OTR_LTX_8GB_MAX_FRAMES against --
+    # so if the contract's floor ever moves alone, that config check would
+    # start accepting a cap below the real minimum and the refusal would fire
+    # for a reason nobody could trace back. Post-code panel, both seats.
+    assert m._LTX8_MIN_FRAMES == int(contract.min_frames)
+    assert not hasattr(m, "_ltx8_frame_length"), (
+        "the retired helper is back -- if a length rule is needed again it "
+        "belongs on the contract, not beside it")
+    f = contract.smallest_legal_at_least
+    assert f(0) == 9 and f(5) == 9                   # floor at the minimum
+    assert f(9) == 9                                 # already legal
+    assert f(10) == 17                               # snaps UP now, not down
+    assert f(16) == 17
+    assert f(65) == 65                               # 8*8+1
+    assert f(100) == 105                             # the off-grid case
+    assert f(161) == 161                             # the declared ceiling
+    assert f(162) is None                            # past it: no legal rung
+    for target in range(1, 162):
+        n = f(target)
+        assert n >= target and n >= 9 and n <= 161 and (n - 1) % 8 == 0
 
 
 # --- the forward, through a real ffmpeg encode ----------------------------- #
@@ -936,3 +951,181 @@ def test_teardown_clears_the_external_handles_BEFORE_the_base_runs(hoistable,
     rig.eng.teardown(prepared)
     assert seen["had_external"] is False
     assert rig.lease.released == ["LEASE-1"]
+
+
+# --- B4: the ping-pong is gone, and what stands in its place ---------------- #
+#
+# The CLIP-FILL block mirror-extended a short render up to the ask. That let a
+# render the engine could not deliver PASS the plan-vs-output count gate
+# wearing the right number -- part real motion, part mirrored frames -- and on
+# this lane, which declares strict_first_frame, the next chained segment would
+# begin on a MIRRORED tail frame. WAN keeps its extension; it renders short on
+# purpose (PBUG-20260723-02).
+
+def test_an_ask_ABOVE_the_cap_is_refused_before_anything_is_staged(
+        staged, monkeypatch):
+    """The env-vs-plan disagreement, and it must cost nothing to discover.
+
+    A server booted with a low OTR_LTX_8GB_MAX_FRAMES against a plan that asked
+    for more is the exact case the ping-pong used to launder: render short, pad
+    back to the ask, pass the count gate. Now it refuses -- and refuses BEFORE
+    an init image is written or a graph is built, because a request this
+    adapter cannot render is knowable from pure numbers.
+    """
+    np = pytest.importorskip("numpy")
+    counter = _Counter()
+    monkeypatch.setenv("OTR_LTX_8GB_MAX_FRAMES", "30")
+    eng = Ltx8gbEngine()
+    eng._classes = _ltx8_fakes(np, counter, n=9)
+
+    def _must_not_stage(*_a, **_k):
+        raise AssertionError("the init image was staged before the refusal")
+
+    monkeypatch.setattr(eng, "_materialize_init_image", _must_not_stage)
+    with pytest.raises(wb.GraphExecutionError) as excinfo:
+        eng.render_clip(_request(staged, frames=49), {"patchers": []})
+    assert "NO FALLBACK" in str(excinfo.value)
+    assert "49" in str(excinfo.value)
+    # ORDERING, pinned two ways: no graph node ran (the counter is empty) and
+    # the init image was never written (the staging detonates). Move the
+    # refusal below either one and this goes red rather than merely slower.
+    assert dict(counter.calls) == {}
+
+
+def test_an_ask_ABOVE_the_declared_maximum_is_refused_too(staged):
+    """No env involved -- 200 frames is past the contract's own 161 ceiling,
+    so there is no legal rung at all and `smallest_legal_at_least` says None.
+    A caller that asks for it (`render_single`, an HTTP body) gets an error
+    instead of a clip that is 161 real frames wearing a 200-frame count."""
+    np = pytest.importorskip("numpy")
+    counter = _Counter()
+    eng = Ltx8gbEngine()
+    eng._classes = _ltx8_fakes(np, counter, n=9)
+    with pytest.raises(wb.GraphExecutionError):
+        eng.render_clip(_request(staged, frames=200), {"patchers": []})
+    assert dict(counter.calls) == {}
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_an_OFF_GRID_ask_renders_the_next_rung_up_and_trims_REAL_frames(
+        staged):
+    """100 is not 8n+1. The engine renders 105 real frames and keeps 100.
+
+    Every frame delivered is a rendered frame in order: no mirror, no loop, no
+    held frame. The decode fake sizes its batch from the `length` the graph
+    actually asked for, so 105 here is an OBSERVATION of what was wired -- if
+    the engine went back to snapping DOWN, the graph would be asked for 97 and
+    this goes red on both numbers.
+    """
+    np = pytest.importorskip("numpy")
+    counter = _Counter()
+    eng = Ltx8gbEngine()
+    eng._classes = _ltx8_fakes(np, counter, n=9)
+    path = None
+    try:
+        raw = eng.render_clip(_request(staged, frames=100), {"patchers": []})
+        path = pathlib.Path(raw["out_path"])
+        assert raw["frame_count"] == 100
+    finally:
+        if path is not None:
+            path.unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_an_ON_GRID_ask_is_rendered_exactly_and_never_trimmed(staged):
+    """The planned path: every coverage-plan segment length is already legal,
+    so nothing is rendered spare and nothing is cut. This is the CONTROL for
+    the trim test above -- if trimming ever fired here it would be silently
+    shortening a planned segment."""
+    np = pytest.importorskip("numpy")
+    counter = _Counter()
+    eng = Ltx8gbEngine()
+    eng._classes = _ltx8_fakes(np, counter, n=9)
+    path = None
+    try:
+        raw = eng.render_clip(_request(staged, frames=65), {"patchers": []})
+        path = pathlib.Path(raw["out_path"])
+        assert raw["frame_count"] == 65
+    finally:
+        if path is not None:
+            path.unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_an_ask_BELOW_the_declared_minimum_is_left_at_the_minimum(staged):
+    """The trim stops at the contract's own floor.
+
+    9 is the shortest thing this adapter renders, so a 5-frame ask gets 9 real
+    frames rather than a 5-frame clip -- cutting below the declared minimum
+    would be inventing a length the declaration forbids, and it is the one
+    place the trim must NOT fire.
+    """
+    np = pytest.importorskip("numpy")
+    counter = _Counter()
+    eng = Ltx8gbEngine()
+    eng._classes = _ltx8_fakes(np, counter, n=9)
+    path = None
+    try:
+        raw = eng.render_clip(_request(staged, frames=5), {"patchers": []})
+        path = pathlib.Path(raw["out_path"])
+        assert raw["frame_count"] == 9
+    finally:
+        if path is not None:
+            path.unlink(missing_ok=True)
+
+
+def test_a_SHORT_decode_is_refused_rather_than_padded(staged, monkeypatch):
+    """The invariant the pad was standing in front of.
+
+    The old block padded whenever the decode came up short FOR ANY REASON, not
+    just a cap disagreement. Deleting it without this check would send the
+    short clip on to the composite, which loop-fills it with the underrun
+    warning suppressed -- trading a logged mirror for a silent jump-cut
+    repeat. The pre-code panel found that, and this is the test for it.
+    """
+    np = pytest.importorskip("numpy")
+    counter = _Counter()
+    eng = Ltx8gbEngine()
+    classes = _ltx8_fakes(np, counter, n=9)
+    short = np.zeros((7, 24, 32, 3), dtype="float32")     # asked 9, decoded 7
+    classes["decode"] = _mk(lambda self, **kw: (short,))
+    eng._classes = classes
+    with pytest.raises(wb.GraphExecutionError) as excinfo:
+        eng.render_clip(_request(staged, frames=9), {"patchers": []})
+    assert "decoded 7" in str(excinfo.value)
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_the_ping_pong_helper_is_never_called_on_this_lane(staged,
+                                                           monkeypatch):
+    """Behavioural, not a source grep: make the helper explode and render.
+
+    A grep for the call site passes a reversed-argument mutation and passes a
+    call that is merely unreachable. Detonating the helper proves the lane does
+    not reach it -- while `wrapper_bridge.extend_frames_to_target` itself stays
+    exactly where it is for WAN, which is the point of a lane-specific rip.
+    """
+    np = pytest.importorskip("numpy")
+
+    def _boom(*_a, **_k):
+        raise AssertionError("ltx_8gb reached the ping-pong extender")
+
+    monkeypatch.setattr(wb, "extend_frames_to_target", _boom)
+    counter = _Counter()
+    eng = Ltx8gbEngine()
+    eng._classes = _ltx8_fakes(np, counter, n=9)
+    path = None
+    try:
+        raw = eng.render_clip(_request(staged, frames=100), {"patchers": []})
+        path = pathlib.Path(raw["out_path"])
+        assert raw["frame_count"] == 100
+    finally:
+        if path is not None:
+            path.unlink(missing_ok=True)
+
+
+def test_the_shared_extender_still_EXISTS_for_the_lanes_that_need_it():
+    """The rip is lane-specific. `wrapper_bridge.extend_frames_to_target` is
+    WAN's mechanism for filling a beat from a deliberately short native render,
+    and deleting it would take the shipped 8GB WAN tier with it."""
+    assert callable(getattr(wb, "extend_frames_to_target", None))
