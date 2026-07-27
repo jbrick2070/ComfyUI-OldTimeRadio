@@ -118,6 +118,43 @@ def _sfx_gain(value=None) -> float:
     return _clamp01(DEFAULT_SFX_BED_GAIN if value is None else value)
 
 
+#: The legacy credits-tail ceiling when no roll declares its own duration.
+_MAX_CREDITS_TAIL_S_DEFAULT = 45.0
+
+
+def _credits_tail_ceiling() -> float:
+    """The ``OTR_MAX_CREDITS_TAIL_S`` ceiling -- NAMED and ignored when
+    malformed, never fatal.
+
+    This knob is read at the LAST node of the graph, after the whole episode has
+    rendered. It used to be a bare ``float(os.environ.get(...))``, so a single
+    typo in a server's launch environment (``45s``, ``forty-five``) killed a
+    finished episode at the finish line with an uncaught ValueError -- hours of
+    render lost to a value that only widens a sanity ceiling.
+
+    That is the ``PBUG-20260723-02`` shape this build has now closed three times
+    over: a knob exported at launch cannot bind work submitted to an
+    already-booted server, so a malformed one must be IGNORED, never FATAL. The
+    house posture is `otr_silent_composite._unsharp_amount`; this adds the
+    WARNING that one omits, because a ceiling silently reverting to the default
+    is a ceiling the operator thinks they moved.
+
+    Its sibling in this same file, ``_sfx_gain``, was already guarded through
+    ``_clamp01``. This was the one env read in the mux that was not."""
+    raw = os.environ.get("OTR_MAX_CREDITS_TAIL_S")
+    if raw in (None, ""):
+        return _MAX_CREDITS_TAIL_S_DEFAULT
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        log.warning(
+            "[OTR_MasterAudioMux] OTR_MAX_CREDITS_TAIL_S=%r is not a number; "
+            "IGNORING it and using the %.1fs default. A malformed knob must "
+            "not lose a finished episode at the mux (PBUG-20260723-02).",
+            raw, _MAX_CREDITS_TAIL_S_DEFAULT)
+        return _MAX_CREDITS_TAIL_S_DEFAULT
+
+
 def _numeric(value, *, field: str, row_id: str) -> float:
     try:
         out = float(value)
@@ -314,7 +351,7 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     # it). The CreditsRoll/composite frame budgets are the primary correctness
     # guards; this bound is the final sanity ceiling.
     declared = float(declared_credits_tail_s or 0.0)
-    env_ceiling = float(os.environ.get("OTR_MAX_CREDITS_TAIL_S", "45"))
+    env_ceiling = _credits_tail_ceiling()      # NAMED-and-ignored if malformed
     max_tail_s = declared if declared > 0 else env_ceiling
     tail_src = "declared" if declared > 0 else "env_ceiling"
     if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + max_tail_s + tol:
@@ -332,9 +369,30 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
             f"-- likely a composite/credits frame-budget bug, not the intended "
             f"silent credits tail"
         )
-    report.append(
-        f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
-        f"tail_budget={max_tail_s:.1f}s ({tail_src}) OK")
+    if v_dur < 0 or a_dur < 0:
+        # THE RECEIPT MAY NOT SAY OK OVER A FAILED PROBE. `_probe_float`
+        # returns -1.0 when ffprobe is absent or the duration is unparsable,
+        # and the gate above is skipped in that case -- so the old line
+        # appended "duration_check v=-1.000s a=-1.000s ... OK", which reads as
+        # a passed check to every downstream reader of this report.
+        #
+        # Reported as UNPROVEN rather than made fatal: the gate is the FINAL
+        # SANITY CEILING, not the primary correctness guard (the CreditsRoll
+        # and composite frame budgets are), and refusing here would lose a
+        # finished episode on a box that merely lacks ffprobe. What must not
+        # happen is a receipt claiming a proof it does not have.
+        report.append(
+            f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
+            f"tail_budget={max_tail_s:.1f}s ({tail_src}) UNPROVEN "
+            f"(duration probe failed -- gate SKIPPED, not passed)")
+        log.warning(
+            "[OTR_MasterAudioMux] duration gate SKIPPED: probe returned "
+            "v=%.3f a=%.3f. The video-longer-than-audio ceiling was NOT "
+            "checked for this episode.", v_dur, a_dur)
+    else:
+        report.append(
+            f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
+            f"tail_budget={max_tail_s:.1f}s ({tail_src}) OK")
 
     _poll_interrupt()
     if not sfx_bed_path:
