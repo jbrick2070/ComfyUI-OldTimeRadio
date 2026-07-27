@@ -314,3 +314,132 @@ def test_the_legacy_path_validates_the_plan_against_the_FINAL_engine(monkeypatch
         rd.resolve_final_shot_engines(ledger)
     # The force ran first: the refusal names the engine that actually renders.
     assert ledger["video"]["shots"][0]["engine_id"] == "ltx_video"
+
+
+# ---------------------------------------------------------------------------
+# B4 (2026-07-27): ShotRow is a CLOSED model (extra="forbid"), so it has to
+# actually describe what the producers stamp. It was missing eight fields, so
+# ShotRow(**real_row) raised on EVERY real ledger -- which is why the "live
+# safety net" other docs cite could not validate one shipped episode.
+# ---------------------------------------------------------------------------
+
+def _real_rows(frames=50):
+    beats = _beats()
+    _groups, shots = sl.build_execution_plan(
+        beats, _budget(beats, frames=frames), {}, _policy())
+    assert shots, "the producer emitted no shots -- this test proves nothing"
+    return shots
+
+
+def test_every_real_shotlock_row_validates_through_ShotRow():
+    """Driven through the REAL producer on purpose: a hand-built row would
+    only ever prove the fields the test itself chose to write, which is how
+    this stayed green while being wrong."""
+    from nodes._otr_video_engines.schemas import ShotRow
+
+    for row in _real_rows():
+        ShotRow(**row)
+
+
+def test_a_multi_clip_row_validates_too():
+    """A beat pushed past its adapter's cap really does partition here, so
+    this exercises a row whose coverage_plan carries several segments."""
+    from nodes._otr_video_engines.schemas import ShotRow
+
+    rows = _real_rows(frames=400)
+    assert any(len(r["coverage_plan"]["segments"]) > 1 for r in rows), \
+        "nothing split -- the multi-clip case is not being exercised"
+    for row in rows:
+        ShotRow(**row)
+
+
+def test_a_row_carrying_real_jump_still_requests_validates():
+    """jump_still_requests is the field the bug report's list did not mention
+    at all. It is NOT reachable through the fixture above: every multi-clip
+    adapter here declares strict_first_frame, so its plan is a CHAIN and
+    jump_still_requests is empty by contract. Drive the real minter over a
+    real JUMP plan instead of writing the rows by hand."""
+    from nodes._otr_video_engines.schemas import ShotRow
+
+    jump_contract = fc.FrameContract(min_frames=9, max_frames=161, quantum=8)
+    plan = cp.partition_beat(400, jump_contract)
+    assert plan.join_mode == "jump", plan.join_mode
+    requests = cp.jump_still_requests(plan, "b001", role="character_video",
+                                      engine_id="ltx_video", char_id="c1")
+    assert requests, "the minter produced nothing -- nothing is being proven"
+
+    row = dict(_real_rows()[0])
+    row["jump_still_requests"] = [dict(r) for r in requests]
+    assert len(ShotRow(**row).jump_still_requests) == len(requests)
+
+
+def test_the_whole_video_section_validates_end_to_end():
+    """The boundary other docs promise exists: model_validate over
+    ledger['video']. Before B4 it hard-failed on the first shot."""
+    from nodes._otr_video_engines.schemas import VideoLedgerSection
+
+    beats = _beats()
+    groups, shots = sl.build_execution_plan(beats, _budget(beats), {}, _policy())
+    section = VideoLedgerSection(execution_groups=groups, shots=shots)
+    assert len(section.shots) == len(shots)
+    assert len(section.execution_groups) == len(groups)
+
+
+def test_the_motion_clause_pass_output_is_accepted_too():
+    """motion_clause is stamped onto the same row by a LATER pass. Ask that
+    pass's own producer for the object rather than transcribing one."""
+    from nodes import _otr_motion_clause as mc
+    from nodes._otr_video_engines.schemas import ShotRow
+
+    clause = mc._clause_obj("", model=mc.GENERATED_MODEL_UNSET, fallback=True,
+                            char_id="c1", beat_id="b001", dialogue="hello")
+    assert isinstance(clause, dict) and clause
+    row = dict(_real_rows()[0])
+    row["motion_clause"] = clause
+    assert ShotRow(**row).motion_clause == clause
+
+
+def test_shotrow_covers_every_key_the_producers_stamp():
+    """Mechanical drift guard. B4's field list was derived from the producers
+    rather than from the bug report -- which named a beat_id no producer
+    writes, and missed two that are written. A newly stamped key must fail
+    HERE, by name, instead of at whichever boundary first validates."""
+    from nodes._otr_video_engines.schemas import ShotRow
+
+    produced = set()
+    for row in _real_rows() + _real_rows(frames=400):
+        produced |= set(row)
+
+    declared = set(ShotRow.model_fields)
+    assert produced <= declared, sorted(produced - declared)
+    # The report's own list was wrong in both directions; pin the correction.
+    assert "beat_id" not in produced
+    assert {"role", "char_id", "coverage_plan"} <= produced
+
+
+def test_absence_is_preserved_for_the_fields_that_encode_it():
+    """coverage_plan / coverage_contract / motion_clause default to None, not
+    to an empty container. 'Never stamped' and 'stamped empty' mean different
+    things: an unregistered engine gets no plan, and a coverage_contract is
+    written only when the tier ceiling narrowed something, which
+    assert_coverage_plans re-derives and compares."""
+    from nodes._otr_video_engines.schemas import ShotRow
+
+    bare = ShotRow(shot_id="s1")
+    assert bare.coverage_plan is None
+    assert bare.coverage_contract is None
+    assert bare.motion_clause is None
+    assert bare.jump_still_requests == []
+    assert bare.dur_s is None
+
+
+def test_shotrow_is_still_a_CLOSED_model():
+    """Everything above would pass for the wrong reason if ShotRow stopped
+    forbidding extras -- completing the field list only means something while
+    an unknown key is still an error. The closedness IS the contract that made
+    the missing fields a bug rather than a cosmetic gap."""
+    from nodes._otr_video_engines.schemas import ShotRow
+
+    with pytest.raises(Exception) as excinfo:
+        ShotRow(shot_id="s1", not_a_field_any_producer_writes=1)
+    assert "not_a_field_any_producer_writes" in str(excinfo.value)

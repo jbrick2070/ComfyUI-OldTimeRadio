@@ -300,9 +300,39 @@ class ExecutionGroup(_Forbid):
 
 
 class ShotRow(_Forbid):
+    """One row of ``ledger['video']['shots']``, as ``OTR_ShotLock`` stamps it.
+
+    B4 (2026-07-27): this model declares ``extra="forbid"`` and was missing
+    eight fields the producers genuinely write, so ``ShotRow(**real_row)``
+    raised on EVERY real ledger -- which made the "live safety net" other docs
+    cite unable to validate a single shipped episode, and would have turned any
+    future ``VideoLedgerSection.model_validate(ledger["video"])`` into a
+    hard-fail at whatever boundary first tried it.
+
+    The field list below was derived MECHANICALLY from the producers, not from
+    the bug report: the report also named ``beat_id``, and no producer stamps
+    one on a shot row -- ``source_line_ids`` carries the beat. It missed
+    ``jump_still_requests`` and ``motion_clause``, which are stamped.
+
+    ABSENCE IS LOAD-BEARING for three of these, so they default to ``None``
+    rather than to an empty container: an unregistered engine gets NO
+    ``coverage_plan`` (and the render path then behaves as it did before chunk
+    3b), a ``coverage_contract`` is stamped ONLY when the tier ceiling actually
+    narrowed something (``render_driver.assert_coverage_plans`` re-derives it
+    and refuses on any difference, so "stamped empty" and "never stamped" must
+    not collapse), and a missing ``motion_clause`` means the pass never ran,
+    which is not the same as a fallback clause.
+    """
+
     shot_id: str
     source_line_ids: list[str] = Field(default_factory=list)
     group_id: str = ""
+    #: The shot's video ROLE, stamped explicitly since 2026-06-10 -- the render
+    #: driver's role-scoped behaviours read it rather than parsing group_id.
+    role: str = ""
+    #: The NORMALIZED char_id (round 5 F5), so the portrait join never depends
+    #: on the raw line scheme.
+    char_id: str = ""
     engine_id: str = ""
     profile_id: str = ""
     family: str = ""
@@ -314,6 +344,20 @@ class ShotRow(_Forbid):
     cache_keys: dict = Field(default_factory=dict)
     degradation_trail: list[str] = Field(default_factory=list)
     creative: dict = Field(default_factory=dict)
+    #: Timeline position, carried by the ROW only for synthetic beats, which
+    #: have no ledger LINE to read it from. dur_s is genuinely Optional: the
+    #: producer forwards ``beat.get("dur_s")`` and that can be absent.
+    start_s: float = 0.0
+    dur_s: Optional[float] = None
+    #: The durable coverage plan (chunk 3b) and its sibling ceiling receipt
+    #: (B3). See the class docstring on why these are None, not {}.
+    coverage_plan: Optional[dict] = None
+    coverage_contract: Optional[dict] = None
+    #: Per-segment still requests for a jump-cut beat (chunk 4), minted only
+    #: for a lane that actually consumes a still. Empty == none owed.
+    jump_still_requests: list[dict] = Field(default_factory=list)
+    #: The per-beat motion clause object (text/model/fallback/source_hash).
+    motion_clause: Optional[dict] = None
 
 
 class VideoLedgerSection(_Forbid):
