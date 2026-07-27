@@ -1,9 +1,22 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-27 (remote Cowork, CODER A session 5) -- **B3 AND B4 ARE IN.
-THE TIER CEILING PLANS, AND THE PING-PONG IS GONE FROM THE LTX LANE. HEAD ==
-origin `5929e19a`; suite 7134 passed / 27 skipped / 1 xfailed; Bible 17;
-canonical `9872624A` byte-identical.**
+**Updated:** 2026-07-27 (remote Cowork, CODER A session 5) -- **B3, B4 AND B5 ARE
+IN. THE TIER CEILING PLANS, THE PING-PONG IS GONE, AND THE 8 GB TIER RENDERS AT
+THE CANVAS IT DECLARES. HEAD == origin `a0141cdd`; suite 7158 passed / 27
+skipped / 1 xfailed; Bible 17; canonical `9872624A` byte-identical.**
+
+**B5 CLOSED O1, AND THE PANEL SENT THE FIRST DESIGN BACK.** The draft read the
+profile's 512x288 off `video.canonical_canvas`; it was green and
+mutation-proven and it was WRONG. `docs/2026-07-26-o1-canvas-arc-judgment.md` --
+one of the three authorities this step names -- lists that channel as the one
+DEAD channel of five and requires the engine to declare its canvas STATICALLY,
+"not an env var, not a ledger read". The later 8gb judgment's B5 paragraph says
+the opposite and never reconciles the two. The deciding evidence was concrete:
+`tmp/_run_canonical_engine_matrix_20260723.py` routes `ltx_8gb` onto the
+CANONICAL 832x480 workflow through profile `role_overrides` and copies no
+canvas, so a ledger-reading design would pillarbox or REFUSE a live QA campaign
+that still owes a requalification leg. **A declaration cannot be displaced by
+where it is pointed.** Record: `docs/2026-07-27-b5-qa-findings.md`.
 
 **B3** made `max_render_frames` narrow the contract the coverage planner
 partitions against -- for `ltx_8gb` and nothing else. It is NOT a general
@@ -31,7 +44,7 @@ frame-count disagreement. B4 landed. A profile may now pin
 `video.max_render_frames` on an `ltx_8gb` tier and the disagreement is terminal
 at both ends.
 
-**NEXT = B5 + B6.** See CURRENT STEP.
+**NEXT = B6, AND IT HAS AN OPEN QUESTION -- see CURRENT STEP.**
 
 ---
 
@@ -256,9 +269,51 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **B5 + B6: the canvas seam fail-closed, then freeze the recipe**
+## CURRENT STEP -- **B6: freeze the recipe in CODE (ONE OPEN QUESTION FIRST)**
 
-**HEAD == origin `5929e19a`.** Suite 7134 / Bible 17 / canonical `9872624A`.
+**HEAD == origin `a0141cdd`.** Suite 7158 / Bible 17 / canonical `9872624A`.
+
+**B6 IS BLOCKED ON A DEFINITION, NOT ON CODE, AND THE BLOCKER IS THE JUDGMENT'S
+OWN ORDERING.** B6 says: *"Freeze the MEASURED T5 / tiling / sampling selection
+into a versioned `ltx_8gb` recipe in CODE, and demote the env vars to
+prequalification-only,"* logging a WARNING whenever an override is honoured
+there. But section 7 of the same judgment orders the work *"Build mechanics
+first, MEASURE second, freeze the recipe third, run canonical acceptance
+last"* -- and **no measurement has happened.** Prequalification is the step
+AFTER this one, and no GPU run is authorised in a coder window.
+
+So B6 as written cannot be executed yet: there is no measured selection to
+freeze. Two ways forward, and it is an operator call which:
+
+- **(a) Freeze what ships today** -- the current defaults ARE decided values
+  with recorded reasons (T5 offloads to CPU because `t5xxl_fp16` alone is ~9 GB,
+  documented as load-bearing rather than an optimisation; tiled VAE defaults OFF
+  because core `VAEDecode` handles the 8 GB peak at the smoke canvas). Version
+  them as `ltx_8gb` recipe v1, demote the env vars, and let prequalification
+  produce v2 if it measures something better. B6 becomes buildable now.
+- **(b) Defer B6 until after prequalification**, run the 512x288
+  prequalification first against the current env-driven knobs, and freeze the
+  measured result. Matches the judgment's ordering literally; leaves the env
+  channel live through one more step.
+
+**Also unspecified either way: what marks a run as "prequalification".** The
+demotion needs a signal the code can read -- an explicit env, or the absence of
+an episode ledger. Do not invent one silently; it decides whether an operator's
+knob works on a production leg.
+
+**A SECOND FACT THAT BEARS ON THE ORDERING (B5 panel, verified):**
+`render_single` and both HTTP entry points never reach the canvas seam -- they
+use the older ledger-free `build_request` and default to
+`OTR_VIDEO_RENDER_CANVAS` (832x480). **That means the 7d-preflight that "proved
+the GPU" ran at 832x480, not at the production canvas.** The production canvas
+for `ltx_8gb` has still never been exercised live, so prequalification is the
+first time it will be.
+
+---
+
+## SUPERSEDED -- B5 (DONE @ `a0141cdd`)
+
+**HEAD == origin `5929e19a` at entry.** Suite 7134 / Bible 17 / canonical `9872624A`.
 Authorities, read ALL THREE first: `docs/2026-07-26-8gb-1080p-arc-judgment.md`
 (the architecture), `docs/2026-07-26-o1-canvas-arc-judgment.md` (the canvas seam)
 and `docs/2026-07-26-dir-override-arc-judgment.md`.
@@ -1056,6 +1111,24 @@ listed as live.
   wrote, so an encode-side drop could still under-report. PRE-EXISTING; close
   it when the assembly boundary is next opened.
 
+- **THE 7d-PREFLIGHT THAT "PROVED THE GPU" RAN AT THE WRONG CANVAS** (found
+  2026-07-27, B5 panel; verified, NEW -- and it corrects a claim this file
+  made). `render_single` and both HTTP entry points use the older ledger-free
+  `build_request`, which never reaches the canvas seam and defaults to
+  `OTR_VIDEO_RENDER_CANVAS` (832x480). So the "GPU IS PROVEN" leg
+  (`ltx_8gb`, 25 frames, 3004 MB) exercised 832x480, not the production
+  canvas. **The production canvas for `ltx_8gb` has never rendered live.**
+  Prequalification is the first time it will. `render_single` parity is
+  explicitly deferred by the O1 judgment; what must NOT happen is another
+  "proof" through that harness being read as a production proof.
+
+- **The ShotLock WRITE-side canvas validation is still owed** (O1 judgment
+  item 1; NEW). `otr_shot_lock.py` stamps `video.canonical_canvas` unvalidated
+  from a possibly-empty policy. B5 made this non-load-bearing for the render
+  (the engine declares its own canvas now), so it is no longer urgent -- the
+  drift guard in `tests/test_ltx_8gb_canonical_canvas.py` covers the
+  disagreement that matters. Close it when the general canvas resolver lands.
+
 - **`schemas.py`'s `ShotRow` is a closed model that no boundary enforces**
   (found 2026-07-27, B3 post-code panel; NEW). It declares
   `extra="forbid"` and is missing `beat_id`, `role`, `char_id`, `start_s`,
@@ -1352,7 +1425,7 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
-| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED. r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1-7a COMPLETE plus nine QA rounds; then the 8GB block: B1a, B2a, B2b, QA-4, the `*_DIR` tripwire, B1b-0, B1b, and now B3 + B4. All LANDED GREEN and PUSHED (HEAD `5929e19a`, suite 7134).** NEXT = **B5 + B6** (canvas seam fail-closed BEFORE `BeatSession` opens; then freeze the measured recipe in CODE), then prequalify 512x288, then **7d** -- the canonical 237-frame opening beat, which is where a GPU first renders through this machine. Seams tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-26-8gb-1080p-arc-judgment.md` (the architecture), `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
+| CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED. r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1-7a COMPLETE plus nine QA rounds; then the 8GB block: B1a, B2a, B2b, QA-4, the `*_DIR` tripwire, B1b-0, B1b, and now B3 + B4 + B5. All LANDED GREEN and PUSHED (HEAD `a0141cdd`, suite 7158).** NEXT = **B6**, which is BLOCKED on an operator call -- there is no measured selection to freeze yet and "prequalification-only" has no defined signal (see CURRENT STEP) -- then prequalify 512x288, then **7d** -- the canonical 237-frame opening beat, which is where a GPU first renders through this machine at its production canvas. Seams tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-26-8gb-1080p-arc-judgment.md` (the architecture), `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
 | CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
@@ -1425,12 +1498,12 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-27 @ `5929e19a`, B3 + B4 landed): full
-  Windows suite `7134 passed / 27 skipped / 1 xfailed`; Bug Bible `17 passed /
-  24 skipped / 3 xfailed`; canonical `9872624A` (byte-identical -- no chunk in
-  the 8GB block touches a node, widget, link or schema; the `max_render_frames`
-  TOOLTIP that B3 rewrote lives in Python `INPUT_TYPES`, never in the graph).
-  Detail in HANDOFF_LOG.
+- Current whole-tree receipt (2026-07-27 @ `a0141cdd`, B3 + B4 + B5 landed):
+  full Windows suite `7158 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; canonical `9872624A` (byte-identical --
+  no chunk in the 8GB block touches a node, widget, link or schema; the
+  `max_render_frames` TOOLTIP that B3 rewrote lives in Python `INPUT_TYPES`,
+  never in the graph). Detail in HANDOFF_LOG.
 - Every code chunk: focused tests, full Windows suite, Bug Bible,
   AST/JSON/BOM/zero-byte checks, commit, push, verify
   `HEAD == origin/v2.0-alpha`.

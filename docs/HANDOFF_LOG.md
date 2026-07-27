@@ -3,6 +3,80 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 05:30 -- HEAD a0141cdd (v2.0-alpha) -- WINDOW CODER A, SESSION 5b
+Did: pushed B5 (a0141cdd) -- ltx_8gb now declares its own render canvas
+  (512x288) as a static class attribute, build_request_from_shot consumes the
+  declaration last in its canvas chain, and render_beat_coverage pre-flights it
+  before BeatSession opens. Plus the drift guard the O1 judgment asked for: the
+  profile's render.canvas_w/h and the 8 GB variant's director widgets are pinned
+  equal to the declaration.
+Current step: B6 -- and it is BLOCKED on an operator call, not on code.
+Next: operator rules on B6 (a) freeze today's defaults as recipe v1 now, or
+  (b) defer B6 until after prequalification -- plus what signal marks a run as
+  "prequalification". Then prequalify 512x288, then 7d. CODER A.
+Models: Claude + 4 Sonnet lenses + 2 agy (kibitz, Gemini 3.6 Flash High). $0
+  external. No codex spend; two-strikes never invoked.
+Commits: a0141cdd. Record: docs/2026-07-27-b5-qa-findings.md. Suite 7134 ->
+  7158; Bible 17; canonical 9872624A byte-identical.
+
+### Detail
+
+**THE POST-CODE PANEL SENT THE DESIGN BACK, AND IT WAS RIGHT.** B5 was written,
+green and mutation-proven with 10 mutants when a seat pointed at a document I
+had read and mis-weighted: `docs/2026-07-26-o1-canvas-arc-judgment.md` -- one of
+the THREE authorities GO_FORWARD names for this step -- lists the
+`render.canvas_w/h -> canonical_canvas` channel as the one DEAD channel of five
+and rules that the engine must declare its canvas STATICALLY, "not an env var,
+NOT A LEDGER READ". I had built the ledger read, following the later 8gb
+judgment's B5 paragraph, which says the opposite and never reconciles the two.
+Verified against the file before acting, not taken on the seat's word.
+
+**THE PANEL ALSO SUPPLIED THE EVIDENCE THAT DECIDES IT ON THE MERITS**, which is
+why this was not a coin-flip between two docs.
+`tmp/_run_canonical_engine_matrix_20260723.py` routes ltx_8gb onto the CANONICAL
+832x480 workflow through profile role_overrides and copies no canvas -- and its
+author had already special-cased the WAN sibling for exactly this reason
+("Applying only the engine name silently discarded its 832x480/17-frame render
+contract"). Under the ledger-reading design that live QA campaign, which still
+owes a requalification leg, would pillarbox or be REFUSED outright. **A
+declaration cannot be displaced by where it is pointed.**
+
+**THE DRAFT WAS FAIL-CLOSED IN THE WRONG DIRECTION**, and a seat named it
+precisely: the exact-16:9 clause was "a quality judgment wearing a structural
+gate's clothes" -- the render would have completed, the asset would have
+existed, the ledger would have stayed usable, and what was refused was the LOOK
+of a composite. Under the declaration there is no cross-engine refusal at all;
+the only remaining error is a code-integrity check on a broken declaration, the
+shape of FrameContract.__post_init__.
+
+**A FACT THAT CORRECTS THIS FILE'S OWN EARLIER CLAIM:** render_single and both
+HTTP entry points never reach the canvas seam -- they use the older ledger-free
+build_request and default to OTR_VIDEO_RENDER_CANVAS (832x480). So the
+7d-preflight recorded as "GPU IS PROVEN" ran at 832x480, NOT at the production
+canvas. The production canvas for ltx_8gb has still never rendered live.
+
+**TWO ERRORS OF MINE THE TESTS CAUGHT, worth naming because both were sloppy
+arithmetic dressed as rigour.** 512 does not divide 1920 -- the scale is 3.75x
+-- so my "zero pad area" assertion checked divisibility and was simply wrong;
+the property that matters is that the rectangles are the same SHAPE
+(w*1080 == h*1920). And the malformed-declaration check ran AFTER the int
+conversion, so a stringly-typed "512x288" parsed as 5x1 and was refused for the
+wrong reason, naming the latent grid instead of the real mistake. Shape is now
+checked before value.
+
+**Mutation: 11 mutants, 9 defect all red** -- including the resolver answering
+None, the engine declaring the landscape canvas, the engine declaring nothing, a
+string slipping the shape check, and the PROFILE drifting from the declaration
+-- **2 controls green**, baseline and restore green.
+
+**WHY B6 STOPPED HERE rather than being attempted.** B6 says freeze the MEASURED
+selection; section 7 of the same judgment orders "build mechanics first, MEASURE
+second, freeze third" -- and no measurement exists, because prequalification is
+the NEXT step and no GPU run is authorised in a coder window. Executing B6 now
+would mean inventing both the frozen values and the signal that marks a run as
+"prequalification". Both are operator calls; they are written up with defaults
+in GO_FORWARD's CURRENT STEP rather than guessed at unattended.
+
 ## 2026-07-27 02:05 -- HEAD 5929e19a (v2.0-alpha) -- WINDOW CODER A, SESSION 5
 Did: pushed B3 (b23fc035, the tier ceiling now narrows the coverage contract for
   ltx_8gb ONLY, with the WAN topology regression in the same commit) and B4
