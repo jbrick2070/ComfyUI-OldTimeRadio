@@ -3,6 +3,111 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 -- HEAD 54b3626b (v2.0-alpha) -- WINDOW CODER (BUG TRIAGE)
+Did: operator-directed triage of the whole OPEN BUGS list, then the fixes it
+  turned up. Panel: kibitz r1 with codex gpt-5.6-sol high (seat verified in
+  codex_model_selected.txt for this run) + agy Gemini 3.6 Flash (High), then a
+  Fable consult under CLAUDE.md section 9's reality exception. Claude wrote the
+  anchor triage first and grounded every panel claim against the real Windows
+  files before acting on any of it. Of five anchor rows the panel corrected
+  three, cut one, and added one that was absent from GO_FORWARD entirely.
+  Shipped 54b3626b: the two OTR_MasterAudioMux defects Fable found, both in the
+  LAST node of the graph, where everything raises AFTER the whole episode has
+  already rendered.
+Current step: B5's ruling FIRST. It is a dependency, not a peer; whether the
+  profile family is retained or retired changes the value and the acceptance
+  target of A1, A2 and A6. Then A1, A6, A2, A4, B4, A5-lite, frame_count.
+Next: the ranked queue in docs/2026-07-27-open-bug-triage.md, carried into
+  GO_FORWARD's CURRENT STEP. 7d stays PARKED.
+Models: Claude anchors, judges and codes; codex gpt-5.6-sol high and agy Gemini
+  3.6 Flash (High) as the local panel ($0, rungs 2 and 3); one Fable consult
+  (rung 6, operator-authorized) as the final gate. Two-strikes never invoked.
+Commits: 54b3626b plus this doc push. Suite 7346 to 7356; Bible 17; canonical
+  9872624A byte-identical. Record: docs/2026-07-27-open-bug-triage.md.
+
+### Detail
+
+**THE PANEL DISAGREED WITH ME MORE THAN THE TWO SEATS DISAGREED WITH EACH
+OTHER.** That is the finding worth keeping. Three corrections, all grounded:
+
+1. **A1's fix shape was INCOMPLETE.** "Enforce the ceiling in GGUF preflight"
+   misses the path that matters: a resident model returns at
+   _otr_model_loader.py:982-992 without entering preflight at all, and
+   GGUFLoadConfig.reuse_key() (_otr_gguf_backend.py:435-439) excludes the
+   ceiling, so a permissive-policy load satisfies a stricter-policy request by
+   cache hit. Correct shape: ONE policy-admission calculation before BOTH cache
+   reuse and loading, with a test for permissive-cache to stricter-request at
+   the same load identity.
+2. **A2's causal chain was WRONG.** The override does not come from the
+   validator's OTR_ACTIVE_PROFILE export; it happens at submission,
+   scripts/otr_canonical_api_run.py:157 into apply_profile_to_workflow. And the
+   real applier (nodes/_otr_workflow_apply.py:492-540) ALREADY flattens llm.
+   Only the printed echo (scripts/otr_api.py:816-825) is stale. Generate the
+   echo FROM the applier's map; adding llm by hand leaves the next drift intact.
+3. **A3 was already covered and I would have written a duplicate.** Three tests
+   cover the provider_side redirect: test_video_render_driver_perbeat_audio.py
+   :319-325, test_video_platform_aseam.py:903-920, and
+   test_still_plan_parity.py:114-116. I had checked the CODE, not the TESTS.
+
+**A6 IS NEW AND IS THE HIGHEST-VALUE ROW.** The shipped 8 GB profile selects
+Gemma Q4_K_M, but GGUF_ARTIFACTS (_otr_gguf_backend.py:56-60) gives that quant
+size None and GGUF_ROWS (:226-233) gives sha None. Both checks are conditional
+on the value existing, so a truncated or partial Q4 download passes readiness.
+
+**FABLE RESOLVED BOTH SPLITS THE MECHANICAL SEATS LEFT OPEN.** A5 (codex: fix
+at the shared boundary / agy: cut) is cut as a LIVE bug but keeps codex's
+location at a fraction of his scope: every producer feeds exact-size uint8,
+ffmpeg raises on a short write, and chunk 6 already put a decode-count at the
+boundary that matters (wan_shared.py:224-232). One dtype == uint8 assert closes
+the latent residual, which is a future float32 caller piping 4x the bytes and
+getting a clean receipt. B4 ShotRow (mine: operator ruling / agy: coder fix) is
+a CODER FIX: ShotLock stamps role, char_id, start_s/dur_s, coverage_plan and
+coverage_contract, none of which exist on a model declaring extra="forbid", so
+ShotRow(**real_row) raises on every real ledger and the "live safety net" other
+docs cite cannot validate one shipped episode. The repo's own observability and
+requires_mesh_portrait precedent settles the shape. No product question is left.
+
+**AND FABLE KILLED A FINDING THE OTHER SEAT WAS CONFIDENT ABOUT.** agy's
+heavy-import claim: the imports are real (Fable verified all four files and
+found eight more), but the enforced gate test_capability_profiles.py:481-503
+excludes the audio lane BY DESIGN and says so in its own docstring; ComfyUI
+imports torch/PIL/numpy before any custom node loads; and __init__.py wraps
+every node import so a broken dep skips one node loudly. Not a violation of the
+gate as this build defines it. Do not file.
+
+**WHAT SHIPPED AT 54b3626b.** Both defects live in OTR_MasterAudioMux. First, a
+FATAL env knob: float(os.environ.get("OTR_MAX_CREDITS_TAIL_S", "45")) was
+unguarded, so a malformed value killed a finished episode with an uncaught
+ValueError over a knob that only widens a sanity ceiling. That is the
+PBUG-20260723-02 shape, at the opposite end of the pipeline from where this
+build usually pays for it. Now IGNORED and NAMED via _credits_tail_ceiling();
+the sibling knob in the same file was already guarded, this was the one that was
+not. Second, the duration gate fails open: _probe_float returns -1.0 when
+ffprobe is absent or a duration is unparsable, which skips the only
+video-longer-than-audio guard, and the report still appended
+"duration_check v=-1.000s a=-1.000s ... OK". Now UNPROVEN, with the gate named
+as SKIPPED rather than passed. Not made fatal: it is the final sanity ceiling,
+not the primary correctness guard, and refusing would lose a finished episode on
+a box that merely lacks ffprobe.
+
+**STILL OPEN FROM FABLE, NOT YET FIXED.** CanonicalClip.frame_count, "the
+integer timing authority", is decode-counted truth for assembled multi-segment
+beats but self-declared input length for every single-render beat, and eng_humo
+and eng_ltx_av return self-declared dicts with no M7 probe while wan_i2v,
+wan_ti2v, ltx_8gb and ltx_video all probe. The two derivations agree today only
+because every producer pipes exact bytes. Now filed as an OPEN BUG.
+
+**A DEFECT IN THE BUG LIST ITSELF.** Every line cite checked had moved:
+_is_cloud_video_engine is render_driver.py:1599 not 1274-1295; the "NO FALLBACK
+to text-only" refusal is :2148 not 1801-1817; _use_i2v is eng_ltx_video.py:583
+not 559-572. The defects are mostly still real; their coordinates are not.
+Re-pin a row's cite when you touch it.
+
+**PROCESS NOTE.** r2/r3/r4 of the kibitz arc were NOT run. The arc hardens a
+PLAN across four lenses; what was asked for was a triage plus fixes, and r1 plus
+the Fable consult answered it. A next window wanting the full arc on the ranked
+queue starts at r2 with docs/2026-07-27-open-bug-triage.md as input.
+
 ## 2026-07-27 -- HEAD 8424f369 (v2.0-alpha) -- WINDOW CODER (LANE 2)
 Did: a measurement clip's receipt now names WHICH cell produced it --
   71e231ec (ltx_8gb + the shared format in the new recipe_departures.py),
