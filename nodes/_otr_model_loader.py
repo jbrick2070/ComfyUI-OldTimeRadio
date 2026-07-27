@@ -857,6 +857,72 @@ def invalidate_cache_no_gpu_teardown() -> None:
     LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
 
 
+def _assert_policy_admits_vram(
+    model_id: str, ctx_verdict: Any, policy: Any,
+) -> None:
+    """THE policy-admission calculation: may THIS request load this model
+    under the ceiling it arrived with?
+
+    Called once per request, before BOTH cache reuse and loading, for every
+    LOCAL lane. ``vram_ceiling_gb == 0`` disables the gate (cpu tier -- there
+    is no VRAM to fit). Remote lanes never reach it: they return earlier and
+    use zero local VRAM.
+
+    Why it does not live inside either loader branch (A1, 2026-07-27):
+    neither ``LLMRuntimePolicy.cache_key()`` nor ``GGUFLoadConfig.reuse_key()``
+    carries the ceiling, and both are RIGHT not to -- admission does not shape
+    the loaded artifact. But that means a resident model is reused on load
+    IDENTITY alone, so a model admitted under a permissive ceiling used to
+    satisfy a stricter-ceiling request by cache hit. Gating the load alone
+    cannot close that: the question is asked of the REQUEST, not of the cache.
+    This mirrors the lane backstop, which was already placed correctly -- the
+    two admission fields now get the same treatment.
+
+    ONE estimator serves every local lane. ``check_vram_fit`` already prices a
+    ``gguf_native`` row from its pinned on-disk artifact plus that row's KV
+    cache (``_otr_model_catalog._estimate_resident_gb``), so the GGUF lane
+    never needed a second calculation -- it needed this one to RUN. The GGUF
+    backend's own in-load preflight answers a different question ("does this
+    box have free VRAM right now") and stays where it is; a physical-free
+    probe cannot enforce a tier ceiling on a card that is larger than it.
+    """
+    from . import _otr_model_catalog as _otr_catalog
+    from ._otr_model_inputs import VRAMFitFailedError
+
+    if policy.vram_ceiling_gb <= 0:
+        log.info(
+            "[Selector] VRAM-fit gate disabled by policy "
+            "(vram_ceiling_gb=0, cpu tier)"
+        )
+        return
+
+    fit_verdict = _otr_catalog.check_vram_fit(
+        model_id, ctx_verdict.value, ceiling_gb=policy.vram_ceiling_gb,
+    )
+
+    # FAIL escalates BEFORE any cache reuse, network or disk work. A 70B pick
+    # on a 16 GB card must not trigger snapshot_download or a disk-space
+    # pre-check pass; both waste minutes on a doomed-to-OOM load.
+    if fit_verdict.tier == "FAIL":
+        raise VRAMFitFailedError(
+            f"VRAMFitFailedError: {model_id!r}: {fit_verdict.reason}. "
+            f"ctx_cap={ctx_verdict.tier}@{ctx_verdict.value}",
+            estimated_gb=fit_verdict.estimated_gb,
+            ceiling_gb=fit_verdict.ceiling_gb,
+        )
+
+    # Combined caution log (everything below PASS/PASS).
+    if not (fit_verdict.tier == "PASS" and ctx_verdict.tier == "PASS"):
+        log.info(
+            "[Selector] proceeding with caution: ctx_cap=%s@%d, "
+            "vram_fit=%s@%.1f GB",
+            ctx_verdict.tier,
+            ctx_verdict.value,
+            fit_verdict.tier,
+            fit_verdict.estimated_gb,
+        )
+
+
 def request_slot(
     slot: str, model_id: str, policy: Any = None, load_config: Any = None,
 ) -> dict[str, Any]:
@@ -869,16 +935,23 @@ def request_slot(
     n_batch + n_gpu_layers) and is threaded to the backend load -- no live-env
     rebuild. Ignored for non-GGUF rows.
 
-    B1d order (vram-fit BEFORE any network/disk work):
+    B1d order, as CORRECTED by A1 (2026-07-27) -- admission before REUSE,
+    not merely before network/disk work:
       1. normalize model_id via catalog.validate_model_id (strips
          [NOT DOWNLOADED] suffix, structural rejection, admit-path check).
-      2. Cache hit (same model_id resident) -> return entry. Done.
+      2. Lane backstop, then the REMOTE dispatch (zero local VRAM; returns).
       3. resolve_context_cap(model_id) -> tiered ContextCapVerdict.
-      4. check_vram_fit(model_id, ctx_verdict.value) -> tiered VRAMFitVerdict.
-      5. FAIL -> raise VRAMFitFailedError. CRITICAL: this fires BEFORE
-         auto_download so a 70B-on-16GB pick never triggers a network
-         pull or a disk-space pre-check pass on a doomed-to-fail load.
-      6. Combined caution log (anything below PASS/PASS).
+      4. _assert_policy_admits_vram -> check_vram_fit against the POLICY
+         ceiling; FAIL raises VRAMFitFailedError. Steps 3-4 run for every
+         LOCAL lane and run BEFORE every cache read below, because the
+         ceiling is deliberately absent from both reuse keys -- so a
+         cache hit would otherwise inherit the ceiling of whichever
+         request loaded the model first. It also still fires before
+         auto_download, so a 70B-on-16GB pick triggers no network pull.
+      5. GGUF dispatch: reuse on load identity, else load. Returns.
+      6. Transformers cache hit (same model_id + same policy cache_key)
+         -> return entry; a mismatched cache_key is a teardown, never
+         a silent reuse.
       7. auto_download_if_missing -- gated/disk-space pre-flight +
          snapshot_download. Local-cache short-circuit fires inside the
          catalog helper.
@@ -893,7 +966,6 @@ def request_slot(
     cached entry without a full teardown.
     """
     from . import _otr_model_catalog as _otr_catalog
-    from ._otr_model_inputs import VRAMFitFailedError
     from ._otr_shared.llm_policy import BASELINE_POLICY, lane_for_row
 
     if slot not in ("creative", "technical"):
@@ -964,6 +1036,15 @@ def request_slot(
             normalized, _virtual_row, policy=_policy,
         )
 
+    # Steps 3-5, HOISTED (A1, 2026-07-27): the context cap and THE policy
+    # admission calculation, once, before every local-lane cache read and
+    # before every local-lane load. They used to sit below both cache-hit
+    # returns and below the GGUF dispatch, so the ceiling could only ever
+    # gate a fresh TRANSFORMERS load -- see _assert_policy_admits_vram for
+    # why neither reuse key can carry the ceiling instead.
+    ctx_verdict = _otr_catalog.resolve_context_cap(normalized)
+    _assert_policy_admits_vram(normalized, ctx_verdict, _policy)
+
     if (
         _virtual_row is not None
         and getattr(_virtual_row, "loader_backend", None) in _GGUF_DISPATCH_BACKENDS
@@ -1031,43 +1112,7 @@ def request_slot(
         )
         unload_llm()
 
-    # Step 3: context cap (never raises).
-    ctx_verdict = _otr_catalog.resolve_context_cap(normalized)
-
-    # Step 4: VRAM fit (never raises). Ceiling comes from the policy (S1);
-    # 0 = gate DISABLED (cpu tier -- there is no VRAM to fit).
-    if _policy.vram_ceiling_gb > 0:
-        fit_verdict = _otr_catalog.check_vram_fit(
-            normalized, ctx_verdict.value,
-            ceiling_gb=_policy.vram_ceiling_gb,
-        )
-
-        # Step 5: FAIL escalates BEFORE any network/disk work. A 70B pick on
-        # a 16 GB card must not trigger snapshot_download or a disk-space
-        # pre-check pass; both waste minutes on a doomed-to-OOM load.
-        if fit_verdict.tier == "FAIL":
-            raise VRAMFitFailedError(
-                f"VRAMFitFailedError: {normalized!r}: {fit_verdict.reason}. "
-                f"ctx_cap={ctx_verdict.tier}@{ctx_verdict.value}",
-                estimated_gb=fit_verdict.estimated_gb,
-                ceiling_gb=fit_verdict.ceiling_gb,
-            )
-
-        # Step 6: combined caution log (everything below PASS/PASS).
-        if not (fit_verdict.tier == "PASS" and ctx_verdict.tier == "PASS"):
-            log.info(
-                "[Selector] proceeding with caution: ctx_cap=%s@%d, "
-                "vram_fit=%s@%.1f GB",
-                ctx_verdict.tier,
-                ctx_verdict.value,
-                fit_verdict.tier,
-                fit_verdict.estimated_gb,
-            )
-    else:
-        log.info(
-            "[Selector] VRAM-fit gate disabled by policy "
-            "(vram_ceiling_gb=0, cpu tier)"
-        )
+    # Steps 3-6 ran above, before the cache reads -- see the hoist comment.
 
     # Step 7: ensure on-disk + handle gating / disk-space pre-flight.
     # Local-cache short-circuit (B1d) fires inside this helper when the
