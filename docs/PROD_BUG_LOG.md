@@ -2718,8 +2718,28 @@ out until they independently meet the same production-only admission rule.
   this entry as the definition of the key should read
   `docs/2026-07-27-b3-qa-findings.md` and `frame_contract.effective_frame_contract`
   alongside it
+- UPDATE 2026-07-27 (B6): SECOND application of this entry's portable rule to
+  the same tier, with the OPPOSITE remedy, because there was no channel to fix.
+  B3 gave the ltx_8gb CEILING a profile -> ledger channel. The tier's RECIPE --
+  T5 device, tiled decode, the sampling knobs, the negative conditioning, the
+  tile geometry -- has no channel at all: the profile schema accepts only
+  `device_policy`, `dtype_policy` and `max_render_frames`, and
+  `otr_8gb_ltx.json`'s `launch.env` is `{}`. So the recipe is now FROZEN IN
+  CODE (`eng_ltx_8gb.LTX8_RECIPE_V1`); those env vars bind only under an
+  explicit `OTR_LTX_8GB_PREQUALIFICATION` consent act, and a run that sets it
+  stamps a `+prequalification` recipe receipt so a measurement artifact is
+  never mistaken for a production one in `meta.render_engines`.
+  A NEW TESTABLE COROLLARY this produced, which the original entry does not
+  state: **a knob that cannot bind must be IGNORED, never FATAL.** The first
+  draft parsed the demoted vars before discarding them, which meant a stale
+  `OTR_LTX_8GB_STEPS=not-a-number` in a long-booted server's environment would
+  raise MALFORMED_CONFIG and kill a leg over a value with no effect on it --
+  the same defect wearing the opposite mask. Presence is named in a warning;
+  nothing outside the consent act is parsed
 - bible-worthy: yes -- the portable rule is that a contract declared only in a
   process-launch environment cannot bind work submitted to an already-running
-  server; a per-tier constraint has to ride the artifact the run loads
+  server; a per-tier constraint has to ride the artifact the run loads. B6 adds
+  the corollary above (ignore, never fail, on a knob that cannot bind) and the
+  receipt rule (a run under a consent act must mark its own artifacts)
 - status: **ROOT-FIXED + suite/contract GREEN; live 8GB requalification leg
   still owed (no GPU run authorized in this window)**

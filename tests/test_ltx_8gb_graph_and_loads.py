@@ -60,6 +60,7 @@ _ENVS = (
     "OTR_LTX_8GB_TERMINAL", "OTR_LTX_8GB_MAX_FRAMES", "OTR_LTX_8GB_NEGATIVE",
     "OTR_LTX_8GB_VAE_TILE", "OTR_LTX_8GB_VAE_OVERLAP",
     "OTR_LTX_8GB_VAE_TEMPORAL", "OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP",
+    m.PREQUALIFICATION_ENV,
 )
 
 
@@ -186,6 +187,10 @@ def test_the_decode_CLASS_and_its_INPUTS_are_chosen_by_the_same_switch(
         {"asset_refs": {"init_image": "p"},
          "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
 
+    # Prequalification: the tiled-VAE lever is only LIVE there since B6, and the
+    # property under test is that the two readers AGREE, which needs a knob that
+    # can actually move. A production leg's freeze has its own test below.
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     assert eng._node_candidates()["decode"] == ("VAEDecode",)
     plain = eng._build_graph({}, "p.png", plan, 9, 512, 288)["decode"]["inputs"]
     assert set(plain) == {"samples", "vae"}
@@ -195,6 +200,27 @@ def test_the_decode_CLASS_and_its_INPUTS_are_chosen_by_the_same_switch(
     tiled = eng._build_graph({}, "p.png", plan, 9, 512, 288)["decode"]["inputs"]
     assert tiled["tile_size"] == 512 and tiled["overlap"] == 64
     assert tiled["temporal_size"] == 16 and tiled["temporal_overlap"] == 8
+
+
+def test_a_production_leg_decodes_through_the_FROZEN_class_whatever_the_env_says(
+        monkeypatch):
+    """B6 -- the decode class is part of the frozen recipe on a production leg.
+
+    An episode is submitted to an ALREADY-BOOTED server (PBUG-20260723-02), so
+    `OTR_LTX_8GB_TILED_VAE` in that server's environment is whatever the box was
+    started with -- possibly months ago, possibly by a different sweep. It must
+    not decide which decoder a published render used. Both readers stay on
+    `VAEDecode`, so they still agree; the freeze does not split them."""
+    eng = Ltx8gbEngine()
+    plan = eng._build_render_request(
+        {"asset_refs": {"init_image": "p"},
+         "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")     # no prequalification
+
+    assert eng._tiled_vae() is False
+    assert eng._node_candidates()["decode"] == ("VAEDecode",)
+    inputs = eng._build_graph({}, "p.png", plan, 9, 512, 288)["decode"]["inputs"]
+    assert set(inputs) == {"samples", "vae"}
 
 
 # --- the graph shape ------------------------------------------------------- #
@@ -277,7 +303,8 @@ def test_the_PROMPT_POLARITY_is_pinned_on_every_hop():
     assert g["decode"]["inputs"]["samples"] == wb.Wire("sample", 0)
 
 
-def test_the_RESOLVED_RECIPE_VALUES_reach_the_nodes_that_consume_them():
+def test_the_RESOLVED_RECIPE_VALUES_reach_the_nodes_that_consume_them(
+        monkeypatch):
     """A configured value with a severed channel is this build's recurring
     defect class -- three instances in four days. `_resolve_render_config` is
     the ONE authority for steps / cfg / shift / sampler / terminal, so this
@@ -288,9 +315,31 @@ def test_the_RESOLVED_RECIPE_VALUES_reach_the_nodes_that_consume_them():
     VALUES are the recipe's to change, the DELIVERY is not. What this catches
     is a crossed key (`"steps": cfg["max_shift"]`) or a hard-coded literal --
     the shapes that survive every other assertion in this file.
+
+    SINCE B6 THAT NEEDS THE CONSENT ACT. With the recipe frozen, a clean
+    environment makes the resolver return the frozen constants, so a
+    `_build_graph` that hard-coded `8` / `1.0` / `"euler"` would compare EQUAL
+    to it and the literal-catching half of this test would be decorative.
+    Opening the knobs and setting values that differ from every frozen one
+    restores the discrimination.
     """
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    for env, value in (("OTR_LTX_8GB_STEPS", "13"),
+                       ("OTR_LTX_8GB_CFG", "2.5"),
+                       ("OTR_LTX_8GB_MAX_SHIFT", "3.25"),
+                       ("OTR_LTX_8GB_BASE_SHIFT", "1.75"),
+                       ("OTR_LTX_8GB_TERMINAL", "0.35"),
+                       ("OTR_LTX_8GB_SAMPLER", "dpmpp_2m")):
+        monkeypatch.setenv(env, value)
+
     eng = Ltx8gbEngine()
     cfg = eng._resolve_render_config()
+    # Every value must differ from the frozen one, or a literal would still
+    # match and the test would be back where it started.
+    for key in ("steps", "cfg", "max_shift", "base_shift", "terminal",
+                "sampler"):
+        assert cfg[key] != m.LTX8_RECIPE_V1[key], key
+
     plan = eng._build_render_request(
         {"asset_refs": {"init_image": "p"},
          "timing": {"target_frame_count": 9},

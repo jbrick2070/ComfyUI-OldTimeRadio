@@ -39,6 +39,12 @@ _ENVS = (
     "OTR_LTX_8GB_T5_DIR", "OTR_LTX_8GB_T5_NAME", "OTR_LTX_8GB_STEPS",
     "OTR_LTX_8GB_TILED_VAE", "OTR_LTX_8GB_T5_DEVICE",
     "OTR_WAN_I2V_VAE_DIR", "OTR_WAN_I2V_CLIP_DIR",
+    # The ceiling is the ONE knob still parsed on this file's `assert_usable`
+    # path outside prequalification, so a malformed host value would turn a
+    # MISSING_MODEL assertion into MALFORMED_CONFIG. The frozen knobs are
+    # harmless here only because the freeze makes them unreadable -- scrub the
+    # one that is not, and the consent act that would unfreeze the rest.
+    "OTR_LTX_8GB_MAX_FRAMES", m.PREQUALIFICATION_ENV,
 )
 
 #: The real floor is 4 GiB; materialising that per test buys no extra proof.

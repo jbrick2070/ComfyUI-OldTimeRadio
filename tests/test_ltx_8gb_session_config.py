@@ -33,7 +33,18 @@ _ENVS = (
     "OTR_LTX_8GB_T5_DEVICE", "OTR_LTX_8GB_STEPS", "OTR_LTX_8GB_MAX_FRAMES",
     "OTR_LTX_8GB_CFG", "OTR_LTX_8GB_SAMPLER", "OTR_LTX_8GB_MAX_SHIFT",
     "OTR_LTX_8GB_BASE_SHIFT", "OTR_LTX_8GB_TERMINAL", "OTR_LTX_8GB_NEGATIVE",
+    "OTR_LTX_8GB_VAE_TILE", "OTR_LTX_8GB_VAE_OVERLAP",
+    "OTR_LTX_8GB_VAE_TEMPORAL", "OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP",
+    m.PREQUALIFICATION_ENV,
 )
+
+
+def test_the_env_scrub_list_covers_every_frozen_knob():
+    """This file's own fixture, held to its own claim. `_RECIPE_ENV_KEYS` grew
+    twice during B6; a scrub list that does not grow with it is the T-6 leak
+    the comment above says it closed -- a host var reaching the demotion
+    warning that other tests here assert on."""
+    assert set(m._RECIPE_ENV_KEYS.values()) <= set(_ENVS)
 
 
 @pytest.fixture(autouse=True)
@@ -220,28 +231,75 @@ def test_a_missing_t5_is_named_and_says_offline(eng, monkeypatch):
     assert m._LTX8_DEFAULT_T5 in msg and "offline" in msg
 
 
-def test_a_malformed_render_knob_fails_before_any_file_work(eng, monkeypatch):
+def test_a_malformed_render_knob_fails_before_any_file_work_under_prequalification(
+        eng, monkeypatch):
+    """Under prequalification the recipe knobs BIND, so a bad one is terminal --
+    the original contract, now scoped to the mode where the value has effect."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     monkeypatch.setenv("OTR_LTX_8GB_STEPS", "not-a-number")
     with pytest.raises(EngineUnusable) as e:
         eng.resolve_session_config()
     assert "OTR_LTX_8GB_STEPS" in str(e.value)
 
 
+def test_a_malformed_recipe_knob_is_IGNORED_on_a_production_leg(
+        eng, monkeypatch, caplog):
+    """B6 -- THE INVERSION, and the reason the freeze had to stop parsing.
+
+    A production episode is submitted to an ALREADY-BOOTED server, so a stale
+    `OTR_LTX_8GB_STEPS=not-a-number` may be sitting in that server's environment
+    from a sweep weeks ago. It cannot bind (the recipe is frozen), so it cannot
+    be wrong -- and failing the leg over a value with NO EFFECT on it is exactly
+    the shape PBUG-20260723-02 forbids. It is named in the log and ignored."""
+    monkeypatch.setenv("OTR_LTX_8GB_STEPS", "not-a-number")
+    with caplog.at_level("WARNING"):
+        cfg = eng.resolve_session_config()
+    assert cfg.steps == m.LTX8_RECIPE_V1["steps"]          # the frozen value
+    assert "OTR_LTX_8GB_STEPS" in caplog.text              # named, not silent
+
+
 # --- the levers are captured, so a later reader cannot disagree ------------ #
-def test_tiled_vae_and_max_frames_are_captured_at_resolution_time(
+def test_max_frames_is_captured_at_resolution_time_on_EVERY_leg(
         eng, monkeypatch):
-    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
+    """The CEILING is not a recipe knob (B6) -- it keeps its env channel on a
+    production leg, because B4's pre-render refusal reads it to make a
+    plan-vs-box disagreement terminal."""
     monkeypatch.setenv("OTR_LTX_8GB_MAX_FRAMES", "65")
     cfg = eng.resolve_session_config()
-    assert cfg.tiled_vae is True
     assert cfg.max_frames == 65
-    # The whole point: flipping the env AFTER resolution does not move the
-    # frozen config, so identity and prepare cannot see different values.
+
+    # The snapshot a consumer already HOLDS does not move under it -- that is
+    # what "resolve once, pass by value" buys, and it is why prepare() and the
+    # graph cannot disagree about a config they were handed together.
+    monkeypatch.setenv("OTR_LTX_8GB_MAX_FRAMES", "161")
+    assert cfg.max_frames == 65
+    # But a FRESH resolution genuinely re-reads, by design (`session_identity`
+    # is explicitly not cached, so it can notice a weight that moved). Assert
+    # that too, or the line above proves only that a namedtuple is immutable.
+    assert eng.resolve_session_config().max_frames == 161
+
+
+def test_tiled_vae_is_captured_at_resolution_time_under_prequalification(
+        eng, monkeypatch):
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
+    cfg = eng.resolve_session_config()
+    assert cfg.tiled_vae is True
     monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")
     assert cfg.tiled_vae is True
 
 
+def test_tiled_vae_does_NOT_bind_on_a_production_leg(eng, monkeypatch):
+    """Same env, no consent act: the frozen decoder wins."""
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
+    assert eng.resolve_session_config().tiled_vae is \
+        m.LTX8_RECIPE_V1["tiled_vae"]
+
+
 def test_profile_argument_is_accepted_today_without_changing_the_result(eng):
-    """B6 will consult it; the signature must not churn under callers later."""
+    """B6 landed WITHOUT consulting it, deliberately: the profile schema accepts
+    only device_policy / dtype_policy / max_render_frames, so it has no channel
+    for these levers -- which is why the recipe is frozen in CODE. The parameter
+    stays so the signature does not churn under callers if a channel appears."""
     assert eng.resolve_session_config(profile={"video": {}}) == \
         eng.resolve_session_config()

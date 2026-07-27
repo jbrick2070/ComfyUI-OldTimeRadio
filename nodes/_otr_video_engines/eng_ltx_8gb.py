@@ -42,15 +42,29 @@ NO auto-fallback (operator directive 2026-07-20). Cold-import clean (V-12): modu
 scope imports only the stdlib + the dep-free shared helpers; torch / PIL / ffmpeg /
 the ComfyUI node registry are imported LAZILY inside load / render_clip. UTF-8, no BOM.
 
-Config (env; all optional): ``OTR_LTX_8GB_CKPT`` explicit checkpoint path;
-``OTR_LTX_8GB_CKPT_NAME`` / ``OTR_LTX_8GB_T5_NAME`` loader basenames;
-``OTR_LTX_8GB_CKPT_DIR`` / ``OTR_LTX_8GB_T5_DIR`` DEPRECATED dir overrides (see
-the paragraph below before reaching for either); ``OTR_LTX_8GB_STEPS``
-(default 8) / ``OTR_LTX_8GB_CFG`` (1.0) / ``OTR_LTX_8GB_SAMPLER`` (euler) /
-``OTR_LTX_8GB_MAX_SHIFT`` (2.05) / ``OTR_LTX_8GB_BASE_SHIFT`` (0.95) /
-``OTR_LTX_8GB_TERMINAL`` (0.1) / ``OTR_LTX_8GB_MAX_FRAMES`` (cap; 8n+1) /
-``OTR_LTX_8GB_T5_DEVICE`` (default cpu) / ``OTR_LTX_8GB_TILED_VAE`` (default off) /
-``OTR_LTX_8GB_NEGATIVE``.
+Config (env). READ THE SPLIT -- since B6 (2026-07-27) most of these do NOT bind
+on a production leg:
+
+* STILL LIVE, every leg: ``OTR_LTX_8GB_CKPT`` explicit checkpoint path;
+  ``OTR_LTX_8GB_CKPT_NAME`` / ``OTR_LTX_8GB_T5_NAME`` loader basenames;
+  ``OTR_LTX_8GB_CKPT_DIR`` / ``OTR_LTX_8GB_T5_DIR`` DEPRECATED dir overrides
+  (see the paragraph below before reaching for either); and
+  ``OTR_LTX_8GB_MAX_FRAMES`` (render-length ceiling; 8n+1) -- a CEILING, not a
+  recipe value, so it keeps its channel and its fail-closed range check.
+* FROZEN IN CODE as ``LTX8_RECIPE_V1``, ignored-with-a-warning otherwise:
+  ``OTR_LTX_8GB_STEPS`` / ``_CFG`` / ``_SAMPLER`` / ``_MAX_SHIFT`` /
+  ``_BASE_SHIFT`` / ``_TERMINAL`` / ``_T5_DEVICE`` / ``_TILED_VAE`` /
+  ``_NEGATIVE`` / ``_VAE_TILE`` / ``_VAE_OVERLAP`` / ``_VAE_TEMPORAL`` /
+  ``_VAE_TEMPORAL_OVERLAP``. Their defaults live in that dict, not here, so
+  this list cannot drift from the values.
+* THE CONSENT ACT: set ``OTR_LTX_8GB_PREQUALIFICATION=1`` and the frozen knobs
+  bind again, range-checked and fail-closed, for a MEASUREMENT run -- whose
+  clips stamp a ``+prequalification`` recipe receipt so a sweep artifact is
+  never mistaken for a production one.
+
+Why the freeze: a production episode is submitted to an ALREADY-BOOTED server,
+so a knob exported at launch cannot bind the work (``PBUG-20260723-02``). Code
+binds on every leg; an environment cannot.
 
 ``OTR_LTX_8GB_CKPT`` and the two ``*_DIR`` overrides are CHECKED against the
 loader's own token resolution and REFUSE with MALFORMED_CONFIG when they
@@ -103,7 +117,162 @@ _LTX8_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, distorted, watermark, text, static")
 
 #: The defined recipe-receipt string threaded into the manifest (S-B/E5).
-RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass"
+#:
+#: THE VERSION LIVES IN THE STRING (B6, 2026-07-27), not in a separate constant.
+#: This value rides `_clip_from_raw` -> the manifest row -> the render-batch
+#: receipt -> `stamp_durable(meta.render_engines)`, so it is what a PUBLISHED
+#: EPISODE's DURABLE LEDGER can be asked "which recipe rendered you". (It also
+#: reaches `otr_credits_roll`, which builds a `video_suffix` from it -- but
+#: `_draw_models` does not currently draw that field, so the recipe is in the
+#: ledger, not yet on the burned-in card. Tracked in GO_FORWARD open bugs.)
+#: A bare `LTX8_RECIPE_VERSION` constant that never reached that string would
+#: leave the recipe invisible to every consumer that matters -- an unowned
+#: ledger field in all but name. It is also `cfg.recipe` in `session_identity`,
+#: so a version bump moves the identity for free.
+RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v1"
+
+#: THE CONSENT ACT that re-opens the recipe knobs (B6). One explicit env var,
+#: the same shape as the client-bank build's `--activate`: an operator who
+#: means to sweep says so, and a production box that never sets it gets the
+#: frozen recipe no matter how the server booted.
+PREQUALIFICATION_ENV = "OTR_LTX_8GB_PREQUALIFICATION"
+
+#: What a MEASUREMENT run stamps onto its clips instead of the frozen name.
+#: See ``recipe_receipt`` -- a sweep's artifacts must be distinguishable from
+#: production's in the durable ledger, because they are not the same recipe.
+PREQUALIFICATION_RECIPE_SUFFIX = "+prequalification"
+
+#: THE FROZEN ltx_8gb RECIPE, v1 (B6, 2026-07-27).
+#:
+#: WHY IT EXISTS. The profile schema accepts only `device_policy`,
+#: `dtype_policy` and `max_render_frames`, so this tier's real levers -- T5
+#: device, tiled VAE decode, the sampling knobs -- have NO end-to-end channel.
+#: They were read from `os.environ`, and per `PBUG-20260723-02` a production
+#: episode is submitted to an ALREADY-BOOTED server, so a profile's
+#: `launch.env` can never reach it and `otr_8gb_ltx.json`'s is empty. The
+#: tier's recipe was therefore whatever the server happened to boot with.
+#: Code binds on every leg regardless -- that is the whole point of that PBUG's
+#: Bible rule, and this dict is it.
+#:
+#: WHAT v1 IS, STATED HONESTLY. These are TODAY'S SHIPPED DEFAULTS, not a
+#: measured selection. The judgment orders "build mechanics first, MEASURE
+#: second, freeze third", and no measurement has happened -- prequalification
+#: is the next step. Freezing them now is behaviour-preserving on any box that
+#: did not set the env vars, and it is reversible: prequalification measures
+#: and produces v2. Each value already has a recorded reason -- the T5 offloads
+#: to CPU because `t5xxl_fp16` alone is ~9 GB (load-bearing, not an
+#: optimisation), and tiled VAE is OFF because core `VAEDecode` handles the
+#: 8 GB peak at the smoke canvas.
+#:
+#: `max_frames` IS DELIBERATELY NOT HERE. It is a render-length CEILING, not a
+#: recipe knob: B3 gave the tier ceiling its own profile -> ledger channel and
+#: B4's pre-render refusal reads the env cap to make a plan-vs-box
+#: disagreement terminal. Folding it in would silence that refusal, and
+#: `test_an_ask_ABOVE_the_cap_is_refused_before_anything_is_staged` is the
+#: trip-wire that catches anyone trying.
+LTX8_RECIPE_V1 = {
+    "steps": 8,
+    "cfg": 1.0,
+    "max_shift": 2.05,
+    "base_shift": 0.95,
+    "terminal": 0.1,
+    "sampler": "euler",
+    "t5_device": "cpu",
+    "tiled_vae": False,
+    #: The negative conditioning text. A RENDER INPUT, so it belongs here for
+    #: the same reason the samplers do: read from `os.environ` it made two
+    #: boxes produce visibly different clips that both stamped the same recipe
+    #: receipt. A per-shot `negative_prompt` on the request still wins -- that
+    #: is the director's channel, and it travels WITH the work rather than with
+    #: the server's boot.
+    "negative": _LTX8_DEFAULT_NEGATIVE,
+    #: The tiled-decode geometry. Only consumed while `tiled_vae` is True, so
+    #: these are inert today -- and that is exactly why they are frozen NOW:
+    #: the day a measured v2 flips tiled decode on, four env-driven render
+    #: inputs would otherwise come live again with no demotion notice and no
+    #: receipt, quietly re-opening the hole this chunk closed.
+    "vae_tile": 512,
+    "vae_overlap": 64,
+    "vae_temporal": 16,
+    "vae_temporal_overlap": 8,
+}
+
+#: The env var each frozen field was read from, kept so the demotion can NAME
+#: what it is ignoring. Presence is all this map is used for outside
+#: prequalification -- see `_ignored_override_keys`.
+_RECIPE_ENV_KEYS = {
+    "steps": "OTR_LTX_8GB_STEPS",
+    "cfg": "OTR_LTX_8GB_CFG",
+    "max_shift": "OTR_LTX_8GB_MAX_SHIFT",
+    "base_shift": "OTR_LTX_8GB_BASE_SHIFT",
+    "terminal": "OTR_LTX_8GB_TERMINAL",
+    "sampler": "OTR_LTX_8GB_SAMPLER",
+    "t5_device": "OTR_LTX_8GB_T5_DEVICE",
+    "tiled_vae": "OTR_LTX_8GB_TILED_VAE",
+    "negative": "OTR_LTX_8GB_NEGATIVE",
+    "vae_tile": "OTR_LTX_8GB_VAE_TILE",
+    "vae_overlap": "OTR_LTX_8GB_VAE_OVERLAP",
+    "vae_temporal": "OTR_LTX_8GB_VAE_TEMPORAL",
+    "vae_temporal_overlap": "OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP",
+}
+
+#: Per-knob bounds for the tiled-decode geometry, from the LIVE ``/object_info``
+#: capture of 2026-07-20 (docs/2026-07-20-OTR-video-tiers/ltx_8gb_discovery.json):
+#: ``VAEDecodeTiled`` declares tile_size min 64, overlap min 0, temporal_size
+#: min 8, temporal_overlap min 4. A value under the NODE'S OWN floor is a render
+#: that dies inside ComfyUI, so it is refused here like every other knob rather
+#: than handed over to fail late.
+_VAE_TILE_BOUNDS = {
+    "vae_tile": (64, 4096),
+    "vae_overlap": (0, 4096),
+    "vae_temporal": (8, 4096),
+    "vae_temporal_overlap": (4, 4096),
+}
+
+_TRUTHY = ("1", "true", "yes", "on")
+
+
+def _prequalification_active():
+    """True when the operator has explicitly opened the recipe knobs.
+
+    Deliberately NOT inferred from the absence of a ledger or from any other
+    ambient condition: a signal you can arrive at by accident is one a
+    production leg can arrive at by accident."""
+    return (os.environ.get(PREQUALIFICATION_ENV, "") or "").strip().lower() \
+        in _TRUTHY
+
+
+def _ignored_override_keys():
+    """Which frozen knobs the environment is trying to set, by NAME ONLY.
+
+    PRESENCE, NEVER PARSING, and that is load-bearing rather than tidy. If this
+    parsed, a stale malformed `OTR_LTX_8GB_STEPS=not-a-number` left in a
+    long-booted server's environment would raise MALFORMED_CONFIG and kill a
+    production leg over a knob that has NO EFFECT on that leg -- the precise
+    shape `PBUG-20260723-02` says must not happen. Outside prequalification
+    these values cannot bind, so they cannot be wrong; they can only be
+    ignored, and the operator is told."""
+    return sorted(env for env in _RECIPE_ENV_KEYS.values()
+                  if os.environ.get(env) not in (None, ""))
+
+
+def recipe_receipt():
+    """The recipe string a rendered clip is STAMPED with.
+
+    NOT simply ``RECIPE_LTX8_I2V``, and the difference is a ledger-integrity
+    one. Under prequalification the knobs genuinely bind, so the clip on disk
+    may share NONE of v1's values -- while the receipt rides ``_clip_from_raw``
+    -> the manifest row -> ``stamp_durable(meta.render_engines)``, which is a
+    DURABLE ledger a published episode carries. Stamping the frozen name onto a
+    sweep artifact would make a measurement indistinguishable from production
+    in the one record that outlives the run.
+
+    So the consent act marks its own output. It also moves ``session_identity``
+    (the recipe is element [1]), which is correct: a sweep segment and a
+    production segment must never be mistaken for the same session."""
+    if _prequalification_active():
+        return RECIPE_LTX8_I2V + PREQUALIFICATION_RECIPE_SUFFIX
+    return RECIPE_LTX8_I2V
 
 #: The FROZEN per-beat resolution (B2). Everything a beat's HANDLES depend on,
 #: read exactly ONCE and passed by value to identity, prepare, assert_usable and
@@ -467,7 +636,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "ltx_8gb %s" % (exc,), kind="video")
         return LtxSessionConfig(
-            engine=self.name, recipe=RECIPE_LTX8_I2V,
+            engine=self.name, recipe=recipe_receipt(),
             ckpt_token=self._ckpt_name(), ckpt_path=ckpt,
             ckpt_receipt=ckpt_receipt,
             t5_token=self._t5_name(), t5_path=t5,
@@ -508,37 +677,117 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """Whether to decode through ``VAEDecodeTiled`` (default OFF: 0.9.8 core
         VAEDecode handles the 8GB peak at the smoke canvas; C3 tuning may flip this
         via env if a larger canvas needs it). Truthy {1,true,yes,on} enables it."""
-        return (os.environ.get("OTR_LTX_8GB_TILED_VAE", "0").strip().lower()
-                in ("1", "true", "yes", "on"))
+        if not _prequalification_active():
+            return bool(LTX8_RECIPE_V1["tiled_vae"])
+        # The prequalification DEFAULT is the frozen value, not a literal: a
+        # sweep that opens the knobs but re-exports only some of them must
+        # measure the recipe it is validating, not a third configuration.
+        dflt = "1" if LTX8_RECIPE_V1["tiled_vae"] else "0"
+        # `or dflt`, not `get(name, dflt)`: an exported-but-EMPTY var would
+        # otherwise read as "" -- not truthy -- and force the knob OFF against
+        # a frozen default of ON. Every other accessor treats empty as unset.
+        raw = os.environ.get("OTR_LTX_8GB_TILED_VAE") or dflt
+        return raw.strip().lower() in _TRUTHY
 
     def _t5_device(self):
         """T5 CLIPLoader device: default ``cpu`` for the 8GB tier (t5xxl_fp16 alone
         is ~9 GB, so it encodes on CPU first, then diffusion runs on the GPU). The
         offload-on-vs-off VRAM measurement (C3) may flip this via OTR_LTX_8GB_T5_DEVICE."""
-        dev = (os.environ.get("OTR_LTX_8GB_T5_DEVICE") or "cpu").strip().lower()
-        return dev if dev in ("cpu", "default") else "cpu"
+        frozen = str(LTX8_RECIPE_V1["t5_device"])
+        if not _prequalification_active():
+            return frozen
+        dev = (os.environ.get("OTR_LTX_8GB_T5_DEVICE") or frozen).strip().lower()
+        return dev if dev in ("cpu", "default") else frozen
+
+    def _negative_prompt(self):
+        """The FROZEN negative conditioning (B6).
+
+        The per-shot ``negative_prompt`` on the request still wins over this --
+        that is the director's channel and it travels with the work. What is
+        gone is the ``os.environ`` fallback: it made two boxes render visibly
+        different clips from the same episode while both stamped the same
+        recipe receipt, which is the whole defect this chunk closes."""
+        frozen = str(LTX8_RECIPE_V1["negative"])
+        if not _prequalification_active():
+            return frozen
+        return os.environ.get("OTR_LTX_8GB_NEGATIVE") or frozen
+
+    def _config_number(self, env, dflt, lo, hi, cast):
+        """Parse + RANGE-CHECK one numeric env knob, or fail CLOSED by name.
+
+        THE ONE implementation, deliberately. It used to be a closure inside
+        ``_resolve_render_config`` while ``_decode_inputs`` carried a second,
+        quieter copy that swallowed a bad value and silently substituted the
+        default -- so the tile geometry was the single knob on this adapter
+        that failed OPEN. A sweep could then mistype the value it was
+        measuring, render at something else, and stamp a receipt saying it had
+        measured it. Two implementations of one rule is how that happens; one
+        is the fix."""
+        raw = os.environ.get(env)
+        if raw is None or raw == "":
+            return cast(dflt)
+        try:
+            val = cast(raw)
+        except (TypeError, ValueError):
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "%s=%r is not a valid number" % (env, raw), kind="video")
+        if not (lo <= val <= hi):
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "%s=%s out of range [%s, %s]" % (env, val, lo, hi), kind="video")
+        return val
 
     def _resolve_render_config(self):
         """Parse + RANGE-CHECK the render knobs ONCE (shared by assert_usable and
         _build_graph). A bad env value fails CLOSED here with a named MALFORMED_CONFIG,
         never a raw int()/float() crash mid-render. The sampler is validated against
         the portable floor whitelist."""
-        def _num(env, dflt, lo, hi, cast):
-            raw = os.environ.get(env)
-            if raw is None or raw == "":
-                return cast(dflt)
-            try:
-                val = cast(raw)
-            except (TypeError, ValueError):
-                raise EngineUnusable(
-                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                    "%s=%r is not a valid number" % (env, raw), kind="video")
-            if not (lo <= val <= hi):
-                raise EngineUnusable(
-                    self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                    "%s=%s out of range [%s, %s]" % (env, val, lo, hi), kind="video")
-            return val
+        _num = self._config_number
 
+        # THE CEILING IS RESOLVED ON EVERY LEG (B6). ``max_frames`` is NOT part
+        # of the frozen recipe -- it is a render-length ceiling B4's pre-render
+        # refusal reads to make a plan-vs-box disagreement terminal -- so it
+        # keeps its env channel AND its fail-closed range check everywhere.
+        max_frames = _num("OTR_LTX_8GB_MAX_FRAMES", _LTX8_MAX_FRAMES_DEFAULT,
+                          _LTX8_MIN_FRAMES, 16384, int)
+
+        if not _prequalification_active():
+            # THE PRODUCTION LEG: the frozen recipe binds, whatever the server
+            # booted with. Anything the environment is trying to say is named
+            # and ignored -- named because a knob that silently does nothing is
+            # the complaint B3 already collected, and ignored (never parsed)
+            # because a stale malformed value must not be able to kill a leg it
+            # cannot influence. See ``_ignored_override_keys``.
+            ignored = _ignored_override_keys()
+            if ignored:
+                _LOG.warning(
+                    "[OTR video] ltx_8gb recipe %s is FROZEN in code; ignoring "
+                    "%s from the environment. These knobs bind only under %s=1 "
+                    "during prequalification -- a production leg is submitted "
+                    "to an already-booted server, so its recipe may not depend "
+                    "on how that server started (PBUG-20260723-02).",
+                    RECIPE_LTX8_I2V, ", ".join(ignored), PREQUALIFICATION_ENV)
+            # SPELLED OUT rather than `dict(LTX8_RECIPE_V1)` so BOTH legs return
+            # the SAME KEY SET. The recipe dict also carries `t5_device` and
+            # `tiled_vae`, whose owners are `_t5_device()` / `_tiled_vae()`;
+            # passing them through here on the production leg only would give
+            # this function a return shape that varies by mode, and the next
+            # reader to write `cfg["t5_device"]` would get a KeyError that only
+            # reproduces under prequalification.
+            return {
+                "steps": LTX8_RECIPE_V1["steps"],
+                "cfg": LTX8_RECIPE_V1["cfg"],
+                "max_shift": LTX8_RECIPE_V1["max_shift"],
+                "base_shift": LTX8_RECIPE_V1["base_shift"],
+                "terminal": LTX8_RECIPE_V1["terminal"],
+                "max_frames": max_frames,
+                "sampler": LTX8_RECIPE_V1["sampler"],
+            }
+
+        # PREQUALIFICATION: the knobs are open, every value is range-checked as
+        # before, and each honoured override is announced so a sweep's log says
+        # what it actually measured.
         sampler = (os.environ.get("OTR_LTX_8GB_SAMPLER")
                    or self._DEFAULT_SAMPLER).strip()
         if sampler not in self._PORTABLE_SAMPLERS:
@@ -546,14 +795,25 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
                 "OTR_LTX_8GB_SAMPLER=%r is not in the portable floor whitelist %s"
                 % (sampler, sorted(self._PORTABLE_SAMPLERS)), kind="video")
+        honoured = _ignored_override_keys()
+        if honoured:
+            _LOG.warning(
+                "[OTR video] ltx_8gb PREQUALIFICATION (%s is set): honouring "
+                "%s from the environment INSTEAD of frozen recipe %s. This is "
+                "a measurement run, not a production contract.",
+                PREQUALIFICATION_ENV, ", ".join(honoured), RECIPE_LTX8_I2V)
         return {
-            "steps": _num("OTR_LTX_8GB_STEPS", 8, 1, 100, int),
-            "cfg": _num("OTR_LTX_8GB_CFG", 1.0, 0.0, 30.0, float),
-            "max_shift": _num("OTR_LTX_8GB_MAX_SHIFT", 2.05, 0.0, 100.0, float),
-            "base_shift": _num("OTR_LTX_8GB_BASE_SHIFT", 0.95, 0.0, 100.0, float),
-            "terminal": _num("OTR_LTX_8GB_TERMINAL", 0.1, 0.0, 0.99, float),
-            "max_frames": _num("OTR_LTX_8GB_MAX_FRAMES", _LTX8_MAX_FRAMES_DEFAULT,
-                               _LTX8_MIN_FRAMES, 16384, int),
+            "steps": _num("OTR_LTX_8GB_STEPS", LTX8_RECIPE_V1["steps"],
+                          1, 100, int),
+            "cfg": _num("OTR_LTX_8GB_CFG", LTX8_RECIPE_V1["cfg"],
+                        0.0, 30.0, float),
+            "max_shift": _num("OTR_LTX_8GB_MAX_SHIFT",
+                              LTX8_RECIPE_V1["max_shift"], 0.0, 100.0, float),
+            "base_shift": _num("OTR_LTX_8GB_BASE_SHIFT",
+                               LTX8_RECIPE_V1["base_shift"], 0.0, 100.0, float),
+            "terminal": _num("OTR_LTX_8GB_TERMINAL", LTX8_RECIPE_V1["terminal"],
+                             0.0, 0.99, float),
+            "max_frames": max_frames,
             "sampler": sampler,
         }
 
@@ -638,16 +898,29 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         base = {"samples": W("sample", 0), "vae": W("ckpt", 2)}
         if not self._tiled_vae():
             return base
-        def _i(env, dflt):
-            try:
-                return int(os.environ.get(env, str(dflt)))
-            except (TypeError, ValueError):
+        def _i(key):
+            """The frozen geometry, env-overridable ONLY under the consent act.
+
+            These are render inputs like any other knob: reachable only while
+            tiled decode is on, which the frozen recipe keeps off -- so today
+            they are inert either way. They are gated anyway, because the day a
+            measured v2 turns tiled decode on is the day four boot-environment
+            values would otherwise start deciding what a published clip looks
+            like, with nothing naming them.
+
+            Range-checked through the SAME helper as every other knob, so a
+            mistyped value stops a sweep instead of being quietly replaced by
+            the default it was meant to be measured against."""
+            dflt = int(LTX8_RECIPE_V1[key])
+            if not _prequalification_active():
                 return dflt
+            lo, hi = _VAE_TILE_BOUNDS[key]
+            return self._config_number(_RECIPE_ENV_KEYS[key], dflt, lo, hi, int)
         base.update({
-            "tile_size": _i("OTR_LTX_8GB_VAE_TILE", 512),
-            "overlap": _i("OTR_LTX_8GB_VAE_OVERLAP", 64),
-            "temporal_size": _i("OTR_LTX_8GB_VAE_TEMPORAL", 16),
-            "temporal_overlap": _i("OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP", 8),
+            "tile_size": _i("vae_tile"),
+            "overlap": _i("vae_overlap"),
+            "temporal_size": _i("vae_temporal"),
+            "temporal_overlap": _i("vae_temporal_overlap"),
         })
         return base
 
@@ -675,8 +948,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             lambda k, d=None: getattr(request, k, d))
         cfg = self._resolve_render_config()
         positive = get("text_prompt") or "subtle natural motion, cinematic light"
-        negative = (get("negative_prompt")
-                    or os.environ.get("OTR_LTX_8GB_NEGATIVE", _LTX8_DEFAULT_NEGATIVE))
+        negative = get("negative_prompt") or self._negative_prompt()
         graph = {
             "ckpt": {"class": "ckpt", "inputs": {"ckpt_name": self._ckpt_name()}},
             "clip": {"class": "clip",
@@ -970,7 +1242,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             _LOG.info("[OTR video] ltx_8gb VRAM render-phase peak %s MB @ %dx%d len=%d",
                       render_peak, width, height, n)
         return {"out_path": path, "frame_count": n,
-                "vram_peak_mb": render_peak, "recipe": RECIPE_LTX8_I2V,
+                "vram_peak_mb": render_peak, "recipe": recipe_receipt(),
                 "render_canvas": "%dx%d" % (int(width), int(height))}
 
     def canonicalize(self, raw, request, profile):

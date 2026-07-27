@@ -15,9 +15,25 @@ import pytest
 from nodes._otr_video_engines import beat_session as bs
 from nodes._otr_video_engines import eng_ltx_8gb as m
 
-_ENVS = ("OTR_LTX_8GB_CKPT", "OTR_LTX_8GB_CKPT_DIR", "OTR_LTX_8GB_T5_DIR",
+#: EVERY env var reachable from `session_identity` -> `resolve_session_config`,
+#: including the token names `_ckpt_name`/`_t5_name` read and the knobs that
+#: come alive once a test sets the consent act. A short list lets the HOST
+#: environment decide an outcome (QA finding T-6).
+_ENVS = ("OTR_LTX_8GB_CKPT", "OTR_LTX_8GB_CKPT_DIR", "OTR_LTX_8GB_CKPT_NAME",
+         "OTR_LTX_8GB_T5_DIR", "OTR_LTX_8GB_T5_NAME",
          "OTR_LTX_8GB_T5_DEVICE", "OTR_LTX_8GB_TILED_VAE",
-         "OTR_LTX_8GB_MAX_SHIFT", "OTR_LTX_8GB_MAX_FRAMES")
+         "OTR_LTX_8GB_STEPS", "OTR_LTX_8GB_CFG", "OTR_LTX_8GB_SAMPLER",
+         "OTR_LTX_8GB_MAX_SHIFT", "OTR_LTX_8GB_BASE_SHIFT",
+         "OTR_LTX_8GB_TERMINAL", "OTR_LTX_8GB_NEGATIVE",
+         "OTR_LTX_8GB_VAE_TILE", "OTR_LTX_8GB_VAE_OVERLAP",
+         "OTR_LTX_8GB_VAE_TEMPORAL", "OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP",
+         "OTR_LTX_8GB_MAX_FRAMES", m.PREQUALIFICATION_ENV)
+
+
+def test_the_env_scrub_list_covers_every_frozen_knob():
+    """Held to the claim three lines above: every knob the freeze names must be
+    scrubbed, or the host box decides an outcome here."""
+    assert set(m._RECIPE_ENV_KEYS.values()) <= set(_ENVS)
 
 
 @pytest.fixture(autouse=True)
@@ -72,8 +88,15 @@ def test_identity_excludes_per_segment_state(eng, monkeypatch):
 
 def test_identity_excludes_tiled_vae_which_selects_a_node_class_not_a_handle(
         eng, monkeypatch):
+    """PREQUALIFICATION IS SET ON PURPOSE. Since B6 the frozen recipe ignores
+    OTR_LTX_8GB_TILED_VAE on a production leg, so without the flag this test
+    would pass because the env did NOTHING -- proving the freeze, not the
+    exclusion it is named for. With the knob genuinely open, an identity that
+    still does not move is proving what it claims."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     before = bs.session_identity(eng)
     monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
+    assert eng._tiled_vae() is True          # the lever really is live here
     assert bs.session_identity(eng) == before
 
 
@@ -91,13 +114,20 @@ def test_a_swapped_t5_moves_the_identity(eng):
 
 
 def test_a_model_sampling_shift_moves_the_identity(eng, monkeypatch):
-    """The shifts are baked into the hoisted patcher, so they ARE the handle."""
+    """The shifts are baked into the hoisted patcher, so they ARE the handle.
+
+    The env var is only this test's LEVER for moving a shift; since B6 it moves
+    one under prequalification, which is the mode a sweep runs in. The property
+    -- a different shift is a different handle -- is unchanged."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     before = bs.session_identity(eng)
     monkeypatch.setenv("OTR_LTX_8GB_MAX_SHIFT", "3.5")
     assert bs.session_identity(eng) != before
 
 
 def test_moving_the_t5_off_cpu_moves_the_identity(eng, monkeypatch):
+    """Same shape: prequalification is how the T5 device moves at all now."""
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     before = bs.session_identity(eng)
     monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "default")
     assert bs.session_identity(eng) != before
