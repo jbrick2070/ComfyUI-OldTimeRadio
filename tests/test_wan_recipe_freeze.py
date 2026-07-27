@@ -441,3 +441,343 @@ def test_each_tile_knob_maps_to_its_OWN_env_name(monkeypatch, key, env,
     for other_key, _e, other_input, _o in _TILE_CASES:
         if other_input != graph_input:
             assert vd[other_input] == WAN_TI2V_RECIPE[other_key]
+
+
+# =========================================================================== #
+# wan_i2v (the 14B lane) -- LANE 1b
+#
+# Same mechanism, its OWN data. Before the freeze this adapter read six knobs
+# INLINE in _build_graph with bare int()/float(): no range check, no named
+# refusal, so a mistyped value surfaced as a raw ValueError from the middle of a
+# graph build with nothing naming the knob that caused it.
+# =========================================================================== #
+from nodes._otr_video_engines.eng_wan_i2v import (          # noqa: E402
+    PREQUALIFICATION_ENV as I2V_PREQUAL_ENV,
+    RECIPE_WAN_I2V, WAN_I2V_RECIPE, WanI2VEngine,
+)
+
+_I2V_LOGGER = "OTR.video.wan_i2v"
+_I2V_RECIPE_ENVS = (
+    "OTR_WAN_STEPS", "OTR_WAN_CFG", "OTR_WAN_SHIFT", "OTR_WAN_SAMPLER",
+    "OTR_WAN_SCHEDULER", "OTR_WAN_NEGATIVE",
+)
+
+
+@pytest.fixture(autouse=True)
+def _clean_i2v_env(monkeypatch):
+    for k in _I2V_RECIPE_ENVS + (I2V_PREQUAL_ENV,):
+        monkeypatch.delenv(k, raising=False)
+
+
+def _i2v_graph(eng=None):
+    eng = eng or WanI2VEngine()
+    req = {"text_prompt": "a slow pan", "canvas": {"w": 832, "h": 480}}
+    return eng._build_graph(req, "init.png", {"seed": 7}, 81, 832, 480)
+
+
+def test_the_two_wan_adapters_do_not_share_one_consent_switch():
+    """One switch for both tiers would open the OTHER adapter's knobs and stamp
+    ``+prequalification`` on a clip that had rendered with its frozen recipe.
+    A receipt that lies in the safer direction still lies."""
+    assert PREQUALIFICATION_ENV != I2V_PREQUAL_ENV
+
+
+def test_opening_one_adapters_consent_does_NOT_open_the_others(monkeypatch):
+    # The behavioural half of the test above -- the part a name comparison
+    # cannot prove.
+    monkeypatch.setenv(I2V_PREQUAL_ENV, "1")
+    monkeypatch.setenv("OTR_WAN_TI2V_STEPS", "11")
+    assert WAN_TI2V_RECIPE["steps"] != 11
+    assert WanTi2vEngine()._resolve_render_config()["steps"] \
+        == WAN_TI2V_RECIPE["steps"]
+    assert wr.recipe_receipt(RECIPE_WAN_TI2V, PREQUALIFICATION_ENV) \
+        == RECIPE_WAN_TI2V
+
+
+def test_i2v_recipe_shape_and_env_map():
+    assert set(WAN_I2V_RECIPE) == {
+        "steps", "cfg", "shift", "sampler", "scheduler", "negative"}
+    from nodes._otr_video_engines.eng_wan_i2v import _RECIPE_ENV_KEYS
+    assert set(_RECIPE_ENV_KEYS) == set(WAN_I2V_RECIPE)
+    assert set(_RECIPE_ENV_KEYS.values()) == set(_I2V_RECIPE_ENVS)
+
+
+def test_i2v_both_legs_return_the_SAME_KEY_SET(monkeypatch):
+    production = set(WanI2VEngine()._resolve_render_config())
+    monkeypatch.setenv(I2V_PREQUAL_ENV, "1")
+    assert set(WanI2VEngine()._resolve_render_config()) == production
+    assert production == {"steps", "cfg", "shift", "sampler", "scheduler",
+                          "negative"}
+
+
+def test_i2v_keeps_its_OWN_sampler_which_is_not_the_ti2v_floor():
+    """The freeze preserves behaviour; it does not add policy.
+
+    wan_ti2v is the 8GB/Mac/AMD floor and carries a portability whitelist that
+    admits only ``euler``. The 14B lane never had one and ships ``uni_pc``.
+    Freezing it to the floor's value would have silently changed what this
+    engine renders."""
+    assert WAN_I2V_RECIPE["sampler"] == "uni_pc"
+    assert WAN_I2V_RECIPE["sampler"] != WAN_TI2V_RECIPE["sampler"]
+    assert _i2v_graph()["ksampler"]["inputs"]["sampler_name"] == "uni_pc"
+
+
+def test_i2v_frozen_recipe_reaches_the_graph():
+    g = _i2v_graph()
+    assert g["ksampler"]["inputs"]["steps"] == WAN_I2V_RECIPE["steps"]
+    assert g["ksampler"]["inputs"]["cfg"] == WAN_I2V_RECIPE["cfg"]
+    assert g["ksampler"]["inputs"]["scheduler"] == WAN_I2V_RECIPE["scheduler"]
+    assert g["modelsampling"]["inputs"]["shift"] == WAN_I2V_RECIPE["shift"]
+    assert g["neg"]["inputs"]["text"] == WAN_I2V_RECIPE["negative"]
+
+
+def test_i2v_overrides_reach_the_graph_under_the_consent_act(monkeypatch):
+    # Every value OPPOSES the frozen one, and that is asserted before comparing.
+    monkeypatch.setenv(I2V_PREQUAL_ENV, "1")
+    monkeypatch.setenv("OTR_WAN_STEPS", "11")
+    monkeypatch.setenv("OTR_WAN_CFG", "2.25")
+    monkeypatch.setenv("OTR_WAN_SHIFT", "3.75")
+    monkeypatch.setenv("OTR_WAN_SAMPLER", "euler")
+    monkeypatch.setenv("OTR_WAN_SCHEDULER", "beta")
+    monkeypatch.setenv("OTR_WAN_NEGATIVE", "a distinct negative")
+    assert WAN_I2V_RECIPE["steps"] != 11
+    assert WAN_I2V_RECIPE["cfg"] != 2.25
+    assert WAN_I2V_RECIPE["shift"] != 3.75
+    assert WAN_I2V_RECIPE["sampler"] != "euler"
+    assert WAN_I2V_RECIPE["scheduler"] != "beta"
+    assert WAN_I2V_RECIPE["negative"] != "a distinct negative"
+    g = _i2v_graph()
+    ks = g["ksampler"]["inputs"]
+    assert ks["steps"] == 11 and ks["cfg"] == 2.25
+    assert ks["sampler_name"] == "euler" and ks["scheduler"] == "beta"
+    assert g["modelsampling"]["inputs"]["shift"] == 3.75
+    assert g["neg"]["inputs"]["text"] == "a distinct negative"
+
+
+def test_i2v_environment_can_NOT_author_the_render_on_a_production_leg(
+        monkeypatch):
+    for env, val in (("OTR_WAN_STEPS", "11"), ("OTR_WAN_CFG", "2.25"),
+                     ("OTR_WAN_SAMPLER", "euler"),
+                     ("OTR_WAN_NEGATIVE", "a distinct negative")):
+        monkeypatch.setenv(env, val)
+    g = _i2v_graph()
+    assert g["ksampler"]["inputs"]["steps"] == WAN_I2V_RECIPE["steps"]
+    assert g["ksampler"]["inputs"]["cfg"] == WAN_I2V_RECIPE["cfg"]
+    assert g["ksampler"]["inputs"]["sampler_name"] == WAN_I2V_RECIPE["sampler"]
+    assert g["neg"]["inputs"]["text"] == WAN_I2V_RECIPE["negative"]
+
+
+def test_i2v_a_mistyped_knob_no_longer_dies_as_a_raw_ValueError(monkeypatch):
+    """The defect this chunk closes on this adapter.
+
+    ``int(os.environ.get("OTR_WAN_STEPS", "20"))`` inline in ``_build_graph``
+    raised a bare ValueError from the middle of a graph build, naming nothing.
+    Now it is a NAMED MALFORMED_CONFIG -- and only where the knob can bind."""
+    monkeypatch.setenv(I2V_PREQUAL_ENV, "1")
+    monkeypatch.setenv("OTR_WAN_STEPS", "twenty")
+    with pytest.raises(EngineUnusable) as exc:
+        _i2v_graph()
+    assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
+    assert "OTR_WAN_STEPS" in str(exc.value)
+
+
+def test_i2v_a_stale_malformed_knob_can_NOT_kill_a_production_leg(monkeypatch):
+    monkeypatch.setenv("OTR_WAN_STEPS", "twenty")
+    monkeypatch.setenv("OTR_WAN_CFG", "high")
+    g = _i2v_graph()
+    assert g["ksampler"]["inputs"]["steps"] == WAN_I2V_RECIPE["steps"]
+    assert g["ksampler"]["inputs"]["cfg"] == WAN_I2V_RECIPE["cfg"]
+
+
+def test_i2v_out_of_range_steps_fails_closed_under_the_consent_act(monkeypatch):
+    monkeypatch.setenv(I2V_PREQUAL_ENV, "1")
+    monkeypatch.setenv("OTR_WAN_STEPS", "999")
+    with pytest.raises(EngineUnusable) as exc:
+        WanI2VEngine()._resolve_render_config()
+    assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
+
+
+def test_i2v_warning_direction_is_pinned(monkeypatch, caplog):
+    monkeypatch.setenv("OTR_WAN_SAMPLER", "euler")
+    with caplog.at_level(logging.WARNING, logger=_I2V_LOGGER):
+        WanI2VEngine()._resolve_render_config()
+    text = " ".join(r.getMessage() for r in caplog.records
+                    if r.name == _I2V_LOGGER)
+    assert "OTR_WAN_SAMPLER" in text and RECIPE_WAN_I2V in text
+    assert wr.FROZEN_MARKER in text
+    assert wr.MEASUREMENT_MARKER not in text
+
+
+def test_i2v_receipt_and_the_vram_peak_both_reach_the_clip_dict():
+    """``vram_peak_mb`` was MEASURED, logged, and then DISCARDED on this
+    adapter -- NEWBUG-1's fix landed for wan_ti2v in 2026-07 and was never
+    applied here, so every wan_i2v clip reported None and ``render_shot``
+    silently fell back to an instantaneous post-render read that can
+    under-report the true peak. Found by the pre-push QA fan-out."""
+    clip = WanI2VEngine()._clip_from_raw(
+        {"out_path": "/x/y.mp4", "frame_count": 81, "vram_peak_mb": 9123,
+         "recipe": RECIPE_WAN_I2V}, {"shot_id": "b007"})
+    assert clip["recipe"] == RECIPE_WAN_I2V
+    assert clip["vram_peak_mb"] == 9123
+    assert clip["engine_id"] == "wan_i2v"
+
+
+def test_i2v_measurement_clips_are_distinguishable(monkeypatch):
+    monkeypatch.setenv(I2V_PREQUAL_ENV, "1")
+    stamped = wr.recipe_receipt(RECIPE_WAN_I2V, I2V_PREQUAL_ENV)
+    assert stamped == RECIPE_WAN_I2V + wr.PREQUALIFICATION_RECIPE_SUFFIX
+    assert stamped != RECIPE_WAN_I2V
+
+
+# =========================================================================== #
+# GAPS THE MUTATION ROUND FOUND (2026-07-27). Four REAL mutants survived the
+# first pass; each fix below is the test that now kills one.
+# =========================================================================== #
+def _mk_node(fn):
+    return type("FakeNode", (), {"FUNCTION": "f", "f": fn})
+
+
+class _FakeModel:
+    def detach(self, unpatch_all=False):
+        return None
+
+
+def _wan_fakes(np, n=4):
+    """The CORE Wan node classes, faked -- same shape as
+    ``tests/test_video_motion_forward.py``'s, kept local so this file's receipt
+    tests do not depend on that file's import surface."""
+    img = np.zeros((n, 8, 8, 3), dtype="float32")
+    return {
+        "unet": _mk_node(lambda self, **k: (_FakeModel(),)),
+        "modelsampling": _mk_node(lambda self, **k: (_FakeModel(),)),
+        "clip": _mk_node(lambda self, **k: (object(),)),
+        "pos": _mk_node(lambda self, **k: (("c",),)),
+        "neg": _mk_node(lambda self, **k: (("c",),)),
+        "vae": _mk_node(lambda self, **k: (object(),)),
+        "loadimage": _mk_node(lambda self, **k: (object(), object())),
+        "wan": _mk_node(lambda self, **k: (("p",), ("n",), ("latent",))),
+        "latent": _mk_node(lambda self, **k: (("latent",),)),
+        "ksampler": _mk_node(lambda self, **k: (("latent",),)),
+        "vaedecode": _mk_node(lambda self, **k: (img,)),
+    }
+
+
+def _render_without_ffmpeg(monkeypatch, engine_module, np, tmp_path):
+    """Stub the encode + probe tail so ``render_clip`` runs end to end with no
+    ffmpeg. The RECEIPT FIELDS on the returned raw are what these tests read,
+    and those are decided before this tail ever runs."""
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    out = tmp_path / "clip.mp4"
+    out.write_bytes(b"not-a-real-mp4")
+    monkeypatch.setattr(_wb, "encode_frames_to_silent_mp4",
+                        lambda frames, path, fps: (str(out), len(frames)))
+    monkeypatch.setattr(engine_module, "ffprobe_clip_fields", lambda p: {})
+    monkeypatch.setattr(engine_module, "validate_silent_clip_contract",
+                        lambda fields, fps: None)
+    monkeypatch.setattr(engine_module._MC, "VramPeakProbe",
+                        lambda **kw: _FakeProbe())
+
+
+class _FakeProbe:
+    """A deterministic stand-in for the NVML peak probe."""
+    PEAK_MB = 9123
+
+    def start(self):
+        return self
+
+    def stop(self):
+        return self.PEAK_MB
+
+
+def _init_png(tmp_path):
+    Image = pytest.importorskip("PIL.Image")
+    src = tmp_path / "p.png"
+    Image.new("RGB", (832, 480), (10, 20, 30)).save(src)
+    return str(src)
+
+
+@pytest.mark.parametrize("engine_name", ["wan_ti2v", "wan_i2v"])
+def test_render_clip_RETURNS_the_receipt_and_the_measured_peak(
+        monkeypatch, tmp_path, engine_name):
+    """The hop the hand-built ``_clip_from_raw`` tests could not see.
+
+    Those tests construct the raw themselves, so they stay green when
+    ``render_clip`` stops putting the fields IN it -- the same shape as the
+    chunk-6 defect where a test's own builder agreed with the bug. Two mutants
+    (recipe -> None, vram_peak_mb -> None) survived the first mutation round on
+    exactly this gap. This drives the real ``render_clip``."""
+    np = pytest.importorskip("numpy")
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    if engine_name == "wan_ti2v":
+        from nodes._otr_video_engines import eng_wan_ti2v as mod
+        eng, expected = WanTi2vEngine(), RECIPE_WAN_TI2V
+    else:
+        from nodes._otr_video_engines import eng_wan_i2v as mod
+        eng, expected = WanI2VEngine(), RECIPE_WAN_I2V
+    monkeypatch.setattr(_wb, "comfy_input_dir", lambda: str(tmp_path))
+    _render_without_ffmpeg(monkeypatch, mod, np, tmp_path)
+    eng._classes = _wan_fakes(np, n=4)
+    req = {"shot_id": "s1", "asset_refs": {"init_image": _init_png(tmp_path)},
+           "text_prompt": "subtle motion", "init_w": 832, "init_h": 480,
+           "canvas": {"w": 832, "h": 480, "aspect_policy": "pad"},
+           "timing": {"target_frame_count": 33},
+           "seed_bundle": {"request_seed": 3}}
+    raw = eng.render_clip(req, {"patchers": []})
+    assert raw["recipe"] == expected
+    assert raw["vram_peak_mb"] == _FakeProbe.PEAK_MB
+    # ...and it survives canonicalisation into the dict the manifest reads.
+    clip = eng.canonicalize(raw, req, {})
+    assert clip["recipe"] == expected
+    assert clip["vram_peak_mb"] == _FakeProbe.PEAK_MB
+
+
+#: The consent env vars as an OPERATOR TYPES THEM. Deliberately literal strings
+#: and NOT the imported constants: a test that sets `PREQUALIFICATION_ENV`
+#: follows the constant wherever it is renamed, so it can never notice the
+#: adapter reading a var no operator will ever set. A mutant that renamed the
+#: constant survived the first mutation round on exactly that.
+_DOCUMENTED_CONSENT_VARS = (
+    ("wan_ti2v", "OTR_WAN_TI2V_PREQUALIFICATION"),
+    ("wan_i2v", "OTR_WAN_I2V_PREQUALIFICATION"),
+)
+
+
+@pytest.mark.parametrize("engine_name,documented", _DOCUMENTED_CONSENT_VARS)
+def test_the_DOCUMENTED_consent_var_is_the_one_the_adapter_reads(
+        monkeypatch, engine_name, documented):
+    if engine_name == "wan_ti2v":
+        eng, env, opposing = WanTi2vEngine(), "OTR_WAN_TI2V_STEPS", 11
+        frozen = WAN_TI2V_RECIPE["steps"]
+    else:
+        eng, env, opposing = WanI2VEngine(), "OTR_WAN_STEPS", 11
+        frozen = WAN_I2V_RECIPE["steps"]
+    assert frozen != opposing                        # the override OPPOSES
+    monkeypatch.setenv(env, str(opposing))
+    assert eng._resolve_render_config()["steps"] == frozen
+    # Setting the var the DOCS and the module docstring name must open it.
+    monkeypatch.setenv(documented, "1")
+    assert eng._resolve_render_config()["steps"] == opposing
+
+
+def test_i2v_shift_and_scheduler_are_frozen_on_a_production_leg(monkeypatch):
+    """`shift` had no production-leg test, so a mutant that put
+    `float(os.environ.get("OTR_WAN_SHIFT", "8.0"))` back inline survived: the
+    consent-act test agreed with it, and the production test never set it."""
+    monkeypatch.setenv("OTR_WAN_SHIFT", "3.75")
+    monkeypatch.setenv("OTR_WAN_SCHEDULER", "beta")
+    assert WAN_I2V_RECIPE["shift"] != 3.75
+    assert WAN_I2V_RECIPE["scheduler"] != "beta"
+    g = _i2v_graph()
+    assert g["modelsampling"]["inputs"]["shift"] == WAN_I2V_RECIPE["shift"]
+    assert g["ksampler"]["inputs"]["scheduler"] == WAN_I2V_RECIPE["scheduler"]
+
+
+def test_ti2v_shift_and_scheduler_are_frozen_on_a_production_leg(monkeypatch):
+    # The twin of the test above -- the same gap existed on both adapters.
+    monkeypatch.setenv("OTR_WAN_TI2V_SHIFT", "3.75")
+    monkeypatch.setenv("OTR_WAN_TI2V_SCHEDULER", "beta")
+    assert WAN_TI2V_RECIPE["shift"] != 3.75
+    assert WAN_TI2V_RECIPE["scheduler"] != "beta"
+    g = _graph()
+    assert g["modelsampling"]["inputs"]["shift"] == WAN_TI2V_RECIPE["shift"]
+    assert g["ksampler"]["inputs"]["scheduler"] == WAN_TI2V_RECIPE["scheduler"]

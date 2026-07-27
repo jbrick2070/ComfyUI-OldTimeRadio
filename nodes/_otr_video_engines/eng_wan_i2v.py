@@ -28,11 +28,34 @@ contract proof are SHARED with wan_ti2v via :mod:`wan_shared` (GO_FORWARD 4A:
 "share only pure helpers; keep loaders + node candidates + graph SEPARATE"); the
 loaders, node candidates and the 14B I2V graph below stay engine-specific.
 
-Config (env): ``OTR_ENABLE_WAN_I2V`` opt-in flag; ``OTR_WAN_I2V_CKPT`` the primary
-checkpoint path the load probe checks; ``OTR_WAN_I2V_LOADER`` safetensors|gguf
-(else inferred from the unet extension); ``OTR_WAN_SHIFT`` (ModelSamplingSD3 sigma
-shift, default 8.0 for the 14B); ``OTR_WAN_STEPS`` / ``OTR_WAN_CFG`` /
-``OTR_WAN_SAMPLER`` / ``OTR_WAN_SCHEDULER`` / ``OTR_WAN_NEGATIVE``.
+Config (env). READ THE SPLIT -- since the WAN recipe freeze (2026-07-27) the
+render knobs do NOT bind on a production leg:
+
+* STILL LIVE, every leg -- ASSET LOCATION only: ``OTR_ENABLE_WAN_I2V``
+  (vestigial opt-in flag); ``OTR_WAN_I2V_CKPT`` the primary checkpoint path the
+  load probe checks; ``OTR_WAN_I2V_UNET_NAME`` / ``OTR_WAN_I2V_CLIP_NAME`` /
+  ``OTR_WAN_I2V_VAE_NAME`` loader basenames; ``OTR_WAN_I2V_LOADER``
+  safetensors|gguf (else INFERRED from the resolved basename -- it stays live
+  WITH the name it follows); ``OTR_WAN_I2V_CLIP_DIR`` / ``OTR_WAN_I2V_VAE_DIR``
+  dir overrides.
+* FROZEN IN CODE as ``WAN_I2V_RECIPE``, ignored-with-a-warning: ``OTR_WAN_STEPS``
+  / ``OTR_WAN_CFG`` / ``OTR_WAN_SHIFT`` / ``OTR_WAN_SAMPLER`` /
+  ``OTR_WAN_SCHEDULER`` / ``OTR_WAN_NEGATIVE``. These six were read INLINE in
+  ``_build_graph`` with bare ``int()`` / ``float()`` -- no range check, no named
+  refusal, so a mistyped value died as a raw ValueError mid-render.
+* THE CONSENT ACT: set ``OTR_WAN_I2V_PREQUALIFICATION=1`` and they bind again,
+  range-checked and fail-closed, for a MEASUREMENT run -- whose clips stamp a
+  ``+prequalification`` recipe receipt.
+
+The six frozen names are UN-NAMESPACED (``OTR_WAN_*``, not ``OTR_WAN_I2V_*``)
+and are deliberately left that way here. Renaming an operator-facing knob is an
+operator's call, not a coder's, and the freeze already removes the power that
+made the missing namespace dangerous: they cannot bind a production leg at all.
+Flagged for the operator rather than changed silently.
+
+Why the freeze: a production episode is submitted to an ALREADY-BOOTED server,
+so a knob exported at launch cannot bind the work (``PBUG-20260723-02``). Code
+binds on every leg; an environment cannot.
 """
 from __future__ import annotations
 
@@ -40,6 +63,7 @@ import logging
 import os
 
 from . import motion_common as _MC
+from . import wan_recipe as _WR
 from . import wan_shared as _WS
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
@@ -70,6 +94,62 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 # HIGH/LOW MoE handoff (Path B) is a future option, not wired here.
 _WAN_MIN_FRAMES = 33
 _WAN_MAX_FRAMES = 177
+
+#: The defined recipe-receipt string threaded into the manifest.
+#:
+#: THE VERSION LIVES IN THE STRING, not in a separate constant, so it reaches
+#: ``_clip_from_raw`` -> the manifest row -> ``stamp_durable(meta.render_engines)``
+#: and a published episode can be asked which recipe rendered it. This adapter
+#: stamped ``recipe: None`` on every clip before the freeze.
+RECIPE_WAN_I2V = "wan22_14b_i2v_single_pass_v1"
+
+#: THE CONSENT ACT for THIS adapter. Separate from wan_ti2v's on purpose: one
+#: switch for both tiers would stamp ``+prequalification`` on a clip that had
+#: rendered with the frozen recipe, and a receipt that lies in the safer
+#: direction still lies.
+PREQUALIFICATION_ENV = "OTR_WAN_I2V_PREQUALIFICATION"
+
+#: THE FROZEN wan_i2v RECIPE, v1 (LANE 1, 2026-07-27).
+#:
+#: TODAY'S SHIPPED DEFAULTS, lifted verbatim from the inline ``os.environ``
+#: fallbacks they replace -- NOT a measured selection; no WAN sweep has run.
+#: Behaviour-preserving on any box that set nothing, and reversible: a
+#: prequalification run measures and produces v2 (bump the version INSIDE
+#: ``RECIPE_WAN_I2V`` and add a new dict; never edit a versioned dict in place,
+#: or receipts already on disk stop being interpretable).
+#:
+#: ``sampler`` is ``uni_pc``, NOT the portable-floor ``euler`` that wan_ti2v
+#: freezes. That difference is deliberate and pre-existing: wan_ti2v is the
+#: 8GB/Mac/AMD floor and carries a portability whitelist; the 14B I2V lane never
+#: had one, and inventing one here would refuse a configuration that ships and
+#: works today. The freeze preserves behaviour; it does not add policy.
+WAN_I2V_RECIPE_V1 = {
+    "steps": 20,
+    "cfg": 3.5,
+    #: ModelSamplingSD3 sigma shift; 8.0 is the 14B value (the 5B uses 5.0).
+    "shift": 8.0,
+    "sampler": "uni_pc",
+    "scheduler": "simple",
+    #: The negative conditioning text. A RENDER INPUT: this adapter has no
+    #: per-shot negative channel, so before the freeze the server's boot
+    #: environment was the SOLE author of it.
+    "negative": _WAN_DEFAULT_NEGATIVE,
+}
+
+#: THE ONE NAME EVERY CONSUMER READS.
+WAN_I2V_RECIPE = WAN_I2V_RECIPE_V1
+
+#: The env var each frozen field was read from, kept so the demotion can NAME
+#: what it is ignoring. Presence is all this map is used for outside the consent
+#: act. The names are un-namespaced for the reason given in the module docstring.
+_RECIPE_ENV_KEYS = {
+    "steps": "OTR_WAN_STEPS",
+    "cfg": "OTR_WAN_CFG",
+    "shift": "OTR_WAN_SHIFT",
+    "sampler": "OTR_WAN_SAMPLER",
+    "scheduler": "OTR_WAN_SCHEDULER",
+    "negative": "OTR_WAN_NEGATIVE",
+}
 
 
 #: S1 (2026-07-25) per-model still plan for wan_i2v (spec
@@ -185,6 +265,10 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         (UNET + umt5 CLIP + VAE) present on disk. Wan TOLERATES Sage by
         escaping to a sidecar (``resolve_isolation``), so it does NOT hard-fail
         on Sage the way ltx_video does."""
+        # Fail CLOSED on a bad render knob BEFORE any forward -- under the
+        # consent act only, where the knobs can actually bind. On a production
+        # leg this is where the demotion notice is emitted.
+        self._resolve_render_config()
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
@@ -239,6 +323,55 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "vaedecode": ("VAEDecode",),
         }
 
+    def _resolve_render_config(self):
+        """The FROZEN render knobs (shared by assert_usable and _build_graph).
+
+        PRODUCTION: the recipe binds whatever the server booted with, and
+        anything the environment is trying to say is NAMED and ignored -- never
+        PARSED, so a stale malformed value cannot kill a leg it cannot
+        influence.
+
+        PREQUALIFICATION: the knobs are open, every value is range-checked and
+        fails CLOSED with a named MALFORMED_CONFIG. Before the freeze these six
+        were read INLINE in ``_build_graph`` with bare ``int()`` / ``float()``,
+        so a mistyped value surfaced as a raw ValueError from the middle of a
+        graph build with nothing naming the knob that caused it."""
+        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+            _WR.warn_ignored(_LOG, self.name, RECIPE_WAN_I2V,
+                             _WR.ignored_override_keys(_RECIPE_ENV_KEYS),
+                             PREQUALIFICATION_ENV)
+            # SPELLED OUT, not a dict slice, so both legs return the SAME KEY
+            # SET and no reader can hit a KeyError that reproduces in one mode.
+            return {
+                "steps": WAN_I2V_RECIPE["steps"],
+                "cfg": WAN_I2V_RECIPE["cfg"],
+                "shift": WAN_I2V_RECIPE["shift"],
+                "sampler": WAN_I2V_RECIPE["sampler"],
+                "scheduler": WAN_I2V_RECIPE["scheduler"],
+                "negative": WAN_I2V_RECIPE["negative"],
+            }
+        _WR.warn_honoured(_LOG, self.name, RECIPE_WAN_I2V,
+                          _WR.ignored_override_keys(_RECIPE_ENV_KEYS),
+                          PREQUALIFICATION_ENV)
+        _num = _WR.config_number
+        return {
+            "steps": _num(self, _RECIPE_ENV_KEYS["steps"],
+                          WAN_I2V_RECIPE["steps"], 1, 100, int),
+            "cfg": _num(self, _RECIPE_ENV_KEYS["cfg"],
+                        WAN_I2V_RECIPE["cfg"], 0.0, 30.0, float),
+            "shift": _num(self, _RECIPE_ENV_KEYS["shift"],
+                          WAN_I2V_RECIPE["shift"], 0.1, 20.0, float),
+            # No portability whitelist on this lane -- see the recipe's comment.
+            # An exported-empty value means unset, as everywhere else.
+            "sampler": _WR.config_text(self, _RECIPE_ENV_KEYS["sampler"],
+                                       WAN_I2V_RECIPE["sampler"]),
+            "scheduler": _WR.config_text(self, _RECIPE_ENV_KEYS["scheduler"],
+                                         WAN_I2V_RECIPE["scheduler"]),
+            "negative": _WR.config_text(self, _RECIPE_ENV_KEYS["negative"],
+                                        WAN_I2V_RECIPE["negative"],
+                                        strip=False),
+        }
+
     def _loader_names(self):
         """Model FILENAMES the loader nodes consume (env-overridable; defaults are
         placeholders the operator confirms against the installed Wan models)."""
@@ -261,13 +394,14 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         names = self._loader_names()
         get = request.get if isinstance(request, dict) else (
             lambda k, d=None: getattr(request, k, d))
-        steps = int(os.environ.get("OTR_WAN_STEPS", "20"))
-        cfg = float(os.environ.get("OTR_WAN_CFG", "3.5"))
-        shift = float(os.environ.get("OTR_WAN_SHIFT", "8.0"))
-        sampler = os.environ.get("OTR_WAN_SAMPLER", "uni_pc")
-        scheduler = os.environ.get("OTR_WAN_SCHEDULER", "simple")
+        knobs = self._resolve_render_config()         # frozen, range-checked
+        steps = knobs["steps"]
+        cfg = knobs["cfg"]
+        shift = knobs["shift"]
+        sampler = knobs["sampler"]
+        scheduler = knobs["scheduler"]
         positive = get("text_prompt") or "subtle natural motion"
-        negative = os.environ.get("OTR_WAN_NEGATIVE", _WAN_DEFAULT_NEGATIVE)
+        negative = knobs["negative"]
         if self._loader_mode() == "gguf":
             unet_inputs = {"unet_name": names["unet"]}
         else:
@@ -376,10 +510,26 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             post_mb = _MC.vram_used_mb() or 0
             _LOG.info("[OTR video] wan_i2v VRAM render-phase peak %s MB / post %s "
                       "MB", render_peak, post_mb)
-        return {"out_path": path, "frame_count": n}
+        # `vram_peak_mb`: NEWBUG-1's fix (2026-07-20) landed for wan_ti2v and
+        # was never applied here, so this adapter MEASURED the render-window
+        # peak, logged it, and then discarded it -- `_clip_from_raw` read
+        # raw.get("vram_peak_mb") and got None on every wan_i2v clip forever.
+        # render_shot then silently fell back to an INSTANTANEOUS post-render
+        # read, which can under-report the true peak, and that weaker number
+        # rolls up into the episode figure and the credits card. Found by the
+        # pre-push QA fan-out; the field has a real consumer and no other owner.
+        #
+        # `recipe`: the same shape of receipt for the render CONFIG, riding
+        # into stamp_durable(meta.render_engines) so a published episode can be
+        # asked which recipe rendered it.
+        return {"out_path": path, "frame_count": n,
+                "vram_peak_mb": render_peak,
+                "recipe": _WR.recipe_receipt(RECIPE_WAN_I2V,
+                                             PREQUALIFICATION_ENV)}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)
 
 
-__all__ = ["WanI2VEngine"]
+__all__ = ["WanI2VEngine", "RECIPE_WAN_I2V", "WAN_I2V_RECIPE",
+           "PREQUALIFICATION_ENV"]
