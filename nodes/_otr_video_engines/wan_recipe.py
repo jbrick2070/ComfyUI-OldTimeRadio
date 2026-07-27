@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import os
 
+from . import recipe_departures as _RD
 from .registry import EngineUnusable, EngineUsabilityReason
 
 #: The explicit YES spellings for a consent act or a yes/no knob.
@@ -47,7 +48,12 @@ _FALSY = ("0", "false", "no", "off")
 #: The receipt rides the manifest row into ``stamp_durable(meta.render_engines)``
 #: -- a durable ledger a published episode carries -- so a sweep artifact must
 #: never be mistakable for a production one in the record that outlives the run.
-PREQUALIFICATION_RECIPE_SUFFIX = "+prequalification"
+#:
+#: SOURCED, not spelled (LANE 2): ``eng_ltx_8gb`` stamps the same mark through
+#: its own lane, and one consumer chain reads both -- two literals with one
+#: value is how a ledger grows two dialects. ``recipe_departures`` owns the
+#: format for every adapter in the build.
+PREQUALIFICATION_RECIPE_SUFFIX = _RD.PREQUALIFICATION_SUFFIX
 
 #: ``VAEDecodeTiled`` input floors from the LIVE ``/object_info`` capture of
 #: 2026-07-20 (docs/2026-07-20-OTR-video-tiers/ltx_8gb_discovery.json): tile_size
@@ -97,7 +103,7 @@ def ignored_override_keys(recipe_env_keys):
                   if os.environ.get(env) not in (None, ""))
 
 
-def recipe_receipt(frozen_receipt, prequalification_env):
+def recipe_receipt(frozen_receipt, prequalification_env, departed=None):
     """The recipe string a rendered clip is STAMPED with.
 
     NOT simply the frozen name, and the difference is a ledger-integrity one.
@@ -105,9 +111,16 @@ def recipe_receipt(frozen_receipt, prequalification_env):
     share none of the frozen values -- while the receipt rides the manifest row
     into ``stamp_durable(meta.render_engines)``. Stamping the frozen name onto a
     sweep artifact would make a measurement indistinguishable from production in
-    the one record that outlives the run."""
+    the one record that outlives the run.
+
+    ``departed`` names the knobs THIS CELL actually changed (LANE 2). Without
+    it a sweep's artifacts are distinguishable from production but not from
+    EACH OTHER, which is only half of what a measurement receipt is for.
+    Optional so a caller with no engine in hand still gets the bare mark; the
+    stamp sites pass it, and each adapter's source-level guard keeps them
+    doing so."""
     if prequalification_active(prequalification_env):
-        return frozen_receipt + PREQUALIFICATION_RECIPE_SUFFIX
+        return frozen_receipt + _RD.format_suffix(departed or {})
     return frozen_receipt
 
 

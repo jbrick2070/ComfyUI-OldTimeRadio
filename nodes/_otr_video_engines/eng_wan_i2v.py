@@ -63,6 +63,7 @@ import logging
 import os
 
 from . import motion_common as _MC
+from . import recipe_departures as _RD
 from . import wan_recipe as _WR
 from . import wan_shared as _WS
 from .._otr_shared.still_plan_helpers import StillPlanRow
@@ -372,6 +373,29 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                                         strip=False),
         }
 
+    def _recipe_departures(self, knobs=None):
+        """Which frozen knobs THIS CELL actually changed. ``{}`` on production.
+
+        Every field of this adapter's recipe comes from one resolver, so the
+        departure walk is the whole resolved dict against the whole frozen one
+        -- there is no in-effect gate to apply, because there is no knob here
+        that a render can fail to reach.
+
+        NOTHING IS RESOLVED ON A PRODUCTION LEG: the early return keeps the
+        "never parse what cannot bind" guarantee structural rather than
+        dependent on the resolver staying correct, and keeps the demotion
+        notice from being emitted twice per leg."""
+        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+            return {}
+        knobs = self._resolve_render_config() if knobs is None else knobs
+        return _RD.departures(WAN_I2V_RECIPE, knobs)
+
+    def _recipe_receipt(self, knobs=None):
+        """THE stamp -- the single stamp site goes through here and nowhere
+        else."""
+        return _WR.recipe_receipt(RECIPE_WAN_I2V, PREQUALIFICATION_ENV,
+                                  self._recipe_departures(knobs))
+
     def _loader_names(self):
         """Model FILENAMES the loader nodes consume (env-overridable; defaults are
         placeholders the operator confirms against the installed Wan models)."""
@@ -524,8 +548,7 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # asked which recipe rendered it.
         return {"out_path": path, "frame_count": n,
                 "vram_peak_mb": render_peak,
-                "recipe": _WR.recipe_receipt(RECIPE_WAN_I2V,
-                                             PREQUALIFICATION_ENV)}
+                "recipe": self._recipe_receipt()}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)

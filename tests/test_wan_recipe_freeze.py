@@ -25,6 +25,7 @@ CPU-only. No GPU, no model load, no ComfyUI node registry.
 from __future__ import annotations
 
 import logging
+import re
 
 import pytest
 
@@ -781,3 +782,148 @@ def test_ti2v_shift_and_scheduler_are_frozen_on_a_production_leg(monkeypatch):
     g = _graph()
     assert g["modelsampling"]["inputs"]["shift"] == WAN_TI2V_RECIPE["shift"]
     assert g["ksampler"]["inputs"]["scheduler"] == WAN_TI2V_RECIPE["scheduler"]
+
+
+# =========================================================================== #
+# LANE 2 -- the WAN receipts name WHICH CELL, not merely that a sweep ran
+# =========================================================================== #
+from nodes._otr_video_engines import recipe_departures as rdep   # noqa: E402
+
+
+@pytest.mark.parametrize("engine_name", ["wan_ti2v", "wan_i2v"])
+def test_a_production_receipt_is_UNCHANGED_by_lane_2(engine_name):
+    # LANE 2 must be invisible on the leg that publishes episodes.
+    if engine_name == "wan_ti2v":
+        eng, frozen = WanTi2vEngine(), RECIPE_WAN_TI2V
+    else:
+        eng, frozen = WanI2VEngine(), RECIPE_WAN_I2V
+    assert eng._recipe_departures() == {}
+    assert eng._recipe_receipt() == frozen
+
+
+@pytest.mark.parametrize("engine_name,env,opposing", [
+    ("wan_ti2v", "OTR_WAN_TI2V_STEPS", "11"),
+    ("wan_i2v", "OTR_WAN_STEPS", "11"),
+])
+def test_the_production_path_does_not_even_REACH_the_resolver(
+        monkeypatch, engine_name, env, opposing):
+    """The early return is STRUCTURAL. Without it the guarantee would depend on
+    every accessor returning the frozen value forever -- which they do today,
+    which is exactly why a test that only checks the OUTPUT cannot see the
+    guard disappear. Detonating the resolver is what proves it."""
+    eng = WanTi2vEngine() if engine_name == "wan_ti2v" else WanI2VEngine()
+
+    def _detonate():
+        raise AssertionError(
+            "a production leg must not resolve knobs to name departures")
+    monkeypatch.setattr(eng, "_resolve_render_config", _detonate)
+    monkeypatch.setenv(env, opposing)
+    assert eng._recipe_departures() == {}
+
+
+def test_ti2v_a_sweep_cell_NAMES_the_knobs_it_moved(monkeypatch):
+    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")     # OPPOSES frozen True
+    monkeypatch.setenv("OTR_WAN_TI2V_STEPS", "11")
+    assert WAN_TI2V_RECIPE["tiled_vae"] is True and WAN_TI2V_RECIPE["steps"] != 11
+    eng = WanTi2vEngine()
+    assert eng._recipe_departures() == {"steps": 11, "tiled_vae": False}
+    assert eng._recipe_receipt() == \
+        RECIPE_WAN_TI2V + "+prequalification[steps=11,tiled_vae=off]"
+
+
+def test_i2v_a_sweep_cell_NAMES_the_knobs_it_moved(monkeypatch):
+    monkeypatch.setenv(I2V_PREQUAL_ENV, "1")
+    monkeypatch.setenv("OTR_WAN_SAMPLER", "euler")        # OPPOSES frozen uni_pc
+    assert WAN_I2V_RECIPE["sampler"] != "euler"
+    eng = WanI2VEngine()
+    assert eng._recipe_departures() == {"sampler": "euler"}
+    assert eng._recipe_receipt() == \
+        RECIPE_WAN_I2V + "+prequalification[sampler=euler]"
+
+
+@pytest.mark.parametrize("engine_name", ["wan_ti2v", "wan_i2v"])
+def test_TWO_DIFFERENT_CELLS_STAMP_DIFFERENT_RECEIPTS(monkeypatch, engine_name):
+    """The defect stated as a test: before LANE 2 both of these produced the
+    same string, so the durable ledger could not tell one cell from another."""
+    if engine_name == "wan_ti2v":
+        eng, env, consent = WanTi2vEngine(), "OTR_WAN_TI2V_STEPS", PREQUALIFICATION_ENV
+    else:
+        eng, env, consent = WanI2VEngine(), "OTR_WAN_STEPS", I2V_PREQUAL_ENV
+    monkeypatch.setenv(consent, "1")
+    monkeypatch.setenv(env, "11")
+    cell_a = eng._recipe_receipt()
+    monkeypatch.setenv(env, "13")
+    cell_b = eng._recipe_receipt()
+    assert cell_a != cell_b
+    assert "steps=11" in cell_a and "steps=13" in cell_b
+
+
+@pytest.mark.parametrize("engine_name", ["wan_ti2v", "wan_i2v"])
+def test_a_cell_that_moved_NOTHING_still_marks_itself(monkeypatch, engine_name):
+    if engine_name == "wan_ti2v":
+        eng, frozen, consent = (WanTi2vEngine(), RECIPE_WAN_TI2V,
+                                PREQUALIFICATION_ENV)
+    else:
+        eng, frozen, consent = WanI2VEngine(), RECIPE_WAN_I2V, I2V_PREQUAL_ENV
+    monkeypatch.setenv(consent, "1")
+    assert eng._recipe_receipt() == frozen + rdep.PREQUALIFICATION_SUFFIX
+
+
+def test_ti2v_the_tile_geometry_is_reported_only_when_tiled_decode_RAN(
+        monkeypatch):
+    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_WAN_TI2V_VAE_TILE", "1024")
+    assert WAN_TI2V_RECIPE["vae_tile"] != 1024
+    eng = WanTi2vEngine()
+    assert eng._recipe_departures()["vae_tile"] == 1024
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")
+    assert eng._recipe_departures() == {"tiled_vae": False}
+
+
+@pytest.mark.parametrize("key,env,graph_input,opposing", _TILE_CASES)
+def test_ti2v_the_GRAPH_and_the_RECEIPT_read_the_same_tile_value(
+        monkeypatch, key, env, graph_input, opposing):
+    # All four, because _vaedecode_inputs hand-lists its four calls while
+    # _recipe_departures loops -- the graph side is independently regressable.
+    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv(env, str(opposing))
+    assert WAN_TI2V_RECIPE[key] != opposing
+    assert _graph()["vaedecode"]["inputs"][graph_input] == opposing
+    assert WanTi2vEngine()._recipe_departures()[key] == opposing
+
+
+@pytest.mark.parametrize("engine_name,env,consent", [
+    ("wan_ti2v", "OTR_WAN_TI2V_NEGATIVE", "OTR_WAN_TI2V_PREQUALIFICATION"),
+    ("wan_i2v", "OTR_WAN_NEGATIVE", "OTR_WAN_I2V_PREQUALIFICATION"),
+])
+def test_a_swept_NEGATIVE_is_named_as_a_digest(monkeypatch, engine_name, env,
+                                               consent):
+    """BOTH adapters. The mutation round caught the ti2v half missing: dropping
+    ``negative`` from that adapter's departure report left the suite green,
+    because only the i2v twin of this test existed.
+
+    The shipped default is long and full of commas, so a swept negative always
+    takes the digest path -- which is also the only end-to-end exercise the
+    digest gets against a real departure rather than a synthetic string."""
+    monkeypatch.setenv(consent, "1")
+    monkeypatch.setenv(env, "a measured negative, with commas")
+    eng = WanTi2vEngine() if engine_name == "wan_ti2v" else WanI2VEngine()
+    assert eng._recipe_departures()["negative"] \
+        == "a measured negative, with commas"
+    assert re.search(r"negative=#[0-9a-f]{8}", eng._recipe_receipt())
+
+
+@pytest.mark.parametrize("module_name", ["eng_wan_ti2v", "eng_wan_i2v"])
+def test_EVERY_stamp_goes_through_the_receipt_helper(module_name):
+    """A source-level drift guard, the shape the ltx lane already uses. The
+    stamp is what a sweep artifact is identified by; an edit that reached for
+    the bare constant would silently un-NAME measurement clips, and no value
+    assertion catches it because the constant is still correct in production --
+    the only leg most tests run."""
+    import importlib
+    import inspect
+    src = inspect.getsource(
+        importlib.import_module("nodes._otr_video_engines." + module_name))
+    assert '"recipe": self._recipe_receipt()' in src
+    assert '"recipe": _WR.recipe_receipt(' not in src

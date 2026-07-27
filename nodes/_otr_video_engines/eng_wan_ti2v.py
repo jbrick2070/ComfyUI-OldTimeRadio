@@ -60,6 +60,7 @@ import logging
 import os
 
 from . import motion_common as _MC
+from . import recipe_departures as _RD
 from . import wan_recipe as _WR
 from . import wan_shared as _WS
 from .._otr_shared.role_compat import ROLES
@@ -495,6 +496,58 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 allowed=self._PORTABLE_SCHEDULERS),
         }
 
+    def _tile_geometry(self, key):
+        """One tiled-decode geometry value: frozen, or range-checked under the
+        consent act.
+
+        THE one implementation -- ``_vaedecode_inputs`` builds the graph from it
+        and ``_recipe_departures`` reports it. It used to swallow a bad value
+        and substitute the default, which made these four the only knobs on this
+        adapter that failed OPEN: a sweep could mistype the value it was
+        measuring, render at something else, and stamp a receipt saying it had
+        measured it."""
+        dflt = int(WAN_TI2V_RECIPE[key])
+        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+            return dflt
+        lo, hi = _WR.VAE_TILE_BOUNDS[key]
+        return _WR.config_number(self, _RECIPE_ENV_KEYS[key], dflt, lo, hi, int)
+
+    def _recipe_departures(self, knobs=None):
+        """Which frozen knobs THIS CELL actually changed. ``{}`` on production.
+
+        RESOLVED values, never env presence: re-exporting a knob at the value it
+        already has changes nothing, and a receipt claiming a departure there
+        would describe a cell that does not exist.
+
+        NOTHING IS RESOLVED ON A PRODUCTION LEG. The early return is structural,
+        not an optimisation -- it keeps the "never parse what cannot bind"
+        guarantee from depending on every accessor staying correct forever, and
+        keeps a production leg from emitting the demotion notice twice.
+
+        The tile geometry is reported ONLY when tiled decode ran: a knob the
+        render never reached is not a departure that describes the clip."""
+        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+            return {}
+        knobs = self._resolve_render_config() if knobs is None else knobs
+        resolved = {
+            "steps": knobs["steps"], "cfg": knobs["cfg"],
+            "shift": knobs["shift"], "sampler": knobs["sampler"],
+            "scheduler": knobs["scheduler"],
+            "negative": self._negative_prompt(),
+            "tiled_vae": self._tiled_vae(),
+        }
+        if resolved["tiled_vae"]:
+            for key in _WR.VAE_TILE_BOUNDS:
+                resolved[key] = self._tile_geometry(key)
+        return _RD.departures(WAN_TI2V_RECIPE, resolved)
+
+    def _recipe_receipt(self, knobs=None):
+        """THE stamp. The single stamp site goes through here and nowhere else
+        -- a second site reaching for the bare constant would put an unmarked,
+        or an unnamed, sweep clip into the durable ledger."""
+        return _WR.recipe_receipt(RECIPE_WAN_TI2V, PREQUALIFICATION_ENV,
+                                  self._recipe_departures(knobs))
+
     def _floor_length(self, target_frame_count, width=None, height=None):
         """The VRAM-PREDICTED render length (4n+1) for this beat (clip-fill fix).
 
@@ -600,20 +653,10 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         base = {"samples": W("ksampler", 0), "vae": W("vae", 0)}
         if not self._tiled_vae():
             return base
-        def _i(key):
-            """The frozen geometry, env-overridable ONLY under the consent act.
-
-            Range-checked through the SAME helper as every other knob. It used
-            to swallow a bad value and substitute the default, which made these
-            four the only knobs on this adapter that failed OPEN -- a sweep
-            could mistype the value it was measuring, render at something else,
-            and stamp a receipt saying it had measured it."""
-            dflt = int(WAN_TI2V_RECIPE[key])
-            if not _WR.prequalification_active(PREQUALIFICATION_ENV):
-                return dflt
-            lo, hi = _WR.VAE_TILE_BOUNDS[key]
-            return _WR.config_number(self, _RECIPE_ENV_KEYS[key], dflt,
-                                     lo, hi, int)
+        # ``_tile_geometry`` is the ONE implementation (LANE 2). It used to be a
+        # closure here, and ``_recipe_departures`` would have needed a second
+        # copy to report what a sweep cell actually decoded with.
+        _i = self._tile_geometry
         base.update({
             "tile_size": _i("vae_tile"),
             "overlap": _i("vae_overlap"),
@@ -706,8 +749,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # so a published episode can be asked which recipe rendered it. It was
         # None on every WAN clip until the freeze landed.
         return {"out_path": path, "frame_count": n, "vram_peak_mb": render_peak,
-                "recipe": _WR.recipe_receipt(RECIPE_WAN_TI2V,
-                                             PREQUALIFICATION_ENV)}
+                "recipe": self._recipe_receipt()}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)
