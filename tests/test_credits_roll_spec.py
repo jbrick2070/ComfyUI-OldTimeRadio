@@ -519,3 +519,252 @@ def test_node_surface_two_force_inputs_no_widgets():
         assert spec[1].get("forceInput") is True
     assert cr.OTRCreditsRoll.RETURN_NAMES == (
         "video_with_credits_path", "declared_credits_tail_s", "report")
+
+
+# --------------------------------------------------------------------------- #
+# MODELS.VIDEO -- the recipe reaches the CARD, and the row is CLAMPED
+# (2026-07-28). `video_suffix` had ONE write and ZERO readers since the S-E5
+# stamp: the durable ledger knew what rendered each beat and the credits sheet
+# did not. And `_row` right-aligned by subtracting pixel width with no bound,
+# so a ~90-character LANE 2 receipt would have begun LEFT of its own label.
+#
+# These drive the REAL _draw_models with a REAL font onto a REAL canvas and
+# record the coordinates it actually draws at. Nothing here asserts a value the
+# fixture handed in.
+# --------------------------------------------------------------------------- #
+_LANE2 = ("RECIPE_LTX8_I2V_v2+prequalification[tiled_vae=off] "
+          "· Q8_0 · 512x288")
+
+
+def _spy_models(models, w=1920, h=1080):
+    """Render the MODELS block and return (draw_calls, end_y, draw, image).
+
+    Each call is (x, y, text, font). The draw object is real -- textlength,
+    font metrics and the canvas are all the production ones."""
+    from PIL import Image, ImageDraw
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 255))
+    d = ImageDraw.Draw(img)
+    calls = []
+    real_text = d.text
+
+    def spy(xy, text, *a, **k):
+        calls.append((int(xy[0]), int(xy[1]), text, k.get("font")))
+        return real_text(xy, text, *a, **k)
+
+    d.text = spy
+    end_y = cr._draw_models(d, int(cr._COL1_X * h / cr._REF_H), 48, models,
+                            w, h)
+    return calls, end_y, d, img
+
+
+def _models_block(video_suffix=None, video_rows=None):
+    return {"header": "MODELS", "tag": "GENERATIVE STACK", "img_rev": 1,
+            "vid_rev": 3, "image_rows": [("stills", "flux2_klein x5")],
+            "video_rows": video_rows or [("music_visual", "ltx_8gb",
+                                          "image-to-video")],
+            "video_suffix": video_suffix or {},
+            "music": "stable_audio_3"}
+
+
+def test_the_card_draws_the_recipe_it_had_been_carrying_unread():
+    """THE DEFECT: one write, zero readers. Proven by pixels, not by reading
+    the source -- the same block with and without a recipe must not render to
+    the same image."""
+    without = _spy_models(_models_block())[3]
+    with_it = _spy_models(_models_block({"ltx_8gb": _LANE2}))[3]
+    assert without.tobytes() != with_it.tobytes()
+
+
+def test_rendering_the_same_block_twice_is_identical():
+    """CONTROL for the test above -- if the renderer were nondeterministic,
+    an image inequality would prove nothing."""
+    a = _spy_models(_models_block({"ltx_8gb": _LANE2}))[3]
+    b = _spy_models(_models_block({"ltx_8gb": _LANE2}))[3]
+    assert a.tobytes() == b.tobytes()
+
+
+def test_the_recipe_text_is_actually_drawn_and_says_the_recipe():
+    calls, _end, _d, _img = _spy_models(_models_block({"ltx_8gb": _LANE2}))
+    drawn = " ".join(c[2] for c in calls)
+    assert "RECIPE_LTX8_I2V_v2" in drawn
+    assert "tiled_vae=off" in drawn          # the DEPARTURE, not just the name
+
+
+def test_an_engine_with_no_recipe_adds_no_line():
+    """A still_* / humo row stamps no recipe, and an empty note must not open
+    a blank line under it."""
+    tall = _spy_models(_models_block({"ltx_8gb": _LANE2}))[1]
+    short = _spy_models(_models_block({"ltx_8gb": ""}))[1]
+    bare = _spy_models(_models_block())[1]
+    assert short == bare < tall
+
+
+def test_a_long_value_never_starts_left_of_its_own_label():
+    """THE RIDER, measured at the pixels. Before the clamp, vx was
+    x + colw - width with no bound."""
+    from PIL import Image, ImageDraw
+    h = 1080
+    long_engine = "ltx_8gb_" + ("x" * 120)
+    calls, _end, d, _img = _spy_models(
+        _models_block(video_rows=[("music_visual", long_engine, "")]))
+    fbody = cr._load_font(cr._sc(cr._PT_BODY, h))
+    label = next(c for c in calls if c[2] == "music_visual")
+    value = next(c for c in calls if c[2].startswith("ltx_8gb_x"))
+    assert value[0] >= label[0] + cr._fw(d, "music_visual", fbody)
+    assert value[2].endswith("...")          # the cut is MARKED, not silent
+
+
+def test_a_clamped_row_stays_inside_its_column():
+    """BOTH bounds. The right edge alone is a TAUTOLOGY of the positioning
+    formula (vx is DEFINED as x + colw - width, so value_x + width == x + colw
+    for any string, clamped or not) -- the pre-push fan-out caught this test
+    asserting only that. The LEFT bound is the one the old code violated: it
+    put vx at -754 on a 120-character engine id."""
+    h = 1080
+    long_engine = "ltx_8gb_" + ("x" * 120)
+    calls, _end, d, _img = _spy_models(
+        _models_block(video_rows=[("music_visual", long_engine, "")]))
+    x0 = int(cr._COL1_X * h / cr._REF_H)
+    colw = int(cr._COL1_W * h / cr._REF_H)
+    fbody = cr._load_font(cr._sc(cr._PT_BODY, h))
+    value = next(c for c in calls if c[2].startswith("ltx_8gb_x"))
+    assert value[0] >= x0                                   # <- the real bound
+    assert value[0] + cr._fw(d, value[2], fbody) <= x0 + colw + 1
+
+
+def test_a_long_family_suffix_gives_way_before_the_engine_id():
+    """The clamp's first branch: an engine id that cannot be read is worse
+    than a missing family annotation, so the annotation is trimmed first."""
+    calls, _end, _d, _img = _spy_models(_models_block(
+        video_rows=[("music_visual", "wan_i2v", "family " * 30)]))
+    engine = [c for c in calls if c[2] == "wan_i2v"]
+    assert engine, "the engine id was trimmed while the annotation survived"
+    suffix = [c for c in calls if c[2].startswith("· family")]
+    assert suffix and suffix[0][2].endswith("...")
+
+
+def test_a_row_that_clamps_and_carries_a_recipe_does_both():
+    """The two mechanisms meet on one row; each was only ever tested alone."""
+    long_engine = "ltx_8gb_" + ("x" * 120)
+    calls, _end, _d, _img = _spy_models(_models_block(
+        {long_engine: _LANE2},
+        video_rows=[("music_visual", long_engine, "")]))
+    drawn = [c[2] for c in calls]
+    assert any(t.startswith("ltx_8gb_x") and t.endswith("...") for t in drawn)
+    assert any("RECIPE_LTX8_I2V_v2" in t for t in drawn)
+
+
+def test_only_the_roles_that_carry_a_receipt_get_a_note():
+    """A real ledger mixes engines that stamp a recipe with engines that do
+    not (still_* and humo stamp none) in the SAME render."""
+    calls, _end, _d, _img = _spy_models(_models_block(
+        {"ltx_8gb": _LANE2},
+        video_rows=[("announcer_visual", "humo", "audio-driven face"),
+                    ("music_visual", "ltx_8gb", "image-to-video")]))
+    ys = {c[2]: c[1] for c in calls}
+    note = [c for c in calls if "RECIPE_LTX8_I2V_v2" in c[2]]
+    assert len(note) == 1
+    assert note[0][1] > ys["ltx_8gb"]          # BELOW its own engine row
+    assert note[0][1] > ys["humo"]             # ...and not under humo's
+
+
+def test_an_unbreakable_receipt_token_is_cut_not_run_off_the_edge():
+    """_wrap splits on whitespace and cannot break one long token -- and a
+    departure list is exactly one long token."""
+    h = 1080
+    token = "RECIPE_LTX8_I2V_v2+prequalification[" + ("k=v," * 40) + "]"
+    calls, _end, d, _img = _spy_models(_models_block({"ltx_8gb": token}))
+    fmicro = cr._load_font(cr._sc(cr._PT_MICRO, h))
+    x0 = int(cr._COL1_X * h / cr._REF_H)
+    colw = int(cr._COL1_W * h / cr._REF_H)
+    note = [c for c in calls if c[2].startswith("RECIPE_LTX8_I2V_v2+prequal")]
+    assert note, "the receipt line was dropped entirely"
+    for c in note:
+        assert c[0] + cr._fw(d, c[2], fmicro) <= x0 + colw + 1
+    assert any(c[2].endswith("...") for c in note)
+
+
+def test_the_recipe_note_is_bounded_at_the_columns_allowance():
+    """col1 flows downward with no backstop, so an unbounded note pushes the
+    [PRODUCTION LEDGER] and [SYSTEM] grids toward the footer."""
+    h = 1080
+    huge = " ".join("departure_%02d=value" % i for i in range(60))
+    calls, _end, _d, _img = _spy_models(_models_block({"ltx_8gb": huge}))
+    fmicro = cr._load_font(cr._sc(cr._PT_MICRO, h))
+    note_lines = [c for c in calls
+                  if c[3] is fmicro and c[2].startswith("departure_")]
+    # The LITERAL, not cr._NOTE_LINES_MAX. Asserting against the constant is
+    # tautological -- the mutation round raised the ceiling to 9 and this test
+    # happily agreed with it, which is how a two-line note becomes a wall of
+    # micro text on a card with room to spare. TWO lines is the product
+    # decision: enough for a full LANE 2 receipt with its departure list.
+    assert len(note_lines) == 2
+    assert note_lines[-1][2].endswith("...")     # overflow folded, not dropped
+    # ...and line 2 is a CONTINUATION of line 1, not an unrelated micro call:
+    assert note_lines[1][0] == note_lines[0][0]
+    assert note_lines[1][1] == note_lines[0][1] + cr._fh(fmicro)
+
+
+_LONG_RECIPE = ("RECIPE_LTX8_I2V_v2+prequalification"
+                "[tiled_vae=off,t5_device=cpu,attn=sage2]")
+
+
+def _led_with(recipe):
+    led = _led()
+    led["meta"]["render_engines"]["by_engine"] = {
+        eng: {"family": "image_to_video", "recipe": recipe, "quant": "Q8_0",
+              "render_canvas": "704x400", "use_lora": True, "varied": [],
+              "clip_count": 3}
+        for eng in ("humo", "ltx_video", "wan_i2v")}
+    return led
+
+
+def _col1_end_y(recipe, w, h):
+    from PIL import Image, ImageDraw
+    lay = cr.build_credits_layout(_led_with(recipe), w=w, h=h, manifest={
+        "clips": [{"shot_id": "s0", "path": "a.mp4", "exists": True,
+                   "start_s": 0.0}],
+        "total_target_frames": 400, "fps": 25, "clip_count": 3})
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 255))
+    return cr._draw_col1(ImageDraw.Draw(img),
+                         int(cr._COL1_X * h / cr._REF_H),
+                         int(cr._MARGIN_TOP * h / cr._REF_H), lay, w, h)
+
+
+@pytest.mark.parametrize("w,h", [(1280, 720), (1920, 1080), (3840, 2160)])
+def test_col1_with_a_long_receipt_on_every_role_clears_the_footer(w, h):
+    """THE REGRESSION THE PRE-PUSH FAN-OUT CAUGHT. A FIXED two-line note
+    allowance overran the footer by 27px at 1280x720 -- the size this repo's
+    own render tests already use -- so the [PRODUCTION LEDGER] rows drew into
+    the footer band. The column measures what it can afford now."""
+    end_y = _col1_end_y(_LONG_RECIPE, w, h)
+    footer_top = h - int(56 * h / cr._REF_H)
+    assert end_y <= footer_top, (
+        "col1 ran into the footer at y=%d (footer starts %d)"
+        % (end_y, footer_top))
+
+
+def test_where_the_column_cannot_afford_a_note_it_adds_nothing():
+    """854x480 overflows on its REQUIRED content alone and did so before any
+    of this. The allowance drops to zero there, so the recipe note must cost
+    exactly nothing rather than deepening a pre-existing overflow."""
+    w, h = 854, 480
+    assert _col1_end_y(_LONG_RECIPE, w, h) == _col1_end_y(None, w, h)
+
+
+def test_the_card_shows_mixed_rather_than_one_clips_recipe():
+    """Row 1 and row 2 meet here: the card draws what the PER-FIELD roll-up
+    reports, so an engine that rendered two recipes says so on screen."""
+    from nodes.otr_video_render_batch import _build_render_engines_payload
+    ren = _build_render_engines_payload({"clips": [
+        {"shot_id": "s1", "role": "music_visual", "engine_id": "ltx_8gb",
+         "recipe": "RECIPE_LTX8_I2V_v2", "quant": "Q8_0"},
+        {"shot_id": "s2", "role": "music_visual", "engine_id": "ltx_8gb",
+         "recipe": "RECIPE_LTX8_I2V_v2+prequalification[tiled_vae=off]",
+         "quant": "Q8_0"}]}, None)
+    block = _models_block(
+        {"ltx_8gb": cr._recipe_suffix(ren, "ltx_8gb")},
+        video_rows=cr._video_role_rows(ren))
+    drawn = " ".join(c[2] for c in _spy_models(block)[0])
+    assert "mixed recipe" in drawn
+    assert "RECIPE_LTX8_I2V_v2" not in drawn

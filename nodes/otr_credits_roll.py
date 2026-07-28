@@ -643,6 +643,39 @@ def render_static_base(layout: dict, w: int, h: int):
 
 
 def _draw_col1(d, x, top, layout, w, h):
+    """Column 1, with the recipe notes sized to what the column can AFFORD.
+
+    Col1 flows its blocks downward and has no backstop -- whatever it draws
+    past ``h - 56*sx`` lands in the footer band or off the canvas entirely,
+    and PIL clips it silently. The per-engine recipe note (2026-07-28) is the
+    only OPTIONAL content here, so it is measured first: draw the whole column
+    onto a scratch canvas at the largest note allowance, and step down until
+    the column ends above the footer. At 1280x720 -- the size this repo's own
+    render tests use -- the full-length allowance overruns by 27px, which is
+    exactly the regression this pass exists to not ship.
+
+    It does NOT rescue a column that overflows on its REQUIRED content alone
+    (h=480 already did before any of this); at that point the allowance is
+    zero and the pre-existing overflow is unchanged, not hidden."""
+    floor_y = h - int(56 * (h / _REF_H))
+    allowance = _NOTE_LINES_MAX
+    while allowance > 0:
+        if _flow_col1(_scratch_draw(w, h), x, top, layout, w, h,
+                      allowance) <= floor_y:
+            break
+        allowance -= 1
+    return _flow_col1(d, x, top, layout, w, h, allowance)
+
+
+def _scratch_draw(w, h):
+    """A throwaway ImageDraw for MEASUREMENT passes. Real fonts and real
+    textlength, nothing kept."""
+    from PIL import Image, ImageDraw
+    return ImageDraw.Draw(Image.new("RGBA", (max(1, w), max(1, h)),
+                                    (0, 0, 0, 0)))
+
+
+def _flow_col1(d, x, top, layout, w, h, note_lines):
     sx = h / _REF_H
     y = top
     # hero (auto-shrink to col1 width)
@@ -667,13 +700,19 @@ def _draw_col1(d, x, top, layout, w, h):
 
     for kind, block in layout["col1"]:
         if kind == "models":
-            y = _draw_models(d, x, y, block, w, h)
+            y = _draw_models(d, x, y, block, w, h, note_lines=note_lines)
         elif kind == "grid":
             y = _draw_grid(d, x, y, block["header"], block["rows"], h)
     return y
 
 
-def _draw_models(d, x, y, m, w, h):
+# How many wrapped lines a per-engine recipe note may occupy at most. The
+# column's own measurement pass (_draw_col1) spends DOWN from here; two lines
+# holds a full LANE 2 receipt with its departure list at 1080.
+_NOTE_LINES_MAX = 2
+
+
+def _draw_models(d, x, y, m, w, h, note_lines=_NOTE_LINES_MAX):
     sx = h / _REF_H
     fh1 = _load_font(_sc(_PT_H1, h))
     d.text((x, y), m["header"], fill=_rgba(_TEAL), font=fh1)
@@ -686,14 +725,97 @@ def _draw_models(d, x, y, m, w, h):
     fmicro = _load_font(_sc(_PT_MICRO, h))
     colw = int(_COL1_W * sx)
 
+    gap = _sc(12, h)
+
+    def _fit(s, font, max_w):
+        """Trim ``s`` to ``max_w`` pixels, ending in a visible "...".
+
+        Binary search rather than a per-character walk: the credits card is
+        drawn per frame, and a ~90-character LANE 2 receipt would otherwise
+        cost ~90 textlength calls a row. Returns "" only when even the ellipsis
+        does not fit -- above that the cut is always MARKED, because a value
+        silently shortened to fit reads as the whole value."""
+        if max_w <= 0:
+            return ""
+        if _fw(d, s, font) <= max_w:
+            return s
+        lo, hi = 0, len(s)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if _fw(d, s[:mid] + "...", font) <= max_w:
+                lo = mid
+            else:
+                hi = mid - 1
+        return (s[:lo] + "...") if _fw(d, "...", font) <= max_w else ""
+
     def _row(label, value, suffix=""):
         d.text((x, cur_y[0]), label, fill=_rgba(_GREEN, _A_LABEL), font=fbody)
+        # CLAMP (2026-07-28, the LANE 2 fan-out rider). This right-aligned
+        # block used to start at ``x + colw - width`` with no bound, so a value
+        # wider than the column began LEFT of the label and drew straight over
+        # it -- and a LANE 2 recipe receipt is ~90 characters against a layout
+        # sized for short engine ids. The annotation gives way first: an engine
+        # id that cannot be read is worse than a missing family suffix.
+        # The whole block is measured in fbody even though the suffix DRAWS in
+        # fmicro, which is the convention this row already used. It
+        # over-estimates the suffix, so the clamp errs toward more space, never
+        # less; correcting the measurement would move every existing row.
+        avail = colw - _fw(d, label, fbody) - gap
+        if _fw(d, value + (("  " + suffix) if suffix else ""), fbody) > avail:
+            if suffix:
+                suffix = _fit(suffix, fbody,
+                              avail - _fw(d, value + "  ", fbody))
+            if not suffix:
+                value = _fit(value, fbody, avail)
         vx = x + colw - _fw(d, value + (("  " + suffix) if suffix else ""), fbody)
         d.text((vx, cur_y[0]), value, fill=_rgba(_BRIGHT), font=fbody)
         if suffix:
             d.text((vx + _fw(d, value + "  ", fbody), cur_y[0] + _sc(3, h)),
                    suffix, fill=_rgba(_GREEN, _A_MICRO), font=fmicro)
         cur_y[0] += _fh(fbody) + _sc(3, h)
+
+    def _micro_note(text, max_lines=note_lines):
+        """A wrapped continuation note under a row, in micro type.
+
+        The recipe receipt does NOT go in ``_row``'s suffix slot: it is ~90
+        characters since LANE 2, so the clamp above would cut it to nothing
+        and the row would say less than saying nothing. It gets its own
+        indented lines, wrapped to the column.
+
+        ``max_lines`` comes from the COLUMN, which measured what it can afford
+        (see _draw_col1) -- col1 flows downward with no backstop, and a fixed
+        two-line allowance overruns the footer at 720p. Overflow is folded into
+        the last line and ellipsized rather than dropped, because a silently
+        truncated recipe reads as the whole recipe; at an allowance of zero the
+        note is absent entirely, which is honest -- there is no room for it."""
+        if not text or max_lines <= 0:
+            return
+        ix = x + _sc(10, h)
+        room = colw - (ix - x)
+        lines = _wrap(d, text, fmicro, room)
+        if not lines:
+            return
+        shown = lines[:max_lines]
+        if len(lines) > max_lines:
+            shown[-1] = " ".join(lines[max_lines - 1:])
+        # EVERY line goes through the clamp, not just the folded one: _wrap
+        # splits on whitespace and cannot break a single long token, and a
+        # departure list like
+        # RECIPE_LTX8_I2V_v2+prequalification[tiled_vae=off,t5_device=cpu]
+        # is exactly that -- one token wider than the column, which _wrap
+        # returns intact and which would otherwise draw straight off the edge.
+        shown = [_fit(ln, fmicro, room) for ln in shown]
+        for ln in shown:
+            if not ln:
+                continue
+            d.text((ix, cur_y[0]), ln, fill=_rgba(_GREEN, _A_MICRO),
+                   font=fmicro)
+            cur_y[0] += _fh(fmicro)
+        # No trailing pad. _sc() floors at 8 because it scales FONT sizes, so
+        # a nominal "2px" gap would silently be 8px at EVERY canvas height --
+        # 24px of invisible drift across three video rows, spent out of the
+        # same budget the note itself is competing for. The micro line advance
+        # already separates the note from the row below it.
 
     cur_y = [y]
     # IMAGE
@@ -711,8 +833,15 @@ def _draw_models(d, x, y, m, w, h):
            "%d RENDER ROLES" % len(m["video_rows"]),
            fill=_rgba(_GREEN, _A_MICRO), font=fmicro)
     cur_y[0] += _fh(fsub) + _sc(4, h)
+    # The recipe receipt finally reaches the CARD (2026-07-28). It has been
+    # written into ``video_suffix`` since the S-E5 stamp and read by nobody --
+    # one write, zero readers -- so the ledger knew what rendered each beat and
+    # the credits sheet did not. It draws UNDER its engine row rather than
+    # beside it; see _micro_note for why the suffix slot cannot hold it.
+    suffixes = m.get("video_suffix") or {}
     for role, eng, fam in m["video_rows"]:
         _row(role, eng, ("· " + fam) if fam else "")
+        _micro_note(suffixes.get(eng) or "")
     cur_y[0] += _sc(8, h)
     # MUSIC
     d.text((x, cur_y[0]), "MUSIC", fill=_rgba(_SUB), font=fsub)
