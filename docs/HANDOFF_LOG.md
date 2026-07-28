@@ -3,6 +3,95 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-28 -- HEAD 48e3c6fb (v2.0-alpha) -- WINDOW CODER
+Did: the three remote-safe rows, in the operator's order, one green pushed
+  chunk each -- `bcaab4db` the by_engine PER-FIELD roll-up (+ both credits
+  readers), `24f4251a` the credits card drawing video_suffix + the _row()
+  clamp, `48e3c6fb` the encoder returning a PROVEN frame count. The QA
+  fan-out ran BEFORE every push this time and caught a 720p layout regression
+  and a lost-beat behaviour change that mutation structurally could not see;
+  both are fixed inside their own commits. A2 untouched (still HELD behind the
+  profile scope). 7d still PARKED.
+Current step: the SECOND ENCODER -- nodes/_otr_shared/scope_draw.py, which
+  four live viz_* engines write clips through with no ffprobe at all and which
+  the M7 roster gate structurally cannot see. Then cheap_families' four still_*
+  count proofs. Then the operator's GPU sequence.
+Next: a CODER window takes the second encoder + the roster gate widening (it
+  will go red on purpose). The clamped recipe-v2 confirmation, the WAN
+  prequalification sweep and 7d all belong to a RENDER window.
+Models: Claude codes and judges (rung 4) + eight Sonnet subagent QA lenses
+  across three pre-push fan-outs. No codex, no agy, no Fable, no roundtable --
+  two-strikes never invoked, so no panel was owed.
+Commits: bcaab4db 24f4251a 48e3c6fb plus this doc push. Suite 7384 -> 7429;
+  Bible 17; build_variants --check 11/0; canonical 9872624A byte-identical
+  throughout. Mutation across the three chunks: 38/38 real mutants caught,
+  13/13 controls survived.
+
+### Detail
+
+**THE FAN-OUT PAID FOR ITSELF TWICE, ON GROUND MUTATION CANNOT REACH.** Row
+2's recipe note had a FIXED two-line allowance; at 1280x720 -- the size this
+repo's own render tests already use -- that pushed col1 27px past the footer,
+because col1 flows its blocks downward with no backstop and PIL clips the
+overflow silently. No mutation of the code reveals that the LAYOUT stopped
+fitting. The column now measures itself onto a scratch canvas and spends the
+allowance down until it clears the footer. Row 3 turned a zero-frame batch
+from `return (path, 0)` into a raise from the count proof describing a failed
+multi-segment ASSEMBLY -- true words about the wrong event -- so the encoder
+refuses zero frames by name instead.
+
+**THE FRAME-COUNT ROW ASKED THE WRONG QUESTION AND THE ANSWER WAS FREE.** It
+framed the choice as "pay a decode per clip or leave the count self-declared".
+`nb_frames` is the MUXER'S OWN count and rides the same stream read
+`ffprobe_clip_fields` already performs on every emitted clip -- the identical
+argument that put width/height in that query at chunk 6. The decode is now the
+FALLBACK, for a container recording no count. Measured before deciding: header
+29-45ms flat from 50 to 18000 frames, decode 35-168ms and scaling, against
+real beat renders of 744-842 SECONDS. The docstring's "expensive by design"
+was true of the decode and was never the reason this could not be done.
+
+**MUTATION KILLED THREE DECORATIVE ASSERTIONS OF MINE, AND ONE MUTANT WAS
+RECLASSIFIED RATHER THAN CHASED.** The line-count test asserted against
+`cr._NOTE_LINES_MAX` instead of the literal 2, so raising the ceiling to 9
+left it green -- a two-line note could have become a wall of micro text. Every
+frame-count fixture had counted < declared, so a refusal that only caught
+SHORT clips stayed green; a beat with MORE frames drifts just as badly. And
+`return int(counted)` -> `return int(declared)` survived because control only
+reaches that line after the two are proven equal: that is a CONTROL, not a
+decorative test, and the source keeps `int(counted)` because it names the
+authority if the check ever gains a tolerance.
+
+**THE FAN-OUT ALSO KILLED A TAUTOLOGY AND TWO VACUOUS TESTS.** The clamp test
+asserted only the RIGHT edge -- which is an identity of the positioning
+formula (`vx` is DEFINED as `x + colw - width`), so it passed against the
+unclamped code that put `vx` at -754. Two frame-count tests asserted inside a
+bare `except` block, which passes vacuously the day the code stops raising.
+Both patterns are now written into GO_FORWARD's carry-forward list.
+
+**AND IT FOUND A SECOND ENCODER NOBODY HAD FILED.** The four viz_* engines do
+not use `encode_frames_to_silent_mp4` at all -- they write through
+`nodes/_otr_shared/scope_draw.py`, which has no ffprobe call of any kind, and
+the M7 roster gate cannot see them because it greps for the literal strings
+`encode_frames_to_silent_mp4(` and `run_ffmpeg(`. That is the cheap_families
+finding of 2026-07-27 repeating one module over, in the exact shape the gate
+was built to catch. Three of those four are the video slots the surviving
+six-bank 120w matrix uses. Filed, not started -- it is a multi-file chunk and
+the operator's scope was three rows.
+
+**FOUR CITES MOVED AGAIN, and one bug-list claim was wrong about the code.**
+`_draw_models` is `otr_credits_roll.py:675-719` not `:657-712`;
+`ffprobe_counted_frames` is `wan_shared.py:124` not `:105`; and the receipt's
+own comment claimed a non-stamping engine arrives with `family=None` when
+`build_clip_manifest` writes `clip.get("family") or shot.get("family") or ""`,
+so it arrives as `""`. The `by_engine.setdefault` cite at `:87` and the
+credits `:211`/`:269` cites were still accurate -- "every cite has moved" is
+a real warning but not a universal one.
+
+**THE TREE WAS LEFT EXACTLY AS FOUND.** Another window's three modified
+`tmp/*.ps1` and its six untracked `config/profiles/otr_sbcov_*.json` were
+preserved throughout; every commit was pathspec-only; no variants were
+generated from those scratch profiles, so 7429 reproduces on a clean clone.
+
 ## 2026-07-27 20:24 -- HEAD 40780b82 (v2.0-alpha) -- WINDOW CODER
 Did: executed the ranked open-bug queue. SIX of seven rows shipped as green
   pushed chunks -- A1 ebec0f1f, A6 ba24af29, A4 c9b89769, B4 57caf43d,

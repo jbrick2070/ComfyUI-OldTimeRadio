@@ -1,6 +1,48 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-27 20:24 (remote Cowork, CODER window) -- **THE RANKED
+**Updated:** 2026-07-28 (remote Cowork, CODER window) -- **ALL THREE
+REMOTE-SAFE ROWS ARE DONE, AND THE FAN-OUT RAN BEFORE EVERY PUSH THIS TIME --
+WHICH IS THE ONLY REASON TWO OF THE THREE SHIPPED CORRECT.** HEAD == origin
+`48e3c6fb`; suite **7429 passed / 27 skipped / 1 xfailed**; Bible 17;
+`build_variants --check` 11 variants / 0 failures; canonical `9872624A`
+byte-identical across all three commits.
+
+Landed: `bcaab4db` the `by_engine` roll-up, `24f4251a` the credits-card
+`video_suffix` + the `_row()` clamp, `48e3c6fb` the encoder frame count.
+Per-chunk detail is in `docs/HANDOFF_LOG.md`, not here.
+
+**THE FAN-OUT EARNED ITS KEEP TWICE, ON THINGS MUTATION STRUCTURALLY CANNOT
+SEE.** Row 2's fixed two-line recipe note overran the footer by 27px at
+1280x720 -- the size this repo's own render tests already use -- because col1
+flows downward with no backstop and PIL clips the overflow silently; no
+mutation of the code reveals that the LAYOUT no longer fits. Row 3 turned a
+zero-frame batch from `return (path, 0)` into a raise describing a failed
+multi-segment ASSEMBLY -- true words about the wrong event. Both were found
+BEFORE the push and are fixed in the same commit. Mutation was load-bearing
+too and on its own ground: 38/38 real mutants caught, 13/13 controls survived
+across the three chunks, and it killed three decorative assertions of mine.
+
+**THE ENCODER FRAME-COUNT DECISION WAS A FALSE CHOICE.** The row framed it as
+"pay a decode per clip, or leave the count self-declared". `nb_frames` is the
+MUXER'S OWN count and rides the SAME stream read `ffprobe_clip_fields` already
+performs on every emitted clip -- the identical argument that put width/height
+in that query at chunk 6. A header can disagree with the picture data on a
+CONCATENATED file, which is exactly why `assemble_beat_segments` decodes and
+must keep decoding; a single-render clip was never concatenated. The decode is
+now the FALLBACK, for a container that records no count. Measured on this box:
+header 29-45ms flat from 50 to 18000 frames, decode 35-168ms and scaling,
+against real beat renders of 744-842 SECONDS. Cost was never the obstacle.
+
+**AND THE FAN-OUT FOUND A SECOND ENCODER NOBODY HAD FILED.** The four `viz_*`
+engines do not write clips through `encode_frames_to_silent_mp4` at all -- they
+go through `nodes/_otr_shared/scope_draw.py`, which has NO ffprobe call of any
+kind, and they are structurally invisible to the M7 roster gate. That is the
+`cheap_families` shape of 2026-07-27 repeating one module over. See OPEN BUGS;
+it is the highest-value row this window did not take.
+
+---
+
+**Superseded header (2026-07-27 20:24, CODER window) -- THE RANKED
 BUG QUEUE IS DONE: SIX OF SEVEN ROWS SHIPPED, A2 HELD, AND A POST-PUSH PANEL
 FOUND THAT ONE OF THE SIX HAD BRICKED TWO SHIPPED WORKFLOWS.** HEAD == origin
 `40780b82`; suite **7384 passed / 27 skipped / 1 xfailed**; Bible 17; canonical
@@ -522,67 +564,78 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **the ranked bug queue is DONE. What is left is three
-## remote-safe rows, A2 behind the profile ruling, and the operator's own
-## GPU sequence.**
+## CURRENT STEP -- **the three remote-safe rows are DONE. What is left is a
+## SECOND ENCODER nobody had filed, A2 behind the profile ruling, and the
+## operator's own GPU sequence.**
 
 **7d IS STILL PARKED** until the operator is at the desk -- his call, recorded
 in `docs/TRAVEL_RELAY_PROTOCOL.md`. Do not start it from a remote window.
 
-Six of the seven ranked rows shipped this window and are tombstoned in OPEN
-BUGS below. **A2 is HELD, not skipped**: its entire subject is
-`apply_profile_to_workflow` and the printed override echo, which is the channel
-the operator has directed be retired. Fix it only after the retire-now vs
-retire-later scope is settled; the shape is already correct in its OPEN BUGS
-row (generate the echo FROM the applier's flattened map).
+**TWO OPERATOR DECISIONS ARE STILL OPEN, both unchanged by this window:** the
+profile retire-now vs retire-later scope (which gates A2 and nothing else), and
+the LTX per-beat recipe capability. Neither was touched.
 
-**THE NEXT REMOTE-SAFE LANE, in the order a panel ranked them** (verified
-against HEAD `58e288af`, cites re-pinned, all three need no GPU):
+**THE NEXT REMOTE-SAFE LANE, and it is bigger than the three that just
+landed: THE SECOND ENCODER.** `nodes/_otr_shared/scope_draw.py::encode_silent_mp4`
+is a hand-rolled Popen wrapper that four live engines write clips through
+(`viz_green`, `viz_camera`, `viz_mxc_mandala`, `viz_mxc_cpu`). It has NO
+ffprobe call of any kind -- no colour/stream proof, no frame-count proof -- and
+each engine returns its pre-computed loop bound as `frame_count`. Worse, the
+M7 roster gate in `tests/test_terminal_frame.py` builds its `encoders` set by
+grepping for the literal substrings `encode_frames_to_silent_mp4(` and
+`run_ffmpeg(`; neither appears in any of those four files, so they never enter
+the set and `encoders - provers == set()` can never flag them. **This is the
+`cheap_families` finding of 2026-07-27 repeating one module over, in the shape
+the gate was built to catch and cannot.** The chunk is: widen the roster gate
+to find a clip WRITER rather than a known call spelling, then give the second
+encoder the same two proofs the first one has. Expect the gate to go red the
+moment it is widened -- that is the point, not a setback. `viz_mxc_cpu`,
+`viz_mxc_mandala` and `viz_camera` are the three video slots the surviving
+six-bank 120w matrix uses, so this is on the live path, not a dark corner.
 
-1. **The `by_engine` roll-up keeps only the first clip's receipt per engine**
-   (`nodes/otr_video_render_batch.py:87`, `by_engine.setdefault(eng, receipt)`;
-   `per_clip` at `:85-86` keeps every clip in full). `ltx_audio_in` declares
-   `default_roles = ("music_visual", "announcer_visual")`, so ONE engine
-   legitimately serves several beats -- and since LANE 2 their receipts
-   legitimately differ per cell. `tests/test_render_engines_recipe_stamp.py`
-   defines exactly one clip per engine, so the gap is untested rather than
-   accepted. Best product of severity x self-containedness.
-2. **The credits card never draws the recipe** (`nodes/otr_credits_roll.py`:
-   `_recipe_suffix` at `:211` writes `models["video_suffix"]` at `:269`;
-   `_draw_models` at `:657-712` never reads it; repo-wide the name has one
-   write and zero readers, and `eng_ltx_8gb.py:126-128` admits it in a
-   comment). **Do row 1 FIRST** -- wiring the card before `by_engine`
-   accumulates more than a first-clip receipt just puts confidently-wrong
-   per-engine data on screen instead of none. Carry the rider: `_row()`
-   (nested in `_draw_models` at `:670`) right-aligns by subtracting pixel
-   width with no clamp, truncation or wrap, so a ~90-character LANE 2 receipt
-   would overrun its label.
-3. **`encode_frames_to_silent_mp4` still reports its INPUT ARRAY's length**
-   (`nodes/_otr_video_engines/wrapper_bridge.py:804`, `return out_path,
-   int(b)`). This window proved the color/stream contract on every emitted
-   clip but NOT the count. `ffprobe_clip_fields` deliberately does not count
-   frames (counting means decoding); `ffprobe_counted_frames`
-   (`wan_shared.py:105`) does, and its own docstring says never per clip in
-   the render loop. So closing this is a real decision about paying a decode,
-   not a copy -- which is why it is ranked below the other two.
+Then, still remote-safe and smaller: `cheap_families`' four `still_*` engines
+self-declare their count the same way (they DO prove colour/stream, and they
+ARE visible to the gate -- they build their mp4 from an ffmpeg arg list through
+`run_ffmpeg`, so the count proof is the only half missing). `still_motion` is
+the terminus of the `humo -> humo_1.7B -> still_motion` degrade chain.
 
 **THEN, and none of it is remote:** the clamped confirmation of ltx recipe v2,
 a WAN prequalification sweep (the mechanism is built and named on both WAN
 tiers; no WAN sweep has ever run), then 7d.
 
-**CARRY FORWARD, and this window is the fourth consecutive proof:** run the
+**CARRY FORWARD, and this window is the fifth consecutive proof:** run the
 mutation round even after a QA fan-out clears the change, and treat a test that
 verifies a thing it also CONSTRUCTS, or an exception type asserted without its
-message, as presumed decorative until proven otherwise. **AND RUN THE FAN-OUT
-BEFORE THE PUSH** -- mutation cannot see a shipped JSON artifact that selects
-something the code just made illegal, which is exactly how A6 shipped broken.
+message, as presumed decorative until proven otherwise. **Two additions this
+window earned:** an assertion that lives inside a bare `except` block passes
+VACUOUSLY the day the code stops raising -- use `pytest.raises(...) as info`
+and read `info.value`; and a test that asserts against the CONSTANT the code
+uses is tautological -- assert the documented LITERAL, because the mutation
+round raised a ceiling from 2 to 9 and the test happily agreed with it.
+
+**AND THE FAN-OUT GOES BEFORE THE PUSH. This window did, and it caught a
+720p layout regression and a lost-beat behaviour change that mutation
+structurally could not see.** The previous window ran it after six pushes and
+paid for it.
 
 **RE-PIN THE CITE WHEN YOU TOUCH A ROW, and do not trust the row's own field
-lists either.** B4's report named a `beat_id` no producer stamps and missed
-`jump_still_requests` and `motion_clause`, which are stamped. The frame_count
-row said `eng_ltx_video` already probed; it did not, on either recipe path, and
-`eng_still_parallax` was missing from the row entirely. Derive from the
+lists either.** Confirmed again this window: `build_clip_manifest` writes
+`family = clip.get("family") or shot.get("family") or ""`, so a non-stamping
+engine arrives as `""` and NOT `None` as the receipt's own comment claimed;
+`_draw_models` is `otr_credits_roll.py:675-719`, not `:657-712`; and
+`ffprobe_counted_frames` is `wan_shared.py:124`, not `:105`. Derive from the
 producers mechanically, every time.
+
+---
+
+## SUPERSEDED -- the three remote-safe rows (2026-07-28, ALL THREE LANDED)
+
+The ranked lane was: (1) the `by_engine` roll-up keeping only the first clip's
+receipt per engine, (2) the credits-card `video_suffix` write with zero readers
+plus the `_row()` clamp rider, ordered AFTER (1) so the card could not draw
+confidently-wrong per-engine data, and (3) the encoder frame-count decision.
+All three shipped -- `bcaab4db`, `24f4251a`, `48e3c6fb` -- and are tombstoned
+in OPEN BUGS. The third was not the choice the row framed: see the header.
 
 ---
 
@@ -1685,19 +1738,51 @@ listed as live.
 - ~~**All prequalification cells share ONE receipt**~~ -- **CLOSED by LANE 2**
   @ `71e231ec` + `8424f369`, on all three adapters. Record:
   `docs/2026-07-27-lane2-prequalification-receipt-qa-findings.md`.
-- **The `by_engine` roll-up keeps only the FIRST clip's receipt per engine**
-  (found 2026-07-27, LANE 2 fan-out lens C; verified at
-  `nodes/otr_video_render_batch.py:87`, `by_engine.setdefault(eng, receipt)`).
-  Pre-LANE-2 this lost nothing, because every sweep clip on one engine stamped
-  the same string; now the strings legitimately differ per cell, so the summary
-  discards distinguishing data. **NOT a hole in the ledger** -- `per_clip`
-  (line 85) keeps every clip's receipt in full, and the 2026-07-27 sweep ran one
-  EPISODE per cell, so a real sweep ledger carries one recipe anyway. Also
-  pre-existing and outside the adapter lane, which is why LANE 2 left it. Note
-  it already loses per-shot `render_canvas` the same way, which is reachable
-  TODAY on any episode mixing aspect ratios on one engine. Decide whether a
-  lossy summary beside a lossless one is worth changing, or write down that it
-  is not.
+- ~~**The `by_engine` roll-up keeps only the FIRST clip's receipt per
+  engine**~~ -- **CLOSED @ `bcaab4db`.** The roll-up is PER FIELD now: an
+  identity field (recipe / quant / use_lora / render_canvas / family) is
+  reported only when every clip on that engine agrees, otherwise it is `None`
+  and its NAME is listed in a new `varied`, so `None` means "no single value"
+  and `varied` distinguishes "stamped nothing" from "stamped several".
+  `vram_peak_mb` became the WORST clip's value (a measurement has a correct
+  aggregate; a NaN peak is skipped because it compares False against
+  everything and would silently discard a real measurement). Both credits
+  readers moved in the same commit. **The reason it was untested rather than
+  accepted, and the trap one level up:** the shipped fixture defined exactly
+  one clip per engine -- and the first draft of the NEW tests had several
+  clips but only ever one engine, so cross-engine isolation was still
+  untested. The pre-push fan-out caught that; mutation could not.
+
+- **NEW 2026-07-28: a SECOND clip encoder exists, it proves nothing, and the
+  M7 roster gate cannot see it.** `nodes/_otr_shared/scope_draw.py::encode_silent_mp4`
+  is a hand-rolled `Popen` wrapper returning only `out_path`, with NO ffprobe
+  call anywhere -- no colour/stream contract, no frame count. Four LIVE engines
+  write their clips through it (`eng_visualizer.py` viz_green,
+  `eng_viz_camera.py`, `eng_viz_mandala.py`, `eng_viz_rainbow.py`), each
+  returning its pre-computed loop bound as `frame_count`. The M7 gate
+  (`tests/test_terminal_frame.py`) builds its `encoders` set by grepping for
+  the literal substrings `encode_frames_to_silent_mp4(` and `run_ffmpeg(`;
+  neither string appears in any of those four files, so they never enter the
+  set and `encoders - provers == set()` can never flag them. **This is exactly
+  the `cheap_families` shape of 2026-07-27 repeating one module over** -- the
+  gate that was widened to catch a wrong filename now misses a wrong CALL
+  SPELLING. Three of the four are the video slots the surviving six-bank 120w
+  matrix uses, so this is the live path. Fix shape: make the gate identify a
+  clip WRITER structurally rather than by known call spelling, expect it to go
+  red, then give the second encoder both proofs. Found by the pre-push fan-out
+  (lens F), 2026-07-28.
+
+- **NEW 2026-07-28: `cheap_families`' four `still_*` engines self-declare
+  their frame count.** `still_motion`, `still_pan`, `still_flat`,
+  `still_word` build their mp4 from an ffmpeg ARG LIST through
+  `_wb.run_ffmpeg(cmd)`, never through `encode_frames_to_silent_mp4`, so
+  `48e3c6fb`'s count proof does not reach them; `n` (the requested count) is
+  returned as `frame_count` unchecked. They DO call
+  `validate_silent_clip_contract(ffprobe_clip_fields(...))`, so the colour and
+  stream halves are proven, and they ARE visible to the M7 gate -- only the
+  count is missing. `still_motion` is the terminus of the
+  `humo -> humo_1.7B -> still_motion` degrade chain. Smaller than the row
+  above and the same chunk.
 - ~~**A6 -- the Q4 artifact has neither an expected size nor a SHA**~~ --
   **CLOSED @ `ba24af29`**, corrected @ `40780b82`. Q8_0 and Q4_K_M are pinned
   by MEASUREMENT (three independent copies agreed byte for byte; the Q8_0
@@ -1714,12 +1799,20 @@ listed as live.
   from the row), plus `cheap_families` behind all four still_* engines. A
   roster gate in `tests/test_terminal_frame.py` fails by name for any module
   that writes a clip without proving it.
-  **STILL OPEN: the COUNT itself.** `encode_frames_to_silent_mp4`
-  (`wrapper_bridge.py:804`) still returns its input array's length, so a
-  single-render beat's `frame_count` remains self-declared -- what landed
-  proves the color/stream contract, not the number. See CURRENT STEP item 3:
-  `ffprobe_clip_fields` deliberately does not count (counting means decoding),
-  so closing it is a decision about paying a decode per clip.
+  **THE COUNT IS NOW CLOSED TOO @ `48e3c6fb`, and without paying a decode.**
+  `encode_frames_to_silent_mp4` returns `proven_frame_count(...)`: the muxer's
+  own `nb_frames`, which rides the SAME stream read `ffprobe_clip_fields`
+  already performs on every clip, with the decode kept as the FALLBACK for a
+  container that records no count, and a NAMED refusal on any disagreement in
+  either direction. A zero-frame batch is refused by name at the encoder (it
+  used to return `frame_count=0` over a container with no video stream).
+  Measured: header 29-45ms flat, decode 35-168ms and scaling, against real
+  beat renders of 744-842 SECONDS. **What this proves and what it does not:**
+  it proves the muxer wrote what it was piped, which is the right question for
+  a clip written by ONE ffmpeg pass; it does NOT prove decodability, which is
+  why `assemble_beat_segments` still decode-counts every ASSEMBLED beat and
+  must keep doing so. **Still self-declared elsewhere:** the four `viz_*`
+  engines and the four `still_*` engines -- two separate rows above.
 - ~~**The encoder boundary does not assert `dtype == uint8`**~~ -- **CLOSED @
   `de50786e`** (A5-lite). One assert at `wrapper_bridge.encode_frames_to_silent_mp4`,
   naming the byte multiplier and the converter to use.
@@ -1747,12 +1840,46 @@ listed as live.
   refusal is `:2148` not `1801-1817`; `_use_i2v` is `eng_ltx_video.py:583` not
   `559-572`. The defects are mostly still real; their coordinates are not.
   **Re-pin a row's cite when you touch it.**
-- **RIDER on the credits-card display gap (LANE 2 fan-out lens C).** When
-  whoever owns the card wires `video_suffix` into `_draw_models`, note that
-  `_row()` right-aligns with no clamp, truncation or wrapping. A LANE 2 receipt
-  is ~90 characters against a layout sized for short engine ids, so it would
-  overrun the label in the same row. The clamp is part of that chunk, not this
-  one.
+- ~~**RIDER on the credits-card display gap: `_row()` right-aligns with no
+  clamp**~~ -- **CLOSED @ `24f4251a`** with the card wiring itself. `_row()`
+  clamps against the space left of the label, and the ANNOTATION gives way
+  before the engine id; every cut is marked with `...` rather than silently
+  shortened. Measured pre-fix: `vx = -754` on a 120-character engine id.
+
+- **NEW 2026-07-28: col1 overflows the footer at 854x480 on its REQUIRED
+  content alone.** PRE-EXISTING -- it was already 20px past `h - 56*sx` before
+  the recipe note existed, and PIL clips the overflow silently, so the tail of
+  the [PRODUCTION LEDGER] grid is drawn off-canvas. `24f4251a` made the card
+  measure what it can afford and spend the note allowance DOWN to zero, so the
+  note cannot deepen this; it does not rescue it, and deliberately does not
+  pretend to. Reachable only if something renders the card at 480p -- the
+  shipped render tests use 720p and 1080p. Fix belongs to whoever next opens
+  the card's geometry: either shrink the required blocks at small canvases or
+  refuse the canvas. Found by the pre-push fan-out (lens D), 2026-07-28.
+
+- **NEW 2026-07-28 (LATENT, pre-existing): an ODD canvas dimension makes the
+  encoder's declared stride disagree with the bytes it pipes.**
+  `ffmpeg_silent_mp4_cmd` declares rawvideo `-s even_dim(w)xeven_dim(h)` while
+  `encode_frames_to_silent_mp4` pipes `frames.tobytes()` at the array's REAL
+  odd H/W, so ffmpeg slices the byte stream on the wrong boundaries. Measured:
+  `(5,63,47,3)` encodes "successfully" to a 46x62 clip with skewed content and
+  the new count proof PASSES it (5 frames either way); `(27,63,47,3)` and
+  `(10,17,17,3)` now RAISE -- correctly refusing, but blaming a timing drift
+  when the real cause is the stride. No live producer builds an odd canvas
+  (every value in the tree -- 832x480, 512x288, 1472x832 -- is even) and
+  neither `WanInitImageMixin._dims()` nor the `Canvas` schema validates
+  evenness. Fix belongs with the geometry, not the count proof: make the
+  declared size and the piped bytes ONE derivation. Found by the pre-push
+  fan-out (lens G), 2026-07-28.
+
+- **NOTED 2026-07-28, not a defect: two `scripts/` bake-off runners now abort
+  a whole sweep on a count mismatch.** `scripts/run_ltx_av_q_bakeoff.py:453`
+  and `scripts/run_humo_bakeoff.py:660` call the encoder inside per-leg loops
+  with no try/except and DISCARD its return value (both set
+  `result["frame_count"]` from `int(frames.shape[0])` independently). A
+  disagreement that was previously invisible there is now fatal to the run.
+  That is the correct direction -- a lying count is not a leg worth
+  finishing -- but a sweep operator should know it before an overnight run.
 
 - **The `ltx_8gb` render-length ceiling has TWO owners that only agree by
   coincidence** (found 2026-07-27, B6 panel, two lenses independently; grounded
@@ -1771,15 +1898,15 @@ listed as live.
   cleanup. The preset now carries a `_ceiling_note` saying do not export it
   alone. Compare WAN, which B3 wired correctly: `otr_8gb_wan.json` sets BOTH
   `launch.env.OTR_WAN_TI2V_MAX_FRAMES` and `video.max_render_frames`.
-- **The recipe reaches the ledger but never the credits CARD** (found
-  2026-07-27, B6 panel, lens C; traced hop by hop). `otr_credits_roll`
-  `_recipe_suffix` builds `models["video_suffix"]` from the clip's recipe --
-  and `_draw_models` never reads it; repo-wide, `video_suffix` has one write
-  and zero readers, and `tests/test_credits_roll_spec.py` supplies `recipe` in
-  its fixture without asserting it is drawn. Not a hole in the ledger --
-  `stamp_durable(meta.render_engines)` genuinely carries it -- so this is a
-  DISPLAY gap. The adapter docstring was narrowed to claim only what is true.
-  Fixing the renderer belongs to whoever owns the credits card.
+- ~~**The recipe reaches the ledger but never the credits CARD**~~ --
+  **CLOSED @ `24f4251a`.** `_draw_models` draws it as an indented micro-type
+  note UNDER its engine row (the right-aligned suffix slot cannot hold ~90
+  characters), and the COLUMN measures what it can afford: it flows itself
+  onto a scratch canvas at the largest note allowance and steps down until it
+  ends above the footer. **A fixed two-line allowance overran the footer by
+  27px at 1280x720 -- the size this repo's own render tests use -- and the
+  pre-push fan-out is the only reason that did not ship.** Rows that carry no
+  recipe render pixel-identically to before.
 - ~~**The WAN adapters have the whole pre-B6 defect, unfrozen**~~ -- **CLOSED by
   LANE 1** @ `71753cb4` + `3acc7fed`. Both recipes are frozen in code behind
   per-adapter consent acts and both adapters stamp a receipt. Detail in
@@ -2212,7 +2339,18 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-27 @ `40780b82`, the ranked bug queue +
+- Current whole-tree receipt (2026-07-28 @ `48e3c6fb`, the three remote-safe
+  rows): full Windows suite `7429 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
+  11 variants / 0 failures; canonical
+  `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`
+  byte-identical (no node, widget, link or schema touched by any of the
+  three); AST/BOM/zero-byte/UTF-8 clean on every touched file. Measured with
+  the tree exactly as found -- another window's six untracked
+  `config/profiles/otr_sbcov_*.json` were left in place and NO variants were
+  generated from them (`--check` regenerates in memory and writes nothing), so
+  the count reproduces on a clean clone.
+- Prior receipt (2026-07-27 @ `40780b82`, the ranked bug queue +
   its QA fan-out corrections): full Windows suite
   `7384 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
