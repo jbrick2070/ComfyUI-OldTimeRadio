@@ -1,11 +1,70 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-28 (remote Cowork, CODER window) -- **ONE STREAMING CLIP
-ENCODER INSTEAD OF THREE, BOTH PROOF HALVES ENFORCED, THE GEOMETRY DOWN TO ONE
-DERIVATION, AND THE END CARD NO LONGER OVERFLOWS THE CANVAS THE BUILD SHIPS.**
-HEAD == origin `1959fb49`; suite **7464 passed / 27 skipped / 1 xfailed**;
-Bible 17; `build_variants --check` 11 variants / 0 failures; canonical
-`9872624A` byte-identical across all five commits.
+**Updated:** 2026-07-28 06:15 (remote Cowork, RENDER/QA window) -- **THE
+CREDITS CARD IS LIVE-PROVEN AT 1920x1080 AND A CLOUD ENGINE WAS FOUND SITTING
+IN THE "LOCAL ONLY" ROSTER.** HEAD == origin `72282083`; canonical
+`9872624A` unchanged (pinned by hash at campaign launch). No production code
+was changed by this window -- the work was the GPU lane harness (`tmp/`) and
+the kibitz r1-r4 arc, so the suite/Bible numbers below stand from `1959fb49`.
+
+**LIVE PROOF EARNED TONIGHT (first ever for the five encoder chunks):** a full
+canonical leg on `still_flat` published green --
+`[OTR_CreditsRoll] appended 52.0s console (hero='THE FROST ON THE GLASS')` then
+`obs_publish OK`, 14,637,297 bytes in `otr/obs/`, `engine_histogram
+{"still_flat": 7}`, VRAM peak 1712 MB. The credits col1 ladder (`24f4251a` +
+`1959fb49`) has now rendered live at the production canvas. `OTR_CreditsRoll`
+is CONFIRMED on the executed canonical path (it is node 95 and it both failed
+and succeeded live).
+
+**GPU LANE CAMPAIGN RUNNING** as of 06:06:46 -- master
+`tmp/gpu_lane_all_models_20260728_060646`, 18 local engines over 4 lanes,
+frozen controls (`z_image_turbo` + `original` + `sci_fi_radio`, 45 words),
+harness pinned by SHA-256 in `harness_pins.txt`. Expect ~6 h. Verdicts land in
+each lane's `lane_summary.json` and the master `campaign_summary.json`.
+Read `tmp/_kbA_gpu_campaign.done` for PASS/FAIL. **These cases are engine
+COVERAGE and are NOT an 8 GB qualification.**
+
+**Prior header (still true for the code):** ONE STREAMING CLIP ENCODER INSTEAD
+OF THREE, BOTH PROOF HALVES ENFORCED, THE GEOMETRY DOWN TO ONE DERIVATION, AND
+THE END CARD NO LONGER OVERFLOWS THE CANVAS THE BUILD SHIPS. At `1959fb49`:
+suite **7464 passed / 27 skipped / 1 xfailed**; Bible 17; `build_variants
+--check` 11 variants / 0 failures.
+
+**NEW OPEN ROWS FOUND BY THE 2026-07-28 RENDER/QA WINDOW** (detail in
+`kibitz-runs/2026-07-28-gpu-lane-all-models/r{1,2,3,4}/final.md`):
+
+1. **`word_razzle` IS A CLOUD ENGINE AND EVERY NAME-PREFIX FILTER IN THE TREE
+   CALLS IT LOCAL.** `nodes/_otr_video_engines/eng_cloud_video.py:946`
+   `CloudWordRazzleEngine`, `node_key="cloud_pixverse_i2v"`, needs
+   `OTR_COMFY_API_KEY`. Any harness that classifies locality with
+   `startswith("cloud_")/("google_")` puts a PAID provider in a local-only
+   run -- the 2026-07-28 campaign had it as case 10/10 of its floor lane and
+   logged it under "19 LOCAL". The build already owns the right answer:
+   `render_driver._is_cloud_video_engine` (`:1599`) tests `provider_side` and
+   `node_key`. **The true local roster is 18, not 19.** Promote that helper to
+   a public registry function so nobody derives locality from spelling again.
+2. **THE HEADLESS LAUNCHER SETS NO IMAGE-ENGINE FLAGS.**
+   `scripts/_otr_soak_server_launch.cmd` sets `OTR_ENABLE_HUMO/LTX/WAN` per
+   lane and nothing for images, so `flux2_klein` and `lumina_image` are
+   UNUSABLE in any headless/soak run even though their weights are on disk
+   (`flux-2-klein-4b-Q4_K_M.gguf`, 2484 MB; `lumina_2_model_bf16.safetensors`,
+   4978 MB) and the operator's User-scope flags are set. Cause: a process
+   inherits its parent's environment block, and the campaign's tree predates
+   those variables. Live cost: two cases died at 552 s each in
+   `OTR_ImageGenDispatcher` with `missing_model`, proving nothing about the
+   video engine under test. Same mechanism means `OTR_COMFY_API_KEY` is also
+   absent in the server tree.
+3. **`mesh_stage` CAN NEVER PUBLISH A WHOLE-EPISODE CASE, BY DESIGN.**
+   `otr_credits_roll.plan_backdrop` (`:1152-1161`, dated 2026-07-03) excludes
+   DIRECTORY clips and raises `CreditsDataError` when nothing loopable
+   remains. An episode rendered entirely by `mesh_stage` has no file clip, so
+   the terminal node refuses it. NOT a regression from the encoder chunks --
+   `git blame` puts it at `0606d1cd8`/`f00a8e8ef`. Score mesh coverage-only;
+   do not read the red row as an engine defect.
+4. **`poll_history` TRUNCATES ITS ERROR AT 500 CHARACTERS**
+   (`scripts/otr_api.py:748`). Any harness matching on an exception MESSAGE
+   will silently never match -- the node id and `node_type` survive, the
+   message body does not. Parse structured history if the reason matters.
 
 Landed: `27a4f97c` the second encoder + the widened gate's COLOUR half,
 `afeb5b84` cheap_families' four `still_*` count proofs + the gate's COUNT half,

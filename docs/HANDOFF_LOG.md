@@ -3,6 +3,35 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-28 06:15 -- HEAD 72282083 (v2.0-alpha) -- WINDOW RENDER/QA
+Did: judged the full kibitz r1-r4 arc on the GPU lane plan (codex gpt-5.6-sol
+  high + agy Gemini 3.6 Flash High, pins verified every round) and rebuilt the
+  harness around what it found. FIRST LIVE PROOF for the five encoder chunks:
+  a `still_flat` leg published green -- credits console 52.0s at 1920x1080,
+  `obs_publish OK`, 14,637,297 bytes, `engine_histogram {"still_flat": 7}`.
+  Found `word_razzle` is a Pixverse CLOUD engine that every name-prefix filter
+  calls local (2-of-2, confirmed in code); locality now delegates to
+  `render_driver._is_cloud_video_engine` -- true local roster is 18, not 19.
+  Found the headless launcher sets no image-engine flags, so `flux2_klein` and
+  `lumina_image` cannot work in a soak run (two cases burned 552s each proving
+  nothing). Found `mesh_stage` can never publish a whole-episode case: the
+  2026-07-03 directory-clip look contract in `plan_backdrop` refuses it -- not
+  a regression. Harness now proves cases from the ASSET ON DISK plus the
+  engine histogram instead of a `poll_history` status (the operator-named gap;
+  the old receipts recorded FAIL for an episode that was complete on disk).
+  Four of my own defects were caught by the panel before the long run: a
+  `character_visual` rename that broke every case in 1s, a C6 gate on an
+  unread assumption that killed a campaign in 90s, an aggregation hole, and a
+  credits predicate that could never match a 500-char-truncated error.
+Current step: the operator's GPU sequence. The engine-coverage campaign is
+  RUNNING (master `tmp/gpu_lane_all_models_20260728_060646`, 18 engines, 4
+  lanes, ~6h, harness pinned by SHA-256). A2 stays HELD, 7d stays PARKED.
+Next: read `tmp/_kbA_gpu_campaign.done` + `campaign_summary.json` when it
+  lands; then the operator's clamped ltx recipe-v2 confirmation. Owed harness
+  items are listed in r4/final.md (none load-bearing tonight).
+Models: Claude + 4 kibitz rounds (codex gpt-5.6-sol high + agy 3.6 Flash High).
+Commits: none (no production code touched; harness lives in tmp/).
+
 ## 2026-07-28 -- HEAD 1959fb49 (v2.0-alpha) -- WINDOW CODER (continued)
 Did: `1959fb49` the credits-card col1 ladder. The row was filed LATENT and was
   live on the default path: roll() sizes the card from the FINISHED VIDEO, the
