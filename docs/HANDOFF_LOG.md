@@ -3,6 +3,93 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-27 20:24 -- HEAD 40780b82 (v2.0-alpha) -- WINDOW CODER
+Did: executed the ranked open-bug queue. SIX of seven rows shipped as green
+  pushed chunks -- A1 ebec0f1f, A6 ba24af29, A4 c9b89769, B4 57caf43d,
+  A5-lite de50786e, the frame_count M7 sweep 58e288af. A2 HELD behind the
+  profile retire-now/retire-later scope, not skipped. Then a Sonnet fan-out
+  over all six found TWO real defects in already-green, already-pushed,
+  mutation-proven code -- both mine -- fixed at 40780b82.
+Current step: the ranked queue is DONE; next remote-safe lane is the by_engine
+  roll-up, then the credits-card video_suffix (in that order), then the
+  encoder frame-count decision. 7d still PARKED.
+Next: a CODER window takes by_engine; the clamped recipe-v2 confirmation, the
+  WAN prequalification sweep and 7d all belong to a RENDER window.
+Models: Claude codes and judges (rung 4) + a Sonnet subagent fan-out for the
+  post-push QA round. No codex, no agy, no Fable, no roundtable -- two-strikes
+  never invoked, so no panel was owed.
+Commits: ebec0f1f ba24af29 c9b89769 57caf43d de50786e 58e288af 40780b82 plus
+  this doc push. Suite 7356 -> 7384; Bible 17; canonical 9872624A
+  byte-identical throughout.
+
+### Detail
+
+**THE TRIAGE'S OWN B5 GATE WAS WRONG ABOUT TWO OF THE THREE ROWS IT GATED.**
+It said the profile retain/retire ruling gated A1, A2 and A6. It gates only A2.
+The VRAM ceiling has a live NON-profile channel -- llm_vram_ceiling_gb is a
+widget in otr_canonical.json, which is exactly the channel the operator's
+retirement direction KEEPS -- and the GGUF artifact table belongs to the
+loader. Flagged before starting; operator agreed; A1 and A6 went first.
+
+**A1 WAS A PURE HOIST, AND THE OBVIOUS FIX WOULD HAVE BROKEN THE DEFAULT.**
+check_vram_fit already prices a gguf_native row from its pinned on-disk
+artifact plus KV, and already answers correctly at both ceilings (gemma GGUF
+estimates 14.6 GB: WARN at 14.5, FAIL at 6.8). The defect was placement only --
+the gate sat below both cache-hit returns and below the GGUF dispatch, so it
+could only ever gate a fresh transformers load. Writing the natural hard
+estimate > ceiling comparison would have refused today's canonical default at
+14.5. Grounded with a throwaway probe before any code was written.
+
+**A6 SHIPPED BROKEN AND THE POST-PUSH PANEL CAUGHT IT.** Refusing unpinned GGUF
+artifacts is right, but config/profiles/otr_mac_mps.json and otr_nv40_12gb.json
+both select Q6_K, which has no pin -- and their GENERATED variant workflows
+carried Q6_K in the writer node's widgets_values with no in-workflow remedy
+(hard-coded widget, no GEMMA4_12B_GGUF_PATH set). Both moved to the pinned
+Q4_K_M, which is also the only quant that fits their declared 10.0 / 10.5 GB
+ceilings; Q6_K at ~9.1 GiB plus a 2.8 GiB KV cache never did. Fixed at the
+profile and regenerated through build_variants.py rather than hand-edited.
+Q4_K_M and Q8_0 were pinned by MEASUREMENT: Q4 hashed in all three copies on
+this box (all agreeing byte for byte) and the Q8_0 measurement reproduced its
+existing pin, which is what corroborates the set.
+
+**THE SECOND PANEL FINDING WAS A TEST OF MINE THAT WAS CONFIDENTLY BLIND.** The
+M7 roster gate added at 58e288af globbed eng_*.py and grepped for
+encode_frames_to_silent_mp4. cheap_families.py matches neither -- wrong
+filename, and it builds its mp4 from an ffmpeg arg list -- so still_motion,
+still_pan, still_flat and still_word kept hand-writing container/codec/
+pixel_format/color_* as literals while the test reported PASS over them.
+still_motion is the terminus of the humo -> humo_1.7B -> still_motion degrade
+chain. Sweep widened to every module and both write paths, probe added, and an
+explicit assertion that the sweep can still SEE cheap_families.py.
+
+**MUTATION BEAT THE LENSES A FOURTH CONSECUTIVE TIME, ON MY OWN TEST.** The
+frame_count ordering test asserted only that some proof FOLLOWS each encode,
+which stays green when a bad proof is inserted BEFORE one -- the exact defect
+the test is named for. Now asserted in both directions. Across the window:
+32/32 real mutants caught, 10/10 controls survived.
+
+**AND THE DISCIPLINE LESSON IS ONE THIS FILE ALREADY RECORDED.** Every chunk
+ran its mutation round before its push and they were load-bearing, but no
+mutation of the CODE can reveal that a shipped JSON ARTIFACT selects something
+the code just made illegal. GO_FORWARD already said "run the fan-out BEFORE the
+push, not after"; this window ran it after six pushes and paid for it.
+
+**THREE BUG-LIST ROWS WERE WRONG ABOUT THE CODE, in ways that only mechanical
+derivation caught.** B4's row named a beat_id no producer stamps and missed
+jump_still_requests and motion_clause, which are stamped. The frame_count row
+listed eng_ltx_video among the adapters that already probed; it did not, on
+either recipe path, and eng_still_parallax was absent from the row entirely --
+the sweep found four adapters, not two. A6's cites (56-60, 435-439, 982-992)
+all still pointed at the right code, so the "every cite has moved" warning is
+real but not universal.
+
+**A RECEIPT DEFECT WORTH NOT REPEATING:** build_variants.py --all also emits
+variants for any UNTRACKED profile on disk, and some profile checks are
+parametrized over the variants present, so another window's six scratch
+profiles inflated the first suite reading to 7396 -- a number that would not
+reproduce on a clean clone. The generated files were removed, restoring the
+tree to exactly the shape it was found in, and the suite re-measured at 7384.
+
 ## 2026-07-27 -- HEAD 54b3626b (v2.0-alpha) -- WINDOW CODER (BUG TRIAGE)
 Did: operator-directed triage of the whole OPEN BUGS list, then the fixes it
   turned up. Panel: kibitz r1 with codex gpt-5.6-sol high (seat verified in

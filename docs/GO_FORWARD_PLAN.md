@@ -1,6 +1,51 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-27 (remote Cowork, CODER window) -- **THE OPEN BUGS ARE
+**Updated:** 2026-07-27 20:24 (remote Cowork, CODER window) -- **THE RANKED
+BUG QUEUE IS DONE: SIX OF SEVEN ROWS SHIPPED, A2 HELD, AND A POST-PUSH PANEL
+FOUND THAT ONE OF THE SIX HAD BRICKED TWO SHIPPED WORKFLOWS.** HEAD == origin
+`40780b82`; suite **7384 passed / 27 skipped / 1 xfailed**; Bible 17; canonical
+`9872624A` byte-identical across all eight commits.
+
+Landed: `ebec0f1f` A1, `ba24af29` A6, `c9b89769` A4, `57caf43d` B4,
+`de50786e` A5-lite, `58e288af` the frame_count M7 sweep, `40780b82` the QA
+fan-out corrections. Per-chunk detail is in `docs/HANDOFF_LOG.md`, not here.
+
+**B5 DID NOT GATE A1 OR A6, AND THE OPERATOR HAD ALREADY RULED.** The triage
+said the profile retain/retire question gated the top three. It gates only A2:
+the ceiling has a live NON-profile channel (`llm_vram_ceiling_gb` is a widget in
+`otr_canonical.json`, which is exactly the channel the retirement direction
+KEEPS), and the GGUF artifact table belongs to the loader, not to any profile.
+A2 is the one row whose whole subject is `apply_profile_to_workflow`, so it is
+HELD rather than built on a channel scheduled for deletion.
+
+**A1 NEEDED NO NEW ESTIMATOR -- IT WAS A PURE HOIST, and the "obvious" fix
+would have refused the shipped default.** `check_vram_fit` already prices a
+`gguf_native` row from its pinned on-disk artifact plus KV, and already answers
+correctly at both ceilings (gemma GGUF estimates 14.6 GB: WARN at 14.5, FAIL at
+6.8). The defect was placement only: the ceiling sat below BOTH cache-hit
+returns and below the GGUF dispatch, so it could only ever gate a fresh
+transformers load. A hard `estimate > ceiling` comparison, which looks like the
+right fix, refuses today's canonical default. The 1.5x FAIL ratio is untouched.
+
+**THE POST-PUSH PANEL FOUND WHAT MUTATION STRUCTURALLY COULD NOT.** Every chunk
+ran a mutation round before its push (32/32 real mutants caught, 10/10 controls
+survived) and they were load-bearing -- one caught an ordering test of my own
+that was decorative. But no mutation of the CODE can reveal that a shipped
+JSON ARTIFACT selects a quant the code just made illegal. A6 refused unpinned
+GGUF artifacts; `config/profiles/otr_mac_mps.json` and `otr_nv40_12gb.json`
+both select `Q6_K`, which has no pin, and their generated variant workflows
+carried it in `widgets_values` with no in-workflow remedy. **Run the fan-out
+BEFORE the push. This file already said so, and this window did it after.**
+
+**Q6_K IS NOW UNUSABLE UNTIL SOMEONE PINS IT** -- it has no size, no sha and no
+file on this box, so the loader refuses it by name. Both draft profiles moved to
+the pinned `Q4_K_M`, which is also the only one that fits their declared 10.0 /
+10.5 GB ceilings (Q6_K is ~9.1 GiB of weights plus a 2.8 GiB KV cache). The
+refusal surfaced an older sizing defect rather than creating one.
+
+---
+
+**Superseded header (2026-07-27, CODER window) -- THE OPEN BUGS ARE
 TRIAGED AND RANKED, AND THE ONE NOBODY HAD FILED SHIPPED THE SAME SESSION.**
 HEAD == origin `54b3626b`; suite **7356 passed / 27 skipped / 1 xfailed**;
 Bible 17; canonical `9872624A` byte-identical.
@@ -477,8 +522,71 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **the OPEN BUGS are TRIAGED and RANKED. B5's ruling gates
-## the top three. Record: `docs/2026-07-27-open-bug-triage.md`.**
+## CURRENT STEP -- **the ranked bug queue is DONE. What is left is three
+## remote-safe rows, A2 behind the profile ruling, and the operator's own
+## GPU sequence.**
+
+**7d IS STILL PARKED** until the operator is at the desk -- his call, recorded
+in `docs/TRAVEL_RELAY_PROTOCOL.md`. Do not start it from a remote window.
+
+Six of the seven ranked rows shipped this window and are tombstoned in OPEN
+BUGS below. **A2 is HELD, not skipped**: its entire subject is
+`apply_profile_to_workflow` and the printed override echo, which is the channel
+the operator has directed be retired. Fix it only after the retire-now vs
+retire-later scope is settled; the shape is already correct in its OPEN BUGS
+row (generate the echo FROM the applier's flattened map).
+
+**THE NEXT REMOTE-SAFE LANE, in the order a panel ranked them** (verified
+against HEAD `58e288af`, cites re-pinned, all three need no GPU):
+
+1. **The `by_engine` roll-up keeps only the first clip's receipt per engine**
+   (`nodes/otr_video_render_batch.py:87`, `by_engine.setdefault(eng, receipt)`;
+   `per_clip` at `:85-86` keeps every clip in full). `ltx_audio_in` declares
+   `default_roles = ("music_visual", "announcer_visual")`, so ONE engine
+   legitimately serves several beats -- and since LANE 2 their receipts
+   legitimately differ per cell. `tests/test_render_engines_recipe_stamp.py`
+   defines exactly one clip per engine, so the gap is untested rather than
+   accepted. Best product of severity x self-containedness.
+2. **The credits card never draws the recipe** (`nodes/otr_credits_roll.py`:
+   `_recipe_suffix` at `:211` writes `models["video_suffix"]` at `:269`;
+   `_draw_models` at `:657-712` never reads it; repo-wide the name has one
+   write and zero readers, and `eng_ltx_8gb.py:126-128` admits it in a
+   comment). **Do row 1 FIRST** -- wiring the card before `by_engine`
+   accumulates more than a first-clip receipt just puts confidently-wrong
+   per-engine data on screen instead of none. Carry the rider: `_row()`
+   (nested in `_draw_models` at `:670`) right-aligns by subtracting pixel
+   width with no clamp, truncation or wrap, so a ~90-character LANE 2 receipt
+   would overrun its label.
+3. **`encode_frames_to_silent_mp4` still reports its INPUT ARRAY's length**
+   (`nodes/_otr_video_engines/wrapper_bridge.py:804`, `return out_path,
+   int(b)`). This window proved the color/stream contract on every emitted
+   clip but NOT the count. `ffprobe_clip_fields` deliberately does not count
+   frames (counting means decoding); `ffprobe_counted_frames`
+   (`wan_shared.py:105`) does, and its own docstring says never per clip in
+   the render loop. So closing this is a real decision about paying a decode,
+   not a copy -- which is why it is ranked below the other two.
+
+**THEN, and none of it is remote:** the clamped confirmation of ltx recipe v2,
+a WAN prequalification sweep (the mechanism is built and named on both WAN
+tiers; no WAN sweep has ever run), then 7d.
+
+**CARRY FORWARD, and this window is the fourth consecutive proof:** run the
+mutation round even after a QA fan-out clears the change, and treat a test that
+verifies a thing it also CONSTRUCTS, or an exception type asserted without its
+message, as presumed decorative until proven otherwise. **AND RUN THE FAN-OUT
+BEFORE THE PUSH** -- mutation cannot see a shipped JSON artifact that selects
+something the code just made illegal, which is exactly how A6 shipped broken.
+
+**RE-PIN THE CITE WHEN YOU TOUCH A ROW, and do not trust the row's own field
+lists either.** B4's report named a `beat_id` no producer stamps and missed
+`jump_still_requests` and `motion_clause`, which are stamped. The frame_count
+row said `eng_ltx_video` already probed; it did not, on either recipe path, and
+`eng_still_parallax` was missing from the row entirely. Derive from the
+producers mechanically, every time.
+
+---
+
+## SUPERSEDED -- the ranked-queue step (2026-07-27, all but A2 now landed)
 
 **LANE 1 AND LANE 2 ARE DONE.** **7d IS STILL PARKED** until the operator is at
 the desk -- his call, recorded in `docs/TRAVEL_RELAY_PROTOCOL.md`. Do not start
@@ -1522,9 +1630,14 @@ listed as live.
   with no profile passed, the canonical JSON's own `gguf_n_ctx=4096` / Q8_0
   binds and the leg runs -- which is exactly how all four sweep cells ran. Fix
   the profiles or finish retiring them; do not leave both.
-- **The profile's `llm` section silently overrides the canonical JSON, and the
-  applied-overrides echo HIDES it** (found 2026-07-27, RENDER window;
-  grounded). `_otr_workflow_validator.py:377` exports
+- **A2 -- HELD 2026-07-27 pending the profile retire-now vs retire-later
+  scope. The profile's `llm` section silently overrides the canonical JSON, and
+  the applied-overrides echo HIDES it** (found 2026-07-27, RENDER window;
+  grounded). Held because its entire subject is `apply_profile_to_workflow` and
+  the printed echo -- a channel the operator has directed be retired, so
+  building on it now may be work on something scheduled for deletion. The fix
+  SHAPE below is correct and ready when the scope is settled.
+  `_otr_workflow_validator.py:377` exports
   `os.environ["OTR_ACTIVE_PROFILE"]`, and the profile's `llm.*` values then win
   over the widgets the operator set in `otr_canonical.json` -- which ships
   `creative`/`technical` = `google/gemma-4-12b-it`, `gguf_n_ctx=4096`,
@@ -1542,8 +1655,13 @@ listed as live.
   printed echo (`scripts/otr_api.py:816-825`) is stale. **Fix: generate the echo
   FROM the applier's flattened map.** Adding `llm` to the echo by hand leaves
   the next drift intact.
-- **The 6.8 GB profile ceiling is DECORATIVE on the GGUF path** (found
-  2026-07-27, kibitz codex `gpt-5.6-sol` high; grounded). `_otr_model_loader.py`
+- ~~**The 6.8 GB profile ceiling is DECORATIVE on the GGUF path**~~ --
+  **CLOSED @ `ebec0f1f`** (A1). ONE policy-admission calculation now runs for
+  every LOCAL lane before every cache read and every load
+  (`_assert_policy_admits_vram`); remote lanes stay exempt by placement. It
+  needed no new estimator and no ratio change -- see the header for why the
+  "obvious" hard comparison would have refused the shipped default. Original
+  row below, kept only for its cites. `_otr_model_loader.py`
   dispatches and caches GGUF before the generic `check_vram_fit` block, and
   `_otr_gguf_backend.py` checks PHYSICAL free VRAM instead of
   `policy.vram_ceiling_gb`. On a 16 GiB box an 8.13 GB writer therefore passes
@@ -1580,29 +1698,31 @@ listed as live.
   TODAY on any episode mixing aspect ratios on one engine. Decide whether a
   lossy summary beside a lossless one is worth changing, or write down that it
   is not.
-- **A6 -- THE Q4 ARTIFACT HAS NEITHER AN EXPECTED SIZE NOR A SHA, SO A
-  TRUNCATED DOWNLOAD PASSES READINESS** (found 2026-07-27, triage, codex
-  `gpt-5.6-sol`; grounded). The shipped 8 GB profile selects Gemma `Q4_K_M`,
-  but `GGUF_ARTIFACTS` (`_otr_gguf_backend.py:56-60`) gives that quant size
-  `None` and `GGUF_ROWS` (`:226-233`) gives sha `None`. Both checks are
-  CONDITIONAL on the value being present, so a partial or truncated Q4 file is
-  reported ready. Highest-value defect the triage added; it was absent from
-  this list entirely. Pin both; reject a non-zero short file.
+- ~~**A6 -- the Q4 artifact has neither an expected size nor a SHA**~~ --
+  **CLOSED @ `ba24af29`**, corrected @ `40780b82`. Q8_0 and Q4_K_M are pinned
+  by MEASUREMENT (three independent copies agreed byte for byte; the Q8_0
+  measurement reproduced its existing pin, which corroborates the set); an
+  unpinned artifact is REFUSED by name; the gemma registry row and the
+  env-fallback path now read the one table instead of discarding its shas.
+  **`Q6_K` remains unpinned and is therefore UNUSABLE until someone pins it
+  from a box that carries the file** -- see the header.
 - **`CanonicalClip.frame_count` -- "the integer timing authority" -- has two
-  derivations** (found 2026-07-27, Fable consult; grounded). It is
-  decode-counted truth for assembled multi-segment beats but self-declared
-  input length for every single-render beat, and `eng_humo` / `eng_ltx_av`
-  return self-declared dicts with no M7 probe while `wan_i2v`, `wan_ti2v`,
-  `ltx_8gb` and `ltx_video` all probe. The two derivations agree today only
-  because every producer pipes exact bytes. Fix: copy the four siblings' M7
-  probe line into the two adapters that lack it.
-- **The encoder boundary does not assert `dtype == uint8`** (found 2026-07-27;
-  codex proposed a wide fix, Fable cut it to this). NOT a live bug: every
-  producer feeds an exact-size uint8 buffer, ffmpeg raises on a short write,
-  and chunk 6 already put a decode-count at the boundary that matters
-  (`assemble_beat_segments`, `wan_shared.py:224-232`). The residual is latent --
-  a future float32 caller would pipe 4x the bytes and get a clean receipt. One
-  assert closes it.
+  derivations** -- **HALF CLOSED @ `58e288af` + `40780b82`.** Every module that
+  writes a clip now ffprobes it: the sweep found FOUR adapters missing the M7
+  proof, not the two the row named (`eng_ltx_video` was listed as already
+  probing and did not, on either recipe path; `eng_still_parallax` was absent
+  from the row), plus `cheap_families` behind all four still_* engines. A
+  roster gate in `tests/test_terminal_frame.py` fails by name for any module
+  that writes a clip without proving it.
+  **STILL OPEN: the COUNT itself.** `encode_frames_to_silent_mp4`
+  (`wrapper_bridge.py:804`) still returns its input array's length, so a
+  single-render beat's `frame_count` remains self-declared -- what landed
+  proves the color/stream contract, not the number. See CURRENT STEP item 3:
+  `ffprobe_clip_fields` deliberately does not count (counting means decoding),
+  so closing it is a decision about paying a decode per clip.
+- ~~**The encoder boundary does not assert `dtype == uint8`**~~ -- **CLOSED @
+  `de50786e`** (A5-lite). One assert at `wrapper_bridge.encode_frames_to_silent_mp4`,
+  naming the byte multiplier and the converter to use.
 - ~~**A FATAL env knob at the terminal node** and **the duration gate fails open
   while the receipt prints OK**~~ -- **CLOSED @ `54b3626b`** (found 2026-07-27,
   Fable consult; both in `nodes/otr_master_audio_mux.py`, the LAST node of the
@@ -1724,15 +1844,14 @@ listed as live.
   drift guard in `tests/test_ltx_8gb_canonical_canvas.py` covers the
   disagreement that matters. Close it when the general canvas resolver lands.
 
-- **`schemas.py`'s `ShotRow` is a closed model that no boundary enforces**
-  (found 2026-07-27, B3 post-code panel; NEW). It declares
-  `extra="forbid"` and is missing `beat_id`, `role`, `char_id`, `start_s`,
-  `dur_s`, `coverage_plan` (since chunk 3b) and `coverage_contract` (B3).
-  Nothing validates a real ledger through it, so this is NOT a live break --
-  but other docs in this tree cite it as a live safety net, and a future
-  `VideoLedgerSection.model_validate(ledger["video"])` at any boundary would
-  hard-fail every real shot. Either wire it and complete it, or demote it in
-  writing. Do not widen it silently inside an unrelated chunk.
+- ~~**`schemas.py`'s `ShotRow` is a closed model that no boundary enforces**~~
+  -- **CLOSED @ `57caf43d`** (B4), completed rather than demoted. **The row's
+  own field list was wrong in both directions**: it named a `beat_id` no
+  producer stamps (`source_line_ids` carries the beat) and missed
+  `jump_still_requests` and `motion_clause`, which are stamped. The shipped
+  list was derived MECHANICALLY from the producers. Three fields default to
+  `None` rather than an empty container because their ABSENCE is load-bearing
+  (`coverage_plan`, `coverage_contract`, `motion_clause`).
 
 - **`docs/ENGINE_MATRIX.md` reports the DECLARED contract only** (found
   2026-07-27, B3 post-code panel; NEW). Correct today and consistent with its
@@ -1766,13 +1885,13 @@ listed as live.
   not raise the minimum word target as a capacity workaround.
 - **WAN 8-GB low-VRAM launch contract** -- FIRST item of the rescoped order.
 - **Image-phase still ownership** -- bug-first item 2 above.
-- **`eng_ltx_video._use_i2v` contradicts fail-closed** (found 2026-07-25, r3
-  panel, grounded). With I2V enabled and the init image missing it LOGS and
-  degrades to the text-to-video path (`eng_ltx_video.py:559-572`), while
-  `render_driver.py:1801-1817` RAISES `RenderError` "NO FALLBACK to text-only
-  rendering" on that same state. Two contradictory policies; whichever fires
-  first wins. Static finding at HEAD -- needs a live reproduction before it
-  becomes a PBUG row.
+- ~~**`eng_ltx_video._use_i2v` contradicts fail-closed**~~ -- **CLOSED @
+  `c9b89769`** (A4). The adapter now REFUSES instead of degrading, holding the
+  same policy `render_driver.py:2146-2150` already held. The adapter's check is
+  the stronger one: the driver asks only whether the still INDEX holds a
+  non-empty path, so a STALE path passed it and degraded silently, and requests
+  built through the ledger-free `build_request` never met it at all.
+  `OTR_ENABLE_LTX_I2V=0` stays the named opt-out for a deliberate text render.
 - **`style_tail_policy` closed enum cannot express a SHIPPED path** (found
   2026-07-25 by this window, missed by both r4 panelists; grounded).
   `VALID_STYLE_TAIL_POLICIES` has two tokens, `full` and `minimal_clean`, but
@@ -2093,11 +2212,21 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-27 @ `8424f369`, LANE 1 + LANE 2 landed):
-  full Windows suite `7346 passed / 27 skipped / 1 xfailed`; Bug Bible
-  `17 passed / 24 skipped / 3 xfailed`; canonical
+- Current whole-tree receipt (2026-07-27 @ `40780b82`, the ranked bug queue +
+  its QA fan-out corrections): full Windows suite
+  `7384 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
+  11 variants / 0 failures; canonical
   `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`
   byte-identical; AST/BOM/zero-byte/UTF-8/ASCII clean on every touched file.
+  **Count the suite on a clean tree:** `build_variants.py --all` also emits
+  variants for any UNTRACKED profile on disk, and some profile checks are
+  parametrized over the variants present, so another window's scratch profiles
+  can inflate the number by a dozen tests that would not reproduce on a fresh
+  clone. This receipt was re-measured after removing that side effect.
+- Prior receipt (2026-07-27 @ `8424f369`, LANE 1 + LANE 2 landed):
+  full Windows suite `7346 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; canonical `9872624A` byte-identical.
 - Prior receipt (2026-07-27 @ `3acc7fed`, LANE 1 landed):
   full Windows suite `7291 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; canonical `9872624A` byte-identical.
