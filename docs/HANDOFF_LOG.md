@@ -3,6 +3,81 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-28 -- HEAD 1959fb49 (v2.0-alpha) -- WINDOW CODER (continued)
+Did: `1959fb49` the credits-card col1 ladder. The row was filed LATENT and was
+  live on the default path: roll() sizes the card from the FINISHED VIDEO, the
+  canonical workflow ships 832x480, and that canvas was overflowing its own
+  footer on every episode while PIL clipped it silently. Fable ruled the
+  standing policy; agy dissented and was overruled on one point and adopted on
+  two.
+Current step: the remote-safe queue is one DESIGN job -- a small-canvas variant
+  of the card for 512x288 / 640x360 -- plus A2, still HELD. Next real work is
+  the operator's GPU sequence.
+Next: a RENDER window owns the GPU items. The small-canvas card is a design
+  chunk whenever someone wants it; it blocks nothing.
+Models: Claude codes and judges (rung 4); FABLE ruled the persistent policy
+  (CLAUDE.md section 9); agy at rung 2 ($0) reviewed and dissented; six Sonnet
+  QA lenses across the session's fan-outs. No codex, no roundtable.
+Commits: 1959fb49 plus this doc push. Suite 7453 -> 7464; Bible 17;
+  build_variants --check 11/0; canonical 9872624A byte-identical.
+  Mutation: 36/37 real mutants caught, 6/6 controls survived.
+
+### Detail
+
+**A REACHABILITY CLAIM IN A BUG ROW IS A CLAIM LIKE ANY OTHER.** The row said
+the overflow was "reachable only if something renders the card at 480p -- the
+shipped render tests use 720p and 1080p". Derived from the producers instead:
+`roll()` takes w/h from `_probe_video(video_path)`, the canonical
+OTR_VideoDirector ships 832x480, the ltx_8gb tier renders 512x288. Measured
+spare on required content alone: 1080p +194, 720p +85, 832x480 -2, 640x360 -78,
+512x288 -131. And `render_static_base` captured the column's returned `y` and
+never used it, so nothing logged it either.
+
+**THE POLICY, RULED BY FABLE, RECORDED SO IT IS NOT RE-LITIGATED.** The card is
+a VIEW of the durable ledger, not the ledger. A record may never elide; a view
+may elide WITH NOTICE. It may show less than it knows; it may never claim more
+than it shows. Ladder: optional note (unmarked -- a gloss's absence asserts
+nothing) -> inter-block WHITESPACE (unmarked -- whitespace is not a claim) ->
+ledger ROWS, fine print first, always MARKED, SEED and COMMIT never dropped.
+Type is NEVER shrunk: a receipt in unreadable type is a receipt-shaped object
+claiming credit for a disclosure that never happened, and unlike a clip it is a
+lie the policy tells on purpose. It never raises -- step 21 of 22, and
+`54b3626b` already settled that a terminal node is the sanity ceiling.
+CreditsDataError stays fatal for missing TRUTH; insufficient GLASS degrades.
+
+**THE CANONICAL CANVAS IS FIXED WITH ZERO INFORMATION SPENT.** At 832x480 the
+whitespace rung alone clears the footer with 6px spare, full ledger intact, no
+marker, nothing logged. That rung exists because the shortfall is two pixels
+and dropping a row to buy them nets nothing once the cut marker takes a row
+back -- which Fable flagged before a line was written.
+
+**agy DISSENTED AND WAS OVERRULED; TWO OF ITS MECHANICAL FINDINGS SHIPPED.**
+It argued option C "violates the no-fallback contract" -- conflating a missing
+RECEIPT (missing truth -> raise, untouched) with insufficient GLASS
+(presentational). Discarded with the reason recorded. Its two mechanical
+findings survived grounding and are both in the commit: the unused `y`, and
+that compacting whitespace recovers enough to save the canonical canvas. The
+dissent was wrong and the mechanics were right, which is the usual shape --
+ground every claim separately rather than taking a review whole.
+
+**MUTATION CAUGHT A DECORATIVE TEST OF MINE, the fifth time this arc.**
+`test_the_canonical_canvas_keeps_its_WHOLE_ledger` read the INPUT layout, which
+`_abridge` deliberately COPIES rather than mutates -- so it passed no matter
+what the ladder did, and deleting the whitespace rung SURVIVED: the column fell
+through to dropping rows, still "fit", and the assertion never noticed. It
+observes what was DRAWN now, and derives the expected row list from the layout
+rather than hard-coding labels the fixture does not even have.
+
+**A PROCESS ERROR OF MINE, twice in one session, and worth a rule.** I launched
+the mutation harness three times without checking whether one was already
+running, and two raced -- each mutating the same files while the other held a
+mutant on disk. Verified no corruption (`git diff --stat HEAD` showed only the
+two files the chunk owned, and a fingerprint grep for every mutant string came
+back clean), but the risk is real: run B can capture run A's mutant as its
+"original" and restore it permanently. RULE: one mutation harness at a time,
+check for a live one first, and never alongside a QA fan-out -- earlier in this
+session a lens read a mutant off disk and reported it as corruption.
+
 ## 2026-07-28 -- HEAD b1f2ee86 (v2.0-alpha) -- WINDOW CODER (continued)
 Did: two more green pushed chunks on the same arc. `6aad4fe5` DELETED the third
   copy of the scope encoder -- otr_scene_aware_scopes had its own private

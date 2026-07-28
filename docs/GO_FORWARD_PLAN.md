@@ -1,17 +1,52 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-28 (remote Cowork, CODER window) -- **THERE IS ONE
-STREAMING CLIP ENCODER NOW, NOT THREE; BOTH PROOF HALVES ARE ENFORCED; AND THE
-GEOMETRY STOPPED HAVING TWO DERIVATIONS.** HEAD == origin `b1f2ee86`; suite
-**7453 passed / 27 skipped / 1 xfailed**; Bible 17; `build_variants --check`
-11 variants / 0 failures; canonical `9872624A` byte-identical across all four
-commits.
+**Updated:** 2026-07-28 (remote Cowork, CODER window) -- **ONE STREAMING CLIP
+ENCODER INSTEAD OF THREE, BOTH PROOF HALVES ENFORCED, THE GEOMETRY DOWN TO ONE
+DERIVATION, AND THE END CARD NO LONGER OVERFLOWS THE CANVAS THE BUILD SHIPS.**
+HEAD == origin `1959fb49`; suite **7464 passed / 27 skipped / 1 xfailed**;
+Bible 17; `build_variants --check` 11 variants / 0 failures; canonical
+`9872624A` byte-identical across all five commits.
 
 Landed: `27a4f97c` the second encoder + the widened gate's COLOUR half,
 `afeb5b84` cheap_families' four `still_*` count proofs + the gate's COUNT half,
 `6aad4fe5` the THIRD copy of the encoder deleted (not hardened a third time)
 plus a gate against a fourth, `b1f2ee86` the odd-canvas stride defect closed at
-the batch encoder. Per-chunk detail is in `docs/HANDOFF_LOG.md`, not here.
+the batch encoder, `1959fb49` the credits-card col1 ladder. Per-chunk detail is
+in `docs/HANDOFF_LOG.md`, not here.
+
+**A ROW FILED AS LATENT WAS LIVE ON THE DEFAULT PATH, and the lesson is the
+one this file keeps writing down.** The credits-card overflow row said
+"reachable only if something renders the card at 480p -- the shipped render
+tests use 720p and 1080p". Derived from the PRODUCERS instead: `roll()` sizes
+the card from `_probe_video(video_path)` -- the FINISHED EPISODE's own
+dimensions -- the canonical workflow's VideoDirector ships **832x480**, and the
+ltx_8gb tier renders **512x288**. Both overflowed; PIL clipped in silence; and
+`render_static_base` captured the column's returned `y` and never used it, so
+nothing logged it either. **A reachability claim in a bug row is a claim like
+any other -- derive it from the producers before trusting it.**
+
+**STANDING POLICY FOR THE END CARD (ruled by Fable 2026-07-28 under CLAUDE.md
+section 9; do not re-litigate, extend).** THE CARD IS A VIEW OF THE DURABLE
+LEDGER, NOT THE LEDGER. A record may never elide; a view may elide WITH NOTICE.
+It may show less than it knows; it may never claim more than it shows. The
+column gives up the cheapest honest thing first: the optional recipe note
+(unmarked -- a gloss's absence asserts nothing), then inter-block WHITESPACE
+(unmarked -- whitespace is not a claim), then ledger ROWS, fine print first and
+always MARKED. **Type is never shrunk**: a receipt in unreadable type is a
+receipt-shaped object claiming credit for a disclosure that never happened --
+worse than a missing row, because unlike a clip it is a lie the policy tells on
+purpose. **It never raises.** Missing TRUTH stays structural and still raises
+`CreditsDataError`; insufficient GLASS degrades with marks. Do not soften that
+guard on the strength of this one.
+
+**HOW THAT DECISION WAS MADE, and what the panel was worth.** Fable ruled;
+**agy (rung 2, $0) DISSENTED** and was overruled with the reason recorded --
+it conflated a missing RECEIPT (missing truth -> raise) with insufficient GLASS
+(presentational). Two of agy's MECHANICAL findings survived grounding and both
+shipped: the unused `y`, and that compacting whitespace recovers enough to save
+the canonical canvas without spending a single ledger row. **The dissent was
+wrong and the mechanics were right, which is the usual shape -- ground every
+claim separately rather than accepting or rejecting a review whole.**
 
 **THE ARC'S ONE LESSON, said plainly: THE SAME DEFECT KEPT BEING IN A COPY.**
 An encoder was duplicated three times, and each copy carried a dead frame-count
@@ -654,13 +689,13 @@ in `docs/TRAVEL_RELAY_PROTOCOL.md`. Do not start it from a remote window.
 profile retire-now vs retire-later scope (which gates A2 and nothing else), and
 the LTX per-beat recipe capability.
 
-**THE REMOTE-SAFE QUEUE IS DOWN TO ONE FILED ROW, and it is small:** the
-credits card's col1 overflows the footer at 854x480 on its REQUIRED content
-alone (pre-existing; PIL clips the overflow silently, so the tail of the
-[PRODUCTION LEDGER] grid draws off-canvas). Reachable only if something renders
-the card at 480p -- the shipped render tests use 720p and 1080p. It belongs to
-whoever next opens the card's geometry: either shrink the required blocks at
-small canvases or refuse the canvas. NOT a blocker for anything.
+**THE REMOTE-SAFE QUEUE IS DOWN TO ONE FILED ROW, and it is a DESIGN job, not
+a bug fix:** a small-canvas variant of the credits card. At 512x288 -- the
+ltx_8gb tier -- col1 is still 65px past its footer even fully abridged (it was
+131px), and 640x360 is 12px over. Those canvases are LOGGED at ERROR now
+instead of clipped in silence, and the log says what it needs: at 288 lines the
+three-column console is a polite fiction, and the answer is a card designed for
+a small canvas, not more ladder. NOT a blocker for anything.
 
 **THE NEXT REAL WORK IS THE OPERATOR'S GPU SEQUENCE, and none of it is
 remote:** the clamped confirmation of ltx recipe v2, then a WAN prequalification
@@ -1981,8 +2016,26 @@ listed as live.
   before the engine id; every cut is marked with `...` rather than silently
   shortened. Measured pre-fix: `vx = -754` on a 120-character engine id.
 
-- **NEW 2026-07-28: col1 overflows the footer at 854x480 on its REQUIRED
-  content alone.** PRE-EXISTING -- it was already 20px past `h - 56*sx` before
+- **NEW 2026-07-28: the credits card needs a SMALL-CANVAS VARIANT, and the
+  ladder is not it.** At 512x288 (the ltx_8gb tier) col1 is 65px past its
+  footer even with every ledger row this policy may drop already dropped; at
+  640x360 it is 12px over. Both are now drawn anyway (a terminal node never
+  destroys a finished episode) and LOGGED at ERROR naming the canvas -- the old
+  behaviour was drawn, clipped by PIL, silent. At 288 lines the three-column
+  console is already a polite fiction: col3's scrolling transcript is as
+  unreadable as anything col1 clips. This is a DESIGN job -- a card laid out
+  for a small canvas -- not more ladder heroics. Filed 2026-07-28 with the
+  ladder that made the shipped 832x480 canvas fit.
+- ~~**col1 overflows the footer at 854x480 on its REQUIRED content alone**~~ --
+  **CLOSED @ `1959fb49`, and it was NOT latent.** `roll()` sizes the card from
+  the FINISHED VIDEO, the canonical workflow ships 832x480, and that canvas was
+  overflowing on every episode. The col1 ladder now spends the optional note,
+  then inter-block WHITESPACE, then ledger ROWS (fine print first, always
+  MARKED, SEED and COMMIT never dropped) -- and at 832x480 the whitespace rung
+  alone clears the footer with 6px spare and the FULL ledger intact, no row
+  dropped and nothing logged. Type is never shrunk; the card never raises. See
+  the header for the standing policy and who ruled it. Original row below,
+  kept for its cites. PRE-EXISTING -- it was already 20px past `h - 56*sx` before
   the recipe note existed, and PIL clips the overflow silently, so the tail of
   the [PRODUCTION LEDGER] grid is drawn off-canvas. `24f4251a` made the card
   measure what it can afford and spend the note allowance DOWN to zero, so the
@@ -2491,7 +2544,14 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-28 @ `b1f2ee86`, the encoder arc: second
+- Current whole-tree receipt (2026-07-28 @ `1959fb49`, the encoder arc + the
+  credits-card ladder): full Windows suite
+  `7464 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
+  11 variants / 0 failures; canonical `9872624A` byte-identical across all
+  five commits; AST/BOM/zero-byte/UTF-8 clean. Same pre-existing-section-sign
+  note as below.
+- Prior receipt (2026-07-28 @ `b1f2ee86`, the encoder arc: second
   encoder, still_* counts, the third copy deleted, the odd-canvas stride): full
   Windows suite `7453 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
