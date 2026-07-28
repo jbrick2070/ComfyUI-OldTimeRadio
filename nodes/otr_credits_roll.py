@@ -567,12 +567,17 @@ def _autoshrink_pt(draw, text, max_w, hi, lo, mkfont):
     return max(lo, pt)
 
 
-def _draw_grid(draw, x, y, header, rows, h, *, label_w=None):
+def _draw_grid(draw, x, y, header, rows, h, *, label_w=None, gaps=1.0):
     """Bracket header + dim-label/bright-value rows. Returns new y."""
     from PIL import ImageFont  # noqa: F401
+
+    def _gap(pt):
+        """Spacing only -- see _flow_col1._gap. Type stays on `_sc`."""
+        return max(1, int(_sc(pt, h) * gaps))
+
     fh = _load_font(_sc(_PT_H2, h))
     draw.text((x, y), header, fill=_rgba(_TEAL), font=fh)
-    y += _fh(fh) + _sc(6, h)
+    y += _fh(fh) + _gap(6)
     fg = _load_font(_sc(_PT_GRID, h))
     lw = label_w if label_w is not None else _sc(96, h)
     for label, value in rows:
@@ -580,8 +585,8 @@ def _draw_grid(draw, x, y, header, rows, h, *, label_w=None):
         for i, ln in enumerate(_wrap(draw, str(value), fg, _COL_W_FOR(x, h) - lw)):
             draw.text((x + lw, y + i * _fh(fg)), ln, fill=_rgba(_BRIGHT), font=fg)
         y += _fh(fg) * max(1, len(_wrap(draw, str(value), fg,
-                                        _COL_W_FOR(x, h) - lw))) + _sc(4, h)
-    return y + _sc(14, h)
+                                        _COL_W_FOR(x, h) - lw))) + _gap(4)
+    return y + _gap(14)
 
 
 def _COL_W_FOR(x, h):
@@ -621,7 +626,11 @@ def render_static_base(layout: dict, w: int, h: int):
     d = ImageDraw.Draw(txt)
 
     x1, top = int(_COL1_X * sx), int(_MARGIN_TOP * sx)
-    y = _draw_col1(d, x1, top, layout, w, h)
+    # The return is deliberately unused: col1 measures itself and REPORTS its
+    # own overflow (warning when it abridges, error when even that is not
+    # enough), so a second check here would only duplicate the log one frame
+    # further from the measurement.
+    _draw_col1(d, x1, top, layout, w, h)
     # col1 footer (bottom)
     ff = _load_font(_sc(_PT_FOOTER, h))
     d.text((x1, h - int(56 * sx)), layout["footer_l"] % (), fill=_rgba(_TEAL, 200),
@@ -654,17 +663,113 @@ def _draw_col1(d, x, top, layout, w, h):
     render tests use -- the full-length allowance overruns by 27px, which is
     exactly the regression this pass exists to not ship.
 
-    It does NOT rescue a column that overflows on its REQUIRED content alone
-    (h=480 already did before any of this); at that point the allowance is
-    zero and the pre-existing overflow is unchanged, not hidden."""
+    THE LADDER (policy ruled 2026-07-28; do not re-litigate it, extend it).
+    The card is a VIEW of the durable ledger, not the ledger. A record may
+    never elide; a view may elide WITH NOTICE. So the column gives up, in this
+    order, the cheapest honest thing first:
+
+      1. the OPTIONAL recipe note, spent down 2 -> 0. Unmarked, because a
+         gloss's absence asserts nothing.
+      2. INTER-BLOCK WHITESPACE, tightened to 1/2 then 1/4. Unmarked, because
+         whitespace is not a claim. Type is NEVER shrunk past `_sc`: a receipt
+         in unreadable type is a receipt-shaped object claiming credit for a
+         disclosure that never happened, and that is a worse lie than a
+         missing row -- it performs disclosure while delivering texture.
+      3. LEDGER ROWS, dropped by the declared priority below and MARKED on the
+         card. Fine print goes before marquee; the reproducibility stamps
+         (SEED, COMMIT) are never dropped.
+
+    It NEVER RAISES. This node is step 21 of 22 -- everything here fails after
+    the whole episode has rendered -- and `54b3626b` already settled that a
+    terminal node is the sanity ceiling, not the correctness guard. Missing
+    TRUTH is still structural and still raises `CreditsDataError`; insufficient
+    GLASS is presentational and degrades with marks. Do not soften that guard
+    on the strength of this one.
+
+    Why the whitespace rung exists at all: the canonical workflow renders
+    832x480 and the ltx_8gb tier 512x288, and `roll()` sizes the card from the
+    FINISHED VIDEO -- so this is the shipped path, not a latent one. At 832x480
+    the shortfall is a couple of pixels, and dropping a row to buy them would
+    net nothing once the cut marker takes a row back. Whitespace pays for that
+    case without spending any information at all."""
     floor_y = h - int(56 * (h / _REF_H))
-    allowance = _NOTE_LINES_MAX
-    while allowance > 0:
-        if _flow_col1(_scratch_draw(w, h), x, top, layout, w, h,
-                      allowance) <= floor_y:
-            break
-        allowance -= 1
-    return _flow_col1(d, x, top, layout, w, h, allowance)
+    for allowance in range(_NOTE_LINES_MAX, -1, -1):
+        for gaps in _GAP_TIERS:
+            if _flow_col1(_scratch_draw(w, h), x, top, layout, w, h,
+                          allowance, gaps=gaps) <= floor_y:
+                return _flow_col1(d, x, top, layout, w, h, allowance,
+                                  gaps=gaps)
+    return _draw_col1_abridged(d, x, top, layout, w, h, floor_y)
+
+
+#: Inter-block whitespace multipliers, tried in order. Whitespace only -- no
+#: font size is ever touched by this ladder.
+_GAP_TIERS = (1.0, 0.5, 0.25)
+
+#: The order ledger rows are given up in, by label. FINE PRINT FIRST: a frame
+#: budget and a VRAM peak are telemetry, a revision pair is a footnote. SEED
+#: and COMMIT are the reproducibility stamps and are deliberately ABSENT from
+#: this tuple -- they are never dropped, because they are the two rows that
+#: make the episode findable again.
+_LEDGER_DROP_ORDER = ("FRAMES:", "VRAM:", "REV:")
+
+#: What an abridged ledger says about itself. The mark has to be legible at
+#: the size that FORCED the cut -- a cut marked in type too small to read is
+#: not marked -- so the disclosure rides the grid HEADER, and the tail row
+#: carries the detail.
+_ABRIDGED_HEADER = "[ PRODUCTION LEDGER -- ABRIDGED ]"
+_ABRIDGED_TAIL = ("+%d CUT", "FOR SPACE -- FULL LEDGER ON FILE")
+
+
+def _abridge(layout, dropped):
+    """A COPY of ``layout`` with ``dropped`` ledger labels removed and the cut
+    declared on the card. Never mutates the caller's layout."""
+    out = dict(layout)
+    col1 = []
+    for kind, block in layout["col1"]:
+        if kind != "grid" or not dropped:
+            col1.append((kind, block))
+            continue
+        rows = [r for r in block["rows"] if r[0] not in dropped]
+        rows.append((_ABRIDGED_TAIL[0] % len(dropped), _ABRIDGED_TAIL[1]))
+        col1.append((kind, {"header": _ABRIDGED_HEADER, "rows": rows}))
+    out["col1"] = col1
+    return out
+
+
+def _draw_col1_abridged(d, x, top, layout, w, h, floor_y):
+    """The last rung: give up ledger ROWS, and say so on the card.
+
+    Measured WITH the marker included, because the tail row costs a row back
+    -- dropping one row to buy two pixels nets nothing, and a ladder that did
+    not account for its own mark would report a fit it does not have."""
+    dropped = []
+    for label in _LEDGER_DROP_ORDER:
+        dropped.append(label)
+        trimmed = _abridge(layout, dropped)
+        if _flow_col1(_scratch_draw(w, h), x, top, trimmed, w, h, 0,
+                      gaps=_GAP_TIERS[-1]) <= floor_y:
+            log.warning(
+                "[CreditsRoll] col1 ABRIDGED at %dx%d: dropped %s to clear the "
+                "footer. The cut is marked on the card; the durable ledger "
+                "keeps every row -- nothing left the record.",
+                w, h, ", ".join(r.rstrip(":") for r in dropped))
+            return _flow_col1(d, x, top, trimmed, w, h, 0,
+                              gaps=_GAP_TIERS[-1])
+    # Every rung spent and it still does not fit. Draw it -- this node runs
+    # after the whole episode has rendered and refusing would destroy it -- but
+    # NEVER silently: an unmeasured draw is the actual defect this file is a
+    # response to, and PIL clips without a word.
+    trimmed = _abridge(layout, list(_LEDGER_DROP_ORDER))
+    y = _flow_col1(d, x, top, trimmed, w, h, 0, gaps=_GAP_TIERS[-1])
+    log.error(
+        "[CreditsRoll] col1 OVERFLOWS its footer by %dpx at %dx%d even with "
+        "every ledger row this policy may drop already dropped. The card is "
+        "drawn anyway (a terminal node never destroys a finished episode) and "
+        "PIL will clip the tail. This canvas is too small for the card as "
+        "designed -- it needs a small-canvas variant, not more ladder.",
+        y - floor_y, w, h)
+    return y
 
 
 def _scratch_draw(w, h):
@@ -675,8 +780,15 @@ def _scratch_draw(w, h):
                                     (0, 0, 0, 0)))
 
 
-def _flow_col1(d, x, top, layout, w, h, note_lines):
+def _flow_col1(d, x, top, layout, w, h, note_lines, gaps=1.0):
     sx = h / _REF_H
+
+    def _gap(pt):
+        """A SPACING step, scaled by the whitespace tier. Never used for a
+        font size -- `_sc` alone owns type, so no tier can push text below
+        the legibility floor."""
+        return max(1, int(_sc(pt, h) * gaps))
+
     y = top
     # hero (auto-shrink to col1 width)
     hero = layout["hero"]
@@ -693,16 +805,18 @@ def _flow_col1(d, x, top, layout, w, h, note_lines):
     d.text((x + _fw(d, layout["subtitle"], fs) + _sc(16, h),
             y + (_fh(fs) - _fh(ft))), layout["subtitle_tag"],
            fill=_rgba(_GREEN, _A_TAG), font=ft)
-    y += _fh(fs) + _sc(6, h)
+    y += _fh(fs) + _gap(6)
     ffine = _load_font(_sc(_PT_FOOTER, h))
     d.text((x, y), layout["meta_strip"], fill=_rgba(_BRIGHT, 150), font=ffine)
-    y += _fh(ffine) + _sc(24, h)
+    y += _fh(ffine) + _gap(24)
 
     for kind, block in layout["col1"]:
         if kind == "models":
-            y = _draw_models(d, x, y, block, w, h, note_lines=note_lines)
+            y = _draw_models(d, x, y, block, w, h, note_lines=note_lines,
+                             gaps=gaps)
         elif kind == "grid":
-            y = _draw_grid(d, x, y, block["header"], block["rows"], h)
+            y = _draw_grid(d, x, y, block["header"], block["rows"], h,
+                           gaps=gaps)
     return y
 
 
@@ -712,20 +826,25 @@ def _flow_col1(d, x, top, layout, w, h, note_lines):
 _NOTE_LINES_MAX = 2
 
 
-def _draw_models(d, x, y, m, w, h, note_lines=_NOTE_LINES_MAX):
+def _draw_models(d, x, y, m, w, h, note_lines=_NOTE_LINES_MAX, gaps=1.0):
     sx = h / _REF_H
+
+    def _gap(pt):
+        """Spacing only -- see _flow_col1._gap. Type stays on `_sc`."""
+        return max(1, int(_sc(pt, h) * gaps))
+
     fh1 = _load_font(_sc(_PT_H1, h))
     d.text((x, y), m["header"], fill=_rgba(_TEAL), font=fh1)
     y += _fh(fh1)
     ftag = _load_font(_sc(_PT_TAG, h))
     d.text((x, y), m["tag"], fill=_rgba(_GREEN, _A_TAG), font=ftag)
-    y += _fh(ftag) + _sc(14, h)
+    y += _fh(ftag) + _gap(14)
     fsub = _load_font(_sc(_PT_SUBHEAD, h))
     fbody = _load_font(_sc(_PT_BODY, h))
     fmicro = _load_font(_sc(_PT_MICRO, h))
     colw = int(_COL1_W * sx)
 
-    gap = _sc(12, h)
+    gap = _gap(12)
 
     def _fit(s, font, max_w):
         """Trim ``s`` to ``max_w`` pixels, ending in a visible "...".

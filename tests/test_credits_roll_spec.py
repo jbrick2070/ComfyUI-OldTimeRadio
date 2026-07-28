@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import logging
 import subprocess
 
 import pytest
@@ -768,3 +769,165 @@ def test_the_card_shows_mixed_rather_than_one_clips_recipe():
     drawn = " ".join(c[2] for c in _spy_models(block)[0])
     assert "mixed recipe" in drawn
     assert "RECIPE_LTX8_I2V_v2" not in drawn
+
+
+# --------------------------------------------------------------------------- #
+# THE COL1 LADDER (2026-07-28). The card is a VIEW of the durable ledger, not
+# the ledger: it may show less than it knows, never claim more than it shows.
+#
+# This was filed as latent -- "reachable only if something renders the card at
+# 480p". It is not: roll() sizes the card from the FINISHED VIDEO
+# (_probe_video), the canonical workflow's VideoDirector ships 832x480, and the
+# ltx_8gb tier renders 512x288. The shipped default was overflowing its own
+# footer and PIL was clipping it in silence.
+# --------------------------------------------------------------------------- #
+
+def _col1_bottom(w, h, led=None):
+    """Run the REAL ladder and return (floor_y, final_y, layout)."""
+    lay = cr.build_credits_layout(led or _led_with("recipe_v2[tiled_vae=on]"),
+                                  w=w, h=h, manifest={"clips": []})
+    sx = h / cr._REF_H
+    floor_y = h - int(56 * sx)
+    y = cr._draw_col1(cr._scratch_draw(w, h), int(cr._COL1_X * sx),
+                      int(cr._MARGIN_TOP * sx), lay, w, h)
+    return floor_y, y, lay
+
+
+@pytest.mark.parametrize("w,h", [(3840, 2160), (1920, 1080), (1280, 720),
+                                 (854, 480), (832, 480)])
+def test_col1_clears_its_footer_at_every_shipped_canvas(w, h):
+    """832x480 is the CANONICAL WORKFLOW's own canvas. It used to overflow."""
+    floor_y, y, _lay = _col1_bottom(w, h)
+    assert y <= floor_y, (
+        "col1 ends %dpx past the footer at %dx%d" % (y - floor_y, w, h))
+
+
+def test_the_canonical_canvas_keeps_its_WHOLE_ledger():
+    """The fix at 832x480 is bought with WHITESPACE, not information.
+
+    Asserted separately from "it fits", because a ladder that fits by dropping
+    the frame budget and the VRAM peak off the shipped end-card would satisfy
+    that test while quietly costing the operator the two rows they most often
+    want.
+
+    It observes WHAT WAS DRAWN, not the layout handed in. The first version of
+    this test read the input layout -- which `_abridge` deliberately COPIES
+    rather than mutates -- so it passed no matter what the ladder did, and the
+    mutation round duly found `_GAP_TIERS = (1.0,)` surviving: with the
+    whitespace rung deleted the column falls through to dropping rows, still
+    "fits", and the old assertion never noticed."""
+    drawn = {}
+    real_grid = cr._draw_grid
+
+    def _spy(draw, x, y, header, rows, h, **kw):
+        drawn.setdefault("grids", []).append((header, [r[0] for r in rows]))
+        return real_grid(draw, x, y, header, rows, h, **kw)
+
+    cr._draw_grid = _spy
+    try:
+        _floor, _y, lay = _col1_bottom(832, 480)
+    finally:
+        cr._draw_grid = real_grid
+
+    header, labels = drawn["grids"][-1]
+    # Derived from the layout, not hard-coded: which ledger rows exist at all
+    # depends on the manifest (FRAMES only appears when it carries a frame
+    # count), and a hard-coded list would fail for the wrong reason.
+    expected = [r[0] for k, b in lay["col1"] if k == "grid" for r in b["rows"]]
+    assert labels == expected, (labels, expected)
+    assert "ABRIDGED" not in header, header
+    for stamp in ("SEED:", "COMMIT:"):
+        assert stamp in labels, (stamp, labels)
+
+
+def test_the_canonical_canvas_abridges_NOTHING_and_says_nothing(caplog):
+    """The other half of the same fact, from the log rather than the pixels:
+    at the shipped canvas the ladder is SILENT. A warning here would mean the
+    end-card of every canonical episode is quietly shorter than the ledger."""
+    with caplog.at_level(logging.WARNING, logger=cr.log.name):
+        _col1_bottom(832, 480)
+    assert "ABRIDGED" not in caplog.text, caplog.text
+    assert "OVERFLOWS" not in caplog.text, caplog.text
+
+
+def test_the_whitespace_tiers_never_touch_TYPE():
+    """The whole reason whitespace is spent before content: type is a
+    legibility floor, and a receipt in unreadable type is a receipt-shaped
+    object claiming credit for a disclosure that never happened.
+
+    Compares the FONT SIZES the flow asks for at the loosest and tightest
+    tier. Only the gaps may differ."""
+    lay = cr.build_credits_layout(_led_with("recipe_v2"), w=832, h=480,
+                                  manifest={"clips": []})
+    real_load = cr._load_font
+
+    def _sizes_at(tier):
+        seen = []
+
+        def _spy(pt):
+            seen.append(pt)
+            return real_load(pt)
+
+        cr._load_font = _spy
+        try:
+            cr._flow_col1(cr._scratch_draw(832, 480), 30, 20, lay, 832, 480,
+                          0, gaps=tier)
+        finally:
+            cr._load_font = real_load
+        return seen
+
+    loose, tight = _sizes_at(1.0), _sizes_at(0.25)
+    assert loose == tight, (
+        "the tightest whitespace tier changed a font size: %r vs %r"
+        % (loose, tight))
+
+
+def test_a_canvas_too_small_for_the_card_ABRIDGES_and_SAYS_SO(caplog):
+    """512x288 is the ltx_8gb tier. Even abridged the card does not fit there
+    -- so it is drawn anyway (a terminal node never destroys a finished
+    episode) and the shortfall is LOGGED. What is not acceptable is the old
+    behaviour: drawn, clipped by PIL, and silent."""
+    with caplog.at_level(logging.WARNING, logger=cr.log.name):
+        _floor, _y, lay = _col1_bottom(512, 288)
+    grid = [b for k, b in lay["col1"] if k == "grid"][0]
+    # The LAYOUT is untouched -- abridging is a drawing-time view, so the
+    # ledger the rest of the card reads from still has every row.
+    assert grid["header"] == "[ PRODUCTION LEDGER ]"
+    text = caplog.text
+    assert "512x288" in text
+    assert "OVERFLOWS" in text
+    assert "small-canvas variant" in text
+
+
+def test_the_abridged_view_keeps_the_reproducibility_stamps():
+    """SEED and COMMIT are the two rows that make an episode findable again,
+    and they are deliberately absent from the drop order."""
+    assert "SEED:" not in cr._LEDGER_DROP_ORDER
+    assert "COMMIT:" not in cr._LEDGER_DROP_ORDER
+    # Fine print goes before marquee: a frame budget and a VRAM peak are
+    # telemetry, a revision pair is a footnote.
+    assert cr._LEDGER_DROP_ORDER == ("FRAMES:", "VRAM:", "REV:")
+
+    lay = cr.build_credits_layout(_led_with("recipe_v2"), w=512, h=288,
+                                  manifest={"clips": []})
+    trimmed = cr._abridge(lay, list(cr._LEDGER_DROP_ORDER))
+    grid = [b for k, b in trimmed["col1"] if k == "grid"][0]
+    labels = [r[0] for r in grid["rows"]]
+    assert "SEED:" in labels and "COMMIT:" in labels
+    assert "FRAMES:" not in labels and "VRAM:" not in labels
+    # EVERY CUT IS MARKED -- on the header, which is the tier still legible at
+    # the size that forced the cut, and again in a tail row with the count.
+    assert grid["header"] == "[ PRODUCTION LEDGER -- ABRIDGED ]"
+    assert labels[-1] == "+3 CUT"
+
+
+def test_abridging_never_mutates_the_callers_layout():
+    """The abridged card is a VIEW. If it edited the layout in place, the
+    scroll column and the footers would start reading a ledger the drawing
+    pass had quietly shortened."""
+    lay = cr.build_credits_layout(_led_with("recipe_v2"), w=832, h=480,
+                                  manifest={"clips": []})
+    before = [r[0] for k, b in lay["col1"] if k == "grid" for r in b["rows"]]
+    cr._abridge(lay, ["FRAMES:", "VRAM:"])
+    after = [r[0] for k, b in lay["col1"] if k == "grid" for r in b["rows"]]
+    assert before == after
