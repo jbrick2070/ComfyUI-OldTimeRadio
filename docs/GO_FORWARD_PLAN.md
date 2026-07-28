@@ -1770,18 +1770,35 @@ Gate: r4 convergence at CURRENT HEAD on the corrected plan before code. Both
 r3 panelists explicitly rejected Path B (S2-first against live env); do not
 revive it.
 
-Operator rescope 2026-07-24 -- the rest of the live order:
+**THE LIVE ORDER IS THE 2026-07-27 OPERATOR DIRECTION ABOVE (this file, the
+"OPERATOR DIRECTION 2026-07-27" block), NOT the 2024-07-24 list that used to
+sit here.** The 07-24 ordering put LEAN-MEAN FRONT second; the operator moved
+lean-mean to LAST on 07-27 because it is a deletion campaign whose value IS
+its file-and-line kill inventory, so it must re-ground once against the FINAL
+tree instead of ripping first and re-grounding after two blocks land on
+freshly-rewired code. The stale list was left un-struck and a 2026-07-28
+window read it and reported the wrong order to the operator. Corrected here so
+the next window cannot repeat it.
+
+Live order:
 
 1. ~~**WAN 8-GB low-VRAM launch contract**~~ -- DONE @ `f914f0a4`
    (`PBUG-20260723-02`). The live 8-GB requalification leg is still owed and
    belongs to a render window.
-2. **LEAN-MEAN FRONT** (`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 ->
+2. **Randomizer A.**
+3. **`dynamic_story`** -- WIRING ONLY; rev-5's design stays FINAL, do not
+   rerun the design panels.
+4. **SFX** -- carries the Timeline Cue Ledger C0/C1 gate + the R4.1 refit as a
+   precondition.
+5. **LEAN-MEAN FRONT** (`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 ->
    W5+SW4 -> C1-C5`), with `docs/ENGINE_MATRIX.md` folded in as a W6 sub-step.
-3. **Randomizer A -> `dynamic_story`.**
-4. **LEAN-MEAN TAIL** (`SW1/SW2/SW3 -> C6 -> C7 -> W8`).
-5. **SFX** (still behind the Timeline Cue Ledger C0/C1 gate).
-6. **Re-observe the parked story bugs** -- after SFX, see whether they still
+6. **LEAN-MEAN TAIL** (`SW1/SW2/SW3 -> C6 -> C7 -> W8`).
+7. **Re-observe the parked story bugs** -- after SFX, see whether they still
    occur at that HEAD (see OPEN BUGS).
+
+NOTE the knock-on for the Window packing table: its CODER D / F / G rows still
+carry the 07-24 sequencing ("after A", "after D", "after F"). The BLOCKS are
+right, the ORDER is the list above.
 
 Standing constraints, unchanged by the rescope: keep the RTX 5080 free for
 ComfyUI; the 4060 Qwen endpoint is a read-only QA reviewer, not a production
