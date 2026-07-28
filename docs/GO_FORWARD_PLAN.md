@@ -55,6 +55,39 @@ silent degradation this build exists to remove, and the existing `NO FALLBACK`
 refusals plus the image-phase row's "no text-only or dark-floor degradation"
 stay in force everywhere the math is satisfiable.
 
+**OPERATOR RULING 2026-07-28 -- EVERY AUDIO-IN BEAT GETS A STILL WITH A MOUTH.**
+Operator: "all audio in video should have a still with a mouth so the audio-in
+works as expected."
+
+Any beat routed to an engine whose `required_inputs` contain `audio_ref` --
+`humo`, `humo_1.7B`, `humo_1.7B_169`, `humo_14B_169`, `ltx_audio_in` -- MUST
+receive a still that carries a visible face/mouth. The audio-in lane animates a
+mouth against speech; a still without one gives it nothing to drive. This is a
+STILL-CONTRACT requirement, not a nice-to-have, and it is the operator's answer
+to the Fable seat's proposal that the show keep the camera off the speaker
+entirely. **That proposal is CONSIDERED AND OVERRULED** -- lip sync stays in
+the show, so the HuMo lane stays load-bearing and the per-segment audio slicer
+is NOT descoped.
+
+Two consequences, both now load-bearing:
+
+1. **The talking-still decision must be STABLE.** `wants_talking_prompt()`
+   (`eng_ltx_av.py:390-400`) returns `_recipe_config(self._recipe())["two_stage"]`,
+   and `_recipe()` re-reads `OTR_LTX_AV_RECIPE` / `OTR_LTX_AV_SHARP` / the UNET
+   name from the environment on EVERY call by design. `route_freeze.routing_env_snapshot()`
+   captures only `OTR_FORCE_ENGINE_MAP` and `OTR_ENABLE_HUMO_HOSTS`, so the
+   recipe axis escapes the freeze. Concrete divergence: the director stamps
+   `policy["talking"][role]=True` under one UNET and MetaBrief mints a
+   face-forward still; the operator swaps `OTR_LTX_AV_UNET` before the render
+   leg; ShotLock's guard passes because neither watched var moved; the render
+   driver now answers False. Under THIS ruling that is no longer a latent
+   hardening -- a flipped answer means an audio-in beat gets a still with no
+   mouth, which is the exact failure the ruling forbids.
+2. **The portrait index must not be empty for a talking beat.** The 2026-07-28
+   campaign logged "talking-head shot b003 char_id='c03' has NO portrait-index
+   entry -- HuMo will fail closed LOUD (NO FALLBACKS)". Under this ruling that
+   warning is a contract violation, not noise.
+
 **NEW OPEN ROWS FOUND BY THE 2026-07-28 RENDER/QA WINDOW** (detail in
 `kibitz-runs/2026-07-28-gpu-lane-all-models/r{1,2,3,4}/final.md`):
 
