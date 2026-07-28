@@ -145,6 +145,9 @@ class VizCameraEngine:
         import numpy as np
 
         from ._tmp import otr_engine_tmp_mp4
+        from .wan_shared import (ffprobe_clip_fields,
+                                 validate_silent_clip_contract)
+        from .wrapper_bridge import proven_frame_count
         from .._otr_shared import scope_draw as _sd
 
         plan = self._build_render_request(request)
@@ -186,10 +189,18 @@ class VizCameraEngine:
         out_path = otr_engine_tmp_mp4("otr_viz_camera_")
         _sd.encode_silent_mp4(_frames(), total, out_path, w, h, fps,
                               os.environ.get("OTR_FFMPEG", "ffmpeg"))
+        # M7 (2026-07-28): THE SECOND ENCODER. These four viz_* engines write
+        # through scope_draw.encode_silent_mp4, not encode_frames_to_silent_mp4,
+        # so neither half of the clip proof ever reached them and the roster
+        # gate could not see them either -- it grepped two literal call
+        # spellings and this is a third. frame_count is the integer timing
+        # authority, and it was the pre-computed loop bound, self-declared.
+        validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)
+        proven = proven_frame_count(out_path, total)
         if not os.environ.get("OTR_TEST_MODE"):
             _LOG.info("[OTR video] viz_camera %dx%d x%d frames (audio=%s) -> %s",
-                      w, h, total, audio_used, out_path)
-        return {"out_path": out_path, "frame_count": total,
+                      w, h, proven, audio_used, out_path)
+        return {"out_path": out_path, "frame_count": proven,
                 "mode": "reactive" if audio_used else "idle", "audio_used": audio_used}
 
     def canonicalize(self, raw, request, profile):

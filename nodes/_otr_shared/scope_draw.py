@@ -22,6 +22,7 @@ import math
 import os
 import shutil
 import subprocess
+import tempfile
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -762,6 +763,49 @@ def find_ffmpeg(ffmpeg):
     return shutil.which("ffmpeg")
 
 
+#: The smallest canvas h264_nvenc will open, per NVIDIA's H.264 NVENC spec and
+#: MEASURED on this box 2026-07-28 (144x48 refused, 146x50 accepted).
+_NVENC_MIN_W, _NVENC_MIN_H = 145, 49
+
+
+def _read_sink(sink):
+    """Whatever ffmpeg wrote to its error sink, best effort."""
+    try:
+        sink.seek(0)
+        return sink.read().decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001 -- diagnostics must never raise
+        return ""
+
+
+def _reap(proc, sink=None):
+    """Close the pipes and make sure ffmpeg is GONE.
+
+    A refusal raised part-way through the frame stream used to leave the child
+    running: it was still waiting for the rest of its input, still holding the
+    OUTPUT FILE open. On Windows that also stops the caller deleting the
+    directory it wrote into -- the first refusal test written against this
+    encoder failed on a PermissionError from its own TemporaryDirectory
+    cleanup, not on the refusal it was checking."""
+    try:
+        if proc.stdin is not None and not proc.stdin.closed:
+            proc.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=10)
+    except Exception:  # noqa: BLE001 -- best effort; never mask the refusal
+        pass
+    if sink is not None:
+        try:
+            sink.close()
+        except OSError:
+            pass
+
+
 def _has_nvenc(ffmpeg):
     try:
         out = subprocess.run([ffmpeg, "-hide_banner", "-codecs"],
@@ -772,13 +816,85 @@ def _has_nvenc(ffmpeg):
 
 
 def encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
+    """Stream ``frames_iter`` to a SILENT bt709 / yuv420p H.264 mp4.
+
+    THE SECOND CLIP ENCODER of this build (filed 2026-07-28): four live
+    engines -- ``viz_green``, ``viz_camera``, ``viz_mxc_mandala`` and
+    ``viz_mxc_cpu`` -- write every clip they emit through here.
+
+    Three things this used to do that it no longer does, all of them silent:
+
+    * ``total`` was accepted and NEVER READ. The signature promised a frame
+      count and checked nothing, so a generator that stopped early wrote a
+      short clip and the engines went on to stamp the requested number as
+      ``CanonicalClip.frame_count`` -- the integer timing authority the
+      composite positions the beat by. Now the frames are counted as they are
+      piped, and a divergence is REFUSED by name.
+    * The rawvideo ``-s`` was built from the CALLER'S ``w``/``h`` while the
+      pipe carried whatever the generator actually painted. Two derivations of
+      one fact: when they disagree ffmpeg slices the byte stream on the wrong
+      boundaries and writes a skewed clip behind a clean exit code. The
+      declared size now comes from the FIRST FRAME, and a caller whose ``w``/
+      ``h`` disagree with it is refused rather than quietly re-cut. (This is
+      the same defect class filed against ``ffmpeg_silent_mp4_cmd`` on
+      2026-07-28, where ``even_dim()`` declares one size and ``tobytes()``
+      pipes another -- it is NOT copied in here.)
+    * A frame of a different shape or dtype midway through the generator went
+      straight down the pipe and desynchronised everything after it.
+
+    It still returns ``out_path`` alone: the count PROVEN AGAINST THE FILE is
+    the caller's to take, because this encoder is also used for the
+    post-upscale bars layer, which is a compositing input and not a
+    CanonicalClip and owes no clip contract. Raises ``RuntimeError``, NAMED,
+    and never falls back.
+    """
     fb = find_ffmpeg(ffmpeg)
     if not fb:
         raise RuntimeError("scope_draw: ffmpeg not found.")
-    use_nvenc = _has_nvenc(fb)
+    frames = iter(frames_iter)
+    try:
+        first = np.ascontiguousarray(next(frames))
+    except StopIteration:
+        raise RuntimeError(
+            "scope_draw: asked to encode ZERO frames to %r -- there is no clip "
+            "here to write. NO FALLBACK (a zero-length beat is a planning bug "
+            "upstream, not an empty video)." % out_path)
+    if first.ndim != 3 or first.shape[2] != 3:
+        raise RuntimeError(
+            "scope_draw: expected (H,W,3) rgb24 frames for %r, got shape %r"
+            % (out_path, (first.shape,)))
+    if first.dtype != np.uint8:
+        raise RuntimeError(
+            "scope_draw: expected uint8 frames for %r, got dtype %r (%d bytes "
+            "per sample): the rawvideo pipe is 8-bit, so this sends %dx the "
+            "bytes and every frame boundary after the first is wrong."
+            % (out_path, first.dtype, first.dtype.itemsize,
+               first.dtype.itemsize))
+    fh, fw = int(first.shape[0]), int(first.shape[1])
+    if (fw, fh) != (int(w), int(h)):
+        raise RuntimeError(
+            "scope_draw: caller declared %dx%d for %r but the first frame is "
+            "%dx%d. The rawvideo -s is the DECLARED size while the pipe "
+            "carries the REAL bytes, so ffmpeg would slice the stream on the "
+            "wrong boundaries and write a skewed clip behind a clean exit "
+            "code. NO FALLBACK." % (int(w), int(h), out_path, fw, fh))
+    # h264_nvenc REFUSES a canvas below its documented 145x49 minimum, and it
+    # refuses it with "Error while opening encoder - maybe incorrect
+    # parameters such as bit_rate, rate, width or height", which names four
+    # things and not the one that is wrong. MEASURED on this box 2026-07-28:
+    # 144x48 fails, 146x50 encodes, libx264 encodes every size tried from
+    # 96x64 up. Selecting nvenc purely on "the box has it" therefore made a
+    # small-canvas beat die on a machine WITH a GPU and succeed on one
+    # without -- a box-dependent failure, found when the viz contract tests
+    # stopped stubbing the encoder and rendered at their 96x64 fixture size.
+    # This is codec SELECTION, not a fallback: both encoders emit the same
+    # bt709 / yuv420p H.264 clip, and the caller proves the contract either
+    # way. The dimension test is first so a small canvas skips the probe.
+    use_nvenc = (fw >= _NVENC_MIN_W and fh >= _NVENC_MIN_H
+                 and _has_nvenc(fb))
     cmd = [fb, "-y", "-loglevel", "error",
            "-f", "rawvideo", "-vcodec", "rawvideo",
-           "-s", "%dx%d" % (w, h), "-pix_fmt", "rgb24", "-r", str(fps), "-i", "-",
+           "-s", "%dx%d" % (fw, fh), "-pix_fmt", "rgb24", "-r", str(fps), "-i", "-",
            "-an",
            "-c:v", "h264_nvenc" if use_nvenc else "libx264"]
     if use_nvenc:
@@ -788,13 +904,59 @@ def encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
     cmd += ["-pix_fmt", "yuv420p", "-vsync", "cfr", "-r", str(fps),
             "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
             "-movflags", "+faststart", out_path]
+    # ffmpeg's stderr goes to a TEMP FILE, not a PIPE. Nothing reads stderr
+    # while the frame loop is writing, so a pipe deadlocks the moment ffmpeg
+    # emits more than one OS buffer (~64KB on Windows) of error text: ffmpeg
+    # blocks writing its own stderr, stops draining stdin, and our next
+    # stdin.write() blocks too. That state raises NOTHING, so neither except
+    # clause below ever runs and the child is never reaped -- the one exit
+    # path where the "ffmpeg left alive holding the output file" defect could
+    # still happen. A file sink has no buffer limit. (The FIRST encoder does
+    # not have this hazard: it uses proc.communicate(), which drains
+    # concurrently. This one must stream, so it cannot.)
+    err_sink = tempfile.TemporaryFile()
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    for frame in frames_iter:
-        proc.stdin.write(np.ascontiguousarray(frame).tobytes())
+                            stdout=subprocess.DEVNULL, stderr=err_sink)
+    written = 0
+    try:
+        frame = first
+        while True:
+            arr = np.ascontiguousarray(frame)
+            if arr.shape != first.shape or arr.dtype != first.dtype:
+                raise RuntimeError(
+                    "scope_draw: frame %d of %r is %r/%s but the clip was "
+                    "declared %r/%s by frame 0 -- one odd frame desynchronises "
+                    "the rawvideo pipe for every frame after it. NO FALLBACK."
+                    % (written, out_path, (arr.shape,), arr.dtype,
+                       (first.shape,), first.dtype))
+            proc.stdin.write(arr.tobytes())
+            written += 1
+            try:
+                frame = next(frames)
+            except StopIteration:
+                break
+    except BrokenPipeError:
+        # ffmpeg died mid-stream. Without this the caller sees BrokenPipeError
+        # and never learns WHY ffmpeg quit, because the stderr goes unread.
+        err = _read_sink(err_sink)
+        _reap(proc, err_sink)
+        raise RuntimeError(
+            "scope_draw: ffmpeg closed the pipe after %d frame(s) of %r: %s"
+            % (written, out_path, err[-800:]))
+    except BaseException:
+        _reap(proc, err_sink)
+        raise
     proc.stdin.close()
-    err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
     proc.wait()
+    err = _read_sink(err_sink)
+    err_sink.close()
     if proc.returncode != 0:
         raise RuntimeError("scope_draw: ffmpeg failed: %s" % err[-800:])
+    if written != int(total):
+        raise RuntimeError(
+            "scope_draw: %r declared %d frame(s) but the generator produced "
+            "%d. That declared number is what an engine stamps as "
+            "CanonicalClip.frame_count -- the integer timing authority -- so "
+            "the beat would drift against its own audio behind a clean exit "
+            "code. NO FALLBACK." % (out_path, int(total), written))
     return out_path

@@ -1,7 +1,10 @@
 """viz_mxc_cpu -- the OTR rainbow visualizer (2026-06-30, kibitz-hardened).
 
-CPU-only contract tests (no GPU, no real ffmpeg -- encode_silent_mp4 is
-monkeypatched). Covers: registration + CAPABILITIES; required_inputs=() fits all 5
+CPU-only contract tests (no GPU). The render-path tests DO shell out to ffmpeg
+now: since 2026-07-28 the engine proves the clip it wrote, so the encoder is
+wrapped to capture frames rather than replaced by a stub -- a proof cannot be
+run against a file the test invented; they skip where ffmpeg is absent.
+Covers: registration + CAPABILITIES; required_inputs=() fits all 5
 roles by capability; accepts_still=False (mints no still); the ambient-audio gate;
 content-oracle motion-exemption; the silent-clip render contract for BOTH the
 audio-present (reactive) and audio-absent (idle) paths; frame-count exactness; and
@@ -9,6 +12,7 @@ paint determinism. UTF-8, no BOM, SFW.
 """
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 
@@ -78,13 +82,23 @@ def _req(frames=3, w=96, h=64, seed=7, audio=None):
 def _render_capturing_frames(monkeypatch, request):
     captured = {}
 
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        pytest.skip("the engine now PROVES its clip; that needs a real clip")
+    real_encode = sd.encode_silent_mp4
+
     def _fake_encode(frames_iter, total, out_path, w, h, fps, ffmpeg):
-        captured["frames"] = [np.asarray(f) for f in frames_iter]
+        frames = [np.asarray(f) for f in frames_iter]
+        captured["frames"] = frames
         captured["total"] = total
-        # write a stub file so any exists() check passes
-        with open(out_path, "wb") as fh:
-            fh.write(b"\x00")
-        return out_path
+        # PASSES THROUGH to the real encoder instead of writing one zero byte.
+        # M7 (2026-07-28): the engine now proves the clip it just wrote -- the
+        # silent-clip colour/stream contract, plus a frame count read back off
+        # the FILE -- and a one-byte stub is not something ffprobe can be
+        # asked about. Stubbing it would also have made the frame_count
+        # assertions below tautological: the test would be verifying a number
+        # against a file the test itself invented. Capturing on the way
+        # through keeps every frame-level assertion intact.
+        return real_encode(iter(frames), total, out_path, w, h, fps, ffmpeg)
 
     monkeypatch.setattr(sd, "encode_silent_mp4", _fake_encode)
     raw = vreg.get_engine(NAME).render_clip(request)
