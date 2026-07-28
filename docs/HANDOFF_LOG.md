@@ -3,6 +3,79 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-28 -- HEAD b1f2ee86 (v2.0-alpha) -- WINDOW CODER (continued)
+Did: two more green pushed chunks on the same arc. `6aad4fe5` DELETED the third
+  copy of the scope encoder -- otr_scene_aware_scopes had its own private
+  _encode_silent_mp4 carrying every defect the shared one was fixed for two
+  commits earlier -- and pinned the six remaining rawvideo-stdin encoders so a
+  fourth fails by name. `b1f2ee86` closed the odd-canvas stride defect: the
+  batch encoder's declared -s is now the size it actually pipes, and an odd
+  canvas is refused by name.
+Current step: the remote-safe queue is down to ONE small filed row (the credits
+  card's col1 overflowing the footer at 854x480) plus A2, still HELD. The next
+  real work is the operator's GPU sequence -- clamped recipe-v2 confirmation,
+  the WAN prequalification sweep, then 7d.
+Next: a RENDER window owns all three GPU items. The credits-card geometry row
+  is a coder chunk whenever someone opens that file; it blocks nothing.
+Models: Claude codes and judges (rung 4) + six Sonnet subagent QA lenses across
+  three pre-push fan-outs. No codex, no agy, no Fable, no roundtable --
+  two-strikes never invoked, so no panel was owed.
+Commits: 6aad4fe5 b1f2ee86 plus this doc push. Suite 7449 -> 7453; Bible 17;
+  build_variants --check 11/0; canonical 9872624A byte-identical throughout.
+  Mutation: 30/31 real mutants caught, 6/6 controls survived.
+
+### Detail
+
+**THE SAME DEFECT WAS IN A COPY, THREE TIMES, AND DELETING THE COPY IS WHAT
+CLOSED IT.** otr_scene_aware_scopes assembled a byte-for-byte identical ffmpeg
+command to the shared encoder and carried the identical defects: `total`
+accepted and never read, the rawvideo `-s` from the caller rather than the
+frames, no per-frame shape or dtype check, nvenc with no canvas floor, and a
+stderr PIPE read only after the whole stream was written -- a deadlock that
+raises nothing, so the child is never reaped and holds the output file. It was
+deleted rather than hardened a third time; render_scopes calls
+_otr_shared.scope_draw.encode_silent_mp4, which is exactly the refactor that
+module's docstring anticipated. The SEPARATION INVARIANT is directional and
+always was -- scope_draw must not import a NODE -- and this node already
+imported freq_bars_green from it.
+
+**MUTATION PROVED THE DELEGATION RATHER THAN THE COMMENT CLAIMING IT.** Passing
+the node's dimensions SWAPPED, and declaring one frame more than the generator
+yields, are both refused now and were both silently accepted by the deleted
+copy. Two mutants, both dead, on a live end-to-end path.
+
+**AND A GATE AGAINST A FOURTH.** _RAWVIDEO_STDIN_ENCODERS pins every function
+under nodes/ that pipes raw frames into ffmpeg on stdin -- six, each with the
+reason it exists -- and names otr_scene_aware_scopes in its own assertion. A new
+copy fails HERE instead of being found by a fan-out two months later.
+
+**THE ODD-CANVAS DEFECT PASSED EVERY PROOF THIS ARC ADDED, AND THE SUITE WAS
+DEFENDING IT.** ffmpeg_silent_mp4_cmd declared even_dim(w) while
+encode_frames_to_silent_mp4 piped the array's real odd rows. Measured, a
+(5,63,47,3) batch wrote a 46x62 clip of skewed pixels, exit 0, and the
+frame-count proof AGREED -- five in, five out. A count proof structurally cannot
+see a stride error. Worse, test_ffmpeg_silent_cmd_contract REQUIRED the
+rounding, commented "odd width -> even": the defect written down as the
+contract, which is why it sat filed as latent instead of being caught. **A
+latent row the tests assert as the contract is not latent, it is protected.**
+even_dim stays on the three builders that SCALE or PAD to a target, where
+ffmpeg is told what to produce; both halves are asserted so they cannot be
+collapsed into one.
+
+**A SEQUENCING MISTAKE OF MINE, WORTH NOT REPEATING.** I launched a QA fan-out
+and a mutation round at the same time. The lens read `if False:` in the shared
+encoder and reported possible corruption -- it was the mutation harness holding
+a mutant on disk at that instant. The lens caught it by re-verifying through a
+second reader, which is the right instinct, but the wasted round is on me. Do
+not run a fan-out while mutation is editing files.
+
+**ONE HYGIENE FALSE ALARM, RESOLVED BY MEASUREMENT NOT BY REWRITING.** My
+scratch hygiene script failed on non-ASCII in the two scene-aware files. Both
+carry a literal section sign at HEAD, long predating this work; the non-ASCII
+inventory is byte-identical to HEAD, so nothing new was introduced and
+rewriting them would have been unrelated churn. The repo rule is UTF-8 / no
+BOM; ASCII-only is a per-file docstring convention.
+
 ## 2026-07-28 -- HEAD afeb5b84 (v2.0-alpha) -- WINDOW CODER
 Did: closed THE SECOND ENCODER in two green pushed chunks -- `27a4f97c` the
   four viz_* engines' colour proof + proven frame count, the scope_draw encoder

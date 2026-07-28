@@ -1,14 +1,35 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-28 (remote Cowork, CODER window) -- **THE SECOND ENCODER
-IS CLOSED, BOTH HALVES, AND THE ROSTER GATE NO LONGER LOOKS FOR A CALL
-SPELLING.** HEAD == origin `afeb5b84`; suite **7449 passed / 27 skipped / 1
-xfailed**; Bible 17; `build_variants --check` 11 variants / 0 failures;
-canonical `9872624A` byte-identical across both commits.
+**Updated:** 2026-07-28 (remote Cowork, CODER window) -- **THERE IS ONE
+STREAMING CLIP ENCODER NOW, NOT THREE; BOTH PROOF HALVES ARE ENFORCED; AND THE
+GEOMETRY STOPPED HAVING TWO DERIVATIONS.** HEAD == origin `b1f2ee86`; suite
+**7453 passed / 27 skipped / 1 xfailed**; Bible 17; `build_variants --check`
+11 variants / 0 failures; canonical `9872624A` byte-identical across all four
+commits.
 
 Landed: `27a4f97c` the second encoder + the widened gate's COLOUR half,
-`afeb5b84` cheap_families' four `still_*` count proofs + the gate's COUNT half.
-Per-chunk detail is in `docs/HANDOFF_LOG.md`, not here.
+`afeb5b84` cheap_families' four `still_*` count proofs + the gate's COUNT half,
+`6aad4fe5` the THIRD copy of the encoder deleted (not hardened a third time)
+plus a gate against a fourth, `b1f2ee86` the odd-canvas stride defect closed at
+the batch encoder. Per-chunk detail is in `docs/HANDOFF_LOG.md`, not here.
+
+**THE ARC'S ONE LESSON, said plainly: THE SAME DEFECT KEPT BEING IN A COPY.**
+An encoder was duplicated three times, and each copy carried a dead frame-count
+parameter, a declared size that disagreed with the bytes it piped, and no
+shape/dtype check. Two of the three copies were found only because a gate was
+widened; the third was found by a fan-out. Deleting the copy is what actually
+closed it -- `otr_scene_aware_scopes` now calls the shared encoder, and
+`_RAWVIDEO_STDIN_ENCODERS` pins the six remaining rawvideo-stdin encoders with
+a reason each so a fourth fails by name.
+
+**AND THE GEOMETRY DEFECT PASSED EVERY PROOF THIS ARC ADDED.** The batch
+encoder declared `even_dim(w)` while piping the array's real odd rows;
+measured, a `(5,63,47,3)` batch wrote a 46x62 clip of skewed pixels, exit 0,
+and the frame-count proof AGREED -- five in, five out. A count proof
+structurally cannot see a stride error. Worse, `test_ffmpeg_silent_cmd_contract`
+REQUIRED the rounding ("odd width -> even"), so the suite was actively
+defending the defect. **A latent row that the tests assert as the contract is
+not latent, it is protected.**
 
 **THE GATE IS STRUCTURAL NOW, AND THAT IS THE DURABLE PART.** It used to grep
 two literal substrings, so a third spelling was invisible and
@@ -633,13 +654,13 @@ in `docs/TRAVEL_RELAY_PROTOCOL.md`. Do not start it from a remote window.
 profile retire-now vs retire-later scope (which gates A2 and nothing else), and
 the LTX per-beat recipe capability.
 
-**THE REMOTE-SAFE QUEUE IS DOWN TO ONE FILED ROW, and it is small:** the THIRD
-copy of the scope encoder at `nodes/otr_scene_aware_scopes.py::_encode_silent_mp4`
--- see OPEN BUGS. It carries every defect the second encoder just had plus the
-stderr-pipe deadlock, but it writes a whole-episode compositing OVERLAY, never
-a CanonicalClip, so it is outside the clip contract and outside the roster
-gate's scope by design. It is a one-file chunk whenever a coder window wants
-it, and it is NOT a blocker for anything.
+**THE REMOTE-SAFE QUEUE IS DOWN TO ONE FILED ROW, and it is small:** the
+credits card's col1 overflows the footer at 854x480 on its REQUIRED content
+alone (pre-existing; PIL clips the overflow silently, so the tail of the
+[PRODUCTION LEDGER] grid draws off-canvas). Reachable only if something renders
+the card at 480p -- the shipped render tests use 720p and 1080p. It belongs to
+whoever next opens the card's geometry: either shrink the required blocks at
+small canvases or refuse the canvas. NOT a blocker for anything.
 
 **THE NEXT REAL WORK IS THE OPERATOR'S GPU SEQUENCE, and none of it is
 remote:** the clamped confirmation of ltx recipe v2, then a WAN prequalification
@@ -1811,8 +1832,22 @@ listed as live.
   clips but only ever one engine, so cross-engine isolation was still
   untested. The pre-push fan-out caught that; mutation could not.
 
-- **NEW 2026-07-28: a THIRD copy of the scope encoder, with every defect the
-  second one just had, plus the deadlock.**
+- ~~**A THIRD copy of the scope encoder, with every defect the second one just
+  had, plus the deadlock**~~ -- **CLOSED @ `6aad4fe5`, by DELETION.**
+  `otr_scene_aware_scopes.render_scopes` calls
+  `_otr_shared.scope_draw.encode_silent_mp4` and its private copy (and its
+  private `_has_nvenc`) are gone; `_find_ffmpeg` stays, still used for ffprobe
+  resolution. `_RAWVIDEO_STDIN_ENCODERS` in
+  `tests/test_video_scope_draw_encoder.py` pins the six remaining
+  rawvideo-stdin encoders with a reason each, and names this module in its own
+  assertion, so a FOURTH copy fails by name. Mutation proved the delegation
+  earns its keep: passing the node's dimensions SWAPPED, and declaring one more
+  frame than the generator yields, are both refused now and were both silently
+  accepted before. No behaviour change on the live path -- `out_w`/`out_h` are
+  cast once and drive the plan, every frame canvas and the encode call; `_gen()`
+  yields exactly `total` by construction; a zero-length manifest is already
+  refused upstream; a sub-floor canvas selects libx264 rather than being
+  refused. Original row below, kept for its cites.
   `nodes/otr_scene_aware_scopes.py::_encode_silent_mp4` (def at `:361`, body
   `:362-388`) is a near-copy of the scope_draw encoder: `total` is accepted and
   NEVER READ (no counter, no comparison before `return out_path` at `:387`);
@@ -1957,6 +1992,23 @@ listed as live.
   the card's geometry: either shrink the required blocks at small canvases or
   refuse the canvas. Found by the pre-push fan-out (lens D), 2026-07-28.
 
+- ~~**An ODD canvas dimension makes the encoder's declared stride disagree with
+  the bytes it pipes**~~ -- **CLOSED @ `b1f2ee86`.** `ffmpeg_silent_mp4_cmd`
+  declares the REAL width/height (the `-s` describes the INPUT byte stream, so
+  it is not ours to round), and `encode_frames_to_silent_mp4` REFUSES an odd
+  canvas by name -- yuv420p subsamples chroma 2x2 and cannot represent an odd
+  dimension, so there is no correct clip to write and rounding at the encoder
+  would only move the same mistake one level down. `even_dim` stays on the
+  three builders that SCALE or PAD to a target (still motion, still static, the
+  lavfi floor), where ffmpeg is being told what to PRODUCE; both halves are
+  asserted so they cannot later be collapsed into one. **The reason this sat
+  filed as latent: the suite was DEFENDING it** --
+  `test_ffmpeg_silent_cmd_contract` required `"832x480" in joined and "833x480"
+  not in joined`, commented "odd width -> even". A latent row the tests assert
+  as the contract is not latent, it is protected. Still true and NOT fixed
+  here: neither `WanInitImageMixin._dims()` nor the `Canvas` schema validates
+  evenness, so an odd canvas is caught at the encoder rather than where it was
+  chosen. Original row below, kept for its cites.
 - **NEW 2026-07-28 (LATENT, pre-existing): an ODD canvas dimension makes the
   encoder's declared stride disagree with the bytes it pipes.**
   `ffmpeg_silent_mp4_cmd` declares rawvideo `-s even_dim(w)xeven_dim(h)` while
@@ -2439,7 +2491,18 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-28 @ `afeb5b84`, the second encoder +
+- Current whole-tree receipt (2026-07-28 @ `b1f2ee86`, the encoder arc: second
+  encoder, still_* counts, the third copy deleted, the odd-canvas stride): full
+  Windows suite `7453 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
+  11 variants / 0 failures; canonical
+  `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`
+  byte-identical across all four commits (no node, widget, link or schema
+  touched); AST/BOM/zero-byte/UTF-8 clean on every touched file. **Note on
+  ASCII:** `otr_scene_aware_scopes.py` and its test carry a pre-existing
+  literal section sign; the non-ASCII inventory is byte-identical to HEAD, so
+  nothing new was introduced and they were not rewritten for it.
+- Prior receipt (2026-07-28 @ `afeb5b84`, the second encoder +
   the still_* count proofs): full Windows suite
   `7449 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
