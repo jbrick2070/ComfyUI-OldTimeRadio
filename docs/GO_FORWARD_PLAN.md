@@ -30,6 +30,31 @@ THE END CARD NO LONGER OVERFLOWS THE CANVAS THE BUILD SHIPS. At `1959fb49`:
 suite **7464 passed / 27 skipped / 1 xfailed**; Bible 17; `build_variants
 --check` 11 variants / 0 failures.
 
+**OPERATOR RULING 2026-07-28 -- THE STILL FLOOR IS ALLOWED, BUT ONLY WHERE THE
+MATH IS IMPOSSIBLE.** Operator, verbatim in substance: "if mathematically there
+is no way to get moving video, we could use a still in place. But ideally we
+want to divide the beat into enough different clips so that we can have video
+for the whole beat."
+
+The gate is ARITHMETIC, never convenience and never engine failure. A still
+floor is permitted for a beat if and ONLY if `coverage_plan.partition_beat`
+can produce NO legal plan, which is exactly three cases:
+  1. target frames < the engine's `min_frames` (no legal clip exists at all);
+  2. the cover would need more segments than the planner's ceiling;
+  3. a `discrete_frames` menu engine with no exact cover for the target.
+In every other case the beat is DIVIDED into enough legal clips to carry video
+for its whole duration. That is the preference, stated by the operator.
+
+**THIS RULING DOES NOT COVER THE SIX 2026-07-28 FAILURES.** HuMo's 184-frame
+beat has a legal two-clip partition; wan's two-segment split is legal
+arithmetic. Those are MISSING CAPABILITY (no per-segment audio slicer, no
+`session_identity()`), not impossible math, and they get FIXED, not stilled.
+Any future window that reaches for the still floor to close them is reading
+this ruling backwards -- a fallback that fires on "the engine refused" is the
+silent degradation this build exists to remove, and the existing `NO FALLBACK`
+refusals plus the image-phase row's "no text-only or dark-floor degradation"
+stay in force everywhere the math is satisfiable.
+
 **NEW OPEN ROWS FOUND BY THE 2026-07-28 RENDER/QA WINDOW** (detail in
 `kibitz-runs/2026-07-28-gpu-lane-all-models/r{1,2,3,4}/final.md`):
 
