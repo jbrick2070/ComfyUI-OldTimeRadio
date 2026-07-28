@@ -1,6 +1,65 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-28 (remote Cowork, CODER window) -- **ALL THREE
+**Updated:** 2026-07-28 (remote Cowork, CODER window) -- **THE SECOND ENCODER
+IS CLOSED, BOTH HALVES, AND THE ROSTER GATE NO LONGER LOOKS FOR A CALL
+SPELLING.** HEAD == origin `afeb5b84`; suite **7449 passed / 27 skipped / 1
+xfailed**; Bible 17; `build_variants --check` 11 variants / 0 failures;
+canonical `9872624A` byte-identical across both commits.
+
+Landed: `27a4f97c` the second encoder + the widened gate's COLOUR half,
+`afeb5b84` cheap_families' four `still_*` count proofs + the gate's COUNT half.
+Per-chunk detail is in `docs/HANDOFF_LOG.md`, not here.
+
+**THE GATE IS STRUCTURAL NOW, AND THAT IS THE DURABLE PART.** It used to grep
+two literal substrings, so a third spelling was invisible and
+`encoders - provers == set()` was vacuously true over four LIVE engines. It
+derives the roster instead: a command that WRITES video must name a video codec
+(`-c:v` / `-vcodec` / `-codec:v`) and a command that only reads never does, so
+the flag is chased from every subprocess spawn AND every argv BUILDER (
+cheap_families builds its command and hands it to a generic runner). The
+subprocess alias comes from the module's own imports. Where a proof legitimately
+lives inside the encoder it is pinned per entry point and VERIFIED against the
+credited function's source. **Known limit, recorded in the file: a codec flag
+assembled at runtime (an f-string, `"-c:%s" % stream`, or the `-c:0` spelling)
+is invisible to it. Nothing in the tree does that; an encoder that ever needs
+to must be pinned by hand.**
+
+**THE COLOUR AND COUNT HALVES SHIPPED AS TWO CHUNKS ON PURPOSE.** The colour
+gate could go green while the count gate was still red on `cheap_families`. A
+gate is allowed to arrive a chunk later; it is never allowed to be NARROWED so
+it arrives clean. Both halves now bill the same roster by the same rule.
+
+**THE FAN-OUT PAID FOR ITSELF SIX TIMES, AND FIVE OF THOSE WERE MY OWN NEW
+CODE.** The first draft of the sweep tested `"sp" in name`, which is false for
+`"subprocess"` -- the inventory came back EMPTY and both gates passed
+vacuously, which is precisely the failure being closed. A refusal raised
+mid-stream left ffmpeg ALIVE holding the output file open. `stderr` was a PIPE
+read only after the whole stream was written, which deadlocks the moment ffmpeg
+emits more than one OS buffer -- and that state raises nothing, so the child
+would never have been reaped. `_has_proof` matched substrings, so `wan_shared`,
+which DEFINES both proof helpers, was excusing itself on its own `def` lines.
+And the ORDERING test one function over was still blind to these four engines:
+moving the proof BEFORE the encode -- the exact defect it is named for -- stayed
+green. Two independent lenses found that last one.
+
+**A LATENT BOX-DEPENDENT FAILURE WAS MEASURED AND FIXED ON THE WAY.** The
+encoder chose `h264_nvenc` whenever the box had it, and NVENC refuses a canvas
+below 145x49. Measured here: 144x48 refused, 146x50 accepted, libx264 accepted
+every size from 96x64 up. A small-canvas beat therefore died on a machine WITH
+a GPU and succeeded on one without. It is codec SELECTION, not a fallback --
+both encoders emit the same contract and the caller proves it either way.
+
+**MUTATION: 23/24 real mutants caught, 6/6 controls survived.** TWO were
+RECLASSIFIED as controls with reasons rather than chased (spelling the declared
+size `(w, h)` is provably identical once the equality is proven two lines
+above; dropping `Popen` from the spawn set changes nothing while every encoder
+entry point is also a returner). **ONE SURVIVOR IS RECORDED, NOT HIDDEN:**
+deleting the self-proving membership assertion is catchable only by a meta-test
+of that assertion, which is not written. Harness: `tmp/_kbA_se_mutate.py`.
+
+---
+
+**Superseded header (2026-07-28, CODER window) -- ALL THREE
 REMOTE-SAFE ROWS ARE DONE, AND THE FAN-OUT RAN BEFORE EVERY PUSH THIS TIME --
 WHICH IS THE ONLY REASON TWO OF THE THREE SHIPPED CORRECT.** HEAD == origin
 `48e3c6fb`; suite **7429 passed / 27 skipped / 1 xfailed**; Bible 17;
@@ -564,67 +623,66 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **the three remote-safe rows are DONE. What is left is a
-## SECOND ENCODER nobody had filed, A2 behind the profile ruling, and the
-## operator's own GPU sequence.**
+## CURRENT STEP -- **the second encoder is CLOSED. The remote-safe lane is
+## now EMPTY except A2, so what is left is the operator's own GPU sequence.**
 
 **7d IS STILL PARKED** until the operator is at the desk -- his call, recorded
 in `docs/TRAVEL_RELAY_PROTOCOL.md`. Do not start it from a remote window.
 
-**TWO OPERATOR DECISIONS ARE STILL OPEN, both unchanged by this window:** the
+**TWO OPERATOR DECISIONS ARE STILL OPEN, both untouched by this window:** the
 profile retire-now vs retire-later scope (which gates A2 and nothing else), and
-the LTX per-beat recipe capability. Neither was touched.
+the LTX per-beat recipe capability.
 
-**THE NEXT REMOTE-SAFE LANE, and it is bigger than the three that just
-landed: THE SECOND ENCODER.** `nodes/_otr_shared/scope_draw.py::encode_silent_mp4`
-is a hand-rolled Popen wrapper that four live engines write clips through
-(`viz_green`, `viz_camera`, `viz_mxc_mandala`, `viz_mxc_cpu`). It has NO
-ffprobe call of any kind -- no colour/stream proof, no frame-count proof -- and
-each engine returns its pre-computed loop bound as `frame_count`. Worse, the
-M7 roster gate in `tests/test_terminal_frame.py` builds its `encoders` set by
-grepping for the literal substrings `encode_frames_to_silent_mp4(` and
-`run_ffmpeg(`; neither appears in any of those four files, so they never enter
-the set and `encoders - provers == set()` can never flag them. **This is the
-`cheap_families` finding of 2026-07-27 repeating one module over, in the shape
-the gate was built to catch and cannot.** The chunk is: widen the roster gate
-to find a clip WRITER rather than a known call spelling, then give the second
-encoder the same two proofs the first one has. Expect the gate to go red the
-moment it is widened -- that is the point, not a setback. `viz_mxc_cpu`,
-`viz_mxc_mandala` and `viz_camera` are the three video slots the surviving
-six-bank 120w matrix uses, so this is on the live path, not a dark corner.
+**THE REMOTE-SAFE QUEUE IS DOWN TO ONE FILED ROW, and it is small:** the THIRD
+copy of the scope encoder at `nodes/otr_scene_aware_scopes.py::_encode_silent_mp4`
+-- see OPEN BUGS. It carries every defect the second encoder just had plus the
+stderr-pipe deadlock, but it writes a whole-episode compositing OVERLAY, never
+a CanonicalClip, so it is outside the clip contract and outside the roster
+gate's scope by design. It is a one-file chunk whenever a coder window wants
+it, and it is NOT a blocker for anything.
 
-Then, still remote-safe and smaller: `cheap_families`' four `still_*` engines
-self-declare their count the same way (they DO prove colour/stream, and they
-ARE visible to the gate -- they build their mp4 from an ffmpeg arg list through
-`run_ffmpeg`, so the count proof is the only half missing). `still_motion` is
-the terminus of the `humo -> humo_1.7B -> still_motion` degrade chain.
+**THE NEXT REAL WORK IS THE OPERATOR'S GPU SEQUENCE, and none of it is
+remote:** the clamped confirmation of ltx recipe v2, then a WAN prequalification
+sweep (the mechanism is built and named on both WAN tiers; no WAN sweep has
+ever run), then 7d. After those, the rescoped block order stands: WAN 8-GB
+contract -> LEAN-MEAN FRONT -> Randomizer A -> `dynamic_story` -> LEAN-MEAN
+TAIL -> SFX -> re-observe the parked story bugs.
 
-**THEN, and none of it is remote:** the clamped confirmation of ltx recipe v2,
-a WAN prequalification sweep (the mechanism is built and named on both WAN
-tiers; no WAN sweep has ever run), then 7d.
+**CARRY FORWARD, and this window is the sixth consecutive proof:** run the
+mutation round even after a QA fan-out clears the change, run the FAN-OUT
+BEFORE THE PUSH, and treat as presumed decorative until proven otherwise -- a
+test that verifies a thing it also CONSTRUCTS; an exception type asserted
+without its message; an assertion inside a bare `except`; an assertion against
+the CONSTANT the code uses rather than the documented literal. **Three
+additions this window earned, all of them found on my own new code:**
 
-**CARRY FORWARD, and this window is the fifth consecutive proof:** run the
-mutation round even after a QA fan-out clears the change, and treat a test that
-verifies a thing it also CONSTRUCTS, or an exception type asserted without its
-message, as presumed decorative until proven otherwise. **Two additions this
-window earned:** an assertion that lives inside a bare `except` block passes
-VACUOUSLY the day the code stops raising -- use `pytest.raises(...) as info`
-and read `info.value`; and a test that asserts against the CONSTANT the code
-uses is tautological -- assert the documented LITERAL, because the mutation
-round raised a ceiling from 2 to 9 and the test happily agreed with it.
+1. **A STRUCTURAL SWEEP CAN BE SATISFIED BY A DEFINITION.** `_has_proof`
+   matched its markers as substrings, and `wan_shared.py` DEFINES both proof
+   helpers -- so `def ffprobe_counted_frames(` satisfied the check on its own,
+   and the one module able to regress its real comparison was the one module
+   neither gate could see it in. Match CALLS (AST), not text.
+2. **A SWEEP THAT FINDS NOTHING PASSES EVERY GATE BUILT ON IT.** The first
+   draft's subprocess-alias test was simply wrong, the roster came back empty,
+   and both gates went green over an empty set. Every roster gate now asserts
+   that named engines ARE BILLED, not merely that nobody failed.
+3. **FIXING A BLIND TEST DOES NOT FIX ITS NEIGHBOUR.** The roster gate was
+   rewritten to see the second encoder; the ORDERING test in the same file
+   still regexed the one old spelling and stayed green with the proof moved
+   before the encode. When you widen one sweep, sweep the file for its
+   siblings.
 
-**AND THE FAN-OUT GOES BEFORE THE PUSH. This window did, and it caught a
-720p layout regression and a lost-beat behaviour change that mutation
-structurally could not see.** The previous window ran it after six pushes and
-paid for it.
+**RE-PIN THE CITE WHEN YOU TOUCH A ROW.** Confirmed again: every cite this
+window touched had moved.
 
-**RE-PIN THE CITE WHEN YOU TOUCH A ROW, and do not trust the row's own field
-lists either.** Confirmed again this window: `build_clip_manifest` writes
-`family = clip.get("family") or shot.get("family") or ""`, so a non-stamping
-engine arrives as `""` and NOT `None` as the receipt's own comment claimed;
-`_draw_models` is `otr_credits_roll.py:675-719`, not `:657-712`; and
-`ffprobe_counted_frames` is `wan_shared.py:124`, not `:105`. Derive from the
-producers mechanically, every time.
+## SUPERSEDED -- the second-encoder step (2026-07-28, BOTH HALVES DONE)
+
+The step was: widen the M7 roster gate to find a clip WRITER rather than a
+known call spelling (expecting it to go RED), give
+`nodes/_otr_shared/scope_draw.py::encode_silent_mp4` the two proofs the first
+encoder has, then close `cheap_families`' four `still_*` count proofs. All of
+it shipped -- `27a4f97c` and `afeb5b84` -- and is tombstoned in OPEN BUGS. The
+gate went red on exactly the four `viz_*` engines, as predicted, and green by
+fix rather than by narrowing. See the header for what the fan-out found on top.
 
 ---
 
@@ -1753,8 +1811,47 @@ listed as live.
   clips but only ever one engine, so cross-engine isolation was still
   untested. The pre-push fan-out caught that; mutation could not.
 
-- **NEW 2026-07-28: a SECOND clip encoder exists, it proves nothing, and the
-  M7 roster gate cannot see it.** `nodes/_otr_shared/scope_draw.py::encode_silent_mp4`
+- **NEW 2026-07-28: a THIRD copy of the scope encoder, with every defect the
+  second one just had, plus the deadlock.**
+  `nodes/otr_scene_aware_scopes.py::_encode_silent_mp4` (def at `:361`, body
+  `:362-388`) is a near-copy of the scope_draw encoder: `total` is accepted and
+  NEVER READ (no counter, no comparison before `return out_path` at `:387`);
+  the rawvideo `-s` is built from the caller's `w`/`h` at `:368` and no frame's
+  shape is ever consulted; the write loop at `:380` calls `.tobytes()` on
+  whatever the generator yields with no shape or dtype check; `use_nvenc =
+  _has_nvenc(fb)` at `:365` has no 145x49 minimum-size floor; and `stderr` is a
+  PIPE read only at `:383`, AFTER `proc.stdin.close()` at `:382`, so an ffmpeg
+  error burst larger than one OS buffer deadlocks the render with the child
+  alive and the output file held open. **It is a live registered node**
+  (`OTR_SceneAwareScopes`, `__init__.py:265`) but its artifact is a
+  whole-episode compositing OVERLAY consumed as a bare path string by
+  `OTR_PostUpscaleProcgenBlend` -- it never becomes a CanonicalClip and never
+  reaches the per-beat ledger, which is why the roster gate does not and should
+  not bill it. So this is a REAL defect in live code and NOT a clip-contract
+  hole. `nodes/video_engine.py::_encode_mp4` shares some of the smell but
+  already uses a temp-file stderr sink and never stamps a `frame_count` at all;
+  `nodes/_otr_shared/encode_sink.py` is imported only by
+  `scripts/profile_scope_render.py` and is not a live writer. Found by the
+  pre-push fan-out (lens F), 2026-07-28.
+- **KNOWN LIMIT of the widened roster gate, recorded so it is not rediscovered
+  as a surprise:** the codec flag is matched as a STRING CONSTANT, so a flag
+  assembled at runtime (an f-string, `"-c:%s" % stream`) or the stream-index
+  spelling `-c:0` is invisible to the sweep. Nothing in the tree does that
+  today; an encoder that ever needs to must be pinned in `_ENTRY_POINT_PROOFS`
+  by hand, which the inventory test makes a visible decision. Separately, ONE
+  mutant survives the round by construction: deleting the self-proving
+  membership assertion is catchable only by a meta-test of that assertion.
+- ~~**A SECOND clip encoder exists, it proves nothing, and the M7 roster gate
+  cannot see it**~~ -- **CLOSED @ `27a4f97c`.** The four `viz_*` engines prove
+  the colour/stream contract and stamp a frame count read off the FILE; the
+  encoder itself stopped ignoring its `total` parameter, derives the declared
+  size from the first frame (one derivation, so the stride cannot skew),
+  refuses a frame that changes shape or dtype mid-stream, reaps ffmpeg on every
+  refusal path and writes its stderr to a temp file rather than a pipe. The
+  gate identifies a clip WRITER structurally. A latent box-dependent failure
+  was fixed on the way: nvenc was selected whenever present and refuses a
+  canvas below 145x49 (MEASURED here: 144x48 refused, 146x50 accepted).
+  Original row below, kept for its cites. `nodes/_otr_shared/scope_draw.py::encode_silent_mp4`
   is a hand-rolled `Popen` wrapper returning only `out_path`, with NO ffprobe
   call anywhere -- no colour/stream contract, no frame count. Four LIVE engines
   write their clips through it (`eng_visualizer.py` viz_green,
@@ -1772,17 +1869,20 @@ listed as live.
   red, then give the second encoder both proofs. Found by the pre-push fan-out
   (lens F), 2026-07-28.
 
-- **NEW 2026-07-28: `cheap_families`' four `still_*` engines self-declare
-  their frame count.** `still_motion`, `still_pan`, `still_flat`,
-  `still_word` build their mp4 from an ffmpeg ARG LIST through
-  `_wb.run_ffmpeg(cmd)`, never through `encode_frames_to_silent_mp4`, so
-  `48e3c6fb`'s count proof does not reach them; `n` (the requested count) is
-  returned as `frame_count` unchecked. They DO call
-  `validate_silent_clip_contract(ffprobe_clip_fields(...))`, so the colour and
-  stream halves are proven, and they ARE visible to the M7 gate -- only the
-  count is missing. `still_motion` is the terminus of the
-  `humo -> humo_1.7B -> still_motion` degrade chain. Smaller than the row
-  above and the same chunk.
+- ~~**`cheap_families`' four `still_*` engines self-declare their frame
+  count**~~ -- **CLOSED @ `afeb5b84`.** `render_clip` reads the count back off
+  the file (`proven_frame_count`, the muxer's own count off the SAME stream
+  read `ffprobe_clip_fields` already performs one line above -- no decode) and
+  `_floor_clip` stamps THAT. The M7 gate gained a matching COUNT half, billing
+  the same roster by the same rule as the colour half, and it credits
+  `ffprobe_counted_frames` too -- `wan_shared` proves its assembled beats by
+  DECODING, the stronger proof, and requiring only the cheap header read would
+  have failed it for proving more. **The trap the fan-out caught here:** the
+  gate matched its proof markers as SUBSTRINGS, and `wan_shared.py` defines
+  both helpers, so `def ffprobe_counted_frames(` satisfied the check on its own
+  -- the one module that could regress its real `counted != expect_frames`
+  comparison was the one module neither gate could notice it in. Proof is
+  matched as an AST CALL now.
 - ~~**A6 -- the Q4 artifact has neither an expected size nor a SHA**~~ --
   **CLOSED @ `ba24af29`**, corrected @ `40780b82`. Q8_0 and Q4_K_M are pinned
   by MEASUREMENT (three independent copies agreed byte for byte; the Q8_0
@@ -2339,7 +2439,18 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-28 @ `48e3c6fb`, the three remote-safe
+- Current whole-tree receipt (2026-07-28 @ `afeb5b84`, the second encoder +
+  the still_* count proofs): full Windows suite
+  `7449 passed / 27 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
+  11 variants / 0 failures; canonical
+  `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`
+  byte-identical across both commits (no node, widget, link or schema
+  touched); AST/BOM/zero-byte/UTF-8/ASCII clean on every touched file.
+  Measured with the tree exactly as found -- another window's three modified
+  `tmp/*.ps1` and its six untracked `config/profiles/otr_sbcov_*.json` were
+  preserved throughout and NO variants were generated from them.
+- Prior receipt (2026-07-28 @ `48e3c6fb`, the three remote-safe
   rows): full Windows suite `7429 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
   11 variants / 0 failures; canonical

@@ -3,6 +3,98 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-28 -- HEAD afeb5b84 (v2.0-alpha) -- WINDOW CODER
+Did: closed THE SECOND ENCODER in two green pushed chunks -- `27a4f97c` the
+  four viz_* engines' colour proof + proven frame count, the scope_draw encoder
+  hardened, and the M7 roster gate rewritten to identify a clip WRITER
+  structurally instead of grepping two call spellings; `afeb5b84`
+  cheap_families' four still_* count proofs + the gate's matching COUNT half.
+  The gate went RED on exactly the four viz engines when widened, as predicted,
+  and green by fix rather than by narrowing. Fan-out ran BEFORE both pushes and
+  found six real defects, five of them in my own new code -- including the
+  sweep's subprocess-alias test being simply wrong, which made the roster EMPTY
+  and both gates pass vacuously.
+Current step: the remote-safe lane is EMPTY except A2 (held) and one small
+  filed row (the THIRD encoder copy in otr_scene_aware_scopes.py, which writes
+  a compositing overlay and not a CanonicalClip). Next real work is the
+  operator's GPU sequence: clamped recipe-v2 confirmation, the WAN
+  prequalification sweep, then 7d.
+Next: a RENDER window owns all three GPU items. A CODER window can take the
+  third encoder any time; it blocks nothing.
+Models: Claude codes and judges (rung 4) + five Sonnet subagent QA lenses
+  across two pre-push fan-outs. No codex, no agy, no Fable, no roundtable --
+  two-strikes never invoked, so no panel was owed.
+Commits: 27a4f97c afeb5b84 plus this doc push. Suite 7429 -> 7449; Bible 17;
+  build_variants --check 11/0; canonical 9872624A byte-identical throughout.
+  Mutation: 23/24 real mutants caught, 6/6 controls survived, 2 reclassified,
+  1 survivor recorded.
+
+### Detail
+
+**THE FAN-OUT CAUGHT THE SWEEP FINDING NOTHING, WHICH IS THE WORST POSSIBLE
+FAILURE FOR A GATE LIKE THIS.** The first draft classified a spawning function
+by testing `"sp" in func.value.id` -- which is FALSE for `"subprocess"`. The
+entry-point inventory came back empty, so both the roster gate and the
+contract gate passed over an empty set, green and useless: the exact vacuous
+pass this whole file exists to close, reintroduced while closing it. The alias
+now comes from the module's own `ast.Import`/`ast.ImportFrom`, and every roster
+gate asserts that NAMED engines are BILLED rather than merely that nobody
+failed -- `unproven == {}` is satisfied just as well by "nobody writes a clip".
+
+**FIXING ONE BLIND TEST DID NOT FIX ITS NEIGHBOUR, AND TWO LENSES FOUND IT
+INDEPENDENTLY.** `test_the_proof_runs_AFTER_the_encode_in_every_adapter`, in
+the same file, still regexed `encode_frames_to_silent_mp4\(` alone. So moving
+the proof BEFORE the encode in any of the four viz engines -- the exact defect
+that test is named for, in the exact files this chunk was wiring -- stayed
+green. It derives its spellings from the same billed-debt calculation the
+contract gate uses now, and a mutant that reorders viz_camera dies on it.
+
+**wan_shared WAS EXCUSING ITSELF ON ITS OWN `def` LINES.** `_has_proof` matched
+markers as substrings; `wan_shared.py` DEFINES both `ffprobe_counted_frames`
+and `validate_silent_clip_contract`, so `def ffprobe_counted_frames(` satisfied
+the check with no call at all. The one module that could regress its real
+`counted != expect_frames` comparison was the one module neither gate could
+notice it in. Proof is an AST CALL now, and the gate's own logic is pinned by a
+test that feeds it a define-only source.
+
+**TWO DEFECTS IN MY OWN ENCODER, BOTH ABOUT THE CHILD PROCESS.** A refusal
+raised part-way through the frame stream left ffmpeg ALIVE holding the output
+file open -- the first refusal test failed on a PermissionError from its own
+TemporaryDirectory cleanup rather than on the refusal it was checking. And
+stderr was a PIPE read only after the whole stream was written, which deadlocks
+the moment ffmpeg emits more than one OS buffer of error text; that state
+raises nothing, so neither except clause runs and the child is never reaped.
+stderr is a temp file now, and every exit path reaps.
+
+**A LATENT BOX-DEPENDENT FAILURE, MEASURED NOT GUESSED.** The encoder selected
+h264_nvenc whenever the box had it. NVENC refuses a canvas below 145x49 with an
+error naming four parameters and not the one that is wrong. Measured on this
+box: 144x48 refused, 146x50 accepted, libx264 accepted every size from 96x64
+up. So a small-canvas beat died on a machine WITH a GPU and succeeded on one
+without. Codec SELECTION, not a fallback -- both encoders emit the same
+contract and the caller proves it either way. Found only because the viz
+contract tests stopped stubbing the encoder.
+
+**THE TESTS STOPPED VERIFYING A FILE THEY INVENTED.** The three viz
+render-contract fakes wrote one zero byte and the tests then asserted a frame
+count against it. They pass through to the real encoder now and skip where
+ffmpeg is absent.
+
+**MUTATION RECLASSIFIED TWO AND RECORDED ONE SURVIVOR RATHER THAN CHASING
+EITHER.** Spelling the declared size `(w, h)` is provably identical once the
+equality is proven two lines above -- the same call this build made for
+`int(counted)` vs `int(declared)` at 48e3c6fb. Dropping `Popen` from the spawn
+set changes nothing while every encoder entry point in the tree is also a
+returner; the branch stays because an encoder that returns nothing is an
+ordinary thing to write next. The survivor -- deleting the self-proving
+membership assertion -- is catchable only by a meta-test of that assertion,
+which is not written, and it is in OPEN BUGS rather than left implied.
+
+**THE TREE WAS LEFT EXACTLY AS FOUND.** Another window's three modified
+`tmp/*.ps1` and its six untracked `config/profiles/otr_sbcov_*.json` were
+preserved throughout; every commit was pathspec-only; no variants were
+generated from those scratch profiles, so 7449 reproduces on a clean clone.
+
 ## 2026-07-28 -- HEAD 48e3c6fb (v2.0-alpha) -- WINDOW CODER
 Did: the three remote-safe rows, in the operator's order, one green pushed
   chunk each -- `bcaab4db` the by_engine PER-FIELD roll-up (+ both credits
