@@ -361,3 +361,49 @@ def test_there_is_no_FOURTH_copy_of_this_encoder():
                    for module, _fn in found), (
         "otr_scene_aware_scopes.py has grown its own frame encoder again -- "
         "it must call _otr_shared.scope_draw.encode_silent_mp4")
+
+
+# ---------------------------------------------------------------------------
+# THE ODD CANVAS (2026-07-28). Filed latent on the batch encoder; closed here.
+# ---------------------------------------------------------------------------
+
+def test_the_BATCH_encoder_refuses_an_odd_canvas_by_name():
+    """``ffmpeg_silent_mp4_cmd`` used to declare ``even_dim(w) x even_dim(h)``
+    while ``encode_frames_to_silent_mp4`` piped the array's REAL odd rows.
+
+    That is the same two-derivations-of-one-fact defect the streaming encoder
+    had, and it is worse here because it passes: a measured (5,63,47,3) batch
+    wrote a 46x62 clip of skewed pixels and the frame-count proof agreed with
+    it, five frames in and five frames out. The count was never what was wrong.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as wb
+
+    for shape, size in (((4, 63, 48, 3), "48x63"),
+                        ((4, 64, 47, 3), "47x64"),
+                        ((4, 63, 47, 3), "47x63")):
+        frames = np.zeros(shape, dtype=np.uint8)
+        with pytest.raises(wb.GraphExecutionError) as excinfo:
+            wb.encode_frames_to_silent_mp4(frames, "unused.mp4", 25)
+        message = str(excinfo.value)
+        assert "ODD canvas %s" % size in message, message
+        assert "yuv420p" in message
+        assert "skewed" in message
+        assert "Fix the CANVAS upstream" in message
+
+
+def test_an_EVEN_canvas_of_the_same_awkward_size_still_encodes():
+    """The CONTROL. A refusal that also rejected small even canvases would
+    have retired the fixture size half this suite renders at."""
+    from nodes._otr_video_engines import wrapper_bridge as wb
+    from nodes._otr_video_engines.wan_shared import (
+        ffprobe_clip_fields, validate_silent_clip_contract)
+
+    frames = np.zeros((4, 64, 48, 3), dtype=np.uint8)
+    with tempfile.TemporaryDirectory() as tmp:
+        out = _out(tmp, "even.mp4")
+        path, n = wb.encode_frames_to_silent_mp4(frames, out, 25)
+        assert (path, n) == (out, 4)
+        fields = ffprobe_clip_fields(out)
+        validate_silent_clip_contract(fields, 25)
+        # The clip is the size that was PIPED -- not a rounded neighbour.
+        assert (fields["width"], fields["height"]) == (48, 64)

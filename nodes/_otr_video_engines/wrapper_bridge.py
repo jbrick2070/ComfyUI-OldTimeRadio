@@ -595,11 +595,28 @@ def _bt709_encode_args(crf):
 
 def ffmpeg_silent_mp4_cmd(out_path, width, height, fps, *, ffmpeg="ffmpeg", crf=18):
     """ffmpeg arg list: raw rgb24 frames on stdin -> a SILENT bt709 / yuv420p
-    H.264 MP4. Frames are piped as width*height*3 byte rgb24 images at ``fps``."""
+    H.264 MP4. Frames are piped as width*height*3 byte rgb24 images at ``fps``.
+
+    THE DECLARED SIZE IS THE PIPED SIZE (2026-07-28). This used to declare
+    ``even_dim(width) x even_dim(height)`` while
+    :func:`encode_frames_to_silent_mp4` piped ``frames.tobytes()`` at the
+    array's REAL dimensions -- two derivations of one fact, and on an odd
+    canvas they disagree. ffmpeg then slices the byte stream on the wrong
+    boundaries: a measured ``(5,63,47,3)`` batch encoded "successfully" to a
+    46x62 clip with skewed content, and the frame-count proof PASSED it,
+    because 5 frames went in and 5 frames came out. The count was never the
+    thing that was wrong.
+
+    ``even_dim`` still belongs on the three builders that SCALE or PAD to a
+    target (still motion/static, the lavfi floor) -- there ffmpeg is being told
+    what to produce, and rounding to even is the yuv420p requirement. Here it
+    described the INPUT, which is not ours to round. An odd canvas is refused
+    by name at the encoder instead; see :func:`encode_frames_to_silent_mp4`.
+    """
     return [
         ffmpeg, "-y",
         "-f", "rawvideo", "-pix_fmt", "rgb24",
-        "-s", "%dx%d" % (even_dim(width), even_dim(height)),
+        "-s", "%dx%d" % (int(width), int(height)),
         "-r", str(fps), "-i", "pipe:0",
     ] + _bt709_encode_args(crf) + [out_path]
 
@@ -852,6 +869,22 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg",
             "clip. Convert with images_to_uint8 first."
             % (frames.dtype, frames.dtype.itemsize, frames.dtype.itemsize))
     b, h, w, _ = frames.shape
+    # AN ODD CANVAS IS REFUSED HERE, BY NAME (2026-07-28). yuv420p subsamples
+    # chroma 2x2 and cannot encode an odd dimension at all, so the old
+    # even_dim() in the arg builder was not a courtesy -- it declared a size
+    # the pipe did not carry, and ffmpeg re-sliced every row. Measured:
+    # (5,63,47,3) wrote a 46x62 clip of skewed pixels and passed the frame
+    # count. Rounding here would repeat that mistake one level down; the fix
+    # belongs with whoever chose the canvas, which is why this names them.
+    if h % 2 or w % 2:
+        raise GraphExecutionError(
+            "refusing to encode an ODD canvas %dx%d for %r: yuv420p cannot "
+            "represent an odd dimension, and declaring an even size while "
+            "piping the real odd rows makes ffmpeg slice every row on the "
+            "wrong boundary -- it writes a skewed clip with a clean exit code "
+            "and the correct frame count. Fix the CANVAS upstream (round the "
+            "render size to even), not the stride. NO FALLBACK."
+            % (w, h, out_path))
     cmd = ffmpeg_silent_mp4_cmd(out_path, w, h, fps, ffmpeg=ffmpeg, crf=crf)
     try:
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,

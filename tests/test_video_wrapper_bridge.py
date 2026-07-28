@@ -181,13 +181,37 @@ def test_images_to_uint8_from_float_numpy():
 
 # --- ffmpeg cmd builders (pure) -------------------------------------------- #
 def test_ffmpeg_silent_cmd_contract():
-    cmd = wb.ffmpeg_silent_mp4_cmd("o.mp4", 833, 480, 25)
+    cmd = wb.ffmpeg_silent_mp4_cmd("o.mp4", 832, 480, 25)
     assert "-an" in cmd                                  # V-1 no audio
     pix_vals = [cmd[k + 1] for k, v in enumerate(cmd) if v == "-pix_fmt"]
     assert pix_vals == ["rgb24", "yuv420p"]              # input raw rgb24, out yuv420p
     assert "bt709" in cmd and cmd[-1] == "o.mp4"
-    joined = " ".join(cmd)
-    assert "832x480" in joined and "833x480" not in joined  # odd width -> even
+    assert "832x480" in " ".join(cmd)
+
+
+def test_the_declared_size_is_the_PIPED_size_never_rounded():
+    """This assertion used to read the other way round -- it REQUIRED that an
+    833-wide ask be declared as 832 ("odd width -> even"), which is the defect
+    written down as the contract.
+
+    The ``-s`` describes the INPUT byte stream, and
+    ``encode_frames_to_silent_mp4`` pipes ``frames.tobytes()`` at the array's
+    real width. Declaring 832 while piping 833-pixel rows makes ffmpeg slice
+    every row on the wrong boundary: measured, a (5,63,47,3) batch wrote a
+    46x62 clip of skewed pixels and PASSED the frame-count proof, because five
+    frames went in and five came out. Rounding is now the caller's business
+    and an odd canvas is refused by name at the encoder."""
+    joined = " ".join(wb.ffmpeg_silent_mp4_cmd("o.mp4", 833, 481, 25))
+    assert "833x481" in joined
+    assert "832x480" not in joined
+    # The three builders that SCALE or PAD to a target keep even_dim: there
+    # ffmpeg is told what to PRODUCE, and yuv420p requires even. Asserted so
+    # the two cases cannot be "simplified" into one. (They spell their target
+    # as an ffmpeg filter argument, `scale=W:H`, not as a `-s WxH`.)
+    static = wb.ffmpeg_still_static_cmd("s.png", "o.mp4", 833, 481, 25, 10)
+    vf = static[static.index("-vf") + 1]
+    assert vf.startswith("scale=832:480:"), vf
+    assert "833" not in vf and "481" not in vf
 
 
 def test_floor_and_still_cmd_frame_count():
