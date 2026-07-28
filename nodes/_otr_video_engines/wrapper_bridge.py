@@ -763,25 +763,87 @@ def run_ffmpeg(cmd):
     return cmd
 
 
-def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg", crf=18):
+def proven_frame_count(out_path, declared, *, ffprobe="ffprobe"):
+    """How many frames the CLIP ON DISK holds -- not how many were piped at it.
+
+    ``encode_frames_to_silent_mp4`` used to return ``len(frames)``, the length
+    of the array it handed to ffmpeg. For a single-render beat that number IS
+    ``CanonicalClip.frame_count``, the integer timing authority the composite
+    positions the beat by, so a clip that came out short would drift against
+    its own audio behind a clean exit code. Multi-segment beats were already
+    covered -- :func:`wan_shared.assemble_beat_segments` decode-counts every
+    assembled beat -- and single-render beats were the half left open when the
+    M7 sweep landed the colour/stream proof at ``58e288af``.
+
+    THIS DOES NOT PAY A DECODE, which is the whole reason it can be
+    unconditional. ``nb_frames`` is the muxer's own record and it comes out of
+    the SAME stream read ``ffprobe_clip_fields`` already runs on every emitted
+    clip -- the same argument that put width/height in that query. A container
+    header can disagree with the picture data on a CONCATENATED file, which is
+    exactly why ``assemble_beat_segments`` decodes and must keep decoding; this
+    file was written by ONE ffmpeg pass from a rawvideo pipe, where "did the
+    muxer write what it was piped" is precisely the question being asked.
+
+    When the container carries no count at all, the proof falls back to the
+    DECODE rather than back to the array: paying for a decode in the rare case
+    beats returning an unproven number in every case. Measured on this box
+    2026-07-28 -- header 37-45ms per clip (that is the ffprobe process, not the
+    counting), decode 43-132ms, against real beat renders of 744-842 SECONDS in
+    the 2026-07-27 ltx sweep. The cost was never the reason not to do this.
+    """
+    from . import wan_shared as _ws
+    counted = _ws.ffprobe_clip_fields(out_path, ffprobe=ffprobe).get("nb_frames")
+    how = "the container's own count"
+    if counted is None:
+        counted = _ws.ffprobe_counted_frames(out_path, ffprobe=ffprobe)
+        how = "a decode (the container recorded no count)"
+    if int(counted) != int(declared):
+        raise GraphExecutionError(
+            "encode wrote %d frame(s) for %r but %d were piped into it (%s). "
+            "That number becomes CanonicalClip.frame_count -- the integer "
+            "timing authority -- so the beat would drift against its own audio "
+            "behind a clean exit code. NO FALLBACK."
+            % (int(counted), out_path, int(declared), how))
+    return int(counted)
+
+
+def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg",
+                                ffprobe="ffprobe", crf=18):
     """Encode a uint8 (B,H,W,3) frame batch to a silent bt709 MP4 via ffmpeg.
 
-    Returns ``(out_path, frame_count)``. The arg build is tested via
-    ffmpeg_silent_mp4_cmd; this runs the encoder (the ffmpeg leaf) and raises a
-    NAMED GraphExecutionError on failure."""
+    Returns ``(out_path, frame_count)``, where the count is PROVEN against the
+    file (:func:`proven_frame_count`) rather than reported from the input
+    array. The arg build is tested via ffmpeg_silent_mp4_cmd; this runs the
+    encoder (the ffmpeg leaf) and raises a NAMED GraphExecutionError on
+    failure."""
     import numpy as np
     frames = np.ascontiguousarray(frames)
     if frames.ndim != 4 or frames.shape[-1] != 3:
         raise GraphExecutionError(
             "expected (B,H,W,3) uint8 frames, got shape %r" % (frames.shape,))
+    if frames.shape[0] == 0:
+        # ndim==4 is satisfied by a batch of ZERO frames, and ffmpeg accepts
+        # the empty pipe and exits 0 -- writing a container with no video
+        # stream in it at all. The pre-2026-07-28 encoder then returned a
+        # frame_count of 0 for that file and the beat carried on. Refused HERE,
+        # by name, rather than one call later where the count proof would find
+        # no stream to count and report it in the language of a failed
+        # multi-segment ASSEMBLY, which is not what happened.
+        raise GraphExecutionError(
+            "asked to encode ZERO frames to %r -- there is no clip here to "
+            "write or to prove. NO FALLBACK (a 0-frame beat is a planning bug "
+            "upstream, not an empty video)." % out_path)
     # A5-lite (2026-07-27): the SHAPE was checked and the dtype was not, while
     # the docstring promised uint8. Not a live bug -- every producer feeds an
     # exact-size uint8 buffer through images_to_uint8, and ffmpeg raises on a
     # short write. The residual is a future wider-dtype caller: the rawvideo
     # pipe is 8-bit, so float32 sends 4x the bytes for the same frames and
-    # ffmpeg consumes them as a different number of frames -- and the count
-    # returned below comes from the ARRAY, not from what ffmpeg wrote, so the
-    # receipt would be clean and wrong. One assert closes it.
+    # ffmpeg consumes them as a different number of frames. The assert stays:
+    # it names the CAUSE at the point a caller can fix it, and it is cheaper
+    # and clearer than making the count check below diagnose a dtype mistake
+    # from an arithmetic mismatch. (The count is no longer taken from the
+    # array -- see proven_frame_count -- so that half of the 2026-07-27 note
+    # is now closed rather than merely documented.)
     if frames.dtype != np.uint8:
         raise GraphExecutionError(
             "expected uint8 frames, got dtype %r (%d bytes per sample): the "
@@ -801,7 +863,7 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg", crf=1
         raise GraphExecutionError(
             "ffmpeg frame encode failed rc=%s: %s"
             % (proc.returncode, (err or b"").decode("utf-8", "replace")[-400:]))
-    return out_path, int(b)
+    return out_path, proven_frame_count(out_path, int(b), ffprobe=ffprobe)
 
 
 # --------------------------------------------------------------------------- #

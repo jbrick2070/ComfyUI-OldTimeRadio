@@ -52,9 +52,9 @@ def _parse_fps(rate):
 def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
     """Probe a clip's stream + color contract (read-only). Returns
     ``{codec_types, video_codec, pix_fmt, color_space, color_primaries,
-    color_transfer, fps, width, height}``. Raises a NAMED GraphExecutionError
-    on an ffprobe failure (a missing ffprobe is a broken install, same class as
-    the encoder's missing-ffmpeg).
+    color_transfer, fps, width, height, nb_frames}``. Raises a NAMED
+    GraphExecutionError on an ffprobe failure (a missing ffprobe is a broken
+    install, same class as the encoder's missing-ffmpeg).
 
     ``width``/``height`` joined the query for multi-clip coverage chunk 6
     (2026-07-26). They cost nothing -- they come out of the SAME stream read --
@@ -63,9 +63,20 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
     downstream consumer expects and the mux will not tell you about. They are
     absent from an audio-only stream, so they read as 0 rather than raising.
 
-    This helper deliberately does NOT count frames: it runs on EVERY emitted
-    clip, and counting means decoding. Use :func:`ffprobe_counted_frames` at
-    the assembly boundary, where the cost is paid once and the truth matters."""
+    ``nb_frames`` joined on the same terms (2026-07-28) and is the MUXER'S OWN
+    count -- what ffmpeg recorded having written, read straight out of the
+    container header. It is NOT a frame count in the sense below: nothing is
+    decoded, so it costs nothing here, and on a CONCATENATED file it can
+    disagree with the picture data (which is the whole reason
+    :func:`assemble_beat_segments` decodes instead). On a clip written by ONE
+    ffmpeg pass it answers exactly one question -- did the muxer write what it
+    was piped -- which is what the encoder boundary needs. ``None`` when the
+    container carries no count.
+
+    This helper still deliberately does NOT count frames: it runs on EVERY
+    emitted clip, and counting means decoding. Use
+    :func:`ffprobe_counted_frames` at the assembly boundary, where the cost is
+    paid once and the truth matters."""
     import json as _json
     import subprocess as _sp
 
@@ -75,7 +86,7 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
             [ffprobe, "-v", "error", "-show_entries",
              "stream=codec_type,codec_name,pix_fmt,color_primaries,"
              "color_transfer,color_space,avg_frame_rate,r_frame_rate,"
-             "width,height",
+             "width,height,nb_frames",
              "-of", "json", path],
             stdout=_sp.PIPE, stderr=_sp.PIPE)
     except FileNotFoundError as exc:
@@ -89,6 +100,13 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
     vids = [s for s in streams if s.get("codec_type") == "video"]
     v = vids[0] if vids else {}
     rate = v.get("avg_frame_rate") or v.get("r_frame_rate")
+    try:
+        # ffprobe reports it as a STRING, or as "N/A" / omits it entirely for
+        # a container that does not record one. None means "no count here",
+        # never zero -- an unreadable count is not an empty clip.
+        nb_frames = int(v["nb_frames"])
+    except (KeyError, TypeError, ValueError):
+        nb_frames = None
     return {
         "codec_types": [s.get("codec_type") for s in streams],
         "video_codec": v.get("codec_name"),
@@ -99,6 +117,7 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
         "fps": _parse_fps(rate),
         "width": int(v.get("width") or 0),
         "height": int(v.get("height") or 0),
+        "nb_frames": nb_frames,
     }
 
 

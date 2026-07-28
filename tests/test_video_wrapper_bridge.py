@@ -265,3 +265,179 @@ def test_bridge_source_ascii_no_bom_no_em_dash():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# --------------------------------------------------------------------------- #
+# The encoder returns a PROVEN frame count, not the input array's length
+# (2026-07-28). The M7 sweep at 58e288af proved the colour/stream contract on
+# every emitted clip but NOT the COUNT: encode_frames_to_silent_mp4 returned
+# int(len(frames)), and for a single-render beat that number IS
+# CanonicalClip.frame_count -- the integer timing authority. Multi-segment
+# beats were already covered by assemble_beat_segments' decode.
+#
+# It costs no decode: nb_frames rides the stream read ffprobe_clip_fields
+# already performs on every clip. The decode is the FALLBACK, for a container
+# that records no count at all.
+# --------------------------------------------------------------------------- #
+@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE),
+                    reason="ffmpeg/ffprobe not on PATH")
+def test_the_container_reports_its_own_count_to_ffprobe_clip_fields(tmp_path):
+    np = pytest.importorskip("numpy")
+    from nodes._otr_video_engines import wan_shared as ws
+    out = tmp_path / "clip.mp4"
+    wb.encode_frames_to_silent_mp4(
+        np.full((7, 64, 48, 3), 90, dtype="uint8"), str(out), 25)
+    assert ws.ffprobe_clip_fields(str(out))["nb_frames"] == 7
+
+
+@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE),
+                    reason="ffmpeg/ffprobe not on PATH")
+def test_a_stream_with_no_count_reports_None_and_not_zero(tmp_path):
+    """None means "no count here". Zero would mean "an empty clip", and the
+    encoder boundary would then refuse every good clip it could not read a
+    header from."""
+    from nodes._otr_video_engines import wan_shared as ws
+    aud = tmp_path / "silence.m4a"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
+                    "-i", "anullsrc=r=44100:cl=mono", "-t", "0.2", str(aud)],
+                   check=True, capture_output=True)
+    assert ws.ffprobe_clip_fields(str(aud))["nb_frames"] is None
+
+
+@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE),
+                    reason="ffmpeg/ffprobe not on PATH")
+def test_a_count_the_file_does_not_support_is_REFUSED(tmp_path):
+    """THE DEFECT, stated at the boundary: a declared count the clip does not
+    hold must not become the timing authority."""
+    np = pytest.importorskip("numpy")
+    out = tmp_path / "clip.mp4"
+    wb.encode_frames_to_silent_mp4(
+        np.full((5, 64, 48, 3), 90, dtype="uint8"), str(out), 25)
+    with pytest.raises(wb.GraphExecutionError,
+                       match="timing authority") as exc_info:
+        wb.proven_frame_count(str(out), 9)
+    # ...and the refusal names BOTH numbers, so the log says what disagreed.
+    # Read off exc_info, NOT a second bare try/except: a try/except whose
+    # asserts live in the handler passes vacuously the day the code stops
+    # raising, which is the one regression this test exists to catch.
+    assert "5 frame(s)" in str(exc_info.value)
+    assert "9 were piped" in str(exc_info.value)
+
+
+@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE),
+                    reason="ffmpeg/ffprobe not on PATH")
+def test_zero_frames_is_refused_by_name_at_the_encoder(tmp_path):
+    """ndim==4 is satisfied by a batch of ZERO frames and ffmpeg exits 0 on
+    the empty pipe, writing a container with no video stream. The old encoder
+    returned frame_count=0 for that and the beat carried on."""
+    np = pytest.importorskip("numpy")
+    out = tmp_path / "clip.mp4"
+    with pytest.raises(wb.GraphExecutionError, match="ZERO frames") as info:
+        wb.encode_frames_to_silent_mp4(
+            np.zeros((0, 64, 48, 3), dtype="uint8"), str(out), 25)
+    # ...and it does NOT describe itself as a failed multi-segment assembly,
+    # which is what the count proof one call later would have said.
+    assert "assembled beat" not in str(info.value)
+
+
+@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE),
+                    reason="ffmpeg/ffprobe not on PATH")
+def test_the_normal_path_never_pays_for_a_decode(monkeypatch, tmp_path):
+    """The reason this proof can be unconditional.
+
+    Detonating the decoder is only half the test: the pre-2026-07-28 encoder
+    probed NOTHING and would also pass it. So the header read is COUNTED --
+    exactly once, which is what distinguishes "used the free proof" from
+    "never proved anything"."""
+    np = pytest.importorskip("numpy")
+    from nodes._otr_video_engines import wan_shared as ws
+    seen = {"header": 0}
+    real_fields = ws.ffprobe_clip_fields
+
+    def _spy(*a, **k):
+        seen["header"] += 1
+        return real_fields(*a, **k)
+
+    def _boom(*_a, **_k):
+        raise AssertionError("decoded per clip in the render loop")
+
+    monkeypatch.setattr(ws, "ffprobe_clip_fields", _spy)
+    monkeypatch.setattr(ws, "ffprobe_counted_frames", _boom)
+    out = tmp_path / "clip.mp4"
+    _p, n = wb.encode_frames_to_silent_mp4(
+        np.full((11, 64, 48, 3), 90, dtype="uint8"), str(out), 25)
+    assert n == 11
+    assert seen["header"] == 1
+
+
+def test_a_container_with_no_count_falls_back_to_the_decode(monkeypatch):
+    """A count that cannot be read is not an excuse to return the array's
+    length -- that is the number this whole change exists to stop trusting."""
+    from nodes._otr_video_engines import wan_shared as ws
+    monkeypatch.setattr(ws, "ffprobe_clip_fields",
+                        lambda *_a, **_k: {"nb_frames": None})
+    monkeypatch.setattr(ws, "ffprobe_counted_frames", lambda *_a, **_k: 33)
+    assert wb.proven_frame_count("x.mp4", 33) == 33
+    with pytest.raises(wb.GraphExecutionError, match="timing authority"):
+        wb.proven_frame_count("x.mp4", 34)
+
+
+def test_a_clip_LONGER_than_it_was_piped_is_refused_too(monkeypatch):
+    """A beat with MORE frames than were piped drifts exactly as badly as a
+    short one -- the check is a disagreement, not a shortfall. Found by the
+    mutation round: every fixture until now had counted < declared, so a
+    refusal that only caught short clips stayed green."""
+    from nodes._otr_video_engines import wan_shared as ws
+    monkeypatch.setattr(ws, "ffprobe_clip_fields",
+                        lambda *_a, **_k: {"nb_frames": 40})
+    with pytest.raises(wb.GraphExecutionError, match="timing authority"):
+        wb.proven_frame_count("x.mp4", 33)
+
+
+def test_the_fallback_says_which_proof_it_used(monkeypatch):
+    """A receipt that cannot say HOW it knows is the mux defect at 54b3626b.
+
+    Both blocks REQUIRE the raise (pytest.raises, not a bare try/except): a
+    handler-only assertion passes vacuously the day the refusal stops firing,
+    and this test would then be guarding nothing at all."""
+    from nodes._otr_video_engines import wan_shared as ws
+    monkeypatch.setattr(ws, "ffprobe_clip_fields",
+                        lambda *_a, **_k: {"nb_frames": None})
+    monkeypatch.setattr(ws, "ffprobe_counted_frames", lambda *_a, **_k: 33)
+    with pytest.raises(wb.GraphExecutionError, match="timing authority") as a:
+        wb.proven_frame_count("x.mp4", 34)
+    assert "decode" in str(a.value)
+    monkeypatch.setattr(ws, "ffprobe_clip_fields",
+                        lambda *_a, **_k: {"nb_frames": 33})
+    with pytest.raises(wb.GraphExecutionError, match="timing authority") as b:
+        wb.proven_frame_count("x.mp4", 34)
+    assert "container" in str(b.value) and "decode" not in str(b.value)
+
+
+def test_the_encoder_returns_what_the_boundary_proved(monkeypatch, tmp_path):
+    """CONTROL against the obvious wrong fix: returning int(b) and calling
+    proven_frame_count only for its side effect. The returned value must BE
+    the proof's answer."""
+    np = pytest.importorskip("numpy")
+    seen = {}
+
+    def _fake(out_path, declared, **_k):
+        seen["declared"] = declared
+        return 4242
+
+    monkeypatch.setattr(wb, "proven_frame_count", _fake)
+    monkeypatch.setattr(wb, "run_ffmpeg", lambda cmd: cmd)
+
+    class _P:
+        returncode = 0
+
+        def communicate(self, _data):
+            return b"", b""
+
+    out = tmp_path / "clip.mp4"
+    out.write_bytes(b"x")
+    monkeypatch.setattr(wb.subprocess, "Popen", lambda *_a, **_k: _P())
+    _p, n = wb.encode_frames_to_silent_mp4(
+        np.zeros((6, 8, 8, 3), dtype="uint8"), str(out), 25)
+    assert seen["declared"] == 6            # it was told the array's length
+    assert n == 4242                        # ...and returned the PROOF's
