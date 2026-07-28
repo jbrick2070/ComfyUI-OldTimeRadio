@@ -340,51 +340,30 @@ def plan_scope_frames(manifest, out_w, out_h, ffprobe="ffprobe",
 
 
 # --------------------------------------------------------------------------- #
-# Silent encoder (the floor's _encode_mp4 HARD-REQUIRES audio; this is the -an
-# variant matching the blend's input contract: yuv420p / CFR / 25fps).
+# Silent encoder (the floor's _encode_mp4 HARD-REQUIRES audio; this node needs
+# the -an variant matching the blend's input contract: yuv420p / CFR / 25fps).
+#
+# THE COPY IS GONE (2026-07-28). This module used to carry its own
+# ``_encode_silent_mp4`` -- the THIRD copy of the same encoder in the tree,
+# assembling a byte-for-byte identical ffmpeg command, and carrying every
+# defect the shared one was just fixed for: ``total`` accepted and never read,
+# the rawvideo ``-s`` built from the caller's w/h while the pipe carried
+# whatever the generator painted, no per-frame shape or dtype check, nvenc
+# selected with no minimum-canvas floor, and stderr on a PIPE read only after
+# the whole stream was written -- which deadlocks without raising, so the child
+# was never reaped and kept the output file open.
+#
+# It now calls ``_otr_shared.scope_draw.encode_silent_mp4``, which is exactly
+# the refactor that module's own docstring anticipated. The SEPARATION
+# INVARIANT is unharmed and points the other way: scope_draw must not import
+# the floor or the overlay NODE, and this node already imports
+# ``freq_bars_green`` from it. Hardening a third dialect instead would have
+# left three encoders to fix the next time one of them is wrong.
 # --------------------------------------------------------------------------- #
 def _find_ffmpeg(ffmpeg):
     if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
         return ffmpeg
     return shutil.which("ffmpeg")
-
-
-def _has_nvenc(ffmpeg):
-    try:
-        out = subprocess.run([ffmpeg, "-hide_banner", "-codecs"],
-                             capture_output=True, text=True, timeout=5)
-        return "h264_nvenc" in (out.stdout or "")
-    except Exception:  # noqa: BLE001
-        return False
-
-
-def _encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
-    fb = _find_ffmpeg(ffmpeg)
-    if not fb:
-        raise RuntimeError("OTR_SceneAwareScopes: ffmpeg not found.")
-    use_nvenc = _has_nvenc(fb)
-    cmd = [fb, "-y", "-loglevel", "error",
-           "-f", "rawvideo", "-vcodec", "rawvideo",
-           "-s", f"{w}x{h}", "-pix_fmt", "rgb24", "-r", str(fps), "-i", "-",
-           "-an",  # SILENT -- no audio stream at all
-           "-c:v", "h264_nvenc" if use_nvenc else "libx264"]
-    if use_nvenc:
-        cmd += ["-preset", "p5", "-rc", "vbr", "-b:v", "8M"]
-    else:
-        cmd += ["-preset", "medium", "-crf", "20"]
-    cmd += ["-pix_fmt", "yuv420p", "-vsync", "cfr", "-r", str(fps),
-            "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
-            "-movflags", "+faststart", out_path]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    for frame in frames_iter:
-        proc.stdin.write(frame.tobytes())
-    proc.stdin.close()
-    err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
-    proc.wait()
-    if proc.returncode != 0:
-        raise RuntimeError(f"OTR_SceneAwareScopes: ffmpeg failed: {err[-800:]}")
-    return out_path
 
 
 # --------------------------------------------------------------------------- #
@@ -555,7 +534,11 @@ class SceneAwareScopes:
         out_path = os.path.join(_tmp_root, f"otr_scopes_{key}_{ts}.mp4")
         log.info("[SceneAwareScopes] %d frames @ %dx%d 25fps -> %s",
                  total, out_w, out_h, out_path)
-        _encode_silent_mp4(_gen(), total, out_path, out_w, out_h, fps, ffmpeg)
+        try:
+            from ._otr_shared import scope_draw as _sd
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_shared import scope_draw as _sd  # type: ignore
+        _sd.encode_silent_mp4(_gen(), total, out_path, out_w, out_h, fps, ffmpeg)
         return {"result": (out_path,)}
 
 

@@ -11,9 +11,19 @@ provably unchanged -- a later refactor can make the floor import this module.
 The title-card / ident / gap branches are deliberately OMITTED -- those only make
 sense for the whole-episode floor; a per-beat clip is pure procedural art.
 
-Self-contained on purpose: ``_analyze_audio_np`` / ``_dual_ema`` / ``_encode_silent_mp4``
-mirror the ``otr_scene_aware_scopes`` helpers byte-for-byte but are copied here so the
-engine couples to NOTHING (neither the floor node nor the overlay node). UTF-8, no BOM.
+Self-contained on purpose: ``_analyze_audio_np`` / ``_dual_ema`` mirror the
+``otr_scene_aware_scopes`` helpers byte-for-byte but are copied here so the engine
+couples to NOTHING (neither the floor node nor the overlay node). The invariant is
+DIRECTIONAL and always was: this module must not import a node; a node importing
+THIS module is the refactor the line below anticipated.
+
+``encode_silent_mp4`` is no longer one of the copies. 2026-07-28 hardened it -- the
+frames are counted against the declared ``total``, the rawvideo size is derived from
+the first frame so the declared stride cannot disagree with the piped bytes, a frame
+that changes shape or dtype mid-stream is refused, nvenc is skipped below its 145x49
+floor, stderr goes to a file rather than a deadlockable pipe, and ffmpeg is reaped on
+every refusal path -- and ``otr_scene_aware_scopes`` deleted its own copy and calls
+this one. There is ONE streaming clip encoder now, not three. UTF-8, no BOM.
 """
 from __future__ import annotations
 

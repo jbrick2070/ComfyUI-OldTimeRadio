@@ -179,7 +179,12 @@ def test_scopes_span_master_audio_no_blend_clamp_bug406(monkeypatch):
         captured["total"] = total
         captured["gen_n"] = sum(1 for _ in gen)   # drain: no IndexError on the tail
 
-    monkeypatch.setattr(sc, "_encode_silent_mp4", _fake_encode)
+    # Patched on the SHARED encoder since 2026-07-28: this module's private
+    # copy -- the third in the tree -- was deleted rather than hardened a third
+    # time. What this test asserts (gen_n == total) is now also an invariant
+    # the real encoder enforces, so a drift here fails twice.
+    from nodes._otr_shared import scope_draw as _sd
+    monkeypatch.setattr(_sd, "encode_silent_mp4", _fake_encode)
 
     # beats budget = 50 frames (2 s @25); master audio = 5 s -> 125 frames.
     m = {"episode_id": "ext", "fps": 25, "total_target_frames": 50,

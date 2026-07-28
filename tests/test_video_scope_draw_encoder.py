@@ -284,3 +284,80 @@ def test_the_engine_stamps_the_PROVEN_count_not_the_declared_one(
     assert raw["frame_count"] == sentinel, (
         "%s returned %r -- it is still stamping its own loop bound rather "
         "than the proven count" % (engine_name, raw["frame_count"]))
+
+
+# ---------------------------------------------------------------------------
+# THERE IS NO FOURTH COPY.
+# ---------------------------------------------------------------------------
+
+#: Every function under ``nodes/`` that pipes RAW FRAMES into ffmpeg on stdin,
+#: with the reason each one exists. Pinned so that the next copy of this
+#: encoder fails HERE, by name, instead of being discovered by a fan-out two
+#: months later carrying every defect the others were already fixed for.
+#: ``otr_scene_aware_scopes.py`` is deliberately ABSENT: it carried the third
+#: copy until 2026-07-28 and now calls scope_draw's.
+_RAWVIDEO_STDIN_ENCODERS = {
+    ("scope_draw.py", "encode_silent_mp4"):
+        "the shared STREAMING encoder -- takes a generator, so it cannot "
+        "buffer the batch and cannot use communicate()",
+    ("wrapper_bridge.py", "encode_frames_to_silent_mp4"):
+        "the shared BATCH encoder -- takes a whole (B,H,W,3) array and pipes "
+        "it through communicate(), which is why it has no stderr deadlock",
+    ("wrapper_bridge.py", "ffmpeg_silent_mp4_cmd"):
+        "the batch encoder's pure argv builder, not a spawner of its own",
+    ("video_engine.py", "_encode_mp4"):
+        "the whole-episode procedural FLOOR, which hard-requires audio and "
+        "stamps no frame_count -- a different contract, not a clip",
+    ("rtx_upscale.py", "_chunked_upscale"):
+        "the upscaler's chunk pipe -- transforms an existing clip rather than "
+        "authoring one",
+    ("encode_sink.py", "__enter__"):
+        "imported only by scripts/profile_scope_render.py; not a live writer",
+}
+
+
+def test_there_is_no_FOURTH_copy_of_this_encoder():
+    """The tree had THREE copies of one streaming encoder.
+
+    ``otr_scene_aware_scopes.py`` carried its own ``_encode_silent_mp4``: a
+    byte-for-byte identical ffmpeg command, and every defect the shared one was
+    fixed for on 2026-07-28 -- a dead ``total`` parameter, the declared size
+    taken from the caller instead of the frames, no per-frame shape or dtype
+    check, nvenc with no canvas floor, and a stderr PIPE that deadlocks without
+    raising so the child is never reaped. It was deleted, not hardened a third
+    time, because three copies means three places to fix the next one.
+
+    This pins the inventory rather than the deletion: a NEW rawvideo-stdin
+    encoder anywhere under nodes/ fails here and has to be justified in the
+    table above."""
+    import importlib.util
+    import pathlib
+
+    # Loaded BY PATH rather than `import test_terminal_frame`: whether a
+    # sibling test module is importable by name depends on pytest's import
+    # mode, and a gate that silently stops running is the failure this whole
+    # area is about. The classifier lives there because that is where the
+    # roster gate uses it; duplicating it here would be a second dialect.
+    here = pathlib.Path(__file__).resolve().parent
+    spec = importlib.util.spec_from_file_location(
+        "_otr_roster_gate_helpers", here / "test_terminal_frame.py")
+    tf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tf)
+
+    nodes_dir = here.parent / "nodes"
+    found = set()
+    for module, fns in tf._clip_encoder_entry_points(nodes_dir).items():
+        for fn in fns:
+            if "rawvideo" in tf._function_source(nodes_dir, module, fn):
+                found.add((module, fn))
+
+    assert found == set(_RAWVIDEO_STDIN_ENCODERS), (
+        "the rawvideo-stdin encoder inventory moved.\n  NEW: %r\n  GONE: %r"
+        % (sorted(found - set(_RAWVIDEO_STDIN_ENCODERS)),
+           sorted(set(_RAWVIDEO_STDIN_ENCODERS) - found)))
+    # Named separately from the set comparison: this is the one the chunk
+    # closed, and "it is not in a set" is a weaker sentence than saying why.
+    assert not any(module == "otr_scene_aware_scopes.py"
+                   for module, _fn in found), (
+        "otr_scene_aware_scopes.py has grown its own frame encoder again -- "
+        "it must call _otr_shared.scope_draw.encode_silent_mp4")
