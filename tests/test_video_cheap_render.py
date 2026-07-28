@@ -87,15 +87,29 @@ def test_still_flat_uses_static_cmd_pan_uses_motion(monkeypatch, tmp_path):
     monkeypatch.setattr(cf, "ffprobe_clip_fields", lambda p: {"probed": p})
     monkeypatch.setattr(cf, "validate_silent_clip_contract",
                         lambda fields, fps: calls.setdefault("proved", fields))
+    # M7 COUNT half (2026-07-28): the frame count is read back off the file
+    # too. Same reasoning as the line above -- no file exists on this stubbed
+    # path, so the count proof is stubbed AND asserted rather than silently
+    # depended upon. It returns a number the caller could not have computed,
+    # so the engine stamping its own `n` instead would be visible here.
+    monkeypatch.setattr(wb, "proven_frame_count",
+                        lambda path, declared, **kw:
+                        calls.setdefault("counted", declared) and 0 or 4242)
     req = _req(asset_refs={"init_image": str(still)})
 
-    vreg.get_engine("still_flat").render_clip(req)
+    raw = vreg.get_engine("still_flat").render_clip(req)
     assert "static" in calls and "motion" not in calls   # flat = NO pan
     assert "proved" in calls, "the emitted clip was never proven"
+    assert "counted" in calls, "the emitted clip's frame count was never proven"
+    assert raw["frame_count"] == 4242, (
+        "still_flat stamped %r -- its own requested count, not the proven one"
+        % (raw["frame_count"],))
     calls.clear()
-    vreg.get_engine("still_motion").render_clip(req)
+    raw = vreg.get_engine("still_motion").render_clip(req)
     assert "motion" in calls and "static" not in calls   # still_motion = the pan path
     assert "proved" in calls, "the emitted clip was never proven"
+    assert "counted" in calls, "the emitted clip's frame count was never proven"
+    assert raw["frame_count"] == 4242
 
 
 def test_still_flat_registered_validated_all_roles():

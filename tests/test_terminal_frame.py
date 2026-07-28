@@ -225,10 +225,15 @@ def test_the_encoder_still_accepts_what_the_real_converter_produces():
 # current producers rather than a contract anything enforced.
 # ---------------------------------------------------------------------------
 
-#: The source marker that evidences each proof half.
+#: The source markers that evidence each proof half. The count half accepts
+#: EITHER: proven_frame_count reads the muxer's own header off a stream read
+#: that already happens, and ffprobe_counted_frames DECODES -- the stronger of
+#: the two, and the right one at the assembly boundary where a concatenated
+#: container's header can disagree with its own picture data. Requiring only
+#: the cheap one would have failed wan_shared for proving MORE.
 _ENCODER_PROOF_MARKER = {
-    "count": "proven_frame_count(",
-    "contract": "validate_silent_clip_contract(",
+    "count": ("proven_frame_count(", "ffprobe_counted_frames("),
+    "contract": ("validate_silent_clip_contract(",),
 }
 #: subprocess entry points that start a child.
 _SPAWN_CALLS = ("Popen", "run", "call", "check_call", "check_output")
@@ -238,6 +243,21 @@ _SPAWN_CALLS = ("Popen", "run", "call", "check_call", "check_output")
 # as is the stream-index spelling "-c:0". Nothing in the tree does that today.
 # An encoder that ever needs to must be pinned in _ENTRY_POINT_PROOFS by hand,
 # and the inventory test below is what makes that a visible decision.
+
+
+def _has_proof(src, half):
+    """Does ``src`` CALL one of the accepted proofs for ``half``.
+
+    A substring search was wrong here, and wan_shared.py is the proof: it
+    DEFINES both ``ffprobe_counted_frames`` and ``validate_silent_clip_contract``,
+    so `def ffprobe_counted_frames(` satisfied a whole-file match on its own.
+    The module was excused for proving nothing, on the strength of owning the
+    helper -- deleting its real call and its `counted != expect_frames`
+    comparison would have left both gates green. Matching CALLS cannot be
+    satisfied by a definition, a docstring or a comment."""
+    calls = _called_names(src)
+    return any(marker.rstrip("(") in calls
+               for marker in _ENCODER_PROOF_MARKER[half])
 
 
 def _function_source(nodes_dir, module, fn_name):
@@ -409,11 +429,15 @@ def _called_names(src):
 
     Substring matching was tried first and was wrong in both directions: a
     module that merely DEFINES ``__enter__`` contains the text ``__enter__(``
-    and was billed for a clip it never writes."""
+    and was billed for a clip it never writes.
+
+    Dedented first so this works on a single function's source segment as
+    readily as on a whole module."""
     import ast
+    import textwrap
 
     names = set()
-    for node in ast.walk(ast.parse(src)):
+    for node in ast.walk(ast.parse(textwrap.dedent(src))):
         if isinstance(node, ast.Call):
             if isinstance(node.func, ast.Attribute):
                 names.add(node.func.attr)
@@ -472,11 +496,10 @@ def test_the_encoder_inventory_is_derived_and_still_proves_what_it_claims():
             # substring would let the count proof be credited to
             # ffmpeg_silent_mp4_cmd -- a pure argv builder that never calls it
             # -- because the marker exists elsewhere in wrapper_bridge.py.
-            assert _ENCODER_PROOF_MARKER[half] in _function_source(
-                nodes_dir, module, fn), (
+            assert _has_proof(_function_source(nodes_dir, module, fn), half), (
                 "%s::%s is credited with the %s proof, which excuses every "
-                "one of its callers from it, and %r is not in THAT function"
-                % (module, fn, half, _ENCODER_PROOF_MARKER[half]))
+                "one of its callers from it, and none of %r is in THAT "
+                "function" % (module, fn, half, _ENCODER_PROOF_MARKER[half]))
     for (module, fn), evidence in _SELF_PROVING_ENTRY_POINTS.items():
         # The membership assertion its sibling loop has. Without it, an
         # encoder that stops being FOUND keeps its exemption: the evidence
@@ -518,7 +541,7 @@ def test_every_adapter_that_writes_a_clip_proves_its_COLOUR_CONTRACT():
         if not owed:
             continue
         billed.add(path.name)
-        if _ENCODER_PROOF_MARKER["contract"] not in src:
+        if not _has_proof(src, "contract"):
             unproven[path.name] = sorted(owed)
 
     # WITHOUT THIS the test passes vacuously the day the roster stops billing
@@ -538,6 +561,70 @@ def test_every_adapter_that_writes_a_clip_proves_its_COLOUR_CONTRACT():
     assert unproven == {}, (
         "these engines write a clip through an ffmpeg encode and never prove "
         "the clip's colour/stream contract: %r" % (unproven,))
+
+
+def test_DEFINING_a_proof_helper_is_not_the_same_as_calling_it():
+    """The gate's own logic, pinned.
+
+    ``wan_shared.py`` owns both proof helpers, so the first version of
+    ``_has_proof`` -- a whole-file substring search -- was satisfied by their
+    ``def`` lines alone: the one module that could regress its real
+    ``counted != expect_frames`` comparison was also the one module the gates
+    could not notice it in. Found by the pre-push QA fan-out."""
+    assert not _has_proof("def ffprobe_counted_frames(path):\n    return 0\n",
+                          "count")
+    assert not _has_proof("# calls ffprobe_counted_frames( eventually\n",
+                          "count")
+    assert _has_proof("def go(p):\n    return ffprobe_counted_frames(p)\n",
+                      "count")
+    assert _has_proof("def go(p):\n    return proven_frame_count(p, 3)\n",
+                      "count")
+    assert not _has_proof(
+        "def validate_silent_clip_contract(fields, fps):\n    return None\n",
+        "contract")
+
+
+def test_every_adapter_that_writes_a_clip_proves_its_FRAME_COUNT():
+    """The other half. An engine that writes a clip must prove how many frames
+    the FILE holds -- at itself, or inside the encoder it calls.
+
+    Landed one chunk after the colour half, and strictly on top of it: the
+    roster is the same, the rule is the same, only the debt is new. Splitting
+    them that way is what let the colour gate land GREEN while this one was
+    still red on cheap_families -- a gate is allowed to arrive later, never to
+    be narrowed so it arrives clean.
+
+    ``frame_count`` is documented as the integer timing authority the
+    composite positions a beat by, so an engine that declares it without ever
+    reading the file is asserting a timing fact about a clip it never
+    measured."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    entry_points = _clip_encoder_entry_points(root / "nodes")
+    engines = root / "nodes" / "_otr_video_engines"
+
+    unproven, billed = {}, set()
+    for path in sorted(engines.glob("*.py")):
+        src = path.read_text(encoding="utf-8")
+        owed = _proof_debts(src, path.name, entry_points, "count")
+        if not owed:
+            continue
+        billed.add(path.name)
+        if not _has_proof(src, "count"):
+            unproven[path.name] = sorted(owed)
+
+    # Same anti-vacuity guard as the colour gate: `unproven == {}` is equally
+    # satisfied by "nobody writes a clip".
+    for expected in ("eng_viz_camera.py", "eng_visualizer.py",
+                     "cheap_families.py", "wan_shared.py"):
+        assert expected in billed, (
+            "%s writes a clip and the roster no longer bills it for the frame "
+            "count -- the gate has gone blind again, not clean" % expected)
+
+    assert unproven == {}, (
+        "these engines write a clip through an ffmpeg encode and never prove "
+        "how many frames it holds: %r" % (unproven,))
 
 
 def test_the_proof_runs_AFTER_the_encode_in_every_adapter():

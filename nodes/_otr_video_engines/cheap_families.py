@@ -226,7 +226,18 @@ class _CheapFamilyBase:
         # in the same _bt709_encode_args tail as the encoder, so a floor clip
         # already satisfies this contract by construction.
         validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)
-        return self._floor_clip(request, out_path, fps, n)
+        # M7 COUNT half (2026-07-28). The colour/stream half landed above on
+        # 2026-07-27; the count stayed self-declared -- ``n`` is what was ASKED
+        # for, and _floor_clip stamped it as CanonicalClip.frame_count, the
+        # integer timing authority the composite positions the beat by.
+        # All three builders use ffmpeg's frame-exact ``-frames:v`` rather than
+        # a duration, so a miscount is less likely here than from a Python
+        # generator -- but "less likely" is what the first encoder's count was
+        # too, right up until the sweep looked. This reads the muxer's own
+        # count off the SAME stream read ffprobe_clip_fields just performed, so
+        # it costs no decode.
+        proven = _wb.proven_frame_count(out_path, n)
+        return self._floor_clip(request, out_path, fps, proven)
 
     def _floor_clip(self, request, out_path, fps, n):
         """Pure: shape the rendered floor mp4 into the silent CanonicalClip dict
