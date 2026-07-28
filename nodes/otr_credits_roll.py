@@ -196,19 +196,33 @@ def _hist_rows(by_role: dict) -> list:
 
 def _video_role_rows(render_engines: dict) -> list:
     """(role, engine, family-suffix) for the MODELS.VIDEO block. The family
-    suffix comes from by_engine[eng]['family'] (S-B stamp)."""
+    suffix comes from by_engine[eng]['family'] (S-B stamp).
+
+    When the roll-up lists ``family`` in its ``varied`` the engine has NO
+    single family across its clips (2026-07-28), and the row says "mixed". A
+    blank suffix there would read as "this engine has no family", which is a
+    different statement and an untrue one."""
     by_role = render_engines.get("by_role") or {}
     by_engine = render_engines.get("by_engine") or {}
     rows = []
     for role in sorted(by_role):
         engs = by_role[role] or {}
         eng = sorted(engs)[0] if engs else "?"
-        fam = _fam((by_engine.get(eng) or {}).get("family"))
+        rollup = by_engine.get(eng) or {}
+        fam = ("mixed" if "family" in (rollup.get("varied") or [])
+               else _fam(rollup.get("family")))
         rows.append((role, eng, fam))
     return rows
 
 
 def _recipe_suffix(render_engines: dict, eng: str) -> str:
+    """The recipe line a MODELS.VIDEO row carries for one engine.
+
+    Reads the PER-FIELD by_engine roll-up: a field the engine did NOT hold to
+    one value across its clips is absent from the row and named in ``varied``,
+    so the card reports ``mixed <fields>`` rather than dropping the fact
+    silently or printing one clip's value as though it were the engine's.
+    Pre-2026-07-28 ledgers carry no ``varied`` key and read exactly as before."""
     r = (render_engines.get("by_engine") or {}).get(eng) or {}
     bits = []
     if r.get("recipe"):
@@ -219,6 +233,11 @@ def _recipe_suffix(render_engines: dict, eng: str) -> str:
         bits.append("lora")
     if r.get("render_canvas"):
         bits.append(str(r["render_canvas"]))
+    # family has its OWN slot on the row (_video_role_rows), so naming it here
+    # too would print the same fact twice; this line reports only its own.
+    mixed = [f for f in (r.get("varied") or []) if f != "family"]
+    if mixed:
+        bits.append("mixed " + ", ".join(mixed))
     return " · ".join(bits)
 
 

@@ -54,17 +54,89 @@ def _legacy_receipt_bypass_allowed(ledger):
                    for shot in shots)
 
 
+# The by_engine roll-up's IDENTITY fields: each one is a statement about what
+# the ENGINE did, so it may only be reported when every clip that engine
+# delivered agrees. Ordered as they appear in the per-clip receipt so the two
+# read side by side in the ledger. ``vram_peak_mb`` is deliberately NOT here --
+# it is a measurement, not an identity (see _roll_up_engine_receipts).
+_ROLLUP_IDENTITY_FIELDS = ("recipe", "quant", "use_lora", "render_canvas",
+                           "family")
+
+
+def _roll_up_engine_receipts(receipts):
+    """Pure: collapse ONE engine's per-clip receipts into one engine-level row.
+
+    THE RULE IS PER FIELD, NOT PER ROW. Until 2026-07-28 this was
+    ``by_engine.setdefault(eng, receipt)`` -- the FIRST clip's receipt stood in
+    for every later clip on the same engine. That lost nothing while every clip
+    on an engine stamped the same string, and it stopped being true: since
+    LANE 2 a prequalification cell NAMES its own departures, so two clips on
+    one engine legitimately carry DIFFERENT recipe receipts; and per-shot
+    ``render_canvas`` already differs today on any episode that mixes aspect
+    ratios on one engine. ``per_clip`` was always lossless -- this stops the
+    summary beside it from asserting things it cannot know.
+
+    An identity field is reported ONLY when every clip agrees. When they
+    disagree the field is ``None`` and its NAME is listed in ``varied``. So
+    ``None`` means "this engine has no single value", which covers BOTH the
+    engine that stamped nothing at all and the engine that stamped several --
+    ``varied`` is what tells those apart. A consumer therefore never has to
+    sniff a sentinel string out of a field whose type it depends on
+    (``use_lora`` is a bool; a truthy "(varied)" marker parked there would have
+    made the credits card print "lora" for an engine that mixed both).
+
+    ``vram_peak_mb`` is a MEASUREMENT, so it has a correct engine-level answer:
+    the WORST clip's peak. It is returned exactly as that clip stamped it (not
+    coerced to float) and is never blanked merely because clips disagreed.
+    """
+    rolled = {}
+    varied = []
+    for field in _ROLLUP_IDENTITY_FIELDS:
+        values = [r.get(field) for r in receipts]
+        first = values[0] if values else None
+        if all(v == first for v in values):
+            rolled[field] = first
+        else:
+            rolled[field] = None
+            varied.append(field)
+    worst = None
+    worst_key = None
+    for r in receipts:
+        raw = r.get("vram_peak_mb")
+        try:
+            key = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if key != key:
+            # NaN compares False against everything, so once it became the
+            # incumbent no later peak could ever beat it -- the worst-of would
+            # DISCARD a real measurement, and the answer would depend on clip
+            # order. Latent (gpu_residency stamps int(info.used) // _MB, so no
+            # adapter produces a float peak), closed here because the failure
+            # is silent LOSS. The identity comparison above is deliberately
+            # NOT hardened the same way: a NaN there degrades to "no single
+            # value", which is conservative and visible rather than lossy.
+            continue
+        if worst_key is None or key > worst_key:
+            worst_key, worst = key, raw
+    rolled["vram_peak_mb"] = worst
+    rolled["clip_count"] = len(receipts)
+    rolled["varied"] = varied
+    return rolled
+
+
 def _build_render_engines_payload(manifest, vram_peak_mb):
     """Pure: the ``meta.render_engines`` payload. Preserves the existing keys
     (histogram / video_revision / by_role / vram_peak_mb) and ADDS the S-E5
     recipe receipt -- a per-beat ``delivered_engine`` + recipe/quant/LoRA/canvas/
-    peak block + a by-engine roll-up -- so every saved episode self-documents
-    "what did I use?" (the durable twin of no-fallbacks + dropdown labels). An
-    engine that emits no receipt stamps recipe=None (never drops the row). No
-    I/O; unit-testable."""
+    peak block + a PER-FIELD by-engine roll-up (:func:`_roll_up_engine_receipts`
+    -- never one clip's receipt standing in for the rest) -- so every saved
+    episode self-documents "what did I use?" (the durable twin of no-fallbacks
+    + dropdown labels). An engine that emits no receipt stamps recipe=None
+    (never drops the row). No I/O; unit-testable."""
     by_role: dict[str, dict[str, int]] = {}
     per_clip: list = []
-    by_engine: dict[str, dict] = {}
+    receipts_by_engine: dict[str, list] = {}
     for clip in (manifest or {}).get("clips") or []:
         role = str(clip.get("role") or "?")
         eng = str(clip.get("engine_id") or "?")
@@ -78,13 +150,18 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             # family = the engine's render family (audio_driven_face / text_to_video /
             # image_to_video ...) -- the human-readable suffix the credits MODELS.VIDEO
             # rows show (e.g. "visualizer . camera"). Sourced from the manifest
-            # clip row (render_driver stamps clip["family"]); None on engines that
-            # don't stamp it (the None IS the receipt, never a fallback).
+            # clip row. build_clip_manifest writes
+            # ``clip.get("family") or shot.get("family") or ""``, so an engine
+            # that stamps nothing arrives here as "" -- NOT None (cite re-pinned
+            # 2026-07-28 against render_driver.build_clip_manifest). Either way
+            # the absence IS the receipt, never a fallback.
             "family": clip.get("family"),
         }
         per_clip.append({"shot_id": clip.get("shot_id"), "role": role,
                          "delivered_engine": eng, **receipt})
-        by_engine.setdefault(eng, receipt)
+        receipts_by_engine.setdefault(eng, []).append(receipt)
+    by_engine = {eng: _roll_up_engine_receipts(rows)
+                 for eng, rows in receipts_by_engine.items()}
     return {
         "histogram": (manifest or {}).get("engine_histogram") or {},
         "video_revision": (manifest or {}).get("video_revision"),

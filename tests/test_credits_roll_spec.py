@@ -78,6 +78,12 @@ def _led():
                 "by_role": {"announcer_visual": {"humo": 2},
                             "music_visual": {"ltx_video": 1},
                             "character_video": {"wan_i2v": 3}},
+                # DELIBERATELY the PRE-2026-07-28 by_engine shape: no
+                # ``varied``, no ``clip_count``, and the wan_i2v row carrying
+                # only ``family``. _build_render_engines_payload can no longer
+                # emit this, and that is the point -- it pins that the credits
+                # readers still read an episode stamped before the per-field
+                # roll-up landed. Do not "modernise" it.
                 "by_engine": {
                     "humo": {"family": "audio_driven_face", "recipe": None,
                              "quant": None, "use_lora": False},
