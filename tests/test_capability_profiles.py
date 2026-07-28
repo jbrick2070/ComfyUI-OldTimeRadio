@@ -523,3 +523,78 @@ def test_two_heavy_roles_still_validate():
     assert "ltx_audio_in" in enabled and "humo" in enabled
     assert "humo_1.7B" in enabled       # legacy selectable engine stays registered
     cp.cross_validate_profile(profile, cp.load_widget_mapping(), decls)
+
+
+# ---------------------------------------------------------------------------
+# A6 follow-up (2026-07-27, post-push QA fan-out): a profile may only select a
+# GGUF quant whose artifact is PINNED.
+#
+# A6 made an unpinned GGUF artifact a refusal at load, which is right -- an
+# artifact with no expected size and no sha cannot be shown to be the file it
+# claims to be. But two shipped DRAFT profiles selected Q6_K, which has neither
+# pin, so their GENERATED variant workflows carried "Q6_K" baked into the
+# writer node's widgets_values and would have raised on the first creative call
+# with no in-workflow remedy: the widget value is hard-coded and neither
+# profile sets the GEMMA4_12B_GGUF_PATH escape hatch.
+#
+# Q6_K was also the wrong quant for those two tiers on its own arithmetic: at
+# roughly 9.1 GiB of weights plus a 2.8 GiB KV cache at n_ctx=4096 it does not
+# fit either profile's declared 10.0 / 10.5 GB ceiling, while the Q4_K_M they
+# now select does. The refusal surfaced a second, older defect rather than
+# creating one -- which is the argument for keeping the refusal and fixing the
+# selection, instead of relaxing the gate back to a warning.
+# ---------------------------------------------------------------------------
+
+def _pinned_quants():
+    from nodes._otr_gguf_backend import GGUF_ARTIFACTS
+
+    return {q for q, (_name, size, sha) in GGUF_ARTIFACTS.items()
+            if size is not None and sha is not None}
+
+
+def test_every_profile_selects_a_pinned_gguf_quant():
+    """The selection is what reaches the widget, so it is the selection that
+    has to be verifiable -- checking only the artifact table would leave the
+    profile free to name a quant the loader will refuse."""
+    import json
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    pinned = _pinned_quants()
+    assert pinned, "no quant is pinned at all -- the check would be vacuous"
+
+    offenders = {}
+    for path in sorted((root / "config" / "profiles").glob("*.json")):
+        quant = ((json.loads(path.read_text(encoding="utf-8")) or {})
+                 .get("llm", {}) or {}).get("gguf_quant")
+        if quant is not None and quant not in pinned:
+            offenders[path.name] = quant
+    assert not offenders, offenders
+
+
+def test_no_generated_variant_bakes_in_an_unpinned_quant():
+    """The profile is the source, but the VARIANT is what an operator loads,
+    and the value is positional inside widgets_values -- so prove it there
+    too. This is the artifact that would actually have failed."""
+    import json
+    import pathlib
+
+    from nodes._otr_gguf_backend import GGUF_ARTIFACTS
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    unpinned = {q for q, (_n, size, sha) in GGUF_ARTIFACTS.items()
+                if size is None or sha is None}
+    assert unpinned, "nothing is unpinned -- this test would prove nothing"
+
+    checked, offenders = 0, {}
+    for profile in sorted((root / "config" / "profiles").glob("*.json")):
+        variant = root / "workflows" / "variants" / profile.name
+        if not variant.exists():
+            continue
+        raw = variant.read_text(encoding="utf-8")
+        checked += 1
+        hits = sorted(q for q in unpinned if '"%s"' % q in raw)
+        if hits:
+            offenders[variant.name] = hits
+    assert checked, "found no generated variants -- the sweep is broken"
+    assert not offenders, offenders

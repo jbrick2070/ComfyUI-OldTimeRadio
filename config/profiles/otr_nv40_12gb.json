@@ -39,7 +39,7 @@
     "quant_policy": "bnb_nf4",
     "vram_ceiling_gb": 10.5,
     "gguf_n_ctx": 4096,
-    "gguf_quant": "Q6_K",
+    "gguf_quant": "Q4_K_M",
     "creative_model": "unsloth/gemma-4-12b-it-GGUF",
     "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
     "openrouter_slot_a_model": "(enable OpenRouter)",

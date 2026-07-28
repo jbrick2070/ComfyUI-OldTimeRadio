@@ -78,13 +78,24 @@ def test_still_flat_uses_static_cmd_pan_uses_motion(monkeypatch, tmp_path):
     monkeypatch.setattr(wb, "ffmpeg_still_motion_cmd",
                         lambda *a, **k: calls.setdefault("motion", a) or ["ffmpeg"])
     monkeypatch.setattr(wb, "run_ffmpeg", lambda cmd: None)
+    # M7 (2026-07-27): render_clip now ffprobes the emitted mp4 before
+    # _floor_clip self-declares its contract. run_ffmpeg is stubbed here, so no
+    # file is ever written and the real probe would raise on a missing path --
+    # the proof is stubbed too, and ASSERTED, so that this test says out loud
+    # that the proof ran rather than silently depending on it not existing.
+    from nodes._otr_video_engines import cheap_families as cf
+    monkeypatch.setattr(cf, "ffprobe_clip_fields", lambda p: {"probed": p})
+    monkeypatch.setattr(cf, "validate_silent_clip_contract",
+                        lambda fields, fps: calls.setdefault("proved", fields))
     req = _req(asset_refs={"init_image": str(still)})
 
     vreg.get_engine("still_flat").render_clip(req)
     assert "static" in calls and "motion" not in calls   # flat = NO pan
+    assert "proved" in calls, "the emitted clip was never proven"
     calls.clear()
     vreg.get_engine("still_motion").render_clip(req)
     assert "motion" in calls and "static" not in calls   # still_motion = the pan path
+    assert "proved" in calls, "the emitted clip was never proven"
 
 
 def test_still_flat_registered_validated_all_roles():

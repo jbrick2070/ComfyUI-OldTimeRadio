@@ -231,14 +231,29 @@ def test_every_adapter_that_encodes_a_clip_also_proves_it():
     engines = (pathlib.Path(__file__).resolve().parents[1]
                / "nodes" / "_otr_video_engines")
     encoders, provers = set(), set()
-    for path in sorted(engines.glob("eng_*.py")):
+    # The sweep is over EVERY module in the package, and counts BOTH ways of
+    # writing a clip. Its first version globbed eng_*.py and looked only for
+    # encode_frames_to_silent_mp4, which made cheap_families.py structurally
+    # invisible: it is not named eng_*, and it builds its mp4 from an ffmpeg
+    # arg list instead of the encoder. That hid FOUR registered engines
+    # (still_motion / still_pan / still_flat / still_word) behind a test that
+    # kept reporting PASS -- including the terminus of the documented
+    # humo -> humo_1.7B -> still_motion degrade chain. Found by the post-push
+    # QA fan-out; a test that is confidently blind is worse than no test.
+    for path in sorted(engines.glob("*.py")):
         src = path.read_text(encoding="utf-8")
-        if "encode_frames_to_silent_mp4(" in src:
+        if path.name in ("wrapper_bridge.py", "wan_shared.py"):
+            continue                      # the helpers themselves, not clients
+        if ("encode_frames_to_silent_mp4(" in src
+                or "run_ffmpeg(" in src):
             encoders.add(path.name)
         if "validate_silent_clip_contract(" in src:
             provers.add(path.name)
 
     assert encoders, "found no encoders at all -- the sweep is broken"
+    assert "cheap_families.py" in encoders, (
+        "the sweep no longer sees cheap_families.py, which is exactly the "
+        "blind spot this widening exists to close")
     assert encoders - provers == set(), sorted(encoders - provers)
 
 

@@ -25,6 +25,7 @@ import logging
 from .registry import register
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .frame_contract import FrameContract
+from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 log = logging.getLogger("OTR.video.cheap_families")
 
@@ -213,6 +214,18 @@ class _CheapFamilyBase:
             cmd = _wb.ffmpeg_lavfi_floor_cmd(
                 out_path, w, h, fps, n, source=self._lavfi_source(w, h, fps))
         _wb.run_ffmpeg(cmd)
+        # M7 (added 2026-07-27, post-push QA fan-out). These four families
+        # (still_motion / still_pan / still_flat / still_word) never touch
+        # encode_frames_to_silent_mp4 -- they build the mp4 from an ffmpeg arg
+        # list instead -- so the sweep that added the proof to every ENCODER
+        # walked straight past them, and _floor_clip goes on to hand-write
+        # container / codec / pixel_format / color_* as literals. still_motion
+        # is also the terminus of the documented humo -> humo_1.7B ->
+        # still_motion degrade chain, so it is the LAST place a self-declared
+        # clip should be trusted. Safe to prove: all four command builders end
+        # in the same _bt709_encode_args tail as the encoder, so a floor clip
+        # already satisfies this contract by construction.
+        validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)
         return self._floor_clip(request, out_path, fps, n)
 
     def _floor_clip(self, request, out_path, fps, n):
