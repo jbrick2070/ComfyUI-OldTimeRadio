@@ -914,6 +914,11 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
         from _otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
 
     try:
+        from ._otr_video_engines import mouth_policy as _mouth  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import mouth_policy as _mouth  # type: ignore
+
+    try:
         from ._otr_video_engines.render_driver import (
             DeferredImageGapError, FamilyInputGap, _is_character_face_beat,
             _is_never_humo_video_role, _line_index, _present_request_tokens,
@@ -1005,6 +1010,21 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
     # validate the engine that would actually receive this request.
     effective_engine = str(shot.get("engine_id") or effective_engine or "")
     fam = engine_family(effective_engine, "")
+
+    # WHO OWNS THIS BEAT'S MOUTH (WIRE-W7, 2026-07-29).
+    #
+    # r3 MUST-FIX 11: no W1-W6 step enforced the operator's three rulings, and
+    # an unowned ruling silently lapses. Asked HERE because this is the one
+    # place that has the FROZEN route -- the effective engine AFTER the
+    # route-freeze and the radio-is-host redirect -- and the ruling is decided
+    # from the route, never from the beat's prose.
+    #
+    # It refuses only the case nobody owned: an audio-in beat that is neither a
+    # character face nor a cabinet role. Every routed beat in the shipped
+    # roster answers HUMAN or RADIO, so this is a gate rather than a change.
+    _mouth.mouth_owner_for_beat(
+        engine_id=effective_engine, family=fam, role=role,
+        is_character_face=_is_character_face_beat(shot))
     required = _required_inputs_for_engine(effective_engine, fam)
     if not required and fam != "static_image_gen":
         return
@@ -1054,6 +1074,53 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
             "candidate %r (family %s) requires input(s) %s the request does "
             "not carry -- LOUD skip down the chain (never feed a wrong-shaped "
             "request to an engine)" % (effective_engine, fam, missing))
+
+
+#: Re-exported so ``build_execution_plan``'s log line names the operator's
+#: number rather than a literal that could drift from the policy's.
+_MOUTH_MAX_FACES = 1
+
+
+def _audit_episode_faces(shots):
+    """Ask the mouth policy how many human faces this episode shows.
+
+    Translates SHOT ROWS into the plain route facts the policy takes -- it is
+    pure and dependency-free by design, so the translation lives here, next to
+    the rows, rather than teaching the policy this module's schema.
+
+    The two derived facts are taken from the SAME authorities the render
+    dispatcher uses: ``engine_family`` for the family (a shot row's own
+    ``family`` is still ``""`` at this point -- it is filled downstream), and
+    ``_is_character_face_beat`` for the talking-head question. A second
+    derivation of either is a second chance to disagree with the dispatcher
+    about which beats show a face.
+    """
+    try:
+        from ._otr_video_engines import mouth_policy as _mouth  # type: ignore
+        from ._otr_video_engines.render_driver import (  # type: ignore
+            _is_character_face_beat, engine_family)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import mouth_policy as _mouth  # type: ignore
+        from _otr_video_engines.render_driver import (  # type: ignore
+            _is_character_face_beat, engine_family)
+
+    global _MOUTH_MAX_FACES
+    _MOUTH_MAX_FACES = _mouth.MAX_HUMAN_FACES_PER_EPISODE
+
+    beats = []
+    for shot in shots or ():
+        engine_id = str(shot.get("engine_id") or "")
+        plan = shot.get("coverage_plan") or {}
+        beats.append({
+            "beat_id": str(shot.get("shot_id") or ""),
+            "engine_id": engine_id,
+            "family": engine_family(engine_id, ""),
+            "role": str(shot.get("role") or ""),
+            "char_id": str(shot.get("char_id") or ""),
+            "is_character_face": _is_character_face_beat(shot),
+            "is_multi_clip": len(plan.get("segments") or ()) > 1,
+        })
+    return _mouth.audit_episode_faces(beats)
 
 
 def _lane_consumes_a_still(shot, engine_id):
@@ -1381,6 +1448,26 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
         # find out here that it expired, not by trusting it.
         _stamp_coverage_plan(shots[-1], b["beat_id"],
                              max_render_frames=max_render_frames)
+
+    # HOW MANY FACES THIS EPISODE SHOWS (WIRE-W7, 2026-07-29).
+    #
+    # The per-beat half runs in the cast-time preflight above; this is the half
+    # that can only be asked once, of the WHOLE episode: "One face per episode
+    # at most, and only for a line the engine can hold in a single take."
+    #
+    # It runs HERE rather than earlier because it needs the coverage plans --
+    # the single-take clause is a question about the STAMPED plan, and the
+    # plans do not exist until the loop above has finished. It runs BEFORE the
+    # rows reach the ledger, so an episode that breaks the look contract never
+    # becomes a lock a downstream phase would honour.
+    _faces = _audit_episode_faces(shots)
+    if _faces:
+        log.info("[OTR_ShotLock] the set speaks except for %s -- %d overheard "
+                 "human face(s) of at most %d", ", ".join(_faces), len(_faces),
+                 _MOUTH_MAX_FACES)
+    else:
+        log.info("[OTR_ShotLock] the set speaks throughout: no overheard human "
+                 "face in this episode")
     return groups, shots
 
 

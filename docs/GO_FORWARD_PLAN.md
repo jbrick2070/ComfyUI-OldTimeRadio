@@ -845,8 +845,10 @@ guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
 ## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2, W6, W3a,
-## W3b, W4a, W4b, W4c and W4d ARE LANDED AND PUSHED; WIRE-W7 (mouth-still
-## ownership) is the next line of code, then WIRE-W5 (the acceptance grader).**
+## W3b, W4a, W4b, W4c, W4d and W7 ARE LANDED AND PUSHED; WIRE-W5 (the
+## acceptance grader) is the LAST chunk, and then the 45-word run over all 18
+## local video/still engines -- which is the operator's stated first priority
+## and the only thing that proves any of this.**
 
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
@@ -1034,11 +1036,40 @@ hash, segment index, start sample, sample count, rate/channels, output PCM
 hash) under the canonical episode directory rather than tmp. It is telemetry
 for the W5 grader, not correctness, so it is filed rather than jammed in here.
 
-**WIRE-W7 IS THE NEXT LINE OF CODE:** mouth-still ownership -- ShotLock as the
-sole cardinality owner, zero or one human face, never inferred from prose. Then
-WIRE-W5, the acceptance grader, which must grade SOURCE COMPONENTS BEFORE
-OVERLAYS (see the panel finding above: a whole-frame motion check passes a
-frozen backdrop because the overlay moves), and can now read
+**WIRE-W7 IS LANDED** -- the operator's three mouth rulings finally have an
+OWNER. r3 MUST-FIX 11 named this as the gap nobody held: *"The plan has the
+rulings and no owner for them."*
+
+- `nodes/_otr_video_engines/mouth_policy.py` is the authority: pure, and
+  IMPORTS NOTHING (a test asserts the import list is exactly `__future__`), so
+  ShotLock can ask it at plan time and the W5 grader can ask it later without
+  either becoming a cycle.
+- **Decided from the FROZEN ROUTE, never from prose** -- the operator's own
+  wording. The policy takes `engine_id`, `family`, `role`,
+  `is_character_face` and no text at all; a test pins the signature, which is
+  the strongest form of that promise.
+- **THE SCHEMA IS NOT EXTENDED.** `still_plan_helpers` carries CLOSED enums and
+  says adding a token is an operator decision, never a coder's. There is no
+  `bears_a_mouth` field and W7 does not add one.
+- ShotLock owns both halves: the per-beat gate in the cast-time preflight
+  (after the route-freeze and the radio-is-host redirect, so the ruling is
+  judged against the engine that will really render), and the episode
+  cardinality after the coverage plans are stamped -- because the single-take
+  clause is a question about the STAMPED plan.
+- **MEASURED, not missed:** the one live route this closes is a cloud
+  `audio_conditioned_video` lane (`cloud_seedance_2`, `cloud_wan_i2v_audio`)
+  aimed at a character beat. Those declare no roles, so an operator can pick
+  one; `_is_character_face_beat` says False, so the beat gets the ambient mix
+  and a SCENE still -- an audio-in engine animating an image with no lips. It
+  now refuses with the remedy in the message. `cloud_kling_avatar` is the
+  CONTROL: same empty `roles`, same beat, answers HUMAN, because the refusal is
+  about the family's relationship to a face and not about being a cloud lane.
+
+**WIRE-W5 IS THE NEXT LINE OF CODE** -- the acceptance grader. It must grade
+SOURCE COMPONENTS BEFORE OVERLAYS (kibitz r1: a whole-frame motion check passes
+a frozen backdrop because the overlay moves,
+`tests/test_credits_roll_spec.py:446-470`), it reads the FROZEN route rather
+than the live environment, histograms are CUT, and it can now read
 `native_frame_count`/`extension_mode` off the manifest to reject a ping-ponged
 clip on a lane claiming real multi-clip coverage.
 
