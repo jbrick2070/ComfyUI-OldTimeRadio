@@ -845,8 +845,9 @@ guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
 ## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2, W6, W3a,
-## W3b, W4a and W4b ARE LANDED AND PUSHED; WIRE-W7 (mouth-still ownership) is
-## the next line of code, then WIRE-W5 (the acceptance grader).**
+## W3b, W4a, W4b and W4c ARE LANDED AND PUSHED; WIRE-W7 (mouth-still ownership)
+## is the next line of code, then WIRE-W5 (the acceptance grader). WIRE-W4d
+## (prebuild the slices OUTSIDE BeatSession) is filed, not built.**
 
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
@@ -974,17 +975,54 @@ right init image -- only the sound was wrong, and no gate listens.
   frame and is dropped at assembly. Give it the visible window and every
   chained segment's mouth runs a frame ahead of its own audio for the whole
   clip -- small enough to ship, and wrong on every segment but the first.
-- `trim_tail` deliberately does NOT shorten the window: the adapter renders
-  those frames, so they need audio like any others, and the slice comes from
-  the FROZEN MASTER rather than a per-beat file, so the samples exist. They are
-  discarded at assembly, which is the only reason it is safe for them to carry
-  the next beat's sound.
+- `trim_tail` does NOT shorten the window -- the adapter renders those frames,
+  so they need audio like any others. **W4b filled them from the master; W4c
+  below corrects that to SILENCE.** The window length was right; the source
+  was not.
 - A single-clip beat -- and a one-segment plan -- asks for a byte-identical
   slice, which is what production renders today.
 - Measured mutation CONTROL, recorded rather than chased: the negative-offset
   clamp in `segment_render_window` is unreachable, because
   `validate_coverage_plan` already refuses a first segment carrying a
   `drop_head`. It stays because the alternative is a negative ffmpeg seek.
+
+**WIRE-W4c IS LANDED** -- and it CORRECTS W4b against r4/A4, which I had not
+re-read closely enough when I built it. The ratified contract is *"conditioning
+WAV duration EQUALS `render_frames`; copy only the `visible_frames` source
+interval and APPEND SILENCE for `trim_tail_frames` -- never speech from the
+next segment."* W4b took the whole window straight off the master.
+
+- **That looked harmless and is not.** The trimmed frames are discarded at
+  assembly, so nobody sees them -- but the AUDIO ENCODER SEES THE WHOLE
+  WAVEFORM before a single frame is sampled, so the next beat's speech sitting
+  in the tail conditions the frames that DO survive. On the pinned 184-frame
+  case that is 2 frames of the next line leaning on a 31-frame take.
+- `segment_render_window` now returns `SegmentAudioWindow(offset_s, copy_s,
+  pad_s)`; `total_s` still equals `render_frames`, which is the generation
+  length and is unchanged. `_slice_master_audio` grew `pad_tail_s` and builds
+  `-af apad` plus an OUTPUT `-t` of the total -- the pair is the contract,
+  because `apad` alone never terminates and a bare output `-t` would just
+  re-cut the source. It also fixes the other end for free: a window running
+  past the END of the master pads to length instead of emitting a short WAV.
+- **The pad is IN the cache key and `SLICER_VERSION` moves 2 -> 3.** Two
+  segments can copy the identical source interval and owe different silence, so
+  a key that ignored the pad would serve the first one's WAV to the second; and
+  every WAV already on disk describes the OLD contract for the same
+  `(master, start, dur)`.
+- The slicer now honours `OTR_FFMPEG`. It used the bare literal while
+  `otr_credits_roll` already honoured the config, so on a box where ffmpeg is
+  configured but not on PATH the credits rendered and the slice silently
+  returned `""` -- which reads downstream as "this beat has no voice line".
+
+**WIRE-W4d IS FILED, NOT BUILT** (r3's own W4 paragraph): segment requests and
+audio slices are still built INSIDE `BeatSession` (`render_driver:~3025`), so
+ffmpeg does filesystem work while holding the GPU lease and the hoisted model.
+r3: *"Prebuild and validate all segment requests and audio slices BEFORE
+entering BeatSession; only terminal-image chaining stays in the render loop."*
+It is a sequencing change, not an arithmetic one. Also unbuilt from that
+paragraph: the durable slice RECEIPT (source PCM hash, segment index, start
+sample, sample count, rate/channels, output PCM hash) under the canonical
+episode directory rather than tmp.
 
 **WIRE-W7 IS THE NEXT LINE OF CODE:** mouth-still ownership -- ShotLock as the
 sole cardinality owner, zero or one human face, never inferred from prose. Then

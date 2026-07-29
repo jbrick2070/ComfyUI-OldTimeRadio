@@ -504,9 +504,30 @@ def validate_coverage_plan(plan: CoveragePlan, contract):
 # independent derivations are two chances to disagree about one string -- the
 # mirror class chunk 1a collapsed for routing.
 
+@dataclass(frozen=True)
+class SegmentAudioWindow:
+    """The conditioning WAV one segment is owed, in seconds from the beat's
+    start. ``copy_s`` comes off the master; ``pad_s`` is SILENCE appended after
+    it. ``total_s`` always equals the segment's ``render_frames``.
+
+    Three numbers rather than two because r4/A4's contract needs all three:
+    "conditioning WAV duration EQUALS render_frames; copy only the
+    visible_frames source interval and APPEND SILENCE for trim_tail_frames --
+    never speech from the next segment."
+    """
+
+    offset_s: float
+    copy_s: float
+    pad_s: float
+
+    @property
+    def total_s(self) -> float:
+        return float(self.copy_s) + float(self.pad_s)
+
+
 def segment_render_window(plan, segment_index, fps):
-    """``(offset_s, duration_s)`` of segment ``segment_index``'s RENDER window,
-    measured from the START OF THE BEAT. Pure; the caller adds the beat's own
+    """The :class:`SegmentAudioWindow` for segment ``segment_index``, measured
+    from the START OF THE BEAT. Pure; the caller adds the beat's own
     ``start_s`` to place it on the episode timeline.
 
     THIS IS THE AUDIO ARITHMETIC (WIRE-W4b, 2026-07-29), and the defect it
@@ -524,11 +545,16 @@ def segment_render_window(plan, segment_index, fps):
     clip -- a lip-sync error small enough to ship and wrong on every segment
     but the first.
 
-    The last segment's ``trim_tail`` deliberately does NOT shorten the window:
-    the adapter renders those frames, so they need audio like any others, and
-    the caller slices from the FROZEN MASTER rather than from a per-beat file,
-    so the samples exist. They are discarded at assembly, which is the only
-    reason it is safe for them to carry the next beat's sound.
+    THE TRIMMED TAIL IS SILENCE, NOT THE NEXT BEAT'S SPEECH (WIRE-W4c,
+    correcting W4b against r4/A4). The window is still ``render_frames`` long,
+    because that is what the graph is asked to generate -- but only
+    ``render_frames - trim_tail`` of it is COPIED from the master and the rest
+    is padded with silence. Taking the tail off the master looked harmless,
+    since those frames are discarded at assembly; it is not, because the audio
+    encoder sees the WHOLE waveform before a single frame is sampled. Speech
+    from the next beat sitting in the tail conditions the frames that DO
+    survive. r4/A4 says it in as many words: "never speech from the next
+    segment".
 
     Raises rather than guessing:
 
@@ -567,7 +593,11 @@ def segment_render_window(plan, segment_index, fps):
             # carrying a drop_head, and only a first segment could go negative.
             # It stays because the alternative is a negative ffmpeg seek, and
             # the validator is one edit away from being the thing that changed.
-            return (max(0, start) / fps, int(segment.render_frames) / fps)
+            copy_frames = int(segment.render_frames) - int(segment.trim_tail)
+            return SegmentAudioWindow(
+                offset_s=max(0, start) / fps,
+                copy_s=max(0, copy_frames) / fps,
+                pad_s=int(segment.trim_tail) / fps)
         visible_start += int(segment.visible_frames)
     raise CoveragePlanError(                      # pragma: no cover -- unreachable
         "segment %d passed the membership check and then was not found" % index)

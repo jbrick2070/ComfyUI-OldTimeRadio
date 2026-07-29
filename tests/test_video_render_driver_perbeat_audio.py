@@ -246,9 +246,13 @@ class TestAmbientAudioMusicBeatGap:
         captured = {}
         slice_path = str(tmp_path / "synth_slice.wav")
 
-        def _fake_slice(path, start, dur, master_hash=""):
+        # ``pad_tail_s`` (WIRE-W4c): a fake that does not accept the real
+        # signature fails as a TypeError inside build_request_from_shot, which
+        # reads as "the slice failed" rather than "this fake is stale".
+        def _fake_slice(path, start, dur, master_hash="", pad_tail_s=0.0):
             captured["start"] = start
             captured["dur"] = dur
+            captured["pad"] = pad_tail_s
             with open(slice_path, "wb") as f:        # must EXIST (build_request filters)
                 f.write(b"RIFF fake wav")
             return slice_path
@@ -285,9 +289,10 @@ class TestAmbientAudioMusicBeatGap:
         sliced = str(tmp_path / "cloud_avatar_slice.wav")
         captured = {}
 
-        def _fake_slice(path, start, dur, master_hash=""):
+        def _fake_slice(path, start, dur, master_hash="", pad_tail_s=0.0):
             captured["start"] = start
             captured["dur"] = dur
+            captured["pad"] = pad_tail_s
             return sliced
 
         with mock.patch.object(rd, "_slice_master_audio", side_effect=_fake_slice):
@@ -512,8 +517,12 @@ class TestBuildRequestFromShotPerBeatAudio:
                             side_effect=lambda p: p == master or orig_isfile(p)):
                 req = rd.build_request_from_shot(shot, ledger,
                                                  master_audio_path=master)
+        # pad_tail_s=0.0 on a single-clip beat (WIRE-W4c): the silence pad is
+        # for a coverage-planned segment's TRIMMED tail and nothing else, so
+        # this majority path must keep asking for a plain interval.
         m.assert_called_once_with(master, 2.0, 4.5,
-                                  master_hash=rd.FROZEN_AUDIO_SHA)
+                                  master_hash=rd.FROZEN_AUDIO_SHA,
+                                  pad_tail_s=0.0)
         assert req["audio_ref"] == {"path": sliced}
 
     def test_no_audio_when_master_empty(self):
@@ -611,7 +620,8 @@ class TestBuildRequestFromShotPerBeatAudio:
             req = rd.build_request_from_shot(shot, ledger,
                                              master_audio_path=master)
         m.assert_called_once_with(master, 9.5, 9.40375,
-                                  master_hash=rd.FROZEN_AUDIO_SHA)
+                                  master_hash=rd.FROZEN_AUDIO_SHA,
+                                  pad_tail_s=0.0)
         assert req["audio_ref"] == {"path": sliced}
         assert req["asset_refs"]["init_image"] == str(portrait), (
             "announcer beat must resolve the radio-style portrait as "

@@ -46,16 +46,23 @@ def _plan(join, *segments):
 # The arithmetic, on its own
 # ---------------------------------------------------------------------------
 
+def _win(plan, index):
+    """(offset, copy, pad) as plain floats, for readable comparisons."""
+    w = cp.segment_render_window(plan, index, FPS)
+    return (w.offset_s, w.copy_s, w.pad_s)
+
+
 def test_a_JUMP_beats_segments_TILE_the_beat_end_to_end():
     """No drop, no trim: three 33-frame clips cover 99 frames, and each one's
     audio starts exactly where the previous one's ended. Any gap or overlap
     here is a gap or overlap in the finished beat's lip sync."""
     plan = _plan(cp.JOIN_JUMP, (33, 0, 0), (33, 0, 0), (33, 0, 0))
     windows = [cp.segment_render_window(plan, i, FPS) for i in range(3)]
-    assert windows == [(0.0, 33 / FPS), (33 / FPS, 33 / FPS),
-                       (66 / FPS, 33 / FPS)]
-    for (start, dur), (nxt, _d) in zip(windows, windows[1:]):
-        assert start + dur == pytest.approx(nxt)
+    assert [_win(plan, i) for i in range(3)] == [
+        (0.0, 33 / FPS, 0.0), (33 / FPS, 33 / FPS, 0.0),
+        (66 / FPS, 33 / FPS, 0.0)]
+    for cur, nxt in zip(windows, windows[1:]):
+        assert cur.offset_s + cur.total_s == pytest.approx(nxt.offset_s)
 
 
 def test_a_CHAINED_successor_gets_audio_for_the_frame_it_DROPS():
@@ -65,22 +72,52 @@ def test_a_CHAINED_successor_gets_audio_for_the_frame_it_DROPS():
     Hand it the VISIBLE window and its mouth runs a frame ahead of its own
     audio for the whole clip -- on every segment but the first."""
     plan = _plan(cp.JOIN_CHAIN, (33, 0, 0), (33, 1, 0), (33, 1, 0))
-    assert cp.segment_render_window(plan, 0, FPS) == (0.0, 33 / FPS)
+    assert _win(plan, 0) == (0.0, 33 / FPS, 0.0)
     # segment 1 contributes from visible frame 33 but RENDERS from 32
-    assert cp.segment_render_window(plan, 1, FPS) == (32 / FPS, 33 / FPS)
+    assert _win(plan, 1) == (32 / FPS, 33 / FPS, 0.0)
     # segment 2 contributes from 65 (33 + 32) and RENDERS from 64
-    assert cp.segment_render_window(plan, 2, FPS) == (64 / FPS, 33 / FPS)
+    assert _win(plan, 2) == (64 / FPS, 33 / FPS, 0.0)
 
 
-def test_the_TRIMMED_tail_still_gets_audio_because_it_is_still_RENDERED():
-    """``trim_tail`` is an ASSEMBLY cut, not a render one -- the adapter is
-    asked for those frames and needs audio under them like any others. The
-    caller slices from the FROZEN MASTER rather than from a per-beat file, so
-    the samples exist; they are discarded at assembly, which is the only reason
-    it is safe for them to carry the next beat's sound."""
+def test_the_TRIMMED_tail_is_SILENCE_and_never_the_next_beats_SPEECH():
+    """r4/A4, and W4b got this wrong: it copied ``render_frames`` straight off
+    the master, so the trimmed tail carried whatever came next in the episode.
+
+    That looked harmless because those frames are discarded at assembly. It is
+    not: the audio encoder sees the WHOLE waveform before a single frame is
+    sampled, so speech sitting in the tail conditions the frames that DO
+    survive. The window stays ``render_frames`` long -- that is the generation
+    length -- but only ``render_frames - trim_tail`` is COPIED."""
     plan = _plan(cp.JOIN_JUMP, (33, 0, 0), (33, 0, 2))
-    assert cp.segment_render_window(plan, 1, FPS) == (33 / FPS, 33 / FPS)
+    offset, copy, pad = _win(plan, 1)
+    assert offset == pytest.approx(33 / FPS)
+    assert copy == pytest.approx(31 / FPS)          # the real speech
+    assert pad == pytest.approx(2 / FPS)            # silence, not the next beat
+    window = cp.segment_render_window(plan, 1, FPS)
+    assert window.total_s == pytest.approx(33 / FPS), (
+        "the conditioning WAV duration EQUALS render_frames")
     assert plan.total_visible_frames == 64          # the beat is 2 frames shorter
+
+
+def test_the_OPERATORS_PINNED_184_CASE_is_the_contracts_own_example():
+    """r4/A4 states it in numbers: the pinned 184-frame beat plans [153, 33]
+    with trim 2, so the last segment is "31 audio frames against a 33-frame
+    render". Nothing else in this file would notice if the two stopped
+    agreeing."""
+    plan = _plan(cp.JOIN_JUMP, (153, 0, 0), (33, 0, 2))
+    assert plan.total_visible_frames == 184
+    window = cp.segment_render_window(plan, 1, FPS)
+    assert window.copy_s * FPS == pytest.approx(31)
+    assert window.pad_s * FPS == pytest.approx(2)
+    assert window.total_s * FPS == pytest.approx(33)
+
+
+def test_a_segment_with_NO_TRIM_owes_NO_SILENCE():
+    """The pad is not a constant sprinkled on every segment -- only the one
+    the ladder could not land on exactly carries any."""
+    plan = _plan(cp.JOIN_JUMP, (33, 0, 0), (33, 0, 2))
+    assert _win(plan, 0)[2] == 0.0
+    assert _win(plan, 1)[2] > 0.0
 
 
 def test_the_WINDOWS_COVER_the_beat_for_every_shipped_ladder():
@@ -104,11 +141,15 @@ def test_the_WINDOWS_COVER_the_beat_for_every_shipped_ladder():
                 continue
             visible = 0
             for segment in plan.segments:
-                start, dur = cp.segment_render_window(
-                    plan, segment.index, FPS)
-                assert start == pytest.approx(
+                window = cp.segment_render_window(plan, segment.index, FPS)
+                assert window.offset_s == pytest.approx(
                     max(0, visible - segment.drop_head) / FPS)
-                assert dur == pytest.approx(segment.render_frames / FPS)
+                assert window.total_s == pytest.approx(
+                    segment.render_frames / FPS), (
+                    "the conditioning WAV is always the GENERATION length")
+                assert window.pad_s == pytest.approx(
+                    segment.trim_tail / FPS), (
+                    "and only the trimmed frames are silence")
                 visible += segment.visible_frames
                 checked += 1
     assert checked >= 30, "only %d segment windows checked" % checked
@@ -163,17 +204,17 @@ def _shot(plan=None):
     return shot
 
 
-def _capture_slices(tmp_path, shot, ledger, indices):
-    """Build one request per segment index and return the (start, dur) each
-    one asked the slicer for."""
+def _capture_slices(tmp_path, shot, ledger, indices, with_pad=False):
+    """Build one request per segment index and return what each one asked the
+    slicer for -- (start, dur) by default, (start, dur, pad) when asked."""
     master = tmp_path / "master.mp4"
     master.write_bytes(b"fake-master")
     out = tmp_path / "slice.wav"
     out.write_bytes(b"RIFF fake wav")
     seen = []
 
-    def _fake_slice(path, start, dur, master_hash=""):
-        seen.append((start, dur))
+    def _fake_slice(path, start, dur, master_hash="", pad_tail_s=0.0):
+        seen.append((start, dur, pad_tail_s) if with_pad else (start, dur))
         return str(out)
 
     with mock.patch.object(rd, "_slice_master_audio", side_effect=_fake_slice):
@@ -229,3 +270,110 @@ def test_a_CHAINED_beats_slices_OVERLAP_by_exactly_the_dropped_frame(tmp_path):
     seen = _capture_slices(tmp_path, _shot(plan), _ledger(), (0, 1))
     (s0, d0), (s1, _d1) = seen
     assert s0 + d0 - s1 == pytest.approx(1 / FPS)
+
+
+# ---------------------------------------------------------------------------
+# WIRE-W4c -- the conditioning WAV contract reaches ffmpeg
+# ---------------------------------------------------------------------------
+
+def test_the_TRIM_reaches_the_SLICER_as_a_SILENCE_PAD(tmp_path):
+    """The arithmetic being right is half of it -- the pad has to arrive at the
+    process that writes the WAV. W4b passed only (start, dur), so the correct
+    numbers were computed and the wrong file was written."""
+    plan = _plan(cp.JOIN_JUMP, (153, 0, 0), (33, 0, 2))
+    ledger = _ledger()
+    ledger["lines"][0]["dur_s"] = 184 / FPS
+    ledger["video"]["shots"][0]["target_frame_count"] = 184
+    shot = _shot(plan)
+    shot["target_frame_count"] = 184
+    seen = _capture_slices(tmp_path, shot, ledger, (0, 1), with_pad=True)
+    assert seen[0] == (pytest.approx(10.0), pytest.approx(153 / FPS),
+                       pytest.approx(0.0))
+    assert seen[1] == (pytest.approx(10.0 + 153 / FPS),
+                       pytest.approx(31 / FPS), pytest.approx(2 / FPS))
+
+
+def test_a_SINGLE_CLIP_beat_asks_for_NO_PAD(tmp_path):
+    """The majority path stays byte-identical: no plan, no pad."""
+    seen = _capture_slices(tmp_path, _shot(None), _ledger(), (0,),
+                           with_pad=True)
+    assert seen == [(pytest.approx(10.0), pytest.approx(99 / FPS), 0.0)]
+
+
+def test_the_PAD_is_IN_the_cache_key(tmp_path):
+    """Two segments can copy the IDENTICAL source interval and owe different
+    silence. A key that ignored the pad would serve the first one's WAV to the
+    second -- an under-length conditioning track wearing a cache hit."""
+    bare = rd.slice_cache_key("deadbeef", 1.0, 2.0)
+    padded = rd.slice_cache_key("deadbeef", 1.0, 2.0, pad_tail_s=0.08)
+    assert bare != padded
+    assert rd.slice_cache_key("deadbeef", 1.0, 2.0, pad_tail_s=0.0) == bare
+
+
+def test_the_SLICER_VERSION_moved_so_old_cached_WAVs_cannot_be_served():
+    """Every WAV on disk from before this chunk describes a different contract
+    -- the same (master, start, dur) now means "and pad the tail". Serving one
+    would hand a segment a conditioning track built to the old rule."""
+    assert rd.SLICER_VERSION != "2"
+
+
+def _slicer_argv(tmp_path, monkeypatch, **kwargs):
+    """Run the slicer with ffmpeg faked and the cache ISOLATED to tmp_path,
+    and return the argv it built.
+
+    The isolation is load-bearing: the slice cache lives under the shared
+    episode tmp dir, so a second run of this test would take a CACHE HIT, skip
+    ffmpeg entirely and assert against an argv that was never built."""
+    from nodes._otr_video_engines import _tmp as _otr_tmp
+    monkeypatch.setattr(_otr_tmp, "_in_tree_tmp_dir", lambda: str(tmp_path))
+    master = tmp_path / "master.wav"
+    master.write_bytes(b"RIFF fake")
+    seen = {}
+
+    def _fake_run(cmd, **_kw):
+        seen["cmd"] = list(cmd)
+        with open(cmd[-1], "wb") as fh:          # ffmpeg's job, faked
+            fh.write(b"RIFF fake out")
+        return mock.Mock(returncode=0)
+
+    monkeypatch.setattr(rd.subprocess, "run", _fake_run)
+    out = rd._slice_master_audio(str(master), master_hash="deadbeef", **kwargs)
+    assert out, "the slicer reported failure, so there is no argv to judge"
+    return seen["cmd"]
+
+
+def test_the_FFMPEG_COMMAND_pads_with_SILENCE_and_truncates_to_length(
+        tmp_path, monkeypatch):
+    """Down to the argv, because this is the layer where "the tail is silence"
+    either happens or does not. ``apad`` alone never terminates and a bare
+    output ``-t`` would just re-cut the source, so the pair is the contract."""
+    cmd = _slicer_argv(tmp_path, monkeypatch, start_s=10.0, dur_s=31 / FPS,
+                       pad_tail_s=2 / FPS)
+    assert "-af" in cmd and cmd[cmd.index("-af") + 1] == "apad"
+    # the OUTPUT -t is the TOTAL contracted length, not the source interval
+    assert cmd[-3:-1] == ["-t", "%.6f" % (31 / FPS + 2 / FPS)]
+    # ...and the INPUT -t still reads only the real speech
+    assert cmd[cmd.index("-i") - 1] == "%.6f" % (31 / FPS)
+
+
+def test_an_UNPADDED_slice_keeps_the_shipped_ffmpeg_command(tmp_path,
+                                                            monkeypatch):
+    """CONTROL. Every single-clip beat in production takes this path, so the
+    argv must not grow a filter it never had."""
+    cmd = _slicer_argv(tmp_path, monkeypatch, start_s=10.0, dur_s=2.0)
+    assert "-af" not in cmd
+    assert cmd.count("-t") == 1, "only the INPUT read-duration"
+
+
+def test_the_SLICER_honours_the_CONFIGURED_ffmpeg(tmp_path, monkeypatch):
+    """otr_credits_roll already honoured OTR_FFMPEG while this module used the
+    bare literal, so on a box where ffmpeg is configured but not on PATH the
+    credits rendered and the slice silently returned "" -- which reads
+    downstream as "this beat has no voice line", not as "this box cannot
+    slice"."""
+    configured = tmp_path / "my-ffmpeg.exe"
+    configured.write_bytes(b"#!/bin/sh\n")
+    monkeypatch.setenv("OTR_FFMPEG", str(configured))
+    assert rd._slicer_ffmpeg_bin() == str(configured)
+    monkeypatch.delenv("OTR_FFMPEG", raising=False)
+    assert "ffmpeg" in rd._slicer_ffmpeg_bin()

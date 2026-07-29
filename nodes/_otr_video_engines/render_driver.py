@@ -373,7 +373,9 @@ def build_request(shot, assets, frame_count, canvas=None):
 
 #: Bumps when the SLICE ffmpeg recipe changes (codec/rate/channels/trim
 #: semantics) -- part of the slice cache key, so old cached WAVs invalidate.
-SLICER_VERSION = "2"
+#: v3 (WIRE-W4c): the recipe grew a silence pad, so every v2 WAV on disk
+#: describes a different contract and must not be served to a v3 caller.
+SLICER_VERSION = "3"
 
 #: The HuMo slice recipe constants (UNCHANGED semantics -- 7.3: HuMo's
 #: slicer is NOT changed; they are named so the cache key can bind them).
@@ -385,16 +387,23 @@ def slice_cache_key(master_hash, start_s, dur_s, *,
                     sample_rate=_SLICE_SAMPLE_RATE,
                     channels=_SLICE_CHANNELS,
                     slicer_version=SLICER_VERSION,
-                    master_path=""):
+                    master_path="", pad_tail_s=0.0):
     """The SLICE cache key (3D plan 7.3): master CONTENT hash + timing +
     rate + channels + slicer version. ``master_path`` participates ONLY when
     ``master_hash`` is empty (the legacy hashless caller keeps the shipped
-    path-keyed behavior instead of all colliding on one key). Pure; 16-hex."""
+    path-keyed behavior instead of all colliding on one key). Pure; 16-hex.
+
+    ``pad_tail_s`` (WIRE-W4c) is IN the key because it is part of the OUTPUT,
+    not part of the request: two segments can copy the identical source
+    interval and owe different amounts of trailing silence, and a key that
+    ignored the pad would serve the first one's WAV to the second -- an
+    under-length conditioning track wearing a cache hit."""
     ident = str(master_hash or "") or ("path:%s" % master_path)
     return hashlib.sha256(
-        ("slice|v%s|%s|%.6f|%.6f|ar%d|ac%d"
+        ("slice|v%s|%s|%.6f|%.6f|ar%d|ac%d|pad%.6f"
          % (slicer_version, ident, float(start_s), float(dur_s),
-            int(sample_rate), int(channels))).encode("utf-8")
+            int(sample_rate), int(channels), float(pad_tail_s or 0.0))
+         ).encode("utf-8")
     ).hexdigest()[:16]
 
 
@@ -412,10 +421,39 @@ def curve_cache_key(slice_key, line_id, *, fps, driver_version,
     ).hexdigest()[:16]
 
 
-def _slice_master_audio(master_path, start_s, dur_s, master_hash=""):
+def _slicer_ffmpeg_bin():
+    """The CONFIGURED ffmpeg, then PATH (WIRE-W4c).
+
+    This module hard-coded the bare literal ``"ffmpeg"`` while
+    ``otr_credits_roll`` already honoured ``OTR_FFMPEG`` -- so on a box where
+    ffmpeg is configured but not on PATH the credits rendered and the audio
+    slice silently returned ``""``, which reads downstream as "this beat has
+    no voice line" rather than as "this box cannot slice". Returns the bare
+    name when nothing resolves, so the failure is still ffmpeg's own and still
+    LOUD at the call site rather than an import-time raise."""
+    cand = (os.environ.get("OTR_FFMPEG") or "").strip()
+    if cand and (os.path.isfile(cand) or shutil.which(cand)):
+        return cand
+    return shutil.which("ffmpeg") or "ffmpeg"
+
+
+def _slice_master_audio(master_path, start_s, dur_s, master_hash="",
+                        pad_tail_s=0.0):
     """ffmpeg-slice ``[start_s, start_s+dur_s]`` from the FROZEN master into a
-    temp WAV.  Read-only (``-i`` only, never ``-o`` on the master).  Returns
-    the temp path on success, ``""`` on failure (LOUD warning logged).
+    temp WAV, optionally APPENDING ``pad_tail_s`` of silence.  Read-only
+    (``-i`` only, never ``-o`` on the master).  Returns the temp path on
+    success, ``""`` on failure (LOUD warning logged).
+
+    ``pad_tail_s`` (WIRE-W4c, r4/A4) exists so a coverage-planned segment's
+    conditioning WAV can be ``render_frames`` long while carrying only
+    ``render_frames - trim_tail`` of real speech. The pad is genuine silence,
+    never the master's continuation: the audio encoder sees the WHOLE waveform
+    before a single frame is sampled, so speech from the next beat sitting in
+    a tail that gets trimmed still conditions the frames that survive.
+
+    ``apad`` also covers the other end of the same problem for free: a window
+    that runs past the END of the master pads to length instead of emitting a
+    short WAV.
 
     The output file is cached by :func:`slice_cache_key` so render-twice is
     deterministic without re-running ffmpeg AND a new master at the same
@@ -430,7 +468,8 @@ def _slice_master_audio(master_path, start_s, dur_s, master_hash=""):
                      "master at the same path); thread "
                      "ledger['audio']['master_audio_sha256'] in")
     key = slice_cache_key(master_hash, start_s, dur_s,
-                          master_path=master_path)
+                          master_path=master_path,
+                          pad_tail_s=pad_tail_s)
     from ._tmp import _in_tree_tmp_dir
     _base = _in_tree_tmp_dir() or tempfile.gettempdir()
     tmp_dir = os.path.join(_base, "audio_slices")
@@ -444,14 +483,22 @@ def _slice_master_audio(master_path, start_s, dur_s, master_hash=""):
     if os.path.exists(out) and os.path.getsize(out) > 0:
         return out                       # deterministic cache hit
     cmd = [
-        "ffmpeg", "-y",
+        _slicer_ffmpeg_bin(), "-y",
+        # INPUT options: seek + read exactly the source interval.
         "-ss", "%.6f" % float(start_s),
         "-t",  "%.6f" % float(dur_s),
         "-i",  master_path,
         "-vn", "-c:a", "pcm_s16le",
         "-ar", str(_SLICE_SAMPLE_RATE), "-ac", str(_SLICE_CHANNELS),
-        out,
     ]
+    pad = float(pad_tail_s or 0.0)
+    if pad > 0:
+        # OUTPUT options: `apad` emits silence forever after the source ends
+        # and the second `-t` truncates the result to the contracted length.
+        # The pair is deliberate -- `apad` alone never terminates, and a `-t`
+        # alone would just re-cut the source interval.
+        cmd += ["-af", "apad", "-t", "%.6f" % (float(dur_s) + pad)]
+    cmd.append(out)
     try:
         subprocess.run(cmd, check=True, capture_output=True, timeout=30)
     except Exception as exc:             # noqa: BLE001 - LOUD, never crash
@@ -2259,7 +2306,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # no multi-clip plan and takes the branch below untouched, and a
             # plan this shot could not describe is a stamp error that the
             # planner's own validator already refuses upstream.
-            _slice_start, _slice_dur = float(start_s), float(dur_s)
+            _slice_start, _slice_dur, _slice_pad = float(start_s), float(dur_s), 0.0
             _seg_label = ""
             _seg_plan_raw = shot.get("coverage_plan")
             if isinstance(_seg_plan_raw, dict) and _seg_plan_raw:
@@ -2271,19 +2318,27 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 if _seg_plan.is_multi_clip:
                     _sfps = int(((ledger or {}).get("video") or {}).get("fps")
                                 or 25) or 25
-                    _off, _len = _cp.segment_render_window(
+                    _win = _cp.segment_render_window(
                         _seg_plan, int(segment_index or 0), _sfps)
-                    _slice_start = float(start_s) + _off
-                    _slice_dur = _len
+                    _slice_start = float(start_s) + _win.offset_s
+                    _slice_dur = _win.copy_s
+                    # r4/A4: the conditioning WAV is render_frames long, but
+                    # only the untrimmed part is COPIED -- the rest is silence,
+                    # never the next segment's speech.
+                    _slice_pad = _win.pad_s
                     _seg_label = " segment %d/%d" % (
                         int(segment_index or 0), _seg_plan.segment_count)
+                    if _slice_pad > 0:
+                        _seg_label += " (+%.3fs silence for the trimmed tail)" \
+                            % _slice_pad
             # 7.3 slice key: the master CONTENT hash is the cache identity
             # (a new master at the same path invalidates the slice).
             _mhash = str(((ledger or {}).get("audio") or {})
                          .get("master_audio_sha256") or "")
             sliced = _slice_master_audio(master_audio_path,
                                          _slice_start, _slice_dur,
-                                         master_hash=_mhash)
+                                         master_hash=_mhash,
+                                         pad_tail_s=_slice_pad)
             if sliced:
                 _LOG.info("[OTR.render_driver] per-beat audio: sliced "
                           "%s @%.3f+%.3fs -> %s (beat %s%s)",
