@@ -69,6 +69,40 @@ entirely. **That proposal is CONSIDERED AND OVERRULED** -- lip sync stays in
 the show, so the HuMo lane stays load-bearing and the per-segment audio slicer
 is NOT descoped.
 
+**THE LIPS MAY BE A PERSON *OR* A RADIO** (operator refinement, same day). The
+audio-in engine needs a mouth-shaped thing to move; it does not need a human
+one. Fable seat, asked again under this refinement, REVISED its own defect
+verdict and produced the house rule:
+
+- **THE SET SPEAKS BY DEFAULT; A FACE MUST BE OVERHEARD.** The cabinet is the
+  speaker for the announcer (who IS the station), for the music bookends, and
+  for characters while they are performing. A human mouth appears only when a
+  character stops broadcasting and says something private -- the confession,
+  the last line. **One face per episode at most**, and only for a line the
+  engine can hold in a single take.
+- **POINT THE ENGINE AT THE TUNING EYE.** Late-1930s console, dark walnut,
+  three-quarter, room black. The dominant feature is the magic-eye tube -- the
+  green phosphor iris that opens and closes with signal strength -- with the
+  dial glass a warm OUT-OF-FOCUS band below and the grille cloth falling into
+  shadow. The eye's fan closes on sibilants; the dial lamp breathes; the grille
+  micro-trembles on plosives. **The wood never moves.** Rationale: these models
+  want a bright mouth-shaped region on a dark ground, and the tuning eye is an
+  iris whose entire job in 1938 was already to move with audio.
+- **THE STILL MUST DENY THE ENGINE ANYTHING IT CAN VISIBLY BREAK.** No legible
+  text, no sharp slat pattern, no straight edge in focus. Rigid geometry and
+  typography punish drift far harder than flesh does -- "a dial that re-spells
+  its own numbers every render is the most legible error this show could
+  produce." Let light carry the motion. **A generated still showing legible
+  dial numbers or brand type is a BAD STILL: regenerate, do not hope.**
+  Watch one failure mode in test: these engines invent motion, and wood grain
+  that swims continuously is worse than a face that cuts six times.
+- **CONSEQUENCE FOR `humo_14B_169`:** its 49-frame ceiling STOPS being a defect
+  for the set-subject. Two renders of dark wood and a glow butt together like a
+  soft dissolve, and residual flicker reads as signal behaviour. It gets its
+  long beats back ON THE CABINET ONLY. For human faces the original verdict
+  stands: breath-length lines, cuts on breaths, one face an episode. The face
+  ration and the frame ceiling are now THE SAME RULE.
+
 Two consequences, both now load-bearing:
 
 1. **The talking-still decision must be STABLE.** `wants_talking_prompt()`
