@@ -2743,3 +2743,91 @@ out until they independently meet the same production-only admission rule.
   receipt rule (a run under a consent act must mark its own artifacts)
 - status: **ROOT-FIXED + suite/contract GREEN; live 8GB requalification leg
   still owed (no GPU run authorized in this window)**
+
+## PBUG-20260729-01 -- P5 markup defect hid behind the compile refusal, and the one repair shot died on it
+- surfaced: the live 45-word campaign, leg `ltx_8gb` (2026-07-29 06:46), headless
+  canonical run. `P5 failed: ... disposition=primary_ladder_exhausted; last
+  error -> PostValidationError: l001: spoken text is production markup`
+- symptom: the writer died before any video engine ran. Attempt 1 (base) was
+  told only "P5 compact draft line IDs do not exactly cover the accepted graph
+  (missing=[], unknown=['l011','l012','l013'])". Attempt 2 (typed repair) did
+  exactly what it was told -- dropped the three invented IDs -- and was then
+  refused for `l001: spoken text is production markup`, a defect that was
+  sitting in attempt 1's output and had never been mentioned. The ladder was
+  spent: `structured_call` deliberately does not retry a repair that was
+  schema-valid but content-invalid.
+- root cause: the P5 post-validator surfaced ONE defect at a time.
+  `compile_script_text_draft` raises on ID coverage before any markup check can
+  run, so a compile refusal hid every markup defect behind it; and
+  `_validate_p5_structure` returned on the first offending line, so even a
+  clean-ID draft with three bad lines would have burned the shot on line one.
+  A validator that reports serially is incompatible with a ladder that grants
+  one repair attempt.
+- fix: `3b49d3f8` -- `_validate_p5_structure` reports EVERY offending spoken
+  line (a single finding still yields the bare historical message, so existing
+  pins hold); and when `compile_script_text_draft` refuses, the RAW draft rows
+  are scanned by the new `_p5_raw_spoken_findings` and those findings ride
+  along with the compile refusal. Only rows the score owns and marks spoken are
+  judged -- an invented ID has no speaker_role, and judging its text would be
+  inventing a contract.
+- verify idea: drive the P5 post_validator with a draft that BOTH misses the
+  graph and speaks production markup, and assert the returned string names both
+  defects. `tests/test_p5_repair_sees_every_defect.py` does this; mutation E9
+  (the compile refusal drops the markup findings again) and E8 (the structure
+  validator reports only the first bad line) both die against it.
+- bible-worthy: yes -- the portable rule is that **a validator feeding a
+  bounded repair budget must report every defect it can see in one pass.**
+  Serial reporting silently converts an N-defect artifact into N required
+  attempts, and any ladder shorter than N then fails for a reason that looks
+  like a model problem and is actually a reporting problem.
+- status: **ROOT-FIXED; suite/mutation GREEN; live requalification owed --
+  `ltx_8gb` must be re-run and reach a video engine**
+
+## PBUG-20260729-02 -- a degenerate P5 generation burns 24 minutes and bypasses the whole retry ladder
+- surfaced: the live 45-word campaign, leg `ltx_audio_in` (2026-07-29 06:46 ->
+  07:11, 1449s), headless canonical run
+- symptom: `P5 failed: prose generation exhausted the full remaining
+  provider/context capacity (14697 output tokens after a 1687-token prompt);
+  the partial artifact is not eligible for a prose or structural reroll`
+  (`PromptContextOverflowError`). One leg, 24 minutes, no video engine reached.
+- root cause: TWO layers, and only the second is in doubt.
+  (a) The model never stopped adding lines. `ScriptTextDraftV4.lines` declares
+      `max_length=_SCRIPT_TEXT_DRAFT_MAX_LINES`, but that ceiling is the GLOBAL
+      one (`_RADIO_SCORE_MAX_BEATS * _RADIO_SCORE_MAX_LINES_PER_BEAT`), not this
+      episode's accepted line count, and the constrained decoder did not force
+      the array closed at it. Nothing told the decoder the real ceiling. This is
+      the same pathology as PBUG-20260729-01's `unknown=['l011','l012','l013']`,
+      one step worse -- there the model invented three extra lines, here it
+      never stopped. `repetition_penalty` was already at its gentle 1.03, so
+      this is a constrained-decoding ceiling problem, not a sampling one.
+  (b) The refusal is raised on attempt 1 of 3 and `PromptContextOverflowError`
+      is a `RuntimeError`, which `structured_call` does not catch -- so a
+      runaway consumes one attempt and then BYPASSES the remaining two rungs of
+      a ladder that exists to absorb exactly this. The refusal's own text says
+      the partial ARTIFACT is not eligible for a reroll, which is right; it does
+      not say a fresh call at a lower temperature is ineligible, and the
+      structural-retry rung (0.32) is the standard remedy for a degenerate loop.
+- fix: **NOT FIXED.** Deliberately left open rather than changed unattended:
+  every candidate touches a ratified fail-loud contract or the writer's
+  sampling, and getting it wrong is worse than one lost leg the campaign
+  watchdog already re-runs. Two candidates, for whoever picks this up:
+    1. Bound the constrained decoder by the ACCEPTED line count for this
+       episode rather than the global product ceiling, so a runaway is
+       structurally impossible instead of merely caught. Preferred -- it
+       removes the failure rather than recovering from it.
+    2. Let a runaway under `_otr_reserve_remaining_output_capacity` advance the
+       ladder instead of being terminal. Note the trap: the typed repair
+       factory would be handed the ~14,700-token truncated output as
+       `failed_output`, so the repair prompt itself must be bounded first.
+  Do NOT "fix" this by capping P5's output budget to the word target -- THE LAW
+  is explicit that requested word length and actual word count are telemetry
+  only and may never reject or block an episode, and `output_budget_mode:
+  "provider_capacity"` is that decision written down.
+- verify idea: a fake slot_fn that returns exactly `effective_max_new_tokens`
+  tokens without an EOS, asserting the pass makes a SECOND call at the
+  structural-retry temperature instead of raising on the first.
+- bible-worthy: yes -- the portable rule is that **a failure raised as a
+  RuntimeError inside one rung of a retry ladder silently cancels the rungs
+  below it.** Any bounded-retry design has to classify its own terminal errors
+  explicitly, or the budget it advertises is not the budget it spends.
+- status: **OPEN -- diagnosed, not fixed. Live: 1 occurrence in 6 legs.**
