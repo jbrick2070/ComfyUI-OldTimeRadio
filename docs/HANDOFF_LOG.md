@@ -3,6 +3,49 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-28 18:40 -- HEAD 7e768828 (v2.0-alpha) -- WINDOW RENDER/QA (cont.)
+Did: ran the 45-word engine-coverage campaign to completion over all 18 LOCAL
+  engines. RESULT: 11 publish to otr/obs/, 6 NO_RENDER, mesh_stage renders 7/7
+  and publishes nothing. The six are NOT a stills problem -- 5 of 6 are
+  MULTI-SEGMENT COVERAGE (wan x2 at node 92, no session_identity(); humo x3 at
+  node 90, beat > cap with no per-segment audio slicer) and 1 is a preflight
+  string match (ltx_video: _is_deferred_image_gap's four needles miss the
+  LTX-I2V wording, so ShotLock re-raises and node 91 never runs).
+  Ran a wiring kibitz arc r1 + r2 with THREE seats (opus + codex gpt-5.6-sol
+  high + agy). VERIFIED MYSELF: session_identity() exists on ONE engine
+  (eng_ltx_8gb.py:732); beat_session.py:155 raises the exact string the wan
+  receipts carry; ltx_8gb really does render multi-segment (server_ltx.log
+  :1323,1394,1533,1582). agy's "unproven assumption" was wrong.
+  codex broke my scope estimate correctly: identity ALONE is not the fix --
+  BeatSession promises ONE MODEL LOAD PER BEAT, and ltx_8gb earns that with
+  identity + custom prepare() + hoisted checkpoints with loaders omitted from
+  the segment graph + teardown. A ten-line identity declaration would silence
+  the refusal and then load per segment.
+  r2 found the partition bug: a 184-frame beat plans FOUR clips because the
+  ladder is solved as an EXACT cover despite allow_tail_trim=True (33 + 4n:
+  118%4=2, 85%4=1, 52%4=0). ~15 trips vs ~30 on a 100s beat.
+  THREE OPERATOR RULINGS RECORDED in GO_FORWARD: (1) a still floor is legal
+  ONLY where the partition math is impossible, never where an engine refused;
+  (2) every audio-in beat gets a still with a mouth -- the no-lip-sync
+  proposal is overruled; (3) the lips may be a person OR A RADIO, and the
+  Fable seat then revised its own verdict: the set speaks by default, point
+  the engine at the magic-eye tube, no legible text or straight edges in the
+  still, and humo_14B_169's 49-frame ceiling stops being a defect on the
+  cabinet.
+Current step: r3 of the wiring arc. r1 and r2 are JUDGED
+  (kibitz-runs/2026-07-28-local-engine-obs-wiring/r{1,2}/final.md); r2/final.md
+  carries the build order and is code-ready. NOTE: the opus seat FAILED to
+  produce claude.md in r2 -- re-seat it in r3.
+Next: r3 + r4, then code in the r2/final.md order -- C5 partition fix FIRST
+  (it shrinks C2 and C3), then C1 typed DeferredImageGapError in
+  _otr_shared/retry_taxonomy.py, then WAN (hoist ONLY the UNET patcher --
+  hoisting CLIP/VAE nullifies free_after_use and OOMs a 16 GiB card), then
+  HuMo audio bounded to CoverageSegment.contributes.
+Models: Claude + Sonnet fan-out (6) + kibitz r1/r2 (opus + codex 5.6-sol high
+  + agy) + one Fable spawn on the two taste rulings.
+Commits: cfcd572c, 4a47f005, 24d69d9a, 7e768828 (docs only; no production
+  code touched -- the harness and campaign live in tmp/).
+
 ## 2026-07-28 06:15 -- HEAD 72282083 (v2.0-alpha) -- WINDOW RENDER/QA
 Did: judged the full kibitz r1-r4 arc on the GPU lane plan (codex gpt-5.6-sol
   high + agy Gemini 3.6 Flash High, pins verified every round) and rebuilt the
