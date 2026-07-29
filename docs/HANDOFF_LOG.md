@@ -3,6 +3,71 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- HEAD b2060a31 (v2.0-alpha) -- WINDOW CODER -- THE 45-WORD RUN IS LIVE
+Did: fixed a boot bug found by bringing the box up, then LAUNCHED the campaign.
+  **`b2060a31` prestartup_script.py is ASCII-only.** Found while starting
+  ComfyUI, not by a test: every boot logged "PRESTARTUP FAILED ...
+  ComfyUI-OldTimeRadio / 'charmap' codec can't encode character '\u2705'". The
+  file carried em-dashes, box-drawing rules and a check-mark emoji and its
+  closing print() raised UnicodeEncodeError on a cp1252 console. The mock had
+  already installed by then, so the pack worked and the BANNER LIED -- a
+  permanent red herring for whoever debugs a real load failure next, and a
+  silent trapdoor, because anything added BELOW that print would never have run
+  and nothing would have said so. Verified fixed under `chcp 1252`: exit 0.
+**THE CAMPAIGN IS RUNNING RIGHT NOW. Do not start a second one.**
+  Launcher: `tmp\_w45_campaign.ps1` (detached, started 06:16). One FULL
+  canonical 45-word episode per LOCAL engine, 19 legs, through the TRACKED
+  `scripts\otr_headless_canonical.ps1` so no harness is improvised. Legs are
+  independent -- a failing lane is logged and the campaign continues.
+  WHERE TO LOOK:
+    tmp\_w45_run\PROGRESS.txt      live leg-by-leg log
+    tmp\_w45_run\SUMMARY.tsv       engine / exit / secs / obs_new / grade
+    tmp\_w45_run\<profile>.log     the full runner log for one leg
+    tmp\_w45_run\DONE.txt          written only when all 19 have finished
+  Per leg it records the runner exit code, whether anything NEW landed in
+  output\otr\obs\, and scripts\grade_episode.py's verdict (ACCEPTED /
+  FINDINGS) on that episode's own ledger + clip_manifest.
+  HOW THE ENGINE IS FORCED, because this is the part that is not obvious:
+  the engine dropdowns are PROFILE-MANAGED and
+  `otr_canonical_api_run.py --set` REFUSES a managed engine widget by design.
+  So `tmp\_w45_make_profiles.py` generated one scratch profile per engine,
+  cloned from the shipping 16gb_full, with all THREE video role_overrides
+  (announcer_visual / music_visual / character_visual) plus
+  slot_overrides.video_render_engine naming that one lane -- so the whole
+  episode renders through the engine under test rather than one role's beats.
+  **config\profiles\otr_w45_*.json ARE SCRATCH AND MUST NEVER BE COMMITTED**
+  (config/profiles is a tracked set; nineteen throwaway entries would read as
+  shipping tiers). Nothing deletes them automatically:
+      Remove-Item config\profiles\otr_w45_*.json
+  Verified before launch with a real `-DryRun` leg: profile applied, all four
+  engine widgets set, target_words=45, 23-node prompt built, not submitted.
+  BOX STATE AT LAUNCH: ComfyUI 0.28.3 / PyTorch 2.10.0+cu130, RTX 5080 Laptop
+  14.7 of 15.9 GB free, 39.7 GB RAM, all 34 OTR nodes loaded, queue empty,
+  extra_model_paths resolving C:\ComfyUI-Models -- HuMo 1.7B fp16 / 17B fp8 /
+  14B fp8, Wan2.2 TI2V-5B GGUF, Wan2.2 i2v 14B fp8, LTX-2.3 22B, whisper_large_v3
+  and the lightx2v distill LoRA all visible. Each leg boots its OWN server on a
+  free port and selectively resets first, so do not leave a manual ComfyUI
+  running alongside it -- it will hold VRAM the legs need.
+  A NOTE ON THE READINESS PROBE (tmp\_run_readiness.py): run HEADLESS it calls
+  all ten heavy lanes `missing_model`, which is WRONG. The weights resolve
+  through ComfyUI's folder_paths / extra_model_paths, which does not import
+  outside the server. Only trust that probe from inside a running ComfyUI.
+Current step: **WATCH THE CAMPAIGN.** When DONE.txt appears, read SUMMARY.tsv.
+  What a green result means, per engine: exit=0, obs_new>0 (something reached
+  otr\obs\), and grade=ACCEPTED (the delivered engine_id matched the route the
+  ledger froze). What to distrust: a leg that is green but whose beats are
+  still_flat. kibitz r1 found the first live green episode logged
+  engine_histogram {"still_flat": 7} -- seven dead-flat stills that passed
+  every gate we owned. grade_episode.py catches a WRONG engine; it does not
+  catch a lane that legitimately routed to a still. Read the histogram by eye.
+Next after the run: fix whatever it breaks, then LEAN-MEAN, which stays LAST.
+The wiring block behind this run: W1, W2, W6, W3a, W3b, W4a, W4b, W4c, W4d, W7,
+  W5 -- all landed and pushed, suite 7723 / Bible 17, canonical 9872624A
+  byte-identical at every commit. **This campaign is the first time any of it
+  touches a GPU.**
+Models: Claude (rung 4) only. No Codex spend -- two-strikes never fired.
+Commits: b2060a31 (+ this handoff).
+
 ## 2026-07-29 -- HEAD 1045ca71 (v2.0-alpha) -- WINDOW CODER (WIRING BLOCK CODE-COMPLETE)
 Did: the last two chunks of the block -- WIRE-W7 and WIRE-W5.
   **`df3fd3e9` WIRE-W7 -- the three mouth rulings finally have an OWNER.**
