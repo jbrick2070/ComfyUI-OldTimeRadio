@@ -901,13 +901,53 @@ The half that is NEW is the ping-pong:
   the loader ran inside the segment graph, so the budget must be taken with
   the same memory state every segment sees.
 
-**ONE OPERATOR EYEBALL OWED, and it is the only thing WIRE-W6 cannot settle
-itself:** the credits console used to ride the last drama clip LOOPED; it now
-rides that clip's final frame HELD, for the length of the roll. Same darkened
-drama imagery, never credits-over-black -- but motionless. Ratified in r3 and
-unamended by r4, and it is what removes the manifest read that made an
-all-`mesh_stage` episode unpublishable. If the held frame reads badly, the fix
-is a short looped tail cut FROM THE BODY rather than a return to the manifest.
+**OPERATOR RULING 2026-07-29 -- THE MOTION FLOOR, AND THE CREDITS EXCEPTION.**
+
+Operator, on the beats: *"For video models, there needs to be video for every
+beat. ... if the minimum is, like, four seconds, then we should have video for
+four seconds."* And, separately and explicitly, on the credits: *"The credits
+is an exception. I'm fine with a still for the credits, or ping-ponging. In
+fact, for credits I'm fine with just a black background."*
+
+**THE CREDITS QUESTION IS CLOSED. No eyeball is owed and no work is queued.**
+WIRE-W6's held final frame stands as shipped -- same darkened drama imagery as
+the looped clip it replaced, motionless, and it is what removes the manifest
+read that made an all-`mesh_stage` episode unpublishable. The 2026-06-17 look
+contract's "never credits-over-black" is RELAXED by this ruling -- black is
+acceptable under the console. Do not spend a chunk making the credits backdrop
+move; the operator has said twice that he does not care about it.
+
+**THE BEAT RULE WAS ALREADY THE SHIPPED BEHAVIOUR, and it is now PINNED.**
+For any contract permitting a tail trim, `partition_beat` renders the SMALLEST
+LEGAL LENGTH at or above the beat target and trims the surplus -- so a beat
+shorter than an engine's minimum gets real rendered frames, never a held
+image. Audited across the live registry: **all 31 registered engines cover a
+1-second beat with real video**, no engine declares `allow_tail_trim=False`,
+and `google_veo` renders 100 frames (4.0 s) and trims 75 -- which is the
+operator's sentence, executed, since 2026-07-25.
+`tests/test_motion_floor_roster.py` is the roster gate that fails BY NAME if a
+future adapter declares a minimum without the trim and reopens the still floor.
+
+**WHAT THE PANEL FOUND THAT IS WORTH KEEPING** (kibitz r1,
+`kibitz-runs/2026-07-29-motion-floor/r1/final.md`; codex `gpt-5.6-sol` high +
+agy, Claude judge):
+
+- **The first-ever live green episode was SEVEN DEAD-FLAT STILLS.** The proof
+  cited at the top of this file logs `engine_histogram {"still_flat": 7}`, and
+  `cheap_families.py:330` documents `still_flat` as *"A DEAD-FLAT still: the
+  selected image held STATIC"*. It passed every gate we own, because a still
+  engine emits N identical frames and satisfies every frame-count and coverage
+  check. **Not a defect to fix -- `still_flat` is a declared still route doing
+  its job -- but nobody should cite that leg as proof the VIDEO lanes work.**
+  The 45-word run over all 18 local engines is what proves those.
+- **A whole-frame motion check would PASS a frozen backdrop.**
+  `tests/test_credits_roll_spec.py:446-470` proves col-3 text scrolls over a
+  deliberately constant backdrop, so "did the frame change" goes green on a
+  frozen background because the overlay moves. Relevant to WIRE-W5: grade
+  source components BEFORE overlays, never the composited frame.
+- **agy argued to KEEP the 52-second held frame**; recorded because a panel
+  arguing for the defect is worth knowing about. The operator has since made
+  the point moot in the other direction.
 
 **ONE NEW OPEN ROW, filed not built (see OPEN BUGS):** the fewest-segments
 preference can accept a disproportionate trim on a discrete menu whose largest

@@ -1,0 +1,4 @@
+budget=medium
+model=sonnet
+effort=high
+note=(none)

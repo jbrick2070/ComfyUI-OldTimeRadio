@@ -1,0 +1,18 @@
+agent=claude
+quota_check=enabled
+thresholds=50,70,90
+usage_percent=unknown
+
+[status commands]
+$ claude.EXE auth status
+rc=0
+STDOUT:
+{
+  "loggedIn": true,
+  "authMethod": "claude.ai",
+  "apiProvider": "firstParty",
+  "email": "<email>",
+  "orgId": "cff774c2-bb97-4b73-b186-daa560353c46",
+  "orgName": "<email>'s Organization",
+  "subscriptionType": "max"
+}
