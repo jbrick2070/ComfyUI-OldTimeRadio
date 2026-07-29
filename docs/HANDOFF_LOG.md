@@ -3,6 +3,87 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- HEAD 1045ca71 (v2.0-alpha) -- WINDOW CODER (WIRING BLOCK CODE-COMPLETE)
+Did: the last two chunks of the block -- WIRE-W7 and WIRE-W5.
+  **`df3fd3e9` WIRE-W7 -- the three mouth rulings finally have an OWNER.**
+  r3 MUST-FIX 11 said it plainly: "The plan has the rulings and no owner for
+  them", and an unowned ruling silently lapses -- this one had been through a
+  whole build block with no line of code able to state it.
+  nodes/_otr_video_engines/mouth_policy.py is the authority and IMPORTS NOTHING
+  (a test asserts the import list is exactly __future__), so ShotLock can ask
+  it at plan time and the W5 grader can ask it later without a cycle. Every
+  audio-in beat (by FAMILY -- audio_driven_face / audio_conditioned_video, so a
+  new adapter inherits the ruling rather than slipping past a list) owes a
+  mouth; a character face answers HUMAN, the announcer and music bookends
+  answer RADIO, and the case r3 named as unowned REFUSES by name.
+  DECIDED FROM THE FROZEN ROUTE, NEVER FROM PROSE -- the policy takes
+  engine_id/family/role/is_character_face and NO TEXT AT ALL, and a test pins
+  the signature, which is the strongest form of that promise.
+  THE SCHEMA IS NOT EXTENDED: still_plan_helpers carries CLOSED enums and says
+  adding a token is an operator decision, never a coder's. There is no
+  bears_a_mouth field and W7 does not add one.
+  Cardinality: at most ONE distinct char_id per episode, counted by character
+  and not by beat, and a human-face beat may NOT be multi-clip -- HuMo declares
+  soft-reference continuity, so a multi-clip face beat is a jump cut from a
+  character to a regenerated copy of themselves mid-line. That is the
+  operator's "only for a line the engine can hold in a single take". The
+  cabinet may be cut across as many clips as it likes (control test).
+  MEASURED, NOT MISSED -- the one live route this closes: a cloud
+  audio_conditioned_video lane (cloud_seedance_2 / cloud_wan_i2v_audio) aimed
+  at a character beat. Those declare no roles, so an operator CAN pick one;
+  _is_character_face_beat says False, so the beat gets the ambient mix and a
+  SCENE still -- an audio-in engine animating an image with no lips.
+  cloud_kling_avatar is the CONTROL: same empty roles, same beat, answers HUMAN.
+  Mutation 12/12.
+  **`1045ca71` WIRE-W5 -- an episode is graded against the route it FROZE.**
+  acceptance.py is the pure grader; scripts/grade_episode.py is r4/A6's
+  "durable repository script" (a grader nobody can run is the same failure mode
+  as an unowned ruling). Exit 0 clean / 1 findings / 2 unreadable.
+  Both halves of A6, per shot: shots[].engine_id == roles_effective[role], then
+  every DELIVERED manifest row's engine_id against that same FROZEN value --
+  never against the shot row, because a rewritten row would agree with its own
+  rewrite. HISTOGRAMS ARE CUT and the test is an EXPERIMENT rather than an
+  assertion: swap two shots' engines, show engine_histogram is byte-identical
+  either way, then show the per-shot grader reporting both.
+  The multi-clip honesty check is what W3b's receipts were for: a planned
+  multi-clip beat may not deliver extension_mode="ping_pong", a "none" claim
+  must have native_frame_count == frame_count, and SILENCE IS NOT A PASS -- a
+  multi-clip row with no receipt is reported, because that is exactly what a
+  lane padding without saying so looks like. A single-clip beat may pad (the
+  8GB WAN tier; control test).
+  Three refusals, each with a test: imports nothing but __future__ so it CANNOT
+  query live routing state (grading against later environment state is a
+  clock-domain mismatch); never reads engine_histogram; never grades a
+  composited frame (kibitz r1's trap -- test_credits_roll_spec.py:446-470
+  scrolls text over a deliberately CONSTANT backdrop, so "did the frame change"
+  goes green on a frozen background because the overlay moved).
+  build_clip_manifest now carries native_frame_count / extension_mode on every
+  row -- a grader reading a field nobody stamps always passes. Mutation 12/12.
+Filed, not built: grading OBS PUBLICATION and the canonical artifacts
+  separately (A6). That is a filesystem question about the otr/obs/ contract
+  and it belongs WITH the 45-word run, not ahead of it. Also still filed: the
+  durable audio-slice RECEIPT (source PCM hash, segment index, start sample,
+  sample count, rate/channels, output PCM hash) under the canonical episode
+  directory rather than tmp.
+Current step: **THE 45-WORD RUN OVER ALL 18 LOCAL VIDEO/STILL ENGINES.** The
+  wiring block is CODE-COMPLETE -- W1, W2, W6, W3a, W3b, W4a, W4b, W4c, W4d,
+  W7, W5 all landed and pushed -- and **NOTHING IN IT IS LIVE-PROVEN.** Suite
+  and contract only. The run is the operator's stated first priority and the
+  only thing that turns "the code says it will" into "the box did".
+  What the run must show, per engine: a clip lands in otr/obs/, the manifest
+  row's engine_id equals the frozen route (scripts/grade_episode.py answers
+  this mechanically now), and no video lane comes back still_flat. Remember
+  the kibitz r1 finding: the first live green episode logged
+  engine_histogram {"still_flat": 7} and passed every gate we owned -- seven
+  dead-flat stills. That leg proves nothing about the video lanes.
+Next after the run: whatever it breaks. Then LEAN-MEAN, which stays LAST.
+Suite 7679 -> 7723 passed / 62 skipped / 1 xfailed across the two chunks; Bible
+  17; build_variants --check 11 variants / 0 failures; validate_workflow_links
+  0 violations; canonical 9872624A byte-identical at every commit in the block
+  -- no node, widget, link or schema touched by any of the eleven chunks.
+Models: Claude (rung 4) only. No Codex spend -- two-strikes never fired.
+Commits: df3fd3e9, 1045ca71 (+ this handoff).
+
 ## 2026-07-29 -- HEAD 69daf4fe (v2.0-alpha) -- WINDOW CODER (wiring block, cont.)
 Did: two more green pushed chunks, and the FIRST of them corrects the previous
   one. Re-reading r4/A4 before starting W7 turned up a deviation I had shipped.
